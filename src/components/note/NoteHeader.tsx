@@ -1,58 +1,67 @@
 /**
- * TickBar — 便利贴自定义标题栏 NoteHeader（sticky-note.md §1 / §3.3 / §5）
+ * TickBar — 便利贴标题条 NoteHeader（V0.2.1：无文字，只剩右上角两枚圆点）
  * -----------------------------------------------------------------------------
- * - 标题 13/600（取正文首行；空 → 「未命名」--ink-4）；超长省略号。
- * - 右侧三枚 26×26 图标按钮：pin（hover 显示）/ trash（hover --danger）/ x。
- * - **`data-tauri-drag-region` 只放标题区**（放正文会抢输入；按钮为兄弟节点不触发拖动）。
- * - 未悬停时整块淡出（opacity 0 / pointer-events none）由 note.css 的 .note:hover 驱动。
+ * 用户口径（V0.2.1 · 3）：便利贴去掉所有文字，仅保留输出框；右上角两枚圆点 =
+ *   红点「删除」、黄点「隐藏」。
+ * - 两个点都用 title / aria-label 承载语义（屏幕上不出现文字）。
+ * - 删除不可撤销，故红点走**两步确认**：第一次点亮起环形高亮（armed），
+ *   `ARM_MS` 内再点一次才真正删除，超时自动解除。全程零文字。
+ * - `data-tauri-drag-region` 放在整条上：标题文字已去掉，这里就是唯一可拖拽区域。
+ * - 未悬停整条淡出（opacity 0 / pointer-events none），由 note.css 的 .note:hover 驱动。
  */
-import { PinIcon, PinOffIcon, TrashIcon, XIcon } from '../../lib/icons';
+import { useEffect, useRef, useState } from 'react';
+
+/** 删除确认的武装窗口（毫秒） */
+const ARM_MS = 3500;
 
 interface NoteHeaderProps {
-  title: string;
-  /** 无标题（空内容）→ 用 --ink-4 弱化 */
-  untitled: boolean;
-  pinned: boolean;
-  onTogglePin: () => void;
+  onRequestHide: () => void;
   onRequestDelete: () => void;
-  onRequestClose: () => void;
 }
 
-export function NoteHeader({ title, untitled, pinned, onTogglePin, onRequestDelete, onRequestClose }: NoteHeaderProps) {
-  const Pin = pinned ? PinIcon : PinOffIcon;
+export function NoteHeader({ onRequestHide, onRequestDelete }: NoteHeaderProps) {
+  const [armed, setArmed] = useState(false);
+  const timer = useRef<number | null>(null);
+
+  const disarm = () => {
+    if (timer.current != null) window.clearTimeout(timer.current);
+    timer.current = null;
+    setArmed(false);
+  };
+
+  useEffect(() => disarm, []);
+
+  const handleDelete = () => {
+    if (!armed) {
+      setArmed(true);
+      if (timer.current != null) window.clearTimeout(timer.current);
+      timer.current = window.setTimeout(() => setArmed(false), ARM_MS);
+      return;
+    }
+    disarm();
+    onRequestDelete();
+  };
+
   return (
-    <header className="note__head">
-      <span
-        className="note__title"
-        data-untitled={untitled ? 'true' : 'false'}
-        title={title}
-        data-tauri-drag-region
-      >
-        {title}
-      </span>
-      <div className="note__actions">
+    <header className="note__head" data-tauri-drag-region>
+      <div className="note__dots">
         <button
           type="button"
-          className="note__icon"
-          aria-label={pinned ? '取消置顶' : '置顶'}
-          aria-pressed={pinned}
-          title={pinned ? '取消置顶' : '置顶'}
-          onClick={onTogglePin}
-        >
-          <Pin size={14} strokeWidth={1.5} aria-hidden />
-        </button>
+          className="note__dot"
+          data-tone="danger"
+          data-armed={armed ? 'true' : 'false'}
+          aria-label={armed ? '再点一次删除这张便利贴' : '删除便利贴'}
+          title={armed ? '再点一次删除' : '删除'}
+          onClick={handleDelete}
+        />
         <button
           type="button"
-          className="note__icon note__icon--danger"
-          aria-label="删除便利贴"
-          title="删除便利贴"
-          onClick={onRequestDelete}
-        >
-          <TrashIcon size={14} strokeWidth={1.5} aria-hidden />
-        </button>
-        <button type="button" className="note__icon" aria-label="关闭" title="关闭" onClick={onRequestClose}>
-          <XIcon size={14} strokeWidth={1.5} aria-hidden />
-        </button>
+          className="note__dot"
+          data-tone="warn"
+          aria-label="隐藏这张便利贴"
+          title="隐藏"
+          onClick={onRequestHide}
+        />
       </div>
     </header>
   );

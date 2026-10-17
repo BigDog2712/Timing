@@ -1,6 +1,6 @@
 [package]
 name = "tickbar"
-version = "0.2.1"
+version = "0.2.8"
 description = "TickBar — 常驻悬浮计时条（Windows 桌面，纯本地）"
 authors = ["TickBar Team"]
 edition = "2021"
@@ -39,6 +39,10 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 
 [features]
 default = []
+# 发布构建把前端 dist 编进二进制（tauri 的 custom-protocol）；不开此特性时
+# `cargo build --release` 仍会去连 devUrl（http://localhost:1420），脱离 dev server 就是白窗。
+# `tauri build` 会自己带这个特性；直接用 cargo 构建发布版时必须显式打开。
+custom-protocol = ["tauri/custom-protocol"]
 # [P1] 全局快捷键特性开关：解锁时才编入 tauri-plugin-global-shortcut
 p1-shortcuts = ["dep:tauri-plugin-global-shortcut"]
 

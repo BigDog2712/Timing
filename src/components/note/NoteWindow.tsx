@@ -7,30 +7,22 @@
  *   2. **自订阅** theme-changed（主窗不代转，K-21）+ 首帧 theme_get/accent_get；
  *   3. 首帧就绪后自行 show（K-18 防白闪）；
  *   4. Moved/Resized → 逻辑像素去抖落盘（K-15/K-23，见 useNoteGeometry）。
- * 「未悬停全透只剩正文」由 note.css 的 .note:hover / :focus-within 驱动；正文始终可输入。
- * 尺寸/透明底由 html[data-window="note"] 与 .note 承载（见 note.css）。
+ * V0.2.1 · 3：**零文字**——只剩正文输出框 + 右上角红/黄两枚圆点（删除 / 隐藏）；
+ *   原先的标题、页脚（关联事项、说明文字）、删除确认条与置顶按钮全部移除。
+ * 背景：未悬停整窗透明（只剩正文浮在桌面上），悬停/聚焦才显影为板（V0.2.1 · 4）。
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNoteGeometry } from '../../hooks/useNoteGeometry';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
-import { closeCurrentWindow, currentNoteId, setCurrentWindowAlwaysOnTop, showCurrentWindowOnReady } from '../../lib/window';
-import { LinkIcon, UnlinkIcon } from '../../lib/icons';
+import { closeCurrentWindow, currentNoteId, showCurrentWindowOnReady, startCurrentWindowResize } from '../../lib/window';
 import { closeNote, removeNote } from '../../services/noteActions';
 import { themeActions } from '../../services/themeActions';
-import { useItemStore } from '../../stores/itemStore';
 import { useNoteStore } from '../../stores/noteStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { IPC_EVENTS } from '../../types/domain';
 import type { ThemeChangedPayload } from '../../types/domain';
-import { NoteConfirm } from './NoteConfirm';
 import { NoteEditor } from './NoteEditor';
 import { NoteHeader } from './NoteHeader';
-
-/** 正文首行作为标题（换行折叠为空格语义之外的「窗口标题」用） */
-function firstLine(content: string): string {
-  const line = content.split('\n', 1)[0]?.trim() ?? '';
-  return line;
-}
 
 export function NoteWindow() {
   const noteId = currentNoteId();
@@ -38,13 +30,7 @@ export function NoteWindow() {
   const error = useNoteStore((s) => s.error);
   const setLocalContent = useNoteStore((s) => s.setLocalContent);
   const saveContent = useNoteStore((s) => s.saveContent);
-  const setItemId = useNoteStore((s) => s.setItemId);
-  const items = useItemStore((s) => s.items);
   const oversize = useNoteGeometry();
-
-  const [pinned, setPinned] = useState(true);
-  const [confirming, setConfirming] = useState(false);
-  const [linking, setLinking] = useState(false);
 
   /* ---- 主题：本窗自订阅广播（K-21） ---- */
   useTauriEvent<ThemeChangedPayload>(IPC_EVENTS.themeChanged, (payload) => {
@@ -62,116 +48,52 @@ export function NoteWindow() {
     void useNoteStore.getState().load(noteId);
   }, [noteId]);
 
-  /* AC-64 默认置顶：作用于「当前便利贴窗」自身（创建时后端已置顶，此处兜运行期），
-     不走主窗 IPC set_always_on_top（那会置顶主窗并污染全局设置） */
-  useEffect(() => {
-    void setCurrentWindowAlwaysOnTop(true).catch(() => undefined);
-  }, []);
-
-  /* 首帧就绪后显示窗口（防白闪） */
-  useEffect(() => showCurrentWindowOnReady(), []);
-
-  const title = useMemo(() => (note ? firstLine(note.content) : ''), [note]);
-  const untitled = title.length === 0;
-
-  const handleTogglePin = () => {
-    const next = !pinned;
-    setPinned(next);
-    // 作用于「当前便利贴窗」；失败回滚 UI 态（勿用主窗 IPC）
-    void setCurrentWindowAlwaysOnTop(next).catch(() => setPinned(pinned));
-  };
-
-  const handleClose = async () => {
+  const handleHide = async () => {
     if (noteId == null) return void closeCurrentWindow();
     await saveContent();
     await closeNote(noteId);
   };
 
-  const handleConfirmDelete = async () => {
-    if (noteId == null) return;
+  const handleDelete = async () => {
+    if (noteId == null) return void closeCurrentWindow();
     await removeNote(noteId);
     useNoteStore.getState().clear();
     void closeCurrentWindow();
   };
 
-  const handleOpenLink = async () => {
-    if (items.length === 0) await useItemStore.getState().reload().catch(() => undefined);
-    setLinking(true);
-  };
+  /* 标题只剩无障碍用途（屏幕上不显示） */
+  const accessibleTitle = useMemo(() => {
+    const line = note?.content.split('\n', 1)[0]?.trim() ?? '';
+    return line.length > 0 ? `便利贴：${line}` : '便利贴';
+  }, [note?.content]);
 
-  const handlePickItem = async (value: string) => {
-    setLinking(false);
-    await setItemId(value === '' ? null : Number(value));
-  };
-
-  const linked = note?.itemId != null;
+  /* 首帧就绪后显示窗口（防白闪） */
+  useEffect(() => showCurrentWindowOnReady(), []);
 
   return (
-    <div className="note" data-oversize={oversize ? 'true' : 'false'}>
-      <NoteHeader
-        title={untitled ? '未命名' : title}
-        untitled={untitled}
-        pinned={pinned}
-        onTogglePin={handleTogglePin}
-        onRequestDelete={() => setConfirming(true)}
-        onRequestClose={() => void handleClose()}
-      />
+    <div className="note" data-oversize={oversize ? 'true' : 'false'} data-error={error ? 'true' : 'false'}>
+      <NoteHeader onRequestHide={() => void handleHide()} onRequestDelete={() => void handleDelete()} />
 
       <NoteEditor
         value={note?.content ?? ''}
         onChange={setLocalContent}
         onCommit={() => void saveContent()}
         autoFocus={note != null && note.content.length === 0}
+        ariaLabel={accessibleTitle}
       />
 
-      {confirming ? (
-        <NoteConfirm onCancel={() => setConfirming(false)} onConfirm={() => void handleConfirmDelete()} />
-      ) : (
-        <footer className="note__foot" data-error={error ? 'true' : 'false'}>
-          {error ? (
-            <span className="note__foot-text note__foot-error">{error}</span>
-          ) : linking ? (
-            <select
-              className="note__link-select"
-              defaultValue=""
-              autoFocus
-              onBlur={() => setLinking(false)}
-              onChange={(e) => void handlePickItem(e.target.value)}
-              aria-label="选择要关联的事项"
-            >
-              <option value="">选择事项…</option>
-              {items.map((it) => (
-                <option key={it.id} value={it.id}>
-                  {it.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <>
-              <span className="note__foot-text">
-                {linked ? '第 1 条会同步到记录行 · 换行折叠为空格' : '随记 · 未关联事项'}
-              </span>
-              <button
-                type="button"
-                className="note__link"
-                onClick={() => (linked ? void setItemId(null) : void handleOpenLink())}
-              >
-                {linked ? (
-                  <>
-                    <UnlinkIcon size={16} strokeWidth={2.5} aria-hidden />
-                    解绑
-                  </>
-                ) : (
-                  <>
-                    <LinkIcon size={16} strokeWidth={2.5} aria-hidden />
-                    关联
-                  </>
-                )}
-              </button>
-            </>
-          )}
-        </footer>
-      )}
+      {/* [V0.2.4 · 2] 右下角缩放手柄：交给系统做 nwse 缩放，松手后 Moved/Resized 事件照常落盘尺寸 */}
+      <div
+        className="note__resize"
+        role="separator"
+        aria-label="拖动调整便利贴大小"
+        onPointerDown={(e) => {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          void startCurrentWindowResize('SouthEast');
+        }}
+      />
     </div>
   );
 }

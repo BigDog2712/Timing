@@ -12,7 +12,8 @@
   margin-top: var(--space-3);
   padding: var(--space-5);
   border-radius: var(--radius-lg);
-  background: var(--surface-2);
+  /* [V0.2.2] 面板底板乘 --ui-bg-opacity（设置面板另有自己的底，不受影响） */
+  background: color-mix(in srgb, var(--surface-2) calc(100% * var(--ui-bg-opacity)), transparent);
   border: 1px solid var(--border);
   box-shadow: var(--elev-panel);
 }

@@ -127,6 +127,15 @@ pub async fn stop(pool: &SqlitePool) -> AppResult<TimeRecord> {
     reload(pool, active.id).await
 }
 
+/// 丢弃当前会话：直接软删除，不触发待办联动。
+pub async fn discard(pool: &SqlitePool) -> AppResult<()> {
+    let active = session::find_active(pool)
+        .await?
+        .ok_or_else(AppError::timer_not_running)?;
+    let now = now_ms();
+    session::discard(pool, active.id, now, now).await
+}
+
 /// 撤销结束：saved 回滚为 active（3s 窗口内，且当前无其他 active）。
 pub async fn undo(pool: &SqlitePool, record_id: i64) -> AppResult<TimeRecord> {
     let record = repo::find_by_id(pool, record_id)
@@ -154,6 +163,9 @@ pub async fn switch(pool: &SqlitePool, item_id: i64, mode: SwitchMode) -> AppRes
         .ok_or_else(AppError::timer_not_running)?;
     if item_repo::find_by_id(pool, item_id).await?.is_none() {
         return Err(AppError::item_not_found());
+    }
+    if mode == SwitchMode::EndAndStart && active.running_since.is_some() {
+        return Err(AppError::timer_already_running());
     }
     let now = now_ms();
     match mode {

@@ -7,7 +7,7 @@
 import { create } from 'zustand';
 import { ipc } from '../services/ipc';
 import { DEFAULT_COUNTDOWN_PRESETS } from '../types/domain';
-import type { Settings } from '../types/domain';
+import type { ReferenceSettings, Settings } from '../types/domain';
 
 export const DEFAULT_SETTINGS: Settings = {
   autostartEnabled: false,
@@ -25,15 +25,25 @@ export const DEFAULT_SETTINGS: Settings = {
 
 interface SettingsStore {
   settings: Settings;
+  referenceSettings: ReferenceSettings | null;
   loaded: boolean;
   setSettings: (settings: Settings) => void;
+  setReferenceSettings: (settings: ReferenceSettings) => void;
+  reloadReference: () => Promise<ReferenceSettings>;
   reload: () => Promise<Settings>;
 }
 
 export const useSettingsStore = create<SettingsStore>((set) => ({
   settings: DEFAULT_SETTINGS,
+  referenceSettings: null,
   loaded: false,
   setSettings: (settings) => set({ settings, loaded: true }),
+  setReferenceSettings: (referenceSettings) => set({ referenceSettings }),
+  reloadReference: async () => {
+    const referenceSettings = await ipc.getReferenceSettings();
+    set({ referenceSettings });
+    return referenceSettings;
+  },
   reload: async () => {
     const settings = await ipc.getSettings();
     set({ settings, loaded: true });

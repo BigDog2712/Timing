@@ -13,20 +13,28 @@ import { formatClockTime, formatDuration } from '../../lib/format';
 import {
   CalendarClockIcon,
   CheckIcon,
+  ChevronLeftIcon,
+  EyeOffIcon,
   ListIcon,
+  MoonIcon,
   PauseIcon,
   PencilIcon,
   PinIcon,
   PinOffIcon,
   PlayIcon,
+  PlusIcon,
   SettingsIcon,
   StickyNoteIcon,
+  SunIcon,
   TimerIcon,
   TrashIcon,
 } from '../../lib/icons';
 import { openSettings, settingsActions } from '../../services/settingsActions';
 import { openNoteForItem } from '../../services/noteActions';
 import { openTodosWindow } from '../../services/todosActions';
+import { errorText, ipc } from '../../services/ipc';
+import { diaryActions } from '../../services/diaryActions';
+import { themeActions } from '../../services/themeActions';
 import { reminderActions } from '../../services/reminderActions';
 import { findItem, useItemStore } from '../../stores/itemStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -41,6 +49,7 @@ export function ContextMenu() {
   const session = useTimerStore((s) => s.state.session);
   const items = useItemStore((s) => s.items);
   const alwaysOnTop = useSettingsStore((s) => s.settings.alwaysOnTop);
+  const themeMode = useSettingsStore((s) => s.settings.themeMode);
   const menuPos = useUiStore((s) => s.menuPos);
   const closeMenu = useUiStore((s) => s.closeMenu);
   const openPanel = useUiStore((s) => s.openPanel);
@@ -52,6 +61,52 @@ export function ContextMenu() {
 
   const entries = useMemo<MenuEntry[]>(
     () => [
+      /* Reference main menu: daily aggregate and individual time entries are distinct views. */
+      {
+        type: 'item',
+        id: 'digest',
+        label: '今日事项',
+        icon: ListIcon,
+        onSelect: () => openPanel('digest'),
+      },
+      {
+        type: 'item',
+        id: 'todos',
+        label: '今日计时',
+        icon: ListIcon,
+        onSelect: () => void openTodosWindow(),
+      },
+      {
+        type: 'item',
+        id: 'timer-window',
+        label: '只读计时窗口',
+        icon: TimerIcon,
+        onSelect: () => void ipc.openTimerWindow(),
+      },
+      {
+        type: 'item', id: 'diary', label: '打开今日日记', icon: PencilIcon,
+        onSelect: () => void diaryActions.openToday().catch((error: unknown) => useUiStore.getState().setNotice({ text: errorText(error), tone: 'danger' })),
+      },
+      { type: 'separator', id: 'sep-appearance' },
+      {
+        type: 'item',
+        id: 'theme',
+        label: themeMode === 'light' ? '切到深色' : '切到浅色',
+        icon: themeMode === 'light' ? MoonIcon : SunIcon,
+        onSelect: () => void themeActions.setMode(themeMode === 'light' ? 'dark' : 'light'),
+      },
+      { type: 'item', id: 'settings', label: '设置…', icon: SettingsIcon, onSelect: () => void openSettings() },
+      { type: 'separator', id: 'sep-tray' },
+      {
+        type: 'item',
+        id: 'hide',
+        label: '隐藏到托盘',
+        icon: EyeOffIcon,
+        onSelect: () => void ipc.hideWindow(),
+      },
+
+      /* ---- [V0.2.6] 第二段：TickBar 自己的计时动作（参照版没有对应项，保留以免功能丢失） ---- */
+      { type: 'separator', id: 'sep-timer' },
       {
         type: 'item',
         id: 'toggle',
@@ -92,6 +147,14 @@ export function ContextMenu() {
         onSelect: () => useUiStore.getState().openCommonItems(menuPos),
       },
       {
+        /* [V0.2.3] 条上左键已改成「就地命名」，完整表单（选颜色 / 归档等）收在这里 */
+        type: 'item',
+        id: 'create',
+        label: '新建事项…',
+        icon: PlusIcon,
+        onSelect: () => openPanel('create'),
+      },
+      {
         /* AC-38：小条右键「便利贴…」绑定**当前计时事项**（计时中=session.itemId；空闲=当前选中事项） */
         type: 'item',
         id: 'note',
@@ -116,9 +179,6 @@ export function ContextMenu() {
         disabled: idle,
         onSelect: () => void actions.discardCurrent(),
       },
-      { type: 'separator', id: 'sep-todos' },
-      /* [V0.2.0] 事项窗口入口（C4；独立 336 窗） */
-      { type: 'item', id: 'todos', label: '事项窗口', icon: ListIcon, onSelect: () => void openTodosWindow() },
       {
         type: 'item',
         id: 'pin',
@@ -127,10 +187,26 @@ export function ContextMenu() {
         checked: alwaysOnTop,
         onSelect: () => void settingsActions.setAlwaysOnTop(!alwaysOnTop),
       },
-      { type: 'separator', id: 'sep-settings' },
-      { type: 'item', id: 'settings', label: '设置…', icon: SettingsIcon, onSelect: () => void openSettings() },
+      /* [V0.2.1] 手柄改绑便利贴后，「收起」在这里保留入口（收回圆点由 CollapsedDot 单击展开） */
+      {
+        type: 'item',
+        id: 'collapse',
+        label: '收起为圆点',
+        icon: ChevronLeftIcon,
+        onSelect: () => useUiStore.getState().toggleCollapsed(),
+      },
     ],
-    [idle, status, alwaysOnTop, actions, openPanel, menuPos, activeItemId, activeItemName],
+    [
+      idle,
+      status,
+      alwaysOnTop,
+      actions,
+      openPanel,
+      menuPos,
+      activeItemId,
+      activeItemName,
+      themeMode,
+    ],
   );
 
   /* 状态块：计时中 / 暂停时显示（空闲不显示） */

@@ -126,6 +126,13 @@ pub fn open_todos_window(app: &AppHandle) -> AppResult<()> {
     open_panel_window(app, spec)
 }
 
+/// 打开 / 聚焦只读计时器窗口（单例）。
+pub fn open_timer_window(app: &AppHandle) -> AppResult<()> {
+    let spec = window_spec::spec_for(window_spec::TIMER.label)
+        .ok_or_else(|| AppError::io("计时器窗规格未登记"))?;
+    open_panel_window(app, spec)
+}
+
 /// 打开 / 聚焦便利贴窗口（动态 label `note-{id}`；几何取自 DB 行，ADR-009）。
 ///
 /// 已存在 → `show + set_focus`；不存在 → 按 `window_spec::NOTE` 建窗并落 DB 逻辑几何，

@@ -63,7 +63,18 @@ export async function openNewNote(itemId?: number | null): Promise<Note | null> 
       width: DEFAULT_NOTE_W,
       height: DEFAULT_NOTE_H,
     });
-    await openNoteWindowFor(note.id);
+    try {
+      await ipc.openNoteWindow({ noteId: note.id });
+    } catch (err) {
+      // 建行成功但窗口创建失败时回滚，避免留下不可见空白贴。
+      try {
+        await ipc.noteDelete({ id: note.id });
+      } catch {
+        /* 保留原始打开失败提示；后端清理失败由下一次清理处理 */
+      }
+      notify(errorText(err));
+      return null;
+    }
     return note;
   } catch (err) {
     notify(errorText(err));
@@ -76,11 +87,42 @@ export function openNoteForItem(itemId: number): Promise<Note | null> {
   return openNewNote(itemId);
 }
 
+/** 便利贴清单（便利贴清单浮层用）：省略 itemId = 全部 */
+export function listNotes(itemId?: number): Promise<Note[]> {
+  return ipc.noteList(itemId != null ? { itemId } : {});
+}
+
+/** [V0.2.1] 手柄左键：唤出**当前事项的便利贴**——已有则开那张（取最近更新时间），否则新建一张 */
+export async function openOrCreateNoteForItem(itemId: number | null): Promise<Note | null> {
+  let notes: Note[];
+  try {
+    notes = await listNotes(itemId ?? undefined);
+  } catch (err) {
+    notify(errorText(err));
+    return null;
+  }
+  const latest = notes
+    .filter((note) => (note.itemId ?? null) === itemId)
+    .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+  if (latest) {
+    await openNoteWindowFor(latest.id);
+    return latest;
+  }
+  return openNewNote(itemId);
+}
+
 /** 关闭便利贴窗口（「收纳」）：先落盘未决正文，再关后端窗。
  *  几何由后端 close_note_window 从活窗口自读并落盘（后端口径），前端**不传几何**。 */
 export async function closeNote(noteId: number): Promise<void> {
+  const store = useNoteStore.getState();
+  const current = store.note;
+  // 空白草稿取消时删除数据行，避免「取消新建」留下不可见便利贴。
+  if (current && current.id === noteId && current.content.trim().length === 0) {
+    await removeNote(noteId);
+    return;
+  }
   // 提交未决正文（与最近落盘值一致时 store 内部自动跳过，幂等）
-  await useNoteStore.getState().saveContent().catch(() => undefined);
+  await store.saveContent().catch(() => undefined);
   if (isTauri()) {
     try {
       await ipc.closeNoteWindow({ noteId });

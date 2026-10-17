@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
 import { CheckIcon, iconStroke, type LucideIcon } from '../../lib/icons';
+import { useHoverClose } from '../../hooks/useHoverClose';
 
 export interface MenuItemEntry {
   type: 'item';
@@ -58,6 +59,9 @@ const EDGE = 4;
 export function GlassMenu({ entries, status, anchor, ariaLabel, onClose, className, onExtraKey }: GlassMenuProps) {
   const ref = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  /* [V0.2.7] 指针离开浮层（且不在小条上）就自动收起，见 useHoverClose */
+  useHoverClose(onClose);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
   /** 首个未禁用项下标（-1 = 全禁用） */

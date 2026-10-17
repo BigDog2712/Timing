@@ -107,8 +107,7 @@ export function useTimerActions(): TimerActions {
 
   const discardCurrent = useCallback(async () => {
     try {
-      const record = await ipc.stopTimer();
-      await ipc.deleteRecord({ id: record.id });
+      await ipc.discardTimer();
       await useTimerStore.getState().refresh();
     } catch (err) {
       notify(err);

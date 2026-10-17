@@ -37,6 +37,8 @@ import type {
   SetAutostartParams,
   SetCountdownPresetParams,
   Settings,
+  ReferenceSettings,
+  ReferenceSettingsPatch,
   StartCountdownParams,
   StartTimerParams,
   StatsSummary,
@@ -57,6 +59,8 @@ import type {
   UpdateRecordParams,
   UpdateSettingsParams,
   IpcApi,
+  DiaryConfig,
+  TodayDiary,
 } from '../types/domain';
 import { createMockApi } from '../mocks/browserMock';
 
@@ -152,6 +156,8 @@ export function errorText(err: unknown): string {
 
 /** IpcApi 实现（前端唯一命令出口，方法名 = 命令名 camelCase） */
 export const ipc: IpcApi = {
+  dailyStatusGet: (date: string) => call<Record<number, 'pending' | 'done'>>('daily_status_get', { date }),
+  dailyStatusSet: (date: string, itemId: number, status: 'pending' | 'done') => call<void>('daily_status_set', { date, itemId, status }),
   /* ---- 事项域 ---- */
   listItems: (params: ListItemsParams) => call<Item[]>('list_items', { includeArchived: params.includeArchived ?? false }),
   createItem: (params: CreateItemParams) => call<Item>('create_item', { name: params.name, color: params.color }),
@@ -166,6 +172,7 @@ export const ipc: IpcApi = {
   pauseTimer: () => call<TimeRecord>('pause_timer'),
   resumeTimer: () => call<TimeRecord>('resume_timer'),
   stopTimer: () => call<TimeRecord>('stop_timer'),
+  discardTimer: () => call<void>('discard_timer'),
   undoStop: (params: UndoStopParams) => call<TimeRecord>('undo_stop', { recordId: params.recordId }),
   getTimerState: () => call<TimerState>('get_timer_state'),
   switchItem: (params: SwitchItemParams) => call<TimerState>('switch_item', { itemId: params.itemId, mode: params.mode }),
@@ -191,6 +198,8 @@ export const ipc: IpcApi = {
   /* ---- 设置域 ---- */
   getSettings: () => call<Settings>('get_settings'),
   updateSettings: (params: UpdateSettingsParams) => call<Settings>('update_settings', { patch: params.patch }),
+  getReferenceSettings: () => call<ReferenceSettings>('get_reference_settings'),
+  updateReferenceSettings: (params: { patch: ReferenceSettingsPatch }) => call<ReferenceSettings>('update_reference_settings', { patch: params.patch }),
   setAutostart: (params: SetAutostartParams) => call<boolean>('set_autostart', { enabled: params.enabled }),
   getAutostart: () => call<boolean>('get_autostart'),
 
@@ -235,6 +244,11 @@ export const ipc: IpcApi = {
   closeNoteWindow: (params: CloseNoteWindowParams) => call<void>('close_note_window', { noteId: params.noteId }),
   openTodosWindow: () => call<void>('open_todos_window'),
   openSettingsWindow: () => call<void>('open_settings_window'),
+  openTimerWindow: () => call<void>('open_timer_window'),
+  diaryGetConfig: () => call<DiaryConfig>('diary_get_config'),
+  diarySetConfig: (config: DiaryConfig) => call<DiaryConfig>('diary_set_config', { config }),
+  diaryToday: () => call<TodayDiary>('diary_today'),
+  diaryOpenToday: () => call<TodayDiary>('diary_open_today'),
 
   /* ---- [V0.2.0] 主题域 ---- */
   themeGet: () => call<ThemeSettings>('theme_get'),

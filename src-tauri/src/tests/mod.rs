@@ -6,6 +6,7 @@
 mod support;
 
 mod countdown;
+mod daily_status;
 mod item;
 mod item_batch2;
 mod migration;

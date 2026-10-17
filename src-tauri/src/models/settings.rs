@@ -4,6 +4,51 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::theme::{default_presets, AccentColors, AccentPatch, ThemeMode};
 
+/// Timing v1.7.3 参考设置（独立于现有 Settings，便于渐进接线）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferenceSettings {
+    pub ui_scale: f64,
+    pub plate_opacity: f64,
+    pub default_countdown_minutes: i64,
+    pub max_minutes: i64,
+    pub auto_write_on_stop: bool,
+    pub auto_bind_first_todo: bool,
+    pub default_pause_reason: String,
+    pub merge_gap_minutes: i64,
+    pub min_record_seconds: i64,
+    pub pending_enabled: bool,
+    pub remind_advance_minutes: i64,
+    pub light_remind_default_on: bool,
+    pub quick_find_enabled: bool,
+    pub timer_window_enabled: bool,
+    pub extension_auto_start: bool,
+    pub highlight_color: String,
+    pub desktop_menu_enabled: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ReferenceSettingsPatch {
+    pub ui_scale: Option<f64>,
+    pub plate_opacity: Option<f64>,
+    pub default_countdown_minutes: Option<i64>,
+    pub max_minutes: Option<i64>,
+    pub auto_write_on_stop: Option<bool>,
+    pub auto_bind_first_todo: Option<bool>,
+    pub default_pause_reason: Option<String>,
+    pub merge_gap_minutes: Option<i64>,
+    pub min_record_seconds: Option<i64>,
+    pub pending_enabled: Option<bool>,
+    pub remind_advance_minutes: Option<i64>,
+    pub light_remind_default_on: Option<bool>,
+    pub quick_find_enabled: Option<bool>,
+    pub timer_window_enabled: Option<bool>,
+    pub extension_auto_start: Option<bool>,
+    pub highlight_color: Option<String>,
+    pub desktop_menu_enabled: Option<bool>,
+}
+
 /// 全局快捷键映射（字符串值为 accelerator；null = 未注册，[P1]）。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,6 +76,30 @@ pub struct Settings {
     pub countdown_presets: Vec<i64>,
     /// [V0.2.0 批 2] 倒计时到点「自动结束并保存」开关（默认 false = 仅通知 + 视觉提示，AC-62）。
     pub countdown_auto_end: bool,
+}
+
+impl Default for ReferenceSettings {
+    fn default() -> Self {
+        Self {
+            ui_scale: 1.0,
+            plate_opacity: 0.9,
+            default_countdown_minutes: 25,
+            max_minutes: 120,
+            auto_write_on_stop: true,
+            auto_bind_first_todo: false,
+            default_pause_reason: String::new(),
+            merge_gap_minutes: 5,
+            min_record_seconds: 5,
+            pending_enabled: true,
+            remind_advance_minutes: 10,
+            light_remind_default_on: true,
+            quick_find_enabled: true,
+            timer_window_enabled: false,
+            extension_auto_start: false,
+            highlight_color: "#4DA3E8".to_string(),
+            desktop_menu_enabled: true,
+        }
+    }
 }
 
 impl Default for Settings {

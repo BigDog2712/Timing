@@ -87,17 +87,22 @@ pub async fn finalize(
     ended_at: i64,
     now: i64,
 ) -> AppResult<()> {
-    sqlx::query(
+    let mut tx = pool.begin().await?;
+    let saved = sqlx::query(
         "UPDATE time_records \
          SET status = 'saved', ended_at = ?, accumulated_sec = ?, running_since = NULL, updated_at = ? \
-         WHERE id = ? AND status = 'active'",
+         WHERE id = ? AND status = 'active' AND deleted_at IS NULL",
     )
     .bind(ended_at)
     .bind(accumulated_sec)
     .bind(now)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *tx)
     .await?;
+    if saved.rows_affected() == 1 {
+        super::todo::soft_delete_for_saved_record(&mut tx, id, now).await?;
+    }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -155,10 +160,10 @@ pub async fn end_and_start(
     now: i64,
 ) -> AppResult<i64> {
     let mut tx = pool.begin().await?;
-    sqlx::query(
+    let saved = sqlx::query(
         "UPDATE time_records \
          SET status = 'saved', ended_at = ?, accumulated_sec = ?, running_since = NULL, updated_at = ? \
-         WHERE id = ? AND status = 'active'",
+         WHERE id = ? AND status = 'active' AND deleted_at IS NULL",
     )
     .bind(ended_at)
     .bind(accumulated_sec)
@@ -166,6 +171,9 @@ pub async fn end_and_start(
     .bind(old_id)
     .execute(&mut *tx)
     .await?;
+    if saved.rows_affected() == 1 {
+        super::todo::soft_delete_for_saved_record(&mut tx, old_id, now).await?;
+    }
     let new_id: i64 = sqlx::query_scalar(
         "INSERT INTO time_records \
          (item_id, status, started_at, ended_at, accumulated_sec, running_since, created_at, updated_at) \

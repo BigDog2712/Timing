@@ -5,6 +5,7 @@
  * 因此主窗与事项窗**各自挂载一份**：在哪个窗触发，就在哪个窗浮出。
  * （便利贴窗不挂——它不承载这些入口。）
  */
+import { CountdownCard } from './menu/CountdownCard';
 import { CountdownMenu } from './menu/CountdownMenu';
 import { CommonItems } from './panel/CommonItems';
 import { ReminderPopover } from './reminder/ReminderPopover';
@@ -12,11 +13,15 @@ import { useUiStore } from '../stores/uiStore';
 
 export function Batch2Overlays() {
   const countdownPos = useUiStore((s) => s.countdownPos);
+  const countdownCardPos = useUiStore((s) => s.countdownCardPos);
+  const closeCountdownCard = useUiStore((s) => s.closeCountdownCard);
+  const openCountdownMenu = useUiStore((s) => s.openCountdownMenu);
   const commonItemsPos = useUiStore((s) => s.commonItemsPos);
   const reminderPopover = useUiStore((s) => s.reminderPopover);
 
   return (
     <>
+      {countdownCardPos && <CountdownCard anchor={countdownCardPos} onClose={closeCountdownCard} onMenu={(pos) => openCountdownMenu({ pos, custom: true })} />}
       {countdownPos && <CountdownMenu state={countdownPos} />}
       {commonItemsPos && <CommonItems anchor={commonItemsPos} />}
       {reminderPopover && <ReminderPopover state={reminderPopover} />}

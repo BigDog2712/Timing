@@ -15,6 +15,7 @@ import { useUiStore } from '../../stores/uiStore';
 import { DayWeekTabs } from './DayWeekTabs';
 import { ItemGroup } from './ItemGroup';
 import { TimerDisplay } from '../pill/TimerDisplay';
+import { useHoverClose } from '../../hooks/useHoverClose';
 
 const SKELETON_ROWS = [0, 1, 2];
 
@@ -23,6 +24,9 @@ export function RecordsPanel() {
   const { loading, error, totalSec, groups, reload } = useRecordsData(range);
   const items = useItemStore((s) => s.items);
   const closePanel = useUiStore((s) => s.closePanel);
+
+  /* [V0.2.7] 指针离开面板即自动收起（小条触发的浮层统一行为） */
+  useHoverClose(closePanel);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === 'Escape') {

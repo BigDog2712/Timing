@@ -25,10 +25,34 @@ async fn switch_just_switch_keeps_timing_continuous() {
 }
 
 #[tokio::test]
+async fn switch_end_and_start_rejects_running_session() {
+    let pool = fresh_pool("timer-switch-running").await;
+    let item2 = new_item(&pool, "乙").await;
+    let rec = timer::start(&pool, Some(1)).await.unwrap();
+    assert_eq!(
+        expect_err(timer::switch(&pool, item2, SwitchMode::EndAndStart).await),
+        ErrorCode::TimerAlreadyRunning
+    );
+    assert_eq!(count_active(&pool).await, 1);
+    assert_eq!(
+        scalar_i64(
+            &pool,
+            &format!(
+                "SELECT status = 'active' FROM time_records WHERE id={}",
+                rec.id
+            )
+        )
+        .await,
+        1
+    );
+}
+
+#[tokio::test]
 async fn switch_end_and_start_segments() {
     let pool = fresh_pool("timer-switch-seg").await;
     let item2 = new_item(&pool, "乙").await;
     timer::start(&pool, Some(1)).await.unwrap();
+    timer::pause(&pool).await.unwrap();
 
     let st = timer::switch(&pool, item2, SwitchMode::EndAndStart)
         .await

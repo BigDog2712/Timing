@@ -4660,7 +4660,7 @@ dependencies = [
 
 [[package]]
 name = "tickbar"
-version = "0.2.1"
+version = "0.2.8"
 dependencies = [
  "chrono",
  "serde",

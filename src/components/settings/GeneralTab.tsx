@@ -9,6 +9,8 @@ import { KeyboardIcon, PencilIcon, iconStroke } from '../../lib/icons';
 import { errorText } from '../../services/ipc';
 import { settingsActions } from '../../services/settingsActions';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { TEXT_OPACITY_MIN, useAppearanceStore } from '../../stores/appearanceStore';
+import { Slider } from '../ui/Slider';
 import { Switch } from '../ui/Switch';
 
 const SHORTCUT_ROWS = [
@@ -20,6 +22,10 @@ const SHORTCUT_ROWS = [
 
 export function GeneralTab() {
   const settings = useSettingsStore((s) => s.settings);
+  const textOpacity = useAppearanceStore((s) => s.textOpacity);
+  const bgOpacity = useAppearanceStore((s) => s.bgOpacity);
+  const setTextOpacity = useAppearanceStore((s) => s.setTextOpacity);
+  const setBgOpacity = useAppearanceStore((s) => s.setBgOpacity);
   const [error, setError] = useState<string | null>(null);
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -67,6 +73,31 @@ export function GeneralTab() {
           checked={settings.countdownAutoEnd}
           onChange={(v) => void run(() => settingsActions.setCountdownAutoEnd(v))}
         />
+      </div>
+
+      {/* [V0.2.2] 外观：文字 / 背景不透明度（本机偏好，不写数据库；设置面板自身不受影响） */}
+      <div className="setting-row">
+        <span className="setting-row__label">
+          文字不透明度
+          <span className="setting-row__hint">
+            {Math.round(textOpacity * 100)}% · 小条 / 便利贴
+          </span>
+        </span>
+        <Slider
+          label="文字不透明度"
+          value={textOpacity}
+          min={TEXT_OPACITY_MIN}
+          onChange={setTextOpacity}
+        />
+      </div>
+      <div className="setting-row">
+        <span className="setting-row__label">
+          背景不透明度
+          <span className="setting-row__hint">
+            {Math.round(bgOpacity * 100)}% · 除设置面板
+          </span>
+        </span>
+        <Slider label="背景不透明度" value={bgOpacity} onChange={setBgOpacity} />
       </div>
 
       {error && (

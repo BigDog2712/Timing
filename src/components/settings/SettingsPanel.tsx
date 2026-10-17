@@ -11,15 +11,17 @@ import { XIcon, iconStroke } from '../../lib/icons';
 import { useUiStore } from '../../stores/uiStore';
 import { ExtensionsTab } from './ExtensionsTab';
 import { GeneralTab } from './GeneralTab';
+import { DiaryTab } from './DiaryTab';
 import { SegmentedTabs, type TabDef } from './SegmentedTabs';
 import { ThemePicker } from './ThemePicker';
 
-type TabId = 'look' | 'ext' | 'gen';
+type TabId = 'look' | 'ext' | 'gen' | 'diary';
 
 const TABS: readonly TabDef<TabId>[] = [
   { id: 'look', label: '外观配色' },
   { id: 'ext', label: '扩展' },
   { id: 'gen', label: '通用' },
+  { id: 'diary', label: '日记' },
 ];
 
 interface SettingsPanelProps {
@@ -69,6 +71,7 @@ export function SettingsPanel({ variant = 'panel', onRequestClose }: SettingsPan
         {tab === 'look' && <ThemePicker />}
         {tab === 'ext' && <ExtensionsTab />}
         {tab === 'gen' && <GeneralTab />}
+        {tab === 'diary' && <DiaryTab />}
       </div>
 
       <footer className="settings__foot">

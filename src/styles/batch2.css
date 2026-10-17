@@ -25,9 +25,15 @@
 
 .ring__arc {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  /* [V0.2.1 · 1.6] 绝对定位以 padding box 为基准：.ring 有 --ring-stroke 的边框，
+     原 inset:0 让 SVG 只剩 16 − 2×描边（≈11.2px），弧比 border 环小一圈（进行时看起来缩了一个号）。
+     改为「按 border box 尺寸居中摆放」：宽高直接取 --ring-size，用负外边距抵消一半，
+     viewBox 16 与环 16 一一对应，弧与静态环同径，且不随边框像素对齐而变化。 */
+  top: 50%;
+  left: 50%;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  margin: calc(var(--ring-size) / -2) 0 0 calc(var(--ring-size) / -2);
   overflow: visible; /* 弧外沿恰好触界（r+stroke/2 = 8），防半像素裁切 */
   transform: rotate(-90deg); /* 起点置于 12 点方向 */
   pointer-events: none;

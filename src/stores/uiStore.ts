@@ -8,7 +8,7 @@ import { create } from 'zustand';
 import { UNDO_WINDOW_MS } from '../types/domain';
 import type { ReminderTarget, TimeRecord } from '../types/domain';
 
-export type PanelKind = 'none' | 'create' | 'records' | 'settings';
+export type PanelKind = 'none' | 'create' | 'records' | 'settings' | 'digest';
 
 export interface Notice {
   text: string;
@@ -24,6 +24,22 @@ export interface MenuPos {
 export interface CountdownMenuState {
   pos: MenuPos;
   itemId?: number | null;
+  /** Time-zone right-click opens the editor directly. */
+  custom?: boolean;
+}
+
+/** [V0.2.3 · 4] 事项菜单（右键事项名）：锚点 + 目标事项 */
+export interface ItemMenuState {
+  pos: MenuPos;
+  itemId: number | null;
+}
+
+/** [V0.2.3 · 3] 小条内联命名（左键事项 = 快捷添加；itemId 非空 = 改这条的名字） */
+export interface InlineEditState {
+  /** null = 新建事项；非空 = 重命名该事项 */
+  itemId: number | null;
+  /** 进入时的初始文本（重命名用；新建留空） */
+  initial: string;
 }
 
 /** 提醒浮出卡状态（批2 N-5）：设置态（选时间）/ 到时态（reminder-fired） */export interface FiredReminderItem {
@@ -67,10 +83,17 @@ interface UiStore {
   /* [批2 N-6/N-5/N-7] 主窗三个浮层（互斥 anchor，各自独立开关） */
   /** 倒计时菜单锚点（非空 = 展开） */
   countdownPos: CountdownMenuState | null;
+  countdownCardPos: MenuPos | null;
   /** 常用事项菜单锚点（非空 = 展开） */
   commonItemsPos: MenuPos | null;
   /** 提醒浮出卡（非空 = 展示；mode 区分设置 / 到时） */
   reminderPopover: ReminderPopoverState | null;
+  /** [V0.2.1] 便利贴清单锚点（手柄右键唤出；非空 = 展开） */
+  notesListPos: MenuPos | null;
+  /** [V0.2.3] 事项菜单（事项名右键；非空 = 展开） */
+  itemMenu: ItemMenuState | null;
+  /** [V0.2.3] 小条内联命名（非空 = 条上直接编辑名称） */
+  inlineEdit: InlineEditState | null;
 
   openPanel: (panel: Exclude<PanelKind, 'none'>) => void;
   closePanel: () => void;
@@ -84,15 +107,40 @@ interface UiStore {
   flashEnded: () => void;
   setNotice: (notice: Notice | null) => void;
   /* [批2] 浮层开关 */
+  openCountdownCard: (pos: MenuPos) => void;
+  closeCountdownCard: () => void;
   openCountdownMenu: (state: CountdownMenuState) => void;
   closeCountdownMenu: () => void;
   openCommonItems: (pos: MenuPos) => void;
   closeCommonItems: () => void;
   openReminderPopover: (state: ReminderPopoverState) => void;
   closeReminderPopover: () => void;
+  /* [V0.2.1] 便利贴清单 */
+  openNotesList: (pos: MenuPos) => void;
+  closeNotesList: () => void;
+  /* [V0.2.3] 事项菜单 + 内联命名 */
+  openItemMenu: (state: ItemMenuState) => void;
+  closeItemMenu: () => void;
+  openInlineEdit: (state: InlineEditState) => void;
+  closeInlineEdit: () => void;
   /** 托盘/显隐事件后重置瞬时 UI（收起面板与菜单） */
   resetTransient: () => void;
 }
+
+/**
+ * 所有「浮层类」瞬时状态的关闭形态：任一新浮层开启时先铺这一份，再覆盖自己要开的那个字段。
+ * 集中一处是为了不再逐个手写 `xxx: null`（[V0.2.3] 新增事项菜单 / 内联命名后，漏清会叠层）。
+ */
+const CLOSED = {
+  panel: 'none' as PanelKind,
+  menuOpen: false,
+  countdownPos: null,
+  countdownCardPos: null,
+  commonItemsPos: null,
+  notesListPos: null,
+  itemMenu: null,
+  inlineEdit: null,
+};
 
 export const useUiStore = create<UiStore>((set) => ({
   panel: 'none',
@@ -105,26 +153,37 @@ export const useUiStore = create<UiStore>((set) => ({
   endedAt: null,
   notice: null,
   countdownPos: null,
+  countdownCardPos: null,
   commonItemsPos: null,
   reminderPopover: null,
+  notesListPos: null,
+  itemMenu: null,
+  inlineEdit: null,
 
-  openPanel: (panel) => set({ panel, menuOpen: false, countdownPos: null, commonItemsPos: null }),
+  openPanel: (panel) => set({ ...CLOSED, panel }),
   closePanel: () => set({ panel: 'none' }),
   setCollapsed: (collapsed) => set({ collapsed }),
-  toggleCollapsed: () =>
-    set((s) => ({ collapsed: !s.collapsed, panel: 'none', menuOpen: false, countdownPos: null, commonItemsPos: null })),
-  openMenu: (menuPos) => set({ menuOpen: true, menuPos, panel: 'none', countdownPos: null, commonItemsPos: null }),
+  toggleCollapsed: () => set((s) => ({ ...CLOSED, collapsed: !s.collapsed })),
+  openMenu: (menuPos) => set({ ...CLOSED, menuOpen: true, menuPos }),
   closeMenu: () => set({ menuOpen: false }),
   setRecover: (recover) => set({ recover }),
   beginUndo: (undoRecord) => set({ undoRecord, undoDeadline: Date.now() + UNDO_WINDOW_MS }),
   clearUndo: () => set({ undoRecord: null, undoDeadline: null }),
   flashEnded: () => set({ endedAt: Date.now() }),
   setNotice: (notice) => set({ notice }),
-  openCountdownMenu: (state) => set({ countdownPos: state, menuOpen: false, commonItemsPos: null, panel: 'none' }),
+  openCountdownCard: (pos) => set({ ...CLOSED, countdownCardPos: pos }),
+  closeCountdownCard: () => set({ countdownCardPos: null }),
+  openCountdownMenu: (state) => set({ ...CLOSED, countdownPos: state }),
   closeCountdownMenu: () => set({ countdownPos: null }),
-  openCommonItems: (pos) => set({ commonItemsPos: pos, menuOpen: false, countdownPos: null, panel: 'none' }),
+  openCommonItems: (pos) => set({ ...CLOSED, commonItemsPos: pos }),
   closeCommonItems: () => set({ commonItemsPos: null }),
   openReminderPopover: (state) => set({ reminderPopover: state }),
   closeReminderPopover: () => set({ reminderPopover: null }),
-  resetTransient: () => set({ panel: 'none', menuOpen: false, countdownPos: null, commonItemsPos: null }),
+  openNotesList: (pos) => set({ ...CLOSED, notesListPos: pos }),
+  closeNotesList: () => set({ notesListPos: null }),
+  openItemMenu: (state) => set({ ...CLOSED, itemMenu: state }),
+  closeItemMenu: () => set({ itemMenu: null }),
+  openInlineEdit: (state) => set({ ...CLOSED, inlineEdit: state }),
+  closeInlineEdit: () => set({ inlineEdit: null }),
+  resetTransient: () => set({ ...CLOSED }),
 }));

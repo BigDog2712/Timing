@@ -45,7 +45,8 @@ pub const SETTINGS: WindowSpec = WindowSpec {
     resizable: false,
     decorations: false,
     transparent: true,
-    skip_taskbar: false,
+    /* [V0.2.8] 设置面板也是浮层，不上任务栏（用户要求「唤起的悬浮菜单不该出现在任务栏」） */
+    skip_taskbar: true,
     always_on_top: false,
 };
 
@@ -55,6 +56,24 @@ pub const SETTINGS: WindowSpec = WindowSpec {
 /// —— min_height 取登记值 360；max_height 取设计稿 `todos-panel.md §1`「最大 ≈560」，默认高
 /// 取 min（内容驱动，前端可向上撑到 560，超出滚动）。`resizable:true` + `min_width==max_width`
 /// 钉死宽度，仅高度可调（与 window-state 跨 DPI 回填配合，K-15）。
+/// 只读计时器窗口（单例）。
+pub const TIMER: WindowSpec = WindowSpec {
+    label: "timer",
+    url: "index.html?w=timer",
+    title: "TickBar 计时器",
+    width: 280.0,
+    height: 180.0,
+    min_width: 280.0,
+    min_height: 180.0,
+    max_width: 280.0,
+    max_height: 180.0,
+    resizable: false,
+    decorations: false,
+    transparent: true,
+    skip_taskbar: true,
+    always_on_top: true,
+};
+
 pub const TODOS: WindowSpec = WindowSpec {
     label: "todos",
     url: "index.html?w=todos",
@@ -68,7 +87,8 @@ pub const TODOS: WindowSpec = WindowSpec {
     resizable: true,
     decorations: false,
     transparent: true,
-    skip_taskbar: false,
+    /* [V0.2.8] 事项窗同样是浮层：不上任务栏，且指针离开即隐藏（见前端 useWindowLeaveHide） */
+    skip_taskbar: true,
     always_on_top: false,
 };
 
@@ -110,6 +130,7 @@ pub fn note_label(id: i64) -> String {
 pub fn spec_for(label: &str) -> Option<&'static WindowSpec> {
     match label {
         "settings" => Some(&SETTINGS),
+        "timer" => Some(&TIMER),
         "todos" => Some(&TODOS),
         _ if label.starts_with(NOTE_LABEL_PREFIX) => Some(&NOTE),
         _ => None,

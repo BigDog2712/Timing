@@ -4,9 +4,22 @@ use tauri::{AppHandle, State};
 
 use crate::error::AppResult;
 use crate::infra::{autostart, events, window};
-use crate::models::settings::{Settings, SettingsPatch};
+use crate::models::settings::{ReferenceSettings, ReferenceSettingsPatch, Settings, SettingsPatch};
 use crate::services;
 use crate::state::AppState;
+
+#[tauri::command]
+pub async fn get_reference_settings(state: State<'_, AppState>) -> AppResult<ReferenceSettings> {
+    services::settings::get_reference(&state.pool).await
+}
+
+#[tauri::command]
+pub async fn update_reference_settings(
+    state: State<'_, AppState>,
+    patch: ReferenceSettingsPatch,
+) -> AppResult<ReferenceSettings> {
+    services::settings::update_reference(&state.pool, &patch).await
+}
 
 #[tauri::command]
 pub async fn get_settings(app: AppHandle, state: State<'_, AppState>) -> AppResult<Settings> {

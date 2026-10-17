@@ -75,6 +75,8 @@ pub const KEY_COUNTDOWN_PRESETS: &str = "countdown.presets";
 /// 键值表无 DDL，缺省即回落默认（不需要迁移）。
 pub const KEY_COUNTDOWN_AUTO_END: &str = "countdown.auto_end";
 
+pub const KEY_REFERENCE_SETTINGS: &str = "timing.reference_settings";
+
 /* V0.2.0 默认值（**唯一**允许出现色值字面量的位置；组件 / 服务层一律引用此处，禁裸 hex，DTO-05） */
 /// 主题模式默认值（"dark" | "light" | "system"）。
 pub const DEFAULT_THEME_MODE: &str = "dark";

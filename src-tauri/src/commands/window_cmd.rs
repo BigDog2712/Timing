@@ -21,6 +21,12 @@ pub async fn open_todos_window(app: AppHandle) -> AppResult<()> {
     window::open_todos_window(&app)
 }
 
+/// 打开 / 聚焦只读计时器窗口（单例；label `timer`）。
+#[tauri::command]
+pub async fn open_timer_window(app: AppHandle) -> AppResult<()> {
+    window::open_timer_window(&app)
+}
+
 /// 打开 / 聚焦便利贴窗口（动态 label `note-{id}`；超上限 → `WINDOW_LIMIT_EXCEEDED`）。
 #[tauri::command]
 pub async fn open_note_window(

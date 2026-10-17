@@ -7,7 +7,9 @@ use sqlx::SqlitePool;
 use crate::error::AppResult;
 use crate::infra::clock::now_ms;
 use crate::models::constants::*;
-use crate::models::settings::{Settings, SettingsPatch, ShortcutMap};
+use crate::models::settings::{
+    ReferenceSettings, ReferenceSettingsPatch, Settings, SettingsPatch, ShortcutMap,
+};
 use crate::repositories::settings as repo;
 use crate::services::theme;
 
@@ -24,6 +26,113 @@ pub async fn ensure_defaults(pool: &SqlitePool) -> AppResult<()> {
         repo::set_value(pool, KEY_LAST_ITEM_ID, &SYSTEM_ITEM_ID.to_string(), now).await?;
     }
     Ok(())
+}
+
+pub async fn get_reference(pool: &SqlitePool) -> AppResult<ReferenceSettings> {
+    let map = repo::get_all(pool).await?;
+    let mut value = ReferenceSettings::default();
+    macro_rules! read {
+        ($field:ident, $key:expr, $ty:ty) => {
+            if let Some(raw) = map.get($key) {
+                if let Ok(parsed) = raw.parse::<$ty>() {
+                    value.$field = parsed;
+                }
+            }
+        };
+    }
+    read!(ui_scale, "timing.ui_scale", f64);
+    read!(plate_opacity, "timing.plate_opacity", f64);
+    read!(
+        default_countdown_minutes,
+        "timing.default_countdown_minutes",
+        i64
+    );
+    read!(max_minutes, "timing.max_minutes", i64);
+    read!(merge_gap_minutes, "timing.merge_gap_minutes", i64);
+    read!(min_record_seconds, "timing.min_record_seconds", i64);
+    read!(remind_advance_minutes, "timing.remind_advance_minutes", i64);
+    for (key, target) in [
+        ("timing.auto_write_on_stop", &mut value.auto_write_on_stop),
+        (
+            "timing.auto_bind_first_todo",
+            &mut value.auto_bind_first_todo,
+        ),
+        ("timing.pending_enabled", &mut value.pending_enabled),
+        (
+            "timing.light_remind_default_on",
+            &mut value.light_remind_default_on,
+        ),
+        ("timing.quick_find_enabled", &mut value.quick_find_enabled),
+        (
+            "timing.timer_window_enabled",
+            &mut value.timer_window_enabled,
+        ),
+        (
+            "timing.extension_auto_start",
+            &mut value.extension_auto_start,
+        ),
+        (
+            "timing.desktop_menu_enabled",
+            &mut value.desktop_menu_enabled,
+        ),
+    ] {
+        if let Some(raw) = map.get(key) {
+            *target = raw == "true";
+        }
+    }
+    if let Some(v) = map.get("timing.default_pause_reason") {
+        value.default_pause_reason = v.clone();
+    }
+    if let Some(v) = map.get("timing.highlight_color") {
+        value.highlight_color = v.clone();
+    }
+    Ok(value)
+}
+
+pub async fn update_reference(
+    pool: &SqlitePool,
+    patch: &ReferenceSettingsPatch,
+) -> AppResult<ReferenceSettings> {
+    let now = now_ms();
+    macro_rules! write_num {
+        ($field:ident, $key:expr) => {
+            if let Some(v) = patch.$field {
+                repo::set_value(pool, $key, &v.to_string(), now).await?;
+            }
+        };
+    }
+    write_num!(ui_scale, "timing.ui_scale");
+    write_num!(plate_opacity, "timing.plate_opacity");
+    write_num!(
+        default_countdown_minutes,
+        "timing.default_countdown_minutes"
+    );
+    write_num!(max_minutes, "timing.max_minutes");
+    write_num!(merge_gap_minutes, "timing.merge_gap_minutes");
+    write_num!(min_record_seconds, "timing.min_record_seconds");
+    write_num!(remind_advance_minutes, "timing.remind_advance_minutes");
+    macro_rules! write_bool {
+        ($field:ident, $key:expr) => {
+            if let Some(v) = patch.$field {
+                repo::set_value(pool, $key, bool_str(v), now).await?;
+            }
+        };
+    }
+    write_bool!(auto_write_on_stop, "timing.auto_write_on_stop");
+    write_bool!(auto_bind_first_todo, "timing.auto_bind_first_todo");
+    write_bool!(pending_enabled, "timing.pending_enabled");
+    write_bool!(light_remind_default_on, "timing.light_remind_default_on");
+    write_bool!(quick_find_enabled, "timing.quick_find_enabled");
+    write_bool!(timer_window_enabled, "timing.timer_window_enabled");
+    write_bool!(extension_auto_start, "timing.extension_auto_start");
+    write_bool!(desktop_menu_enabled, "timing.desktop_menu_enabled");
+    if let Some(v) = patch.default_pause_reason.as_deref() {
+        repo::set_value(pool, "timing.default_pause_reason", v, now).await?;
+    }
+    if let Some(v) = patch.highlight_color.as_deref() {
+        repo::set_value(pool, "timing.highlight_color", v, now).await?;
+    }
+    get_reference(pool).await
 }
 
 /// 读取全部设置（不含注册表回填）。

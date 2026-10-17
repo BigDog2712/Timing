@@ -162,6 +162,9 @@ fn note_window_is_desktop_widget() {
     const {
         assert!(NOTE.always_on_top, "默认置顶（AC-64）");
         assert!(NOTE.skip_taskbar, "不上任务栏");
+        /* [V0.2.8] 设置窗与事项窗同属浮层：一律不上任务栏（用户要求） */
+        assert!(SETTINGS.skip_taskbar, "设置窗不上任务栏");
+        assert!(TODOS.skip_taskbar, "事项窗不上任务栏");
         assert!(NOTE.transparent, "透明底（圆角自绘外壳 / 防白闪）");
         assert!(
             !NOTE.decorations,

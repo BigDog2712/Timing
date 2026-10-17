@@ -22,10 +22,16 @@
   padding: var(--menu-pad);
   border-radius: var(--radius-lg);
   background: var(--menu-bg);
-  border: 1px solid var(--line-2);
+  /* [V0.2.1 · 1.2] 浮层不再画 1px 描边：靠板 + 投影分层（与主条悬停态同口径，无边框） */
+  border: 0;
   box-shadow: var(--shadow-float);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   pointer-events: auto;
+  /* [V0.2.4 · 4] 长菜单（倒计时 8 档预设 + 分隔 + 自定义）在小条 384×360 的窗口里放不下：
+     限高 + 内部滚动，而不是让它顶出窗口被裁掉。 */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   animation: menu-in var(--dur-base) var(--ease-standard);
 }
 
@@ -214,4 +220,25 @@
   height: 1px;
   margin: 5px 6px;
   background: var(--line);
+}
+
+/* ------------------------------ 滚动条 ------------------------------ */
+/* [V0.2.6] 菜单行数超过窗口高度后内部滚动（见上方 max-height），
+   默认滚动条会在玻璃板上画一条亮灰色实心条，这里收敛成细的 --line-3。 */
+.menu {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-3) transparent;
+}
+.menu::-webkit-scrollbar {
+  width: 8px;
+}
+.menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+.menu::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+.menu::-webkit-scrollbar-thumb:hover {
+  background: var(--line-2);
 }

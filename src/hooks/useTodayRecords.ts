@@ -47,9 +47,16 @@ export function useTodayRecords(): TodayRecordsData {
           ipc.statsSummary({ from, to }),
           ipc.listRecords({ from, to, page: 1, limit: MAX_PAGE_SIZE }),
         ]);
+        const records = [...page.items];
+        for (let next = 2; records.length < page.total; next += 1) {
+          const more = await ipc.listRecords({ from, to, page: next, limit: MAX_PAGE_SIZE });
+          if (cancelled) return;
+          if (more.items.length === 0) break;
+          records.push(...more.items);
+        }
         if (cancelled) return;
         setTotalSec(summary.totalSec);
-        setRows(page.items.slice().sort((a, b) => b.startedAt - a.startedAt));
+        setRows(records.sort((a, b) => b.startedAt - a.startedAt));
       } catch (err) {
         if (!cancelled) setError(errorText(err));
       } finally {

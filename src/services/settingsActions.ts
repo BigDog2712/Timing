@@ -34,6 +34,11 @@ export const settingsActions = {
     const settings = await ipc.updateSettings({ patch: { countdownAutoEnd: enabled } });
     useSettingsStore.getState().setSettings(settings);
   },
+
+  async updateReferenceSettings(patch: Parameters<typeof ipc.updateReferenceSettings>[0]['patch']): Promise<void> {
+    const referenceSettings = await ipc.updateReferenceSettings({ patch });
+    useSettingsStore.getState().setReferenceSettings(referenceSettings);
+  },
 };
 
 /**

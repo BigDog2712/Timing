@@ -12,6 +12,7 @@
 import { useEffect } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
 import { useTodoDeleteFlush } from '../../hooks/useTodoDeleteFlush';
+import { useWindowLeaveHide } from '../../hooks/useWindowLeaveHide';
 import { closeCurrentWindow, showCurrentWindowOnReady } from '../../lib/window';
 import { themeActions } from '../../services/themeActions';
 import { useItemStore } from '../../stores/itemStore';
@@ -25,6 +26,9 @@ import { Batch2Overlays } from '../Batch2Overlays';
 export function TodosWindow() {
   /* AC-32 兜底：撤销窗内窗口隐藏 / 最小化 / 应用退出 → 立即提交未决删除 */
   useTodoDeleteFlush();
+
+  /* [V0.2.8] 事项窗是浮层：指针离开窗口即隐藏（不销毁，再开即原位显示） */
+  useWindowLeaveHide();
 
   /* 主题：本窗自订阅广播 */
   useTauriEvent<ThemeChangedPayload>(IPC_EVENTS.themeChanged, (payload) => {

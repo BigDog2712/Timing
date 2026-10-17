@@ -1,6 +1,8 @@
 //! 命令层：仅反序列化 -> 调 service -> 序列化，无业务、无 SQL。
 
 pub mod countdown_cmd;
+pub mod daily_status_cmd;
+pub mod diary_cmd;
 pub mod item_cmd;
 pub mod note_cmd;
 pub mod record_cmd;

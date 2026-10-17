@@ -49,7 +49,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: var(--snap-margin);
+  /* [V0.2.3 · 2] 左内缩单独用 --pill-inset（6px），让小条与事项名+手柄整体更靠左 */
+  padding: var(--snap-margin) var(--snap-margin) var(--snap-margin) var(--pill-inset);
   pointer-events: none;
 }
 

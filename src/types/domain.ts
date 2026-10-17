@@ -284,6 +284,17 @@ export interface ShortcutMap {
   newItem: string | null;
 }
 
+/** Timing v1.7.3 参考设置（独立于现有 Settings） */
+export interface ReferenceSettings {
+  uiScale: number; plateOpacity: number; defaultCountdownMinutes: number; maxMinutes: number;
+  autoWriteOnStop: boolean; autoBindFirstTodo: boolean; defaultPauseReason: string; mergeGapMinutes: number;
+  minRecordSeconds: number; pendingEnabled: boolean; remindAdvanceMinutes: number; lightRemindDefaultOn: boolean;
+  quickFindEnabled: boolean; timerWindowEnabled: boolean; extensionAutoStart: boolean; highlightColor: string;
+  desktopMenuEnabled: boolean;
+}
+
+export interface ReferenceSettingsPatch extends Partial<ReferenceSettings> {}
+
 /** 应用设置 */
 export interface Settings {
   /** 开机自启是否开启（以注册表实际状态为准，P0-6） */
@@ -410,6 +421,23 @@ export const IPC_EVENTS = {
 } as const;
 
 /* ===========================================================================
+ * 日记 DTO（参考 Timing DiaryWriterConfig）
+ * ========================================================================= */
+export interface DiaryConfig {
+  vaultRoot: string;
+  diaryRelativeDir: string;
+  diaryFileNameFormat: string;
+  editorPath: string;
+}
+
+export interface TodayDiary {
+  date: string;
+  path: string;
+  exists: boolean;
+  config: DiaryConfig;
+}
+
+/* ===========================================================================
  * IPC 方法签名（src/services/ipc.ts 实现，仅在此声明类型）
  * ========================================================================= */
 
@@ -419,6 +447,8 @@ export const IPC_EVENTS = {
  * IPC-CONTRACT-v2 §3。实现侧不得在此签名之外新增方法（规格即契约）。
  */
 export interface IpcApi {
+  dailyStatusGet(date: string): Promise<Record<number, 'pending' | 'done'>>;
+  dailyStatusSet(date: string, itemId: number, status: 'pending' | 'done'): Promise<void>;
   /* 事项域 */
   listItems(params: ListItemsParams): Promise<Item[]>;
   createItem(params: CreateItemParams): Promise<Item>;
@@ -432,6 +462,7 @@ export interface IpcApi {
   pauseTimer(): Promise<TimeRecord>;
   resumeTimer(): Promise<TimeRecord>;
   stopTimer(): Promise<TimeRecord>;
+  discardTimer(): Promise<void>;
   undoStop(params: UndoStopParams): Promise<TimeRecord>;
   getTimerState(): Promise<TimerState>;
   switchItem(params: SwitchItemParams): Promise<TimerState>;
@@ -448,6 +479,8 @@ export interface IpcApi {
   /* 设置域 */
   getSettings(): Promise<Settings>;
   updateSettings(params: UpdateSettingsParams): Promise<Settings>;
+  getReferenceSettings(): Promise<ReferenceSettings>;
+  updateReferenceSettings(params: { patch: ReferenceSettingsPatch }): Promise<ReferenceSettings>;
   setAutostart(params: SetAutostartParams): Promise<boolean>;
   getAutostart(): Promise<boolean>;
 
@@ -485,6 +518,11 @@ export interface IpcApi {
   closeNoteWindow(params: CloseNoteWindowParams): Promise<void>;
   openTodosWindow(): Promise<void>;
   openSettingsWindow(): Promise<void>;
+  openTimerWindow(): Promise<void>;
+  diaryGetConfig(): Promise<DiaryConfig>;
+  diarySetConfig(config: DiaryConfig): Promise<DiaryConfig>;
+  diaryToday(): Promise<TodayDiary>;
+  diaryOpenToday(): Promise<TodayDiary>;
 
   /* 主题域 [V0.2.0] */
   themeGet(): Promise<ThemeSettings>;

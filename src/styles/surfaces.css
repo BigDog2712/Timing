@@ -14,6 +14,9 @@
   position: relative;
   display: flex;
   align-items: center;
+  /* [V0.2.2 · 3] 内容左移贴齐：由居中对齐改回左对齐，环 / 计时数字 / 事项名 / 手柄
+     从左侧内边距起排，不再被整条居中留出左空档 */
+  justify-content: flex-start;
   gap: var(--space-2);
   height: var(--pill-h);
   min-width: var(--pill-w-min);
@@ -49,25 +52,11 @@
   transform: scale(0.985);
 }
 
-/* [UI 统一 2026-10-16] 状态墨度（Timing PaintFrame：idle 0.75 / paused 0.88 / running 1；
-   悬停 / 显影时回满） */
+/* [V0.2.2 · 4] 文字不透明度改由设置驱动（--ui-text-opacity）：取消 idle .75 /
+   paused .88 的自动淡出，悬停与否不再改变文字浓淡（原状态墨度块已删）。 */
 .pill > * {
-  opacity: var(--pill-ink-a, 1);
+  opacity: var(--ui-text-opacity, 1);
   transition: opacity var(--dur-base) var(--ease-standard);
-}
-
-.pill[data-state="idle"] {
-  --pill-ink-a: 0.75;
-}
-
-.pill[data-state="paused"] {
-  --pill-ink-a: 0.88;
-}
-
-.pill:hover > *,
-.pill:focus-within > *,
-.pill[data-reveal="true"] > * {
-  opacity: 1;
 }
 
 /* 事项名：Timing TaskEm 14 / YaHei Bold / 全墨（InkOnGlass ×0.94）+ 透明态投埃 */
@@ -91,13 +80,39 @@
   color: var(--ink-3);
 }
 
+/* [V0.2.3 · 3] 条上内联命名输入框：与事项名同字号同基线，宽度吃掉事项名原本的位置 */
+.pill__input {
+  flex: 0 1 auto;
+  min-width: 0;
+  width: var(--task-w-max);
+  max-width: var(--task-w-max);
+  height: calc(var(--pill-h) - 8px);
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--bg-field);
+  color: var(--ink);
+  font-size: var(--text-task-pill);
+  font-weight: var(--weight-strong);
+  font-family: var(--font-ui);
+  caret-color: var(--accent);
+}
+
+.pill__input::placeholder {
+  color: var(--ink-4);
+  font-weight: var(--weight-medium);
+}
+
 .pill__empty {
   flex: 0 1 auto;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
   height: var(--pill-h);
-  padding: 0 var(--space-2);
+  /* [V0.2.1 · 2] 事项组件左右空白缩短：原 8px 内边距在窄形态里显得松，收到 2px，
+     文字与圆环/手柄之间的间隔交给 .pill 的 gap 统一控制 */
+  padding: 0 2px;
   border-radius: var(--radius-pill);
   font-size: var(--text-body);
   font-weight: var(--weight-medium);
@@ -109,13 +124,21 @@
   color: var(--ink);
 }
 
-/* 小条计时数字：对齐 Timing 观感（Segoe UI Semibold + 有效字号 ≈20px）；
+/* 小条计时数字：对齐 Timing 观感（Segoe UI Semibold）；
+   行高锁成与圆环同高（--ring-size），使数字与圆环共用同一条中心线（V0.2.1 · 1.1 对齐）；
    tabular-nums 保 AC-24 不抖动（替代 .timer-digits 基础 mono，仅小条作用域） */
 .pill .timer-digits {
+  display: inline-flex;
+  align-items: center;
+  height: var(--ring-size);
   font-family: var(--font-timer);
   font-size: var(--text-timer-pill);
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+  /* [V0.2.1 · 1'] 光学微调：Segoe UI 的数字墨迹在行盒里偏下，几何盒虽已与圆环同心，
+     看上去仍低一档。整体上移 1px，让数字的视觉重心与圆环对齐。 */
+  transform: translateY(-1px);
   text-shadow: var(--shadow-ink);
   transition: text-shadow var(--dur-base) var(--ease-standard);
 }

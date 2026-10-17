@@ -2,6 +2,7 @@
 
 pub mod common;
 pub mod constants;
+pub mod diary;
 pub mod enums;
 pub mod item;
 pub mod note;

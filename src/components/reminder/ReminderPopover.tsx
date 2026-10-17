@@ -16,6 +16,7 @@ import { ipc } from '../../services/ipc';
 import { reminderActions, clearFiredItem, clearAllFired } from '../../services/reminderActions';
 import type { ReminderPopoverState } from '../../stores/uiStore';
 import type { Reminder } from '../../types/domain';
+import { useHoverClose } from '../../hooks/useHoverClose';
 
 const W = 280;
 const H = 178;
@@ -34,6 +35,8 @@ interface ReminderPopoverProps {
 }
 
 export function ReminderPopover({ state }: ReminderPopoverProps) {
+  /* [V0.2.7] 指针离开提醒卡即自动收起 */
+  useHoverClose(reminderActions.close);
   const [snoozeOpen, setSnoozeOpen] = useState(false);
   const [pending, setPending] = useState<Reminder[]>([]);
   const { mode, target, targetId, title } = state;

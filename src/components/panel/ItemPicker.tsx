@@ -16,12 +16,16 @@ import { useUiStore } from '../../stores/uiStore';
 import type { Item } from '../../types/domain';
 import { AlertIcon, iconStroke } from '../../lib/icons';
 import { RecentChips } from './RecentChips';
+import { useHoverClose } from '../../hooks/useHoverClose';
 import { ShortcutHint } from './ShortcutHint';
 
 export function ItemPicker() {
   const actions = useTimerActions();
   const items = useItemStore((s) => s.items);
   const closePanel = useUiStore((s) => s.closePanel);
+
+  /* [V0.2.7] 指针离开面板即自动收起（小条触发的浮层统一行为） */
+  useHoverClose(closePanel);
 
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);

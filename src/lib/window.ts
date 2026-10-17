@@ -12,7 +12,7 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { isTauri } from '../services/ipc';
 
-export type WindowKind = 'main' | 'settings' | 'todos' | 'note';
+export type WindowKind = 'main' | 'settings' | 'todos' | 'timer' | 'note';
 
 /** 当前窗口 label（Tauri）；非 Tauri 回退 ?w= */
 export function currentWindowLabel(): string {
@@ -35,7 +35,10 @@ export function currentWindowKind(): WindowKind {
   const label = currentWindowLabel();
   if (label === 'settings') return 'settings';
   if (label === 'todos') return 'todos';
-  if (label.startsWith('note-')) return 'note';
+  if (label === 'timer') return 'timer';
+  // Tauri 下 label = note-{id}；浏览器 dev 下回退的 `?w=note` 只会得到 'note'（无 id 后缀），
+  // 两种都要认，否则便利贴窗在 dev 里会被当成主窗渲染。
+  if (label === 'note' || label.startsWith('note-')) return 'note';
   return 'main';
 }
 
@@ -77,11 +80,23 @@ export function markWindowKind(): WindowKind {
 let windowShown = false;
 export function showCurrentWindowOnReady(): () => void {
   if (!isTauri()) return () => undefined;
+  /* [V0.2.8] 设置面板 / 事项窗是浮层，不该在任务栏留按钮。
+     tao 的 `skip_taskbar` 走的是 `ITaskbarList::DeleteTab`（只删已存在的按钮），
+     窗口 `show()` 之后外壳可能又把按钮加回来——所以显示后再删一次。 */
+  const keepOffTaskbar = (win: ReturnType<typeof getCurrentWindow>) => {
+    const kind = currentWindowKind();
+    if (kind !== 'settings' && kind !== 'todos' && kind !== 'timer') return;
+    void win
+      .setSkipTaskbar(true)
+      .catch(() => undefined);
+  };
   const show = () => {
     if (windowShown) return;
     windowShown = true;
-    void getCurrentWindow()
+    const win = getCurrentWindow();
+    void win
       .show()
+      .then(() => keepOffTaskbar(win))
       .catch(() => undefined);
   };
   let raf1 = 0;
@@ -114,4 +129,51 @@ export function closeCurrentWindow(): Promise<void> {
 export function setCurrentWindowAlwaysOnTop(enabled: boolean): Promise<void> {
   if (!isTauri()) return Promise.resolve();
   return getCurrentWindow().setAlwaysOnTop(enabled);
+}
+
+/**
+ * [V0.2.1] 让「当前窗口」跟随鼠标拖动（主小条整条可拖，1.3）。
+ * 依赖 capability `core:window:allow-start-dragging`（`src-tauri/capabilities/default.json:7`）。
+ * 非 Tauri 为 no-op；失败静默（拖不起来不该打断计时交互）。
+ */
+export function startCurrentWindowDrag(): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return getCurrentWindow()
+    .startDragging()
+    .catch(() => undefined);
+}
+
+/**
+ * [V0.2.4 · 2] 让「当前窗口」进入系统级缩放拖动（便利贴右下角手柄用）。
+ * 依赖 capability `core:window:allow-start-resize-dragging`。
+ * 非 Tauri 为 no-op；失败静默（缩放手柄失灵不该影响写作）。
+ * 注：`ResizeDirection` 在 @tauri-apps/api 里是本地类型未导出，这里按同构联合重声明。
+ */
+export type ResizeDir =
+  | 'East'
+  | 'North'
+  | 'NorthEast'
+  | 'NorthWest'
+  | 'South'
+  | 'SouthEast'
+  | 'SouthWest'
+  | 'West';
+
+export function startCurrentWindowResize(direction: ResizeDir = 'SouthEast'): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return getCurrentWindow()
+    .startResizeDragging(direction)
+    .catch(() => undefined);
+}
+
+/**
+ * [V0.2.8] 隐藏当前窗口（不销毁）：事项窗「指针离开即隐藏」用。
+ * 依赖 capability `core:window:allow-hide`（`src-tauri/capabilities/default.json` 已含 core:window 默认集）。
+ * 非 Tauri 为 no-op；失败静默。
+ */
+export function hideCurrentWindow(): Promise<void> {
+  if (!isTauri()) return Promise.resolve();
+  return getCurrentWindow()
+    .hide()
+    .catch(() => undefined);
 }

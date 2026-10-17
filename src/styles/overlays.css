@@ -11,7 +11,8 @@
   margin-top: var(--space-3);
   padding: var(--space-3) var(--space-5) var(--space-5);
   border-radius: var(--radius-lg);
-  background: var(--surface-2);
+  /* [V0.2.2] 浮层底板乘 --ui-bg-opacity */
+  background: color-mix(in srgb, var(--surface-2) calc(100% * var(--ui-bg-opacity)), transparent);
   border: 1px solid var(--border);
   box-shadow: var(--elev-panel);
   animation: panel-in var(--dur-morph) var(--ease-morph);
@@ -150,7 +151,7 @@
   margin-top: var(--space-3);
   padding: 0 var(--space-5);
   border-radius: var(--radius-md);
-  background: var(--undo-bg);
+  background: color-mix(in srgb, var(--undo-bg) calc(100% * var(--ui-bg-opacity)), transparent);
   border: 1px solid var(--undo-border);
   box-shadow: var(--elev-float);
   color: var(--undo-text);

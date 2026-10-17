@@ -32,3 +32,15 @@ export const SHORT_RECORD_SEC = 60;
 
 /** [V0.2.0] 倒计时「接近到点」提示窗口：剩余 ≤ 60s → 小条数字切 --color-warn */
 export const COUNTDOWN_WARN_SEC = 60;
+
+/** [V0.2.1] 整条拖动阈值：位移超过该值（物理像素）才判定为拖动，避免吃掉单击 */
+export const DRAG_THRESHOLD_PX = 4;
+
+/** [V0.2.1] 拖动后吞掉尾随 click 的窗口：拖完松手时那一次 click 不应触发组件功能 */
+export const DRAG_CLICK_SWALLOW_MS = 240;
+
+/** [V0.2.7] 浮层「指针离开即收」的宽限：跨过小条与浮层之间的空隙时不误收 */
+export const HOVER_CLOSE_GRACE_MS = 420;
+
+/** [V0.2.8] 事项窗「指针离开即隐藏」的宽限：跨过窗口边缘抖动时不误收 */
+export const WINDOW_LEAVE_HIDE_MS = 420;

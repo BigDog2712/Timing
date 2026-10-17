@@ -10,37 +10,41 @@ import { useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useUiStore } from '../../stores/uiStore';
 import type { MenuPos } from '../../stores/uiStore';
-import { MAX_COUNTDOWN_SEC } from '../../types/domain';
+import { useHoverClose } from '../../hooks/useHoverClose';
 
 interface CountdownCustomProps {
   anchor: MenuPos;
-  active: boolean;
+  initialSec: number;
   onCancel: () => void;
   onSubmit: (targetSec: number) => void;
 }
 
-const MIN_SEC = 60;
+const MIN_SEC = 1;
+const MAX_SEC = 5400;
 const W = 200;
 const H = 132;
 const EDGE = 4;
 
-export function CountdownCustom({ anchor, active, onCancel, onSubmit }: CountdownCustomProps) {
-  const [minutes, setMinutes] = useState('10');
-  const [seconds, setSeconds] = useState('0');
+export function CountdownCustom({ anchor, initialSec, onCancel, onSubmit }: CountdownCustomProps) {
+  const [minutes, setMinutes] = useState(String(Math.floor(initialSec / 60)));
+  const [seconds, setSeconds] = useState(String(initialSec % 60));
   const [error, setError] = useState<string | null>(null);
 
   const close = useUiStore((s) => s.closeCountdownMenu);
+
+  /* [V0.2.7] 指针离开即收（自定义时长也是小条触发的浮层） */
+  useHoverClose(close);
 
   const commit = () => {
     const m = Number.parseInt(minutes || '0', 10);
     const s = Number.parseInt(seconds || '0', 10);
     const total = (Number.isFinite(m) ? m : 0) * 60 + (Number.isFinite(s) ? s : 0);
     if (total < MIN_SEC) {
-      setError('最短 1 分钟');
+      setError('最短 1 秒');
       return;
     }
-    if (total > MAX_COUNTDOWN_SEC) {
-      setError('最长 24 小时');
+    if (total > MAX_SEC) {
+      setError('最长 90 分钟');
       return;
     }
     onSubmit(total);
@@ -75,7 +79,7 @@ export function CountdownCustom({ anchor, active, onCancel, onSubmit }: Countdow
             <input
               type="number"
               min={0}
-              max={1440}
+              max={90}
               value={minutes}
               autoFocus
               className="cd-custom__input"
@@ -104,14 +108,14 @@ export function CountdownCustom({ anchor, active, onCancel, onSubmit }: Countdow
         {error ? (
           <p className="cd-custom__error">{error}</p>
         ) : (
-          <p className="cd-custom__hint">{active ? '将结束当前并开始' : 'Enter 开始计时'}</p>
+          <p className="cd-custom__hint">Enter 保存时长，再点圆环开始</p>
         )}
         <div className="cd-custom__actions">
           <button type="button" className="btn btn--ghost cd-custom__btn" onClick={onCancel}>
             取消
           </button>
           <button type="button" className="btn btn--primary cd-custom__btn" onClick={commit}>
-            开始
+            确定
           </button>
         </div>
       </div>

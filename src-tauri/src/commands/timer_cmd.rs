@@ -56,6 +56,13 @@ pub async fn stop_timer(app: AppHandle, state: State<'_, AppState>) -> AppResult
 }
 
 #[tauri::command]
+pub async fn discard_timer(app: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
+    services::timer::discard(&state.pool).await?;
+    events::emit_timer_state(&app, &state.pool).await;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn undo_stop(
     app: AppHandle,
     state: State<'_, AppState>,

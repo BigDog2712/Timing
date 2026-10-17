@@ -12,6 +12,7 @@
  * 键盘：Space 开始/暂停、Enter 结束（在 PillBar 容器统一处理）。
  */
 import type { VisualState } from '../../types/ui';
+import { useRef } from 'react';
 
 /** SVG 弧几何：viewBox 0 0 16 16，r = (16 - stroke 2.4) / 2 = 6.8，周长 2πr */
 const ARC_R = 6.8;
@@ -42,10 +43,24 @@ interface MainButtonProps {
   progress?: number;
   /** [V0.2.0] 接近到点（剩余 ≤ 阈值）→ 弧色切 warn */
   warn?: boolean;
+  /**
+   * [V0.2.6] 右键（对齐 Timing v1.7.3 的 Zone.Ring / OnRingRight）：
+   * 计时中 = 结束并保存；空闲 = 主菜单。按下/抬起都不往上传，避免再被 PillBar 的空白区逻辑接管。
+   */
+  onMenu?: (pos: { x: number; y: number }) => void;
 }
 
-export function MainButton({ state, label, onClick, countdown = false, progress = 1, warn = false }: MainButtonProps) {
+export function MainButton({
+  state,
+  label,
+  onClick,
+  countdown = false,
+  progress = 1,
+  warn = false,
+  onMenu,
+}: MainButtonProps) {
   const arc = arcSpec(state, countdown, progress);
+  const rightUpAt = useRef(0);
 
   return (
     <button
@@ -55,7 +70,29 @@ export function MainButton({ state, label, onClick, countdown = false, progress 
       data-countdown={countdown ? 'true' : 'false'}
       data-warn={warn ? 'true' : 'false'}
       onClick={onClick}
-      aria-label={label}
+      onPointerDown={onMenu ? (e) => { if (e.button === 2) e.stopPropagation(); } : undefined}
+      onPointerUp={
+        onMenu
+          ? (e) => {
+              if (e.button !== 2) return;
+              e.stopPropagation();
+              e.preventDefault();
+              rightUpAt.current = Date.now();
+              onMenu({ x: e.clientX, y: e.clientY });
+            }
+          : undefined
+      }
+      onContextMenu={
+        onMenu
+          ? (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (Date.now() - rightUpAt.current < 400) return;
+              onMenu({ x: e.clientX, y: e.clientY });
+            }
+          : undefined
+      }
+      aria-label={onMenu ? `${label}（右键结束或菜单）` : label}
     >
       {arc && (
         <svg className="ring__arc" viewBox="0 0 16 16" aria-hidden>

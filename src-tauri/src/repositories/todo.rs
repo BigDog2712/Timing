@@ -1,6 +1,6 @@
 //! 待办仓库（`todos` 表）。仅 SQL + 行映射，不含业务规则。
 
-use sqlx::{QueryBuilder, Sqlite, SqlitePool};
+use sqlx::{QueryBuilder, Sqlite, SqlitePool, Transaction};
 
 use crate::error::AppResult;
 use crate::models::todo::{Todo, TodoListParams};
@@ -131,6 +131,28 @@ pub async fn set_done(pool: &SqlitePool, id: i64, done_at: Option<i64>, now: i64
         .bind(id)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+/// 已保存记录的同名未完成待办：与记录保存共用事务，精确匹配所有重复标题。
+/// 不恢复历史软删行，也不触碰已完成待办。
+pub(crate) async fn soft_delete_for_saved_record(
+    tx: &mut Transaction<'_, Sqlite>,
+    record_id: i64,
+    now: i64,
+) -> AppResult<()> {
+    sqlx::query(
+        "UPDATE todos SET deleted_at = ?, updated_at = ? \
+         WHERE deleted_at IS NULL AND done_at IS NULL AND title COLLATE BINARY = (\
+           SELECT items.name FROM time_records JOIN items ON items.id = time_records.item_id \
+           WHERE time_records.id = ? AND time_records.status = 'saved' \
+             AND time_records.deleted_at IS NULL)",
+    )
+    .bind(now)
+    .bind(now)
+    .bind(record_id)
+    .execute(&mut **tx)
+    .await?;
     Ok(())
 }
 

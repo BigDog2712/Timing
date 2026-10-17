@@ -115,6 +115,8 @@ export function createMockApiV020(
     close_note_window: () => undefined,
     open_todos_window: () => undefined,
     open_settings_window: () => undefined,
+    get_reference_settings: () => ({ uiScale: 1, plateOpacity: 0.9, defaultCountdownMinutes: 25, maxMinutes: 120, autoWriteOnStop: true, autoBindFirstTodo: false, defaultPauseReason: '', mergeGapMinutes: 5, minRecordSeconds: 5, pendingEnabled: true, remindAdvanceMinutes: 10, lightRemindDefaultOn: true, quickFindEnabled: true, timerWindowEnabled: false, extensionAutoStart: false, highlightColor: '#4DA3E8', desktopMenuEnabled: true }),
+    update_reference_settings: (a) => a?.patch,
 
     /* ---- 主题域 ---- */
     theme_get: () => ({ mode: s.settings.themeMode }),

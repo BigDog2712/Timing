@@ -1,0 +1,24 @@
+/* =============================================================================
+ * TickBar V0.2.2 — slider.css（设置面板的「文字 / 背景不透明度」滑杆）
+ * -----------------------------------------------------------------------------
+ * P0：仅 var(--*)，零字面量色值。
+ * 不重绘轨道的伪元素：Chrome 的 range 轨道伪元素在 appearance:none 下仍会退回 UA 画法
+ * （实测 track 规则不生效、滑块规则生效），因此改用 accent-color 让轨道/滑块跟主题走，
+ * 只保留尺寸与焦点环。
+ * ========================================================================== */
+
+.slider {
+  width: 118px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.slider:focus-visible {
+  outline: none;
+  border-radius: var(--radius-full);
+  box-shadow: var(--focus-ring);
+}
