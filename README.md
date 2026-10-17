@@ -54,6 +54,15 @@ npm run typecheck    # tsc --noEmit
 npm run build        # tsc + vite build
 ```
 
+Windows 上跑桌面端的前提与差异：
+
+- 需要 Rust（`stable-x86_64-pc-windows-msvc`）、VS Build Tools 的「使用 C++ 的桌面开发」、Windows SDK、WebView2 运行时。
+- VS Build Tools **不会**把 `link.exe` 写进系统 PATH，直接 `npm run tauri dev` 会报 ``linker `link.exe` not found``。两种解法：
+  - 用 `scripts/dev-desktop.cmd`（自动 `vcvars64` 后启动，双击或命令行均可）；
+  - 或在「x64 Native Tools Command Prompt for VS」里执行 `npm run tauri dev`。
+- 若 PowerShell 禁止运行脚本（`npm.ps1` 被 ExecutionPolicy 拦截），改用 `npm.cmd` 或 `cmd`。
+- 只想看界面、不碰 Rust：`npm run dev` 后打开 <http://localhost:1420>，走 `src/mocks` 的 mock IPC（无托盘、无全局快捷键、无真实窗口）。
+
 ```bash
 cd src-tauri
 cargo test           # 后端测试（当前 164 项）
