@@ -1,0 +1,286 @@
+/* =============================================================================
+ * TickBar — app.css（基础层与共享原语）
+ * -----------------------------------------------------------------------------
+ * P0：本文件**只允许**引用 var(--*) CSS 变量，禁止出现任何字面量色值
+ *     （十六进制色值、色彩函数一律禁止，白色与黑色也不例外）。
+ *     原始色值唯一合法出现处是 styles/design-tokens.css。
+ * 结构：reset -> 透明置顶层 -> 按钮/开关/提示/错误 -> 焦点环（置于末尾以赢得同优先）
+ * ========================================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: var(--window-w);
+  height: var(--window-h);
+  overflow: hidden;
+  background: transparent; /* 透明置顶层：无背景、无 Mica/Acrylic */
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+  cursor: default;
+}
+
+#root {
+  width: var(--window-w);
+  height: var(--window-h);
+}
+
+/* 固定 384x360 透明置层：空白区 click-through，仅可见元素接管指针 */
+.layer {
+  position: relative;
+  width: var(--window-w);
+  height: var(--window-h);
+  pointer-events: none;
+}
+
+.layer__stack {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: var(--snap-margin);
+  pointer-events: none;
+}
+
+.layer__stack > * {
+  pointer-events: auto;
+}
+
+/* ---- 基础控件 reset ---- */
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+kbd {
+  font: inherit;
+}
+
+/* ---- 无障碍：仅视觉隐藏 ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- 键盘键名（ALL CAPS：必须带字距） ---- */
+.kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ---- 通用按钮 ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--toast-h);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-chip);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-emphasize);
+  color: var(--text-primary);
+  background: var(--surface-3);
+  border: 1px solid transparent;
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard),
+    border-color var(--dur-quick) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-4);
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+/* accent tint 档（V0.2.0 §4.1：品牌蓝不做实心主按钮——白字压强调蓝仅 2.45:1） */
+.btn--primary {
+  background: var(--btn-accent-bg);
+  color: var(--btn-accent-ink);
+  border-color: var(--btn-accent-line);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-line);
+}
+
+.btn--secondary {
+  background: transparent;
+  border-color: var(--btn-accent-line);
+  color: var(--btn-accent-ink);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--accent-wash);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.btn--danger {
+  color: var(--danger);
+}
+
+.btn--danger:hover:not(:disabled) {
+  color: var(--danger);
+  background: var(--surface-2);
+}
+
+/* ---- 提示条 ---- */
+.notice {
+  position: absolute;
+  left: var(--snap-margin);
+  right: var(--snap-margin);
+  bottom: var(--snap-margin);
+  z-index: var(--z-tooltip);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--toast-h);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-float);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  pointer-events: auto;
+}
+
+.notice[data-tone="danger"] {
+  color: var(--danger);
+}
+
+/* ---- 内联错误 ---- */
+.inline-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+
+.inline-error svg {
+  flex: 0 0 auto;
+}
+
+.inline-error__action {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-emphasize);
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* ---- 开关（V0.2.0 §4.3：38×22 / 槽 --track / 开 --accent / 钮 18px） ---- */
+.switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--switch-w);
+  height: var(--switch-h);
+  border-radius: var(--radius-full);
+  background: var(--track);
+  border: 1px solid transparent;
+  transition: background-color var(--dur-base) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
+}
+
+.switch[data-on="true"] {
+  background: var(--accent);
+}
+
+.switch:hover:not(:disabled) {
+  border-color: var(--line-3);
+}
+
+.switch:disabled {
+  background: var(--bg-field);
+}
+
+.switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--solid-bg);
+  transition: transform var(--dur-exit) var(--ease-standard), background-color var(--dur-base) var(--ease-standard);
+}
+
+.switch[data-on="true"] .switch__thumb {
+  background: var(--solid-bg);
+  transform: translateX(16px);
+}
+
+.switch:disabled .switch__thumb {
+  background: var(--ink-3);
+}
+
+.switch:active:not(:disabled) .switch__thumb {
+  transform: scale(0.94);
+}
+
+.switch[data-on="true"]:active:not(:disabled) .switch__thumb {
+  transform: translateX(16px) scale(0.94);
+}
+
+/* ---- 焦点环（置于文件末尾，保证在相同优先级下胜出；禁止 outline:none 清除） ---- */
+:where(button, [role="switch"], input, select, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

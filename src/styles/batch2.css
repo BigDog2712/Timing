@@ -1,0 +1,205 @@
+/* =============================================================================
+ * TickBar V0.2.0 — batch2.css（批2 浮层：小条倒计时环 / 倒计时自定义 / 常用事项）
+ * -----------------------------------------------------------------------------
+ * 依据 docs/design/pages-V0.2.0/{countdown-menu,common-items}.md。
+ * P0：仅 var(--*)，零字面量色值。自绘玻璃复用于 menu.css 的 .menu 语言。
+ * 提醒浮出卡见同目录 reminder.css（单文件 ≤300 行纪律）。
+ * ========================================================================== */
+
+/* ------------------------------ 小条：倒计时剩余提示色 ------------------------------ */
+/* [Timing 对齐 D3] 裁决一：急迫态 = RingUrgent 红（非橙）；数字变红不闪（MainForm.cs:786-793） */
+.pill .timer-digits[data-tone="warn"] {
+  color: var(--color-danger);
+}
+
+/* [Timing 对齐 D4] 暂停即橙字（MainForm.cs:782-785，与暂停弧同源）；置于 warn 规则后，
+   同权重下暂停优先（MainForm 先判 paused） */
+.pill[data-state="paused"] .timer-digits {
+  color: var(--color-warn);
+}
+
+/* 倒计时：色环改递减弧（border 环隐去，改由 SVG 弧承载；countdown-menu.md §3.3） */
+.ring[data-countdown="true"] {
+  border-color: transparent;
+}
+
+.ring__arc {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible; /* 弧外沿恰好触界（r+stroke/2 = 8），防半像素裁切 */
+  transform: rotate(-90deg); /* 起点置于 12 点方向 */
+  pointer-events: none;
+}
+
+.ring__arc-track {
+  fill: none;
+  /* [Timing 对齐 D6] 轨道 = 状态色 × RingTrackAlpha 95/255 ≈ 0.37（MainForm.cs:2369） */
+  stroke: color-mix(in srgb, currentColor 37%, transparent);
+  stroke-width: var(--ring-stroke);
+}
+
+.ring__arc-bar {
+  fill: none;
+  stroke: var(--color-running);
+  stroke-width: var(--ring-stroke);
+  stroke-linecap: round;
+  transition:
+    stroke-dashoffset var(--dur-tick) linear,
+    stroke var(--dur-base) var(--ease-standard);
+}
+
+/* [Timing 对齐 D3] 急迫态：环色与弧切 RingUrgent 红；轨道 currentColor 随之变红。
+   暂停优先（MainForm.cs:782 先判 paused）：paused 态不切红 */
+.ring[data-warn="true"]:not([data-state="paused"]) {
+  color: var(--color-danger);
+}
+
+.ring[data-warn="true"]:not([data-state="paused"]) .ring__arc-bar {
+  stroke: var(--color-danger);
+}
+
+/* Blink（MainForm.cs:2388-2395）：1s 周期，0-520ms 全亮、480ms 亮度 0.615，
+   作用于弧与轨道；数字不闪（裁决一实现要点） */
+@keyframes ring-blink {
+  0%, 52% {
+    opacity: 1;
+  }
+  52.01%, 100% {
+    opacity: 0.615;
+  }
+}
+
+.ring[data-warn="true"]:not([data-state="paused"]) .ring__arc-bar,
+.ring[data-warn="true"]:not([data-state="paused"]) .ring__arc-track {
+  animation: ring-blink 1s linear infinite;
+}
+
+/* [UI 统一] 暂停态 270° 静弧 → 暖橙（Timing RingPause）；运行态 90° 弧已在 SVG 中，
+   由下方动画整体旋转（Timing spin 113°/s → 3.2s/圈，MainForm.cs:3062） */
+.ring[data-state="paused"] .ring__arc-bar {
+  stroke: var(--color-warn);
+}
+
+@keyframes ring-spin {
+  from {
+    transform: rotate(-90deg);
+  }
+  to {
+    transform: rotate(270deg);
+  }
+}
+
+.ring[data-state="running"] .ring__arc {
+  animation: ring-spin 3.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring[data-state="running"] .ring__arc,
+  .ring[data-warn="true"] .ring__arc-bar,
+  .ring[data-warn="true"] .ring__arc-track {
+    animation: none;   /* [Timing 对齐 D3] blink 退化为静态红 */
+  }
+}
+
+/* 事项名可点（常用事项入口） */
+.pill__name[data-interactive="true"] {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-quick) var(--ease-standard);
+}
+
+.pill__name[data-interactive="true"]:hover {
+  color: var(--ink);
+}
+
+/* ------------------------------ 自定义时长（countdown-menu.md §3.2） ------------------------------ */
+.menu--countdown-custom {
+  width: 200px;
+  animation: menu-in var(--dur-base) var(--ease-standard);
+}
+
+.cd-custom__row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--menu-item-pad-x) 0;
+}
+
+.cd-custom__field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cd-custom__input {
+  width: var(--field-num-w);
+  height: var(--input-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  text-align: right;
+}
+
+.cd-custom__input:focus-visible {
+  outline: none;
+  background: var(--input-bg-focus);
+  box-shadow: var(--focus-ring);
+}
+
+.cd-custom__unit {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.cd-custom__hint,
+.cd-custom__error {
+  margin: var(--space-2) var(--menu-item-pad-x) 0;
+  font-size: var(--text-cap);
+}
+
+.cd-custom__hint {
+  color: var(--ink-4);
+}
+
+.cd-custom__error {
+  color: var(--danger);
+}
+
+.cd-custom__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--menu-item-pad-x) var(--space-1);
+}
+
+.cd-custom__btn {
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+}
+
+/* ------------------------------ 常用事项（common-items.md §1） ------------------------------ */
+/* 当前项：左 3×16 --accent 竖条（与事项窗口当前行一致）；隐藏右侧勾以去重编码 */
+.menu--common .menu__item[data-current="true"] {
+  box-shadow: inset 3px 0 0 0 var(--accent);
+  color: var(--menu-text-on);
+}
+
+.menu--common .menu__check {
+  display: none;
+}
+
+/* ------------------------------ 设置 · 通用页：开关行内小字提示 ------------------------------ */
+.setting-row__hint {
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}

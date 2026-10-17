@@ -1,0 +1,27 @@
+# --- Node / 前端 ---
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# --- Rust / Tauri ---
+**/target/
+src-tauri/gen/schemas/
+
+# --- 构建产物（构建期复制生成，不入库） ---
+release/*.exe
+release/*.msi
+release/*.nsis.zip
+
+# --- 临时 / 本地 ---
+*.log
+tmp_*
+*.pyc
+__pycache__/
+.DS_Store
+
+# --- 编辑器 / 系统 ---
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

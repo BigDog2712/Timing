@@ -1,0 +1,155 @@
+/* =============================================================================
+ * TickBar V0.2.0 — todos-pending.css（事项窗口：待办分组 + 待办行）
+ * -----------------------------------------------------------------------------
+ * 拆自 todos-panel.css（单文件 ≤300 行纪律）。仅 var(--*)，零字面量色值。
+ * 依据 docs/design/pages-V0.2.0/todos-panel.md §1 待办区 + §3.1 三级语气。
+ * 内联编辑 / 空态 / Loading-Error 见 todos-inline.css。
+ * ========================================================================== */
+
+/* ------------------------------ 待办分组 ------------------------------ */
+.todo-sec {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.todo-sec__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 22px;
+}
+
+.todo-sec__head--done {
+  margin-top: var(--space-2);
+}
+
+.todo-sec__label {
+  font-size: var(--text-cap);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  color: var(--todo-summary-ink);
+}
+
+.todo-sec__meta {
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+}
+
+.todo-sec__none {
+  margin: var(--space-2) 0;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+.todo-sec__more {
+  width: 100%;
+  height: var(--todos-pending-row-h);
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-sec__more:hover {
+  background: var(--todo-row-hover);
+  color: var(--ink);
+}
+
+/* ------------------------------ 待办行 ------------------------------ */
+.todo-pend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--todos-pending-row-h);
+  padding: 0 6px 0 4px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-pend:hover {
+  background: var(--todo-row-hover);
+}
+
+.todo-pend__mark {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+}
+
+.todo-pend__mark:active {
+  transform: scale(0.9);
+}
+
+.todo-pend__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);   /* [Timing 对齐 D10] RowEm 12.5 */
+  color: var(--ink-2);
+}
+
+.todo-pend[data-tone="none"] .todo-pend__title {
+  color: var(--todo-no-time);
+}
+
+.todo-pend[data-tone="overdue"] .todo-pend__title {
+  color: var(--todo-overdue);
+}
+
+.todo-pend[data-done="true"] .todo-pend__title {
+  color: var(--todo-name-done);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-3);
+}
+
+.todo-pend__info {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);   /* [Timing 对齐 D10] NumEm 11.5 */
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink-4);
+}
+
+.todo-pend[data-tone="overdue"] .todo-pend__info {
+  color: var(--todo-overdue);
+}
+
+.todo-pend__actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.todo-pend__act {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-pend__act:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+/* 图标非文本，门槛 3:1（WCAG 1.4.11）；勿按文字 4.5 抬高 */
+.todo-pend__act--danger:hover {
+  background: var(--danger-wash);
+  color: var(--danger);
+}

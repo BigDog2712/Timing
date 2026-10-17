@@ -1,0 +1,113 @@
+/* =============================================================================
+ * TickBar V0.2.0 — design-tokens-compat.css（V0.1.0 过渡别名 + 主题卡预览色）
+ * -----------------------------------------------------------------------------
+ * 拆自 design-tokens.css（单文件 <=300 行纪律）。**仅此文件与 design-tokens.css
+ * 允许出现字面量色值**；其余组件 CSS 一律 var(--*)。
+ * 载入顺序须在 design-tokens.css 之后。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 7. V0.1.0 过渡别名桥（仅此文件可含字面量）
+ *   目的：V0.1.0 既有组件 CSS 引用旧名，仍需解析。全部映射到 V0.2.0 令牌，
+ *   颜色/阴影经 var 间接层，自动随 data-theme 切换；新代码一律用 V0.2.0 规范名。
+ * ========================================================================== */
+:root {
+  /* 状态色（旧三态色 → V0.2.0） */
+  /* [Timing 对齐 D1] RingIdle = InkOnGlass：深 #F2F3F5 / 浅 #16181D → var(--ink) */
+  --state-idle:    var(--ink);
+  --state-running: var(--color-running);
+  --state-paused:  var(--color-warn);   /* [Timing 对齐裁决三] 暂停=暖橙；别名零消费方，纯一致性 */
+  --success:       var(--ok);
+  --info:          var(--ink-3);
+  --warn-on:       var(--solid-ink);
+  --danger-on:     var(--solid-bg);
+  --accent-on:     var(--solid-ink);
+  --accent-hover:  var(--accent-ink);
+  --accent-active: var(--accent);
+  --accent-halo:   transparent;   /* V0.2.0 删除运行光晕 */
+  --accent-halo-success: transparent;
+
+  /* 描边 / 内高光 */
+  --border-strong: var(--line-3);
+  --edge-inner:    var(--inset-highlight);
+
+  /* 字阶（旧名 → 新名） */
+  --text-2xs:      var(--text-cap);
+  --text-base:     var(--text-body);
+  --text-md:       var(--text-num);
+  --text-lg:       var(--text-title);
+  --text-timer:    var(--text-num);
+  --text-timer-lg: 28px;
+  --leading-timer: var(--leading-num);
+  --leading-timer-lg: 1.15;
+  --tracking-sm:   var(--tracking-base);
+  --tracking-tighter: var(--tracking-tight);
+  --weight-emphasize: var(--weight-medium);
+  --weight-announce:  var(--weight-strong);
+
+  /* 圆角 / 阴影（旧名 → 新名） */
+  --radius-chip:    var(--radius-full);
+  --elev-flat:      var(--shadow-flat);
+  --elev-ring:      var(--shadow-ring);
+  --elev-raised:    var(--shadow-pop);
+  --elev-raised-hover: var(--shadow-pop);
+  --elev-float:     var(--shadow-float);
+  --elev-panel:     var(--shadow-panel);
+  --elev-drag:      var(--shadow-plate);
+
+  /* 间距补充档（V0.2.0 仅定义 1..7） */
+  --space-8:  24px;
+  --space-9:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* 尺寸补充（V0.2.0 未定义） */
+  --panel-w:   300px;
+  --toast-h:   32px;
+  --chip-h:    28px;
+  --chip-pad-x: 12px;
+  --dot-size:  28px;
+  --dur-breath: 2400ms;
+
+  /* 药丸旧别名 → V0.2.0 */
+  /* [Timing 对齐 D2] --pill-bg-hover 已删：无任何消费方，--pill-hover-plate 直接接线 */
+  --pill-bg-active:     var(--bg-field-hi);
+  --pill-bg-drag:       var(--bg-field-hi);
+  --pill-border:        var(--line-2);
+  --pill-shadow:        var(--shadow-balloon);
+  --pill-shadow-hover:  var(--shadow-pop);
+  --pill-shadow-drag:   var(--shadow-plate);
+  --divider:            var(--line);
+
+  /* chips 旧别名 */
+  --chip-bg:        var(--bg-field);
+  --chip-bg-hover:  var(--bg-field-hi);
+  --chip-text:      var(--ink-2);
+
+  /* 菜单旧别名 */
+  --menu-item-pressed: var(--bg-field-hi);
+
+  /* 撤销条旧别名（V0.2.0 未定义，映射到通用浮层） */
+  --undo-bg:     var(--bg-panel);
+  --undo-border: var(--line-2);
+  --undo-text:   var(--ink-2);
+  --undo-action: var(--accent);
+
+  --ring-color:  var(--state-idle);
+  --pill-opacity: 0.96;
+  --pill-scale:   1;
+}
+
+/* =============================================================================
+ * 8. 主题卡迷你预览色（ThemePicker 用「真实色」缩略，非 UI 语义色）
+ *    仅为让「深色 / 浅色」卡在任意当前主题下都显示各自真实外观；字面量集中于此。
+ * ========================================================================== */
+:root {
+  --preview-dark-plate:  #0E0F12;
+  --preview-dark-ink:    #F2F3F5;
+  --preview-dark-line:   rgba(255, 255, 255, 0.14);
+  --preview-light-plate: #F2F3F5;
+  --preview-light-ink:   #16181D;
+  --preview-light-line:  rgba(16, 20, 28, 0.14);
+  --preview-accent:      #4DA3E8;
+}

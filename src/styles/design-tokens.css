@@ -1,0 +1,449 @@
+/* =============================================================================
+ * TickBar V0.2.0 — design-tokens.css（三层 Token：primitive → semantic → component）
+ * V0.2.0-2 设计系统整体重做（对标 Timing v1.7.0）| 设计师：颜好看
+ * -----------------------------------------------------------------------------
+ * 消费规则（P0）：
+ *   1. 组件 CSS 只允许引用 var(--*)，禁止出现任何裸 hex / rgb。
+ *      唯一例外：box-shadow 内的 rgba 阴影色，且必须经 --shadow-* / --inset-* 引用。
+ *   2. 主题切换：<html data-theme="dark|light">，两套变量在同一文件内，无 JS 重排。
+ *   3. 语义色作『文字』须 >=4.5:1；作『非文本』（描边/进度/色点）须 >=3:1。
+ *   4. 一屏强调色可见用量：小条 <=1 处，面板 <=2 处。
+ *   5. 计时数字规则不可协商（见 §5 .timer-digits）。
+ *   6. 禁止弹跳/弹性缓动；禁止动画 width/height/font-size/filter/backdrop-filter。
+ * 源：docs/design/design-tokens-V0.2.0.css（移植）+ §7 为 V0.1.0 过渡别名桥。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 0. 主题无关令牌（字体 / 字阶 / 尺寸 / 间距 / 圆角 / 阴影 / 动效 / 层级 / 图标）
+ * ========================================================================== */
+:root {
+  /* ---- 字体 ---- */
+  --font-ui:      "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-ui);
+  --font-mono:    "Cascadia Mono", "Consolas", "SFMono-Regular", "Segoe UI Mono", ui-monospace, monospace;
+
+  /* ---- 字阶（对齐 Timing §2.5）---- */
+  --text-title: 15px;    --leading-title: 1.3;
+  --text-num:   14px;    --leading-num:   1.0;
+  --text-body:  13px;    --leading-body:  1.6;
+  --text-sm:    12.5px;  --leading-sm:    1.45;
+  --text-xs:    11.5px;  --leading-xs:    1.5;
+  --text-cap:   11px;    --leading-cap:   1.4;
+  --text-mono:  11.5px;  --leading-mono:  1.4;
+
+  /* ---- 字重三级 + 强档（YaHei UI 落地映射见 DESIGN-V0.2.0.md §3.3）---- */
+  --weight-read:     400;   /* 正文 / 说明 */
+  --weight-medium:   500;   /* 控件文本 / 任务名 */
+  --weight-semibold: 600;   /* 分组标题 / 已完成行名 */
+  --weight-strong:   650;   /* 标题 / 时间数字 */
+
+  /* ---- 字距 ---- */
+  --tracking-caps:  0.08em;
+  --tracking-xs:    0.02em;
+  --tracking-base:  0;
+  --tracking-tight: -0.01em;
+
+  /* ---- 间距（4px 网格）---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --row-pad-y:   9px;
+  --card-pad-x:  14px;
+  --panel-pad:   16px;
+  --menu-pad:    6px;
+
+  /* ---- 圆角 ---- */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   12px;
+  --radius-xl:   14px;
+  --radius-full: 9999px;
+
+  /* ---- 尺寸：小条几何（对齐 Timing §4.1）---- */
+  --window-w:        384px;
+  --window-h:        360px;
+  --pill-h:          32px;   /* Timing BarH 32（MainForm.cs:175） */
+  --pill-h-compact:  30px;
+  --radius-pill:     calc(var(--pill-h) / 2);   /* 真胶囊 = 16px */
+  --pill-w-min:      116px;
+  --pill-w-max:      288px;
+  --task-w-max:      164px;
+  --pill-pad-l:      8px;
+  --pill-pad-r:      7px;
+  /* [UI 统一 2026-10-16] 环几何对齐 Timing 实测（MainForm.cs: RingD=14 / RingLW=2.4）：
+     视觉 ⌀16（Timing 14 + 命中余量），描边 2.4；命中区经 .ring::before 扩到 24。 */
+  --ring-size:       16px;
+  --ring-stroke:     2.4px;
+  --ring-hit-extra:  4px;
+  /* 小条计时数字：对齐 Timing 有效字号（TimeEm 28 自动收缩到 53px 盒 → 实测 ≈19-20）。
+     字体 Segoe UI Semibold 观感 + tabular-nums 保 AC-24 不抖动（替代 mono，见 pill-bar.md §1 注）。 */
+  --text-timer-pill: 20px;
+  --text-task-pill:  14px;   /* Timing TaskEm=14（YaHei UI Bold） */
+  --font-timer:      "Segoe UI", "Segoe UI Semibold", "Microsoft YaHei UI", sans-serif;
+  --grip-w:          10px;
+  --grip-hit-w:      10px;
+  --grip-svg-w:      12px;
+  --grip-svg-h:      22px;
+
+  /* ---- 尺寸：窗口 ---- */
+  --settings-w: 392px;  --settings-h: 660px;
+  --settings-title-h: 50px;  --settings-tab-h: 48px;  --settings-foot-h: 58px;
+  --todos-w: 336px;  --todos-head-h: 32px;  --todos-row-h: 26px;  --todos-mark-size: 15px;
+  --todos-pending-row-h: 24px;  --todos-foot-h: 40px;  --todos-pending-max: 8;
+  --note-w: 320px;  --note-h: 232px;  --note-head-h: 36px;  --note-foot-h: 34px;
+  --note-w-min: 160px;  --note-h-min: 120px;  --note-w-max: 900px;  --note-h-max: 900px;
+  --note-w-comfort-max: 640px;  --note-h-comfort-max: 480px;
+  --note-max-count: 20;
+  --note-geom-persist-debounce-ms: 300;
+  --note-confirm-stack-below-w: 200px;
+
+  /* ---- 尺寸：菜单 / 控件 ---- */
+  --menu-w: 184px;  --menu-item-h: 30px;  --menu-item-pad-x: 9px;
+  --menu-icon-gap: 10px;  --menu-status-h: 46px;   /* Timing StatusH 46（GlassMenu.cs:27）。预留：.menu__status 为内容驱动高度（padding 9 + 多行），强接定高有 3 行变体裁切风险，待运行态验证后接线 */
+  --btn-md-h: 28px;  --btn-sm-h: 24px;  --icon-btn-size: 26px;
+  --input-h: 28px;  --field-num-w: 54px;
+  --slider-track-h: 4px;  --slider-thumb: 14px;
+  --switch-w: 38px;  --switch-h: 22px;
+
+  /* ---- 尺寸：命中 ---- */
+  --hit-target: 44px;
+  --hit-target-small: 26px;
+  --hit-target-dot: 36px;
+  --snap-margin: 16px;
+  --drag-threshold: 4px;
+
+  /* ---- 图标 ---- */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-stroke-sm: 2.5;   /* 16px */
+  --icon-stroke-lg: 2;     /* 20px / 24px */
+
+  /* ---- 动效（仅 3 条缓动；禁止任何弹跳/弹性）---- */
+  --dur-instant: 100ms;
+  --dur-quick:   150ms;
+  --dur-exit:    180ms;
+  --dur-base:    200ms;
+  --dur-morph:   280ms;
+  --dur-confirm: 900ms;
+  --dur-undo:    3000ms;
+  --dur-tick:    1000ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit:     cubic-bezier(0.4, 0, 1, 1);
+  --ease-morph:    cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ---- 层级 ---- */
+  --z-base: 0;  --z-pill: 10;  --z-panel: 20;  --z-note: 20;
+  --z-settings: 30;  --z-undo: 40;  --z-tooltip: 50;  --z-menu: 60;  --z-dialog: 70;
+
+  /* ---- 玻璃（有明确功能目的，见 DESIGN-V0.2.0.md §6.4）---- */
+  --glass-blur: 18px;
+  --glass-blur-sm: 14px;
+  --glass-saturate: 150%;
+}
+
+/* =============================================================================
+ * 0b. 首屏兜底 + V0.1.0 颜色过渡别名
+ *   index.html 内联引导脚本只需设 data-theme（读 localStorage `tickbar.theme`）
+ *   即可让 --bg 立即生效 —— 无需等 CSS 全量就绪，消除首帧白闪（坑 K-1）。
+ * ========================================================================== */
+:root {
+  --bg:          var(--bg-plate);
+  --surface:     var(--bg-panel);
+  --surface-2:   var(--bg-card);
+  --surface-3:   var(--bg-field);
+  --surface-4:   var(--bg-field-hi);
+  --fg:          var(--ink);
+  --fg-2:        var(--ink-2);
+  --muted:       var(--ink-3);
+  --meta:        var(--ink-4);
+  --border:      var(--line-2);
+  --border-soft: var(--line);
+}
+html { background: var(--bg); font-synthesis-weight: none; }   /* 首屏兜底 + 禁伪粗体 */
+body { background: transparent; }
+
+/* =============================================================================
+ * 1. 深色主题（默认）
+ * ========================================================================== */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-plate:    #0E0F12;
+  --bg-inset:    #1B1E25;
+  --bg-panel:    #0E1015;
+  --bg-card:     #14161C;
+  --bg-field:    #1B1E25;
+  --bg-field-hi: #232833;
+  --bg-seg:      #171A21;
+  --bg-seg-on:   #262B36;
+
+  --line:    rgba(255, 255, 255, 0.06);
+  --line-2:  rgba(255, 255, 255, 0.10);
+  --line-3:  rgba(255, 255, 255, 0.16);
+
+  --ink:    #F2F3F5;
+  --ink-2:  #C9CED8;
+  --ink-3:  #8B93A2;
+  --ink-4:  #7A8292;
+
+  --accent:      #4DA3E8;
+  --accent-ink:  #8FC6F5;
+  --accent-wash: color-mix(in srgb, #4DA3E8 14%, transparent);
+  --accent-line: color-mix(in srgb, #4DA3E8 32%, transparent);
+
+  --warn:        #E8A33D;
+  --warn-wash:   color-mix(in srgb, #E8A33D 12%, transparent);
+  --danger:      #E5484D;
+  --danger-wash: color-mix(in srgb, #E5484D 12%, transparent);
+  --ok:          #4CC38A;
+  --ok-ink:      #06251A;
+
+  --solid-bg:  #EDEFF3;
+  --solid-ink: #0B0C10;
+  --danger-solid: #E1292F;   /* dark: danger 实心底（白字 4.61:1；原 #E5484D 白字仅 3.91）*/
+
+  --track:      rgba(255, 255, 255, 0.09);
+  --scrim:      rgba(14, 15, 18, 0.56);
+  /* [Timing 对齐 D6] --ring-track 已删：倒计时 SVG 轨道改用 currentColor 37%（batch2.css） */
+
+  --glass-panel-bg: color-mix(in srgb, #0E0F12 94%, transparent);
+  --glass-hover-bg: color-mix(in srgb, #0E0F12 74%, transparent);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  --shadow-flat:    none;
+  --shadow-ring:    0 0 0 1px var(--line-2);
+  --shadow-pop:     0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-plate:   0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.40);
+  --shadow-float:   0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-panel:   0 16px 40px rgba(0, 0, 0, 0.52);
+  --shadow-balloon: 0 1px 2px rgba(0, 0, 0, 0.72), 0 0 1px rgba(0, 0, 0, 0.90);
+  /* 透明态文字/环投埃（对齐 Timing TextShadow：offY 1.4 / blur 2.3 / 悬停时淡出） */
+  --shadow-ink: 0 1px 2.5px rgba(0, 0, 0, 0.55);
+  --inset-top:      var(--inset-highlight);
+
+  --grip-ink:   rgba(255, 255, 255, 0.55);   /* Timing 实绘 GlassInkDim 139/255（MainForm.cs:2238） */
+  --focus-ring: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
+  --focus-ring-danger: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--danger);
+}
+
+/* =============================================================================
+ * 2. 浅色主题
+ * ========================================================================== */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-plate:    #F2F3F5;
+  --bg-inset:    #FFFFFF;
+  --bg-panel:    #FFFFFF;
+  --bg-card:     #F7F8FA;
+  --bg-field:    #F1F3F7;
+  --bg-field-hi: #E6E9EF;
+  --bg-seg:      #EDEFF4;
+  --bg-seg-on:   #FFFFFF;
+
+  --line:    rgba(16, 20, 28, 0.07);
+  --line-2:  rgba(16, 20, 28, 0.12);
+  --line-3:  rgba(16, 20, 28, 0.18);
+
+  /* 前景层（AC-53：四级文本对最浅底 --bg-plate 亦须 >=4.5:1，可作正文小字）*/
+  --ink:    #16181D;
+  --ink-2:  #41485A;
+  --ink-3:  #5C6577;
+  --ink-4:  #656E7D;   /* 对 plate 4.64:1 / 卡 4.84 / 白 5.15（原 #707A8A 仅 3.91）*/
+
+  --accent:      #1669AD;
+  --accent-ink:  #1F63AA;
+  --accent-wash: color-mix(in srgb, #1669AD 14%, transparent);
+  --accent-line: color-mix(in srgb, #1669AD 32%, transparent);
+
+  /* 语义层（AC-53：作『文字』对最浅底 --bg-plate 须 >=4.5:1；亦满足非文本 >=3:1）
+     保色相、仅降亮度：H 分别 35 / 358 / 151，与原色同相 */
+  --warn:        #A05E00;   /* 对 plate 4.62:1 / 卡 4.82（原 #A76200 仅 4.31）*/
+  --warn-wash:   color-mix(in srgb, #A05E00 12%, transparent);
+  --danger:      #D02C33;   /* 对 plate 4.62:1 / 卡 4.83（原 #D4353B 仅 4.33）*/
+  --danger-wash: color-mix(in srgb, #D02C33 12%, transparent);
+  --ok:          #0C7E47;   /* 对 plate 4.62:1 / 卡 4.83（原 #0C834A 仅 4.34）*/
+  --ok-ink:      #FFFFFF;
+
+  --solid-bg:  #1A1D24;
+  --solid-ink: #FFFFFF;
+  --danger-solid: #D02C33;   /* light: danger 实心底 = 浅色 --danger（白字 5.13:1）*/
+
+  --track:      rgba(16, 20, 28, 0.11);
+  --scrim:      rgba(16, 20, 28, 0.32);
+
+  --glass-panel-bg: color-mix(in srgb, #F2F3F5 97%, transparent);
+  --glass-hover-bg: color-mix(in srgb, #F2F3F5 86%, transparent);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.90);
+
+  --shadow-flat:    none;
+  --shadow-ring:    0 0 0 1px var(--line-2);
+  --shadow-pop:     0 12px 32px rgba(16, 20, 28, 0.16), 0 2px 6px rgba(16, 20, 28, 0.10);
+  --shadow-plate:   0 18px 48px rgba(16, 20, 28, 0.18), 0 2px 8px rgba(16, 20, 28, 0.12);
+  --shadow-float:   0 12px 32px rgba(16, 20, 28, 0.16);
+  --shadow-panel:   0 16px 40px rgba(16, 20, 28, 0.18);
+  --shadow-balloon: 0 1px 2px rgba(16, 20, 28, 0.28), 0 0 1px rgba(16, 20, 28, 0.45);
+  --shadow-ink: 0 1px 2.5px rgba(16, 20, 28, 0.30);
+  --inset-top:      var(--inset-highlight);
+
+  --grip-ink:   rgba(16, 20, 28, 0.36);   /* Timing 浅档 GlassInkDim = Ink3.A 92/255（Design.cs:258） */
+  --focus-ring: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
+  --focus-ring-danger: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--danger);
+}
+
+/* =============================================================================
+ * 3. 四色可配（settings 写入；默认 = 语义色）
+ * ========================================================================== */
+:root {
+  --color-running: var(--accent);
+  --color-danger:  var(--danger);   /* [Timing 对齐 D3] 急迫态 = RingUrgent，与 running/warn/done 同构 */
+  --color-warn:  var(--warn);
+  --color-done:    var(--ok);
+  --color-bar:     var(--bg-plate);
+}
+
+/* =============================================================================
+ * 4. B-slot 组件别名（组件引用这些，不直接引用原始值）
+ * ========================================================================== */
+:root {
+  /* 小条 */
+  /* [Timing 对齐 D2] --pill-bg 死别名已删（悬停板改接 --pill-hover-plate，无消费方） */
+  --pill-border-in:     var(--line-2);
+  --pill-hover-plate:   color-mix(in srgb, var(--color-bar) 74%, transparent);   /* 裁决二：74%（= --glass-hover-bg 档） */
+  --pill-grip-ink:      var(--grip-ink);
+  --pill-divider:       var(--line);
+
+  /* 菜单 */
+  --menu-bg:            var(--glass-panel-bg);
+  --menu-border:        var(--line-2);
+  --menu-item-hover:    var(--bg-field-hi);
+  --menu-text:          var(--ink-2);
+  --menu-text-on:       var(--ink);
+  --menu-danger:        var(--danger);
+  --menu-group-label:   var(--ink-4);
+  --menu-badge-bg:      var(--accent-wash);
+  --menu-badge-ink:     var(--accent-ink);
+
+  /* 输入 / 分段 */
+  --input-bg:           var(--bg-field);
+  --input-bg-focus:     var(--bg-field-hi);
+  --input-border:       var(--line);
+  --input-placeholder:  var(--ink-4);
+  --input-text:         var(--ink);
+  --seg-track:          var(--bg-seg);
+  --seg-track-line:     var(--line);
+  --seg-on-bg:          var(--bg-seg-on);
+  --seg-on-ink:         var(--ink);
+  --seg-off-ink:        var(--ink-3);
+
+  /* 按钮（六档：solid / accent / neutral / ghost / danger / icon）*/
+  --btn-accent-bg:      var(--accent-wash);
+  --btn-accent-ink:     var(--accent-ink);
+  --btn-accent-line:    var(--accent-line);
+  --btn-neutral-bg:     var(--bg-field-hi);
+  --btn-neutral-ink:    var(--ink);
+  --btn-ghost-ink:      var(--ink-3);
+  --btn-danger-bg:      var(--danger-solid);   /* 实心底专用（深 #E1292F / 浅 #D02C33），白字均 >=4.5 */
+  --btn-danger-ink:     #FFFFFF;
+  --btn-solid-bg:       var(--solid-bg);
+  --btn-solid-ink:      var(--solid-ink);
+  --btn-icon-ink:       var(--ink-3);
+  --btn-icon-hover-bg:  var(--bg-field-hi);
+  --btn-icon-danger-bg: var(--danger-wash);
+
+  /* 卡片 / 行 */
+  --card-bg:            var(--bg-card);
+  --card-line:          var(--line);
+
+  /* 事项窗口 / 待办（todos-panel.md §3.1 四状态分层；DESIGN §2.4 B-slot） */
+  --todo-row-hover:      var(--bg-field-hi);
+  --todo-row-current:    var(--accent-wash);
+  --todo-bar-current:    var(--accent);
+  --todo-time-current:   var(--accent-ink);
+  --todo-name-done:      var(--ink-4);
+  --todo-mark-ring:      var(--line-3);
+  --todo-mark-done:      var(--ok);
+  --todo-mark-done-ink:  var(--ok-ink);
+  --todo-overdue:        var(--color-warn);   /* 走可配色（AC-54），默认回落 --warn */
+  --todo-no-time:        var(--ink-4);
+  --todo-summary-ink:    var(--ink-4);
+
+  /* 便利贴（sticky-note.md §4；源 docs/design/design-tokens-V0.2.0.css §4 B-slot） */
+  --note-body-bg:       var(--bg-inset);
+  --note-foot-ink:      var(--ink-3);
+  --note-confirm-bg:    var(--danger-wash);
+  --note-confirm-line:  var(--danger);
+
+  /* 文本语义别名 */
+  --text-primary:       var(--ink);
+  --text-secondary:     var(--ink-2);
+  --text-tertiary:      var(--ink-3);
+  --text-disabled:      var(--ink-4);
+
+  /* 提示气泡 kbd */
+  --kbd-bg:             var(--bg-panel);
+  --kbd-border:         var(--line-2);
+}
+
+/* =============================================================================
+ * 5. 计时数字规则（全项目最重要的一条排版规则，不可协商）
+ * ========================================================================== */
+.timer-digits {
+  font-family: var(--font-mono);
+  font-size: var(--text-num);
+  line-height: var(--leading-num);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-base);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-variant-ligatures: none;
+  min-width: 53px;                            /* MM:SS 定宽（对齐 Timing TimeW 53）*/
+  text-align: right;
+  white-space: nowrap;
+  color: var(--ink);
+  display: inline-block;
+}
+.timer-digits[data-hours="true"] { min-width: 72px; }
+.timer-digits[data-size="lg"] {
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: var(--tracking-tight);
+}
+
+/* =============================================================================
+ * 6. focus-visible（永不被清除）与 reduced-motion
+ * ========================================================================== */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: inherit;
+}
+.btn-danger:focus-visible,
+[data-danger]:focus-visible {
+  box-shadow: var(--focus-ring-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0.01ms;
+    --dur-quick:   0.01ms;
+    --dur-exit:    0.01ms;
+    --dur-base:    0.01ms;
+    --dur-morph:   0.01ms;
+  }
+  .halo-breath,
+  .ring-tick { animation: none !important; }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .ring[data-state="running"] { stroke-width: 3px; }
+  .ring[data-state="paused"]  { stroke-dasharray: 4 3; }
+}

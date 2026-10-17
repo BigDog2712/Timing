@@ -1,0 +1,299 @@
+/* =============================================================================
+ * TickBar V0.2.0 — note.css（便利贴窗口 label = note-{id}）
+ * -----------------------------------------------------------------------------
+ * 依据 docs/design/pages-V0.2.0/sticky-note.md §1/§3/§6。
+ * P0：仅 var(--*)，零字面量色值（尺寸断点除外）。
+ * 关键：正文文字**始终 100% 不透明**（--ink），未悬停仅让**背景板**更透 + 头/页脚/按钮淡出
+ *       （sticky-note.md §3.1 可读性红线：Timing §1-11 双重透明硬伤的修复）。
+ * 窗口壳：html[data-window="note"] 覆写 app.css 的主窗 384×360 根尺寸。
+ * ========================================================================== */
+
+/* ------------------------------ 窗口根 ------------------------------ */
+html[data-window="note"] {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+html[data-window="note"] body,
+html[data-window="note"] #root {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* ------------------------------ 便利贴本体 ------------------------------ */
+.note {
+  container-type: inline-size; /* 供确认条窄宽断点查询（noteConfirmStackBelowW 200） */
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  /* 未悬停（sticky 态）：更透的底，无描边、无投影（§3.1 / §6） */
+  background: var(--glass-hover-bg);
+  border: 1px solid transparent;
+  box-shadow: none;
+  color: var(--ink);
+  transition:
+    background-color var(--dur-exit) var(--ease-standard),
+    border-color var(--dur-exit) var(--ease-standard),
+    box-shadow var(--dur-exit) var(--ease-standard);
+}
+
+/* 悬停 / 聚焦：显影为完整板式玻璃 */
+.note:hover,
+.note:focus-within {
+  background: var(--glass-panel-bg);
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-plate);
+}
+
+/* ------------------------------ 头（未悬停淡出） ------------------------------ */
+.note__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--note-head-h);
+  padding: 0 5px 0 var(--card-pad-x);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-exit) var(--ease-standard);
+}
+
+.note:hover .note__head,
+.note:focus-within .note__head {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.note__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+  cursor: default;
+}
+
+.note__title[data-untitled="true"] {
+  color: var(--ink-4);
+  font-weight: var(--weight-read);
+}
+
+.note__actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.note__icon {
+  display: grid;
+  place-items: center;
+  width: var(--icon-btn-size);
+  height: var(--icon-btn-size);
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  background: transparent;
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard);
+}
+
+.note__icon:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.note__icon:active {
+  transform: scale(0.92);
+}
+
+.note__icon--danger:hover {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+/* ------------------------------ 正文（始终可读可输入） ------------------------------ */
+.note__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 9px;
+  border-radius: var(--radius-sm);
+  background: var(--note-body-bg);
+  border: 1px solid transparent;
+  transition:
+    border-color var(--dur-quick) var(--ease-standard),
+    box-shadow var(--dur-quick) var(--ease-standard);
+}
+
+.note__body:focus-within {
+  border-color: var(--accent-line);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+.note__input {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 9px 11px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--ink); /* 可读性红线：始终 100% 不透明 */
+  /* [Timing 对齐 D5] 正文 = 悬浮小条事项名同套字体参数：14px / 650（StickyNoteForm.cs:1289-1293）。
+     font 简写保行数红线（等价 font-family + font-size + line-height + font-weight 四行） */
+  font: var(--weight-strong) var(--text-task-pill) / var(--leading-body) var(--font-ui);
+  user-select: text;
+  cursor: text;
+  overflow-y: auto;
+}
+
+.note__input::placeholder {
+  color: var(--ink-4);
+}
+
+/* 自绘 6px 滚动条（无箭头） */
+.note__input::-webkit-scrollbar {
+  width: 6px;
+}
+
+.note__input::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+
+/* ------------------------------ 页脚（未悬停淡出） ------------------------------ */
+.note__foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--note-foot-h);
+  padding: 0 var(--card-pad-x);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-exit) var(--ease-standard);
+}
+
+.note:hover .note__foot,
+.note:focus-within .note__foot {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.note__foot-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--note-foot-ink);
+}
+
+.note__foot-error {
+  color: var(--danger);
+}
+
+.note__link {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.note__link:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.note__link-select {
+  width: 100%;
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: var(--text-xs);
+}
+
+/* 超出舒适上限（640×480）软提示：仅弱化页脚，不拦截拖拽（§1 舒适上限为软提示） */
+.note[data-oversize="true"] .note__foot-text {
+  color: var(--ink-4);
+}
+
+/* ------------------------------ 删除内联确认条 ------------------------------ */
+.note__confirm {
+  flex: 0 0 auto;
+  margin: var(--space-2) 9px;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--note-confirm-bg);
+  border: 1px solid color-mix(in srgb, var(--note-confirm-line) 30%, transparent);
+}
+
+.note__confirm-title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.note__confirm-desc {
+  margin: 2px 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.note__confirm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.note__confirm-btn {
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+}
+
+.note__confirm-danger {
+  background: var(--btn-danger-bg);
+  color: var(--btn-danger-ink);
+}
+
+.note__confirm-danger:hover:not(:disabled) {
+  background: var(--btn-danger-bg);
+  transform: translateY(-1px);
+}
+
+/* 窄宽（note < 200px）：按钮竖排、各满宽（§3.4；200 为组件内布局断点，不入窗配置） */
+@container (max-width: 199.98px) {
+  .note__confirm-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .note__confirm-btn {
+    width: 100%;
+  }
+}

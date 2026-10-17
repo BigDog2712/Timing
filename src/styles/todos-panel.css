@@ -1,0 +1,239 @@
+/* =============================================================================
+ * TickBar V0.2.0 — todos-panel.css（事项窗口外壳 / 表头 / 记录行 / 底栏）
+ * -----------------------------------------------------------------------------
+ * 依据 docs/design/pages-V0.2.0/todos-panel.md。
+ * P0：仅 var(--*)，零字面量色值；清单用 1px 线分组（不用卡片盒）；
+ *     进行中行 = --accent-wash 底 + 3px 竖条（非「彩色左边框」单打独斗）。
+ * 窗口壳：html[data-window="todos"] 覆写 app.css 的主窗 384×360 根尺寸。
+ * 待办分组 / 内联编辑 / 空态见同目录 todos-pending.css（单文件 ≤300 行纪律）。
+ * ========================================================================== */
+
+/* ------------------------------ 窗口根 ------------------------------ */
+html[data-window="todos"] {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+html[data-window="todos"] body,
+html[data-window="todos"] #root {
+  width: 100vw;
+  height: 100vh;
+}
+
+.todos {
+  display: flex;
+  flex-direction: column;
+  width: var(--todos-w);
+  height: 100vh;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--menu-bg); /* 玻璃板 94%（todos-panel.md §1 底） */
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-plate);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  color: var(--ink-2);
+}
+
+/* ------------------------------ 表头 ------------------------------ */
+.todos__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  height: var(--todos-head-h);
+  padding: 0 var(--card-pad-x);
+  border-bottom: 1px solid var(--line);
+}
+
+.todos__head-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--text-xs);   /* [Timing 对齐 D10] HeadEm 11.5（TodoListPanel.cs:64） */
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.todos__head-count {
+  font-weight: var(--weight-read);
+  color: var(--ink-3);
+}
+
+.todos__head-total {
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+/* ------------------------------ 主体 ------------------------------ */
+.todos__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--space-1) var(--space-2);
+}
+
+.todos__body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.todos__body::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+
+.todos__records {
+  padding-bottom: var(--space-1);
+}
+
+/* ------------------------------ 记录行 ------------------------------ */
+.todo-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--todos-row-h);
+  padding: 0 6px 0 10px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-row:hover {
+  background: var(--todo-row-hover);
+}
+
+.todo-row[data-status="running"] {
+  background: var(--todo-row-current);
+  box-shadow: inset 3px 0 0 0 var(--todo-bar-current);
+}
+
+.todo-row--editing,
+.todo-row--confirming {
+  padding: 0 6px;
+}
+
+.todo-row__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.todo-row__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);   /* [Timing 对齐 D10] RowEm 12.5（TodoListPanel.cs:66） */
+  color: var(--ink-2);
+}
+
+.todo-row[data-status="running"] .todo-row__title {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.todo-row[data-status="done"] .todo-row__title {
+  color: var(--todo-name-done);
+}
+
+/* 提醒铃（AC-54）：跟随**可配提醒色** --color-warn（未自定义时经别名回落到分主题 --warn） */
+.todo-row__bell,
+.todo-pend__bell {
+  flex: 0 0 auto;
+  color: var(--color-warn);
+}
+
+.todo-row__time {
+  flex: 0 0 auto;
+  min-width: 34px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);   /* [Timing 对齐 D10] NumEm 11.5（TodoListPanel.cs:68） */
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+}
+
+.todo-row__dur {
+  flex: 0 0 auto;
+  min-width: 50px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);   /* [Timing 对齐 D10] NumEm 11.5（TodoListPanel.cs:68） */
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.todo-row[data-status="running"] .todo-row__dur {
+  color: var(--todo-time-current);
+}
+
+.todo-row[data-status="done"] .todo-row__dur {
+  color: var(--todo-name-done);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-3);
+}
+
+/* ------------------------------ 状态圆标记 ------------------------------ */
+.todo-mark {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--todos-mark-size);
+  height: var(--todos-mark-size);
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--todo-mark-ring);
+  background: transparent;
+  color: var(--todo-mark-done-ink);
+  transition: background-color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-mark[data-done="true"] {
+  background: var(--todo-mark-done);
+  border-color: var(--todo-mark-done);
+}
+
+.todo-mark[data-current="true"] {
+  border-color: var(--todo-mark-ring);
+}
+
+/* ------------------------------ 底栏 ------------------------------ */
+.todos__foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--todos-foot-h);
+  padding: 0 var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.todos__foot-add {
+  flex: 1.3 1 0;
+  justify-content: center;
+}
+
+.todos__foot-edit {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+.todos__foot-edit[data-on="true"] {
+  color: var(--ink);
+  background: var(--bg-field-hi);
+}
+
+/* ------------------------------ 撤销条（AC-32：删除待办） ------------------------------ */
+/* 复用 overlays.css 的 .undo 视觉（同底 / 同描边 / 同圆角 / 同入场动效），仅按面板宽度自适应。 */
+.todos__undo {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-3) 0;
+}
+
+.todos__undo .undo {
+  margin-top: 0;
+  max-width: none;
+}

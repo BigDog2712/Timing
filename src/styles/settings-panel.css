@@ -1,0 +1,200 @@
+/* =============================================================================
+ * TickBar V0.2.0 — settings-panel.css（设置面板外壳 / 页签 / 底栏 / 按钮）
+ * -----------------------------------------------------------------------------
+ * 依据 settings-panel.md。P0：仅 var(--*)，零字面量色值，零毛玻璃，无弹跳缓动。
+ * 主题/配色卡片样式见 theme-picker.css（同一面板内分文件，控制单文件行数）。
+ * ========================================================================== */
+
+/* ------------------------------ 面板外壳 ------------------------------ */
+.settings {
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  max-height: calc(var(--window-h) - var(--snap-margin) * 2 - var(--pill-h) - var(--space-3));
+  margin-top: var(--space-3);
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--bg-panel);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-panel);
+}
+
+.settings__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--settings-title-h);
+  padding: 0 var(--panel-pad);
+  border-bottom: 1px solid var(--line);
+}
+
+.settings__title {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.settings__close {
+  display: grid;
+  place-items: center;
+  width: var(--icon-btn-size);
+  height: var(--icon-btn-size);
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.settings__close:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.settings__tabs {
+  padding: var(--space-3) var(--panel-pad) 0;
+}
+
+.settings__content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--panel-pad);
+}
+
+.settings__content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings__content::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+
+.settings__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: var(--settings-foot-h);
+  padding: 0 var(--panel-pad);
+  border-top: 1px solid var(--line);
+}
+
+.settings__foot-hint {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* ------------------------------ 分段控件 ------------------------------ */
+.seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--bg-seg);
+  border: 1px solid var(--line);
+}
+
+.seg__item {
+  flex: 1 1 0;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.seg__item:hover {
+  color: var(--ink);
+}
+
+.seg__item:active {
+  transform: scale(0.99);
+}
+
+.seg__item[data-on="true"] {
+  background: var(--bg-seg-on);
+  color: var(--ink);
+  box-shadow: var(--inset-top);
+}
+
+/* ------------------------------ 空态 ------------------------------ */
+.empty-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.empty-block__icon {
+  color: var(--ink-4);
+}
+
+.empty-block__title {
+  margin: 0;
+  font-size: var(--text-body);
+  color: var(--ink-2);
+}
+
+.empty-block__hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* ------------------------------ 按钮补充档 ------------------------------ */
+.btn--sm {
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.btn--neutral {
+  height: var(--btn-md-h);
+  padding: 0 var(--space-3);
+  background: var(--btn-neutral-bg);
+  color: var(--btn-neutral-ink);
+  border-color: transparent;
+}
+
+.btn--neutral:hover:not(:disabled) {
+  background: var(--bg-field-hi);
+}
+
+/* =============================================================================
+ * 独立设置窗（label=settings，decorations:false / transparent:true）
+ *   app.css 默认按主窗 384×360 设定 html/body/#root；此处按 data-window 覆写为 100vw/vh。
+ *   圆角外壳外的四角保持透明（html 背景置透明，不铺 --bg），避免露出方形透明区。
+ * ========================================================================== */
+.win {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+html[data-window="settings"] {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+html[data-window="settings"] body,
+html[data-window="settings"] #root {
+  width: 100vw;
+  height: 100vh;
+}
+
+.settings--window {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+}
+
+/* 自绘标题栏为拖动区（K-2：capabilities 已放行 core:window:allow-start-dragging） */
+.settings__bar[data-tauri-drag-region] {
+  cursor: default;
+}

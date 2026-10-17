@@ -1,0 +1,28 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "TickBar MVP 最小权限白名单（IPC-CONTRACT-v2 附录 A）。global-shortcut 整组不放行（P1）。",
+  "windows": ["main", "settings", "todos", "note-*"],
+  "permissions": [
+    "core:window:allow-start-dragging",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-position",
+    "core:window:allow-close",
+    "core:window:allow-scale-factor",
+    "core:window:allow-inner-size",
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+    "sql:allow-execute",
+    "sql:allow-select",
+    "sql:allow-load",
+    "sql:allow-close",
+    "store:allow-get",
+    "store:allow-set",
+    "store:allow-save",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
+  ]
+}

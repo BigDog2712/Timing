@@ -1,0 +1,176 @@
+/* =============================================================================
+ * TickBar V0.2.0 — todos-inline.css（事项窗口：内联编辑/确认 + 空态 + Loading/Error）
+ * -----------------------------------------------------------------------------
+ * 拆自 todos-pending.css（单文件 ≤300 行纪律）。仅 var(--*)，零字面量色值。
+ * 依据 docs/design/pages-V0.2.0/todos-panel.md §3.2 交互态 / §3.3 空态 / §3.4 键盘路径。
+ * ========================================================================== */
+
+/* ------------------------------ 内联编辑 / 确认 ------------------------------ */
+.inline-edit,
+.inline-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.inline-edit__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--input-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  border: 1px solid var(--input-border);
+  font-size: var(--text-body);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.inline-edit__input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.inline-edit__input:focus {
+  background: var(--input-bg-focus);
+}
+
+.inline-edit__ok {
+  flex: 0 0 auto;
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  background: var(--btn-accent-bg);
+  color: var(--btn-accent-ink);
+  border: 1px solid var(--btn-accent-line);
+}
+
+.inline-edit__ok:disabled {
+  color: var(--ink-4);
+  border-color: var(--line);
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.inline-edit__cancel {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--btn-sm-h);
+  height: var(--btn-sm-h);
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+}
+
+.inline-edit__cancel:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.inline-confirm__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.inline-confirm__ok {
+  flex: 0 0 auto;
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  background: var(--btn-danger-bg);
+  color: var(--btn-danger-ink);
+}
+
+.inline-confirm__cancel {
+  flex: 0 0 auto;
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+.inline-confirm__cancel:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+/* ------------------------------ 空态 ------------------------------ */
+.todos__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.todos__empty-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+  color: var(--ink-4);
+}
+
+.todos__empty-title {
+  margin: 0;
+  font-size: var(--text-body);
+  color: var(--ink-2);
+}
+
+.todos__empty-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+/* ------------------------------ Loading / Error ------------------------------ */
+.todos__skel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.todos__skel-row {
+  height: var(--todos-row-h);
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+}
+
+.todos__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+.todos__state svg {
+  color: var(--ink-3);
+}
+
+.todos__state p {
+  margin: 0;
+}
+
+.todos__err {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-xs);
+  color: var(--danger);
+}

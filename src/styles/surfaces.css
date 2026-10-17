@@ -1,0 +1,252 @@
+/* =============================================================================
+ * TickBar V0.2.0 — surfaces.css（药丸形态：Pill / Ring / Grip / CollapsedDot）
+ * -----------------------------------------------------------------------------
+ * 几何对齐 Timing v1.7.0 实测（MainForm.cs 常量 + 2026-10-16 截图比对）：
+ *   高 --pill-h 32 / 圆角 --radius-pill(h/2)=16 / 色环 ⌀16 stroke 2.4（Timing RingD 14 + 命中余量）/
+ *   计时数字 20px Segoe UI Semibold 观感（tabular-nums 保不抖）/ 事项名 14px Bold /
+ *   状态墨度 idle .75 / paused .88 / running 1 / 透明态文字投埃 --shadow-ink /
+ *   运行态 = Timing 式旋转 90° 弧（3.2s/圈），暂停 = 270° 静弧（--color-warm 系）。
+ * P0：仅允许 var(--*)；零字面量色值；零毛玻璃；禁止运行光晕（V0.2.0 删除）。
+ * ========================================================================== */
+
+/* ------------------------------ 药丸 Pill ------------------------------ */
+.pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--pill-h);
+  min-width: var(--pill-w-min);
+  max-width: var(--pill-w-max);
+  padding: 0 var(--pill-pad-r) 0 var(--pill-pad-l);
+  border-radius: var(--radius-pill);
+  /* 未悬停：隐去背景板（背景 / 描边 / 投影）——仅保留内容（状态环 + 计时数字 + 事项名）。
+     鼠标移入 / 键盘聚焦 / 菜单·面板展开时显影为完整药丸（悬停显隐）。 */
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    border-color var(--dur-quick) var(--ease-standard),
+    border-radius var(--dur-quick) var(--ease-standard),
+    box-shadow var(--dur-quick) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard);
+}
+
+/* 显影：悬停 / 焦点 / 菜单或面板展开时恢复板式（Timing GlassPlate：半透板 + 无描边，D2；
+   圆角 GlassRadius 11 → 标度档 --radius-lg 12，裁决二） */
+.pill:hover,
+.pill:focus-within,
+.pill[data-reveal="true"] {
+  background: var(--pill-hover-plate);
+  border-color: transparent;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-balloon);
+}
+
+.pill:active {
+  background: var(--bg-field-hi);
+  transform: scale(0.985);
+}
+
+/* [UI 统一 2026-10-16] 状态墨度（Timing PaintFrame：idle 0.75 / paused 0.88 / running 1；
+   悬停 / 显影时回满） */
+.pill > * {
+  opacity: var(--pill-ink-a, 1);
+  transition: opacity var(--dur-base) var(--ease-standard);
+}
+
+.pill[data-state="idle"] {
+  --pill-ink-a: 0.75;
+}
+
+.pill[data-state="paused"] {
+  --pill-ink-a: 0.88;
+}
+
+.pill:hover > *,
+.pill:focus-within > *,
+.pill[data-reveal="true"] > * {
+  opacity: 1;
+}
+
+/* 事项名：Timing TaskEm 14 / YaHei Bold / 全墨（InkOnGlass ×0.94）+ 透明态投埃 */
+.pill__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: var(--task-w-max);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-task-pill);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
+  text-shadow: var(--shadow-ink);
+  transition:
+    color var(--dur-quick) var(--ease-standard),
+    text-shadow var(--dur-base) var(--ease-standard);
+}
+
+.pill__name[data-muted="true"] {
+  color: var(--ink-3);
+}
+
+.pill__empty {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--pill-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--ink-3);
+  transition: color var(--dur-quick) var(--ease-standard);
+}
+
+.pill__empty:hover {
+  color: var(--ink);
+}
+
+/* 小条计时数字：对齐 Timing 观感（Segoe UI Semibold + 有效字号 ≈20px）；
+   tabular-nums 保 AC-24 不抖动（替代 .timer-digits 基础 mono，仅小条作用域） */
+.pill .timer-digits {
+  font-family: var(--font-timer);
+  font-size: var(--text-timer-pill);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--shadow-ink);
+  transition: text-shadow var(--dur-base) var(--ease-standard);
+}
+
+/* 悬停 / 显影：投埃淡出（Timing shadow × (1 - 0.82·hoverFade)），由板式承接对比度 */
+.pill:hover .pill__name,
+.pill:focus-within .pill__name,
+.pill:hover .timer-digits,
+.pill:focus-within .timer-digits {
+  text-shadow: none;
+}
+
+/* 抓取柄：圆角括号 ）（非 lucide，自绘 SVG 12×22）；仅 hover 显示 */
+.pill__handle {
+  flex: 0 0 auto;
+  width: var(--grip-w);
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--pill-grip-ink);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.pill__handle svg {
+  opacity: 0;
+  transition: opacity var(--dur-exit) var(--ease-standard);
+}
+
+.pill:hover .pill__handle svg,
+.pill__handle:focus-visible svg {
+  opacity: 1;
+}
+
+/* ------------------------------ 状态环 Ring ------------------------------ */
+.ring {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  border: var(--ring-stroke) solid var(--state-idle);
+  background: transparent;
+  color: var(--state-idle);
+  box-shadow: var(--shadow-ink);
+  transition:
+    border-color var(--dur-base) var(--ease-standard),
+    color var(--dur-base) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard);
+}
+
+/* 命中区扩到 ⌀24（视觉 ⌀16 + 命中余量；a11y） */
+.ring::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--ring-hit-extra));
+  border-radius: var(--radius-full);
+}
+
+.pill:hover .ring,
+.pill:focus-within .ring {
+  box-shadow: none;
+}
+
+.ring[data-state="running"] {
+  /* 底环 = 同色低透明轨道（Timing RingTrackAlpha 95/255 ≈ 0.37），亮弧由 SVG 承载 */
+  border-color: color-mix(in srgb, var(--color-running) 35%, transparent);
+  color: var(--color-running);
+}
+
+.ring[data-state="paused"] {
+  /* Timing RingPause = 暖橙（Design.cs: 232,163,61）→ 走 --color-warn；270° 静弧 */
+  border-color: color-mix(in srgb, var(--color-warn) 35%, transparent);
+  color: var(--color-warn);
+}
+
+.ring[data-state="ended"] {
+  border-color: var(--color-done);
+  color: var(--color-done);
+  border-width: 3px;
+}
+
+.ring:hover {
+  transform: scale(1.04);
+}
+
+.ring:active {
+  transform: scale(0.92);
+}
+
+/* ------------------------------ 状态环 Ring ------------------------------ */
+/* --------------------------- 收起圆点 CollapsedDot --------------------------- */
+.dot {
+  position: relative;
+  width: var(--hit-target-dot);
+  height: var(--hit-target-dot);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+}
+
+.dot__ring {
+  position: relative;
+  z-index: 1;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: var(--radius-full);
+  border: var(--ring-stroke) solid var(--state-idle);
+  box-shadow: var(--shadow-balloon);
+  transition: border-color var(--dur-base) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
+}
+
+.dot[data-state="running"] .dot__ring {
+  border-color: var(--color-running);
+}
+
+.dot[data-state="paused"] .dot__ring {
+  /* [Timing 对齐 D9] 裁决三：暂停在小条与圆点两形态必须同色 → --color-warn */
+  border-color: var(--color-warn);
+}
+
+.dot[data-state="ended"] .dot__ring {
+  border-color: var(--color-done);
+  border-width: 3px;
+}
+
+.dot:hover .dot__ring {
+  border-color: var(--line-3);
+  transform: scale(1.06);
+}
