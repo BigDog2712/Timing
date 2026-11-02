@@ -12,9 +12,10 @@
  *   连续删除多条 → 只保留最后一条待撤销（前一条立即提交）。后端无 todo_restore 命令，故用此法。
  */
 import { create } from 'zustand';
-import { errorText, IpcError, ipc } from '../services/ipc';
+import { errorText, IpcError } from '../services/ipc';
+import { todoApi } from '../services/api';
 import { UNDO_WINDOW_MS } from '../types/domain';
-import type { Todo } from '../types/domain';
+import type { Todo, TodoPatch } from '../types/domain';
 
 /** 一条待撤销的乐观删除（捕获整行以便原样恢复） */
 export interface PendingDelete {
@@ -38,6 +39,12 @@ interface TodoStore {
   create: (title: string, plannedAt?: number | null, remindAt?: number | null) => Promise<Todo>;
   /** 重命名 */
   rename: (id: number, title: string) => Promise<Todo>;
+  /**
+   * [V0.3.10] 部分更新（目前用于改开启 / 截止时间）。
+   * `plannedAt` / `remindAt` 传 `null` = **显式清空**（后端 `double_option` 落 NULL），
+   * 省略字段 = 不动它。
+   */
+  patch: (id: number, patch: TodoPatch) => Promise<Todo>;
   /** 勾选 / 取消完成（显式传 done，避免盲翻转竞态） */
   toggle: (id: number, done: boolean) => Promise<Todo>;
   /** 乐观删除：本地立即移除 + 起撤销窗（不落库） */
@@ -88,7 +95,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     await get().commitPending();
     set({ loading: true, error: null });
     try {
-      const rows = await ipc.todoList({ includeDone: true });
+      const rows = await todoApi.list({ includeDone: true });
       const todos = sortTodos(rows);
       set({ todos, loading: false, loaded: true });
       return todos;
@@ -102,7 +109,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     const trimmed = title.trim();
     if (!trimmed) throw new Error('待办标题不能为空');
     await get().commitPending();
-    const todo = await ipc.todoCreate({ title: trimmed, plannedAt, remindAt });
+    const todo = await todoApi.create(trimmed, plannedAt, remindAt);
     set((s) => ({ todos: sortTodos([...s.todos, todo]), commitError: null }));
     return todo;
   },
@@ -110,9 +117,13 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
   rename: async (id, title) => {
     const trimmed = title.trim();
     if (!trimmed) throw new Error('待办标题不能为空');
+    return get().patch(id, { title: trimmed });
+  },
+
+  patch: async (id, patch) => {
     await get().commitPending();
     try {
-      const todo = await ipc.todoUpdate({ id, patch: { title: trimmed } });
+      const todo = await todoApi.update(id, patch);
       set((s) => ({ todos: s.todos.map((t) => (t.id === id ? todo : t)), commitError: null }));
       return todo;
     } catch (err) {
@@ -124,7 +135,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
   toggle: async (id, done) => {
     await get().commitPending();
     try {
-      const todo = await ipc.todoToggle({ id, done });
+      const todo = await todoApi.toggle(id, done);
       set((s) => ({ todos: s.todos.map((t) => (t.id === id ? todo : t)), commitError: null }));
       return todo;
     } catch (err) {
@@ -162,7 +173,7 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
     clearPendingTimer();
     set({ pendingDelete: null });
     try {
-      await ipc.todoDelete({ id: pending.todo.id });
+      await todoApi.remove(pending.todo.id);
     } catch (err) {
       set((s) => ({
         todos: restore(s.todos, pending.todo),
@@ -173,11 +184,3 @@ export const useTodoStore = create<TodoStore>((set, get) => ({
 
   clearCommitError: () => set({ commitError: null }),
 }));
-
-/** 派生视图：未完成 / 已完成（保序） */
-export function splitTodos(todos: Todo[]): { pending: Todo[]; done: Todo[] } {
-  const pending: Todo[] = [];
-  const done: Todo[] = [];
-  for (const t of todos) (t.doneAt != null ? done : pending).push(t);
-  return { pending, done };
-}

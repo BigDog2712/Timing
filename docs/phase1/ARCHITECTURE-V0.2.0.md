@@ -409,7 +409,7 @@ V0.1.0 是「单窗 384×360 内绘制」；V0.2.0 改为**多独立 `WebviewWin
 
 | 窗口 | label | 尺寸（逻辑px） | 单例 | 配置要点 |
 |---|---|---|---|---|
-| 主小条 PillBar | `main` | 384×360（沿用） | 是 | `transparent:true`、`decorations:false`（沿用 V0.1.0）；**不挂任何背景模糊**（保拖拽顺滑，见 §6.g） |
+| 主小条 PillBar | `main` | 画布 384×360（沿用）；**OS 窗口随内容自适应** | 是 | `transparent:true`、`decorations:false`（沿用 V0.1.0）；`minWidth/minHeight = 1`、`maxWidth/maxHeight = 384/360`，由 `useWindowAutoFit` 收缩到可见内容包围盒（ADR-014，解决透明区吞桌面点击）；**不挂任何背景模糊**（保拖拽顺滑，见 §6.g） |
 | 设置面板 | `settings` | 392×660 | 是 | 新不透明窗；`resizable:false`、`skipTaskbar:false`、`alwaysOnTop:false` |
 | 事项窗口 | `todos` | 宽 336（高自适应，min 360） | 是 | 新不透明窗；`resizable:true`（限高） |
 | 便利贴 | `note-{id}` | 320×232（默认） | 否（每贴一窗，上限 20） | `skipTaskbar:true`、`alwaysOnTop:false`（默认）、min 160×120 |

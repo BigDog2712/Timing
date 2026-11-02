@@ -12,7 +12,8 @@
  *   - 保存失败 → error 文案（页脚临时换 --danger），内容保留不丢。
  */
 import { create } from 'zustand';
-import { errorText, ipc } from '../services/ipc';
+import { errorText } from '../services/ipc';
+import { noteApi } from '../services/api';
 import { NOTE_CONTENT_MAX_LEN, NOTE_GEOM_DEBOUNCE_MS } from '../types/domain';
 import type { Note, NotePatch } from '../types/domain';
 
@@ -46,6 +47,8 @@ interface NoteStore {
   patchGeom: (patch: NotePatch) => void;
   /** 关联 / 解绑事项（AC-63；即时落盘，itemId=null 解绑为随记） */
   setItemId: (itemId: number | null) => Promise<void>;
+  /** 切换置顶（AC-64；即时落盘，后端同步窗口层级） */
+  setPinned: (pinned: boolean) => Promise<void>;
   /** 立即落盘未决几何变更（关窗前） */
   flush: () => Promise<void>;
   /** 本窗便利贴被删除 → 清空本地 */
@@ -64,7 +67,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
   load: async (id) => {
     set({ loading: true, error: null });
     try {
-      const note = await ipc.noteGet({ id });
+      const note = await noteApi.get(id);
       set({ note, savedContent: note.content, loading: false, loaded: true });
       return note;
     } catch (err) {
@@ -91,7 +94,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     }
     set({ saving: true, error: null });
     try {
-      const note = await ipc.noteUpdate({ id: current.id, patch: { content: clamped } });
+      const note = await noteApi.update({ id: current.id, patch: { content: clamped } });
       set({ note, savedContent: note.content, saving: false });
     } catch (err) {
       set({ saving: false, error: errorText(err) });
@@ -116,7 +119,7 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     const current = get().note;
     if (!patch || !current) return;
     try {
-      const note = await ipc.noteUpdate({ id: current.id, patch });
+      const note = await noteApi.update({ id: current.id, patch });
       set({ note, savedContent: note.content, error: null });
     } catch (err) {
       set({ error: errorText(err) });
@@ -131,10 +134,27 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     clearGeomTimer();
     pendingGeom = null;
     try {
-      const note = await ipc.noteUpdate({ id: current.id, patch: merged });
+      const note = await noteApi.update({ id: current.id, patch: merged });
       set({ note, savedContent: note.content, error: null });
     } catch (err) {
       set({ error: errorText(err) });
+    }
+  },
+
+  setPinned: async (pinned) => {
+    const current = get().note;
+    if (!current) return;
+    /* 乐观翻转：置顶是「点了就要看见」的开关，等 IPC 往返会有一拍迟滞。
+       失败时回滚成落库前的值，避免「看着置顶、其实没落库」的假象。 */
+    set({ note: { ...current, isPinned: pinned } });
+    const merged: NotePatch = { ...(pendingGeom ?? {}), isPinned: pinned };
+    clearGeomTimer();
+    pendingGeom = null;
+    try {
+      const note = await noteApi.update({ id: current.id, patch: merged });
+      set({ note, savedContent: note.content, error: null });
+    } catch (err) {
+      set({ note: current, error: errorText(err) });
     }
   },
 

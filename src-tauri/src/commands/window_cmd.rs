@@ -4,8 +4,9 @@
 
 use tauri::{AppHandle, State};
 
+use crate::app::events;
 use crate::error::AppResult;
-use crate::infra::{events, window};
+use crate::infra::window;
 use crate::services;
 use crate::state::AppState;
 

@@ -8,7 +8,7 @@ use crate::models::note::{NoteCreateParams, NoteGeometry, NotePatch};
 use crate::services::note;
 use crate::tests::support::{expect_err, fresh_pool, new_item, scalar_i64};
 
-fn params(item_id: Option<i64>, content: &str) -> NoteCreateParams {
+pub(super) fn params(item_id: Option<i64>, content: &str) -> NoteCreateParams {
     NoteCreateParams {
         item_id,
         content: content.to_string(),
@@ -27,6 +27,7 @@ async fn create_independent_note_defaults_closed() {
         .unwrap();
     assert_eq!(n.item_id, None, "无关联 = 随记（AC-63）");
     assert!(!n.is_open, "note_create 只建数据行，不建窗口（is_open=0）");
+    assert!(n.is_pinned, "AC-64：新建便利贴默认置顶（列默认 1）");
     assert_eq!(n.pos_x, 120.0);
     assert_eq!(n.width, 320.0);
 }
@@ -52,7 +53,7 @@ async fn create_overlong_content_rejected_without_insert() {
     let pool = fresh_pool("note-long").await;
     let long = "字".repeat(NOTE_CONTENT_MAX_LEN + 1);
     let code = expect_err(note::create(&pool, params(None, &long)).await);
-    assert_eq!(code, ErrorCode::ItemNameEmpty, "超长不得静默接受");
+    assert_eq!(code, ErrorCode::ItemNameTooLong, "超长不得静默接受");
     assert_eq!(scalar_i64(&pool, "SELECT COUNT(*) FROM notes").await, 0);
 }
 
@@ -258,11 +259,20 @@ fn note_dto_is_camel_case() {
         width: 320.0,
         height: 232.0,
         is_open: true,
+        is_pinned: true,
         created_at: 0,
         updated_at: 0,
     };
     let v = serde_json::to_value(&n).unwrap();
-    for key in ["itemId", "posX", "posY", "isOpen", "createdAt", "updatedAt"] {
+    for key in [
+        "itemId",
+        "posX",
+        "posY",
+        "isOpen",
+        "isPinned",
+        "createdAt",
+        "updatedAt",
+    ] {
         assert!(v.get(key).is_some(), "缺字段 {key}");
     }
     assert!(v.get("pos_x").is_none(), "不得出现 snake_case");

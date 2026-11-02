@@ -4,10 +4,46 @@
  * 与 browserMock.ts 配套（后者只放命令处理器）。语义对齐 IPC-CONTRACT-v2：
  * 错误以 `{ code, message }` 的 rejected value 抛出。**不参与生产**。
  */
-import type { Item, Note, Reminder, Settings, TimeRecord, TimerState, Todo } from '../types/domain';
+import type {
+  Item,
+  Note,
+  ReferenceSettings,
+  Reminder,
+  Settings,
+  TimeRecord,
+  TimerState,
+  Todo,
+} from '../types/domain';
 import { DEFAULT_COUNTDOWN_PRESETS } from '../types/domain';
+import { DEFAULT_MOYU_PRESETS, RECENT_ITEMS_DEFAULT } from '../lib/moyu';
 
 export const now = () => Date.now();
+
+/**
+ * [V0.3.4] 参考设置默认值：与 Rust `ReferenceSettings::default()` 逐字一致。
+ *
+ * 放在 state 里而不是各 mock 模块本地常量：`stop_timer`（最短记录时长判定）
+ * 与设置页滑杆必须读同一份，否则浏览器里调完滑杆，丢弃行为不跟着变（自相矛盾）。
+ */
+export const REFERENCE_DEFAULTS: ReferenceSettings = {
+  uiScale: 1,
+  plateOpacity: 0.9,
+  defaultCountdownMinutes: 25,
+  maxMinutes: 120,
+  autoWriteOnStop: true,
+  autoBindFirstTodo: false,
+  defaultPauseReason: '',
+  mergeGapMinutes: 5,
+  minRecordSeconds: 30,
+  pendingEnabled: true,
+  remindAdvanceMinutes: 10,
+  lightRemindDefaultOn: true,
+  quickFindEnabled: true,
+  timerWindowEnabled: false,
+  extensionAutoStart: false,
+  highlightColor: '#4DA3E8',
+  desktopMenuEnabled: true,
+};
 
 function sampleRecords(): TimeRecord[] {
   const base = now() - 4 * 3600 * 1000;
@@ -35,16 +71,16 @@ function sampleRecords(): TimeRecord[] {
 
 const DEFAULT_SETTINGS: Settings = {
   autostartEnabled: false,
-  alwaysOnTop: true,
-  opacityEnabled: true,
   lastDisplayId: null,
-  shortcuts: { toggleWindow: null, startPause: null, stop: null, newItem: null },
   /* [V0.2.0] */
   themeMode: 'dark',
   accents: { running: '#4DA3E8', warn: '#E8A33D', done: '#4CC38A', bar: null },
   countdownPresets: [...DEFAULT_COUNTDOWN_PRESETS],
-  /* [V0.2.0 批2] 到点「自动结束并保存」默认关（AC-62） */
-  countdownAutoEnd: false,
+  /* [V0.3.9] 常用摸鱼 / 常用事项框偏好（与 Rust `Settings::default()` 同值） */
+  moyuPresets: [...DEFAULT_MOYU_PRESETS],
+  itemsShowRecent: true,
+  itemsRecentCount: RECENT_ITEMS_DEFAULT,
+  itemsTimers: {},
 };
 
 export interface MockState {
@@ -58,6 +94,10 @@ export interface MockState {
   todos: Todo[];
   notes: Note[];
   reminders: Reminder[];
+  /* [V0.3] 日状态（`daily_status_*` 两命令的内存态） */
+  dailyStatus: Record<string, Record<number, 'pending' | 'done'>>;
+  /* [V0.3.4] 参考设置（`get_reference_settings` / `update_reference_settings` 的内存态） */
+  reference: ReferenceSettings;
 }
 
 /** 构造初始状态（含「未归类」系统事项与示例记录） */
@@ -81,6 +121,8 @@ export function seed(): MockState {
     ],
     notes: [],
     reminders: [],
+    dailyStatus: {},
+    reference: { ...REFERENCE_DEFAULTS },
   };
 }
 

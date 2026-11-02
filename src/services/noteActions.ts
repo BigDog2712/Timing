@@ -10,7 +10,9 @@
  * 非 Tauri（浏览器 dev 无多窗口）→ 提示条兜底（与 todosActions 同口径）。
  */
 import { errorText, ipc, isTauri } from './ipc';
+import { mainWindowRect } from '../lib/window';
 import { useNoteStore } from '../stores/noteStore';
+import { useTimerStore } from '../stores/timerStore';
 import { useUiStore } from '../stores/uiStore';
 import { NOTE_MIN_H, NOTE_MIN_W } from '../types/domain';
 import type { Note } from '../types/domain';
@@ -20,12 +22,30 @@ const DEFAULT_NOTE_W = 320;
 const DEFAULT_NOTE_H = 232;
 /** 逐张错位偏移，避免新便利贴完全重叠 */
 const CASCADE_STEP = 28;
+/** 与主条之间的间隙（DIP），与后端 `PANEL_GAP_DIP` 同口径 */
+const BAR_GAP = 6;
 
 function notify(text: string, tone: 'info' | 'danger' = 'danger'): void {
   useUiStore.getState().setNotice({ text, tone });
 }
 
-/** 计算下一张便利贴的落点（取现有数量做层叠偏移；清单不可用则退回起点） */
+/** 当前事项：计时中的会话事项优先，空闲取最近事项（与便利贴清单同一口径） */
+function currentItemId(): number | undefined {
+  const state = useTimerStore.getState().state;
+  return state.session?.itemId ?? state.lastItemId ?? undefined;
+}
+
+/**
+ * 计算下一张便利贴的落点：**以悬浮条为基准**（左对齐、贴小条下沿 +6px），
+ * 下方放不下时翻到小条上方，最后按显示器工作区钳制；多张时向右级联 28px。
+ *
+ * 旧实现写死 `(120,120)+级联`——那是「屏幕左上角」而不是「小条附近」，
+ * 小条在右下角时新便利贴会隔着半个屏幕冒出来，这就是「改过但没生效」的那一处
+ * （改动从未落到这段取值上）。基准取主窗矩形而非当前窗：从事项窗里点
+ * 「新建便利贴」时，当前窗不是小条。
+ *
+ * 读不到主窗（非 Tauri / 建窗早期）→ 退回旧的固定起点，保证仍能开窗。
+ */
 async function nextPlacement(): Promise<{ posX: number; posY: number }> {
   let count = 0;
   try {
@@ -33,8 +53,25 @@ async function nextPlacement(): Promise<{ posX: number; posY: number }> {
   } catch {
     /* 清单不可用：用固定起点 */
   }
-  const step = (count % 8) * CASCADE_STEP;
-  return { posX: 120 + step, posY: 120 + step };
+  const step = (count % 6) * CASCADE_STEP;
+
+  const bar = await mainWindowRect();
+  if (!bar) return { posX: 120 + step, posY: 120 + step };
+
+  let posX = bar.x + step;
+  let posY = bar.y + bar.h + BAR_GAP;
+  try {
+    const area = await ipc.mainWorkArea();
+    if (area.w > 0 && area.h > 0) {
+      /* 小条贴着屏幕底部时下方没空间：翻到小条上方，别硬挤出屏幕 */
+      if (posY + DEFAULT_NOTE_H > area.y + area.h) posY = bar.y - DEFAULT_NOTE_H - BAR_GAP;
+      posX = Math.min(Math.max(posX, area.x), area.x + area.w - DEFAULT_NOTE_W);
+      posY = Math.min(Math.max(posY, area.y), area.y + area.h - DEFAULT_NOTE_H);
+    }
+  } catch {
+    /* 工作区不可用：只按小条落位，出屏由后端 reclamp 兜底 */
+  }
+  return { posX: Math.round(posX), posY: Math.round(posY) };
 }
 
 /** 仅打开已有便利贴的窗口（后端单例按 label 去重：已开则 show+focus） */
@@ -51,12 +88,16 @@ export async function openNoteWindowFor(noteId: number): Promise<void> {
   useUiStore.getState().setNotice({ text: '便利贴需在桌面版中打开', tone: 'info' });
 }
 
-/** 新建便利贴：建行（可挂事项）→ 开窗；超 20 张由后端返回 WINDOW_LIMIT_EXCEEDED */
+/** 新建便利贴：建行（默认挂当前事项）→ 开窗；超 20 张由后端返回 WINDOW_LIMIT_EXCEEDED */
 export async function openNewNote(itemId?: number | null): Promise<Note | null> {
+  /* [V0.3.9] 用户口径：「便利贴应默认绑定事项」——不传 itemId 时挂到**当前事项**
+     （计时中 / 暂停的会话事项，空闲取最近事项）；显式传 null 才建「随记」。
+     清单里「写一张新的…」、托盘入口也走这条，于是默认都有归属，不再散落无主便利贴。 */
+  const boundItemId = itemId === null ? undefined : (itemId ?? currentItemId());
   const { posX, posY } = await nextPlacement();
   try {
     const note = await ipc.noteCreate({
-      itemId: itemId ?? undefined,
+      itemId: boundItemId,
       content: '',
       posX,
       posY,
@@ -108,7 +149,8 @@ export async function openOrCreateNoteForItem(itemId: number | null): Promise<No
     await openNoteWindowFor(latest.id);
     return latest;
   }
-  return openNewNote(itemId);
+  /* null → 交给 openNewNote 按「当前事项」兜底绑定（V0.3.9） */
+  return openNewNote(itemId ?? undefined);
 }
 
 /** 关闭便利贴窗口（「收纳」）：先落盘未决正文，再关后端窗。

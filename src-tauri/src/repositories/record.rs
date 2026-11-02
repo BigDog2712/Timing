@@ -28,13 +28,19 @@ pub async fn find_by_id(pool: &SqlitePool, id: i64) -> AppResult<Option<TimeReco
         .await?)
 }
 
+/// 编辑已保存记录时可改的时间字段（None = 不动）。
+pub struct SavedTimes {
+    pub started_at: Option<i64>,
+    pub ended_at: Option<i64>,
+    pub accumulated_sec: Option<i64>,
+}
+
 /// 编辑已保存记录（动态 SET）。
 pub async fn update_saved(
     pool: &SqlitePool,
     id: i64,
     item_id: Option<i64>,
-    started_at: Option<i64>,
-    ended_at: Option<i64>,
+    times: SavedTimes,
     note: Option<&str>,
     now: i64,
 ) -> AppResult<()> {
@@ -43,11 +49,14 @@ pub async fn update_saved(
     if let Some(v) = item_id {
         qb.push(", item_id = ").push_bind(v);
     }
-    if let Some(v) = started_at {
+    if let Some(v) = times.started_at {
         qb.push(", started_at = ").push_bind(v);
     }
-    if let Some(v) = ended_at {
+    if let Some(v) = times.ended_at {
         qb.push(", ended_at = ").push_bind(v);
+    }
+    if let Some(v) = times.accumulated_sec {
+        qb.push(", accumulated_sec = ").push_bind(v);
     }
     if let Some(v) = note {
         qb.push(", note = ").push_bind(v.to_string());

@@ -1,0 +1,76 @@
+/* =============================================================================
+ * TickBar — 03-theme-light.css（语义层 · 浅色主题）
+ * 拆自 design-tokens.css §2（ADR-017 单文件 ≤300 行）。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 2. 浅色主题
+ * ========================================================================== */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-plate:    #F2F3F5;
+  --bg-inset:    #FFFFFF;
+  --bg-panel:    #FFFFFF;
+  --bg-card:     #F7F8FA;
+  --bg-field:    #F1F3F7;
+  --bg-field-hi: #E6E9EF;
+  --bg-seg:      #EDEFF4;
+  --bg-seg-on:   #FFFFFF;
+
+  --line:    rgba(16, 20, 28, 0.07);
+  --line-2:  rgba(16, 20, 28, 0.12);
+  --line-3:  rgba(16, 20, 28, 0.18);
+
+  /* 前景层（AC-53：四级文本对最浅底 --bg-plate 亦须 >=4.5:1，可作正文小字）*/
+  --ink:    #16181D;
+  --ink-2:  #41485A;
+  --ink-3:  #5C6577;
+  --ink-4:  #656E7D;   /* 对 plate 4.64:1 / 卡 4.84 / 白 5.15（原 #707A8A 仅 3.91）*/
+
+  /* 浅色主题底色浅、字色深，不需要暗影 */
+  --text-halo: none;
+
+  --accent:      #1669AD;
+
+  /* [V0.3.1] 高亮定位色（默认同后端出厂值；设置可改） */
+  --highlight-color: #4DA3E8;
+  --accent-ink:  #1F63AA;
+  --accent-wash: color-mix(in srgb, #1669AD 14%, transparent);
+  --accent-line: color-mix(in srgb, #1669AD 32%, transparent);
+
+  /* 语义层（AC-53：作『文字』对最浅底 --bg-plate 须 >=4.5:1；亦满足非文本 >=3:1）
+     保色相、仅降亮度：H 分别 35 / 358 / 151，与原色同相 */
+  --warn:        #A05E00;   /* 对 plate 4.62:1 / 卡 4.82（原 #A76200 仅 4.31）*/
+  --warn-wash:   color-mix(in srgb, #A05E00 12%, transparent);
+  --danger:      #D02C33;   /* 对 plate 4.62:1 / 卡 4.83（原 #D4353B 仅 4.33）*/
+  --danger-wash: color-mix(in srgb, #D02C33 12%, transparent);
+  --ok:          #0C7E47;   /* 对 plate 4.62:1 / 卡 4.83（原 #0C834A 仅 4.34）*/
+  --ok-ink:      #FFFFFF;
+
+  --solid-bg:  #1A1D24;
+  --solid-ink: #FFFFFF;
+  --danger-solid: #D02C33;   /* light: danger 实心底 = 浅色 --danger（白字 5.13:1）*/
+
+  --track:      rgba(16, 20, 28, 0.11);
+  --scrim:      rgba(16, 20, 28, 0.32);
+
+  --glass-panel-bg: color-mix(in srgb, #F2F3F5 calc(97% * var(--ui-bg-opacity)), transparent);
+  --glass-hover-bg: color-mix(in srgb, #F2F3F5 calc(86% * var(--ui-bg-opacity)), transparent);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.90);
+
+  --shadow-flat:    none;
+  --shadow-ring:    0 0 0 1px var(--line-2);
+  /* [V0.2.10] 与深色主题一致：整体去投影 */
+  --shadow-pop:     none;
+  --shadow-plate:   none;
+  --shadow-float:   none;
+  --shadow-panel:   none;
+  --shadow-balloon: none;
+  --shadow-ink: none;
+  --inset-top:      var(--inset-highlight);
+
+  --grip-ink:   rgba(16, 20, 28, 0.36);   /* Timing 浅档 GlassInkDim = Ink3.A 92/255（Design.cs:258） */
+  --focus-ring: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
+  --focus-ring-danger: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--danger);
+}

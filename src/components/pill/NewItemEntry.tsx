@@ -9,6 +9,7 @@
  */
 import { useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import { clientToLayer } from '../../lib/fitBounds';
 import type { MenuPos } from '../../stores/uiStore';
 
 interface NewItemEntryProps {
@@ -26,7 +27,8 @@ export function NewItemEntry({ onClick, onMenu }: NewItemEntryProps) {
   };
 
   const openMenuAt = (clientX: number, clientY: number) => {
-    onMenu?.({ x: clientX, y: clientY });
+    /* [ADR-020] 指针是视口坐标、菜单锚点是布局坐标：置层被 translate 过，必须换算 */
+    onMenu?.(clientToLayer(clientX, clientY));
   };
 
   const handlePointerUp = (e: ReactPointerEvent<HTMLButtonElement>) => {

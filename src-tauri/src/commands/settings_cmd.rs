@@ -2,8 +2,9 @@
 
 use tauri::{AppHandle, State};
 
+use crate::app::events;
 use crate::error::AppResult;
-use crate::infra::{autostart, events, window};
+use crate::infra::autostart;
 use crate::models::settings::{ReferenceSettings, ReferenceSettingsPatch, Settings, SettingsPatch};
 use crate::services;
 use crate::state::AppState;
@@ -34,10 +35,7 @@ pub async fn update_settings(
     state: State<'_, AppState>,
     patch: SettingsPatch,
 ) -> AppResult<Settings> {
-    // 联动：alwaysOnTop 即时应用到窗口；autostart 即时写注册表。
-    if let Some(enabled) = patch.always_on_top {
-        window::set_always_on_top(&app, enabled)?;
-    }
+    // 联动：autostart 即时写注册表（`alwaysOnTop` 自 V0.3.3 起恒定，不再随设置变化，ADR-022）。
     if let Some(enabled) = patch.autostart_enabled {
         autostart::set_enabled(&app, enabled)?;
     }

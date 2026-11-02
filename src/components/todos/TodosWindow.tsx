@@ -16,10 +16,11 @@ import { useWindowLeaveHide } from '../../hooks/useWindowLeaveHide';
 import { closeCurrentWindow, showCurrentWindowOnReady } from '../../lib/window';
 import { themeActions } from '../../services/themeActions';
 import { useItemStore } from '../../stores/itemStore';
+import { useTodoStore } from '../../stores/todoStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { IPC_EVENTS } from '../../types/domain';
-import type { ThemeChangedPayload, TimerState } from '../../types/domain';
+import type { MdSyncReport, ThemeChangedPayload, TimerState } from '../../types/domain';
 import { TodosPanel } from './TodosPanel';
 import { Batch2Overlays } from '../Batch2Overlays';
 
@@ -40,6 +41,17 @@ export function TodosWindow() {
     useTimerStore.getState().setState(payload);
   });
 
+  /* [V0.4.0] Markdown 导入可能新建事项 / 便利贴 / 改待办：重拉列表，避免本窗显示旧数据。 */
+  useTauriEvent<MdSyncReport>(IPC_EVENTS.mdSyncChanged, (report) => {
+    const touched =
+      report.kinds.includes('timers') ||
+      report.kinds.includes('notes') ||
+      report.kinds.includes('todos');
+    if (!touched) return;
+    void useItemStore.getState().reload().catch(() => undefined);
+    void useTodoStore.getState().reload().catch(() => undefined);
+  });
+
   /* 首帧读权威主题 + 四色 */
   useEffect(() => {
     let cancelled = false;
@@ -55,6 +67,16 @@ export function TodosWindow() {
   useEffect(() => {
     void useItemStore.getState().reload().catch(() => undefined);
     void useTimerStore.getState().refresh().catch(() => undefined);
+  }, []);
+
+  /* [V0.3.12] 窗口重新获得焦点时重拉待办：主窗那边可能刚做过轻提醒的「推迟」、
+     「现在就开始」或到点自动开始（这些都会改/删待办），不重拉这里就是一份陈旧列表。 */
+  useEffect(() => {
+    const onFocus = () => {
+      void useTodoStore.getState().reload().catch(() => undefined);
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, []);
 
   /* 首帧就绪后显示窗口（防白闪；cleanup 取消未执行的 rAF/定时器） */

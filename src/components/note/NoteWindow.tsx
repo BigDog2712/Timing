@@ -14,13 +14,14 @@
 import { useEffect, useMemo } from 'react';
 import { useNoteGeometry } from '../../hooks/useNoteGeometry';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
+import { useWindowDragAnywhere } from '../../hooks/useWindowDragAnywhere';
 import { closeCurrentWindow, currentNoteId, showCurrentWindowOnReady, startCurrentWindowResize } from '../../lib/window';
 import { closeNote, removeNote } from '../../services/noteActions';
 import { themeActions } from '../../services/themeActions';
 import { useNoteStore } from '../../stores/noteStore';
 import { useThemeStore } from '../../stores/themeStore';
 import { IPC_EVENTS } from '../../types/domain';
-import type { ThemeChangedPayload } from '../../types/domain';
+import type { MdSyncReport, ThemeChangedPayload } from '../../types/domain';
 import { NoteEditor } from './NoteEditor';
 import { NoteHeader } from './NoteHeader';
 
@@ -31,10 +32,23 @@ export function NoteWindow() {
   const setLocalContent = useNoteStore((s) => s.setLocalContent);
   const saveContent = useNoteStore((s) => s.saveContent);
   const oversize = useNoteGeometry();
+  /* [P1 修复] 整个面板都能拖动窗口：原先只有右上角那条 data-tauri-drag-region 可拖，
+     而正文 textarea 占了面板九成面积。Shift + 拖动 仍保留给选中文本。 */
+  const drag = useWindowDragAnywhere();
 
   /* ---- 主题：本窗自订阅广播（K-21） ---- */
   useTauriEvent<ThemeChangedPayload>(IPC_EVENTS.themeChanged, (payload) => {
     useThemeStore.getState().apply(payload.mode, payload.accents);
+  });
+
+  /* [V0.4.0] Markdown 改了这张便利贴 → 重拉。本地有未落盘编辑时**不覆盖**
+     （用户正在打字，不能被后台同步冲掉；落盘后下一轮再取）。 */
+  useTauriEvent<MdSyncReport>(IPC_EVENTS.mdSyncChanged, (report) => {
+    if (noteId == null || !report.kinds.includes('notes')) return;
+    const state = useNoteStore.getState();
+    if (!state.note || state.note.id !== noteId) return;
+    if (state.note.content !== state.savedContent) return;
+    void state.load(noteId);
   });
 
   /* 首帧读权威主题 + 四色 */
@@ -71,7 +85,13 @@ export function NoteWindow() {
   useEffect(() => showCurrentWindowOnReady(), []);
 
   return (
-    <div className="note" data-oversize={oversize ? 'true' : 'false'} data-error={error ? 'true' : 'false'}>
+    <div
+      className="note"
+      data-oversize={oversize ? 'true' : 'false'}
+      data-error={error ? 'true' : 'false'}
+      onPointerDown={drag.onPointerDown}
+      onClickCapture={drag.onClickCapture}
+    >
       <NoteHeader onRequestHide={() => void handleHide()} onRequestDelete={() => void handleDelete()} />
 
       <NoteEditor
@@ -85,6 +105,7 @@ export function NoteWindow() {
       {/* [V0.2.4 · 2] 右下角缩放手柄：交给系统做 nwse 缩放，松手后 Moved/Resized 事件照常落盘尺寸 */}
       <div
         className="note__resize"
+        data-no-drag
         role="separator"
         aria-label="拖动调整便利贴大小"
         onPointerDown={(e) => {

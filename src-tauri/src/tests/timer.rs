@@ -1,109 +1,14 @@
 //! 计时状态机（Spec §9 AC-02~07；IPC-CONTRACT-v2 §4.2）。
 //! 覆盖：start/pause/resume/stop/undo_stop 迁移、单 active 约束、accumulated_sec 计算、幂等语义。
-//! 换事项 switch / 周期落盘 flush / 崩溃恢复 resolve_open 见同目录 `timer_switch.rs`。
-
-use sqlx::SqlitePool;
+//! 换事项 switch / 周期落盘 flush / 崩溃恢复 resolve_open 见 `timer_switch.rs`。
+//! [V0.3.4]「最短记录时长」阈值见 `timer_threshold.rs`。
 
 use crate::error::ErrorCode;
 use crate::models::constants::{SYSTEM_ITEM_ID, UNDO_TOLERANCE_MS, UNDO_WINDOW_MS};
 use crate::services::timer;
-use crate::tests::support::{count_active, exec, expect_err, fresh_pool, new_item, scalar_i64};
-
-/// 把会话的 started_at / running_since 同步回拨 ms 毫秒（running_since 为 NULL 时保持 NULL）。
-async fn rewind(pool: &SqlitePool, id: i64, ms: i64) {
-    exec(
-        pool,
-        &format!(
-            "UPDATE time_records \
-             SET started_at = started_at - {ms}, running_since = running_since - {ms} \
-             WHERE id = {id}"
-        ),
-    )
-    .await;
-}
-
-#[tokio::test]
-async fn stop_soft_deletes_matching_pending_todos_only_after_save() {
-    let pool = fresh_pool("timer-todo-link").await;
-    let item = new_item(&pool, "写周报").await;
-    let first = crate::services::todo::create(&pool, "写周报", None, None)
-        .await
-        .unwrap();
-    let _done = crate::services::todo::create(&pool, "写周报", None, None)
-        .await
-        .unwrap();
-    crate::services::todo::toggle(&pool, _done.id, true)
-        .await
-        .unwrap();
-    let rec = timer::start(&pool, Some(item)).await.unwrap();
-    assert_eq!(
-        scalar_i64(
-            &pool,
-            &format!("SELECT deleted_at IS NULL FROM todos WHERE id={}", first.id)
-        )
-        .await,
-        1
-    );
-    rewind(&pool, rec.id, 2_000).await;
-    timer::stop(&pool).await.unwrap();
-    assert_eq!(
-        scalar_i64(
-            &pool,
-            &format!(
-                "SELECT deleted_at IS NOT NULL FROM todos WHERE id={}",
-                first.id
-            )
-        )
-        .await,
-        1
-    );
-    assert_eq!(
-        scalar_i64(
-            &pool,
-            &format!("SELECT deleted_at IS NULL FROM todos WHERE id={}", _done.id)
-        )
-        .await,
-        1
-    );
-}
-
-#[tokio::test]
-async fn start_keeps_matching_pending_todo() {
-    let pool = fresh_pool("timer-todo-start").await;
-    let item = new_item(&pool, "写周报").await;
-    let todo = crate::services::todo::create(&pool, "写周报", None, None)
-        .await
-        .unwrap();
-    timer::start(&pool, Some(item)).await.unwrap();
-    assert_eq!(
-        scalar_i64(
-            &pool,
-            &format!("SELECT deleted_at IS NULL FROM todos WHERE id={}", todo.id)
-        )
-        .await,
-        1
-    );
-}
-
-#[tokio::test]
-async fn discard_keeps_matching_todo() {
-    let pool = fresh_pool("timer-discard-todo").await;
-    let item = new_item(&pool, "写周报").await;
-    let todo = crate::services::todo::create(&pool, "写周报", None, None)
-        .await
-        .unwrap();
-    timer::start(&pool, Some(item)).await.unwrap();
-    timer::discard(&pool).await.unwrap();
-    assert_eq!(
-        scalar_i64(
-            &pool,
-            &format!("SELECT deleted_at IS NULL FROM todos WHERE id={}", todo.id)
-        )
-        .await,
-        1
-    );
-}
-
+use crate::tests::support::{
+    allow_short_records, count_active, exec, expect_err, fresh_pool, new_item, rewind, scalar_i64,
+};
 #[tokio::test]
 async fn start_creates_running_active_session() {
     let pool = fresh_pool("timer-start").await;
@@ -246,10 +151,14 @@ async fn resume_when_running_is_idempotent() {
 #[tokio::test]
 async fn stop_saves_and_freezes_accumulated() {
     let pool = fresh_pool("timer-stop").await;
+    // 阈值关到 0：本用例验的是「结束时的冻结口径」，不是最短记录时长。
+    allow_short_records(&pool).await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
     rewind(&pool, rec.id, 5_000).await;
 
-    let stopped = timer::stop(&pool).await.unwrap();
+    let result = timer::stop(&pool).await.unwrap();
+    assert!(!result.discarded, "阈值 0 → 任何时长都应保存");
+    let stopped = result.record;
     assert_eq!(stopped.status, "saved");
     assert!(stopped.running_since.is_none());
     assert_eq!(stopped.accumulated_sec, 5, "结束冻结 accumulated");
@@ -273,9 +182,11 @@ async fn stop_when_idle_rejected() {
 #[tokio::test]
 async fn undo_within_window_reactivates_and_continues() {
     let pool = fresh_pool("timer-undo").await;
+    // 撤销需要一条真正落库的 saved 记录，先把阈值关掉。
+    allow_short_records(&pool).await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
     rewind(&pool, rec.id, 4_000).await;
-    let stopped = timer::stop(&pool).await.unwrap();
+    let stopped = timer::stop(&pool).await.unwrap().record;
     assert_eq!(stopped.accumulated_sec, 4);
 
     let back = timer::undo(&pool, stopped.id).await.unwrap();
@@ -290,8 +201,9 @@ async fn undo_within_window_reactivates_and_continues() {
 #[tokio::test]
 async fn undo_expired_rejected() {
     let pool = fresh_pool("timer-undo-exp").await;
+    allow_short_records(&pool).await;
     timer::start(&pool, Some(1)).await.unwrap();
-    let stopped = timer::stop(&pool).await.unwrap();
+    let stopped = timer::stop(&pool).await.unwrap().record;
     // 把 started_at/ended_at 一起回拨超过窗口，保持 ended>=started
     let back = UNDO_WINDOW_MS + UNDO_TOLERANCE_MS + 5_000;
     exec(
@@ -324,6 +236,7 @@ async fn undo_expired_rejected() {
 #[tokio::test]
 async fn undo_blocked_when_a_new_session_is_active() {
     let pool = fresh_pool("timer-undo-race").await;
+    allow_short_records(&pool).await;
     let item2 = new_item(&pool, "乙").await;
     let a = timer::start(&pool, Some(1)).await.unwrap();
     timer::stop(&pool).await.unwrap();

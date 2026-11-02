@@ -8,8 +8,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { errorText, ipc } from '../services/ipc';
 import { startOfDay } from '../lib/time';
-import { MAX_PAGE_SIZE } from '../types/domain';
-import type { TimeRecord } from '../types/domain';
+import { IPC_EVENTS, MAX_PAGE_SIZE } from '../types/domain';
+import type { MdSyncReport, TimeRecord } from '../types/domain';
+import { useTauriEvent } from './useTauriEvent';
 
 export interface TodayRecordsData {
   loading: boolean;
@@ -69,6 +70,11 @@ export function useTodayRecords(): TodayRecordsData {
   }, [nonce]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
+
+  /* [V0.4.0] Markdown 改时间 / 删组后，今日计时区立即跟上，不必等切窗。 */
+  useTauriEvent<MdSyncReport>(IPC_EVENTS.mdSyncChanged, (report) => {
+    if (report.kinds.includes('timers')) reload();
+  });
 
   return { loading, error, totalSec, rows, reload };
 }

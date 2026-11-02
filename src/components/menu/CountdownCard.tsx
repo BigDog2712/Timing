@@ -5,9 +5,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent, WheelEvent } from 'react';
 import { useHoverClose } from '../../hooks/useHoverClose';
+import { defaultCountdownSec } from '../../lib/countdown';
+import { clientToLayer } from '../../lib/fitBounds';
 import { formatDuration } from '../../lib/format';
 import { countdownActions } from '../../services/countdownActions';
 import { useCountdownArmStore } from '../../stores/countdownArm';
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { useUiStore, type MenuPos } from '../../stores/uiStore';
 import '../../styles/countdown-card.css';
@@ -31,7 +34,10 @@ export function CountdownCard({ anchor, onClose, onMenu }: CountdownCardProps) {
   const arm = useCountdownArmStore((state) => state.arm);
   const timerState = useTimerStore((state) => state.state);
   const setNotice = useUiStore((state) => state.setNotice);
-  const [displaySec, setDisplaySec] = useState(armedSec ?? 1500);
+  /* [P1 优化] 未设定过时长时显示参考设置的「默认倒计时」（Timing 默认 25 分钟），
+     不再硬编码 1500，避免与设置页口径分叉。 */
+  const defaultSec = useSettingsStore((state) => defaultCountdownSec(state.referenceSettings));
+  const [displaySec, setDisplaySec] = useState(armedSec ?? defaultSec);
   const displayRef = useRef(displaySec);
 
   useHoverClose(onClose);
@@ -59,7 +65,7 @@ export function CountdownCard({ anchor, onClose, onMenu }: CountdownCardProps) {
   const handleContextMenu = useCallback((event: MouseEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    onMenu({ x: event.clientX, y: event.clientY });
+    onMenu(clientToLayer(event.clientX, event.clientY));
   }, [onMenu]);
 
   const handleClick = useCallback(() => {

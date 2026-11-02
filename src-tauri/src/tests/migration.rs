@@ -51,7 +51,8 @@ async fn seed_system_item_uncategorized() {
             .as_deref(),
         Some("未归类")
     );
-    // schema 版本登记：V0.2.0 批 1 迁移后推进到 2（K-7 / Spec §6 迁移铁律）
+    // schema 版本登记：全部迁移跑完推进到 4（K-7 / Spec §6 迁移铁律；v3 = 便利贴置顶列，ADR-019；
+    // v4 = 待办提醒链路的 remind_stage / auto_start，ADR-030）
     assert_eq!(
         scalar_opt_str(
             &pool,
@@ -59,7 +60,7 @@ async fn seed_system_item_uncategorized() {
         )
         .await
         .as_deref(),
-        Some("2")
+        Some("4")
     );
 }
 

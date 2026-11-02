@@ -1,4 +1,4 @@
-/* =============================================================================
+﻿/* =============================================================================
  * TickBar V0.2.0 — todos-inline.css（事项窗口：内联编辑/确认 + 空态 + Loading/Error）
  * -----------------------------------------------------------------------------
  * 拆自 todos-pending.css（单文件 ≤300 行纪律）。仅 var(--*)，零字面量色值。
@@ -6,7 +6,8 @@
  * ========================================================================== */
 
 /* ------------------------------ 内联编辑 / 确认 ------------------------------ */
-.inline-edit,
+/* [V0.3.13] 改名 / 改时间不再是「编辑条 + 确定 / 取消」，而是**就地打字**（`.inline-text`）；
+   删除确认条（`.inline-confirm`）保持原样。 */
 .inline-confirm {
   display: flex;
   align-items: center;
@@ -14,58 +15,37 @@
   width: 100%;
 }
 
-.inline-edit__input {
-  flex: 1 1 auto;
+/* 就地文本框：吃掉所在格子，观感尽量贴近原来的纯文本（同字号、无内边距跳动） */
+.inline-text {
   min-width: 0;
-  height: var(--input-h);
-  padding: 0 var(--space-3);
+  width: 100%;
+  height: var(--todos-pending-row-h);
+  padding: 0 2px;
   border-radius: var(--radius-sm);
-  background: var(--input-bg);
-  color: var(--input-text);
-  border: 1px solid var(--input-border);
-  font-size: var(--text-body);
-  transition: background-color var(--dur-quick) var(--ease-standard);
-}
-
-.inline-edit__input::placeholder {
-  color: var(--input-placeholder);
-}
-
-.inline-edit__input:focus {
   background: var(--input-bg-focus);
-}
-
-.inline-edit__ok {
-  flex: 0 0 auto;
-  height: var(--btn-sm-h);
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  background: var(--btn-accent-bg);
-  color: var(--btn-accent-ink);
-  border: 1px solid var(--btn-accent-line);
-}
-
-.inline-edit__ok:disabled {
-  color: var(--ink-4);
-  border-color: var(--line);
-  background: transparent;
-  cursor: not-allowed;
-}
-
-.inline-edit__cancel {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: var(--btn-sm-h);
-  height: var(--btn-sm-h);
-  border-radius: var(--radius-sm);
-  color: var(--ink-3);
-}
-
-.inline-edit__cancel:hover {
-  background: var(--bg-field-hi);
   color: var(--ink);
+  border: 1px solid var(--input-border);
+  font: inherit;
+  font-size: var(--text-sm);
+  outline: none;
+}
+
+.inline-text:focus {
+  border-color: var(--accent-line);
+}
+
+.inline-text[data-invalid="true"] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* 时间位是定宽的等宽格：输入时不能把左右两列挤走 */
+.inline-text--time {
+  width: 62px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .inline-confirm__text {
@@ -173,4 +153,85 @@
   border-top: 1px solid var(--line);
   font-size: var(--text-xs);
   color: var(--danger);
+}
+
+/* --------------------- 记录行编辑态（V0.3.11） --------------------- */
+/* 用户口径「编辑事项功能应也能修改计时的事项」：打开底栏「编辑事项」后，
+   记录行的名字变成改名按钮、行尾多一枚删除（走同一条内联确认条 ——
+   记录挂在**事项**上，删的是事项本身，所以不像待办那样即时删除）。 */
+/* 编辑态：名字 / 时间 / 删除 三列，**隐藏时长列** —— 四列时「时长」把名字挤到只剩 25px
+   （实测），改名的输入面根本看不到字。编辑时段里名字优先于时长。 */
+.todo-row[data-edit="true"] {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.todo-row[data-edit="true"] .todo-row__dur {
+  display: none;
+}
+
+.todo-row__name--btn {
+  margin: 0 -2px;
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: text;
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-row__name--btn:hover {
+  background: var(--bg-field-hi);
+}
+
+.todo-row__actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  justify-self: end;
+}
+
+.todo-row__act {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+/* 图标非文本，门槛 3:1（WCAG 1.4.11） */
+.todo-row__act:hover {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+/* 记录行编辑态的「开始 / 结束」两枚时间位（[V0.3.12] ADR-030）：
+   与待办行的 `.todo-pend__chip` 同一套观感（等宽数字、悬停底、未设虚线），
+   但落在 `.todo-row` 里，所以单独一组类名，避免和待办行的 grid 打架。 */
+.todo-row__times {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.todo-row__chip {
+  display: inline-block;
+  padding: 0 3px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-row__chip:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.todo-row__chip[data-empty="true"] {
+  color: var(--ink-4);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
 }

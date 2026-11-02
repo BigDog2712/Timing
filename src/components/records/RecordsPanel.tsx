@@ -9,7 +9,7 @@ import type { KeyboardEvent } from 'react';
 import { useRecordsData } from '../../hooks/useRecordsData';
 import type { RecordsRange } from '../../lib/time';
 import { AlertIcon, EmptyDotIcon, iconStroke } from '../../lib/icons';
-import { ipc } from '../../services/ipc';
+import { recordApi } from '../../services/api';
 import { useItemStore } from '../../stores/itemStore';
 import { useUiStore } from '../../stores/uiStore';
 import { DayWeekTabs } from './DayWeekTabs';
@@ -38,7 +38,7 @@ export function RecordsPanel() {
   const handleReassign = useCallback(
     async (recordId: number, itemId: number) => {
       try {
-        await ipc.updateRecord({ id: recordId, patch: { itemId } });
+        await recordApi.update(recordId, { itemId });
       } finally {
         reload();
       }
@@ -49,7 +49,7 @@ export function RecordsPanel() {
   const handleDelete = useCallback(
     async (recordId: number) => {
       try {
-        await ipc.deleteRecord({ id: recordId });
+        await recordApi.remove({ id: recordId });
       } finally {
         reload();
       }

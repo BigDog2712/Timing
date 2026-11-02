@@ -10,13 +10,16 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useReminderKeys } from './useReminderKeys';
+import { NudgeBody } from './NudgeBody';
 import { formatClockTime } from '../../lib/format';
 import { BellIcon, BellRingIcon, PlayIcon, XIcon } from '../../lib/icons';
 import { ipc } from '../../services/ipc';
 import { reminderActions, clearFiredItem, clearAllFired } from '../../services/reminderActions';
+import { todoNudgeActions } from '../../services/todoNudgeActions';
 import type { ReminderPopoverState } from '../../stores/uiStore';
 import type { Reminder } from '../../types/domain';
 import { useHoverClose } from '../../hooks/useHoverClose';
+import { fitBounds } from '../../lib/fitBounds';
 
 const W = 280;
 const H = 178;
@@ -59,23 +62,39 @@ export function ReminderPopover({ state }: ReminderPopoverProps) {
   const fired = state.fired ?? [];
   const merged = fired.length > 1;
   const firstFired = fired[0];
+  /* [V0.3.12] 待办两级提醒：与到点卡同一张卡，靠 stage 区分正文与动作（ADR-030） */
+  const nudge = state.nudge;
+  const isNudge = mode === 'nudge' && nudge != null;
+  const lightNudge = isNudge && nudge.stage === 1;
 
   const heading = useMemo(() => {
+    if (isNudge) return lightNudge ? `轻提醒 · ${title}` : `即将开始 · ${title}`;
     if (mode === 'set') return `提醒 · ${title}`;
     return merged ? `${fired.length} 条事项到点` : `提醒 · ${title}`;
-  }, [mode, title, merged, fired.length]);
+  }, [isNudge, lightNudge, mode, title, merged, fired.length]);
 
   useReminderKeys({
     onEscape: () => reminderActions.close(),
     onEnter: () => {
+      if (isNudge) {
+        if (lightNudge) todoNudgeActions.close();
+        else void todoNudgeActions.startNow(nudge);
+        return;
+      }
       if (mode === 'fired') void reminderActions.startNewTimer(state);
       else void reminderActions.setRemindAt(target, targetId, Date.now() + OFFSETS[0].ms);
     },
     onSnooze: () => setSnoozeOpen((v) => !v),
   });
 
-  const left = Math.min(Math.max(state.pos.x, EDGE), Math.max(EDGE, window.innerWidth - W - EDGE));
-  const top = Math.min(Math.max(state.pos.y, EDGE), Math.max(EDGE, window.innerHeight - H - EDGE));
+  /* [ADR-020] 贴边钳制按「显示器工作区」算：主窗没有画布了，读 window.innerWidth
+     会把浮层硬挤到胶囊上。fitBounds() 非主窗自动回落真实视口；主窗返回层坐标
+     （x/y 为负），右/下边界写成 x + w、y + h。 */
+  const viewport = fitBounds();
+  /* 轻提醒多一行平移档，卡片更高：夹取时按实际高度算，别让卡片被裁在屏幕外 */
+  const cardH = lightNudge ? H + 40 : H;
+  const left = Math.min(Math.max(state.pos.x, EDGE), Math.max(EDGE, viewport.x + viewport.w - W - EDGE));
+  const top = Math.min(Math.max(state.pos.y, EDGE), Math.max(EDGE, viewport.y + viewport.h - cardH - EDGE));
 
   return (
     <>
@@ -93,7 +112,9 @@ export function ReminderPopover({ state }: ReminderPopoverProps) {
         </header>
 
         <div className="reminder__body">
-          {mode === 'fired' ? (
+          {isNudge ? (
+            <NudgeBody nudge={nudge} />
+          ) : mode === 'fired' ? (
             merged ? (
               <ul className="reminder__pending">
                 {fired.map((f, i) => (
@@ -142,7 +163,7 @@ export function ReminderPopover({ state }: ReminderPopoverProps) {
           )}
         </div>
 
-        {snoozeOpen && (
+        {!isNudge && snoozeOpen && (
           <div className="reminder__snooze" role="group" aria-label="稍后提醒">
             {OFFSETS.map((o) => (
               <button
@@ -158,33 +179,61 @@ export function ReminderPopover({ state }: ReminderPopoverProps) {
         )}
 
         <footer className="reminder__actions">
-          <button type="button" className="btn btn--ghost reminder__btn" onClick={() => setSnoozeOpen((v) => !v)}>
-            稍后提醒
-          </button>
-          {mode === 'fired' ? (
-            <button
-              type="button"
-              className="btn btn--primary reminder__btn"
-              onClick={() => void reminderActions.startNewTimer(state)}
-            >
-              <PlayIcon size={16} strokeWidth={2.5} aria-hidden />
-              开始新计时
-            </button>
+          {isNudge ? (
+            lightNudge ? (
+              <button type="button" className="btn btn--primary reminder__btn" onClick={() => todoNudgeActions.close()}>
+                不用改
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="btn btn--ghost reminder__btn"
+                  onClick={() => void todoNudgeActions.autoStart(nudge)}
+                >
+                  结束后自动开始
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary reminder__btn"
+                  onClick={() => void todoNudgeActions.startNow(nudge)}
+                >
+                  <PlayIcon size={16} strokeWidth={2.5} aria-hidden />
+                  现在就开始
+                </button>
+              </>
+            )
           ) : (
-            <button
-              type="button"
-              className="btn btn--primary reminder__btn"
-              onClick={() => void reminderActions.setRemindAt(target, targetId, Date.now() + OFFSETS[1].ms)}
-            >
-              15 分钟后
-            </button>
+            <>
+              <button type="button" className="btn btn--ghost reminder__btn" onClick={() => setSnoozeOpen((v) => !v)}>
+                稍后提醒
+              </button>
+              {mode === 'fired' ? (
+                <button
+                  type="button"
+                  className="btn btn--primary reminder__btn"
+                  onClick={() => void reminderActions.startNewTimer(state)}
+                >
+                  <PlayIcon size={16} strokeWidth={2.5} aria-hidden />
+                  开始新计时
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn--primary reminder__btn"
+                  onClick={() => void reminderActions.setRemindAt(target, targetId, Date.now() + OFFSETS[1].ms)}
+                >
+                  15 分钟后
+                </button>
+              )}
+            </>
           )}
           <button
             type="button"
             className="reminder__close"
             aria-label="关闭"
             title="关闭"
-            onClick={() => reminderActions.close()}
+            onClick={() => (isNudge ? todoNudgeActions.close() : reminderActions.close())}
           >
             <XIcon size={16} strokeWidth={2.5} aria-hidden />
           </button>

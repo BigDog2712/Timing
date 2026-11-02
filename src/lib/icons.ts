@@ -22,8 +22,6 @@ import {
   Pencil,
   Trash2,
   Settings2,
-  Pin,
-  PinOff,
   Keyboard,
   CircleAlert,
   Clock,
@@ -52,6 +50,11 @@ import {
   Link,
   Unlink,
   CalendarClock,
+  /* [V0.3.9] 常用事项（置顶）+ 常用摸鱼排序 */
+  Pin,
+  PinOff,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 
 export type IconSize = 16 | 20 | 24;
@@ -68,8 +71,6 @@ export const UndoIcon = Undo2;
 export const PencilIcon = Pencil;
 export const TrashIcon = Trash2;
 export const SettingsIcon = Settings2;
-export const PinIcon = Pin;
-export const PinOffIcon = PinOff;
 export const KeyboardIcon = Keyboard;
 export const AlertIcon = CircleAlert;
 export const ClockIcon = Clock;
@@ -94,6 +95,11 @@ export const BellRingIcon = BellRing;
 export const LinkIcon = Link;
 export const UnlinkIcon = Unlink;
 export const CalendarClockIcon = CalendarClock;
+/* [V0.3.9] 常用事项管理（置顶 / 取消置顶）+ 常用摸鱼上移下移 */
+export const PinIcon = Pin;
+export const PinOffIcon = PinOff;
+export const ChevronUpIcon = ChevronUp;
+export const ChevronDownIcon = ChevronDown;
 
 /** 20px 档图标（按钮内） */
 export const ChevronRightIcon = ChevronRight;

@@ -10,27 +10,27 @@
  */
 import { useEffect } from 'react';
 import { ipc } from '../services/ipc';
+import { highlightPill } from '../services/highlightActions';
 import { themeActions } from '../services/themeActions';
-import { openSettings } from '../services/settingsActions';
 import { openNewNote } from '../services/noteActions';
 import { reminderActions } from '../services/reminderActions';
+import { todoNudgeActions } from '../services/todoNudgeActions';
 import { useItemStore } from '../stores/itemStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useThemeStore } from '../stores/themeStore';
 import { useTimerStore } from '../stores/timerStore';
+import { useTodoStore } from '../stores/todoStore';
 import { useUiStore } from '../stores/uiStore';
 import { IPC_EVENTS } from '../types/domain';
 import type {
   CountdownFinishedPayload,
+  MdSyncReport,
   ReminderFiredPayload,
-  ShortcutTriggeredPayload,
   ThemeChangedPayload,
   TimerState,
+  TodoNudgePayload,
 } from '../types/domain';
 import { useTauriEvent } from './useTauriEvent';
-
-/** 主窗浮层默认锚点（事件触发无鼠标位置时；与键盘菜单一致） */
-const EVENT_ANCHOR = { x: 12, y: 56 };
 
 /**
  * K-1 窗口显式显示护栏：跨 React `StrictMode` 的双执行也只显示一次。
@@ -44,24 +44,21 @@ export function useAppBootstrap(): void {
     useTimerStore.getState().setState(payload);
   });
 
-  useTauriEvent<unknown>(IPC_EVENTS.trayToggleVisibility, () => {
-    useUiStore.getState().resetTransient();
+  /* [V0.3.1] 托盘双击 = 高亮定位小条（颜色取设置里的「高亮颜色」）。
+     原「托盘左键 → 显隐悬浮条」已随显隐功能一起删除。 */
+  useTauriEvent<unknown>(IPC_EVENTS.trayHighlight, () => {
+    void highlightPill();
   });
 
-  useTauriEvent<unknown>(IPC_EVENTS.openSettings, () => {
-    // 托盘 / 快捷键「设置…」→ 独立设置窗（dev 回退内联面板）
-    void openSettings();
-  });
+  // 托盘「设置…」由 Rust 侧直接 open_settings_window，不再广播事件
+  // （原 IPC_EVENTS.openSettings 后端从未 emit，是死常量，已删除）。
 
   useTauriEvent<unknown>(IPC_EVENTS.openNewItem, () => {
     useUiStore.getState().openPanel('create');
   });
 
-  useTauriEvent<ShortcutTriggeredPayload>(IPC_EVENTS.shortcutTriggered, (payload) => {
-    // [P1] MVP 不注册热键；此分支仅为结构预留，按动作做最小安全映射
-    if (payload.action === 'toggle_window') void ipc.toggleWindow();
-    else if (payload.action === 'new_item') useUiStore.getState().openPanel('create');
-  });
+  /* [V0.3.3] `shortcut:triggered` 订阅已随全局快捷键整体下架（ADR-022）：
+     此前它只是「结构预留」（后端从不 emit），留着等于一个永不触发的死常量。 */
 
   /* ---- 主题变更广播：各窗自订阅（K-21），主窗不代转 ---- */
   useTauriEvent<ThemeChangedPayload>(IPC_EVENTS.themeChanged, (payload) => {
@@ -81,16 +78,45 @@ export function useAppBootstrap(): void {
     reminderActions.onFired(payload);
   });
 
+  /* ---- [V0.3.12] 待办两级提醒：T-15 轻提醒（改时间）/ T-5 自动开始询问（ADR-030） ---- */
+  useTauriEvent<TodoNudgePayload>(IPC_EVENTS.todoNudge, (payload) => {
+    todoNudgeActions.onNudge(payload);
+  });
+
   /* ---- [批2 N-4] 便利贴窗口开关：主窗无需更新自身状态（备注逐窗自持），
    *      订阅仅为占位——将来若主窗要展示「已开便利贴数」可在此对接。 ---- */
   useTauriEvent<unknown>(IPC_EVENTS.noteWindowOpened, () => undefined);
   useTauriEvent<unknown>(IPC_EVENTS.noteWindowClosed, () => undefined);
 
-  /* ---- [批2 E] 托盘 IA → 主窗浮层（原生托盘菜单项触发；前端零渲染） ---- */
-  useTauriEvent<unknown>(IPC_EVENTS.openCommonItems, () => {
-    useUiStore.getState().openCommonItems(EVENT_ANCHOR);
+  /* ---- [V0.4.0] Markdown 同步把文件改动写回 SQL：刷新受影响的 store ----
+     事件只在「真的导入了数据」时发；空轮询不打扰界面。 */
+  useTauriEvent<MdSyncReport>(IPC_EVENTS.mdSyncChanged, (report) => {
+    if (report.kinds.includes('timers') || report.kinds.includes('notes')) {
+      void useItemStore
+        .getState()
+        .reload()
+        .catch(() => undefined);
+    }
+    if (report.kinds.includes('timers')) {
+      void useTimerStore
+        .getState()
+        .refresh()
+        .catch(() => undefined);
+    }
+    /* 待办区块的勾选 / 改标题会改 `todos`，待办窗口不能停在旧列表上。 */
+    if (report.kinds.includes('todos')) {
+      void useTodoStore
+        .getState()
+        .reload()
+        .catch(() => undefined);
+    }
+    useUiStore.getState().setNotice({
+      text: `已从 Markdown 同步 ${report.imported} 条更新`,
+      tone: 'info',
+    });
   });
 
+  /* ---- [批2 E] 托盘 IA → 主窗浮层（原生托盘菜单项触发；前端零渲染） ---- */
   useTauriEvent<unknown>(IPC_EVENTS.openNewNote, () => {
     void openNewNote();
   });
@@ -142,6 +168,13 @@ export function useAppBootstrap(): void {
           useTimerStore.getState().refresh(),
           useItemStore.getState().reload(),
           useSettingsStore.getState().reload(),
+          /* [P1 优化] 参考设置（Timing v1.7.3 口径）首帧也要拉：否则
+             settingsStore.referenceSettings 恒为 null，倒计时默认时长等字段等于假接线。
+             拉取失败不拖垮首帧，回落容忍。 */
+          useSettingsStore
+            .getState()
+            .reloadReference()
+            .catch(() => null),
         ]);
         if (cancelled) return;
         if (state.session) useUiStore.getState().setRecover(state.session);

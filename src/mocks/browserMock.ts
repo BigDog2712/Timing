@@ -6,101 +6,28 @@
  * 种子数据与状态构造见同目录 mockSeed.ts。
  */
 import type {
-  CreateItemParams,
-  Item,
   ItemIdParams,
   RecordPatch,
   StatsSummary,
-  UpdateItemParams,
   UpdateRecordParams,
   UpdateSettingsParams,
   UndoStopParams,
 } from '../types/domain';
 import { createMockApiV020 } from './browserMockV020';
+import { createMockApiDaily } from './browserMockDaily';
+import { createMockApiItems } from './browserMockItems';
+import { createMockApiPlugins } from './browserMockPlugins';
 import { buildState, fail, now, seed, type MockState } from './mockSeed';
 
-/** 命令名 -> 处理器。返回 rejected value 时抛 `{ code, message }`。 */
+/**
+ * 命令名 -> 处理器。返回 rejected value 时抛 `{ code, message }`。
+ */
 export function createMockApi(): Record<string, (args?: any) => unknown> {
   const s: MockState = seed();
 
   const findItem = (id: number) => s.items.find((i) => i.id === id && i.status === 'active');
 
   const core: Record<string, (args?: any) => unknown> = {
-    list_items: (a) => {
-      const includeArchived = Boolean(a?.includeArchived);
-      return s.items
-        .filter((i) => (includeArchived ? true : i.status === 'active'))
-        .sort((x, y) => x.sortOrder - y.sortOrder || x.name.localeCompare(y.name));
-    },
-    create_item: (a) => {
-      const p = a as CreateItemParams;
-      const name = (p?.name ?? '').trim();
-      if (!name) fail('ITEM_NAME_EMPTY', '事项名称不能为空');
-      if (s.items.some((i) => i.status === 'active' && i.name.trim().toLowerCase() === name.toLowerCase())) {
-        fail('ITEM_NAME_DUPLICATE', '已存在同名事项');
-      }
-      const id = ++s.seq;
-      const t = now();
-      const item: Item = {
-        id,
-        name,
-        color: p?.color ?? null,
-        status: 'active',
-        isSystem: false,
-        sortOrder: s.items.length,
-        /* [V0.2.0] */
-        remindAt: null,
-        remindedAt: null,
-        isPinned: false,
-        createdAt: t,
-        updatedAt: t,
-      };
-      s.items.push(item);
-      return item;
-    },
-    update_item: (a) => {
-      const p = a as UpdateItemParams;
-      const item = s.items.find((i) => i.id === p.id);
-      if (!item) fail('ITEM_NOT_FOUND', '事项不存在');
-      if (p.patch.name !== undefined) {
-        const name = p.patch.name.trim();
-        if (!name) fail('ITEM_NAME_EMPTY', '事项名称不能为空');
-        item.name = name;
-      }
-      if (p.patch.color !== undefined) item.color = p.patch.color;
-      if (p.patch.sortOrder !== undefined) item.sortOrder = p.patch.sortOrder;
-      /* [V0.2.0] */
-      if (p.patch.remindAt !== undefined) {
-        item.remindAt = p.patch.remindAt;
-        item.remindedAt = null;
-      }
-      if (p.patch.isPinned !== undefined) item.isPinned = p.patch.isPinned;
-      item.updatedAt = now();
-      return item;
-    },
-    archive_item: (a) => {
-      const item = s.items.find((i) => i.id === (a as ItemIdParams).id);
-      if (!item) fail('ITEM_NOT_FOUND', '事项不存在');
-      if (item.isSystem) fail('ITEM_SYSTEM_PROTECTED', '系统事项不可归档');
-      item.status = 'archived';
-      item.updatedAt = now();
-      return item;
-    },
-    unarchive_item: (a) => {
-      const item = s.items.find((i) => i.id === (a as ItemIdParams).id);
-      if (!item) fail('ITEM_NOT_FOUND', '事项不存在');
-      item.status = 'active';
-      item.updatedAt = now();
-      return item;
-    },
-    delete_item: (a) => {
-      const item = s.items.find((i) => i.id === (a as ItemIdParams).id);
-      if (!item) fail('ITEM_NOT_FOUND', '事项不存在');
-      if (item.isSystem) fail('ITEM_SYSTEM_PROTECTED', '系统事项不可删除');
-      item.status = 'archived';
-      item.updatedAt = now();
-      return undefined;
-    },
     start_timer: (a) => {
       if (s.active) fail('TIMER_ALREADY_RUNNING', '已有进行中的计时');
       const itemId = (a?.itemId as number | undefined) ?? 1;
@@ -144,9 +71,15 @@ export function createMockApi(): Record<string, (args?: any) => unknown> {
       }
       rec.status = 'saved';
       rec.endedAt = now();
-      s.records.unshift(rec);
       s.active = null;
-      return rec;
+      /* [V0.3.4] 与后端 `services::timer::stop` 同口径：低于「最短记录时长」→ 不保存
+         （后端是软删，mock 直接不进 records），返回 discarded 让前端不展示撤销条。
+         阈值读 `MockState.reference`，与设置页滑杆同一份状态。 */
+      if (rec.accumulatedSec < s.reference.minRecordSeconds) {
+        return { record: rec, discarded: true };
+      }
+      s.records.unshift(rec);
+      return { record: rec, discarded: false };
     },
     undo_stop: (a) => {
       const { recordId } = a as UndoStopParams;
@@ -245,14 +178,21 @@ export function createMockApi(): Record<string, (args?: any) => unknown> {
     },
     resolve_open_record: (a) => {
       const action = a?.action as string;
+      /* [V0.4.2] 与 Rust 同口径：只有勾了 includeGap 才补「退出期间」 */
+      const includeGap = a?.includeGap === true;
       if (!s.active) return null;
       const rec = s.active;
+      const gapSec =
+        includeGap && rec.runningSince != null
+          ? Math.max(0, Math.floor((now() - rec.runningSince) / 1000))
+          : 0;
       if (action === 'resume') {
+        rec.accumulatedSec += gapSec;
         rec.runningSince = now();
         return rec;
       }
       if (action === 'close') {
-        if (rec.runningSince != null) rec.accumulatedSec += Math.floor((now() - rec.runningSince) / 1000);
+        rec.accumulatedSec += gapSec;
         rec.runningSince = null;
         rec.status = 'saved';
         rec.endedAt = (a?.endAt as number | undefined) ?? now();
@@ -277,18 +217,37 @@ export function createMockApi(): Record<string, (args?: any) => unknown> {
       return enabled;
     },
     get_autostart: () => s.settings.autostartEnabled,
-    register_shortcut: () => true,
     show_window: () => undefined,
+    /* 浏览器 mock：无权读真实工作区，退化成屏幕可用区（DIP 口径不严格，仅供布局不崩） */
+    main_work_area: () => ({
+      x: 0,
+      y: 0,
+      w: window.screen.availWidth || 1440,
+      h: window.screen.availHeight || 900,
+    }),
     hide_window: () => undefined,
     toggle_window: () => undefined,
-    set_always_on_top: (a) => {
-      s.settings.alwaysOnTop = Boolean(a?.enabled);
-      return undefined;
-    },
+    /* 浏览器 mock：没有真实小条，给小条应处的右下角位置，保证便利贴落点逻辑可走查 */
+    main_window_rect: () => ({
+      x: Math.max(0, (window.screen.availWidth || 1440) - 200),
+      y: Math.max(0, (window.screen.availHeight || 900) - 60),
+      w: 168,
+      h: 32,
+    }),
     save_window_position: () => undefined,
     quit_app: () => undefined,
   };
 
   /* [V0.2.0] 新增命令拆至 browserMockV020（单文件 <=300 行纪律） */
-  return { ...core, ...createMockApiV020(s, findItem) };
+  /* [V0.3.4] 原 browserMockDiary 的日记四条命令已随日记域下架删除，
+     余下的日状态 / 丢弃计时 / 计时窗三条拆至 browserMockDaily */
+  /* [V0.3.0] 事项域 6 条拆至 browserMockItems（同上纪律，ADR-017） */
+  /* [V0.3.2] 插件域 2 条拆至 browserMockPlugins */
+  return {
+    ...core,
+    ...createMockApiItems(s),
+    ...createMockApiV020(s, findItem),
+    ...createMockApiDaily(s),
+    ...createMockApiPlugins(),
+  };
 }

@@ -10,7 +10,18 @@
  *  - closeCurrentWindow()：自绘标题栏 × 的关闭动作。
  */
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { isTauri } from '../services/ipc';
+import { ipc, isTauri } from '../services/ipc';
+
+/**
+ * 本文件是**全前端唯一的窗口 API 出口**（R2）。
+ *
+ * 任何组件 / hook 都不得直接 `import '@tauri-apps/api/window'`——窗口能力与"多窗口
+ * 单 bundle"的路由假设强绑定（label 命名、note-{id} 前缀、非 Tauri 的 `?w=` 回退），
+ * 散落到各处会让「新增一类窗口」变成全仓搜索。
+ * 机械门禁：`grep -rl "@tauri-apps/api/window" src` = 1（只允许本文件）。
+ */
+export { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window';
+export type { PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window';
 
 export type WindowKind = 'main' | 'settings' | 'todos' | 'timer' | 'note';
 
@@ -63,6 +74,30 @@ export function currentNoteId(): number | null {
     }
   }
   return null;
+}
+
+/**
+ * 主条（label = `main`）在屏幕上的**逻辑矩形**（DIP），供「浮层默认落在小条附近」使用。
+ *
+ * 为什么不是 `getCurrentWindow()`：调用方可能是事项窗 / 便利贴窗（在那边点「新建便利贴」），
+ * 拿到的是**它自己**的位置，落点就会跑偏。
+ *
+ * 为什么不是 `Window.getByLabel('main')`：它内部走 `get_all_windows`，需要
+ * `core:window:allow-get-all-windows` 权限——本项目的能力白名单没有放行，调用会
+ * **静默失败**（catch 吃掉 → 退回固定落点），这正是「改了落点但没生效」的根因。
+ * 改走 IPC `main_window_rect`：后端直接读主窗，不依赖前端窗口枚举权限。
+ *
+ * 读不到（非 Tauri / 主窗尚未创建）→ `null`，调用方退回固定落点。
+ */
+export async function mainWindowRect(): Promise<{ x: number; y: number; w: number; h: number } | null> {
+  if (!isTauri()) return null;
+  try {
+    const rect = await ipc.mainWindowRect();
+    if (!(rect.w > 0) || !(rect.h > 0)) return null;
+    return rect;
+  } catch {
+    return null;
+  }
 }
 
 /** 把窗口类别写到 <html data-window>（供 CSS 按窗切换根尺寸/底色） */
@@ -120,16 +155,9 @@ export function closeCurrentWindow(): Promise<void> {
     .catch(() => undefined);
 }
 
-/**
- * 设置「当前窗口」的置顶态（便利贴运行期 pin，AC-64）。非 Tauri 为 no-op。
- * 注意：**勿用** `ipc.setAlwaysOnTop` —— 该 IPC 命令固定作用于**主窗**并落库全局设置
- *       `ui.always_on_top`（属设置面板契约）；对 note-{id} 窗无效且会产生全局副作用。
- * 失败时 reject（调用方据此回滚 UI 态）。
- */
-export function setCurrentWindowAlwaysOnTop(enabled: boolean): Promise<void> {
-  if (!isTauri()) return Promise.resolve();
-  return getCurrentWindow().setAlwaysOnTop(enabled);
-}
+/* 便利贴的运行期置顶**不在这里**：统一由后端 `infra::window_note::apply_note_pin`
+   在服务端完成（落库 + 当场改窗口层级），前端不再提供切换入口（ADR-022）。
+   需要改置顶时走 `ipc.noteUpdate({ id, patch: { isPinned } })`。 */
 
 /**
  * [V0.2.1] 让「当前窗口」跟随鼠标拖动（主小条整条可拖，1.3）。

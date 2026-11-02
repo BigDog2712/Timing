@@ -67,12 +67,45 @@ pub async fn count_active(pool: &SqlitePool) -> i64 {
     .await
 }
 
+/// 把会话的 `started_at` / `running_since` 同步回拨 ms 毫秒（`running_since` 为 NULL 时保持 NULL）。
+///
+/// 用途：模拟「已经跑了一段时间」而不必真的 sleep——计时相关用例共用。
+pub async fn rewind(pool: &SqlitePool, id: i64, ms: i64) {
+    exec(
+        pool,
+        &format!(
+            "UPDATE time_records \
+             SET started_at = started_at - {ms}, running_since = running_since - {ms} \
+             WHERE id = {id}"
+        ),
+    )
+    .await;
+}
+
 /// 新建一个普通事项并返回其 id（新库仅有系统事项 id=1，用例按需建 2/3/…）。
 pub async fn new_item(pool: &SqlitePool, name: &str) -> i64 {
     crate::services::item::create(pool, name, None)
         .await
         .expect("建事项应成功")
         .id
+}
+
+/// 把「最短记录时长」阈值关到 0，让用例可以自由结束任意短的会话。
+///
+/// [V0.3.4] `timer::stop` 默认会忽略短于 `min_record_seconds`（出厂 30s）的会话
+/// （`discarded = true`，软删、不落库）。**状态机 / 待办联动**的用例只关心迁移本身，
+/// 不该被阈值牵连，所以显式关掉它；阈值行为本身在
+/// `timer.rs::stop_discards_below_min_record_seconds` 与 `countdown.rs` 里专门验证。
+pub async fn allow_short_records(pool: &SqlitePool) {
+    crate::services::settings::update_reference(
+        pool,
+        &crate::models::settings::ReferenceSettingsPatch {
+            min_record_seconds: Some(0),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("写入最短记录时长应成功");
 }
 
 /// 直接插入一条 saved 记录（确定性构造统计/分页数据），返回记录 id。

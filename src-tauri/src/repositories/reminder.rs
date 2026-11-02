@@ -102,16 +102,15 @@ pub async fn pending(pool: &SqlitePool) -> AppResult<Vec<Reminder>> {
 }
 
 /// 已到点未触发提醒（`remind_at <= now`），按 `remind_at ASC`（后台扫描用）。
+///
+/// **只含事项**（V0.3.12 / ADR-030）：待办的 `remind_at` 是「开始时间」，走
+/// `jobs::nudge` 的两级提醒链路（T-15 / T-5），不再进通用到点提醒。
 pub async fn due(pool: &SqlitePool, now: i64) -> AppResult<Vec<Reminder>> {
     let sql = format!(
         "SELECT 'item' AS target, id AS target_id, {} AS title, remind_at FROM items \
          WHERE deleted_at IS NULL AND remind_at IS NOT NULL AND reminded_at IS NULL AND remind_at <= ? \
-         UNION ALL \
-         SELECT 'todo', id, {}, remind_at FROM todos \
-         WHERE deleted_at IS NULL AND remind_at IS NOT NULL AND reminded_at IS NULL AND remind_at <= ? \
          ORDER BY remind_at ASC",
         ReminderTarget::Item.title_col(),
-        ReminderTarget::Todo.title_col(),
     );
     fetch_reminders(pool, &sql, Some(now)).await
 }
@@ -165,8 +164,8 @@ async fn fetch_reminders(
 ) -> AppResult<Vec<Reminder>> {
     let mut query = sqlx::query_as::<_, ReminderRow>(sql);
     if let Some(v) = now {
-        // 两个 `remind_at <= ?` 占位符各绑一次。
-        query = query.bind(v).bind(v);
+        // 单占位符（`due` 只查 items，V0.3.12 起不再 UNION todos）
+        query = query.bind(v);
     }
     let rows = query.fetch_all(pool).await?;
     Ok(rows.into_iter().map(ReminderRow::into_reminder).collect())

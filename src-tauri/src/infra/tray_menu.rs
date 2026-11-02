@@ -4,7 +4,7 @@
 //! 文案口径与 `MenuStatusBlock` 一致；**纯文本、无圆点 / 无 emoji**（P0 从紧）。
 //!
 //! 范围说明：本模块只登记**后端已具备能力**的菜单项。设计稿
-//! `docs/design/pages-V0.2.0/tray-menu.md §1.1` 中依赖尚未交付能力的项（日期视图 / 日记 /
+//! `docs/design/pages-V0.2.0/tray-menu.md §1.1` 中依赖尚未交付能力的项（日期视图 /
 //! 关于面板等）不生成（**不产出空占位项**）。批 2 已追加「打开事项 / 编辑固定任务… /
 //! 便利贴…」三个后端已具备能力的项（后两者 emit 应用内事件交由前端弹菜单）。
 
@@ -20,12 +20,10 @@ pub const ID_TIMER_PAUSE: &str = "timer_pause";
 pub const ID_TIMER_RESUME: &str = "timer_resume";
 pub const ID_TIMER_STOP: &str = "timer_stop";
 pub const ID_TIMER_DISCARD: &str = "timer_discard";
-pub const ID_SHOW_HIDE: &str = "show_hide";
 pub const ID_NEW_ITEM: &str = "new_item";
 pub const ID_OPEN_SETTINGS: &str = "open_settings";
 /* [V0.2.0 批 2] 后端已具备能力的常显项 */
 pub const ID_OPEN_TODOS: &str = "open_todos";
-pub const ID_OPEN_COMMON_ITEMS: &str = "open_common_items";
 pub const ID_OPEN_NOTE: &str = "open_note";
 pub const ID_QUIT: &str = "quit";
 
@@ -99,10 +97,11 @@ pub fn build_nodes(status: TrayStatus, line: &str) -> Vec<TrayNode> {
     }
 
     nodes.push(TrayNode::Separator);
-    nodes.push(TrayNode::item(ID_SHOW_HIDE, "显示 / 隐藏", true));
+    /* [V0.3.1] 「显示 / 隐藏」已移除：小条常驻，不再提供显隐入口
+    （用户口径「去除显示与隐藏悬浮条功能」）。托盘左键单击仍会把小条叫出来
+    （只显不隐），双击 = 高亮定位。 */
     nodes.push(TrayNode::item(ID_NEW_ITEM, "新建事项", true));
     nodes.push(TrayNode::item(ID_OPEN_TODOS, "打开事项", true));
-    nodes.push(TrayNode::item(ID_OPEN_COMMON_ITEMS, "编辑固定任务…", true));
     nodes.push(TrayNode::item(ID_OPEN_NOTE, "便利贴…", true));
     nodes.push(TrayNode::item(ID_OPEN_SETTINGS, "设置…", true));
     nodes.push(TrayNode::Separator);

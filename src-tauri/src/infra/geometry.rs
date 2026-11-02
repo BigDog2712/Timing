@@ -51,6 +51,15 @@ fn intersects(a: &Rect, b: &Rect) -> bool {
         && a.bottom() > (b.y as i64)
 }
 
+/// 两矩形交叠面积（物理像素²）；不相交（含仅边缘相切）返回 0。
+///
+/// i64 计算防越界；负宽高按 0 处理。用于「窗口落在哪块显示器」的归属判定。
+pub fn overlap_area(a: &Rect, b: &Rect) -> u64 {
+    let width = (a.right().min(b.right()) - (a.x as i64).max(b.x as i64)).max(0);
+    let height = (a.bottom().min(b.bottom()) - (a.y as i64).max(b.y as i64)).max(0);
+    (width * height) as u64
+}
+
 /// 把越界窗口钳制回可见区。
 ///
 /// 判定规则：

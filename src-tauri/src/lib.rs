@@ -1,9 +1,17 @@
 //! TickBar 桌面壳入口（仅装配：插件 / 状态 / 托盘 / 命令 / 窗口事件，无业务）。
+//!
+//! 分层（依赖只能向下）：
+//! `platform`（叶子）→ `infra`（平台适配）→ `services`（业务）
+//! → `app`（装配：事件/托盘/启动/诊断）/ `jobs`（调度）→ `commands`（IPC 入口）。
+//! 机械校验：`npm run check:contract` + CI 里的两条 grep（见 AGENTS.md）。
 
+mod app;
 mod commands;
 mod error;
 mod infra;
+mod jobs;
 mod models;
+mod platform;
 mod repositories;
 mod services;
 mod state;
@@ -13,23 +21,34 @@ mod state;
 mod tests;
 
 pub fn run() {
+    // 冷启动计时起点（T17）：越靠近进程入口越准。这里比 `Builder` 早，也早于任何插件初始化。
+    platform::boot_timing::start();
     tauri::Builder::default()
         // 插件（IPC-CONTRACT-v2 附录 A / Spec §4）
-        .plugin(tauri_plugin_sql::Builder::default().build())
-        .plugin(tauri_plugin_store::Builder::default().build())
+        // v0.3 起移除 `plugin-sql` / `plugin-store`：前端从未引用它们，但 capability
+        // 曾放行 `sql:allow-execute` / `store:allow-set`，等于给前端留了一条绕过四层
+        // 直接改库的通道（ADR-015）。数据访问统一走 commands -> services -> repositories。
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // [V0.2.10] 事项窗的默认位置是「主条正下方」，由 `open_panel_window` 每次现算；
+        // 不让 window-state 把上次的旧坐标盖回来（它会覆盖 builder 的 position）。
+        .plugin(
+            tauri_plugin_window_state::Builder::default()
+                .skip_initial_state(infra::window_spec::TODOS.label)
+                .build(),
+        )
         // [V0.2.0] 系统通知（批 2 提醒调度用；本波仅注册，不接线）
         .plugin(tauri_plugin_notification::init())
+        // [V0.4.0] 原生文件夹选择（设置 → 同步；只开 dialog:allow-open）
+        .plugin(tauri_plugin_dialog::init())
         // 单实例：重复启动聚焦已有窗口（AC-22）
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             let _ = infra::window::show_main(app);
         }))
-        // 启动装配：建库 -> 默认设置 -> 状态 -> 托盘 -> 后台落盘
-        .setup(|app| infra::setup::setup(app.handle().clone()))
+        // 启动装配：日志 -> 建库 -> 默认设置 -> 状态 -> 托盘 -> 诊断 -> 调度器
+        .setup(|app| app::bootstrap::setup(app.handle().clone()))
         // K-5：拦截关闭请求 -> 隐藏窗口
         .on_window_event(infra::window::on_window_event)
         .invoke_handler(tauri::generate_handler![
@@ -39,10 +58,8 @@ pub fn run() {
             commands::item_cmd::archive_item,
             commands::item_cmd::unarchive_item,
             commands::item_cmd::delete_item,
-            commands::diary_cmd::diary_get_config,
-            commands::diary_cmd::diary_set_config,
-            commands::diary_cmd::diary_today,
-            commands::diary_cmd::diary_open_today,
+            /* [V0.3.4] 日记域四条命令（diary_get_config / diary_set_config / diary_today /
+            diary_open_today）随日记模块整体下架删除，见 ADR-023。 */
             commands::timer_cmd::start_timer,
             commands::timer_cmd::pause_timer,
             commands::timer_cmd::resume_timer,
@@ -64,11 +81,11 @@ pub fn run() {
             commands::settings_cmd::update_settings,
             commands::settings_cmd::set_autostart,
             commands::settings_cmd::get_autostart,
-            commands::system_cmd::register_shortcut,
             commands::system_cmd::show_window,
+            commands::system_cmd::main_work_area,
+            commands::system_cmd::main_window_rect,
             commands::system_cmd::hide_window,
             commands::system_cmd::toggle_window,
-            commands::system_cmd::set_always_on_top,
             commands::system_cmd::save_window_position,
             commands::system_cmd::quit_app,
             commands::theme_cmd::theme_get,
@@ -85,6 +102,7 @@ pub fn run() {
             commands::todo_cmd::todo_delete,
             commands::todo_cmd::todo_list,
             commands::todo_cmd::todo_toggle,
+            commands::todo_cmd::todo_start,
             // [V0.2.0 批 2] 便利贴 / 倒计时 / 提醒（IPC 40 → 52）
             commands::note_cmd::note_create,
             commands::note_cmd::note_get,
@@ -96,6 +114,14 @@ pub fn run() {
             commands::reminder_cmd::reminder_set,
             commands::reminder_cmd::reminder_clear,
             commands::reminder_cmd::reminder_pending,
+            // [V0.3.2] 插件域（声明式插件：读 `<插件目录>/plugin.json` 启动头）
+            commands::plugin_cmd::plugin_list,
+            commands::plugin_cmd::plugin_open_dir,
+            // [V0.4.0] Markdown 同步（插件 API v2 的宿主实现）
+            commands::md_sync_cmd::md_sync_get,
+            commands::md_sync_cmd::md_sync_save,
+            commands::md_sync_cmd::md_sync_run,
+            commands::md_sync_cmd::md_sync_open,
         ])
         .run(tauri::generate_context!())
         .expect("TickBar 启动失败");

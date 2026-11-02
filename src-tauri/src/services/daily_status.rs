@@ -1,7 +1,7 @@
 //! Per-day item completion state, independent of global items and pending todos.
 use crate::{
     error::{AppError, AppResult},
-    infra::clock::now_ms,
+    platform::clock::now_ms,
     repositories::{item, settings},
 };
 use sqlx::SqlitePool;

@@ -31,9 +31,7 @@ import type {
   ReminderClearParams,
   ReminderSetParams,
   ResolveOpenRecordParams,
-  RegisterShortcutParams,
   SaveWindowPositionParams,
-  SetAlwaysOnTopParams,
   SetAutostartParams,
   SetCountdownPresetParams,
   Settings,
@@ -59,8 +57,14 @@ import type {
   UpdateRecordParams,
   UpdateSettingsParams,
   IpcApi,
-  DiaryConfig,
-  TodayDiary,
+  StopResult,
+  WindowRectDip,
+  WorkAreaDip,
+  PluginListResult,
+  MdSyncConfig,
+  MdSyncKind,
+  MdSyncReport,
+  MdSyncView,
 } from '../types/domain';
 import { createMockApi } from '../mocks/browserMock';
 
@@ -124,8 +128,6 @@ export function errorText(err: unknown): string {
       return '目标不存在，已为你刷新列表';
     case 'ITEM_NAME_EMPTY':
       return '事项名称不能为空';
-    case 'ITEM_NAME_DUPLICATE':
-      return '已存在同名事项';
     case 'ITEM_SYSTEM_PROTECTED':
       return '系统事项不可删除';
     case 'TIMER_ALREADY_RUNNING':
@@ -134,10 +136,12 @@ export function errorText(err: unknown): string {
       return '当前没有进行中的计时';
     case 'TIMER_NO_UNDO':
       return '撤销窗口已过期';
-    case 'SHORTCUT_REGISTER_FAILED':
-      return '该组合键已被占用';
     case 'INVALID_DURATION':
       return '结束时间早于开始时间';
+    case 'IO_ERROR':
+      /* [V0.3.0] 此前漏了这一支，会静默落到「操作失败，请稍后重试」——
+         由 check:contract 的「错误码文案覆盖」规则抓出。 */
+      return '系统调用失败，请重试';
     /* [V0.2.0] */
     case 'NOTE_NOT_FOUND':
       return '便利贴不存在或已删除';
@@ -149,6 +153,13 @@ export function errorText(err: unknown): string {
       return '倒计时时长不合法';
     case 'INVALID_COLOR':
       return '颜色值不合法';
+    /* [V0.3.0] 超长与「为空」分开：让表单高亮到正确分支（ADR-018） */
+    case 'ITEM_NAME_TOO_LONG':
+      return '输入内容过长，请精简后再试';
+    /* [V0.4.0] 同步落点配置校验失败：把后端给的具体原因原样透出，
+       设置页需要它告诉用户「哪个落点、哪一项」不合法。 */
+    case 'MD_SYNC_CONFIG_INVALID':
+      return err instanceof Error && err.message ? err.message : '同步设置不合法';
     default:
       return err instanceof Error && err.message ? err.message : '操作失败，请稍后重试';
   }
@@ -171,7 +182,7 @@ export const ipc: IpcApi = {
     call<TimeRecord>('start_timer', params.itemId != null ? { itemId: params.itemId } : {}),
   pauseTimer: () => call<TimeRecord>('pause_timer'),
   resumeTimer: () => call<TimeRecord>('resume_timer'),
-  stopTimer: () => call<TimeRecord>('stop_timer'),
+  stopTimer: () => call<StopResult>('stop_timer'),
   discardTimer: () => call<void>('discard_timer'),
   undoStop: (params: UndoStopParams) => call<TimeRecord>('undo_stop', { recordId: params.recordId }),
   getTimerState: () => call<TimerState>('get_timer_state'),
@@ -193,7 +204,11 @@ export const ipc: IpcApi = {
 
   /* ---- 崩溃恢复 ---- */
   resolveOpenRecord: (params: ResolveOpenRecordParams) =>
-    call<TimeRecord | null>('resolve_open_record', { action: params.action, endAt: params.endAt }),
+    call<TimeRecord | null>('resolve_open_record', {
+      action: params.action,
+      endAt: params.endAt,
+      includeGap: params.includeGap ?? false,
+    }),
 
   /* ---- 设置域 ---- */
   getSettings: () => call<Settings>('get_settings'),
@@ -203,15 +218,13 @@ export const ipc: IpcApi = {
   setAutostart: (params: SetAutostartParams) => call<boolean>('set_autostart', { enabled: params.enabled }),
   getAutostart: () => call<boolean>('get_autostart'),
 
-  /* ---- 快捷键域 [P1] ---- */
-  registerShortcut: (params: RegisterShortcutParams) =>
-    call<boolean>('register_shortcut', { action: params.action, accelerator: params.accelerator }),
-
   /* ---- 窗口 / 系统域 ---- */
   showWindow: () => call<void>('show_window'),
+  mainWorkArea: () => call<WorkAreaDip>('main_work_area'),
+  /** 主条（小条）矩形（DIP）：便利贴等浮层「默认落在小条附近」的基准 */
+  mainWindowRect: () => call<WindowRectDip>('main_window_rect'),
   hideWindow: () => call<void>('hide_window'),
   toggleWindow: () => call<void>('toggle_window'),
-  setAlwaysOnTop: (params: SetAlwaysOnTopParams) => call<void>('set_always_on_top', { enabled: params.enabled }),
   saveWindowPosition: (params: SaveWindowPositionParams) => call<void>('save_window_position', { x: params.x, y: params.y }),
   quitApp: () => call<void>('quit_app'),
 
@@ -223,6 +236,7 @@ export const ipc: IpcApi = {
   todoList: (params: TodoListParams) =>
     call<Todo[]>('todo_list', { includeDone: params.includeDone ?? false, from: params.from, to: params.to }),
   todoToggle: (params: TodoToggleParams) => call<Todo>('todo_toggle', { id: params.id, done: params.done }),
+  todoStart: (params: TodoRefParams) => call<TimeRecord>('todo_start', { id: params.id }),
 
   /* ---- [V0.2.0] 便利贴域 ---- */
   noteCreate: (params: NoteCreateParams) =>
@@ -245,10 +259,7 @@ export const ipc: IpcApi = {
   openTodosWindow: () => call<void>('open_todos_window'),
   openSettingsWindow: () => call<void>('open_settings_window'),
   openTimerWindow: () => call<void>('open_timer_window'),
-  diaryGetConfig: () => call<DiaryConfig>('diary_get_config'),
-  diarySetConfig: (config: DiaryConfig) => call<DiaryConfig>('diary_set_config', { config }),
-  diaryToday: () => call<TodayDiary>('diary_today'),
-  diaryOpenToday: () => call<TodayDiary>('diary_open_today'),
+  /* [V0.3.4] 日记域四条命令实现随模块下架删除（ADR-023）。 */
 
   /* ---- [V0.2.0] 主题域 ---- */
   themeGet: () => call<ThemeSettings>('theme_get'),
@@ -269,4 +280,16 @@ export const ipc: IpcApi = {
     call<Reminder>('reminder_set', { target: params.target, targetId: params.targetId, remindAt: params.remindAt }),
   reminderClear: (params: ReminderClearParams) => call<void>('reminder_clear', { target: params.target, targetId: params.targetId }),
   reminderPending: () => call<Reminder[]>('reminder_pending'),
+
+  /* ---- [V0.3.2] 插件域 ---- */
+  pluginList: () => call<PluginListResult>('plugin_list'),
+  pluginOpenDir: () => call<void>('plugin_open_dir'),
+
+  /* ---- [V0.4.0] Markdown 同步（插件 API v2） ---- */
+  mdSyncGet: () => call<MdSyncView>('md_sync_get'),
+  mdSyncSave: (params: { config: MdSyncConfig }) =>
+    call<MdSyncView>('md_sync_save', { config: params.config }),
+  mdSyncRun: () => call<MdSyncReport>('md_sync_run'),
+  mdSyncOpen: (params: { kind: MdSyncKind }) =>
+    call<void>('md_sync_open', { kind: params.kind }),
 };

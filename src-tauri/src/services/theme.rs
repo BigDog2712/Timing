@@ -7,12 +7,12 @@ use serde::de::DeserializeOwned;
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
-use crate::infra::clock::now_ms;
 use crate::models::constants::*;
 use crate::models::theme::{
     default_presets, is_valid_hex, normalize_presets, AccentColors, AccentPatch, ThemeChanged,
     ThemeMode, ThemeSettings,
 };
+use crate::platform::clock::now_ms;
 use crate::repositories::settings as repo;
 
 /// 读取主题设置。

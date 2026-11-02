@@ -33,6 +33,41 @@
         }
       })();
     </script>
+    <script>
+      /* [TEMP-DIAG] 启动故障排查：把「脚本是否执行 / 首个错误」用图片打点送到本地监听。
+         WebView 里没有 DevTools 时这是唯一能把信息带出来的通道。定位完即删。 */
+      (function () {
+        function send(tag, msg) {
+          try {
+            new Image().src =
+              'http://127.0.0.1:8787/?t=' +
+              tag +
+              '&m=' +
+              encodeURIComponent(String(msg === undefined ? '' : msg).slice(0, 300));
+          } catch (e) {}
+        }
+        window.__diagSend = send;
+        send('inline', 'ready=' + document.readyState + ' theme=' + document.documentElement.getAttribute('data-theme'));
+        window.addEventListener(
+          'error',
+          function (e) {
+            if (e && e.target && e.target.tagName) {
+              send('res', e.target.tagName + ' ' + (e.target.src || e.target.href || ''));
+            } else {
+              send('js', ((e && e.message) || '') + ' @ ' + ((e && e.filename) || '') + ':' + ((e && e.lineno) || ''));
+            }
+          },
+          true
+        );
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e && e.reason;
+          send('rej', (r && (r.message || r.stack)) || r);
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+          send('dom', 'root=' + !!document.getElementById('root'));
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

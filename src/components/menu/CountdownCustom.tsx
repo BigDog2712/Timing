@@ -11,6 +11,7 @@ import type { KeyboardEvent } from 'react';
 import { useUiStore } from '../../stores/uiStore';
 import type { MenuPos } from '../../stores/uiStore';
 import { useHoverClose } from '../../hooks/useHoverClose';
+import { fitBounds } from '../../lib/fitBounds';
 
 interface CountdownCustomProps {
   anchor: MenuPos;
@@ -60,8 +61,12 @@ export function CountdownCustom({ anchor, initialSec, onCancel, onSubmit }: Coun
     }
   };
 
-  const left = Math.min(Math.max(anchor.x, EDGE), Math.max(EDGE, window.innerWidth - W - EDGE));
-  const top = Math.min(Math.max(anchor.y, EDGE), Math.max(EDGE, window.innerHeight - H - EDGE));
+  /* [ADR-020] 贴边钳制按「显示器工作区」算：主窗没有画布了，读 window.innerWidth
+     会把菜单硬挤到胶囊上。fitBounds() 非主窗自动回落真实视口；主窗返回层坐标
+     （x/y 为负），右/下边界写成 x + w、y + h。 */
+  const viewport = fitBounds();
+  const left = Math.min(Math.max(anchor.x, EDGE), Math.max(EDGE, viewport.x + viewport.w - W - EDGE));
+  const top = Math.min(Math.max(anchor.y, EDGE), Math.max(EDGE, viewport.y + viewport.h - H - EDGE));
 
   return (
     <>

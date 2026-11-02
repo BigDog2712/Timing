@@ -3,12 +3,12 @@
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
-use crate::infra::clock::now_ms;
 use crate::models::common::Paginated;
 use crate::models::constants::{DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, NOTE_MAX_LEN};
 use crate::models::enums::record_status;
 use crate::models::record::{RecordPatch, TimeRecord};
 use crate::models::stats::StatsSummary;
+use crate::platform::clock::now_ms;
 use crate::repositories::item as item_repo;
 use crate::repositories::record as repo;
 
@@ -59,19 +59,30 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: RecordPatch) -> AppResult
         }
     }
     let started = patch.started_at.unwrap_or(existing.started_at);
-    if let Some(ended) = patch.ended_at.or(existing.ended_at) {
-        if ended < started {
+    let ended = patch.ended_at.or(existing.ended_at);
+    if let Some(ended_at) = ended {
+        if ended_at < started {
             return Err(AppError::invalid_duration());
         }
     }
+    /* [V0.3.12] 改了起止时刻 → 时长跟着区间走（ADR-030）：用户改的就是「这段时间」。
+    只在真的动了时刻时重算 —— 单独改备注 / 事项时保留原来的累计（可能含暂停）。 */
+    let accumulated_sec = if patch.started_at.is_some() || patch.ended_at.is_some() {
+        ended.map(|end| ((end - started) / 1000).max(0))
+    } else {
+        None
+    };
     let note = patch.note.as_deref().map(clamp_note);
 
     repo::update_saved(
         pool,
         id,
         patch.item_id,
-        patch.started_at,
-        patch.ended_at,
+        repo::SavedTimes {
+            started_at: patch.started_at,
+            ended_at: patch.ended_at,
+            accumulated_sec,
+        },
         note.as_deref(),
         now_ms(),
     )

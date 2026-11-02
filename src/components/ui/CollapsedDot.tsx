@@ -2,7 +2,7 @@
  * TickBar — 收起圆点 CollapsedDot（collapsed.md）
  * -----------------------------------------------------------------------------
  * 可见直径 28px、环描边 2.5px（面积缩小加粗补偿）；命中区 36x36（< 44 的偏差已
- * 在 DESIGN.md §8.3 说明）。单击展开回药丸；右键单击弹上下文菜单；
+ * 在 DESIGN.md §8.3 说明）。单击展开回药丸；右键不再弹任何菜单（V0.3.1）；
  * hover 300ms 后原生 title 显示「时长 · 事项名」。
  */
 import { useEffect, useState } from 'react';
@@ -23,7 +23,6 @@ export function CollapsedDot() {
   const items = useItemStore((s) => s.items);
   const endedAt = useUiStore((s) => s.endedAt);
   const toggleCollapsed = useUiStore((s) => s.toggleCollapsed);
-  const openMenu = useUiStore((s) => s.openMenu);
 
   const [ended, setEnded] = useState(false);
   useEffect(() => {
@@ -38,9 +37,9 @@ export function CollapsedDot() {
   const name = findItem(items, currentItemId)?.name ?? '未归类';
   const tooltip = `${formatDuration(seconds)} · ${name}`;
 
+  /* [V0.3.1] 右键主菜单已删除：圆点右键只吞事件，不再弹菜单 */
   const handleContextMenu = (e: ReactMouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
-    openMenu({ x: e.clientX, y: e.clientY });
   };
 
   return (

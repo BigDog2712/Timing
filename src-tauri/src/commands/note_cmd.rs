@@ -5,8 +5,9 @@
 
 use tauri::{AppHandle, State};
 
+use crate::app::events;
 use crate::error::AppResult;
-use crate::infra::{events, window};
+use crate::infra::window;
 use crate::models::note::{Note, NoteCreateParams, NotePatch};
 use crate::services;
 use crate::state::AppState;
@@ -43,8 +44,26 @@ pub async fn note_list(state: State<'_, AppState>, item_id: Option<i64>) -> AppR
 }
 
 #[tauri::command]
-pub async fn note_update(state: State<'_, AppState>, id: i64, patch: NotePatch) -> AppResult<Note> {
-    services::note::update(&state.pool, id, patch).await
+pub async fn note_update(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+    patch: NotePatch,
+) -> AppResult<Note> {
+    let pin_changed = patch.is_pinned.is_some();
+    let note = services::note::update(&state.pool, id, patch).await?;
+    /* [V0.3.0] 置顶是**窗口属性**，光落库不会立刻改变层级；这里把最新值推给窗口。
+    窗口未打开时 apply_note_pin 静默跳过，下次 open_note_window 会按列值建窗。
+
+    **失败只记日志、不冒泡**：列值已经落库，此刻返回 Err 会让前端回滚乐观状态，
+    结果是「库里 false、界面 true」的假象。窗口层级失败是瞬时的（窗口正在销毁 /
+    被系统拒绝），下一次开窗会自愈。 */
+    if pin_changed {
+        if let Err(err) = window::apply_note_pin(&app, note.id, note.is_pinned) {
+            crate::log_warn!("apply note pin failed (id={}): {err}", note.id);
+        }
+    }
+    Ok(note)
 }
 
 /// 软删除 + 关闭该便利贴窗口（若开）+ emit `note-window-closed`。

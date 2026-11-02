@@ -8,7 +8,7 @@
  * - 非 Tauri（浏览器 dev）为 no-op。
  */
 import { useEffect, useState } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow } from '../lib/window';
 import { isTauri } from '../services/ipc';
 import { useNoteStore } from '../stores/noteStore';
 import { NOTE_COMFORT_MAX_H, NOTE_COMFORT_MAX_W } from '../types/domain';

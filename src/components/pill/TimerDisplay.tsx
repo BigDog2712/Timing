@@ -11,6 +11,7 @@
  */
 import { useRef } from 'react';
 import type { MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import { clientToLayer } from '../../lib/fitBounds';
 import { formatDuration, hasHours } from '../../lib/format';
 import type { MenuPos } from '../../stores/uiStore';
 import type { TimerMode } from '../../types/domain';
@@ -48,7 +49,8 @@ export function TimerDisplay({
   const rightUpAt = useRef(0);
 
   const openMenuAt = (clientX: number, clientY: number) => {
-    onMenu?.({ x: clientX, y: clientY });
+    /* [ADR-020] 指针是视口坐标、菜单锚点是布局坐标：置层被 translate 过，必须换算 */
+    onMenu?.(clientToLayer(clientX, clientY));
   };
 
   const stopRight = (e: ReactPointerEvent<HTMLSpanElement>) => {

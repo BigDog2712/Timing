@@ -9,6 +9,8 @@
  *   —— 分隔 ——
  *   删除事项（两步确认，走软删除 delete_item，历史记录不受影响）
  * 与小条本体的右键菜单（ContextMenu = 计时操作 + 全局入口）分工：本菜单只作用于**这一条事项**。
+ * [V0.3.1] 小条本体的 ContextMenu 已整体删除（用户口径「悬浮框右键唤出设置菜单」不要了），
+ * 本菜单是仅存的右键菜单，入口是**事项名**（主窗）与**事项行**（事项窗）——只改这一条事项。
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTimerActions } from '../../hooks/useTimerActions';
@@ -21,7 +23,8 @@ import {
   StickyNoteIcon,
   TrashIcon,
 } from '../../lib/icons';
-import { errorText, ipc } from '../../services/ipc';
+import { errorText } from '../../services/ipc';
+import { itemApi, reminderApi } from '../../services/api';
 import { openNewNote } from '../../services/noteActions';
 import { reminderActions } from '../../services/reminderActions';
 import { findItem, useItemStore } from '../../stores/itemStore';
@@ -50,8 +53,8 @@ export function ItemMenu() {
     const id = item?.id;
     if (id == null) return;
     let alive = true;
-    void ipc
-      .reminderPending()
+    void reminderApi
+      .pending()
       .then((list) => {
         if (alive) setHasReminder(list.some((r) => r.target === 'item' && r.targetId === id));
       })
@@ -61,7 +64,9 @@ export function ItemMenu() {
     };
   }, [item?.id]);
 
-  const pos = itemMenu?.pos ?? { x: 12, y: 56 };
+  // 每次渲染都新建 `{x,y}` 会让下面的菜单项 useMemo 每帧失效（lint 报警）；
+  // 锚点本身只随 itemMenu 变化，用 useMemo 固定引用。
+  const pos = useMemo(() => itemMenu?.pos ?? { x: 12, y: 56 }, [itemMenu?.pos]);
   const runningThis = status !== 'idle' && sessionItemId != null && sessionItemId === item?.id;
 
   const removeItem = useCallback(() => {
@@ -76,7 +81,7 @@ export function ItemMenu() {
     }
     void (async () => {
       try {
-        await ipc.deleteItem({ id: target.id });
+        await itemApi.remove({ id: target.id });
         await useItemStore.getState().reload();
         closeItemMenu();
       } catch (err) {
@@ -98,8 +103,9 @@ export function ItemMenu() {
           label: `开始计时 · ${name}`,
           icon: PlayIcon,
           disabled: item.isSystem,
-          onSelect: () =>
-            void (status === 'idle' ? actions.start(id) : actions.switchTo(id, 'end_and_start')),
+          /* [V0.4.2] 走 startOrSwitch：正在计别的时先暂停冻结累计再分段，
+             之前直接调 switchTo 会被后端「会话在跑」的守卫挡回来（点了没反应）。 */
+          onSelect: () => void actions.startOrSwitch(id),
         };
 
     return [
@@ -152,6 +158,7 @@ export function ItemMenu() {
         onSelect: removeItem,
       },
     ];
+    /* runningThis 已由 status + sessionItemId 推导，无需再列 status（否则 lint 报多余依赖） */
   }, [itemMenu, item, name, runningThis, hasReminder, armed, actions, pos, closeItemMenu, removeItem]);
 
   if (!itemMenu) return null;

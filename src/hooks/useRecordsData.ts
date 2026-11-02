@@ -8,8 +8,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { errorText, ipc } from '../services/ipc';
 import { rangeBounds, type RecordsRange } from '../lib/time';
 import { itemName, useItemStore } from '../stores/itemStore';
-import { MAX_PAGE_SIZE } from '../types/domain';
-import type { Item, TimeRecord } from '../types/domain';
+import { IPC_EVENTS, MAX_PAGE_SIZE } from '../types/domain';
+import type { Item, MdSyncReport, TimeRecord } from '../types/domain';
+import { useTauriEvent } from './useTauriEvent';
 
 export interface RecordGroup {
   itemId: number;
@@ -88,6 +89,10 @@ export function useRecordsData(range: RecordsRange): RecordsData {
   const groups = useMemo(() => buildGroups(rows, items, byItem), [rows, items, byItem]);
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
+
+  useTauriEvent<MdSyncReport>(IPC_EVENTS.mdSyncChanged, (report) => {
+    if (report.kinds.includes('timers')) reload();
+  });
 
   return { loading, error, totalSec, recordCount, groups, reload };
 }

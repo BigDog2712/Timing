@@ -2,9 +2,10 @@
 
 pub mod countdown_cmd;
 pub mod daily_status_cmd;
-pub mod diary_cmd;
 pub mod item_cmd;
+pub mod md_sync_cmd;
 pub mod note_cmd;
+pub mod plugin_cmd;
 pub mod record_cmd;
 pub mod reminder_cmd;
 pub mod settings_cmd;

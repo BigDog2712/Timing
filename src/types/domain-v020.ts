@@ -17,7 +17,7 @@
  * -----------------------------------------------------------------------------
  */
 
-import type { EpochMs, Seconds } from './domain';
+import type { EpochMs, Seconds } from './domain/constants';
 
 /* ===========================================================================
  * 便利贴 Note（一窗一行；窗口由 note-{id} 承载）
@@ -41,6 +41,13 @@ export interface Note {
   height: number;
   /** 窗口当前是否打开（启动据此恢复，K-14） */
   isOpen: boolean;
+  /**
+   * 是否置顶（窗口 always-on-top；AC-64）。
+   *
+   * [V0.3.0] 由数据库列 `notes.is_pinned` 承载（默认 true），不再随窗口硬编码。
+   * 语义是**窗口层级**，与「列表排序置顶」无关（那是 `items.isPinned`）。
+   */
+  isPinned: boolean;
   createdAt: EpochMs;
   updatedAt: EpochMs;
 }
@@ -53,6 +60,8 @@ export interface NotePatch {
   posY?: number;
   width?: number;
   height?: number;
+  /** 置顶开关（缺省 = 不改；后端落库后同步窗口层级） */
+  isPinned?: boolean;
 }
 
 /** note_create 入参（只建数据行，不建窗口；窗口由 open_note_window 负责） */
@@ -119,6 +128,8 @@ export interface TodoPatch {
   plannedAt?: EpochMs | null;
   remindAt?: EpochMs | null;
   sortOrder?: number;
+  /** [V0.3.12] 「当前事项结束后自动开始」（ADR-030） */
+  autoStart?: boolean;
 }
 
 /** todo_create 入参 */
@@ -223,6 +234,22 @@ export interface ReminderClearParams {
 
 /** reminder-fired 事件载荷（= Reminder） */
 export type ReminderFiredPayload = Reminder;
+
+/**
+ * todo-nudge 事件载荷（[V0.3.12] / ADR-030）。
+ * stage = 1 轻提醒（开始前 15 分钟，问要不要改时间）；
+ * stage = 2 自动开始询问（开始前 5 分钟，问当前结束后是否自动开始）。
+ */
+export interface TodoNudge {
+  todoId: number;
+  title: string;
+  /** 待办的开始时刻（= todos.remindAt） */
+  remindAt: EpochMs;
+  stage: 1 | 2;
+}
+
+/** todo-nudge 事件载荷别名 */
+export type TodoNudgePayload = TodoNudge;
 
 /** 倒计时剩余秒数（保留类型别名，与 TimerState.remainingSec 同义） */
 export type RemainingSec = Seconds;

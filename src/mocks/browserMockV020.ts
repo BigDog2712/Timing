@@ -4,8 +4,9 @@
  * 拆自 browserMock.ts（单文件 ≤300 行纪律）。**不参与生产**：Tauri 环境走 invoke。
  * 覆盖：待办域 5 · 便利贴域 5 · 多窗口域 4 · 主题域 4 · 倒计时 2 · 提醒域 3。
  */
-import type { AccentColors, Item, Note, Reminder, ThemeMode, Todo } from '../types/domain';
+import type { AccentColors, Item, Note, ReferenceSettings, Reminder, ThemeMode, Todo } from '../types/domain';
 import { MAX_COUNTDOWN_SEC } from '../types/domain';
+import { TODO_TITLE_MAX_CHARS } from '../lib/constants';
 import { fail, now, type MockState } from './mockSeed';
 
 export function createMockApiV020(
@@ -16,7 +17,10 @@ export function createMockApiV020(
     /* ---- 待办域 ---- */
     todo_create: (a) => {
       const title = String(a?.title ?? '').trim();
-      if (!title || title.length > 200) fail('ITEM_NAME_EMPTY', '待办标题不能为空');
+      if (!title) fail('ITEM_NAME_EMPTY', '待办标题不能为空');
+      if (title.length > TODO_TITLE_MAX_CHARS) {
+        fail('ITEM_NAME_TOO_LONG', `待办标题长度不能超过 ${TODO_TITLE_MAX_CHARS} 字`);
+      }
       const t = now();
       const todo: Todo = {
         id: ++s.seq,
@@ -36,7 +40,14 @@ export function createMockApiV020(
       const todo = s.todos.find((x) => x.id === a?.id);
       if (!todo) fail('TODO_NOT_FOUND', '待办不存在');
       const patch = (a?.patch ?? {}) as Partial<Todo>;
-      if (patch.title !== undefined) todo.title = String(patch.title);
+      if (patch.title !== undefined) {
+        const title = String(patch.title).trim();
+        if (!title) fail('ITEM_NAME_EMPTY', '待办标题不能为空');
+        if (title.length > TODO_TITLE_MAX_CHARS) {
+          fail('ITEM_NAME_TOO_LONG', `待办标题长度不能超过 ${TODO_TITLE_MAX_CHARS} 字`);
+        }
+        todo.title = title;
+      }
       if (patch.plannedAt !== undefined) todo.plannedAt = patch.plannedAt;
       if (patch.remindAt !== undefined) {
         todo.remindAt = patch.remindAt;
@@ -62,9 +73,32 @@ export function createMockApiV020(
     todo_toggle: (a) => {
       const todo = s.todos.find((x) => x.id === a?.id);
       if (!todo) fail('TODO_NOT_FOUND', '待办不存在');
-      todo.doneAt = Boolean(a?.done) ? now() : null;
+      todo.doneAt = a?.done ? now() : null;
       todo.updatedAt = now();
       return todo;
+    },
+    /* [V0.3.12] 待办 → 计时：开始即移出待办区（ADR-030）。mock 只做数据侧等价。 */
+    todo_start: (a) => {
+      const todo = s.todos.find((x) => x.id === a?.id);
+      if (!todo) fail('TODO_NOT_FOUND', '待办不存在');
+      if (s.active) fail('TIMER_ALREADY_RUNNING', '已有进行中的计时');
+      const item = s.items.find((x) => x.name === todo.title) ?? null;
+      const itemId = item?.id ?? s.items[0]?.id ?? 1;
+      const t = now();
+      s.active = {
+        id: ++s.seq,
+        itemId,
+        status: 'active',
+        startedAt: t,
+        endedAt: null,
+        accumulatedSec: 0,
+        runningSince: t,
+        note: null,
+        mode: 'countup',
+        targetSec: null,
+      };
+      s.todos = s.todos.filter((x) => x.id !== todo.id);
+      return s.active;
     },
 
     /* ---- 便利贴域 ---- */
@@ -79,6 +113,8 @@ export function createMockApiV020(
         width: Number(a?.width ?? 320),
         height: Number(a?.height ?? 232),
         isOpen: false,
+        /* [V0.3.0] 与后端列默认值一致：新建便利贴默认置顶（AC-64） */
+        isPinned: true,
         createdAt: t,
         updatedAt: t,
       };
@@ -98,7 +134,7 @@ export function createMockApiV020(
       const note = s.notes.find((x) => x.id === a?.id);
       if (!note) fail('NOTE_NOT_FOUND', '便利贴不存在');
       const patch = (a?.patch ?? {}) as Record<string, unknown>;
-      (['itemId', 'content', 'posX', 'posY', 'width', 'height'] as const).forEach((key) => {
+      (['itemId', 'content', 'posX', 'posY', 'width', 'height', 'isPinned'] as const).forEach((key) => {
         if (patch[key] !== undefined) (note as unknown as Record<string, unknown>)[key] = patch[key];
       });
       note.updatedAt = now();
@@ -115,8 +151,13 @@ export function createMockApiV020(
     close_note_window: () => undefined,
     open_todos_window: () => undefined,
     open_settings_window: () => undefined,
-    get_reference_settings: () => ({ uiScale: 1, plateOpacity: 0.9, defaultCountdownMinutes: 25, maxMinutes: 120, autoWriteOnStop: true, autoBindFirstTodo: false, defaultPauseReason: '', mergeGapMinutes: 5, minRecordSeconds: 5, pendingEnabled: true, remindAdvanceMinutes: 10, lightRemindDefaultOn: true, quickFindEnabled: true, timerWindowEnabled: false, extensionAutoStart: false, highlightColor: '#4DA3E8', desktopMenuEnabled: true }),
-    update_reference_settings: (a) => a?.patch,
+    get_reference_settings: () => ({ ...s.reference }),
+    /* 参考设置在浏览器里只有内存态（`MockState.reference`）：设置页改完滑杆要能立刻
+       读回新值，且 `stop_timer` 的阈值判定必须读同一份。 */
+    update_reference_settings: (a) => {
+      s.reference = { ...s.reference, ...((a?.patch ?? {}) as Partial<ReferenceSettings>) };
+      return { ...s.reference };
+    },
 
     /* ---- 主题域 ---- */
     theme_get: () => ({ mode: s.settings.themeMode }),

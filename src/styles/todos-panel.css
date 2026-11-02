@@ -4,7 +4,7 @@
  * 依据 docs/design/pages-V0.2.0/todos-panel.md。
  * P0：仅 var(--*)，零字面量色值；清单用 1px 线分组（不用卡片盒）；
  *     进行中行 = --accent-wash 底 + 3px 竖条（非「彩色左边框」单打独斗）。
- * 窗口壳：html[data-window="todos"] 覆写 app.css 的主窗 384×360 根尺寸。
+ * 窗口壳：html[data-window="todos"] 铺满自身视口（独立窗口，按 ADR-020 没有画布）。
  * 待办分组 / 内联编辑 / 空态见同目录 todos-pending.css（单文件 ≤300 行纪律）。
  * ========================================================================== */
 
@@ -21,10 +21,20 @@ html[data-window="todos"] #root {
   height: 100vh;
 }
 
+/* [V0.3.9] 窗口宽 = 面板 252 + 左侧便利贴预览区 240（`window_spec::TODOS`）。
+   面板靠右贴住主条原位，左边 240 透明——预览卡（portal 到 body）就画在那一段里。 */
+html[data-window="todos"] .win {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
 .todos {
+  position: relative; /* [V0.3.9] 「新增待办」表单卡按绝对定位贴在底栏上方 */
   display: flex;
   flex-direction: column;
-  width: var(--todos-w);
+  /* 面板只占右侧 252（= Rust `TODOS_PANEL_W`），不铺满窗口 */
+  width: 252px;
   height: 100vh;
   overflow: hidden;
   border-radius: var(--radius-lg);
@@ -90,8 +100,12 @@ html[data-window="todos"] #root {
 }
 
 /* ------------------------------ 记录行 ------------------------------ */
+/* 三列网格：名字（左）/ 时间（整行正中）/ 时长（右）。
+   左右两列等分 1fr，中间 auto 列才会落在行的正中央 —— 用 flex 做不到
+   「时间居中且时长仍贴右」。 */
 .todo-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-2);
   min-height: var(--todos-row-h);
@@ -104,6 +118,11 @@ html[data-window="todos"] #root {
   background: var(--todo-row-hover);
 }
 
+/* [V0.4.2] 记录行可点 = 直接开始这一条事项的计时；编辑模式不可点（那里的点击是改名 / 输时间） */
+.todo-row[data-clickable='true'] {
+  cursor: pointer;
+}
+
 .todo-row[data-status="running"] {
   background: var(--todo-row-current);
   box-shadow: inset 3px 0 0 0 var(--todo-bar-current);
@@ -114,8 +133,14 @@ html[data-window="todos"] #root {
   padding: 0 6px;
 }
 
+/* 内联条独占整行（网格下只有一个孩子，不指定会挤在左列） */
+.todo-row--editing > *,
+.todo-row--confirming > * {
+  grid-column: 1 / -1;
+}
+
 .todo-row__name {
-  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
   display: inline-flex;
   align-items: center;
@@ -140,17 +165,22 @@ html[data-window="todos"] #root {
   color: var(--todo-name-done);
 }
 
-/* 提醒铃（AC-54）：跟随**可配提醒色** --color-warn（未自定义时经别名回落到分主题 --warn） */
-.todo-row__bell,
-.todo-pend__bell {
+/* 提醒铃（AC-54）：跟随**可配提醒色** --color-warn（未自定义时经别名回落到分主题 --warn）。
+   只有「今日计时」记录行还挂铃铛；待办行 V0.3.11 起按用户口径与计时同格式，不再挂图标。 */
+.todo-row__bell {
   flex: 0 0 auto;
   color: var(--color-warn);
 }
 
+
+/* 时间列居中：位置由网格的等分左列决定（见 .todo-row），这里再让列内文字居中，
+   两列都不必凑宽度也能落到视觉中线上。 */
 .todo-row__time {
   flex: 0 0 auto;
   min-width: 34px;
-  text-align: right;
+  text-align: center;
+  /* [P2] 时间列现在可能是「开始–结束」区间，不能折行 */
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: var(--text-mono);   /* [Timing 对齐 D10] NumEm 11.5（TodoListPanel.cs:68） */
   font-variant-numeric: tabular-nums;
@@ -159,6 +189,7 @@ html[data-window="todos"] #root {
 
 .todo-row__dur {
   flex: 0 0 auto;
+  justify-self: end;
   min-width: 50px;
   text-align: right;
   font-family: var(--font-mono);
@@ -177,28 +208,10 @@ html[data-window="todos"] #root {
   text-decoration-color: var(--line-3);
 }
 
-/* ------------------------------ 状态圆标记 ------------------------------ */
-.todo-mark {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  width: var(--todos-mark-size);
-  height: var(--todos-mark-size);
-  border-radius: var(--radius-full);
-  border: 1.5px solid var(--todo-mark-ring);
-  background: transparent;
-  color: var(--todo-mark-done-ink);
-  transition: background-color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
-}
 
-.todo-mark[data-done="true"] {
-  background: var(--todo-mark-done);
-  border-color: var(--todo-mark-done);
-}
-
-.todo-mark[data-current="true"] {
-  border-color: var(--todo-mark-ring);
-}
+/* ------------------------------ 状态圆标记（已移除） ------------------------------ */
+/* [V0.3.9] 待办行不再画左侧圆点（用户口径：与计时行一致）；组件 TodoMark 一并删除，
+   `--todos-mark-*` 令牌仍由主窗「今日摘要」的 .today-digest__mark 使用，故令牌保留。 */
 
 /* ------------------------------ 底栏 ------------------------------ */
 .todos__foot {
@@ -219,6 +232,14 @@ html[data-window="todos"] #root {
 .todos__foot-edit {
   flex: 1 1 0;
   justify-content: center;
+}
+
+/* [V0.3.9] 窗口从 336 缩到 252 后，底栏两按钮的内宽不够，「编辑事项」会折成两行；
+   按钮标签一律不换行（实在放不下就压缩图标与内边距，不折行）。 */
+.todos__foot-add,
+.todos__foot-edit {
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .todos__foot-edit[data-on="true"] {

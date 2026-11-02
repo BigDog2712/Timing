@@ -211,3 +211,61 @@ async fn delete_record_is_idempotent() {
         .unwrap();
     assert_eq!(page.total, 0, "软删除后不进明细");
 }
+
+/// [V0.3.12] 改起止时刻 → 时长跟着区间走；只改备注时保留原累计（可能含暂停）。
+#[tokio::test]
+async fn editing_times_recomputes_duration() {
+    let pool = fresh_pool("rec-times").await;
+    let item = new_item(&pool, "写周报").await;
+    let id = insert_saved(&pool, item, 1_000_000, 1_600_000, 500).await;
+
+    // 只改备注：累计秒数保持原值（用户没动时间）
+    let kept = record::update(
+        &pool,
+        id,
+        RecordPatch {
+            note: Some("备注".to_string()),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(kept.accumulated_sec, 500, "只改备注不该重算时长");
+    assert_eq!(kept.ended_at, Some(1_600_000));
+
+    // 改结束时刻：时长 = 新区间（900s）
+    let rec = record::update(
+        &pool,
+        id,
+        RecordPatch {
+            ended_at: Some(1_900_000),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(rec.ended_at, Some(1_900_000));
+    assert_eq!(rec.accumulated_sec, 900, "改了时刻，时长跟着区间走");
+
+    // 结束早于开始 → INVALID_DURATION，库里不动
+    let code = expect_err(
+        record::update(
+            &pool,
+            id,
+            RecordPatch {
+                ended_at: Some(500_000),
+                ..Default::default()
+            },
+        )
+        .await,
+    );
+    assert_eq!(code, ErrorCode::InvalidDuration);
+    assert_eq!(
+        scalar_i64(
+            &pool,
+            &format!("SELECT accumulated_sec FROM time_records WHERE id = {id}")
+        )
+        .await,
+        900
+    );
+}

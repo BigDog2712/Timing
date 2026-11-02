@@ -6,12 +6,17 @@
  * 视觉四态：idle / running / paused / ended（ended 为 900ms 瞬时确认，非状态机第四态）。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
 import { COUNTDOWN_WARN_SEC, DEBOUNCE_MS, ENDED_FLASH_MS } from '../../lib/constants';
+import { clientToLayer } from '../../lib/fitBounds';
+import { defaultCountdownSec } from '../../lib/countdown';
 import { useTimerActions } from '../../hooks/useTimerActions';
 import { useTimerTick } from '../../hooks/useTimerTick';
 import { usePillDrag } from '../../hooks/usePillDrag';
 import { usePillInlineEdit } from '../../hooks/usePillInlineEdit';
+import { usePillKeyboard } from '../../hooks/usePillKeyboard';
+import { usePauseMoyu } from '../../hooks/usePauseMoyu';
+import { usePillWheel } from '../../hooks/usePillWheel';
 import { countdownActions } from '../../services/countdownActions';
 import { openOrCreateNoteForItem } from '../../services/noteActions';
 import { readCountdownDuration, useCountdownArmStore } from '../../stores/countdownArm';
@@ -28,6 +33,9 @@ import { MainButton } from './MainButton';
 import { NewItemEntry } from './NewItemEntry';
 import { NoteHandle } from './NoteHandle';
 import { TimerDisplay } from './TimerDisplay';
+
+/** [V0.3.1] 高亮闪烁总时长：CSS 动画 0.8s/次 × 3 次，留一点余量再摘属性 */
+const HIGHLIGHT_MS = 2500;
 
 const RING_LABEL: Record<VisualState, string> = {
   idle: '开始计时',
@@ -48,36 +56,41 @@ export function PillBar() {
   const armedSec = useCountdownArmStore((s) => s.armedSec);
   const arm = useCountdownArmStore((s) => s.arm);
   const clearArm = useCountdownArmStore((s) => s.clear);
-  const presets = useSettingsStore((s) => s.settings.countdownPresets);
-  const openCommonItems = useUiStore((s) => s.openCommonItems);
+  /* [P1 优化] 倒计时默认时长统一走参考设置（见 lib/countdown.ts），
+     原先这里订阅 settings.countdownPresets 只为取第一档当默认值，口径不一致，已下线。 */
+  const defaultSec = useSettingsStore((s) => defaultCountdownSec(s.referenceSettings));
   const items = useItemStore((s) => s.items);
   const endedAt = useUiStore((s) => s.endedAt);
-  const openMenu = useUiStore((s) => s.openMenu);
   const openNotesList = useUiStore((s) => s.openNotesList);
-  const menuOpen = useUiStore((s) => s.menuOpen);
   const panel = useUiStore((s) => s.panel);
   const countdownPos = useUiStore((s) => s.countdownPos);
   const countdownCardPos = useUiStore((s) => s.countdownCardPos);
+  const moyuPos = useUiStore((s) => s.moyuPos);
   const commonItemsPos = useUiStore((s) => s.commonItemsPos);
   const reminderPopover = useUiStore((s) => s.reminderPopover);
   const notesListPos = useUiStore((s) => s.notesListPos);
   const itemMenu = useUiStore((s) => s.itemMenu);
   const inlineEdit = useUiStore((s) => s.inlineEdit);
+  /** [V0.3.1] 托盘双击 → 高亮定位：序号变化即闪一下（3 × 0.8s） */
+  const highlightSeq = useUiStore((s) => s.highlightSeq);
   const openInlineEdit = useUiStore((s) => s.openInlineEdit);
   const openCountdownMenu = useUiStore((s) => s.openCountdownMenu);
+  const openMoyuMenu = useUiStore((s) => s.openMoyuMenu);
+  const openCommonItems = useUiStore((s) => s.openCommonItems);
+  const openCommonItemsNew = useUiStore((s) => s.openCommonItemsNew);
 
-  /* 未悬停时隐去背景板；任一悬浮层（菜单 / 面板 / 倒计时 / 常用事项 / 提醒 / 便利贴清单 / 事项菜单）展开期间强制显影，
+  /* 未悬停时隐去背景板；任一悬浮层（面板 / 倒计时 / 摸鱼 / 提醒 / 便利贴清单 / 事项菜单）展开期间强制显影，
      避免交互中「药丸凭空消失」 */
   const revealed =
-    menuOpen ||
     panel !== 'none' ||
     countdownPos != null ||
     countdownCardPos != null ||
-    commonItemsPos != null ||
+    moyuPos != null ||
     reminderPopover != null ||
     notesListPos != null ||
     inlineEdit != null ||
-    itemMenu != null;
+    itemMenu != null ||
+    commonItemsPos != null;
 
   /* 结束态：900ms 瞬时视觉确认（--dur-confirm） */
   const [ended, setEnded] = useState(false);
@@ -89,10 +102,21 @@ export function PillBar() {
   }, [endedAt]);
 
   const visual = toVisualState(status, ended);
+
+  /* [V0.3.1] 高亮定位：托盘双击后闪 3 下（0.8s × 3），到点自动摘掉属性。
+     `highlightSeq` 从 0 起步——初始挂载不该闪，所以只在 > 0 时触发。 */
+  const [highlighting, setHighlighting] = useState(false);
+  useEffect(() => {
+    if (highlightSeq <= 0) return;
+    setHighlighting(true);
+    const id = window.setTimeout(() => setHighlighting(false), HIGHLIGHT_MS);
+    return () => window.clearTimeout(id);
+  }, [highlightSeq]);
   const currentItemId = status === 'idle' ? lastItemId : sessionItemId;
   const currentName = findItem(items, currentItemId)?.name;
 
-  /* 左键点「新建事项」/ 点事项名 = 就地长出输入框（不再弹 ItemPicker 面板） */
+  /* 就地长出输入框（不再弹 ItemPicker 面板）。[V0.3.9] 只剩「圆环 + 尚无任何事项」这条路径：
+     空闲态的「新建事项」格已改为弹常用事项框（框里自带常驻输入框）。 */
   const beginCreate = useCallback(() => {
     if (status === 'running') {
       useUiStore.getState().setNotice({ text: '专注进行中，事项已锁定；请先暂停或结束当前计时。', tone: 'info' });
@@ -101,12 +125,16 @@ export function PillBar() {
     openInlineEdit({ itemId: null, initial: '' });
   }, [openInlineEdit, status]);
 
-  /* 倒计时菜单整块 233px 高，用光标位置当锚点会盖住小条本身：统一贴到小条下沿 +4px 展开 */
+  /* 倒计时菜单整块 233px 高，用光标位置当锚点会盖住小条本身：统一贴到小条下沿 +4px 展开。
+     rect 是 viewport 坐标，必须换回 layer 坐标；auto-fit 扩展窗口后 layer 会平移，不能直接拿 rect.bottom。 */
   const pillRef = useRef<HTMLDivElement>(null);
   const posBelowBar = useCallback((pos: MenuPos): MenuPos => {
     const rect = pillRef.current?.getBoundingClientRect();
-    return rect ? { x: pos.x, y: rect.bottom + 4 } : pos;
+    return rect ? { x: pos.x, y: clientToLayer(0, rect.bottom).y + 4 } : pos;
   }, []);
+
+  /* 主菜单已删除（V0.3.1：用户口径「悬浮框右键唤出设置菜单」不要了），
+     右下的注释保留说明：菜单锚点曾用 pill 的 rect 换算到层坐标。 */
 
   /* [V0.2.0] 倒计时：小条显示**剩余**（targetSec - accumulatedSec 派生），到点前 warn 提示
      [V0.2.5 · 5] 空闲但已设定档位时，小条直接显示该时长（等用户点圆环才开始倒数） */
@@ -116,8 +144,11 @@ export function PillBar() {
   const displaySec = isCountdown ? remaining : armedIdle ? (armedSec ?? 0) : seconds;
   const nearEnd = isCountdown && remaining > 0 && remaining <= COUNTDOWN_WARN_SEC;
 
+  /* [V0.3.8] 暂停即弹摸鱼菜单：方向判定 / 失败不弹 / 锚点同源等连招细节见 usePauseMoyu */
+  const pauseAndOpenMoyu = usePauseMoyu(actions, pillRef, currentItemId);
+
   /* 左键：连点去抖；空闲且已设定倒计时档位时，左键 = 开始倒计时（参照 v1.7.3 的点开始）
-     [V0.2.6] 计时中点击圆环 → 先暂停，再摊开常用事项菜单（对齐 OnRingLeft 的 Pause + ShowCommonMenu） */
+     [V0.3.1] 运行中点击圆环只做暂停；[V0.3.8] 暂停后自动弹摸鱼菜单（连招补回） */
   const lastClickRef = useRef(0);
   const onRingClick = useCallback(() => {
     const t = Date.now();
@@ -132,17 +163,12 @@ export function PillBar() {
       void countdownActions.start(currentItemId ?? undefined, armedSec, false);
       return;
     }
-    if (status === 'running') {
-      void actions.togglePause().then(() => {
-        openCommonItems({ x: 12, y: 56 });
-      });
-      return;
-    }
-    void actions.togglePause();
-  }, [actions, armedSec, currentItemId, status, openCommonItems, beginCreate]);
+    /* [V0.3.8] running / paused 都交给连招：暂停弹摸鱼菜单、继续收菜单（方向判定在 hook 内） */
+    pauseAndOpenMoyu();
+  }, [armedSec, currentItemId, status, beginCreate, pauseAndOpenMoyu]);
 
   /* [V0.2.6] Zone.Time 左键：计时中/暂停 = 与圆环相同；空闲 = 正计时 ⇄ 倒计时切换
-     （对齐 ToggleCountdownMode：切到倒计时用设置里的第一档，再点回正计时） */
+     （对齐 ToggleCountdownMode：切到倒计时用「默认倒计时时长」，再点回正计时） */
   const onTimeClick = useCallback(() => {
     if (status !== 'idle') {
       onRingClick();
@@ -153,40 +179,28 @@ export function PillBar() {
       useUiStore.getState().setNotice({ text: '正计时', tone: 'info' });
       return;
     }
-    const duration = readCountdownDuration(presets[0] ?? 1500);
+    /* [P1 优化] 默认值改读参考设置「默认倒计时」（Timing 默认 25 分钟），
+       不再拿预设档位第一档（5 分钟）冒充默认；上次用过的时长仍优先（readCountdownDuration）。 */
+    const duration = readCountdownDuration(defaultSec);
     arm(duration);
     useUiStore.getState().openCountdownCard(posBelowBar({ x: 32, y: 56 }));
-  }, [status, onRingClick, armedSec, clearArm, arm, presets, openCountdownMenu, posBelowBar, currentItemId]);
+  }, [status, onRingClick, armedSec, clearArm, arm, defaultSec, posBelowBar]);
+  // 注：`openCountdownMenu` / `currentItemId` 曾列在依赖里但函数体内未使用（lint 已报
+  // unnecessary-dependencies）。去掉不改变行为——两者都不是这里的闭包读取项。
 
   const drag = usePillDrag();
-  const handlePointerUp = (e: ReactPointerEvent) => {
-    if (e.button === 2) openMenu({ x: e.clientX, y: e.clientY });
-  };
-  const handleContextMenu = (e: ReactMouseEvent) => e.preventDefault();
+  /* [V0.2.10] 空闲时滚轮调倒计时：位移归一、攒够一格才步进的细节在 hook 里 */
+  const onWheel = usePillWheel(status === 'idle', defaultSec);
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    const onRing = target.classList.contains('ring');
-    if ((e.key === ' ' || e.key === 'Spacebar') && onRing) {
-      e.preventDefault();
-      if (!e.repeat) void actions.togglePause();
-      return;
-    }
-    if (e.key === 'Enter' && onRing) {
-      e.preventDefault();
-      if (!e.repeat && status !== 'idle') void actions.stop();
-      return;
-    }
-    if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) {
-      e.preventDefault();
-      openMenu({ x: 12, y: 56 });
-      return;
-    }
-    if (e.key === 'Escape') {
-      useUiStore.getState().closeMenu();
-      useUiStore.getState().closePanel();
-    }
+  /* [V0.3.1] 小条右键不再唤出任何菜单（主菜单已整体删除）：
+     只吞掉事件，避免 WebView2 弹出浏览器自带菜单。各子区域的右键语义见各自组件。 */
+  const suppressContextMenu = (e: ReactMouseEvent) => {
+    e.preventDefault();
   };
+
+  /* Space/Enter 只在圆环上生效，Esc 只收浮层——细节见 usePillKeyboard；
+     [V0.3.8] Space 的暂停方向也要自动弹摸鱼菜单（与左键同一回调） */
+  const handleKeyDown = usePillKeyboard(status, actions, pauseAndOpenMoyu);
 
   return (
     <div
@@ -194,37 +208,35 @@ export function PillBar() {
       className="pill"
       data-state={visual}
       data-reveal={revealed ? 'true' : undefined}
+      data-highlight={highlighting ? 'true' : undefined}
       onPointerDown={(e) => {
         drag.onDown(e);
       }}
       onPointerMove={drag.onMove}
-      onPointerUp={(e) => {
-        drag.onUp();
-        handlePointerUp(e);
-      }}
+      onPointerUp={drag.onUp}
       onPointerCancel={drag.onUp}
       onClickCapture={drag.onClickCapture}
-      onContextMenu={handleContextMenu}
+      onContextMenu={suppressContextMenu}
+      onWheel={onWheel}
       onKeyDown={handleKeyDown}
     >
       <MainButton
         state={visual}
         label={
           armedIdle
-            ? '开始倒计时（右键改档位）'
-            : isCountdown
-              ? `${RING_LABEL[visual]}（倒计时）`
-              : RING_LABEL[visual]
+            ? '开始倒计时（滚轮或右键数字改档位）'
+            : status === 'paused'
+              ? '继续计时（右键数字唤出摸鱼菜单）'
+              : isCountdown
+                ? `${RING_LABEL[visual]}（倒计时）`
+                : RING_LABEL[visual]
         }
         onClick={onRingClick}
         countdown={isCountdown || armedIdle}
         progress={isCountdown && session?.targetSec ? remaining / session.targetSec : 1}
         warn={nearEnd}
-        /* [V0.2.6] Zone.Ring 右键：计时中 = 结束并保存；空闲 = 主菜单（对齐 Timing OnRingRight） */
-        onMenu={(pos) => {
-          if (status === 'idle') openMenu(pos);
-          else void actions.stop();
-        }}
+        /* [V0.3.1] 右键主菜单删除后：空闲右键什么也不弹；计时中右键仍 = 结束并保存 */
+        onMenu={status === 'idle' ? undefined : () => void actions.stop()}
       />
       <TimerDisplay
         seconds={displaySec}
@@ -232,14 +244,16 @@ export function PillBar() {
         tone={nearEnd ? 'warn' : 'default'}
         /* [V0.2.6] Zone.Time 左键：计时中 = 与圆环相同（暂停/继续）；空闲 = 正计时 ⇄ 倒计时切换 */
         onActivate={onTimeClick}
-        /* [V0.2.6] Zone.Time 右键：计时中 = 主菜单；空闲且已设定 = 倒计时菜单；空闲 = 主菜单 */
-        onMenu={(pos) => {
-          if (status === 'idle' && armedSec != null) {
-            openCountdownMenu({ pos: posBelowBar(pos), itemId: currentItemId, custom: true });
-            return;
-          }
-          openMenu(pos);
-        }}
+        /* [P2] 对齐 Timing v1.7.3 的 Zone.Time 右键（MainForm.cs OnMouseUp → ToggleCountdownMode）：
+           空闲时右键数字**直接切倒计时**——一次给齐九档预设 / 输入分秒 / 改为正计时 / 开始倒计时。
+           [V0.3.2] 暂停态右键数字改开**摸鱼菜单**（快捷换件事 + 定长）；计时中仍不弹菜单。 */
+        onMenu={
+          status === 'idle'
+            ? (pos) => openCountdownMenu({ pos: posBelowBar(pos), itemId: currentItemId })
+            : status === 'paused'
+              ? (pos) => openMoyuMenu({ pos: posBelowBar(pos), itemId: currentItemId })
+              : undefined
+        }
       />
       {inlineEdit ? (
         <InlineNameEntry
@@ -251,7 +265,10 @@ export function PillBar() {
         />
       ) : status === 'idle' ? (
         <NewItemEntry
-          onClick={beginCreate}
+          /* [V0.3.9] 空闲态点事项组件 = **新建输入框与常用事项框一起出**（用户口径）：
+             条上就地长出输入框可以直接命名，下方同时展开常用框可以挑已有事项。
+             两者由 `openCommonItemsNew` 一次落库（分两次会互相顶掉）。 */
+          onClick={() => openCommonItemsNew(posBelowBar({ x: 32, y: 56 }))}
           /* [V0.2.6] Zone.Task 右键：展开事项窗口（对齐 Timing 的「今日计时」面板；事项级菜单在窗内逐行给） */
           onMenu={() => void openTodosWindow()}
         />
@@ -259,15 +276,10 @@ export function PillBar() {
         <ItemName
           name={currentName ?? '未归类'}
           muted={visual === 'ended'}
-          /* [V0.2.6] Zone.Task：左键暂停态 = 常用事项菜单（对齐 Timing ShowCommonMenu），
-             其余状态 = 快捷新建（就地命名后立即开始）；右键 = 展开事项窗口 */
-          onActivate={() => {
-            if (status === 'paused') {
-              openCommonItems({ x: 12, y: 56 });
-              return;
-            }
-            beginCreate();
-          }}
+          /* [V0.3.1] Zone.Task：左键 = 快捷新建（就地命名后立即开始）；右键 = 展开事项窗口。
+             [V0.3.9] 计时中 / 暂停态左键改为**常用事项框**（置顶 + 最近编辑 + 事项管理点），
+             点一行即切事项；摸鱼菜单仍由右键数字与暂停自动弹出承担。 */
+          onActivate={() => openCommonItems(posBelowBar({ x: 32, y: 56 }))}
           onMenu={() => void openTodosWindow()}
         />
       )}

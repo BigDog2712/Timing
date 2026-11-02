@@ -75,28 +75,19 @@ export function truncateName(name: string, maxChars: number): string {
 }
 
 /**
- * 分钟粒度时长（事项窗口「今日计时」行 / todos-panel.md §1）：
- *   - 0 ~ 59s → `「< 1 分」`（不显示 00:00，避免「看着像没计时」）
- *   - 其余    → `「N 分」`（四舍五入到分）
- * 与 `formatDuration`（小条 MM:SS）职责分离：此处面向「清单读数」，非「秒表读数」。
+ * 分钟粒度时长（事项窗口「今日计时」行 / 桌面今日事项面板；todos-panel.md §1）：
+ *   - 0 ~ 59s → `「<1m」`（不显示 00:00，避免「看着像没计时」）
+ *   - < 1h    → `「N m」`，如 `23m`
+ *   - >= 1h   → `「Nh Mm」`，整点省略分：`2h` / `2h1m`
+ * 默认 60 分钟。与 `formatDuration`（小条 MM:SS 秒表读数）职责分离：此处面向清单读数，
+ * 且用户要求「时换 h、分换 m，尽量简洁」——不再写「小时 / 分」两个汉字。
  */
 export function formatMinutes(totalSec: number): string {
   const sec = clampSeconds(totalSec);
-  if (sec < SEC_PER_MIN) return '< 1 分';
-  return `${Math.round(sec / SEC_PER_MIN)} 分`;
-}
-
-/**
- * 中文时长汇总（事项窗口表头「共 X 小时 Y 分」）：
- *   - < 1h  → `「N 分」`
- *   - 整点  → `「N 小时」`（省略「0 分」）
- *   - 其余  → `「X 小时 Y 分」`
- */
-export function formatHoursMinutes(totalSec: number): string {
-  const sec = clampSeconds(totalSec);
-  const h = Math.floor(sec / SEC_PER_HOUR);
-  const m = Math.round((sec % SEC_PER_HOUR) / SEC_PER_MIN);
-  if (h === 0) return `${m} 分`;
-  if (m === 0) return `${h} 小时`;
-  return `${h} 小时 ${m} 分`;
+  if (sec < SEC_PER_MIN) return '<1m';
+  const totalMin = Math.round(sec / SEC_PER_MIN);
+  if (totalMin < 60) return `${totalMin}m`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m === 0 ? `${h}h` : `${h}h${m}m`;
 }

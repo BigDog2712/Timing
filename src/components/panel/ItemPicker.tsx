@@ -2,19 +2,20 @@
  * TickBar — 展开面板 ItemPicker（panel.md）
  * -----------------------------------------------------------------------------
  * 触发：点「新建事项」/ 手柄。命令：create_item / list_items / switch_item。
- * 覆盖 5 态：Populated / Typing / Empty / Error（ITEM_NAME_EMPTY）
- *          / Duplicate（ITEM_NAME_DUPLICATE + 「直接使用该事项」）/ Loading。
+ * 覆盖 5 态：Populated / Typing / Empty / Error（`ITEM_NAME_EMPTY`）/ Loading。
+ * 同名不再拦截（ADR-021）：改同名只当新建一条，不再给「直接使用该事项」的兜底入口。
  * Enter 提交：无计时 → start_timer；计时中 → switch_item(end_and_start) 分段。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { IpcError, errorText, ipc } from '../../services/ipc';
+import { IpcError, errorText } from '../../services/ipc';
+import { itemApi } from '../../services/api';
 import { useTimerActions } from '../../hooks/useTimerActions';
 import { useItemStore } from '../../stores/itemStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { useUiStore } from '../../stores/uiStore';
-import type { Item } from '../../types/domain';
 import { AlertIcon, iconStroke } from '../../lib/icons';
+import { ITEM_NAME_MAX_CHARS } from '../../lib/constants';
 import { RecentChips } from './RecentChips';
 import { useHoverClose } from '../../hooks/useHoverClose';
 import { ShortcutHint } from './ShortcutHint';
@@ -29,7 +30,6 @@ export function ItemPicker() {
 
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [duplicate, setDuplicate] = useState<Item | null>(null);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -50,7 +50,6 @@ export function ItemPicker() {
       }
       setName('');
       setError(null);
-      setDuplicate(null);
     },
     [actions, closePanel],
   );
@@ -63,19 +62,12 @@ export function ItemPicker() {
     }
     setBusy(true);
     setError(null);
-    setDuplicate(null);
     try {
-      const item = await ipc.createItem({ name: value });
+      const item = await itemApi.create({ name: value });
       await useItemStore.getState().reload();
       await activate(item.id);
     } catch (err) {
-      if (err instanceof IpcError && err.code === 'ITEM_NAME_DUPLICATE') {
-        const existing = useItemStore
-          .getState()
-          .items.find((i) => i.name.trim().toLowerCase() === value.toLowerCase());
-        setDuplicate(existing ?? null);
-        setError('已存在同名事项');
-      } else if (err instanceof IpcError && err.code === 'ITEM_NAME_EMPTY') {
+      if (err instanceof IpcError && err.code === 'ITEM_NAME_EMPTY') {
         setError('事项名称不能为空');
       } else {
         setError(errorText(err));
@@ -103,17 +95,14 @@ export function ItemPicker() {
           className="panel__input"
           type="text"
           value={name}
-          maxLength={60}
+          maxLength={ITEM_NAME_MAX_CHARS}
           placeholder="这一段时间在做什么？"
           aria-label="事项名称"
           aria-invalid={error != null}
           disabled={busy}
           onChange={(e) => {
             setName(e.target.value);
-            if (error) {
-              setError(null);
-              setDuplicate(null);
-            }
+            if (error) setError(null);
           }}
           onKeyDown={handleKeyDown}
         />
@@ -124,11 +113,6 @@ export function ItemPicker() {
         <p className="inline-error" role="alert">
           <AlertIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
           <span>{error}</span>
-          {duplicate && (
-            <button type="button" className="inline-error__action" onClick={() => void activate(duplicate.id)}>
-              直接使用该事项
-            </button>
-          )}
         </p>
       )}
 

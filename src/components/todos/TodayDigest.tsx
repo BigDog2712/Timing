@@ -6,10 +6,11 @@ import { useTimerStore } from '../../stores/timerStore';
 import { useTimerTick } from '../../hooks/useTimerTick';
 import { useHoverClose } from '../../hooks/useHoverClose';
 import { useItemStore } from '../../stores/itemStore';
-import { errorText, ipc } from '../../services/ipc';
+import { errorText } from '../../services/ipc';
+import { recordApi } from '../../services/api';
 // Added by host agent; this component expects the daily digest status service contract.
 import { getDailyDigestStatuses, setDailyDigestStatus } from '../../services/dailyStatusActions';
-import { formatHoursMinutes, formatMinutes } from '../../lib/format';
+import { formatMinutes } from '../../lib/format';
 import { CheckIcon, ClockIcon, ListIcon, PlayIcon, TrashIcon, iconStroke } from '../../lib/icons';
 import { GlassMenu, type MenuEntry } from '../menu/GlassMenu';
 import '../../styles/today-digest.css';
@@ -100,7 +101,7 @@ export function TodayDigest({ onClose, onViewRecords }: TodayDigestProps) {
     const ids = new Set(row.itemIds);
     const records = today.rows.filter((record) => ids.has(record.itemId));
     if (records.length === 0) return;
-    for (const record of records) await ipc.deleteRecord({ id: record.id });
+    for (const record of records) await recordApi.remove({ id: record.id });
     await today.reload();
   };
   const toggleStatus = async (row: DigestRow) => {
@@ -121,7 +122,7 @@ export function TodayDigest({ onClose, onViewRecords }: TodayDigestProps) {
 
   const totalSec = rows.reduce((sum, row) => sum + row.totalSec, 0);
   return <section className="panel today-digest" role="dialog" aria-label="今日事项" onKeyDown={(event) => { if (event.key === 'Escape') onClose(); }}>
-    <header className="today-digest__head"><h2>今日事项 <span>{rows.length ? `· ${rows.length} 项` : '· 还没有'}</span></h2>{rows.length > 0 && <time>{formatHoursMinutes(totalSec)}</time>}</header>
+    <header className="today-digest__head"><h2>今日事项 <span>{rows.length ? `· ${rows.length} 项` : '· 还没有'}</span></h2>{rows.length > 0 && <time>{formatMinutes(totalSec)}</time>}</header>
     <div className="today-digest__body">
       {(today.loading || statusesLoading) && <p className="today-digest__state">正在加载…</p>}
       {!today.loading && today.error && <div className="today-digest__state" role="alert"><p>{today.error}</p><button type="button" className="btn btn--ghost btn--sm" onClick={today.reload}>重试</button></div>}

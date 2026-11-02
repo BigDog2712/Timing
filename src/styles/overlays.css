@@ -184,10 +184,8 @@
   color: var(--fg);
 }
 
-.undo__actions {
-  display: inline-flex;
-  gap: var(--space-3);
-}
+/* [V0.3.4] 原 `.undo__actions`（短记录二选一的按钮组容器）随弹条删除；撤销条现在只有
+   一个按钮，不需要额外容器。 */
 
 .undo__btn {
   display: inline-flex;

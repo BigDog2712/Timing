@@ -18,6 +18,21 @@ pub async fn find_by_id(pool: &SqlitePool, id: i64) -> AppResult<Option<Item>> {
     Ok(item)
 }
 
+/// 按名称精确查询（排除已软删除；同名多条取最小 id —— V0.3.12 待办→计时映射用）。
+///
+/// 与 `todos.title` 的匹配口径一致（`COLLATE BINARY`，见 `soft_delete_for_saved_record`）。
+pub async fn find_by_name(pool: &SqlitePool, name: &str) -> AppResult<Option<Item>> {
+    let sql = format!(
+        "SELECT {COLS} FROM items WHERE name = ? COLLATE BINARY AND deleted_at IS NULL \
+         ORDER BY id ASC LIMIT 1"
+    );
+    let item = sqlx::query_as::<_, Item>(&sql)
+        .bind(name)
+        .fetch_optional(pool)
+        .await?;
+    Ok(item)
+}
+
 /// 列表（固定任务置顶；排序 `is_pinned DESC, sort_order ASC, id ASC`）。
 pub async fn list(pool: &SqlitePool, include_archived: bool) -> AppResult<Vec<Item>> {
     let mut qb =
@@ -38,24 +53,6 @@ pub async fn max_sort_order(pool: &SqlitePool) -> AppResult<i64> {
     .fetch_one(pool)
     .await?;
     Ok(value)
-}
-
-/// 是否存在同名 active 事项（trim + 大小写不敏感），可排除自身 id。
-pub async fn name_exists(
-    pool: &SqlitePool,
-    name: &str,
-    exclude_id: Option<i64>,
-) -> AppResult<bool> {
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM items \
-         WHERE deleted_at IS NULL AND status = 'active' \
-         AND lower(trim(name)) = lower(trim(?)) AND id != ?",
-    )
-    .bind(name)
-    .bind(exclude_id.unwrap_or(-1))
-    .fetch_one(pool)
-    .await?;
-    Ok(count > 0)
 }
 
 /// 插入并返回新 id。

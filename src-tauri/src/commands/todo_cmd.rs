@@ -5,6 +5,7 @@
 use tauri::State;
 
 use crate::error::AppResult;
+use crate::models::record::TimeRecord;
 use crate::models::todo::{Todo, TodoListParams, TodoPatch};
 use crate::services;
 use crate::state::AppState;
@@ -47,4 +48,10 @@ pub async fn todo_list(
 #[tauri::command]
 pub async fn todo_toggle(state: State<'_, AppState>, id: i64, done: bool) -> AppResult<Todo> {
     services::todo::toggle(&state.pool, id, done).await
+}
+
+/// 待办 → 计时（V0.3.12 / ADR-030）：开始计时并立刻把这条待办移出待办区。
+#[tauri::command]
+pub async fn todo_start(state: State<'_, AppState>, id: i64) -> AppResult<TimeRecord> {
+    services::todo_start::start(&state.pool, id).await
 }

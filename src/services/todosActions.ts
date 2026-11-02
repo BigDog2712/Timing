@@ -10,10 +10,14 @@
 import { ipc, isTauri } from './ipc';
 import { useTodoStore } from '../stores/todoStore';
 import { useUiStore } from '../stores/uiStore';
+import type { TodoPatch } from '../types/domain';
 
 export const todosActions = {
-  create: (title: string, plannedAt?: number | null) => useTodoStore.getState().create(title, plannedAt),
+  create: (title: string, plannedAt?: number | null, remindAt?: number | null) =>
+    useTodoStore.getState().create(title, plannedAt, remindAt),
   rename: (id: number, title: string) => useTodoStore.getState().rename(id, title),
+  /** [V0.3.10] 改开启 / 截止时间（`null` = 清空该项） */
+  patch: (id: number, patch: TodoPatch) => useTodoStore.getState().patch(id, patch),
   toggle: (id: number, done: boolean) => useTodoStore.getState().toggle(id, done),
   /** [AC-32] 乐观删除：本地立即移除并起撤销窗（**不**立即落库；见 todoStore.remove 注释） */
   remove: (id: number) => useTodoStore.getState().remove(id),

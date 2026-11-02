@@ -1,4 +1,4 @@
-//! 待办仓库（`todos` 表）。仅 SQL + 行映射，不含业务规则。
+﻿//! 待办仓库（`todos` 表）。仅 SQL + 行映射，不含业务规则。
 
 use sqlx::{QueryBuilder, Sqlite, SqlitePool, Transaction};
 
@@ -78,7 +78,9 @@ pub async fn insert(
 /// 部分更新。
 ///
 /// `planned_at` / `remind_at` 三态：`Some(Some(v))` 改值、`Some(None)` 置 NULL、`None` 不动。
-/// 任一 `remind_at` 改动都清 `reminded_at`（重设提醒使提醒复活，K-19）。
+/// 任一 `remind_at` 改动都清 `reminded_at`（重设提醒使提醒复活，K-19）**并把 `remind_stage` 归零**
+/// —— 改了开始时间，两级提醒（T-15 / T-5）就得按新时刻重来（ADR-030）。
+#[allow(clippy::too_many_arguments)]
 pub async fn update(
     pool: &SqlitePool,
     id: i64,
@@ -86,6 +88,7 @@ pub async fn update(
     planned_at: Option<Option<i64>>,
     remind_at: Option<Option<i64>>,
     sort_order: Option<i64>,
+    auto_start: Option<bool>,
     now: i64,
 ) -> AppResult<()> {
     let mut qb = QueryBuilder::<Sqlite>::new("UPDATE todos SET updated_at = ");
@@ -106,15 +109,20 @@ pub async fn update(
         Some(Some(v)) => {
             qb.push(", remind_at = ").push_bind(v);
             qb.push(", reminded_at = NULL");
+            qb.push(", remind_stage = 0");
         }
         Some(None) => {
             qb.push(", remind_at = NULL");
             qb.push(", reminded_at = NULL");
+            qb.push(", remind_stage = 0");
         }
         None => {}
     }
     if let Some(v) = sort_order {
         qb.push(", sort_order = ").push_bind(v);
+    }
+    if let Some(v) = auto_start {
+        qb.push(", auto_start = ").push_bind(i64::from(v));
     }
     qb.push(" WHERE id = ")
         .push_bind(id)

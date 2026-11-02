@@ -1,34 +1,56 @@
 /**
  * TickBar — 前端入口（只挂载 App，无业务）
  * 样式加载顺序：design-tokens（唯一裸色值来源）-> app -> surfaces -> panels。
+ * design-tokens.css 本身是索引，内部按 §1~§6 顺序 @import ./tokens/*.css。
  */
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles/design-tokens.css';
 import './styles/design-tokens-compat.css';
 import './styles/app.css';
+import './styles/utilities.css';
 import './styles/surfaces.css';
 import './styles/overlays.css';
 import './styles/menu.css';
 import './styles/panels.css';
 import './styles/settings-dialog.css';
 import './styles/settings-panel.css';
+/* [V0.3.4] 插件页签样式（从 settings-panel.css 拆出，控制单文件行数） */
+import './styles/settings-plugins.css';
+/* [V0.4.0] Markdown 同步页签（md-sync 插件的落点配置） */
+import './styles/settings-sync.css';
+/* [V0.4.1] 渲染异常兜底（透明窗里渲染抛错 = 药丸凭空消失，必须留住可点的界面） */
+import './styles/error-boundary.css';
 import './styles/theme-picker.css';
 import './styles/slider.css';
 import './styles/todos-panel.css';
 import './styles/todos-pending.css';
 import './styles/todos-inline.css';
+/* [V0.3.9] 新增待办表单卡（与待办行样式分开，控制单文件行数） */
+import './styles/todos-compose.css';
+/* [V0.3.9] 待办时间字段 + 自绘日期时间选择浮层 */
+import './styles/todos-datetime.css';
+/* [V0.3.9] 事项窗左侧便利贴预览卡 */
+import './styles/todos-preview.css';
 import './styles/timer-window.css';
 import './styles/note.css';
 import './styles/batch2.css';
 import './styles/reminder.css';
+/* [V0.3.1] 高亮定位（必须在 surfaces.css 之后：与 .pill:hover 同特异性，靠顺序取胜） */
+import './styles/highlight.css';
+/* [V0.3.2] 摸鱼菜单（复用 menu.css 的玻璃语言，只补表单与大数字） */
+import './styles/moyu.css';
 import App from './App';
+import { AppErrorBoundary, installGlobalErrorHooks } from './components/ui/AppErrorBoundary';
 import { markWindowKind } from './lib/window';
 import { initAppearance } from './stores/appearanceStore';
 import { useUiStore } from './stores/uiStore';
 
 /* 先把窗口类别写到 <html data-window>，使 CSS 在首帧即按窗切换根尺寸/底色（K-18） */
 markWindowKind();
+
+/* [V0.4.1] 渲染之外的异常（事件回调 / 未处理的 Promise）也要可见，不能静默 */
+installGlobalErrorHooks();
 
 /* [V0.2.2] 文字 / 背景不透明度：首帧即套用，避免先闪一帧全不透明 */
 initAppearance();
@@ -52,6 +74,8 @@ if (!rootEl) {
 
 createRoot(rootEl).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 );

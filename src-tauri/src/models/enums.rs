@@ -1,16 +1,6 @@
 //! 枚举类型（字符串值与 `domain.ts` 联合类型一一对应）。
 
-use serde::{Deserialize, Serialize};
-
-/// 全局快捷键动作（[P1]；字符串值 snake_case）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ShortcutAction {
-    ToggleWindow,
-    StartPause,
-    Stop,
-    NewItem,
-}
+use serde::Deserialize;
 
 /// 计时中换事项的模式。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]

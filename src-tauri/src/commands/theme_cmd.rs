@@ -5,8 +5,8 @@
 
 use tauri::{AppHandle, State};
 
+use crate::app::events;
 use crate::error::AppResult;
-use crate::infra::events;
 use crate::models::theme::{AccentColors, AccentPatch, ThemeMode, ThemeSettings};
 use crate::services;
 use crate::state::AppState;

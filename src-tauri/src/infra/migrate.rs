@@ -1,11 +1,14 @@
-//! 迁移执行器（幂等）：`0001_init` → `ensure_column`（列守卫）→ `0002_v020` → 版本推进。
+//! 迁移执行器（幂等）：`0001_init` → 补列 → `0002_v020` → 补列(v3) → `0003_v030` → 版本推进。
 //!
 //! **K-13 硬约束**：SQLite 不支持 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`，重复
-//! `ADD COLUMN` 报 `duplicate column name`。故 items / time_records 的加列**不能**靠纯 SQL
-//! 幂等，必须由 `ensure_column`（`PRAGMA table_info` 守卫）执行。
+//! `ADD COLUMN` 报 `duplicate column name`。故 items / time_records / notes 的加列**不能**
+//! 靠纯 SQL 幂等，必须由 `ensure_column`（`PRAGMA table_info` 守卫）执行。
 //!
-//! **顺序是硬约束**：先补列，再执行 `0002_v020.sql` —— 后者建的 `idx_items_remind` 依赖
-//! `items.remind_at`，旧库若先建索引会报 `no such column`（架构 §4.5）。
+//! **顺序是硬约束**：
+//!   1. 先补 v2 列，再执行 `0002_v020.sql` —— 后者建的 `idx_items_remind` 依赖
+//!      `items.remind_at`，旧库若先建索引会报 `no such column`（架构 §4.5）；
+//!   2. 先执行 `0002_v020.sql` 建 `notes` 表，再补 `notes.is_pinned` —— 反过来
+//!      `ALTER TABLE notes` 在 v1 库上会报 `no such table`。
 
 use sqlx::{Row, SqlitePool};
 
@@ -21,16 +24,44 @@ const MIGRATE_COLUMNS: &[(&str, &str, &str)] = &[
     ("time_records", "target_sec", "INTEGER"),
 ];
 
+/// V0.3.0 加列清单。**必须晚于 `0002_v020.sql`**（`notes` 表由它创建）。
+///
+/// `DEFAULT 1` = 置顶：V0.2.x 的便利贴窗口硬编码 `always_on_top=true`，默认 1 让
+/// 老数据升级后行为不变（ADR-019）。
+const MIGRATE_COLUMNS_V3: &[(&str, &str, &str)] =
+    &[("notes", "is_pinned", "INTEGER NOT NULL DEFAULT 1")];
+
+/// V0.3.12 加列清单（待办提醒链路，ADR-030）。**必须晚于 `0002_v020.sql`**（`todos` 由它创建）。
+///
+/// - `remind_stage`：0 未提醒 / 1 轻提醒已弹 / 2 五分钟询问已弹（单调递进，替代单次 `reminded_at`）；
+/// - `auto_start`：1 = 用户答应「当前事项结束后自动开始」。
+const MIGRATE_COLUMNS_V4: &[(&str, &str, &str)] = &[
+    ("todos", "remind_stage", "INTEGER NOT NULL DEFAULT 0"),
+    ("todos", "auto_start", "INTEGER NOT NULL DEFAULT 0"),
+];
+
 /// 执行全部迁移（幂等）。由 `infra::db::init_pool` 调用。
 pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
     // ① 3 张基表（IF NOT EXISTS，幂等）
     run_raw(pool, include_str!("../migrations/0001_init.sql")).await?;
-    // ② 补列（必须早于建索引，K-13）
+    // ② 补 v2 列（必须早于建索引，K-13）
     for (table, column, def) in MIGRATE_COLUMNS {
         ensure_column(pool, table, column, def).await?;
     }
     // ③ 建 notes/todos + 全部 V0.2.0 索引 + settings 种子 + schema.version=2（幂等）
     run_raw(pool, include_str!("../migrations/0002_v020.sql")).await?;
+    // ④ 补 v3 列（必须在 notes 建好之后）
+    for (table, column, def) in MIGRATE_COLUMNS_V3 {
+        ensure_column(pool, table, column, def).await?;
+    }
+    // ⑤ v3 版本推进（schema.version=3）
+    run_raw(pool, include_str!("../migrations/0003_v030.sql")).await?;
+    // ⑥ 补 v4 列（待办提醒链路）
+    for (table, column, def) in MIGRATE_COLUMNS_V4 {
+        ensure_column(pool, table, column, def).await?;
+    }
+    // ⑦ v4 版本推进（schema.version=4）
+    run_raw(pool, include_str!("../migrations/0004_v0312.sql")).await?;
     Ok(())
 }
 

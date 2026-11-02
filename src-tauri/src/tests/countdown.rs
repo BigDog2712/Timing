@@ -1,12 +1,18 @@
-//! 倒计时（V0.2.0 批 2 · ADR-011 / AC-62）：目标校验 / 到点判定 / 钳制 / 自动结束开关。
+//! 倒计时（V0.2.0 批 2 · ADR-011 / AC-62）：目标校验 / 到点判定 / 钳制。
+//!
+//! [V0.3.4] 「到点自动结束并保存」开关已下架（ADR-023）：**到点一律结束并保存**。
+//! 因此原来「开关关 → 保持 active」的用例改为断言落库形态；并新增一条
+//! 「倒计时到点不受最短记录时长约束」的用例（阈值只作用于手动停止）。
 
 use sqlx::SqlitePool;
 
 use crate::error::ErrorCode;
 use crate::models::constants::MAX_COUNTDOWN_SEC;
-use crate::models::settings::SettingsPatch;
+use crate::models::settings::ReferenceSettingsPatch;
 use crate::services::{countdown, settings, timer};
-use crate::tests::support::{count_active, exec, expect_err, fresh_pool, new_item, scalar_i64};
+use crate::tests::support::{
+    allow_short_records, count_active, exec, expect_err, fresh_pool, new_item, scalar_i64,
+};
 
 /// 把会话的 started_at / running_since 同步回拨 ms 毫秒。
 async fn rewind(pool: &SqlitePool, id: i64, ms: i64) {
@@ -21,11 +27,12 @@ async fn rewind(pool: &SqlitePool, id: i64, ms: i64) {
     .await;
 }
 
-async fn set_auto_end(pool: &SqlitePool, enabled: bool) {
-    settings::update(
+/// 把「最短记录时长」调到指定秒数（验证倒计时到点是否受它约束）。
+async fn set_min_record_seconds(pool: &SqlitePool, sec: i64) {
+    settings::update_reference(
         pool,
-        &SettingsPatch {
-            countdown_auto_end: Some(enabled),
+        &ReferenceSettingsPatch {
+            min_record_seconds: Some(sec),
             ..Default::default()
         },
     )
@@ -90,51 +97,62 @@ async fn tick_none_before_target() {
     );
 }
 
+/// [V0.3.4] 到点一律结束：会话转 saved、active 清零、只留一条已保存记录。
 #[tokio::test]
-async fn tick_notify_only_keeps_session_active_by_default() {
-    let pool = fresh_pool("cd-tick-notify").await;
+async fn tick_always_finalizes_session() {
+    let pool = fresh_pool("cd-tick-always").await;
     let rec = countdown::start(&pool, Some(1), 60).await.unwrap();
     rewind(&pool, rec.id, 61_000).await;
 
     let fired = countdown::tick(&pool).await.unwrap().expect("应到点");
-    assert!(!fired.ended, "AC-62 默认不自动结束");
+    assert!(fired.ended, "V0.3.4 起到点恒结束（无开关）");
     assert_eq!(fired.target_sec, 60);
-    assert_eq!(fired.record.status, "active", "仍 active");
-    assert_eq!(count_active(&pool).await, 1);
-    assert_eq!(
-        scalar_i64(
-            &pool,
-            "SELECT COUNT(*) FROM time_records WHERE status='saved'"
-        )
-        .await,
-        0
-    );
-}
-
-#[tokio::test]
-async fn tick_auto_end_finalizes_and_clamps_to_target() {
-    let pool = fresh_pool("cd-tick-auto").await;
-    set_auto_end(&pool, true).await;
-    let rec = countdown::start(&pool, Some(1), 60).await.unwrap();
-    // 回拨远超 target（+1s），验证钳到精确落点
-    rewind(&pool, rec.id, 61_000).await;
-
-    let fired = countdown::tick(&pool).await.unwrap().expect("应到点");
-    assert!(fired.ended, "开关开 → 自动结束");
-    assert_eq!(fired.record.status, "saved");
+    assert_eq!(fired.record.status, "saved", "会话已落盘");
     assert_eq!(fired.record.accumulated_sec, 60, "时长钳到 target");
     assert_eq!(
         fired.record.ended_at.unwrap() - fired.record.started_at,
         60_000,
         "ended_at = started_at + target*1000"
     );
-    assert_eq!(count_active(&pool).await, 0);
+    assert_eq!(count_active(&pool).await, 0, "不得留下 active");
     assert_eq!(timer::state(&pool).await.unwrap().status, "idle");
+    assert_eq!(
+        scalar_i64(
+            &pool,
+            "SELECT COUNT(*) FROM time_records WHERE status='saved' AND deleted_at IS NULL"
+        )
+        .await,
+        1
+    );
+}
+
+/// [V0.3.4] 倒计时到点**不**受「最短记录时长」约束：目标时长是用户显式设定的。
+#[tokio::test]
+async fn tick_ignores_min_record_seconds() {
+    let pool = fresh_pool("cd-tick-threshold").await;
+    // 阈值调到 300s，远超这次 60s 的目标
+    set_min_record_seconds(&pool, 300).await;
+    let rec = countdown::start(&pool, Some(1), 60).await.unwrap();
+    rewind(&pool, rec.id, 61_000).await;
+
+    let fired = countdown::tick(&pool).await.unwrap().expect("应到点");
+    assert_eq!(fired.record.status, "saved", "到点即保存，与阈值无关");
+    assert_eq!(
+        scalar_i64(
+            &pool,
+            "SELECT COUNT(*) FROM time_records WHERE deleted_at IS NULL"
+        )
+        .await,
+        1,
+        "记录未被软删"
+    );
 }
 
 #[tokio::test]
 async fn remaining_sec_clamps_and_is_none_for_countup() {
     let pool = fresh_pool("cd-remaining").await;
+    // 阈值关掉：本用例紧接着要开倒计时，不关心短会话是否落库
+    allow_short_records(&pool).await;
     // countup → None
     let up = timer::start(&pool, Some(1)).await.unwrap();
     assert_eq!(timer::state(&pool).await.unwrap().remaining_sec, None);
@@ -152,24 +170,17 @@ async fn remaining_sec_clamps_and_is_none_for_countup() {
 }
 
 #[tokio::test]
-async fn countdown_auto_end_defaults_off() {
-    let pool = fresh_pool("cd-default-off").await;
-    assert!(
-        !settings::countdown_auto_end(&pool).await.unwrap(),
-        "AC-62 默认关"
-    );
-    set_auto_end(&pool, true).await;
-    assert!(settings::countdown_auto_end(&pool).await.unwrap());
-}
-
-#[tokio::test]
 async fn manual_stop_before_target_keeps_actual_live() {
     let pool = fresh_pool("cd-stop-early").await;
+    // 手动结束走「最短记录时长」判定，这里只验时长口径 → 阈值关到 0
+    allow_short_records(&pool).await;
     let item = new_item(&pool, "乙").await;
     let rec = countdown::start(&pool, Some(item), 600).await.unwrap();
     rewind(&pool, rec.id, 5_000).await;
 
-    let stopped = timer::stop(&pool).await.unwrap();
+    let result = timer::stop(&pool).await.unwrap();
+    assert!(!result.discarded, "阈值 0 → 提前结束也保存");
+    let stopped = result.record;
     assert_eq!(stopped.status, "saved");
     assert_eq!(stopped.accumulated_sec, 5, "手动提前结束记实际经过时长");
 }

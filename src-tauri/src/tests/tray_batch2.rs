@@ -1,9 +1,8 @@
-//! 托盘菜单批 2 增量：倒计时状态行 + 新常显项（打开事项 / 编辑固定任务… / 便利贴…）。
+//! 托盘菜单批 2 增量：倒计时状态行 + 新常显项（打开事项 / 便利贴…）。
 
 use crate::infra::tray_menu::{
-    build_nodes, countdown_status_line, TrayNode, ID_OPEN_COMMON_ITEMS, ID_OPEN_NOTE,
-    ID_OPEN_TODOS, ID_TIMER_DISCARD, ID_TIMER_PAUSE, ID_TIMER_RESUME, ID_TIMER_START,
-    ID_TIMER_STOP,
+    build_nodes, countdown_status_line, TrayNode, ID_OPEN_NOTE, ID_OPEN_TODOS, ID_TIMER_DISCARD,
+    ID_TIMER_PAUSE, ID_TIMER_RESUME, ID_TIMER_START, ID_TIMER_STOP,
 };
 use crate::models::enums::TrayStatus;
 
@@ -53,10 +52,6 @@ fn new_tray_items_present_in_all_states() {
         let nodes = build_nodes(status, "空闲 · 点开始正计时");
         let ids = ids(&nodes);
         assert!(ids.contains(&ID_OPEN_TODOS), "{status:?} 应含「打开事项」");
-        assert!(
-            ids.contains(&ID_OPEN_COMMON_ITEMS),
-            "{status:?} 应含「编辑固定任务…」"
-        );
         assert!(ids.contains(&ID_OPEN_NOTE), "{status:?} 应含「便利贴…」");
         // 结构仍在预算内（K-30：避免菜单失控）
         assert!(nodes.len() <= 14, "{status:?} 菜单项数 {}", nodes.len());

@@ -5,8 +5,8 @@
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
-use crate::infra::clock::now_ms;
 use crate::models::reminder::{Reminder, ReminderTarget};
+use crate::platform::clock::now_ms;
 use crate::repositories::reminder as repo;
 
 /// 设置提醒（重设清 `reminded_at`，提醒复活，K-19）。

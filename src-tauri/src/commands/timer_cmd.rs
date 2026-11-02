@@ -2,11 +2,11 @@
 
 use tauri::{AppHandle, State};
 
+use crate::app::events;
 use crate::error::AppResult;
-use crate::infra::events;
 use crate::models::enums::{ResolveAction, SwitchMode};
 use crate::models::record::TimeRecord;
-use crate::models::timer::TimerState;
+use crate::models::timer::{StopResult, TimerState};
 use crate::services;
 use crate::state::AppState;
 
@@ -48,11 +48,13 @@ pub async fn resume_timer(app: AppHandle, state: State<'_, AppState>) -> AppResu
     Ok(record)
 }
 
+/// [V0.3.4] 返回 `StopResult`：`discarded = true` 表示这次会话短于「最短记录时长」，
+/// 后端已软删，前端据此不展示撤销条（ADR-023）。
 #[tauri::command]
-pub async fn stop_timer(app: AppHandle, state: State<'_, AppState>) -> AppResult<TimeRecord> {
-    let record = services::timer::stop(&state.pool).await?;
+pub async fn stop_timer(app: AppHandle, state: State<'_, AppState>) -> AppResult<StopResult> {
+    let result = services::timer::stop(&state.pool).await?;
     events::emit_timer_state(&app, &state.pool).await;
-    Ok(record)
+    Ok(result)
 }
 
 #[tauri::command]
@@ -96,8 +98,13 @@ pub async fn resolve_open_record(
     state: State<'_, AppState>,
     action: ResolveAction,
     end_at: Option<i64>,
+    /* [V0.4.2] 可选：把「退出期间」并入累计（恢复对话框的勾选项）。
+    缺省 false = R-2 原口径，老前端不带这个字段也不会报错。 */
+    include_gap: Option<bool>,
 ) -> AppResult<Option<TimeRecord>> {
-    let record = services::timer::resolve_open(&state.pool, action, end_at).await?;
+    let record =
+        services::timer::resolve_open(&state.pool, action, end_at, include_gap.unwrap_or(false))
+            .await?;
     events::emit_timer_state(&app, &state.pool).await;
     Ok(record)
 }

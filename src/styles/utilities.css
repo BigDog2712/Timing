@@ -1,0 +1,29 @@
+/* =============================================================================
+ * TickBar — utilities.css（跨组件的少量通用类）
+ * -----------------------------------------------------------------------------
+ * 从 app.css 拆出（ADR-017：单文件 ≤300 行）。只放「与具体组件无关、被多处复用」
+ * 的极小工具类；组件私有样式一律回各自文件，不要把这里当垃圾桶。
+ * P0：只允许引用 var(--*)，禁止字面量色值。
+ * ========================================================================== */
+
+/* ---- 无障碍：仅视觉隐藏 ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- 键盘键名（ALL CAPS：必须带字距） ---- */
+.kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}

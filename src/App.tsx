@@ -5,10 +5,9 @@
  *   - settings → 独立设置窗，**只渲染 SettingsPanel**（不渲染主窗层）；
  *   - todos    → 独立事项窗，只渲染 TodosWindow；
  *   - note     → 独立便利贴窗（label note-{id}），只渲染 NoteWindow；
- *   - main     → 固定 384×360 透明置层：药丸 / 面板 / 菜单 / 撤销条 / 对话框。
+ *   - main     → 无画布置层（ADR-020）：药丸 / 面板 / 菜单 / 撤销条 / 对话框由 auto-fit 撑窗口。
  */
 import { Batch2Overlays } from './components/Batch2Overlays';
-import { ContextMenu } from './components/menu/ContextMenu';
 import { ItemMenu } from './components/menu/ItemMenu';
 import { NoteWindow } from './components/note/NoteWindow';
 import { NotesListPopover } from './components/note/NotesListPopover';
@@ -25,6 +24,7 @@ import { UndoBar } from './components/undo/UndoBar';
 import { CollapsedDot } from './components/ui/CollapsedDot';
 import { NoticeBar } from './components/ui/NoticeBar';
 import { useAppBootstrap } from './hooks/useAppBootstrap';
+import { useWindowAutoFit } from './hooks/useWindowAutoFit';
 import { currentWindowKind } from './lib/window';
 import { useUiStore } from './stores/uiStore';
 import { openTodosWindow } from './services/todosActions';
@@ -40,13 +40,14 @@ export default function App() {
   return <MainWindow />;
 }
 
-/** 主窗（label = main）：固定透明置层 + 各形态组件 */
+/** 主窗（label = main）：无画布置层（ADR-020） + 各形态组件 */
 function MainWindow() {
   useAppBootstrap();
+  /* [P1 修复] 把真实 OS 窗口收缩到可见内容包围盒：透明空白区不再吞掉桌面点击 */
+  useWindowAutoFit();
 
   const collapsed = useUiStore((s) => s.collapsed);
   const panel = useUiStore((s) => s.panel);
-  const menuOpen = useUiStore((s) => s.menuOpen);
   const itemMenu = useUiStore((s) => s.itemMenu);
   const notesListPos = useUiStore((s) => s.notesListPos);
   const closeNotesList = useUiStore((s) => s.closeNotesList);
@@ -63,7 +64,6 @@ function MainWindow() {
         {!collapsed && panel === 'settings' && <SettingsPanel />}
       </div>
 
-      {menuOpen && <ContextMenu />}
       {itemMenu && <ItemMenu />}
       {notesListPos && <NotesListPopover pos={notesListPos} onClose={closeNotesList} />}
       <Batch2Overlays />

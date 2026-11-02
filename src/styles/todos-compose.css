@@ -1,0 +1,95 @@
+/* =============================================================================
+ * TickBar V0.3.9 — todos-compose.css（事项窗「新增待办」卡）
+ * -----------------------------------------------------------------------------
+ * 用户口径：新增待办要与「新增常用摸鱼 / 常用事项」一样走**表单卡**，可填开启 / 截止时间
+ * （都可不填）。卡片贴在底栏上方，占满面板宽度，玻璃底与菜单同源。
+ * P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+.todos-compose {
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: calc(var(--todos-foot-h) + var(--space-2));
+  z-index: 5;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--menu-bg);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-plate);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.todos-compose__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.todos-compose__title {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  color: var(--ink-2);
+}
+
+.todos-compose__close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todos-compose__close:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.todos-compose__input {
+  width: 100%;
+  height: var(--input-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  border: 1px solid var(--input-border);
+  font-size: var(--text-xs);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.todos-compose__input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.todos-compose__input:focus {
+  outline: none;
+  background: var(--input-bg-focus);
+}
+
+/* 时间行：左标签 + 右按钮（窄窗里仍是一行，控件吃掉剩余宽度）。
+   控件本体在 todos-datetime.css（.dt-field / .dt-pop） */
+.todos-compose__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-cap);
+  color: var(--ink-3);
+}
+
+.todos-compose__err {
+  margin: 0;
+  font-size: var(--text-cap);
+  color: var(--danger);
+}
+
+.todos-compose__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

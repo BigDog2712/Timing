@@ -7,7 +7,7 @@
  * 前端本地 tick 由 hooks/useTimerTick 基于 session.runningSince 推算（R-4 同公式）。
  */
 import { create } from 'zustand';
-import { ipc } from '../services/ipc';
+import { timerApi } from '../services/api';
 import { SYSTEM_ITEM_ID } from '../types/domain';
 import type { TimerState } from '../types/domain';
 
@@ -26,6 +26,13 @@ interface TimerStore {
   loaded: boolean;
   /** 以事件 payload 覆盖本地状态（权威） */
   setState: (state: TimerState) => void;
+  /**
+   * 乐观翻状态（暂停 ⇄ 继续）。
+   * 暂停/继续的 IPC 往返约 30ms，这段时间里 `status` 还是旧值——暂停后立刻右键数字
+   * 会因「仍算 running」被吞掉（用户口径：「开启暂停的一瞬间唤不出摸鱼菜单」）。
+   * 先本地认账，再由随后的事件 / `refresh()` 收口；失败路径会 refresh 回真值。
+   */
+  setStatus: (status: TimerState['status']) => void;
   /** 主动拉取 get_timer_state 并覆盖本地状态 */
   refresh: () => Promise<TimerState>;
 }
@@ -34,8 +41,9 @@ export const useTimerStore = create<TimerStore>((set) => ({
   state: IDLE_TIMER_STATE,
   loaded: false,
   setState: (state) => set({ state, loaded: true }),
+  setStatus: (status) => set((store) => ({ state: { ...store.state, status } })),
   refresh: async () => {
-    const state = await ipc.getTimerState();
+    const state = await timerApi.state();
     set({ state, loaded: true });
     return state;
   },

@@ -19,6 +19,7 @@
   position: absolute;
   z-index: var(--z-menu);
   min-width: var(--menu-w);
+  max-width: var(--menu-w-max);
   padding: var(--menu-pad);
   border-radius: var(--radius-lg);
   background: var(--menu-bg);
@@ -27,12 +28,19 @@
   box-shadow: var(--shadow-float);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   pointer-events: auto;
-  /* [V0.2.4 · 4] 长菜单（倒计时 8 档预设 + 分隔 + 自定义）在小条 384×360 的窗口里放不下：
-     限高 + 内部滚动，而不是让它顶出窗口被裁掉。 */
+  /* [V0.2.4 · 4] 长菜单（倒计时 8 档预设 + 分隔 + 自定义）在小条窗口里放不下：
+     限高 + 内部滚动，而不是让它顶出窗口被裁掉。非主窗（设置窗等）沿用 100vh。 */
   max-height: calc(100vh - 16px);
   overflow-y: auto;
   overscroll-behavior: contain;
   animation: menu-in var(--dur-base) var(--ease-standard);
+}
+
+/* [ADR-020] 主窗没有画布了：100vh 是「当前窗口高」，而窗口本身由内容决定，
+   用它限高会自我压扁。改用 --fit-h（胶囊所在显示器工作区高，DIP），
+   长菜单也只在屏幕内滚动，不再被窗口边缘裁掉。 */
+html[data-window="main"] .menu {
+  max-height: calc(var(--fit-h) - 16px);
 }
 
 @keyframes menu-in {
@@ -158,10 +166,11 @@
   color: var(--menu-text-on);
 }
 
-/* 禁用项：--ink-4 + .55，hover 无变化（明确「点不了」） */
+/* 禁用项：字仍是纯白（V0.2.10 起文字不再走灰阶），靠 .72 的透明度表示「点不了」——
+   太低会和「没字」混同，太高又看不出不可点。 */
 .menu__item:disabled {
   color: var(--ink-4);
-  opacity: 0.55;
+  opacity: 0.72;
   cursor: not-allowed;
 }
 
@@ -220,6 +229,13 @@
   height: 1px;
   margin: 5px 6px;
   background: var(--line);
+}
+
+/* 菜单底部附加区（V0.3.9：常用事项框的「事项管理」小圆点） */
+.menu__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-1) var(--menu-item-pad-x) 2px;
 }
 
 /* ------------------------------ 滚动条 ------------------------------ */

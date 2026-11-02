@@ -4,7 +4,7 @@
  * 数据来源：list_items（排序 sort_order ASC, name ASC；系统事项「未归类」恒在）。
  */
 import { create } from 'zustand';
-import { ipc } from '../services/ipc';
+import { itemApi } from '../services/api';
 import type { Item } from '../types/domain';
 
 interface ItemStore {
@@ -19,7 +19,7 @@ export const useItemStore = create<ItemStore>((set) => ({
   loaded: false,
   setItems: (items) => set({ items, loaded: true }),
   reload: async () => {
-    const items = await ipc.listItems({ includeArchived: false });
+    const items = await itemApi.list();
     set({ items, loaded: true });
     return items;
   },

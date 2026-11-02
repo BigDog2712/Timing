@@ -5,7 +5,7 @@
  * P0：仅 var(--*)，零字面量色值（尺寸断点除外）。
  * 关键：正文文字**始终 100% 不透明**（--ink），未悬停仅让**背景板**更透 + 头/页脚/按钮淡出
  *       （sticky-note.md §3.1 可读性红线：Timing §1-11 双重透明硬伤的修复）。
- * 窗口壳：html[data-window="note"] 覆写 app.css 的主窗 384×360 根尺寸。
+ * 窗口壳：html[data-window="note"] 铺满自身视口（独立窗口，按 ADR-020 没有画布）。
  * ========================================================================== */
 
 /* ------------------------------ 窗口根 ------------------------------ */
@@ -19,6 +19,15 @@ html[data-window="note"] body,
 html[data-window="note"] #root {
   width: 100vw;
   height: 100vh;
+}
+
+/* [V0.3.1] 指针形状恒为**默认箭头**（用户口径「不要在便利贴改变鼠标状态」）：
+   正文的 I-beam、圆点/手柄的 pointer、拖动期的 grabbing 全部压回 default。
+   cursor 只影响形状，不影响输入、选区与拖动本身；要选字用 Shift+拖动照旧。
+   放在 note.css（在 app.css 之后加载）并用 !important，才能盖住控件级规则。 */
+html[data-window="note"],
+html[data-window="note"] * {
+  cursor: default !important;
 }
 
 /* ------------------------------ 便利贴本体 ------------------------------ */
@@ -82,7 +91,7 @@ html[data-window="note"] #root {
   z-index: 2;
   width: 14px;
   height: 14px;
-  cursor: nwse-resize;
+  /* [V0.3.1] 不再改指针（原 nwse-resize）：整块便利贴统一默认箭头 */
   opacity: 0;
   transition: opacity var(--dur-exit) var(--ease-standard);
   /* 两道斜纹示意可拖拽角（零字面量色值：全部走令牌） */
@@ -121,6 +130,9 @@ html[data-window="note"] #root {
 .note__dot[data-tone="warn"] {
   background: var(--warn);
 }
+
+/* [V0.3.1] 白色「置顶」点已删除（用户口径）；便利贴恒为置顶，无切换入口。
+   原 data-tone="pin" 两条规则（实心 / 空心环）随之移除。 */
 
 .note__dot:hover {
   transform: scale(1.15);
@@ -179,7 +191,8 @@ html[data-window="note"] #root {
      font 简写保行数红线（等价 font-family + font-size + line-height + font-weight 四行） */
   font: var(--weight-strong) var(--text-task-pill) / var(--leading-body) var(--font-ui);
   user-select: text;
-  cursor: text;
+  /* [V0.3.1] 整块便利贴都是默认箭头（含聚焦后的正文），不再切 I-beam。 */
+  cursor: default;
   overflow-y: auto;
 }
 

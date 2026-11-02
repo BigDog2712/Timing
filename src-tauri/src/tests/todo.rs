@@ -42,7 +42,7 @@ async fn create_overlong_title_rejected_without_insert() {
     let pool = fresh_pool("todo-long").await;
     let long = "字".repeat(TODO_TITLE_MAX_LEN + 1);
     let code = expect_err(todo::create(&pool, &long, None, None).await);
-    assert_eq!(code, ErrorCode::ItemNameEmpty, "超长不得静默接受");
+    assert_eq!(code, ErrorCode::ItemNameTooLong, "超长不得静默接受");
     assert_eq!(
         scalar_i64(&pool, "SELECT COUNT(*) FROM todos").await,
         0,

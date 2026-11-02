@@ -5,8 +5,8 @@ use sqlx::{QueryBuilder, Sqlite, SqlitePool};
 use crate::error::AppResult;
 use crate::models::note::{Note, NoteGeometry, NoteGeometryPatch};
 
-const COLS: &str = "id, item_id, content, pos_x, pos_y, width, height, is_open, created_at, \
-                    updated_at";
+const COLS: &str = "id, item_id, content, pos_x, pos_y, width, height, is_open, is_pinned, \
+                    created_at, updated_at";
 
 /// 按 id 查询（排除已软删除）。
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> AppResult<Option<Note>> {
@@ -29,6 +29,8 @@ pub async fn list(pool: &SqlitePool, item_id: Option<i64>) -> AppResult<Vec<Note
 }
 
 /// 启动恢复用：`is_open=1 AND deleted_at IS NULL` 的便利贴（热点索引 `idx_notes_open`）。
+/// 生产路径已不自动重开（V0.3.9），仅测试使用；标 `cfg(test)` 避免 dead_code。
+#[cfg(test)]
 pub async fn list_open(pool: &SqlitePool) -> AppResult<Vec<Note>> {
     let sql = format!(
         "SELECT {COLS} FROM notes WHERE is_open = 1 AND deleted_at IS NULL ORDER BY id ASC"
@@ -43,6 +45,18 @@ pub async fn count_open(pool: &SqlitePool) -> AppResult<i64> {
             .fetch_one(pool)
             .await?;
     Ok(count)
+}
+
+/// 启动时清掉「上次没收纳」的打开标记（V0.3.9）。
+///
+/// `is_open` 只在「点黄点收纳」时归零；应用退出 / 崩溃不会清零。既然启动不再自动
+/// 重开便利贴（见 `services::note::reset_open`），这些残留只会在「最多 20 张」的
+/// 打开计数里占位，故启动统一归零，语义回到「当前真的开着窗」。
+pub async fn clear_open(pool: &SqlitePool) -> AppResult<u64> {
+    let res = sqlx::query("UPDATE notes SET is_open = 0 WHERE is_open = 1 AND deleted_at IS NULL")
+        .execute(pool)
+        .await?;
+    Ok(res.rows_affected())
 }
 
 /// 插入并返回新 id（`is_open` 默认 0；窗口由 `open_note_window` 负责）。
@@ -72,12 +86,16 @@ pub async fn insert(
 }
 
 /// 部分更新（仅传非 None 字段）。`item_id` 三态：改值 / 置 NULL（解绑）/ 不动。
+///
+/// 新建行的 `is_pinned` 不在本函数参数里：由列默认值 `1`（置顶）给出，
+/// 与 AC-64「默认置顶」一致，避免每个调用点都要传一次 true。
 pub async fn update(
     pool: &SqlitePool,
     id: i64,
     content: Option<&str>,
     item_id: Option<Option<i64>>,
     geom: NoteGeometryPatch,
+    is_pinned: Option<bool>,
     now: i64,
 ) -> AppResult<()> {
     let mut qb = QueryBuilder::<Sqlite>::new("UPDATE notes SET updated_at = ");
@@ -105,6 +123,9 @@ pub async fn update(
     }
     if let Some(v) = geom.height {
         qb.push(", height = ").push_bind(v);
+    }
+    if let Some(v) = is_pinned {
+        qb.push(", is_pinned = ").push_bind(v);
     }
     qb.push(" WHERE id = ")
         .push_bind(id)

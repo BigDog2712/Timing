@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 机械门禁：不依赖编译，几十秒内给出「架构契约有没有被破坏」的结论。
+  # 单独成 job 是为了让它在 PR 上最先返回红/绿，不被构建时间拖住。
+  # ---------------------------------------------------------------------------
+  gates:
+    name: 门禁 · 体积 / 分层 / 版本 / 契约
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 单文件体积（≤300 行 · 白名单须带 owner + 到期日）
+        run: npm run check:size
+
+      - name: 分层依赖（6 条规则）
+        run: npm run check:layers
+
+      - name: 版本号一致性（6 处）
+        run: npm run check:version
+
+      - name: IPC 契约（命令 / 错误码 / 事件 / mock 覆盖）
+        run: npm run check:contract
+
+  frontend:
+    name: 前端 · 类型 / Lint / 测试 / 构建
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查
+        run: npm run typecheck
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: 单元测试（vitest · 含双端时间公式黄金用例）
+        run: npm test
+
+      - name: 生产构建
+        run: npm run build
+
+  backend:
+    name: Rust · 测试 / Clippy / 格式
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: 单元 / 集成测试
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+      # `-D warnings` 是刻意加的：`eprintln!` 这类回归除了被 check:layers 拦，
+      # 还会在这里被编译器/剪裁器再拦一次（双保险）。
+      - name: Clippy（warning 视为失败）
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: 格式检查（cargo fmt --check）
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --check

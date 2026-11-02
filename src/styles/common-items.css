@@ -1,0 +1,279 @@
+/* =============================================================================
+ * TickBar V0.3.9 — common-items.css（常用事项框 / 常用事项管理卡）
+ * -----------------------------------------------------------------------------
+ * 列表本体沿用 menu.css 的 .menu / .menu__item 语言，本文件补三块：
+ *   1. 框底的「事项管理」小圆点（新建不在这里做，见 CommonItems 注释）；
+ *   2. 管理卡里可拖动排序的常用事项行；
+ *   3. 「显示最近事项」开关（开=高亮色）与条数输入框。
+ * P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+/* ------------------------------ 右下角小圆点 ------------------------------ */
+.common-items__dot {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--line-3);
+  transition:
+    border-color var(--dur-quick) var(--ease-standard),
+    background-color var(--dur-quick) var(--ease-standard);
+}
+
+.common-items__dot::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.common-items__dot:hover,
+.common-items__dot:focus-visible {
+  border-color: var(--line-2);
+  background: var(--bg-field-hi);
+}
+
+.common-items__dot:hover::after,
+.common-items__dot:focus-visible::after {
+  background: var(--ink);
+}
+
+.common-items__dot[aria-expanded="true"] {
+  border-color: var(--accent);
+}
+
+.common-items__dot[aria-expanded="true"]::after {
+  background: var(--accent);
+}
+
+/* --------------------------- 框底：管理小圆点 --------------------------- */
+/* [V0.3.9 修订] 框底的「最近事项胶囊 + 小圆点」外框与胶囊样式拆到
+   common-items-chips.css（本文件已接近 300 行上限）。 */
+
+/* 管理卡的表单输入框（框底已无新建输入框，这里只剩管理卡在用） */
+.common-items__input {
+  width: 100%;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  color: var(--menu-text);
+  font-size: var(--text-body);
+  transition: border-color var(--dur-quick) var(--ease-standard);
+}
+
+.common-items__input::placeholder {
+  color: var(--ink-4);
+}
+
+.common-items__input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* ------------------------------ 管理卡 ------------------------------ */
+.items-prefs {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-3) transparent;
+}
+
+.items-prefs__list {
+  max-height: 168px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-3) transparent;
+}
+
+.items-prefs__empty {
+  margin: 0;
+  padding: var(--space-2) var(--menu-item-pad-x);
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+.items-prefs__row {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  height: var(--menu-item-h);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.items-prefs__row:hover {
+  background: var(--menu-item-hover);
+}
+
+.items-prefs__row[data-editing="true"] {
+  background: var(--accent-wash);
+}
+
+/* 拖动落点：上沿一条 accent 线 */
+.items-prefs__row[data-over="true"] {
+  box-shadow: inset 0 1px 0 var(--accent);
+}
+
+.items-prefs__grip {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 22px;
+  color: var(--ink-4);
+  cursor: grab;
+}
+
+.items-prefs__grip:active {
+  cursor: grabbing;
+}
+
+.items-prefs__grip:focus-visible {
+  color: var(--accent);
+}
+
+.items-prefs__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  color: var(--menu-text);
+}
+
+.items-prefs__name:hover {
+  color: var(--ink);
+}
+
+.items-prefs__meta {
+  flex: 0 0 auto;
+  padding-right: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  letter-spacing: var(--tracking-caps);
+  color: var(--ink-4);
+}
+
+.items-prefs__act {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.items-prefs__act:hover:not(:disabled) {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.items-prefs__act:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.items-prefs__act--danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+/* ------------------------------ 新增 / 编辑表单 ------------------------------ */
+.items-prefs__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--menu-item-pad-x);
+}
+
+.items-prefs__form .menu__group {
+  padding: var(--space-1) 0 0;
+}
+
+.items-prefs__minutes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.items-prefs__minutes .common-items__input {
+  width: 84px;
+}
+
+.items-prefs__minutes span {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.items-prefs__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+}
+
+/* --------------------------- 最近事项开关 + 条数 --------------------------- */
+.items-prefs__recent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--menu-item-pad-x) var(--space-2);
+}
+
+.items-prefs__toggle {
+  flex: 1 1 auto;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  font-size: var(--text-body);
+  color: var(--ink-3);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.items-prefs__toggle:hover {
+  background: var(--bg-field);
+  color: var(--ink);
+}
+
+/* 开 = 高亮色，关 = 常规色（不再有图标与对勾） */
+.items-prefs__toggle[data-on="true"] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.items-prefs__count {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 26px;
+  padding: 0 var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  color: var(--ink-2);
+  font-size: var(--text-body);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.items-prefs__count:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.items-prefs__count:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

@@ -18,10 +18,13 @@
   color: var(--color-warn);
 }
 
-/* 倒计时：色环改递减弧（border 环隐去，改由 SVG 弧承载；countdown-menu.md §3.3） */
-.ring[data-countdown="true"] {
-  border-color: transparent;
-}
+/* ------------------------- 状态环弧（V0.3.6 统一结构，ADR-024 / V0.3.7 全状态单载体） ------------------------- */
+/* 单一结构裁决：**每一种状态**都渲染同一个 `<svg>` + 同一条 ARC_PATH，`border` 彻底退场
+   （`.ring` 的 border 已归零，见 surfaces.css）。V0.3.7 之前 idle / ended 是例外——
+   它们走 CSS border-radius，也就是「圆角矩形」，与 SVG 的超椭圆是两种形状；
+   而空环恰恰是用户最常看到的状态，只改计时态等于没改。
+   去掉 border 后还顺带修掉两笔旧账：环的粗细只剩 SVG 一处（不再有 2.4 被吸附成 2.00px），
+   以及 `.ring::before` 的命中区终于真的等于 24×24（原 padding box 只有 11.2，实际 19.2）。 */
 
 .ring__arc {
   position: absolute;
@@ -34,21 +37,30 @@
   width: var(--ring-size);
   height: var(--ring-size);
   margin: calc(var(--ring-size) / -2) 0 0 calc(var(--ring-size) / -2);
-  overflow: visible; /* 弧外沿恰好触界（r+stroke/2 = 8），防半像素裁切 */
-  transform: rotate(-90deg); /* 起点置于 12 点方向 */
+  /* 描边中线 inset 1.2 + stroke/2 1.2 = 8，外沿恰好触界；overflow 兜住半像素裁切 */
+  overflow: visible;
+  /* [V0.3.6 P0] 这里**不再有任何 transform**：行进取代 rotate()，见 ring-march 的注释。
+     留着 rotate 会让整个 SVG（含底轨）一起歪——那是 V0.3.3 改 squircle 时埋下的静默回归。 */
   pointer-events: none;
 }
 
 .ring__arc-track {
   fill: none;
-  /* [Timing 对齐 D6] 轨道 = 状态色 × RingTrackAlpha 95/255 ≈ 0.37（MainForm.cs:2369） */
+  /* [Timing 对齐 D6] 轨道 = 状态色 × RingTrackAlpha 95/255 ≈ 0.37（MainForm.cs:2369）。
+     [V0.3.6] 这是**唯一**一处底环实现：surfaces.css 里 35% 的 border-color 已删，
+     两套载体在分数 DPI 下抗锯齿不同（SVG 走 subpixel、border 走像素对齐），必须收成一套。
+     track 不加 transition：底轨是静态参照物，跟着 bar 一起动会显得整环在抖。 */
   stroke: color-mix(in srgb, currentColor 37%, transparent);
   stroke-width: var(--ring-stroke);
 }
 
 .ring__arc-bar {
   fill: none;
-  stroke: var(--color-running);
+  /* [V0.3.6] 弧色 = currentColor，与 track 同源：环色只由 .ring 的 color 一处决定
+     （running / warn / danger / 待命-running），SVG 里不再写死 --color-running——
+     写死会让「待命态弧亮绿 + 轨道仍用 idle 的 ink」这类分叉永远修不掉。 */
+  stroke: currentColor;
+  /* 与 track 同源：一条粗一条细是 16px 盒上最显眼的失谐 */
   stroke-width: var(--ring-stroke);
   stroke-linecap: round;
   transition:
@@ -56,14 +68,29 @@
     stroke var(--dur-base) var(--ease-standard);
 }
 
-/* [Timing 对齐 D3] 急迫态：环色与弧切 RingUrgent 红；轨道 currentColor 随之变红。
+/* [V0.3.7] ended 的瞬时确认：描边加粗到 3px（原来是 `border-width: 3px`）。
+   方向差别要知道：border 从盒边向**内**长，SVG 描边从中线向**两侧**长，
+   所以外沿会超出 16×16 约 0.3px（`.ring__arc` 的 overflow: visible 兜得住）。
+   900ms 之后 ring 回到 idle，这 0.3px 不会停留。 */
+.ring[data-thick="true"] .ring__arc-bar {
+  stroke-width: 3px;
+}
+
+/* [V0.3.6] 暂停 = 瞬时定格：从 transition 里摘掉 dashoffset，只留颜色过渡。
+   CSS transition 取**变化后状态**的 declaration，所以 running→paused 命中这条 →
+   弧长在一个 rAF 内直接到位，不再用 1s 线性「长到 270°」。
+   为什么必须掐掉：暂停的语义是「停住」，渐变等于告诉用户「还在动」；而且倒计时剩 20% 时
+   弧会从 72° 缓缓长到 270°，看起来像进度回退了。正计时那边本来就是硬切，现在两边一致。
+   注意**不能**影响倒计时 running 的每秒 tick 平滑——那条仍在 .ring__arc-bar 基准规则里。 */
+.ring[data-state="paused"] .ring__arc-bar {
+  transition: stroke var(--dur-base) var(--ease-standard);
+}
+
+/* [Timing 对齐 D3] 急迫态：环色切 RingUrgent 红；轨道（color-mix 取 currentColor）与弧
+   （stroke: currentColor）随之一起变红，不需要再单独给 bar 写 stroke。
    暂停优先（MainForm.cs:782 先判 paused）：paused 态不切红 */
 .ring[data-warn="true"]:not([data-state="paused"]) {
   color: var(--color-danger);
-}
-
-.ring[data-warn="true"]:not([data-state="paused"]) .ring__arc-bar {
-  stroke: var(--color-danger);
 }
 
 /* Blink（MainForm.cs:2388-2395）：1s 周期，0-520ms 全亮、480ms 亮度 0.615，
@@ -82,30 +109,45 @@
   animation: ring-blink 1s linear infinite;
 }
 
-/* [UI 统一] 暂停态 270° 静弧 → 暖橙（Timing RingPause）；运行态 90° 弧已在 SVG 中，
-   由下方动画整体旋转（Timing spin 113°/s → 3.2s/圈，MainForm.cs:3062） */
-.ring[data-state="paused"] .ring__arc-bar {
-  stroke: var(--color-warn);
-}
+/* 暂停态（270° 暖橙静弧）不需要单独规则：弧色 = currentColor，而 `.ring[data-state="paused"]`
+   的 color 已是 --color-warn（surfaces.css），track 的 color-mix 取同一个 currentColor，
+   一处改、弧与轨同步（V0.3.6）。 */
 
-@keyframes ring-spin {
+/* [V0.3.3] 起点已在顶边中点（ARC_PATH），沿路径走一整圈仍是 360° */
+/* [V0.3.6 P0] 行进 = dashoffset 沿路径推进，**不是** transform: rotate()。
+   squircle（圆角方形）只有 90° 旋转对称：把 rotate() 加在 .ring__arc 上会让
+   ① 底轨一起歪掉（41° 时四边既不水平也不垂直）；② 90° 弧段只在 90° 整数倍上
+   与轨道曲率吻合，转到中途会浮出轨道。dashoffset 推进让弧永远贴着真实路径走，track 完全不动。 */
+@keyframes ring-march {
   from {
-    transform: rotate(-90deg);
+    stroke-dashoffset: 0;
   }
   to {
-    transform: rotate(270deg);
+    stroke-dashoffset: -100;   /* 沿路径正方向（顺时针）推进一整圈，pathLength 口径 100 */
   }
 }
 
-.ring[data-state="running"] .ring__arc {
-  animation: ring-spin 3.2s linear infinite;
+/* [V0.3.6] 行进只认 data-spin（正计时 running 独占；一圈 3.2s，转速口径与 Timing 一致，
+   MainForm.cs:3062）。动画落在 **bar** 上，`.ring__arc` 不含任何 transform。
+   **不要**退回 `[data-state="running"]`：倒计时运行时 data-state 也是 running，
+   递减弧会被一起动起来，用户读不出剩余量（D1，本次核心 P0）。
+   transition 只留颜色：dashoffset 交给动画（动画驱动的变化不会触发 transition，
+   但把 dashoffset 从 transition 里摘掉可以省掉「切到 running 的第一帧」那次多余的插值）。 */
+.ring[data-spin="true"] .ring__arc-bar {
+  animation: ring-march 3.2s linear infinite;
+  transition: stroke var(--dur-base) var(--ease-standard);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ring[data-state="running"] .ring__arc,
-  .ring[data-warn="true"] .ring__arc-bar,
-  .ring[data-warn="true"] .ring__arc-track {
-    animation: none;   /* [Timing 对齐 D3] blink 退化为静态红 */
+  /* [V0.3.6-F1] 三条都**必须**与基准规则同特异性（spin 0,3,0 / warn 0,4,0）：
+     媒体查询本身不贡献特异性，若写成 `.ring[data-warn="true"] .ring__arc-bar`（0,3,0）
+     就会被基准规则的 `animation: ring-blink` 压掉，这条 `animation: none` 变成死规则
+     （CDP 实测：命中但被压，computed animationName 仍是 ring-blink）。
+     同特异性 + 后加载 → 本块胜出，减动效才真的生效。不要改用 `!important` 兜底。 */
+  .ring[data-spin="true"] .ring__arc-bar,
+  .ring[data-warn="true"]:not([data-state="paused"]) .ring__arc-bar,
+  .ring[data-warn="true"]:not([data-state="paused"]) .ring__arc-track {
+    animation: none;   /* blink 退化为静态红；行进弧退化为静止的「顶部起 90°」 */
   }
 }
 

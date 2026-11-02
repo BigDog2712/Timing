@@ -40,6 +40,63 @@
   color: var(--text-secondary);
 }
 
+/* [V0.3.5] 最短记录时长：数字输入框 + 单位。
+ * 外壳承担边框 / 底色 / 焦点环，内部 input 去壳——这样「数字 + S」是一个整体控件，
+ * 与右侧的开关视觉重量对齐。原生数字输入的上下箭头由 UA 绘制，拿不到令牌，直接隐藏；
+ * 键盘上下键仍可增减（不带箭头也照常工作）。 */
+.num-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  border: 1px solid var(--line);
+}
+
+/* [V0.3.9] 用户口径：「调整最短记录时长时的高亮效果取消」——
+   聚焦不再给外壳描边染色，控件保持常态底色，调数时不闪一块高亮。 */
+.num-field:focus-within {
+  border-color: var(--line);
+}
+
+.num-field__input {
+  width: 40px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  color: var(--ink);
+  text-align: right;
+  -webkit-appearance: none;
+  appearance: textfield;
+}
+
+.num-field__input:focus {
+  outline: none;
+}
+
+/* [V0.3.9] 用户口径：「调整最短记录时长时的高亮效果取消」。
+   全局焦点环是 `box-shadow: var(--focus-ring)`（app.css 末尾），`outline: none` 盖不掉它，
+   这里按控件单独关掉——外壳描边也不染色，调数时整行保持常态。 */
+.num-field__input:focus-visible {
+  box-shadow: none;
+}
+
+.num-field__input::-webkit-inner-spin-button,
+.num-field__input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.num-field__unit {
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
 .settings__divider {
   height: 1px;
   margin: var(--space-4) 0;
@@ -111,6 +168,25 @@
   pointer-events: auto;
 }
 
+/* 主窗不是整屏画布（ADR-020 后窗口按内容自适应）。遮罩若铺满布局空间会出两件事：
+   ①place-items:center 把对话框摆到「工作区中央」，而真实窗口只有胶囊那么大
+     → 对话框落在窗口之外，用户完全看不见；
+   ②pointer-events:auto 让这层看不见的遮罩吞掉胶囊上的全部点击（左键/右键都失灵）。
+   所以主窗里改成贴着胶囊下方就地渲染：遮罩只做视觉底衬、不拦指针，对话框自己可点。 */
+html[data-window="main"] .dialog-scrim {
+  inset: auto;
+  left: 0;
+  top: calc(var(--snap-margin) + var(--pill-h) + var(--space-2));
+  display: block;
+  width: max-content;
+  background: transparent;
+  pointer-events: none;
+}
+
+html[data-window="main"] .dialog {
+  pointer-events: auto;
+}
+
 .dialog {
   width: var(--panel-w);
   padding: var(--space-6);
@@ -157,6 +233,30 @@
   margin: 0 0 var(--space-6);
   font-size: var(--text-sm);
   color: var(--muted);
+}
+
+/* [V0.4.2] 恢复对话框：「把退出期间（xx）也计入」 */
+.dialog__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dialog__check input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* 勾上后「已计时 → 计入后」的增量，只是提示，不是主信息 */
+.dialog__plus {
+  color: var(--accent-ink);
 }
 
 .dialog__buttons {

@@ -11,17 +11,21 @@
  */
 import { useMemo, useState } from 'react';
 import { useTimerTick } from '../../hooks/useTimerTick';
+import { defaultCountdownSec } from '../../lib/countdown';
 import { formatClockTime, formatDuration } from '../../lib/format';
 import { ClockIcon, PlayIcon, RepeatIcon, TimerIcon } from '../../lib/icons';
 import { countdownActions } from '../../services/countdownActions';
 import { useCountdownArmStore } from '../../stores/countdownArm';
 import { useItemStore, findItem } from '../../stores/itemStore';
-const REFERENCE_PRESETS = [300, 600, 900, 1500, 1800, 2700, 3600, 4500, 5400] as const;
+import { useSettingsStore } from '../../stores/settingsStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { useUiStore } from '../../stores/uiStore';
 import type { CountdownMenuState } from '../../stores/uiStore';
 import { GlassMenu, type MenuEntry, type MenuStatus } from './GlassMenu';
 import { CountdownCustom } from './CountdownCustom';
+
+/** 九档预设沿用 Timing v1.7.3 倒计时菜单的固定档位（参考版不可配置） */
+const REFERENCE_PRESETS = [300, 600, 900, 1500, 1800, 2700, 3600, 4500, 5400] as const;
 
 interface CountdownMenuProps {
   state: CountdownMenuState;
@@ -29,14 +33,15 @@ interface CountdownMenuProps {
 
 export function CountdownMenu({ state }: CountdownMenuProps) {
   const anchor = state.pos;
-  const presets = REFERENCE_PRESETS;
-  const status = useTimerStore((s) => s.state.status);
+  const presets = REFERENCE_PRESETS;  const status = useTimerStore((s) => s.state.status);
   const session = useTimerStore((s) => s.state.session);
   const lastItemId = useTimerStore((s) => s.state.lastItemId);
   const items = useItemStore((s) => s.items);
   const liveSec = useTimerTick();
   const close = useUiStore((s) => s.closeCountdownMenu);
   const armedSec = useCountdownArmStore((s) => s.armedSec);
+  /* [P1 优化] 「自定义…」的初值同样取参考设置的默认倒计时，不再是硬编码 25 分钟 */
+  const defaultSec = useSettingsStore((s) => defaultCountdownSec(s.referenceSettings));
   const arm = useCountdownArmStore((s) => s.arm);
   const clearArm = useCountdownArmStore((s) => s.clear);
   const [custom, setCustom] = useState(state.custom ?? false);
@@ -118,7 +123,7 @@ export function CountdownMenu({ state }: CountdownMenuProps) {
     return (
       <CountdownCustom
         anchor={anchor}
-        initialSec={armedSec ?? 1500}
+        initialSec={armedSec ?? defaultSec}
         onCancel={() => setCustom(false)}
         onSubmit={(sec) => {
           setCustom(false);

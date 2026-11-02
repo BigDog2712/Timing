@@ -6,9 +6,9 @@
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult, ErrorCode};
-use crate::infra::clock::now_ms;
 use crate::models::constants::TODO_TITLE_MAX_LEN;
 use crate::models::todo::{Todo, TodoListParams, TodoPatch};
+use crate::platform::clock::now_ms;
 use crate::repositories::todo as repo;
 
 pub async fn list(pool: &SqlitePool, params: TodoListParams) -> AppResult<Vec<Todo>> {
@@ -41,6 +41,7 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: TodoPatch) -> AppResult<T
         patch.planned_at,
         patch.remind_at,
         patch.sort_order,
+        patch.auto_start,
         now_ms(),
     )
     .await?;
@@ -63,20 +64,26 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> AppResult<()> {
     repo::soft_delete(pool, id, now_ms()).await
 }
 
+/// 过期清理（V0.3.15 / ADR-032）：截止时间早于「今天 00:00」且未完成的待办一律软删除。
+///
+/// 与「待办区只显示今天」共用同一条自然日边界 —— 今天已经看不到的待办，就不留着了；
+/// 删的是软删（`deleted_at`），库里仍可追溯，前端也还有撤销条之外的历史记录路径。
+/// 调用方是 15s 的 `jobs::nudge`，因此跨零点后最多 15s 内清干净；应用没开则下次启动补齐。
+pub async fn purge_overdue(pool: &SqlitePool, today_start: i64) -> AppResult<u64> {
+    crate::repositories::todo_nudge::soft_delete_overdue_before(pool, today_start, now_ms()).await
+}
+
 /// trim + 非空 + 长度上限校验。
 ///
-/// 空标题 → `ITEM_NAME_EMPTY`（契约）。超长无专用错误码（错误码集锁定 16 个，不可扩展），
-/// 复用 `ITEM_NAME_EMPTY` 并给明确 message，绝不静默截断入库。
+/// 空标题 → `ITEM_NAME_EMPTY`（契约）；超长 → `ITEM_NAME_TOO_LONG`（ADR-018）。
+/// 绝不静默截断入库。
 fn normalize_title(raw: &str) -> AppResult<String> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
         return Err(AppError::new(ErrorCode::ItemNameEmpty, "待办标题不能为空"));
     }
     if trimmed.chars().count() > TODO_TITLE_MAX_LEN {
-        return Err(AppError::new(
-            ErrorCode::ItemNameEmpty,
-            format!("待办标题长度不能超过 {TODO_TITLE_MAX_LEN} 字"),
-        ));
+        return Err(AppError::text_too_long("待办标题", TODO_TITLE_MAX_LEN));
     }
     Ok(trimmed.to_string())
 }

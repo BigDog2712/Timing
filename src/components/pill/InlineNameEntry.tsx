@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
+import { ITEM_NAME_MAX_CHARS } from '../../lib/constants';
 
 interface InlineNameEntryProps {
   /** 进入时的文本（重命名用；新建为空） */
@@ -16,8 +17,8 @@ interface InlineNameEntryProps {
   onCancel: () => void;
 }
 
-/** 事项名长度上限（与 ItemPicker 的 maxLength / Rust 校验一致） */
-const NAME_MAX_LENGTH = 60;
+/** 事项名长度上限（与 ItemPicker 的 maxLength / 后端 `ITEM_NAME_MAX_LEN` 同值） */
+const NAME_MAX_LENGTH = ITEM_NAME_MAX_CHARS;
 
 export function InlineNameEntry({ initial = '', placeholder = '新事项名称', onSubmit, onCancel }: InlineNameEntryProps) {
   const [value, setValue] = useState(initial);

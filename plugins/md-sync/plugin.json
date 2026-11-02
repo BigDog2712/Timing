@@ -1,0 +1,36 @@
+{
+  "id": "md-sync",
+  "name": "Markdown 同步",
+  "version": "1.0.0",
+  "apiVersion": 2,
+  "description": "把 TickBar 的计时与便利贴同步到 Obsidian 日记；改 Markdown 也会写回数据库。",
+  "entry": "manifest",
+  "enabled": true,
+  "contributes": {
+    "mdSync": {
+      "bindings": [
+        {
+          "kind": "timers",
+          "enabled": true,
+          "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
+          "file": "{date}.md",
+          "heading": "#### 事项计时"
+        },
+        {
+          "kind": "notes",
+          "enabled": true,
+          "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
+          "file": "{date}.md",
+          "heading": "#### 便利贴"
+        },
+        {
+          "kind": "todos",
+          "enabled": true,
+          "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
+          "file": "{date}.md",
+          "heading": "#### 待办事项"
+        }
+      ]
+    }
+  }
+}

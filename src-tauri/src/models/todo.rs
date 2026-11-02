@@ -57,6 +57,9 @@ pub struct TodoPatch {
     pub remind_at: Option<Option<i64>>,
     #[serde(default)]
     pub sort_order: Option<i64>,
+    /// [V0.3.12] 「当前事项结束后自动开始」（ADR-030）：省略 = 不改。
+    #[serde(default)]
+    pub auto_start: Option<bool>,
 }
 
 /// 把可空字段反序列化为 `Some(None)`（JSON `null`）以区别于缺省（`None`）。

@@ -8,7 +8,7 @@
  *   - 提醒…    → 打开提醒设置卡（reminder_set；提醒 ≠ 结束计时）
  * 备注类项（增加/编辑/复制备注）依赖备注能力，本批不生成。
  */
-import { StickyNoteIcon, PencilIcon, SquareIcon, TimerIcon, CalendarClockIcon, TrashIcon } from '../../lib/icons';
+import { StickyNoteIcon, PencilIcon, PlayIcon, SquareIcon, TimerIcon, CalendarClockIcon, TrashIcon } from '../../lib/icons';
 import { reminderActions } from '../../services/reminderActions';
 import { useUiStore } from '../../stores/uiStore';
 import { GlassMenu, type MenuEntry } from '../menu/GlassMenu';
@@ -21,6 +21,8 @@ interface TodosItemMenuProps {
   isActive: boolean;
   onClose: () => void;
   onStop: () => void;
+  /** [V0.4.2] 开始这一条事项的计时（非当前会话时，首项由「停止计时」换成「开始计时」） */
+  onStart: () => void;
   onEdit: () => void;
   onDelete: () => void;
   /** 便利贴…（关联该事项） */
@@ -34,19 +36,31 @@ export function TodosItemMenu({
   isActive,
   onClose,
   onStop,
+  onStart,
   onEdit,
   onDelete,
   onNote,
 }: TodosItemMenuProps) {
+  /* [V0.4.2] 首项随状态切换：正在计的这条 → 停止；其它 → 开始（用户口径
+     「在事项菜单点击事项可以直接开始计时」，这里之前只有一条永远禁用的「停止计时」）。 */
+  const firstEntry: MenuEntry = isActive
+    ? {
+        type: 'item',
+        id: 'stop',
+        label: `停止计时 · ${itemName}`,
+        icon: SquareIcon,
+        onSelect: onStop,
+      }
+    : {
+        type: 'item',
+        id: 'start',
+        label: `开始计时 · ${itemName}`,
+        icon: PlayIcon,
+        onSelect: onStart,
+      };
+
   const entries: MenuEntry[] = [
-    {
-      type: 'item',
-      id: 'stop',
-      label: `停止计时 · ${itemName}`,
-      icon: SquareIcon,
-      disabled: !isActive,
-      onSelect: onStop,
-    },
+    firstEntry,
     { type: 'item', id: 'edit', label: '编辑事项', icon: PencilIcon, onSelect: onEdit },
     { type: 'separator', id: 'sep-batch2' },
     { type: 'item', id: 'note', label: '便利贴…', icon: StickyNoteIcon, onSelect: onNote },

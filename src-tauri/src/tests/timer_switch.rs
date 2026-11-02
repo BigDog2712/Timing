@@ -3,10 +3,12 @@
 //! （含 discard 释放唯一槽 R-5）。开始 / 暂停 / 结束 / 撤销见同目录 `timer.rs`。
 
 use crate::error::ErrorCode;
-use crate::infra::clock::now_ms;
 use crate::models::enums::{ResolveAction, SwitchMode};
+use crate::platform::clock::now_ms;
 use crate::services::timer;
-use crate::tests::support::{count_active, exec, expect_err, fresh_pool, new_item, scalar_i64};
+use crate::tests::support::{
+    allow_short_records, count_active, exec, expect_err, fresh_pool, new_item, scalar_i64,
+};
 
 #[tokio::test]
 async fn switch_just_switch_keeps_timing_continuous() {
@@ -50,6 +52,9 @@ async fn switch_end_and_start_rejects_running_session() {
 #[tokio::test]
 async fn switch_end_and_start_segments() {
     let pool = fresh_pool("timer-switch-seg").await;
+    /* 本用例只验证「分段」本身：把阈值关到 0，否则 0 秒的旧段会被当成短会话丢弃
+    （那段行为由 `timer_threshold.rs::switch_discards_short_segment` 守）。 */
+    allow_short_records(&pool).await;
     let item2 = new_item(&pool, "乙").await;
     timer::start(&pool, Some(1)).await.unwrap();
     timer::pause(&pool).await.unwrap();
@@ -63,11 +68,12 @@ async fn switch_end_and_start_segments() {
     assert_eq!(
         scalar_i64(
             &pool,
-            "SELECT COUNT(*) FROM time_records WHERE item_id=1 AND status='saved'"
+            "SELECT COUNT(*) FROM time_records \
+             WHERE item_id=1 AND status='saved' AND deleted_at IS NULL"
         )
         .await,
         1,
-        "旧会话应被分段置 saved"
+        "旧会话应被分段置 saved（未被丢弃）"
     );
 }
 
@@ -139,7 +145,7 @@ async fn resolve_resume_resets_running_since_without_gap() {
     )
     .await;
 
-    let out = timer::resolve_open(&pool, ResolveAction::Resume, None)
+    let out = timer::resolve_open(&pool, ResolveAction::Resume, None, false)
         .await
         .unwrap()
         .unwrap();
@@ -170,7 +176,7 @@ async fn resolve_close_uses_last_flushed_without_gap() {
     )
     .await;
 
-    let out = timer::resolve_open(&pool, ResolveAction::Close, None)
+    let out = timer::resolve_open(&pool, ResolveAction::Close, None, false)
         .await
         .unwrap()
         .unwrap();
@@ -199,7 +205,7 @@ async fn resolve_close_honors_explicit_end_at() {
     .await;
     let end = now_ms() - 50_000;
 
-    let out = timer::resolve_open(&pool, ResolveAction::Close, Some(end))
+    let out = timer::resolve_open(&pool, ResolveAction::Close, Some(end), false)
         .await
         .unwrap()
         .unwrap();
@@ -212,7 +218,7 @@ async fn resolve_close_end_before_start_rejected() {
     let rec = timer::start(&pool, Some(1)).await.unwrap();
     let bad_end = rec.started_at - 1;
     assert_eq!(
-        expect_err(timer::resolve_open(&pool, ResolveAction::Close, Some(bad_end)).await),
+        expect_err(timer::resolve_open(&pool, ResolveAction::Close, Some(bad_end), false).await),
         ErrorCode::InvalidDuration
     );
 }
@@ -222,7 +228,7 @@ async fn resolve_discard_frees_single_active_slot() {
     let pool = fresh_pool("timer-discard").await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
 
-    let out = timer::resolve_open(&pool, ResolveAction::Discard, None)
+    let out = timer::resolve_open(&pool, ResolveAction::Discard, None, false)
         .await
         .unwrap();
     assert!(out.is_none(), "discard 返回 null");
@@ -249,12 +255,16 @@ async fn resolve_discard_frees_single_active_slot() {
 #[tokio::test]
 async fn resolve_without_active_session_is_none() {
     let pool = fresh_pool("timer-resolve-none").await;
-    assert!(timer::resolve_open(&pool, ResolveAction::Resume, None)
-        .await
-        .unwrap()
-        .is_none());
-    assert!(timer::resolve_open(&pool, ResolveAction::Discard, None)
-        .await
-        .unwrap()
-        .is_none());
+    assert!(
+        timer::resolve_open(&pool, ResolveAction::Resume, None, false)
+            .await
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        timer::resolve_open(&pool, ResolveAction::Discard, None, false)
+            .await
+            .unwrap()
+            .is_none()
+    );
 }

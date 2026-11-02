@@ -2,7 +2,8 @@
  * TickBar V0.2.0 — settings-panel.css（设置面板外壳 / 页签 / 底栏 / 按钮）
  * -----------------------------------------------------------------------------
  * 依据 settings-panel.md。P0：仅 var(--*)，零字面量色值，零毛玻璃，无弹跳缓动。
- * 主题/配色卡片样式见 theme-picker.css（同一面板内分文件，控制单文件行数）。
+ * 主题/配色卡片样式见 theme-picker.css；插件页签见 settings-plugins.css
+ * （同一面板内分文件，控制单文件行数）。
  * ========================================================================== */
 
 /* ------------------------------ 面板外壳 ------------------------------ */
@@ -10,7 +11,7 @@
   display: flex;
   flex-direction: column;
   width: 340px;
-  max-height: calc(var(--window-h) - var(--snap-margin) * 2 - var(--pill-h) - var(--space-3));
+  max-height: calc(var(--fit-h) - var(--snap-margin) * 2 - var(--pill-h) - var(--space-3));
   margin-top: var(--space-3);
   padding: 0;
   overflow: hidden;
@@ -36,20 +37,7 @@
   color: var(--ink);
 }
 
-.settings__close {
-  display: grid;
-  place-items: center;
-  width: var(--icon-btn-size);
-  height: var(--icon-btn-size);
-  border-radius: var(--radius-sm);
-  color: var(--ink-3);
-  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
-}
-
-.settings__close:hover {
-  background: var(--bg-field-hi);
-  color: var(--ink);
-}
+/* [V0.3.9] 标题栏右侧的关闭 × 已按用户口径移除，`.settings__close` 规则随之删除 */
 
 .settings__tabs {
   padding: var(--space-3) var(--panel-pad) 0;
@@ -119,32 +107,6 @@
   box-shadow: var(--inset-top);
 }
 
-/* ------------------------------ 空态 ------------------------------ */
-.empty-block {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-6) var(--space-4);
-  text-align: center;
-}
-
-.empty-block__icon {
-  color: var(--ink-4);
-}
-
-.empty-block__title {
-  margin: 0;
-  font-size: var(--text-body);
-  color: var(--ink-2);
-}
-
-.empty-block__hint {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--ink-3);
-}
-
 /* ------------------------------ 按钮补充档 ------------------------------ */
 .btn--sm {
   height: var(--btn-sm-h);
@@ -166,7 +128,7 @@
 
 /* =============================================================================
  * 独立设置窗（label=settings，decorations:false / transparent:true）
- *   app.css 默认按主窗 384×360 设定 html/body/#root；此处按 data-window 覆写为 100vw/vh。
+ *   app.css 的根按 100% 铺满视口；此窗口再按 data-window 显式钉一遍 100vw/vh（独立窗口无画布）。
  *   圆角外壳外的四角保持透明（html 背景置透明，不铺 --bg），避免露出方形透明区。
  * ========================================================================== */
 .win {

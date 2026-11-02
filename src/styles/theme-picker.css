@@ -94,7 +94,9 @@
   flex: 0 0 auto;
   width: 12px;
   height: 12px;
-  border-radius: var(--radius-full);
+  /* [V0.3.3] 预览跟着主环改形状：12px 按 16px 的比例缩放（5 × 12/16 = 3.75px），
+     仍保持 ~31% 圆角观感，不至于缩成圆形（直接用 --ring-radius 会变成 42%）。 */
+  border-radius: calc(var(--ring-radius) * 0.75);
   border: 2px solid var(--preview-accent);
 }
 
@@ -175,7 +177,10 @@
 }
 
 .swatch__hex {
-  width: var(--field-num-w);
+  /* 7 位 hex（#RRGGBB）在 11.5px 等宽下约 48px，加上左右各 10px 内边距需要 68px。
+     原先套用 --field-num-w（54px，那是给倒计时分钟数用的），hex 会被截成「#4DA3」，
+     看起来像色值没显示出来。 */
+  width: 68px;
   height: 26px;
   padding: 0 10px;
   border-radius: var(--radius-sm);

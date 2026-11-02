@@ -2,10 +2,13 @@
 
 pub mod common;
 pub mod constants;
-pub mod diary;
 pub mod enums;
 pub mod item;
+pub mod md_sync;
+pub mod moyu;
 pub mod note;
+pub mod nudge;
+pub mod plugin;
 pub mod record;
 pub mod reminder;
 pub mod settings;

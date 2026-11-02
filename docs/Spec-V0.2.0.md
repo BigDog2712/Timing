@@ -87,7 +87,17 @@
 
 > 完整签名与 DTO 见 `src/types/domain.ts`（`IpcApi` 接口）+ `domain-v020.ts`。**实现侧不得在签名之外新增方法。**
 
-**命令总数 52**（V0.1.0 的 29 + V0.2.0 的 23）：
+**Spec 锁定命令总数 52**（V0.1.0 的 29 + V0.2.0 的 23）；**实装 62** —— 下表之外的 10 个为 0.2.4–0.2.10 期间实装但未回写 Spec 的增量，见 `docs/phase2/IPC-CONTRACT-v2.md` §11：
+
+| 增量命令 | 用途 |
+|---|---|
+| `daily_status_get` / `daily_status_set` | 今日计时逐行状态（待办/完成视图） |
+| `diary_get_config` / `diary_set_config` / `diary_today` / `diary_open_today` | Obsidian 日记跳转 |
+| `discard_timer` | 放弃当前会话（不落记录、不触发待办联动） |
+| `get_reference_settings` / `update_reference_settings` | Timing 参考设置读写（仅 `defaultCountdownMinutes` 已消费） |
+| `open_timer_window` | 只读 Timer 窗 |
+
+> 这 10 个命令已进入 `IpcApi` / `generate_handler!` / `ipc.ts` 三处，并由 `npm run check:contract` 守护；Spec 不回写以保留 0.2.0 锁定口径。
 
 | 分组 | 命令 | 数量 |
 |------|------|------|

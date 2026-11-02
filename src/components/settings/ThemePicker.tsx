@@ -1,7 +1,9 @@
 /**
  * TickBar — 主题 / 配色 ThemePicker（theme-picker.md · V0.2.0 新增）
  * -----------------------------------------------------------------------------
- * 两张卡片：主题卡（深色 / 浅色 / 跟随系统）+ 配色卡（四色取色行 + 恢复默认）。
+ * 三张卡片：主题卡（深色 / 浅色 / 跟随系统）+ 配色卡（四色取色行 + 高亮颜色 + 恢复默认）
+ * + [V0.3.3] 显示卡（文字 / 背景不透明度，原在「通用」页签）。
+ * [V0.3.5] 高亮颜色从「显示」卡并入配色卡——颜色类设置集中在同一张卡里。
  * 切换即时反馈：先本地 apply（所见即所得），再落库（theme_set / accent_set）。
  * 对应命令 theme_get/set · accent_get/set | 事件 theme-changed。
  */
@@ -12,6 +14,8 @@ import { errorText } from '../../services/ipc';
 import { themeActions } from '../../services/themeActions';
 import { useThemeStore } from '../../stores/themeStore';
 import type { AccentColors, ThemeMode } from '../../types/domain';
+import { AppearanceCard } from './AppearanceCard';
+import { HighlightColorRow } from './HighlightColorRow';
 import { SwatchRow } from './SwatchRow';
 
 interface ThemeCardDef {
@@ -117,8 +121,13 @@ export function ThemePicker() {
           {SWATCHES.map(({ role, label }) => (
             <SwatchRow key={role} role={role} label={label} colors={accents} disabled={busy} onChange={pickColor} />
           ))}
+          {/* [V0.3.5] 高亮颜色（参考设置，独立存储）与四个主题色同行形制 */}
+          <HighlightColorRow disabled={busy} onError={setError} />
         </div>
       </section>
+
+      {/* [V0.3.3] 显示类设置（文字 / 背景不透明度、高亮颜色）从「通用」迁到本页签 */}
+      <AppearanceCard />
 
       {error && (
         <p className="picker__error" role="alert">

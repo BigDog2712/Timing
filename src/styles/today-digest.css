@@ -12,6 +12,12 @@
   color: var(--ink-2);
 }
 
+/* [ADR-020] 主窗没有画布了：80vh 是「当前窗口高」（由内容决定），用它限高会自我压扁。
+   改用 --fit-h（显示器工作区高），与收缩前的 80vh(360) 观感一致但不再写死。 */
+html[data-window="main"] .today-digest {
+  max-height: min(calc(var(--fit-h) * 0.8), 560px);
+}
+
 .today-digest__head {
   display: flex;
   flex: 0 0 auto;

@@ -26,10 +26,13 @@ pub struct WindowSpec {
     /// 透明底（配合圆角自绘外壳；亦使「早显」为不可见，防白闪，K-18）。
     pub transparent: bool,
     pub skip_taskbar: bool,
+    /// 是否置顶。**[V0.3.3] 起所有窗口恒为 true**——「保持窗口置顶」设置项已删除，
+    /// 不再可切换（ADR-022）；主窗 `main` 由 `tauri.conf.json` 的 `alwaysOnTop: true` 承担。
+    /// 便利贴窗口的**运行期**置顶仍按 `notes.is_pinned` 逐窗切换（独立特性，AC-64）。
     pub always_on_top: bool,
 }
 
-/// 设置面板（单例；392×660，不可缩放，不置顶；ADR-009 §窗口目录 / settings-panel.md §1）。
+/// 设置面板（单例；392×660，不可缩放，恒定置顶；ADR-009 §窗口目录 / settings-panel.md §1）。
 ///
 /// V0.1.0 主窗 `main` 仍由 `tauri.conf.json` 声明，不在此表（避免重复来源）。
 pub const SETTINGS: WindowSpec = WindowSpec {
@@ -47,15 +50,17 @@ pub const SETTINGS: WindowSpec = WindowSpec {
     transparent: true,
     /* [V0.2.8] 设置面板也是浮层，不上任务栏（用户要求「唤起的悬浮菜单不该出现在任务栏」） */
     skip_taskbar: true,
-    always_on_top: false,
+    /* [V0.3.3] 恒定置顶：设置项已删除，不再可切换（ADR-022） */
+    always_on_top: true,
 };
 
-/// 事项窗口（单例）。宽固定 336；高自适应，区间 [360, 560]（限高可缩放）。
+/// 事项窗口（单例）。面板宽 252（V0.3.9 从 336 缩 1/4），窗口另含左侧 240 透明预览区；
+/// 高自适应，区间 [360, 560]（禁止手动缩放）。
 ///
 /// 取值依据：ADR-009 窗口目录 / ARCHITECTURE-V0.2.0 §6.a 登记「宽 336（高自适应，min 360）」
 /// —— min_height 取登记值 360；max_height 取设计稿 `todos-panel.md §1`「最大 ≈560」，默认高
-/// 取 min（内容驱动，前端可向上撑到 560，超出滚动）。`resizable:true` + `min_width==max_width`
-/// 钉死宽度，仅高度可调（与 window-state 跨 DPI 回填配合，K-15）。
+/// 取 min（内容驱动，超出滚动）。窗口所有尺寸都由应用布局决定，用户不可手动调整宽高。
+/// [V0.3.9] 宽度按用户口径缩到原来的 3/4：336 → 252（「事项组件右键唤出的菜单宽度缩小四分之一」）。
 /// 只读计时器窗口（单例）。
 pub const TIMER: WindowSpec = WindowSpec {
     label: "timer",
@@ -74,22 +79,35 @@ pub const TIMER: WindowSpec = WindowSpec {
     always_on_top: true,
 };
 
+/// 事项窗**面板**宽度（逻辑像素）。窗口本身比它宽，见 [`TODOS_PREVIEW_INSET`]。
+pub const TODOS_PANEL_W: f64 = 252.0;
+
+/// 事项窗左侧的**透明预览区**宽度（V0.3.9）。
+///
+/// 用户口径：「事项菜单里悬停在事项上，若该事项有便利贴，应在事项左侧预览便利贴」。
+/// WebView 只能画在窗口内，所以窗口整体向左加宽这段，面板靠右贴住主条原位，
+/// 左边这段透明区在悬停时承载便利贴预览卡（不悬停时完全透明、看不见）。
+pub const TODOS_PREVIEW_INSET: f64 = 240.0;
+
 pub const TODOS: WindowSpec = WindowSpec {
     label: "todos",
     url: "index.html?w=todos",
     title: "TickBar 事项",
-    width: 336.0,
+    /* [V0.3.9] 面板 252 + 左侧预览区 240 = 492。面板仍只占 252，右侧对齐主条左边缘；
+    多出来的 240 是透明区，见 TODOS_PREVIEW_INSET。 */
+    width: TODOS_PANEL_W + TODOS_PREVIEW_INSET,
     height: 360.0,
-    min_width: 336.0,
+    min_width: TODOS_PANEL_W + TODOS_PREVIEW_INSET,
     min_height: 360.0,
-    max_width: 336.0,
+    max_width: TODOS_PANEL_W + TODOS_PREVIEW_INSET,
     max_height: 560.0,
-    resizable: true,
+    resizable: false,
     decorations: false,
     transparent: true,
     /* [V0.2.8] 事项窗同样是浮层：不上任务栏，且指针离开即隐藏（见前端 useWindowLeaveHide） */
     skip_taskbar: true,
-    always_on_top: false,
+    /* [V0.3.3] 恒定置顶：设置项已删除，不再可切换（ADR-022） */
+    always_on_top: true,
 };
 
 /// 便利贴窗口（动态 label `note-{id}`；ADR-009 / sticky-note.md）。

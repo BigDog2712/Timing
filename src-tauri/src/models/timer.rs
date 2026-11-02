@@ -41,17 +41,17 @@ impl TimerState {
 
 /// 倒计时到点结果（`countdown-finished` 事件源；ADR-011）。
 ///
-/// `ended = true` 表示已自动结束（`saved`，时长钳到 target）；`false` 表示「仅通知 + 视觉提示」
-/// （AC-62 默认：会话仍 `active`，不自动结束）。
+/// `ended` 在 V0.3.4 起恒为 `true`（到点一律结束并保存，无开关，ADR-023）；
+/// 字段保留是为了不改事件侧与 watcher 的判定形状。
 #[derive(Debug, Clone)]
 pub struct CountdownFired {
-    /// 会话记录（自动结束为 `saved`；通知模式仍为 `active`）。
+    /// 会话记录（已结束，`saved`）。
     pub record: TimeRecord,
     /// 目标秒数。
     pub target_sec: i64,
     /// 归属事项名（通知文案用；缺失为空串）。
     pub item_name: String,
-    /// 是否已自动结束。
+    /// 是否已自动结束（V0.3.4 起恒 `true`）。
     pub ended: bool,
 }
 
@@ -61,6 +61,19 @@ pub struct CountdownFired {
 pub struct CountdownFinished {
     pub session: TimeRecord,
     pub target_sec: i64,
+}
+
+/// 手动结束计时的结果（`stop_timer` 返回；= `domain.ts::StopResult`）。
+///
+/// [V0.3.4] `discarded = true` 表示这次会话短于「最短记录时长」
+/// （`ReferenceSettings.min_record_seconds`），已按软删除处理：记录不进列表，
+/// 前端也不展示撤销条（ADR-023）。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StopResult {
+    pub record: TimeRecord,
+    /// 低于「最短记录时长」→ 已软删除，前端不展示撤销条
+    pub discarded: bool,
 }
 
 /// 托盘菜单状态快照（ADR-013 §6.e 状态文本口径）。仅供 `infra::tray` 使用，不上 IPC。

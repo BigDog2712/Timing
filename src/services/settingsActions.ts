@@ -2,10 +2,13 @@
  * TickBar — 设置动作（菜单与设置面板共用；唯一改造设置的口径）
  * -----------------------------------------------------------------------------
  * - setAutostart：写/删 HKCU Run，返回**实际生效状态**并回填（AC-21）。
- * - setAlwaysOnTop：先应用到窗口，再持久化 settings.alwaysOnTop。
- * - setOpacityEnabled：更新设置（感知壁纸降级开关）。
+ * - updateReferenceSettings：Timing v1.7.3 参考设置（高亮颜色 / 最短记录时长等）。
  * - openSettings：打开设置入口（Tauri→独立 392×660 单例设置窗；浏览器 dev→主窗内联兜底）。
  * 失败即抛 IpcError，由调用方决定提示/回滚。
+ *
+ * V0.3.3：`setAlwaysOnTop` / `setOpacityEnabled` 随对应设置项下架（窗口恒定置顶，
+ * 感知壁纸开关删除，见 ADR-022）。
+ * V0.3.4：`setCountdownAutoEnd` 随开关下架——倒计时到点恒结束并保存（ADR-023）。
  */
 import { ipc, isTauri } from './ipc';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -16,23 +19,6 @@ export const settingsActions = {
     const actual = await ipc.setAutostart({ enabled });
     useSettingsStore.getState().setSettings({ ...useSettingsStore.getState().settings, autostartEnabled: actual });
     return actual;
-  },
-
-  async setAlwaysOnTop(enabled: boolean): Promise<void> {
-    await ipc.setAlwaysOnTop({ enabled });
-    const settings = await ipc.updateSettings({ patch: { alwaysOnTop: enabled } });
-    useSettingsStore.getState().setSettings(settings);
-  },
-
-  async setOpacityEnabled(enabled: boolean): Promise<void> {
-    const settings = await ipc.updateSettings({ patch: { opacityEnabled: enabled } });
-    useSettingsStore.getState().setSettings(settings);
-  },
-
-  /** [批2 N-6] 倒计时到点「自动结束并保存」开关（默认关；countdown-menu.md §3.3） */
-  async setCountdownAutoEnd(enabled: boolean): Promise<void> {
-    const settings = await ipc.updateSettings({ patch: { countdownAutoEnd: enabled } });
-    useSettingsStore.getState().setSettings(settings);
   },
 
   async updateReferenceSettings(patch: Parameters<typeof ipc.updateReferenceSettings>[0]['patch']): Promise<void> {

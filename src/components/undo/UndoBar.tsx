@@ -2,15 +2,18 @@
  * TickBar — 撤销条 UndoBar（undo-bar.md，AC-05 / AC-06 / AC-07）
  * -----------------------------------------------------------------------------
  * 生命周期严格 = UNDO_WINDOW_MS 3000ms（uiStore.undoDeadline 由 domain 常量算出）。
- * 变体：默认（可撤销）/ 短时计时 < 60s（保存 / 丢弃两选）。
+ *
+ * 形态只有一个：`已记录 <时长> · <事项名>` + 「撤销」。
+ * [V0.3.4] 删除「短记录二选一（保存 / 丢弃）」分支（ADR-023）：短到不值得留的会话
+ * 已在后端按「最短记录时长」直接忽略（`StopResult.discarded`，前端根本拿不到撤销条），
+ * 留下来的记录有 3 秒撤销兜底——再问一次「要留下吗」纯属多一次点击。
+ *
  * 撤销失败（TIMER_NO_UNDO / TIMER_ALREADY_RUNNING）由 useTimerActions 友好提示，
  * 本组件只负责按窗口退场，绝不因失败而崩溃。
  */
 import { useEffect, useState } from 'react';
-import { SHORT_RECORD_SEC } from '../../lib/constants';
 import { formatDuration } from '../../lib/format';
 import { UndoIcon, iconStroke } from '../../lib/icons';
-import { ipc } from '../../services/ipc';
 import { useTimerActions } from '../../hooks/useTimerActions';
 import { itemName, useItemStore } from '../../stores/itemStore';
 import { useUiStore } from '../../stores/uiStore';
@@ -32,7 +35,6 @@ export function UndoBar() {
 
   if (!record) return null;
 
-  const isShort = record.accumulatedSec < SHORT_RECORD_SEC;
   const name = itemName(items, record.itemId);
 
   const handleUndo = async () => {
@@ -44,46 +46,20 @@ export function UndoBar() {
     }
   };
 
-  const handleDiscard = async () => {
-    setBusy(true);
-    try {
-      await ipc.deleteRecord({ id: record.id });
-    } finally {
-      clearUndo();
-      setBusy(false);
-    }
-  };
-
   return (
-    <div className="undo" role="status" data-short={isShort ? 'true' : 'false'}>
-      {isShort ? (
-        <>
-          <span className="undo__text">只记了 {record.accumulatedSec} 秒，要留下吗？</span>
-          <div className="undo__actions">
-            <button type="button" className="undo__btn undo__btn--primary" onClick={clearUndo} disabled={busy}>
-              保存
-            </button>
-            <button type="button" className="undo__btn" onClick={() => void handleDiscard()} disabled={busy}>
-              丢弃
-            </button>
-          </div>
-        </>
-      ) : (
-        <>
-          <span className="undo__text">
-            已记录 <span className="undo__time">{formatDuration(record.accumulatedSec)}</span> · {name}
-          </span>
-          <button
-            type="button"
-            className="undo__btn undo__btn--primary"
-            onClick={() => void handleUndo()}
-            disabled={busy}
-          >
-            <UndoIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
-            撤销
-          </button>
-        </>
-      )}
+    <div className="undo" role="status">
+      <span className="undo__text">
+        已记录 <span className="undo__time">{formatDuration(record.accumulatedSec)}</span> · {name}
+      </span>
+      <button
+        type="button"
+        className="undo__btn undo__btn--primary"
+        onClick={() => void handleUndo()}
+        disabled={busy}
+      >
+        <UndoIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
+        撤销
+      </button>
     </div>
   );
 }

@@ -2,26 +2,24 @@
 
 use std::collections::HashMap;
 
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use sqlx::SqlitePool;
 
-use crate::error::AppResult;
-use crate::infra::clock::now_ms;
+use crate::error::{AppError, AppResult};
 use crate::models::constants::*;
-use crate::models::settings::{
-    ReferenceSettings, ReferenceSettingsPatch, Settings, SettingsPatch, ShortcutMap,
-};
+use crate::models::moyu::{default_presets as default_moyu_presets, normalize_presets, MoyuPreset};
+use crate::models::settings::{ReferenceSettings, ReferenceSettingsPatch, Settings, SettingsPatch};
+use crate::platform::clock::now_ms;
 use crate::repositories::settings as repo;
 use crate::services::theme;
 
 /// 首次读取时写入默认值（schema.sql 尾部登记的键）。
+///
+/// V0.3.3：不再初始化 `ui.always_on_top` / `ui.opacity_enabled` / `shortcut.*`
+/// ——对应设置项已下架（ADR-022），历史库里的旧行保留只读不删。
 pub async fn ensure_defaults(pool: &SqlitePool) -> AppResult<()> {
     let now = now_ms();
-    if repo::get_value(pool, KEY_ALWAYS_ON_TOP).await?.is_none() {
-        repo::set_value(pool, KEY_ALWAYS_ON_TOP, bool_str(true), now).await?;
-    }
-    if repo::get_value(pool, KEY_OPACITY_ENABLED).await?.is_none() {
-        repo::set_value(pool, KEY_OPACITY_ENABLED, bool_str(true), now).await?;
-    }
     if repo::get_value(pool, KEY_LAST_ITEM_ID).await?.is_none() {
         repo::set_value(pool, KEY_LAST_ITEM_ID, &SYSTEM_ITEM_ID.to_string(), now).await?;
     }
@@ -140,21 +138,46 @@ pub async fn get(pool: &SqlitePool) -> AppResult<Settings> {
     let map = repo::get_all(pool).await?;
     Ok(Settings {
         autostart_enabled: flag(&map, KEY_AUTOSTART_ENABLED, false),
-        always_on_top: flag(&map, KEY_ALWAYS_ON_TOP, true),
-        opacity_enabled: flag(&map, KEY_OPACITY_ENABLED, true),
         last_display_id: opt(&map, KEY_LAST_DISPLAY_ID),
-        shortcuts: ShortcutMap {
-            toggle_window: opt(&map, KEY_SHORTCUT_TOGGLE_WINDOW),
-            start_pause: opt(&map, KEY_SHORTCUT_START_PAUSE),
-            stop: opt(&map, KEY_SHORTCUT_STOP),
-            new_item: opt(&map, KEY_SHORTCUT_NEW_ITEM),
-        },
         // [V0.2.0] 主题 / 四色 / 倒计时预设（DTO-03：与 domain.ts 字段一一对应）
         theme_mode: theme::mode(pool).await?,
         accents: theme::accents(pool).await?,
         countdown_presets: theme::presets(pool).await?,
-        countdown_auto_end: countdown_auto_end(pool).await?,
+        // [V0.3.9] 常用摸鱼 / 常用事项框偏好
+        moyu_presets: moyu_presets(pool).await?,
+        items_show_recent: flag(&map, KEY_ITEMS_SHOW_RECENT, true),
+        items_recent_count: clamp_recent_count(
+            opt(&map, KEY_ITEMS_RECENT_COUNT)
+                .and_then(|v| v.parse::<i64>().ok())
+                .unwrap_or(RECENT_ITEMS_DEFAULT),
+        ),
+        items_timers: items_timers(pool).await?,
     })
+}
+
+/// 读取「常用事项默认倒计时」（itemId → 分钟）：键缺失 / JSON 损坏 → 空表。
+/// 超出 1..=1440 分钟或 itemId 非法（<=0）的项直接丢弃，坏数据不该让整份偏好失效。
+pub async fn items_timers(pool: &SqlitePool) -> AppResult<HashMap<i64, i64>> {
+    let raw = read_json::<HashMap<i64, i64>>(pool, KEY_ITEMS_TIMERS)
+        .await?
+        .unwrap_or_default();
+    Ok(normalize_item_timers(raw))
+}
+
+fn normalize_item_timers(map: HashMap<i64, i64>) -> HashMap<i64, i64> {
+    map.into_iter()
+        .filter(|(id, minutes)| {
+            *id > 0 && (ITEM_TIMER_MIN_MINUTES..=ITEM_TIMER_MAX_MINUTES).contains(minutes)
+        })
+        .collect()
+}
+
+/// 读取常用摸鱼：键缺失 / JSON 损坏 → 出厂三条；空数组是合法值（用户删光了）。
+pub async fn moyu_presets(pool: &SqlitePool) -> AppResult<Vec<MoyuPreset>> {
+    match read_json::<Vec<MoyuPreset>>(pool, KEY_MOYU_PRESETS).await? {
+        Some(list) => Ok(normalize_presets(list)),
+        None => Ok(default_moyu_presets()),
+    }
 }
 
 /// 部分更新，返回合并后全量。
@@ -163,32 +186,8 @@ pub async fn update(pool: &SqlitePool, patch: &SettingsPatch) -> AppResult<Setti
     if let Some(v) = patch.autostart_enabled {
         repo::set_value(pool, KEY_AUTOSTART_ENABLED, bool_str(v), now).await?;
     }
-    if let Some(v) = patch.always_on_top {
-        repo::set_value(pool, KEY_ALWAYS_ON_TOP, bool_str(v), now).await?;
-    }
-    if let Some(v) = patch.opacity_enabled {
-        repo::set_value(pool, KEY_OPACITY_ENABLED, bool_str(v), now).await?;
-    }
     if let Some(v) = patch.last_display_id.as_deref() {
         repo::set_value(pool, KEY_LAST_DISPLAY_ID, v, now).await?;
-    }
-    if let Some(map) = patch.shortcuts.as_ref() {
-        write_opt(
-            pool,
-            KEY_SHORTCUT_TOGGLE_WINDOW,
-            map.toggle_window.as_deref(),
-            now,
-        )
-        .await?;
-        write_opt(
-            pool,
-            KEY_SHORTCUT_START_PAUSE,
-            map.start_pause.as_deref(),
-            now,
-        )
-        .await?;
-        write_opt(pool, KEY_SHORTCUT_STOP, map.stop.as_deref(), now).await?;
-        write_opt(pool, KEY_SHORTCUT_NEW_ITEM, map.new_item.as_deref(), now).await?;
     }
     // [V0.2.0] 主题相关字段复用 theme 服务（含 hex 校验与预设归一）
     if let Some(mode) = patch.theme_mode {
@@ -200,8 +199,22 @@ pub async fn update(pool: &SqlitePool, patch: &SettingsPatch) -> AppResult<Setti
     if let Some(presets) = patch.countdown_presets.as_ref() {
         theme::set_presets(pool, presets.clone()).await?;
     }
-    if let Some(enabled) = patch.countdown_auto_end {
-        repo::set_value(pool, KEY_COUNTDOWN_AUTO_END, bool_str(enabled), now).await?;
+    // [V0.3.9] 常用摸鱼整表覆盖（顺序即展示顺序）；偏好标量各自落键
+    if let Some(list) = patch.moyu_presets.as_ref() {
+        let normalized = normalize_presets(list.clone());
+        repo::set_value(pool, KEY_MOYU_PRESETS, &encode_json(&normalized)?, now).await?;
+    }
+    if let Some(v) = patch.items_show_recent {
+        repo::set_value(pool, KEY_ITEMS_SHOW_RECENT, bool_str(v), now).await?;
+    }
+    if let Some(v) = patch.items_recent_count {
+        let clamped = clamp_recent_count(v);
+        repo::set_value(pool, KEY_ITEMS_RECENT_COUNT, &clamped.to_string(), now).await?;
+    }
+    // [V0.3.9] 常用事项默认时长整表覆盖（itemId → 分钟；归一化后再落库）
+    if let Some(map) = patch.items_timers.as_ref() {
+        let normalized = normalize_item_timers(map.clone());
+        repo::set_value(pool, KEY_ITEMS_TIMERS, &encode_json(&normalized)?, now).await?;
     }
     get(pool).await
 }
@@ -219,22 +232,9 @@ pub async fn get_last_item_id(pool: &SqlitePool) -> AppResult<i64> {
         .unwrap_or(SYSTEM_ITEM_ID))
 }
 
-/// 持久化置顶开关。
-pub async fn set_always_on_top(pool: &SqlitePool, enabled: bool) -> AppResult<()> {
-    repo::set_value(pool, KEY_ALWAYS_ON_TOP, bool_str(enabled), now_ms()).await
-}
-
 /// 持久化自启标记（以实际生效状态为准）。
 pub async fn set_autostart_flag(pool: &SqlitePool, enabled: bool) -> AppResult<()> {
     repo::set_value(pool, KEY_AUTOSTART_ENABLED, bool_str(enabled), now_ms()).await
-}
-
-/// 读取倒计时「自动结束并保存」开关（缺省 / 损坏 → false，AC-62 默认关闭）。
-pub async fn countdown_auto_end(pool: &SqlitePool) -> AppResult<bool> {
-    Ok(repo::get_value(pool, KEY_COUNTDOWN_AUTO_END)
-        .await?
-        .map(|v| v == "true")
-        .unwrap_or(false))
 }
 
 /// 持久化窗口位置（逻辑像素，K-6）。
@@ -261,6 +261,18 @@ fn flag(map: &HashMap<String, String>, key: &str, default: bool) -> bool {
     opt(map, key).map(|v| v == "true").unwrap_or(default)
 }
 
-async fn write_opt(pool: &SqlitePool, key: &str, value: Option<&str>, now: i64) -> AppResult<()> {
-    repo::set_value(pool, key, value.unwrap_or(""), now).await
+/// 最近编辑条数钳制到 1..=10。
+fn clamp_recent_count(value: i64) -> i64 {
+    value.clamp(RECENT_ITEMS_MIN, RECENT_ITEMS_MAX)
+}
+
+/// 读取并 JSON 解码单个键；缺失或解码失败返回 `None`。
+async fn read_json<T: DeserializeOwned>(pool: &SqlitePool, key: &str) -> AppResult<Option<T>> {
+    let raw = repo::get_value(pool, key).await?;
+    Ok(raw.and_then(|value| serde_json::from_str::<T>(&value).ok()))
+}
+
+/// JSON 编码（写回 settings KV）。
+fn encode_json<T: Serialize>(value: &T) -> AppResult<String> {
+    serde_json::to_string(value).map_err(AppError::db)
 }

@@ -5,12 +5,12 @@
 
 use sqlx::SqlitePool;
 
-use crate::error::{AppError, AppResult, ErrorCode};
-use crate::infra::clock::now_ms;
+use crate::error::{AppError, AppResult};
 use crate::models::constants::{
     MAX_NOTE_WINDOWS, NOTE_CONTENT_MAX_LEN, NOTE_MAX_H, NOTE_MAX_W, NOTE_MIN_H, NOTE_MIN_W,
 };
 use crate::models::note::{Note, NoteCreateParams, NoteGeometry, NoteGeometryPatch, NotePatch};
+use crate::platform::clock::now_ms;
 use crate::repositories::item as item_repo;
 use crate::repositories::note as repo;
 
@@ -46,8 +46,21 @@ pub async fn list(pool: &SqlitePool, item_id: Option<i64>) -> AppResult<Vec<Note
 }
 
 /// 启动恢复：`is_open=1 AND deleted_at IS NULL` 的便利贴（ADR-009 §5）。
+/// [V0.3.9] 启动**不再**自动重开便利贴（用户口径：不要「默认存在一张」）；
+/// 生产路径无调用点，保留给测试（`cfg(test)`）。
+#[cfg(test)]
 pub async fn list_open(pool: &SqlitePool) -> AppResult<Vec<Note>> {
     repo::list_open(pool).await
+}
+
+/// 启动时把 `is_open` 全部归零（V0.3.9）。
+///
+/// 用户口径：「默认存在一张便利贴，看看是什么原因」——原因是 `restore_notes` 按
+/// `is_open=1` 重开上次没收纳的便利贴，而 `is_open` 只在点黄点收纳时清零，
+/// 退出应用不清零，于是下次启动它就自己冒出来。现在启动不恢复，残留标记会占满
+/// 「最多同时开 20 张」的额度，故一并清掉。
+pub async fn reset_open(pool: &SqlitePool) -> AppResult<u64> {
+    repo::clear_open(pool).await
 }
 
 pub async fn update(pool: &SqlitePool, id: i64, patch: NotePatch) -> AppResult<Note> {
@@ -71,6 +84,7 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: NotePatch) -> AppResult<N
             width,
             height,
         },
+        patch.is_pinned,
         now_ms(),
     )
     .await?;
@@ -111,21 +125,17 @@ pub async fn close(pool: &SqlitePool, id: i64, geom: Option<NoteGeometry>) -> Ap
         },
         None => NoteGeometryPatch::default(),
     };
-    repo::update(pool, id, None, None, geometry, now_ms()).await?;
+    repo::update(pool, id, None, None, geometry, None, now_ms()).await?;
     repo::set_open(pool, id, false, now_ms()).await?;
     fetch_or_not_found(pool, id).await
 }
 
 /// 便利贴正文长度校验（长度上限见 `NOTE_CONTENT_MAX_LEN`；允许为空）。
 ///
-/// 超长无专用错误码（错误码集锁定 16 个），复用 `ITEM_NAME_EMPTY` 并给明确 message
-/// （与待办超长标题同法，绝不静默截断）。
+/// 超长 → `ITEM_NAME_TOO_LONG`（ADR-018），message 写明字段与上限；绝不静默截断。
 fn check_content(raw: &str) -> AppResult<String> {
     if raw.chars().count() > NOTE_CONTENT_MAX_LEN {
-        return Err(AppError::new(
-            ErrorCode::ItemNameEmpty,
-            format!("便利贴正文长度不能超过 {NOTE_CONTENT_MAX_LEN} 字"),
-        ));
+        return Err(AppError::text_too_long("便利贴正文", NOTE_CONTENT_MAX_LEN));
     }
     Ok(raw.to_string())
 }

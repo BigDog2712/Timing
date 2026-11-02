@@ -3,7 +3,10 @@
 //! 断言来源：`ADR-009`（窗口目录）、`ARCHITECTURE-V0.2.0 §6.a`、
 //! `docs/design/pages-V0.2.0/{settings-panel,todos-panel,sticky-note}.md`。
 
-use crate::infra::window_spec::{note_label, spec_for, NOTE, NOTE_LABEL_PREFIX, SETTINGS, TODOS};
+use crate::infra::window_spec::{
+    note_label, spec_for, NOTE, NOTE_LABEL_PREFIX, SETTINGS, TODOS, TODOS_PANEL_W,
+    TODOS_PREVIEW_INSET,
+};
 
 #[test]
 fn settings_spec_matches_adr_009() {
@@ -15,7 +18,10 @@ fn settings_spec_matches_adr_009() {
         spec.min_width <= spec.width && spec.min_height <= spec.height,
         "最小尺寸不应大于默认尺寸"
     );
-    assert!(!spec.always_on_top, "设置窗不置顶");
+    assert!(
+        spec.always_on_top,
+        "V0.3.3 起恒定置顶（ADR-022，开关已删除）"
+    );
 }
 
 /// 固定尺寸窗不变量：min == max == 尺寸（防 window-state 物理像素回填后在跨 DPI 显示器漂移，K-15）。
@@ -75,23 +81,31 @@ fn unknown_label_has_no_spec() {
     assert!(spec_for("settings-extra").is_none(), "未登记 label 不匹配");
 }
 
-/// 事项窗口（V0.2.0 批 1 · B2）：宽 336、高自适应 [360, 560]、限高可缩放。
+/// 事项窗口：面板宽 252（V0.3.9 从 336 缩 1/4），窗口另含左侧 240 透明预览区（合计 492）；
+/// 高自适应 [360, 560]、不可手动缩放。
 /// 断言来源：ADR-009 窗口目录 / ARCHITECTURE-V0.2.0 §6.a；max 高取 todos-panel.md §1。
 #[test]
 fn todos_spec_matches_adr_009() {
     let spec = spec_for("todos").expect("todos 应已登记");
+    let total = TODOS_PANEL_W + TODOS_PREVIEW_INSET;
     assert_eq!(spec.label, "todos", "label 固定");
-    assert_eq!(spec.width, 336.0, "宽固定 336");
-    assert_eq!(spec.width, spec.min_width, "宽度下限 = 336");
-    assert_eq!(spec.width, spec.max_width, "宽度上限 = 336（不可横向缩放）");
+    assert_eq!(spec.width, total, "窗口宽 = 面板 252 + 预览区 240");
+    assert_eq!(spec.width, spec.min_width, "宽度下限 = 总宽");
+    assert_eq!(
+        spec.width, spec.max_width,
+        "宽度上限 = 总宽（不可横向缩放）"
+    );
     assert_eq!(spec.min_height, 360.0, "登记值 min 高 360");
     assert_eq!(spec.max_height, 560.0, "设计稿最大高 560");
     assert!(
         spec.min_height <= spec.height && spec.height <= spec.max_height,
         "默认高应落在 [min, max]"
     );
-    assert!(spec.resizable, "事项窗允许缩放（限高）");
-    assert!(!spec.always_on_top, "事项窗不置顶");
+    assert!(!spec.resizable, "事项窗不可手动缩放");
+    assert!(
+        spec.always_on_top,
+        "V0.3.3 起恒定置顶（ADR-022，开关已删除）"
+    );
     assert!(
         spec.url.contains("w=todos"),
         "应按 label 路由：{}",
@@ -181,4 +195,16 @@ fn note_url_routes_to_note_view() {
         NOTE.url
     );
     assert!(NOTE.url.contains("w=note"), "应按 label 路由：{}", NOTE.url);
+}
+
+/// [V0.3.3] 恒定置顶不变量：「保持窗口置顶」开关已删除，所有窗口规格一律置顶（ADR-022）。
+///
+/// 主窗 `main` 不在本表（由 `tauri.conf.json` 的 `alwaysOnTop: true` 承担），
+/// 便利贴的**运行期**开关仍走 `notes.is_pinned`（独立特性，AC-64）。
+#[test]
+fn every_window_spec_is_always_on_top() {
+    for label in ["settings", "todos", "timer", "note-1"] {
+        let spec = spec_for(label).unwrap_or_else(|| panic!("{label} 应已登记"));
+        assert!(spec.always_on_top, "{label} 应恒定置顶（ADR-022）");
+    }
 }

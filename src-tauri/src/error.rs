@@ -4,22 +4,35 @@
 use serde::ser::{SerializeStruct, Serializer};
 use serde::Serialize;
 
-/// 统一错误码（V0.1.0 的 11 + V0.2.0 新增 5，共 16）。
+/// 统一错误码（V0.1.0 的 11 + V0.2.0 新增 5 + V0.3.0 新增 1 − V0.3.1 下架 1
+/// − V0.3.3 下架 1 + V0.4.0 新增 1，共 16）。
 ///
 /// V0.2.0 五码已全部接线（`TODO_NOT_FOUND` 随待办域；`NOTE_NOT_FOUND` /
 /// `WINDOW_LIMIT_EXCEEDED` / `INVALID_TARGET_SEC` 随批 2 便利贴与倒计时；
 /// `INVALID_COLOR` 随主题域）。
+///
+/// **V0.3.0 破例说明（ADR-018）**：此前「错误码集锁定 16 个、不得越权加第 17 码」，
+/// 导致「文本超长」只能借用 `ITEM_NAME_EMPTY`——前端拿到「名称不能为空」的提示去修
+/// 一个「名字太长」的问题，属于**语义错配**（表单会高亮到错误的分支）。V0.3.0 起
+/// 增设 `ITEM_NAME_TOO_LONG`，把「空」与「超长」两类校验失败分开；闭集规则不变，
+/// 只是基数从 16 变 17，新增仍须走一次契约评审。
+///
+/// **V0.3.1 下架 `ITEM_NAME_DUPLICATE`（ADR-021）**：事项改为允许同名，唯一性校验从
+/// `services/item.rs` 整体移除，该码不再有触发点。**下架同样是一次契约变更**——闭集
+/// 里留一个永远返回不了的码，等于给调用方假的失败契约。基数回到 16。
+///
+/// **V0.3.3 下架 `SHORTCUT_REGISTER_FAILED`（ADR-022）**：全局快捷键整体下线
+/// （`register_shortcut` 命令、`infra/shortcuts.rs`、`Settings.shortcuts`、
+/// `shortcut:triggered` 事件一并删除），该码不再有任何触发点。基数 16 → 15。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorCode {
     DbError,
     ItemNotFound,
     ItemNameEmpty,
-    ItemNameDuplicate,
     ItemSystemProtected,
     TimerAlreadyRunning,
     TimerNotRunning,
     TimerNoUndo,
-    ShortcutRegisterFailed,
     InvalidDuration,
     IoError,
     /* [V0.2.0] */
@@ -28,6 +41,10 @@ pub enum ErrorCode {
     WindowLimitExceeded,
     InvalidTargetSec,
     InvalidColor,
+    /* [V0.3.0] */
+    ItemNameTooLong,
+    /* [V0.4.0] */
+    MdSyncConfigInvalid,
 }
 
 impl ErrorCode {
@@ -37,12 +54,10 @@ impl ErrorCode {
             ErrorCode::DbError => "DB_ERROR",
             ErrorCode::ItemNotFound => "ITEM_NOT_FOUND",
             ErrorCode::ItemNameEmpty => "ITEM_NAME_EMPTY",
-            ErrorCode::ItemNameDuplicate => "ITEM_NAME_DUPLICATE",
             ErrorCode::ItemSystemProtected => "ITEM_SYSTEM_PROTECTED",
             ErrorCode::TimerAlreadyRunning => "TIMER_ALREADY_RUNNING",
             ErrorCode::TimerNotRunning => "TIMER_NOT_RUNNING",
             ErrorCode::TimerNoUndo => "TIMER_NO_UNDO",
-            ErrorCode::ShortcutRegisterFailed => "SHORTCUT_REGISTER_FAILED",
             ErrorCode::InvalidDuration => "INVALID_DURATION",
             ErrorCode::IoError => "IO_ERROR",
             ErrorCode::NoteNotFound => "NOTE_NOT_FOUND",
@@ -50,6 +65,8 @@ impl ErrorCode {
             ErrorCode::WindowLimitExceeded => "WINDOW_LIMIT_EXCEEDED",
             ErrorCode::InvalidTargetSec => "INVALID_TARGET_SEC",
             ErrorCode::InvalidColor => "INVALID_COLOR",
+            ErrorCode::ItemNameTooLong => "ITEM_NAME_TOO_LONG",
+            ErrorCode::MdSyncConfigInvalid => "MD_SYNC_CONFIG_INVALID",
         }
     }
 }
@@ -92,10 +109,17 @@ impl AppError {
         Self::new(ErrorCode::ItemNameEmpty, "事项名称不能为空")
     }
 
-    pub fn item_name_duplicate(name: &str) -> Self {
+    /// [V0.3.0] 文本字段超出上限（`ITEM_NAME_TOO_LONG`）。
+    ///
+    /// 参数化 `field` / `max` 是为了让三个调用点（事项名 / 待办标题 / 便利贴正文）
+    /// 共用一条 message 模板，同时各自说清「哪个字段、多少字上限」——
+    /// 前端拿到 code 后走「超长」分支，message 直接可展示，不必再拼。
+    ///
+    /// 建码动机见 `ErrorCode` 的 V0.3.0 破例说明与 `docs/decisions/ADR-018.md`。
+    pub fn text_too_long(field: &str, max: usize) -> Self {
         Self::new(
-            ErrorCode::ItemNameDuplicate,
-            format!("已存在同名事项「{name}」"),
+            ErrorCode::ItemNameTooLong,
+            format!("{field}长度不能超过 {max} 字"),
         )
     }
 
@@ -153,15 +177,31 @@ impl AppError {
         Self::new(ErrorCode::InvalidColor, "颜色值非法，须为 #RRGGBB 格式")
     }
 
-    /// [P1] 全局快捷键注册失败（热键被占用 / 加速键非法）。
-    #[allow(dead_code)]
-    pub fn shortcut_failed(msg: impl Into<String>) -> Self {
-        Self::new(ErrorCode::ShortcutRegisterFailed, msg)
+    /// [V0.4.0] Markdown 同步落点配置不合法（插件 API v2 / md-sync）。
+    pub fn md_sync_config_invalid(message: impl Into<String>) -> Self {
+        Self::new(
+            ErrorCode::MdSyncConfigInvalid,
+            format!("同步设置不合法：{}", message.into()),
+        )
     }
 }
 
 impl Serialize for AppError {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        /* [V0.4.1] 这里是**命令错误回到前端的唯一收口**——65 条命令的 `Err` 都要经过
+        一次序列化，所以日志只在这一处埋点就能覆盖全部 IPC 失败，不用在 65 个
+        command 里各写一遍（写了也一定会漏）。
+
+        分级口径（此前 0 条 ERROR 级日志，所有失败都是 WARN，真故障会被淹掉）：
+        - 基础设施类（`DB_ERROR` / `IO_ERROR`）：用户看不出原因、必须留痕 → ERROR；
+        - 业务校验类（找不到、名字为空、时长非法…）：界面已经给出明确提示 →
+          只在 `TICKBAR_LOG=debug` 时记 DEBUG，避免把正常操作刷成告警。 */
+        match self.code {
+            ErrorCode::DbError | ErrorCode::IoError => {
+                crate::log_error!("ipc {}: {}", self.code.as_str(), self.message)
+            }
+            _ => crate::log_debug!("ipc {}: {}", self.code.as_str(), self.message),
+        }
         let mut state = serializer.serialize_struct("AppError", 2)?;
         state.serialize_field("code", self.code.as_str())?;
         state.serialize_field("message", &self.message)?;

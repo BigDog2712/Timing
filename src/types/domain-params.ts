@@ -7,7 +7,8 @@
  *      调用方仍 `from './types/domain'` 引入即可，无需改动。
  * -----------------------------------------------------------------------------
  */
-import type { EpochMs, ResolveAction, Seconds, Settings, ShortcutAction, SwitchMode } from './domain';
+import type { EpochMs, Seconds } from './domain/constants';
+import type { ResolveAction, Settings, SwitchMode } from './domain/models';
 
 export interface ListItemsParams {
   /** 是否包含已归档事项；默认 false */
@@ -104,6 +105,11 @@ export interface ResolveOpenRecordParams {
   action: ResolveAction;
   /** 仅 action='close' 时有意义；省略 = now */
   endAt?: EpochMs;
+  /**
+   * [V0.4.2] 把「退出期间」（最后一次落盘 → 结束/现在）并入累计。
+   * 省略 = false（R-2：应用关着就停表）；暂停中崩溃时后端忽略此开关。
+   */
+  includeGap?: boolean;
 }
 
 export interface UpdateSettingsParams {
@@ -111,15 +117,6 @@ export interface UpdateSettingsParams {
 }
 
 export interface SetAutostartParams {
-  enabled: boolean;
-}
-
-export interface RegisterShortcutParams {
-  action: ShortcutAction;
-  accelerator: string;
-}
-
-export interface SetAlwaysOnTopParams {
   enabled: boolean;
 }
 

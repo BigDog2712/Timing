@@ -1,0 +1,137 @@
+/* =============================================================================
+ * TickBar — settings-plugins.css（设置 · 插件页签，V0.3.4 由「扩展」改名）
+ * -----------------------------------------------------------------------------
+ * 从 settings-panel.css 拆出（单文件 ≤300 行纪律，同 theme-picker.css 的做法）。
+ * 消费规则：只引用 var(--*)，无裸色值。组件的类名/结构见 PluginsTab.tsx。
+ * ========================================================================== */
+
+/* ------------------------------ 插件（V0.3.4 由「扩展」改名） ------------------------------ */
+/* 原「暂无扩展」空态在 V0.3.2 被删过（当时认为内置包恒在、不存在空列表）；
+   V0.3.4 不再展示任何内置功能，没有插件时列表**真的**会空，故补回 `.plg__empty`。 */
+.plg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.plg__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.plg__path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plg__btn {
+  flex: none;
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+}
+
+.plg__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plg__item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+}
+
+/* 载入失败的行用 danger 描边：一眼能挑出来，不必逐行读原因 */
+.plg__item[data-broken="true"] {
+  border-color: var(--danger);
+}
+
+.plg__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.plg__name {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.plg__tag {
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-seg-on);
+  font-size: var(--text-cap);
+  color: var(--ink-3);
+}
+
+.plg__ver {
+  font-size: var(--text-cap);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+}
+
+.plg__desc,
+.plg__meta,
+.plg__hint,
+.plg__error {
+  margin: 0;
+  font-size: var(--text-cap);
+}
+
+.plg__desc {
+  color: var(--ink-3);
+}
+
+.plg__meta,
+.plg__hint {
+  color: var(--ink-4);
+}
+
+.plg__hint {
+  line-height: 1.5;
+}
+
+/* 空列表说明：没有插件时不留白屏，直接告诉用户下一步做什么 */
+.plg__empty {
+  margin: 0;
+  padding: var(--space-3) 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+.plg__error {
+  color: var(--danger);
+}
+
+/* 插件来源目录：同 id 放两处时，一眼看出这份是从哪读来的 */
+.plg__dir {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

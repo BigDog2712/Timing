@@ -2,10 +2,24 @@
 
 use sqlx::SqlitePool;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::models::record::TimeRecord;
 
 use super::record::COLS;
+
+/// 把 `uq_records_open` 的唯一索引冲突翻成业务错误码。
+///
+/// `start` 是「先查 active、再 insert」两步，两个并发调用可能都查到空，
+/// 第二条 insert 撞唯一索引。若原样冒泡就是 `DB_ERROR`，前端只能提示「数据库操作失败」；
+/// 这里识别唯一冲突并返回 `TIMER_ALREADY_RUNNING`，与串行路径同一语义。
+fn active_conflict(err: sqlx::Error) -> AppError {
+    if let sqlx::Error::Database(db) = &err {
+        if db.is_unique_violation() {
+            return AppError::timer_already_running();
+        }
+    }
+    err.into()
+}
 
 /// 查询全局唯一 active 会话（排除已软删除）。
 pub async fn find_active(pool: &SqlitePool) -> AppResult<Option<TimeRecord>> {
@@ -31,7 +45,8 @@ pub async fn insert_active(pool: &SqlitePool, item_id: i64, now: i64) -> AppResu
     .bind(now)
     .bind(now)
     .fetch_one(pool)
-    .await?;
+    .await
+    .map_err(active_conflict)?;
     Ok(id)
 }
 
@@ -54,7 +69,8 @@ pub async fn insert_active_countdown(
     .bind(now)
     .bind(now)
     .fetch_one(pool)
-    .await?;
+    .await
+    .map_err(active_conflict)?;
     Ok(id)
 }
 
@@ -99,9 +115,12 @@ pub async fn finalize(
     .bind(id)
     .execute(&mut *tx)
     .await?;
-    if saved.rows_affected() == 1 {
-        super::todo::soft_delete_for_saved_record(&mut tx, id, now).await?;
+    if saved.rows_affected() != 1 {
+        // 事务未 commit 即返回：tx 被 drop 时自动回滚。
+        // 0 行说明会话已被别处结束（双击结束、并发 stop），不能让调用方以为保存成功。
+        return Err(AppError::timer_not_running());
     }
+    super::todo::soft_delete_for_saved_record(&mut tx, id, now).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -134,13 +153,26 @@ pub async fn set_item_id(pool: &SqlitePool, id: i64, item_id: i64, now: i64) -> 
     Ok(())
 }
 
-/// 丢弃 active 会话：置 saved + ended_at + 软删除（释放单 active 唯一槽，R-5）。
-pub async fn discard(pool: &SqlitePool, id: i64, ended_at: i64, now: i64) -> AppResult<()> {
+/// 丢弃 active 会话：置 saved + 折入累计 + ended_at + 软删除（释放单 active 唯一槽，R-5）。
+///
+/// `accumulated_sec` 必须由调用方给出真实值（`live_duration`）：早先这里不写这一列，
+/// 被丢弃的行会留下「`accumulated_sec=0` 却 `ended_at - started_at = 12 分钟`」的脏数据。
+/// 当前所有查询都过滤 `deleted_at`，所以它暂时不可见——但一旦有人写"回收站 / 统计全量"
+/// 就会读到假数据。软删不等于可以留脏值。
+pub async fn discard(
+    pool: &SqlitePool,
+    id: i64,
+    accumulated_sec: i64,
+    ended_at: i64,
+    now: i64,
+) -> AppResult<()> {
     sqlx::query(
         "UPDATE time_records \
-         SET status = 'saved', ended_at = ?, running_since = NULL, deleted_at = ?, updated_at = ? \
+         SET status = 'saved', accumulated_sec = ?, ended_at = ?, running_since = NULL, \
+             deleted_at = ?, updated_at = ? \
          WHERE id = ? AND status = 'active'",
     )
+    .bind(accumulated_sec)
     .bind(ended_at)
     .bind(now)
     .bind(now)
@@ -151,6 +183,12 @@ pub async fn discard(pool: &SqlitePool, id: i64, ended_at: i64, now: i64) -> App
 }
 
 /// 分段换事项：事务内结束旧会话并新开一条 active，返回新 id。
+///
+/// `discard_old = true` 时旧会话按**软删**处理（`deleted_at` 落盘、不联动待办）：
+/// 调用方判定旧段短于「最短记录时长」，这段不该出现在记录列表里（ADR-023）。
+/// 两条路径都写真实的 `accumulated_sec`——软删不等于可以留脏值。
+///
+/// 无论旧段留下还是被丢弃，新会话都照常创建：切换事项不能因为旧段太短而中断。
 pub async fn end_and_start(
     pool: &SqlitePool,
     old_id: i64,
@@ -158,20 +196,28 @@ pub async fn end_and_start(
     accumulated_sec: i64,
     ended_at: i64,
     now: i64,
+    discard_old: bool,
 ) -> AppResult<i64> {
     let mut tx = pool.begin().await?;
+    let deleted_at: Option<i64> = if discard_old { Some(now) } else { None };
     let saved = sqlx::query(
         "UPDATE time_records \
-         SET status = 'saved', ended_at = ?, accumulated_sec = ?, running_since = NULL, updated_at = ? \
+         SET status = 'saved', ended_at = ?, accumulated_sec = ?, running_since = NULL, \
+             deleted_at = ?, updated_at = ? \
          WHERE id = ? AND status = 'active' AND deleted_at IS NULL",
     )
     .bind(ended_at)
     .bind(accumulated_sec)
+    .bind(deleted_at)
     .bind(now)
     .bind(old_id)
     .execute(&mut *tx)
     .await?;
-    if saved.rows_affected() == 1 {
+    if saved.rows_affected() != 1 {
+        // 旧会话已不在 active（并发结束）：不要用新分段掩盖掉这次失败
+        return Err(AppError::timer_not_running());
+    }
+    if !discard_old {
         super::todo::soft_delete_for_saved_record(&mut tx, old_id, now).await?;
     }
     let new_id: i64 = sqlx::query_scalar(

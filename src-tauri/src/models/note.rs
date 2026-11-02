@@ -42,6 +42,11 @@ pub struct Note {
     pub height: f64,
     /// 窗口当前是否打开（启动据此恢复，K-14）。
     pub is_open: bool,
+    /// 是否置顶（`always_on_top`；AC-64 默认 true，ADR-019 起持久化）。
+    ///
+    /// 语义是**窗口层级**而非列表排序：true → 便利贴浮在普通窗口之上；
+    /// 用户主动取消后落 0，重开窗口沿用该值。
+    pub is_pinned: bool,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -77,6 +82,9 @@ pub struct NotePatch {
     pub width: Option<f64>,
     #[serde(default)]
     pub height: Option<f64>,
+    /// 置顶开关（AC-64）。缺省 = 不改；由窗口层 `set_always_on_top` 即时生效。
+    #[serde(default)]
+    pub is_pinned: Option<bool>,
 }
 
 /// 区分「字段缺省」（`None`）与「显式 null」（`Some(None)`）。

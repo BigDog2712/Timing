@@ -1,7 +1,7 @@
 //! Daily status validation, date isolation, and timer/todo transaction rollback.
 
 use crate::error::ErrorCode;
-use crate::infra::clock::now_ms;
+use crate::platform::clock::now_ms;
 use crate::repositories::record_session;
 use crate::services::{daily_status, todo};
 use crate::tests::support::{expect_err, fresh_pool, new_item, scalar_i64};
@@ -61,7 +61,8 @@ async fn failed_segment_save_rolls_back_todo_soft_delete() {
         .await
         .unwrap();
 
-    let result = record_session::end_and_start(&pool, record_id, 9999, 1, now + 1, now + 1).await;
+    let result =
+        record_session::end_and_start(&pool, record_id, 9999, 1, now + 1, now + 1, false).await;
     assert!(result.is_err(), "nonexistent next item must fail its FK");
     assert_eq!(
         scalar_i64(

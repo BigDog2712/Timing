@@ -18,6 +18,18 @@ pub const MAX_PAGE_SIZE: i64 = 100;
 /// 备注最大长度（字符）。
 pub const NOTE_MAX_LEN: usize = 500;
 
+/// 事项名称最大长度（字符）。
+///
+/// [V0.3.0] 此前**只有前端**限制（`ItemPicker` / `InlineNameEntry` 的 `maxLength=60`），
+/// 后端不校验 —— 绕过 UI 直接调 IPC 可以存进任意长的名字，而托盘菜单会按显示宽度
+/// 截断（`infra/tray_menu.rs`），数据与展示就此不一致。此处补上后端同值校验，
+/// 超长 → `ITEM_NAME_TOO_LONG`（ADR-018）。
+pub const ITEM_NAME_MAX_LEN: usize = 60;
+
+/// [V0.4.0] Markdown 同步轮询间隔（秒）。文件监听在 Windows 上要额外依赖 + 处理
+/// 编辑器「先写临时文件再替换」的原子写，轮询 2s 足够便宜也足够跟手。
+pub const MD_SYNC_POLL_SECS: u64 = 2;
+
 /// 待办标题最大长度（字符，schema-V0.2.0 §todos.title / domain-v020.ts:100「长度 1-200」）。
 pub const TODO_TITLE_MAX_LEN: usize = 200;
 
@@ -29,6 +41,24 @@ pub const FLUSH_INTERVAL_SECS: u64 = 15;
 
 /// 倒计时预设上限（个）。
 pub const COUNTDOWN_PRESETS_MAX: usize = 8;
+
+/* V0.3.9 常用摸鱼（应用内置预设）+ 常用事项框偏好 */
+/// 常用摸鱼条目上限（个）。超出按顺序截断，避免菜单无限长。
+pub const MOYU_PRESET_MAX: usize = 20;
+/// 常用摸鱼名称最大长度（字符，与 `MoyuCustom` 输入框 maxLength 一致）。
+pub const MOYU_PRESET_NAME_MAX_LEN: usize = 40;
+/// 摸鱼时长下限（分钟，与前端 `MOYU_MIN_MINUTES` 同值）。
+pub const MOYU_MIN_MINUTES: i64 = 1;
+/// 摸鱼时长上限（分钟）= 24h，与 `MAX_COUNTDOWN_SEC` 对齐。
+pub const MOYU_MAX_MINUTES: i64 = MAX_COUNTDOWN_SEC / 60;
+/// 常用事项框「最近编辑」条数范围与默认值。
+pub const RECENT_ITEMS_MIN: i64 = 1;
+pub const RECENT_ITEMS_MAX: i64 = 10;
+pub const RECENT_ITEMS_DEFAULT: i64 = 5;
+/// [V0.3.9] 常用事项的「默认倒计时」时长范围（分钟）：
+/// 设了就点它起倒计时，没设就是正计时。上限同样对齐 24h。
+pub const ITEM_TIMER_MIN_MINUTES: i64 = 1;
+pub const ITEM_TIMER_MAX_MINUTES: i64 = MAX_COUNTDOWN_SEC / 60;
 
 /* V0.2.0 批 2 常量（ADR-009 / ADR-010 / ADR-011） */
 /// 便利贴窗口数上限（内存护栏，K-14）。超限 `open_note_window` → `WINDOW_LIMIT_EXCEEDED`。
@@ -48,21 +78,30 @@ pub const MAX_COUNTDOWN_SEC: i64 = 86400;
 /// 后台提醒扫描间隔（秒；查询式扫描，天然抗休眠，ADR-010）。
 pub const REMINDER_SCAN_INTERVAL_SECS: u64 = 15;
 
+/// 待办「轻提醒」提前量（毫秒）：开始前 15 分钟 —— 浮出卡问「要不要改时间」（V0.3.12）。
+pub const TODO_LIGHT_LEAD_MS: i64 = 15 * 60 * 1000;
+
+/// 待办「自动开始」询问提前量（毫秒）：开始前 5 分钟 —— 问「当前结束后自动开始？」。
+pub const TODO_START_LEAD_MS: i64 = 5 * 60 * 1000;
+
+/// 待办提醒的过期宽限（毫秒）：到点后超过这个时长就不再补弹。
+///
+/// 关机 / 休眠一晚上后，昨天的待办不该在启动瞬间连着弹两条提醒，更不该自动开始计时；
+/// 超过宽限的直接标成「已处理」（stage=2）并静默跳过（`todo_nudge::expire`）。
+pub const TODO_NUDGE_GRACE_MS: i64 = 10 * 60 * 1000;
+
 /// 倒计时到点判定间隔（秒；1s watcher，ADR-011）。
 pub const COUNTDOWN_WATCH_INTERVAL_SECS: u64 = 1;
 
-/* settings 键名（schema.sql 尾部登记） */
+/* settings 键名（schema.sql 尾部登记）
+[V0.3.3] 下架的键：`ui.always_on_top`（窗口恒定置顶）、`ui.opacity_enabled`（感知壁纸）、
+`shortcut.*` 四键（全局快捷键）。常量一并删除——数据库里残留的行没人再读即无害，
+历史迁移文件不改（ADR-022）。 */
 pub const KEY_AUTOSTART_ENABLED: &str = "autostart.enabled";
-pub const KEY_ALWAYS_ON_TOP: &str = "ui.always_on_top";
-pub const KEY_OPACITY_ENABLED: &str = "ui.opacity_enabled";
 pub const KEY_LAST_DISPLAY_ID: &str = "ui.last_display_id";
 pub const KEY_LAST_ITEM_ID: &str = "ui.last_item_id";
 pub const KEY_WINDOW_X: &str = "ui.window_x";
 pub const KEY_WINDOW_Y: &str = "ui.window_y";
-pub const KEY_SHORTCUT_TOGGLE_WINDOW: &str = "shortcut.toggle_window";
-pub const KEY_SHORTCUT_START_PAUSE: &str = "shortcut.start_pause";
-pub const KEY_SHORTCUT_STOP: &str = "shortcut.stop";
-pub const KEY_SHORTCUT_NEW_ITEM: &str = "shortcut.new_item";
 
 /* V0.2.0 新增 settings 键（schema-V0.2.0.sql §第二部分） */
 pub const KEY_THEME_MODE: &str = "theme.mode";
@@ -71,11 +110,16 @@ pub const KEY_ACCENT_WARN: &str = "accent.warn";
 pub const KEY_ACCENT_DONE: &str = "accent.done";
 pub const KEY_ACCENT_BAR: &str = "accent.bar";
 pub const KEY_COUNTDOWN_PRESETS: &str = "countdown.presets";
-/// [V0.2.0 批 2] 倒计时到点「自动结束并保存」开关（bool，默认 false = 仅通知 + 视觉提示，AC-62）。
-/// 键值表无 DDL，缺省即回落默认（不需要迁移）。
-pub const KEY_COUNTDOWN_AUTO_END: &str = "countdown.auto_end";
-
-pub const KEY_REFERENCE_SETTINGS: &str = "timing.reference_settings";
+/* V0.3.9 常用摸鱼 / 常用事项框偏好（均为 settings KV，JSON 或标量） */
+pub const KEY_MOYU_PRESETS: &str = "moyu.presets";
+pub const KEY_ITEMS_SHOW_RECENT: &str = "items.show_recent";
+pub const KEY_ITEMS_RECENT_COUNT: &str = "items.recent_count";
+/// [V0.3.9] 常用事项的默认倒计时时长：JSON 对象 `{ "<itemId>": 分钟 }`。
+/// 不建表——它只是「这个事项点下去要多长时间」的偏好，跟 is_pinned / sort_order 一样属于 UI 偏好，
+/// 事项被删后残留的 key 在读取时按无效值丢弃，无需级联清理。
+pub const KEY_ITEMS_TIMERS: &str = "items.timers";
+/* [V0.3.4] 原 `KEY_COUNTDOWN_AUTO_END = "countdown.auto_end"` 已删除：
+倒计时到点恒结束并保存，不再有开关（ADR-023）。历史库里那一行只读不删。 */
 
 /* V0.2.0 默认值（**唯一**允许出现色值字面量的位置；组件 / 服务层一律引用此处，禁裸 hex，DTO-05） */
 /// 主题模式默认值（"dark" | "light" | "system"）。

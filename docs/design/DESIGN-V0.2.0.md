@@ -372,7 +372,7 @@ CSS：`.bar { width: auto } .bar .task { flex: 0 1 auto; max-width: var(--task-w
 
 | 窗口 / 元素 | 尺寸 |
 |---|---|
-| 小条置顶层 | 384×360 DIP（透明，永不 resize；容纳悬停板 / 菜单） |
+| 小条置顶层 | 画布 384×360 DIP（透明；容纳悬停板 / 菜单）。**OS 窗口不钉死 384×360**：真实窗口由 `useWindowAutoFit` 收缩到可见内容包围盒，画布坐标不变（ADR-014） |
 | 小条 | 高 34 / 宽 116–288 |
 | 设置面板 | 392×660（标题 50 / 页签 48 / 底栏 58 / 内容区 504） |
 | 事项窗口 | 宽 336（高自适应；表头 32 / 行 26 / 待办行 24（上限 8）/ 底栏 40） |
@@ -421,7 +421,7 @@ CSS：`.bar { width: auto } .bar .task { flex: 0 1 auto; max-width: var(--task-w
 
 1. **板式拟玻璃 = 高不透明度板（菜单 `94%` / 便利贴 `97%`）+ 文字 100% 不透明**。可读性由此**静态保证**（这正是 Timing §1 第 11 条硬伤的解），且无平台降级 / 拖拽抖动。
 2. **默认不启用 OS 效果**（不加 `set_effects(Acrylic)`）；若将来真要桌面透过模糊，须 `set_effects(Acrylic)`——Win11 22H2+，标 **K-27**。
-3. **主小条（pill窗口）禁挂任何模糊** —— 含悬停板一律用**高不透明度板（无 `backdrop-filter`）**，保拖拽顺滑。`--pill-hover-plate` 已是「94% 板、无模糊」。
+3. **主小条（pill窗口）禁挂任何模糊** —— 含悬停板一律用**高不透明度板（无 `backdrop-filter`）**，保拖拽顺滑。`--pill-hover-plate` 已是「74% 板、无模糊、仅在悬停/聚焦/菜单展开时出现」；未悬停时 `.pill` 背景全透（无底、无描边、无投影），`--pill-idle-plate` 已于 V0.2.10 删除。全局投影（`--shadow-*` 与 `--text-halo`）同版一并置 `none`，只留 `--shadow-ring` 描边与 `--focus-ring` 焦点环。
 4. **与 K-1 白闪无因果** —— 白闪是 WebView2 预绘制默认底色；模糊层只略抬高首帧合成成本，仍守 `visible:false` 握手。
 
 **玻璃使用范围：** 应用内菜单（`context-menu` / `countdown-menu` / `common-items`）· 便利贴 · 事项窗口 · 提醒卡。**主小条除外；系统托盘菜单除外**（托盘菜单为原生 Win32 菜单，不经 WebView，无玻璃一说）。

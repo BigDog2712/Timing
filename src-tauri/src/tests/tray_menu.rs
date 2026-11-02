@@ -5,8 +5,8 @@
 
 use crate::infra::tray_menu::{
     build_nodes, format_duration, status_line, truncate_name, TrayNode, ID_NEW_ITEM,
-    ID_OPEN_SETTINGS, ID_QUIT, ID_SHOW_HIDE, ID_STATUS, ID_TIMER_DISCARD, ID_TIMER_PAUSE,
-    ID_TIMER_RESUME, ID_TIMER_START, ID_TIMER_STOP, LABEL_MAX_CHARS,
+    ID_OPEN_SETTINGS, ID_QUIT, ID_STATUS, ID_TIMER_DISCARD, ID_TIMER_PAUSE, ID_TIMER_RESUME,
+    ID_TIMER_START, ID_TIMER_STOP, LABEL_MAX_CHARS,
 };
 use crate::models::enums::TrayStatus;
 
@@ -184,7 +184,8 @@ fn constant_items_always_present() {
         let nodes = build_nodes(status, "空闲 · 点开始正计时");
         let ids = ids(&nodes);
         assert!(ids.contains(&ID_STATUS), "{status:?} 应有状态项");
-        assert!(ids.contains(&ID_SHOW_HIDE));
+        /* [V0.3.1] 「显示 / 隐藏」项已移除（小条常驻，不再提供显隐入口） */
+        assert!(!ids.contains(&"show_hide"), "{status:?} 不应再有显隐项");
         assert!(ids.contains(&ID_NEW_ITEM));
         assert!(ids.contains(&ID_OPEN_SETTINGS));
         assert!(ids.contains(&ID_QUIT));
