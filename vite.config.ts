@@ -25,5 +25,21 @@ export default defineConfig({
     minify: 'oxc',
     sourcemap: false,
     cssTarget: 'chrome105',
+    // [0.4.1] 分包：此前业务代码 + React + 图标库挤在一个 425 kB chunk 里，任何一行业务
+    // 改动都会让整包换 hash 重新解析。react / 图标库几乎不随业务变，单独切出来后
+    // 业务 chunk 只含自身代码。注意 Vite 8（rolldown）只接受函数形式，传对象会报
+    // Expected Function but received Object。
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('lucide-react')) return 'icons';
+          if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler')) {
+            return 'react';
+          }
+          return 'vendor';
+        },
+      },
+    },
   },
 });

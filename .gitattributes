@@ -1,4 +1,8 @@
 * text=auto eol=lf
+# cmd.exe 按 OEM 代码页解析批处理，LF-only 时 goto/label 会失效。
+# scripts/dev-desktop.cmd 的注释里也写死了这条要求，仓库侧必须与之一致。
+*.cmd text eol=crlf
+*.bat text eol=crlf
 *.png binary
 *.ico binary
 *.exe binary

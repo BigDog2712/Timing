@@ -1,6 +1,6 @@
 [package]
 name = "tickbar"
-version = "0.2.8"
+version = "0.4.1"
 description = "TickBar — 常驻悬浮计时条（Windows 桌面，纯本地）"
 authors = ["TickBar Team"]
 edition = "2021"
@@ -18,15 +18,19 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2.12.4", features = ["tray-icon", "image-png", "image-ico"] }
 
 # 官方插件（Spec §4 / IPC-CONTRACT-v2 附录 A）
-tauri-plugin-sql = { version = "=2.4.1", features = ["sqlite"] }
-tauri-plugin-store = "2"
+# v0.3：移除 tauri-plugin-sql / tauri-plugin-store —— 前端从未引用，且它们的
+# capability 放行让前端可以绕过四层直接改库（ADR-015）。需要时按 ADR 回退：
+# 在 [features] 里加 legacy-data-plugins，把两个依赖写回来并重新注册。
 tauri-plugin-autostart = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-single-instance = "2"
 # V0.2.0 唯一新增依赖（Spec §4 / ADR-010；crates.io max_stable = 2.7.0，已核实）
 tauri-plugin-notification = "2.7.0"
-# [P1] 可选依赖：MVP 不注册任何热键，默认 feature 关闭
-tauri-plugin-global-shortcut = { version = "2", optional = true }
+# V0.4.0：文件夹选择器（设置 → 同步的「选择…」）。只放行 dialog:allow-open，
+# 不给文件系统读写的通用能力；路径最终仍由 Rust 侧校验。
+tauri-plugin-dialog = "2.8.3"
+# V0.3.3：tauri-plugin-global-shortcut 已随全局快捷键功能整体移除（ADR-022），
+# 连同 p1-shortcuts feature 一起下线——不再保留占位。
 
 # 序列化 / 错误 / 时间 / 异步
 serde = { version = "1", features = ["derive"] }
@@ -43,8 +47,6 @@ default = []
 # `cargo build --release` 仍会去连 devUrl（http://localhost:1420），脱离 dev server 就是白窗。
 # `tauri build` 会自己带这个特性；直接用 cargo 构建发布版时必须显式打开。
 custom-protocol = ["tauri/custom-protocol"]
-# [P1] 全局快捷键特性开关：解锁时才编入 tauri-plugin-global-shortcut
-p1-shortcuts = ["dep:tauri-plugin-global-shortcut"]
 
 # QA 测试（仅 dev profile）：提供 #[tokio::test] 异步测试运行时。
 # 不进入发布产物；tokio 及 tokio-macros 已在依赖图中（勿需新增外部 crate）。
