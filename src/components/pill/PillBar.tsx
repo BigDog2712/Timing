@@ -7,11 +7,12 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import { COUNTDOWN_WARN_SEC, DEBOUNCE_MS, ENDED_FLASH_MS } from '../../lib/constants';
+import { COUNTDOWN_WARN_SEC, DEBOUNCE_MS } from '../../lib/constants';
 import { clientToLayer } from '../../lib/fitBounds';
 import { defaultCountdownSec } from '../../lib/countdown';
 import { useTimerActions } from '../../hooks/useTimerActions';
 import { useTimerTick } from '../../hooks/useTimerTick';
+import { useEndedFlash } from '../../hooks/useEndedFlash';
 import { usePillDrag } from '../../hooks/usePillDrag';
 import { usePillInlineEdit } from '../../hooks/usePillInlineEdit';
 import { usePillKeyboard } from '../../hooks/usePillKeyboard';
@@ -60,7 +61,6 @@ export function PillBar() {
      原先这里订阅 settings.countdownPresets 只为取第一档当默认值，口径不一致，已下线。 */
   const defaultSec = useSettingsStore((s) => defaultCountdownSec(s.referenceSettings));
   const items = useItemStore((s) => s.items);
-  const endedAt = useUiStore((s) => s.endedAt);
   const openNotesList = useUiStore((s) => s.openNotesList);
   const panel = useUiStore((s) => s.panel);
   const countdownPos = useUiStore((s) => s.countdownPos);
@@ -92,14 +92,9 @@ export function PillBar() {
     itemMenu != null ||
     commonItemsPos != null;
 
-  /* 结束态：900ms 瞬时视觉确认（--dur-confirm） */
-  const [ended, setEnded] = useState(false);
-  useEffect(() => {
-    if (endedAt == null) return;
-    setEnded(true);
-    const id = window.setTimeout(() => setEnded(false), ENDED_FLASH_MS);
-    return () => window.clearTimeout(id);
-  }, [endedAt]);
+  /* 结束态：900ms 瞬时视觉确认（--dur-confirm）。窗口判定在 hook 里，
+     组件重挂载（折叠后展开）不会把上一次结束重放一遍。 */
+  const ended = useEndedFlash();
 
   const visual = toVisualState(status, ended);
 

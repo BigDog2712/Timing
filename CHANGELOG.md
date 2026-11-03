@@ -7,6 +7,21 @@
 依据 `docs/mobile/DESIGN-ANDROID-V1.md` 执行 **T2 / T3 / T4 / T5 / T13**，前端 T6–T12 已就位。
 **契约零变化**：命令 65 / 事件 11 / 错误码 16，`check:contract` 输出 `65/65/65/65 · 16/16 · 11/11`。
 
+### 手机端走查修复（2026-11-03，全前端）
+
+以 390×844 视口真机式走查（CDP 点击）后修掉 4 项，桌面与移动共用部分一并受益：
+
+- 新增 `hooks/useEndedFlash.ts`：`uiStore.endedAt` 是「时刻」且不清零，组件重挂载会把上一次
+  结束重放成 900ms「已保存」。改为按窗口判定（过期不重放、只闪剩余毫秒），
+  `PillBar` / `CollapsedDot` / `TimerPage` 三处共用（桌面折叠→展开的同一问题一并修掉）。
+- `UndoToast` 撤销成功后 `bumpRecords()`；`ItemsPage` 订阅 `recordsNonce` 重拉今日记录——
+  此前在记录页就地点撤销，总计条数不刷新。
+- 触控目标：`.m-seg__item` 由 40px 抬到 `var(--m-tap)`（44）；取色行色点 18→24px 并用
+  `::after` 把热区补到 44×44（不动桌面 `SwatchRow` 的 DOM）。
+- `vite.config.ts` 新增 `platformCss()`：桌面构建在 transform 阶段摘掉 `styles/mobile/*` 的
+  导入（CSS 无法像 JS 一样摇树）。桌面 CSS 102 → 86.53 kB，产物里不再有 `.m-*`。
+- 重新出包 `release/TickBar-v0.4.1-android-arm64.apk`（8.6 MB，debug keystore，仅自测安装）。
+
 ### 依赖与入口（T2）
 
 - `Cargo.toml`：`tauri` 的 `tray-icon` / `image-png` / `image-ico` 与 `autostart` /

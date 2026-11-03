@@ -61,6 +61,7 @@ export function ItemsPage() {
   const today = useTodayRecords();
   const timerActions = useTimerActions();
   const openSheet = useMobileUiStore((s) => s.openSheet);
+  const recordsNonce = useMobileUiStore((s) => s.recordsNonce);
 
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -73,6 +74,13 @@ export function ItemsPage() {
     const id = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => window.clearInterval(id);
   }, []);
+
+  /* 记录被编辑 / 删除 / 撤销（记录页发同一个自增信号）后，今日记录与汇总条要重拉：
+     两处读的是同一份 `list_records`，否则撤销完这里还挂着那条已不存在的记录。 */
+  const reloadToday = today.reload;
+  useEffect(() => {
+    if (recordsNonce > 0) reloadToday();
+  }, [recordsNonce, reloadToday]);
 
   const { pending, done } = useMemo(() => todoPanelLists(todos, now), [todos, now]);
   const groups = useMemo(

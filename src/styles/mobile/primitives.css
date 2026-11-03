@@ -130,7 +130,9 @@
 
 .m-seg__item {
   flex: 1 1 0;
-  min-height: 40px;
+  /* 与 --m-tap 对齐：40px 在手机上是「看着能点、实际容易点空」的下限，
+     分段又是最高频的切换控件（日/周、三个页签），统一按 44 走 */
+  min-height: var(--m-tap);
   border-radius: var(--radius-md);
   color: var(--seg-off-ink);
   font-size: var(--text-sm);

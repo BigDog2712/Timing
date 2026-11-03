@@ -1,5 +1,35 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+
+/** 编译期平台标记：`tauri android dev/build` 注入 TAURI_ENV_FAMILY=mobile */
+const IS_MOBILE_BUILD = process.env.TAURI_ENV_FAMILY === 'mobile';
+
+/** `main.tsx` 里的移动端样式导入（整行） */
+const MOBILE_CSS_IMPORT = /^[ \t]*import[ \t]+['"]\.\/styles\/mobile\/[^'"]+['"];?[ \t]*$/gm;
+
+/**
+ * 桌面构建剔除移动端样式表
+ * -----------------------------------------------------------------------------
+ * `src/styles/mobile/*.css` 是 7 个只服务于移动壳的样式表（约 1200 行）。JS 侧的
+ * `if (IS_MOBILE) return <MobileShell/>` 会被摇树整块删掉，但 CSS 是**副作用导入**：
+ * 只要 `main.tsx` 里有那几行 `import`，样式就会进桌面产物（实测桌面 CSS 里能搜到
+ * `.m-tabbar`）。CSS 不能像 JS 那样靠死代码消除，只能在模块进入打包器之前把导入摘掉
+ * ——这就是本插件唯一的职责，与 `define` 里的平台标记同源、同一次构建生效。
+ *
+ * 约束：移动端样式只允许从 `main.tsx` 导入（当前如此）；换到别处需要同步改这里。
+ */
+function platformCss(): Plugin {
+  return {
+    name: 'tickbar:platform-css',
+    enforce: 'pre',
+    transform(code, id) {
+      if (IS_MOBILE_BUILD || !/src[\\/]main\.tsx$/.test(id)) return;
+      const stripped = code.replace(MOBILE_CSS_IMPORT, '');
+      if (stripped === code) return;
+      return { code: stripped, map: null };
+    },
+  };
+}
 
 // TickBar — 桌面悬浮应用（Tauri 2 + React 19）
 // 说明：本工程为固定 384x360 DIP 透明置顶层，无 Web 路由、无网络请求。
@@ -7,12 +37,12 @@ import react from '@vitejs/plugin-react';
 // - strictPort 1420：与 src-tauri/tauri.conf.json 的 devUrl 对齐
 // - target=chrome105：WebView2（Chromium 105+）
 export default defineConfig({
-  plugins: [react()],
+  plugins: [platformCss(), react()],
   /* 编译期平台标记（DESIGN-ANDROID-V1 §1.2）：`tauri android dev/build` 会注入
      TAURI_ENV_FAMILY=mobile；纯 vite（dev / vitest）下没有这个变量 → false，
      桌面路径与桌面产物完全不受影响（替换成字面量后移动分支可被摇树删除）。 */
   define: {
-    __TICKBAR_MOBILE__: JSON.stringify(process.env.TAURI_ENV_FAMILY === 'mobile'),
+    __TICKBAR_MOBILE__: JSON.stringify(IS_MOBILE_BUILD),
   },
   clearScreen: false,
   server: {

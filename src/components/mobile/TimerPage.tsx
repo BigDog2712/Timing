@@ -10,16 +10,15 @@
  *
  * 状态色与弧形态交给 `TimerRing`（复用 arcSpec），本文件只管布局与动作。
  */
-import { useEffect, useState } from 'react';
+import { useEndedFlash } from '../../hooks/useEndedFlash';
 import { useTimerActions } from '../../hooks/useTimerActions';
 import { useTimerTick } from '../../hooks/useTimerTick';
-import { COUNTDOWN_WARN_SEC, ENDED_FLASH_MS } from '../../lib/constants';
+import { COUNTDOWN_WARN_SEC } from '../../lib/constants';
 import { formatMinutes } from '../../lib/format';
 import { PauseIcon, PlayIcon, RepeatIcon, TimerIcon, iconStroke } from '../../lib/icons';
 import { useMobileUiStore } from '../../stores/mobileUiStore';
 import { findItem, useItemStore } from '../../stores/itemStore';
 import { useTimerStore } from '../../stores/timerStore';
-import { useUiStore } from '../../stores/uiStore';
 import { toVisualState } from '../../types/ui';
 import type { VisualState } from '../../types/ui';
 import { TimerRing } from './TimerRing';
@@ -38,17 +37,11 @@ export function TimerPage() {
   const session = useTimerStore((s) => s.state.session);
   const lastItemId = useTimerStore((s) => s.state.lastItemId);
   const items = useItemStore((s) => s.items);
-  const endedAt = useUiStore((s) => s.endedAt);
   const openSheet = useMobileUiStore((s) => s.openSheet);
 
-  /* 结束态是 900ms 的瞬时确认（与药丸同源），不是状态机第四态 */
-  const [ended, setEnded] = useState(false);
-  useEffect(() => {
-    if (endedAt == null) return;
-    setEnded(true);
-    const id = window.setTimeout(() => setEnded(false), ENDED_FLASH_MS);
-    return () => window.clearTimeout(id);
-  }, [endedAt]);
+  /* 结束态是 900ms 的瞬时确认（与药丸同源），不是状态机第四态。
+     hook 内部按 `endedAt` 的窗口判定：切 Tab 重挂载不会把上一次结束重放一遍。 */
+  const ended = useEndedFlash();
 
   const visual = toVisualState(status, ended);
   const currentItemId = status === 'idle' ? lastItemId : (session?.itemId ?? null);

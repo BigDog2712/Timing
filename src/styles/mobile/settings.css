@@ -36,6 +36,25 @@
   padding: 0 var(--space-3);
 }
 
+/* 取色行的色点：桌面是 18px 的方块（点它弹原生取色器），手机上 18px 的热区等于让人
+   用指尖去打靶。这里把方块做大到 24（视觉更好认），再用伪元素把热区补到 44×44
+   —— SwatchRow 是桌面共用组件，不动它的 DOM，只在 m-settings 作用域里覆盖。 */
+.m-settings .swatch {
+  padding-block: 10px;
+}
+
+.m-settings .swatch__dot {
+  width: 24px;
+  height: 24px;
+}
+
+.m-settings .swatch__dot::after {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border-radius: var(--radius-md);
+}
+
 .m-settings .theme-cards {
   gap: var(--space-2);
 }

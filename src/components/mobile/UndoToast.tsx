@@ -15,6 +15,7 @@ import { formatDuration } from '../../lib/format';
 import { UndoIcon, iconStroke } from '../../lib/icons';
 import { useTimerActions } from '../../hooks/useTimerActions';
 import { itemName, useItemStore } from '../../stores/itemStore';
+import { useMobileUiStore } from '../../stores/mobileUiStore';
 import { useTodoStore } from '../../stores/todoStore';
 import { useUiStore } from '../../stores/uiStore';
 
@@ -59,8 +60,13 @@ export function UndoToast() {
         type="button"
         className="m-btn m-btn--accent"
         onClick={() => {
-          if (record) void actions.undo(record.id);
-          else undoRemove();
+          if (record) {
+            /* 撤销 = 这条记录被删掉、会话回到运行中。记录页与今日汇总都按「已保存的记录」
+               算数，不在这里发一次刷新信号的话，用户会看到总计条数纹丝不动。 */
+            void actions.undo(record.id).then(() => useMobileUiStore.getState().bumpRecords());
+          } else {
+            undoRemove();
+          }
         }}
       >
         <UndoIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />

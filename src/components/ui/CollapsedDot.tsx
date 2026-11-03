@@ -5,10 +5,9 @@
  * 在 DESIGN.md §8.3 说明）。单击展开回药丸；右键不再弹任何菜单（V0.3.1）；
  * hover 300ms 后原生 title 显示「时长 · 事项名」。
  */
-import { useEffect, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import { ENDED_FLASH_MS } from '../../lib/constants';
 import { formatDuration } from '../../lib/format';
+import { useEndedFlash } from '../../hooks/useEndedFlash';
 import { useTimerTick } from '../../hooks/useTimerTick';
 import { findItem, useItemStore } from '../../stores/itemStore';
 import { useTimerStore } from '../../stores/timerStore';
@@ -21,16 +20,10 @@ export function CollapsedDot() {
   const sessionItemId = useTimerStore((s) => s.state.session?.itemId ?? null);
   const lastItemId = useTimerStore((s) => s.state.lastItemId);
   const items = useItemStore((s) => s.items);
-  const endedAt = useUiStore((s) => s.endedAt);
   const toggleCollapsed = useUiStore((s) => s.toggleCollapsed);
 
-  const [ended, setEnded] = useState(false);
-  useEffect(() => {
-    if (endedAt == null) return;
-    setEnded(true);
-    const id = window.setTimeout(() => setEnded(false), ENDED_FLASH_MS);
-    return () => window.clearTimeout(id);
-  }, [endedAt]);
+  /* 结束态 900ms（与药丸同源）：窗口判定在 hook 里，折叠→展开不会重放旧时间戳 */
+  const ended = useEndedFlash();
 
   const visual = toVisualState(status, ended);
   const currentItemId = status === 'idle' ? lastItemId : sessionItemId;
