@@ -40,6 +40,16 @@ import './styles/reminder.css';
 import './styles/highlight.css';
 /* [V0.3.2] 摸鱼菜单（复用 menu.css 的玻璃语言，只补表单与大数字） */
 import './styles/moyu.css';
+/* [Android V1] 移动壳（类名 m-* / 变量 --m-*，与桌面零冲突；桌面产物里这几份样式
+   仍会被打包，但没有 .m-shell 挂载点，规则不会命中任何元素）。
+   按页面拆成 7 份是为了守住单文件 ≤300 行（AGENTS.md）。 */
+import './styles/mobile/shell.css';
+import './styles/mobile/primitives.css';
+import './styles/mobile/timer.css';
+import './styles/mobile/items.css';
+import './styles/mobile/records.css';
+import './styles/mobile/settings.css';
+import './styles/mobile/sheets.css';
 import App from './App';
 import { AppErrorBoundary, installGlobalErrorHooks } from './components/ui/AppErrorBoundary';
 import { markWindowKind } from './lib/window';

@@ -12,7 +12,7 @@
  *
  * 约束：本文件**不得** import stores 或 React（否则与 actions 形成环）。
  */
-import { ipc, isTauri } from './ipc';
+import { errorText, ipc, isTauri } from './ipc';
 import type {
   CreateItemParams,
   Item,
@@ -29,8 +29,11 @@ import type {
   RecordPatch,
   ReminderClearParams,
   ReminderSetParams,
+  ResolveAction,
   Settings,
+  StatsSummary,
   StopResult,
+  SwitchMode,
   TimeRecord,
   TimerState,
   Todo,
@@ -51,6 +54,8 @@ export const itemApi = {
 /* ---- 记录 ---- */
 export const recordApi = {
   list: (params: ListRecordsParams): Promise<Paginated<TimeRecord>> => ipc.listRecords(params),
+  /** 汇总（唯一统计口径，见 PRD §6）：移动端记录页的「总计 / 按事项分布」只用它 */
+  summary: (from: number, to: number): Promise<StatsSummary> => ipc.statsSummary({ from, to }),
   update: (id: number, patch: RecordPatch): Promise<TimeRecord> => ipc.updateRecord({ id, patch }),
   remove: (params: ItemIdParams): Promise<void> => ipc.deleteRecord(params),
 };
@@ -93,6 +98,17 @@ export const timerApi = {
   resume: () => ipc.resumeTimer(),
   stop: (): Promise<StopResult> => ipc.stopTimer(),
   discard: () => ipc.discardTimer(),
+  /** 撤销结束（3s 撤销条） */
+  undo: (recordId: number) => ipc.undoStop({ recordId }),
+  /** 换事项：end_and_start = 分段，just_switch = 只改归属（时长连续） */
+  switchItem: (itemId: number, mode: SwitchMode): Promise<TimerState> => ipc.switchItem({ itemId, mode }),
+  /** 定长倒计时；到点由后端恒结束并保存（ADR-023） */
+  startCountdown: (itemId: number | null, targetSec: number) =>
+    ipc.startCountdown({ itemId: itemId ?? undefined, targetSec }),
+  setCountdownPresets: (presets: number[]) => ipc.setCountdownPreset({ presets }),
+  /** 崩溃恢复三选一；`includeGap` = 把退出期间并入累计（默认 false） */
+  resolveOpenRecord: (action: ResolveAction, includeGap = false) =>
+    ipc.resolveOpenRecord({ action, includeGap }),
 };
 
 /* ---- 提醒 ---- */
@@ -130,3 +146,6 @@ export const mdSyncApi = {
 };
 
 export { isTauri };
+/* 错误文案也走门面：视图层要的是「给用户看的一句话」，不是传输层对象。
+   从本文件再导出，组件就不必为了一个文案函数直接 import services/ipc。 */
+export { errorText };

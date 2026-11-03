@@ -8,6 +8,12 @@ import react from '@vitejs/plugin-react';
 // - target=chrome105：WebView2（Chromium 105+）
 export default defineConfig({
   plugins: [react()],
+  /* 编译期平台标记（DESIGN-ANDROID-V1 §1.2）：`tauri android dev/build` 会注入
+     TAURI_ENV_FAMILY=mobile；纯 vite（dev / vitest）下没有这个变量 → false，
+     桌面路径与桌面产物完全不受影响（替换成字面量后移动分支可被摇树删除）。 */
+  define: {
+    __TICKBAR_MOBILE__: JSON.stringify(process.env.TAURI_ENV_FAMILY === 'mobile'),
+  },
   clearScreen: false,
   server: {
     port: 1420,

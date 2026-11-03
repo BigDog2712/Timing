@@ -5,6 +5,7 @@ use serde::Serialize;
 
 use crate::models::enums::timer_mode;
 use crate::models::enums::timer_status;
+#[cfg(desktop)]
 use crate::models::enums::TrayStatus;
 use crate::models::record::TimeRecord;
 
@@ -77,6 +78,9 @@ pub struct StopResult {
 }
 
 /// 托盘菜单状态快照（ADR-013 §6.e 状态文本口径）。仅供 `infra::tray` 使用，不上 IPC。
+///
+/// 桌面独占：移动端没有托盘，也就没有这份快照的消费者（见 `app::events::sync_tray`）。
+#[cfg(desktop)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraySnapshot {
     pub status: TrayStatus,
@@ -88,6 +92,7 @@ pub struct TraySnapshot {
     pub remaining_sec: Option<i64>,
 }
 
+#[cfg(desktop)]
 impl TraySnapshot {
     /// 空闲快照（DB 不可用时的兜底）。
     pub fn idle() -> Self {

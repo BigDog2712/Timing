@@ -738,6 +738,58 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 | 前端 | 设置页签 3 → **4**：外观配色 / 插件 / 同步 / 通用 | 「同步」只服务于已安装的 md-sync 插件 |
 | 权限 | 新增 `dialog:allow-open` | 原生文件夹选择；不引入 `fs` 读写能力 |
 
+### 12.8 V1.0-Android 平台差异（不是契约变更）
+
+> 本节登记**同一份契约在两个平台上的行为差异**，与 §12.5/§12.6 的「减量」不同：
+> **命令 65 / 错误码 16 / 事件 11 一个都没少**，`check:contract` 输出仍是
+> `65/65/65/65 · 16/16 · 11/11`。Android 分支只是把「桌面才有实现」的少数命令改成
+> 返回 `IO_ERROR` + 一句中文说明，DTO 字段一个不改。
+>
+> 依据：`docs/mobile/DESIGN-ANDROID-V1.md` §1.1 / §1.3 / §1.4 / §1.5 / §3.3。
+
+#### 12.8.1 计数：零变化
+
+| 面 | 桌面 | Android | 变更 |
+|---|---|---|---|
+| 命令 | 65 | **65**（全注册，其中 12 条为桩） | 无 |
+| 事件 | 11 | **11**（`tray:highlight` / `app:open-*` / `note-window-*` 在移动端无 emit 点） | 无 |
+| 错误码 | 16 | **16**（桩统一 `IO_ERROR`，不新增码） | 无 |
+| DTO | — | 与桌面逐字相同；`Settings.autostartEnabled` 恒 `false`（字段保留） | 无 |
+
+#### 12.8.2 行为差异（同名命令，移动端返回 `IO_ERROR`）
+
+| 命令 | 移动端行为 | 说明 |
+|---|---|---|
+| `main_work_area` / `main_window_rect` | `IO_ERROR`「仅桌面端可用」 | 手机单 Activity 全屏，没有「主条」与多屏工作区，前端 auto-fit 无上界可算 |
+| `quit_app` | `IO_ERROR` | Android 由系统回收进程，不提供「退出应用」入口；前端也不调用 |
+| `open_settings_window` / `open_todos_window` / `open_timer_window` / `open_note_window` / `close_note_window` | `IO_ERROR` | 手机是单窗多页面路由（`MobileShell` 的 4 Tab + Sheet），没有第二个窗口可开 |
+| `md_sync_get` / `md_sync_save` / `md_sync_run` / `md_sync_open` | `IO_ERROR`「移动端暂不支持 Markdown 同步」 | 落点模型不同构（见 12.8.4） |
+| `show_window` / `hide_window` / `toggle_window` / `save_window_position` | **`Ok(())` 幂等空操作**（不报错） | 前端首帧与「拖动结束落盘」会调它们；语义上「已显示 / 位置无处可存」本来就是成功，回错误只会在控制台刷红 |
+| `set_autostart` | 恒返回 `false`（`get_autostart` 同） | `update_settings` 的 `autostartEnabled` 字段**接受但忽略**（不报错），老配置带该字段过来仍成功 |
+
+`get_timer_state` 在两端都**只读**：启动时不自动 resolve 未结束会话，崩溃恢复面板因此
+必定能拿到 `session` 并弹出「继续 / 结束 / 丢弃」三选一。
+
+#### 12.8.3 已知差异（能力面）
+
+| 能力 | 移动端 | 后果 / 兜底 |
+|---|---|---|
+| 系统托盘 | 无 | 托盘菜单里的入口（设置 / 事项 / 便利贴 / 退出）改由应用内页面承担；`tray:highlight` 无 emit 点 |
+| 多窗口 / 窗口位置记忆 / 多屏钳制 | 无 | 不做 `window-state` 插件；便利贴改为「列表 + 单编辑页」（P1） |
+| 开机自启 | 无 | 设置页不出现该开关（`autostartEnabled` 恒 `false`） |
+| 单实例锁 | 不需要 | Android 系统本就单实例 |
+| 前台服务 / 后台保活 | **本轮不做**（见 `DESIGN-ANDROID-V1.md` §1.5） | 进程存活 → 现有 tokio ticker 正常；被冻结 / 杀死 → **到点通知可能延迟**。数据不丢：恢复运行时 `countdown::tick` / `reminder::due` 按 `ends_at <= now` / `remind_at <= now` 幂等补判，口径是「**数据正确、通知延迟**」 |
+| 系统通知 | 保留（`reminder-fired` / `countdown-finished` 照常 emit） | 需 `POST_NOTIFICATIONS` 运行时权限 + 单通道 `timer-reminder`「计时提醒」；用户拒绝时前端降级为应用内提示条 |
+| 存储 | 同构 | 仍在 `app_data_dir()/tickbar.db`（Android 解析为应用私有 files 目录），迁移 `0001~0004` 原样复用，`schema.version=4`，不需要存储权限 |
+
+#### 12.8.4 未做与理由
+
+- **md-sync（SAF）**：桌面落点是**路径字符串**，Android 只能拿到 SAF 的 `content://` 持久
+  URI，两者模型不同构；要做得先扩配置模型并新增 ADR（PRD Q2）。本轮按「保留注册、返回不支持」处理，
+  设置页在移动端隐藏「同步」页签。
+- **前台服务**：需 `FOREGROUND_SERVICE` + 不可消除通知 + 电池优化豁免（PRD Q3），
+  且无真机可验，属「必须装机才能验证」的路径，留 P2-1。
+
 ---
 
 ## 附录 A：capabilities 最小权限白名单（MVP，锁定）

@@ -10,7 +10,13 @@
 
 pub mod countdown;
 pub mod flusher;
-pub mod md_sync;
-pub mod monitor;
 pub mod nudge;
 pub mod reminder;
+
+/* 桌面独占（V1-Android）：
+- `monitor`：轮询 `available_monitors()` 做多屏钳制，Android 无该 API；
+- `md_sync`：Markdown 落点是桌面路径，移动端待 SAF（本轮不做，见设计 §1.4）。 */
+#[cfg(desktop)]
+pub mod md_sync;
+#[cfg(desktop)]
+pub mod monitor;

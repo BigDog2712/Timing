@@ -1,0 +1,72 @@
+/* =============================================================================
+ * TickBar — 移动端 · 设置页（复用桌面页签时的移动适配）
+ * -----------------------------------------------------------------------------
+ * 从 pages.css 按页面拆出（AGENTS.md 单文件 ≤300 行；原文件 504 行）。
+ * 只写本页自己的块：按钮 / 输入 / 分段 / 列表等原语在 primitives.css，
+ * 外壳与导航在 shell.css。颜色一律走令牌，可点元素高度 >= 44px。
+ * ========================================================================== */
+
+/* ============================== 设置页 ============================== */
+.m-settings__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+}
+
+/* 复用桌面控件时的移动适配：只放大命中区，不改配色/层级（外观页签仍由 theme-picker.css 决定） */
+.m-settings .btn {
+  min-height: var(--m-tap);
+  padding: 0 var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.m-settings .setting-row {
+  height: auto;
+  min-height: 56px;
+  gap: var(--space-3);
+}
+
+.m-settings .setting-row__label {
+  font-size: 15px;
+}
+
+.m-settings .num-field {
+  height: var(--m-tap);
+  padding: 0 var(--space-3);
+}
+
+.m-settings .theme-cards {
+  gap: var(--space-2);
+}
+
+.m-settings .theme-card {
+  min-height: 84px;
+}
+
+.m-settings .swatch-row {
+  min-height: var(--m-tap);
+}
+
+.m-settings .plg__bar {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.m-settings .plg__hint {
+  line-height: 1.6;
+}
+
+.m-notify {
+  flex-wrap: wrap;
+}
+
+.m-notify__state {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-notify__state[data-denied="true"] {
+  color: var(--color-warn);
+}

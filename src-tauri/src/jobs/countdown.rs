@@ -13,9 +13,10 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 
 use crate::app::events;
-use crate::infra::{notify, tray_menu};
+use crate::infra::notify;
 use crate::models::constants::COUNTDOWN_WATCH_INTERVAL_SECS;
 use crate::models::timer::CountdownFinished;
+use crate::platform::duration::format_duration;
 use crate::services;
 use crate::state::AppState;
 
@@ -66,7 +67,7 @@ pub fn spawn_countdown_watcher(app: AppHandle) {
 
 /// 通知正文：`{事项名} · {MM:SS} 到点`；事项名缺失退化为 `{MM:SS} 到点`。
 fn notify_body(item_name: &str, target_sec: i64) -> String {
-    let duration = tray_menu::format_duration(target_sec);
+    let duration = format_duration(target_sec);
     if item_name.trim().is_empty() {
         format!("{duration} 到点")
     } else {

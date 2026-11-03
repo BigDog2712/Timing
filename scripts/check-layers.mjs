@@ -10,6 +10,7 @@
  *   L4 Rust `infra` 不得依赖 `services`（解环，见 ADR-016）
  *   L5 Rust `commands` 不得直接依赖 `repositories`（必须经 service）
  *   L6 Rust 全域不得出现 `eprintln!`（结构化日志，见 platform/log.rs）
+ *   L7 编译期平台常量 `__TICKBAR_MOBILE__` 只允许出现在 `src/lib/platform.ts`
  *
  * 每一条都是「改坏了 CI 就红」的判据，而不是「建议」。
  */
@@ -47,6 +48,7 @@ const R = {
   L4: rule('L4', 'Rust infra 不得 use crate::services'),
   L5: rule('L5', 'Rust commands 不得 use crate::repositories'),
   L6: rule('L6', 'Rust 不得使用 eprintln!（用 crate::log_*!）'),
+  L7: rule('L7', '编译期平台常量 __TICKBAR_MOBILE__ 只允许出现在 src/lib/platform.ts'),
 };
 
 function scan(files, pattern, target, allow = () => false) {
@@ -86,6 +88,10 @@ scan(
   R.L5,
 );
 scan(rsFiles, /\beprintln!\(/, R.L6);
+
+/* L7：平台常量是「编译期一次性替换」的全局，散落读取会让分支不可枚举、
+   也让「桌面产物里不该有移动代码」这条摇树前提失效。唯一读取点是 platform.ts。 */
+scan(feFiles, /__TICKBAR_MOBILE__/, R.L7, (rel) => rel === 'src/lib/platform.ts');
 
 for (const r of Object.values(R)) if (r.hits.length) violations.push(r);
 

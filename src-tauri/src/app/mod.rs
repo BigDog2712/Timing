@@ -10,6 +10,13 @@
 //! 禁止：被 `infra` 反向依赖（否则又成环）。
 
 pub mod bootstrap;
-pub mod diagnostics;
 pub mod events;
+
+/* 桌面独占（V1-Android）：
+- `tray`：`TrayIconBuilder` / 原生菜单在 Android 上不存在；
+- `diagnostics`：快照里要枚举显示器与各窗口 label，两者都是桌面概念。
+移动端不写这两份快照——出问题时看日志与 `boot_timing` 即可。 */
+#[cfg(desktop)]
+pub mod diagnostics;
+#[cfg(desktop)]
 pub mod tray;

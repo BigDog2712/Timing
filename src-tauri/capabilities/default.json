@@ -1,7 +1,8 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "TickBar 最小权限白名单（ADR-015）。数据访问一律走 IPC 命令，前端不持有 SQL / KV 能力。",
+  "description": "TickBar 最小权限白名单（ADR-015）。数据访问一律走 IPC 命令，前端不持有 SQL / KV 能力。仅桌面生效：autostart / 窗口拖拽 / dialog 在 Android 上不存在或无对应窗口。",
+  "platforms": ["windows", "macOS", "linux"],
   "windows": ["main", "settings", "todos", "timer", "note-*"],
   "permissions": [
     "core:window:allow-start-dragging",

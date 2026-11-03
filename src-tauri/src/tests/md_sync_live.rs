@@ -91,7 +91,11 @@ async fn stopped_record_takes_over_without_duplicating_the_segment() {
     let env = env("md-live-stop").await;
     let item = new_item(&env.pool, "测试2").await;
     let record = services::timer::start(&env.pool, Some(item)).await.unwrap();
-    pin_start(&env, record.id, at(env.date, 9, 18)).await;
+    /* 起点必须相对真实「现在」：`stop` 写入的结束时刻走真实墙钟
+    `platform::clock::now_ms()`，若把起点钉死成今日 09:18，在本地时间 09:18
+    之前跑这一步就会「结束早于开始」，用例必红（InvalidDuration）。故取
+    now - 60s 作为起点，只求「开始 < 结束」成立；具体时刻由下方 UPDATE 覆盖。 */
+    pin_start(&env, record.id, crate::platform::clock::now_ms() - 60_000).await;
 
     services::timer::stop(&env.pool).await.unwrap();
     /* 结束时刻由状态机写「现在」，用例改成确定值再断言渲染结果。 */

@@ -15,6 +15,7 @@ import { themeActions } from '../services/themeActions';
 import { openNewNote } from '../services/noteActions';
 import { reminderActions } from '../services/reminderActions';
 import { todoNudgeActions } from '../services/todoNudgeActions';
+import { IS_MOBILE } from '../lib/platform';
 import { useItemStore } from '../stores/itemStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useThemeStore } from '../stores/themeStore';
@@ -139,7 +140,9 @@ export function useAppBootstrap(): void {
    * 两路共用 windowShown 护栏（先到先得，只显示一次）；cleanup 取消未执行的 rAF / 定时器
    * （StrictMode 双执行安全且幂等）。 */
   useEffect(() => {
-    if (windowShown) return;
+    /* 移动端：窗口随 Activity 出现，`show_window` 是桌面桩（移动后端为空操作），
+       没有白闪可防，跳过这一跳 IPC。其余订阅与首帧加载照旧。 */
+    if (IS_MOBILE || windowShown) return;
     const show = () => {
       if (windowShown) return;
       windowShown = true;

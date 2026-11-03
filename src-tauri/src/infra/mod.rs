@@ -9,16 +9,29 @@
 //! - `runtime` / `monitor` / `reminder` / `countdown` / `note_windows::restore_open`
 //!   → `jobs::*`（定时触发业务动作，属调度层）
 
-pub mod autostart;
 pub mod db;
-pub mod geometry;
 pub mod md_backup;
 pub mod md_file;
 pub mod migrate;
 pub mod notify;
 pub mod plugin_fs;
+
+/* 桌面独占（V1-Android）：下面这些模块直接调 tauri 桌面专有 API ——
+`WebviewWindowBuilder` 的 `transparent/skip_taskbar/always_on_top/decorations`、
+`available_monitors()` / `primary_monitor()`、托盘菜单、注册表自启。
+Android 上这些 API 要么不存在，要么无实现，**模块级**门控比逐行撒 `#[cfg]` 更省事，
+也让移动端读代码时不会误以为「这里有实现、只是没调用」。 */
+#[cfg(desktop)]
+pub mod autostart;
+#[cfg(desktop)]
+pub mod geometry;
+#[cfg(desktop)]
 pub mod tray_menu;
+#[cfg(desktop)]
 pub mod window;
+#[cfg(desktop)]
 pub mod window_note;
+#[cfg(desktop)]
 pub mod window_rect;
+#[cfg(desktop)]
 pub mod window_spec;

@@ -1,0 +1,296 @@
+/* =============================================================================
+ * TickBar — 移动端 · 共享原语（按钮 / 表单 / 分段 / 列表 / 提示）
+ * -----------------------------------------------------------------------------
+ * 从 shell.css 拆出（AGENTS.md 单文件 ≤300 行；原文件 379 行）。
+ * 全端共用：按钮 / 表单 / 分段 / 列表 / 空态 / 提示条。各页样式在
+ * timer / items / records / settings.css，外壳与导航在 shell.css。
+ * ========================================================================== */
+
+/* ------------------------------ 按钮 ------------------------------ */
+.m-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--m-tap);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  background: var(--bg-field);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: var(--weight-medium);
+  transition: transform var(--dur-instant) var(--ease-standard);
+}
+
+.m-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.m-btn:disabled {
+  color: var(--ink-4);
+  opacity: 0.55;
+}
+
+.m-btn--primary {
+  background: var(--accent-wash);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+}
+
+.m-btn--accent {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+}
+
+.m-btn--danger {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+.m-btn--ghost {
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.m-btn--small {
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.m-btn--wide {
+  width: 100%;
+}
+
+.m-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--m-tap);
+  height: var(--m-tap);
+  margin-right: calc(var(--space-2) * -1);
+  border-radius: var(--radius-full);
+  color: var(--ink-3);
+}
+
+.m-link {
+  min-height: var(--m-tap);
+  padding: 0 var(--space-2);
+  color: var(--accent-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+/* ------------------------------ 表单 ------------------------------ */
+.m-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.m-field--grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.m-field__label {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-input {
+  min-height: var(--m-tap);
+  width: 100%;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--input-text);
+  /* 16px 是移动浏览器的硬门槛：小于它，聚焦时 WebView 会自己放大页面 */
+  font-size: 16px;
+}
+
+.m-input--area {
+  min-height: 84px;
+  padding: var(--space-3);
+  line-height: 1.5;
+  resize: none;
+}
+
+/* ------------------------------ 分段控件 ------------------------------ */
+.m-seg {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  background: var(--seg-track);
+  border: 1px solid var(--seg-track-line);
+}
+
+.m-seg__item {
+  flex: 1 1 0;
+  min-height: 40px;
+  border-radius: var(--radius-md);
+  color: var(--seg-off-ink);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.m-seg__item[data-on="true"] {
+  background: var(--seg-on-bg);
+  color: var(--seg-on-ink);
+}
+
+/* ------------------------------ 列表 / 通用块 ------------------------------ */
+.m-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* 选择器里的一行（换事项 / 事项列表）：整行即命中区，44px 起 */
+.m-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.m-list__row[data-current="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+}
+
+.m-list__name {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-badge {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--bg-field-hi);
+  color: var(--ink-3);
+  font-size: var(--text-cap);
+}
+
+.m-badge--accent {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+}
+
+.m-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+.m-empty {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-4);
+  border-radius: var(--m-radius);
+  background: var(--m-card);
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.m-empty--block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.m-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--danger-wash);
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.m-more {
+  width: 100%;
+  min-height: var(--m-tap);
+  margin-top: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+
+.m-section {
+  margin-top: var(--space-5);
+}
+
+.m-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--m-tap);
+}
+
+.m-section__title {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+}
+
+.m-section__meta {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* ------------------------------ 提示 / 降级条 ------------------------------ */
+.m-toast {
+  position: absolute;
+  left: var(--m-gutter);
+  right: var(--m-gutter);
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  z-index: var(--z-tooltip);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--m-tap);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--bg-field-hi);
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.m-toast[data-tone="danger"] {
+  color: var(--danger);
+  background: var(--danger-wash);
+}
+
+.m-banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--m-gutter);
+  background: var(--warn-wash);
+  color: var(--color-warn);
+  font-size: var(--text-xs);
+}

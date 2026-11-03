@@ -14,16 +14,15 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# 桌面壳（Spec §4 锁定 2.12.4）；tray 为内建能力
-tauri = { version = "2.12.4", features = ["tray-icon", "image-png", "image-ico"] }
+# 桌面壳（Spec §4 锁定 2.12.4）。
+# 托盘图标 + 图片解码只在桌面 target 段开启（见下方 target 段）：`tray-icon` /
+# `image-ico` 会拉进 Android 上没有实现的原生依赖，写在这里等于让移动端链接失败。
+tauri = { version = "2.12.4", features = [] }
 
 # 官方插件（Spec §4 / IPC-CONTRACT-v2 附录 A）
 # v0.3：移除 tauri-plugin-sql / tauri-plugin-store —— 前端从未引用，且它们的
 # capability 放行让前端可以绕过四层直接改库（ADR-015）。需要时按 ADR 回退：
 # 在 [features] 里加 legacy-data-plugins，把两个依赖写回来并重新注册。
-tauri-plugin-autostart = "2"
-tauri-plugin-window-state = "2"
-tauri-plugin-single-instance = "2"
 # V0.2.0 唯一新增依赖（Spec §4 / ADR-010；crates.io max_stable = 2.7.0，已核实）
 tauri-plugin-notification = "2.7.0"
 # V0.4.0：文件夹选择器（设置 → 同步的「选择…」）。只放行 dialog:allow-open，
@@ -40,6 +39,15 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 tokio = { version = "1", features = ["time"] }
 # Rust 侧数据访问（repositories 只写 SQL + 映射）
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros"] }
+
+# 桌面独占依赖（Android / iOS 上这三个插件没有实现，放进通用段必然链接失败）。
+# 用 `cfg(not(any(android, ios)))` 而不是 `cfg(desktop)`：Cargo 的 target 段只认
+# rustc 内建 cfg，`desktop` 是 tauri-build 给源码用的自定义别名，在 Cargo.toml 里无效。
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri = { version = "2.12.4", features = ["tray-icon", "image-png", "image-ico"] }
+tauri-plugin-autostart = "2"
+tauri-plugin-window-state = "2"
+tauri-plugin-single-instance = "2"
 
 [features]
 default = []

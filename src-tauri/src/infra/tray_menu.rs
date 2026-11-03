@@ -27,9 +27,6 @@ pub const ID_OPEN_TODOS: &str = "open_todos";
 pub const ID_OPEN_NOTE: &str = "open_note";
 pub const ID_QUIT: &str = "quit";
 
-/// 时长显示上限（与前端 `formatDuration` 同口径：99:59:59）。
-const MAX_DISPLAY_SEC: i64 = 99 * 3600 + 59 * 60 + 59;
-
 /// 一条菜单节点：分隔线，或文本项。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TrayNode {
@@ -133,17 +130,10 @@ pub fn truncate_name(name: &str, max_chars: usize) -> String {
 }
 
 /// 时长格式化：`<1h` → `MM:SS`；`>=1h` → `HH:MM:SS`；负值归零、上限 99:59:59。
-pub fn format_duration(total_sec: i64) -> String {
-    let sec = total_sec.clamp(0, MAX_DISPLAY_SEC);
-    let hours = sec / 3600;
-    let minutes = (sec % 3600) / 60;
-    let seconds = sec % 60;
-    if hours > 0 {
-        format!("{hours:02}:{minutes:02}:{seconds:02}")
-    } else {
-        format!("{minutes:02}:{seconds:02}")
-    }
-}
+///
+/// 实现已移到 `platform::duration`（倒计时通知也要用，不能只挂在桌面独占模块下），
+/// 这里 re-export 保持既有调用点与测试路径不变。
+pub use crate::platform::duration::format_duration;
 
 /// 状态项里的名称：截断；空名回落「未命名」（设计稿 §3.3.1）。
 fn display_name(item_name: &str) -> String {

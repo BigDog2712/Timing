@@ -6,4 +6,6 @@
 
 pub mod boot_timing;
 pub mod clock;
+pub mod duration;
+pub mod host;
 pub mod log;

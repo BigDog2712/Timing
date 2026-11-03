@@ -45,7 +45,15 @@ function contributions(plugin: PluginInfo): string {
   return parts.length > 0 ? parts.join('；') : '无贡献项';
 }
 
-export function PluginsTab() {
+interface PluginsTabProps {
+  /**
+   * 是否显示「打开目录」。移动端传 false（PRD §5 D16：手机没有资源管理器可跳，
+   * 后端 `plugin_open_dir` 为移动桩返回 IO_ERROR）。桌面不传 = true，行为不变。
+   */
+  showOpenDir?: boolean;
+}
+
+export function PluginsTab({ showOpenDir = true }: PluginsTabProps) {
   const plugins = usePluginStore((s) => s.plugins);
   const dir = usePluginStore((s) => s.dir);
   const loaded = usePluginStore((s) => s.loaded);
@@ -68,9 +76,11 @@ export function PluginsTab() {
         <span className="plg__path" title={dir}>
           {dir || '正在定位插件目录…'}
         </span>
-        <button type="button" className="btn btn--ghost plg__btn" onClick={() => void pluginApi.openDir()}>
-          打开目录
-        </button>
+        {showOpenDir && (
+          <button type="button" className="btn btn--ghost plg__btn" onClick={() => void pluginApi.openDir()}>
+            打开目录
+          </button>
+        )}
         <button
           type="button"
           className="btn btn--neutral plg__btn"

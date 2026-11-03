@@ -5,6 +5,14 @@
 //! → `app`（装配：事件/托盘/启动/诊断）/ `jobs`（调度）→ `commands`（IPC 入口）。
 //! 机械校验：`npm run check:contract` + CI 里的两条 grep（见 AGENTS.md）。
 
+/* 移动端允许 dead_code（V1-Android）：
+md-sync 整域（repositories / services / infra 的 md_*）在 Android 上不接线 —— 4 条命令
+是桩、调度器不 spawn，但源码仍两平台共用（不另开一套移动分支）。同理，托盘快照、
+窗口几何、`WINDOW_LIMIT_EXCEEDED` 之类「没有触发点但契约里必须留着」的定义，在移动端
+都只会被判定为未使用。逐个模块加 `#[cfg]` 让同一份源码分叉更糟：桌面侧才是唯一维护面，
+移动端只是「这份代码暂时用不到」。桌面构建不受影响（clippy -D warnings 仍会抓桌面死码）。 */
+#![cfg_attr(mobile, allow(dead_code))]
+
 mod app;
 mod commands;
 mod error;
@@ -20,14 +28,22 @@ mod state;
 #[cfg(test)]
 mod tests;
 
+/// 应用入口。
+///
+/// `mobile_entry_point` 是 Android / iOS 的**必需**属性：移动端由原生侧
+/// （`MainActivity`）回调这里，没有 `main()` 可走。桌面侧该属性不展开，行为不变。
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 冷启动计时起点（T17）：越靠近进程入口越准。这里比 `Builder` 早，也早于任何插件初始化。
     platform::boot_timing::start();
-    tauri::Builder::default()
-        // 插件（IPC-CONTRACT-v2 附录 A / Spec §4）
-        // v0.3 起移除 `plugin-sql` / `plugin-store`：前端从未引用它们，但 capability
-        // 曾放行 `sql:allow-execute` / `store:allow-set`，等于给前端留了一条绕过四层
-        // 直接改库的通道（ADR-015）。数据访问统一走 commands -> services -> repositories。
+
+    let builder = tauri::Builder::default();
+
+    /* 桌面独占插件（V1-Android）：这三个 crate 在 Android 上无实现，
+    依赖已移入 `Cargo.toml` 的桌面 target 段，注册点也必须同步门控。
+    用「重新绑定」而不是给链式调用加 `#[cfg]`：属性只能挂在语句上，挂不到调用链中间。 */
+    #[cfg(desktop)]
+    let builder = builder
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -39,18 +55,22 @@ pub fn run() {
                 .skip_initial_state(infra::window_spec::TODOS.label)
                 .build(),
         )
-        // [V0.2.0] 系统通知（批 2 提醒调度用；本波仅注册，不接线）
-        .plugin(tauri_plugin_notification::init())
-        // [V0.4.0] 原生文件夹选择（设置 → 同步；只开 dialog:allow-open）
-        .plugin(tauri_plugin_dialog::init())
-        // 单实例：重复启动聚焦已有窗口（AC-22）
+        // 单实例：重复启动聚焦已有窗口（AC-22）。Android 系统本就单实例，无需该插件。
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             let _ = infra::window::show_main(app);
-        }))
+        }));
+
+    let builder = builder
+        // 插件（IPC-CONTRACT-v2 附录 A / Spec §4）
+        // v0.3 起移除 `plugin-sql` / `plugin-store`：前端从未引用它们，但 capability
+        // 曾放行 `sql:allow-execute` / `store:allow-set`，等于给前端留了一条绕过四层
+        // 直接改库的通道（ADR-015）。数据访问统一走 commands -> services -> repositories。
+        // [V0.2.0] 系统通知（批 2 提醒调度用；本波仅注册，不接线）——两平台通用
+        .plugin(tauri_plugin_notification::init())
+        // [V0.4.0] 原生文件夹选择（设置 → 同步；只开 dialog:allow-open）——两平台通用
+        .plugin(tauri_plugin_dialog::init())
         // 启动装配：日志 -> 建库 -> 默认设置 -> 状态 -> 托盘 -> 诊断 -> 调度器
         .setup(|app| app::bootstrap::setup(app.handle().clone()))
-        // K-5：拦截关闭请求 -> 隐藏窗口
-        .on_window_event(infra::window::on_window_event)
         .invoke_handler(tauri::generate_handler![
             commands::item_cmd::list_items,
             commands::item_cmd::create_item,
@@ -122,7 +142,14 @@ pub fn run() {
             commands::md_sync_cmd::md_sync_save,
             commands::md_sync_cmd::md_sync_run,
             commands::md_sync_cmd::md_sync_open,
-        ])
+        ]);
+
+    // K-5：拦截关闭请求 -> 隐藏窗口。移动端没有「关窗即隐藏」的语义（返回键退后台由
+    // 系统管），且 `WindowEvent` 的关窗分支在 Android 上没有触发点，故只在桌面挂。
+    #[cfg(desktop)]
+    let builder = builder.on_window_event(infra::window::on_window_event);
+
+    builder
         .run(tauri::generate_context!())
         .expect("TickBar 启动失败");
 }

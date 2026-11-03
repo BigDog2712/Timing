@@ -2,6 +2,86 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## [未发布] V1.0-Android：Rust 侧平台门控 + APK 出包
+
+依据 `docs/mobile/DESIGN-ANDROID-V1.md` 执行 **T2 / T3 / T4 / T5 / T13**，前端 T6–T12 已就位。
+**契约零变化**：命令 65 / 事件 11 / 错误码 16，`check:contract` 输出 `65/65/65/65 · 16/16 · 11/11`。
+
+### 依赖与入口（T2）
+
+- `Cargo.toml`：`tauri` 的 `tray-icon` / `image-png` / `image-ico` 与 `autostart` /
+  `window-state` / `single-instance` 三个插件移入
+  `[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]`。
+  这些 crate 在 Android 无实现，留在通用段必然链接失败。
+- `lib.rs`：`run()` 加 `#[cfg_attr(mobile, tauri::mobile_entry_point)]`（Android 靠它找入口）；
+  插件链拆两段，桌面独占三个插件与 `.on_window_event()` 用 `#[cfg(desktop)]` 门控。
+- 新增 `platform/host.rs`：`OS` 常量 + `desktop_only(cmd)`（统一造 `IO_ERROR`，不新增错误码）。
+- 新增 `platform/duration.rs`：`format_duration` 从 `infra::tray_menu` 提出——倒计时**通知**正文
+  也要用它，而托盘模块要整块门控；`tray_menu` 保留 `pub use` 维持调用点与测试路径不变。
+
+### 桌面模块门控（T3）
+
+- `infra`：`autostart` / `geometry` / `tray_menu` / `window` / `window_note` / `window_rect` /
+  `window_spec` 模块级 `#[cfg(desktop)]`。
+- `app`：`tray` / `diagnostics` 门控；`bootstrap` 的托盘、启动钳制、诊断快照、`monitor` 与
+  `md_sync` 调度按平台分段，移动端补 `boot_timing::mark("mobile_skip_desktop")`。
+- `jobs::monitor` / `jobs::md_sync` 门控；`services::timer::tray_snapshot` 与
+  `models::timer::TraySnapshot` 随托盘一起只在桌面编译。
+- `app::events`：`tray::sync_status` 收成本地 `sync_tray()`，移动端空实现（**连快照查询都不做**）。
+- `lib.rs` 加 `#![cfg_attr(mobile, allow(dead_code))]`：md-sync 整域、错误码闭集等在两平台共用
+  源码但在移动端无触发点，逐个模块分叉比留一条「暂时用不到」的代码更糟。
+
+### 命令层移动桩（T4）
+
+- `commands/mod.rs` 用 `#[path]` 换文件，模块名/函数名不变 → `lib.rs` 的 65 条注册一字未改。
+- 新增 `commands/{system,window,md_sync}_cmd_mobile.rs`：
+  - `show/hide/toggle_window`、`save_window_position` → `Ok(())` 幂等空操作（前端首帧与拖动收尾会调）；
+  - `main_work_area` / `main_window_rect` / `quit_app` / 5 条 `open_*` / `close_note_window` → `IO_ERROR`；
+  - 4 条 `md_sync_*` → `IO_ERROR`「移动端暂不支持 Markdown 同步」。
+- `settings_cmd.rs`：自启收成 `autostart_enabled()` / `set_autostart_enabled()` 一对，
+  桌面读写注册表、移动端恒 `false`（`Settings.autostartEnabled` 字段保留，契约不变）。
+- `note_cmd.rs`：便利贴置顶只推窗口层级（桌面），移动端只落列值。
+
+### 移动端配置与通知（T5）
+
+- `capabilities/default.json` 加 `"platforms": ["windows","macOS","linux"]`（Android 上
+  `autostart:allow-*` 不存在，不隔离会让 `tauri android build` 的权限校验失败）。
+- 新增 `capabilities/mobile.json`：`platforms: ["android","iOS"]`，窗口只留显隐/定位/读尺寸、
+  事件 `listen/emit`、`notification:default`。
+- 新增 `tauri.android.conf.json`：窗口改为不透明、有装饰、不置顶、不上任务栏、**可见**，
+  去掉 WebView2 专用 `additionalBrowserArgs` 与桌面药丸尺寸。
+- `AndroidManifest.xml` 加 `POST_NOTIFICATIONS`；`infra/notify.rs` 在 Android 启动时建
+  单通道 `timer-reminder`「计时提醒」并让所有通知显式指向它（API 26+ 无通道即丢通知）。
+- `gen/android` 的 `compileSdk` 由 CLI 默认的 **37** 降到 **36**、`targetSdk` 用 **35**：
+  `tauri-android` / `tauri-plugin-notification` 的 AAR 元数据要求 compileSdk ≥ 36，
+  而 targetSdk 才是运行时行为开关，按设计口径留 35；`minSdk 24` 不变。
+- `gradle-wrapper.properties` 的 `distributionUrl` 换腾讯镜像（`services.gradle.org` 的 307
+  会跳到 GitHub Releases，本机不可达）。
+
+### 本机环境绕行（出包路径与设计 §9 的差异，都是环境限制）
+
+| 现象 | 绕行 |
+|---|---|
+| `tauri android build` 把 `.so` **符号链接**进 `app/src/main/jniLibs` 时报「Creation symbolic link is not allowed」（本机未开开发者模式 / 无 SeCreateSymbolicLinkPrivilege） | 改为 `cargo build --lib --target aarch64-linux-android` + 硬链接 `.so` 到 jniLibs + 复制 `dist` 到 `assets` + `gradlew assembleArm64Debug -x rustBuildArm64Debug -x rustBuildUniversalDebug`。**产物与 CLI 路径等价**，只是踩过了那一步 |
+| Gradle 分发与 AGP 依赖从境外源只有几 KB/s（AGP 9 + Kotlin 2.2 首次解析要几百 MB） | 分发走腾讯镜像；依赖解析用临时 init script 指向 maven.aliyun.com（`~/.gradle` 与本机临时文件，不入仓库） |
+| 只装了 `aarch64` / `x86_64` 两个 rust-std，`armv7` / `i686` 下载被镜像 403 | 只出 `--target aarch64`（arm64-v8a）单 ABI APK；universal / 32 位需先补 rust-std |
+
+### 验收
+
+- 桌面：`cargo test` **338 passed / 0 failed**；`cargo clippy --all-targets -- -D warnings` 通过；
+  `cargo fmt --check` 通过；`npm run typecheck` / `check:contract` 通过。
+- Android：`cargo check --lib --target aarch64-linux-android` 通过（0 warning）。
+- 出包：`src-tauri/gen/android/app/build/outputs/apk/arm64/debug/app-arm64-debug.apk`
+  （debug · arm64-v8a），含 `lib/arm64-v8a/libtickbar_lib.so`、`classes*.dex`、
+  `assets/index.html`、`assets/assets/index-*.js`（已确认打到移动分支：含 `m-shell`）。
+  体积偏大是 debug 未 strip 的 183 MB `.so` 所致，release 会 LTO + strip。
+
+### 本轮没做
+
+- 前台服务 / 后台保活（PRD Q3）：进程被冻结时到点通知会延迟，数据由幂等补判保证正确。
+- md-sync / SAF（PRD Q2）：4 条命令保留注册但返回不支持，设置页在移动端隐藏「同步」页签。
+- 真机验证（无设备）：触摸、通知权限弹窗、返回键层级、后台冻结行为全部未实测。
+
 ## [0.4.1] - 2026-11-02
 
 ### 归档到 `261102-Timing` + 构建层优化

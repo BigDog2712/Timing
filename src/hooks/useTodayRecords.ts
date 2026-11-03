@@ -17,6 +17,12 @@ export interface TodayRecordsData {
   error: string | null;
   /** 今日已保存记录合计秒数 */
   totalSec: number;
+  /**
+   * 今日已保存记录条数（`stats_summary.recordCount`）。
+   * 与 `rows.length` 的区别：明细只拉 100 条一页的循环，条数超过时会与聚合不一致；
+   * 汇总条要的是**统计口径**的条数，所以单独透出这个值。
+   */
+  recordCount: number;
   /** 今日已保存记录（startedAt 降序） */
   rows: TimeRecord[];
   reload: () => void;
@@ -33,6 +39,7 @@ export function useTodayRecords(): TodayRecordsData {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalSec, setTotalSec] = useState(0);
+  const [recordCount, setRecordCount] = useState(0);
   const [rows, setRows] = useState<TimeRecord[]>([]);
   const [nonce, setNonce] = useState(0);
 
@@ -57,6 +64,7 @@ export function useTodayRecords(): TodayRecordsData {
         }
         if (cancelled) return;
         setTotalSec(summary.totalSec);
+        setRecordCount(summary.recordCount);
         setRows(records.sort((a, b) => b.startedAt - a.startedAt));
       } catch (err) {
         if (!cancelled) setError(errorText(err));
@@ -76,5 +84,5 @@ export function useTodayRecords(): TodayRecordsData {
     if (report.kinds.includes('timers')) reload();
   });
 
-  return { loading, error, totalSec, rows, reload };
+  return { loading, error, totalSec, recordCount, rows, reload };
 }

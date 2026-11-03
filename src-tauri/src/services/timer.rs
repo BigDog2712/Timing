@@ -15,11 +15,14 @@ use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
 use crate::models::constants::{SYSTEM_ITEM_ID, UNDO_TOLERANCE_MS, UNDO_WINDOW_MS};
-use crate::models::enums::{
-    record_status, timer_mode, timer_status, ResolveAction, SwitchMode, TrayStatus,
-};
+use crate::models::enums::{record_status, timer_status, ResolveAction, SwitchMode};
+// 托盘快照相关类型仅桌面用（移动端没有菜单可填），故只进桌面编译。
+#[cfg(desktop)]
+use crate::models::enums::{timer_mode, TrayStatus};
 use crate::models::record::TimeRecord;
-use crate::models::timer::{TimerState, TraySnapshot};
+use crate::models::timer::TimerState;
+#[cfg(desktop)]
+use crate::models::timer::TraySnapshot;
 use crate::platform::clock;
 use crate::repositories::item as item_repo;
 use crate::repositories::record as repo;
@@ -55,6 +58,9 @@ pub async fn state(pool: &SqlitePool) -> AppResult<TimerState> {
 ///
 /// 复用调用方已加载的 `TimerState`，避免重复查询（性能：同一轮事件仅查一次状态）。
 /// `liveDurationSec` 与 `state()` 同源，额外补充当前会话的事项名。
+///
+/// 桌面独占：快照只服务托盘菜单，移动端没有托盘（`app::events` 的 `sync_tray` 空实现）。
+#[cfg(desktop)]
 pub async fn tray_snapshot(pool: &SqlitePool, current: &TimerState) -> AppResult<TraySnapshot> {
     let base = TrayStatus::from_timer_status(&current.status);
     // 倒计时中单独成态（状态行带剩余时长）；暂停中的倒计时仍按「已暂停」呈现（设计稿 §3.3.1）。

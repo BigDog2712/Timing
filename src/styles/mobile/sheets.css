@@ -1,0 +1,265 @@
+/* =============================================================================
+ * TickBar — 移动端 Sheet / 撤销条 / 恢复面板
+ * -----------------------------------------------------------------------------
+ * 手机没有 hover，浮层的三个出口必须显式：点遮罩、下滑抓取柄、Android 返回键。
+ * 抓取柄的可触区做成 44px 高（本体只有 4px），否则「往下滑」永远滑不准。
+ * ========================================================================== */
+
+.m-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: var(--scrim);
+}
+
+.m-sheet {
+  display: flex;
+  flex-direction: column;
+  max-height: 88%;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-radius: 18px 18px 0 0;
+  border-top: 1px solid var(--line-2);
+  background: var(--bg-panel);
+  /* 入场用一次性动画（不 fill-forwards）：拖拽期靠行内 transform 接管，
+     两者同时生效会让手指拖不动面板。 */
+  animation: m-sheet-in var(--dur-morph) var(--ease-morph);
+}
+
+@keyframes m-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.m-sheet[data-dragging="true"] {
+  animation: none;
+}
+
+.m-sheet__grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--m-tap);
+  padding-top: var(--space-2);
+  cursor: grab;
+  touch-action: none;
+}
+
+.m-sheet__grip span {
+  width: 36px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--line-3);
+}
+
+.m-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) 0 var(--m-gutter);
+}
+
+.m-sheet__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: var(--weight-semibold);
+}
+
+.m-sheet__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-2) var(--m-gutter) var(--space-4);
+}
+
+.m-sheet__foot {
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--m-gutter);
+  border-top: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+
+.m-sheet__foot-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.m-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+/* ------------------------------ 预设档位 ------------------------------ */
+.m-grid--preset {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.m-preset {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 64px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-field);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-preset__unit {
+  font-size: var(--text-cap);
+  font-weight: var(--weight-read);
+  color: var(--ink-3);
+}
+
+/* ------------------------------ 底部菜单 ------------------------------ */
+.m-actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.m-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-2) var(--space-1);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 16px;
+  text-align: left;
+}
+
+.m-action:last-child {
+  border-bottom: 0;
+}
+
+.m-action[data-tone="danger"] {
+  color: var(--danger);
+}
+
+.m-action:disabled {
+  color: var(--ink-4);
+}
+
+.m-action__hint {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-action[data-tone="danger"] .m-action__hint {
+  color: var(--ink-3);
+}
+
+/* ------------------------------ 3s 撤销条 ------------------------------ */
+.m-undo {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(var(--m-tabbar-h) + env(safe-area-inset-bottom, 0px) + var(--space-3));
+  z-index: var(--z-undo);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-3) var(--space-4);
+  border-radius: var(--m-radius);
+  background: var(--bg-field-hi);
+  border: 1px solid var(--line-2);
+  overflow: hidden;
+}
+
+.m-undo__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 剩余时间进度条：时长由行内 animation-duration 给出（剩余毫秒），这里只描述形状 */
+.m-undo__bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: var(--accent);
+  transform-origin: left center;
+  animation-name: m-undo-count;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+@keyframes m-undo-count {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ------------------------------ 崩溃恢复 ------------------------------ */
+.m-recover__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  font-size: 15px;
+}
+
+.m-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: var(--m-tap);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.m-check input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.m-check__sub {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--accent-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-sheet,
+  .m-ring[data-spin="true"] .m-ring__bar,
+  .m-undo__bar {
+    animation: none;
+  }
+}

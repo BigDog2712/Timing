@@ -16,8 +16,12 @@
 
 use tauri::{AppHandle, Manager};
 
+// `app::tray` / `app::diagnostics` 都是桌面独占模块，移动端这个叶子导入会空着。
+#[cfg(desktop)]
 use crate::app;
-use crate::infra::{db, window};
+use crate::infra::db;
+#[cfg(desktop)]
+use crate::infra::window;
 use crate::jobs;
 use crate::platform::boot_timing;
 use crate::services;
@@ -31,6 +35,12 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     crate::platform::log::init(&app_data_dir);
     boot_timing::set_dir(&app_data_dir.join("logs"));
     boot_timing::mark("log_ready");
+    // 平台标识入日志：用户报障时第一眼要能分清是桌面还是手机（能力面不同）。
+    crate::log_info!(
+        "startup on {} ({})",
+        crate::platform::host::OS,
+        app_data_dir.display()
+    );
 
     // ①' [V0.4.1] Markdown 落点写前留底目录（md-sync 覆写用户日记前存原内容）。
     //     放在 app_data 而不是 vault 里：不在 Obsidian 的库里堆 .bak。
@@ -43,29 +53,49 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(AppState::new(pool.clone()));
     boot_timing::mark("defaults_ready");
 
-    // ⑤ 托盘
-    app::tray::build(&app)?;
-    boot_timing::mark("tray_ready");
+    // ④' 移动端通知通道：API 26+ 没有通道的通知会被系统静默丢弃，必须在第一次
+    //    发送前建好（倒计时 / 提醒都走这条通道）。
+    #[cfg(target_os = "android")]
+    crate::infra::notify::ensure_channel(&app);
+
+    // ⑤ 托盘（桌面独占：Android 无托盘，跳过）
+    #[cfg(desktop)]
+    {
+        app::tray::build(&app)?;
+        boot_timing::mark("tray_ready");
+    }
 
     // ⑥ 启动即钳制：AC-23①。window-state 插件的 on_window_ready 早于本 setup 回调，
     //    所以此刻窗口位置已是「上次的」，越界要在这里纠正。
-    if let Err(err) = window::reclamp_main(&app) {
-        crate::log_warn!("startup reclamp failed: {err}");
-    }
-    boot_timing::mark("reclamped");
+    //    移动端只有一个系统管理的全屏 Activity，没有可钳制的窗口。
+    #[cfg(desktop)]
+    {
+        if let Err(err) = window::reclamp_main(&app) {
+            crate::log_warn!("startup reclamp failed: {err}");
+        }
+        boot_timing::mark("reclamped");
 
-    // ⑦ 诊断快照（失败不致命）
-    app::diagnostics::write_snapshot(&app, &app_data_dir);
-    boot_timing::mark("diagnostics_done");
+        // ⑦ 诊断快照（失败不致命；要枚举显示器与窗口，移动端无意义）
+        app::diagnostics::write_snapshot(&app, &app_data_dir);
+        boot_timing::mark("diagnostics_done");
+    }
 
     // ⑧ 常驻调度
+    #[cfg(desktop)]
     jobs::monitor::spawn_watch(app.clone());
     jobs::flusher::spawn_flusher(app.clone());
     jobs::reminder::spawn_reminder_watcher(app.clone());
     jobs::nudge::spawn_nudge_watcher(app.clone());
     jobs::countdown::spawn_countdown_watcher(app.clone());
+    // md-sync 落点是桌面文件路径，移动端要 SAF（本轮不做，设计 §1.4）
+    #[cfg(desktop)]
     jobs::md_sync::spawn_md_sync_watcher(app.clone());
     boot_timing::mark("jobs_spawned");
+
+    // 移动端跳过了托盘 / 钳制 / 诊断，补一个标记点：启动耗时报告里段落不缺项，
+    // 一眼能看出「不是卡住，是这三步本来就不跑」。
+    #[cfg(mobile)]
+    boot_timing::mark("mobile_skip_desktop");
 
     // ⑨ [V0.3.9] 不再恢复上次打开的便利贴窗口（用户口径：启动不要「默认存在一张」）。
     //    `is_open` 只在点黄点收纳时归零，退出时不清；启动统一清零，避免残留标记占满

@@ -12,6 +12,8 @@ src-tauri/gen/schemas/
 release/*.exe
 release/*.msi
 release/*.nsis.zip
+# Android 安装包：可执行产物，体积按 MB 计，不入库（构建方式见 归档说明.md §8）
+release/*.apk
 
 # --- 临时 / 本地 ---
 *.log

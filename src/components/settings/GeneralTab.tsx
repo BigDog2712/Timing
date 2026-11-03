@@ -31,7 +31,16 @@ function clampSec(value: number): number {
   return Math.min(MIN_RECORD_SEC_MAX, Math.max(MIN_RECORD_SEC_MIN, value));
 }
 
-export function GeneralTab() {
+interface GeneralTabProps {
+  /**
+   * 是否显示「开机自启」。移动端传 false（PRD §5 D4：Android 无等价语义，
+   * 后端 get_settings 恒返回 false，留一个点了没反应的开关等于骗人）。
+   * 桌面不传 = true，行为与样式完全不变。
+   */
+  showAutostart?: boolean;
+}
+
+export function GeneralTab({ showAutostart = true }: GeneralTabProps) {
   const settings = useSettingsStore((s) => s.settings);
   const referenceSettings = useSettingsStore((s) => s.referenceSettings);
   const [error, setError] = useState<string | null>(null);
@@ -87,14 +96,16 @@ export function GeneralTab() {
 
   return (
     <div className="setting-group">
-      <div className="setting-row">
-        <span className="setting-row__label">开机自启</span>
-        <Switch
-          label="开机自启"
-          checked={settings.autostartEnabled}
-          onChange={(v) => void run(() => settingsActions.setAutostart(v))}
-        />
-      </div>
+      {showAutostart && (
+        <div className="setting-row">
+          <span className="setting-row__label">开机自启</span>
+          <Switch
+            label="开机自启"
+            checked={settings.autostartEnabled}
+            onChange={(v) => void run(() => settingsActions.setAutostart(v))}
+          />
+        </div>
+      )}
 
       <div className="setting-row">
         <span className="setting-row__label">最短记录时长</span>

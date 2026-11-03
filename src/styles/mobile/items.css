@@ -1,0 +1,188 @@
+/* =============================================================================
+ * TickBar — 移动端 · 事项页（汇总条 / 待办 / 今日记录）
+ * -----------------------------------------------------------------------------
+ * 从 pages.css 按页面拆出（AGENTS.md 单文件 ≤300 行；原文件 504 行）。
+ * 只写本页自己的块：按钮 / 输入 / 分段 / 列表等原语在 primitives.css，
+ * 外壳与导航在 shell.css。颜色一律走令牌，可点元素高度 >= 44px。
+ * ========================================================================== */
+
+/* ============================== 事项页 ============================== */
+.m-items {
+  padding-top: var(--space-1);
+}
+
+.m-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--m-radius);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+.m-summary__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.m-summary__label {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-summary__count {
+  font-size: 18px;
+  font-weight: var(--weight-semibold);
+}
+
+.m-summary__total {
+  font-family: var(--font-timer);
+  font-size: 24px;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-ink);
+}
+
+.m-compose {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.m-todo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+/* 圆圈本体 24px，命中区撑到 44×44（视觉小、手指好点） */
+.m-todo__check {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--m-tap);
+  height: var(--m-tap);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.m-todo__check::before {
+  content: "";
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--todo-mark-ring);
+}
+
+.m-todo__check[aria-checked="true"]::before {
+  background: var(--todo-mark-done);
+  border-color: var(--todo-mark-done);
+}
+
+.m-todo__check svg {
+  position: absolute;
+  color: var(--todo-mark-done-ink);
+}
+
+.m-todo__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--m-tap);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.m-todo__title {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-todo[data-done="true"] .m-todo__title {
+  color: var(--todo-name-done);
+  text-decoration: line-through;
+}
+
+.m-todo__time {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-todo[data-overdue="true"] .m-todo__time {
+  color: var(--todo-overdue);
+}
+
+.m-record {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px var(--space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.m-list--record .m-record {
+  border: 0;
+  background: transparent;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+
+.m-record__name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-record__count {
+  font-size: var(--text-cap);
+  color: var(--ink-3);
+}
+
+.m-record__range {
+  grid-column: 1;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-record__note {
+  grid-column: 1;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-record__dur {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}

@@ -11,6 +11,7 @@
  */
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { ipc, isTauri } from '../services/ipc';
+import { IS_MOBILE } from './platform';
 
 /**
  * 本文件是**全前端唯一的窗口 API 出口**（R2）。
@@ -114,7 +115,9 @@ export function markWindowKind(): WindowKind {
 /** K-18 防白闪：首帧就绪后显示当前窗口（只显示一次；cleanup 取消未执行的 rAF/定时器） */
 let windowShown = false;
 export function showCurrentWindowOnReady(): () => void {
-  if (!isTauri()) return () => undefined;
+  /* 移动端只有一个随 Activity 出现的全屏窗，没有「visible:false 等首帧再 show」这回事：
+     `setSkipTaskbar` 在 Android 也没有对应概念，整段直接空转。 */
+  if (IS_MOBILE || !isTauri()) return () => undefined;
   /* [V0.2.8] 设置面板 / 事项窗是浮层，不该在任务栏留按钮。
      tao 的 `skip_taskbar` 走的是 `ITaskbarList::DeleteTab`（只删已存在的按钮），
      窗口 `show()` 之后外壳可能又把按钮加回来——所以显示后再删一次。 */
@@ -165,7 +168,8 @@ export function closeCurrentWindow(): Promise<void> {
  * 非 Tauri 为 no-op；失败静默（拖不起来不该打断计时交互）。
  */
 export function startCurrentWindowDrag(): Promise<void> {
-  if (!isTauri()) return Promise.resolve();
+  /* 手机没有「拖动窗口」：整屏固定布局（PRD §5 D9），调用方按 no-op 收敛 */
+  if (IS_MOBILE || !isTauri()) return Promise.resolve();
   return getCurrentWindow()
     .startDragging()
     .catch(() => undefined);
@@ -188,7 +192,7 @@ export type ResizeDir =
   | 'West';
 
 export function startCurrentWindowResize(direction: ResizeDir = 'SouthEast'): Promise<void> {
-  if (!isTauri()) return Promise.resolve();
+  if (IS_MOBILE || !isTauri()) return Promise.resolve();
   return getCurrentWindow()
     .startResizeDragging(direction)
     .catch(() => undefined);

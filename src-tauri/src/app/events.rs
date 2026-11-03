@@ -6,7 +6,6 @@
 use sqlx::SqlitePool;
 use tauri::{AppHandle, Emitter};
 
-use crate::app::tray;
 use crate::services;
 
 /// 计时状态变化事件名（IPC-CONTRACT-v2 §6）。
@@ -44,16 +43,34 @@ pub const MD_SYNC_CHANGED: &str = "md-sync:changed";
 pub async fn emit_timer_state(app: &AppHandle, pool: &SqlitePool) {
     match services::timer::state(pool).await {
         Ok(state) => {
-            match services::timer::tray_snapshot(pool, &state).await {
-                Ok(snapshot) => tray::sync_status(app, &snapshot),
-                Err(err) => crate::log_warn!("build tray snapshot failed: {err}"),
-            }
+            sync_tray(app, pool, &state).await;
             if let Err(err) = app.emit(TIMER_STATE_CHANGED, &state) {
                 crate::log_warn!("emit {TIMER_STATE_CHANGED} failed: {err}");
             }
         }
         Err(err) => crate::log_warn!("build timer state failed: {err}"),
     }
+}
+
+/// 托盘状态同步（桌面：重建原生菜单；移动端：无托盘，空实现）。
+///
+/// 抽成函数而不是在调用点 `#[cfg]`：`emit_timer_state` 是唯一的状态广播入口，
+/// 平台差异必须留在它下面一层，否则以后多一个广播点就会漏一次门控。
+/// 移动端整段跳过 —— 连 `tray_snapshot` 的查询都不做（没人消费那份快照）。
+#[cfg(desktop)]
+async fn sync_tray(app: &AppHandle, pool: &SqlitePool, state: &crate::models::timer::TimerState) {
+    match services::timer::tray_snapshot(pool, state).await {
+        Ok(snapshot) => crate::app::tray::sync_status(app, &snapshot),
+        Err(err) => crate::log_warn!("build tray snapshot failed: {err}"),
+    }
+}
+
+#[cfg(mobile)]
+async fn sync_tray(
+    _app: &AppHandle,
+    _pool: &SqlitePool,
+    _state: &crate::models::timer::TimerState,
+) {
 }
 
 /// 读取最新主题 / 四色并广播 `theme-changed`（所有窗口自订阅，K-21）。
