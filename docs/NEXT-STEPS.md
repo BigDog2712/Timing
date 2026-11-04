@@ -36,8 +36,9 @@
 ### 4. 自动更新
 
 - **现状**：没有 updater。发新版只能让用户手动下载重装。
-- **建议**：`tauri-plugin-updater` + GitHub Releases（或自建静态 JSON）。桌面与安卓共用同一份
-  `version` 清单；安卓走 Tauri 那套需要改用 WebView 版，**原生 Kotlin 端建议自己做「检查更新 → 下载 APK → 拉起安装」**（约 150 行）。
+- **建议**：`tauri-plugin-updater` + GitHub Releases（或自建静态 JSON）。桌面沿用 Tauri 那套；
+  **安卓端只有原生 Kotlin 一套，Tauri 的 updater 用不上**，需要自己做「检查更新 → 下载 APK → 拉起安装」（约 150 行）。
+  两端共用同一份静态 `version` 清单，避免两套发布逻辑。
 - **验收**：装 0.1.0 → 发 0.1.1 → 应用内点「检查更新」能装上新版且数据不丢。
 
 ---

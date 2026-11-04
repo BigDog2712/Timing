@@ -18,7 +18,7 @@ SAF 目录授权都需要装机确认。
 
 ## 1. 为什么是原生 Kotlin，而不是复用桌面那套 Tauri
 
-桌面版（`src-tauri/`，v0.4.1）和已发布的 Tauri 安卓包（`release/TickBar-v0.4.1-android-arm64.apk`）都**没有悬浮层**能力，原因是技术性的，不是没做：
+桌面版（`src-tauri/`，v0.4.1）和旧版本出过的 Tauri 安卓包（`TickBar-v0.4.1-android-arm64.apk`）都**没有悬浮层**能力，原因是技术性的，不是没做：
 
 | 需求 | 需要的系统能力 | Tauri / WebView 能做吗 |
 | --- | --- | --- |
@@ -246,7 +246,7 @@ android-app/
 
 ## 6. 怎么跑起来
 
-构建组合（与本机已验证的 Tauri 安卓工程一致，两套工程共用同一份 Gradle 缓存）：
+构建组合（与已验证的 Tauri 安卓工程对齐过版本，两套工程共用同一份 Gradle 缓存）：
 Gradle **9.6.1** · AGP **9.3.1** · Kotlin **2.2.10** · `compileSdk 36` / `targetSdk 35` / `minSdk 26`。
 运行前提只有 JDK 17 + Android SDK（platforms;android-36、build-tools 36）。
 

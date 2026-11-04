@@ -24,7 +24,7 @@
 
 ### 工程整合
 
-- 以 `261102-Timing`（0.4.1，含安卓双实现）为准，确认它是 `261017-Tickbar`（0.4.0）的**严格超集**：
+- 以 `261102-Timing`（0.4.1，含原生安卓工程）为准，确认它是 `261017-Tickbar`（0.4.0）的**严格超集**：
   `src/`、`src-tauri/src/`、`plugins/`、`tests/` 的差异全部是前者新增或更新，无一条只存在于旧库。
 - `scripts/dev-desktop.cmd`、`scripts/build-release.cmd` 与五道门禁原样保留，桌面调试路径不变。
 - 文档分家：现行文档留在 `docs/`（契约 / ADR / 设计 / 移动端 / 同步），v0.2.0 与 v1 阶段文档归入
@@ -35,8 +35,13 @@
 
 | 平台 | 文件 |
 | --- | --- |
-| Windows x64 | `release/TickBar_0.1.0_x64-setup.exe`（NSIS）· `release/TickBar_0.1.0_x64_zh-CN.msi` |
-| Android | `release/TickBar-android-0.1.0.apk`（原生 Kotlin） |
+| Windows x64 | `release/TickBar_0.1.0_x64-setup.exe`（NSIS）· `release/TickBar-0.1.0-portable.exe`（绿色版） |
+| Android | `release/TickBar-android-0.1.0.apk`（原生 Kotlin，安卓端唯一产物） |
+
+本版未出 MSI：`npm run tauri build` 的打包阶段要从 GitHub 拉 NSIS/WiX，构建机不通。
+安装器改由本地 NSIS 编译（`scripts/installer/TickBar.nsi` + `scripts/build-installer.cmd`）。
+安卓端收敛为原生 Kotlin 一套，Tauri WebView 包不再出——无系统级悬浮窗、退后台会被冻结。
+`src-tauri/gen/android` 保留为工程备用，不参与出包。
 
 ## [未发布] V1.0-Android：Rust 侧平台门控 + APK 出包
 

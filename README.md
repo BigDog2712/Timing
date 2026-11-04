@@ -19,7 +19,8 @@ Windows 桌面常驻悬浮计时条 + 安卓悬浮计时器：屏幕边缘一条
 > 安卓包用 debug keystore 签名，**能装能跑，不可上架**（正式分发请自备 keystore，见 `docs/mobile/`）。
 > 需要 MSI 时在能访问 GitHub 的机器上跑 `npm run tauri build`；本仓库额外提供
 > `scripts/build-installer.cmd`（本地 NSIS 出安装包，无需联网下载工具链）。
-> 同源 WebView 版安卓包（`TickBar-tauri-android-*-arm64.apk`，无悬浮层）按需另出，不在本版产物里。
+> 安卓端**只有原生 Kotlin 版一套**（`android-app/`）。同源的 Tauri WebView 壳包不再出：它拿不到
+> 系统级悬浮窗、进后台会被冻结，作为手机端产品是退化的，只保留工程备用。
 
 ## 双端是什么关系
 
@@ -33,8 +34,10 @@ Windows 桌面常驻悬浮计时条 + 安卓悬浮计时器：屏幕边缘一条
 | 便利贴 / 插件 | 有（多窗 + 声明式插件） | 无（系统窗口模型不同） |
 | Markdown 同步 | md-sync 插件，路径落点 | SAF 选目录，双向合并 |
 
-`src-tauri/gen/android` 是 Tauri 官方安卓壳工程（WebView 方案），只在需要「同源预览包」时用，
-日常手机端以 `android-app/` 为准。
+`src-tauri/gen/android` 是 Tauri 官方安卓壳工程（WebView 方案），**不随版发布**：手机端只有
+`android-app/` 一套，桌面能力在手机上要靠原生实现补齐，WebView 壳做不到悬浮层与后台常驻。
+该目录保留原因：将来若要在移动端复用桌面 UI（例如大屏平板上的只读视图），它是现成起点；
+确认不需要可直接删，不影响任何构建与发布流程。
 
 ## 桌面能做什么
 
@@ -94,7 +97,7 @@ macOS / Linux 版本是一个独立的移植项目（托盘、几何钳制、DPI
 │   ├── src/jobs/           # 调度：monitor / flusher / reminder / countdown / restore_notes
 │   ├── src/commands/  src/repositories/  src/models/  src/tests/
 │   ├── capabilities/       # Tauri 2 权限放行清单（只留实际用到的窗口/事件/自启/目录选择）
-│   ├── gen/android/        # Tauri 官方安卓壳工程（可选，用于同源预览包）
+│   ├── gen/android/        # Tauri 官方安卓壳工程（保留备用，不随版发布，可删）
 │   └── tauri.conf.json
 ├── android-app/            # 原生 Kotlin 安卓端（悬浮条 / 前台服务 / SQLite / Obsidian 同步）
 ├── scripts/                # dev-desktop.cmd / build-release.cmd + 五道机械门禁
