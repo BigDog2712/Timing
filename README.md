@@ -1,5 +1,8 @@
 # TickBar v0.1.1
 
+[![CI](https://github.com/BigDog2712/timing/actions/workflows/ci.yml/badge.svg)](https://github.com/BigDog2712/timing/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/BigDog2712/timing?label=release)](https://github.com/BigDog2712/timing/releases)
+
 Windows 桌面常驻悬浮计时条 + 安卓悬浮计时器：屏幕边缘一条 32px 的小药丸，按一下就开计时，不占工作区。
 纯本地（SQLite），无账号、无联网。
 
