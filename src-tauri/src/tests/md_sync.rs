@@ -113,9 +113,7 @@ async fn exports_planner_format_and_imports_edited_time() {
     )
     .await;
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     assert!(report.exported >= 1);
 
@@ -135,9 +133,7 @@ async fn exports_planner_format_and_imports_edited_time() {
     let edited = md_file::replace_in_text(&text, TIMERS_HEADING, &body);
     std::fs::write(&file, edited).unwrap();
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     assert!(report.kinds.contains(&MdSyncKind::Timers));
 
@@ -169,18 +165,14 @@ async fn deleting_a_group_soft_deletes_its_records() {
         binding(MdSyncKind::Timers, &env.vault, "{date}.md", TIMERS_HEADING),
     )
     .await;
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
 
     let file = file_for(&env);
     let text = std::fs::read_to_string(&file).unwrap();
     let edited = md_file::replace_in_text(&text, TIMERS_HEADING, "");
     std::fs::write(&file, edited).unwrap();
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     let alive = scalar_i64(
         &env.pool,
@@ -224,9 +216,7 @@ async fn missing_file_is_created_with_heading_only_when_there_is_data() {
         binding(MdSyncKind::Timers, &env.vault, "{date}.md", TIMERS_HEADING),
     )
     .await;
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     assert!(!file_for(&env).exists(), "没有数据时不应创建空日记");
 
     let item = new_item(&env.pool, "喝水").await;
@@ -238,9 +228,7 @@ async fn missing_file_is_created_with_heading_only_when_there_is_data() {
         300,
     )
     .await;
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     let text = std::fs::read_to_string(file_for(&env)).unwrap();
     assert!(text.starts_with("#### 事项计时\n- [ ] 喝水"));
 }

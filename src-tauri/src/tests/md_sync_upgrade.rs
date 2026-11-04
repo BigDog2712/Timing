@@ -40,9 +40,7 @@ async fn a_saved_config_gets_the_new_kind_from_the_plugin() {
     let env = env("md-upgrade").await;
     save_old_config(&env).await;
 
-    let view = services::md_sync::get_view(&env.pool)
-        .await
-        .unwrap();
+    let view = services::md_sync::get_view(&env.pool).await.unwrap();
 
     assert_eq!(view.config.bindings.len(), 3, "新 kind 应被补齐");
     assert_eq!(
@@ -72,9 +70,7 @@ async fn a_disabled_saved_binding_stays_disabled() {
     };
     config::save(&env.pool, &old).await.unwrap();
 
-    let view = services::md_sync::get_view(&env.pool)
-        .await
-        .unwrap();
+    let view = services::md_sync::get_view(&env.pool).await.unwrap();
     let saved = view
         .config
         .bindings
@@ -94,9 +90,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
     let env = env("md-upgrade-write").await;
     save_old_config(&env).await;
 
-    let view = services::md_sync::get_view(&env.pool)
-        .await
-        .unwrap();
+    let view = services::md_sync::get_view(&env.pool).await.unwrap();
     let merged = view.config.bindings.clone();
     let todos = merged
         .iter()
@@ -135,9 +129,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
     .await
     .unwrap();
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
 
     let text = std::fs::read_to_string(file_for(&env)).unwrap();

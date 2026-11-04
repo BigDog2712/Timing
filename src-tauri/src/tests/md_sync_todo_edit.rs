@@ -61,9 +61,7 @@ async fn d_plan_suffix_updates_planned_at_including_year_omitted_form() {
     let (env, now) = setup("qa-d").await;
     let tomorrow = env.date.succ_opt().unwrap();
     let id = add(&env.pool, "对齐方案", Some(at(tomorrow, 9, 0)), now).await;
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
 
     /* ① 完整时间戳：明天 09:00 → 后天 15:30。 */
     let later = tomorrow.succ_opt().unwrap();
@@ -71,9 +69,7 @@ async fn d_plan_suffix_updates_planned_at_including_year_omitted_form() {
         &env,
         &block(&env).replace(&stamp(tomorrow, "09:00"), &stamp(later, "15:30")),
     );
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert_eq!(report.imported, 1, "{report:?}");
     assert_eq!(planned_of(&env.pool, id).await, Some(at(later, 15, 30)));
 
@@ -83,9 +79,7 @@ async fn d_plan_suffix_updates_planned_at_including_year_omitted_form() {
     见下面第三段）。 */
     let short = format!("{} 16:45", later.format("%m-%d"));
     edit(&env, &block(&env).replace(&stamp(later, "15:30"), &short));
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert_eq!(report.imported, 1, "省略年份也要能回写：{report:?}");
     assert_eq!(planned_of(&env.pool, id).await, Some(at(later, 16, 45)));
     /* 导入后重新渲染会把写法规范化回 `YYYY-MM-DD HH:MM`。 */
@@ -102,9 +96,7 @@ async fn d_plan_suffix_updates_planned_at_including_year_omitted_form() {
             &format!("{} 16:45", later.format("%m-%d")),
         ),
     );
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert_eq!(report.imported, 0, "同值写法不该触发导入：{report:?}");
 }
 
@@ -117,9 +109,7 @@ async fn e_handwritten_lines_create_todos_once() {
     let target = tomorrow.succ_opt().unwrap();
     add(&env.pool, "锚点", Some(at(tomorrow, 9, 0)), now).await;
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     let added = format!(
         "{}\n- [ ] 手写带计划 · 计划 {}\n- [ ] 手写不带后缀",
         block(&env),
@@ -127,9 +117,7 @@ async fn e_handwritten_lines_create_todos_once() {
     );
     edit(&env, &added);
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert_eq!(report.imported, 2, "两条新行都要建：{report:?}");
 
     /* 注意必须 `fetch_one` + `Option<i64>`：用 `fetch_optional` 时泛型会被推成
@@ -154,9 +142,7 @@ async fn e_handwritten_lines_create_todos_once() {
     assert_eq!(alive, 3);
 
     /* 建完之后重新渲染会补上 id；下一轮不能再建一遍（去重靠 id）。 */
-    let again = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let again = services::md_sync::run(&env.pool).await.unwrap();
     assert_eq!(again.imported, 0, "重复导入必须幂等：{again:?}");
     assert_eq!(again.exported, 0, "补上 id 后不该再写盘");
     assert!(block(&env).contains("<!-- tb-todo:"), "新行应带上 id");

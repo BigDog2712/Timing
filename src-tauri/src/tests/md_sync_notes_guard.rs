@@ -69,9 +69,7 @@ async fn f1_only_notes_touched_today_belong_to_today() {
         binding(MdSyncKind::Notes, &env.vault, "{date}.md", NOTES_HEADING),
     )
     .await;
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
 
     let body = block(&env);
     assert!(body.contains("今天新建"), "{body}");
@@ -111,9 +109,7 @@ async fn f2_day_rollover_after_export_must_not_soft_delete() {
     )
     .await;
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     assert!(block(&env).contains("跨天前贴的"), "第一轮应导出");
     let before = note_rows(&env.pool).await;
 
@@ -128,9 +124,7 @@ async fn f2_day_rollover_after_export_must_not_soft_delete() {
         .await
         .unwrap();
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     assert_eq!(report.imported, 0, "这一轮不该产生任何导入：{report:?}");
 
@@ -177,9 +171,7 @@ async fn f3_missing_baseline_does_not_turn_stale_rows_into_deletes() {
     )
     .await;
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     assert_eq!(alive_rows(&env.pool).await, 1, "没有基线也不能当成删除");
     let deleted: Option<i64> = sqlx::query_scalar("SELECT deleted_at FROM notes WHERE id = ?")
@@ -212,9 +204,7 @@ async fn f4_a_row_the_user_really_deletes_is_soft_deleted() {
         binding(MdSyncKind::Notes, &env.vault, "{date}.md", NOTES_HEADING),
     )
     .await;
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
 
     let body = block(&env);
     let kept: Vec<&str> = body
@@ -224,9 +214,7 @@ async fn f4_a_row_the_user_really_deletes_is_soft_deleted() {
     let edited = md_file::replace_in_text(&text(&env), NOTES_HEADING, &kept.join("\n"));
     std::fs::write(file_for(&env), edited).unwrap();
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert_eq!(report.imported, 1, "便利贴删行是导入：{report:?}");
     let dropped: Option<i64> = sqlx::query_scalar("SELECT deleted_at FROM notes WHERE id = ?")
         .bind(drop)

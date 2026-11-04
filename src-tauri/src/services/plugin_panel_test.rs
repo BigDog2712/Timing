@@ -26,7 +26,7 @@ fn relative_days_read_naturally() {
 #[tokio::test]
 async fn an_unknown_source_returns_empty_instead_of_failing() {
     /* 正常路径上不可能出现（清单加载已校验白名单）。走到这里说明有人绕过校验，
-       空列表比整窗报错温和：面板其余块还能用。 */
+    空列表比整窗报错温和：面板其余块还能用。 */
     let pool = fresh_pool("panel-src").await;
     let rows = query(&pool, "records.everything", &QueryParams::default())
         .await
@@ -51,7 +51,11 @@ async fn adding_a_todo_actually_writes_one() {
         ..Default::default()
     };
     let outcome = run_action(&pool, "todo.add", &params).await.unwrap();
-    assert!(outcome.message.contains("面板加的待办"), "{}", outcome.message);
+    assert!(
+        outcome.message.contains("面板加的待办"),
+        "{}",
+        outcome.message
+    );
 
     let rows = query(
         &pool,
@@ -63,7 +67,10 @@ async fn adding_a_todo_actually_writes_one() {
     )
     .await
     .unwrap();
-    assert!(rows.iter().any(|row| row.label == "面板加的待办"), "{rows:?}");
+    assert!(
+        rows.iter().any(|row| row.label == "面板加的待办"),
+        "{rows:?}"
+    );
 }
 
 #[tokio::test]
@@ -74,7 +81,11 @@ async fn starting_a_timer_creates_the_item_when_missing() {
         ..Default::default()
     };
     let outcome = run_action(&pool, "timer.start", &params).await.unwrap();
-    assert!(outcome.message.contains("面板新事项"), "{}", outcome.message);
+    assert!(
+        outcome.message.contains("面板新事项"),
+        "{}",
+        outcome.message
+    );
 
     let state = crate::services::timer::state(&pool).await.unwrap();
     assert_eq!(state.status, "running", "应当已在计时");

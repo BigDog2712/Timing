@@ -60,9 +60,7 @@ async fn only_future_or_overdue_undone_todos_are_listed() {
     add_todo(&env.pool, "今天要做的", Some(today_noon), false, now).await;
     add_todo(&env.pool, "已经做完", Some(tomorrow), true, now).await;
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     let text = read(&env);
 
     assert!(text.contains("明天的会"), "{text}");
@@ -89,9 +87,7 @@ async fn checking_a_box_marks_it_done_and_it_leaves_the_block() {
     )
     .await;
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     let text = read(&env);
     assert!(text.contains("- [ ] 交季度报告"), "{text}");
 
@@ -100,9 +96,7 @@ async fn checking_a_box_marks_it_done_and_it_leaves_the_block() {
     let edited = md_file::replace_in_text(&text, TODOS_HEADING, &body.replace("- [ ]", "- [x]"));
     std::fs::write(file_for(&env), edited).unwrap();
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
 
     let done_at: Option<i64> = sqlx::query_scalar("SELECT done_at FROM todos WHERE id = ?")
         .bind(id)
@@ -123,9 +117,7 @@ async fn removing_a_line_never_deletes_the_todo() {
     add_todo(&env.pool, "要保留的", Some(tomorrow), false, now).await;
     add_todo(&env.pool, "被手删掉的", Some(tomorrow), false, now).await;
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     assert!(read(&env).contains("被手删掉的"));
 
     /* 用户在 Obsidian 里删掉那一行。区块是过滤视图，「没有」不等于「删掉」。 */
@@ -139,9 +131,7 @@ async fn removing_a_line_never_deletes_the_todo() {
     let edited = md_file::replace_in_text(&text, TODOS_HEADING, &kept_line);
     std::fs::write(file_for(&env), edited).unwrap();
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
 
     let alive: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM todos WHERE deleted_at IS NULL")
         .fetch_one(&env.pool)
@@ -165,9 +155,7 @@ async fn editing_the_plan_suffix_updates_planned_at() {
     let tomorrow = at(env.date.succ_opt().unwrap(), 9, 0);
     let id = add_todo(&env.pool, "对齐方案", Some(tomorrow), false, now).await;
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     let text = read(&env);
     let body = md_file::body_in_text(&text, TODOS_HEADING).unwrap();
     /* 把「明天 09:00」改成后天 15:30 —— 后缀是计划时间的唯一事实来源。 */
@@ -178,9 +166,7 @@ async fn editing_the_plan_suffix_updates_planned_at() {
         md_file::replace_in_text(&text, TODOS_HEADING, &body.replace(&old_stamp, &new_stamp));
     std::fs::write(file_for(&env), edited).unwrap();
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
 
     let planned: Option<i64> = sqlx::query_scalar("SELECT planned_at FROM todos WHERE id = ?")
         .bind(id)
@@ -202,9 +188,7 @@ async fn a_line_without_id_creates_a_todo() {
     )
     .await;
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     let text = read(&env);
     let body = md_file::body_in_text(&text, TODOS_HEADING).unwrap();
     let target = env.date.succ_opt().unwrap().succ_opt().unwrap();
@@ -215,9 +199,7 @@ async fn a_line_without_id_creates_a_todo() {
     let edited = md_file::replace_in_text(&text, TODOS_HEADING, &added);
     std::fs::write(file_for(&env), edited).unwrap();
 
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
 
     /* 用 `fetch_one` 而不是 `fetch_optional`：SQLite 上 `query_scalar::<Option<i64>>`
     配 `fetch_optional` 会把 NULL 解成 `Some(0)`，`assert_eq!(x, None)` 会假通过。 */

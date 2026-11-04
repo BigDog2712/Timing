@@ -69,7 +69,7 @@ async fn records_by_item(pool: &SqlitePool, params: &QueryParams) -> AppResult<V
     let from = now - days * 24 * 60 * 60 * 1000;
     let rows = record_repo::stats_by_item_named(pool, Some(from), None).await?;
     /* 占比按**最大值**归一，不按总和：一个事项占满全周时，按总和算会让其他行都变成
-       看不见的细线，看不出相对差距。 */
+    看不见的细线，看不出相对差距。 */
     let max = rows.iter().map(|(_, sec)| *sec).max().unwrap_or(0);
     Ok(rows
         .into_iter()
@@ -77,7 +77,8 @@ async fn records_by_item(pool: &SqlitePool, params: &QueryParams) -> AppResult<V
         .map(|(name, sec)| PanelRow {
             label: name,
             detail: format_duration(sec),
-            ratio: (max > 0).then(|| f64::from(i32::try_from(sec * 1000 / max).unwrap_or(1000)) / 1000.0),
+            ratio: (max > 0)
+                .then(|| f64::from(i32::try_from(sec * 1000 / max).unwrap_or(1000)) / 1000.0),
         })
         .collect())
 }

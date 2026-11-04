@@ -35,7 +35,7 @@ pub fn open_panel_window(
         return Ok(());
     }
     /* URL 参数是面板窗口的唯一身份来源：`App.tsx` 按 label 路由到
-       `PluginPanelWindow`，那个组件再从查询参数里取 plugin / panel。 */
+    `PluginPanelWindow`，那个组件再从查询参数里取 plugin / panel。 */
     let url = format!("index.html?w=panel&plugin={plugin_id}&panel={panel_id}");
     WebviewWindowBuilder::new(app, &label, WebviewUrl::App(url.into()))
         .title(title)

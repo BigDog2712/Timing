@@ -151,7 +151,10 @@ pub async fn stats_by_item_named(
     }
     qb.push(" GROUP BY r.item_id, i.name ORDER BY total_sec DESC");
     let rows: Vec<NamedStat> = qb.build_query_as().fetch_all(pool).await?;
-    Ok(rows.into_iter().map(|row| (row.name, row.total_sec)).collect())
+    Ok(rows
+        .into_iter()
+        .map(|row| (row.name, row.total_sec))
+        .collect())
 }
 
 /// 带名字的聚合行。

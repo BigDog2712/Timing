@@ -146,7 +146,7 @@ fn validate(manifest: &PluginManifest) -> Result<(), String> {
         }
     }
     /* [v3] 面板：没升到 3 却写 panels 的清单要明确拒载，而不是让作者对着一个
-       「写了但没出现」的插件猜。 */
+    「写了但没出现」的插件猜。 */
     if !manifest.contributes.panels.is_empty() {
         if manifest.api_version < 3 {
             return Err("panels 需要 apiVersion 3".into());

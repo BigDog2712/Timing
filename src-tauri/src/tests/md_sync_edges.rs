@@ -97,17 +97,13 @@ async fn g3_handwritten_checked_line_is_created_as_done() {
         now,
     )
     .await;
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
 
     let edited = format!("{}\n- [x] 手动抄的已完成一条", block(&env));
     let updated = md_file::replace_in_text(&text(&env), HEADING, &edited);
     std::fs::write(file_for(&env), updated).unwrap();
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert_eq!(report.imported, 1, "{report:?}");
     let done: Option<i64> =
         sqlx::query_scalar("SELECT done_at FROM todos WHERE title = '手动抄的已完成一条'")
@@ -116,9 +112,7 @@ async fn g3_handwritten_checked_line_is_created_as_done() {
             .unwrap();
     assert!(done.is_some(), "手写 [x] 应直接建成已完成");
     /* 已完成的不会进区块，所以下一轮文件里不该出现它。 */
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     assert!(!block(&env).contains("手动抄的已完成一条"));
 }
 
@@ -140,9 +134,7 @@ async fn g4_empty_block_leaves_heading_only_and_stops_writing() {
         now,
     )
     .await;
-    services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     assert!(block(&env).contains("明天的事"));
 
     /* 把它挪进今天：按用户口径，今天要执行的不再出现在待办区块里 → 区块变空。 */
@@ -153,9 +145,7 @@ async fn g4_empty_block_leaves_heading_only_and_stops_writing() {
         .await
         .unwrap();
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.exported >= 1, "有变化要写盘：{report:?}");
     assert_eq!(block(&env), "");
     assert!(text(&env).contains(HEADING), "标题行要保留");
@@ -166,9 +156,7 @@ async fn g4_empty_block_leaves_heading_only_and_stops_writing() {
     );
 
     let before = mtime(&env);
-    let again = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let again = services::md_sync::run(&env.pool).await.unwrap();
     assert_eq!(again.exported, 0, "空区块不该每轮重写：{again:?}");
     assert_eq!(mtime(&env), before, "文件 mtime 不该变");
 }
@@ -225,16 +213,12 @@ async fn h_two_idle_runs_leave_mtime_untouched() {
     .await
     .unwrap();
 
-    let first = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let first = services::md_sync::run(&env.pool).await.unwrap();
     assert!(first.exported >= 1, "{first:?}");
     let baseline_text = text(&env);
     let before = mtime(&env);
 
-    let second = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let second = services::md_sync::run(&env.pool).await.unwrap();
     assert_eq!(second.exported, 0, "无改动不该写盘：{second:?}");
     assert_eq!(second.imported, 0);
     assert_eq!(mtime(&env), before, "mtime 变了说明空转了一轮写盘");

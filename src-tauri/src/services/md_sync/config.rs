@@ -42,8 +42,8 @@ pub const CONFIG_KEY: &str = "plugin.md-sync.config";
 /// 用户改过的值优先（见 `merge_bindings`），这里只是「从没配过」时的起点。
 fn default_bindings() -> Vec<MdSyncBinding> {
     /* 作者自己的 Obsidian 日记库。别人的机器上没有这个目录时，同步会报
-       「路径不存在」并逐条列出——是可发现的具体错误，不是静默失败。
-       在设置页点「选择文件夹」即可换成本机路径。 */
+    「路径不存在」并逐条列出——是可发现的具体错误，不是静默失败。
+    在设置页点「选择文件夹」即可换成本机路径。 */
     const VAULT: &str = r"%USERPROFILE%\OneDrive\应用\remotely-save\Elio\1-MemeX\Diary";
     [
         (MdSyncKind::Timers, "#### 事项计时"),

@@ -3,9 +3,7 @@
 use super::*;
 
 fn text(value: &str) -> PanelBlock {
-    PanelBlock::Text {
-        text: value.into(),
-    }
+    PanelBlock::Text { text: value.into() }
 }
 
 fn stats(source: &str) -> PanelBlock {
@@ -81,18 +79,18 @@ fn an_action_missing_its_required_param_fails_at_load_time() {
     /* 参数缺失必须在加载时拒绝：点下去才失败的按钮，用户只会以为插件坏了 */
     let mut item = button("timer.start");
     item.params.item = Some("   ".into());
-    let err = validate_panels(&[panel(
-        "a",
-        vec![PanelBlock::Actions { items: vec![item] }],
-    )])
-    .unwrap_err();
+    let err = validate_panels(&[panel("a", vec![PanelBlock::Actions { items: vec![item] }])])
+        .unwrap_err();
     assert!(err.contains("timer.start 需要 params.item"), "{err}");
 }
 
 #[test]
 fn duplicate_panel_ids_are_rejected() {
-    let err = validate_panels(&[panel("dup", vec![text("一")]), panel("dup", vec![text("二")])])
-        .unwrap_err();
+    let err = validate_panels(&[
+        panel("dup", vec![text("一")]),
+        panel("dup", vec![text("二")]),
+    ])
+    .unwrap_err();
     assert!(err.contains("重复"), "{err}");
 }
 
@@ -137,7 +135,7 @@ fn defaults_fill_in_a_sane_window_size() {
 #[test]
 fn an_unknown_block_type_fails_to_deserialize() {
     /* 块类型是封闭枚举：写 `table` 这类没实现的形态必须解析失败（并因此被
-       `plugin_fs` 拒载），而不是安安静静渲染成一片空白。 */
+    `plugin_fs` 拒载），而不是安安静静渲染成一片空白。 */
     let raw = r#"{"id":"a","title":"t","blocks":[{"type":"table","rows":[]}]}"#;
     assert!(serde_json::from_str::<Panel>(raw).is_err());
 }

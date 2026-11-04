@@ -79,9 +79,7 @@ async fn a_block_is_exactly_future_overdue_and_unplanned() {
     )
     .await;
 
-    let report = services::md_sync::run(&env.pool)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
 
     /* 逐字断言：措辞（逾期 / 计划 / 无后缀）、顺序（计划时间升序、未排期最后）、id 对位。 */
