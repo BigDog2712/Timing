@@ -79,7 +79,7 @@ async fn a_block_is_exactly_future_overdue_and_unplanned() {
     )
     .await;
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
+    let report = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);

@@ -38,12 +38,6 @@
   color: var(--ink-3);
 }
 
-.sync__plugin {
-  margin: var(--space-1) 0 0;
-  font-size: var(--text-cap);
-  color: var(--ink-4);
-}
-
 .sync__enable {
   display: flex;
   flex: none;

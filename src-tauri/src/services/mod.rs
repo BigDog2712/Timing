@@ -5,6 +5,7 @@ pub mod item;
 pub mod md_sync;
 pub mod note;
 pub mod plugin;
+pub mod plugin_panel;
 pub mod plugin_merge;
 pub mod record;
 pub mod reminder;

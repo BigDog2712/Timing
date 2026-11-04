@@ -38,7 +38,7 @@ async fn today_note_roundtrips_and_yesterdays_stays_out() {
     )
     .await;
 
-    services::md_sync::run(&env.pool, &env.app_data)
+    services::md_sync::run(&env.pool)
         .await
         .unwrap();
     let file = file_for(&env);
@@ -55,7 +55,7 @@ async fn today_note_roundtrips_and_yesterdays_stays_out() {
     let edited = md_file::replace_in_text(&text, NOTES_HEADING, &body.replace("旧内容", "新内容"));
     std::fs::write(&file, edited).unwrap();
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
+    let report = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
@@ -90,7 +90,7 @@ async fn a_note_touched_today_shows_up_even_if_created_earlier() {
     )
     .await;
 
-    services::md_sync::run(&env.pool, &env.app_data)
+    services::md_sync::run(&env.pool)
         .await
         .unwrap();
     let text = std::fs::read_to_string(file_for(&env)).unwrap();

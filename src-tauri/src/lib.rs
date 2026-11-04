@@ -137,6 +137,9 @@ pub fn run() {
             // [V0.3.2] 插件域（声明式插件：读 `<插件目录>/plugin.json` 启动头）
             commands::plugin_cmd::plugin_list,
             commands::plugin_cmd::plugin_open_dir,
+            commands::plugin_cmd::plugin_panel_open,
+            commands::plugin_cmd::plugin_panel_data,
+            commands::plugin_cmd::plugin_action_run,
             // [V0.4.0] Markdown 同步（插件 API v2 的宿主实现）
             commands::md_sync_cmd::md_sync_get,
             commands::md_sync_cmd::md_sync_save,

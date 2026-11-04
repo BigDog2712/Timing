@@ -40,18 +40,18 @@ const PLUGIN: PluginInfo = {
   enabled: true,
   error: null,
   quickTimers: [{ item: '喝水', minutes: 5 }],
-  mdSync: null,
+  panels: [],
 };
 
 let container: HTMLDivElement;
 let root: Root;
 
-async function mount(): Promise<string> {
+async function mount(props: Parameters<typeof PluginsTab>[0] = {}): Promise<string> {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => {
-    root.render(createElement(PluginsTab));
+    root.render(createElement(PluginsTab, props));
   });
   /* 让 load() 里的 promise 链在同一个 act 里落地 */
   await act(async () => {
@@ -113,45 +113,6 @@ describe('PluginsTab —— 空态条件 = loaded && plugins.length === 0 && !er
     expect(html).not.toContain(EMPTY_TEXT);
     expect(html).toContain(PLUGIN.name);
     expect(html).toContain('用户'); // source 标签
-  });
-
-  it('v2 插件展示 mdSync 落点种类，而不是「无贡献项」', async () => {
-    const mdPlugin: PluginInfo = {
-      ...PLUGIN,
-      id: 'md-sync',
-      name: 'Markdown 同步',
-      apiVersion: 2,
-      quickTimers: [],
-      mdSync: {
-        bindings: [
-          {
-            kind: 'timers',
-            enabled: true,
-            root: 'C:\\Vault',
-            file: '{date}.md',
-            heading: '#### 事项计时',
-          },
-          {
-            kind: 'notes',
-            enabled: true,
-            root: 'C:\\Vault',
-            file: '{date}.md',
-            heading: '#### 便利贴',
-          },
-        ],
-      },
-    };
-    vi.spyOn(ipc, 'pluginList').mockResolvedValue({
-      ...EMPTY,
-      plugins: [mdPlugin],
-      quickTimers: [],
-    });
-
-    const html = await mount();
-
-    expect(html).toContain('Markdown 同步 2 个落点');
-    expect(html).toContain('事项计时 · 便利贴');
-    expect(html).not.toContain('无贡献项');
   });
 
   it('整体加载失败时显示错误而不是空态（静默变成「你没装插件」是最难排查的形态）', async () => {

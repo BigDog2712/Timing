@@ -61,6 +61,7 @@ import type {
   WorkAreaDip,
 } from './models';
 import type { PluginListResult } from './plugin';
+import type { ActionParams, PanelActionOutcome, PanelRow, QueryParams } from './pluginPanel';
 import type { MdSyncConfig, MdSyncKind, MdSyncReport, MdSyncView } from './mdSync';
 
 /**
@@ -187,6 +188,11 @@ export interface IpcApi {
   /* 插件域 [V0.3.2] —— 声明式插件：读插件目录下的启动头 plugin.json */
   pluginList(): Promise<PluginListResult>;
   pluginOpenDir(): Promise<void>;
+
+  /* 插件面板 [v3] —— 声明式 UI + 白名单动作 */
+  pluginPanelOpen(params: { pluginId: string; panelId: string }): Promise<void>;
+  pluginPanelData(params: { source: string; params?: QueryParams }): Promise<PanelRow[]>;
+  pluginActionRun(params: { action: string; params?: ActionParams }): Promise<PanelActionOutcome>;
 
   /* Markdown 同步 [V0.4.0 / 插件 API v2] */
   mdSyncGet(): Promise<MdSyncView>;

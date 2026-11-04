@@ -32,6 +32,8 @@ pub mod window;
 #[cfg(desktop)]
 pub mod window_note;
 #[cfg(desktop)]
+pub mod window_panel;
+#[cfg(desktop)]
 pub mod window_rect;
 #[cfg(desktop)]
 pub mod window_spec;

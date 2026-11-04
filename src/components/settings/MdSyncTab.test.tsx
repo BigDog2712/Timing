@@ -22,10 +22,6 @@ const BINDINGS: MdSyncBinding[] = [
 ];
 
 const VIEW: MdSyncView = {
-  installed: true,
-  pluginId: 'md-sync',
-  pluginName: 'Markdown 同步',
-  pluginVersion: '1.0.0',
   today: '2026-10-20',
   config: { enabled: true, bindings: BINDINGS },
   status: {

@@ -14,6 +14,7 @@
  */
 import { errorText, ipc, isTauri } from './ipc';
 import type {
+  ActionParams,
   CreateItemParams,
   Item,
   ItemIdParams,
@@ -26,6 +27,9 @@ import type {
   NoteListParams,
   NoteUpdateParams,
   Paginated,
+  PanelActionOutcome,
+  PanelRow,
+  QueryParams,
   RecordPatch,
   ReminderClearParams,
   ReminderSetParams,
@@ -135,6 +139,13 @@ export const windowApi = {
 export const pluginApi = {
   list: () => ipc.pluginList(),
   openDir: (): Promise<void> => ipc.pluginOpenDir(),
+  /* ---- [v3] 面板 ---- */
+  openPanel: (pluginId: string, panelId: string): Promise<void> =>
+    ipc.pluginPanelOpen({ pluginId, panelId }),
+  panelData: (source: string, params?: QueryParams): Promise<PanelRow[]> =>
+    ipc.pluginPanelData({ source, params }),
+  runAction: (action: string, params?: ActionParams): Promise<PanelActionOutcome> =>
+    ipc.pluginActionRun({ action, params }),
 };
 
 /* ---- [V0.4.0] Markdown 同步（插件 API v2；执行在 Rust，前端只配置/看状态） ---- */

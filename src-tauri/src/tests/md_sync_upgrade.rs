@@ -1,16 +1,17 @@
-//! 升级路径：插件后来新增了第三种落点，**已有用户**能不能拿到它。
+//! 升级路径：宿主后来新增了第三种落点，**已有用户**能不能拿到它。
 //!
-//! 这是本轮唯一一个会让功能「只对新装用户可用」的坑。`config::load` 原本是
+//! 这是唯一一个会让功能「只对新装用户可用」的坑。`config::load` 原本是
 //! `saved.or(defaults)`（保存值整体优先），而 v0.4.0 的用户保存过的配置里只有
 //! timers + notes 两条。设置页只渲染 `config.bindings`、没有「添加落点」入口，
 //! 所以 saved 一旦存在，`todos` 就永远进不了生效配置——待办区块一次也不会被写出来。
 //!
-//! 修法见 `config::merge_bindings`：saved 的总开关、顺序与内容原样保留，插件默认值里
+//! 修法见 `config::merge_bindings`：saved 的总开关、顺序与内容原样保留，默认值里
 //! **saved 完全没有的 kind** 追加到末尾。用户主动禁用（`enabled: false`）的落点仍在
 //! saved 里，因此不会被默认值重新打开。
 //!
-//! 这里的「插件默认值」就是仓库里真实的 `plugins/md-sync`：扫描的 dev 源优先于
-//! `app_data` 下的测试插件，所以 `config::load` 拿到的是它声明的那三条落点。
+//! 这里的「默认值」是 `config::default_bindings()` 的三条出厂落点。它以前来自
+//! `plugins/md-sync/plugin.json`，同步改成内建功能后搬进了宿主代码，本文件的断言逻辑
+//! 不变——只是不再需要一个插件目录来提供这三条。
 
 use crate::infra::md_file;
 use crate::models::md_sync::{MdSyncBinding, MdSyncConfig, MdSyncKind};
@@ -39,7 +40,7 @@ async fn a_saved_config_gets_the_new_kind_from_the_plugin() {
     let env = env("md-upgrade").await;
     save_old_config(&env).await;
 
-    let view = services::md_sync::get_view(&env.pool, &env.app_data)
+    let view = services::md_sync::get_view(&env.pool)
         .await
         .unwrap();
 
@@ -49,7 +50,7 @@ async fn a_saved_config_gets_the_new_kind_from_the_plugin() {
         MdSyncKind::Todos,
         "保存值在前，补进来的落点追加在后面"
     );
-    /* 用户已有的落点原样保留，不被插件默认值覆盖。 */
+    /* 用户已有的落点原样保留，不被默认值覆盖。 */
     assert_eq!(view.config.bindings[0].heading, TIMERS_HEADING);
     assert_eq!(
         view.config.bindings[0].root,
@@ -71,7 +72,7 @@ async fn a_disabled_saved_binding_stays_disabled() {
     };
     config::save(&env.pool, &old).await.unwrap();
 
-    let view = services::md_sync::get_view(&env.pool, &env.app_data)
+    let view = services::md_sync::get_view(&env.pool)
         .await
         .unwrap();
     let saved = view
@@ -93,7 +94,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
     let env = env("md-upgrade-write").await;
     save_old_config(&env).await;
 
-    let view = services::md_sync::get_view(&env.pool, &env.app_data)
+    let view = services::md_sync::get_view(&env.pool)
         .await
         .unwrap();
     let merged = view.config.bindings.clone();
@@ -105,7 +106,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
     assert_eq!(todos.heading, TODOS_HEADING);
     assert!(!todos.file.trim().is_empty());
 
-    /* 把落点全部指向临时目录再跑：目的是不碰插件里声明的真实路径（作者本机日记）。 */
+    /* 把落点全部指向临时目录再跑：目的是不碰出厂默认里的真实路径（作者本机日记）。 */
     let redirected: Vec<MdSyncBinding> = merged
         .into_iter()
         .map(|mut item| {
@@ -134,7 +135,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
     .await
     .unwrap();
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
+    let report = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);

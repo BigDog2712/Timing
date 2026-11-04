@@ -1,8 +1,7 @@
 //! `infra::plugin_fs` 的单元测试（拆出以守住单文件 ≤300 行）。
 
 use super::*;
-use crate::models::md_sync::{MdSyncBinding, MdSyncKind};
-use crate::models::plugin::{EntryKind, MdSyncContribution, PluginContributes, QuickTimer};
+use crate::models::plugin::{EntryKind, PluginContributes, QuickTimer};
 
 fn sample() -> PluginManifest {
     PluginManifest {
@@ -66,45 +65,6 @@ fn rejects_script_entry() {
     manifest.entry = EntryKind::Script;
     let err = validate(&manifest).unwrap_err();
     assert!(err.contains("script"));
-}
-
-#[test]
-fn md_sync_requires_api_v2_and_valid_binding() {
-    let mut manifest = sample();
-    manifest.contributes.md_sync = Some(MdSyncContribution {
-        bindings: vec![MdSyncBinding {
-            kind: MdSyncKind::Timers,
-            enabled: true,
-            root: "C:\\vault".into(),
-            file: "{date}.md".into(),
-            heading: "#### 事项计时".into(),
-        }],
-    });
-    let err = validate(&manifest).unwrap_err();
-    assert!(err.contains("apiVersion 2"), "{err}");
-
-    manifest.api_version = 2;
-    assert!(validate(&manifest).is_ok());
-
-    manifest.contributes.md_sync.as_mut().unwrap().bindings[0].heading = "事项计时".into();
-    let err = validate(&manifest).unwrap_err();
-    assert!(err.contains("mdSync"), "{err}");
-}
-
-#[test]
-fn repo_md_sync_plugin_manifest_is_valid() {
-    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("plugins")
-        .join("md-sync");
-    let manifest = read_manifest(&dir).expect("仓库内的 md-sync 启动头应合法");
-    assert_eq!(manifest.id, "md-sync");
-    assert_eq!(manifest.api_version, 2);
-    let md_sync = manifest.contributes.md_sync.expect("应声明 mdSync");
-    assert_eq!(md_sync.bindings.len(), 3);
-    assert_eq!(md_sync.bindings[0].kind, MdSyncKind::Timers);
-    assert_eq!(md_sync.bindings[1].kind, MdSyncKind::Notes);
-    assert_eq!(md_sync.bindings[2].kind, MdSyncKind::Todos);
 }
 
 #[test]

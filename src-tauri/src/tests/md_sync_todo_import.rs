@@ -85,14 +85,14 @@ async fn b_checking_the_box_writes_done_at_and_the_line_leaves() {
     )
     .await;
 
-    services::md_sync::run(&env.pool, &env.app_data)
+    services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert!(block(&env).contains("- [ ] 交季度报告"));
 
     /* 只动勾选框：等价于在 Obsidian 里点了一下。 */
     edit(&env, &block(&env).replace("- [ ]", "- [x]"));
-    let report = services::md_sync::run(&env.pool, &env.app_data)
+    let report = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert_eq!(report.imported, 1, "勾选必须走导入路径：{report:?}");
@@ -106,7 +106,7 @@ async fn b_checking_the_box_writes_done_at_and_the_line_leaves() {
     assert!(done_at.is_some(), "done_at 应有值");
 
     /* 第二轮：完成的待办从区块退场，且不再产生导入 / 写盘（幂等）。 */
-    let again = services::md_sync::run(&env.pool, &env.app_data)
+    let again = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert_eq!(again.imported, 0);
@@ -132,7 +132,7 @@ async fn c1_deleting_a_line_never_soft_deletes_and_the_line_comes_back() {
     )
     .await;
 
-    services::md_sync::run(&env.pool, &env.app_data)
+    services::md_sync::run(&env.pool)
         .await
         .unwrap();
     let body = block(&env);
@@ -143,14 +143,14 @@ async fn c1_deleting_a_line_never_soft_deletes_and_the_line_comes_back() {
         .to_string();
     edit(&env, &kept);
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
+    let report = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     assert_eq!(alive(&env.pool).await, 2, "删一行不能软删待办");
     assert_eq!(deleted(&env.pool).await, 0, "待办区块从不产生软删");
 
-    services::md_sync::run(&env.pool, &env.app_data)
+    services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert!(block(&env).contains("被手删掉的"), "下一轮应写回来");
@@ -176,7 +176,7 @@ async fn c2_import_really_runs_and_still_deletes_nothing() {
     )
     .await;
 
-    services::md_sync::run(&env.pool, &env.app_data)
+    services::md_sync::run(&env.pool)
         .await
         .unwrap();
 
@@ -197,7 +197,7 @@ async fn c2_import_really_runs_and_still_deletes_nothing() {
         "文件与期望一致时无法证明导入被执行"
     );
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
+    let report = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert_eq!(report.imported, 1, "导入必须真的执行：{report:?}");
@@ -212,7 +212,7 @@ async fn c2_import_really_runs_and_still_deletes_nothing() {
     assert_eq!(alive(&env.pool).await, 2, "同一次导入也不能少一行");
     assert_eq!(deleted(&env.pool).await, 0);
 
-    services::md_sync::run(&env.pool, &env.app_data)
+    services::md_sync::run(&env.pool)
         .await
         .unwrap();
     let body = block(&env);

@@ -14,11 +14,15 @@
  *
  * 插件是声明式的（读启动头 `plugin.json`，不执行插件代码），所以这里没有
  * 启用/停用开关：`enabled` 写在启动头里，改文件 + 重新加载即可。
+ *
+ * [v2 撤回] 这里曾给声明了 `mdSync` 的插件挂一个「配置 →」按钮跳到同步页。
+ * Markdown 同步改成内建功能后，插件不再贡献落点，按钮也随之删除——同步页签
+ * 自己就在设置里，不需要从插件列表绕过去。
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { formatMinutes } from '../../lib/format';
 import { pluginApi } from '../../services/api';
-import { MD_SYNC_KIND_LABELS } from '../../types/domain';
+import { errorText } from '../../services/ipc';
 import { usePluginStore } from '../../stores/pluginStore';
 import type { PluginInfo, PluginSource } from '../../types/domain';
 
@@ -36,11 +40,8 @@ function contributions(plugin: PluginInfo): string {
       .join(' · ');
     parts.push(`快捷计时 ${plugin.quickTimers.length} 项：${items}`);
   }
-  if (plugin.mdSync && plugin.mdSync.bindings.length > 0) {
-    const kinds = plugin.mdSync.bindings
-      .map((binding) => MD_SYNC_KIND_LABELS[binding.kind])
-      .join(' · ');
-    parts.push(`Markdown 同步 ${plugin.mdSync.bindings.length} 个落点：${kinds}`);
+  if (plugin.panels.length > 0) {
+    parts.push(`面板 ${plugin.panels.map((panel) => panel.title).join(' · ')}`);
   }
   return parts.length > 0 ? parts.join('；') : '无贡献项';
 }
@@ -51,15 +52,21 @@ interface PluginsTabProps {
    * 后端 `plugin_open_dir` 为移动桩返回 IO_ERROR）。桌面不传 = true，行为不变。
    */
   showOpenDir?: boolean;
+  /**
+   * 是否显示「打开面板」。移动端传 false：面板窗口是桌面多窗口模型的产物，
+   * 手机单窗口（`plugin_panel_open` 在移动端回 IO_ERROR）。
+   */
+  showPanels?: boolean;
 }
 
-export function PluginsTab({ showOpenDir = true }: PluginsTabProps) {
+export function PluginsTab({ showOpenDir = true, showPanels = true }: PluginsTabProps) {
   const plugins = usePluginStore((s) => s.plugins);
   const dir = usePluginStore((s) => s.dir);
   const loaded = usePluginStore((s) => s.loaded);
   const loading = usePluginStore((s) => s.loading);
   const error = usePluginStore((s) => s.error);
   const load = usePluginStore((s) => s.load);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
@@ -92,6 +99,7 @@ export function PluginsTab({ showOpenDir = true }: PluginsTabProps) {
       </div>
 
       {error && <p className="plg__error">{error}</p>}
+      {notice && <p className="plg__error">{notice}</p>}
 
       {isEmpty ? (
         <p className="plg__empty">还没有安装插件。把插件文件夹放进上面的目录，点「重新加载」即可。</p>
@@ -111,6 +119,24 @@ export function PluginsTab({ showOpenDir = true }: PluginsTabProps) {
                 </div>
                 {plugin.description && <p className="plg__desc">{plugin.description}</p>}
                 <p className="plg__meta">{contributions(plugin)}</p>
+                {showPanels && plugin.panels.length > 0 && (
+                  <div className="plg__panels">
+                    {plugin.panels.map((panel) => (
+                      <button
+                        key={panel.id}
+                        type="button"
+                        className="btn btn--ghost plg__btn"
+                        onClick={() => {
+                          void pluginApi
+                            .openPanel(plugin.id, panel.id)
+                            .catch((err: unknown) => setNotice(errorText(err)));
+                        }}
+                      >
+                        打开「{panel.title}」
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {/* 同 id 可能同时躺在 dev / exe / user 三处：把这份到底从哪读来的写出来，
                     否则「我改的文件没生效」只能靠猜（先到先得规则在 plugin.rs）。 */}
                 {plugin.dir && (

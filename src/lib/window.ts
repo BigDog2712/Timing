@@ -24,7 +24,7 @@ import { IS_MOBILE } from './platform';
 export { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window';
 export type { PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window';
 
-export type WindowKind = 'main' | 'settings' | 'todos' | 'timer' | 'note';
+export type WindowKind = 'main' | 'settings' | 'todos' | 'timer' | 'note' | 'panel';
 
 /** 当前窗口 label（Tauri）；非 Tauri 回退 ?w= */
 export function currentWindowLabel(): string {
@@ -51,7 +51,28 @@ export function currentWindowKind(): WindowKind {
   // Tauri 下 label = note-{id}；浏览器 dev 下回退的 `?w=note` 只会得到 'note'（无 id 后缀），
   // 两种都要认，否则便利贴窗在 dev 里会被当成主窗渲染。
   if (label === 'note' || label.startsWith('note-')) return 'note';
+  // 插件面板：label = panel-{pluginId}-{panelId}（v3）。
+  if (label === 'panel' || label.startsWith('panel-')) return 'panel';
   return 'main';
+}
+
+/**
+ * 插件面板窗口的目标（`?plugin=&panel=`）。
+ *
+ * **不从 label 拆**：插件 id 与面板 id 都允许含 `-`（如 `moyu-kit` / `weekly-report`），
+ * `panel-moyu-kit-weekly` 无法反解出正确边界。label 只负责「同一面板不重复开窗」，
+ * 真正的身份放在查询参数里——建窗代码（`infra::window_panel`）两处都会写。
+ */
+export function currentPanelTarget(): { pluginId: string; panelId: string } | null {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const pluginId = params.get('plugin');
+    const panelId = params.get('panel');
+    if (pluginId && panelId) return { pluginId, panelId };
+  } catch {
+    /* 忽略 */
+  }
+  return null;
 }
 
 /**

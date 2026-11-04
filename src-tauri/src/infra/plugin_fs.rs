@@ -21,7 +21,6 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use crate::models::md_sync::MdSyncConfig;
 use crate::models::plugin::{PluginManifest, PluginSource, MANIFEST_FILE, PLUGIN_API_VERSION};
 
 /// 启动头体积上限：正常几百字节，64K 已经离谱到只可能是放错了文件。
@@ -116,18 +115,6 @@ fn validate(manifest: &PluginManifest) -> Result<(), String> {
     if manifest.entry == crate::models::plugin::EntryKind::Script {
         return Err("entry=script 暂不支持，当前宿主只执行 manifest".into());
     }
-    if let Some(md_sync) = &manifest.contributes.md_sync {
-        if manifest.api_version < 2 {
-            return Err("mdSync 需要 apiVersion 2".into());
-        }
-        let config = MdSyncConfig {
-            enabled: true,
-            bindings: md_sync.bindings.clone(),
-        };
-        config
-            .validate()
-            .map_err(|err| format!("mdSync 配置不合法：{err}"))?;
-    }
     if manifest.contributes.quick_timers.len() > MAX_QUICK_TIMERS {
         return Err(format!("quickTimers 最多 {MAX_QUICK_TIMERS} 条"));
     }
@@ -140,6 +127,14 @@ fn validate(manifest: &PluginManifest) -> Result<(), String> {
                 "quickTimers.minutes 必须为 1..={MAX_QUICK_TIMER_MINUTES}"
             ));
         }
+    }
+    /* [v3] 面板：没升到 3 却写 panels 的清单要明确拒载，而不是让作者对着一个
+       「写了但没出现」的插件猜。 */
+    if !manifest.contributes.panels.is_empty() {
+        if manifest.api_version < 3 {
+            return Err("panels 需要 apiVersion 3".into());
+        }
+        crate::models::plugin_panel::validate_panels(&manifest.contributes.panels)?;
     }
     Ok(())
 }

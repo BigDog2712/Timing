@@ -129,6 +129,38 @@ pub async fn totals(
     Ok((row.total_sec, row.cnt))
 }
 
+/// 按事项聚合，**带事项名**（插件面板数据源用）。按总时长降序。
+///
+/// 与 `stats_by_item` 的差别只有「有没有名字」：面板要直接渲染文案，
+/// 让前端再拉一次事项表就多一次往返、也多一处口径。
+pub async fn stats_by_item_named(
+    pool: &SqlitePool,
+    from: Option<i64>,
+    to: Option<i64>,
+) -> AppResult<Vec<(String, i64)>> {
+    let mut qb = QueryBuilder::<Sqlite>::new(
+        "SELECT i.name AS name, COALESCE(SUM(r.accumulated_sec), 0) AS total_sec \
+         FROM time_records r JOIN items i ON i.id = r.item_id \
+         WHERE r.status = 'saved' AND r.deleted_at IS NULL",
+    );
+    if let Some(v) = from {
+        qb.push(" AND r.started_at >= ").push_bind(v);
+    }
+    if let Some(v) = to {
+        qb.push(" AND r.started_at < ").push_bind(v);
+    }
+    qb.push(" GROUP BY r.item_id, i.name ORDER BY total_sec DESC");
+    let rows: Vec<NamedStat> = qb.build_query_as().fetch_all(pool).await?;
+    Ok(rows.into_iter().map(|row| (row.name, row.total_sec)).collect())
+}
+
+/// 带名字的聚合行。
+#[derive(sqlx::FromRow)]
+struct NamedStat {
+    name: String,
+    total_sec: i64,
+}
+
 /// 按事项聚合（total_sec 降序）。
 pub async fn stats_by_item(
     pool: &SqlitePool,

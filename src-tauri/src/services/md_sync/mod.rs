@@ -40,48 +40,39 @@ use crate::models::md_sync::{
 };
 use crate::platform::clock::now_ms;
 
-/// 设置页读取：插件身份 + 配置 + 最后一次运行状态 + 今日日期。
-pub async fn get_view(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyncView> {
-    let loaded = config::load(pool, app_data_dir).await?;
-    let status = runtime::lock().await.status.clone();
+/// 设置页读取：配置 + 最后一次运行状态 + 今日日期。
+pub async fn get_view(pool: &SqlitePool) -> AppResult<MdSyncView> {
+    let config = config::load(pool).await?;
+    let status = runtime::status_snapshot().await; // 状态专用锁：刷新不排在整轮同步后面
     Ok(MdSyncView {
-        installed: loaded.installed(),
-        plugin_id: loaded.plugin_id,
-        plugin_name: loaded.plugin_name,
-        plugin_version: loaded.plugin_version,
         today: Local::now().format("%Y-%m-%d").to_string(),
-        config: loaded.config,
+        config,
         status,
     })
 }
 
 /// 保存配置并立刻同步一次；返回保存后的视图（含本轮状态）。
-pub async fn save_config(
-    pool: &SqlitePool,
-    app_data_dir: &Path,
-    config: &MdSyncConfig,
-) -> AppResult<MdSyncView> {
+pub async fn save_config(pool: &SqlitePool, config: &MdSyncConfig) -> AppResult<MdSyncView> {
     config::save(pool, config).await?;
-    sync_all(pool, app_data_dir).await?;
-    get_view(pool, app_data_dir).await
+    sync_all(pool).await?;
+    get_view(pool).await
 }
 
 /// 手动「立即同步」。返回本轮报告，不因单个落点失败而整体报错。
-pub async fn run(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyncReport> {
-    sync_all(pool, app_data_dir).await
+pub async fn run(pool: &SqlitePool) -> AppResult<MdSyncReport> {
+    sync_all(pool).await
 }
 
 /// 轮询任务用：只在真的从 Markdown 导入了数据时返回 `Some`，避免空转发事件。
-pub async fn tick(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<Option<MdSyncReport>> {
-    let report = sync_all(pool, app_data_dir).await?;
+pub async fn tick(pool: &SqlitePool) -> AppResult<Option<MdSyncReport>> {
+    let report = sync_all(pool).await?;
     Ok(report.touched().then_some(report))
 }
 
 /// 打开某个种类的今日文件；文件还没生成时先同步一次。
-pub async fn open(pool: &SqlitePool, app_data_dir: &Path, kind: MdSyncKind) -> AppResult<()> {
-    let loaded = config::load(pool, app_data_dir).await?;
-    let binding = loaded
-        .config
+pub async fn open(pool: &SqlitePool, kind: MdSyncKind) -> AppResult<()> {
+    let config = config::load(pool).await?;
+    let binding = config
         .bindings
         .iter()
         .find(|binding| binding.kind == kind)
@@ -102,33 +93,32 @@ pub async fn open(pool: &SqlitePool, app_data_dir: &Path, kind: MdSyncKind) -> A
         ));
     }
     /* 先同步一轮：文件存在但标题还没写出来时，也要先补上区块再打开。 */
-    sync_all(pool, app_data_dir).await?;
+    sync_all(pool).await?;
     if !path.exists() {
         return Err(AppError::io("今日文件尚未生成，请先保存并同步"));
     }
     open_path(&path)
 }
 
-async fn sync_all(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyncReport> {
+async fn sync_all(pool: &SqlitePool) -> AppResult<MdSyncReport> {
     /* 先拿锁再读配置：防止上一轮 tick 的旧配置在新配置保存后又写一次旧落点。 */
     let mut rt = runtime::lock().await;
-    let loaded = config::load(pool, app_data_dir).await?;
+    let config = config::load(pool).await?;
     let at = now_ms();
     let mut report = MdSyncReport::new(at);
     let mut next_status = MdSyncStatus {
         last_sync_at: Some(at),
-        last_error: None,
-        bindings: Vec::new(),
+        ..Default::default()
     };
 
-    if !loaded.installed() || !loaded.config.enabled {
-        rt.status = next_status;
-        rt.initialized = true;
+    /* 没有落点 = 这套同步等于没开过，不必每轮白跑一次。 */
+    if config.bindings.is_empty() || !config.enabled {
+        runtime::set_status(next_status).await;
         return Ok(report);
     }
 
     let date = Local::now().date_naive();
-    for binding in &loaded.config.bindings {
+    for binding in &config.bindings {
         let mut status = MdSyncBindingStatus::empty(binding.kind);
         if !binding.enabled {
             next_status.bindings.push(status);
@@ -174,8 +164,7 @@ async fn sync_all(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyncRep
     if !report.errors.is_empty() {
         next_status.last_error = Some(report.errors.join("；"));
     }
-    rt.status = next_status;
-    rt.initialized = true;
+    runtime::set_status(next_status).await;
     Ok(report)
 }
 
@@ -193,7 +182,7 @@ async fn sync_binding(
     date: chrono::NaiveDate,
     path: &Path,
 ) -> Result<BindingOutcome, String> {
-    let section = md_file::read_section(path, &binding.heading)?;
+    let section = rt.read_section_cached(path, &binding.heading)?; // 文件没变就不读整篇日记
     let expected = render_expected(pool, binding, date)
         .await
         .map_err(|err| err.to_string())?;
@@ -240,7 +229,8 @@ async fn sync_binding(
         SectionState::Present { body, .. } => body.trim_end() != target.trim_end(),
     };
     if needs_write {
-        md_file::write_section(path, &binding.heading, &target)?;
+        /* 写盘 + 缓存作废绑在一起（见 Runtime::write_section）：漏了后者下一轮会拿旧 body 判「无变化」 */
+        rt.write_section(path, &binding.heading, &target)?;
     }
     rt.set_baseline(binding.kind, path, &binding.heading, target);
 

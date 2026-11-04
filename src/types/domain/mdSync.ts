@@ -55,12 +55,13 @@ export interface MdSyncStatus {
   bindings: MdSyncBindingStatus[];
 }
 
-/** `md_sync_get` / `md_sync_save` 的返回 */
+/**
+ * `md_sync_get` / `md_sync_save` 的返回。
+ *
+ * 没有「谁提供同步」这一层：Markdown 同步是宿主内建功能，落点由用户直接改。
+ * 要判断配置是否可用，看 `config.bindings` 即可。
+ */
 export interface MdSyncView {
-  installed: boolean;
-  pluginId: string | null;
-  pluginName: string | null;
-  pluginVersion: string | null;
   /** 本地今天，`YYYY-MM-DD`，用于路径预览 */
   today: string;
   config: MdSyncConfig;
@@ -76,11 +77,6 @@ export interface MdSyncReport {
   imported: number;
   kinds: MdSyncKind[];
   errors: string[];
-}
-
-/** 插件启动头里的 mdSync 贡献 */
-export interface MdSyncContribution {
-  bindings: MdSyncBinding[];
 }
 
 /** 事件载荷别名（语义更清楚） */

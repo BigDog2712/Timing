@@ -5,6 +5,7 @@
  *   - settings → 独立设置窗，**只渲染 SettingsPanel**（不渲染主窗层）；
  *   - todos    → 独立事项窗，只渲染 TodosWindow；
  *   - note     → 独立便利贴窗（label note-{id}），只渲染 NoteWindow；
+ *   - panel    → 插件面板窗（label panel-{pluginId}-{panelId}），只渲染 PluginPanelWindow；
  *   - main     → 无画布置层（ADR-020）：药丸 / 面板 / 菜单 / 撤销条 / 对话框由 auto-fit 撑窗口。
  *
  * 移动端（Android 包，DESIGN-ANDROID-V1 §1.2）：整个桌面壳被编译期常量短路，
@@ -17,6 +18,7 @@ import { NoteWindow } from './components/note/NoteWindow';
 import { NotesListPopover } from './components/note/NotesListPopover';
 import { ItemPicker } from './components/panel/ItemPicker';
 import { PillBar } from './components/pill/PillBar';
+import { PluginPanelWindow } from './components/plugin/PluginPanelWindow';
 import { RecordsPanel } from './components/records/RecordsPanel';
 import { RecoverDialog } from './components/recover/RecoverDialog';
 import { SettingsPanel } from './components/settings/SettingsPanel';
@@ -45,6 +47,7 @@ export default function App() {
   if (kind === 'todos') return <TodosWindow />;
   if (kind === 'timer') return <TimerWindow />;
   if (kind === 'note') return <NoteWindow />;
+  if (kind === 'panel') return <PluginPanelWindow />;
 
   return <MainWindow />;
 }

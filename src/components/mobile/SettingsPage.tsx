@@ -73,7 +73,7 @@ export function SettingsPage() {
 
       <div className="m-settings__body">
         {tab === 'look' && <ThemePicker />}
-        {tab === 'plugins' && <PluginsTab showOpenDir={false} />}
+        {tab === 'plugins' && <PluginsTab showOpenDir={false} showPanels={false} />}
         {tab === 'gen' && (
           <>
             <GeneralTab showAutostart={false} />

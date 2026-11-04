@@ -33,6 +33,19 @@ pub enum SectionState {
     Present { body: String, mtime_ms: i64 },
 }
 
+/// 只 stat、不读正文：给出 `(mtime_ms, len)`，文件不存在或不是文件时返回 `None`。
+///
+/// 用途是「文件没变就别读整篇日记」：同步轮询每 2 秒对每个落点读一次区块，
+/// 而一次 `read_section` 会读几百 KB 再按标题切。判据只能是 stat，且必须
+/// mtime 与长度一起比——同一毫秒内的两次写入 mtime 相同，长度才收得住。
+pub fn stat_stamp(path: &Path) -> Option<(i64, u64)> {
+    let meta = fs::metadata(path).ok()?;
+    if !meta.is_file() {
+        return None;
+    }
+    Some((mtime_ms(&meta), meta.len()))
+}
+
 /// 解析落点路径：根目录 + 文件模板，模板里的日期令牌按本地日期替换。
 pub fn resolve_path(root: &str, file: &str, date: NaiveDate) -> PathBuf {
     let root = expand_env(root);

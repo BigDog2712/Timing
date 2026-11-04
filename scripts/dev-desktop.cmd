@@ -24,11 +24,26 @@ if not exist "%VCVARS%" goto novc
 call "%VCVARS%" >nul 2>&1
 if errorlevel 1 goto vcfail
 
+rem vcvars64 locates the Windows SDK through reg.exe. When that lookup is blocked the SDK
+rem include/lib paths stay empty and the linker cannot find kernel32.lib - fall back to the
+rem SDK folders on disk in that case. Same fallback as build-installer.cmd.
+echo %LIB% | find /i "Windows Kits" >nul || call :sdkfallback
+
 pushd "%REPO%" || goto nodir
 call npm.cmd run tauri dev
 set "RC=%ERRORLEVEL%"
 popd
 if not "%RC%"=="0" goto devfail
+exit /b 0
+
+:sdkfallback
+set "SDKROOT=C:/Windows Kits\10"
+if not exist "%SDKROOT%\Lib" exit /b 0
+for /d %%d in ("%SDKROOT%\Lib\*") do set "SDKVER=%%~nxd"
+if not defined SDKVER exit /b 0
+set "INCLUDE=%INCLUDE%;%SDKROOT%\Include\%SDKVER%\ucrt;%SDKROOT%\Include\%SDKVER%\um;%SDKROOT%\Include\%SDKVER%\shared;%SDKROOT%\Include\%SDKVER%\winrt;%SDKROOT%\Include\%SDKVER%\cppwinrt"
+set "LIB=%LIB%;%SDKROOT%\Lib\%SDKVER%\ucrt\x64;%SDKROOT%\Lib\%SDKVER%\um\x64"
+set "PATH=%PATH%;%SDKROOT%\bin\%SDKVER%\x64"
 exit /b 0
 
 :novc

@@ -20,6 +20,8 @@ import './styles/settings-plugins.css';
 /* [V0.4.0] Markdown 同步页签（md-sync 插件的落点配置） */
 import './styles/settings-sync.css';
 /* [V0.4.1] 渲染异常兜底（透明窗里渲染抛错 = 药丸凭空消失，必须留住可点的界面） */
+/* [v3] 插件面板窗口（声明式界面，独立窗口） */
+import './styles/plugin-panel.css';
 import './styles/error-boundary.css';
 import './styles/theme-picker.css';
 import './styles/slider.css';

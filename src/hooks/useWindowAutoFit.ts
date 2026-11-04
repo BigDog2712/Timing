@@ -19,12 +19,16 @@
  *
  * 本文件只负责「测量 → 交给纯函数裁决 → 落地到 OS 窗口」这条管道；
  * 包围盒算术全部在 `lib/autoFit.ts`，由 `autoFit.test.ts` 覆盖（T15）。
+ *
+ * [V0.4.2] 「什么时候该量」不再靠恒定轮询：尺寸变化走 ResizeObserver、DOM 变化走
+ * MutationObserver，轮询只做空闲兜底并按 250ms / 1000ms 自适应（见 `lib/layoutWatch.ts`）。
  */
 
 import { useEffect } from 'react';
 import { getCurrentWindow, LogicalPosition, LogicalSize } from '../lib/window';
 import { isTauri } from '../services/ipc';
 import { fitBounds, refreshFitBounds, setLayerOffset } from '../lib/fitBounds';
+import { watchLayout } from '../lib/layoutWatch';
 import {
   DEFAULT_FIT_THRESHOLDS,
   computeFitBox,
@@ -34,10 +38,7 @@ import {
   type FitBox,
 } from '../lib/autoFit';
 
-/** 轮询间隔：兜底捕获「只改样式不改 DOM」的显隐变化（动画结束、过渡态） */
-const POLL_MS = 250;
-/**
- * 窗口原点对应的布局坐标。跨会话记住它：
+/** 窗口原点对应的布局坐标。跨会话记住它：
  * window-state 插件会恢复上次的窗口位置与尺寸，二者必须成对恢复，
  * 否则首帧会把内容按旧起点平移一次（最多 16px 的跳位）。
  */
@@ -194,17 +195,13 @@ export function useWindowAutoFit(): void {
       });
     };
 
-    // DOM 增删 / class 与 style 变化（浮层开合）→ 立刻重量
-    const observer = new MutationObserver(schedule);
-    observer.observe(document.body, {
-      subtree: true,
-      childList: true,
-      attributes: true,
-      attributeFilter: ['class', 'style', 'hidden'],
+    /* DOM 增删 / class 与 style 变化（浮层开合）→ 立刻重量；
+       元素尺寸变化（含过渡）由 ResizeObserver 逐帧送来；轮询只是空闲兜底。 */
+    const watch = watchLayout({
+      resolveRoot: () => document.querySelector('.layer'),
+      onChanged: schedule,
     });
-
-    const timer = window.setInterval(schedule, POLL_MS);
-    /* 从隐藏恢复时补测一次：隐藏期间的尺寸变化不会触发 MutationObserver */
+    /* 从隐藏恢复时补测一次：隐藏期间的尺寸变化不会触发 MutationObserver / 尺寸观察 */
     const onVisibility = () => {
       if (!document.hidden) schedule();
     };
@@ -251,8 +248,7 @@ export function useWindowAutoFit(): void {
 
     return () => {
       disposed = true;
-      observer.disconnect();
-      window.clearInterval(timer);
+      watch.dispose();
       document.removeEventListener('visibilitychange', onVisibility);
       offMoved?.();
       if (pendingRefresh !== undefined) window.clearTimeout(pendingRefresh);

@@ -66,6 +66,7 @@ import type {
   MdSyncReport,
   MdSyncView,
 } from '../types/domain';
+import type { ActionParams, PanelActionOutcome, PanelRow, QueryParams } from '../types/domain';
 import { createMockApi } from '../mocks/browserMock';
 
 /** 规范化后的 IPC 失败对象（业务错误码 + 人类可读信息） */
@@ -284,6 +285,10 @@ export const ipc: IpcApi = {
   /* ---- [V0.3.2] 插件域 ---- */
   pluginList: () => call<PluginListResult>('plugin_list'),
   pluginOpenDir: () => call<void>('plugin_open_dir'),
+
+  pluginPanelOpen: (params: { pluginId: string; panelId: string }) => call<void>('plugin_panel_open', params),
+  pluginPanelData: (params: { source: string; params?: QueryParams }) => call<PanelRow[]>('plugin_panel_data', params),
+  pluginActionRun: (params: { action: string; params?: ActionParams }) => call<PanelActionOutcome>('plugin_action_run', params),
 
   /* ---- [V0.4.0] Markdown 同步（插件 API v2） ---- */
   mdSyncGet: () => call<MdSyncView>('md_sync_get'),

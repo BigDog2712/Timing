@@ -51,7 +51,7 @@ pub fn list(app_data_dir: &Path) -> PluginListResult {
                             source_label(winner)
                         )),
                         quick_timers: Vec::new(),
-                        md_sync: None,
+                        panels: Vec::new(),
                     });
                     continue;
                 }
@@ -67,7 +67,7 @@ pub fn list(app_data_dir: &Path) -> PluginListResult {
                     enabled: manifest.enabled,
                     error: None,
                     quick_timers: manifest.contributes.quick_timers,
-                    md_sync: manifest.contributes.md_sync,
+                    panels: manifest.contributes.panels,
                 });
             }
             Err(error) => {
@@ -89,7 +89,7 @@ pub fn list(app_data_dir: &Path) -> PluginListResult {
                     enabled: false,
                     error: Some(error),
                     quick_timers: Vec::new(),
-                    md_sync: None,
+                    panels: Vec::new(),
                 });
             }
         }

@@ -3,7 +3,7 @@
 //! 断言来源：`docs/Spec-v1.md` §6 / §9 与 `docs/phase2/IPC-CONTRACT-v2.md`，
 //! 以行为（输入→可观测输出/错误码）为准，不绑定实现内部细节。
 
-mod support;
+pub(crate) mod support;
 
 mod boot_timing;
 mod countdown;
@@ -29,7 +29,6 @@ mod migration_v2;
 mod moyu_settings;
 mod note;
 mod note_pin;
-mod plugin_dev;
 mod record;
 mod reminder;
 mod settings_reference;

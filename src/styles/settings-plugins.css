@@ -41,8 +41,7 @@
   font-size: var(--text-xs);
 }
 
-.plg__list {
-  display: flex;
+.plg__list {  display: flex;
   flex-direction: column;
   gap: var(--space-2);
   margin: 0;
@@ -106,6 +105,14 @@
 .plg__meta,
 .plg__hint {
   color: var(--ink-4);
+}
+
+/* 面板入口：一个插件可以有多个面板，按钮挨着排，换行不挤成一条。 */
+.plg__panels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 .plg__hint {

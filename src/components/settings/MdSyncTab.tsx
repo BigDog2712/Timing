@@ -48,10 +48,10 @@ export function MdSyncTab() {
     void load();
   }, [load]);
 
-  /* 关掉总开关时把落点设置自动收起来；重新打开、或插件未安装时展开。 */
+  /* 关掉总开关时把落点设置自动收起来；重新打开、或还没配过落点时展开。 */
   useEffect(() => {
-    setSettingsOpen(enabled || !view?.installed);
-  }, [enabled, view?.installed]);
+    setSettingsOpen(enabled || bindings.length === 0);
+  }, [enabled, bindings.length]);
 
   /* 第一次拿到视图 / 保存后重新拿到视图时，把草稿同步过来；dirty 时不动。 */
   useEffect(() => {
@@ -122,11 +122,6 @@ export function MdSyncTab() {
           <p className="sync__hint">
             数据库或 Markdown 任一侧改动都会在 2 秒内对齐；两边同时改时，最后写入者胜。
           </p>
-          {view?.installed && (
-            <p className="sync__plugin">
-              插件：{view.pluginName} v{view.pluginVersion}
-            </p>
-          )}
         </div>
         <div className="sync__enable">
           <span className="sync__label">启用</span>
@@ -172,9 +167,9 @@ export function MdSyncTab() {
         </button>
       )}
 
-      {loaded && view && !view.installed && (
+      {loaded && view && view.config.bindings.length === 0 && (
         <p className="sync__warn">
-          未检测到声明 mdSync 的插件。把 <code>plugins/md-sync</code> 放进插件目录后，到「插件」页签点「重新加载」。
+          还没有配置落点。选一个日记目录后保存，同步才会开始写文件。
         </p>
       )}
 
@@ -184,7 +179,7 @@ export function MdSyncTab() {
       <div id="md-sync-settings" className="sync__body" hidden={!settingsOpen}>
         {bindings.length === 0 ? (
           <p className="sync__empty">
-            {loading ? '正在读取落点…' : '这个插件没有声明可同步的落点。'}
+            {loading ? '正在读取落点…' : '还没有配置可同步的落点。'}
           </p>
         ) : (
           bindings.map((binding, index) => (

@@ -240,14 +240,12 @@ pub struct MdSyncStatus {
 }
 
 /// `md_sync_get` / `md_sync_save` 的返回：设置页一次拿全。
+///
+/// [v2 撤回] 不再有 `installed` / `pluginId` 等字段：Markdown 同步是宿主内建功能，
+/// 「谁提供它」这个问题已经不存在。落点是否配好，看 `config.bindings` 就知道。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MdSyncView {
-    /// 磁盘上是否有启用的、声明了 mdSync 的插件。
-    pub installed: bool,
-    pub plugin_id: Option<String>,
-    pub plugin_name: Option<String>,
-    pub plugin_version: Option<String>,
     /// 今天（本地时区，`YYYY-MM-DD`），前端用它做路径预览。
     pub today: String,
     pub config: MdSyncConfig,

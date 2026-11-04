@@ -1,12 +1,11 @@
-# TickBar 插件规格（v2 · V0.4.0）
+# TickBar 插件规格（apiVersion 3 · TickBar 0.1.1）
 
-> 状态：**已实装**。适用 TickBar `0.4.0` 及以后；v1 插件继续有效。
+> 状态：**已实装**。适用 TickBar `0.1.1` 及以后（`apiVersion` 最高 3）；只声明 `quickTimers` 的 v1 插件继续有效。
 > **V0.3.9 起** `quickTimers` 不再注入摸鱼菜单（菜单改为应用内置条目，见 §4 顶部与 ADR-026）。
-> **V0.4.0（apiVersion 2）** 新增 `mdSync` 贡献点：插件声明 Markdown 落点，宿主执行双向同步
-> （ADR-033）。首个 v2 插件是仓库内 `plugins/md-sync`。
-> **当前未发布版本** `mdSync` 新增第三种落点 `todos`（待办事项），并把「哪些数据属于哪一天」
-> 写成了明确口径（见 §5「落点格式」与「同步语义」）。种类扩展**不升 `apiVersion`**：它不改变
-> `bindings` 的 schema，不声明 `todos` 的插件完全不受影响。
+> **v3 新增 `panels`**（ADR-037）：插件可以声明一扇独立窗口，宿主渲染、按钮走白名单动作。
+> **`mdSync` 贡献点已撤回**（ADR-036）：Markdown 同步改回宿主内建功能，落点由用户在
+> 「设置 → 同步」直接改。插件不再能声明落点，老清单里多写的 `mdSync` 会被静默忽略。
+> §5 保留下来只为记录落点的字段约束与同步语义，**不再属于插件契约**。
 > 本文是插件作者与宿主实现之间的唯一契约；与代码冲突时以本文为准，并请提 issue。
 
 ---
@@ -19,8 +18,7 @@ TickBar 只**读**这个文件，不执行插件里的任何代码。所以插�
 不可能拿到你的数据——它只能"声明"自己贡献什么，由宿主去落实。
 
 这条边界是刻意划的：v1 的目标是让"我想把摸鱼 25 分钟改成 40 分钟"这种需求，
-靠改一个数字就能完成，而不是先装一个运行时。v2 的 `mdSync` 同样只声明落点，
-文件读写与冲突判定全部在宿主 Rust 侧完成——插件依旧拿不到数据库或任意文件权限。
+靠改一个数字就能完成，而不是先装一个运行时。
 
 ---
 
@@ -58,7 +56,7 @@ TickBar 只**读**这个文件，不执行插件里的任何代码。所以插�
 | `id` | string | ✅ | — | 1~48 字符，仅小写字母 / 数字 / `-` / `_`。全局唯一 |
 | `name` | string | ✅ | — | 显示名，非空 |
 | `version` | string | ✅ | — | 显示用，非空（建议 `1.0.0`） |
-| `apiVersion` | number | ✅ | — | `1` 或 `2`。`2` 才能声明 `mdSync`；更高版本拒载，而不是猜语义 |
+| `apiVersion` | number | ✅ | — | `1` / `2` / `3`。更高版本拒载，而不是猜语义。`1` 与 `2` 的可用贡献点相同（都只有 `quickTimers`），`3` 才能写 `panels` |
 | `description` | string | ❌ | `""` | 一行说明，显示在设置页 |
 | `entry` | string | ❌ | `"manifest"` | 启动方式。宿主目前只接受 `"manifest"` |
 | `enabled` | boolean | ❌ | `true` | `false` = 留在盘上但不生效 |
@@ -124,41 +122,45 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 
 ---
 
-## 5. 贡献点 `mdSync`（apiVersion 2）
+## 5. Markdown 同步落点（宿主内建）
 
-声明「应用数据 → Markdown 落点」的映射。宿主按下表把计时记录 / 便利贴 / 待办事项写进
-指定标题下，并在文件被改动时把差异写回 SQL；插件本身不接触文件。
+> **这一节不再是插件契约。** `mdSync` 贡献点已撤回（ADR-036）：同步要读写任意路径、
+> 后台定时、写数据库，属于宿主特权能力，不该由插件当配置携带者。出厂默认落点在
+> `services::md_sync/config.rs` 的 `default_bindings()`，用户可在「设置 → 同步」直接改，
+> 改动落在 `settings` 表的 `plugin.md-sync.config` 键里（键名是历史遗留）。
+>
+> 保留本节是因为**字段约束没变**——设置页保存时用的是同一套校验。
+
+宿主按下表把计时记录 / 便利贴 / 待办事项写进指定标题下，并在文件被改动时把差异写回 SQL。
+
+配置的持久形态（就是 `plugin.md-sync.config` 的内容）：
 
 ```json
 {
-  "apiVersion": 2,
-  "contributes": {
-    "mdSync": {
-      "bindings": [
-        {
-          "kind": "timers",
-          "enabled": true,
-          "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
-          "file": "{date}.md",
-          "heading": "#### 事项计时"
-        },
-        {
-          "kind": "notes",
-          "enabled": true,
-          "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
-          "file": "{date}.md",
-          "heading": "#### 便利贴"
-        },
-        {
-          "kind": "todos",
-          "enabled": true,
-          "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
-          "file": "{date}.md",
-          "heading": "#### 待办事项"
-        }
-      ]
+  "enabled": true,
+  "bindings": [
+    {
+      "kind": "timers",
+      "enabled": true,
+      "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
+      "file": "{date}.md",
+      "heading": "#### 事项计时"
+    },
+    {
+      "kind": "notes",
+      "enabled": true,
+      "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
+      "file": "{date}.md",
+      "heading": "#### 便利贴"
+    },
+    {
+      "kind": "todos",
+      "enabled": true,
+      "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
+      "file": "{date}.md",
+      "heading": "#### 待办事项"
     }
-  }
+  ]
 }
 ```
 
@@ -170,12 +172,12 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 | `file` | string | ✅ | 相对文件模板，1~260 字符。禁止绝对路径与 `..`。支持 `{date}` / `{yyyy}` / `{MM}` / `{dd}` |
 | `heading` | string | ✅ | 目标标题行（`#`~`######` + 空格 + 标题文字），1~120 字符。例如 `#### 事项计时` |
 
-`bindings` 最多 8 条，但同一 `kind` 只能一条（设置页按 kind 找状态）。没有
-`contributes.mdSync` 的插件不受影响；写了 `mdSync` 但 `apiVersion: 1` 会被拒载。
+`bindings` 最多 8 条，但同一 `kind` 只能一条（设置页按 kind 找状态）。超出或重复
+会在保存时被 `MD_SYNC_CONFIG_INVALID` 拒绝。
 
 **升级行为**：保存过的配置以用户为准（总开关、根目录、文件模板、标题，以及主动
-`enabled: false` 的落点都不会被插件默认值覆盖），但保存值里**完全没有的 kind** 会用
-插件默认值补齐。所以插件新增一种落点后，老用户不必删配置重来——它会在下一轮同步时
+`enabled: false` 的落点都不会被出厂默认值覆盖），但保存值里**完全没有的 kind** 会用
+出厂默认值补齐。所以宿主新增一种落点后，老用户不必删配置重来——它会在下一轮同步时
 自动出现。这条是必需的：设置页没有「添加落点」入口。
 
 ### 落点格式
@@ -339,11 +341,89 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 - 计时按 `started_at` 归日：昨天 23:00 开始、现在仍在跑的会话属于昨天的文件，今天的
   区块不会画它（已知限制，取舍见 `services/md_sync/export.rs` 模块注释）。
 
-改完 `plugin.json` 后到 **设置 → 插件** 点「重新加载」，再到 **设置 → 同步** 确认落点并保存。
+落点改在 **设置 → 同步**，保存即同步一次；没有保存过时用 `default_bindings()` 的出厂三条。
 
 ---
 
-## 6. 内置预设
+## 6. 贡献点 `panels`（apiVersion 3）
+
+插件可以用**声明**的方式贡献一扇独立窗口：宿主渲染界面，插件仍然不执行任何代码。
+面板在「设置 → 插件」里点「打开「标题」」进入，窗口 label 为 `panel-{pluginId}-{panelId}`。
+
+```json
+{
+  "apiVersion": 3,
+  "contributes": {
+    "panels": [
+      {
+        "id": "weekly",
+        "title": "本周概览",
+        "width": 360,
+        "height": 520,
+        "blocks": [
+          { "type": "text", "text": "按事项统计最近 7 天的投入。" },
+          { "type": "stats", "source": "records.byItem", "label": "各事项", "params": { "days": 7 } },
+          { "type": "list", "source": "todos.pending", "label": "待办", "params": { "limit": 5 } },
+          {
+            "type": "actions",
+            "items": [
+              { "label": "开始摸鱼", "action": "timer.start", "params": { "item": "摸鱼" } }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+| 字段 | 类型 | 必需 | 约束 |
+|---|---|---|---|
+| `id` | string | ✅ | 小写字母 / 数字 / `-` / `_`，≤32 字，同一插件内唯一 |
+| `title` | string | ✅ | 1~40 字；同时是窗口标题 |
+| `width` / `height` | number | ❌ | 280~720 / 240~900（逻辑像素）；留空 = 320×460 |
+| `blocks` | array | ✅ | 1~12 块 |
+
+一个插件最多 **3** 个面板。没有 `apiVersion: 3` 却写 `panels` 会被拒载。
+
+### 块类型
+
+| `type` | 作用 | 字段 |
+|---|---|---|
+| `text` | 静态段落（说明、免责声明） | `text`，≤2000 字 |
+| `stats` | 带条形的排行 | `source` 必需；`label`、`params` 可选 |
+| `list` | 纯文本列表 | 同上，但不画条 |
+| `actions` | 按钮组 | `items[]`，每项 `label` + `action` + `params`；最多 6 个 |
+
+写了没实现的 `type`（比如 `table`）会让整个清单**解析失败**——宁可拒载并说明，也不要
+渲染出一片空白让人以为插件「没生效」。
+
+### 数据源（白名单）
+
+| `source` | 返回 | `params` |
+|---|---|---|
+| `records.byItem` | 最近 N 天各事项时长，按时长降序 | `days`：1~365，默认 7 |
+| `todos.pending` | 未完成待办 | `limit`：1~50，默认 8 |
+
+### 动作（白名单）
+
+| `action` | 效果 | `params` |
+|---|---|---|
+| `timer.start` | 按事项名开始计时（事项不存在则新建） | `item` ✅ |
+| `timer.pause` | 暂停当前计时 | — |
+| `todo.add` | 新增一条待办 | `title` ✅ |
+| `note.create` | 新建一张便利贴 | `content` ✅ |
+
+带 ✅ 的参数**在清单加载时**就校验：`timer.start` 没写 `item` 会被直接拒载，
+而不是点下去没反应。
+
+**为什么只有这几项**：一旦允许插件传 SQL 或脚本，宿主要做的就不再是「渲染一块界面」，
+而是「沙箱 + 权限模型 + 崩溃隔离」。白名单能力已经能覆盖「看统计、加点东西、起个计时」，
+越界的需求应该由宿主新增一个能力，而不是让插件绕过去。
+
+---
+
+## 7. 内置预设
 
 摸鱼菜单自带三条预设，**它们是应用的内置功能，不是插件**：没有 `plugin.json`、
 不在插件扫描范围内、不出现在设置 → 插件的插件列表里，也无目录可打开。
@@ -361,7 +441,7 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 
 ---
 
-## 7. 出错时你会看到什么
+## 8. 出错时你会看到什么
 
 载入失败的插件**不会**从列表里消失，而是标红并在行内写明原因：
 
@@ -370,20 +450,22 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 | 文件夹里没有 `plugin.json` | 缺少启动头 plugin.json |
 | JSON 语法错 | 启动头 JSON 不合法：`<serde 原文>` |
 | `id` 大写或含空格 | id 只能用小写字母、数字、- 和 _ |
-| `apiVersion: 3` 或更高 | apiVersion 必须为 1..=2（本机宿主版本更低） |
+| `apiVersion: 4` 或更高 | apiVersion 必须为 1..=3（本机宿主版本更低） |
 | `entry: "script"` | entry=script 暂不支持，当前宿主只执行 manifest |
 | `minutes: 0` 或 `1500` | quickTimers.minutes 必须为 1..=1440 |
 | `quickTimers` 超过 12 条 | quickTimers 最多 12 条 |
-| `mdSync` 但 `apiVersion: 1` | mdSync 需要 apiVersion 2 |
-| `file` 绝对路径 / 含 `..` | mdSync.file 必须是落点根目录内的相对路径 |
-| `heading` 没有 `#` | mdSync.heading 必须是以 # 开头的标题行 |
-| 同一 `kind` 两个落点 | 每个数据种类只能有一个落点 |
+| 写了 `panels` 但 `apiVersion: 2` | panels 需要 apiVersion 3 |
+| `panels[].id` 重复或含大写 | panel.id「weekly」重复 / panel.id 只能用小写字母、数字、- 和 _ |
+| `source` 写错 | 未知数据源「records.everything」；可用：records.byItem / todos.pending |
+| `action` 写错 | 未知动作「shell.run」；可用：timer.start / timer.pause / todo.add / note.create |
+| 按钮缺参数 | timer.start 需要 params.item |
+| 块类型没实现 | 启动头 JSON 不合法（`unknown variant`） |
 
 改完文件后在 **设置 → 插件** 点「重新加载」，无需重启程序。
 
 ---
 
-## 8. 完整示例
+## 9. 完整示例
 
 自己在插件目录里新建一个文件夹（示例里叫 `moyu-kit`，名字随意），把下面的内容存成
 其中的 `plugin.json`，回到 设置 → 插件 点「重新加载」：
@@ -409,13 +491,13 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 
 ---
 
-## 9. 边界（明确不做的事）
+## 10. 边界（明确不做的事）
 
 | 不做 | 原因 |
 |---|---|
-| 执行插件 JS / 脚本 | 需要沙箱与权限模型，v2 仍不做半成品 |
-| 插件读写数据库 / 任意文件 | 数据访问一律走 `commands → services → repositories`（ADR-015）；文件只由宿主按声明落点读写 |
-| 插件自定义 UI | 同上：先有稳定的贡献点，再谈 UI 扩展 |
+| 执行插件 JS / 脚本 | 需要沙箱与权限模型；`panels` 走声明式路线，正是为了不背这个包袱 |
+| 插件读写数据库 / 任意文件 | 数据访问一律走 `commands → services → repositories`（ADR-015）；插件只能通过白名单数据源读汇总，写操作走白名单动作 |
+| 插件自定义 UI 结构 | 块类型是封闭枚举（`text` / `stats` / `list` / `actions`）；加新形态要改宿主并升 `apiVersion` |
 | 插件热重载（文件监听） | 「重新加载」按钮已足够，且语义明确 |
 
 加新贡献点必须同时升 `apiVersion`，并在本文件补一节。

@@ -97,7 +97,7 @@ async fn g3_handwritten_checked_line_is_created_as_done() {
         now,
     )
     .await;
-    services::md_sync::run(&env.pool, &env.app_data)
+    services::md_sync::run(&env.pool)
         .await
         .unwrap();
 
@@ -105,7 +105,7 @@ async fn g3_handwritten_checked_line_is_created_as_done() {
     let updated = md_file::replace_in_text(&text(&env), HEADING, &edited);
     std::fs::write(file_for(&env), updated).unwrap();
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
+    let report = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert_eq!(report.imported, 1, "{report:?}");
@@ -116,7 +116,7 @@ async fn g3_handwritten_checked_line_is_created_as_done() {
             .unwrap();
     assert!(done.is_some(), "手写 [x] 应直接建成已完成");
     /* 已完成的不会进区块，所以下一轮文件里不该出现它。 */
-    services::md_sync::run(&env.pool, &env.app_data)
+    services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert!(!block(&env).contains("手动抄的已完成一条"));
@@ -140,7 +140,7 @@ async fn g4_empty_block_leaves_heading_only_and_stops_writing() {
         now,
     )
     .await;
-    services::md_sync::run(&env.pool, &env.app_data)
+    services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert!(block(&env).contains("明天的事"));
@@ -153,7 +153,7 @@ async fn g4_empty_block_leaves_heading_only_and_stops_writing() {
         .await
         .unwrap();
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
+    let report = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert!(report.exported >= 1, "有变化要写盘：{report:?}");
@@ -166,7 +166,7 @@ async fn g4_empty_block_leaves_heading_only_and_stops_writing() {
     );
 
     let before = mtime(&env);
-    let again = services::md_sync::run(&env.pool, &env.app_data)
+    let again = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert_eq!(again.exported, 0, "空区块不该每轮重写：{again:?}");
@@ -225,14 +225,14 @@ async fn h_two_idle_runs_leave_mtime_untouched() {
     .await
     .unwrap();
 
-    let first = services::md_sync::run(&env.pool, &env.app_data)
+    let first = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert!(first.exported >= 1, "{first:?}");
     let baseline_text = text(&env);
     let before = mtime(&env);
 
-    let second = services::md_sync::run(&env.pool, &env.app_data)
+    let second = services::md_sync::run(&env.pool)
         .await
         .unwrap();
     assert_eq!(second.exported, 0, "无改动不该写盘：{second:?}");

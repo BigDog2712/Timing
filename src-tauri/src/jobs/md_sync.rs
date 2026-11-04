@@ -24,15 +24,8 @@ pub fn spawn_md_sync_watcher(app: AppHandle) {
         let mut ticker = tokio::time::interval(Duration::from_secs(MD_SYNC_POLL_SECS));
         loop {
             ticker.tick().await;
-            let app_data_dir = match app.path().app_data_dir() {
-                Ok(dir) => dir,
-                Err(err) => {
-                    crate::log_warn!("resolve app data dir failed: {err}");
-                    continue;
-                }
-            };
             let pool = app.state::<AppState>().pool.clone();
-            match services::md_sync::tick(&pool, &app_data_dir).await {
+            match services::md_sync::tick(&pool).await {
                 Ok(Some(report)) => events::emit_md_sync_changed(&app, &report),
                 Ok(None) => {}
                 Err(err) => crate::log_warn!("md sync tick failed: {err}"),

@@ -4,12 +4,14 @@
  * 与 `src-tauri/src/models/plugin.rs` 逐字对应（`#[serde(rename_all = "camelCase")]`）。
  *
  * 插件是**声明式**的：宿主读 `<插件目录>/plugin.json`（启动头），不执行插件代码。
- * - v1：`quickTimers`（摸鱼菜单的预设行）；
- * - v2：新增 `mdSync`（Markdown 双向同步落点）。
+ * 贡献点：`quickTimers`（摸鱼菜单的预设行）与 [v3] `panels`（独立窗口里的声明式面板）。
+ *
+ * [v2 撤回] 曾经的 `mdSync` 贡献点已移除：Markdown 同步是宿主内建功能，落点由用户在
+ * 「设置 → 同步」直接改。老插件里多写的 `mdSync` 字段会被后端静默忽略。
  * 字段语义见 `docs/plugin-spec.md`。
  */
 
-import type { MdSyncContribution } from './mdSync';
+import type { Panel } from './pluginPanel';
 
 /** 摸鱼菜单的一行：事项名 + 目标倒计时分钟数 */
 export interface QuickTimer {
@@ -44,8 +46,8 @@ export interface PluginInfo {
   error: string | null;
   /** 该插件声明的快捷计时（未生效时后端也会回填，但不会进合并结果） */
   quickTimers: QuickTimer[];
-  /** [v2] 该插件声明的 Markdown 同步落点；未生效时为 null */
-  mdSync: MdSyncContribution | null;
+  /** [v3] 该插件声明的面板（停用 / 载入失败的插件回空数组） */
+  panels: Panel[];
 }
 
 export interface PluginListResult {

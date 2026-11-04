@@ -1,0 +1,192 @@
+/**
+ * TickBar — 插件面板窗口样式（apiVersion 3）
+ * -----------------------------------------------------------------------------
+ * 类名统一 `plgp__*`（plugin panel），与 `.plg__*`（设置里的插件页签）区分开：
+ * 前者是一整扇窗，后者是列表行，混用会让改一处布局影响另一处。
+ *
+ * 玻璃语言与设置窗一致（`--surface-*` / `--radius-md`），但**不继承设置窗口的固定尺寸**：
+ * 面板宽高由插件声明，这里只保证内容在任意尺寸下都从顶部排、不横向溢出。
+ */
+
+.plgp {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--surface-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--radius-lg);
+  color: var(--ink-1);
+}
+
+.plgp__bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.plgp__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.plgp__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plgp__src {
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.plgp__close {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.plgp__close:hover {
+  background: var(--surface-2);
+  color: var(--ink-1);
+}
+
+.plgp__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  overflow-y: auto;
+}
+
+.plgp__text {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+}
+
+.plgp__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.plgp__label {
+  margin: 0;
+  font-size: var(--text-cap);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-4);
+  text-transform: uppercase;
+}
+
+.plgp__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plgp__row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.plgp__row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.plgp__row-label {
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plgp__row-detail {
+  flex: none;
+  font-size: var(--text-cap);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 条形（`.plgp__bar` 是标题栏，条形另起名字，别撞车） */
+.plgp__meter-fill {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--accent-1);
+}
+
+.plgp__meter {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.plgp__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.plgp__action {
+  flex: 1 1 auto;
+  min-width: 120px;
+}
+
+.plgp__muted,
+.plgp__error {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.plgp__muted {
+  color: var(--ink-4);
+}
+
+.plgp__error {
+  color: var(--danger-1, #c0392b);
+}
+
+.plgp__notice {
+  flex: none;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--line-1);
+  background: var(--surface-2);
+  font-size: var(--text-cap);
+  color: var(--ink-2);
+}

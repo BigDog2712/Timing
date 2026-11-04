@@ -5,20 +5,27 @@
 //!   宿主只认这一个文件——读不到它，目录再花哨也不算插件。
 //! - **贡献点（contribution）**：插件向宿主声明的能力。
 //!   - v1：`quickTimers`（摸鱼菜单的预设项）；
-//!   - v2：新增 `mdSync`（Markdown 双向同步的落点预设）。
+//!   - v3：`panels`（声明式面板：独立窗口里的一块界面 + 按钮触发的宿主动作）。
 //!     加新贡献点必须同时升 `apiVersion`。
+//!
+//! [v2 撤回] 曾经的 `mdSync` 贡献点已移除。Markdown 同步是**宿主内建功能**：
+//! 它要读写任意路径、后台定时、写库，属于特权能力，不该由插件当配置携带者。
+//! 落点由用户在「设置 → 同步」直接改，出厂默认值在 `services::md_sync::config`。
+//! 老插件里多写的 `mdSync` 字段会被静默忽略——解析策略本就是「字段不认识就忽略」。
 //!
 //! 解析策略：**宁缺毋滥**。字段不认识就忽略（向前兼容），但 `entry` / `apiVersion`
 //! 不认识就拒载并留下原因——猜语义比不加载更危险。
 
 use serde::{Deserialize, Serialize};
 
-use crate::models::md_sync::MdSyncBinding;
+use crate::models::plugin_panel::Panel;
 
 /// 宿主支持的最高 apiVersion。插件写更高版本 → 拒载（不猜语义）。
 ///
-/// v2 新增 `contributes.mdSync`；只声明 `quickTimers` 的 v1 插件继续有效。
-pub const PLUGIN_API_VERSION: u32 = 2;
+/// v2 曾引入 `contributes.mdSync`，现已撤回；v3 新增 `contributes.panels`。
+/// 只声明 `quickTimers` 的 v1 插件继续有效——它不写 `apiVersion: 3` 就不会被当 v3 解析，
+/// 而 `panels` 又是可选字段，所以老插件不需要任何改动。
+pub const PLUGIN_API_VERSION: u32 = 3;
 
 /// 启动头文件名（固定，不可配置）。
 pub const MANIFEST_FILE: &str = "plugin.json";
@@ -43,23 +50,13 @@ pub enum EntryKind {
     Script,
 }
 
-/// [v2] Markdown 同步贡献：只声明**默认落点**，真正的读写由宿主执行。
-///
-/// 插件不跑代码，所以路径、标题、文件模板必须全是数据；用户可在
-/// 「设置 → 同步」里覆盖，覆盖值落在 `settings` KV，不写回插件目录。
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct MdSyncContribution {
-    pub bindings: Vec<MdSyncBinding>,
-}
-
 /// 贡献点集合。全部可选——空贡献的插件也合法（只登记，不产生行为）。
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct PluginContributes {
     pub quick_timers: Vec<QuickTimer>,
-    /// [v2] 声明本插件提供 Markdown 同步落点。
-    pub md_sync: Option<MdSyncContribution>,
+    /// [v3] 声明式面板。`apiVersion: 3` 才认，低版本写了也不生效（校验层拒绝）。
+    pub panels: Vec<Panel>,
 }
 
 /// 磁盘上的启动头（严格按本结构解析）。
@@ -126,8 +123,8 @@ pub struct PluginInfo {
     pub enabled: bool,
     pub error: Option<String>,
     pub quick_timers: Vec<QuickTimer>,
-    /// [v2] 本插件声明的同步落点（未生效 / 载入失败的插件不贡献）。
-    pub md_sync: Option<MdSyncContribution>,
+    /// [v3] 本插件声明的面板（停用 / 载入失败的插件不贡献）。
+    pub panels: Vec<Panel>,
 }
 
 /// `plugin_list` 的返回：插件 + 用户插件目录（设置页据此显示与「打开目录」）。

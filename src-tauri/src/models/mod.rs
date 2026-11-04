@@ -9,6 +9,7 @@ pub mod moyu;
 pub mod note;
 pub mod nudge;
 pub mod plugin;
+pub mod plugin_panel;
 pub mod record;
 pub mod reminder;
 pub mod settings;
