@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.tickbar.droid"
+    namespace = "com.timing.droid"
     compileSdk = 36          // 本机已装 platforms;android-36
 
     defaultConfig {
-        applicationId = "com.tickbar.droid"
+        applicationId = "com.timing.droid"
         minSdk = 26          // 前台服务 + TYPE_APPLICATION_OVERLAY 的下限
         targetSdk = 35
         versionCode = 11

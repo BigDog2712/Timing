@@ -20,7 +20,7 @@ const MOBILE_CSS_IMPORT = /^[ \t]*import[ \t]+['"]\.\/styles\/mobile\/[^'"]+['"]
  */
 function platformCss(): Plugin {
   return {
-    name: 'tickbar:platform-css',
+    name: 'timing:platform-css',
     enforce: 'pre',
     transform(code, id) {
       if (IS_MOBILE_BUILD || !/src[\\/]main\.tsx$/.test(id)) return;
@@ -31,7 +31,7 @@ function platformCss(): Plugin {
   };
 }
 
-// TickBar — 桌面悬浮应用（Tauri 2 + React 19）
+// Timing — 桌面悬浮应用（Tauri 2 + React 19）
 // 说明：本工程为固定 384x360 DIP 透明置顶层，无 Web 路由、无网络请求。
 // - clearScreen=false：保留 Rust 侧 dev 日志
 // - strictPort 1420：与 src-tauri/tauri.conf.json 的 devUrl 对齐
@@ -42,7 +42,7 @@ export default defineConfig({
      TAURI_ENV_FAMILY=mobile；纯 vite（dev / vitest）下没有这个变量 → false，
      桌面路径与桌面产物完全不受影响（替换成字面量后移动分支可被摇树删除）。 */
   define: {
-    __TICKBAR_MOBILE__: JSON.stringify(IS_MOBILE_BUILD),
+    __TIMING_MOBILE__: JSON.stringify(IS_MOBILE_BUILD),
   },
   clearScreen: false,
   server: {

@@ -1,17 +1,17 @@
-# TickBar 架构设计 v1（Phase 1）
+# Timing 架构设计 v1（Phase 1）
 
 - Document ID: ARCH-v1
 - Status: Draft for Phase 2 review
 - Owner: 高见远（首席架构师，mvp-dev-expert-team-architect）
 - Date: 2026-10-16
-- Upstream: 产品简报《Windows 桌面悬浮轻量计时小工具 TickBar》（暂定名）
+- Upstream: 产品简报《Windows 桌面悬浮轻量计时小工具 Timing》（暂定名）
 - Downstream: Phase 2 API 契约 / 前端实现 / 后端实现 / Phase 3 测试
 
 ---
 
 ## 0. 一句话结论
 
-TickBar 是一个**纯本地、免登录、常驻托盘的 Windows 桌面计时小工具**。架构结论：**Tauri 2（Rust）+ React 19 + TypeScript + SQLite**，前端只做表现，Rust 侧承载计时状态机、数据持久化与全部 OS 集成（托盘 / 全局快捷键 / 开机自启 / 窗口状态）。安装包体积目标 < 8MB，空闲内存目标 < 60MB（在 Windows 11 WebView2 环境）。
+Timing 是一个**纯本地、免登录、常驻托盘的 Windows 桌面计时小工具**。架构结论：**Tauri 2（Rust）+ React 19 + TypeScript + SQLite**，前端只做表现，Rust 侧承载计时状态机、数据持久化与全部 OS 集成（托盘 / 全局快捷键 / 开机自启 / 窗口状态）。安装包体积目标 < 8MB，空闲内存目标 < 60MB（在 Windows 11 WebView2 环境）。
 
 ---
 
@@ -158,7 +158,7 @@ TickBar 是一个**纯本地、免登录、常驻托盘的 Windows 桌面计时�
                             │
 ┌───────────────────────────▼──────────────────────────────────────────┐
 │  基础设施 (SQLite 文件 / OS API)                                        │
-│  - SQLite：%APPDATA%\com.tickbar.app\tickbar.db（WAL）                  │
+│  - SQLite：%APPDATA%\com.timing.app\timing.db（WAL）                  │
 │  - Tray / GlobalShortcut / Autostart / WindowState / SingleInstance     │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -654,7 +654,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
 ```bash
 # 1. 构建
-cd tickbar
+cd timing
 npm install
 npm run tauri build          # 产出 NSIS/MSI 安装包
 # 或开发态：npm run tauri dev
@@ -726,7 +726,7 @@ npm run tauri build          # 产出 NSIS/MSI 安装包
 
 1. 平台：Windows 优先（Win10 1903+ / Win11）；依赖 WebView2 运行时。
 2. 网络：**零网络请求**，全离线；不得引入任何远程调用。
-3. 存储：单机 SQLite 文件，路径 `%APPDATA%\com.tickbar.app\`；启用 WAL、`foreign_keys=ON`；首启种入系统事项「未归类」(id=1, is_system=1)，不可删除/归档。
+3. 存储：单机 SQLite 文件，路径 `%APPDATA%\com.timing.app\`；启用 WAL、`foreign_keys=ON`；首启种入系统事项「未归类」(id=1, is_system=1)，不可删除/归档。
 4. 单实例运行：由 `single-instance` 插件保证。
 5. 图标：**唯一使用 `lucide-react@1.57.0`**；禁止 emoji 图标、禁止混用其它图标库。
 6. 体积/占用目标：安装包 < 8MB；空闲内存 < 60MB；冷启动 < 1s。

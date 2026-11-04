@@ -1,5 +1,5 @@
 /**
- * TickBar 领域类型（对外唯一入口 / re-export 门面）
+ * Timing 领域类型（对外唯一入口 / re-export 门面）
  * -----------------------------------------------------------------------------
  * Document ID : domain.ts
  * Status      : Frozen for Phase 3（v0.3 起仅作门面，实现在 ./domain/*）

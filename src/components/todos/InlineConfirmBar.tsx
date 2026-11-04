@@ -1,5 +1,5 @@
 /**
- * TickBar — 内联删除确认条 InlineConfirmBar（todos-panel.md §3.4「Delete → 内联确认」）
+ * Timing — 内联删除确认条 InlineConfirmBar（todos-panel.md §3.4「Delete → 内联确认」）
  * -----------------------------------------------------------------------------
  * 不弹阻塞对话框：文案 + 确认（danger）+ 取消。
  */

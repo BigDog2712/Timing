@@ -1,5 +1,5 @@
 /**
- * TickBar — IPC 唯一出口（K-11）
+ * Timing — IPC 唯一出口（K-11）
  * -----------------------------------------------------------------------------
  * 契约：docs/phase2/IPC-CONTRACT-v2.md §3；类型：src/types/domain.ts（IpcApi）。
  * 规则（硬）：

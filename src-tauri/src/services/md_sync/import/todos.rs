@@ -13,7 +13,7 @@
 //! - 标题 / `· 计划 <时间>` 变了 → 回写 `title` / `planned_at`；
 //! - 没有 id 的新行 → 新建待办。
 //!
-//! 删待办请回 TickBar 的待办窗口——那里是明确的删除动作，这里不是。
+//! 删待办请回 Timing 的待办窗口——那里是明确的删除动作，这里不是。
 
 use chrono::NaiveDate;
 use sqlx::SqlitePool;

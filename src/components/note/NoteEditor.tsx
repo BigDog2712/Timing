@@ -1,5 +1,5 @@
 /**
- * TickBar — 便利贴正文编辑区 NoteEditor（sticky-note.md §1 / §3.3 / §3.5）
+ * Timing — 便利贴正文编辑区 NoteEditor（sticky-note.md §1 / §3.3 / §3.5）
  * -----------------------------------------------------------------------------
  * - 无边框可编辑区（--note-body-bg + radius-sm 8 + padding 9 11）；6px 自绘滚动条走 CSS。
  * - 纯文本、保留换行（sticky-note.md：「换行折叠为空格」由记录行侧处理）。

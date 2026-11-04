@@ -12,7 +12,7 @@
 - **现状**：安卓包用 `~/.android/debug.keystore`（口令 `android`）签名，`build.gradle.kts` 里
   `signingConfig = signingConfigs.getByName("debug")`，注释也写明「不能上架」。桌面 exe 完全未签名。
 - **后果**：手机上换机重装会因签名冲突装不上；Windows 首次运行弹 SmartScreen「未知发布者」。
-- **做法**：安卓自备 keystore（`keytool -genkey -v -keystore tickbar-release.jks -alias tickbar -validity 10000`），
+- **做法**：安卓自备 keystore（`keytool -genkey -v -keystore timing-release.jks -alias timing -validity 10000`），
   在 `build.gradle.kts` 加 `signingConfigs { create("release") { storeFile = file(System.getenv("TB_KEYSTORE")) … } }`，
   口令走环境变量或 `local.properties`（**不要入库**）；桌面买一张代码签名证书（或先用自签 + 内部分发说明）。
 - **验收**：`apksigner verify --print-certs` 显示自家证书；`signtool verify /pa` 通过。
@@ -22,7 +22,7 @@
 - **现状**：卸载脚本只做了代码审查（本机安全策略拦掉了卸载器自启）；计时 / 暂停 / 托盘 / 便利贴
   均未代跑（会写真实数据库）。
 - **做法**：照 `RELEASE-NOTES-v0.1.0.md` §5 的 8 条清单走一遍，重点看「卸载后
-  `%APPDATA%\com.tickbar.app` 仍在、`%LOCALAPPDATA%\Programs\TickBar` 已清空」。
+  `%APPDATA%\com.timing.app` 仍在、`%LOCALAPPDATA%\Programs\Timing` 已清空」。
 - **验收**：清单全勾，异常记到 issue。
 
 ### 3. 安卓端真机验收
@@ -47,7 +47,7 @@
 
 ### 5. 三份源码漂移（当前最大风险）
 
-- **现状**：`261017-Tickbar`（0.4.0）、`261102-Timing`（0.4.1）、`261104-Timing`（0.1.0）三份同源工程并存。
+- **现状**：`261017-Timing`（0.4.0）、`261102-Timing`（0.4.1）、`261104-Timing`（0.1.0）三份同源工程并存。
   本轮已确认后者是前两者的严格超集，但下次改动只会在其中一份上发生。
 - **建议**：`261104-Timing` 定为唯一主线并推到远端仓库；另两份降级为只读归档（或直接删除，
   历史已在 git 里）。`README` 顶部标注「唯一有效工程」。

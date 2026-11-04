@@ -1,4 +1,4 @@
-# Spec — TickBar v1.0
+# Spec — Timing v1.0
 
 > 生成日期：2026-10-16
 > 基于：PRD v1（许清楚）+ 架构文档 v1 / ADR-001~006（高见远）+ UIUX 文档 v1（颜好看）
@@ -9,7 +9,7 @@
 
 ## 1. 产品定义
 
-- **一句话描述**：TickBar 把"我到底把时间花在哪了"压缩成桌面上一颗永远可见的小药丸——点一下开始，点一下暂停，右键结束，时间自动落到对应事项上。
+- **一句话描述**：Timing 把"我到底把时间花在哪了"压缩成桌面上一颗永远可见的小药丸——点一下开始，点一下暂停，右键结束，时间自动落到对应事项上。
 - **目标用户**：按小时/按项目收费、在多个客户与事项间高频切换的 Windows 自由职业者与知识工作者（独立设计师、远程开发者、写作者、顾问）。
 - **核心问题**：现有计时工具的第一失败原因是「忘记开始/停止计时」；自动记录类工具做不了"事项/客户归属"，手动计时类仍靠人记得点；且"常驻可见"形态现有实现普遍很糟（置顶失效、遮挡、无手柄）。
 
@@ -104,7 +104,7 @@
   ↓
 数据层 repositories/*（仅 SQL + 行映射）
   ↓
-基础设施：SQLite（%APPDATA%\com.tickbar.app\tickbar.db，WAL）+ OS API（tray/shortcut/autostart/…）
+基础设施：SQLite（%APPDATA%\com.timing.app\timing.db，WAL）+ OS API（tray/shortcut/autostart/…）
 ```
 
 关键决策：**计时状态机归属 Rust**（单一事实来源），前端只渲染并基于 `started_at` 本地推算 tick，避免高频 IPC。
@@ -233,7 +233,7 @@
 
 ## 6. 数据库表清单（锁定）
 
-> DB 路径：`%APPDATA%\com.tickbar.app\tickbar.db`；`journal_mode=WAL`、`foreign_keys=ON`。
+> DB 路径：`%APPDATA%\com.timing.app\timing.db`；`journal_mode=WAL`、`foreign_keys=ON`。
 
 | 表名 | 核心字段 | 索引 | 关联 |
 |------|----------|------|------|
@@ -363,7 +363,7 @@
 
 ```bash
 # 1. 安装与构建
-cd tickbar && npm install
+cd timing && npm install
 npm run tauri dev          # 开发态；或 npm run tauri build 出安装包
 
 # 2. 形态核验

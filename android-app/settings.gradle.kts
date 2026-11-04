@@ -1,4 +1,4 @@
-rootProject.name = "TickBarDroid"
+rootProject.name = "TimingDroid"
 include(":app")
 
 dependencyResolutionManagement {

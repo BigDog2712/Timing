@@ -1,4 +1,4 @@
-# TickBar 架构设计 V0.2.0（增量）
+# Timing 架构设计 V0.2.0（增量）
 
 - Document ID: ARCH-v0.2.0
 - Status: Draft for V0.2.0-1 review（用户确认后冻结）
@@ -14,7 +14,7 @@
 
 ## 0. 一句话结论
 
-V0.2.0 在**不动架构主干**的前提下，把 TickBar 从「单窗药丸计时器」扩成「常驻计时 + 待办 + 便利贴多窗 + 提醒 + 倒计时 + 双主题」的桌面工具：数据 3 表 → 5 表，IPC 29 → 52 命令，视图 9 → 14。新代码**全部沿用四层分层、状态机归 Rust、单文件 ≤ 300 行**；四个新能力的架构决策各配一条 ADR（009~012），另含**托盘菜单决策 ADR-013**（用户裁决：**保留原生菜单、不自绘**；自绘方案降级为 v0.3+ 可选增强）。
+V0.2.0 在**不动架构主干**的前提下，把 Timing 从「单窗药丸计时器」扩成「常驻计时 + 待办 + 便利贴多窗 + 提醒 + 倒计时 + 双主题」的桌面工具：数据 3 表 → 5 表，IPC 29 → 52 命令，视图 9 → 14。新代码**全部沿用四层分层、状态机归 Rust、单文件 ≤ 300 行**；四个新能力的架构决策各配一条 ADR（009~012），另含**托盘菜单决策 ADR-013**（用户裁决：**保留原生菜单、不自绘**；自绘方案降级为 v0.3+ 可选增强）。
 
 ---
 
@@ -520,9 +520,9 @@ V0.1.0 是「单窗 384×360 内绘制」；V0.2.0 改为**多独立 `WebviewWin
   - 解析模式：`themeMode='dark'|'light'|'system'`；`system` 时读 `matchMedia('(prefers-color-scheme: light)')` 并按需订阅系统变化。
   - 应用：`document.documentElement.dataset.theme = resolved`。
   - 注入四色：`root.style.setProperty('--color-running', accents.running)` 等（默认不设 = 用令牌值，用户改了才覆盖）。
-  - 持久化：设置（`settings.theme.mode`）为**事实来源**，同时写 `localStorage['tickbar.theme']` 作为**首屏快取**。
+  - 持久化：设置（`settings.theme.mode`）为**事实来源**，同时写 `localStorage['timing.theme']` 作为**首屏快取**。
 - **首屏无白闪（K-18）**：
-  1. `index.html` `<head>` 内联引导脚本（在 CSS/React 之前同步执行）：读 `localStorage['tickbar.theme']`，立即 `document.documentElement.dataset.theme = v || 'dark'`；并设 `color-scheme`。
+  1. `index.html` `<head>` 内联引导脚本（在 CSS/React 之前同步执行）：读 `localStorage['timing.theme']`，立即 `document.documentElement.dataset.theme = v || 'dark'`；并设 `color-scheme`。
   2. 窗口 `visible:false`，前端**首帧渲染完成后**再 `show_window`（沿用 K-1/K-18），把「令牌生效」与「窗口可见」错开。
   3. 令牌文件里 `:root` 给 `--bg` 等**兜底默认值**，保证「只设了 data-theme、CSS 尚未解析」也无纯白底。
   4. 主窗（透明）自身无白闪风险；**设置窗 / 事项窗 / 便利贴窗**为新不透明窗，统一走「内联脚本 + visible:false + 兜底背景」三件套。
@@ -736,7 +736,7 @@ src-tauri/src/                         # 后端（四层）
 | K-15 | 便利贴 `Moved`/`Resized` 是**物理像素** | 存逻辑坐标须除 `scaleFactor`；恢复时按显示器 `work_area` 钳制，越界回落主屏（K-6 同源） |
 | K-16 | Windows toast 需 **AppUserModelID**；dev 态可能不弹；专注助手会吞通知 | 打包写 AUMID（NSIS/MSI）；通知失败回滚 `reminded_at` 以便重试；应用内 `reminder-fired` / `countdown-finished` 事件保证有可视提示 |
 | K-17 | 浅色主题下用户 accent 作文字对比度不足 | 浅色非文本 ≥3:1、文本 ≥4.5:1 派生（`deepenForNonText`）；两套主题逐对 AA 纳入验收 |
-| K-18 | 主题在首屏后异步加载 → 白闪 | `index.html` 内联脚本同步读 `localStorage['tickbar.theme']` 设 `data-theme`；新窗 `visible:false` 首帧后 `show()`；令牌 `:root` 给兜底 `--bg` |
+| K-18 | 主题在首屏后异步加载 → 白闪 | `index.html` 内联脚本同步读 `localStorage['timing.theme']` 设 `data-theme`；新窗 `visible:false` 首帧后 `show()`；令牌 `:root` 给兜底 `--bg` |
 | K-19 | 提醒无去重标记 → 每 tick 重复弹通知 | 落 `reminded_at`；扫描条件含 `reminded_at IS NULL`；`reminder_set` 重设时清 `reminded_at` |
 | K-20 | 倒计时到点若由前端判定，窗口隐藏/挂起会漏触发 | 到点判定归 Rust 的 `countdown_watcher`（1s）；结束时 `accumulated_sec` 钳到 `target_sec`，`ended_at = started_at + target*1000` |
 | K-21 | `app.emit` 广播**所有** webview，多窗会互相误收事件 | 窗口专属事件用 `emit_to(label, ...)`；广播事件（`theme-changed`）各窗按 label 自行判定是否响应；便利贴/待办窗**忽略** `timer:state-changed` |
@@ -792,7 +792,7 @@ V0.1.0 的 10 条全部继续有效，追加：
 #   - 跟随系统 → 改系统主题 → 应用跟随
 
 # 13. 后端迁移与老库共存
-#   - 用 V0.1.0 生成的 tickbar.db 启动 V0.2.0 → 自动加列/建表成功，历史记录/设置不丢
+#   - 用 V0.1.0 生成的 timing.db 启动 V0.2.0 → 自动加列/建表成功，历史记录/设置不丢
 #   - 连续启动两次 → 无 duplicate column 报错（幂等）
 
 # 14. 托盘菜单（原生，ADR-013；方案 Ⅰ）

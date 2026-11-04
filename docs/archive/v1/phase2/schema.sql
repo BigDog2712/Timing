@@ -1,5 +1,5 @@
 -- =============================================================================
--- TickBar 数据库初始化 / 迁移脚本（Phase 2 锁定）
+-- Timing 数据库初始化 / 迁移脚本（Phase 2 锁定）
 -- -----------------------------------------------------------------------------
 -- Document ID : schema.sql
 -- Upstream    : docs/Spec-v1.md §6 / docs/phase2/IPC-CONTRACT-v2.md
@@ -7,7 +7,7 @@
 -- Date        : 2026-10-16
 --
 -- 用途        : 由 tauri-plugin-sql 的 Migration（MigrationKind::Up）按序执行，
---               作为 %APPDATA%\com.tickbar.app\tickbar.db 的 schema 事实来源。
+--               作为 %APPDATA%\com.timing.app\timing.db 的 schema 事实来源。
 -- 幂等性      : 全部 DDL 使用 IF NOT EXISTS / INSERT OR IGNORE，重复执行不报错（K-7）。
 -- 版本        : schema.version = 1（见文件末 settings 种子）。
 --

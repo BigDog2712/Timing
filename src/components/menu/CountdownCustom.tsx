@@ -1,5 +1,5 @@
 /**
- * TickBar — 自定义时长输入 CountdownCustom（countdown-menu.md §3.2 Edge）
+ * Timing — 自定义时长输入 CountdownCustom（countdown-menu.md §3.2 Edge）
  * -----------------------------------------------------------------------------
  * 「自定义…」展开的玻璃小表单：分钟 + 秒两输入；Enter 提交、Esc 取消。
  *   - 非法（0 / < 1 分钟）→ 输入框 1px --danger + 行下 11px 提示（最短 1 分钟）。

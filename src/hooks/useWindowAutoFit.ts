@@ -1,5 +1,5 @@
 /**
- * TickBar — 主窗「内容自适应尺寸」（P1 修复：透明层空白区吞点击）
+ * Timing — 主窗「内容自适应尺寸」（P1 修复：透明层空白区吞点击）
  * -----------------------------------------------------------------------------
  * 背景：点击穿透只对 CSS 生效（pointer-events:none），对 **OS 窗口**无效 ——
  * WebView2 窗口矩形的鼠标事件全被它吃掉，桌面 / 别的应用都点不到。
@@ -42,7 +42,7 @@ import {
  * window-state 插件会恢复上次的窗口位置与尺寸，二者必须成对恢复，
  * 否则首帧会把内容按旧起点平移一次（最多 16px 的跳位）。
  */
-const OFFSET_KEY = 'tickbar:fit-offset';
+const OFFSET_KEY = 'timing:fit-offset';
 /** 窗口移动后重取上界的节流间隔（拖动时 `onMoved` 会连发；每次重取是 3 个 IPC） */
 const MOVE_REFRESH_MS = 160;
 

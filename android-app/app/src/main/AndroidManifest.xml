@@ -16,7 +16,7 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.TickBar">
+        android:theme="@style/Theme.Timing">
 
         <!-- configChanges：旋转 / 分屏 / 深色切换都不重建 Activity。
              便利贴编辑是「停手 800ms 才落盘」的，重建一次就丢掉还没写库的最后几句话；

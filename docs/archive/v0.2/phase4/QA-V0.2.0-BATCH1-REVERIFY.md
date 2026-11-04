@@ -1,4 +1,4 @@
-# QA 复验小结 — TickBar V0.2.0 批 1（定向复验 · AC-32 / AC-53 / AC-54 + 保真）
+# QA 复验小结 — Timing V0.2.0 批 1（定向复验 · AC-32 / AC-53 / AC-54 + 保真）
 
 - 文档 ID：`docs/phase4/QA-V0.2.0-BATCH1-REVERIFY.md`
 - 验证人：严过关（测试工程师，mvp-dev-expert-team-qa）

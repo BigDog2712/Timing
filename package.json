@@ -1,9 +1,9 @@
 {
-  "name": "tickbar",
+  "name": "timing",
   "private": true,
   "version": "0.1.1",
   "type": "module",
-  "description": "TickBar — 桌面悬浮计时药丸（Tauri 2 + React 19）",
+  "description": "Timing — 桌面悬浮计时药丸（Tauri 2 + React 19）",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

@@ -1,5 +1,5 @@
 /**
- * TickBar — 插件面板窗口（label `panel-{pluginId}-{panelId}`，apiVersion 3）
+ * Timing — 插件面板窗口（label `panel-{pluginId}-{panelId}`，apiVersion 3）
  * -----------------------------------------------------------------------------
  * 这扇窗是「别人能给应用加功能」的落点：插件的 `plugin.json` 声明面板长什么样，
  * 宿主按声明渲染。插件本身仍然不执行任何代码（`docs/plugin-spec.md` §1）。

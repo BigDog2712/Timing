@@ -1,5 +1,5 @@
 /**
- * TickBar — 领域常量与基础数值类型
+ * Timing — 领域常量与基础数值类型
  * -----------------------------------------------------------------------------
  * 从 `types/domain.ts` 拆出（原 552 行破 300 行硬约束，见 ADR-017）。
  * 纯常量、无依赖：任何层都可以引，不会形成环。
@@ -53,4 +53,7 @@ export const NOTE_GEOM_DEBOUNCE_MS = 300;
 export const DEFAULT_COUNTDOWN_PRESETS: readonly number[] = [300, 900, 1500, 1800, 2700, 3600];
 
 /** 主题快取键（首屏内联脚本同步读取，防白闪 K-18） */
-export const THEME_CACHE_KEY = 'tickbar.theme';
+export const THEME_CACHE_KEY = 'timing.theme';
+
+/** 改名前的主题键（存量用户可能还停在这上面，只读不写，见 theme.readCachedTheme） */
+export const THEME_CACHE_KEY_LEGACY = 'tickbar.theme';

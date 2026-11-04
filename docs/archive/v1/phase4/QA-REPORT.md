@@ -1,4 +1,4 @@
-# QA 报告 — TickBar V0.1.0（MVP）
+# QA 报告 — Timing V0.1.0（MVP）
 
 - 文档 ID：`docs/phase4/QA-REPORT.md`
 - 验证人：严过关（测试工程师，mvp-dev-expert-team-qa）
@@ -33,8 +33,8 @@
 | 命令 | 退出码 | 结果 |
 |---|---|---|
 | `cd src-tauri && cargo test --message-format short -j 2` | **0** | **`68 passed; 0 failed; 0 ignored`** |
-| `cd tickbar && npx tsc --noEmit` | **0** | 无类型错误 |
-| （初版）`cd tickbar && npm run build` | **0** | `✓ 1971 modules`；gzip 83.66 kB |
+| `cd timing && npx tsc --noEmit` | **0** | 无类型错误 |
+| （初版）`cd timing && npm run build` | **0** | `✓ 1971 modules`；gzip 83.66 kB |
 | （初版）`cargo build -j 2` | **0** | `Finished dev profile` |
 
 > 复验轮次测试数 58 → **68**：新增 `src/tests/window_geometry.rs` **10 个**纯函数单测（多显示器工作区钳制）。
@@ -288,8 +288,8 @@
 # 后端（必须 -j 2）
 cd src-tauri && cargo test --message-format short -j 2   # 68 passed, exit 0
 # 前端
-cd tickbar && npx tsc --noEmit                                   # exit 0
-cd tickbar && npm run build                                      # exit 0
+cd timing && npx tsc --noEmit                                   # exit 0
+cd timing && npm run build                                      # exit 0
 # P0 门禁（emoji）
 grep -rP '[\x{1F300}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{1F000}-\x{1F02F}\x{1F0A0}-\x{1F0FF}\x{1F100}-\x{1F64F}\x{1F680}-\x{1F6FF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FA6F}\x{1FA70}-\x{1FAFF}\x{FE00}-\x{FE0F}\x{200D}\x{20E3}]' src src-tauri/src   # 0 命中
 ```

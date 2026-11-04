@@ -1,5 +1,5 @@
 /**
- * TickBar — 移动端外壳（4 Tab + 全局覆盖层）
+ * Timing — 移动端外壳（4 Tab + 全局覆盖层）
  * -----------------------------------------------------------------------------
  * 职责边界（DESIGN-ANDROID-V1 §2.2 / T7）：
  *   - Tab 路由：timer / items / records / settings，**只渲染当前页**（切 Tab 即重挂载，
@@ -89,7 +89,7 @@ export function MobileShell() {
   useMobileBackSheet(sheet != null);
   /* 恢复面板不可关闭：返回键只把历史条目续上，既不丢决定也不退出应用 */
   const holdRecover = useCallback(() => {
-    window.history.pushState({ tickbarRecover: true }, '');
+    window.history.pushState({ timingRecover: true }, '');
   }, []);
   useMobileBackSheet(recover != null, holdRecover);
 

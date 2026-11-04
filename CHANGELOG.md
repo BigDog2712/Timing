@@ -37,7 +37,7 @@
 
 ### 插件目录随程序走（ADR-038）
 
-插件原先把 `%APPDATA%\com.tickbar.app\plugins` 当用户目录。绿色版拷到别的机器，插件不跟，
+插件原先把 `%APPDATA%\com.timing.app\plugins` 当用户目录。绿色版拷到别的机器，插件不跟，
 而屏幕上没有任何线索指向 C 盘深处；同时 `<exe>/plugins`（标「随包」）和它并存，用户看到
 两个 plugins 目录只能靠猜。
 
@@ -55,7 +55,7 @@
 | `package.json` | 0.1.0 | 0.1.1 |
 | `package-lock.json`（2 处） | 0.1.0 | 0.1.1 |
 | `src-tauri/Cargo.toml` | 0.1.0 | 0.1.1 |
-| `src-tauri/Cargo.lock`（`tickbar` 段） | 0.1.0 | 0.1.1 |
+| `src-tauri/Cargo.lock`（`timing` 段） | 0.1.0 | 0.1.1 |
 | `src-tauri/tauri.conf.json` | 0.1.0 | 0.1.1 |
 | `android-app/app/build.gradle.kts` | 0.1.0 / code 10 | 0.1.1 / code 11 |
 
@@ -67,7 +67,7 @@
 - 手机端不显示面板入口；安卓仍无插件机制。
 - 面板能力只到「读统计 + 触发内置动作」，插件不能自定义界面布局之外的样式。
 
-## [0.1.0] 2026-11-04 —— 首个发布版（整合 TickBar + Timing 双库）
+## [0.1.0] 2026-11-04 —— 首个发布版（整合悬浮条与时间记录双库）
 
 **本版不改业务代码、不改契约**：命令 65 / 事件 11 / 错误码 16，与内部迭代版 `0.4.1` 逐条一致。
 差异只在「版本号口径 + 工程整理 + 出包」。
@@ -81,7 +81,7 @@
 | `package.json` | 0.4.1 | 0.1.0 |
 | `package-lock.json`（2 处） | 0.4.1 | 0.1.0 |
 | `src-tauri/Cargo.toml` | 0.4.1 | 0.1.0 |
-| `src-tauri/Cargo.lock`（`tickbar` 段） | 0.4.1 | 0.1.0 |
+| `src-tauri/Cargo.lock`（`timing` 段） | 0.4.1 | 0.1.0 |
 | `src-tauri/tauri.conf.json` | 0.4.1 | 0.1.0 |
 | `android-app/app/build.gradle.kts` | 0.3.6 / code 9 | 0.1.0 / code 10 |
 
@@ -89,7 +89,7 @@
 
 ### 工程整合
 
-- 以 `261102-Timing`（0.4.1，含原生安卓工程）为准，确认它是 `261017-Tickbar`（0.4.0）的**严格超集**：
+- 以 `261102-Timing`（0.4.1，含原生安卓工程）为准，确认它是 `261017-Timing`（0.4.0）的**严格超集**：
   `src/`、`src-tauri/src/`、`plugins/`、`tests/` 的差异全部是前者新增或更新，无一条只存在于旧库。
 - `scripts/dev-desktop.cmd`、`scripts/build-release.cmd` 与五道门禁原样保留，桌面调试路径不变。
 - 文档分家：现行文档留在 `docs/`（契约 / ADR / 设计 / 移动端 / 同步），v0.2.0 与 v1 阶段文档归入
@@ -100,11 +100,11 @@
 
 | 平台 | 文件 |
 | --- | --- |
-| Windows x64 | `release/TickBar_0.1.0_x64-setup.exe`（NSIS）· `release/TickBar-0.1.0-portable.exe`（绿色版） |
-| Android | `release/TickBar-android-0.1.0.apk`（原生 Kotlin，安卓端唯一产物） |
+| Windows x64 | `release/Timing_0.1.0_x64-setup.exe`（NSIS）· `release/Timing-0.1.0-portable.exe`（绿色版） |
+| Android | `release/Timing-android-0.1.0.apk`（原生 Kotlin，安卓端唯一产物） |
 
 本版未出 MSI：`npm run tauri build` 的打包阶段要从 GitHub 拉 NSIS/WiX，构建机不通。
-安装器改由本地 NSIS 编译（`scripts/installer/TickBar.nsi` + `scripts/build-installer.cmd`）。
+安装器改由本地 NSIS 编译（`scripts/installer/Timing.nsi` + `scripts/build-installer.cmd`）。
 安卓端收敛为原生 Kotlin 一套，Tauri WebView 包不再出——无系统级悬浮窗、退后台会被冻结。
 `src-tauri/gen/android` 保留为工程备用，不参与出包。
 
@@ -126,7 +126,7 @@
   `::after` 把热区补到 44×44（不动桌面 `SwatchRow` 的 DOM）。
 - `vite.config.ts` 新增 `platformCss()`：桌面构建在 transform 阶段摘掉 `styles/mobile/*` 的
   导入（CSS 无法像 JS 一样摇树）。桌面 CSS 102 → 86.53 kB，产物里不再有 `.m-*`。
-- 重新出包 `release/TickBar-v0.4.1-android-arm64.apk`（8.6 MB，debug keystore，仅自测安装）。
+- 重新出包 `release/Timing-v0.4.1-android-arm64.apk`（8.6 MB，debug keystore，仅自测安装）。
 
 ### 依赖与入口（T2）
 
@@ -193,7 +193,7 @@
   `cargo fmt --check` 通过；`npm run typecheck` / `check:contract` 通过。
 - Android：`cargo check --lib --target aarch64-linux-android` 通过（0 warning）。
 - 出包：`src-tauri/gen/android/app/build/outputs/apk/arm64/debug/app-arm64-debug.apk`
-  （debug · arm64-v8a），含 `lib/arm64-v8a/libtickbar_lib.so`、`classes*.dex`、
+  （debug · arm64-v8a），含 `lib/arm64-v8a/libtiming_lib.so`、`classes*.dex`、
   `assets/index.html`、`assets/assets/index-*.js`（已确认打到移动分支：含 `m-shell`）。
   体积偏大是 debug 未 strip 的 183 MB `.so` 所致，release 会 LTO + strip。
 
@@ -210,7 +210,7 @@
 **本轮零业务改动、零契约改动**：命令仍 65、事件仍 11、错误码仍 16，
 `src/` 与 `src-tauri/src/` 一行未改；改的只有构建配置、依赖声明与文档。
 
-- **整包归档（含 `src-tauri/target`）**：从 `261017-Tickbar` 原样搬入 `261102-Timing`，
+- **整包归档（含 `src-tauri/target`）**：从 `261017-Timing` 原样搬入 `261102-Timing`，
   源码 13605 个文件、`node_modules` 12754 个、`target` 24232 个文件，逐文件核对零缺失。
   上一轮归档把 `target` 排除在外，导致新目录必须从零编译（本机实测一次冷编要几十分钟）；
   这次连编译产物一起搬，`cargo build` 换路径后只重跑了少数 build script，**34.5 秒**即完成。
@@ -334,7 +334,7 @@ layers 341）· `npm test` 245 · `npm run build` 通过 · `cargo test` 见 `�
   16–24px，带底板的版本在那里只剩一个深色方块。
 - **可复现**：`python scripts/gen-icon.py` 重出全部尺寸，`--lab` 出深/浅底色 × 各档
   尺寸的对比图；本仓库不再需要「设计师给一张图」。
-- 桌面快捷方式（`TickBar 调试版.lnk`）本来就指向 `src-tauri/icons/icon.ico`，
+- 桌面快捷方式（`Timing 调试版.lnk`）本来就指向 `src-tauri/icons/icon.ico`，
   改完即生效；Windows 若仍显示旧图，是图标缓存没刷（见 `docs/design/BRAND-ICON.md`）。
 
 ### 变更 · 事项窗口待办区改为显示「全部未完成」，时间列区分逾期 / 未来日期（ADR-034）
@@ -476,7 +476,7 @@ layers 341）· `npm test` 245 · `npm run build` 通过 · `cargo test` 见 `�
 ### 新增 · 日记里同时写出「真实计时时长」（`duration:`）
 
 用户口径：「为什么时长不对 我没理解」。现场：日记里那段是 `09:18:33 → 14:40:48`
-（墙钟 5 小时 22 分），而 TickBar 界面显示 46 分钟，两者差 4 小时 36 分。
+（墙钟 5 小时 22 分），而 Timing 界面显示 46 分钟，两者差 4 小时 36 分。
 
 **两个数都没错，量的是两件事**：`started_at` / `ended_at` 是墙钟跨度，
 `accumulated_sec` 才是真实累计。分叉是设计如此——应用关闭、电脑休眠期间不累计
@@ -1033,7 +1033,7 @@ CSS `border`、一套是 SVG 轨；暂停一套是 270° 静弧、一套是冻�
   用户目录首次只建**空目录**，全新安装打开插件页看到的就是上面那条空态文案。
   删的理由是示例包让空态**永远不可达**（一个插件都没装，页面上却有一行 `moyu-kit`），
   与「插件页不展示任何内置功能」直接冲突。已经装到
-  `%APPDATA%\com.tickbar.app\plugins\moyu-kit` 的旧副本**不会被代码删除**（宿主不碰用户文件），
+  `%APPDATA%\com.timing.app\plugins\moyu-kit` 的旧副本**不会被代码删除**（宿主不碰用户文件），
   需要清掉请手工删除该文件夹。
 - **高亮颜色去掉说明文字**：那一行只留「高亮颜色」+ 色块，「双击托盘图标时，小条按这个
   颜色闪三下」整段删除（文字 / 背景不透明度两行的 hint 保留）。
@@ -1110,7 +1110,7 @@ CSS `border`、一套是 SVG 轨；暂停一套是 270° 静弧、一套是冻�
 - **新增插件模块**：`plugins/` 下一个文件夹 = 一个插件，必须有启动头 **`plugin.json`**。
   插件是**声明式**的——宿主只读启动头，不执行插件代码，所以插件不能拖慢启动、不能触碰数据。
 - **三个扫描位置，同 id 先到先得**：`dev`（调试构建的仓库根 `plugins/`）→
-  `exe`（exe 同级 `plugins/`，随包分发）→ `user`（`%APPDATA%\com.tickbar.app\plugins`，可写）。
+  `exe`（exe 同级 `plugins/`，随包分发）→ `user`（`%APPDATA%\com.timing.app\plugins`，可写）。
   用户目录首次自动创建并写入示例包 `moyu-kit`。
 - **v1 唯一贡献点 `quickTimers`**：往摸鱼菜单加「事项名 + 分钟」。同名事项后加载者覆盖
   （内置 < dev < exe < user），位置不变。
@@ -1292,7 +1292,7 @@ CSS `border`、一套是 SVG 轨；暂停一套是 270° 静弧、一套是冻�
 
 ### 新增 · 可观测性
 
-- **文件日志**（`platform/log.rs`，零新增依赖）：`%APPDATA%/TickBar/logs/tickbar-YYYY-MM-DD.log`，按天分文件、保留 7 天、`TICKBAR_LOG` 控级、panic 另写 `panic.log`（`panic = "abort"` + `strip = true` 下这是唯一能拿到的现场）。原 21 处 `eprintln!` 全部替换为 `log_warn!` / `log_error!`。
+- **文件日志**（`platform/log.rs`，零新增依赖）：`%APPDATA%/Timing/logs/timing-YYYY-MM-DD.log`，按天分文件、保留 7 天、`TIMING_LOG` 控级、panic 另写 `panic.log`（`panic = "abort"` + `strip = true` 下这是唯一能拿到的现场）。原 21 处 `eprintln!` 全部替换为 `log_warn!` / `log_error!`。
 - **启动诊断快照**（`app/diagnostics.rs`）：`setup` 结束时落一份现场（版本 / 系统 / 日志目录 / 数据库路径与体积 / 显示器 / 窗口可见性），出问题让用户直接发文件。
 - **冷启动时序埋点**（`platform/boot_timing.rs`）：`run()` 入口 → 各启动步骤 → 前端首次 `show_window`，每次启动输出一行 trail（`log_ready=… db_ready=… tray_ready=… setup_done=… first_frame=…`），并把样本追加到 `logs/boot-timing.tsv`，日志里给出最近 30 次的 **setup P50/P95** 与 **first_frame P50/P95**。历史文件随日志 7 天清理一起走，启动路径不碰 SQL。
 
@@ -1423,7 +1423,7 @@ CSS `border`、一套是 SVG 轨；暂停一套是 270° 静弧、一套是冻�
 ### 修复
 
 - **悬浮面板下方的桌面点不动**：`.layer { pointer-events: none }` 只是 CSS 层语义，Linux/macOS 的 WebView 会把它翻译成逐像素命中测试，Windows 的 WebView2 不会——窗口矩形覆盖到哪，鼠标事件就吃到哪。新增 `src/lib/canvas.ts`（`canvasViewport()`）与 `src/hooks/useWindowAutoFit.ts`：把**真实 OS 窗口**收缩到 `.layer` 直接子节点的可见包围盒（每帧采样，变化 ≥2px 才 `setSize`），画布坐标、浮层锚点、`--window-w/h` 全部不动，真正的窗口尺寸上限仍是 384×360。配套：`tauri.conf.json` 主窗 `minWidth/minHeight` 由 384/360 放开到 1/1（否则 Windows 的 `WM_GETMINMAXINFO` 会把 `setSize` 夹回去），capability 增 `core:window:allow-set-size`。为什么不选全局鼠标钩子（`WH_MOUSE_LL`）：要写原生轮询 + 跨进程坐标换算，DPI 与多屏组合下极易漂移，还会拖慢全系统鼠标。决策记录见 `docs/decisions/ADR-014.md`。
-- **最后一圈透明带也吃掉**：上一版只按 `right/bottom` 收缩，窗口原点仍是画布原点，于是 `.layer__stack` 的 `--snap-margin`（16px）与 `--pill-inset`（6px）变成窗口左上两条看不见的挡片。`useWindowAutoFit` 改为量四条边：内容在画布内偏移 (L, T) 时窗口位置同步 +（L, T），`.layer` 用 `transform: translate(-L, -T)` 把画布整体挪回窗口原点，裁掉的正好是四周留白，**内容在屏幕上一点不动**；偏移量存 `localStorage` 的 `tickbar:fit-offset`，与 window-state 恢复的窗口位置/尺寸成对还原（否则首帧会跳 16px）。capability 增 `core:window:allow-outer-position`。排版容器（`.layer__stack`）会被递归展开成孩子再量，否则它自己的内边距又把透明带算回来（实测 198×64 → 展开后 176×32）。
+- **最后一圈透明带也吃掉**：上一版只按 `right/bottom` 收缩，窗口原点仍是画布原点，于是 `.layer__stack` 的 `--snap-margin`（16px）与 `--pill-inset`（6px）变成窗口左上两条看不见的挡片。`useWindowAutoFit` 改为量四条边：内容在画布内偏移 (L, T) 时窗口位置同步 +（L, T），`.layer` 用 `transform: translate(-L, -T)` 把画布整体挪回窗口原点，裁掉的正好是四周留白，**内容在屏幕上一点不动**；偏移量存 `localStorage` 的 `timing:fit-offset`，与 window-state 恢复的窗口位置/尺寸成对还原（否则首帧会跳 16px）。capability 增 `core:window:allow-outer-position`。排版容器（`.layer__stack`）会被递归展开成孩子再量，否则它自己的内边距又把透明带算回来（实测 198×64 → 展开后 176×32）。
 - **便利贴只有顶部一条能拖**：新增 `src/hooks/useWindowDragAnywhere.ts`，按下后位移超过 4px 才 `startDragging()`，单击不动；`[data-no-drag]` 子树（右上两枚圆点、右下缩放手柄）永不拖动；`Shift` + 拖动仍可选中文本；拖完紧跟的那次 `click` 会被吞掉，避免误触按钮。
 - **拖动时鼠标是「写入」那个 I-beam**：便利贴正文占满整块面板，指针一直是文本光标，拖动时看着像在选字。`.note__input` 默认改回正常箭头（`:focus` 时才给 I-beam），并在跨过拖动阈值时给 `documentElement` 挂 `data-window-dragging`，`html[data-window-dragging] * { cursor: grabbing !important }` 全量覆盖；松手 / 10s 兜底复位。
 
@@ -1449,7 +1449,7 @@ CSS `border`、一套是 SVG 轨；暂停一套是 270° 静弧、一套是冻�
 
 ### 变更
 
-- **设置窗与事项窗不再上任务栏**：`src-tauri/src/infra/window_spec.rs` 的 `SETTINGS.skip_taskbar` 与 `TODOS.skip_taskbar` 由 `false` 改 `true`（便利贴与主窗本来就是 `true`）。tao 的 `skip_taskbar` 走 `ITaskbarList::DeleteTab`（只能删已存在的按钮），窗口 `show()` 之后外壳可能把按钮加回来，所以 `showCurrentWindowOnReady()`（`src/lib/window.ts`）在显示后再对设置窗 / 事项窗补一次 `setSkipTaskbar(true)`（capability 增 `core:window:allow-set-skip-taskbar`）。至此 TickBar 的所有窗口都只在桌面上出现，任务栏里只留托盘图标。
+- **设置窗与事项窗不再上任务栏**：`src-tauri/src/infra/window_spec.rs` 的 `SETTINGS.skip_taskbar` 与 `TODOS.skip_taskbar` 由 `false` 改 `true`（便利贴与主窗本来就是 `true`）。tao 的 `skip_taskbar` 走 `ITaskbarList::DeleteTab`（只能删已存在的按钮），窗口 `show()` 之后外壳可能把按钮加回来，所以 `showCurrentWindowOnReady()`（`src/lib/window.ts`）在显示后再对设置窗 / 事项窗补一次 `setSkipTaskbar(true)`（capability 增 `core:window:allow-set-skip-taskbar`）。至此 Timing 的所有窗口都只在桌面上出现，任务栏里只留托盘图标。
 - **便利贴不受影响**：仍是独立窗口，点圆点隐藏、拖右下角缩放；设置窗也不自动消失（编辑到一半不能丢）。
 
 ## [0.2.7] — 2026-10-17
@@ -1476,7 +1476,7 @@ CSS `border`、一套是 SVG 轨；暂停一套是 270° 静弧、一套是冻�
 - **时间数字左键 = 正计时 ⇄ 倒计时**：空闲态点时间切到«倒计时 · 第一档»（浮层提示），再点切回正计时；对位 `ToggleCountdownMode()`。
 - **圆环左键计时中 = 先暂停、再摊开常用事项菜单**：对位 `OnRingLeft()` 的 `Pause` + `ShowCommonMenu()`；菜单本身已是 `name · 正计时 / 倒计时 N 分` +「其他事项…」，与参照同构。
 - **圆环右键计时中 = 结束并保存**（空闲 = 主菜单）：对位 `OnRingRight()`。
-- **主菜单重排**：前段对齐参照 `MenuRows()`（3293-3360）——便利贴清单、事项窗口、切到深色/浅色、设置…、隐藏到托盘；分隔后保留 TickBar 自己的计时动作（开始计时 / 结束并保存 / 倒计时… / 提醒… / 常用事项… / 新建事项… / 便利贴… / 微调开始时间 / 丢弃本次记录 / 保持置顶 / 收起为圆点）。
+- **主菜单重排**：前段对齐参照 `MenuRows()`（3293-3360）——便利贴清单、事项窗口、切到深色/浅色、设置…、隐藏到托盘；分隔后保留 Timing 自己的计时动作（开始计时 / 结束并保存 / 倒计时… / 提醒… / 常用事项… / 新建事项… / 便利贴… / 微调开始时间 / 丢弃本次记录 / 保持置顶 / 收起为圆点）。
 - **事项区右键 = 展开事项窗口**（参照 `Task → ToggleTodoPanel()`）；事项级菜单仍在窗内逐行给。
 - **菜单内部滚动条收敛**：行数超过窗口高度时（主菜单 16 行）不再出现亮灰实心滚动条，改 8px `--line-3` 圆角细条。
 
@@ -1494,7 +1494,7 @@ CSS `border`、一套是 SVG 轨；暂停一套是 270° 静弧、一套是冻�
 ### 新增
 
 - **便利贴右下角缩放手柄**：`NoteWindow` 末尾 `.note__resize`（14×14，两道斜纹，悬停现形），按下即 `startResizeDragging('SouthEast')` 交给系统做 nwse 缩放；依赖新增 capability `core:window:allow-start-resize-dragging`，`src/lib/window.ts` 增 `startCurrentWindowResize()`（`ResizeDirection` 在 `@tauri-apps/api` 未导出，故按同构联合重声明 `ResizeDir`）。
-- **倒计时「先设定、再开始」**：新增 `src/stores/countdownArm.ts`（`armedSec`，localStorage `tickbar.countdownArm.v1`）。`CountdownMenu` 点档位只**设定**时长（当前档位勾选），另加「开始倒计时」「改为正计时」两行；空闲且已设定时小条直接显示该时长（对位 Timing v1.7.3 的 `TimeText()` / `CountdownMenuRows()`），点圆环才真正开始倒数。
+- **倒计时「先设定、再开始」**：新增 `src/stores/countdownArm.ts`（`armedSec`，localStorage `timing.countdownArm.v1`）。`CountdownMenu` 点档位只**设定**时长（当前档位勾选），另加「开始倒计时」「改为正计时」两行；空闲且已设定时小条直接显示该时长（对位 Timing v1.7.3 的 `TimeText()` / `CountdownMenuRows()`），点圆环才真正开始倒数。
 
 ### 变更
 
@@ -1546,7 +1546,7 @@ CSS `border`、一套是 SVG 轨；暂停一套是 270° 静弧、一套是冻�
 - **便利贴清单浮层**：小条右侧手柄右键弹出当前事项的便利贴列表（按更新时间倒序，最多 8 条，空态一行提示，末尾「写一张新的…」）。见 `src/components/note/NotesListPopover.tsx`。
 - **设置 · 外观不透明度**：新增「文字不透明度」「背景不透明度」两条滑杆（`src/components/ui/Slider.tsx`）。背景不透明度作用于小条、菜单、面板、快捷条、便利贴，设置面板与托盘菜单不参与；两项为本机偏好（`localStorage`，见 `src/stores/appearanceStore.ts`），不入数据库。
 - **便利贴轻量 markdown 列表**：行首 `-` 按空格自动变成 `• `，`Enter` 续行继承缩进与圆点，`Tab` / `Shift+Tab` 对选中行做 2 空格缩进 / 反缩进。文本变换在 `src/lib/noteText.ts`（纯函数）。
-- **构建脚本** `scripts/build-release.cmd`：加载 MSVC 环境 → 前端构建 → `cargo clean` + release 构建 → 复制到 `release\TickBar.exe`。
+- **构建脚本** `scripts/build-release.cmd`：加载 MSVC 环境 → 前端构建 → `cargo clean` + release 构建 → 复制到 `release\Timing.exe`。
 
 ### 变更
 
@@ -1574,15 +1574,15 @@ CSS `border`、一套是 SVG 轨；暂停一套是 270° 静弧、一套是冻�
 
 ### 变更
 
-- **仓库结构**：应用源码从 `Timing_Rustv0.2.0/tickbar/` 平铺到仓库根（`src/`、`src-tauri/`、`package.json` 等），与既有 `docs/agents/` 合并成单一文档树。
+- **仓库结构**：应用源码从 `Timing_Rustv0.2.0/timing/` 平铺到仓库根（`src/`、`src-tauri/`、`package.json` 等），与既有 `docs/agents/` 合并成单一文档树。
 - **版本号**：五处同步升到 `0.2.1` —— `package.json`、`package-lock.json`、`src-tauri/Cargo.toml`、`src-tauri/Cargo.lock`、`src-tauri/tauri.conf.json`。此前三处填的是占位值 `1.0.0`，与产品版本号（V0.2.0）脱节。
 - **文档归档**：v1 阶段文档（`Spec-v1` / `PRD-v1` / `ARCHITECTURE-v1` / `UIUX-v1` / `DESIGN.md` / `design/pages/*` / v1 令牌 / `schema.sql` / `QA-REPORT.md`）移入 `docs/archive/v1/`，现行 v0.2.0 文档留在原位。
 - **`.gitignore` 重写**：原文件是 GBK 编码（UTF-8 下为乱码）且规则与布局不符（`**/target/` 未生效、产物路径缺失）。改为 UTF-8，按根布局覆盖 `node_modules/`、`dist/`、`src-tauri/target/`、`src-tauri/gen/schemas/`、`release/*.exe` 等。
-- **文档内路径**：`tickbar/src/...` 一类旧前缀统一改为 `src/...`，与平铺后的布局一致。
+- **文档内路径**：`timing/src/...` 一类旧前缀统一改为 `src/...`，与平铺后的布局一致。
 
 ### 移除（未纳入本仓库）
 
-- `release/TickBar.exe`、`release/TickBar.new.exe`：构建产物；两者字节数相同（6,192,640 B），可重新构建。
+- `release/Timing.exe`、`release/Timing.new.exe`：构建产物；两者字节数相同（6,192,640 B），可重新构建。
 - `src-tauri/gen/schemas/*.json`（`acl-manifests` / `desktop-schema` / `windows-schema`，共 375 KB）：Tauri 构建期生成，已入 `.gitignore`。
 - `docs/design/_archive/`、`_ac53_*.mjs`、`_contrast_check.py`：一次性自检脚本。
 - `.workbuddy/memory/`：团队工作记忆，不属于仓库内容（源目录仍保留）。

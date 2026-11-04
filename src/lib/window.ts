@@ -1,5 +1,5 @@
 /**
- * TickBar — 多窗口路由与窗口壳辅助（ADR-009 §1：label 路由）
+ * Timing — 多窗口路由与窗口壳辅助（ADR-009 §1：label 路由）
  * -----------------------------------------------------------------------------
  * 载体：Tauri `getCurrentWindow().label`（main / settings / todos / note-{id}）。
  * 非 Tauri（浏览器 dev）回退到 `?w=settings`，便于单窗走查。

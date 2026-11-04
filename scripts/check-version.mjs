@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * TickBar — 版本号五处一致性门禁（AGENTS.md：版本号五处同步）
+ * Timing — 版本号五处一致性门禁（AGENTS.md：版本号五处同步）
  * -----------------------------------------------------------------------------
  *   1. package.json            version
  *   2. package-lock.json       version + packages[""].version
  *   3. src-tauri/Cargo.toml    [package] version
- *   4. src-tauri/Cargo.lock    name = "tickbar" 那条的 version
+ *   4. src-tauri/Cargo.lock    name = "timing" 那条的 version
  *   5. src-tauri/tauri.conf.json  version
  */
 import { readFileSync } from 'node:fs';
@@ -33,10 +33,10 @@ function cargoToml() {
 
 function cargoLock() {
   const src = read('src-tauri/Cargo.lock');
-  // 只取 name = "tickbar" 这个 package 段
+  // 只取 name = "timing" 这个 package 段
   const blocks = src.split('[[package]]');
   for (const b of blocks) {
-    if (/name\s*=\s*"tickbar"/.test(b)) {
+    if (/name\s*=\s*"timing"/.test(b)) {
       const m = b.match(/version\s*=\s*"([^"]+)"/);
       if (m) return m[1];
     }

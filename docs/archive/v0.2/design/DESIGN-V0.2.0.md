@@ -1,4 +1,4 @@
-# TickBar V0.2.0 设计规范（DESIGN-V0.2.0.md）
+# Timing V0.2.0 设计规范（DESIGN-V0.2.0.md）
 
 > 生成日期：2026-10-16 | 设计师：颜好看 | 阶段：V0.2.0-2 / V0.2.0-3
 > 依据：`docs/CHANGE-PLAN-V0.2.0.md` §F + 参考项目 `Timing_v1.7.0/README/DESIGN/DESIGN-SYSTEM.md`（791 行，已实测落地）
@@ -20,7 +20,7 @@
 
 ### 0.2 与 Timing 设计系统的对齐映射表
 
-> **原则**：**视觉与令牌 1:1 照搬，实现载体因技术栈改写**。Timing 是单进程 WinForms（GDI+ 自绘控件），TickBar 是 Tauri WebView（DOM + CSS）。凡是「控件怎么画」的差异，都归第二张表。
+> **原则**：**视觉与令牌 1:1 照搬，实现载体因技术栈改写**。参考 Timing 是单进程 WinForms（GDI+ 自绘控件），本项目是 Tauri WebView（DOM + CSS）。凡是「控件怎么画」的差异，都归第二张表。
 
 #### A. 直接搬（视觉 / 令牌 / 规格，1:1 照搬）
 
@@ -47,7 +47,7 @@
 
 #### B. 因技术栈需调整（WinForms → Tauri WebView）
 
-| # | Timing（WinForms / GDI+） | TickBar V0.2.0（Tauri 2 + React 19 + CSS） | 原因 |
+| # | 参考 Timing（WinForms / GDI+） | 本项目 V0.2.0（Tauri 2 + React 19 + CSS） | 原因 |
 |---|---|---|---|
 | 1 | `Design.cs` 静态色字段 + 过渡别名 | `design-tokens-V0.2.0.css` CSS 变量 + `design-tokens-V0.2.0.json` | Web 用 CSS 变量天然支持主题切换 |
 | 2 | `TrackBar` → 自绘 `SliderRow`（C#，保留 `ValueChanged`） | HTML `<input type="range">` 自绘（`appearance:none`）或 React 受控组件 | DOM 原生控件可完全样式化 |
@@ -86,7 +86,7 @@
 - 主对标 **Timing v1.7.0**（本项目的直接来源，深色玻璃 + 蓝信号 + 等宽数字）
 - 辅助 **Raycast**（近黑底 + 极低饱和中性层次 + 单一强调色）/ **Linear**（排版纪律）/ **Apple HIG**（形态连续性）
 
-**明确不对标：** Toggl Track（表单化、多步）/ Sunsama（规划过载）/ Notion（无限嵌套）。它们是「要打开的应用」；TickBar 是「一直在那里的状态」。
+**明确不对标：** Toggl Track（表单化、多步）/ Sunsama（规划过载）/ Notion（无限嵌套）。它们是「要打开的应用」；Timing 是「一直在那里的状态」。
 
 **与 V0.1.0 的三处气质变更（有意为之）：**
 1. 主色 Signal Amber `#E9A23B` → **Accent Blue `#4DA3E8`**（对齐 Timing）。
@@ -487,7 +487,7 @@ CSS：`.bar { width: auto } .bar .task { flex: 0 1 auto; max-width: var(--task-w
 
 - 常规热区 44×44。
 - **图标按钮 26×26**（同尺寸同形态）。
-- **收起态命中区 36×36 的偏差说明**：主动小于 44px。理由：TickBar 是常驻置顶覆盖层，44px 隐形命中区会遮挡底层应用 44×44 的点击（在 Windows 上比「目标略小」严重得多）。补偿：鼠标场景 36px 已舒适；提供全局热键路径；悬停即出 tooltip。
+- **收起态命中区 36×36 的偏差说明**：主动小于 44px。理由：Timing 是常驻置顶覆盖层，44px 隐形命中区会遮挡底层应用 44×44 的点击（在 Windows 上比「目标略小」严重得多）。补偿：鼠标场景 36px 已舒适；提供全局热键路径；悬停即出 tooltip。
 
 ### 8.4 5 态覆盖
 
@@ -579,7 +579,7 @@ emoji 正则零命中；组件 CSS 无裸 hex/rgb；计时数字规则已实现�
 ### 10.1 主题切换
 
 - **载体**：`<html data-theme="dark|light">`（**属性切换，非 class**）。两套变量在同一 CSS 文件内（`:root` 默认深色 / `:root[data-theme="light"]` 覆盖），切换时**无 JS 重排、无闪烁**。
-- **持久化 + 首屏无白闪（与架构对齐，K-1）**：`index.html` 放**内联引导脚本**，同步读 `localStorage('tickbar.theme')` 设 `data-theme`，再挂 React。令牌文件提供 `html { background: var(--bg) }` 且 `:root` 内给 `--bg` 默认值 —— 即使「仅设了 `data-theme`、CSS 未全量就绪」也不会白闪。
+- **持久化 + 首屏无白闪（与架构对齐，K-1）**：`index.html` 放**内联引导脚本**，同步读 `localStorage('timing.theme')` 设 `data-theme`，再挂 React。令牌文件提供 `html { background: var(--bg) }` 且 `:root` 内给 `--bg` 默认值 —— 即使「仅设了 `data-theme`、CSS 未全量就绪」也不会白闪。
 - **多窗口同步（架构 §6.a）**：主窗口 `theme_set` 后广播 `theme-changed`，**各窗各自订阅**并更新自身 `data-theme`（**主窗不代转**）。同理便利贴 / 事项 / 设置窗均自订阅 `theme-changed`。
 - **降级**：`color-scheme` 随主题切换，使系统滚动条/表单控件底色跟随。
 - **V0.1.0 过渡别名**：CSS 提供 `--bg / --surface / --fg / --fg-2 / --muted / --meta / --border` 等过渡别名（分别指向 `--bg-plate / --bg-panel / --ink / --ink-2 / --ink-3 / --ink-4 / --line-2`），供引导脚本与旧代码引用；**新代码一律用 V0.2.0 规范名**。
@@ -715,4 +715,4 @@ emoji 正则零命中；组件 CSS 无裸 hex/rgb；计时数字规则已实现�
 
 ---
 
-*文档结束 · TickBar DESIGN-V0.2.0.md · 颜好看 · 2026-10-16*
+*文档结束 · Timing DESIGN-V0.2.0.md · 颜好看 · 2026-10-16*

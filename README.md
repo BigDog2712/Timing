@@ -1,4 +1,4 @@
-# TickBar v0.1.1
+# Timing v0.1.1
 
 [![CI](https://github.com/BigDog2712/timing/actions/workflows/ci.yml/badge.svg)](https://github.com/BigDog2712/timing/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/BigDog2712/timing?label=release)](https://github.com/BigDog2712/timing/releases)
@@ -15,15 +15,15 @@ Windows 桌面常驻悬浮计时条 + 安卓悬浮计时器：屏幕边缘一条
 
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
-| Windows 10/11 x64 | [`TickBar-0.1.1-portable.exe`](https://github.com/BigDog2712/timing/releases/download/v0.1.1/TickBar-0.1.1-portable.exe) | 绿色版：双击即用，不写注册表。**当前唯一可下载的包** |
-| Windows 10/11 x64 | `TickBar_0.1.1_x64-setup.exe` | NSIS 安装器：可选安装目录、开始菜单 / 桌面快捷方式、卸载项。未出包 |
-| Android 8.0+ | `TickBar-android-0.1.1.apk` | 原生 Kotlin 版：悬浮条 + 前台服务 + Obsidian 同步。未出包 |
+| Windows 10/11 x64 | [`Timing-0.1.1-portable.exe`](https://github.com/BigDog2712/timing/releases/download/v0.1.1/Timing-0.1.1-portable.exe) | 绿色版：双击即用，不写注册表。**当前唯一可下载的包** |
+| Windows 10/11 x64 | `Timing_0.1.1_x64-setup.exe` | NSIS 安装器：可选安装目录、开始菜单 / 桌面快捷方式、卸载项。未出包 |
+| Android 8.0+ | `Timing-android-0.1.1.apk` | 原生 Kotlin 版：悬浮条 + 前台服务 + Obsidian 同步。未出包 |
 
 > **0.1.1 现状**：绿色版已产出并上传 Release（6.16 MB，日志有 `boot[first_frame]`）。
 > 安装器与安卓包还没出——本机拉不到 NSIS 工具链（`tauri build --bundles nsis` 下载 502），
 > 也没有 Android SDK / JDK。出包后按上表命名并补传到同一个 Release 即可。
 
-> 安装包按用户装到 `%LOCALAPPDATA%\Programs\TickBar`，免管理员；**卸载只删程序，`%APPDATA%\com.tickbar.app` 里的数据保留**。
+> 安装包按用户装到 `%LOCALAPPDATA%\Programs\Timing`，免管理员；**卸载只删程序，`%APPDATA%\com.timing.app` 里的数据保留**。
 > 插件目录在程序目录里（`<exe 同级>\plugins`），卸载会连它一起删掉——自己写的插件请先备份。
 > WebView2 只检测不内嵌：缺失时安装器会提示，Win11 与已更新的 Win10 自带。
 > 安卓包用 debug keystore 签名，**能装能跑，不可上架**（正式分发请自备 keystore，见 `docs/mobile/`）。

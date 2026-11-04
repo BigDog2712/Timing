@@ -1,5 +1,5 @@
 /**
- * TickBar — 事项窗口「待办事项」区（todos-panel.md §1 分组 + §2 PendingSection）
+ * Timing — 事项窗口「待办事项」区（todos-panel.md §1 分组 + §2 PendingSection）
  * -----------------------------------------------------------------------------
  * 分组：待办（未完成，三级语气）+ 已完成（名删除线）。分组用 1px --line 分隔，不用卡片。
  * Edge：未完成 > 8 条 → 折叠（--todos-pending-max），点「还有 N 条」展开。

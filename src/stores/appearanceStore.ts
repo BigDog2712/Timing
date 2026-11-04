@@ -1,5 +1,5 @@
 /**
- * TickBar — 外观 store（[V0.2.2] 文字 / 背景不透明度）
+ * Timing — 外观 store（[V0.2.2] 文字 / 背景不透明度）
  * -----------------------------------------------------------------------------
  * 只存前端本地（localStorage，同一 WebView2 profile 跨窗口共享），不写 Rust
  * settings 表：这两项是纯显示偏好，不参与提醒 / 统计 / 快捷键等业务判定。
@@ -8,7 +8,7 @@
  */
 import { create } from 'zustand';
 
-const STORAGE_KEY = 'tickbar.appearance.v1';
+const STORAGE_KEY = 'timing.appearance.v1';
 
 /** 文字不透明度的下限：再低正文就看不清了 */
 export const TEXT_OPACITY_MIN = 0.2;

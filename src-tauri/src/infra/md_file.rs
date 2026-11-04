@@ -2,7 +2,7 @@
 //!
 //! ## 为什么只改「标题下的那一段」
 //!
-//! 日记里除了 TickBar 的区块还有大量用户手写内容。同步只能是**外科手术**：
+//! 日记里除了 Timing 的区块还有大量用户手写内容。同步只能是**外科手术**：
 //! 找到目标标题行，替换到下一个同级或更高级标题之前，其余字节原样保留。
 //!
 //! ## 标题匹配规则
@@ -270,7 +270,7 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .file_name()
         .and_then(|value| value.to_str())
         .unwrap_or("md-sync");
-    let tmp = parent.join(format!(".{name}.tickbar-{}.tmp", std::process::id()));
+    let tmp = parent.join(format!(".{name}.timing-{}.tmp", std::process::id()));
     {
         let mut file = fs::File::create(&tmp).map_err(|err| format!("创建临时文件失败：{err}"))?;
         file.write_all(bytes)

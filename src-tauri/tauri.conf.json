@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "TickBar",
+  "productName": "Timing",
   "version": "0.1.1",
-  "identifier": "com.tickbar.app",
+  "identifier": "com.timing.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "TickBar",
+        "title": "Timing",
         "url": "index.html",
         "width": 384,
         "height": 360,

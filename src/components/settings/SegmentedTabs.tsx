@@ -1,5 +1,5 @@
 /**
- * TickBar — 分段控件 SegmentedTabs（DESIGN-V0.2.0.md §4.4）
+ * Timing — 分段控件 SegmentedTabs（DESIGN-V0.2.0.md §4.4）
  * -----------------------------------------------------------------------------
  * 取代三个独立页签按钮：role="tablist" + 段等宽；←→ 切段；选中段 --bg-seg-on。
  */

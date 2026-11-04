@@ -1,10 +1,10 @@
 @echo off
-rem Build the TickBar Windows installer (NSIS) plus the portable exe.
+rem Build the Timing Windows installer (NSIS) plus the portable exe.
 rem
 rem Why this script exists: `npm run tauri build` needs to download the NSIS + WiX toolchain
 rem from GitHub. On machines where GitHub is unreachable the bundling step fails after the
 rem Rust build has already succeeded. This script skips the downloader entirely: it compiles
-rem tickbar.exe itself and then runs a local makensis on scripts\installer\TickBar.nsi.
+rem timing.exe itself and then runs a local makensis on scripts\installer\Timing.nsi.
 rem
 rem Requirements:
 rem   - MSVC build tools + Windows SDK (same as dev-desktop.cmd)
@@ -47,17 +47,17 @@ popd
 
 echo [3/4] Copying the portable exe to release\ ...
 if not exist release mkdir release
-copy /y "src-tauri\target\release\tickbar.exe" "release\TickBar-portable.exe" >nul
+copy /y "src-tauri\target\release\timing.exe" "release\Timing-portable.exe" >nul
 
 for /f "delims=" %%v in ('node -p "require('./package.json').version"') do set "VER=%%v"
 echo        version %VER%
 
 echo [4/4] Compiling the NSIS installer ...
-"%MAKENSIS%" -V2 "-DAPP_ROOT=%CD%" "-DAPP_VERSION=%VER%" "scripts\installer\TickBar.nsi"
+"%MAKENSIS%" -V2 "-DAPP_ROOT=%CD%" "-DAPP_VERSION=%VER%" "scripts\installer\Timing.nsi"
 if errorlevel 1 goto fail
 
 echo.
-echo Done: %REPO%\release\TickBar_%VER%_x64-setup.exe
+echo Done: %REPO%\release\Timing_%VER%_x64-setup.exe
 popd
 exit /b 0
 

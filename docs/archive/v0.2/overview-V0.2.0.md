@@ -1,9 +1,9 @@
-> **历史文档（v0.2.0 交付概览）**：记录 2026-10-16 那一轮的交付内容与门禁结果，正文保留原样。其中 `release/TickBar.exe`、`release/TickBar.new.exe` 等构建产物**未纳入本仓库**（见 `.gitignore` / `CHANGELOG.md`）；原 `tickbar/` 路径已随仓库平铺改为根目录相对路径。现行版本为 **0.2.1**。
-# TickBar V0.2.0 —— 交付概览
+> **历史文档（v0.2.0 交付概览）**：记录 2026-10-16 那一轮的交付内容与门禁结果，正文保留原样。其中 `release/Timing.exe`、`release/Timing.new.exe` 等构建产物**未纳入本仓库**（见 `.gitignore` / `CHANGELOG.md`）；原 `timing/` 路径已随仓库平铺改为根目录相对路径。现行版本为 **0.2.1**。
+# Timing V0.2.0 —— 交付概览
 
 > 2026-10-16 · 批2「重功能」+ 小条 UI 统一 + **Timing 全面对齐优化轮**
 > 结论：**QA verdict = PASS，零 P0**。批2 四大功能（常用事项 / 倒计时 / 便利贴 / 提醒铃）+ 托盘 IA 扩展全部落地并验证通过；同日完成以 Timing v1.7.0 源码常量为基准的 UI 全面对齐
-> 交付物：`release/TickBar.new.exe`（Timing 对齐版，双击即用）
+> 交付物：`release/Timing.new.exe`（Timing 对齐版，双击即用）
 
 ---
 
@@ -31,7 +31,7 @@
   - `components/pill/PillBar.tsx`：加 `data-reveal`，任一悬浮层（右键菜单 / 内联面板 / 倒计时菜单 / 常用事项 / 提醒卡）展开时强制显影，避免交互中小条凭空消失。
   - 便利贴无需改（AC-39「未悬停全透仅留正文」早已实现）。
 - **自检**：`tsc --noEmit` 0 错 · `npm run build` 成功（2031 modules）· 两文件均 ≤300 行。
-- exe 已重建：`release/TickBar.exe` = 6,192,640 B。
+- exe 已重建：`release/Timing.exe` = 6,192,640 B。
 
 ---
 
@@ -111,14 +111,14 @@
 | `docs/decisions/OPEN-DECISIONS.md` | 未决 3 / 已决 8 |
 | `docs/design/pages-V0.2.0/` | 批2 设计页（sticky-note / countdown-menu / reminder-popover / common-items / tray-menu） |
 | `docs/phase4/QA-REPORT-V0.2.0-BATCH1.md` | 批1 QA 报告 |
-| `release/TickBar.exe` | 批2 交付可执行文件 |
+| `release/Timing.exe` | 批2 交付可执行文件 |
 | `.workbuddy/memory/2026-10-16.md` | 全流程项目记忆 |
 
 ---
 
 ## UI 统一：小条对齐 Timing（2026-10-16 16:25）
 
-**依据**：用户截图（上行 Timing 目标 / 下行 TickBar 现状）+ Timing 源码 `MainForm.cs` 常量实测。
+**依据**：用户截图（上行参考 Timing 目标 / 下行本项目现状）+ Timing 源码 `MainForm.cs` 常量实测。
 
 | 项 | 改前 | 改后（= Timing） |
 |---|---|---|
@@ -131,4 +131,4 @@
 | 环内图标 | hover 淡入播放/暂停 | **移除**（Timing 无环内图标；状态=环色+弧形；命中区仍 ⌀24） |
 
 **门禁**：tsc 0 错 · build 成功 · emoji/紫粉/裸色 0 · 行数全 ≤300。
-**交付**：`release/TickBar.new.exe`（旧实例运行中占用 TickBar.exe，关闭旧实例后可原地替换）。
+**交付**：`release/Timing.new.exe`（旧实例运行中占用 Timing.exe，关闭旧实例后可原地替换）。

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0E0F12" />
-    <title>TickBar · 悬浮时间记录</title>
+    <title>Timing · 悬浮时间记录</title>
     <script>
       /* 防白闪引导脚本（K-1 / ADR-012）：样式加载前同步解析并写入 <html data-theme>。
          只设 data-theme —— 令牌文件 :root 内已给 --bg 默认值 + html{background:var(--bg)}，
@@ -14,7 +14,7 @@
         try {
           var mode = 'dark';
           try {
-            var cached = localStorage.getItem('tickbar.theme');
+            var cached = localStorage.getItem('timing.theme');
             if (cached === 'dark' || cached === 'light' || cached === 'system') mode = cached;
           } catch (e) {}
           var resolved = mode;

@@ -1,5 +1,5 @@
 /**
- * TickBar — 独立设置窗（label = settings）
+ * Timing — 独立设置窗（label = settings）
  * -----------------------------------------------------------------------------
  * 后端 open_settings_window 以 `decorations:false / transparent:true / visible:false`
  * 创建 392×660 单例窗口（ADR-009 §2）。本组件是该窗的根：

@@ -93,7 +93,7 @@ pub enum PluginSource {
     Dev,
     /// 随包分发：exe 同级 `plugins/`。
     Exe,
-    /// 用户目录：`%APPDATA%/com.tickbar.app/plugins`（可写）。
+    /// 用户目录：`%APPDATA%/com.timing.app/plugins`（可写）。
     User,
 }
 

@@ -1,5 +1,5 @@
 /**
- * TickBar — 独立事项窗（label = todos）
+ * Timing — 独立事项窗（label = todos）
  * -----------------------------------------------------------------------------
  * 后端 open_todos_window 以 `decorations:false / transparent:true / visible:false`
  * 创建宽 --todos-w 336 的单例窗口（ADR-009 §2，高自适应）。本组件是该窗的根：

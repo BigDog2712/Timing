@@ -1,5 +1,5 @@
 /**
- * TickBar — 便利贴窗口几何持久化（sticky-note.md 与架构交叉点 · K-15 / K-23）
+ * Timing — 便利贴窗口几何持久化（sticky-note.md 与架构交叉点 · K-15 / K-23）
  * -----------------------------------------------------------------------------
  * - 订阅 Tauri `onMoved` / `onResized`：物理像素 ÷ scaleFactor → 逻辑像素（K-15），
  *   经 noteStore.patchGeom 合并去抖 300ms 后落盘（K-23）。

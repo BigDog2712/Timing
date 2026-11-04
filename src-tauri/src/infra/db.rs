@@ -1,6 +1,6 @@
 //! SQLite 连接池与迁移入口。
 //!
-//! DB 路径：`%APPDATA%\com.tickbar.app\tickbar.db`（WAL + 外键）。
+//! DB 路径：`%APPDATA%\com.timing.app\timing.db`（WAL + 外键）。
 //! 迁移实现见 `infra/migrate.rs`（0001 → 列守卫 → 0002 → 版本推进，全程幂等，K-13）。
 
 use std::path::Path;
@@ -14,7 +14,7 @@ use crate::infra::migrate;
 /// 建库（若缺）+ 执行全部迁移（v1 → v2），返回连接池。
 pub async fn init_pool(app_data_dir: &Path) -> AppResult<SqlitePool> {
     std::fs::create_dir_all(app_data_dir)?;
-    let db_path = app_data_dir.join("tickbar.db");
+    let db_path = app_data_dir.join("timing.db");
 
     let options = SqliteConnectOptions::new()
         .filename(&db_path)

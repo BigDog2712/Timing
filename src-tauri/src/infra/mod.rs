@@ -10,6 +10,7 @@
 //!   → `jobs::*`（定时触发业务动作，属调度层）
 
 pub mod db;
+pub mod legacy;
 pub mod md_backup;
 pub mod md_file;
 pub mod migrate;

@@ -1,8 +1,8 @@
-# Timing 对齐残余差异审计（TickBar V0.2.0 vs Timing v1.7.0）
+# Timing 对齐残余差异审计（本项目 V0.2.0 vs 参考 Timing v1.7.0）
 
 - 审计人：颜好看（UI/UX 设计师）｜日期：2026-10-16｜供 Task #2 前端落地，唯一依据
 - 权威源：`D:\101-Workshop\261015-Timing\Timing_v1.7.0\src\ElioTimer.Ui\`（C#/GDI 自绘，常量即规格）
-- 对照物：`tickbar\src\`（令牌 + 各面 CSS + 组件）
+- 对照物：`timing\src\`（令牌 + 各面 CSS + 组件）
 - 判定分级：P1 = 视觉显著，本批必改；P2 = 次要，随批改；P3 = 可忽略或判不改（附理由）
 - 排除项（本轮不做）：QuickFind 高亮（Timing 独有，MainForm.cs:2196）；一切功能新增，仅视觉/交互对齐
 - 全局色板核查结论先行：深浅两套 A1/A2 令牌（--bg-panel/--bg-card/--bg-field/--bg-field-hi/--bg-seg/--bg-seg-on/--line*3/--ink*4/--accent/--accent-ink/--warn/--danger/--ok/--ok-ink/--solid-*）逐值比对 Design.cs:20-187 与 Design.cs:239-329，**全部一致**。仅两处例外见 §4-E/F。
@@ -11,7 +11,7 @@
 
 ## 1. 复核：今日 16:25 小条对齐批次（逐条对照 MainForm.cs 常量）
 
-| # | 项 | Timing 权威值(文件:行) | TickBar 现值(文件:行) | 判定 | 建议 |
+| # | 项 | 参考 Timing 权威值(文件:行) | 本项目现值(文件:行) | 判定 | 建议 |
 |---|---|---|---|---|---|
 | R1 | 环几何 | RingD 14 + RingLW 2.4（MainForm.cs:183,185），外沿约 16.4 | --ring-size 16 / --ring-stroke 2.4（design-tokens.css:79-80，border-box 含描边） | 一致（约定：视觉 16 = 14+命中余量） | 不改 |
 | R2 | 运行旋弧 | spin 113°/s（MainForm.cs:3062）+ 90° 弧（MainForm.cs:2346）＝ 3.19s/圈 | ring-spin 3.2s linear infinite（batch2.css:55-66） | 一致 | 不改 |
@@ -28,7 +28,7 @@
 
 ## 2. 主差异审计表
 
-| # | 面/元素 | Timing 权威值(文件:行) | TickBar 现值(文件:行) | 判定 | 建议(含具体值) | 优先级 |
+| # | 面/元素 | 参考 Timing 权威值(文件:行) | 本项目现值(文件:行) | 判定 | 建议(含具体值) | 优先级 |
 |---|---|---|---|---|---|---|
 | D1 | 环 idle 色 | RingIdle = InkOnGlass：深=纯白 / 浅=#1A1C20（MainForm.cs:2323；Design.cs:287,239），实际绘制 alpha 约 0.97（MainForm.cs:2372） | --state-idle = var(--ink-3) 灰（design-tokens-compat.css:16；surfaces.css:160,162,227 引用） | 偏差 | --state-idle 改 var(--ink)（深 #F2F3F5 / 浅 #16181D，最接近 InkOnGlass 的令牌）。dot 空态随之自动同步 | P1 |
 | D2 | 小条悬停板 | 玻璃板 GlassPlate @ GlassAlpha 128（约 50%）（MainForm.cs:2217-2220；Design.cs:63）；半径 min(GlassRadius 11, 板高/2)（MainForm.cs:2227；Design.cs:104）；PlateInset 1（MainForm.cs:231）；**无描边**（DrawHoverPlate 仅 FillPath） | .pill:hover 背景 = --pill-bg = --bg-plate **全不透明**（surfaces.css:39；design-tokens.css:316,308）；圆角 = --radius-pill 17 胶囊（surfaces.css:22）；带 1px 描边 + 投影（surfaces.css:40-41）。--pill-hover-plate 94% 定义后未被 surfaces.css 引用（design-tokens.css:318 为死别名，仅 compat.css:72 桥接） | 偏差 | 1) .pill:hover 背景改接 --pill-hover-plate，其值改 `color-mix(in srgb, var(--color-bar) 74%, transparent)`（Timing 原值 50%；取 74% 的理由见 §3-裁决二）；2) 圆角 17 改 12（--radius-lg，Timing GlassRadius 11 取最近标度档）；3) 去描边（border-color: transparent），保留 --shadow-balloon 与桌面分层 | P1 |
@@ -38,10 +38,10 @@
 | D6 | 倒计时 SVG 轨道 | 轨道 = **状态色** x RingTrackAlpha 95/255 约 0.37（MainForm.cs:2369；Design.cs:42） | .ring__arc-track stroke = --ring-track = 白 0.20/深（design-tokens.css:213；batch2.css:31） | 偏差 | stroke 改 `color-mix(in srgb, currentColor 37%, transparent)`（currentColor = 环状态色，倒计时/暂停自动跟随）；--ring-track 令牌若无他处引用可删除 | P2 |
 | D7 | 小条高度 | BarH 32（MainForm.cs:175） | --pill-h 34（design-tokens.css:69），--radius-pill = 17 | 偏差 | --pill-h 34 改 32，--radius-pill 随 calc 自动变 16。环 16 + 命中 24 在 32 高内不受影响；.pill__empty 同高联动 | P2 |
 | D8 | 抓取柄墨度/描边 | 实绘：Pen 宽 2.5（MainForm.cs:2251），色 = GlassInk，alpha = GlassInkDim.A 139/255 约 0.545 x hoverFade x 区位系数 0.8/1.0（MainForm.cs:2238,2251；Design.cs:67）。注意 Design.GripInk 0.74（Design.cs:180）在 MainForm 未被使用，以实绘为准 | --grip-ink 深 rgba(255,255,255,0.74)/浅 rgba(16,20,28,0.55)（design-tokens.css:230,296）；SVG 描边 2.2（CollapseHandle.tsx:28） | 偏差 | 深改 rgba(255,255,255,0.55)（=139/255）、浅改 rgba(16,20,28,0.36)（浅档 GlassInkDim=Ink3.A=92/255，Design.cs:258）；strokeWidth 2.2 改 2.5。形态（右侧圆角括号 + 仅 hover 显影）与 Timing 实绘等效，保留 | P2 |
-| D9 | 收起圆点 paused | Timing 无收起圆点（TickBar 独有形态，无权威对照） | dot paused = --ink-3 灰（surfaces.css:236-238），而环 paused = --color-warn 橙（surfaces.css:190-194） | 不一致 | 裁决见 §3-裁决三：.dot[data-state="paused"] .dot__ring 改 var(--color-warn) | P2 |
+| D9 | 收起圆点 paused | 参考 Timing 无收起圆点（本项目独有形态，无权威对照） | dot paused = --ink-3 灰（surfaces.css:236-238），而环 paused = --color-warn 橙（surfaces.css:190-194） | 不一致 | 裁决见 §3-裁决三：.dot[data-state="paused"] .dot__ring 改 var(--color-warn) | P2 |
 | D10 | 待办面板字号 | RowEm 12.5（TodoListPanel.cs:66；实绘 TodoListPanel.cs:915）；HeadEm 11.5（TodoListPanel.cs:64；TodoDigestPanel.cs:28） | 行名 --text-body 13px（todos-panel.css:130；todos-pending.css:99）；表头 --text-sm 12.5px（todos-panel.css:55） | 偏差 | 行名改 var(--text-sm)（12.5px）、表头改 var(--text-xs)（11.5px）。时间/时长列 --text-cap 11 vs Timing NumEm 11.5（TodoListPanel.cs:68）随行微调为 var(--text-mono) 11.5px 即可 | P2 |
 | D11 | 菜单状态块 | StatusH 46（GlassMenu.cs:27） | --menu-status-h 52（design-tokens.css:106） | 偏差 | --menu-status-h 改 46px。菜单其余项一致：MinW 184 / ItemH 30 / PadX 9 / PadY 6 / ItemEm 13（GlassMenu.cs:19-33 vs design-tokens.css:105,107 + menu.css:117-121），不改 | P2 |
-| D12 | 提醒浮出卡 | BoxW 330（RemindBox.cs:12）；BtnH 36（RemindBox.cs:24）；标题 14px Regular（RemindBox.cs:125）；Alpha 0.92（RemindBox.cs:28） | 宽 280（reminder.css:11）；按钮 --btn-sm-h 24（reminder.css:92,124,146）；标题 --text-body 13px semibold（reminder.css:51-53） | 偏差 | 宽改 330px；主 CTA（打开/完成类）改 --btn-md-h 28px（Timing 36 为 GDI 触控冗余，Web 取标度档 28；理由：与 --input-h/--menu 同栅格，36 在 280 宽卡内比例失衡——若坚持逐像素对齐则用 36px，二者取一，落地时定 28）；标题字号/字重维持（13 semibold 是 TickBar 排版系统决定，Timing 14 Regular 为 Win32 消息框惯性，见 §4-G） | P2 |
+| D12 | 提醒浮出卡 | BoxW 330（RemindBox.cs:12）；BtnH 36（RemindBox.cs:24）；标题 14px Regular（RemindBox.cs:125）；Alpha 0.92（RemindBox.cs:28） | 宽 280（reminder.css:11）；按钮 --btn-sm-h 24（reminder.css:92,124,146）；标题 --text-body 13px semibold（reminder.css:51-53） | 偏差 | 宽改 330px；主 CTA（打开/完成类）改 --btn-md-h 28px（Timing 36 为 GDI 触控冗余，Web 取标度档 28；理由：与 --input-h/--menu 同栅格，36 在 280 宽卡内比例失衡——若坚持逐像素对齐则用 36px，二者取一，落地时定 28）；标题字号/字重维持（13 semibold 是 Timing 排版系统决定，Timing 14 Regular 为 Win32 消息框惯性，见 §4-G） | P2 |
 | D13 | 主题卡标签 | 12.5px Regular（ThemeCard.cs:170） | --text-xs 11.5px（theme-picker.css:120-121） | 偏差 | font-size 改 var(--text-sm)（12.5px），字重维持 | P2 |
 | D14 | 状态标记尺寸 | MarkW 14（TodoListPanel.cs:41） | --todos-mark-size 15px（design-tokens.css:95） | 偏差 | 判不改：15 仅为视觉标记，实际点击由 20px 的 .todo-pend__mark 承载（todos-pending.css:77-84），1px 差异不可感且无对照观感差异 | P3 |
 | D15 | 菜单分组标题 | GroupEm 10.5（GlassMenu.cs:35） | --text-cap 11px semibold + caps 字距（menu.css:105-108） | 偏差 | 判不改：10.5px 中文笔画在 ClearType 与亚像素渲染下观感差异可忽略，Web 中文低于 11px 触发可读性问题；且分组标题在 Timing 为常规灰字非大写标签，现有处理已更克制 | P3 |
@@ -85,8 +85,8 @@ Timing 无收起圆点（其最小形态即小条本身），无权威对照，�
 - **D. 浅色 --ink-4 #656E7D vs Timing (112,122,138)**（design-tokens.css:258 vs Design.cs:259）：Timing Ink4 仅作 placeholder/禁用；我们允许其作四级小字正文（AC-53），按 4.5:1 有意加深。注释已记录，不改。
 - **E. --ring-track 白 0.20 vs Timing 状态色 0.37**：非有意偏差，见 D6，改。
 - **F. 悬停板描边**：Timing 悬停板无描边（MainForm.cs:2208-2221 仅 FillPath），我们加 1px --line-2。D2 已含去除建议；投影 --shadow-balloon 保留（Web 无 DWM 窗口阴影可依赖，投影承担与桌面的分层）。
-- **G. 提醒卡标题 13 semibold vs Timing 14 Regular**（reminder.css:51-53 vs RemindBox.cs:125）：RemindBox 是 Win32 消息框惯性排版；TickBar 卡片标题层级统一走「--text-body + semibold」系统（同 todos 表头、note 标题）。不改。
-- **H. pill --pill-h-compact 30**：TickBar 独有的紧凑档（Timing 无），功能态，不在本轮。
+- **G. 提醒卡标题 13 semibold vs Timing 14 Regular**（reminder.css:51-53 vs RemindBox.cs:125）：RemindBox 是 Win32 消息框惯性排版；本项目卡片标题层级统一走「--text-body + semibold」系统（同 todos 表头、note 标题）。不改。
+- **H. pill --pill-h-compact 30**：本项目独有的紧凑档（参考 Timing 无），功能态，不在本轮。
 
 ---
 

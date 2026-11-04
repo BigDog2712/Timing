@@ -1,4 +1,4 @@
-# TickBar 安卓端 · 0.3.2
+# Timing 安卓端 · 0.3.2
 
 原生 Kotlin 写的悬浮计时器：**一个悬浮小条（小圆点 / 顶部胶囊）常驻桌面，App 里是四个页签**。
 0.2.0 把数据落到 SQLite（表结构与桌面同构）；0.3.x 接上 **Obsidian 双向同步** —— 两端
@@ -18,7 +18,7 @@ SAF 目录授权都需要装机确认。
 
 ## 1. 为什么是原生 Kotlin，而不是复用桌面那套 Tauri
 
-桌面版（`src-tauri/`，v0.4.1）和旧版本出过的 Tauri 安卓包（`TickBar-v0.4.1-android-arm64.apk`）都**没有悬浮层**能力，原因是技术性的，不是没做：
+桌面版（`src-tauri/`，v0.4.1）和旧版本出过的 Tauri 安卓包（`Timing-v0.4.1-android-arm64.apk`）都**没有悬浮层**能力，原因是技术性的，不是没做：
 
 | 需求 | 需要的系统能力 | Tauri / WebView 能做吗 |
 | --- | --- | --- |
@@ -40,7 +40,7 @@ SAF 目录授权都需要装机确认。
 | 最低记录时长（默认 30s） | 设置页可改 5/30/60s | ✅ |
 | 记录（日 / 周视图） | 页签③：今天（分布 + 明细）/ 本周（七天柱 + 事项占比） | ✅ 0.2.0 |
 | 事项 / 待办 | 页签②：今日汇总 + 待办（长按删） | ✅ 落库 |
-| 数据持久 | SQLite `tickbar.db`，表与桌面同构 | ✅ 0.2.0 |
+| 数据持久 | SQLite `timing.db`，表与桌面同构 | ✅ 0.2.0 |
 | 深 / 浅主题 | 设置 → 主题，令牌抄桌面 `03-theme-light.css` | ✅ 0.2.0 |
 | 窗口位置记忆 | 拖动落盘 + 旋转重算 + 一键复位 | ✅ 0.2.0 |
 | md-sync（写 Obsidian 日记） | 设置 → 同步：SAF 选目录 + 模板 + 标题，双向合并 | ✅ 0.3.0 |
@@ -65,7 +65,7 @@ SAF 目录授权都需要装机确认。
 
 技术上有两条路：**客户端实现**（按原生通知方式发「岛通知」）或 **MiPush 扩展参数**（只支持 regId 发送，进程被杀也能收到）。
 
-**对 TickBar 的结论**：这条路要求「企业资质 + 已上架应用 + 设计稿过审 + 逐场景报备」，为一个个人计时工具走完全程不划算，而且审核周期比功能迭代还长。所以本期做**视觉等价**：
+**对 Timing 的结论**：这条路要求「企业资质 + 已上架应用 + 设计稿过审 + 逐场景报备」，为一个个人计时工具走完全程不划算，而且审核周期比功能迭代还长。所以本期做**视觉等价**：
 
 1. 悬浮窗口默认停在顶部正中、状态栏下 4dp —— 就是灵动岛的位置，胶囊形、深色底；
 2. 同时发常驻通知（`IMPORTANCE_LOW`），带「暂停 / 结束」。
@@ -108,12 +108,12 @@ Obsidian（无论官方 Sync 还是 Remotely Save）同步的是 **vault 目录�
       ```
 
 私有层（不同步，各自离线可用）
-  桌面 %APPDATA%/com.tickbar.app/tickbar.db     手机 /data/data/com.tickbar.droid/databases/tickbar.db
+  桌面 %APPDATA%/com.timing.app/timing.db     手机 /data/data/com.timing.droid/databases/timing.db
 ````
 
 共享层决定「这一天有什么」，私有层只负责界面快与离线可用。
 
-**为什么不能干脆把电脑端的 `tickbar.db` 挪进 vault 让插件同步？** 四个独立的原因：
+**为什么不能干脆把电脑端的 `timing.db` 挪进 vault 让插件同步？** 四个独立的原因：
 
 | 问题 | 后果 |
 |---|---|
@@ -154,7 +154,7 @@ Obsidian（无论官方 Sync 还是 Remotely Save）同步的是 **vault 目录�
 
 用 Remotely Save 的话，落地顺序是：手机装 Obsidian → 建 vault（**不要在 `Android/data`
 或 `Android/obb` 下**，那两个目录对系统选择器关闭）→ 装 Remotely Save 配同一远端 → 先同步
-一轮把 `Diary/` 拉下来 → 再装 TickBar 选这个目录。TickBar **不负责上传**，它只负责把
+一轮把 `Diary/` 拉下来 → 再装 Timing 选这个目录。Timing **不负责上传**，它只负责把
 那篇 `.md` 改对；上传要等 Obsidian 活着时由 Remotely Save 干。
 
 ### 4.4 冲突：不做二选一，做三方合并
@@ -200,7 +200,7 @@ android-app/
 ├── settings.gradle.kts / build.gradle.kts / gradle.properties
 └── app/
     ├── build.gradle.kts            # 零运行时依赖，compileSdk 36 / minSdk 26
-    └── src/main/java/com/tickbar/droid/
+    └── src/main/java/com/timing/droid/
         ├── TickApp.kt          # Application：只做一件事——装崩溃兜底
         ├── core/
         │   ├── Tk.kt           # 设计令牌（深/浅两套，读时求值）
@@ -273,7 +273,7 @@ export PATH="$JAVA_HOME/bin:$PATH"
 ./gradlew :app:installDebug           # 连上手机后直接装
 ```
 
-打好的一份在 `release/TickBar-android-0.3.1.apk`（debug 签名，仅自测安装）。
+打好的一份在 `release/Timing-android-0.3.1.apk`（debug 签名，仅自测安装）。
 
 **Android Studio**：`File → Open` 选本目录即可，`gradlew` 与 wrapper jar 已在仓库里。
 
@@ -303,14 +303,14 @@ export PATH="$JAVA_HOME/bin:$PATH"
 
 ```bash
 adb logcat -c                                   # 清空
-# 然后在手机上打开 TickBar，等它闪退，立刻执行：
+# 然后在手机上打开 Timing，等它闪退，立刻执行：
 adb logcat -d -b crash AndroidRuntime:E "*:S"
 ```
 
 `FATAL EXCEPTION` 往下的十几行就是原因，整段发出来即可。
 
 **覆盖安装 vs 卸载重装**：先直接覆盖安装（保留数据）。只有在「每次打开都退」时才建议卸载重装
-——那会清掉私有目录里的 `tickbar.db`（Obsidian vault 里的 Markdown 不受影响）。
+——那会清掉私有目录里的 `timing.db`（Obsidian vault 里的 Markdown 不受影响）。
 
 0.3.2 具体堵掉了这几条：
 
@@ -335,7 +335,7 @@ adb logcat -d -b crash AndroidRuntime:E "*:S"
   **Remotely Save 通常不生成、直接按修改时间择一覆盖**。两种情况本应用都管不到副本本身，
   需要人工删掉较旧的一份；被覆盖掉的记录靠本机 SQLite 在下一轮合并中写回；
 - **手机端 Obsidian 必须真的在跑**：Remotely Save 的定时同步挂在 Obsidian 进程上。
-  TickBar 只负责把 `.md` 改对，上传那一步要一个活着的 Obsidian；
+  Timing 只负责把 `.md` 改对，上传那一步要一个活着的 Obsidian；
 - **别在没同步前「清除数据 / 重装」**：SQLite 既是本地副本也是被覆盖时的救援来源。
 - **两端同时写有秒级窗口**：手机 20 秒一轮、桌面 2 秒一轮，理论上存在「桌面读到旧文件后
   又基于旧基线写回」的竞态。窗口很窄，桌面写入前会先读一次并留备份；

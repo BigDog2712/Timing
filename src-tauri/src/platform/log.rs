@@ -15,8 +15,8 @@
 //! log_warn!("tray set_menu failed: {err}");
 //! ```
 //!
-//! 级别由环境变量 `TICKBAR_LOG` 控制（`error|warn|info|debug`，默认 `info`）。
-//! 日志目录：`<app_data_dir>/logs/tickbar-YYYY-MM-DD.log`。
+//! 级别由环境变量 `TIMING_LOG` 控制（`error|warn|info|debug`，默认 `info`）。
+//! 日志目录：`<app_data_dir>/logs/timing-YYYY-MM-DD.log`。
 //! Debug 构建同时镜像到 stderr；Release 只落文件（stderr 在 GUI 下不可见）。
 
 use std::fs::{self, File, OpenOptions};
@@ -95,7 +95,7 @@ pub fn init(app_data_dir: &Path) {
     let dir = app_data_dir.join("logs");
     let _ = fs::create_dir_all(&dir);
     prune(&dir);
-    let path = dir.join(format!("tickbar-{}.log", today()));
+    let path = dir.join(format!("timing-{}.log", today()));
     let file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -104,7 +104,7 @@ pub fn init(app_data_dir: &Path) {
     let _ = LOG_DIR.set(dir);
     let _ = SINK.set(Mutex::new(file));
     LEVEL.store(
-        parse_level(&std::env::var("TICKBAR_LOG").unwrap_or_default()) as u8,
+        parse_level(&std::env::var("TIMING_LOG").unwrap_or_default()) as u8,
         Ordering::Relaxed,
     );
     install_panic_hook();
@@ -112,7 +112,7 @@ pub fn init(app_data_dir: &Path) {
         Level::Info,
         "log",
         &format!(
-            "---- TickBar v{} start (level={:?}) ----",
+            "---- Timing v{} start (level={:?}) ----",
             env!("CARGO_PKG_VERSION"),
             current_level()
         ),

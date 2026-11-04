@@ -99,6 +99,6 @@
 
 | 字段 | MASTER 默认 | 本页覆盖 | 原因 |
 |---|---|---|---|
-| 命中目标 | `--hit-target` 44x44 | `--hit-target-dot` **36x36** | TickBar 是**常驻置顶覆盖层**，44px 隐形命中区会遮挡底层应用点击（Windows 头号坑）。补偿：鼠标场景 36px 已舒适 + 全局热键路径 + hover 即出 tooltip |
+| 命中目标 | `--hit-target` 44x44 | `--hit-target-dot` **36x36** | Timing 是**常驻置顶覆盖层**，44px 隐形命中区会遮挡底层应用点击（Windows 头号坑）。补偿：鼠标场景 36px 已舒适 + 全局热键路径 + hover 即出 tooltip |
 | 环描边 | `--ring-stroke` 2px | **2.5px** | 面积缩小到 28px，加粗补偿可见性 |
 | tooltip 延迟 | - | `--size.hoverTooltipMs` 300ms | 防抖，避免扫过即弹 |

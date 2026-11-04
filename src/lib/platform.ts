@@ -1,7 +1,7 @@
 /**
- * TickBar — 平台常量（全前端**唯一**读取编译期标记的位置）
+ * Timing — 平台常量（全前端**唯一**读取编译期标记的位置）
  * -----------------------------------------------------------------------------
- * `__TICKBAR_MOBILE__` 由 `vite.config.ts` 的 `define` 在打包时替换成字面量：
+ * `__TIMING_MOBILE__` 由 `vite.config.ts` 的 `define` 在打包时替换成字面量：
  *   - `tauri android dev/build`（TAURI_ENV_FAMILY=mobile）→ `true`
  *   - 桌面构建 / `npm run dev` / vitest → `false`（vitest.config.ts 也补了同一份 define）
  *
@@ -14,9 +14,9 @@
  * 机械门禁 L7（scripts/check-layers.mjs）保证这个全局只出现在本文件。
  */
 /* 只在本文件里声明、只在本文件里读：全局唯一读取点由 L7 机械保证 */
-declare const __TICKBAR_MOBILE__: boolean;
+declare const __TIMING_MOBILE__: boolean;
 
-export const IS_MOBILE: boolean = __TICKBAR_MOBILE__;
+export const IS_MOBILE: boolean = __TIMING_MOBILE__;
 
 /** 宿主系统。仅移动端有意义；桌面恒为 `desktop`。 */
 export type HostOs = 'android' | 'ios' | 'desktop';

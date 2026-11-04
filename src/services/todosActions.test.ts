@@ -1,5 +1,5 @@
 /**
- * TickBar — 待办时间「写入 / 清空」的端到端单测（V0.3.10）
+ * Timing — 待办时间「写入 / 清空」的端到端单测（V0.3.10）
  * -----------------------------------------------------------------------------
  * 这一层不 mock 任何东西：`todosActions` → `todoStore` → `services/api` → `ipc` → 浏览器 mock
  * （`browserMockV020` 的 `todo_create` / `todo_update`，与后端 `services::todo` 同语义）。

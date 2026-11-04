@@ -1,5 +1,5 @@
 /**
- * TickBar — 插件面板类型（apiVersion 3）
+ * Timing — 插件面板类型（apiVersion 3）
  * -----------------------------------------------------------------------------
  * 与 `src-tauri/src/models/plugin_panel.rs` 逐字对应（`#[serde(tag = "type")]`
  * 让块类型直接写在 JSON 的 `type` 字段上，前端按它 switch 渲染）。

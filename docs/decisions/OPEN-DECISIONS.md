@@ -1,4 +1,4 @@
-# 悬而未决登记册（OPEN-DECISIONS）— TickBar
+# 悬而未决登记册（OPEN-DECISIONS）— Timing
 
 > 规范：只追加 + 就地关闭（OPEN → RESOLVED，补 Resolution 字段）。每次 Phase 开始时把未决项复现到工作上下文最前面。  
 > 三类固定 slug：`waiting-on-external-condition`（等外部条件）/ `design-decision-to-evaluate`（设计待评估）/ `existing-design-boundary`（现有设计边界约束）。
@@ -27,11 +27,11 @@
 | 2026-10-16 | Phase 1 / A-4                      | 悬浮条默认停靠位置与尺寸（架构建议 24px / 设计定 16 DIP）                              | 与吸附阈值一致                                                                                   | 采用 16 DIP（与 §9 平台规范一致）                       | existing-design-boundary                | Spec 锁定                          | **RESOLVED** |
 | 2026-10-16 | Phase 1 / A-5                      | 本地匿名统计是否在 MVP 落地                                                  | 零遥测叙事                                                                                     | 维持 P1，MVP 不采集                                | existing-design-boundary                | Spec 锁定                          | **RESOLVED** |
 | 2026-10-16 | V0.2.0 批1 Wave B / 后端回传 advisory#2 | 待办 `title` 超长（>200）无专属错误码，复用 `ITEM_NAME_EMPTY`（语义偏弱）              | `ErrorCode` 为闭合 union（V0.1.0 的 11 + V0.2.0 的 5 = 16），Spec §5 只授权新增 5 个，不得越权加第 17 码        | 复用 `ITEM_NAME_EMPTY` + 明确 message 承载（已落地并单测） | —（已解除）      | v0.3.0 增设 `ITEM_NAME_TOO_LONG` 并回填（已达成） | **RESOLVED** |
-| 2026-10-16 | V0.2.0 批1 Wave B / 偏差 P-1          | 事项窗「待进行」态的分区归属：设计稿把它列在**今日计时区**，实现把它并入**待办事项区**（有时间/未设时间/已逾期三级语气） | `time_records` 无 `planned_at`；TickBar 的「计划」载体是 `todos.planned_at`，设计稿设想的「计划中的今日记录」数据模型不支持 | 保持现状（四状态语义均可达且视觉可区分）                         | waiting-on-external-condition（用户/设计师确认） | 用户/设计师确认分区归属                     | **RESOLVED** |
+| 2026-10-16 | V0.2.0 批1 Wave B / 偏差 P-1          | 事项窗「待进行」态的分区归属：设计稿把它列在**今日计时区**，实现把它并入**待办事项区**（有时间/未设时间/已逾期三级语气） | `time_records` 无 `planned_at`；Timing 的「计划」载体是 `todos.planned_at`，设计稿设想的「计划中的今日记录」数据模型不支持 | 保持现状（四状态语义均可达且视觉可区分）                         | waiting-on-external-condition（用户/设计师确认） | 用户/设计师确认分区归属                     | **RESOLVED** |
 | 2026-10-16 | 批1 回归 QA 复验 / D-B1-07               | AC-54「提醒色」**可达性边界**：`--color-warn` 两处消费者（提醒铃需 `remind_at`、逾期文字需 `planned_at<now`）**均条件渲染**，而批1 UI 无入口设置 planned/remind ⇒ 常规流程下改「提醒色」可能**无可见像素变化** | 批1 未做排期/提醒入口；`0002_v020.sql` 无 todos seed | 机制完备（持久化 + 注入 + 消费者均通），留批2 凭排期/提醒入口可达；真机验 AC-54 需先造带 planned/remind 的待办 | waiting-on-external-condition（批2 功能） | 批2 交付排期/提醒入口后（已达成） | **RESOLVED** |
 | 2026-10-16 | 批2 回归 QA / advisory#4 | 便利贴「置顶」开关状态未持久化：设计 `sticky-note.md §3.2` 提到状态入 `notes`，但 `notes` 表无 pin 列、前端 `useState(true)` 不落库 | `0002_v020.sql` 无 `notes.pin` 列；AC-64 仅要求「默认置顶」（已满足） | 已加 `notes.is_pinned` 列并落库（默认 1 = 置顶，迁移 v3） | —（已解除） | v0.3.0 加列并落库（已达成） | **RESOLVED** |
 | 2026-10-16 | 批2 回归 QA / advisory#3 | ADR-011 所述倒计时到点「Web Audio 铃声」未实现：实际到点 = 系统通知 + 应用内视觉 | AC-47 仅要求「至少通知 + 视觉提示」（已满足）；铃声属 ADR 增强项 | 本期降级为「系统通知（OS 自带提示音）+ 应用内视觉」；Web Audio 铃声留后续 | design-decision-to-evaluate | 用户反馈需要铃声时 | **RESOLVED** |
-| 2026-10-16 | 批2 回归 QA / advisory#6 | 无 VCS 基线（`tickbar` 非 git 仓库），反作弊门禁「测试删除 / 断言数下降」diff 检测不可执行 | 反作弊门禁需版本基线留痕 | 本期以绝对面兜底（18 测试文件 / 477 断言 / 零 skip·ignore·桩）；建议后续纳入 git | existing-design-boundary | 项目纳入 VCS | **RESOLVED** |
+| 2026-10-16 | 批2 回归 QA / advisory#6 | 无 VCS 基线（`timing` 非 git 仓库），反作弊门禁「测试删除 / 断言数下降」diff 检测不可执行 | 反作弊门禁需版本基线留痕 | 本期以绝对面兜底（18 测试文件 / 477 断言 / 零 skip·ignore·桩）；建议后续纳入 git | existing-design-boundary | 项目纳入 VCS | **RESOLVED** |
 | 2026-10-16 | 持续优化轮 / lead | （上条收口）Resolution：项目根已 `git init`（main 分支，.gitignore 排除 node_modules/target/dist/release），基线 commit `a96ae16` 含批2 全量 + 小条 Timing 对齐；此后反作弊门可跑 `git diff` 检测测试删除/断言下降。Resolved by：team-lead（2026-10-16 17:1x） | — | — | — | — | **RESOLVED** |
 
 ### Resolution 明细

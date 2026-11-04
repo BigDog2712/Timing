@@ -1,5 +1,5 @@
 /**
- * TickBar — Tauri 事件订阅 Hook（K-8：unlisten 必须在 cleanup 调用）
+ * Timing — Tauri 事件订阅 Hook（K-8：unlisten 必须在 cleanup 调用）
  * -----------------------------------------------------------------------------
  * 组件内禁止直接 `listen`；一律经本 Hook（内部走 services/ipc 的 onIpcEvent）。
  * handler 通过 ref 转发，保证订阅只随 event 名重建一次，避免因内联 handler 反复重订阅。

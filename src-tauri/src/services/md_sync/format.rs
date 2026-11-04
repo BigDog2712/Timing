@@ -25,7 +25,7 @@
 //! Planner 照旧能读；宿主用它把实时段与真实数据区分开。
 //!
 //! `duration:` 是**只给人看的派生值**（Planner 忽略未知键）：`start`/`end` 是墙钟跨度，
-//! 应用关闭或电脑休眠期间 TickBar 不累计（`timer::resolve_open` 的 R-2），两者会分叉
+//! 应用关闭或电脑休眠期间 Timing 不累计（`timer::resolve_open` 的 R-2），两者会分叉
 //! ——一段 `09:18 → 14:40` 可能只计到 46 分钟。见 `TimerInterval::duration_sec`。
 
 pub mod notes;
@@ -65,7 +65,7 @@ pub struct TimerInterval {
     /// `None` = 调用方没提供（用户手写、或纯格式用例），此时不写 `duration:` 行。
     ///
     /// 为什么不能从 `end_ms - start_ms` 推：两者会分叉。应用关闭、电脑休眠期间
-    /// TickBar 不累计（`timer::resolve_open` 的 R-2），所以墙钟跨度 `09:18 → 14:40`
+    /// Timing 不累计（`timer::resolve_open` 的 R-2），所以墙钟跨度 `09:18 → 14:40`
     /// 的那段可能只计到 46 分钟。只写 start/end，读日记的人会把墙钟跨度当成工作时长。
     ///
     /// **它永远不参与导入**：`import::apply_timers` 一律先 `strip_durations`，

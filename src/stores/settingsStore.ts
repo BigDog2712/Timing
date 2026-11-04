@@ -1,5 +1,5 @@
 /**
- * TickBar — 设置 store
+ * Timing — 设置 store
  * -----------------------------------------------------------------------------
  * 数据来源：get_settings / update_settings / set_autostart（均为 Rust 侧命令）。
  * 默认值与后端 `Settings::default()` 一致。V0.3.3 起 `alwaysOnTop` /

@@ -18,7 +18,7 @@ use crate::services;
 use crate::state::AppState;
 
 /// 托盘图标 id（`tray_by_id` 检索用）。
-const TRAY_ID: &str = "tickbar-tray";
+const TRAY_ID: &str = "timing-tray";
 
 /// 托盘专用图标（64×64 PNG，编译期嵌入）。
 ///
@@ -33,7 +33,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("TickBar")
+        .tooltip("Timing")
         .on_menu_event(|app, event| on_menu_event(app, event.id.as_ref()))
         .on_tray_icon_event(|tray, event| {
             let app = tray.app_handle();

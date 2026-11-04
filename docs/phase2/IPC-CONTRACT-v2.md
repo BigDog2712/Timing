@@ -1,4 +1,4 @@
-# TickBar IPC 契约 v2（Phase 2 锁定）
+# Timing IPC 契约 v2（Phase 2 锁定）
 
 - Document ID: IPC-CONTRACT-v2
 - Status: **Frozen for Phase 3**（Phase 3 前后端联调唯一依据）
@@ -780,7 +780,7 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 | 单实例锁 | 不需要 | Android 系统本就单实例 |
 | 前台服务 / 后台保活 | **本轮不做**（见 `DESIGN-ANDROID-V1.md` §1.5） | 进程存活 → 现有 tokio ticker 正常；被冻结 / 杀死 → **到点通知可能延迟**。数据不丢：恢复运行时 `countdown::tick` / `reminder::due` 按 `ends_at <= now` / `remind_at <= now` 幂等补判，口径是「**数据正确、通知延迟**」 |
 | 系统通知 | 保留（`reminder-fired` / `countdown-finished` 照常 emit） | 需 `POST_NOTIFICATIONS` 运行时权限 + 单通道 `timer-reminder`「计时提醒」；用户拒绝时前端降级为应用内提示条 |
-| 存储 | 同构 | 仍在 `app_data_dir()/tickbar.db`（Android 解析为应用私有 files 目录），迁移 `0001~0004` 原样复用，`schema.version=4`，不需要存储权限 |
+| 存储 | 同构 | 仍在 `app_data_dir()/timing.db`（Android 解析为应用私有 files 目录），迁移 `0001~0004` 原样复用，`schema.version=4`，不需要存储权限 |
 
 #### 12.8.4 未做与理由
 

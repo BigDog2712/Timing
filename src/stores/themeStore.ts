@@ -1,5 +1,5 @@
 /**
- * TickBar — 主题 store（运行时主题 + 四色；唯一持有 resolved 主题的 store）
+ * Timing — 主题 store（运行时主题 + 四色；唯一持有 resolved 主题的 store）
  * -----------------------------------------------------------------------------
  * 数据来源：theme_get / accent_get / theme_set / accent_set（Rust 命令）+ theme-changed 事件。
  * 状态变更后统一经 lib/theme 写入 <html data-theme> 与 --color-*（无 JS 重排）。

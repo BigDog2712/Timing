@@ -1,5 +1,5 @@
 /**
- * TickBar — 撤销条 UndoBar（undo-bar.md，AC-05 / AC-06 / AC-07）
+ * Timing — 撤销条 UndoBar（undo-bar.md，AC-05 / AC-06 / AC-07）
  * -----------------------------------------------------------------------------
  * 生命周期严格 = UNDO_WINDOW_MS 3000ms（uiStore.undoDeadline 由 domain 常量算出）。
  *

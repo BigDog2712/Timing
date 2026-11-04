@@ -19,10 +19,10 @@ android {
     // 故取 36（本机 platforms 有 35/36）；targetSdk 仍按设计口径 35，
     // 两者可以不同（compileSdk 只决定能编到哪些 API，targetSdk 才决定运行时行为开关）。
     compileSdk = 36
-    namespace = "com.tickbar.app"
+    namespace = "com.timing.app"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        applicationId = "com.tickbar.app"
+        applicationId = "com.timing.app"
         minSdk = 24
         targetSdk = 35
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()

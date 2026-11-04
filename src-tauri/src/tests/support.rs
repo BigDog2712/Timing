@@ -19,7 +19,7 @@ pub fn unique_dir(tag: &str) -> PathBuf {
         .map(|d| d.as_nanos())
         .unwrap_or(0);
     let pid = std::process::id();
-    std::env::temp_dir().join(format!("tickbar-qa-{tag}-{pid}-{n}-{nanos}"))
+    std::env::temp_dir().join(format!("timing-qa-{tag}-{pid}-{n}-{nanos}"))
 }
 
 /// 新建独立空库（已执行 0001 迁移与种子）。

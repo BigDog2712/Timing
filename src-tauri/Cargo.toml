@@ -1,13 +1,13 @@
 [package]
-name = "tickbar"
+name = "timing"
 version = "0.1.1"
-description = "TickBar — 常驻悬浮计时条（Windows 桌面，纯本地）"
-authors = ["TickBar Team"]
+description = "Timing — 常驻悬浮计时条（Windows 桌面，纯本地）"
+authors = ["Timing Team"]
 edition = "2021"
 rust-version = "1.90"
 
 [lib]
-name = "tickbar_lib"
+name = "timing_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -35,6 +35,16 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     crate::platform::log::init(&app_data_dir);
     boot_timing::set_dir(&app_data_dir.join("logs"));
     boot_timing::mark("log_ready");
+
+    // ①' 旧名数据接管。identifier 由 `com.tickbar.app` 改为 `com.timing.app`，
+    //     数据目录整体搬家、库文件名也换了；这里把旧目录搬过来，老用户升级后
+    //     不该看见空数据。放在日志之后：迁移成败都要留下记录。
+    match crate::infra::legacy::adopt(&app_data_dir) {
+        Ok(true) => crate::log_info!("legacy data adopted: com.tickbar.app -> com.timing.app"),
+        Ok(false) => {}
+        Err(err) => crate::log_warn!("legacy data adopt failed: {err}"),
+    }
+    boot_timing::mark("legacy_adopted");
     // 平台标识入日志：用户报障时第一眼要能分清是桌面还是手机（能力面不同）。
     crate::log_info!(
         "startup on {} ({})",

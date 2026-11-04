@@ -1,4 +1,4 @@
-//! TickBar 桌面壳入口（仅装配：插件 / 状态 / 托盘 / 命令 / 窗口事件，无业务）。
+//! Timing 桌面壳入口（仅装配：插件 / 状态 / 托盘 / 命令 / 窗口事件，无业务）。
 //!
 //! 分层（依赖只能向下）：
 //! `platform`（叶子）→ `infra`（平台适配）→ `services`（业务）
@@ -154,5 +154,5 @@ pub fn run() {
 
     builder
         .run(tauri::generate_context!())
-        .expect("TickBar 启动失败");
+        .expect("Timing 启动失败");
 }

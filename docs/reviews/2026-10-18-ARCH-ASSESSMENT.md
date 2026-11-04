@@ -1,6 +1,6 @@
-# TickBar 架构评估与项目架构规划
+# Timing 架构评估与项目架构规划
 
-- 评估基线：仓库根 `D:/101-Workshop/261017-Tickbar` @ v0.2.10（2026-10-18）
+- 评估基线：仓库根 `D:/101-Workshop/261017-Timing` @ v0.2.10（2026-10-18）
 - 评估角色：架构师 高见远（Gao）；编排：交付总监 齐活林（Qi）
 - 方法：读源码 + 机械校验（`node scripts/check-contract.mjs` 实跑）+ 计数统计
 - 标注约定：凡结论均标来源（`路径:行` / 函数名）；无法从代码直接证实的写「推断」
@@ -300,7 +300,7 @@ graph TD
 | T02 | 前端 lint 落地 | `eslint.config.js`(新)、`package.json`、`ci.yml` | T01 | `lint` 0 error；`no-restricted-paths` 能报「components 引 ipc」；CI 增量 ≤90s | M | 前端 |
 | T03 | 契约门禁扩展（事件 + mock） | `scripts/check-contract.mjs` | — | 事件三方集合相等生效；mock 62/62；`app:open-settings` 死常量被报出（先红后修） | M | 架构 |
 | T04 | 补 mock 8 条 | `src/mocks/*` | T03 | mock 62/62；浏览器 dev 下日记/丢弃计时/日状态可走通 | S | 前端 |
-| T05 | 日志与诊断通道 | `Cargo.toml`、`platform/log.rs`(新)、`observability/diagnostics.rs`(新)、`main.rs` | — | 日志落 `%APPDATA%/TickBar/logs/` 保留 7 天；panic 写 `panic.log`；`eprintln!` = 0；release 保留符号 | M | 后端 |
+| T05 | 日志与诊断通道 | `Cargo.toml`、`platform/log.rs`(新)、`observability/diagnostics.rs`(新)、`main.rs` | — | 日志落 `%APPDATA%/Timing/logs/` 保留 7 天；panic 写 `panic.log`；`eprintln!` = 0；release 保留符号 | M | 后端 |
 | T06 | 版本号五处门禁 | `scripts/check-version.mjs`(新)、`ci.yml` | — | 五处不一致即红；`AGENTS.md` 改为「由 CI 保证」 | S | 架构 |
 
 ### 4.2 M2 架构收敛（解环 + 收口 + 权限）

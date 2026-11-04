@@ -1,4 +1,4 @@
-# QA 报告 — TickBar V0.2.0 批 1 回归 QA（**含定向复验终版**）
+# QA 报告 — Timing V0.2.0 批 1 回归 QA（**含定向复验终版**）
 
 - 文档 ID：`docs/phase4/QA-REPORT-V0.2.0-BATCH1.md`（与 V0.1.0 报告 `QA-REPORT.md` 并列，不覆盖）
 - 验证人：严过关（测试工程师，mvp-dev-expert-team-qa）
@@ -66,7 +66,7 @@
 
 > ⚠️ 依据 V0.1.0 结论（E-01），必须带 `-j 2`，否则默认并行编 `tokio-stream` 触发 `STATUS_ACCESS_VIOLATION`。
 
-### 1.2 前端门禁（`cd tickbar`）
+### 1.2 前端门禁（`cd timing`）
 
 | 命令 | 退出码 | 关键输出 |
 |---|---|---|
@@ -334,7 +334,7 @@
 cd src-tauri && cargo fmt --check && cargo clippy -j 2 --all-targets
 cd src-tauri && cargo test -j 2                        # 122 passed, EXIT=0
 # 前端
-cd tickbar && npx tsc --noEmit && npm run build                # EXIT=0 / 2011 modules
+cd timing && npx tsc --noEmit && npm run build                # EXIT=0 / 2011 modules
 # P0 门禁（emoji）
 grep -rP '[\x{1F300}-\x{1F9FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{FE0F}\x{1F000}-\x{1F64F}\x{1F680}-\x{1F6FF}\x{1FA00}-\x{1FAFF}\x{2713}\x{2714}\x{26A0}\x{274C}]' src index.html   # 0 命中
 # 紫粉渐变 / 弹跳缓动

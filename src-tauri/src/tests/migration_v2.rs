@@ -116,7 +116,7 @@ async fn v1_database_upgrades_in_place() {
     let dir = unique_dir("mig-v1-upgrade");
     std::fs::create_dir_all(&dir).expect("建临时目录应成功");
     let options = SqliteConnectOptions::new()
-        .filename(dir.join("tickbar.db"))
+        .filename(dir.join("timing.db"))
         .create_if_missing(true);
     let pool = SqlitePoolOptions::new()
         .max_connections(1)

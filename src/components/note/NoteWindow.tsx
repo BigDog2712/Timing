@@ -1,5 +1,5 @@
 /**
- * TickBar — 便利贴窗口根 NoteWindow（label = note-{id}，ADR-009 §1/§2）
+ * Timing — 便利贴窗口根 NoteWindow（label = note-{id}，ADR-009 §1/§2）
  * -----------------------------------------------------------------------------
  * 后端 open_note_window 以 `decorations:false / transparent:true / visible:false`
  * 创建 `note-{id}` 窗口（可缩放、默认置顶）。本组件是该窗根：

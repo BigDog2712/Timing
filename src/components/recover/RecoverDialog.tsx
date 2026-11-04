@@ -1,5 +1,5 @@
 /**
- * TickBar — 崩溃恢复对话框 RecoverDialog（recover-dialog.md，AC-14）
+ * Timing — 崩溃恢复对话框 RecoverDialog（recover-dialog.md，AC-14）
  * -----------------------------------------------------------------------------
  * 启动检测到 active 会话时弹出，三选一：继续计时(resume) / 结束并保存(close) / 丢弃(discard)。
  * 焦点默认落在最保守的「继续计时」；Esc 等价「继续计时」（不丢弃数据）；点遮罩不关闭。

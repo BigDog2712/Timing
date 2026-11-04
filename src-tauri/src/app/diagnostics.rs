@@ -17,12 +17,12 @@ use crate::platform::log;
 /// 写一份快照到 `<app_data_dir>/logs/diagnostics.txt`（覆盖式）。
 pub fn write_snapshot(app: &AppHandle, app_data_dir: &Path) {
     let mut out = String::new();
-    let _ = writeln!(out, "TickBar diagnostics");
+    let _ = writeln!(out, "Timing diagnostics");
     let _ = writeln!(out, "version      : {}", env!("CARGO_PKG_VERSION"));
     let _ = writeln!(
         out,
         "built        : {}",
-        option_env!("TICKBAR_BUILD_TIME").unwrap_or("n/a")
+        option_env!("TIMING_BUILD_TIME").unwrap_or("n/a")
     );
     let _ = writeln!(
         out,
@@ -34,7 +34,7 @@ pub fn write_snapshot(app: &AppHandle, app_data_dir: &Path) {
     if let Some(dir) = log::log_dir() {
         let _ = writeln!(out, "log_dir      : {}", dir.display());
     }
-    let db_path = app_data_dir.join("tickbar.db");
+    let db_path = app_data_dir.join("timing.db");
     let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
     let _ = writeln!(
         out,

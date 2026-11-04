@@ -1,5 +1,5 @@
 /**
- * TickBar — 取色行 SwatchRow（DESIGN-V0.2.0.md §4.6 / theme-picker.md §1）
+ * Timing — 取色行 SwatchRow（DESIGN-V0.2.0.md §4.6 / theme-picker.md §1）
  * -----------------------------------------------------------------------------
  * [色点 18 + 名 13/--ink + 弹性空白 + hex 胶囊 + 箭头]。点色点 → 原生 color input；
  * hex 胶囊可直接编辑，非法 hex 就地提示（与后端 INVALID_COLOR 呼应）。

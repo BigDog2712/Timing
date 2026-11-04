@@ -110,7 +110,7 @@ mod tests {
     use super::*;
 
     fn temp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("tickbar-md-backup-{tag}"));
+        let dir = std::env::temp_dir().join(format!("timing-md-backup-{tag}"));
         let _ = fs::remove_dir_all(&dir);
         dir
     }

@@ -1,5 +1,5 @@
 /**
- * TickBar — 浏览器降级 Mock：插件域 + Markdown 同步（V0.4.0，6 条）
+ * Timing — 浏览器降级 Mock：插件域 + Markdown 同步（V0.4.0，6 条）
  * -----------------------------------------------------------------------------
  * 纯浏览器没有 `%APPDATA%` 可扫，也没有真实文件系统。这里造一个示例插件与三条
  * 出厂落点，让「设置 → 插件」「设置 → 同步」都能在浏览器里走查：
@@ -21,7 +21,7 @@ import type {
 } from '../types/domain';
 import { fail } from './mockSeed';
 
-const MOCK_DIR = '%APPDATA%\\com.tickbar.app\\plugins';
+const MOCK_DIR = '%APPDATA%\\com.timing.app\\plugins';
 const MOCK_ROOT = '%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary';
 
 const DEFAULT_BINDINGS: MdSyncBinding[] = [

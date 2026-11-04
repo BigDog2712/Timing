@@ -1,8 +1,8 @@
-# TickBar 安卓版实现方案（Tauri 2 mobile · V1）
+# Timing 安卓版实现方案（Tauri 2 mobile · V1）
 
 | 项 | 值 |
 |---|---|
-| 版本 / 基线 | V1 · 2026-11-02 · TickBar **v0.4.1**（Tauri 2.12.4 / React 19 / sqlx 0.8 / schema v4） |
+| 版本 / 基线 | V1 · 2026-11-02 · Timing **v0.4.1**（Tauri 2.12.4 / React 19 / sqlx 0.8 / schema v4） |
 | 依据 | `docs/mobile/PRD-ANDROID-V1.md`（P0 八条；F1–F3 纠正已采信）· `AGENTS.md` · `IPC-CONTRACT-v2.md` |
 | 硬约束 | 六层单向依赖 · 单文件 ≤300 行 · **桌面行为与 65 命令契约零变化** |
 | 验收边界 | **无真机、无模拟器**：只做到「APK 出包 + 结构检查 + 桌面回归全绿」，方案不含「必须装机才能验证」的关键路径 |
@@ -47,12 +47,12 @@ tauri-plugin-single-instance = "2"
 | `src/mobile/` 独立入口（第二个 index.html / Vite entry） | 否 | 要复制 stores/services 引用；打断「一个 bundle 服务所有窗口」与 `lib/window.ts`（L3 唯一出口） |
 | **编译期常量 + 同 bundle 分支** | **是** | 零新增依赖、零契约变化、可被 DCE；两端共用 stores / `services/api.ts` / `types/domain` |
 
-落地三条：① `vite.config.ts` 加 `define: { __TICKBAR_MOBILE__: JSON.stringify(process.env.TAURI_ENV_FAMILY === 'mobile') }`（CLI 在 `android dev/build` 注入；`npm run dev`/`vitest` 下 `undefined → false`）；② 唯一读取点 `src/lib/platform.ts` 导出 `IS_MOBILE`/`HOST_OS`，`check:layers` 增 **L7**（该全局只许出现于此）；③ `App.tsx` 顶层 `if (IS_MOBILE) return <MobileShell />;`，桌面四条 label 分支原样保留。
+落地三条：① `vite.config.ts` 加 `define: { __TIMING_MOBILE__: JSON.stringify(process.env.TAURI_ENV_FAMILY === 'mobile') }`（CLI 在 `android dev/build` 注入；`npm run dev`/`vitest` 下 `undefined → false`）；② 唯一读取点 `src/lib/platform.ts` 导出 `IS_MOBILE`/`HOST_OS`，`check:layers` 增 **L7**（该全局只许出现于此）；③ `App.tsx` 顶层 `if (IS_MOBILE) return <MobileShell />;`，桌面四条 label 分支原样保留。
 
 ### 1.3 存储（SQLite）
 
 - **驱动**：沿用 sqlx **bundled**（`sqlite` feature 默认静态编译 `sqlite3.c`，由 NDK clang 编；**禁用** `sqlite-unbundled`，Android 无系统 libsqlite3）。
-- **路径**：`app.path().app_data_dir()` → `tickbar.db`，`infra/db.rs` 零改动。Android 解析为应用私有 files 目录（`/data/data/com.tickbar.app/files`）：**不硬编码、无需存储权限、卸载即清**。
+- **路径**：`app.path().app_data_dir()` → `timing.db`，`infra/db.rs` 零改动。Android 解析为应用私有 files 目录（`/data/data/com.timing.app/files`）：**不硬编码、无需存储权限、卸载即清**。
 - **参数**：WAL + `foreign_keys(true)` + `max_connections(1)` 原样可用（无第二进程写入）。
 - **迁移**：**100% 复用** `0001~0004` + `infra/migrate.rs`，新装从 v0 直跑 v4，`schema.version=4`；本轮**不新增迁移**（P0-8 同构）。
 
@@ -97,7 +97,7 @@ tauri-plugin-single-instance = "2"
 
 | 文件 | 动作 | 职责 |
 |---|---|---|
-| `src/lib/platform.ts` · `src/types/env.d.ts` | 新 | 唯一平台常量 `IS_MOBILE`/`HOST_OS`（无 import 的叶子）+ `declare const __TICKBAR_MOBILE__: boolean` |
+| `src/lib/platform.ts` · `src/types/env.d.ts` | 新 | 唯一平台常量 `IS_MOBILE`/`HOST_OS`（无 import 的叶子）+ `declare const __TIMING_MOBILE__: boolean` |
 | `vite.config.ts` · `src/App.tsx` | 改 | 加 `define`；`App.tsx` 顶层 `IS_MOBILE → <MobileShell/>`，桌面分支不动 |
 | `.../mobile/MobileShell.tsx` | 新 | 4 Tab 路由（`timer/items/records/settings`）+ 底部导航 + 全局覆盖层槽 + 返回键（先关 Sheet 再退 Tab 再退后台） |
 | `.../mobile/TimerPage.tsx` | 新 | 大计时环（复用 `lib/ringGeometry.ts`、`useTimerTick`）+ MM:SS + 事项名 + 主按钮 + 结束按钮 |
@@ -110,7 +110,7 @@ tauri-plugin-single-instance = "2"
 | `src/styles/mobile/{shell,pages,sheets}.css` | 新 | 三份样式各 ≤300 行；类名 `m-` 前缀，局部变量 `--m-*`（**不动** tokens 的 @import 顺序） |
 | `src/main.tsx` | 改 | 末尾追加 3 个 mobile 样式 import（`.m-*` 作用域，桌面零影响） |
 | `src/lib/window.ts` · `src/hooks/useAppBootstrap.ts` | 改 | `showCurrentWindowOnReady`/`startCurrentWindowDrag`/`startCurrentWindowResize` 在 `IS_MOBILE` 时 no-op；首帧 `ipc.showWindow()` 跳过（其余订阅保留，后端不 emit 即空转） |
-| `scripts/check-layers.mjs` | 改 | 增 **L7**：`__TICKBAR_MOBILE__` 仅允许出现在 `src/lib/platform.ts` |
+| `scripts/check-layers.mjs` | 改 | 增 **L7**：`__TIMING_MOBILE__` 仅允许出现在 `src/lib/platform.ts` |
 
 ## 3. 数据结构与接口
 
@@ -185,7 +185,7 @@ sequenceDiagram
 | T2 | 依赖 target 化 + 入口属性 | `Cargo.toml`、`lib.rs`、`platform/host.rs`、`platform/mod.rs` | 桌面 `cargo check` 通过；android check 不再报 autostart/window-state/single-instance/tray-icon |
 | T3 | 桌面模块门控 | `infra/mod.rs`、`app/{mod,bootstrap,events}.rs`、`jobs/mod.rs` | `cargo check --lib --target aarch64-linux-android` **通过**；桌面 `cargo test` 全绿 |
 | T4 | 命令层移动桩 | `commands/mod.rs`、3 个 `*_mobile.rs`、`commands/settings_cmd.rs` | android check 通过；`npm run check:contract` 仍 `65/65/65/65 · 16/16 · 11/11` |
-| T5 | 能力清单 + 平台配置 + 空壳出包 | `capabilities/{default,mobile}.json`、`tauri.android.conf.json`、`tauri android init` | `--apk --debug` 产出 `app-universal-debug.apk`；`unzip -l` 含 `lib/arm64-v8a/libtickbar_lib.so` + `classes.dex` |
+| T5 | 能力清单 + 平台配置 + 空壳出包 | `capabilities/{default,mobile}.json`、`tauri.android.conf.json`、`tauri android init` | `--apk --debug` 产出 `app-universal-debug.apk`；`unzip -l` 含 `lib/arm64-v8a/libtiming_lib.so` + `classes.dex` |
 | T6 | 前端平台常量与 App 分叉 | `vite.config.ts`、`lib/platform.ts`、`types/env.d.ts`、`App.tsx`、`check-layers.mjs` | `npm run check` 全绿；`npm run build` 桌面产物不含移动标记，`TAURI_ENV_FAMILY=mobile npm run build` 含标记 |
 | T7 | 移动壳与样式骨架 | `MobileShell.tsx`、`Sheet.tsx`、`styles/mobile/*.css`、`main.tsx` | 4 Tab 可切换、返回键层级正确；3 个 css 均 ≤300 行、`check:size` 通过 |
 | T8 | 计时页 / 倒计时 / 换事项 | `TimerPage`、`CountdownSheet`、`SwitchItemSheet` | 组件只经 `services/api.ts`（L1 通过）；主按钮四态、结束按钮独立、`discarded=true` 不出撤销条 |
@@ -209,7 +209,7 @@ sequenceDiagram
 
 | 项 | 约定 |
 |---|---|
-| 平台常量 | 只有 `src/lib/platform.ts` 读 `__TICKBAR_MOBILE__`，其余只 `import { IS_MOBILE }`；L7 机械执行 |
+| 平台常量 | 只有 `src/lib/platform.ts` 读 `__TIMING_MOBILE__`，其余只 `import { IS_MOBILE }`；L7 机械执行 |
 | 命名 / 路由 | 移动组件 `src/components/mobile/*`（`*Page`/`*Sheet`/`*Toast`）；CSS 前缀 `m-`，局部变量 `--m-*`；`type MobileTab = 'timer' \| 'items' \| 'records' \| 'settings'`，Sheet 是 `MobileShell` 的 overlay 状态不入 Tab 栈 |
 | 尺寸 | 触控 ≥44×44dp、正文 ≥14sp、无 hover；安全区 `env(safe-area-inset-*)`；`min-width:600px` 仅单列居中（不做双栏，P2-3） |
 | 数据访问 | 组件 → `services/*Actions` / store；组件与 store **禁止** `ipc.`（L1/L2）；统一走 `services/api.ts` 门面 |
@@ -256,8 +256,8 @@ npm run tauri android init
 npm run tauri android build -- --apk --debug
 # 4. 结构检查（无真机时的等价验收）
 APK=src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
-unzip -l "$APK" | grep -E "classes.dex|lib/arm64-v8a/libtickbar_lib.so|assets/tauri.conf.json"
-unzip -p "$APK" assets/tauri.conf.json | grep -q '"identifier":"com.tickbar.app"' && echo "id OK"
+unzip -l "$APK" | grep -E "classes.dex|lib/arm64-v8a/libtiming_lib.so|assets/tauri.conf.json"
+unzip -p "$APK" assets/tauri.conf.json | grep -q '"identifier":"com.timing.app"' && echo "id OK"
 unzip -p "$APK" assets/index.html | head -5          # 前端已内嵌
 unzip -p "$APK" 'assets/*.js' 2>/dev/null | grep -c "m-shell"   # 移动分支确已打包
 

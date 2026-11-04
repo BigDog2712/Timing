@@ -216,7 +216,7 @@ mod tests {
     fn temp_md(tag: &str, text: &str) -> PathBuf {
         static SEQ: AtomicUsize = AtomicUsize::new(0);
         let name = format!(
-            "tickbar-cache-{}-{}-{tag}.md",
+            "timing-cache-{}-{}-{tag}.md",
             std::process::id(),
             SEQ.fetch_add(1, Ordering::Relaxed)
         );

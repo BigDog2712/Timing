@@ -1,5 +1,5 @@
 /**
- * TickBar — 本地计时 tick（R-4：公式必须与 get_timer_state 完全一致）
+ * Timing — 本地计时 tick（R-4：公式必须与 get_timer_state 完全一致）
  * -----------------------------------------------------------------------------
  * 服务端公式（IPC-CONTRACT-v2 §4.2）：
  *   liveDurationSec = accumulatedSec + (running ? floor((now - runningSince) / 1000) : 0)

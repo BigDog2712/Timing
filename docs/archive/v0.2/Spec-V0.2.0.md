@@ -1,4 +1,4 @@
-# Spec — TickBar V0.2.0
+# Spec — Timing V0.2.0
 
 > 生成日期：2026-10-16
 > 依据：PRD-V0.2.0 + ARCHITECTURE-V0.2.0 + DESIGN-V0.2.0
@@ -10,7 +10,7 @@
 
 ## 1. 产品定义
 
-- **一句话**：TickBar 是一款 Windows 桌面悬浮药丸条时间记录工具——左键开始/暂停、右键结束、按事项归类时间；V0.2.0 起升级为「**桌面时间工作台**」（对标 Timing v1.7.0）。
+- **一句话**：Timing 是一款 Windows 桌面悬浮药丸条时间记录工具——左键开始/暂停、右键结束、按事项归类时间；V0.2.0 起升级为「**桌面时间工作台**」（对标 Timing v1.7.0）。
 - **目标用户**：自由职业者 / 知识工作者
 - **核心问题**：忘记开始或停止计时；时间无法归到事项上
 - **形态**：纯本地 SQLite、免登录、零网络、零遥测
@@ -230,7 +230,7 @@
 
 ```bash
 # 1. 安装 + 构建
-cd tickbar && npm install && npm run build
+cd timing && npm install && npm run build
 cd src-tauri && cargo check && cargo test
 
 # 2. 启动（dev）

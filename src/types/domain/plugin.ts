@@ -1,5 +1,5 @@
 /**
- * TickBar — 插件域类型（V0.3.2）
+ * Timing — 插件域类型（V0.3.2）
  * -----------------------------------------------------------------------------
  * 与 `src-tauri/src/models/plugin.rs` 逐字对应（`#[serde(rename_all = "camelCase")]`）。
  *
@@ -23,7 +23,7 @@ export interface QuickTimer {
  * 插件来源。同 id 冲突时按 dev > exe > user 先到先得：
  * - `dev` 仅调试构建（仓库根 `plugins/`）；
  * - `exe` 随包分发（exe 同级 `plugins/`）；
- * - `user` 用户目录（`%APPDATA%\com.tickbar.app\plugins`）。
+ * - `user` 用户目录（`%APPDATA%\com.timing.app\plugins`）。
  *
  * 没有 `builtin`：摸鱼菜单的出厂预设是应用内置功能，不是插件。
  * [V0.3.4] 出厂预设也不再随 `plugin_list` 回传（ADR-023）——设置页不展示内置功能，

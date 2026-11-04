@@ -1,4 +1,4 @@
-# TickBar V0.2.0 批1 —— 真机验收清单（Real-Machine Acceptance）
+# Timing V0.2.0 批1 —— 真机验收清单（Real-Machine Acceptance）
 
 - 文档 ID：`docs/phase4/RM-CHECKLIST-V0.2.0-BATCH1.md`
 - 生成：team-lead，2026-10-16
@@ -10,7 +10,7 @@
 ## 0. 启动方式
 
 ```bash
-cd D:/401-Agent/WorkBuddy/2026-10-16-08-38-29/tickbar
+cd D:/401-Agent/WorkBuddy/2026-10-16-08-38-29/timing
 npm run tauri dev
 ```
 
@@ -99,7 +99,7 @@ npm run tauri dev
 
 **方式 A（推荐，界面内）**：暂无入口 —— 只能走方式 B。
 
-**方式 B（直接写库）**：数据库文件为 SQLite（应用标识 `com.tickbar.app`）。可用任意 SQLite 工具打开，插入一条已逾期/带提醒的待办：
+**方式 B（直接写库）**：数据库文件为 SQLite（应用标识 `com.timing.app`）。可用任意 SQLite 工具打开，插入一条已逾期/带提醒的待办：
 
 ```sql
 -- 已逾期（planned_at 早于当前）：触发「已逾期」文字用色（--todo-overdue → --color-warn）
@@ -116,7 +116,7 @@ WHERE id = <你的某条待办 id>;
 - 落库后**重开事项窗口**即可看到「已逾期」文字 / 铃铛。
 - 此时回设置页改「提醒色」，两处应立即变色。
 
-> 数据文件位置（Windows）：`%APPDATA%\com.tickbar.app\` 下的 `.db` 文件（具体名以实际为准，可用 `%APPDATA%` 搜索 `tickbar`/`com.tickbar.app` 定位）。
+> 数据文件位置（Windows）：`%APPDATA%\com.timing.app\` 下的 `.db` 文件（具体名以实际为准，可用 `%APPDATA%` 搜索 `timing`/`com.timing.app` 定位）。
 
 ---
 

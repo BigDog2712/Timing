@@ -1,5 +1,5 @@
 /**
- * TickBar — Android 返回键接管（先关 Sheet / 恢复面板，再退 Tab，再退后台）
+ * Timing — Android 返回键接管（先关 Sheet / 恢复面板，再退 Tab，再退后台）
  * -----------------------------------------------------------------------------
  * Android 的返回键在 WebView 里表现为 **history.back()**：没有历史条目就直接退出 Activity。
  * Tauri 2 没有为「返回键」提供 JS 事件，所以这里用一条**临时历史条目**把返回键接管下来：
@@ -23,7 +23,7 @@ export function useMobileBackSheet(open: boolean, onBack: () => void = defaultBa
   useEffect(() => {
     if (!open) return;
     let consumedByPop = false;
-    window.history.pushState({ tickbarOverlay: true }, '');
+    window.history.pushState({ timingOverlay: true }, '');
     const onPop = () => {
       consumedByPop = true;
       onBack();
