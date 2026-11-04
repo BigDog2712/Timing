@@ -53,6 +53,7 @@ TickBar-android-0.1.0.apk      33039569325d93ab...
 | 桌面 Release 编译 | `cargo build --release --features custom-protocol` | 2 min 55 s，0 warning 输出 |
 | 安装包编译 | `makensis -DAPP_ROOT=... -DAPP_VERSION=0.1.0` | 无 warning，产物 2.41 MB |
 | 安装实测 | 安装器 `/S /D=<临时目录>` | 落盘正确：`TickBar.exe` + `plugins\md-sync` + `uninstall.exe`，注册表与快捷方式齐全 |
+| **真机启动（发布版）** | 直接跑 `release/TickBar-0.1.0-portable.exe` 与安装后的 exe | 日志 `TickBar v0.1.0 start` → `startup complete`，`first_frame=527ms`，0 ERROR / 0 WARN |
 | 安卓编译 | `gradlew assembleRelease --offline` | BUILD SUCCESSFUL（31 s）；`aapt dump badging` → `com.tickbar.droid` / versionCode 10 / versionName 0.1.0 / minSdk 26 |
 
 ## 4. 已知限制（请当成未验证，不要当成没问题）
