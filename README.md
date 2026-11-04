@@ -8,15 +8,17 @@ Windows 桌面常驻悬浮计时条 + 安卓悬浮计时器：屏幕边缘一条
 
 ## 装哪个包
 
+下载入口：**[Releases · v0.1.1](https://github.com/BigDog2712/timing/releases/tag/v0.1.1)**
+
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `release/TickBar_0.1.1_x64-setup.exe` | NSIS 安装器（推荐）：可选安装目录、开始菜单 / 桌面快捷方式、卸载项 |
-| Windows 10/11 x64 | `release/TickBar-0.1.1-portable.exe` | 绿色版：双击即用，不写注册表 |
-| Android 8.0+ | `release/TickBar-android-0.1.1.apk` | 原生 Kotlin 版：悬浮条 + 前台服务 + Obsidian 同步 |
+| Windows 10/11 x64 | [`TickBar-0.1.1-portable.exe`](https://github.com/BigDog2712/timing/releases/download/v0.1.1/TickBar-0.1.1-portable.exe) | 绿色版：双击即用，不写注册表。**当前唯一可下载的包** |
+| Windows 10/11 x64 | `TickBar_0.1.1_x64-setup.exe` | NSIS 安装器：可选安装目录、开始菜单 / 桌面快捷方式、卸载项。未出包 |
+| Android 8.0+ | `TickBar-android-0.1.1.apk` | 原生 Kotlin 版：悬浮条 + 前台服务 + Obsidian 同步。未出包 |
 
-> **0.1.1 现状**：绿色版已产出 `release/TickBar-0.1.1-portable.exe`（6.16 MB，日志有 `boot[first_frame]`）。
-> 安装器与安卓包还没重新出包——本机拉不到 NSIS 工具链（`tauri build --bundles nsis` 下载 502），
-> 也没有 Android SDK / JDK。出包后按上表命名即可。
+> **0.1.1 现状**：绿色版已产出并上传 Release（6.16 MB，日志有 `boot[first_frame]`）。
+> 安装器与安卓包还没出——本机拉不到 NSIS 工具链（`tauri build --bundles nsis` 下载 502），
+> 也没有 Android SDK / JDK。出包后按上表命名并补传到同一个 Release 即可。
 
 > 安装包按用户装到 `%LOCALAPPDATA%\Programs\TickBar`，免管理员；**卸载只删程序，`%APPDATA%\com.tickbar.app` 里的数据保留**。
 > 插件目录在程序目录里（`<exe 同级>\plugins`），卸载会连它一起删掉——自己写的插件请先备份。
