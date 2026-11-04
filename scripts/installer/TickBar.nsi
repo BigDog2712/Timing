@@ -107,9 +107,9 @@ Section "主程序" SecMain
   SetOverwrite on
   File "/oname=${APP_EXE}" "${APP_SRC_EXE}"
 
-  ; 插件目录随包分发：宿主按 exe 同级 plugins\ 扫描（.gitkeep 这类占位文件不装）
+  ; 插件目录：宿主按 exe 同级 plugins\ 扫描（0.1.1 起就是「用户插件目录」本身）。
+  ; 目前没有随包插件（md-sync 已回归内建），这里只建空目录，用户往里放自己的插件。
   SetOutPath "$INSTDIR\plugins"
-  File /r /x ".gitkeep" "${APP_SRC_PLUG}\*.*"
   SetOutPath "$INSTDIR"
 
   ; 发布说明（存在才拷，避免构建期顺序依赖）

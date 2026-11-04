@@ -37,9 +37,17 @@ pub struct ScanHit {
     pub manifest: Result<PluginManifest, String>,
 }
 
-/// 用户插件目录（可写、首次自动创建）。
+/// 用户插件目录：**程序所在目录**下的 `plugins`（绿色版解压到哪就跟到哪，不写 C 盘）。
+///
+/// 只有拿不到 exe 路径时才退回 `app_data/plugins`——那种情况实际上不会发生，
+/// 留着是为了别把函数写成 `unwrap`。
+///
+/// 安卓 / iOS 例外：APK 是只读包，装不下「exe 同级可写目录」，仍用 app_data。
 pub fn user_plugin_dir(app_data_dir: &Path) -> PathBuf {
-    app_data_dir.join("plugins")
+    if cfg!(any(target_os = "android", target_os = "ios")) {
+        return app_data_dir.join("plugins");
+    }
+    exe_plugin_dir().unwrap_or_else(|| app_data_dir.join("plugins"))
 }
 
 /// 调试构建时仓库根的 `plugins/`；发布构建返回 `None`（编译期路径在别处无意义）。
@@ -51,21 +59,30 @@ fn dev_plugin_dir() -> Option<PathBuf> {
     Some(PathBuf::from(manifest_dir).join("..").join("plugins"))
 }
 
+/// exe 同级的 `plugins/`（便携版的「随包」与「用户」目录是同一个）。
 fn exe_plugin_dir() -> Option<PathBuf> {
     let exe = std::env::current_exe().ok()?;
     Some(exe.parent()?.join("plugins"))
 }
 
 /// 待扫描的根目录（按优先级排序；不保证存在）。
-pub fn scan_roots(app_data_dir: &Path) -> Vec<(PluginSource, PathBuf)> {
+///
+/// `user_dir` 由调用方解析好后传进来，而不是在这里再算一遍：测试要能把用户目录指到
+/// 临时目录，否则一跑测试就会去翻程序旁边的真实 `plugins/`。
+pub fn scan_roots(user_dir: &Path) -> Vec<(PluginSource, PathBuf)> {
     let mut roots = Vec::new();
     if let Some(dir) = dev_plugin_dir() {
         roots.push((PluginSource::Dev, dir));
     }
+    /* 用户目录通常**就是** exe 同级目录，此时不能再单独推一条「随包」——同一批
+     `plugin.json` 会被扫两遍，第二遍还会以「同 id 被跳过」的错误条目出现在设置页。
+    只有用户目录被迫退回 app_data（拿不到 exe 路径）时，两者才不同，才分开扫。 */
     if let Some(dir) = exe_plugin_dir() {
-        roots.push((PluginSource::Exe, dir));
+        if dir != user_dir {
+            roots.push((PluginSource::Exe, dir));
+        }
     }
-    roots.push((PluginSource::User, user_plugin_dir(app_data_dir)));
+    roots.push((PluginSource::User, user_dir.to_path_buf()));
     roots
 }
 
@@ -140,9 +157,9 @@ fn validate(manifest: &PluginManifest) -> Result<(), String> {
 }
 
 /// 扫描全部根目录下的插件子目录。
-pub fn scan(app_data_dir: &Path) -> Vec<ScanHit> {
+pub fn scan(user_dir: &Path) -> Vec<ScanHit> {
     let mut hits = Vec::new();
-    for (source, root) in scan_roots(app_data_dir) {
+    for (source, root) in scan_roots(user_dir) {
         let Ok(entries) = std::fs::read_dir(&root) else {
             continue;
         };

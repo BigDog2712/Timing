@@ -82,3 +82,29 @@ fn rejects_out_of_range_minutes() {
     manifest.contributes.quick_timers[0].minutes = 25;
     assert!(validate(&manifest).is_ok());
 }
+
+#[test]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn user_plugin_dir_sits_next_to_the_exe() {
+    /* 这条钉住 ADR-038：插件目录跟着程序走，不再写 `%APPDATA%`。
+    以前实现成 `app_data_dir.join("plugins")`，绿色版换台机器插件就不见了。 */
+    let app_data = std::path::Path::new("C:/should-be-ignored");
+    let dir = user_plugin_dir(app_data);
+    let exe = std::env::current_exe().expect("测试进程自己就是 exe");
+    assert_eq!(dir, exe.parent().unwrap().join("plugins"));
+    assert!(!dir.starts_with(app_data));
+}
+
+#[test]
+fn scan_roots_does_not_scan_the_same_dir_twice() {
+    /* 用户目录通常就是 exe 同级目录：再推一条「随包」会把同一批 plugin.json 扫两遍，
+    第二遍以「同 id 被跳过」的红色错误条目出现在设置页。 */
+    let user_dir = std::path::Path::new("C:/somewhere/plugins");
+    let roots = scan_roots(user_dir);
+    let mut paths: Vec<_> = roots.iter().map(|(_, dir)| dir.clone()).collect();
+    let total = paths.len();
+    paths.sort();
+    paths.dedup();
+    assert_eq!(paths.len(), total, "同一个根目录被扫了两次");
+    assert_eq!(roots.last().unwrap().1, user_dir);
+}

@@ -15,14 +15,14 @@
 | Android 8.0+ | `release/TickBar-android-0.1.1.apk` | ⚠️ 待出包 | 本机无 Android SDK / JDK，未编译。代码已改成 0.1.1 / versionCode 11 |
 
 ```
-TickBar-0.1.1-portable.exe    SHA-256  fc2faf65bffabcfba98479f332d597fb7245943423b81aaced88f22d22d0bbcf
+TickBar-0.1.1-portable.exe    SHA-256  4ca13e1f2b6bf0a76d8258aa15d68e5277175acf5868547fb47ca8034b8e18e8
 ```
 
 覆盖安装/替换旧版即可：数据库结构未变（迁移版本 v4），0.1.0 与 0.1.1 可互相读写。
 
 ## 2. 这一版做了什么
 
-本轮只有两条线，都是「让插件这个词名副其实」。
+本轮两条主线加一条目录调整，都是「让插件这个词名副其实」。
 
 1. **Markdown 同步不再是插件**（ADR-036）。它要读写任意路径、后台定时、写库，属于特权能力，
    不该由插件当配置携带者。三条落点搬回宿主 `services/md_sync/config.rs` 的 `default_bindings()`，
@@ -31,6 +31,9 @@ TickBar-0.1.1-portable.exe    SHA-256  fc2faf65bffabcfba98479f332d597fb724594342
    现在可以声明一扇独立窗口：`contributes.panels` 里写 `text` / `stats` / `list` / `actions` 四种块，
    数据来自宿主白名单（`records.byItem` / `todos.pending`），按钮调白名单动作
    （`timer.start` / `timer.pause` / `todo.add` / `note.create`）。**插件仍然不执行任何代码。**
+3. **插件目录移到程序旁边**（ADR-038）。用户插件目录从 `%APPDATA%\com.tickbar.app\plugins`
+   改成 **exe 同级 `plugins/`**：绿色版解压到哪、插件就跟到哪，换机器拷一个文件夹就够。
+   设置页路径、`docs/plugin-spec.md` §2 的来源表、安装器都跟着改了。
 
 ## 3. 验收记录（本机实跑）
 
@@ -38,9 +41,10 @@ TickBar-0.1.1-portable.exe    SHA-256  fc2faf65bffabcfba98479f332d597fb724594342
 | --- | --- | --- |
 | 前端门禁 | `npm run check` | 全绿：契约 `68/68/68/68 · 16/16 · 11/11/emit 11`；size 423 文件；version 0.1.1；layers 7 条（379 文件）；lint 0 告警 |
 | 前端测试 | `npm test` | **270 passed**（34 文件） |
-| 后端测试 | `cargo test` | **358 passed / 0 failed** |
+| 后端测试 | `cargo test` | **360 passed / 0 failed** |
 | 后端静态检查 | `cargo clippy --all-targets` | 0 warning |
-| 桌面 Release 编译 | `cargo build --release --features custom-protocol` | 2 min 01 s，产物 `tickbar.exe` 6.16 MB |
+| 桌面 Release 编译 | `cargo build --release --features custom-protocol` | 1 min 51 s，产物 `tickbar.exe` 6.16 MB |
+| 插件目录 | `cargo test plugin_fs` | `user_plugin_dir_sits_next_to_the_exe` / `scan_roots_does_not_scan_the_same_dir_twice` 两条新用例通过 |
 | 启动冒烟 | 直接跑 `release/TickBar-0.1.1-portable.exe` | `TickBar v0.1.1 start` → `startup complete` → `boot[first_frame] first_frame=568ms`，窗口正常 |
 | 安装包 | `tauri build --bundles nsis` | **失败**：`Downloading nsis-3.13.zip` → `io: unexpected end of file`（网络） |
 | 安卓编译 | `gradlew assembleDebug` | **未跑**：本机无 `ANDROID_HOME` / `java` |
@@ -60,13 +64,18 @@ TickBar-0.1.1-portable.exe    SHA-256  fc2faf65bffabcfba98479f332d597fb724594342
 4. **插件能力只到「读统计 + 触发内置动作」**，不能自定义样式、不能联网、不能读写文件。
 5. **交互未代跑**：计时 / 面板按钮 / 托盘都会写真实数据库，本机没替你点。
 6. **安卓端仍未真机验证**，与 0.1.0 相同。
+7. **插件目录要可写**：装在 `C:\Program Files` 这类受保护目录时，「打开目录」会报错。
+   换绿色版，或给该目录写权限——不会静默退回 `%APPDATA%`（那等于又把目录搬回去了）。
+8. **卸载会删掉插件**：`plugins/` 现在在程序目录里，NSIS 卸载会 `RMDir /r` 整个目录。
+   自己写的插件请先备份。
 
 ## 5. 人工验收清单（10 分钟）
 
 - [ ] 跑 `release/TickBar-0.1.1-portable.exe`，小条正常出现，日志首行是 `TickBar v0.1.1 start`
 - [ ] 设置 → 同步：落点还在（0.1.0 配过的路径不应丢），手动「立即同步」能写进当天日记
 - [ ] 设置 → 插件：列表里不再有「Markdown 同步」这一项（它现在是内建功能）
-- [ ] 在 `%APPDATA%\com.tickbar.app\plugins\weekly-board\plugin.json` 放一个面板插件（见下），点「重新加载」
+- [ ] 设置 → 插件：顶上显示的路径是**exe 同级**的 `...\plugins`，不是 `%APPDATA%`
+- [ ] 在 `release\plugins\weekly-board\plugin.json` 放一个面板插件（见下），点「重新加载」
 - [ ] 插件行出现「打开」按钮，点开窗口能看到排行与按钮；点「开始摸鱼」后主界面开始计时
 - [ ] 故意把 `source` 改成 `records.unknown`，重新加载 → 插件显示加载失败并列出可用数据源
 

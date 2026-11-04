@@ -152,7 +152,8 @@ export function PluginsTab({ showOpenDir = true, showPanels = true }: PluginsTab
       )}
 
       <p className="plg__hint">
-        plugins 目录下每个文件夹是一个插件，必须有启动头 <code>plugin.json</code>。
+        plugins 目录就在程序所在目录（跟着 exe 走，不写系统盘的用户数据目录）。
+        目录下每个文件夹是一个插件，必须有启动头 <code>plugin.json</code>。
         改动后点「重新加载」即可生效，无需重启。
       </p>
     </div>

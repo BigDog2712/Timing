@@ -24,7 +24,13 @@ use crate::services::plugin_merge::{merge_quick_timers, source_label, source_ran
 pub use crate::services::plugin_merge::builtin_quick_timers;
 
 /// 扫描 + 合并，返回设置页要展示的全部插件与最终菜单项。
+/// 用户目录由 `plugin_fs::user_plugin_dir` 定（程序同级的 `plugins`），这里只解析后再交给 `list_in`。
 pub fn list(app_data_dir: &Path) -> PluginListResult {
+    list_in(&plugin_fs::user_plugin_dir(app_data_dir))
+}
+
+/// 同上，但用户目录由调用方给定（测试用；也方便将来做「插件目录可配置」）。
+pub fn list_in(user_dir: &Path) -> PluginListResult {
     /* [V0.3.2 修正] 出厂预设不再伪装成一个插件，它只作为合并的底座。 */
     let builtin = builtin_quick_timers();
     let mut plugins: Vec<PluginInfo> = Vec::new();
@@ -32,7 +38,7 @@ pub fn list(app_data_dir: &Path) -> PluginListResult {
     规则 1 只说「先到先得」，但用户看不到这句话时会以为自己的文件没被读到。 */
     let mut seen: HashMap<String, String> = HashMap::new();
 
-    for hit in plugin_fs::scan(app_data_dir) {
+    for hit in plugin_fs::scan(user_dir) {
         let dir = hit.dir.to_string_lossy().to_string();
         match hit.manifest {
             Ok(manifest) => {
@@ -105,9 +111,7 @@ pub fn list(app_data_dir: &Path) -> PluginListResult {
 
     let quick_timers = merge_quick_timers(&plugins, &builtin);
     PluginListResult {
-        dir: plugin_fs::user_plugin_dir(app_data_dir)
-            .to_string_lossy()
-            .to_string(),
+        dir: user_dir.to_string_lossy().to_string(),
         plugins,
         quick_timers,
     }
@@ -144,7 +148,7 @@ mod tests {
         [V0.3.4] `builtin` 字段已从返回值删除，因此改为通过菜单断言：
         没有插件时菜单**就是**出厂三条——预设从后门变成了一条独立的插件行。 */
         let root = temp_root("no-builtin-row");
-        let result = list(&root);
+        let result = list_in(&root.join("plugins"));
         assert!(result.plugins.iter().all(|item| item.source != "builtin"));
         assert!(result.plugins.iter().all(|item| item.name != "摸鱼基础包"));
         assert_eq!(result.quick_timers.len(), 3, "没有插件时菜单 = 出厂三条");
@@ -162,7 +166,7 @@ mod tests {
                 "contributes":{"quickTimers":[{"item":"摸鱼","minutes":40}]}}"#,
         );
 
-        let result = list(&root);
+        let result = list_in(&root.join("plugins"));
         let moyu = result
             .quick_timers
             .iter()
@@ -197,7 +201,7 @@ mod tests {
                 "contributes":{"quickTimers":[{"item":"摸鱼","minutes":99}]}}"#,
         );
 
-        let result = list(&root);
+        let result = list_in(&root.join("plugins"));
         /* 目录迭代顺序不保证，所以只断言「恰好一份生效、另一份被列出并说明原因」。 */
         let live: Vec<_> = result
             .plugins
@@ -257,7 +261,7 @@ mod tests {
                 "contributes":{"quickTimers":[{"item":"喝水","minutes":3}]}}"#,
         );
 
-        let result = list(&root);
+        let result = list_in(&root.join("plugins"));
         let found = result
             .plugins
             .iter()
@@ -278,7 +282,7 @@ mod tests {
         let root = temp_root("broken");
         write_plugin(&root, "bad", "{ not json");
 
-        let result = list(&root);
+        let result = list_in(&root.join("plugins"));
         let broken = result
             .plugins
             .iter()
