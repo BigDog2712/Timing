@@ -1,6 +1,6 @@
 # AGENTS.md
 
-TickBar（Windows 桌面悬浮计时条，Tauri 2 + React 19 + Rust）· 当前版本 0.1.0（首个发布版）。
+TickBar（Windows 桌面悬浮计时条，Tauri 2 + React 19 + Rust）· 当前版本 0.1.1（0.1.0 之后的第一轮功能迭代）。
 本文件是给编码代理的入口约定。
 
 ## 项目速览

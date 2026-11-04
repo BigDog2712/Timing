@@ -1,4 +1,4 @@
-# TickBar v0.1.0（首个发布版）
+# TickBar v0.1.1
 
 Windows 桌面常驻悬浮计时条 + 安卓悬浮计时器：屏幕边缘一条 32px 的小药丸，按一下就开计时，不占工作区。
 纯本地（SQLite），无账号、无联网。
@@ -10,9 +10,13 @@ Windows 桌面常驻悬浮计时条 + 安卓悬浮计时器：屏幕边缘一条
 
 | 平台 | 产物 | 说明 |
 | --- | --- | --- |
-| Windows 10/11 x64 | `release/TickBar_0.1.0_x64-setup.exe` | NSIS 安装器（推荐）：可选安装目录、开始菜单 / 桌面快捷方式、卸载项 |
-| Windows 10/11 x64 | `release/TickBar-0.1.0-portable.exe` | 绿色版：双击即用，不写注册表 |
-| Android 8.0+ | `release/TickBar-android-0.1.0.apk` | 原生 Kotlin 版：悬浮条 + 前台服务 + Obsidian 同步 |
+| Windows 10/11 x64 | `release/TickBar_0.1.1_x64-setup.exe` | NSIS 安装器（推荐）：可选安装目录、开始菜单 / 桌面快捷方式、卸载项 |
+| Windows 10/11 x64 | `release/TickBar-0.1.1-portable.exe` | 绿色版：双击即用，不写注册表 |
+| Android 8.0+ | `release/TickBar-android-0.1.1.apk` | 原生 Kotlin 版：悬浮条 + 前台服务 + Obsidian 同步 |
+
+> **0.1.1 现状**：绿色版已产出 `release/TickBar-0.1.1-portable.exe`（6.16 MB，日志有 `boot[first_frame]`）。
+> 安装器与安卓包还没重新出包——本机拉不到 NSIS 工具链（`tauri build --bundles nsis` 下载 502），
+> 也没有 Android SDK / JDK。出包后按上表命名即可。
 
 > 安装包按用户装到 `%LOCALAPPDATA%\Programs\TickBar`，免管理员；**卸载只删程序，`%APPDATA%\com.tickbar.app` 里的数据保留**。
 > WebView2 只检测不内嵌：缺失时安装器会提示，Win11 与已更新的 Win10 自带。
@@ -168,13 +172,15 @@ cd android-app
 | `docs/reviews/` | 架构评估（2026-10-18）与 v0.4 评估报告（2026-10-25，13 项问题清单） |
 | `docs/archive/v0.2/` · `docs/archive/v1/` | 历史阶段文档（v0.2.0 与 v1），只作留档，不作实现依据 |
 | `docs/agents/` | 工程技能配置（issue tracker / 标签词汇 / 域文档） |
-| `RELEASE-NOTES-v0.1.0.md` | 本版发布说明：产物清单 / 验收记录 / 已知限制 / 人工验收清单 |
+| `RELEASE-NOTES-v0.1.1.md` | **本版**发布说明：产物现状 / 改动 / 验收记录 / 人工验收清单 |
+| `RELEASE-NOTES-v0.1.0.md` | 上一版发布说明（首次对外发布，含卸载与安装的原始验收记录） |
 | `docs/NEXT-STEPS.md` | 后续完善建议（P0 发布阻断 → P3 维护小项，每条带验收口径） |
 | `整理说明.md` | 本次整理做了什么、删了什么、还缺什么验证 |
 
 ## 版本
 
-当前 **0.1.0**，是本产品**第一个对外发布版**。变更见 [CHANGELOG.md](CHANGELOG.md)。
+当前 **0.1.1**，是 0.1.0 之后的**第一轮功能迭代**：Markdown 同步从插件体系收回内建（ADR-036），
+插件补上声明式面板与受限动作目录（ADR-037，`apiVersion 3`）。变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 > 版本口径说明：0.1.0 之前的 `0.2.x ~ 0.4.1` 是内部迭代号（从未对外发布）。
 > 首个发布版按产品发布口径重新编号为 `0.1.0`，代码与契约与内部 `0.4.1` 完全一致，仅版本号不同。

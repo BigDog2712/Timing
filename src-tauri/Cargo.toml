@@ -1,6 +1,6 @@
 [package]
 name = "tickbar"
-version = "0.1.0"
+version = "0.1.1"
 description = "TickBar — 常驻悬浮计时条（Windows 桌面，纯本地）"
 authors = ["TickBar Team"]
 edition = "2021"

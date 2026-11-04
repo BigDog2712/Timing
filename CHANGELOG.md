@@ -2,6 +2,58 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## [0.1.1] 2026-11-04 —— 插件能加功能了；Markdown 同步回归内建
+
+本版是 0.1.0 之后的第一轮功能迭代，两件事：**把 Markdown 同步从插件体系里摘出来**，
+**给插件补上真正的扩展面**。契约命令 65 → **68**，事件与错误码不变。
+
+### 插件：声明式面板（apiVersion 3，ADR-037）
+
+原先插件只有一个贡献点 `quickTimers`，本质是「往已有功能填数据」，加不了任何新东西。
+本版让插件可以声明一扇**独立窗口**，宿主渲染，按钮绑定白名单动作——插件仍然不执行代码。
+
+- **`contributes.panels`**：最多 3 个面板，每面板 1~12 块。块类型是封闭枚举
+  `text` / `stats` / `list` / `actions`，写没实现的 `type` 会让清单解析失败（半渲染的空白窗比拒载更难排查）。
+- **数据源白名单**：`records.byItem`（近 N 天各事项时长）、`todos.pending`（未完成待办）。
+- **动作白名单**：`timer.start` / `timer.pause` / `todo.add` / `note.create`。参数是具名字段，
+  缺字段在**加载时**就报错，而不是点下去没反应。
+- **新增命令 3 条**：`plugin_panel_open` / `plugin_panel_data` / `plugin_action_run`。
+  命令层再校验一次白名单，挡住绕过清单直接调 IPC 的路径。
+- **窗口**：label `panel-{pluginId}-{panelId}`，身份走查询参数（两个 id 都允许含 `-`，反解会切错）。
+- **前端**：`PluginPanelWindow` + `PanelBlockView`；数据块各自拉数据，一块失败不影响别的块。
+  设置页每个面板一个「打开」按钮，手机端不显示（面板窗是桌面多窗口的产物）。
+- 仓库新增 `record::stats_by_item_named`，面板直接显示事项名，不必前端再拉一次事项表。
+
+### Markdown 同步：不再是插件（ADR-036）
+
+同步要读写任意路径、后台定时、写库，属于特权能力，不该由插件当配置携带者。
+
+- 原来 `plugins/md-sync/plugin.json` 的三条落点（事项计时 / 便利贴 / 待办）搬进
+  `services/md_sync/config.rs` 的 `default_bindings()`。**已保存的落点配置照旧优先，老用户不用重配。**
+- 配置加载不再扫描插件目录；`load / run / tick / open / save_config` 全部去掉 `app_data_dir` 参数。
+- `MdSyncView` 删掉 `installed / pluginId / pluginName / pluginVersion`，设置页不再显示插件身份。
+- `plugins/md-sync/` 目录移除（`git rm`，可从历史恢复）。
+- 老清单里多写的 `contributes.mdSync` 被静默忽略——不拒载、不报错。
+
+### 版本号
+
+| 位置 | 原值 | 现值 |
+| --- | --- | --- |
+| `package.json` | 0.1.0 | 0.1.1 |
+| `package-lock.json`（2 处） | 0.1.0 | 0.1.1 |
+| `src-tauri/Cargo.toml` | 0.1.0 | 0.1.1 |
+| `src-tauri/Cargo.lock`（`tickbar` 段） | 0.1.0 | 0.1.1 |
+| `src-tauri/tauri.conf.json` | 0.1.0 | 0.1.1 |
+| `android-app/app/build.gradle.kts` | 0.1.0 / code 10 | 0.1.1 / code 11 |
+
+安卓 `versionCode` 10 → 11，可覆盖安装 0.1.0 而不丢数据。
+
+### 已知限制
+
+- 面板无状态：没有插件私有存储区，数据块每次打开重查、不缓存，面板之间不能跳转。
+- 手机端不显示面板入口；安卓仍无插件机制。
+- 面板能力只到「读统计 + 触发内置动作」，插件不能自定义界面布局之外的样式。
+
 ## [0.1.0] 2026-11-04 —— 首个发布版（整合 TickBar + Timing 双库）
 
 **本版不改业务代码、不改契约**：命令 65 / 事件 11 / 错误码 16，与内部迭代版 `0.4.1` 逐条一致。
