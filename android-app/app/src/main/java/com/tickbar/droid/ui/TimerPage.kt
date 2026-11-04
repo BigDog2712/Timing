@@ -6,7 +6,6 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import com.tickbar.droid.core.TimeFmt
 import com.tickbar.droid.core.TimerCore
@@ -17,6 +16,22 @@ import com.tickbar.droid.core.Tk
  * 唯一没有的是「hover」，所以所有入口都做成常显按钮。
  */
 class TimerPage(private val a: Activity) : Page {
+
+    private companion object {
+        /**
+         * 大环尺寸的上下限（dp）。桌面那颗药丸固定 230dp，手机上不能照抄：
+         * 横屏可用高度只有 360dp 左右，230dp 的环会把「开始/结束」挤到屏幕外。
+         * 下限 132dp 是为了极小屏或分屏时不把环压成一个看不清的小圆。
+         */
+        const val RING_MAX_DP = 230
+        const val RING_MIN_DP = 132
+
+        /** 环两侧的留白（左右各 18dp 的页面内边距） */
+        const val RING_SIDE_PADDING_DP = 36
+
+        /** 环最多占可用高度的多少：留下标题、按钮、汇总的位置 */
+        const val RING_HEIGHT_RATIO = 0.42f
+    }
 
     private val ring = RingView(a)
     private val status = Ui.text(a, "", 13f, Tk.INK_DIM)
@@ -59,8 +74,9 @@ class TimerPage(private val a: Activity) : Page {
             topMargin = d(12)
         })
 
-        // 大环
-        col.addView(ring, LinearLayout.LayoutParams(d(230), d(230)).apply {
+        // 大环（尺寸按屏幕算，见 ringSidePx）
+        val ringSide = ringSidePx(a.resources.displayMetrics.widthPixels, a.resources.displayMetrics.heightPixels)
+        col.addView(ring, LinearLayout.LayoutParams(ringSide, ringSide).apply {
             gravity = Gravity.CENTER_HORIZONTAL
             topMargin = d(10)
         })
@@ -129,7 +145,9 @@ class TimerPage(private val a: Activity) : Page {
             topMargin = d(18)
         })
 
-        val scroll = ScrollView(a).apply {
+        /* 用 VisibilityScroll 而不是裸 ScrollView：切页只切 visibility，
+           靠 attach 事件起停 ticker 的写法已经不成立了（见该类的注释）。 */
+        val scroll = VisibilityScroll(a) { shown -> if (shown) resume() else pause() }.apply {
             isFillViewport = true
             addView(
                 col,
@@ -138,12 +156,41 @@ class TimerPage(private val a: Activity) : Page {
                     android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
                 ),
             )
-            addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-                override fun onViewAttachedToWindow(v: View) = resume()
-                override fun onViewDetachedFromWindow(v: View) = pause()
-            })
+        }
+        /* 旋转 / 分屏 / 折叠不会重建 Activity（Manifest 里声明了 configChanges），
+           所以这里得自己跟着新尺寸重算环：View 体系只会重新 measure，
+           写死在 LayoutParams 里的边长不会自己变。 */
+        scroll.addOnLayoutChangeListener { _, left, top, right, bottom, oLeft, oTop, oRight, oBottom ->
+            if (right - left != oRight - oLeft || bottom - top != oBottom - oTop) {
+                applyRingSize(right - left, bottom - top)
+            }
         }
         return scroll
+    }
+
+    /**
+     * 环边长（px）。口径 `min(230dp, 可用宽 - 36dp, 可用高 × 0.42)`，下限 132dp：
+     * 宽扣掉左右各 18dp 的页面内边距，高只给环四成——剩下的要留给标题、
+     * 两个按钮、次操作和今日汇总，横屏 360dp 高时才不会把「结束」挤出可视区。
+     */
+    private fun ringSidePx(widthPx: Int, heightPx: Int): Int {
+        val density = a.resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
+        val target = minOf(
+            RING_MAX_DP.toFloat(),
+            widthPx / density - RING_SIDE_PADDING_DP,
+            heightPx / density * RING_HEIGHT_RATIO,
+        )
+        return d(target.coerceAtLeast(RING_MIN_DP.toFloat()).toInt())
+    }
+
+    /** 换环的边长。尺寸没变就什么都不做，避免每帧都重新布局。 */
+    private fun applyRingSize(widthPx: Int, heightPx: Int) {
+        val lp = ring.layoutParams as? LinearLayout.LayoutParams ?: return
+        val side = ringSidePx(widthPx, heightPx)
+        if (lp.width == side && lp.height == side) return
+        lp.width = side
+        lp.height = side
+        ring.layoutParams = lp
     }
 
     // ---------------------------------------------------------- 生命周期

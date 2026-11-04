@@ -3,6 +3,7 @@ package com.tickbar.droid.core.md
 import android.content.Context
 import com.tickbar.droid.core.Days
 import com.tickbar.droid.core.Repo
+import com.tickbar.droid.core.RepoNote
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -76,8 +77,11 @@ object MdSync {
 
         var node = vault.findFile(relPath)
         if (node == null) {
-            /* 本机没数据、也没有基线 → 不凭空在 vault 里造一篇空日记 */
-            if (localMap.isEmpty() && baseMap.isEmpty()) {
+            /* 本机没数据、也没有基线 → 不凭空在 vault 里造一篇空日记。
+               计时和便利贴都要算：只有便利贴有内容时也得把文件建出来。 */
+            val notesLocal = RepoNote.inDay(from, to).isNotEmpty()
+            val notesBase = MdCfg.baseline(ctx, MdCfg.KIND_NOTES, date)?.isNotBlank() == true
+            if (localMap.isEmpty() && baseMap.isEmpty() && !notesLocal && !notesBase) {
                 return done(Report(Action.NONE, "无变化", relPath))
             }
             node = vault.ensureFile(relPath)
@@ -87,6 +91,9 @@ object MdSync {
         val text = vault.readText(node)
             ?: return done(Report(Action.ERROR, "读取日记失败", relPath))
         val currentBody = MdSection.body(text, heading)
+        /* 便利贴区块的「合并前形态」：写盘前做 CAS 要用它比，所以和计时区块一起取。 */
+        val notesHeading = MdCfg.notesHeading(ctx)
+        val currentNotesBody = MdSection.body(text, notesHeading)
 
         /*
          * 读到半截就整轮跳过。
@@ -123,32 +130,76 @@ object MdSync {
             removed++
         }
 
-        // ---- 落地二：日记（进行中的实时段原样带上，不参与合并）
+        // ---- 落地二：日记（两块在内存里合成一份，**只写一次盘**）
         val nextBody = MdMerge.renderMerged(merged, remoteEntries)
         /* 用归一化形态比较：只有「事实」变了才写盘，顶得住 Linter 之类的格式重排。 */
-        val needWrite = currentBody == null ||
+        val needTimersWrite = currentBody == null ||
             MdMerge.normalized(currentBody) != MdMerge.normalized(nextBody)
-        if (needWrite) {
-            val nextText = if (currentBody == null) {
-                MdSection.append(text, heading, nextBody)
-            } else {
-                MdSection.replace(text, heading, nextBody)
+
+        /* 便利贴另外跑一轮：它有自己的标题、基线、认人规则（见 MdNotesSync）。
+           这一轮**必须无条件走到**，不能因为计时「无变化」提前返回 —— 否则
+           「今天只动了便利贴」的那些轮次永远同步不到便利贴。
+           它不再自己读写文件：拿同一份 text 合并，把该写的区块正文交回来。 */
+        val notes = runCatching { MdNotesSync.run(ctx, text, from, to, date) }
+            .getOrElse { MdNotesSync.Outcome(failed = it.message) }
+
+        /* 便利贴那轮失败时**降级**而不是早退：库已经在上面落过了，若这里直接返回，
+           计时区块就再也同步不出去（旧顺序是先写计时再跑便利贴，早退是本轮唯一的行为反转）。
+           降级 = 这一轮只写计时区块，便利贴块留到下一轮；失败原因仍然照实报给状态栏。 */
+        val notesBody = if (notes.failed == null) notes.nextBody else null
+        var wrote = false
+        if (needTimersWrite || notesBody != null) {
+            /* 写前 CAS：从读到这一刻之间隔了一整轮合并，桌面端完全可能刚改过这篇日记。
+               重读一次，两块里只要有一块的当前 body 与合并时读到的不一样，本轮就放弃写盘
+               （库照常落），把改写让给下一轮 —— 否则就是把对面刚写的内容原样抹掉。 */
+            val fresh = vault.readText(node)
+                ?: return done(Report(Action.ERROR, "写前复读日记失败", relPath))
+            val stale = MdSection.body(fresh, heading) != currentBody ||
+                MdSection.body(fresh, notesHeading) != currentNotesBody
+            if (stale) return done(Report(Action.NONE, "日记刚被改过，本轮只落库", relPath))
+
+            var nextText = fresh
+            if (needTimersWrite) {
+                nextText = if (currentBody == null) {
+                    MdSection.append(nextText, heading, nextBody)
+                } else {
+                    MdSection.replace(nextText, heading, nextBody)
+                }
+            }
+            if (notesBody != null) {
+                nextText = if (currentNotesBody == null) {
+                    MdSection.append(nextText, notesHeading, notesBody)
+                } else {
+                    MdSection.replace(nextText, notesHeading, notesBody)
+                }
             }
             runCatching { vault.writeText(node, nextText) }
                 .onFailure { return done(Report(Action.ERROR, "写日记失败：${it.message}", relPath)) }
+            wrote = true
         }
 
-        /* 基线永远存「不含 ongoing」的版本：ongoing 每两秒变一次，存进来会让基线永远抖动。 */
+        /* 基线永远存「不含 ongoing」的版本：ongoing 每两秒变一次，存进来会让基线永远抖动。
+           便利贴那一轮被跳过（半截文件 / 库没就绪）或失败时不动它的基线：写个空串进去，
+           下一轮会把文件里的内容全判成「对面新加的」。 */
         MdCfg.setBaseline(ctx, MdCfg.KIND_TIMERS, date, MdTimers.render(MdMerge.toEntries(merged)))
+        if (notes.skipped == null && notes.failed == null) {
+            MdCfg.setBaseline(ctx, MdCfg.KIND_NOTES, date, notes.baseline)
+        }
+
+        /* 计时区块已经落地（若需要），现在才报便利贴那轮的错 */
+        notes.failed?.let { return done(Report(Action.ERROR, it, relPath)) }
 
         val parts = ArrayList<String>()
         if (changed > 0) parts.add("收下 $changed 段")
         if (removed > 0) parts.add("移除 $removed 段")
-        if (needWrite) parts.add("写入日记")
+        if (notes.changed > 0) parts.add("便利贴变动 ${notes.changed} 张")
+        if (wrote) parts.add("写入日记")
         if (parts.isEmpty()) return done(Report(Action.NONE, "无变化", relPath))
 
+        val pulled = changed > 0 || removed > 0 || notes.changed > 0
         val action = when {
-            changed > 0 || removed > 0 -> if (needWrite) Action.BOTH else Action.PULLED
+            pulled && wrote -> Action.BOTH
+            pulled -> Action.PULLED
             else -> Action.PUSHED
         }
         return done(Report(action, parts.joinToString("、"), relPath))

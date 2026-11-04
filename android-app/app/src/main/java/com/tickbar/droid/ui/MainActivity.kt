@@ -6,11 +6,8 @@ import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.Gravity
 import android.view.View
-import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -20,7 +17,6 @@ import com.tickbar.droid.core.Prefs
 import com.tickbar.droid.core.Repo
 import com.tickbar.droid.core.TimerCore
 import com.tickbar.droid.core.Tk
-import com.tickbar.droid.core.md.MdCfg
 import com.tickbar.droid.core.md.MdSync
 import com.tickbar.droid.overlay.OverlayCtl
 import com.tickbar.droid.overlay.OverlayService
@@ -38,27 +34,23 @@ class MainActivity : Activity() {
 
         /** 选 Obsidian 目录的请求码。 */
         private const val REQ_TREE = 0x71
-
-        /** 前台自动同步间隔。20 秒是「Obsidian Sync 落盘延迟」与「耗电」之间的折中。 */
-        private const val SYNC_INTERVAL = 20_000L
     }
 
     private lateinit var host: FrameLayout
     private lateinit var banner: Notice.Bar
+    private lateinit var navBar: View
+
+    /** 二级页（便利贴编辑）。页签名之外的唯一一层，返回键按它分层。 */
+    lateinit var router: Router
+        private set
     private val pages = mutableListOf<Page>()
     private val nav = mutableListOf<TextView>()
     private var index = 0
 
     private var treeCb: ((Uri?) -> Unit)? = null
-    private val syncHandler = Handler(Looper.getMainLooper())
-    private var syncing = false
 
-    private val syncTicker = object : Runnable {
-        override fun run() {
-            requestSync()
-            syncHandler.postDelayed(this, SYNC_INTERVAL)
-        }
-    }
+    /** 同步执行器：互斥 + 撞车回调排队 + 节拍器（细节见 [SyncRunner]）。 */
+    private val sync = SyncRunner(this) { pages.getOrNull(index)?.onShow() }
 
     private fun d(v: Int) = Tk.dp(this, v)
 
@@ -83,9 +75,10 @@ class MainActivity : Activity() {
 
         runCatching { OverlayCtl.requestNotifications(this) }
 
-        // 四个页签一次性构造：任何一页抛异常都不能牵连其他页（否则就是「打开即闪退」）
+        // 五个页签一次性构造：任何一页抛异常都不能牵连其他页（否则就是「打开即闪退」）
         pages += safePage("计时") { TimerPage(this) }
         pages += safePage("事项") { TodoPage(this) }
+        pages += safePage("便利贴") { NotesPage(this) }
         pages += safePage("记录") { RecordsPage(this) }
         pages += safePage("设置") { SettingsPage(this) }
 
@@ -95,19 +88,8 @@ class MainActivity : Activity() {
         }
 
         // targetSdk 35 起系统强制「边到边」：内容会画到状态栏 / 导航栏底下。
-        // 不用 ScrimInsets 之类的第三方库，直接按系统栏高度给根布局补 padding。
-        if (Build.VERSION.SDK_INT >= 30) {
-            runCatching {
-                window.setDecorFitsSystemWindows(false)
-                root.setOnApplyWindowInsetsListener { v, insets ->
-                    val bars = insets.getInsets(
-                        WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()
-                    )
-                    v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
-                    insets
-                }
-            }
-        }
+        // 统一交给 Insets（它连键盘高度一起算，见该文件注释）。
+        Insets.apply(this, root)
 
         // 提示条本身也不能成为崩溃源：它建不出来就退化成一条空 View
         banner = runCatching { Notice.build(this, crash, dbOk) }
@@ -117,9 +99,17 @@ class MainActivity : Activity() {
         host = FrameLayout(this)
         root.addView(host, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
-        root.addView(runCatching { buildNav() }.getOrElse { View(this) })
+        navBar = runCatching { buildNav() }.getOrElse { View(this) }
+        root.addView(navBar)
 
         setContentView(root)
+        router = Router(
+            this,
+            host,
+            navBar,
+            onCover = { covered -> pages.forEach { it.view.visibility = if (covered) View.GONE else View.VISIBLE } },
+            onRestore = { show(index) },
+        )
         runCatching { show(savedInstanceState?.getInt(EXTRA_TAB) ?: 0) }
     }
 
@@ -147,10 +137,10 @@ class MainActivity : Activity() {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Tk.PANEL)
         }
-        listOf("计时", "事项", "记录", "设置").forEachIndexed { i, label ->
+        listOf("计时", "事项", "便利贴", "记录", "设置").forEachIndexed { i, label ->
             val item = TextView(this).apply {
                 text = label
-                textSize = 13f
+                textSize = 12f
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 setPadding(0, d(16), 0, d(16))
@@ -165,23 +155,39 @@ class MainActivity : Activity() {
 
     // ------------------------------------------------------------ 切页
 
+    /**
+     * 切页：只切 visibility，**不重挂 View**。
+     *
+     * 旧实现每次 `removeAllViews()` + `addView`：View 被 detach/attach 一次，整页重新
+     * measure/layout、ScrollView 滚动位置丢失、`NotesPage` 的 attach 监听又全量重建一次。
+     */
     private fun show(i: Int) {
         if (pages.isEmpty()) return
         index = i.coerceIn(0, pages.size - 1)
-        host.removeAllViews()
-        host.addView(
-            pages[index].view,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
+        mountPages()
+        pages.forEachIndexed { idx, p ->
+            p.view.visibility = if (idx == index) View.VISIBLE else View.GONE
+        }
         pages[index].let { p -> runCatching { p.onShow() } }
         nav.forEachIndexed { idx, t ->
             val on = idx == index
             t.setTextColor(if (on) Tk.ACCENT else Tk.INK_DIM)
             t.setTypeface(t.typeface, if (on) Typeface.BOLD else Typeface.NORMAL)
         }
+    }
+
+    /**
+     * 把所有页挂到内容区。判据是 **`view.parent == null`**，不是「挂过没有」：
+     * 二级页 `Router`（或将来任何整区替换）都可能把页签 View 摘下来，只记一个「已挂载」
+     * 布尔就会让 [show] 以为已经挂好、只切 visibility —— 结果是回到原页签看到一片空白。
+     * 所以每页自己对自己负责：没 parent 才挂，已有 parent 一律不动（也不会重复 addView）。
+     */
+    private fun mountPages() {
+        val fill = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            FrameLayout.LayoutParams.MATCH_PARENT,
+        )
+        for (p in pages) if (p.view.parent == null) host.addView(p.view, fill)
     }
 
     // ------------------------------------------------------------ 同步
@@ -218,31 +224,10 @@ class MainActivity : Activity() {
     }
 
     /**
-     * 跑一轮同步。IO 与 SQLite 放到后台线程，结果回主线程。
-     *
-     * 同一时刻只允许一轮：SAF 读写虽然不慢，但并发两轮会让「基线」互相覆盖。
+     * 跑一轮同步（设置页「立即同步」等调用点用）。互斥、回调排队、页面刷新都在
+     * [SyncRunner] 里，这里只是转调，避免外壳继续变厚。
      */
-    fun requestSync(onDone: ((MdSync.Report) -> Unit)? = null) {
-        if (!MdCfg.enabled(this) || !MdCfg.configured(this)) {
-            onDone?.invoke(MdSync.Report(MdSync.Action.NONE, "同步未配置"))
-            return
-        }
-        if (syncing) return
-        syncing = true
-        Thread {
-            val report = runCatching { MdSync.sync(this) }.getOrElse {
-                MdSync.Report(MdSync.Action.ERROR, "同步异常：${it.message}")
-            }
-            runOnUiThread {
-                syncing = false
-                onDone?.invoke(report)
-                /* 真的从文件收下了数据才刷新当前页，避免每 20 秒把列表重置、滚动位置丢掉 */
-                if (report.action == MdSync.Action.PULLED || report.action == MdSync.Action.BOTH) {
-                    pages.getOrNull(index)?.onShow()
-                }
-            }
-        }.start()
-    }
+    fun requestSync(onDone: ((MdSync.Report) -> Unit)? = null) = sync.request(onDone)
 
     // ------------------------------------------------------------ 生命周期
 
@@ -256,13 +241,13 @@ class MainActivity : Activity() {
         runCatching { OverlayService.sync(this) }
         pages.getOrNull(index)?.let { p -> runCatching { p.onShow() } }
 
-        syncHandler.removeCallbacks(syncTicker)
-        syncHandler.post(syncTicker)
+        /* 回前台立刻同步一次，之后由 ticker 按上一轮结果排下一次 */
+        sync.start()
     }
 
     override fun onPause() {
         super.onPause()
-        syncHandler.removeCallbacks(syncTicker)
+        sync.stop()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -271,6 +256,8 @@ class MainActivity : Activity() {
     }
 
     override fun onBackPressed() {
+        // 三层：先关二级页（全屏编辑），再回首页签，最后才是退到后台
+        if (::router.isInitialized && router.close()) return
         if (index != 0) show(0) else super.onBackPressed()
     }
 }

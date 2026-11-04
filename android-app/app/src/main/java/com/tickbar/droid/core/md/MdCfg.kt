@@ -19,6 +19,9 @@ object MdCfg {
 
     const val KIND_TIMERS = "timers"
 
+    /** 便利贴区块（与桌面 `MdSyncKind::Notes` 的字符串值一致，基线按 kind 分开存）。 */
+    const val KIND_NOTES = "notes"
+
     private const val SP = "tickbar_md"
 
     private fun sp(c: Context) =
@@ -36,7 +39,7 @@ object MdCfg {
 
     fun setTreeUri(c: Context, v: String) = sp(c).edit().putString("tree_uri", v).apply()
 
-    /** 文件模板，相对 [treeUri]。默认每天一个文件，与桌面插件默认值一致。 */
+    /** 文件模板，相对 [treeUri]。默认每天一个文件，与桌面出厂默认值一致。 */
     fun fileTemplate(c: Context): String = sp(c).getString("file", "{date}.md") ?: "{date}.md"
 
     fun setFileTemplate(c: Context, v: String) = sp(c).edit().putString("file", v).apply()
@@ -46,6 +49,18 @@ object MdCfg {
         sp(c).getString("heading", "#### 事项计时") ?: "#### 事项计时"
 
     fun setHeading(c: Context, v: String) = sp(c).edit().putString("heading", v).apply()
+
+    /**
+     * 便利贴区块的标题行。
+     *
+     * 默认 `#### 便利贴` 取自桌面端 `services/md_sync/config.rs` 里 notes 的默认绑定。
+     * 两边必须是**同一个标题**，否则会各写一块：文件里两份便利贴表格，谁看谁都是
+     * 「对面新加的一堆行」，同步会当场打架。
+     */
+    fun notesHeading(c: Context): String =
+        sp(c).getString("notes_heading", "#### 便利贴") ?: "#### 便利贴"
+
+    fun setNotesHeading(c: Context, v: String) = sp(c).edit().putString("notes_heading", v).apply()
 
     fun configured(c: Context): Boolean = treeUri(c).isNotEmpty() && heading(c).trim().isNotEmpty()
 

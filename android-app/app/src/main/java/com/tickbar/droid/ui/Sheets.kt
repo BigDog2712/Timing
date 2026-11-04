@@ -130,9 +130,42 @@ object Sheets {
         }
     }
 
+    /**
+     * 二次确认。删除这类不可撤销的操作走这里，样式与其它 Sheet 一致
+     * （不用系统 AlertDialog：它在深色主题下是白底黑字的另一套外观）。
+     */
+    fun confirm(
+        c: Context,
+        title: String,
+        message: String,
+        okLabel: String = "删除",
+        onOk: () -> Unit,
+    ) {
+        show(c, title) { box, d ->
+            box.addView(Ui.text(c, message, 13f, Tk.INK_DIM))
+            val row = Ui.row(c)
+            row.addView(
+                Ui.button(c, "取消") { d.dismiss() },
+                LinearLayout.LayoutParams(0, Ui.WRAP, 1f),
+            )
+            row.addView(
+                Ui.button(c, okLabel, danger = true) {
+                    d.dismiss()
+                    onOk()
+                },
+                LinearLayout.LayoutParams(0, Ui.WRAP, 1f).apply { leftMargin = Tk.dp(c, 8) },
+            )
+            box.addView(
+                row,
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.WRAP).apply {
+                    topMargin = Tk.dp(c, 14)
+                },
+            )
+        }
+    }
+
     /** 换事项 / 新建事项。 */
-    fun item(c: Context, current: String, recent: List<String>, onPick: (String) -> Unit) {
-        show(c, "换事项") { box, d ->
+    fun item(c: Context, current: String, recent: List<String>, onPick: (String) -> Unit) {        show(c, "换事项") { box, d ->
             if (recent.isNotEmpty()) {
                 val scroll = ScrollView(c)
                 val list = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }

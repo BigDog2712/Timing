@@ -18,10 +18,15 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.TickBar">
 
+        <!-- configChanges：旋转 / 分屏 / 深色切换都不重建 Activity。
+             便利贴编辑是「停手 800ms 才落盘」的，重建一次就丢掉还没写库的最后几句话；
+             计时页的 ticker 也会跟着重挂。布局照样跟着新宽度重新 measure（View 体系自己会做），
+             环的边长由 TimerPage 的 layout 监听重算。 -->
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

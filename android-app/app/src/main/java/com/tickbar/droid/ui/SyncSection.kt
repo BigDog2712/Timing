@@ -27,6 +27,7 @@ class SyncSection(private val a: MainActivity) {
     private lateinit var rowDir: LinearLayout
     private lateinit var rowFile: LinearLayout
     private lateinit var rowHeading: LinearLayout
+    private lateinit var rowNotesHeading: LinearLayout
     private lateinit var status: TextView
 
     private fun d(v: Int) = Tk.dp(a, v)
@@ -90,6 +91,23 @@ class SyncSection(private val a: MainActivity) {
             LinearLayout.LayoutParams(Ui.MATCH, Ui.WRAP).apply { topMargin = d(8) },
         )
 
+        /* 便利贴是**另一个区块**（桌面端 notes 的默认绑定标题），必须单独一指。
+           两端标题填得不一样，文件里就会长出两份便利贴表格。 */
+        rowNotesHeading = Ui.settingRow(
+            a,
+            "便利贴标题行",
+            { MdCfg.notesHeading(a) },
+        ) {
+            Sheets.prompt(a, "便利贴标题行", "例：#### 便利贴", MdCfg.notesHeading(a)) {
+                if (it.isNotEmpty()) MdCfg.setNotesHeading(a, it)
+                refresh()
+            }
+        }
+        card.addView(
+            rowNotesHeading,
+            LinearLayout.LayoutParams(Ui.MATCH, Ui.WRAP).apply { topMargin = d(8) },
+        )
+
         col.addView(card, LinearLayout.LayoutParams(Ui.MATCH, Ui.WRAP).apply { topMargin = d(6) })
 
         col.addView(
@@ -106,8 +124,9 @@ class SyncSection(private val a: MainActivity) {
             Ui.text(
                 a,
                 "Obsidian Sync 同步的是 vault 里的文件，不是数据库。所以两端共享的是" +
-                    "这篇日记里的「" + MdCfg.heading(a) + "」区块：你在这台手机上记的时段会写进去，" +
-                    "桌面端记的也会被收进来，两边按「事项 + 开始时刻」逐条合并，谁也不覆盖谁。",
+                    "这篇日记里的两个区块：「" + MdCfg.heading(a) + "」（计时段，按「事项 + 开始时刻」" +
+                    "逐条合并）和「" + MdCfg.notesHeading(a) + "」（便利贴表格，按桌面端发下的行号认人）。" +
+                    "手机不会自己给便利贴编号，第一次写出去的那条会由桌面发号，下一轮起两边锁在同一张上。",
                 11f,
                 Tk.INK_DIM,
             ).apply { setPadding(0, d(10), 0, 0) },
@@ -123,6 +142,7 @@ class SyncSection(private val a: MainActivity) {
         Ui.refreshRowValue(rowDir, dirLabel())
         Ui.refreshRowValue(rowFile, MdCfg.fileTemplate(a))
         Ui.refreshRowValue(rowHeading, MdCfg.heading(a))
+        Ui.refreshRowValue(rowNotesHeading, MdCfg.notesHeading(a))
 
         val last = MdCfg.lastStatus(a)
         status.text = when {
@@ -156,7 +176,13 @@ class SyncSection(private val a: MainActivity) {
             return
         }
         status.text = "同步中…"
+        /* 撞上正在跑的那轮时 requestSync 会把回调排队、一轮结束后回填；但万一那轮卡在
+           SAF IO 上久久不返回，按钮就会永久停在「同步中…」。这里再兜一层：1 秒后先按
+           已落库的状态还原文案，回调真回来了就再以它为准（removeCallbacks 掉兜底）。 */
+        val fallback = Runnable { refresh() }
+        status.postDelayed(fallback, 1_000L)
         a.requestSync { report ->
+            status.removeCallbacks(fallback)
             refresh()
             if (report.action == MdSync.Action.ERROR) {
                 Toast.makeText(a, report.message, Toast.LENGTH_LONG).show()

@@ -45,7 +45,9 @@ SAF 目录授权都需要装机确认。
 | 窗口位置记忆 | 拖动落盘 + 旋转重算 + 一键复位 | ✅ 0.2.0 |
 | md-sync（写 Obsidian 日记） | 设置 → 同步：SAF 选目录 + 模板 + 标题，双向合并 | ✅ 0.3.0 |
 | 同步收敛加固 | 归一化比较 + 无变化不写 + 半截文件整轮跳过 | ✅ 0.3.1 |
-| 便利贴、插件、主题四色 | — | ⏳ 后续 |
+| 便利贴（列表 + 全屏编辑 + 挂当前事项） | 页签③「便利贴」+ 二级编辑页；正文 ≤4000 字 | ✅ 本版 |
+| 便利贴写进 Obsidian | 日记里的 `#### 便利贴` 表格，按桌面发下的行号认人 | ✅ 本版 |
+| 插件、主题四色 | — | ⏳ 后续 |
 | 托盘、开机自启 | 手机无对应语义 | 🚫 不做 |
 
 ## 3. 关于「小米超级岛 / 灵动岛」
@@ -210,12 +212,17 @@ android-app/
         │   ├── Repo.kt         # 计时落库与聚合查询（今日 / 本周 / 按事项）
         │   ├── RepoTodo.kt     # 待办落库（从 Repo 拆出，守 300 行上限）
         │   ├── TodoStore.kt    # 待办门面（库的内存镜像）
+        │   ├── RepoNote.kt     # 便利贴落库（多一列 sync_id：Markdown 里认人用）
+        │   ├── NoteStore.kt    # 便利贴门面 + 当前事项判定
+        │   ├── NoteText.kt     # 编辑器纯函数：圆点 / 续行 / 缩进（对齐桌面 noteText.ts）
         │   ├── md/             # Obsidian 双向同步
-        │   │   ├── MdCfg.kt       # 落点配置：SAF URI / 模板 / 标题 / 基线
+        │   │   ├── MdCfg.kt       # 落点配置：SAF URI / 模板 / 两个区块标题 / 基线
         │   │   ├── SafVault.kt    # SAF 目录读写（DocumentsContract，零依赖）
         │   │   ├── MdSection.kt   # 标题区块定位与替换（对齐桌面 md_file.rs）
         │   │   ├── MdTimers.kt    # Planner 格式 render / parse
-        │   │   ├── MdMerge.kt     # 三方合并（纯函数，10 条单测）
+        │   │   ├── MdMerge.kt     # 计时段三方合并（纯函数，10 条单测）
+        │   │   ├── MdNotes.kt     # 便利贴表格 render / parse（对齐桌面 format/notes.rs）
+        │   │   ├── MdNotesSync.kt # 便利贴那一轮：认人 + 三方合并（9 条单测）
         │   │   └── MdSync.kt      # 编排：读三方 → 合并 → 双向落地
         │   └── TimerCore.kt    # 状态机（唯一业务内核，Store 接口可替换）
         ├── overlay/
@@ -227,18 +234,23 @@ android-app/
         │   ├── RotationWatcher.kt # 旋转 / 分屏广播（收边用）
         │   └── OverlayCtl.kt      # 权限查询与跳转
         └── ui/
-            ├── MainActivity.kt    # 外壳 + 四页签 + 边到边（启动全程兜底）
+            ├── MainActivity.kt    # 外壳 + 五页签 + 边到边（启动全程兜底）
+            ├── Router.kt          # 二级页（便利贴编辑）与返回键分层
+            ├── Insets.kt          # 系统栏 + 键盘留白（边到边）
             ├── Notice.kt          # 首屏提示条：崩溃 / 库异常 / 去授权
             ├── FallbackPage.kt    # 单页构造失败时的占位
             ├── Page.kt / Ui.kt    # 页面接口、手写 UI 工具
             ├── TimerPage.kt       # ① 计时
             ├── TodoPage.kt        # ② 事项
-            ├── RecordsPage.kt     # ③ 记录（今天 / 本周）
+            ├── NotesPage.kt       # ③ 便利贴清单
+            ├── NoteEditPage.kt    # ③ 便利贴全屏编辑（二级页）
+            ├── NoteTools.kt       # 编辑页工具条：圆点 / 缩进 / 关联事项
+            ├── RecordsPage.kt     # ④ 记录（今天 / 本周）
             ├── WeekBars.kt        # 七天柱状图（自绘）
-            ├── SettingsPage.kt    # ④ 设置
+            ├── SettingsPage.kt    # ⑤ 设置
             ├── SyncSection.kt     # 设置页的「同步（Obsidian）」一节
             ├── RingView.kt        # 大计时环
-            └── Sheets.kt          # 定长倒计时 / 换事项 / 文本输入
+            └── Sheets.kt          # 定长倒计时 / 换事项 / 文本输入 / 二次确认
 ```
 
 单文件均 ≤300 行（仓库硬性规则）。`OverlayService` 原本 380 行，已按「窗口几何」「手势」「旋转监听」
@@ -313,8 +325,12 @@ adb logcat -d -b crash AndroidRuntime:E "*:S"
 ## 8. 已知边界
 
 - **同步只覆盖「当天」**：基线按天存，打开 App 时同步今天的日记；手机上改历史日期不会回写；
-- **待办 / 便利贴还没进手机**：`todos` 表缺 `planned_at` / `done_at`，与桌面待办区块对不齐，
-  所以只同步计时段。手机改了那两块不会被同步；
+- **待办还没进共享层**：`todos` 表缺 `planned_at` / `done_at`，与桌面待办区块对不齐，
+  所以只同步计时与便利贴。手机改了待办不会被同步；
+- **便利贴的号由桌面端发**：手机第一次写出一条便利贴时表里那行**不带号**，桌面端读到会
+  插入一条自己的并回写 `<!-- tb-note:N -->`，手机下一轮才认领这个号。也就是说
+  **首轮往返之前，两端看到的是「各有一张」**；只影响第一条，之后都锁在同一张上。
+  手机不能自己发号——桌面端遇到不认识的号会当成新行插入，两端会越同步越多；
 - **冲突副本的处理因插件而异**：Obsidian Sync 会生成 `xxx (Conflicted copy).md`；
   **Remotely Save 通常不生成、直接按修改时间择一覆盖**。两种情况本应用都管不到副本本身，
   需要人工删掉较旧的一份；被覆盖掉的记录靠本机 SQLite 在下一轮合并中写回；
@@ -332,7 +348,8 @@ adb logcat -d -b crash AndroidRuntime:E "*:S"
 ## 9. 下一步（建议顺序）
 
 1. 真机跑一遍：悬浮手势 → 通知栏按钮 → 选 Obsidian 目录 → 两端来回记几段验证合并；
-2. 待办也进共享层：给 `todos` 补 `planned_at` / `done_at`，实现 `#### 待办事项` 区块；
-3. 历史日期补同步（按天回放基线）；
-4. 进行中的会话也落库，杀进程可恢复；
-5. 便利贴（列表 + 单编辑页）。
+2. **便利贴真机验证**（这一版新加）：新建 → 写正文 → 返回列表 → 桌面上打开同一个日记文件
+   看 `#### 便利贴` 表格；再在桌面改一行，回手机看是否被收下；两端各删一张，看是否都消失；
+3. 待办也进共享层：给 `todos` 补 `planned_at` / `done_at`，实现 `#### 待办事项` 区块；
+4. 历史日期补同步（按天回放基线）；
+5. 进行中的会话也落库，杀进程可恢复。

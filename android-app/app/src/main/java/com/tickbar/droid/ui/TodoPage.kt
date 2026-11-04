@@ -52,15 +52,21 @@ class TodoPage(private val a: Activity) : Page {
             background = Ui.round(a, Tk.FIELD, 11, Tk.LINE, 1)
             setPadding(d(12), d(10), d(12), d(10))
             setSingleLine()
+            /* 空态文案写着「回车即可加」，那就得真的能加：键盘右下角那颗「完成」直接提交。 */
+            imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) {
+                    addTodo()
+                    true
+                } else {
+                    false
+                }
+            }
         }
         val addRow = Ui.row(a)
         addRow.addView(input, LinearLayout.LayoutParams(0, Ui.WRAP, 1f))
         addRow.addView(
-            Ui.button(a, "添加", primary = true) {
-                TodoStore.add(input.text.toString())
-                input.setText("")
-                render()
-            },
+            Ui.button(a, "添加", primary = true) { addTodo() },
             LinearLayout.LayoutParams(d(76), Ui.WRAP).apply { leftMargin = d(8) },
         )
         col.addView(addRow, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, Ui.WRAP).apply {
@@ -88,6 +94,13 @@ class TodoPage(private val a: Activity) : Page {
     }
 
     override fun onShow() = render()
+
+    /** 添加并清空输入框（按钮与键盘「完成」共用，别让两条路径行为不一样）。 */
+    private fun addTodo() {
+        TodoStore.add(input.text.toString())
+        input.setText("")
+        render()
+    }
 
     private fun render() {
         TodoStore.ensureLoaded()
