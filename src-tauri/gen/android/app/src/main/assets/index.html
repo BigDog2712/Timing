@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0E0F12" />
+    <title>TickBar · 悬浮时间记录</title>
+    <script>
+      /* 防白闪引导脚本（K-1 / ADR-012）：样式加载前同步解析并写入 <html data-theme>。
+         只设 data-theme —— 令牌文件 :root 内已给 --bg 默认值 + html{background:var(--bg)}，
+         故即使 CSS 未全量就绪也不会白闪。system 模式用系统偏好解析。 */
+      (function () {
+        try {
+          var mode = 'dark';
+          try {
+            var cached = localStorage.getItem('tickbar.theme');
+            if (cached === 'dark' || cached === 'light' || cached === 'system') mode = cached;
+          } catch (e) {}
+          var resolved = mode;
+          if (mode === 'system') {
+            var dark = true;
+            try {
+              dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            } catch (e) {}
+            resolved = dark ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', resolved);
+          var meta = document.querySelector('meta[name="color-scheme"]');
+          if (meta) meta.setAttribute('content', resolved);
+        } catch (e) {
+          /* 任何异常都回落到默认深色（html 已带 data-theme="dark"） */
+        }
+      })();
+    </script>
+    <script>
+      /* [TEMP-DIAG] 启动故障排查：把「脚本是否执行 / 首个错误」用图片打点送到本地监听。
+         WebView 里没有 DevTools 时这是唯一能把信息带出来的通道。定位完即删。 */
+      (function () {
+        function send(tag, msg) {
+          try {
+            new Image().src =
+              'http://127.0.0.1:8787/?t=' +
+              tag +
+              '&m=' +
+              encodeURIComponent(String(msg === undefined ? '' : msg).slice(0, 300));
+          } catch (e) {}
+        }
+        window.__diagSend = send;
+        send('inline', 'ready=' + document.readyState + ' theme=' + document.documentElement.getAttribute('data-theme'));
+        window.addEventListener(
+          'error',
+          function (e) {
+            if (e && e.target && e.target.tagName) {
+              send('res', e.target.tagName + ' ' + (e.target.src || e.target.href || ''));
+            } else {
+              send('js', ((e && e.message) || '') + ' @ ' + ((e && e.filename) || '') + ':' + ((e && e.lineno) || ''));
+            }
+          },
+          true
+        );
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e && e.reason;
+          send('rej', (r && (r.message || r.stack)) || r);
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+          send('dom', 'root=' + !!document.getElementById('root'));
+        });
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-Bb77-XgP.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-WkwZ5CU-.js">
+    <link rel="modulepreload" crossorigin href="/assets/icons-yR8TjRp4.js">
+    <link rel="modulepreload" crossorigin href="/assets/react-DBjSBWvQ.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-C3PADMln.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-BKY_4rHg.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

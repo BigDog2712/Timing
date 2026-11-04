@@ -1,0 +1,220 @@
+/* =============================================================================
+ * TickBar — overlays.css（浮层：展开面板 Panel / 撤销条 UndoBar）
+ * -----------------------------------------------------------------------------
+ * P0：仅允许 var(--*)；零字面量色值；零毛玻璃；缓动仅 standard / exit / morph。
+ * 自绘玻璃菜单已拆至 styles/menu.css（单文件 ≤300 行纪律）。
+ * ========================================================================== */
+
+/* ------------------------------ 展开面板 Panel ------------------------------ */
+.panel {
+  width: var(--panel-w);
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-5) var(--space-5);
+  border-radius: var(--radius-lg);
+  /* [V0.2.2] 浮层底板乘 --ui-bg-opacity */
+  background: color-mix(in srgb, var(--surface-2) calc(100% * var(--ui-bg-opacity)), transparent);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-panel);
+  animation: panel-in var(--dur-morph) var(--ease-morph);
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.panel__input-wrap {
+  position: relative;
+}
+
+.panel__input {
+  width: 100%;
+  height: var(--input-h);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-emphasize);
+  border: 1px solid transparent;
+  transition: background-color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
+}
+
+.panel__input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.panel__input:focus {
+  background: var(--input-bg-focus);
+}
+
+.panel__input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.panel__spinner {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: var(--radius-chip);
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: arc-pulse var(--dur-morph) var(--ease-standard) infinite;
+}
+
+@keyframes arc-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.panel__chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--chip-h);
+  padding: 0 var(--chip-pad-x);
+  border-radius: var(--radius-chip);
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  border: 1px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-emphasize);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.chip:hover {
+  background: var(--chip-bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.chip--add {
+  color: var(--muted);
+}
+
+.panel__hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  color: var(--meta);
+  font-size: var(--text-xs);
+}
+
+.panel__hint svg {
+  flex: 0 0 auto;
+  color: var(--meta);
+}
+
+.panel__hint-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.panel__hint-item:last-child {
+  margin-left: auto;
+}
+
+/* ------------------------------ 撤销条 UndoBar ------------------------------ */
+.undo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-height: var(--toast-h);
+  max-width: var(--pill-w-max);
+  margin-top: var(--space-3);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--undo-bg) calc(100% * var(--ui-bg-opacity)), transparent);
+  border: 1px solid var(--undo-border);
+  box-shadow: var(--elev-float);
+  color: var(--undo-text);
+  font-size: var(--text-sm);
+  animation: undo-in var(--dur-morph) var(--ease-morph);
+}
+
+@keyframes undo-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.undo__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo__time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+/* [V0.3.4] 原 `.undo__actions`（短记录二选一的按钮组容器）随弹条删除；撤销条现在只有
+   一个按钮，不需要额外容器。 */
+
+.undo__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 24px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-chip);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-emphasize);
+  color: var(--muted);
+  transition: color var(--dur-quick) var(--ease-standard), background-color var(--dur-quick) var(--ease-standard);
+}
+
+.undo__btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.undo__btn--primary {
+  color: var(--undo-action);
+}
+
+.undo__btn--primary:hover:not(:disabled) {
+  color: var(--accent-hover);
+  background: var(--surface-2);
+}
+
+.undo__btn:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}

@@ -1,0 +1,179 @@
+/* =============================================================================
+ * TickBar V0.2.0 — reminder.css（批2 N-5 提醒浮出卡）
+ * -----------------------------------------------------------------------------
+ * 依据 docs/design/pages-V0.2.0/reminder-popover.md §1/§3.2。
+ * P0：仅 var(--*)，零字面量色值。层 --z-dialog (70)，宽 330（Timing BoxW，RemindBox.cs:12），玻璃 --menu-bg。
+ * ========================================================================== */
+
+.reminder {
+  position: absolute;
+  z-index: var(--z-dialog);
+  width: 330px;   /* [Timing 对齐 D12] BoxW 330（RemindBox.cs:12） */
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--menu-bg);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-pop);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  pointer-events: auto;
+  animation: reminder-in var(--dur-base) var(--ease-standard);
+}
+
+@keyframes reminder-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.reminder__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.reminder__bell {
+  display: inline-flex;
+  color: var(--color-warn);
+}
+
+.reminder__title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.reminder__line {
+  margin: 0;
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+
+.reminder__sub {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.reminder__pending {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  max-height: 66px;
+  overflow-y: auto;
+}
+
+.reminder__pending-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--menu-item-h);
+}
+
+.reminder__pending-time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+}
+
+.reminder__clear {
+  margin-left: auto;
+  height: var(--btn-md-h);   /* [Timing 对齐 D12] 主 CTA → --btn-md-h 28（裁决二，标度档） */
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+/* 聚合到点行的标题（弹性截断，清除按钮靠右） */
+.reminder__fired-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+}
+
+.reminder__clear:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.reminder__snooze {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.reminder__snooze-btn {
+  height: var(--btn-md-h);   /* [Timing 对齐 D12] 主 CTA → --btn-md-h 28 */
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--bg-field);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.reminder__snooze-btn:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.reminder__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.reminder__btn {
+  height: var(--btn-md-h);   /* [Timing 对齐 D12] 主 CTA → --btn-md-h 28 */
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+}
+
+.reminder__close {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: var(--icon-btn-size);
+  height: var(--icon-btn-size);
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.reminder__close:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.reminder__clear-all {
+  display: block;
+  margin: var(--space-2) 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  text-underline-offset: 2px;
+}
+
+.reminder__clear-all:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}

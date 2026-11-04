@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 深色底 + 无标题栏，和桌面端 bg-plate #0E0F12 一致 -->
+    <style name="Theme.TickBar" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0E0F12</item>
+        <item name="android:statusBarColor">#0E0F12</item>
+        <item name="android:navigationBarColor">#0E0F12</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorAccent">#4DA3E8</item>
+    </style>
+</resources>

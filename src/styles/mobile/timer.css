@@ -1,0 +1,167 @@
+/* =============================================================================
+ * TickBar — 移动端 · 计时页与大计时环
+ * -----------------------------------------------------------------------------
+ * 从 pages.css 按页面拆出（AGENTS.md 单文件 ≤300 行；原文件 504 行）。
+ * 只写本页自己的块：按钮 / 输入 / 分段 / 列表等原语在 primitives.css，
+ * 外壳与导航在 shell.css。颜色一律走令牌，可点元素高度 >= 44px。
+ * ========================================================================== */
+
+/* ============================== 计时页 ============================== */
+.m-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  padding-top: var(--space-4);
+}
+
+.m-ring {
+  position: relative;
+  width: 232px;
+  height: 232px;
+  color: var(--color-running);
+}
+
+.m-ring__svg {
+  width: 100%;
+  height: 100%;
+}
+
+.m-ring__track {
+  fill: none;
+  stroke: currentColor;
+  opacity: 0.16;
+}
+
+.m-ring__bar {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+
+/* 正计时在跑：90° 短弧沿轨道行进（与桌面同一条动画语言，D1 裁决见 ADR-024） */
+.m-ring[data-spin="true"] .m-ring__bar {
+  animation: m-ring-march 3.2s linear infinite;
+}
+
+@keyframes m-ring-march {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+.m-ring[data-state="paused"] {
+  color: var(--color-warn);
+}
+
+.m-ring[data-state="ended"] {
+  color: var(--color-done);
+}
+
+.m-ring[data-warn="true"] {
+  color: var(--color-danger);
+}
+
+.m-ring__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-6);
+  text-align: center;
+  pointer-events: none;
+}
+
+.m-ring__time {
+  font-family: var(--font-timer);
+  font-size: 40px;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+}
+
+.m-ring__caption {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+.m-timer__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+/* 主按钮四态：开始 / 暂停 / 继续 / 已保存。
+   桌面禁实心强调色（白字压蓝只有 2.45:1），手机沿用同一条约束：
+   用 accent-wash + accent-line 表达主次，只有「已保存」那一瞬用 --color-done 实心（深字）。 */
+.m-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-width: 200px;
+  min-height: 64px;
+  padding: 0 var(--space-6);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--btn-accent-line);
+  background: var(--btn-accent-bg);
+  color: var(--btn-accent-ink);
+  font-size: 18px;
+  font-weight: var(--weight-semibold);
+  transition: transform var(--dur-instant) var(--ease-standard);
+}
+
+.m-primary:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.m-primary[data-state="running"] {
+  background: var(--accent-line);
+  color: var(--ink);
+}
+
+.m-primary[data-state="ended"] {
+  background: var(--color-done);
+  border-color: var(--color-done);
+  color: var(--ok-ink);
+}
+
+.m-primary:disabled {
+  opacity: 0.9;
+}
+
+.m-timer__tools {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.m-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.m-timer__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+  text-align: center;
+}

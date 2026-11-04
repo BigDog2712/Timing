@@ -1,0 +1,199 @@
+/* =============================================================================
+ * TickBar V0.2.0 — design-tokens.css（三层 Token：primitive → semantic → component）
+ * V0.2.0-2 设计系统整体重做（对标 Timing v1.7.0）| 设计师：颜好看
+ * -----------------------------------------------------------------------------
+ * 消费规则（P0）：
+ *   1. 组件 CSS 只允许引用 var(--*)，禁止出现任何裸 hex / rgb。
+ *      唯一例外：box-shadow 内的 rgba 阴影色，且必须经 --shadow-* / --inset-* 引用。
+ *   2. 主题切换：<html data-theme="dark|light">，两套变量在同一文件内，无 JS 重排。
+ *   3. 语义色作『文字』须 >=4.5:1；作『非文本』（描边/进度/色点）须 >=3:1。
+ *   4. 一屏强调色可见用量：小条 <=1 处，面板 <=2 处。
+ *   5. 计时数字规则不可协商（见 §5 .timer-digits）。
+ *   6. 禁止弹跳/弹性缓动；禁止动画 width/height/font-size/filter/backdrop-filter。
+ * 源：docs/design/design-tokens-V0.2.0.css（移植）+ §7 为 V0.1.0 过渡别名桥。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 0. 外观不透明度（[V0.2.2] 设置面板可调；1 = 原色值）
+ * -----------------------------------------------------------------------------
+ * 由调用方写入 <html> 内联变量（appearanceStore），组件不要读写这两个值。
+ * --ui-bg-opacity 只乘在玻璃板的 alpha 上（见 §1/§2 的 --glass-panel-bg、
+ * §3 的 --pill-hover-plate、§4 的 --note-body-bg），设置面板与托盘菜单不参与。
+ * ========================================================================== */
+:root {
+  --ui-text-opacity: 1;
+  --ui-bg-opacity: 1;
+}
+
+/* =============================================================================
+ * 0. 主题无关令牌（字体 / 字阶 / 尺寸 / 间距 / 圆角 / 阴影 / 动效 / 层级 / 图标）
+ * ========================================================================== */
+:root {
+  /* ---- 字体 ---- */
+  --font-ui:      "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-ui);
+  --font-mono:    "Cascadia Mono", "Consolas", "SFMono-Regular", "Segoe UI Mono", ui-monospace, monospace;
+
+  /* ---- 字阶（对齐 Timing §2.5）---- */
+  --text-title: 15px;    --leading-title: 1.3;
+  --text-num:   14px;    --leading-num:   1.0;
+  --text-body:  13px;    --leading-body:  1.6;
+  --text-sm:    12.5px;  --leading-sm:    1.45;
+  --text-xs:    11.5px;  --leading-xs:    1.5;
+  --text-cap:   11px;    --leading-cap:   1.4;
+  --text-mono:  11.5px;  --leading-mono:  1.4;
+
+  /* ---- 字重三级 + 强档（YaHei UI 落地映射见 DESIGN-V0.2.0.md §3.3）---- */
+  --weight-read:     400;   /* 正文 / 说明 */
+  --weight-medium:   500;   /* 控件文本 / 任务名 */
+  --weight-semibold: 600;   /* 分组标题 / 已完成行名 */
+  --weight-strong:   650;   /* 标题 / 时间数字 */
+
+  /* ---- 字距 ---- */
+  --tracking-caps:  0.08em;
+  --tracking-xs:    0.02em;
+  --tracking-base:  0;
+  --tracking-tight: -0.01em;
+
+  /* ---- 间距（4px 网格）---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --row-pad-y:   9px;
+  --card-pad-x:  14px;
+  --panel-pad:   16px;
+  --menu-pad:    6px;
+
+  /* ---- 圆角 ---- */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   12px;
+  --radius-xl:   14px;
+  --radius-full: 9999px;
+
+  /* ---- 尺寸：小条几何（对齐 Timing §4.1）---- */
+  /* [ADR-020] 固定 384×360 画布已删除。布局上界改由 `lib/fitBounds.ts` 写成
+     --fit-w / --fit-h：主窗 = 胶囊所在显示器的工作区（DIP），非主窗 = 真实视口。
+     这里只给兜底值（100vw/100vh），IPC 拿到工作区后会被覆盖。 */
+  --fit-w:           100vw;
+  --fit-h:           100vh;
+  --pill-h:          32px;   /* Timing BarH 32（MainForm.cs:175） */
+  --pill-h-compact:  30px;
+  --radius-pill:     calc(var(--pill-h) / 2);   /* 真胶囊 = 16px */
+  --pill-w-min:      116px;
+  --pill-w-max:      288px;
+  --task-w-max:      164px;
+  --pill-pad-l:      8px;
+  --pill-pad-r:      7px;
+  /* [UI 统一 2026-10-16] 环几何对齐 Timing 实测（MainForm.cs: RingD=14 / RingLW=2.4）：
+     视觉 ⌀16（Timing 14 + 命中余量），描边 2.4；命中区经 .ring::before 扩到 24。 */
+  --ring-size:       16px;
+  --ring-stroke:     2.4px;
+  --ring-hit-extra:  4px;
+  /* [V0.3.7] 圆角方形的**视觉等效半径**（idle / ended 仍走 CSS border，见 surfaces.css）。
+     [V0.3.3] 从圆形改圆角方形时取 5px，那是「圆角矩形」的口径——直线接四分之一圆弧，
+     切点处曲率突变，放大看有一道生硬的接缝。V0.3.7 把握把形状换成超椭圆 n=3
+     （曲率连续，见 lib/ringGeometry.ts 的 ARC_PATH），SVG 那条不用这个值；
+     这里的 5.6px 只是让**走 border 的 idle / ended** 在角部内缩量上与超椭圆对齐：
+     超椭圆外沿（半边长 8）角部内缩 = 8·(1 − 2^(−1/3))·√2 ≈ 2.334px，
+     圆角矩形的内缩 = r·(√2−1)，反解 r ≈ 5.64px。两者相差 0.01px 量级，肉眼不可分。
+     收起态圆点仍走 --radius-full。 */
+  --ring-radius:     5.6px;
+  /* 小条计时数字：对齐 Timing 有效字号（TimeEm 28 自动收缩到 53px 盒 → 实测 ≈19-20）。
+     字体 Segoe UI Semibold 观感 + tabular-nums 保 AC-24 不抖动（替代 mono，见 pill-bar.md §1 注）。
+     [V0.2.1] 20 → 18：大字号下数字的视觉重量压过 16px 圆环，用户要求「时间组件的大小与位置」与
+     圆环对齐（行高锁 --ring-size 共用中心线，见 surfaces.css .pill .timer-digits）。 */
+  --text-timer-pill: 18px;
+  --text-task-pill:  14px;   /* Timing TaskEm=14（YaHei UI Bold） */
+  --font-timer:      "Segoe UI", "Segoe UI Semibold", "Microsoft YaHei UI", sans-serif;
+  --grip-w:          10px;
+  --grip-hit-w:      10px;
+  --grip-svg-w:      12px;
+  --grip-svg-h:      22px;
+
+  /* ---- 尺寸：窗口 ---- */
+  --settings-w: 392px;  --settings-h: 660px;
+  --settings-title-h: 50px;  --settings-tab-h: 48px;  --settings-foot-h: 58px;
+  --todos-w: 336px;  --todos-head-h: 32px;  --todos-row-h: 26px;  --todos-mark-size: 15px;
+  --todos-pending-row-h: 24px;  --todos-foot-h: 40px;  --todos-pending-max: 8;
+  --note-w: 320px;  --note-h: 232px;  --note-head-h: 36px;  --note-foot-h: 34px;
+  /* [V0.2.4] 便利贴正文框相对窗口的内缩：圆点与缩放手柄都浮在这条留白里 */
+  --note-pad: 6px;
+  --note-w-min: 160px;  --note-h-min: 120px;  --note-w-max: 900px;  --note-h-max: 900px;
+  --note-w-comfort-max: 640px;  --note-h-comfort-max: 480px;
+  --note-max-count: 20;
+  --note-geom-persist-debounce-ms: 300;
+  --note-confirm-stack-below-w: 200px;
+
+  /* ---- 尺寸：菜单 / 控件 ---- */
+  --menu-w: 136px;  --menu-item-h: 30px;  --menu-item-pad-x: 9px;
+  --menu-w-max: 208px;   /* 上限：长标签（「开始计时 · 很长的名字」）到此为止，超出省略号 */
+  --menu-icon-gap: 10px;  --menu-status-h: 46px;   /* Timing StatusH 46（GlassMenu.cs:27）。预留：.menu__status 为内容驱动高度（padding 9 + 多行），强接定高有 3 行变体裁切风险，待运行态验证后接线 */
+  --btn-md-h: 28px;  --btn-sm-h: 24px;  --icon-btn-size: 26px;
+  --input-h: 28px;  --field-num-w: 54px;
+  --slider-track-h: 4px;  --slider-thumb: 14px;
+  --switch-w: 38px;  --switch-h: 22px;
+
+  /* ---- 尺寸：命中 ---- */
+  --hit-target: 44px;
+  --hit-target-small: 26px;
+  --hit-target-dot: 36px;
+  --snap-margin: 16px;
+  /* [V0.2.3 · 2] 小条靠左：整条离窗口左沿的内缩从 16px 收到 6px（事项名+手柄这组随之左移） */
+  --pill-inset: 6px;
+  --drag-threshold: 4px;
+
+  /* ---- 图标 ---- */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-stroke-sm: 2.5;   /* 16px */
+  --icon-stroke-lg: 2;     /* 20px / 24px */
+
+  /* ---- 动效（仅 3 条缓动；禁止任何弹跳/弹性）---- */
+  --dur-instant: 100ms;
+  --dur-quick:   150ms;
+  --dur-exit:    180ms;
+  --dur-base:    200ms;
+  --dur-morph:   280ms;
+  --dur-confirm: 900ms;
+  --dur-undo:    3000ms;
+  --dur-tick:    1000ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit:     cubic-bezier(0.4, 0, 1, 1);
+  --ease-morph:    cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ---- 层级 ---- */
+  --z-base: 0;  --z-pill: 10;  --z-panel: 20;  --z-note: 20;
+  --z-settings: 30;  --z-undo: 40;  --z-tooltip: 50;  --z-menu: 60;  --z-dialog: 70;
+
+  /* ---- 玻璃（有明确功能目的，见 DESIGN-V0.2.0.md §6.4）---- */
+  --glass-blur: 18px;
+  --glass-blur-sm: 14px;
+  --glass-saturate: 150%;
+}
+
+/* =============================================================================
+ * 0b. 首屏兜底 + V0.1.0 颜色过渡别名
+ *   index.html 内联引导脚本只需设 data-theme（读 localStorage `tickbar.theme`）
+ *   即可让 --bg 立即生效 —— 无需等 CSS 全量就绪，消除首帧白闪（坑 K-1）。
+ * ========================================================================== */
+:root {
+  --bg:          var(--bg-plate);
+  --surface:     var(--bg-panel);
+  --surface-2:   var(--bg-card);
+  --surface-3:   var(--bg-field);
+  --surface-4:   var(--bg-field-hi);
+  --fg:          var(--ink);
+  --fg-2:        var(--ink-2);
+  --muted:       var(--ink-3);
+  --meta:        var(--ink-4);
+  --border:      var(--line-2);
+  --border-soft: var(--line);
+}
+html { background: var(--bg); font-synthesis-weight: none; }   /* 首屏兜底 + 禁伪粗体 */
+body { background: transparent; }

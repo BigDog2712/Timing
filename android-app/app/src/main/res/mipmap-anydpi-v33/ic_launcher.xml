@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android 13+ 的「主题图标」入口。不写这一份，开了主题图标的桌面会用系统从 foreground
+    自动生成一个灰扑扑的单色版，看起来就像「图标没换」。
+    只放在 v33 目录：低版本解析到 v26 那份即可，避免 <monochrome> 在旧系统上的兼容问题。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_bg" />
+    <foreground android:drawable="@mipmap/ic_launcher_fg" />
+    <monochrome android:drawable="@mipmap/ic_launcher_mono" />
+</adaptive-icon>

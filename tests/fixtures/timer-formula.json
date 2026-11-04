@@ -1,0 +1,17 @@
+{
+  "_doc": "时间口径黄金用例（R8）。Rust 侧 tests/timer_formula.rs 与前端 useTimerTick.test.ts 读同一份，任何一端改公式都会有一端红。deltaMs = now - runningSince；null 表示暂停（running_since = NULL）。",
+  "cases": [
+    { "name": "零秒起步", "accumulatedSec": 0, "deltaMs": 0, "expect": 0 },
+    { "name": "不足 1 秒向下取整", "accumulatedSec": 0, "deltaMs": 999, "expect": 0 },
+    { "name": "整 1 秒", "accumulatedSec": 0, "deltaMs": 1000, "expect": 1 },
+    { "name": "秒数进位不漏", "accumulatedSec": 10, "deltaMs": 1500, "expect": 11 },
+    { "name": "59.999 秒不进位", "accumulatedSec": 0, "deltaMs": 59999, "expect": 59 },
+    { "name": "整分钟", "accumulatedSec": 0, "deltaMs": 60000, "expect": 60 },
+    { "name": "暂停态冻结", "accumulatedSec": 10, "deltaMs": null, "expect": 10 },
+    { "name": "暂停态大累计", "accumulatedSec": 3600, "deltaMs": null, "expect": 3600 },
+    { "name": "墙钟回拨不得倒退", "accumulatedSec": 10, "deltaMs": -5000, "expect": 10 },
+    { "name": "墙钟回拨 1 小时", "accumulatedSec": 42, "deltaMs": -3600000, "expect": 42 },
+    { "name": "超 24 小时累计", "accumulatedSec": 86400, "deltaMs": 3600000, "expect": 90000 },
+    { "name": "亚秒级增量不放大", "accumulatedSec": 5, "deltaMs": 1, "expect": 5 }
+  ]
+}

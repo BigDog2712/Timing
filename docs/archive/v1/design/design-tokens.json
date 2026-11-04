@@ -1,0 +1,335 @@
+{
+  "meta": {
+    "product": "TickBar",
+    "appId": "com.tickbar.app",
+    "version": "1.0.0",
+    "phase": "Phase 2 - Design Refinement",
+    "designer": "颜好看",
+    "sourceOfTruth": "docs/Spec-v1.md §8（设计 Token 锁定）+ docs/phase1/UIUX-v1.md §7",
+    "register": "Product Register（产品型）",
+    "calibration": { "variance": 7, "motion": 5, "density": 8 },
+    "theme": "constant-dark-only",
+    "iconLibrary": "lucide-react",
+    "usage": "组件样式只允许引用 semantic / component 层。primitive 层是原始值仓库，禁止在组件里直接消费。组件 CSS 禁止出现任何裸 hex/rgb（含 #fff / #000）。唯一例外是 shadow 组内已收敛的 rgba 阴影色。",
+    "importExample": "import tokens from './design-tokens.json'; const amber = tokens.color.semantic.accent.value;"
+  },
+
+  "color": {
+    "primitive": {
+      "neutral": {
+        "l0": { "value": "#0E0F12", "type": "color", "description": "深渊 L0 — 投影基色 / 撤销条底 / 拖拽投影" },
+        "l1": { "value": "#1A1C20", "type": "color", "description": "药丸底 L1（默认背景）" },
+        "l2": { "value": "#22242A", "type": "color", "description": "抬升 L2 — hover / 展开面板底" },
+        "l3": { "value": "#2B2E35", "type": "color", "description": "高亮面 L3 — 按下 / chips / 菜单 hover" },
+        "l4": { "value": "#343841", "type": "color", "description": "顶层 L4 — 输入框底 / 菜单按下" }
+      },
+      "text": {
+        "fg": { "value": "#F2F4F7", "type": "color", "description": "主文本，对比度 15.5:1" },
+        "fg2": { "value": "#C3C8D0", "type": "color", "description": "次级文本，对比度 10.1:1" },
+        "muted": { "value": "#8B919C", "type": "color", "description": "三级文本，对比度 5.38:1" },
+        "meta": { "value": "#6E7480", "type": "color", "description": "元信息，对比度 3.63:1。仅限图标 / 分隔线 / 禁用文案，禁止承载可读正文" }
+      },
+      "border": {
+        "default": { "value": "#33373F", "type": "color", "description": "面板 / 菜单 / 输入框外描边（装饰性）" },
+        "soft": { "value": "#26292F", "type": "color", "description": "药丸内部 1px 分隔线（装饰性）" },
+        "strong": { "value": "#454B55", "type": "color", "description": "hover 时描边加强（装饰性）" },
+        "edgeInner": { "value": "rgba(255,255,255,0.08)", "type": "color", "description": "药丸顶部 1px 内高光，模拟金属边缘（非毛玻璃）" },
+        "edgeInnerStrong": { "value": "rgba(255,255,255,0.14)", "type": "color", "description": "高对比 / 浅色壁纸降级时的内描边" }
+      },
+      "brand": {
+        "accent": { "value": "#E9A23B", "type": "color", "description": "Signal Amber 信号琥珀 — 全站唯一强调色，纯色零渐变" },
+        "accentHover": { "value": "#F2B157", "type": "color", "description": "琥珀 hover（提亮）" },
+        "accentActive": { "value": "#D18F2C", "type": "color", "description": "琥珀 active（压暗）" },
+        "accentOn": { "value": "#201603", "type": "color", "description": "琥珀底色上的前景，对比度 8.23:1" }
+      },
+      "state": {
+        "idle": { "value": "#8B919C", "type": "color", "description": "idle 待机状态环（中性、待命）" },
+        "running": { "value": "#E9A23B", "type": "color", "description": "running 计时中状态环（暖、活）" },
+        "paused": { "value": "#7C93AC", "type": "color", "description": "paused 已暂停状态环（冷、静，钢蓝）" },
+        "ended": { "value": "#3FB950", "type": "color", "description": "ended 已保存状态环（仅保持 900ms）" }
+      },
+      "status": {
+        "success": { "value": "#3FB950", "type": "color", "description": "保存成功 / 撤销条确认，对比度 6.72:1" },
+        "successOn": { "value": "#04140A", "type": "color", "description": "成功色底上的前景" },
+        "warn": { "value": "#D29922", "type": "color", "description": "超时提醒 / 休眠缺口，对比度 6.76:1" },
+        "warnOn": { "value": "#1A1203", "type": "color", "description": "警告色底上的前景" },
+        "danger": { "value": "#F2555A", "type": "color", "description": "丢弃 / 错误，对比度 5.05:1。仅用于销毁数据类动作" },
+        "dangerOn": { "value": "#1A0505", "type": "color", "description": "危险色底上的前景" },
+        "info": { "value": "#7C93AC", "type": "color", "description": "信息 / 中性提示，复用钢蓝" }
+      },
+      "effect": {
+        "halo": { "value": "radial-gradient(circle at 50% 50%, rgba(233,162,59,0.10) 0%, rgba(233,162,59,0) 70%)", "type": "gradient", "description": "运行中琥珀光晕，不透明度上限 0.10（唯一允许的渐变）" },
+        "haloSuccess": { "value": "radial-gradient(circle at 50% 50%, rgba(63,185,80,0.10) 0%, rgba(63,185,80,0) 70%)", "type": "gradient", "description": "结束态绿光晕，300ms 淡出" },
+        "scrim": { "value": "rgba(14,15,18,0.56)", "type": "color", "description": "对话框后方遮罩（不使用 backdrop-filter）" }
+      }
+    },
+
+    "semantic": {
+      "bg": { "value": "{color.primitive.neutral.l0}", "type": "color" },
+      "surface": { "value": "{color.primitive.neutral.l1}", "type": "color" },
+      "surfaceRaised": { "value": "{color.primitive.neutral.l2}", "type": "color" },
+      "surfaceHigh": { "value": "{color.primitive.neutral.l3}", "type": "color" },
+      "surfaceTop": { "value": "{color.primitive.neutral.l4}", "type": "color" },
+
+      "fg": { "value": "{color.primitive.text.fg}", "type": "color" },
+      "fg2": { "value": "{color.primitive.text.fg2}", "type": "color" },
+      "muted": { "value": "{color.primitive.text.muted}", "type": "color" },
+      "meta": { "value": "{color.primitive.text.meta}", "type": "color" },
+
+      "border": { "value": "{color.primitive.border.default}", "type": "color" },
+      "borderSoft": { "value": "{color.primitive.border.soft}", "type": "color" },
+      "borderStrong": { "value": "{color.primitive.border.strong}", "type": "color" },
+      "edgeInner": { "value": "{color.primitive.border.edgeInner}", "type": "color" },
+
+      "accent": { "value": "{color.primitive.brand.accent}", "type": "color" },
+      "accentHover": { "value": "{color.primitive.brand.accentHover}", "type": "color" },
+      "accentActive": { "value": "{color.primitive.brand.accentActive}", "type": "color" },
+      "accentOn": { "value": "{color.primitive.brand.accentOn}", "type": "color" },
+
+      "stateIdle": { "value": "{color.primitive.state.idle}", "type": "color" },
+      "stateRunning": { "value": "{color.primitive.state.running}", "type": "color" },
+      "statePaused": { "value": "{color.primitive.state.paused}", "type": "color" },
+      "stateEnded": { "value": "{color.primitive.state.ended}", "type": "color" },
+
+      "success": { "value": "{color.primitive.status.success}", "type": "color" },
+      "warn": { "value": "{color.primitive.status.warn}", "type": "color" },
+      "danger": { "value": "{color.primitive.status.danger}", "type": "color" },
+      "info": { "value": "{color.primitive.status.info}", "type": "color" },
+
+      "halo": { "value": "{color.primitive.effect.halo}", "type": "gradient" },
+      "scrim": { "value": "{color.primitive.effect.scrim}", "type": "color" }
+    },
+
+    "component": {
+      "pillBg": { "value": "{color.semantic.surface}", "type": "color" },
+      "pillBgHover": { "value": "{color.semantic.surfaceRaised}", "type": "color" },
+      "pillBgActive": { "value": "{color.semantic.surfaceHigh}", "type": "color" },
+      "pillBgDrag": { "value": "{color.semantic.surfaceHigh}", "type": "color" },
+      "pillBorder": { "value": "{color.semantic.edgeInner}", "type": "color" },
+      "pillDivider": { "value": "{color.semantic.borderSoft}", "type": "color" },
+
+      "menuBg": { "value": "{color.semantic.surfaceRaised}", "type": "color" },
+      "menuItemHover": { "value": "{color.semantic.surfaceHigh}", "type": "color" },
+      "menuItemPressed": { "value": "{color.semantic.surfaceTop}", "type": "color" },
+      "menuText": { "value": "{color.semantic.fg}", "type": "color" },
+      "menuDanger": { "value": "{color.semantic.danger}", "type": "color" },
+
+      "inputBg": { "value": "{color.semantic.surfaceHigh}", "type": "color" },
+      "inputBgFocus": { "value": "{color.semantic.surfaceTop}", "type": "color" },
+      "inputPlaceholder": { "value": "{color.semantic.muted}", "type": "color" },
+      "inputBorder": { "value": "{color.semantic.border}", "type": "color" },
+      "inputText": { "value": "{color.semantic.fg}", "type": "color" },
+
+      "chipBg": { "value": "{color.semantic.surfaceHigh}", "type": "color" },
+      "chipBgHover": { "value": "{color.semantic.surfaceTop}", "type": "color" },
+      "chipText": { "value": "{color.semantic.fg2}", "type": "color" },
+
+      "undoBg": { "value": "{color.semantic.bg}", "type": "color" },
+      "undoBorder": { "value": "{color.semantic.border}", "type": "color" },
+      "undoText": { "value": "{color.semantic.fg2}", "type": "color" },
+      "undoAction": { "value": "{color.semantic.accent}", "type": "color" },
+
+      "focusRingColor": { "value": "{color.semantic.accent}", "type": "color" },
+      "focusGapColor": { "value": "{color.semantic.surface}", "type": "color" },
+      "focusRingDanger": { "value": "{color.semantic.danger}", "type": "color" }
+    }
+  },
+
+  "typography": {
+    "fontFamily": {
+      "ui": {
+        "value": "\"Geist Sans\", \"Noto Sans SC\", -apple-system, \"Segoe UI Variable Text\", \"Microsoft YaHei UI\", sans-serif",
+        "type": "fontFamily",
+        "description": "界面主字体（Latin + 中文）"
+      },
+      "display": { "value": "{typography.fontFamily.ui}", "type": "fontFamily", "description": "标题复用界面字体，靠字重拉层级" },
+      "mono": {
+        "value": "\"Geist Mono\", \"JetBrains Mono\", \"Cascadia Mono\", Consolas, monospace",
+        "type": "fontFamily",
+        "description": "计时数字 + 快捷键标签专用。必须本地内联，禁止 CDN"
+      }
+    },
+
+    "fontSize": {
+      "2xs": { "value": "10px", "type": "dimension", "description": "极小徽标（如超时角标 4h+）" },
+      "xs": { "value": "11px", "type": "dimension", "description": "快捷键提示 / 撤销条 / 菜单加速键" },
+      "sm": { "value": "12px", "type": "dimension", "description": "「新建事项」/ chips / 辅助说明" },
+      "base": { "value": "13px", "type": "dimension", "description": "事项名 / 菜单项" },
+      "md": { "value": "14px", "type": "dimension", "description": "展开面板输入框 / 菜单主项" },
+      "lg": { "value": "16px", "type": "dimension", "description": "展开面板标题" },
+      "timer": { "value": "20px", "type": "dimension", "description": "药丸内计时数字（默认）" },
+      "timerLg": { "value": "28px", "type": "dimension", "description": "展开面板中的大计时" },
+      "timerXl": { "value": "40px", "type": "dimension", "description": "专注模式全展开（v2，本期仅预留 Token）" }
+    },
+
+    "lineHeight": {
+      "2xs": { "value": "12px", "type": "dimension" },
+      "xs": { "value": "16px", "type": "dimension" },
+      "sm": { "value": "18px", "type": "dimension" },
+      "base": { "value": "20px", "type": "dimension" },
+      "md": { "value": "22px", "type": "dimension" },
+      "lg": { "value": "24px", "type": "dimension" },
+      "timer": { "value": "24px", "type": "dimension" },
+      "timerLg": { "value": "32px", "type": "dimension" },
+      "timerXl": { "value": "44px", "type": "dimension" },
+      "tight": { "value": "1.2", "type": "number", "description": "标题" },
+      "body": { "value": "1.5", "type": "number", "description": "正文" }
+    },
+
+    "fontWeight": {
+      "read": { "value": 400, "type": "number", "description": "说明文字 / 撤销条正文。不用于数字" },
+      "emphasize": { "value": 510, "type": "number", "description": "主力：计时数字 / 菜单项 / 事项名 / 按钮" },
+      "announce": { "value": 590, "type": "number", "description": "面板标题 / 大计时。不用于 14px 以下" }
+    },
+
+    "letterSpacing": {
+      "caps": { "value": "0.06em", "type": "dimension", "description": "ALL CAPS（快捷键标签）" },
+      "xs": { "value": "0.02em", "type": "dimension", "description": "11px 小字" },
+      "sm": { "value": "0.01em", "type": "dimension", "description": "12px 小字" },
+      "base": { "value": "0", "type": "dimension", "description": "正文 / 数字 / 中文（中文永不加字距）" },
+      "tight": { "value": "-0.01em", "type": "dimension", "description": "16px 标题" },
+      "tighter": { "value": "-0.02em", "type": "dimension", "description": "大于等于 28px 大计时" }
+    },
+
+    "timerDigits": {
+      "fontFamily": { "value": "{typography.fontFamily.mono}", "type": "fontFamily" },
+      "fontSize": { "value": "{typography.fontSize.timer}", "type": "dimension" },
+      "fontWeight": { "value": "{typography.fontWeight.emphasize}", "type": "number" },
+      "fontVariantNumeric": { "value": "tabular-nums", "type": "string", "description": "不可协商：等宽数字" },
+      "fontFeatureSettings": { "value": "\"tnum\" 1, \"zero\" 1", "type": "string", "description": "等宽数字 + 斜杠零" },
+      "fontVariantLigatures": { "value": "none", "type": "string" },
+      "letterSpacing": { "value": "0", "type": "dimension" },
+      "minWidth": { "value": "5ch", "type": "dimension", "description": "MM:SS 定宽，防止宽度抖动" },
+      "minWidthWithHours": { "value": "8ch", "type": "dimension", "description": "HH:MM:SS 定宽（>=1h 时启用）" },
+      "textAlign": { "value": "right", "type": "string", "description": "右对齐 + 定宽 = 数字永远原地变化" },
+      "maxValue": { "value": "99:59:59", "type": "string", "description": "上限，超过后冻结显示" }
+    }
+  },
+
+  "space": {
+    "1": { "value": "2px", "type": "dimension", "description": "药丸内边距（亚级）" },
+    "2": { "value": "4px", "type": "dimension" },
+    "3": { "value": "8px", "type": "dimension" },
+    "4": { "value": "10px", "type": "dimension", "description": "药丸内亚级（Token 层收敛，组件不得自由取数）" },
+    "5": { "value": "12px", "type": "dimension" },
+    "6": { "value": "16px", "type": "dimension", "description": "屏幕边距 / 吸附边距" },
+    "7": { "value": "20px", "type": "dimension" },
+    "8": { "value": "24px", "type": "dimension" },
+    "9": { "value": "32px", "type": "dimension" },
+    "10": { "value": "40px", "type": "dimension" },
+    "12": { "value": "48px", "type": "dimension" },
+    "semantic": {
+      "inlineGap": { "value": "{space.2}", "type": "dimension", "description": "图标与文字间距 4px" },
+      "chipGap": { "value": "{space.3}", "type": "dimension", "description": "chips 间距 8px" },
+      "panelPad": { "value": "{space.5}", "type": "dimension", "description": "面板内边距 12px" },
+      "panelPadTop": { "value": "{space.3}", "type": "dimension", "description": "面板顶部内边距 8px" },
+      "screenEdge": { "value": "{space.6}", "type": "dimension", "description": "距屏幕边缘 16px" },
+      "menuItemPadX": { "value": "{space.4}", "type": "dimension", "description": "菜单项左内边距 10px" }
+    }
+  },
+
+  "radius": {
+    "none": { "value": "0", "type": "dimension" },
+    "chip": { "value": "9999px", "type": "dimension", "description": "chips / 药丸内按钮" },
+    "sm": { "value": "8px", "type": "dimension", "description": "输入框 / tooltip" },
+    "md": { "value": "12px", "type": "dimension", "description": "菜单 / 撤销条" },
+    "lg": { "value": "16px", "type": "dimension", "description": "展开面板 / 对话框" },
+    "pill": { "value": "24px", "type": "dimension", "description": "药丸（= 48 / 2，真胶囊形态）" }
+  },
+
+  "shadow": {
+    "flat": { "value": "none", "type": "shadow" },
+    "ring": { "value": "0 0 0 1px rgba(255,255,255,0.08)", "type": "shadow", "description": "内描边环（= edge-inner）" },
+    "raised": {
+      "value": "0 8px 24px rgba(0,0,0,0.44), 0 2px 6px rgba(0,0,0,0.32)",
+      "type": "shadow",
+      "description": "药丸默认外阴影（深色桌面上靠阴影浮起，不靠毛玻璃）"
+    },
+    "raisedHover": { "value": "0 10px 28px rgba(0,0,0,0.50)", "type": "shadow" },
+    "float": { "value": "0 12px 32px rgba(0,0,0,0.50)", "type": "shadow", "description": "菜单 / 撤销条" },
+    "panel": { "value": "0 16px 40px rgba(0,0,0,0.52)", "type": "shadow", "description": "展开面板" },
+    "drag": { "value": "0 20px 48px rgba(0,0,0,0.60)", "type": "shadow", "description": "拖拽中" },
+    "focus": {
+      "value": "0 0 0 2px #1A1C20, 0 0 0 4px #E9A23B",
+      "type": "shadow",
+      "description": "focus-visible 双环：2px 间隙（surface）+ 2px 琥珀环。注意：值内 hex 已在 Token 层收敛，组件只引用 --focus-ring"
+    },
+    "focusDanger": { "value": "0 0 0 2px #1A1C20, 0 0 0 4px #F2555A", "type": "shadow", "description": "危险操作的 focus 环" }
+  },
+
+  "motion": {
+    "duration": {
+      "instant": { "value": "100ms", "type": "duration", "description": "按下反馈 / 图标淡入 / scale 微缩" },
+      "quick": { "value": "150ms", "type": "duration", "description": "hover 变色 / 描边 / 阴影（跨系统收敛值，最常用）" },
+      "base": { "value": "200ms", "type": "duration", "description": "状态切换（idle -> running -> paused）/ 菜单出场" },
+      "exit": { "value": "180ms", "type": "duration", "description": "撤销条淡出 / 菜单关闭" },
+      "morph": { "value": "280ms", "type": "duration", "description": "药丸 <-> 圆点 <-> 面板形态变形" },
+      "confirm": { "value": "900ms", "type": "duration", "description": "结束态绿色保持时间" },
+      "undo": { "value": "3000ms", "type": "duration", "description": "撤销条生命周期。= src/types/domain.ts 导出的 UNDO_WINDOW_MS（契约同步锁定）" },
+      "haloBreath": { "value": "2400ms", "type": "duration", "description": "光晕呼吸周期" },
+      "tick": { "value": "1000ms", "type": "duration", "description": "1Hz tick 周期" }
+    },
+    "easing": {
+      "standard": { "value": "cubic-bezier(0.2, 0, 0, 1)", "type": "cubicBezier", "description": "一切颜色 / 阴影 / 透明度过渡" },
+      "exit": { "value": "cubic-bezier(0.4, 0, 1, 1)", "type": "cubicBezier", "description": "元素离场" },
+      "morph": { "value": "cubic-bezier(0.32, 0.72, 0, 1)", "type": "cubicBezier", "description": "形态变形（先快后极慢收尾）" }
+    },
+    "rules": {
+      "animateWhitelist": { "value": ["opacity", "transform", "background-color", "border-color", "color", "box-shadow", "border-radius"], "type": "array" },
+      "animateBlacklist": { "value": ["width", "height", "margin", "padding", "top", "left", "right", "bottom", "font-size", "filter", "backdrop-filter"], "type": "array" },
+      "documentedException": { "value": "形态变形需过渡 width/height/border-radius（药丸 48px 高 <-> 面板 auto 高）；仅发生在用户主动触发的单次变形中（<=280ms），非稳态动画。除此之外 width/height 一律禁止动画。" },
+      "maxConcurrentAnimations": { "value": 3, "type": "number", "description": "同一时刻动画元素上限；RUNNING 稳态仅 2 个（tick + 呼吸）" },
+      "forbiddenEasing": { "value": ["任何弹跳/弹性缓动", "ease-back", "spring", "cubic-bezier(0.68,-0.55,0.265,1.55)", "cubic-bezier(0.34,1.56,0.64,1)"], "type": "array" },
+      "forbiddenDuration": { "value": "任何 > 400ms 的 UI 动效（confirm/undo 为语义保留时长，非过渡动画）", "type": "string" }
+    }
+  },
+
+  "size": {
+    "windowW": { "value": "384px", "type": "dimension", "description": "固定透明置顶层宽，永不 resize" },
+    "windowH": { "value": "360px", "type": "dimension", "description": "固定透明置层高，永不 resize" },
+    "pillH": { "value": "48px", "type": "dimension" },
+    "pillHCompact": { "value": "40px", "type": "dimension", "description": "紧凑档，设置可切" },
+    "pillWMin": { "value": "256px", "type": "dimension" },
+    "pillWTyp": { "value": "288px", "type": "dimension" },
+    "pillWMax": { "value": "360px", "type": "dimension" },
+    "panelW": { "value": "300px", "type": "dimension" },
+    "dotSize": { "value": "28px", "type": "dimension", "description": "收起圆点可见直径" },
+    "hitTarget": { "value": "44px", "type": "dimension", "description": "药丸内热区" },
+    "hitTargetDot": { "value": "36px", "type": "dimension", "description": "收起态热区，主动小于 44px 以避免遮挡底层应用" },
+    "ringSize": { "value": "32px", "type": "dimension", "description": "状态环直径" },
+    "ringStroke": { "value": "2px", "type": "dimension" },
+    "menuW": { "value": "184px", "type": "dimension" },
+    "menuItemH": { "value": "32px", "type": "dimension" },
+    "inputH": { "value": "36px", "type": "dimension" },
+    "chipH": { "value": "28px", "type": "dimension" },
+    "chipPadX": { "value": "12px", "type": "dimension" },
+    "toastH": { "value": "32px", "type": "dimension" },
+    "iconSm": { "value": "16px", "type": "dimension", "description": "行内图标" },
+    "iconMd": { "value": "20px", "type": "dimension", "description": "按钮内图标" },
+    "iconLg": { "value": "24px", "type": "dimension", "description": "独立图标" },
+    "iconStrokeSm": { "value": 2.5, "type": "number", "description": "16px 图标描边宽，保持视觉线重一致" },
+    "iconStrokeLg": { "value": 2, "type": "number", "description": "20px / 24px 图标描边宽" },
+    "snapMargin": { "value": "16px", "type": "dimension", "description": "吸附阈值 + 吸附后固定边距" },
+    "dragThreshold": { "value": "4px", "type": "dimension", "description": "小于此视为点击" },
+    "nameMaxChars": { "value": 11, "type": "number", "description": "事项名截断：11 个中文字符（或 22 个拉丁字符）" },
+    "longPressMs": { "value": 500, "type": "number", "description": "右键长按弹出菜单阈值" },
+    "clickMaxMs": { "value": 400, "type": "number", "description": "右键单击判定上限（< 400ms = 结束）" },
+    "debounceMs": { "value": 200, "type": "number", "description": "连点去抖窗口" },
+    "hoverTooltipMs": { "value": 300, "type": "number", "description": "收起态悬停 tooltip 延迟" },
+    "hoverNameMs": { "value": 400, "type": "number", "description": "超长事项名 tooltip 延迟" },
+    "recoverLossBudgetSec": { "value": 30, "type": "number", "description": "崩溃恢复丢失时长上限" },
+    "persistIntervalSec": { "value": 15, "type": "number", "description": "运行中每 15s 落盘" }
+  },
+
+  "zIndex": {
+    "base": { "value": 0, "type": "number" },
+    "pill": { "value": 10, "type": "number" },
+    "panel": { "value": 20, "type": "number" },
+    "recordsPanel": { "value": 20, "type": "number" },
+    "settingsPanel": { "value": 30, "type": "number" },
+    "undoBar": { "value": 40, "type": "number" },
+    "tooltip": { "value": 50, "type": "number" },
+    "menu": { "value": 60, "type": "number" },
+    "dialog": { "value": 70, "type": "number", "description": "崩溃恢复对话框，遮罩 + 内容同层" }
+  }
+}

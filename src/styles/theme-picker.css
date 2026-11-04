@@ -1,0 +1,228 @@
+/* =============================================================================
+ * TickBar V0.2.0 — theme-picker.css（主题卡 + 四色取色行）
+ * -----------------------------------------------------------------------------
+ * 依据 theme-picker.md / DESIGN-V0.2.0.md §4.5 §4.6。P0：仅 var(--*)，零字面量色值。
+ * 面板外壳 / 页签 / 底栏见 settings-panel.css。
+ * ========================================================================== */
+
+/* ------------------------------ 卡片 ------------------------------ */
+.card {
+  padding: var(--card-pad-x);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+.card + .card {
+  margin-top: var(--space-3);
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.card__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-cap);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.card__head .card__title {
+  margin: 0;
+}
+
+/* ------------------------------ 主题卡 ------------------------------ */
+.theme-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+  border: 1px solid var(--line);
+  transition: border-color var(--dur-quick) var(--ease-standard), background-color var(--dur-quick) var(--ease-standard);
+}
+
+.theme-card:hover {
+  border-color: var(--line-3);
+}
+
+.theme-card:active {
+  transform: scale(0.99);
+}
+
+.theme-card[data-on="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+}
+
+/* 迷你预览：用该主题的「真实色」缩略（令牌 --preview-*，非当前主题变量） */
+.theme-card__preview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+}
+
+.theme-card__preview[data-preview="dark"] {
+  background: var(--preview-dark-plate);
+  border: 1px solid var(--preview-dark-line);
+}
+
+.theme-card__preview[data-preview="light"] {
+  background: var(--preview-light-plate);
+  border: 1px solid var(--preview-light-line);
+}
+
+.theme-card__ring {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  /* [V0.3.3] 预览跟着主环改形状：12px 按 16px 的比例缩放（5 × 12/16 = 3.75px），
+     仍保持 ~31% 圆角观感，不至于缩成圆形（直接用 --ring-radius 会变成 42%）。 */
+  border-radius: calc(var(--ring-radius) * 0.75);
+  border: 2px solid var(--preview-accent);
+}
+
+.theme-card__bar {
+  flex: 1 1 auto;
+  height: 5px;
+  border-radius: var(--radius-full);
+}
+
+.theme-card__preview[data-preview="dark"] .theme-card__bar {
+  background: var(--preview-dark-ink);
+}
+
+.theme-card__preview[data-preview="light"] .theme-card__bar {
+  background: var(--preview-light-ink);
+}
+
+.theme-card__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: var(--text-sm);   /* [Timing 对齐 D13] ThemeCard 标签 12.5（ThemeCard.cs:170） */
+  color: var(--ink-2);
+}
+
+.theme-card__check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: var(--accent-ink);
+}
+
+/* ------------------------------ 取色行 ------------------------------ */
+.swatches {
+  display: flex;
+  flex-direction: column;
+}
+
+.swatch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--row-pad-y) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.swatch:last-child {
+  border-bottom: 0;
+}
+
+.swatch__dot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px var(--line-3);
+}
+
+.swatch__native {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.swatch__name {
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+
+.swatch__spacer {
+  flex: 1 1 auto;
+}
+
+.swatch__hex {
+  /* 7 位 hex（#RRGGBB）在 11.5px 等宽下约 48px，加上左右各 10px 内边距需要 68px。
+     原先套用 --field-num-w（54px，那是给倒计时分钟数用的），hex 会被截成「#4DA3」，
+     看起来像色值没显示出来。 */
+  width: 68px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.swatch[data-invalid="true"] .swatch__hex {
+  border-color: var(--danger);
+}
+
+.swatch__follow {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.swatch__follow:hover {
+  color: var(--ink);
+  background: var(--bg-field-hi);
+}
+
+.swatch__chev {
+  flex: 0 0 auto;
+  color: var(--ink-4);
+}
+
+.swatch__error {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+
+.picker__error {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}

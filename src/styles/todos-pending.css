@@ -1,0 +1,261 @@
+/* =============================================================================
+ * TickBar V0.2.0 — todos-pending.css（事项窗口：待办分组 + 待办行）
+ * -----------------------------------------------------------------------------
+ * 拆自 todos-panel.css（单文件 ≤300 行纪律）。仅 var(--*)，零字面量色值。
+ * 依据 docs/design/pages-V0.2.0/todos-panel.md §1 待办区 + §3.1 三级语气。
+ * 内联编辑 / 空态 / Loading-Error 见 todos-inline.css。
+ * ========================================================================== */
+
+/* ------------------------------ 待办分组 ------------------------------ */
+.todo-sec {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.todo-sec__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 22px;
+}
+
+.todo-sec__head--done {
+  margin-top: var(--space-2);
+}
+
+.todo-sec__label {
+  font-size: var(--text-cap);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  color: var(--todo-summary-ink);
+}
+
+.todo-sec__none {
+  margin: var(--space-2) 0;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+.todo-sec__more {
+  width: 100%;
+  height: var(--todos-pending-row-h);
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-sec__more:hover {
+  background: var(--todo-row-hover);
+  color: var(--ink);
+}
+
+/* ------------------------------ 待办行 ------------------------------ */
+/* [V0.3.9] 与「今日计时」记录行同构：名字（左）/ 时刻（右）/ 编辑态动作（行尾），
+   左侧不再有圆点；整行可点 = 勾选切换，故给 pointer 光标。
+   [V0.3.10] 编辑模式下名字与两枚时间胶囊**各自可点开改**（点哪改哪）；只读时胶囊只是读数。 */
+.todo-pend {
+  display: grid;
+  /* [V0.3.11] 与「今日计时」行**同一套三列**（用户口径「时间应显示在对应的开始时间列」）：
+     名字（1fr）/ 时间（auto，行内水平居中）/ 右侧（1fr，圆圈贴右沿 —— 正好落在表头「总时间」那一列下）。
+     两节用同一份模板与同一份 gap，时间列才会上下对齐。 */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--todos-pending-row-h);
+  padding: 0 6px 0 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+/* 编辑态：多出「时间位 ×2」与「删除」两列，名字仍占 1fr 以便改名时看得清 */
+.todo-pend[data-edit="true"] {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+.todo-pend:hover {
+  background: var(--todo-row-hover);
+}
+
+.todo-pend--editing {
+  display: block;
+  cursor: default;
+}
+
+.todo-pend__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* [V0.3.10] 名字里不再挂铃铛（铃铛已挪进开启胶囊），所以用**块级**盒子而不是 inline-flex ——
+     text-overflow: ellipsis 只对块级容器的行内内容生效，挂在 flex 容器上只会被硬裁掉半个字。 */
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);   /* [Timing 对齐 D10] RowEm 12.5 */
+  color: var(--ink-2);
+}
+
+/* 编辑态：名字本身是改名按钮（行尾铅笔已删，改名面就是名字） */
+.todo-pend__title--editable {
+  margin: 0 -2px;
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: text;
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-pend__title--editable:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.todo-pend[data-tone="none"] .todo-pend__title {
+  color: var(--todo-no-time);
+}
+
+/* [V0.3.14] 过期：整行降透明度 + 名字一道横线（用户口径「透明度降低且有一条横线表示过期」）。
+   颜色仍走 `--todo-overdue`，但压低 opacity 后不再抢眼 —— 过期是「已经过去」的语气，
+   而不是「更醒目」。编辑态（`data-edit="true"`）不降透明度、不划线：正在改的名字要看得清。 */
+.todo-pend[data-tone="overdue"]:not([data-edit="true"]) {
+  opacity: 0.62;
+}
+
+.todo-pend[data-tone="overdue"]:not([data-edit="true"]) .todo-pend__title {
+  color: var(--todo-overdue);
+  text-decoration: line-through;
+  text-decoration-color: var(--todo-overdue);
+  text-decoration-thickness: 1px;
+}
+
+.todo-pend[data-done="true"] .todo-pend__title {
+  color: var(--todo-name-done);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-3);
+}
+
+/* ------------------------------ 时间胶囊 ------------------------------ */
+/* [V0.3.10] 开启 / 截止各自可点编辑；[V0.3.11] 只读态改回**和「今日计时」行同一套读数**
+   （等宽 11.5 / --ink-4 / 右对齐）：用户口径「显示格式应该和计时一样，没指定时间就右侧空白」。
+   胶囊、铃铛、「未设时间」字样全部取消 —— 有时间就显示：有开始时间按开始显示，否则显示截止。 */
+.todo-pend__time {
+  flex: 0 0 auto;
+  /* [ADR-034] 这一格现在也会写日期（`10-22`）与「逾期」，34px 装不下 `MM-DD`（5 位等宽 ≈ 35–38px），
+     会把字挤成两行。加宽到 40px 兜住常态；跨年 `YY-MM-DD`（8 位）仍允许按内容自然撑开
+     （grid 中列是 auto，两侧 1fr 等分吸收，不破坏行内对齐）。 */
+  min-width: 40px;
+  /* 居中对齐 = 与「今日计时」的时间列同一条视觉中线（两节列模板一致） */
+  text-align: center;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);   /* [Timing 对齐 D10] NumEm 11.5 */
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+}
+
+/* [V0.3.11] 行尾圆圈：**只表达「有没有提醒」**（黄 = 有时间提醒，空心 = 无）。
+   用户口径「提醒放在显示总时间的部分」—— 它贴右沿，正落在表头「X 小时 Y 分」那一列下面。
+   点击它是「完成 / 未完成」（见 TodosPendingRow），行的其余部分才是开关提醒。 */
+.todo-pend__mark {
+  justify-self: end;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--line-3);
+  background: transparent;
+  transition: background-color var(--dur-quick) var(--ease-standard),
+    border-color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-pend__mark[data-on="true"] {
+  border-color: var(--color-warn);
+  background: var(--color-warn);
+}
+
+.todo-pend__mark:hover {
+  border-color: var(--ink-3);
+}
+
+.todo-pend__mark[data-on="true"]:hover {
+  border-color: var(--color-warn);
+}
+
+/* 已完成的待办：圆圈淡下去（完成态本身由名字删除线表达） */
+.todo-pend[data-done="true"] .todo-pend__mark {
+  opacity: 0.5;
+}
+
+.todo-pend__times {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 编辑态的时间位：纯文字（不是胶囊），hover 才起底；未设时是淡淡的「+」 */
+.todo-pend__chip {
+  min-width: 30px;
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-pend__chip:hover,
+.todo-pend__chip[aria-expanded="true"] {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+/* 未设值：虚线「+」——空也能点开去设（用户口径「待办时间应可空置」） */
+.todo-pend__chip[data-empty="true"] {
+  font-family: inherit;
+  text-decoration: underline dotted var(--line-3);
+  text-underline-offset: 2px;
+}
+
+.todo-pend__chip[data-empty="true"]:hover {
+  color: var(--ink-3);
+  text-decoration-color: var(--accent-line);
+}
+
+/* 截止项跟着行语气走（逾期看的是 planned_at，开始时间不参与） */
+.todo-pend[data-tone="overdue"] .todo-pend__time,
+.todo-pend[data-tone="overdue"] .todo-pend__chip[data-field="planned"] {
+  color: var(--todo-overdue);
+}
+
+.todo-pend__actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.todo-pend__act {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-pend__act:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+/* 图标非文本，门槛 3:1（WCAG 1.4.11）；勿按文字 4.5 抬高 */
+.todo-pend__act--danger:hover {
+  background: var(--danger-wash);
+  color: var(--danger);
+}

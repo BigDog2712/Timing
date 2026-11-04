@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    调试版专属图标：全透明。
+    用户要求调试包在桌面上不显眼 —— 装上后图标位是空的，只能靠长按桌面或应用列表找。
+    注意：部分启动器（MIUI / HyperOS）会强制给全透明图标垫底板，效果可能变成半透明方块，
+    那是启动器行为，不是包的问题。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@android:color/transparent" />
+    <foreground android:drawable="@drawable/ic_debug_blank" />
+</adaptive-icon>

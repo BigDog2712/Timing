@@ -1,0 +1,495 @@
+{
+  "meta": {
+    "product": "TickBar",
+    "appId": "com.tickbar.app",
+    "version": "0.2.0",
+    "phase": "V0.2.0-2 设计系统整体重做（对标 Timing v1.7.0）",
+    "designer": "颜好看",
+    "sourceOfTruth": "docs/CHANGE-PLAN-V0.2.0.md §F + 参考项目 Timing_v1.7.0/README/DESIGN/DESIGN-SYSTEM.md（791 行）",
+    "register": "Product Register（产品型）— 设计服务产品，标杆「赢得熟悉感」",
+    "calibration": { "variance": 6, "motion": 5, "density": 8 },
+    "theme": "dual-theme（dark | light，可切换；默认 dark）",
+    "iconLibrary": "lucide-react",
+    "consumptionRules": [
+      "组件只允许引用 semantic / component 两层的 CSS 变量，禁止直接消费 primitive 原始值。",
+      "组件 CSS 禁止出现任何裸 hex / rgb；唯一例外是 shadow 组内已收敛的 rgba 阴影色，且必须经 --shadow-* 变量引用。",
+      "语义色作『文字』时必须满足 4.5:1，作『非文本』（描边/进度/色点）时须满足 3:1 —— 见 contrastAudit。",
+      "主色/语义色为用户可配（四色）。**出厂默认态不派生**：值 == 该主题默认 → 不 setProperty（回落分主题令牌，审计=令牌像素）；**仅用户自定义才派生**（浅色基准底 --bg-plate / 深色 --bg-panel；文字位 >=4.5、非文本位 >=3.0）。禁止硬套深色值。"
+    ],
+    "auditCalibration": "审计『出厂像素』：默认态审分主题令牌值（--accent 深 #4DA3E8 / 浅 #1669AD；warn/done 同理），自定义态才审派生值 —— 与 applyAccents『默认不派生』策略对齐（见 DESIGN-V0.2.0.md §10.2）。",
+    "importExample": "import tokens from './design-tokens-V0.2.0.json'; const accentDark = tokens.color.semantic.accent.dark;",
+    "themeSwitch": "根元素 data-theme=\"dark\" | \"light\"；CSS 变量两套在同一 :root 下按 [data-theme] 切换，无 JS 重排。"
+  },
+
+  "color": {
+    "primitive": {
+      "_comment": "原始值仓库：中性阶分深浅两条 ramp，语义色给出深/浅两枚实值。组件禁止直接消费本层。",
+      "neutralDark": {
+        "plate":    { "value": "#0E0F12", "type": "color", "description": "浮层底（＝小条底色默认）" },
+        "inset":    { "value": "#1B1E25", "type": "color", "description": "浮层内下沉区（便利贴正文）" },
+        "panel":    { "value": "#0E1015", "type": "color", "description": "设置面板外壳" },
+        "card":     { "value": "#14161C", "type": "color", "description": "分组卡片" },
+        "field":    { "value": "#1B1E25", "type": "color", "description": "输入框 / 控件底" },
+        "fieldHi":  { "value": "#232833", "type": "color", "description": "控件 hover" },
+        "seg":      { "value": "#171A21", "type": "color", "description": "分段控件槽" },
+        "segOn":    { "value": "#262B36", "type": "color", "description": "分段控件选中段" }
+      },
+      "neutralLight": {
+        "plate":    { "value": "#F2F3F5", "type": "color" },
+        "inset":    { "value": "#FFFFFF", "type": "color" },
+        "panel":    { "value": "#FFFFFF", "type": "color" },
+        "card":     { "value": "#F7F8FA", "type": "color" },
+        "field":    { "value": "#F1F3F7", "type": "color" },
+        "fieldHi":  { "value": "#E6E9EF", "type": "color" },
+        "seg":      { "value": "#EDEFF4", "type": "color" },
+        "segOn":    { "value": "#FFFFFF", "type": "color" }
+      },
+      "inkDark": {
+        "ink":  { "value": "#F2F3F5", "type": "color", "description": "正文" },
+        "ink2": { "value": "#C9CED8", "type": "color", "description": "次级：控件文本 / 数值" },
+        "ink3": { "value": "#8B93A2", "type": "color", "description": "三级：说明 / 页脚 / 版本号" },
+        "ink4": { "value": "#7A8292", "type": "color", "description": "四级：placeholder / 禁用 / 装饰箭头" }
+      },
+      "inkLight": {
+        "ink":  { "value": "#16181D", "type": "color" },
+        "ink2": { "value": "#41485A", "type": "color" },
+        "ink3": { "value": "#5C6577", "type": "color" },
+        "ink4": { "value": "#656E7D", "type": "color" }
+      },
+      "accentBlue": {
+        "base":     { "value": "#4DA3E8", "type": "color", "description": "Accent Blue 深色基准（语义『计时中』）" },
+        "inkDark":  { "value": "#8FC6F5", "type": "color", "description": "强调底上的前景 / 链接（深色）" },
+        "deep":     { "value": "#1669AD", "type": "color", "description": "浅色主题非文本主色（DeepenForNonText 默认落点）" },
+        "deepInk":  { "value": "#1F63AA", "type": "color", "description": "浅色主题强调文字 / 链接" }
+      },
+      "warnAmber": {
+        "base":    { "value": "#E8A33D", "type": "color", "description": "语义『提醒』（深色）" },
+        "deep":    { "value": "#A05E00", "type": "color", "description": "浅色主题安全值（保色相 H=35 加深至对 plate 4.62:1，文字/非文本通用）" }
+      },
+      "dangerRed": {
+        "base":    { "value": "#E5484D", "type": "color", "description": "破坏性操作（深色，用于文字/描边/色点）" },
+        "deep":    { "value": "#D02C33", "type": "color", "description": "浅色主题安全值（保色相 H=358 加深至对 plate 4.62:1）" },
+        "solidDark":  { "value": "#E1292F", "type": "color", "description": "AC-53：深色 danger 实心底专用（白字 4.61:1；#E5484D 作实心底白字仅 3.91）" },
+        "solidLight": { "value": "#D02C33", "type": "color", "description": "浅色 danger 实心底（＝ deep，白字 5.13:1）" }
+      },
+      "okGreen": {
+        "base":    { "value": "#4CC38A", "type": "color", "description": "语义『完成』（深色）" },
+        "ink":     { "value": "#06251A", "type": "color", "description": "勾画在 ok 实心圆上的深色前景" },
+        "deep":    { "value": "#0C7E47", "type": "color", "description": "浅色主题安全值（保色相 H=151 加深至对 plate 4.62:1）" }
+      },
+      "solidNeutral": {
+        "darkBg":   { "value": "#EDEFF3", "type": "color" },
+        "darkInk":  { "value": "#0B0C10", "type": "color" },
+        "lightBg":  { "value": "#1A1D24", "type": "color" },
+        "lightInk": { "value": "#FFFFFF", "type": "color" }
+      }
+    },
+
+    "semantic": {
+      "_comment": "角色层：每个角色给出 dark / light 两值。value 由 primitive 展开（深层结构见 __themeMap）。",
+
+      "bgPlate":   { "dark": "#0E0F12", "light": "#F2F3F5", "type": "color", "role": "A1-identity", "description": "浮层底 ＝ 小条底色。用户可配（--color-bar / settings.accent_bar）" },
+      "bgInset":   { "dark": "#1B1E25", "light": "#FFFFFF", "type": "color", "description": "浮层内下沉编辑区（便利贴正文）" },
+      "bgPanel":   { "dark": "#0E1015", "light": "#FFFFFF", "type": "color", "description": "常驻窗口外壳（设置面板 / 事项窗口）" },
+      "bgCard":    { "dark": "#14161C", "light": "#F7F8FA", "type": "color", "description": "分组卡片" },
+      "bgField":   { "dark": "#1B1E25", "light": "#F1F3F7", "type": "color", "description": "输入框 / 控件底" },
+      "bgFieldHi": { "dark": "#232833", "light": "#E6E9EF", "type": "color", "description": "控件 hover / neutral 按钮底" },
+      "bgSeg":     { "dark": "#171A21", "light": "#EDEFF4", "type": "color", "description": "分段控件槽" },
+      "bgSegOn":   { "dark": "#262B36", "light": "#FFFFFF", "type": "color", "description": "分段控件选中段" },
+
+      "line":      { "dark": "rgba(255,255,255,0.06)", "light": "rgba(16,20,28,0.07)", "type": "color", "description": "分隔线 / 卡片描边" },
+      "line2":     { "dark": "rgba(255,255,255,0.10)", "light": "rgba(16,20,28,0.12)", "type": "color", "description": "控件描边 / 浮层描边" },
+      "line3":     { "dark": "rgba(255,255,255,0.16)", "light": "rgba(16,20,28,0.18)", "type": "color", "description": "hover 描边 / 未完成圆环 / 滚动条" },
+
+      "ink":       { "dark": "#F2F3F5", "light": "#16181D", "type": "color", "description": "正文 17.14:1 / 17.76:1" },
+      "ink2":      { "dark": "#C9CED8", "light": "#41485A", "type": "color", "description": "次级 11.46:1 / 9.13:1" },
+      "ink3":      { "dark": "#8B93A2", "light": "#5C6577", "type": "color", "description": "三级 6.16:1 / 5.86:1" },
+      "ink4":      { "dark": "#7A8292", "light": "#656E7D", "type": "color", "description": "四级 4.93:1 / plate 4.64:1（AC-53：浅色已提升至 ≥4.5:1，可作正文小字）" },
+
+      "accent":     { "dark": "#4DA3E8", "light": "#1669AD", "type": "color", "description": "『计时中』主色。用户可配（--color-running / settings.accent_running）。浅色＝DeepenForNonText" },
+      "accentInk":  { "dark": "#8FC6F5", "light": "#1F63AA", "type": "color", "description": "强调底/链接上的前景" },
+      "accentWash": { "dark": "color-mix(in srgb, #4DA3E8 14%, transparent)", "light": "color-mix(in srgb, #1669AD 14%, transparent)", "type": "color", "description": "强调底 14%（当前行 / accent 按钮底）" },
+      "accentLine": { "dark": "color-mix(in srgb, #4DA3E8 32%, transparent)", "light": "color-mix(in srgb, #1669AD 32%, transparent)", "type": "color", "description": "强调描边 32%" },
+
+      "warn":      { "dark": "#E8A33D", "light": "#A05E00", "type": "color", "description": "『提醒』。用户可配（--color-warn / settings.accent_warn）。浅色对 plate 4.62:1（原 #A76200 仅 4.31）" },
+      "warnWash":  { "dark": "color-mix(in srgb, #E8A33D 12%, transparent)", "light": "color-mix(in srgb, #A05E00 12%, transparent)", "type": "color" },
+      "danger":    { "dark": "#E5484D", "light": "#D02C33", "type": "color", "description": "破坏性操作，仅用于销毁数据类动作。浅色对 plate 4.62:1（原 #D4353B 仅 4.33）" },
+      "dangerWash":{ "dark": "color-mix(in srgb, #E5484D 12%, transparent)", "light": "color-mix(in srgb, #D02C33 12%, transparent)", "type": "color" },
+      "ok":        { "dark": "#4CC38A", "light": "#0C7E47", "type": "color", "description": "『完成』。用户可配（--color-done / settings.accent_done）。浅色对 plate 4.62:1（原 #0C834A 仅 4.34）" },
+      "dangerSolid": { "dark": "#E1292F", "light": "#D02C33", "type": "color", "description": "AC-53：danger **实心底**专用（白字 ≥4.5）；非文本描边/色点仍用 danger" },
+      "okInk":     { "dark": "#06251A", "light": "#FFFFFF", "type": "color", "description": "勾画在 ok 实心圆上的前景（深 7.36:1）" },
+
+      "solidBg":   { "dark": "#EDEFF3", "light": "#1A1D24", "type": "color", "description": "实心主按钮底（仅确认型对话框）" },
+      "solidInk":  { "dark": "#0B0C10", "light": "#FFFFFF", "type": "color", "description": "实心主按钮字" },
+      "track":     { "dark": "rgba(255,255,255,0.09)", "light": "rgba(16,20,28,0.11)", "type": "color", "description": "滑条轨道 / 开关槽" },
+      "scrim":     { "dark": "rgba(14,15,18,0.56)", "light": "rgba(16,20,28,0.32)", "type": "color", "description": "对话框遮罩（不叠加 backdrop-filter）" }
+    },
+
+    "component": {
+      "_comment": "组件层：B-slot（≥2 处复用的别名）+ C-extension（项目专属）。每项以 ref 指向 semantic 角色。",
+      "pillBg":        { "ref": "semantic.bgPlate", "description": "小条底（用户可配 --color-bar）" },
+      "pillBorderIn":  { "ref": "semantic.line2", "description": "小条内描边 1px" },
+      "pillHoverPlate":{ "ref": "semantic.bgPlate", "modifier": "alpha-74 + blur-14", "description": "小条悬停板（玻璃，见 glass）" },
+      "gripInk":       { "dark": "rgba(255,255,255,0.74)", "light": "rgba(16,20,28,0.55)", "type": "color", "description": "拖拽柄（仅 hover 显示）" },
+
+      "menuBg":         { "ref": "semantic.bgPlate", "modifier": "alpha-94 + blur-18", "description": "菜单 / 事项窗口玻璃底" },
+      "menuItemHover":  { "ref": "semantic.bgFieldHi" },
+      "menuText":       { "ref": "semantic.ink2" },
+      "menuTextOn":     { "ref": "semantic.ink" },
+      "menuDanger":     { "ref": "semantic.danger" },
+      "menuGroupLabel": { "ref": "semantic.ink4" },
+
+      "inputBg":        { "ref": "semantic.bgField" },
+      "inputBgFocus":   { "ref": "semantic.bgFieldHi" },
+      "inputBorder":    { "ref": "semantic.line" },
+      "inputPlaceholder": { "ref": "semantic.ink4" },
+      "inputText":      { "ref": "semantic.ink" },
+
+      "btnAccentBg":    { "ref": "semantic.accentWash" },
+      "btnAccentInk":   { "ref": "semantic.accentInk" },
+      "btnAccentLine":  { "ref": "semantic.accentLine" },
+      "btnNeutralBg":   { "ref": "semantic.bgFieldHi" },
+      "btnNeutralInk":  { "ref": "semantic.ink" },
+      "btnGhostInk":    { "ref": "semantic.ink3" },
+      "btnDangerBg":    { "ref": "semantic.dangerSolid", "description": "AC-53：实心底专用（深 #E1292F / 浅 #D02C33）→ 白字 ≥4.5；**不可**用 semantic.danger（深色白字仅 3.91）" },
+      "btnDangerInk":   { "dark": "#FFFFFF", "light": "#FFFFFF", "type": "color", "description": "danger 实心按钮字（配合 dangerSolid 双主题 ≥4.5）" },
+      "btnSolidBg":     { "ref": "semantic.solidBg" },
+      "btnSolidInk":    { "ref": "semantic.solidInk" },
+      "iconBtnInk":     { "ref": "semantic.ink3" },
+      "iconBtnHoverBg": { "ref": "semantic.bgFieldHi" },
+      "iconBtnDangerBg":{ "ref": "semantic.dangerWash" },
+
+      "segTrack":       { "ref": "semantic.bgSeg" },
+      "segTrackLine":   { "ref": "semantic.line" },
+      "segOnBg":        { "ref": "semantic.bgSegOn" },
+      "segOnInk":       { "ref": "semantic.ink" },
+      "segOffInk":      { "ref": "semantic.ink3" },
+
+      "cardBg":         { "ref": "semantic.bgCard" },
+      "cardLine":       { "ref": "semantic.line" },
+
+      "todoRowHover":   { "ref": "semantic.bgField" },
+      "todoRowCurrent": { "ref": "semantic.accentWash", "description": "『进行中』行底 14%（取代 45% alpha 高亮）" },
+      "todoBarCurrent": { "ref": "semantic.accent", "description": "『进行中』行左 3px 竖条" },
+      "todoNameCurrent":{ "ref": "semantic.ink" },
+      "todoTimeCurrent":{ "ref": "semantic.accentInk" },
+      "todoNameDone":   { "ref": "semantic.ink4", "description": "已完成行名（时长加删除线，text-decoration-color=line3）" },
+      "todoMarkRing":   { "ref": "semantic.line3" },
+      "todoMarkDone":   { "ref": "semantic.ok" },
+      "todoMarkDoneInk":{ "ref": "semantic.okInk" },
+      "todoOverdue":    { "ref": "semantic.warn", "via": "--color-warn", "description": "待办逾期（AC-54：改走可配色 --color-warn，默认回落 semantic.warn）" },
+      "todoNoTime":     { "ref": "semantic.ink4", "description": "待办未设时间" },
+      "todoSummaryInk": { "ref": "semantic.ink3", "description": "表头右侧『共 2 小时 15 分』" },
+
+      "noteBodyBg":     { "ref": "semantic.bgInset" },
+      "noteFootInk":    { "ref": "semantic.ink3" },
+      "noteConfirmBg":  { "ref": "semantic.dangerWash" },
+      "noteConfirmLine":{ "ref": "semantic.danger" },
+
+      "focusRing":      { "dark": "0 0 0 2px #0E1015, 0 0 0 4px #4DA3E8", "light": "0 0 0 2px #FFFFFF, 0 0 0 4px #1669AD", "type": "shadow", "description": "focus-visible 双环；组件只引用 --focus-ring" },
+      "focusRingDanger":{ "dark": "0 0 0 2px #0E1015, 0 0 0 4px #E5484D", "light": "0 0 0 2px #FFFFFF, 0 0 0 4px #D02C33", "type": "shadow" },
+
+      "glassPanelBg":   { "dark": "color-mix(in srgb, #0E0F12 94%, transparent)", "light": "color-mix(in srgb, #F2F3F5 97%, transparent)", "type": "color", "description": "浮层玻璃底（94% / 97%）" },
+      "glassHoverBg":   { "dark": "color-mix(in srgb, #0E0F12 74%, transparent)", "light": "color-mix(in srgb, #F2F3F5 86%, transparent)", "type": "color", "description": "小条悬停板玻璃底（74%）" },
+      "glassBlur":      { "value": "18px", "type": "dimension", "description": "菜单 / 事项窗口玻璃模糊半径" },
+      "glassBlurSm":    { "value": "14px", "type": "dimension", "description": "悬停板玻璃模糊半径" },
+      "glassSaturate":  { "value": "150%", "type": "percentage", "description": "玻璃饱和度提升" },
+      "insetHighlight": { "dark": "inset 0 1px 0 rgba(255,255,255,0.06)", "light": "inset 0 1px 0 rgba(255,255,255,0.90)", "type": "shadow", "description": "选中段 / 悬停板顶部内高光" }
+    }
+  },
+
+  "typography": {
+    "fontFamily": {
+      "ui": {
+        "value": "\"Microsoft YaHei UI\", \"Microsoft YaHei\", \"Segoe UI\", system-ui, -apple-system, sans-serif",
+        "type": "fontFamily",
+        "description": "界面主字体（中文 + Latin）。本地系统字体，零 CDN 依赖。"
+      },
+      "display": { "value": "{typography.fontFamily.ui}", "type": "fontFamily", "description": "标题复用界面字体，靠字重/字号拉层级" },
+      "mono": {
+        "value": "\"Cascadia Mono\", \"Consolas\", \"SFMono-Regular\", \"Segoe UI Mono\", ui-monospace, monospace",
+        "type": "fontFamily",
+        "description": "计时数字 + hex 值 + 键位标签专用。系统 mono fallback 链，保证 tabular-nums。"
+      }
+    },
+
+    "fontSize": {
+      "title": { "value": "15px", "type": "dimension", "lineHeight": "1.3", "weight": 650, "description": "设置面板 / 事项窗口标题" },
+      "num":   { "value": "14px", "type": "dimension", "lineHeight": "1.0", "weight": 650, "description": "小条时间（tabular-nums）" },
+      "body":  { "value": "13px", "type": "dimension", "lineHeight": "1.6", "weight": "400/500/600", "description": "正文 / 控件文本 / 编辑区 / 任务名" },
+      "sm":    { "value": "12.5px", "type": "dimension", "lineHeight": "1.45", "weight": "400/500", "description": "按钮 / 页签 / 取值" },
+      "xs":    { "value": "11.5px", "type": "dimension", "lineHeight": "1.5", "weight": 400, "description": "说明 / 页脚 / 插件描述" },
+      "cap":   { "value": "11px", "type": "dimension", "lineHeight": "1.4", "weight": 600, "letterSpacing": "0.08em", "description": "分组小标题（大写追踪）" },
+      "mono":  { "value": "11.5px", "type": "dimension", "lineHeight": "1.4", "weight": 400, "description": "hex 值 / 版本号 / 信息位" }
+    },
+
+    "fontWeight": {
+      "read":     { "value": 400, "type": "number", "description": "正文 / 说明" },
+      "medium":   { "value": 500, "type": "number", "description": "控件文本 / 任务名" },
+      "semibold": { "value": 600, "type": "number", "description": "分组标题 / 已完成行名" },
+      "strong":   { "value": 650, "type": "number", "description": "标题 / 时间数字" },
+      "_platformNote": { "value": "Microsoft YaHei UI 仅提供 Light(300)/Regular(400)/Bold(700) 三个字面。500/600/650 在中文上会回落到 400 或 700；Latin/数字（mono 链）可表达中间字重。落地映射见 DESIGN-V0.2.0.md §3.3。", "type": "string" }
+    },
+
+    "letterSpacing": {
+      "caps":   { "value": "0.08em", "type": "dimension", "description": "分组小标题 / ALL CAPS" },
+      "xs":     { "value": "0.02em", "type": "dimension", "description": "11.5px 小字" },
+      "base":   { "value": "0", "type": "dimension", "description": "正文 / 数字 / 中文（中文永不加字距）" },
+      "tight":  { "value": "-0.01em", "type": "dimension", "description": "15px 标题" }
+    },
+
+    "timerDigits": {
+      "fontFamily": { "value": "{typography.fontFamily.mono}", "type": "fontFamily" },
+      "fontSize": { "value": "{typography.fontSize.num}", "type": "dimension" },
+      "fontWeight": { "value": 650, "type": "number" },
+      "fontVariantNumeric": { "value": "tabular-nums", "type": "string", "description": "不可协商：等宽数字" },
+      "fontFeatureSettings": { "value": "\"tnum\" 1, \"zero\" 1", "type": "string" },
+      "letterSpacing": { "value": "0", "type": "dimension" },
+      "minWidth": { "value": "53px", "type": "dimension", "description": "MM:SS 定宽（对齐 Timing TimeW 53）" },
+      "minWidthWithHours": { "value": "72px", "type": "dimension", "description": "HH:MM:SS 定宽" },
+      "textAlign": { "value": "right", "type": "string", "description": "右对齐 + 定宽 = 数字永远原地变化" },
+      "maxValue": { "value": "99:59:59", "type": "string" }
+    }
+  },
+
+  "space": {
+    "_comment": "基准 4px 网格。数组段位，组件禁止自行取非标值。",
+    "1":  { "value": "4px", "type": "dimension" },
+    "2":  { "value": "8px", "type": "dimension" },
+    "3":  { "value": "12px", "type": "dimension" },
+    "4":  { "value": "16px", "type": "dimension" },
+    "5":  { "value": "20px", "type": "dimension" },
+    "6":  { "value": "24px", "type": "dimension" },
+    "7":  { "value": "32px", "type": "dimension" },
+    "semantic": {
+      "inlineGap":    { "value": "8px", "type": "dimension", "description": "图标与文字 / 小条内 gap" },
+      "rowPadY":      { "value": "9px", "type": "dimension", "description": "卡片行上下内边距（Timing 行 padding 9px 0）" },
+      "cardPadX":     { "value": "14px", "type": "dimension", "description": "卡片左右内边距" },
+      "panelPad":     { "value": "16px", "type": "dimension", "description": "面板内容内边距" },
+      "menuPad":      { "value": "6px", "type": "dimension", "description": "菜单容器内边距" }
+    }
+  },
+
+  "radius": {
+    "sm":   { "value": "6px", "type": "dimension", "description": "按钮 / 输入框 / 图标按钮 / 色点" },
+    "md":   { "value": "10px", "type": "dimension", "description": "分段控件 / 主题卡 / 提示气泡" },
+    "lg":   { "value": "12px", "type": "dimension", "description": "卡片 / 便利贴 / 菜单" },
+    "xl":   { "value": "14px", "type": "dimension", "description": "设置面板外壳" },
+    "pill": { "value": "calc(var(--pill-h) / 2)", "type": "dimension", "description": "小条（= 高 / 2，真胶囊 17px）" },
+    "full": { "value": "9999px", "type": "dimension", "description": "徽标 / 圆点按钮" }
+  },
+
+  "shadow": {
+    "flat":  { "value": "none", "type": "shadow" },
+    "ring":  { "value": "0 0 0 1px var(--line-2)", "type": "shadow", "description": "内描边环" },
+    "pop":   { "value": "0 12px 32px rgba(0,0,0,0.45), 0 2px 6px rgba(0,0,0,0.35)", "type": "shadow", "description": "小条悬停板 / 提示气泡" },
+    "plate": { "value": "0 18px 48px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.40)", "type": "shadow", "description": "便利贴 / 浮层" },
+    "float": { "value": "0 12px 32px rgba(0,0,0,0.45)", "type": "shadow", "description": "菜单" },
+    "panel": { "value": "0 16px 40px rgba(0,0,0,0.52)", "type": "shadow", "description": "常驻窗口" },
+    "balloon":{ "value": "0 18px 48px rgba(0,0,0,0.55)", "type": "shadow", "description": "小条空闲态贴边硬影（对齐 Timing）" },
+    "inset": { "value": "var(--inset-highlight)", "type": "shadow", "description": "顶部 1px 内高光" },
+    "focus": { "value": "0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent)", "type": "shadow", "description": "focus-visible 双环" },
+    "focusDanger": { "value": "0 0 0 2px var(--bg-panel), 0 0 0 4px var(--danger)", "type": "shadow" }
+  },
+
+  "motion": {
+    "duration": {
+      "instant": { "value": "100ms", "type": "duration", "description": "按下反馈 / 图标淡入 / scale 微缩" },
+      "quick":   { "value": "150ms", "type": "duration", "description": "hover 变色 / 描边（跨系统收敛值，最常用）" },
+      "exit":    { "value": "180ms", "type": "duration", "description": "菜单关闭 / 浮层淡出" },
+      "base":    { "value": "200ms", "type": "duration", "description": "状态切换 / 菜单出场" },
+      "morph":   { "value": "280ms", "type": "duration", "description": "小条 <-> 圆点形态变形" },
+      "confirm": { "value": "900ms", "type": "duration", "description": "结束态绿色保持" },
+      "undo":    { "value": "3000ms", "type": "duration", "description": "撤销条生命周期（= src/types/domain.ts UNDO_WINDOW_MS）" },
+      "tick":    { "value": "1000ms", "type": "duration", "description": "1Hz tick" }
+    },
+    "easing": {
+      "standard": { "value": "cubic-bezier(0.2, 0, 0, 1)", "type": "cubicBezier", "description": "一切颜色 / 阴影 / 透明度过渡" },
+      "exit":     { "value": "cubic-bezier(0.4, 0, 1, 1)", "type": "cubicBezier", "description": "元素离场" },
+      "morph":    { "value": "cubic-bezier(0.32, 0.72, 0, 1)", "type": "cubicBezier", "description": "形态变形（先快后极慢收尾）" }
+    },
+    "rules": {
+      "animateWhitelist": { "value": ["opacity", "transform", "background-color", "border-color", "color", "box-shadow", "border-radius"], "type": "array" },
+      "animateBlacklist": { "value": ["width", "height", "margin", "padding", "top", "left", "font-size", "filter", "backdrop-filter"], "type": "array" },
+      "documentedException": { "value": "形态变形需过渡 width/height/border-radius（圆点 <-> 小条 <-> 面板），仅用户主动触发单次（<=280ms），非稳态动画。", "type": "string" },
+      "forbiddenEasing": { "value": ["任何弹跳/弹性缓动", "ease-back", "spring", "cubic-bezier(0.68,-0.55,0.265,1.55)", "cubic-bezier(0.34,1.56,0.64,1)"], "type": "array" },
+      "forbiddenDuration": { "value": "任何 > 400ms 的 UI 动效（confirm/undo 为语义保留时长，非过渡动画）", "type": "string" },
+      "maxConcurrentAnimations": { "value": 3, "type": "number" }
+    }
+  },
+
+  "size": {
+    "windowW":       { "value": "384px", "type": "dimension", "description": "小条透明置顶层宽（永不 resize）" },
+    "windowH":       { "value": "360px", "type": "dimension", "description": "小条透明置层高（容纳悬停板 / 菜单）" },
+
+    "pillH":         { "value": "34px", "type": "dimension", "description": "小条高（Timing 对齐：32 -> 34）" },
+    "pillHCompact":  { "value": "30px", "type": "dimension", "description": "紧凑档（设置可切）" },
+    "pillRadius":    { "value": "calc(var(--pill-h) / 2)", "type": "dimension", "description": "真胶囊 17px" },
+    "pillWMin":      { "value": "116px", "type": "dimension", "description": "极短事项宽度下界（含 padL 8 + ring 22 + gap 8 + time 53 + gap 8 + grip 10 + padR 7）" },
+    "pillWMax":      { "value": "288px", "type": "dimension", "description": "宽度上限" },
+    "taskWMax":      { "value": "164px", "type": "dimension", "description": "事项区最大墨迹宽（超出省略号）" },
+    "pillPadL":      { "value": "8px", "type": "dimension" },
+    "pillPadR":      { "value": "7px", "type": "dimension", "description": "右比左紧：右端是拖拽柄" },
+    "ringSize":      { "value": "22px", "type": "dimension", "description": "色环外径（Timing 对齐：14 -> 22）" },
+    "ringStroke":    { "value": "2.6px", "type": "dimension", "description": "色环笔宽" },
+    "ringTrack":     { "value": "rgba(255,255,255,0.20)", "type": "color", "description": "色环未填充轨道" },
+    "ringTrackLight":{ "value": "rgba(16,20,28,0.16)", "type": "color" },
+    "gripW":         { "value": "10px", "type": "dimension", "description": "拖拽柄格宽（原 12）" },
+    "gripHitW":      { "value": "10px", "type": "dimension", "description": "拖拽柄命中区（不因图标变窄而缩）" },
+    "gripSvgW":      { "value": "12px", "type": "dimension", "description": "柄 SVG 宽（在 10 宽格内居中，左右各溢 1px）" },
+    "gripSvgH":      { "value": "22px", "type": "dimension" },
+    "gripPath":      { "value": "M5.6 3.6 C9 6.6, 9 15.4, 5.6 18.4", "type": "string", "description": "单条三次贝塞尔，形如 ）" },
+
+    "settingsW":     { "value": "392px", "type": "dimension", "description": "设置面板宽（对齐 Timing）" },
+    "settingsH":     { "value": "660px", "type": "dimension", "description": "设置面板高" },
+    "settingsTitleH":{ "value": "50px", "type": "dimension" },
+    "settingsTabH":  { "value": "48px", "type": "dimension" },
+    "settingsFootH": { "value": "58px", "type": "dimension" },
+
+    "todosW":        { "value": "336px", "type": "dimension", "description": "事项窗口宽（自适应高）" },
+    "todosHeadH":    { "value": "32px", "type": "dimension" },
+    "todosRowH":     { "value": "26px", "type": "dimension" },
+    "todosMarkSize": { "value": "15px", "type": "dimension", "description": "状态圆标记（进行/完成）" },
+    "todosPendingRowH": { "value": "24px", "type": "dimension" },
+    "todosPendingMax": { "value": 8, "type": "number" },
+    "todosFootH":    { "value": "40px", "type": "dimension" },
+
+    "noteW":         { "value": "320px", "type": "dimension", "description": "便利贴默认宽（原 300）" },
+    "noteH":         { "value": "232px", "type": "dimension", "description": "便利贴默认高（原 200）" },
+    "noteHeadH":     { "value": "36px", "type": "dimension" },
+    "noteFootH":     { "value": "34px", "type": "dimension" },
+    "noteWMin":      { "value": "160px", "type": "dimension", "description": "便利贴缩放下限宽 = 架构应用层硬钳制（width 160–900）" },
+    "noteHMin":      { "value": "120px", "type": "dimension", "description": "便利贴缩放下限高 = 架构应用层硬钳制（height 120–900）" },
+    "noteWMax":      { "value": "900px", "type": "dimension", "description": "便利贴缩放上限宽 = 架构应用层硬钳制" },
+    "noteHMax":      { "value": "900px", "type": "dimension", "description": "便利贴缩放上限高 = 架构应用层硬钳制" },
+    "noteWComfortMax": { "value": "640px", "type": "dimension", "description": "设计建议的舒适上限宽（PM 建议；软提示，非硬钳制）" },
+    "noteHComfortMax": { "value": "480px", "type": "dimension", "description": "设计建议的舒适上限高（PM 建议；软提示，非硬钳制）" },
+    "noteMaxCount":  { "value": 20, "type": "number", "description": "便利贴窗口数量上限（架构 ADR-009）；达上限时「新建便利贴」置灰并提示" },
+    "noteGeomPersistDebounceMs": { "value": 300, "type": "number", "description": "便利贴几何落盘去抖（架构 K-23）：Moved/Resized ÷ scale_factor 存逻辑值，300ms 去抖后经 note_update 落盘" },
+    "noteConfirmStackBelowW": { "value": 200, "type": "dimension", "description": "便利贴删除确认条：note 宽 < 此值时按钮改竖排满宽（保证 AC-63 下限 160px 下两按钮不挤压）" },
+
+    "reminderMergeWindowMs": { "value": 60000, "type": "number", "description": "提醒聚合窗口（AC-61）：±60s 内到点的多条合并为一条聚合通知" },
+    "commonRecentCount":     { "value": 5, "type": "number", "description": "常用事项：最近 N 条（工作记忆上限）" },
+    "commonPinnedSoftCap":   { "value": 8, "type": "number", "description": "固定任务建议上限（不设硬上限，展示区滚动）" },
+
+    "menuW":         { "value": "184px", "type": "dimension", "description": "悬浮菜单最小宽" },
+    "trayW":         { "value": "272px", "type": "dimension", "deprecated": true, "description": "已退役：托盘菜单为系统原生 Win32 菜单，宽度由 OS 自算（见 pages-V0.2.0/tray-menu.md）" },
+    "menuItemH":     { "value": "30px", "type": "dimension", "description": "菜单行高（原 28）" },
+    "menuItemPadX":  { "value": "9px", "type": "dimension" },
+    "menuIconGap":   { "value": "10px", "type": "dimension" },
+    "menuStatusH":   { "value": "52px", "type": "dimension", "description": "菜单顶部状态块" },
+
+    "btnMdH":        { "value": "28px", "type": "dimension" },
+    "btnSmH":        { "value": "24px", "type": "dimension" },
+    "iconBtnSize":   { "value": "26px", "type": "dimension", "description": "图标按钮（同尺寸同形态，含删除/关闭）" },
+    "inputH":        { "value": "28px", "type": "dimension" },
+    "fieldNumW":     { "value": "54px", "type": "dimension", "description": "数值胶囊宽" },
+    "sliderTrackH":  { "value": "4px", "type": "dimension" },
+    "sliderThumb":   { "value": "14px", "type": "dimension" },
+    "switchW":       { "value": "38px", "type": "dimension" },
+    "switchH":       { "value": "22px", "type": "dimension" },
+
+    "hitTarget":     { "value": "44px", "type": "dimension", "description": "常规热区" },
+    "hitTargetSmall":{ "value": "26px", "type": "dimension", "description": "图标按钮热区（同 visual 尺寸）" },
+    "hitTargetDot":  { "value": "36px", "type": "dimension", "description": "收起态热区（主动小于 44，避免遮挡底层应用）" },
+    "snapMargin":    { "value": "16px", "type": "dimension" },
+    "dragThreshold": { "value": "4px", "type": "dimension" },
+    "nameMaxChars":  { "value": 11, "type": "number", "description": "（非小条）列表内事项名截断；小条用 taskWMax 164 墨迹宽" },
+    "longPressMs":   { "value": 500, "type": "number" },
+    "clickMaxMs":    { "value": 400, "type": "number" },
+    "debounceMs":    { "value": 200, "type": "number" },
+    "hoverTooltipMs":{ "value": 300, "type": "number" },
+    "persistIntervalSec": { "value": 15, "type": "number" },
+    "recoverLossBudgetSec": { "value": 30, "type": "number" }
+  },
+
+  "zIndex": {
+    "base":      { "value": 0, "type": "number" },
+    "pill":      { "value": 10, "type": "number" },
+    "panel":     { "value": 20, "type": "number" },
+    "note":      { "value": 20, "type": "number" },
+    "settings":  { "value": 30, "type": "number" },
+    "undoBar":   { "value": 40, "type": "number" },
+    "tooltip":   { "value": 50, "type": "number" },
+    "menu":      { "value": 60, "type": "number" },
+    "dialog":    { "value": 70, "type": "number" }
+  },
+
+  "icon": {
+    "library": { "value": "lucide-react", "type": "string", "description": "Spec 锁定的唯一图标库，全项目不混用" },
+    "sizes": { "inline": "16px", "button": "20px", "standalone": "24px" },
+    "strokeWidth": { "16": 2.5, "20": 2, "24": 2 },
+    "rule": { "value": "零 emoji 作为功能图标；禁止 U+2713 / U+2714 / U+26A0 / U+274C 等字符符号。一律用 lucide 对应语义图标。", "type": "string" },
+    "trayException": { "value": "系统托盘图标由 Rust 侧 .ico（16/20/24/32 多尺寸）提供，前端不绘制。", "type": "string" }
+  },
+
+  "contrastAudit": {
+    "_comment": "WCAG 2.1 相对亮度复算（脚本 docs/design/_contrast_check.py 可重跑）。标注【实测】。",
+    "method": "WCAG 2.1 §1.4.3 相对亮度公式；AA 正文 >=4.5:1，大字(>=18.66px 或 >=14px bold) >=3:1，非文本 >=3:1",
+    "dark": {
+      "ink on panel": "17.14:1 OK",
+      "ink on card": "16.29:1 OK",
+      "ink on plate": "17.26:1 OK",
+      "ink-2 on card": "11.46:1 OK",
+      "ink-2 on field": "10.57:1 OK",
+      "ink-3 on panel": "6.16:1 OK",
+      "ink-3 on card": "5.85:1 OK",
+      "ink-4 on panel": "4.93:1 OK",
+      "ink-4 on card": "4.68:1 OK",
+      "ink-4 on field": "4.32:1 (大字OK)",
+      "accent on panel": "6.99:1 OK",
+      "accent on card": "6.65:1 OK",
+      "accent-ink on card": "9.96:1 OK",
+      "accent-ink on accent-wash(#172533)": "8.57:1 OK",
+      "danger on card": "4.62:1 OK",
+      "warn on card": "8.39:1 OK",
+      "ok on card": "8.16:1 OK",
+      "ok-ink on ok solid": "7.36:1 OK",
+      "white on danger-solid #E1292F": "4.61:1 OK（AC-53：danger 实心底专用；原 #E5484D 仅 3.91）",
+      "solid-ink on solid-bg": "16.98:1 OK",
+      "ink on field-hi (neutral btn)": "13.29:1 OK",
+      "ink-3 on seg-on": "4.59:1 OK"
+    },
+    "light": {
+      "ink on white": "17.76:1 OK",
+      "ink on card": "16.71:1 OK",
+      "ink on plate": "15.99:1 OK",
+      "ink-2 on white": "9.13:1 OK",
+      "ink-2 on card": "8.59:1 OK",
+      "ink-3 on white": "5.86:1 OK",
+      "ink-3 on card": "5.52:1 OK",
+      "ink-4 on white": "5.15:1 OK",
+      "ink-4 on card": "4.84:1 OK",
+      "ink-4 on plate": "4.64:1 OK（AC-53 修复：原 #707A8A 仅 3.91）",
+      "accent #1669AD on white": "5.74:1 OK",
+      "accent #1669AD on card": "5.40:1 OK",
+      "accent-ink #1F63AA on white": "6.13:1 OK",
+      "accent-ink #1F63AA on card": "5.77:1 OK",
+      "accent-ink #1F63AA on plate": "5.52:1 OK",
+      "warn #A05E00 on plate": "4.62:1 OK（AC-53 修复：原 #A76200 仅 4.31）",
+      "warn #A05E00 on card": "4.82:1 OK",
+      "ok #0C7E47 on plate": "4.62:1 OK（AC-53 修复：原 #0C834A 仅 4.34）",
+      "ok #0C7E47 on card": "4.83:1 OK",
+      "danger #D02C33 on plate": "4.62:1 OK（AC-53 修复：原 #D4353B 仅 4.33）",
+      "danger #D02C33 on card": "4.83:1 OK",
+      "white on danger #D02C33 (solid)": "5.00:1 OK",
+      "white on ok #0C7E47 (solid)": "5.00:1 OK",
+      "solid-ink on solid-bg": "16.87:1 OK",
+      "ink on field-hi": "14.60:1 OK"
+    },
+    "traps": {
+      "dark ink #F2F3F5 on accent solid #4DA3E8": "2.45:1 不达标 —— 禁止把品牌蓝做主按钮实心底；主按钮走 accent tint 档",
+      "light white on accent solid #1669AD": "5.74:1 OK —— accent 实心底可用白字",
+      "浮层半透明白字 on 未知壁纸": "不可静态保证 —— V0.2.0 浮层文字一律用不透明 ink 令牌",
+      "dark white on danger #E5484D（实心陷阱）": "3.91:1 不达标 —— danger 实心底须用 --danger-solid #E1292F（白字 4.61）"
+    }
+  },
+
+  "configurableColors": {
+    "_comment": "四色可配（settings 表字段 → Token 映射）。**默认态不派生**（回落分主题令牌）；用户自定义时才派生 —— 浅色基准底 --bg-plate、深色基准底 --bg-panel；文字位目标 >=4.5、非文本位 >=3.0。",
+    "running": { "settingsField": "accent_running", "token": "--color-running", "semanticRef": "--accent", "defaultDark": "#4DA3E8", "defaultLight": "#1669AD", "label": "计时中" },
+    "warn":    { "settingsField": "accent_warn",    "token": "--color-warn",  "semanticRef": "--warn",   "defaultDark": "#E8A33D", "defaultLight": "#A05E00", "label": "提醒" },
+    "done":    { "settingsField": "accent_done",    "token": "--color-done",    "semanticRef": "--ok",     "defaultDark": "#4CC38A", "defaultLight": "#0C7E47", "label": "完成" },
+    "bar":     { "settingsField": "accent_bar",     "token": "--color-bar",     "semanticRef": "--bg-plate","defaultDark": "#0E0F12", "defaultLight": "#F2F3F5", "label": "小条底色" }
+  }
+}

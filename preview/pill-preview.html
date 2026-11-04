@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TickBar · 药丸形态预览</title>
+<style>
+/* ===== 唯一 Token 块（原始色值仅在此出现，等价 design-tokens.css）===== */
+:root{
+  color-scheme:dark;
+  --desk:#101218;--stage:#171A20;
+  --surface:#1A1C20;--surface-2:#22242A;--surface-3:#2B2E35;--surface-4:#343841;
+  --fg:#F2F4F7;--fg-2:#C3C8D0;--muted:#8B919C;--meta:#6E7480;
+  --border:#33373F;--border-soft:#26292F;--border-strong:#454B55;--edge-inner:rgba(255,255,255,0.08);
+  --accent:#E9A23B;--accent-hover:#F2B157;--accent-on:#201603;
+  --accent-halo:radial-gradient(circle at 50% 50%, rgba(233,162,59,0.10) 0%, rgba(233,162,59,0) 70%);
+  --accent-halo-success:radial-gradient(circle at 50% 50%, rgba(63,185,80,0.10) 0%, rgba(63,185,80,0) 70%);
+  --state-idle:#8B919C;--state-running:#E9A23B;--state-paused:#7C93AC;--success:#3FB950;--danger:#F2555A;
+  --font-ui:"Segoe UI Variable Text","Microsoft YaHei UI",system-ui,-apple-system,sans-serif;
+  --font-mono:"Cascadia Mono",Consolas,monospace;
+  --radius-sm:8px;--radius-md:12px;--radius-lg:16px;--radius-pill:24px;--radius-chip:9999px;
+  --elev-raised:0 8px 24px rgba(0,0,0,0.44),0 2px 6px rgba(0,0,0,0.32);
+  --elev-float:0 12px 32px rgba(0,0,0,0.50);--elev-panel:0 16px 40px rgba(0,0,0,0.52);
+  --scrim:rgba(14,15,18,0.56);
+  --dur-quick:150ms;--dur-base:200ms;--ease:cubic-bezier(0.2,0,0,1);
+}
+*{box-sizing:border-box}
+body{margin:0;padding:32px 24px 64px;background:var(--desk);color:var(--fg);font-family:var(--font-ui);font-size:13px;line-height:1.5}
+h1{margin:0 0 4px;font-size:20px;font-weight:590;letter-spacing:-0.01em}
+h2{margin:36px 0 14px;font-size:11px;font-weight:510;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em}
+.sub{margin:0 0 8px;font-size:13px;color:var(--fg-2)}
+.stage{margin-top:10px;padding:28px;border-radius:var(--radius-lg);background:var(--stage);border:1px solid var(--border-soft);display:flex;flex-wrap:wrap;gap:28px 36px;align-items:flex-start}
+.stage--col{flex-direction:column;gap:22px}
+.cap{margin:8px 0 0;font-size:11px;color:var(--meta)}
+.wrap{display:flex;flex-direction:column;align-items:flex-start}
+/* ===== 药丸 ===== */
+.pill{position:relative;display:flex;align-items:center;height:48px;min-width:288px;max-width:360px;padding:2px;border-radius:var(--radius-pill);background:var(--surface);box-shadow:var(--elev-raised),0 0 0 1px var(--edge-inner)}
+.ring{position:relative;width:44px;height:44px;display:grid;place-items:center;border-radius:var(--radius-chip)}
+.ring__inner{position:relative;z-index:1;width:32px;height:32px;display:grid;place-items:center;border-radius:var(--radius-chip);border:2px solid var(--state-idle);color:var(--state-idle)}
+.ring[data-state=running] .ring__inner{border-color:var(--state-running);color:var(--state-running)}
+.ring[data-state=paused] .ring__inner{border-color:var(--state-paused);color:var(--state-paused)}
+.ring[data-state=ended] .ring__inner{border-color:var(--success);color:var(--success);border-width:3px}
+.ring__halo{position:absolute;top:50%;left:50%;z-index:0;width:56px;height:56px;transform:translate(-50%,-50%);border-radius:var(--radius-chip);background:var(--accent-halo);opacity:.8}
+.ring__halo--ok{background:var(--accent-halo-success)}
+.timer-digits{font-family:var(--font-mono);font-size:20px;line-height:24px;font-weight:510;font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1,"zero" 1;min-width:5ch;text-align:right;white-space:nowrap;color:var(--fg);display:inline-block;margin-left:12px;margin-right:10px}
+.timer-digits[data-hours=true]{min-width:8ch}
+.pill__divider{width:1px;height:20px;margin:0 10px;background:var(--border-soft);flex:0 0 auto}
+.pill__name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:510;color:var(--fg-2);padding:0 4px}
+.pill__name[data-muted=true]{color:var(--muted)}
+.pill__empty{flex:1 1 auto;display:inline-flex;align-items:center;gap:4px;height:44px;padding:0 12px;border-radius:var(--radius-chip);color:var(--muted);font-weight:510}
+.pill__handle{width:44px;height:44px;display:grid;place-items:center;border-radius:var(--radius-chip);color:var(--muted);flex:0 0 auto}
+/* ===== 图标 ===== */
+.ic{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.ic--20{width:20px;height:20px;stroke-width:2}
+/* ===== 展开面板 ===== */
+.panel{width:300px;padding:8px 12px 12px;border-radius:var(--radius-lg);background:var(--surface-2);border:1px solid var(--border);box-shadow:var(--elev-panel)}
+.panel__input{width:100%;height:36px;padding:0 12px;border-radius:var(--radius-sm);background:var(--surface-3);color:var(--fg);font-size:14px;font-weight:510;border:1px solid transparent;font-family:inherit}
+.panel__input::placeholder{color:var(--muted)}
+.panel__chips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.chip{height:28px;display:inline-flex;align-items:center;justify-content:center;gap:4px;padding:0 12px;border-radius:var(--radius-chip);background:var(--surface-3);color:var(--fg-2);border:1px solid transparent;font-size:12px;font-weight:510;overflow:hidden;white-space:nowrap}
+.chip--add{color:var(--muted)}
+.panel__hint{display:flex;align-items:center;gap:8px;margin-top:12px;color:var(--meta);font-size:11px}
+.hint-item{display:inline-flex;align-items:center;gap:4px}
+.hint-item:last-child{margin-left:auto}
+.kbd{font-family:var(--font-mono);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted)}
+/* ===== 上下文菜单 ===== */
+.menu{width:184px;padding:4px 0;border-radius:var(--radius-md);background:var(--surface-2);border:1px solid var(--border);box-shadow:var(--elev-float)}
+.menu__item{display:flex;align-items:center;gap:8px;width:100%;height:32px;padding:0 10px;color:var(--fg);font-size:13px;font-weight:510;background:none;border:0;font-family:inherit}
+.menu__item .ic{color:var(--fg-2)}
+.menu__item:hover{background:var(--surface-3)}
+.menu__item[data-danger=true]{color:var(--danger)}
+.menu__item[data-danger=true] .ic{color:var(--danger)}
+.menu__item[data-disabled=true]{color:var(--meta)}
+.menu__item[data-disabled=true] .ic{color:var(--meta)}
+.menu__label{flex:1 1 auto;text-align:left}
+.menu__accel{font-family:var(--font-mono);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--meta)}
+.menu__check{color:var(--success)}
+.menu__sep{height:1px;margin:4px 0;background:var(--border-soft)}
+/* ===== 撤销条 ===== */
+.undo{display:flex;align-items:center;gap:12px;min-height:32px;max-width:360px;padding:0 12px;border-radius:var(--radius-md);background:var(--desk);border:1px solid var(--border);box-shadow:var(--elev-float);color:var(--fg-2);font-size:12px}
+.undo__time{font-family:var(--font-mono);color:var(--fg)}
+.undo__btn{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 8px;border-radius:var(--radius-chip);color:var(--accent);background:none;border:0;font-size:12px;font-weight:510;font-family:inherit}
+</style>
+</head>
+<body>
+<!-- 内联 Lucide 图标集（离线，无外链；16px 用 stroke-width 2.5） -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+<symbol id="i-trash-2" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></symbol>
+<symbol id="i-settings-2" viewBox="0 0 24 24"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/></symbol>
+<symbol id="i-undo-2" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5 5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+<symbol id="i-circle-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol>
+<symbol id="i-keyboard" viewBox="0 0 24 24"><path d="M10 8h.01"/><path d="M12 12h.01"/><path d="M14 8h.01"/><path d="M16 12h.01"/><path d="M18 8h.01"/><path d="M6 8h.01"/><path d="M7 16h10"/><path d="M8 12h.01"/><rect width="20" height="16" x="2" y="4" rx="2"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+<symbol id="i-circle-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="1"/></symbol>
+</defs></svg>
+
+<h1>TickBar · 药丸形态预览</h1>
+<p class="sub">恒定深色 · Signal Amber 强调色 · 零 emoji · 全部图标来自 Lucide 内联 SVG</p>
+
+<h2>药丸四态 · 等宽数字不抖动（AC-24）</h2>
+<div class="stage">
+  <div class="wrap"><div class="pill" data-state="idle">
+    <button class="ring" data-state="idle"><span class="ring__inner"><svg class="ic"><use href="#i-play"/></svg></span></button>
+    <span class="timer-digits" data-hours="false">00:00</span>
+    <button class="pill__empty"><svg class="ic"><use href="#i-plus"/></svg><span>新建事项</span></button>
+    <button class="pill__handle"><svg class="ic ic--20"><use href="#i-chevron-right"/></svg></button>
+  </div><p class="cap">IDLE · 环中性灰 · 数字等宽 5ch</p></div>
+
+  <div class="wrap"><div class="pill" data-state="running">
+    <button class="ring" data-state="running"><span class="ring__halo"></span><span class="ring__inner"><svg class="ic"><use href="#i-pause"/></svg></span></button>
+    <span class="timer-digits" data-hours="false">12:41</span>
+    <span class="pill__divider"></span><span class="pill__name">品牌视觉改版</span>
+    <button class="pill__handle"><svg class="ic ic--20"><use href="#i-chevron-right"/></svg></button>
+  </div><p class="cap">RUNNING · 环琥珀 + 光晕 · 环内淡入 pause</p></div>
+
+  <div class="wrap"><div class="pill" data-state="paused">
+    <button class="ring" data-state="paused"><span class="ring__inner"><svg class="ic"><use href="#i-pause"/></svg></span></button>
+    <span class="timer-digits" data-hours="false">12:41</span>
+    <span class="pill__divider"></span><span class="pill__name" data-muted="true">客户方案评审</span>
+    <button class="pill__handle"><svg class="ic ic--20"><use href="#i-chevron-right"/></svg></button>
+  </div><p class="cap">PAUSED · 环钢蓝 · 数字冻结 · 事项名弱化</p></div>
+
+  <div class="wrap"><div class="pill" data-state="ended">
+    <button class="ring" data-state="ended"><span class="ring__halo ring__halo--ok"></span><span class="ring__inner"><svg class="ic"><use href="#i-check"/></svg></span></button>
+    <span class="timer-digits" data-hours="true">01:12:41</span>
+    <span class="pill__divider"></span><span class="pill__name" data-muted="true">接口联调</span>
+    <button class="pill__handle"><svg class="ic ic--20"><use href="#i-chevron-right"/></svg></button>
+  </div><p class="cap">ENDED（900ms 瞬时确认）· 环绿实环 · 跨小时 8ch</p></div>
+</div>
+
+<h2>展开面板 · 新建事项</h2>
+<div class="stage stage--col">
+  <div class="panel">
+    <input class="panel__input" placeholder="这一段时间在做什么？" value="品牌视觉改版" />
+    <div class="panel__chips">
+      <button class="chip">品牌视觉改版</button>
+      <button class="chip">客户方案评审</button>
+      <button class="chip">接口联调</button>
+      <button class="chip chip--add"><svg class="ic"><use href="#i-plus"/></svg><span>新建</span></button>
+    </div>
+    <div class="panel__hint">
+      <svg class="ic"><use href="#i-keyboard"/></svg>
+      <span class="hint-item"><span class="kbd">ENTER</span><span>开始计时</span></span>
+      <span class="hint-item"><span class="kbd">ESC</span><span>取消</span></span>
+    </div>
+  </div>
+  <p class="cap">输入框焦点态唯一强调色 · chips 上限 4（含「+ 新建」）</p>
+</div>
+
+<h2>上下文菜单 · 右键长按 ≥500ms / Menu 键</h2>
+<div class="stage">
+  <div class="menu" role="menu">
+    <button class="menu__item"><svg class="ic"><use href="#i-pause"/></svg><span class="menu__label">暂停</span><span class="menu__accel">SPACE</span></button>
+    <button class="menu__item"><svg class="ic"><use href="#i-check"/></svg><span class="menu__label">结束并保存</span><span class="menu__accel">ENTER</span></button>
+    <button class="menu__item"><svg class="ic"><use href="#i-pencil"/></svg><span class="menu__label">微调开始时间</span></button>
+    <button class="menu__item" data-danger="true"><svg class="ic"><use href="#i-trash-2"/></svg><span class="menu__label">丢弃本次记录</span></button>
+    <div class="menu__sep"></div>
+    <button class="menu__item"><svg class="ic"><use href="#i-pin"/></svg><span class="menu__label">保持置顶</span><svg class="ic menu__check"><use href="#i-check"/></svg></button>
+    <button class="menu__item"><svg class="ic"><use href="#i-settings-2"/></svg><span class="menu__label">设置</span></button>
+  </div>
+  <p class="cap">宽 184 · 危险项仅文字红、hover 不改红底 · 分组用 1px 线</p>
+</div>
+
+<h2>撤销条 · stop_timer 后 3 秒（AC-05 / 06 / 07）</h2>
+<div class="stage stage--col">
+  <div class="undo"><span>已记录 <span class="undo__time">12:41</span> · 品牌视觉改版</span>
+    <button class="undo__btn"><svg class="ic"><use href="#i-undo-2"/></svg>撤销</button></div>
+  <div class="undo"><span>只记了 47 秒，要留下吗？</span>
+    <span style="margin-left:auto;display:inline-flex;gap:8px"><button class="undo__btn">保存</button><button class="undo__btn" style="color:var(--muted)">丢弃</button></span></div>
+  <div class="undo" style="border-color:var(--danger)"><svg class="ic" style="color:var(--danger)"><use href="#i-circle-alert"/></svg><span>保存失败 · 记录已留在本地，点此重试</span>
+    <button class="undo__btn" style="margin-left:auto">重试</button></div>
+  <p class="cap">默认 / 短时计时 <60s / 保存失败三变体 · 底比药丸更暗（层级下沉）</p>
+</div>
+</body>
+</html>

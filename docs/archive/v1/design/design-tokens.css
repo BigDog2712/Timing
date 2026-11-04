@@ -1,0 +1,336 @@
+/* =============================================================================
+ * TickBar — design-tokens.css
+ * Phase 2 设计细化产出 | 设计师：颜好看 | 依据：docs/Spec-v1.md §8 + UIUX-v1 §7
+ * -----------------------------------------------------------------------------
+ * 消费规则（P0）：
+ *   1. 组件 CSS 只允许引用 var(--*)，禁止出现任何裸 hex / rgb（含 #fff / #000）。
+ *   2. 唯一例外：box-shadow 内的 rgba 阴影色，且必须收敛在下方 --elev-* 系列中。
+ *   3. 计时数字规则不可协商（见文件末尾 .timer-digits）。
+ *   4. 主题恒为深色，禁止跟随系统亮色；仅响应高对比度 / 浅色壁纸降级。
+ * ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* ---------------------------------------------------------------------------
+   * 1. A1-identity — 中性阶（深色层次靠亮度递进，不靠阴影）
+   * ------------------------------------------------------------------------ */
+  --bg:             #0E0F12;  /* L0 深渊：投影基色 / 撤销条底 */
+  --surface:        #1A1C20;  /* L1 药丸底（默认背景） */
+  --surface-2:      #22242A;  /* L2 抬升：hover / 展开面板底 */
+  --surface-3:      #2B2E35;  /* L3 高亮面：按下 / chips / 菜单 hover */
+  --surface-4:      #343841;  /* L4 顶层：输入框底 / 菜单按下 */
+
+  /* ---------------------------------------------------------------------------
+   * 2. A1-identity — 前景（可读文字全部 >= 5.38:1）
+   * ------------------------------------------------------------------------ */
+  --fg:             #F2F4F7;  /* 主文本 15.5:1 */
+  --fg-2:           #C3C8D0;  /* 次级文本 10.1:1 */
+  --muted:          #8B919C;  /* 三级文本 5.38:1 */
+  --meta:           #6E7480;  /* 3.63:1 — 仅图标 / 分隔线 / 禁用文案，禁止承载可读正文 */
+
+  /* ---------------------------------------------------------------------------
+   * 3. A1-identity — 边框（均为装饰性）
+   * ------------------------------------------------------------------------ */
+  --border:         #33373F;               /* 面板 / 菜单 / 输入框外描边 */
+  --border-soft:    #26292F;               /* 药丸内部 1px 分隔线 */
+  --border-strong:  #454B55;               /* hover 描边加强 */
+  --edge-inner:     rgba(255, 255, 255, 0.08);  /* 药丸顶部 1px 内高光（非毛玻璃） */
+
+  /* ---------------------------------------------------------------------------
+   * 4. A1-identity — 品牌强调色 Signal Amber（纯色，零渐变）
+   * ------------------------------------------------------------------------ */
+  --accent:         #E9A23B;
+  --accent-hover:   #F2B157;
+  --accent-active:  #D18F2C;
+  --accent-on:      #201603;  /* 琥珀底上的前景 8.23:1 */
+  --accent-halo:    radial-gradient(circle at 50% 50%, rgba(233, 162, 59, 0.10) 0%, rgba(233, 162, 59, 0) 70%);
+  --accent-halo-success: radial-gradient(circle at 50% 50%, rgba(63, 185, 80, 0.10) 0%, rgba(63, 185, 80, 0) 70%);
+
+  /* ---------------------------------------------------------------------------
+   * 5. A1-identity — 状态色（三态三色，绝不混用）
+   * ------------------------------------------------------------------------ */
+  --state-idle:     #8B919C;  /* 待机：中性、待命 */
+  --state-running:  #E9A23B;  /* 计时中：暖、活 */
+  --state-paused:   #7C93AC;  /* 已暂停：冷、静（钢蓝） */
+  --state-ended:    #3FB950;  /* 已保存：仅保持 900ms */
+
+  /* ---------------------------------------------------------------------------
+   * 6. A2 — 语义色
+   * ------------------------------------------------------------------------ */
+  --success:        #3FB950;
+  --success-on:     #04140A;
+  --warn:           #D29922;
+  --warn-on:        #1A1203;
+  --danger:         #F2555A;
+  --danger-on:      #1A0505;
+  --info:           #7C93AC;
+  --scrim:          rgba(14, 15, 18, 0.56);   /* 对话框遮罩，不使用 backdrop-filter */
+
+  /* ---------------------------------------------------------------------------
+   * 7. A1-identity — 字体
+   * ------------------------------------------------------------------------ */
+  --font-ui:      "Geist Sans", "Noto Sans SC", -apple-system, "Segoe UI Variable Text", "Microsoft YaHei UI", sans-serif;
+  --font-display: var(--font-ui);
+  --font-mono:    "Geist Mono", "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+
+  /* ---------------------------------------------------------------------------
+   * 8. A1-structure — 字号 / 行高 / 字重 / 字距
+   * ------------------------------------------------------------------------ */
+  --text-2xs:       10px;   --leading-2xs:       12px;
+  --text-xs:        11px;   --leading-xs:        16px;
+  --text-sm:        12px;   --leading-sm:        18px;
+  --text-base:      13px;   --leading-base:      20px;
+  --text-md:        14px;   --leading-md:        22px;
+  --text-lg:        16px;   --leading-lg:        24px;
+  --text-timer:     20px;   --leading-timer:     24px;
+  --text-timer-lg:  28px;   --leading-timer-lg:  32px;
+  --text-timer-xl:  40px;   --leading-timer-xl:  44px;
+
+  --leading-tight:  1.2;
+  --leading-body:   1.5;
+
+  --tracking-caps:     0.06em;  /* ALL CAPS */
+  --tracking-xs:       0.02em;
+  --tracking-sm:       0.01em;
+  --tracking-base:     0;       /* 正文 / 数字 / 中文 */
+  --tracking-tight:    -0.01em;
+  --tracking-tighter:  -0.02em;
+
+  --weight-read:      400;   /* 仅展开面板正文 */
+  --weight-emphasize: 510;   /* 主力：数字 / 菜单 / 事项名 */
+  --weight-announce:  590;   /* 面板标题 / 大计时 */
+
+  /* ---------------------------------------------------------------------------
+   * 9. A1-structure — 尺寸（全部 DIP；禁硬编码物理像素）
+   * ------------------------------------------------------------------------ */
+  --window-w:        384px;  /* 固定透明置顶层，永不 resize */
+  --window-h:        360px;
+  --pill-h:          48px;
+  --pill-h-compact:  40px;
+  --pill-w-min:      256px;
+  --pill-w-typ:      288px;
+  --pill-w-max:      360px;
+  --panel-w:         300px;
+  --dot-size:        28px;
+  --hit-target:      44px;   /* 药丸内热区 */
+  --hit-target-dot:  36px;   /* 收起态热区（见 UIUX §4.2 偏差说明） */
+  --ring-size:       32px;
+  --ring-stroke:     2px;
+  --menu-w:          184px;
+  --menu-item-h:     32px;
+  --input-h:         36px;
+  --chip-h:          28px;
+  --chip-pad-x:      12px;
+  --toast-h:         32px;
+  --icon-sm:         16px;
+  --icon-md:         20px;
+  --icon-lg:         24px;
+  --snap-margin:     16px;   /* 吸附阈值 + 吸附后固定边距 */
+  --drag-threshold:  4px;
+
+  /* ---------------------------------------------------------------------------
+   * 10. A2 — 间距（4px 网格；2px / 10px 为 48px 药丸内的必要亚级，
+   *     已在 Token 层收敛，组件不得自由取数）
+   * ------------------------------------------------------------------------ */
+  --space-1:   2px;
+  --space-2:   4px;
+  --space-3:   8px;
+  --space-4:   10px;
+  --space-5:   12px;
+  --space-6:   16px;
+  --space-7:   20px;
+  --space-8:   24px;
+  --space-9:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+
+  /* ---------------------------------------------------------------------------
+   * 11. A2 — 圆角
+   * ------------------------------------------------------------------------ */
+  --radius-none:  0;
+  --radius-chip:  9999px;  /* chips / 药丸内按钮 */
+  --radius-sm:    8px;     /* 输入框 / tooltip */
+  --radius-md:    12px;    /* 菜单 / 撤销条 */
+  --radius-lg:    16px;    /* 展开面板 / 对话框 */
+  --radius-pill:  24px;    /* 药丸（= 高度 / 2，真胶囊） */
+
+  /* ---------------------------------------------------------------------------
+   * 12. A2 — 层级 / 阴影（rgba 阴影色唯一合法出现处）
+   * ------------------------------------------------------------------------ */
+  --elev-flat:        none;
+  --elev-ring:        0 0 0 1px var(--edge-inner);
+  --elev-raised:      0 8px 24px rgba(0, 0, 0, 0.44), 0 2px 6px rgba(0, 0, 0, 0.32);
+  --elev-raised-hover:0 10px 28px rgba(0, 0, 0, 0.50);
+  --elev-float:       0 12px 32px rgba(0, 0, 0, 0.50);  /* 菜单 / 撤销条 */
+  --elev-panel:       0 16px 40px rgba(0, 0, 0, 0.52);  /* 展开面板 */
+  --elev-drag:        0 20px 48px rgba(0, 0, 0, 0.60);  /* 拖拽中 */
+
+  /* ---------------------------------------------------------------------------
+   * 13. A2 — Focus（不得用 outline:none 清除）
+   * ------------------------------------------------------------------------ */
+  --focus-ring:        0 0 0 2px var(--surface), 0 0 0 4px var(--accent);
+  --focus-ring-danger: 0 0 0 2px var(--surface), 0 0 0 4px var(--danger);
+
+  /* ---------------------------------------------------------------------------
+   * 14. A2 — 动效（仅 3 条缓动；禁止任何弹跳 / 弹性）
+   * ------------------------------------------------------------------------ */
+  --dur-instant:  100ms;  /* 按下反馈 / 图标淡入 */
+  --dur-quick:    150ms;  /* hover 变色（跨系统收敛值，最常用） */
+  --dur-exit:     180ms;  /* 撤销条淡出 / 菜单关闭 */
+  --dur-base:     200ms;  /* 状态切换 / 菜单出场 */
+  --dur-morph:    280ms;  /* 形态变形 */
+  --dur-confirm:  900ms;  /* 结束态绿色保持 */
+  --dur-undo:     3000ms; /* 撤销条生命周期 */
+  --dur-tick:     1000ms; /* 1Hz tick */
+  --dur-breath:   2400ms; /* 光晕呼吸周期 */
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit:     cubic-bezier(0.4, 0, 1, 1);
+  --ease-morph:    cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ---------------------------------------------------------------------------
+   * 15. z-index（固定 384x360 单窗口内部堆叠）
+   * ------------------------------------------------------------------------ */
+  --z-base:       0;
+  --z-pill:       10;
+  --z-panel:      20;
+  --z-settings:   30;
+  --z-undo:       40;
+  --z-tooltip:    50;
+  --z-menu:       60;
+  --z-dialog:     70;
+
+  /* ---------------------------------------------------------------------------
+   * 16. B-slot — 语义别名（组件层引用这些，不直接引用原始值）
+   * ------------------------------------------------------------------------ */
+  /* 药丸 */
+  --pill-bg:            var(--surface);
+  --pill-bg-hover:      var(--surface-2);
+  --pill-bg-active:     var(--surface-3);
+  --pill-bg-drag:       var(--surface-3);
+  --pill-border:        var(--edge-inner);
+  --pill-shadow:        var(--elev-raised);
+  --pill-shadow-hover:  var(--elev-raised-hover);
+  --pill-shadow-drag:   var(--elev-drag);
+  --divider:            var(--border-soft);
+
+  /* 文本 */
+  --text-primary:       var(--fg);
+  --text-secondary:     var(--fg-2);
+  --text-tertiary:      var(--muted);
+  --text-disabled:      var(--meta);
+
+  /* 菜单 */
+  --menu-bg:            var(--surface-2);
+  --menu-item-hover:    var(--surface-3);
+  --menu-item-pressed:  var(--surface-4);
+  --menu-text:          var(--fg);
+  --menu-danger:        var(--danger);
+
+  /* 输入框 */
+  --input-bg:           var(--surface-3);
+  --input-bg-focus:     var(--surface-4);
+  --input-border:       var(--border);
+  --input-placeholder:  var(--muted);
+  --input-text:         var(--fg);
+
+  /* chips */
+  --chip-bg:            var(--surface-3);
+  --chip-bg-hover:      var(--surface-4);
+  --chip-text:          var(--fg-2);
+
+  /* 撤销条 */
+  --undo-bg:            var(--bg);
+  --undo-border:        var(--border);
+  --undo-text:          var(--fg-2);
+  --undo-action:        var(--accent);
+
+  /* 状态环 */
+  --ring-color:         var(--state-idle);
+
+  /* 降级开关（默认关闭） */
+  --pill-opacity:       0.96;
+  --pill-scale:         1;
+}
+
+/* =============================================================================
+ * 降级分支：浅色壁纸 / 高对比度
+ *   触发方式：<html data-backdrop="light"> 或 <html data-contrast="high">
+ *   策略：药丸转 100% 不透明 + 描边加强 + （高对比）整体放大；不做任何模糊。
+ * ========================================================================== */
+:root[data-backdrop="light"],
+:root[data-contrast="high"] {
+  --pill-opacity:    1;                          /* 药丸转 100% 不透明 */
+  --edge-inner:      rgba(255, 255, 255, 0.14);  /* 描边加强 */
+  --border:          #4A505A;
+  --border-strong:   #5A616C;
+}
+
+:root[data-contrast="high"] {
+  --pill-scale:      1.15;   /* 高对比模式下整体放大 */
+}
+
+/* =============================================================================
+ * 计时数字规则（全项目最重要的一条排版规则，不可协商）
+ *   必须在“不换行、不宽度跳动”的前提下每秒变化。
+ *   任何宽度抖动都会让产品显得廉价。
+ * ========================================================================== */
+.timer-digits {
+  font-family: var(--font-mono);
+  font-size: var(--text-timer);
+  line-height: var(--leading-timer);
+  font-weight: var(--weight-emphasize);       /* 等宽数字不要 600+，会糊 */
+  letter-spacing: var(--tracking-base);
+  font-variant-numeric: tabular-nums;          /* 等宽数字 */
+  font-feature-settings: "tnum" 1, "zero" 1;   /* 等宽 + 斜杠零 */
+  font-variant-ligatures: none;
+  min-width: 5ch;                              /* "00:00" 定宽 */
+  text-align: right;                           /* 右对齐 + 定宽 = 数字原地变化 */
+  white-space: nowrap;
+  color: var(--fg);                            /* RUNNING 下也保持高对比 15.5:1 */
+  display: inline-block;
+}
+
+/* >= 1h：格式切为 HH:MM:SS，min-width 切 8ch */
+.timer-digits[data-hours="true"] {
+  min-width: 8ch;
+}
+
+/* 展开面板大计时 */
+.timer-digits[data-size="lg"] {
+  font-size: var(--text-timer-lg);
+  line-height: var(--leading-timer-lg);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* =============================================================================
+ * prefers-reduced-motion：减少动效 != 减少信息
+ *   关闭持续性动效，但用静态表达保留 100% 状态可辨性（也让色觉障碍用户多一条通道）。
+ * ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0.01ms;
+    --dur-quick:   0.01ms;
+    --dur-exit:    0.01ms;
+    --dur-base:    0.01ms;
+    --dur-morph:   0.01ms;
+  }
+
+  /* 关闭所有持续性动效 */
+  .halo-breath,
+  .ring-tick {
+    animation: none !important;
+  }
+
+  /* 去掉过渡但不去掉状态（保留状态切换的即时可见性） */
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  /* 用静态表达替代动效表达 */
+  .ring[data-state="running"] { stroke-width: 3px; }     /* 加粗代替跳动 */
+  .ring[data-state="paused"]  { stroke-dasharray: 4 3; } /* 虚线代替颜色独占 */
+}

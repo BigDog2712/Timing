@@ -1,0 +1,67 @@
+# AGENTS.md
+
+TickBar（Windows 桌面悬浮计时条，Tauri 2 + React 19 + Rust）· 当前版本 0.1.0（首个发布版）。
+本文件是给编码代理的入口约定。
+
+## 项目速览
+
+- 一个前端 bundle 服务所有窗口：`index.html` → `src/main.tsx`，按 `window.location` / window label 分流（主条 `main`、设置、事项、便利贴 `note-{id}`）。
+- 前端 `src/**`（React + zustand + 自写 CSS，无 UI 框架）。
+- 后端 `src-tauri/src/**` 六层，依赖**只能向下**（ADR-016）：
+  `platform`（叶子：clock / log / boot_timing）→ `infra`（窗口 / 托盘菜单 / 通知 / 几何 / 迁移）→ `services`（业务）→ `app`（装配：events / tray / bootstrap / diagnostics）与 `jobs`（调度）→ `commands`（IPC 入口）。
+- 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql`（v1）+ `0002_v020.sql`（v2）+ `0003_v030.sql`（v3）+ `0004_v0312.sql`（v4），`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。
+- IPC 契约：命令 65 个（`docs/phase2/IPC-CONTRACT-v2.md`）、事件 11 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
+- 插件：`plugins/<id>/plugin.json` 是**启动头**，宿主只读不执行（声明式）。目录三处合并扫描
+  （dev → exe → user，同 id 先到先得）。v1 贡献点 `quickTimers`（摸鱼菜单预设）；
+  **v2 新增 `mdSync`**（Markdown 双向同步落点，宿主实现同步，插件只声明）。
+  首个 v2 插件是仓库内 `plugins/md-sync`（设置 → 同步页签）。
+  规格与字段全表 `docs/plugin-spec.md`；改贡献点必须同时升 `apiVersion` 并补该文档一节。
+
+## 命令
+
+```bash
+npm run dev          # 前端 + 浏览器 mock（1420）
+npm run tauri dev    # 完整桌面应用
+npm run check        # 全部门禁：typecheck + contract + size + version + layers + lint
+npm run typecheck    # tsc --noEmit，必须 0 错
+npm run lint         # ESLint（只查正确性，不查风格）
+npm test             # vitest（含双端时间公式黄金用例）
+npm run build        # tsc + vite build
+cd src-tauri && cargo test                 # 后端测试，必须全绿
+cd src-tauri && cargo clippy --all-targets -- -D warnings
+cd src-tauri && cargo fmt --check
+```
+
+## 硬约束（全部由 CI 机械执行，不靠记性）
+
+- **单文件 ≤300 行**（前后端一致）→ `npm run check:size`
+  确需豁免写 `scripts/size-allowlist.json`，**必须**带 `owner` + `expires`（到期即红）。降到 300 行内后脚本会提示删除条目——不允许永久豁免。
+- **分层只能向下** → `npm run check:layers`（6 条 grep 规则）
+  L1 `components` 不 `invoke`；L2 `stores` 不碰 `ipc.`；L3 只有 `lib/window.ts` 引 `@tauri-apps/api/window`；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）。
+- **IPC 契约** → `npm run check:contract`
+  命令 4 处一致（`generate_handler!` / `IpcApi` / `ipc.ts` / `browserMock`）、错误码 2 处一致、事件三方一致（后端常量 / `IPC_EVENTS` / emit 点）、禁止事件名字面量、**每个错误码必须在 `errorText()` 里有 case**（否则静默落到通用兜底）。
+- **版本号 6 处一致** → `npm run check:version`
+  `package.json` · `package-lock.json`（2 处）· `src-tauri/Cargo.toml` · `src-tauri/Cargo.lock` · `src-tauri/tauri.conf.json`。**不再需要人工核对**；变更记录写 `CHANGELOG.md`。
+- CSS 只用 `var(--*)` 令牌，零字面量色值、零 emoji、零紫粉渐变；令牌定义在 `src/styles/design-tokens.css`（索引，实体在 `src/styles/tokens/*.css`，**@import 顺序不可调换**）。
+- 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/types/domain/models.ts::ErrorCode` 与文案 `src/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **16** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
+- 文档目录：现行文档在 `docs/`；`docs/archive/v1/` 只作历史，不作为实现依据。
+
+## 权限面
+
+`src-tauri/capabilities/default.json` 只放行实际用到的窗口 / 事件 / 开机自启 / 文件夹选择能力。
+V0.4.0 只新增 `dialog:allow-open`（原生目录选择，用于 md-sync 落点配置）；**不是**通用文件读写授权。
+**禁止**加回 `sql:allow-*`、`store:allow-*`——那等于给前端一条绕过四层的直连数据库通道（ADR-015）。数据访问一律 `commands → services → repositories`。
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues (`BigDog2712/Timing_Rust`), driven by the `gh` CLI (panel flows prefer the `deck_` tools). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five triage roles, label string equal to role name (`needs-triage` / `needs-info` / `ready-for-agent` / `ready-for-human` / `wontfix`), plus the `wayfinder:*` ticket-type labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+single-context. See `docs/agents/domain.md`.

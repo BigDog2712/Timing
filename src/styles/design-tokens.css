@@ -1,0 +1,29 @@
+/* =============================================================================
+ * TickBar — design-tokens.css（索引入口，符号入口不变）
+ * -----------------------------------------------------------------------------
+ * 原 486 行单文件按「层」拆为 tokens/ 下 5 个文件（ADR-017 单文件 ≤300 行）：
+ *   01-primitives        §0 不透明度 + 主题无关令牌（字体/字阶/尺寸/间距/圆角/动效/层级）
+ *                       + §0b 首屏兜底与 V0.1.0 过渡别名 + html/body 基础
+ *   02-theme-dark        §1 深色主题（默认）
+ *   03-theme-light       §2 浅色主题
+ *   04-aliases           §3 四色可配 + §4 B-slot 组件别名
+ *   05-typography-rules  §5 计时数字规则 + §6 focus-visible / reduced-motion
+ *
+ * 消费规则（P0，全文仍适用于 tokens/*）：
+ *   1. 组件 CSS 只允许引用 var(--*)，禁止出现任何裸 hex / rgb。
+ *      唯一例外：box-shadow 内的 rgba 阴影色，且必须经 --shadow-* / --inset-* 引用。
+ *   2. 主题切换：<html data-theme="dark|light">，两套变量同在 tokens 内，无 JS 重排。
+ *   3. 语义色作『文字』须 >=4.5:1；作『非文本』（描边/进度/色点）须 >=3:1。
+ *   4. 一屏强调色可见用量：小条 <=1 处，面板 <=2 处。
+ *   5. 计时数字规则不可协商（见 05-typography-rules.css .timer-digits）。
+ *   6. 禁止弹跳/弹性缓动；禁止动画 width/height/font-size/filter/backdrop-filter。
+ *
+ * 【不要调换下面 5 行的顺序】：层叠依赖它。例如 --input-placeholder 在 02 里由
+ * `:root[data-theme="dark"]`（特异性 0,2,0）给出 rgba 白，在 04 里由 `:root`
+ * 给出 var(--ink-4)；两者顺序一动，深色主题的占位符就会跟着变暗。
+ * ========================================================================== */
+@import './tokens/01-primitives.css';
+@import './tokens/02-theme-dark.css';
+@import './tokens/03-theme-light.css';
+@import './tokens/04-aliases.css';
+@import './tokens/05-typography-rules.css';

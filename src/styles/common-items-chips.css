@@ -1,0 +1,57 @@
+/* =============================================================================
+ * TickBar V0.3.9 — common-items-chips.css（常用事项框底：最近事项小胶囊）
+ * -----------------------------------------------------------------------------
+ * 用户口径：「最近事项形态改为最初版的小胶囊状，尽可能小巧显示」。
+ * 原来是整行（图标 + 名称 + 勾选），占的高度和置顶行一样；现在压成一排小胶囊：
+ *   - 18px 高、`--text-cap` 字号、左右 6px，自然宽度横排，放不下自动换行；
+ *   - 当前项用 accent 底色，其余 `--bg-field`，hover 提亮；
+ *   - 右侧仍留「事项管理」小圆点，与胶囊同一行底对齐（省一行高度）。
+ * P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+.menu__footer > .common-items__foot {
+  flex: 1 1 auto;
+}
+
+.common-items__foot {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.common-items__chips {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+
+.common-items__chip {
+  max-width: 100%;
+  height: 18px;
+  padding: 0 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--bg-field);
+  color: var(--ink-3);
+  font-size: var(--text-cap);
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.common-items__chip:hover,
+.common-items__chip:focus-visible {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.common-items__chip[data-current="true"] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}

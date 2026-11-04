@@ -1,0 +1,260 @@
+/* =============================================================================
+ * TickBar V0.2.0 — menu.css（自绘玻璃菜单 GlassMenu / context-menu.md）
+ * -----------------------------------------------------------------------------
+ * 拆自 overlays.css（单文件 ≤300 行纪律）。P0：仅 var(--*)，零字面量色值。
+ * 板式拟玻璃：高不透明度板（--menu-bg 94%）+ 文字全不透明 ink（DESIGN §6.4）；
+ * backdrop-filter 仅作用于菜单浮层 —— 主小条本体（pill）不挂任何模糊。
+ * 行高 30 / 键盘可达（↑↓ Home End Enter Esc Tab）/ 禁用项 hover 不变色。
+ * ========================================================================== */
+
+.menu-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-tooltip);
+  background: transparent;
+  pointer-events: auto;
+}
+
+.menu {
+  position: absolute;
+  z-index: var(--z-menu);
+  min-width: var(--menu-w);
+  max-width: var(--menu-w-max);
+  padding: var(--menu-pad);
+  border-radius: var(--radius-lg);
+  background: var(--menu-bg);
+  /* [V0.2.1 · 1.2] 浮层不再画 1px 描边：靠板 + 投影分层（与主条悬停态同口径，无边框） */
+  border: 0;
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  pointer-events: auto;
+  /* [V0.2.4 · 4] 长菜单（倒计时 8 档预设 + 分隔 + 自定义）在小条窗口里放不下：
+     限高 + 内部滚动，而不是让它顶出窗口被裁掉。非主窗（设置窗等）沿用 100vh。 */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: menu-in var(--dur-base) var(--ease-standard);
+}
+
+/* [ADR-020] 主窗没有画布了：100vh 是「当前窗口高」，而窗口本身由内容决定，
+   用它限高会自我压扁。改用 --fit-h（胶囊所在显示器工作区高，DIP），
+   长菜单也只在屏幕内滚动，不再被窗口边缘裁掉。 */
+html[data-window="main"] .menu {
+  max-height: calc(var(--fit-h) - 16px);
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 顶部状态块（计时中 / 暂停时显示） */
+.menu__status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 2px var(--space-2);
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+  border: 1px solid var(--line);
+}
+
+.menu__status-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.menu__status-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+.menu__status[data-tone="danger"] .menu__status-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-wash);
+}
+
+.menu__status-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.menu__status-meta {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.menu__status-detail {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.menu__status[data-tone="danger"] .menu__status-detail {
+  color: var(--danger);
+}
+
+/* 分组标题 */
+.menu__group {
+  padding: var(--space-1) var(--menu-item-pad-x);
+  font-size: var(--text-cap);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--menu-group-label);
+}
+
+.menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--menu-icon-gap);
+  width: 100%;
+  height: var(--menu-item-h);
+  padding: 0 var(--menu-item-pad-x);
+  border-radius: var(--radius-sm);
+  color: var(--menu-text);
+  font-size: var(--text-body);
+  font-weight: var(--weight-read);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard);
+}
+
+.menu__item svg {
+  flex: 0 0 auto;
+  color: var(--ink-4);
+  transition: color var(--dur-quick) var(--ease-standard);
+}
+
+.menu__item:hover:not(:disabled),
+.menu__item:focus-visible {
+  background: var(--menu-item-hover);
+  color: var(--menu-text-on);
+}
+
+.menu__item:hover:not(:disabled) svg,
+.menu__item:focus-visible svg {
+  color: var(--ink-3);
+}
+
+.menu__item:active:not(:disabled) {
+  background: var(--menu-item-hover);
+  transform: scale(0.99);
+}
+
+.menu__item[data-current="true"] {
+  color: var(--menu-text-on);
+}
+
+/* 禁用项：字仍是纯白（V0.2.10 起文字不再走灰阶），靠 .72 的透明度表示「点不了」——
+   太低会和「没字」混同，太高又看不出不可点。 */
+.menu__item:disabled {
+  color: var(--ink-4);
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.menu__item:disabled svg {
+  color: var(--ink-4);
+}
+
+.menu__item[data-danger="true"],
+.menu__item[data-danger="true"] svg {
+  color: var(--menu-danger);
+}
+
+/* 危险项 hover/focus：底保留淡化红 tint（危险语义不变），**文字回退 --ink**。
+   原「--menu-danger 压 --danger-wash」实测 light 3.87–4.27 / dark 4.38（<4.5，文字 AA 不达标）；
+   改 --ink 后 light 13.4+ / dark 15.4+。图标仍用 --menu-danger（非文本，≥3:1 达标）。 */
+.menu__item[data-danger="true"]:hover:not(:disabled),
+.menu__item[data-danger="true"]:focus-visible {
+  background: var(--danger-wash);
+  color: var(--ink);
+}
+
+.menu__item[data-danger="true"]:hover:not(:disabled) svg,
+.menu__item[data-danger="true"]:focus-visible svg {
+  color: var(--menu-danger);
+}
+
+.menu__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.menu__accel {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.menu__item:hover:not(:disabled) .menu__accel,
+.menu__item:focus-visible .menu__accel {
+  color: var(--ink-3);
+}
+
+.menu__check {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.menu__sep {
+  height: 1px;
+  margin: 5px 6px;
+  background: var(--line);
+}
+
+/* 菜单底部附加区（V0.3.9：常用事项框的「事项管理」小圆点） */
+.menu__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-1) var(--menu-item-pad-x) 2px;
+}
+
+/* ------------------------------ 滚动条 ------------------------------ */
+/* [V0.2.6] 菜单行数超过窗口高度后内部滚动（见上方 max-height），
+   默认滚动条会在玻璃板上画一条亮灰色实心条，这里收敛成细的 --line-3。 */
+.menu {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-3) transparent;
+}
+.menu::-webkit-scrollbar {
+  width: 8px;
+}
+.menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+.menu::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+.menu::-webkit-scrollbar-thumb:hover {
+  background: var(--line-2);
+}

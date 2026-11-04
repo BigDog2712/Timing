@@ -1,0 +1,54 @@
+/**
+ * TickBar — 渲染异常兜底样式（V0.4.1）
+ * -----------------------------------------------------------------------------
+ * 只给 `AppErrorBoundary` 用。出现在主窗时窗口会被 auto-fit 收缩到这块内容，
+ * 所以它必须**自带宽高下限**：否则透明窗 + 空内容 = 仍然看不见。
+ * 零字面量色值，全部走令牌（AGENTS.md 硬约束）。
+ */
+
+.fatal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  min-width: 220px;
+  max-width: 340px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  box-shadow: var(--elev-float);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  pointer-events: auto;
+}
+
+.fatal__title {
+  color: var(--danger);
+  font-weight: var(--weight-semibold);
+}
+
+.fatal__detail {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.fatal__action {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.fatal__action:hover {
+  background: var(--surface-3);
+}

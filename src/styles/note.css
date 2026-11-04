@@ -1,0 +1,224 @@
+/* =============================================================================
+ * TickBar V0.2.0 — note.css（便利贴窗口 label = note-{id}）
+ * -----------------------------------------------------------------------------
+ * 依据 docs/design/pages-V0.2.0/sticky-note.md §1/§3/§6。
+ * P0：仅 var(--*)，零字面量色值（尺寸断点除外）。
+ * 关键：正文文字**始终 100% 不透明**（--ink），未悬停仅让**背景板**更透 + 头/页脚/按钮淡出
+ *       （sticky-note.md §3.1 可读性红线：Timing §1-11 双重透明硬伤的修复）。
+ * 窗口壳：html[data-window="note"] 铺满自身视口（独立窗口，按 ADR-020 没有画布）。
+ * ========================================================================== */
+
+/* ------------------------------ 窗口根 ------------------------------ */
+html[data-window="note"] {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+html[data-window="note"] body,
+html[data-window="note"] #root {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* [V0.3.1] 指针形状恒为**默认箭头**（用户口径「不要在便利贴改变鼠标状态」）：
+   正文的 I-beam、圆点/手柄的 pointer、拖动期的 grabbing 全部压回 default。
+   cursor 只影响形状，不影响输入、选区与拖动本身；要选字用 Shift+拖动照旧。
+   放在 note.css（在 app.css 之后加载）并用 !important，才能盖住控件级规则。 */
+html[data-window="note"],
+html[data-window="note"] * {
+  cursor: default !important;
+}
+
+/* ------------------------------ 便利贴本体 ------------------------------ */
+.note {
+  container-type: inline-size; /* 供确认条窄宽断点查询（noteConfirmStackBelowW 200） */
+  position: relative; /* [V0.2.4 · 1/2] 圆点与缩放手柄都绝对定位在正文框内侧 */
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  /* 未悬停（sticky 态）：**背景消失**，只剩正文浮在桌面上——与主小条同一口径（V0.2.1 · 1.2） */
+  /* [V0.2.1 · 5] 整窗零描边：连 1px 透明占位边也去掉，避免任何缩放/子像素下透出细线 */
+  border: 0;
+  box-shadow: none;
+  color: var(--ink);
+  transition:
+    background-color var(--dur-exit) var(--ease-standard),
+    box-shadow var(--dur-exit) var(--ease-standard);
+}
+
+/* [V0.2.3 · 1] 恒定无底板：悬停/聚焦也不再显影（只留文字 + 右上角圆点） */
+.note:hover,
+.note:focus-within {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ------------------------------ 头（两枚圆点，浮在正文框右上角内侧） ------------------------------ */
+/* [V0.2.4 · 1] 圆点从「独立一行」改为**浮在文字框内**的右上角：不再占正文高度，
+   文字背景亮起时它们就在这块底色里（用户口径：按钮放在文字背景内）。 */
+.note__head {
+  position: absolute;
+  top: var(--note-pad);
+  right: var(--note-pad);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 4px 6px;
+  /* [V0.2.1 · 5] 两枚圆点随背景一起隐藏：允许先藏（找不到落点）是用户明确口径 */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-exit) var(--ease-standard);
+}
+
+.note:hover .note__head,
+.note:focus-within .note__head,
+.note__body:hover .note__head {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* [V0.2.4 · 2] 右下角缩放手柄：悬停才现形，按住交给系统做 nwse 缩放 */
+.note__resize {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  /* [V0.3.1] 不再改指针（原 nwse-resize）：整块便利贴统一默认箭头 */
+  opacity: 0;
+  transition: opacity var(--dur-exit) var(--ease-standard);
+  /* 两道斜纹示意可拖拽角（零字面量色值：全部走令牌） */
+  background:
+    linear-gradient(135deg, transparent 45%, var(--ink-4) 45%, var(--ink-4) 55%, transparent 55%) right 3px bottom 3px /
+      6px 6px no-repeat,
+    linear-gradient(135deg, transparent 45%, var(--ink-4) 45%, var(--ink-4) 55%, transparent 55%) right 0 bottom 0 /
+      4px 4px no-repeat;
+}
+
+.note:hover .note__resize {
+  opacity: 0.85;
+}
+
+.note__dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 红点 = 删除（两步确认：armed 时外扩一圈环）/ 黄点 = 隐藏 */
+.note__dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+  box-shadow: 0 0 0 0 transparent;
+  transition:
+    box-shadow var(--dur-quick) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard),
+    filter var(--dur-quick) var(--ease-standard);
+}
+
+.note__dot[data-tone="warn"] {
+  background: var(--warn);
+}
+
+/* [V0.3.1] 白色「置顶」点已删除（用户口径）；便利贴恒为置顶，无切换入口。
+   原 data-tone="pin" 两条规则（实心 / 空心环）随之移除。 */
+
+.note__dot:hover {
+  transform: scale(1.15);
+  filter: brightness(1.12);
+}
+
+.note__dot:active {
+  transform: scale(0.92);
+}
+
+.note__dot[data-armed="true"] {
+  box-shadow: 0 0 0 3px var(--danger-wash);
+}
+
+.note[data-error="true"] .note__dot[data-tone="danger"] {
+  box-shadow: 0 0 0 3px var(--danger-wash);
+}
+
+/* ------------------------------ 正文（始终可读可输入） ------------------------------ */
+/* V0.2.1 · 4：未悬停时连正文底板也透明（整窗=只剩文字浮在桌面）；悬停/聚焦才浮出底板 */
+.note__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: var(--note-pad);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  /* [V0.2.1 · 5] 去掉外边框：原先 1px 透明描边会在聚焦时变成 accent 边（用户看到的「外框」），
+     现在整块零描边，只靠底板与投影表达焦点。 */
+  border: 0;
+  transition:
+    background-color var(--dur-exit) var(--ease-standard),
+    box-shadow var(--dur-quick) var(--ease-standard);
+}
+
+/* [V0.2.4 · 3] 触发面是**正文框本身**：鼠标进到文字框内就浮出底板（含聚焦态），
+   而不是整个窗口（窗口右下角有小块缩放手柄留白，悬停那里不该点亮）。 */
+.note__body:hover,
+.note__body:focus-within {
+  background: var(--note-body-bg);
+  box-shadow: none;
+}
+
+.note__input {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 9px 11px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--ink); /* 可读性红线：始终 100% 不透明 */
+  /* [V0.2.2 · 4] 文字浓淡只由设置里的「文字不透明度」决定，悬停与否不再变化 */
+  opacity: var(--ui-text-opacity, 1);
+  /* [Timing 对齐 D5] 正文 = 悬浮小条事项名同套字体参数：14px / 650（StickyNoteForm.cs:1289-1293）。
+     font 简写保行数红线（等价 font-family + font-size + line-height + font-weight 四行） */
+  font: var(--weight-strong) var(--text-task-pill) / var(--leading-body) var(--font-ui);
+  user-select: text;
+  /* [V0.3.1] 整块便利贴都是默认箭头（含聚焦后的正文），不再切 I-beam。 */
+  cursor: default;
+  overflow-y: auto;
+}
+
+.note__input::placeholder {
+  color: var(--ink-4);
+}
+
+/* 自绘 6px 滚动条（无箭头） */
+.note__input::-webkit-scrollbar {
+  width: 6px;
+}
+
+.note__input::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+
+/* V0.2.1 · 3：页脚（「随记 · 未关联事项」/ 关联按钮 / 删除确认条）已全部移除——
+   界面上不留任何文字，只剩正文输出框与右上角两枚圆点。 */
+
+/* ------------------------------ 焦点环（取消） ------------------------------ */
+/* [V0.2.6] 便利贴里不再画任何焦点环：app.css 的
+   `:where(button, input, select, [tabindex]):focus-visible { box-shadow: var(--focus-ring) }`
+   会给正文 textarea / 圆点按钮套一圈 accent 蓝环——用户在桌面上看到的就是「便利贴边框蓝色」。
+   便利贴是常驻可编辑面（正文永远可输入），焦点已由底板与光标表达，这里显式清零。 */
+.note :where(input, textarea, button, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: none;
+}

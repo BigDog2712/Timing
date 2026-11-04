@@ -1,0 +1,51 @@
+//! 后端测试入口（QA 新增，仅 `cargo test` 编入）。
+//!
+//! 断言来源：`docs/Spec-v1.md` §6 / §9 与 `docs/phase2/IPC-CONTRACT-v2.md`，
+//! 以行为（输入→可观测输出/错误码）为准，不绑定实现内部细节。
+
+mod support;
+
+mod boot_timing;
+mod countdown;
+mod daily_status;
+mod item;
+mod item_batch2;
+mod md_sync;
+mod md_sync_duration;
+mod md_sync_edges;
+mod md_sync_format;
+mod md_sync_live;
+mod md_sync_live_guard;
+mod md_sync_notes;
+mod md_sync_notes_guard;
+mod md_sync_pairing;
+mod md_sync_todo_edit;
+mod md_sync_todo_export;
+mod md_sync_todo_import;
+mod md_sync_todos;
+mod md_sync_upgrade;
+mod migration;
+mod migration_v2;
+mod moyu_settings;
+mod note;
+mod note_pin;
+mod plugin_dev;
+mod record;
+mod reminder;
+mod settings_reference;
+mod theme;
+mod timer;
+mod timer_clock;
+mod timer_formula;
+mod timer_recover_gap;
+mod timer_switch;
+mod timer_threshold;
+mod timer_todo_link;
+mod todo;
+mod todo_nudge;
+mod todo_purge;
+mod todo_start;
+mod tray_batch2;
+mod tray_menu;
+mod window_geometry;
+mod window_spec;

@@ -1,0 +1,461 @@
+/* =============================================================================
+ * TickBar V0.2.0 — design-tokens-V0.2.0.css
+ * V0.2.0-2 设计系统整体重做（对标 Timing v1.7.0）| 设计师：颜好看
+ * -----------------------------------------------------------------------------
+ * 消费规则（P0）：
+ *   1. 组件 CSS 只允许引用 var(--*)，禁止出现任何裸 hex / rgb。
+ *      唯一例外：box-shadow 内的 rgba 阴影色，且必须经 --shadow-* / --inset-* 引用。
+ *   2. 主题切换：<html data-theme="dark|light">，两套变量在同一文件内，无 JS 重排。
+ *   3. 语义色作『文字』须 >=4.5:1；作『非文本』（描边/进度/色点）须 >=3:1。
+ *   4. 一屏强调色可见用量：小条 <=1 处，面板 <=2 处。
+ *   5. 计时数字规则不可协商（见文件末尾 .timer-digits）。
+ *   6. 禁止弹跳/弹性缓动；禁止动画 width/height/font-size/filter/backdrop-filter。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 0. 主题无关令牌（字体 / 字阶 / 尺寸 / 间距 / 圆角 / 阴影 / 动效 / 层级 / 图标）
+ * ========================================================================== */
+:root {
+  /* ---- 字体 ---- */
+  --font-ui:      "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-ui);
+  --font-mono:    "Cascadia Mono", "Consolas", "SFMono-Regular", "Segoe UI Mono", ui-monospace, monospace;
+
+  /* ---- 字阶（对齐 Timing §2.5）---- */
+  --text-title: 15px;    --leading-title: 1.3;
+  --text-num:   14px;    --leading-num:   1.0;
+  --text-body:  13px;    --leading-body:  1.6;
+  --text-sm:    12.5px;  --leading-sm:    1.45;
+  --text-xs:    11.5px;  --leading-xs:    1.5;
+  --text-cap:   11px;    --leading-cap:   1.4;
+  --text-mono:  11.5px;  --leading-mono:  1.4;
+
+  /* ---- 字重三级 + 强档（YaHei UI 落地映射见 DESIGN-V0.2.0.md §3.3）---- */
+  --weight-read:     400;   /* 正文 / 说明 */
+  --weight-medium:   500;   /* 控件文本 / 任务名 */
+  --weight-semibold: 600;   /* 分组标题 / 已完成行名 */
+  --weight-strong:   650;   /* 标题 / 时间数字 */
+
+  /* ---- 字距 ---- */
+  --tracking-caps:  0.08em;
+  --tracking-xs:    0.02em;
+  --tracking-base:  0;
+  --tracking-tight: -0.01em;
+
+  /* ---- 间距（4px 网格）---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --row-pad-y:   9px;
+  --card-pad-x:  14px;
+  --panel-pad:   16px;
+  --menu-pad:    6px;
+
+  /* ---- 圆角 ---- */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   12px;
+  --radius-xl:   14px;
+  --radius-full: 9999px;
+
+  /* ---- 尺寸：小条几何（对齐 Timing §4.1）---- */
+  --window-w:        384px;
+  --window-h:        360px;
+  --pill-h:          34px;
+  --pill-h-compact:  30px;
+  --radius-pill:     calc(var(--pill-h) / 2);   /* 真胶囊 = 17px */
+  --pill-w-min:      116px;
+  --pill-w-max:      288px;
+  --task-w-max:      164px;
+  --pill-pad-l:      8px;
+  --pill-pad-r:      7px;
+  --ring-size:       22px;
+  --ring-stroke:     2.6px;
+  --grip-w:          10px;
+  --grip-hit-w:      10px;
+  --grip-svg-w:      12px;
+  --grip-svg-h:      22px;
+
+  /* ---- 尺寸：窗口 ---- */
+  --settings-w: 392px;  --settings-h: 660px;
+  --settings-title-h: 50px;  --settings-tab-h: 48px;  --settings-foot-h: 58px;
+  --todos-w: 336px;  --todos-head-h: 32px;  --todos-row-h: 26px;  --todos-mark-size: 15px;
+  --todos-pending-row-h: 24px;  --todos-foot-h: 40px;
+  --note-w: 320px;  --note-h: 232px;  --note-head-h: 36px;  --note-foot-h: 34px;
+  --note-w-min: 160px;  --note-h-min: 120px;  --note-w-max: 900px;  --note-h-max: 900px;   /* 架构应用层硬钳制 */
+  --note-w-comfort-max: 640px;  --note-h-comfort-max: 480px;                                 /* 设计舒适上限（软提示） */
+  --note-max-count: 20;
+  --note-geom-persist-debounce-ms: 300;
+  --note-confirm-stack-below-w: 200px;
+
+  /* ---- 尺寸：菜单 / 控件 ---- */
+  /* --tray-w 已退役：托盘菜单为系统原生 Win32 菜单，宽度由 OS 自算（见 pages-V0.2.0/tray-menu.md） */
+  --menu-w: 184px;  --menu-item-h: 30px;  --menu-item-pad-x: 9px;
+  --menu-icon-gap: 10px;  --menu-status-h: 52px;
+  --btn-md-h: 28px;  --btn-sm-h: 24px;  --icon-btn-size: 26px;
+  --input-h: 28px;  --field-num-w: 54px;
+  --slider-track-h: 4px;  --slider-thumb: 14px;
+  --switch-w: 38px;  --switch-h: 22px;
+
+  /* ---- 尺寸：命中 ---- */
+  --hit-target: 44px;
+  --hit-target-small: 26px;
+  --hit-target-dot: 36px;
+  --snap-margin: 16px;
+  --drag-threshold: 4px;
+
+  /* ---- 图标 ---- */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-stroke-sm: 2.5;   /* 16px */
+  --icon-stroke-lg: 2;     /* 20px / 24px */
+
+  /* ---- 动效（仅 3 条缓动；禁止任何弹跳/弹性）---- */
+  --dur-instant: 100ms;
+  --dur-quick:   150ms;
+  --dur-exit:    180ms;
+  --dur-base:    200ms;
+  --dur-morph:   280ms;
+  --dur-confirm: 900ms;
+  --dur-undo:    3000ms;
+  --dur-tick:    1000ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit:     cubic-bezier(0.4, 0, 1, 1);
+  --ease-morph:    cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ---- 层级 ---- */
+  --z-base: 0;  --z-pill: 10;  --z-panel: 20;  --z-note: 20;
+  --z-settings: 30;  --z-undo: 40;  --z-tooltip: 50;  --z-menu: 60;  --z-dialog: 70;
+
+  /* ---- 玻璃（有明确功能目的，见 DESIGN-V0.2.0.md §6.4）---- */
+  --glass-blur: 18px;
+  --glass-blur-sm: 14px;
+  --glass-saturate: 150%;
+}
+
+/* =============================================================================
+ * 0b. 首屏兜底 + V0.1.0 过渡别名
+ *   机制契约（与架构对齐）：切换靠 <html data-theme="dark|light">，同变量名两套值。
+ *   index.html 内联引导脚本只需设 data-theme（读 localStorage `tickbar.theme`）即可让
+ *   --bg 立即生效 —— 无需等 CSS 全量就绪，消除首帧白闪（对应坑 K-1）。
+ *   下列 --bg/--surface/--fg… 为 V0.1.0 过渡别名；新代码请用 V0.2.0 规范名。
+ * ========================================================================== */
+:root {
+  --bg:          var(--bg-plate);   /* 页面 / 浮层基色（兜底背景用） */
+  --surface:     var(--bg-panel);   /* 面板 / 卡片 */
+  --surface-2:   var(--bg-card);
+  --surface-3:   var(--bg-field);
+  --surface-4:   var(--bg-field-hi);
+  --fg:          var(--ink);
+  --fg-2:        var(--ink-2);
+  --muted:       var(--ink-3);
+  --meta:        var(--ink-4);
+  --border:      var(--line-2);
+  --border-soft: var(--line);
+}
+html { background: var(--bg); font-synthesis-weight: none; }   /* 首屏底色兜底 + 禁伪粗体（雅黑 UI 仅 300/400/700） */
+body { background: transparent; }
+
+/* =============================================================================
+ * 1. 深色主题（默认）
+ * ========================================================================== */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* 表面层 */
+  --bg-plate:    #0E0F12;   /* 浮层底 ＝ 小条底色（用户可配 --color-bar） */
+  --bg-inset:    #1B1E25;   /* 便利贴正文下沉区 */
+  --bg-panel:    #0E1015;   /* 常驻窗口外壳 */
+  --bg-card:     #14161C;   /* 分组卡片 */
+  --bg-field:    #1B1E25;   /* 输入 / 控件底 */
+  --bg-field-hi: #232833;   /* 控件 hover / neutral 按钮底 */
+  --bg-seg:      #171A21;   /* 分段控件槽 */
+  --bg-seg-on:   #262B36;   /* 分段控件选中段 */
+
+  /* 描边层 */
+  --line:    rgba(255, 255, 255, 0.06);
+  --line-2:  rgba(255, 255, 255, 0.10);
+  --line-3:  rgba(255, 255, 255, 0.16);
+
+  /* 前景层（ink 四档）*/
+  --ink:    #F2F3F5;   /* 17.14:1 */
+  --ink-2:  #C9CED8;   /* 11.46:1 */
+  --ink-3:  #8B93A2;   /* 6.16:1 */
+  --ink-4:  #7A8292;   /* 4.93:1（field 上 4.32 → 仅大字）*/
+
+  /* 强调层 */
+  --accent:      #4DA3E8;   /* 『计时中』主色，用户可配 */
+  --accent-ink:  #8FC6F5;   /* 强调底/链接前景 9.96:1 on card */
+  --accent-wash: color-mix(in srgb, #4DA3E8 14%, transparent);
+  --accent-line: color-mix(in srgb, #4DA3E8 32%, transparent);
+
+  /* 语义层 */
+  --warn:        #E8A33D;   /* 『提醒』，用户可配 */
+  --warn-wash:   color-mix(in srgb, #E8A33D 12%, transparent);
+  --danger:      #E5484D;
+  --danger-wash: color-mix(in srgb, #E5484D 12%, transparent);
+  --ok:          #4CC38A;   /* 『完成』，用户可配 */
+  --ok-ink:      #06251A;   /* 勾画在 ok 实心圆上 7.36:1 */
+
+  /* 实心按钮 */
+  --solid-bg:  #EDEFF3;
+  --solid-ink: #0B0C10;
+  --danger-solid: #E1292F;   /* danger 实心底专用（AC-53）：白字 4.61:1。原 #E5484D 作实心底白字仅 3.91 */
+
+  /* 轨道 / 遮罩 / 色环 */
+  --track:      rgba(255, 255, 255, 0.09);
+  --scrim:      rgba(14, 15, 18, 0.56);
+  --ring-track: rgba(255, 255, 255, 0.20);
+
+  /* 玻璃 */
+  --glass-panel-bg: color-mix(in srgb, #0E0F12 94%, transparent);
+  --glass-hover-bg: color-mix(in srgb, #0E0F12 74%, transparent);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  /* 阴影 */
+  --shadow-flat:    none;
+  --shadow-ring:    0 0 0 1px var(--line-2);
+  --shadow-pop:     0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-plate:   0 18px 48px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.40);
+  --shadow-float:   0 12px 32px rgba(0, 0, 0, 0.45);
+  --shadow-panel:   0 16px 40px rgba(0, 0, 0, 0.52);
+  --shadow-balloon: 0 1px 2px rgba(0, 0, 0, 0.72), 0 0 1px rgba(0, 0, 0, 0.90);   /* 小条空闲态贴边硬影 */
+  --inset-top:      var(--inset-highlight);
+
+  /* 拖拽柄 / 焦点 */
+  --grip-ink:   rgba(255, 255, 255, 0.74);
+  --focus-ring: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
+  --focus-ring-danger: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--danger);
+}
+
+/* =============================================================================
+ * 2. 浅色主题
+ * ========================================================================== */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* 表面层 */
+  --bg-plate:    #F2F3F5;
+  --bg-inset:    #FFFFFF;
+  --bg-panel:    #FFFFFF;
+  --bg-card:     #F7F8FA;
+  --bg-field:    #F1F3F7;
+  --bg-field-hi: #E6E9EF;
+  --bg-seg:      #EDEFF4;
+  --bg-seg-on:   #FFFFFF;
+
+  /* 描边层 */
+  --line:    rgba(16, 20, 28, 0.07);
+  --line-2:  rgba(16, 20, 28, 0.12);
+  --line-3:  rgba(16, 20, 28, 0.18);
+
+  /* 前景层（AC-53：四级文本对最浅底 --bg-plate 亦须 >=4.5:1，可作正文小字）*/
+  --ink:    #16181D;   /* 对白 17.76:1 */
+  --ink-2:  #41485A;   /* 对白 9.13:1 */
+  --ink-3:  #5C6577;   /* 对白 5.86:1 */
+  --ink-4:  #656E7D;   /* 对 plate 4.64:1 / 卡 4.84 / 白 5.15（原 #707A8A 仅 3.91 未达标）*/
+
+  /* 强调层（浅色 = DeepenForNonText(计时中色, --bg-panel, 3.0) 默认落点）*/
+  --accent:      #1669AD;   /* 对白 5.74:1 */
+  --accent-ink:  #1F63AA;   /* 对白 6.13:1 / 对卡 5.77:1 */
+  --accent-wash: color-mix(in srgb, #1669AD 14%, transparent);
+  --accent-line: color-mix(in srgb, #1669AD 32%, transparent);
+
+  /* 语义层（AC-53：作『文字』对最浅底 --bg-plate 须 >=4.5:1；亦满足非文本 >=3:1）
+     保色相、仅降亮度：H 分别 35 / 358 / 151，与原色同相，观感几乎不变 */
+  --warn:        #A05E00;   /* 对 plate 4.62:1 / 卡 4.82（原 #A76200 仅 4.31）*/
+  --warn-wash:   color-mix(in srgb, #A05E00 12%, transparent);
+  --danger:      #D02C33;   /* 对 plate 4.62:1 / 卡 4.83（原 #D4353B 仅 4.33）*/
+  --danger-wash: color-mix(in srgb, #D02C33 12%, transparent);
+  --ok:          #0C7E47;   /* 对 plate 4.62:1 / 卡 4.83（原 #0C834A 仅 4.34）*/
+  --ok-ink:      #FFFFFF;
+
+  /* 实心按钮 */
+  --solid-bg:  #1A1D24;
+  --solid-ink: #FFFFFF;
+  --danger-solid: #D02C33;   /* danger 实心底（＝浅色 --danger）：白字 5.13:1 */
+
+  /* 轨道 / 遮罩 / 色环 */
+  --track:      rgba(16, 20, 28, 0.11);
+  --scrim:      rgba(16, 20, 28, 0.32);
+  --ring-track: rgba(16, 20, 28, 0.16);
+
+  /* 玻璃 */
+  --glass-panel-bg: color-mix(in srgb, #F2F3F5 97%, transparent);
+  --glass-hover-bg: color-mix(in srgb, #F2F3F5 86%, transparent);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.90);
+
+  /* 阴影 */
+  --shadow-flat:    none;
+  --shadow-ring:    0 0 0 1px var(--line-2);
+  --shadow-pop:     0 12px 32px rgba(16, 20, 28, 0.16), 0 2px 6px rgba(16, 20, 28, 0.10);
+  --shadow-plate:   0 18px 48px rgba(16, 20, 28, 0.18), 0 2px 8px rgba(16, 20, 28, 0.12);
+  --shadow-float:   0 12px 32px rgba(16, 20, 28, 0.16);
+  --shadow-panel:   0 16px 40px rgba(16, 20, 28, 0.18);
+  --shadow-balloon: 0 1px 2px rgba(16, 20, 28, 0.28), 0 0 1px rgba(16, 20, 28, 0.45);
+  --inset-top:      var(--inset-highlight);
+
+  /* 拖拽柄 / 焦点 */
+  --grip-ink:   rgba(16, 20, 28, 0.55);
+  --focus-ring: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
+  --focus-ring-danger: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--danger);
+}
+
+/* =============================================================================
+ * 3. 四色可配（settings 写入；默认 = 语义色）—— 浅色须经 DeepenForNonText 派生
+ * ========================================================================== */
+:root {
+  --color-running: var(--accent);     /* settings.accent_running · 计时中 */
+  --color-warn:  var(--warn);       /* settings.accent_warn    · 提醒 */
+  --color-done:    var(--ok);         /* settings.accent_done    · 完成 */
+  --color-bar:     var(--bg-plate);   /* settings.accent_bar     · 小条底色 */
+}
+
+/* =============================================================================
+ * 4. B-slot 组件别名（组件引用这些，不直接引用原始值）
+ * ========================================================================== */
+:root {
+  /* 小条 */
+  --pill-bg:            var(--color-bar);
+  --pill-border-in:     var(--line-2);
+  /* 主小条悬停板：高不透明度板，**无 backdrop-filter**（架构裁定：主小条禁挂任何模糊，保拖拽顺滑） */
+  --pill-hover-plate:   color-mix(in srgb, var(--color-bar) 94%, transparent);
+  --pill-grip-ink:      var(--grip-ink);
+  --pill-divider:       var(--line);
+
+  /* 菜单 */
+  --menu-bg:            var(--glass-panel-bg);
+  --menu-border:        var(--line-2);
+  --menu-item-hover:    var(--bg-field-hi);
+  --menu-text:          var(--ink-2);
+  --menu-text-on:       var(--ink);
+  --menu-danger:        var(--danger);
+  --menu-group-label:   var(--ink-4);
+  --menu-badge-bg:      var(--accent-wash);
+  --menu-badge-ink:     var(--accent-ink);
+
+  /* 输入 / 分段 */
+  --input-bg:           var(--bg-field);
+  --input-bg-focus:     var(--bg-field-hi);
+  --input-border:       var(--line);
+  --input-placeholder:  var(--ink-4);
+  --input-text:         var(--ink);
+  --seg-track:          var(--bg-seg);
+  --seg-track-line:     var(--line);
+  --seg-on-bg:          var(--bg-seg-on);
+  --seg-on-ink:         var(--ink);
+  --seg-off-ink:        var(--ink-3);
+
+  /* 按钮（六档：solid / accent / neutral / ghost / danger / icon）*/
+  --btn-accent-bg:      var(--accent-wash);
+  --btn-accent-ink:     var(--accent-ink);
+  --btn-accent-line:    var(--accent-line);
+  --btn-neutral-bg:     var(--bg-field-hi);
+  --btn-neutral-ink:    var(--ink);
+  --btn-ghost-ink:      var(--ink-3);
+  --btn-danger-bg:      var(--danger-solid);   /* 实心底专用：深 #E1292F / 浅 #D02C33，白字均 >=4.5 */
+  --btn-danger-ink:     #FFFFFF;
+  --btn-solid-bg:       var(--solid-bg);
+  --btn-solid-ink:      var(--solid-ink);
+  --btn-icon-ink:       var(--ink-3);
+  --btn-icon-hover-bg:  var(--bg-field-hi);
+  --btn-icon-danger-bg: var(--danger-wash);
+
+  /* 卡片 / 行 */
+  --card-bg:            var(--bg-card);
+  --card-line:          var(--line);
+
+  /* 事项窗口（四状态）*/
+  --todo-row-hover:     var(--bg-field);
+  --todo-row-current:   var(--accent-wash);
+  --todo-bar-current:   var(--accent);
+  --todo-name-current:  var(--ink);
+  --todo-time-current:  var(--accent-ink);
+  --todo-name-done:     var(--ink-4);
+  --todo-mark-ring:     var(--line-3);
+  --todo-mark-done:     var(--ok);
+  --todo-mark-done-ink: var(--ok-ink);
+  --todo-overdue:       var(--color-warn);   /* 走可配色（AC-54），默认回落 --warn */
+  --todo-no-time:       var(--ink-4);
+  --todo-summary-ink:   var(--ink-4);   /* 与页面规格 todos-panel.md §1 小标题 + --menu-group-label 对齐（原 --ink-3 为孤例）*/
+
+  /* 便利贴 */
+  --note-body-bg:       var(--bg-inset);
+  --note-foot-ink:      var(--ink-3);
+  --note-confirm-bg:    var(--danger-wash);
+  --note-confirm-line:  var(--danger);
+
+  /* 文本语义别名 */
+  --text-primary:       var(--ink);
+  --text-secondary:     var(--ink-2);
+  --text-tertiary:      var(--ink-3);
+  --text-disabled:      var(--ink-4);
+
+  /* 提示气泡 kbd */
+  --kbd-bg:             var(--bg-panel);
+  --kbd-border:         var(--line-2);
+}
+
+/* =============================================================================
+ * 5. 计时数字规则（全项目最重要的一条排版规则，不可协商）
+ * ========================================================================== */
+.timer-digits {
+  font-family: var(--font-mono);
+  font-size: var(--text-num);
+  line-height: var(--leading-num);
+  font-weight: var(--weight-strong);          /* 等宽数字不要 700+，会糊 */
+  letter-spacing: var(--tracking-base);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-variant-ligatures: none;
+  min-width: 53px;                            /* MM:SS 定宽（对齐 Timing TimeW 53）*/
+  text-align: right;                          /* 右对齐 + 定宽 = 数字原地变化 */
+  white-space: nowrap;
+  color: var(--ink);                          /* RUNNING 下也保持高对比 */
+  display: inline-block;
+}
+.timer-digits[data-hours="true"] { min-width: 72px; }
+.timer-digits[data-size="lg"] {
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: var(--tracking-tight);
+}
+
+/* =============================================================================
+ * 6. focus-visible（永不被清除）与 reduced-motion
+ * ========================================================================== */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: inherit;
+}
+.btn-danger:focus-visible,
+[data-danger]:focus-visible {
+  box-shadow: var(--focus-ring-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0.01ms;
+    --dur-quick:   0.01ms;
+    --dur-exit:    0.01ms;
+    --dur-base:    0.01ms;
+    --dur-morph:   0.01ms;
+  }
+  .halo-breath,
+  .ring-tick { animation: none !important; }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  /* 用静态表达替代动效：加粗 / 虚线，保留 100% 状态可辨性 */
+  .ring[data-state="running"] { stroke-width: 3px; }
+  .ring[data-state="paused"]  { stroke-dasharray: 4 3; }
+}

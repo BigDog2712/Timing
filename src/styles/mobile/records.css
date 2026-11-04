@@ -1,0 +1,107 @@
+/* =============================================================================
+ * TickBar — 移动端 · 记录页（总计 / 分布 / 明细）
+ * -----------------------------------------------------------------------------
+ * 从 pages.css 按页面拆出（AGENTS.md 单文件 ≤300 行；原文件 504 行）。
+ * 只写本页自己的块：按钮 / 输入 / 分段 / 列表等原语在 primitives.css，
+ * 外壳与导航在 shell.css。颜色一律走令牌，可点元素高度 >= 44px。
+ * ========================================================================== */
+
+/* ============================== 记录页 ============================== */
+.m-records {
+  padding-top: var(--space-1);
+}
+
+.m-total {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--m-radius);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+.m-total__label {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-total__value {
+  font-family: var(--font-timer);
+  font-size: 30px;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-total__meta {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-dist {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.m-dist__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.m-dist__name {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-dist__meta {
+  flex: 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-dist__track {
+  display: block;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--track);
+  overflow: hidden;
+}
+
+.m-dist__bar {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+.m-detail {
+  margin-top: var(--space-3);
+}
+
+.m-detail__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+}
+
+.m-detail__sum {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}

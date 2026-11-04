@@ -1,0 +1,99 @@
+/* =============================================================================
+ * TickBar — 04-aliases.css（§3 四色可配 + §4 B-slot 组件别名）
+ * 拆自 design-tokens.css §3/§4（ADR-017 单文件 ≤300 行）。
+ * 这里全是 `var(--*)` 引用，不出现裸色值；组件只引用本文件的别名。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 3. 四色可配（settings 写入；默认 = 语义色）
+ * ========================================================================== */
+:root {
+  --color-running: var(--accent);
+  --color-danger:  var(--danger);   /* [Timing 对齐 D3] 急迫态 = RingUrgent，与 running/warn/done 同构 */
+  --color-warn:  var(--warn);
+  --color-done:    var(--ok);
+  --color-bar:     var(--bg-plate);
+}
+
+/* =============================================================================
+ * 4. B-slot 组件别名（组件引用这些，不直接引用原始值）
+ * ========================================================================== */
+:root {
+  /* 小条 */
+  /* [Timing 对齐 D2] --pill-bg 死别名已删（悬停板改接 --pill-hover-plate，无消费方） */
+  --pill-border-in:     var(--line-2);
+  --pill-hover-plate:   color-mix(in srgb, var(--color-bar) calc(74% * var(--ui-bg-opacity)), transparent);   /* 裁决二：74%（= --glass-hover-bg 档） */
+  --pill-grip-ink:      var(--grip-ink);
+  --pill-divider:       var(--line);
+
+  /* 菜单 */
+  --menu-bg:            var(--glass-panel-bg);
+  --menu-border:        var(--line-2);
+  --menu-item-hover:    var(--bg-field-hi);
+  --menu-text:          var(--ink-2);
+  --menu-text-on:       var(--ink);
+  --menu-danger:        var(--danger);
+  --menu-group-label:   var(--ink-4);
+  --menu-badge-bg:      var(--accent-wash);
+  --menu-badge-ink:     var(--accent-ink);
+
+  /* 输入 / 分段 */
+  --input-bg:           var(--bg-field);
+  --input-bg-focus:     var(--bg-field-hi);
+  --input-border:       var(--line);
+  --input-placeholder:  var(--ink-4);
+  --input-text:         var(--ink);
+  --seg-track:          var(--bg-seg);
+  --seg-track-line:     var(--line);
+  --seg-on-bg:          var(--bg-seg-on);
+  --seg-on-ink:         var(--ink);
+  --seg-off-ink:        var(--ink-3);
+
+  /* 按钮（六档：solid / accent / neutral / ghost / danger / icon）*/
+  --btn-accent-bg:      var(--accent-wash);
+  --btn-accent-ink:     var(--accent-ink);
+  --btn-accent-line:    var(--accent-line);
+  --btn-neutral-bg:     var(--bg-field-hi);
+  --btn-neutral-ink:    var(--ink);
+  --btn-ghost-ink:      var(--ink-3);
+  --btn-danger-bg:      var(--danger-solid);   /* 实心底专用（深 #E1292F / 浅 #D02C33），白字均 >=4.5 */
+  --btn-danger-ink:     #FFFFFF;
+  --btn-solid-bg:       var(--solid-bg);
+  --btn-solid-ink:      var(--solid-ink);
+  --btn-icon-ink:       var(--ink-3);
+  --btn-icon-hover-bg:  var(--bg-field-hi);
+  --btn-icon-danger-bg: var(--danger-wash);
+
+  /* 卡片 / 行 */
+  --card-bg:            var(--bg-card);
+  --card-line:          var(--line);
+
+  /* 事项窗口 / 待办（todos-panel.md §3.1 四状态分层；DESIGN §2.4 B-slot） */
+  --todo-row-hover:      var(--bg-field-hi);
+  --todo-row-current:    var(--accent-wash);
+  --todo-bar-current:    var(--accent);
+  --todo-time-current:   var(--accent-ink);
+  --todo-name-done:      var(--ink-4);
+  --todo-mark-ring:      var(--line-3);
+  --todo-mark-done:      var(--ok);
+  --todo-mark-done-ink:  var(--ok-ink);
+  --todo-overdue:        var(--color-warn);   /* 走可配色（AC-54），默认回落 --warn */
+  --todo-no-time:        var(--ink-4);
+  --todo-summary-ink:    var(--ink-4);
+
+  /* 便利贴（sticky-note.md §4；源 docs/design/design-tokens-V0.2.0.css §4 B-slot） */
+  --note-body-bg:       color-mix(in srgb, var(--bg-inset) calc(100% * var(--ui-bg-opacity)), transparent);
+  --note-foot-ink:      var(--ink-3);
+  --note-confirm-bg:    var(--danger-wash);
+  --note-confirm-line:  var(--danger);
+
+  /* 文本语义别名 */
+  --text-primary:       var(--ink);
+  --text-secondary:     var(--ink-2);
+  --text-tertiary:      var(--ink-3);
+  --text-disabled:      var(--ink-4);
+
+  /* 提示气泡 kbd */
+  --kbd-bg:             var(--bg-panel);
+  --kbd-border:         var(--line-2);
+}

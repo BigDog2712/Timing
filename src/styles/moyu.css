@@ -1,0 +1,204 @@
+/* =============================================================================
+ * TickBar V0.3.2 — moyu.css（摸鱼菜单 / 其他事项滚轮定长）
+ * -----------------------------------------------------------------------------
+ * 玻璃底、行高、键盘态、贴边定位全部沿用 menu.css 的 .menu 语言；
+ * 本文件只补两处差异：加速位数字等宽 + 「其他事项」卡片的表单/大数字。
+ * P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+/* 行右侧时长用等宽数字：5m / 25m / 1h 混排时不抖 */
+.menu--moyu .menu__accel {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------ 其他事项（名称 + 滚轮定长） ------------------------------ */
+.moyu-custom {
+  padding-bottom: var(--space-2);
+}
+
+.moyu-custom__field {
+  display: block;
+  padding: var(--space-1) var(--menu-item-pad-x) 0;
+}
+
+.moyu-custom__input {
+  width: 100%;
+  height: var(--input-h);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: var(--text-sm);
+}
+
+.moyu-custom__input::placeholder {
+  color: var(--ink-4);
+}
+
+.moyu-custom__input:focus-visible {
+  outline: none;
+  background: var(--input-bg-focus);
+  box-shadow: var(--focus-ring);
+}
+
+.moyu-custom__value {
+  margin-top: var(--space-3);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-timer-pill);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-num);
+  color: var(--ink);
+  /* 滚轮是这个数的唯一主交互：光标给「可上下拖动」的暗示 */
+  cursor: ns-resize;
+  user-select: none;
+}
+
+.moyu-custom__hint {
+  margin: var(--space-1) 0 var(--space-2);
+  text-align: center;
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+}
+
+.moyu-custom__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 0 var(--menu-item-pad-x);
+}
+
+/* ------------------------------ 常用摸鱼管理（V0.3.9） ------------------------------ */
+.moyu-manage {
+  padding-bottom: var(--space-2);
+}
+
+.moyu-manage__list {
+  max-height: 168px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-3) transparent;
+}
+
+.moyu-manage__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--menu-item-h);
+  padding: 0 var(--menu-item-pad-x);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.moyu-manage__row:hover,
+.moyu-manage__row[data-editing="true"] {
+  background: var(--menu-item-hover);
+}
+
+.moyu-manage__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  color: var(--menu-text);
+}
+
+.moyu-manage__meta {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  letter-spacing: var(--tracking-caps);
+  color: var(--ink-4);
+}
+
+.moyu-manage__act {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.moyu-manage__act:hover:not(:disabled) {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.moyu-manage__act:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.moyu-manage__act--danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.moyu-manage__empty {
+  margin: 0;
+  padding: var(--space-2) var(--menu-item-pad-x);
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+.moyu-manage__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--menu-item-pad-x);
+}
+
+.moyu-manage__form .menu__group {
+  padding: var(--space-1) 0 0;
+}
+
+.moyu-manage__mode {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.moyu-manage__mode button {
+  flex: 1 1 0;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.moyu-manage__mode button[data-on="true"] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.moyu-manage__minutes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.moyu-manage__minutes .moyu-custom__input {
+  width: 84px;
+}
+
+.moyu-manage__minutes span {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.moyu-manage__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+}

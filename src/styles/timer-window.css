@@ -1,0 +1,3 @@
+.timer-window { color: var(--text-primary); background: var(--surface-panel); }
+.timer-window__clock { display: block; font-size: 2.4rem; letter-spacing: .04em; }
+.timer-window__item { color: var(--text-secondary); }

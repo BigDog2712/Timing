@@ -1,0 +1,115 @@
+/* =============================================================================
+ * TickBar — 移动端外壳（整屏布局 / 顶部 / 底部导航）
+ * -----------------------------------------------------------------------------
+ * 纪律（DESIGN-ANDROID-V1 §7）：只用 var(--*) 令牌、类名 m- 前缀、无 :hover、
+ * 可点元素 >= 44×44。按钮 / 表单 / 分段 / 列表等共享原语在 primitives.css，
+ * 按页面拆分的样式在 timer / items / records / settings.css（单文件 ≤300 行）。
+ * 尺寸断点：min-width:600px 只做单列居中，不做平板双栏（PRD Q5 / P2-3）。
+ * ========================================================================== */
+
+.m-shell {
+  --m-gutter: 16px;
+  --m-tap: 44px;
+  --m-radius: 14px;
+  --m-tabbar-h: 58px;
+  --m-card: var(--bg-card);
+
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  /* 手机是整屏实心背景：桌面透明置顶层在这里没有任何意义（没有桌面可看穿） */
+  background: var(--bg-plate);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+/* ------------------------------ 顶部 ------------------------------ */
+.m-shell__head {
+  flex: 0 0 auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) var(--m-gutter) 8px;
+}
+
+.m-shell__title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-tight);
+}
+
+.m-shell__sub {
+  margin: 2px 0 0;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+.m-shell__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 var(--m-gutter) var(--space-5);
+}
+
+/* ------------------------------ 底部导航 ------------------------------ */
+.m-tabbar {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--line-2);
+}
+
+.m-tab {
+  min-height: var(--m-tabbar-h);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--ink-3);
+  font-size: var(--text-cap);
+  transition: color var(--dur-quick) var(--ease-standard);
+}
+
+.m-tab[data-on="true"] {
+  color: var(--accent-ink);
+}
+
+/* 选中态不只靠颜色（深色主题下 --ink-3 与 --accent-ink 都是高亮白）：
+   顶部再给一条 2px 强调线，色弱用户也能读出当前位置。 */
+.m-tab {
+  position: relative;
+}
+
+.m-tab[data-on="true"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 24px;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: var(--accent);
+}
+
+.m-tab__label {
+  font-weight: var(--weight-medium);
+}
+
+
+/* ------------------------------ 单列居中（≥600px） ------------------------------ */
+@media (min-width: 600px) {
+  .m-shell {
+    left: 50%;
+    right: auto;
+    width: 560px;
+    margin-left: -280px;
+    border-left: 1px solid var(--line-2);
+    border-right: 1px solid var(--line-2);
+  }
+}

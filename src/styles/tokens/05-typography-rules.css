@@ -1,0 +1,65 @@
+/* =============================================================================
+ * TickBar — 05-typography-rules.css（§5 计时数字规则 + §6 focus-visible / reduced-motion）
+ * 拆自 design-tokens.css §5/§6（ADR-017 单文件 ≤300 行）。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 5. 计时数字规则（全项目最重要的一条排版规则，不可协商）
+ * ========================================================================== */
+.timer-digits {
+  font-family: var(--font-mono);
+  font-size: var(--text-num);
+  line-height: var(--leading-num);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-base);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-variant-ligatures: none;
+  min-width: 53px;                            /* MM:SS 定宽（对齐 Timing TimeW 53）*/
+  text-align: right;
+  white-space: nowrap;
+  color: var(--ink);
+  display: inline-block;
+}
+.timer-digits[data-hours="true"] { min-width: 72px; }
+.timer-digits[data-size="lg"] {
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: var(--tracking-tight);
+}
+
+/* =============================================================================
+ * 6. focus-visible（永不被清除）与 reduced-motion
+ * ========================================================================== */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: inherit;
+}
+/* 危险项的焦点环：必须按值匹配——`data-danger` 在菜单项上恒存在（值为 "true"/"false"），
+   写成 `[data-danger]` 会让所有菜单项都套上红环。 */
+.btn-danger:focus-visible,
+[data-danger="true"]:focus-visible {
+  box-shadow: var(--focus-ring-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0.01ms;
+    --dur-quick:   0.01ms;
+    --dur-exit:    0.01ms;
+    --dur-base:    0.01ms;
+    --dur-morph:   0.01ms;
+  }
+  .halo-breath,
+  .ring-tick { animation: none !important; }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  /* [V0.3.6] 删除两条死代码：`.ring[data-state="running"]{stroke-width:3px}` 与
+     `.ring[data-state="paused"]{stroke-dasharray:4 3}`。`.ring` 是 <button>，stroke-*
+     对 HTML 元素无效；它们描述的是 V0.3.3 改 SVG 之前「环 = CSS 描边」的形态，
+     只剩误导作用（真正管描边的是 .ring__arc-track / .ring__arc-bar）。 */
+}

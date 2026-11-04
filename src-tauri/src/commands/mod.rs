@@ -1,0 +1,36 @@
+//! 命令层：仅反序列化 -> 调 service -> 序列化，无业务、无 SQL。
+//!
+//! 命令名就是契约面（`lib.rs` 的 65 条注册 + `check:contract` 静态比对），所以
+//! **不能**用 `#[cfg]` 把命令整条剔除。三组「桌面有实现、移动端只能给桩」的命令
+//! 改用 `#[path]` 换文件：模块名与函数名一字不变，`lib.rs` 因此零改动。
+//! 桩只回 `IO_ERROR`（见 `platform::host::desktop_only`），不新增错误码。
+
+pub mod countdown_cmd;
+pub mod daily_status_cmd;
+pub mod item_cmd;
+pub mod note_cmd;
+pub mod plugin_cmd;
+pub mod record_cmd;
+pub mod reminder_cmd;
+pub mod settings_cmd;
+pub mod theme_cmd;
+pub mod timer_cmd;
+pub mod todo_cmd;
+
+#[cfg(desktop)]
+pub mod md_sync_cmd;
+#[cfg(mobile)]
+#[path = "md_sync_cmd_mobile.rs"]
+pub mod md_sync_cmd;
+
+#[cfg(desktop)]
+pub mod system_cmd;
+#[cfg(mobile)]
+#[path = "system_cmd_mobile.rs"]
+pub mod system_cmd;
+
+#[cfg(desktop)]
+pub mod window_cmd;
+#[cfg(mobile)]
+#[path = "window_cmd_mobile.rs"]
+pub mod window_cmd;
