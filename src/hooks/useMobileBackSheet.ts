@@ -23,7 +23,7 @@ export function useMobileBackSheet(open: boolean, onBack: () => void = defaultBa
   useEffect(() => {
     if (!open) return;
     let consumedByPop = false;
-    window.history.pushState({ tickbarOverlay: true }, '');
+    window.history.pushState({ timingOverlay: true }, '');
     const onPop = () => {
       consumedByPop = true;
       onBack();

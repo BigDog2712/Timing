@@ -42,6 +42,15 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         app_data_dir.display()
     );
 
+    /* ①' [V0.5.0] 迁移结果补记 + 路径一致性自检 + 自启接管。
+    迁移跑在本函数之前（`lib.rs::run()` 开头），那时还没有日志文件可写，
+    所以结果缓存在 `infra::appdata_migrate`，这里补记（ARCHITECTURE §7 N11）。 */
+    #[cfg(desktop)]
+    {
+        record_migration(&app, &app_data_dir);
+        boot_timing::mark("migrate_recorded");
+    }
+
     // ①' [V0.4.1] Markdown 落点写前留底目录（md-sync 覆写用户日记前存原内容）。
     //     放在 app_data 而不是 vault 里：不在 Obsidian 的库里堆 .bak。
     crate::infra::md_backup::set_root(app_data_dir.join("backups").join("md"));
@@ -110,4 +119,89 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     // 也要留下这次的 setup 耗时，不能白跑一趟。
     boot_timing::report("setup");
     Ok(())
+}
+
+/// 迁移结果的补记与自启接管（桌面独占）。
+///
+/// 三件事，顺序不能换：
+/// 1. **路径一致性自检**：`run()` 阶段没有 `AppHandle`，迁移目标只能靠
+///    `dirs::data_dir()` + identifier 复刻。推错时的表现是「用户看不到自己的数据，
+///    而日志一片安静」——最坏的一种。不一致必须留 ERROR（ARCHITECTURE §7 N12）。
+/// 2. **结果补记**：六条文案逐字可 grep（§6.3）。
+/// 3. **自启接管**：只有真的迁移过才动注册表。
+#[cfg(desktop)]
+fn record_migration(app: &AppHandle, app_data_dir: &std::path::Path) {
+    use crate::infra::appdata_migrate::{self as mig, MigrationOutcome};
+
+    if let Some(used) = mig::paths_used() {
+        if used.target != app_data_dir {
+            crate::log_error!(
+                "appdata mismatch: migrate target={} authoritative={}",
+                used.target.display(),
+                app_data_dir.display()
+            );
+        }
+    }
+    if mig::cleaned_leftover_temp() {
+        crate::log_info!("migrate: cleaned leftover temp");
+    }
+
+    match mig::outcome() {
+        Some(outcome @ MigrationOutcome::Migrated(_)) => {
+            if let MigrationOutcome::Migrated(info) = &outcome {
+                crate::log_info!(
+                    "migrate: ok from={} rows={} bytes={} wal={}",
+                    info.source.display(),
+                    info.row_counts.summary(),
+                    info.db_bytes,
+                    info.wal_copied
+                );
+            }
+            /* 标记文件写不进去时数据其实已经搬好（`appdata_migrate` 里已降级为告警），
+            这里补一条 WARN 让它在日志里可查。 */
+            if mig::read_marker(app_data_dir).is_none() {
+                crate::log_warn!(
+                    "migrate: ok but marker file missing; 详见旧目录 migration-failed.txt"
+                );
+            }
+            if let Err(err) = app::autostart_takeover::run(app, &outcome) {
+                crate::log_warn!("autostart takeover failed: {err}");
+            }
+        }
+        Some(MigrationOutcome::Skipped) => {
+            crate::log_info!("{}", app::preboot::skip_reason());
+        }
+        Some(MigrationOutcome::AlreadyPresent(target)) => {
+            crate::log_info!(
+                "migrate: skip, already migrated target={}",
+                target.display()
+            );
+        }
+        Some(MigrationOutcome::TargetOccupied(source)) => {
+            crate::log_warn!(
+                "migrate: skip, target db exists; legacy={}（未采用）",
+                source.display()
+            );
+        }
+        Some(MigrationOutcome::NoLegacy) => {
+            crate::log_info!("migrate: no legacy data");
+        }
+        Some(MigrationOutcome::Failed(failure)) => {
+            crate::log_error!(
+                "migrate failed: stage={} reason={}",
+                failure.stage.as_str(),
+                failure.reason
+            );
+            /* 失败明细已在 `preboot` 写进旧目录；这里显式说明「旧目录在哪」，
+            用户报障时能直接把路径发过来。 */
+            if let Some(legacy) = mig::legacy_dir_of(app_data_dir) {
+                crate::log_error!(
+                    "migrate failed: legacy dir kept intact at {}",
+                    legacy.display()
+                );
+            }
+        }
+        /* 没跑迁移（移动端 / 拿不到 data_dir）：什么都不记，避免噪声。 */
+        None => {}
+    }
 }

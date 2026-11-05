@@ -11,6 +11,7 @@ use std::path::Path;
 
 use tauri::{AppHandle, Manager};
 
+use crate::infra::appdata_migrate::{self as mig, paths::DB_NAME, MigrationOutcome};
 use crate::infra::window_spec;
 use crate::platform::log;
 
@@ -34,7 +35,7 @@ pub fn write_snapshot(app: &AppHandle, app_data_dir: &Path) {
     if let Some(dir) = log::log_dir() {
         let _ = writeln!(out, "log_dir      : {}", dir.display());
     }
-    let db_path = app_data_dir.join("tickbar.db");
+    let db_path = app_data_dir.join(DB_NAME);
     let db_size = std::fs::metadata(&db_path).map(|m| m.len()).unwrap_or(0);
     let _ = writeln!(
         out,
@@ -42,6 +43,23 @@ pub fn write_snapshot(app: &AppHandle, app_data_dir: &Path) {
         db_path.display(),
         db_size
     );
+
+    /* [V0.5.0] 迁移现场三行：用户报障时第一眼看「数据从哪来 / 该去哪 / 旧目录在哪」。
+    这三行是 PRD M-01 的期望输出，也是 M-05（发现未采用的旧数据）的唯一书面证据。 */
+    let _ = writeln!(out, "migration    : {}", migration_label(app_data_dir));
+    match mig::paths_used() {
+        Some(used) => {
+            let _ = writeln!(out, "migrate_target: {}", used.target.display());
+            let _ = writeln!(out, "legacy       : {} (kept)", used.source.display());
+        }
+        None => {
+            let legacy = mig::legacy_dir_of(app_data_dir)
+                .map(|dir| dir.display().to_string())
+                .unwrap_or_else(|| "-".into());
+            let _ = writeln!(out, "migrate_target: <迁移未运行>");
+            let _ = writeln!(out, "legacy       : {legacy} (kept)");
+        }
+    }
 
     match app.available_monitors() {
         Ok(monitors) => {
@@ -96,5 +114,25 @@ pub fn write_snapshot(app: &AppHandle, app_data_dir: &Path) {
     if let Some(dir) = log::log_dir() {
         let _ = std::fs::create_dir_all(dir);
         let _ = std::fs::write(dir.join("diagnostics.txt"), out);
+    }
+}
+
+/// 迁移来源的一句话标签（`migration    :` 那一行）。
+///
+/// 判定顺序与 `commands::migration_cmd::resolve_source` 保持一致（那边给前端用、
+/// 这边给文本快照用，两处都不该出现「标记文件在但显示 fresh」这种自相矛盾）。
+fn migration_label(app_data_dir: &Path) -> &'static str {
+    if mig::read_marker(app_data_dir).is_some() {
+        return "migrated（已从旧目录迁移）";
+    }
+    if mig::read_pending(app_data_dir).is_some() {
+        return "pending（旧数据待迁移，上次选了以空白数据启动）";
+    }
+    match mig::outcome() {
+        Some(MigrationOutcome::Skipped) => "skipped（本次进程跳过迁移）",
+        Some(MigrationOutcome::TargetOccupied(_)) => "unattached（发现未采用的旧数据）",
+        Some(MigrationOutcome::Migrated(_)) => "migrated",
+        Some(MigrationOutcome::Failed(_)) => "failed（详见旧目录 migration-failed.txt）",
+        _ => "fresh（全新数据）",
     }
 }

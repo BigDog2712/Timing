@@ -14,7 +14,15 @@
         try {
           var mode = 'dark';
           try {
-            var cached = localStorage.getItem('tickbar.theme');
+            /* [V0.5.0] 新键 timing.theme 优先，回落老键 tickbar.theme（0.5.0 兼容，一版后删）。
+               这处是内联 JS，**逃过类型检查**，也不经过 src/lib/storageKeys.ts：
+               改动必须与 src/types/domain/constants.ts / src/lib/theme.ts 同批。
+               这里只读不写——本脚本必须同步执行，搬运（回写新键）由首帧后的
+               readCachedTheme() 完成（ARCHITECTURE §6.2）。 */
+            var cached = localStorage.getItem('timing.theme');
+            if (cached !== 'dark' && cached !== 'light' && cached !== 'system') {
+              cached = localStorage.getItem('tickbar.theme');
+            }
             if (cached === 'dark' || cached === 'light' || cached === 'system') mode = cached;
           } catch (e) {}
           var resolved = mode;
@@ -31,41 +39,6 @@
         } catch (e) {
           /* 任何异常都回落到默认深色（html 已带 data-theme="dark"） */
         }
-      })();
-    </script>
-    <script>
-      /* [TEMP-DIAG] 启动故障排查：把「脚本是否执行 / 首个错误」用图片打点送到本地监听。
-         WebView 里没有 DevTools 时这是唯一能把信息带出来的通道。定位完即删。 */
-      (function () {
-        function send(tag, msg) {
-          try {
-            new Image().src =
-              'http://127.0.0.1:8787/?t=' +
-              tag +
-              '&m=' +
-              encodeURIComponent(String(msg === undefined ? '' : msg).slice(0, 300));
-          } catch (e) {}
-        }
-        window.__diagSend = send;
-        send('inline', 'ready=' + document.readyState + ' theme=' + document.documentElement.getAttribute('data-theme'));
-        window.addEventListener(
-          'error',
-          function (e) {
-            if (e && e.target && e.target.tagName) {
-              send('res', e.target.tagName + ' ' + (e.target.src || e.target.href || ''));
-            } else {
-              send('js', ((e && e.message) || '') + ' @ ' + ((e && e.filename) || '') + ':' + ((e && e.lineno) || ''));
-            }
-          },
-          true
-        );
-        window.addEventListener('unhandledrejection', function (e) {
-          var r = e && e.reason;
-          send('rej', (r && (r.message || r.stack)) || r);
-        });
-        document.addEventListener('DOMContentLoaded', function () {
-          send('dom', 'root=' + !!document.getElementById('root'));
-        });
       })();
     </script>
   </head>

@@ -12,21 +12,21 @@
         {
           "kind": "timers",
           "enabled": true,
-          "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
+          "root": "%USERPROFILE%\\Documents\\Timing",
           "file": "{date}.md",
           "heading": "#### 事项计时"
         },
         {
           "kind": "notes",
           "enabled": true,
-          "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
+          "root": "%USERPROFILE%\\Documents\\Timing",
           "file": "{date}.md",
           "heading": "#### 便利贴"
         },
         {
           "kind": "todos",
           "enabled": true,
-          "root": "%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary",
+          "root": "%USERPROFILE%\\Documents\\Timing",
           "file": "{date}.md",
           "heading": "#### 待办事项"
         }

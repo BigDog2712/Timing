@@ -4212,6 +4212,8 @@ name = "tickbar"
 version = "0.4.1"
 dependencies = [
  "chrono",
+ "dirs 7.0.0",
+ "rfd",
  "serde",
  "serde_json",
  "sqlx",
@@ -4224,6 +4226,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "thiserror 2.0.21",
  "tokio",
+ "windows-registry",
 ]
 
 [[package]]

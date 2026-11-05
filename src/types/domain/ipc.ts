@@ -62,6 +62,7 @@ import type {
 } from './models';
 import type { PluginListResult } from './plugin';
 import type { MdSyncConfig, MdSyncKind, MdSyncReport, MdSyncView } from './mdSync';
+import type { MigrationInfo } from './migration';
 
 /**
  * 事件名常量（供 listen 使用，避免字符串散落）。
@@ -193,4 +194,11 @@ export interface IpcApi {
   mdSyncSave(params: { config: MdSyncConfig }): Promise<MdSyncView>;
   mdSyncRun(): Promise<MdSyncReport>;
   mdSyncOpen(params: { kind: MdSyncKind }): Promise<void>;
+
+  /* 迁移可见性 [V0.5.0] —— 命令 65 → 67（ADR-037）。
+     两条都无入参：路径由后端重算，绝不接受前端传路径（防「改 marker 文件 →
+     打开任意目录」的路径注入；marker 是用户目录下的明文 JSON）。 */
+  getMigrationInfo(): Promise<MigrationInfo>;
+  /** 资源管理器打开旧数据目录；目录不存在返回 `IO_ERROR`，**不创建**目录 */
+  openLegacyDir(): Promise<void>;
 }

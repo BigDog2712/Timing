@@ -1,0 +1,130 @@
+classDiagram
+  direction TB
+
+  class Paths {
+    +PathBuf base
+    +PathBuf source
+    +PathBuf target
+    +PathBuf temp
+    +PathBuf backup
+    +new(base, target_id)$ Paths
+    +resolve(target_id)$ Option~Paths~
+    +from_app_data_dir(dir)$ Option~Paths~
+  }
+  class MigrationOutcome {
+    <<enumeration>>
+    NoLegacy
+    Skipped
+    Migrated
+    AlreadyPresent
+    TargetOccupied
+    Failed
+  }
+  class Migrated {
+    +String at
+    +PathBuf source
+    +u64 db_bytes
+    +RowCounts row_counts
+    +bool wal_copied
+  }
+  class Failure {
+    +Stage stage
+    +String reason
+  }
+  class Stage {
+    <<enumeration>>
+    CleanTemp
+    Copy
+    Verify
+    Swap
+    Marker
+  }
+  class RowCounts {
+    +i64 items
+    +i64 time_records
+    +i64 todos
+    +i64 notes
+    +i64 settings
+  }
+  class migration_module {
+    <<module>> appdata_migrate
+    +run_at(paths, skip) MigrationOutcome
+    +run_once(paths, skip) MigrationOutcome
+    +outcome() Option~MigrationOutcome~
+    +cleanup_temp(paths) bool
+    +read_marker(dir) Option~MigrationMarker~
+    +read_pending(dir) Option~PendingMigrate~
+    +legacy_dir_of(dir) Option~PathBuf~
+  }
+  class MarkerFiles {
+    <<module>> marker
+    +write_marker(dir, Migrated) Result
+    +write_failure(source, Failure, Paths) Result
+    +write_pending(dir, Paths) Result
+    +clear_pending(dir)
+  }
+  class Verify {
+    <<module>>
+    +verify(temp, source, row_counts) Result
+  }
+  class Decide {
+    <<module>>
+    +decide(paths) Decision
+  }
+  class CopyTree {
+    <<module>>
+    +copy_tree(paths) Result
+    +swap_into_place(paths) Result
+  }
+  class Preboot {
+    <<module>> app_preboot
+    +prepare(paths, target_id) BootChoice
+    -ask_failure(reason, source) Retry_Blank_Quit
+  }
+  class AutostartTakeover {
+    <<module>>
+    +run(app, outcome) Result
+  }
+  class MigrationCmd {
+    <<module>>
+    +get_migration_info(app) MigrationInfo
+    +open_legacy_dir(app) void
+  }
+  class MigrationInfo {
+    +MigrationSource source
+    +Option~String~ migrated_at
+    +Option~String~ legacy_dir
+    +bool legacy_exists
+    +Option~RowCounts~ row_counts
+  }
+  class MigrationSource {
+    <<enumeration>>
+    legacy
+    fresh
+    pending
+    unattached
+    skipped
+  }
+  class ShellOpen {
+    <<module>>
+    +open_dir(path) Result
+  }
+
+  migration_module ..> Paths : uses
+  migration_module ..> Decide : uses
+  migration_module ..> CopyTree : uses
+  migration_module ..> Verify : uses
+  migration_module ..> MarkerFiles : uses
+  migration_module --> MigrationOutcome : returns
+  MigrationOutcome *-- Migrated
+  MigrationOutcome *-- Failure
+  Migrated *-- RowCounts
+  Failure *-- Stage
+  Preboot ..> migration_module : run_once
+  Preboot ..> MarkerFiles : write_failure/write_pending
+  AutostartTakeover ..> MigrationOutcome : reads Migrated
+  MigrationCmd ..> migration_module : read_marker/legacy_dir_of
+  MigrationCmd ..> ShellOpen : open_dir
+  MigrationCmd ..> MigrationInfo : returns
+  MigrationInfo *-- RowCounts
+  MigrationInfo *-- MigrationSource

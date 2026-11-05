@@ -16,10 +16,12 @@
  * 输入框只留「数字 + S」，不缀「低于此时长不记录」这类说明。
  */
 import { useEffect, useState } from 'react';
+import { IS_MOBILE } from '../../lib/platform';
 import { errorText } from '../../services/ipc';
 import { settingsActions } from '../../services/settingsActions';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Switch } from '../ui/Switch';
+import { MigrationInfoCard } from './MigrationInfoCard';
 
 /** 最短记录时长：与后端 `ReferenceSettings::default().min_record_seconds` 同值 */
 const FALLBACK_MIN_RECORD_SEC = 30;
@@ -140,6 +142,11 @@ export function GeneralTab({ showAutostart = true }: GeneralTabProps) {
           {error}
         </p>
       )}
+
+      {/* [V0.5.0] 数据迁移可见性：迁移发生在窗口出现之前（lib.rs::run() 开头），
+          用户看不到过程——这块是唯一能确认「我的数据去哪了」的地方。
+          移动端不挂载：迁移只发生在桌面（数据目录搬迁是桌面侧的改名配套）。 */}
+      {!IS_MOBILE && <MigrationInfoCard />}
     </div>
   );
 }

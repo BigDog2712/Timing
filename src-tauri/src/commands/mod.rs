@@ -8,6 +8,7 @@
 pub mod countdown_cmd;
 pub mod daily_status_cmd;
 pub mod item_cmd;
+pub mod migration_cmd;
 pub mod note_cmd;
 pub mod plugin_cmd;
 pub mod record_cmd;

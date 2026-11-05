@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 调试版在主题图标模式下同样保持全透明，和 0.3.5 的口径一致。 -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@android:color/transparent" />
+    <foreground android:drawable="@drawable/ic_debug_blank" />
+    <monochrome android:drawable="@drawable/ic_debug_blank" />
+</adaptive-icon>

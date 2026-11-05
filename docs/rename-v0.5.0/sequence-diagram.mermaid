@@ -1,0 +1,71 @@
+sequenceDiagram
+  autonumber
+  participant R as lib.rs::run()
+  participant P as app::preboot
+  participant M as infra::appdata_migrate
+  participant F as 文件系统
+  participant S as bootstrap::setup
+  participant L as platform::log
+
+  Note over R,L: 路径一 正常迁移（首启，老数据齐全）
+  R->>R: platform::boot_timing::start()
+  R->>R: ctx = generate_context!(); id = ctx.config().identifier
+  R->>P: prepare(Paths::resolve(id), id)
+  P->>M: run_once(paths, skip=false)
+  M->>F: decide: source 存在? target 有库?
+  F-->>M: Go
+  M->>F: cleanup_temp(com.timing.app.migrating)
+  M->>F: 递归复制 source → temp（tickbar.db* → timing.db*，含 -wal/-shm）
+  M->>M: verify(temp): 逐文件字节数 / PRAGMA integrity_check / 五表行数 / 版本键可读
+  M->>F: rename(temp → com.timing.app)
+  M->>F: write_marker(migrated-from-tickbar-app.json)
+  M-->>P: Migrated{at, dbBytes, rowCounts, walCopied}
+  P-->>R: BootChoice::Proceed
+  R->>R: boot_timing::mark("preboot")
+  R->>R: Builder::default() + 插件 + generate_handler!
+  R->>S: setup(AppHandle)
+  S->>S: app_data_dir 与 paths.target 一致性自检
+  S->>L: log::init(<app_data>) 此后文件名已是 timing-*.log
+  S->>L: log_info!("migrate: ok from=… rows=… bytes=…")
+  S->>S: db::init_pool(<app_data>) → 读 timing.db
+  S->>S: app::autostart_takeover::run(&app, migrated)
+  S-->>R: Ok(())
+  R->>R: builder.run(ctx) → 建窗 + window-state 回填（位置正确）
+
+  Note over R,L: 路径二 迁移失败（用户可重试 / 空白启动 / 退出）
+  R->>P: prepare(paths, id)
+  P->>M: run_once(paths, skip=false)
+  M-->>P: Failed{stage=Verify, reason}
+  P->>M: marker::write_failure(source, failure, paths)
+  loop 直到用户不再选「重试」
+    P->>P: rfd::MessageDialog YesNoCancelCustom("重试","以空白数据启动","退出")
+    alt 重试
+      P->>M: run_once(paths, skip=false)（内部先 cleanup_temp）
+      M-->>P: Migrated / Failed
+    else 以空白数据启动
+      P->>M: marker::write_pending(app_data_dir, paths)
+      P-->>R: BootChoice::Proceed（本次空库启动，下次覆盖式迁移）
+    else 退出
+      P-->>R: BootChoice::Abort
+      R->>R: std::process::exit(2)
+    end
+  end
+
+  Note over R,L: 路径三 目标已存在（M-05 / 本机现状）
+  R->>P: prepare(paths, id)
+  P->>M: run_once(paths, false)
+  M-->>P: TargetOccupied(source)
+  P-->>R: Proceed
+  R->>S: setup()
+  S->>S: log_warn!("migrate: skip, target db exists; legacy=<path>")
+  S->>S: diagnostics 追加 "migration : skipped (unattached legacy data: <path>)"
+  Note over S: 绝不覆盖、绝不合并、绝不自动删除
+
+  Note over R,L: 路径四 第二次启动（M-02）/ 迁移后删老目录（M-03）
+  R->>P: prepare(paths, id)
+  P->>M: run_once(paths, false)
+  M-->>P: AlreadyPresent(target)（不复制、不校验、不写 marker）
+  P-->>R: Proceed
+  R->>S: setup()
+  S->>S: log_info!("migrate: skip, already migrated")
+  Note over S: 代码零处依赖老目录存在

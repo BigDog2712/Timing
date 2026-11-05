@@ -17,6 +17,7 @@ import { createMockApiV020 } from './browserMockV020';
 import { createMockApiDaily } from './browserMockDaily';
 import { createMockApiItems } from './browserMockItems';
 import { createMockApiPlugins } from './browserMockPlugins';
+import { createMockApiMigration } from './browserMockMigration';
 import { buildState, fail, now, seed, type MockState } from './mockSeed';
 
 /**
@@ -243,11 +244,13 @@ export function createMockApi(): Record<string, (args?: any) => unknown> {
      余下的日状态 / 丢弃计时 / 计时窗三条拆至 browserMockDaily */
   /* [V0.3.0] 事项域 6 条拆至 browserMockItems（同上纪律，ADR-017） */
   /* [V0.3.2] 插件域 2 条拆至 browserMockPlugins */
+  /* [V0.5.0] 迁移可见性 2 条拆至 browserMockMigration（命令 65 → 67） */
   return {
     ...core,
     ...createMockApiItems(s),
     ...createMockApiV020(s, findItem),
     ...createMockApiDaily(s),
     ...createMockApiPlugins(),
+    ...createMockApiMigration(),
   };
 }

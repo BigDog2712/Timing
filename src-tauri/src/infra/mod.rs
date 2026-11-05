@@ -9,12 +9,14 @@
 //! - `runtime` / `monitor` / `reminder` / `countdown` / `note_windows::restore_open`
 //!   → `jobs::*`（定时触发业务动作，属调度层）
 
+pub mod appdata_migrate;
 pub mod db;
 pub mod md_backup;
 pub mod md_file;
 pub mod migrate;
 pub mod notify;
 pub mod plugin_fs;
+pub mod shell_open;
 
 /* 桌面独占（V1-Android）：下面这些模块直接调 tauri 桌面专有 API ——
 `WebviewWindowBuilder` 的 `transparent/skip_taskbar/always_on_top/decorations`、

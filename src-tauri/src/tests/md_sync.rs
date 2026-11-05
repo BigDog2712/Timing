@@ -44,7 +44,8 @@ pub(super) async fn env(tag: &str) -> Env {
     };
     /* **安全底线，不要删**：插件扫描的 dev 源（仓库 `plugins/`）优先级高于本目录里
     写的测试插件，所以「还没保存配置 / 只保存了部分落点」的用例会拿到仓库 `md-sync`
-    声明的真实落点——作者的 OneDrive 日记目录。那样一次 `md_sync::run` 就会把空库内容
+    声明的真实落点——仓库 `plugin.json` 里的占位目录 `%USERPROFILE%\Documents\Timing`
+    （0.5.0 前是作者本机的云同步日记目录）。那样一次 `md_sync::run` 就会把空库内容
     写进用户的真实日记（本轮真出过这个事故）。这里先把**三种 kind** 都锁到临时目录，
     配合 `save_binding` 的「按 kind 就地替换」，任何用例都不可能写到仓库之外去。 */
     for (kind, heading) in [
@@ -81,7 +82,7 @@ pub(super) fn binding(kind: MdSyncKind, root: &Path, file: &str, heading: &str) 
 
 pub(super) async fn save_binding(pool: &SqlitePool, binding: MdSyncBinding) {
     /* **不能整体替换**：`config::load` 现在会把「保存值里没有的 kind」用插件默认值补齐，
-    而测试环境的默认值来自仓库 `plugins/md-sync`（作者本机的 OneDrive 日记目录）。
+    而测试环境的默认值来自仓库 `plugins/md-sync`（`%USERPROFILE%\Documents\Timing` 占位目录）。
     整体替换只留一个 kind 时，另外两个 kind 会被补齐成真实路径，一次 run 就写到仓库
     外面去。所以这里改成「按 kind 就地替换」，其余落点保持 `env()` 预置的临时目录版本。 */
     let mut current = match settings::get_value(pool, config::CONFIG_KEY).await {

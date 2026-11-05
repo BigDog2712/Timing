@@ -24,7 +24,7 @@ import { PluginsTab } from './PluginsTab';
 (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 const EMPTY: PluginListResult = {
-  dir: 'C:\\Users\\me\\AppData\\Roaming\\com.tickbar.app\\plugins',
+  dir: 'C:\\Users\\me\\AppData\\Roaming\\com.timing.app\\plugins',
   plugins: [],
   quickTimers: [],
 };

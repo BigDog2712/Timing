@@ -601,7 +601,7 @@ active ──resolve_open_record(discard)─▶ soft-deleted + saved（终态，
 ## 10. Phase 3 一致性校验清单与风险
 
 ### 10.1 交付前自检（缺一即退回）
-- [ ] 全部 65 个命令在 Rust `invoke_handler` 注册（含 §11 / §12 / §3.8 增量；V0.3.4 下架日记域 4 条、V0.4.0 新增 md-sync 4 条后的现值），且命令名与本文一致。
+- [ ] 全部 67 个命令在 Rust `invoke_handler` 注册（含 §11 / §12 / §3.8 增量；V0.3.4 下架日记域 4 条、V0.4.0 新增 md-sync 4 条、V0.5.0 新增迁移可见性 2 条后的现值），且命令名与本文一致。
 - [ ] 16 个错误码在 `error.rs` 全部可序列化，无 `unwrap()` 泄漏 panic。
 - [ ] `domain.ts` 每个字段与 §5 DTO 一一对应（含 `null` 联合类型）。
 - [ ] 全项目无 `draft` 残留（命令、DTO、SQL、迁移、类型、文案）。
@@ -618,9 +618,9 @@ active ──resolve_open_record(discard)─▶ soft-deleted + saved（终态，
 - **R-5 `discard` 必须改 `status`**：软删除 `active` 记录而不改 `status` 会永久占用 `uq_records_open` 的唯一槽，导致此后无法开新会话（见 §4.4）。
 
 > 口径说明（2026-10-20）：§2 的「11 个错误码」与 §10.1 的「29 个命令」是 MVP 锁定值；当前实装
-> **65 命令 / 16 错误码**（含 ADR-020 新增的 `main_work_area`；ADR-021 下架 `ITEM_NAME_DUPLICATE`；
+> **67 命令 / 16 错误码**（含 ADR-020 新增的 `main_work_area`；ADR-021 下架 `ITEM_NAME_DUPLICATE`；
 > ADR-022 下架 `register_shortcut` / `set_always_on_top` / `SHORTCUT_REGISTER_FAILED`；
-> ADR-023 下架日记域 4 条命令）。
+> ADR-023 下架日记域 4 条命令；ADR-037 / V0.5.0 新增迁移可见性 2 条命令，见 §12.9）。
 > 以代码为准的机械校验由 `npm run check:contract` 执行（比对 `lib.rs` / `domain.ts` / `ipc.ts` /
 > `error.rs` 四处），本文档的人工数字不再作为门禁。
 
@@ -741,8 +741,9 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 ### 12.8 V1.0-Android 平台差异（不是契约变更）
 
 > 本节登记**同一份契约在两个平台上的行为差异**，与 §12.5/§12.6 的「减量」不同：
-> **命令 65 / 错误码 16 / 事件 11 一个都没少**，`check:contract` 输出仍是
-> `65/65/65/65 · 16/16 · 11/11`。Android 分支只是把「桌面才有实现」的少数命令改成
+> **命令 67 / 错误码 16 / 事件 11 一个都没少**（V0.5.0 新增的两条迁移命令见 §12.9，移动端同样
+> 全注册、返回 `IO_ERROR`），`check:contract` 输出仍是
+> `67/67/67/67 · 16/16 · 11/11`。Android 分支只是把「桌面才有实现」的少数命令改成
 > 返回 `IO_ERROR` + 一句中文说明，DTO 字段一个不改。
 >
 > 依据：`docs/mobile/DESIGN-ANDROID-V1.md` §1.1 / §1.3 / §1.4 / §1.5 / §3.3。
@@ -751,7 +752,7 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 
 | 面 | 桌面 | Android | 变更 |
 |---|---|---|---|
-| 命令 | 65 | **65**（全注册，其中 12 条为桩） | 无 |
+| 命令 | 65 → **67**（两平台全注册；桌面专属命令在移动端返回 `IO_ERROR`。V0.5.0 新增 2 条见 §12.9） | 无 |
 | 事件 | 11 | **11**（`tray:highlight` / `app:open-*` / `note-window-*` 在移动端无 emit 点） | 无 |
 | 错误码 | 16 | **16**（桩统一 `IO_ERROR`，不新增码） | 无 |
 | DTO | — | 与桌面逐字相同；`Settings.autostartEnabled` 恒 `false`（字段保留） | 无 |
@@ -789,6 +790,76 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
   设置页在移动端隐藏「同步」页签。
 - **前台服务**：需 `FOREGROUND_SERVICE` + 不可消除通知 + 电池优化豁免（PRD Q3），
   且无真机可验，属「必须装机才能验证」的路径，留 P2-1。
+
+### 12.9 V0.5.0 契约增量：迁移可见性（ADR-037）
+
+> 背景：0.5.0 把 identifier 从 `com.tickbar.app` 改为 `com.timing.app`，老数据由
+> `lib.rs::run()` 开头的迁移模块搬过来（**只复制、不移动**）。迁移发生在窗口出现之前，
+> 用户看不到任何过程 —— 这两条命令把「结果」变成设置页上的一行字 + 一个按钮。
+> 决策记录见 `docs/decisions/ADR-037.md`。
+
+| 面 | 变更 | 理由 |
+|---|---|---|
+| 命令 | 65 → **67**：新增 `get_migration_info` / `open_legacy_dir` | 迁移结果必须对用户可见；两条都无入参，路径由后端重算 |
+| 错误码 | **16 不变**（两条命令失败一律 `IO_ERROR`） | 错误码只在 `error.rs` 定义且数量不变（PRD 铁律）；迁移失败不是用户可操作的新错误类别 |
+| 事件 | **11 不变** | 迁移只在启动时发生一次，无实时推送需求 |
+| DB schema | **v4 不变** | 迁移是文件级搬运 + 只读校验，不动表结构 |
+| DTO | 新增 `MigrationInfo` / `RowCounts` / `MigrationSource` | 见 §12.9.2 |
+| 前端 | 设置 → 通用页签底部新增「数据迁移」卡（`MigrationInfoCard`） | 移动端不挂载 |
+
+#### 12.9.1 命令语义
+
+| 命令 | 语义 | 入参 | 返回 |
+|---|---|---|---|
+| `get_migration_info` | 纯查询，幂等、无副作用 | 无 | `MigrationInfo` |
+| `open_legacy_dir` | 动作：资源管理器打开旧数据目录；**目录不存在返回 `IO_ERROR`，不创建** | 无 | `()` |
+
+**两条都无入参是硬约束，不是简化**：`open_legacy_dir` 的目标路径由后端用
+「`app_data_dir()` 的父目录 + `com.tickbar.app`」现算，**完全忽略** `MigrationInfo.legacyDir`
+的回传值。原因：迁移标记是用户目录下的明文 JSON，改一行就能让应用 `explorer` 打开任意目录
+（路径注入）。`legacyDir` 字段只用于**展示**。
+
+`open_legacy_dir` 复用既有实现：`infra::plugin_fs::open_dir` → `infra::shell_open::open_dir`
+（`services/plugin.rs::open_user_dir` 原本就是这条链路），本版只是把「spawn explorer 且不建目录」
+抽成公共函数，没有新增系统能力。
+
+#### 12.9.2 `MigrationInfo`（响应体，camelCase）
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `source` | `MigrationSource` | 后端**判定后**的来源，前端不做二次推断 |
+| `migratedAt` | `string \| null` | 迁移完成时刻（本地时区 ISO8601 带偏移） |
+| `appVersionAtMigration` | `string \| null` | 迁移时的应用版本（如 `0.5.0`） |
+| `legacyDir` | `string \| null` | 旧目录绝对路径（**仅展示**，不接受为入参） |
+| `legacyExists` | `boolean` | 旧目录当前是否仍然存在 |
+| `dbBytes` | `number \| null` | 迁入的库文件字节数 |
+| `rowCounts` | `RowCounts \| null` | 迁移时刻的五表行数快照 |
+
+`RowCounts` = `{ items, timeRecords, todos, notes, settings }`，全部 `number`（Rust 侧 `i64`）。
+
+`MigrationSource` 五值（**按序判定，命中即返回**；判定函数 `commands/migration_cmd.rs::resolve_source`）：
+
+| 条件 | `source` | 设置页文案 |
+|---|---|---|
+| 读到 `migrated-from-tickbar-app.json` | `legacy` | 已从 TickBar 迁移（日期） |
+| 读到 `pending-migrate.json` 且旧目录存在 | `pending` | 旧数据待迁移（上次选择了空白启动） |
+| 本次进程 `MigrationOutcome::Skipped` | `skipped` | 已跳过迁移（开发模式） |
+| 目标无库 且 旧目录无数据 | `fresh` | 全新数据 |
+| 目标有库、无标记 且 旧目录有数据 | `unattached` | 发现未采用的旧数据 |
+
+#### 12.9.3 移动端行为
+
+两条命令在 Android 上**同样注册**（`generate_handler!` 不分平台）：
+
+- `get_migration_info`：正常返回。移动端没有 `com.tickbar.app` 目录，判定落到 `fresh`；
+- `open_legacy_dir`：旧目录不存在 → `IO_ERROR`「旧数据目录不存在」。设置页的迁移卡在移动端
+  整体不挂载（`GeneralTab` 用 `IS_MOBILE` 拦），这条路径实际不会被用户触达。
+
+#### 12.9.4 门禁能看见什么、看不见什么
+
+`check:contract` 会机械校验**四处**数量与名字完全相等（`lib.rs` / `IpcApi` / `ipc.ts` / mock），
+所以「命令名写错、少一处实现」必红。但它**不校验响应体字段**：`MigrationInfo` 的字段改名、
+增删，门禁全程绿。这类变更只能靠评审看 —— 与 ADR-037 里「(c) 方案为什么是最坏的一类」是同一件事。
 
 ---
 

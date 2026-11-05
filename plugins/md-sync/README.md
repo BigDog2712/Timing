@@ -19,15 +19,17 @@ TickBar 的第一个真实插件。它把 SQLite 里的**计时记录**和**便�
 
 ## 默认落点
 
-默认指向 Obsidian 日记库：
+默认指向一个**占位**目录：
 
 | 数据 | 文件 | 标题 |
 |---|---|---|
 | 事项计时 | `{date}.md`（如 `2026-10-20.md`） | `#### 事项计时` |
 | 便利贴 | `{date}.md` | `#### 便利贴` |
 
-根目录用 `%USERPROFILE%\OneDrive\应用\remotely-save\Elio\1-MemeX\Diary`。
-换库时在 **设置 → 同步** 里改根目录、文件模板或标题即可；保存后立即同步。
+根目录出厂值是 `%USERPROFILE%\Documents\Timing`（占位，**不是任何真实笔记库**）。
+首次使用请把三处 `root` 改成本机真实目录：设置 → 同步 → 根目录 → 「选择…」，
+或者直接改 `plugin.json` 的 `contributes.mdSync.bindings[].root`。
+保存后立即同步。
 
 ## 计时格式（Planner 兼容）
 

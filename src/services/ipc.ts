@@ -15,7 +15,6 @@ import type {
   AccentSetParams,
   CloseNoteWindowParams,
   CreateItemParams,
-  ErrorCode,
   Item,
   ItemIdParams,
   ListItemsParams,
@@ -65,19 +64,14 @@ import type {
   MdSyncKind,
   MdSyncReport,
   MdSyncView,
+  MigrationInfo,
 } from '../types/domain';
 import { createMockApi } from '../mocks/browserMock';
+/* [V0.5.0] 错误类型与规范化搬到 ipcError.ts 腾行数（本文件 295 行 → 余量足够新增 2 条命令）。
+   `errorText()` 留在本文件不搬——check-contract.mjs 从这里内联解析 `case '...'`。 */
+import { IpcError, normalizeError } from './ipcError';
 
-/** 规范化后的 IPC 失败对象（业务错误码 + 人类可读信息） */
-export class IpcError extends Error {
-  readonly code: ErrorCode;
-
-  constructor(code: ErrorCode, message: string) {
-    super(message);
-    this.name = 'IpcError';
-    this.code = code;
-  }
-}
+export { IpcError } from './ipcError';
 
 /** 是否运行在 Tauri（WebView2）运行时 */
 export function isTauri(): boolean {
@@ -85,20 +79,6 @@ export function isTauri(): boolean {
 }
 
 const mockHandlers = createMockApi();
-
-/** 把后端 rejected value 规范化成 IpcError */
-function normalizeError(raw: unknown): IpcError {
-  if (raw instanceof IpcError) return raw;
-  if (raw && typeof raw === 'object') {
-    const anyRaw = raw as { code?: unknown; message?: unknown };
-    if (typeof anyRaw.code === 'string') {
-      return new IpcError(anyRaw.code as ErrorCode, typeof anyRaw.message === 'string' ? anyRaw.message : '操作失败');
-    }
-    if (typeof anyRaw.message === 'string') return new IpcError('IO_ERROR', anyRaw.message);
-  }
-  if (typeof raw === 'string' && raw.length > 0) return new IpcError('IO_ERROR', raw);
-  return new IpcError('IO_ERROR', '操作失败，请稍后重试');
-}
 
 /** 统一命令调用：Tauri invoke 或浏览器 mock，集中错误规范化 */
 async function call<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
@@ -292,4 +272,8 @@ export const ipc: IpcApi = {
   mdSyncRun: () => call<MdSyncReport>('md_sync_run'),
   mdSyncOpen: (params: { kind: MdSyncKind }) =>
     call<void>('md_sync_open', { kind: params.kind }),
+
+  /* ---- 迁移可见性 [V0.5.0]（命令 65 → 67，ADR-037） ---- */
+  getMigrationInfo: () => call<MigrationInfo>('get_migration_info'),
+  openLegacyDir: () => call<void>('open_legacy_dir'),
 };

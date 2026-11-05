@@ -1,0 +1,13 @@
+{
+  "$comment": "归档工程的冻结版本（V0.5.0）。check-version.mjs 断言这些值没被误动；归档工程永远不追当前版本号。改这里必须同一次提交里改工程文件与 android-app/ARCHIVED.md。",
+  "archived": [
+    {
+      "id": "android-app",
+      "name": "独立 Kotlin 安卓工程（已归档）",
+      "gradleFile": "android-app/app/build.gradle.kts",
+      "versionName": "0.3.6",
+      "versionCode": 9,
+      "reason": "V0.5.0 收敛到 Tauri mobile 单线；本工程冻结在 0.3.6，不发布、不追版本"
+    }
+  ]
+}

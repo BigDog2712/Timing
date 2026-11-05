@@ -4,7 +4,9 @@
  * 依据 DESIGN-V0.2.0.md §10 + ADR-012：
  *   - 载体 <html data-theme="dark|light">（属性切换，非 class）；system 用
  *     matchMedia('(prefers-color-scheme: dark)') 解析。
- *   - 持久化 localStorage('tickbar.theme') 供 index.html 内联脚本抢在首帧前读取（K-1）。
+ *   - 持久化 localStorage 供 index.html 内联脚本抢在首帧前读取（K-1）。
+ *     [V0.5.0] 键从 `tickbar.theme` 改为 `timing.theme`，老键只读回落一个版本
+ *     （读写统一走 `lib/storageKeys.ts`，这里不再出现键字面量）。
  *   - 四色注入 documentElement.style（--color-running/warn/done/bar）：
  *     · 值 == 出厂默认（DEFAULT_ACCENTS）→ **不写内联**，回落分主题令牌
  *       （深 #4DA3E8/#E8A33D/#4CC38A，浅 #1669AD/#A05E00/#0C7E47）⇒ 出厂态与设计稿/审计一致；
@@ -13,7 +15,7 @@
  *   - 非法 hex 一律拒绝（与后端 INVALID_COLOR 呼应）。
  */
 import type { AccentColors, ThemeMode } from '../types/domain';
-import { THEME_CACHE_KEY } from '../types/domain';
+import { readKeyWithLegacy, writeKey } from './storageKeys';
 
 export type ResolvedTheme = 'dark' | 'light';
 
@@ -182,7 +184,8 @@ export function applyAccents(colors: AccentColors, resolved: ResolvedTheme): voi
 
 export function readCachedTheme(): ThemeMode {
   try {
-    const raw = localStorage.getItem(THEME_CACHE_KEY);
+    /* 新键优先，无则回落老键 tickbar.theme（命中即回写新键，见 lib/storageKeys.ts） */
+    const raw = readKeyWithLegacy('theme');
     if (raw === 'dark' || raw === 'light' || raw === 'system') return raw;
   } catch {
     /* localStorage 不可用（隐私模式等）时回退默认 */
@@ -191,9 +194,5 @@ export function readCachedTheme(): ThemeMode {
 }
 
 export function writeCachedTheme(mode: ThemeMode): void {
-  try {
-    localStorage.setItem(THEME_CACHE_KEY, mode);
-  } catch {
-    /* 忽略写入失败 */
-  }
+  writeKey('theme', mode);
 }

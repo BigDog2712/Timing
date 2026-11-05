@@ -52,5 +52,12 @@ export const NOTE_GEOM_DEBOUNCE_MS = 300;
 /** 默认倒计时预设（秒）：5 / 15 / 25 / 30 / 45 / 60 分钟 */
 export const DEFAULT_COUNTDOWN_PRESETS: readonly number[] = [300, 900, 1500, 1800, 2700, 3600];
 
-/** 主题快取键（首屏内联脚本同步读取，防白闪 K-18） */
-export const THEME_CACHE_KEY = 'tickbar.theme';
+/**
+ * 主题快取键（首屏内联脚本同步读取，防白闪 K-18）。
+ * [V0.5.0] 改名 `tickbar.theme` → `timing.theme`；老键只读回落一个版本，
+ * 见 `src/lib/storageKeys.ts`（唯一读取口径）与 `index.html` 内联脚本（同批改）。
+ */
+export const THEME_CACHE_KEY = 'timing.theme';
+
+/** [V0.5.0] 老主题键：只读回落，**不删**（回滚 0.4.1 时它的偏好还在） */
+export const THEME_CACHE_KEY_LEGACY = 'tickbar.theme';

@@ -20,8 +20,9 @@ import type {
 } from '../types/domain';
 import { fail } from './mockSeed';
 
-const MOCK_DIR = '%APPDATA%\\com.tickbar.app\\plugins';
-const MOCK_ROOT = '%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary';
+const MOCK_DIR = '%APPDATA%\\com.timing.app\\plugins';
+/* 落点根目录：仅用于浏览器走查的**占位**路径（不泄露任何本机目录结构） */
+const MOCK_ROOT = '%USERPROFILE%\\Documents\\Timing';
 
 const PRESETS = [
   { item: '上厕所', minutes: 10 },

@@ -25,6 +25,9 @@ import { useEffect } from 'react';
 import { getCurrentWindow, LogicalPosition, LogicalSize } from '../lib/window';
 import { isTauri } from '../services/ipc';
 import { fitBounds, refreshFitBounds, setLayerOffset } from '../lib/fitBounds';
+/* [V0.5.0] 键名统一走 lib/storageKeys.ts：`timing.fit-offset`（老键 `tickbar:fit-offset`
+   是冒号，历史形态，只读回落；本次统一为点，见 ARCHITECTURE §6.2 P1-2）。 */
+import { readKeyWithLegacy, writeKey } from '../lib/storageKeys';
 import {
   DEFAULT_FIT_THRESHOLDS,
   computeFitBox,
@@ -40,8 +43,8 @@ const POLL_MS = 250;
  * 窗口原点对应的布局坐标。跨会话记住它：
  * window-state 插件会恢复上次的窗口位置与尺寸，二者必须成对恢复，
  * 否则首帧会把内容按旧起点平移一次（最多 16px 的跳位）。
+ * [V0.5.0] 键名见 `lib/storageKeys.ts`（不再在本文件写键字面量）。
  */
-const OFFSET_KEY = 'tickbar:fit-offset';
 /** 窗口移动后重取上界的节流间隔（拖动时 `onMoved` 会连发；每次重取是 3 个 IPC） */
 const MOVE_REFRESH_MS = 160;
 
@@ -49,7 +52,7 @@ type FitState = FitBox;
 
 function readOffset(): { l: number; t: number } {
   try {
-    const raw = localStorage.getItem(OFFSET_KEY);
+    const raw = readKeyWithLegacy('fitOffset');
     if (!raw) return { l: 0, t: 0 };
     const parsed = JSON.parse(raw) as { l?: unknown; t?: unknown };
     const l = Number(parsed.l);
@@ -61,11 +64,8 @@ function readOffset(): { l: number; t: number } {
 }
 
 function writeOffset(l: number, t: number): void {
-  try {
-    localStorage.setItem(OFFSET_KEY, JSON.stringify({ l, t }));
-  } catch {
-    /* 隐私模式 / 存储满：退化为不记忆，最多首帧跳一次 */
-  }
+  /* 隐私模式 / 存储满：退化为不记忆，最多首帧跳一次（writeKey 内部吞异常） */
+  writeKey('fitOffset', JSON.stringify({ l, t }));
 }
 
 

@@ -37,6 +37,31 @@ pub fn run() {
     // 冷启动计时起点（T17）：越靠近进程入口越准。这里比 `Builder` 早，也早于任何插件初始化。
     platform::boot_timing::start();
 
+    /* [V0.5.0] 数据目录迁移：必须在这里，**早于 `Builder::run()`**。
+    理由（ARCHITECTURE §1.3.1）：`tauri-2.12.4` 的 `setup` 钩子是「先按 config 建窗口、
+    再调用户钩子」，而 window-state 插件在窗口创建那一刻就把位置回填了 —— 迁移若写在
+    `setup` 里，首启永远拿到「新的空目录 + 默认窗口位置」，M-11 必失败。
+
+    `generate_context!()` 提前到此处：`Context::config()` 是公开 API，identifier 与
+    productName 都从它读（**不写常量**），阶段二改 `tauri.conf.json` 后迁移目标目录与
+    自启值名自动跟随，永不与打包配置漂移。ctx 在末行 `builder.run(ctx)` 被消费。 */
+    let ctx = tauri::generate_context!();
+
+    #[cfg(desktop)]
+    {
+        let identifier = ctx.config().identifier.clone();
+        let paths = infra::appdata_migrate::Paths::resolve(&identifier);
+        if matches!(
+            app::preboot::prepare(paths, &identifier),
+            app::preboot::BootChoice::Abort
+        ) {
+            /* 事件循环还没启动：进程直接退出即可，无需清理任何东西。
+            用专门的退出码，便于从「应用一闪即退」里区分出「用户选了退出」。 */
+            std::process::exit(app::preboot::EXIT_MIGRATION_ABORTED);
+        }
+        platform::boot_timing::mark("preboot");
+    }
+
     let builder = tauri::Builder::default();
 
     /* 桌面独占插件（V1-Android）：这三个 crate 在 Android 上无实现，
@@ -142,6 +167,9 @@ pub fn run() {
             commands::md_sync_cmd::md_sync_save,
             commands::md_sync_cmd::md_sync_run,
             commands::md_sync_cmd::md_sync_open,
+            // [V0.5.0] 迁移可见性（命令 65 → 67，见 ADR-037）
+            commands::migration_cmd::get_migration_info,
+            commands::migration_cmd::open_legacy_dir,
         ]);
 
     // K-5：拦截关闭请求 -> 隐藏窗口。移动端没有「关窗即隐藏」的语义（返回键退后台由
@@ -149,7 +177,5 @@ pub fn run() {
     #[cfg(desktop)]
     let builder = builder.on_window_event(infra::window::on_window_event);
 
-    builder
-        .run(tauri::generate_context!())
-        .expect("TickBar 启动失败");
+    builder.run(ctx).expect("TickBar 启动失败");
 }

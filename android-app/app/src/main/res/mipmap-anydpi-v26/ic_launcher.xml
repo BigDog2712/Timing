@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    正式图标：与桌面端 src-tauri/icons/icon.png 同源。
+    foreground 是各密度的 ic_launcher_fg.png（内容缩到 58%，落在 adaptive 安全区内），
+    background 沿用 ic_launcher_bg #0E0F12 —— 和图形自带的底色 #15181E 几乎同色，视觉无缝。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_bg" />
+    <foreground android:drawable="@mipmap/ic_launcher_fg" />
+</adaptive-icon>

@@ -35,7 +35,7 @@ export class AppErrorBoundary extends Component<Props, State> {
 
   override componentDidCatch(error: unknown, info: ErrorInfo): void {
     // 开发者能在 devtools 看到完整栈；release 下 stderr 不可见，这行只是兜底记录。
-    console.error('[tickbar] 渲染异常', error, info.componentStack);
+    console.error('[timing] 渲染异常', error, info.componentStack);
   }
 
   override render(): ReactNode {
@@ -69,7 +69,7 @@ export function installGlobalErrorHooks(): void {
 /** 渲染之外的异常：提示条可见 + devtools 可见，不阻断交互。 */
 function report(raw: unknown): void {
   const message = describe(raw);
-  console.error('[tickbar] 未捕获异常', raw);
+  console.error('[timing] 未捕获异常', raw);
   useUiStore.getState().setNotice({ text: `界面异常：${message}`, tone: 'danger' });
 }
 

@@ -5,6 +5,8 @@
 
 mod support;
 
+mod appdata_migrate;
+mod appdata_migrate_edges;
 mod boot_timing;
 mod countdown;
 mod daily_status;

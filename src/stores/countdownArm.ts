@@ -9,15 +9,19 @@
  * 用 localStorage 持久化只为跨窗口/重启后仍然记得上次设定的档位。
  */
 import { create } from 'zustand';
+import { readKeyWithLegacy, removeKey, writeKey } from '../lib/storageKeys';
 
-const STORAGE_KEY = 'tickbar.countdownArm.v1';
+/* [V0.5.0] 键名统一走 lib/storageKeys.ts（`timing.countdownArm.v1` /
+   `timing.countdownDuration.v1`），老键 `tickbar.countdownArm.v1` /
+   `tickbar.countdownDuration.v1` 只读回落一个版本。 */
 const MIN_SEC = 1;
 const MAX_SEC = 5400;
-const LAST_DURATION_KEY = 'tickbar.countdownDuration.v1';
 
 export function readCountdownDuration(fallback = 1500): number {
   try {
-    const value = Number(window.localStorage.getItem(LAST_DURATION_KEY));
+    const raw = readKeyWithLegacy('countdownDuration');
+    if (raw === null) return fallback;
+    const value = Number(raw);
     if (Number.isInteger(value) && value >= MIN_SEC && value <= MAX_SEC) return value;
   } catch { /* Use configured default when storage is unavailable. */ }
   return fallback;
@@ -25,7 +29,7 @@ export function readCountdownDuration(fallback = 1500): number {
 
 function readArmed(): number | null {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = readKeyWithLegacy('countdownArm');
     if (!raw) return null;
     const sec = Number.parseInt(raw, 10);
     return Number.isFinite(sec) && sec >= MIN_SEC && sec <= MAX_SEC ? sec : null;
@@ -46,19 +50,12 @@ export const useCountdownArmStore = create<CountdownArmState>((set) => ({
   arm: (sec) => {
     if (!Number.isInteger(sec) || sec < MIN_SEC || sec > MAX_SEC) return;
     set({ armedSec: sec });
-    try {
-      window.localStorage.setItem(STORAGE_KEY, String(sec));
-      window.localStorage.setItem(LAST_DURATION_KEY, String(sec));
-    } catch {
-      /* 隐私模式等场景写不进去：只影响重启后是否记得，不影响当前操作 */
-    }
+    /* 写不进去只影响重启后是否记得，不影响当前操作（隐私模式 / 配额满） */
+    writeKey('countdownArm', String(sec));
+    writeKey('countdownDuration', String(sec));
   },
   clear: () => {
     set({ armedSec: null });
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* 同上 */
-    }
+    removeKey('countdownArm');
   },
 }));

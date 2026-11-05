@@ -7,8 +7,10 @@
  * --ui-bg-opacity 两个令牌（design-tokens.css §0）。
  */
 import { create } from 'zustand';
+import { isKeyEvent, readKeyWithLegacy, writeKey } from '../lib/storageKeys';
 
-const STORAGE_KEY = 'tickbar.appearance.v1';
+/* [V0.5.0] 键名只有一处口径（lib/storageKeys.ts）：`timing.appearance.v1`，
+   老键 `tickbar.appearance.v1` 只读回落。本文件不再出现键字面量。 */
 
 /** 文字不透明度的下限：再低正文就看不清了 */
 export const TEXT_OPACITY_MIN = 0.2;
@@ -29,7 +31,7 @@ function clamp(value: number, min: number, max: number): number {
 
 function readStored(): Appearance {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = readKeyWithLegacy('appearance');
     if (!raw) return DEFAULT_APPEARANCE;
     const parsed = JSON.parse(raw) as Partial<Appearance>;
     return {
@@ -69,11 +71,7 @@ export const useAppearanceStore = create<AppearanceStore>((set, get) => {
     };
     set(next);
     applyAppearance(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* 隐私模式 / 配额满：本次会话内仍生效，不打断用户操作 */
-    }
+    writeKey('appearance', JSON.stringify(next));
   };
 
   return {
@@ -92,7 +90,8 @@ export function initAppearance(): void {
   applyAppearance({ textOpacity: current.textOpacity, bgOpacity: current.bgOpacity });
 
   window.addEventListener('storage', (event) => {
-    if (event.key !== STORAGE_KEY) return;
+    /* 新键与老键都算：升级前仍开着的旧窗口可能还在写老键 */
+    if (!isKeyEvent('appearance', event.key)) return;
     const next = readStored();
     useAppearanceStore.setState(next);
     applyAppearance(next);

@@ -14,9 +14,16 @@ pub mod events;
 
 /* 桌面独占（V1-Android）：
 - `tray`：`TrayIconBuilder` / 原生菜单在 Android 上不存在；
-- `diagnostics`：快照里要枚举显示器与各窗口 label，两者都是桌面概念。
+- `diagnostics`：快照里要枚举显示器与各窗口 label，两者都是桌面概念；
+- `preboot`：迁移在桌面才有（移动端换包名 = 新应用，系统层面没有「旧目录」），
+  且它要用 `rfd` 阻塞式原生对话框 —— 必须在事件循环启动前跑，移动端无此阶段；
+- `autostart_takeover`：清理 `HKCU\\...\\Run` 注册表，Android 无开机自启概念。
 移动端不写这两份快照——出问题时看日志与 `boot_timing` 即可。 */
 #[cfg(desktop)]
+pub mod autostart_takeover;
+#[cfg(desktop)]
 pub mod diagnostics;
+#[cfg(desktop)]
+pub mod preboot;
 #[cfg(desktop)]
 pub mod tray;

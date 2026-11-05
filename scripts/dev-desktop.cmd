@@ -25,6 +25,11 @@ call "%VCVARS%" >nul 2>&1
 if errorlevel 1 goto vcfail
 
 pushd "%REPO%" || goto nodir
+rem [V0.5.0] Never migrate real %APPDATA% data from a dev run: dev and the
+rem installed build share the same identifier, so the very first `tauri dev`
+rem would move the developer's live data. Remove this line only if you
+rem deliberately want to exercise the migration on real data.
+set "TIMING_SKIP_MIGRATE=1"
 call npm.cmd run tauri dev
 set "RC=%ERRORLEVEL%"
 popd

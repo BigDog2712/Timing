@@ -19,7 +19,6 @@
 //! 但界面没变」的解释成本。设置页的「重新加载」就是重新扫一遍，语义最直白。
 
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use crate::models::md_sync::MdSyncConfig;
 use crate::models::plugin::{PluginManifest, PluginSource, MANIFEST_FILE, PLUGIN_API_VERSION};
@@ -187,15 +186,13 @@ pub fn ensure_user_dir(dir: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|err| format!("创建插件目录失败：{err}"))
 }
 
-/// 在资源管理器里打开插件目录（Windows）。
+/// 在资源管理器里打开插件目录（不存在则**先建后用**）。
+///
+/// 打开动作委托 `infra::shell_open`：那里已经有一份「explorer 只 spawn 不 wait」的
+/// 实现，两处各写一遍只会让「explorer 退出码不可信」这条经验失传一处。
 pub fn open_dir(dir: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dir).map_err(|err| format!("创建插件目录失败：{err}"))?;
-    /* explorer 即使成功也常以退出码 1 结束，所以只 spawn 不 wait。 */
-    Command::new("explorer")
-        .arg(dir)
-        .spawn()
-        .map(|_| ())
-        .map_err(|err| format!("打开目录失败：{err}"))
+    crate::infra::shell_open::open_dir(dir)
 }
 
 #[cfg(test)]

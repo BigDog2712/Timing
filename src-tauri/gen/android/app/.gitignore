@@ -4,3 +4,6 @@
 /tauri.build.gradle.kts
 /proguard-tauri.pro
 /tauri.properties
+# [V0.5.0] 前端构建产物由 `tauri android build` 从 `dist/` 重建，不入库（PRD P0-6）。
+# 忽略整个目录而不是逐个文件：否则下次构建换 hash 又会冒出一批新的未跟踪文件。
+/src/main/assets/
