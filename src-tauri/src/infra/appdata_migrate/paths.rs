@@ -17,11 +17,10 @@ pub const LEGACY_PRODUCT_NAME: &str = "TickBar";
 
 /// 本版本的库文件名。
 ///
-/// 阶段一（B1）：identifier 还没变，迁移只是「同一个库名、换一个目录」，
-/// 所以这里与老库同名；`copy.rs` 的名字映射因此是恒等映射。
-/// 阶段二（B2）：与 `tauri.conf.json::identifier` 同批改成 `timing.db`，
-/// 映射自动生效（`tickbar.db*` → `timing.db*`，含 `-wal` / `-shm`）。
-pub const DB_NAME: &str = "tickbar.db";
+/// 阶段一（B1）曾与老库同名（迁移只是「同一个库名、换一个目录」，映射是恒等映射）；
+/// 阶段二（B2，0.5.0）随 `tauri.conf.json::identifier` 同批改成 `timing.db`，
+/// 映射自此真正生效：迁移时 `tickbar.db*` → `timing.db*`（含 `-wal` / `-shm`）。
+pub const DB_NAME: &str = "timing.db";
 
 /// 迁移临时目录后缀：`<target>.migrating`。
 pub const TEMP_SUFFIX: &str = ".migrating";

@@ -64,7 +64,7 @@ const PLUGIN: PluginInfo = {
   name: 'Markdown 同步',
   version: '1.0.0',
   apiVersion: 2,
-  description: '把 TickBar 的计时与便利贴同步到 Obsidian 日记；改 Markdown 也会写回数据库。',
+  description: '把 Timing 的计时与便利贴同步到 Obsidian 日记；改 Markdown 也会写回数据库。',
   source: 'dev',
   dir: `${MOCK_DIR}\\md-sync`,
   enabled: true,

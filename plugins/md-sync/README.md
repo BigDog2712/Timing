@@ -1,6 +1,6 @@
 # md-sync · Markdown 同步
 
-TickBar 的第一个真实插件。它把 SQLite 里的**计时记录**和**便利贴**同步到 Markdown，
+Timing 的第一个真实插件。它把 SQLite 里的**计时记录**和**便利贴**同步到 Markdown，
 也把你在 Markdown 里改的内容写回 SQLite——两边都是真数据，不是导出快照。
 
 插件本身只声明「数据落到哪」（`plugin.json` 的 `contributes.mdSync`），读写、冲突判定、
@@ -10,11 +10,11 @@ TickBar 的第一个真实插件。它把 SQLite 里的**计时记录**和**便�
 
 - **开发运行**（`npm run tauri dev`）：仓库里的 `plugins/md-sync` 会被 dev 扫描根直接读到，
   设置 → 插件 里应出现「Markdown 同步」。
-- **发布版**：把整个 `md-sync` 文件夹复制到 `%APPDATA%\com.tickbar.app\plugins\md-sync`，
+- **发布版**：把整个 `md-sync` 文件夹复制到 `%APPDATA%\com.timing.app\plugins\md-sync`，
   再到 设置 → 插件 点「重新加载」。宿主不会自动往用户目录塞文件。
 
   ```powershell
-  Copy-Item -Recurse -Force plugins\md-sync "$env:APPDATA\com.tickbar.app\plugins\"
+  Copy-Item -Recurse -Force plugins\md-sync "$env:APPDATA\com.timing.app\plugins\"
   ```
 
 ## 默认落点

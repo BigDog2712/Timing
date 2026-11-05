@@ -1,4 +1,4 @@
-package com.tickbar.app
+package com.timing.app
 
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge

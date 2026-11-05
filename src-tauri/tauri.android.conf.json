@@ -4,7 +4,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "TickBar",
+        "title": "Timing",
         "url": "index.html",
         "decorations": true,
         "transparent": false,

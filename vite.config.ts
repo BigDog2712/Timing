@@ -20,7 +20,7 @@ const MOBILE_CSS_IMPORT = /^[ \t]*import[ \t]+['"]\.\/styles\/mobile\/[^'"]+['"]
  */
 function platformCss(): Plugin {
   return {
-    name: 'tickbar:platform-css',
+    name: 'timing:platform-css',
     enforce: 'pre',
     transform(code, id) {
       if (IS_MOBILE_BUILD || !/src[\\/]main\.tsx$/.test(id)) return;
@@ -42,7 +42,7 @@ export default defineConfig({
      TAURI_ENV_FAMILY=mobile；纯 vite（dev / vitest）下没有这个变量 → false，
      桌面路径与桌面产物完全不受影响（替换成字面量后移动分支可被摇树删除）。 */
   define: {
-    __TICKBAR_MOBILE__: JSON.stringify(IS_MOBILE_BUILD),
+    __TIMING_MOBILE__: JSON.stringify(IS_MOBILE_BUILD),
   },
   clearScreen: false,
   server: {

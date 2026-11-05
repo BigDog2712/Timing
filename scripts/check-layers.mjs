@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * TickBar — 分层门禁（把架构规则变成 grep，而不是 code review 的口头约定）
+ * Timing — 分层门禁（把架构规则变成 grep，而不是 code review 的口头约定）
  * -----------------------------------------------------------------------------
  * 规则来自 `docs/reviews/2026-10-18-ARCH-ASSESSMENT.md` §3.4（R1~R6/R10）：
  *
@@ -10,7 +10,7 @@
  *   L4 Rust `infra` 不得依赖 `services`（解环，见 ADR-016）
  *   L5 Rust `commands` 不得直接依赖 `repositories`（必须经 service）
  *   L6 Rust 全域不得出现 `eprintln!`（结构化日志，见 platform/log.rs）
- *   L7 编译期平台常量 `__TICKBAR_MOBILE__` 只允许出现在 `src/lib/platform.ts`
+ *   L7 编译期平台常量 `__TIMING_MOBILE__` 只允许出现在 `src/lib/platform.ts`
  *
  * 每一条都是「改坏了 CI 就红」的判据，而不是「建议」。
  *
@@ -30,7 +30,7 @@ import { fileURLToPath } from 'node:url';
  * 改名时必须同时改：`src/lib/platform.ts` 的 `declare const`、`vite.config.ts` 与
  * `vitest.config.ts` 的 `define` 键、本常量。哨兵会校验三处一致。
  */
-const PLATFORM_SYMBOL = '__TICKBAR_MOBILE__';
+const PLATFORM_SYMBOL = '__TIMING_MOBILE__';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SKIP = new Set(['node_modules', 'target', 'dist', 'gen']);

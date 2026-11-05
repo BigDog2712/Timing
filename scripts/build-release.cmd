@@ -1,5 +1,5 @@
 @echo off
-rem Build the TickBar desktop release: frontend dist + Rust release exe, copied to release\TickBar.exe.
+rem Build the Timing desktop release: frontend dist + Rust release exe, copied to release\Timing.exe.
 rem Same reason as dev-desktop.cmd: the Rust msvc target needs link.exe plus the Windows SDK
 rem LIB/INCLUDE paths, and VS Build Tools does not put them on PATH by default.
 rem Keep this file ASCII-only with CRLF endings - cmd.exe reads batch files with the OEM codepage.
@@ -37,7 +37,7 @@ pushd src-tauri || goto fail
 rem The frontend assets are embedded at compile time. cargo does not track dist\ as an input,
 rem so a fresh dist\ alone leaves the old bundle inside the binary - drop this crate's release
 rem artifacts to force the codegen (and with it the new assets) to run again.
-cargo clean --release -p tickbar
+cargo clean --release -p timing
 rem --features custom-protocol embeds dist\ into the binary; without it the release build
 rem still points at devUrl (http://localhost:1420) and shows a blank window with no dev server.
 cargo build --release --features custom-protocol
@@ -47,12 +47,12 @@ if errorlevel 1 (
 )
 popd
 
-echo [3/3] Copying the binary to release\TickBar.exe ...
+echo [3/3] Copying the binary to release\Timing.exe ...
 if not exist release mkdir release
-copy /y "src-tauri\target\release\tickbar.exe" "release\TickBar.exe" >nul
+copy /y "src-tauri\target\release\timing.exe" "release\Timing.exe" >nul
 if errorlevel 1 goto fail
 
-echo Done: %REPO%\release\TickBar.exe
+echo Done: %REPO%\release\Timing.exe
 popd
 exit /b 0
 

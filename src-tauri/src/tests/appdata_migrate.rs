@@ -31,6 +31,20 @@ pub(super) async fn make_legacy(tag: &str) -> PathBuf {
     M-08 会另造一个「未 checkpoint」的形态。 */
     pool.close().await;
 
+    /* 0.4.1 的用户目录里躺着的是**老库名** `tickbar.db`。阶段二把 `DB_NAME` 改成
+    `timing.db` 之后，`init_pool` 建出来的是新库名 —— 不改名回来，本 fixture 就变成
+    「新版本的目录」，M-01/M-05/M-08 会全部在测错对象（测的是「新库名 → 新库名」，
+    而不是「老库名 → 新库名」这条真正要保的映射）。 */
+    if paths::DB_NAME != paths::LEGACY_DB_NAME {
+        for suffix in ["", "-wal", "-shm"] {
+            let from = source.join(format!("{}{suffix}", paths::DB_NAME));
+            if from.exists() {
+                let to = source.join(format!("{}{suffix}", paths::LEGACY_DB_NAME));
+                std::fs::rename(&from, &to).expect("老库改名应成功");
+            }
+        }
+    }
+
     std::fs::create_dir_all(source.join("plugins").join("md-sync")).expect("建插件目录应成功");
     std::fs::write(
         source.join("plugins").join("md-sync").join("plugin.json"),

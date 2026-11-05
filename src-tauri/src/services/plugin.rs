@@ -233,7 +233,7 @@ mod tests {
 
     fn temp_root(tag: &str) -> std::path::PathBuf {
         let root = std::env::temp_dir().join(format!(
-            "tickbar-plugin-{tag}-{}-{:?}",
+            "timing-plugin-{tag}-{}-{:?}",
             std::process::id(),
             std::thread::current().id()
         ));

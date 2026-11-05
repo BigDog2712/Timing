@@ -38,7 +38,7 @@ pub struct WindowSpec {
 pub const SETTINGS: WindowSpec = WindowSpec {
     label: "settings",
     url: "index.html?w=settings",
-    title: "TickBar 设置",
+    title: "Timing 设置",
     width: 392.0,
     height: 660.0,
     min_width: 392.0,
@@ -65,7 +65,7 @@ pub const SETTINGS: WindowSpec = WindowSpec {
 pub const TIMER: WindowSpec = WindowSpec {
     label: "timer",
     url: "index.html?w=timer",
-    title: "TickBar 计时器",
+    title: "Timing 计时器",
     width: 280.0,
     height: 180.0,
     min_width: 280.0,
@@ -92,7 +92,7 @@ pub const TODOS_PREVIEW_INSET: f64 = 240.0;
 pub const TODOS: WindowSpec = WindowSpec {
     label: "todos",
     url: "index.html?w=todos",
-    title: "TickBar 事项",
+    title: "Timing 事项",
     /* [V0.3.9] 面板 252 + 左侧预览区 240 = 492。面板仍只占 252，右侧对齐主条左边缘；
     多出来的 240 是透明区，见 TODOS_PREVIEW_INSET。 */
     width: TODOS_PANEL_W + TODOS_PREVIEW_INSET,
@@ -120,7 +120,7 @@ pub const TODOS: WindowSpec = WindowSpec {
 pub const NOTE: WindowSpec = WindowSpec {
     label: "note",
     url: "index.html?w=note",
-    title: "TickBar 便利贴",
+    title: "Timing 便利贴",
     width: 320.0,
     height: 232.0,
     min_width: 160.0,

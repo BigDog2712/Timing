@@ -15,8 +15,9 @@
 //! log_warn!("tray set_menu failed: {err}");
 //! ```
 //!
-//! 级别由环境变量 `TICKBAR_LOG` 控制（`error|warn|info|debug`，默认 `info`）。
-//! 日志目录：`<app_data_dir>/logs/tickbar-YYYY-MM-DD.log`。
+//! 级别由环境变量 `TIMING_LOG` 控制（`error|warn|info|debug`，默认 `info`）；
+//! 旧名 `TICKBAR_LOG` 仍生效一个版本，命中时打一条 WARN 提示迁移。
+//! 日志目录：`<app_data_dir>/logs/timing-YYYY-MM-DD.log`。
 //! Debug 构建同时镜像到 stderr；Release 只落文件（stderr 在 GUI 下不可见）。
 
 use std::fs::{self, File, OpenOptions};
@@ -95,7 +96,7 @@ pub fn init(app_data_dir: &Path) {
     let dir = app_data_dir.join("logs");
     let _ = fs::create_dir_all(&dir);
     prune(&dir);
-    let path = dir.join(format!("tickbar-{}.log", today()));
+    let path = dir.join(format!("timing-{}.log", today()));
     let file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -103,20 +104,36 @@ pub fn init(app_data_dir: &Path) {
         .ok();
     let _ = LOG_DIR.set(dir);
     let _ = SINK.set(Mutex::new(file));
-    LEVEL.store(
-        parse_level(&std::env::var("TICKBAR_LOG").unwrap_or_default()) as u8,
-        Ordering::Relaxed,
-    );
+    LEVEL.store(parse_level(&level_from_env()) as u8, Ordering::Relaxed);
+    /* 旧环境变量只在「新名缺失」时生效，并且必须让用户知道要改：静默兼容会让
+    `TICKBAR_LOG` 永远活着（PRD §5 的「旧名保留一个版本」不是保留到永远）。 */
+    if std::env::var("TIMING_LOG").map_or(true, |v| v.is_empty())
+        && std::env::var("TICKBAR_LOG").is_ok()
+    {
+        log(
+            Level::Warn,
+            "log",
+            "TICKBAR_LOG 已弃用，请改用 TIMING_LOG（旧名保留一个版本）",
+        );
+    }
     install_panic_hook();
     log(
         Level::Info,
         "log",
         &format!(
-            "---- TickBar v{} start (level={:?}) ----",
+            "---- Timing v{} start (level={:?}) ----",
             env!("CARGO_PKG_VERSION"),
             current_level()
         ),
     );
+}
+
+/// 日志级别来源：`TIMING_LOG` 优先，缺失/空串时回落旧名 `TICKBAR_LOG`。
+fn level_from_env() -> String {
+    match std::env::var("TIMING_LOG") {
+        Ok(value) if !value.is_empty() => value,
+        _ => std::env::var("TICKBAR_LOG").unwrap_or_default(),
+    }
 }
 
 /// 当前生效级别。

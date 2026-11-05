@@ -257,7 +257,7 @@ fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
         .file_name()
         .and_then(|value| value.to_str())
         .unwrap_or("md-sync");
-    let tmp = parent.join(format!(".{name}.tickbar-{}.tmp", std::process::id()));
+    let tmp = parent.join(format!(".{name}.timing-{}.tmp", std::process::id()));
     {
         let mut file = fs::File::create(&tmp).map_err(|err| format!("创建临时文件失败：{err}"))?;
         file.write_all(bytes)
