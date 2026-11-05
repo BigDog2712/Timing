@@ -16,6 +16,9 @@ import { useUiStore } from '../stores/uiStore';
 /** 「最短记录时长」兜底：与后端 `ReferenceSettings::default().min_record_seconds` 同值 */
 const FALLBACK_MIN_RECORD_SEC = 30;
 
+/** 在途的 `start` 请求（模块级：跨组件实例共用同一个锁，见 `start` 注释） */
+let startInFlight: Promise<void> | null = null;
+
 export interface TimerActions {
   /** 开始计时（缺省用 lastItemId / 首个事项 / 未归类） */
   start: (itemId?: number) => Promise<void>;
@@ -49,16 +52,27 @@ export function useTimerActions(): TimerActions {
 
   const start = useCallback(
     async (itemId?: number) => {
-      const items = useItemStore.getState().items;
-      const lastItemId = useTimerStore.getState().state.lastItemId;
-      const target = itemId ?? findItem(items, lastItemId)?.id ?? items[0]?.id ?? SYSTEM_ITEM_ID;
-      try {
-        await ipc.startTimer({ itemId: target });
-        await useTimerStore.getState().refresh();
-        useUiStore.getState().closePanel();
-      } catch (err) {
-        notify(err);
-      }
+      /* [V0.11.2] 防重入：手机端双击大按钮（间隔约 120ms，IPC 往返 30~200ms）会连发两次
+         `start_timer`，第二次必然收到 TIMER_ALREADY_RUNNING —— 用户看到一条「已在计时」
+         的假报错，而界面其实已经开好了。桌面药丸有 200ms 去抖，其它入口没有。 */
+      if (startInFlight) return startInFlight;
+      const run = (async () => {
+        const items = useItemStore.getState().items;
+        const lastItemId = useTimerStore.getState().state.lastItemId;
+        const target = itemId ?? findItem(items, lastItemId)?.id ?? items[0]?.id ?? SYSTEM_ITEM_ID;
+        try {
+          await ipc.startTimer({ itemId: target });
+          await useTimerStore.getState().refresh();
+          useUiStore.getState().closePanel();
+        } catch (err) {
+          notify(err);
+        }
+      })();
+      startInFlight = run;
+      void run.finally(() => {
+        if (startInFlight === run) startInFlight = null;
+      });
+      return run;
     },
     [notify],
   );

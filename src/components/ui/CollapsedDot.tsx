@@ -24,6 +24,7 @@ import { COUNTDOWN_WARN_SEC } from '../../lib/constants';
 import { formatDuration } from '../../lib/format';
 import { arcDashArray, arcDashOffset, isArcVisible } from '../../lib/ringGeometry';
 import { useEndedFlash } from '../../hooks/useEndedFlash';
+import { usePillDrag } from '../../hooks/usePillDrag';
 import { useTimerTick } from '../../hooks/useTimerTick';
 import { findItem, useItemStore } from '../../stores/itemStore';
 import { useCountdownArmStore } from '../../stores/countdownArm';
@@ -54,6 +55,9 @@ export function CollapsedDot() {
   const items = useItemStore((s) => s.items);
   const armedSec = useCountdownArmStore((s) => s.armedSec);
   const toggleCollapsed = useUiStore((s) => s.toggleCollapsed);
+  /* [V0.11.2] 圆点也要能拖：收起后 PillBar 已卸载，这里是主窗唯一的抓手。
+     复用与悬浮条同一套阈值（4px 才算拖、拖完吞掉那次 click），所以单击仍是展开。 */
+  const drag = usePillDrag();
 
   /* 结束态 900ms（与药丸同源）：窗口判定在 hook 里，折叠→展开不会重放旧时间戳 */
   const ended = useEndedFlash();
@@ -97,7 +101,12 @@ export function CollapsedDot() {
       data-warn={nearEnd ? 'true' : 'false'}
       data-spin={arc.march ? 'true' : 'false'}
       title={`${text} · ${name}`}
-      aria-label={`收起状态：${text} · ${name}，单击展开`}
+      aria-label={`收起状态：${text} · ${name}，单击展开，拖动可移动`}
+      onPointerDown={drag.onDown}
+      onPointerMove={drag.onMove}
+      onPointerUp={drag.onUp}
+      onPointerCancel={drag.onUp}
+      onClickCapture={drag.onClickCapture}
       onClick={toggleCollapsed}
       onContextMenu={handleContextMenu}
     >

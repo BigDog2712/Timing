@@ -129,8 +129,11 @@ export function initAppearance(): void {
     /* 新键与老键都算：升级前仍开着的旧窗口可能还在写老键 */
     if (!isKeyEvent('appearance', event.key)) return;
     const next = readStored();
+    const formChanged = next.floatForm !== useAppearanceStore.getState().floatForm;
     useAppearanceStore.setState(next);
     applyAppearance(next);
-    applyFloatForm(next.floatForm);
+    /* [V0.11.2] 只有形态真变了才重置收起态。原先无条件 `applyFloatForm`：
+       别窗只是拖了一下不透明度滑杆，本窗「临时展开的小条」也会被按常驻形态收回圆点。 */
+    if (formChanged) applyFloatForm(next.floatForm);
   });
 }

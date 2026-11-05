@@ -41,7 +41,8 @@ function NotifyRow() {
         type="button"
         className="m-btn m-btn--small"
         onClick={() => {
-          void ensureNotifyPermission().then(() => setText(notifyPermissionText()));
+          /* force：用户可能已经去系统设置里放开了，必须重新向系统查，而不是读缓存 */
+          void ensureNotifyPermission(true).then(() => setText(notifyPermissionText()));
         }}
       >
         申请

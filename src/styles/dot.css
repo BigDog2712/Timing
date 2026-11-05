@@ -17,6 +17,8 @@
   place-items: center;
   border-radius: var(--radius-full);
   color: var(--state-idle);
+  /* [V0.11.2] 圆点可拖（收起后主窗唯一的抓手）：给一个「能抓」的光标 */
+  cursor: grab;
   transition: transform var(--dur-quick) var(--ease-standard), color var(--dur-base) var(--ease-standard);
 }
 
@@ -25,6 +27,8 @@
 }
 
 .dot:active {
+  /* [V0.11.2] 圆点可拖（收起后主窗唯一的抓手） */
+  cursor: grabbing;
   transform: scale(0.94);
 }
 

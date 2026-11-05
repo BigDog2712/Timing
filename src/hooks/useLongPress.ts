@@ -9,7 +9,7 @@
  *
  * 只用 Pointer Events：Android WebView / 桌面 Chromium 同一套，不需要 touch 兼容分支。
  */
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 
 /** 长按判定时长（ms） */
@@ -85,6 +85,10 @@ export function useLongPress(
     clearTimer();
     fired.current = false;
   }, [clearTimer]);
+
+  /* [V0.11.2] 卸载时清掉未到期的计时器：行被删 / 切页后，500ms 后仍会触发长按回调，
+     对一个已经不存在的行执行删除（或打开已卸载组件里的 Sheet）。 */
+  useEffect(() => clearTimer, [clearTimer]);
 
   return {
     onPointerDown,

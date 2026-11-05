@@ -41,8 +41,8 @@ interface NoteStore {
   load: (id: number) => Promise<Note | null>;
   /** 正文本地即时改（不落库） */
   setLocalContent: (content: string) => void;
-  /** 正文落盘（超长截断）；content 省略 = 用当前本地值 */
-  saveContent: (content?: string) => Promise<void>;
+  /** 正文落盘（超长截断）；content 省略 = 用当前本地值。返回是否**确已落盘** */
+  saveContent: (content?: string) => Promise<boolean>;
   /** 几何 / 关联变更：合并去抖后落盘（K-23） */
   patchGeom: (patch: NotePatch) => void;
   /** 关联 / 解绑事项（AC-63；即时落盘，itemId=null 解绑为随记） */
@@ -85,19 +85,25 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
 
   saveContent: async (content) => {
     const current = get().note;
-    if (!current) return;
+    if (!current) return true;
     const raw = content ?? current.content;
     const clamped = raw.length > NOTE_CONTENT_MAX_LEN ? raw.slice(0, NOTE_CONTENT_MAX_LEN) : raw;
     if (clamped === get().savedContent) {
       /* 与最近落盘值一致：不产生多余 IPC */
-      return;
+      return true;
     }
     set({ saving: true, error: null });
     try {
       const note = await noteApi.update({ id: current.id, patch: { content: clamped } });
-      set({ note, savedContent: note.content, saving: false });
+      /* [V0.11.2] 只回填 `savedContent`，不动 `note.content`：落盘往返期间用户可能还在打字，
+      用服务端回声覆盖本地正文会吞掉这几百毫秒里输入的字（且下次「无变化」判定会跳过保存）。 */
+      set({ savedContent: note.content, saving: false });
+      return true;
     } catch (err) {
+      /* [V0.11.2] 返回值是「是否真落盘」：调用方（关窗 / 收纳）必须据此决定要不要继续，
+      否则 IPC 失败时窗口一关，用户刚写的正文就永久没了。 */
       set({ saving: false, error: errorText(err) });
+      return false;
     }
   },
 

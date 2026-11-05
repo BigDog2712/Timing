@@ -57,7 +57,7 @@ export function ItemMenuSheet({ itemId }: ItemMenuSheetProps) {
   const doRename = () => {
     const next = name.trim();
     if (!next || next === current?.name) {
-      closeSheet();
+      closeSheet('itemMenu');
       return;
     }
     void run(() => renameItem(itemId, next), closeSheet);

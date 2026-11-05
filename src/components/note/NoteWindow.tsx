@@ -24,6 +24,7 @@ import { IPC_EVENTS } from '../../types/domain';
 import type { MdSyncReport, ThemeChangedPayload } from '../../types/domain';
 import { NoteEditor } from './NoteEditor';
 import { NoteHeader } from './NoteHeader';
+import { NoticeBar } from '../ui/NoticeBar';
 
 export function NoteWindow() {
   const noteId = currentNoteId();
@@ -115,6 +116,10 @@ export function NoteWindow() {
           void startCurrentWindowResize('SouthEast');
         }}
       />
+
+      {/* [V0.11.2] 便利贴窗内的 IPC 失败（关联事项、置顶、关窗）原先只写进 store.error，
+          页脚一滚动就看不见了，这里补一条与其它窗口一致的提示条 */}
+      <NoticeBar />
     </div>
   );
 }

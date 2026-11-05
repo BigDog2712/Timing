@@ -23,6 +23,7 @@ import { IPC_EVENTS } from '../../types/domain';
 import type { MdSyncReport, ThemeChangedPayload, TimerState } from '../../types/domain';
 import { TodosPanel } from './TodosPanel';
 import { Batch2Overlays } from '../Batch2Overlays';
+import { NoticeBar } from '../ui/NoticeBar';
 
 export function TodosWindow() {
   /* AC-32 兜底：撤销窗内窗口隐藏 / 最小化 / 应用退出 → 立即提交未决删除 */
@@ -86,6 +87,9 @@ export function TodosWindow() {
     <div className="win">
       <TodosPanel onRequestClose={() => void closeCurrentWindow()} />
       <Batch2Overlays />
+      {/* [V0.11.2] 本窗也要提示条：`setNotice` 在本窗有大量调用点（开便利贴失败、设提醒失败、
+          删除失败），而提示条原先只挂在主窗 → 这些错误在事项窗里完全静默。 */}
+      <NoticeBar />
     </div>
   );
 }

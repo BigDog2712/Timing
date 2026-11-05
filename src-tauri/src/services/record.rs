@@ -93,7 +93,17 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: RecordPatch) -> AppResult
 }
 
 /// 软删除单条记录（幂等）。
+///
+/// [V0.11.2] 进行中的会话不许删：删掉只会把它藏起来而不释放 `uq_records_open`
+/// 的唯一槽（该索引按 `status='active'` 建，不看 `deleted_at`），之后
+/// `start_timer` 永远回「已有进行中的计时」，界面却显示空闲，只能改库恢复。
+/// 要作废进行中的会话请走 `discard_timer`。
 pub async fn delete(pool: &SqlitePool, id: i64) -> AppResult<()> {
+    if let Some(existing) = repo::find_by_id(pool, id).await? {
+        if existing.status != record_status::SAVED {
+            return Err(AppError::item_not_found());
+        }
+    }
     repo::soft_delete(pool, id, now_ms()).await
 }
 

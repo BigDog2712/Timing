@@ -36,7 +36,7 @@ export function SwitchItemSheet() {
   const choose = async (itemId: number) => {
     /* 点的是当前这条：什么都不用做，关掉即可（避免误触发一次分段） */
     if (itemId === currentId) {
-      closeSheet();
+      closeSheet('switchItem');
       return;
     }
     if (busy) return;
@@ -45,7 +45,7 @@ export function SwitchItemSheet() {
       await mobileTimerActions.switchTo(itemId, mode);
     } finally {
       setBusy(false);
-      closeSheet();
+      closeSheet('switchItem');
     }
   };
 
@@ -54,7 +54,7 @@ export function SwitchItemSheet() {
     setBusy(true);
     const ok = await mobileTimerActions.createAndSwitch(name, mode);
     setBusy(false);
-    if (ok) closeSheet();
+    if (ok) closeSheet('switchItem');
   };
 
   return (

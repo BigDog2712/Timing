@@ -28,10 +28,14 @@ export function cachedNotifyPermission(): NotifyPermission | null {
 /**
  * 申请（或复用）通知权限。调用点必须在用户点击里（系统要求有手势上下文）。
  * 返回 `denied` 时同时点亮整壳的降级说明。
+ *
+ * @param force [V0.11.2] 无视缓存，先向系统查现状。设置页「申请」按钮必须传 true：
+ *   用户被拒后去系统设置里手动放开，回到应用还得能认回来；自动申请路径（点开始倒计时）
+ *   仍走缓存，避免反复弹窗。
  */
-export async function ensureNotifyPermission(): Promise<NotifyPermission> {
+export async function ensureNotifyPermission(force = false): Promise<NotifyPermission> {
   if (!IS_MOBILE) return 'granted';
-  if (cached) return cached;
+  if (cached && !force) return cached;
   if (!isTauri()) {
     cached = 'unsupported';
     return cached;
@@ -39,6 +43,7 @@ export async function ensureNotifyPermission(): Promise<NotifyPermission> {
   try {
     if (await isPermissionGranted()) {
       cached = 'granted';
+      useMobileUiStore.getState().setNotifyIssue(null);
       return cached;
     }
     const result = await requestPermission();

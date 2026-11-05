@@ -44,6 +44,23 @@
   transform: scale(0.995);
 }
 
+/* [V0.11.2] 待删行：确认条贴着它展开，行本身也要「亮一下」，
+   否则长按之后屏幕上只有列表下方多了一小块，用户以为没点中。 */
+.m-note[data-pending="true"] {
+  border-color: var(--color-danger);
+  background: var(--danger-wash);
+}
+
+/* 行内确认条：夹在两行之间，不额外撑开列表间距 */
+.m-confirm-wrap {
+  list-style: none;
+  margin: calc(var(--space-2) * -1) 0 0;
+}
+
+.m-confirm-wrap .m-confirm {
+  margin-top: 0;
+}
+
 .m-note__text {
   margin: 0;
   font-size: 15px;
@@ -137,4 +154,12 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+}
+
+/* 删除已「上膛」：实心红 + 外圈淡红，让「再点一次」和普通危险按钮一眼可分。
+   底色用 --danger-solid（两套主题都按白字校准过对比度：浅 5.13:1 / 深 4.61:1）。 */
+.m-btn--danger[data-armed="true"] {
+  background: var(--danger-solid);
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--danger-wash);
 }

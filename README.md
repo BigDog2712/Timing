@@ -1,4 +1,4 @@
-# Timing v0.11.1
+# Timing v0.11.2
 
 Windows 桌面常驻悬浮计时条：屏幕边缘一条 32px 的小药丸，按一下就开计时，不占工作区。纯本地（SQLite），无账号、无联网。
 
@@ -133,9 +133,9 @@ npm run tauri build                  # 出 nsis / msi 安装器
 
 ## 版本
 
-当前 **0.11.1**。变更见 [CHANGELOG.md](CHANGELOG.md)，逐次改动见 [更新日志.md](更新日志.md)。
+当前 **0.11.2**。变更见 [CHANGELOG.md](CHANGELOG.md)，逐次改动见 [更新日志.md](更新日志.md)。
 
-**迭代规则**：每轮默认只递增末位（`0.11.0 → 0.11.1`）；升 `0.12.0` 或 `1.0.0` 须经用户同意。
+**迭代规则**：每轮默认只递增末位（`0.11.1 → 0.11.2`）；升 `0.12.0` 或 `1.0.0` 须经用户同意。
 
 版本号六处同步：`package.json` · `package-lock.json`（2 处）· `src-tauri/Cargo.toml` · `src-tauri/Cargo.lock` · `src-tauri/tauri.conf.json`。
 **不需要人工核对**——`npm run check:version` 会断言，CI 里不一致即红。

@@ -254,35 +254,10 @@ pub async fn resolve_open(
     }
 }
 
-/// 周期落盘：把运行中会话的已计秒数折入 accumulated_sec 并推进 running_since。
-///
-/// 折账用**单调**差值（锚点存在时），所以系统时钟前跳不会被算进时长；
-/// 折完把 `running_since` 推到当前墙钟并**重新锚定**，保证下一段继续单调计量。
-pub async fn flush_active(pool: &SqlitePool) -> AppResult<()> {
-    let Some(active) = session::find_active(pool).await? else {
-        // 无 active 会话：锚点表里不应再有任何有效起点。
-        clock::clear_all_anchors();
-        return Ok(());
-    };
-    let Some(running_since) = active.running_since else {
-        return Ok(());
-    };
-    let now = clock::now_ms();
-    let delta = floor_sec(elapsed_ms(running_since, now));
-    if delta <= 0 {
-        return Ok(());
-    }
-    session::set_accum_and_running(
-        pool,
-        active.id,
-        active.accumulated_sec + delta,
-        Some(now),
-        now,
-    )
-    .await?;
-    clock::anchor(now);
-    Ok(())
-}
+/* [V0.11.2] 周期落盘移到 `services/timer_flush.rs`：跨进程让路的判据与理由太长，
+留在本文件会破 300 行。沿用 timer_time / timer_stop 的老路子在此 re-export，
+`services::timer::flush_active` 的对外路径不变。 */
+pub use crate::services::timer_flush::flush_active;
 
 /* 时间口径（live_duration / elapsed_ms / floor_sec）已移到 `services/timer_time.rs`
 并在此 re-export——调用点写法不变，但单文件回到 300 行内。 */

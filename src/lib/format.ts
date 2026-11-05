@@ -57,21 +57,42 @@ export function formatClockTime(epochMs: number | null | undefined): string {
 /**
  * 记录行「开始 - 结束」显示：`09:12 - 09:47`。
  * 结束为空（active 会话）时显示「进行中」。
+ *
+ * [V0.11.2] 补跨天分支：只取时分会把 23:50 开始、00:20 结束写成
+ * 「23:50 - 00:20」，读起来像负时长。跨一天写「次日」，跨更多天写日期。
  */
 export function formatRange(startedAt: number, endedAt: number | null): string {
   const start = formatClockTime(startedAt);
   if (endedAt == null) return `${start} - 进行中`;
-  return `${start} - ${formatClockTime(endedAt)}`;
+  const end = formatClockTime(endedAt);
+  const days = dayDiff(startedAt, endedAt);
+  if (days <= 0) return `${start} - ${end}`;
+  if (days === 1) return `${start} - 次日 ${end}`;
+  const d = new Date(endedAt);
+  return `${start} - ${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${end}`;
+}
+
+/** 两个时刻相隔几个自然日（同一天 = 0；用 round 吸收夏令时的一天 +-1 小时） */
+function dayDiff(fromMs: number, toMs: number): number {
+  const from = new Date(fromMs);
+  from.setHours(0, 0, 0, 0);
+  const to = new Date(toMs);
+  to.setHours(0, 0, 0, 0);
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000);
 }
 
 /**
  * 事项名截断：超过 maxChars 个字符则截断并追加省略号。
  * 规则（pill-bar.md）：保留**开头**——"品牌视觉改版…" 优于 "…改版第一轮"。
+ *
+ * [V0.11.2] 按**码点**而不是 UTF-16 码元截断：`slice` 会把 emoji 的代理对切成两半，
+ * 屏幕上留下一个「�」。`Array.from` 按码点拆，emoji 要么整个保留要么整个丢弃。
  */
 export function truncateName(name: string, maxChars: number): string {
   const trimmed = name.trim();
-  if (trimmed.length <= maxChars) return trimmed;
-  return `${trimmed.slice(0, maxChars)}…`;
+  const chars = Array.from(trimmed);
+  if (chars.length <= maxChars) return trimmed;
+  return `${chars.slice(0, maxChars).join('')}…`;
 }
 
 /**

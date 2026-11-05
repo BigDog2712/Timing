@@ -39,6 +39,11 @@ interface MobileUiStore {
   /** 记录页刷新信号：编辑 / 删除一条记录后自增 */
   recordsNonce: number;
   /**
+   * [V0.11.2] 便利贴列表刷新信号：新建 / 编辑 / 删除后自增。
+   * 编辑 Sheet 是覆盖层，`NotesPage` 始终挂载，不刷新就会一直显示旧内容。
+   */
+  notesNonce: number;
+  /**
    * 系统通知不可用的原因（null = 没问题）。
    * `denied` = 用户拒绝授权；`unsupported` = 插件/能力缺失（打包配置问题）。
    * 两者都要**常驻**一条降级说明（不是一次 toast）：到点提醒改走应用内提示，
@@ -47,8 +52,14 @@ interface MobileUiStore {
   notifyIssue: 'denied' | 'unsupported' | null;
   setTab: (tab: MobileTab) => void;
   openSheet: (sheet: MobileSheet) => void;
-  closeSheet: () => void;
+  /**
+   * 关 Sheet。传 `kind` 时**只关这一种**：
+   * 异步操作（落盘 / 落库 / 删记录）完成回来时，用户可能已经关掉原 Sheet 又开了另一张，
+   * 无条件关闭会把新开的那张一起关掉（[V0.11.2]）。
+   */
+  closeSheet: (kind?: MobileSheet['kind']) => void;
   bumpRecords: () => void;
+  bumpNotes: () => void;
   setNotifyIssue: (issue: 'denied' | 'unsupported' | null) => void;
 }
 
@@ -56,10 +67,13 @@ export const useMobileUiStore = create<MobileUiStore>((set) => ({
   tab: 'timer',
   sheet: null,
   recordsNonce: 0,
+  notesNonce: 0,
   notifyIssue: null,
   setTab: (tab) => set({ tab }),
   openSheet: (sheet) => set({ sheet }),
-  closeSheet: () => set({ sheet: null }),
+  closeSheet: (kind) =>
+    set((s) => (kind != null && s.sheet?.kind !== kind ? s : { sheet: null })),
   bumpRecords: () => set((s) => ({ recordsNonce: s.recordsNonce + 1 })),
+  bumpNotes: () => set((s) => ({ notesNonce: s.notesNonce + 1 })),
   setNotifyIssue: (notifyIssue) => set({ notifyIssue }),
 }));

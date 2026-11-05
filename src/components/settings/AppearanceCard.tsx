@@ -10,6 +10,7 @@
  * [V0.3.5] 高亮颜色已并入「配色」卡（`HighlightColorRow`）——它本质是一个颜色，
  * 和四个主题色放在同一张卡里才成组。
  */
+import { IS_MOBILE } from '../../lib/platform';
 import { FLOAT_FORM_OPTIONS, TEXT_OPACITY_MIN, useAppearanceStore } from '../../stores/appearanceStore';
 import { Slider } from '../ui/Slider';
 
@@ -25,24 +26,28 @@ export function AppearanceCard() {
     <section className="card">
       <h3 className="card__title">显示</h3>
 
-      {/* [V0.11.0] 常驻形态：切换后立即生效（收起成点 / 展开成条），不重启 */}
-      <div className="setting-row">
-        <span className="setting-row__label">悬浮形态</span>
-        <div className="seg seg--compact" role="group" aria-label="悬浮形态">
-          {FLOAT_FORM_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              className="seg__item"
-              data-on={floatForm === option.id ? 'true' : 'false'}
-              aria-pressed={floatForm === option.id}
-              onClick={() => setFloatForm(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
+      {/* [V0.11.0] 常驻形态：切换后立即生效（收起成点 / 展开成条），不重启。
+          [V0.11.2] 手机端不渲染这一行：手机没有悬浮条也没有圆点，`MobileShell` 根本不读
+          `collapsed`，切了界面零变化却把值写进 localStorage，回头在桌面生效，属于挖坑。 */}
+      {!IS_MOBILE && (
+        <div className="setting-row">
+          <span className="setting-row__label">悬浮形态</span>
+          <div className="seg seg--compact" role="group" aria-label="悬浮形态">
+            {FLOAT_FORM_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className="seg__item"
+                data-on={floatForm === option.id ? 'true' : 'false'}
+                aria-pressed={floatForm === option.id}
+                onClick={() => setFloatForm(option.id)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* [V0.2.2] 文字 / 背景不透明度（本机偏好，不写数据库；设置面板自身不受影响） */}
       <div className="setting-row">

@@ -69,13 +69,21 @@ pub async fn update_saved(
 }
 
 /// 软删除单条记录（幂等）。
+///
+/// [V0.11.2] 只删**已保存**且未删过的行。原先无条件 `UPDATE ... WHERE id = ?`，
+/// 一条进行中的会话被删后会「看不见但占着槽」：`uq_records_open` 是
+/// `WHERE status='active'` 的部分唯一索引，不过滤 `deleted_at`，于是
+/// `find_active` 返回空（用户看到空闲）却再也起不了新计时（唯一冲突）。
 pub async fn soft_delete(pool: &SqlitePool, id: i64, now: i64) -> AppResult<()> {
-    sqlx::query("UPDATE time_records SET deleted_at = ?, updated_at = ? WHERE id = ?")
-        .bind(now)
-        .bind(now)
-        .bind(id)
-        .execute(pool)
-        .await?;
+    sqlx::query(
+        "UPDATE time_records SET deleted_at = ?, updated_at = ? \
+         WHERE id = ? AND status = 'saved' AND deleted_at IS NULL",
+    )
+    .bind(now)
+    .bind(now)
+    .bind(id)
+    .execute(pool)
+    .await?;
     Ok(())
 }
 

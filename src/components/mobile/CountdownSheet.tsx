@@ -39,7 +39,7 @@ export function CountdownSheet() {
       await countdownActions.start(itemId ?? undefined, targetSec, replace);
     } finally {
       setBusy(false);
-      closeSheet();
+      closeSheet('countdown');
     }
   };
 

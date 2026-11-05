@@ -12,7 +12,7 @@ use crate::models::constants::{MAX_COUNTDOWN_SEC, SYSTEM_ITEM_ID};
 use crate::models::enums::timer_mode;
 use crate::models::record::TimeRecord;
 use crate::models::timer::CountdownFired;
-use crate::platform::clock::now_ms;
+use crate::platform::clock::{self, now_ms};
 use crate::repositories::item as item_repo;
 use crate::repositories::record_session as session;
 use crate::services::settings;
@@ -89,6 +89,13 @@ pub async fn tick(pool: &SqlitePool) -> AppResult<Option<CountdownFired>> {
         .unwrap_or_default();
     let ended_at = active.started_at + target_sec * 1000;
     session::finalize(pool, active.id, target_sec, ended_at, now).await?;
+    /* [V0.11.2] 到点与手动停止必须同收尾：①清锚点（与 `timer_stop` 一致，
+    否则锚点表只增不减，攒满 8 条会把正在用的起点挤掉）；②跑「结束后自动开始」
+    （`after_stop`），否则用户答应的「这条结束后开始下一条」只在手动停止时生效。 */
+    if let Some(rs) = active.running_since {
+        clock::clear_anchor(rs);
+    }
+    crate::services::todo_start::after_stop(pool).await;
     let record = timer::reload(pool, active.id).await?;
     Ok(Some(CountdownFired {
         record,

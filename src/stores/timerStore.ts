@@ -37,13 +37,25 @@ interface TimerStore {
   refresh: () => Promise<TimerState>;
 }
 
-export const useTimerStore = create<TimerStore>((set) => ({
+/** 请求代次：只让**最新**那一次 `refresh` 写状态 */
+let seq = 0;
+
+export const useTimerStore = create<TimerStore>((set, get) => ({
   state: IDLE_TIMER_STATE,
   loaded: false,
-  setState: (state) => set({ state, loaded: true }),
+  setState: (state) => {
+    /* 事件推来的快照比任何在途 refresh 都新：自增代次，让旧请求回来时自动作废 */
+    seq += 1;
+    set({ state, loaded: true });
+  },
   setStatus: (status) => set((store) => ({ state: { ...store.state, status } })),
-  refresh: async () => {
+  refresh: async (): Promise<TimerState> => {
+    /* [V0.11.2] 乱序保护：倒计时到点的事件刷新与用户点「结束」触发的刷新可能并发，
+       较早发出但较晚到达的那次会把旧状态写回（表现为「结束完又跳回计时中」）。
+       代次不匹配就丢弃，返回当前已生效的状态。 */
+    const mine = ++seq;
     const state = await timerApi.state();
+    if (mine !== seq) return get().state;
     set({ state, loaded: true });
     return state;
   },

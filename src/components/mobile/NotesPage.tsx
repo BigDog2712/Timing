@@ -14,7 +14,7 @@
  * 为什么长按删除而不是行内放垃圾桶：手机上一行只有 3.5 个字的横向余量，
  * 常驻删除键会被拇指误触；长按 + 编辑页里的显式删除两个入口够用。
  */
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useLongPress } from '../../hooks/useLongPress';
 import { formatClockTime } from '../../lib/format';
 import { AlertIcon, PlusIcon, StickyNoteIcon, iconStroke } from '../../lib/icons';
@@ -26,16 +26,17 @@ import type { Note } from '../../types/domain';
 interface NoteRowProps {
   note: Note;
   owner: string;
+  pending: boolean;
   onOpen: () => void;
   onDelete: () => void;
 }
 
-function NoteRow({ note, owner, onOpen, onDelete }: NoteRowProps) {
+function NoteRow({ note, owner, pending, onOpen, onDelete }: NoteRowProps) {
   const press = useLongPress(onDelete, onOpen);
   const text = note.content.trim();
   return (
     <li>
-      <div className="m-note" {...press}>
+      <div className="m-note" data-pending={pending ? 'true' : 'false'} {...press}>
         <p className="m-note__text" data-empty={text.length === 0 ? 'true' : 'false'}>
           {text.length === 0 ? '空白便利贴' : text}
         </p>
@@ -51,6 +52,9 @@ function NoteRow({ note, owner, onOpen, onDelete }: NoteRowProps) {
 export function NotesPage() {
   const items = useItemStore((s) => s.items);
   const openSheet = useMobileUiStore((s) => s.openSheet);
+  /* [V0.11.2] 编辑 Sheet 是覆盖层，本页始终挂载 → 写完 / 改完 / 删完由信号触发重拉，
+     否则新写的便利贴要等切页才出现，改过的内容还显示旧文本。 */
+  const notesNonce = useMobileUiStore((s) => s.notesNonce);
   const [notes, setNotes] = useState<Note[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +75,7 @@ export function NotesPage() {
 
   useEffect(() => {
     void reload();
-  }, [reload]);
+  }, [reload, notesNonce]);
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
@@ -112,20 +116,6 @@ export function NotesPage() {
           </p>
         )}
 
-        {pendingDelete && (
-          <div className="m-confirm" role="alertdialog" aria-label="确认删除便利贴">
-            <p className="m-confirm__text">删除这张便利贴？此操作不可撤销。</p>
-            <div className="m-confirm__actions">
-              <button type="button" className="m-btn m-btn--small" onClick={() => setPendingDelete(null)}>
-                取消
-              </button>
-              <button type="button" className="m-btn m-btn--small m-btn--danger" onClick={() => void confirmDelete()}>
-                删除
-              </button>
-            </div>
-          </div>
-        )}
-
         {loading ? (
           <p className="m-empty">正在读取…</p>
         ) : notes.length === 0 ? (
@@ -133,13 +123,40 @@ export function NotesPage() {
         ) : (
           <ul className="m-list m-list--note">
             {notes.map((note) => (
-              <NoteRow
-                key={note.id}
-                note={note}
-                owner={note.itemId == null ? '随记' : itemName(items, note.itemId)}
-                onOpen={() => openSheet({ kind: 'noteEdit', noteId: note.id })}
-                onDelete={() => setPendingDelete(note)}
-              />
+              <Fragment key={note.id}>
+                <NoteRow
+                  note={note}
+                  owner={note.itemId == null ? '随记' : itemName(items, note.itemId)}
+                  pending={pendingDelete?.id === note.id}
+                  onOpen={() => openSheet({ kind: 'noteEdit', noteId: note.id })}
+                  onDelete={() => setPendingDelete(note)}
+                />
+                {/* [V0.11.2] 确认条贴着被删那行展开：原先固定渲染在列表上方，
+                    列表一长，用户在下方长按时屏幕上毫无变化，以为功能坏了。 */}
+                {pendingDelete?.id === note.id && (
+                  <li className="m-confirm-wrap">
+                    <div className="m-confirm" role="alertdialog" aria-label="确认删除便利贴">
+                      <p className="m-confirm__text">删除这张便利贴？此操作不可撤销。</p>
+                      <div className="m-confirm__actions">
+                        <button
+                          type="button"
+                          className="m-btn m-btn--small"
+                          onClick={() => setPendingDelete(null)}
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          className="m-btn m-btn--small m-btn--danger"
+                          onClick={() => void confirmDelete()}
+                        >
+                          删除
+                        </button>
+                      </div>
+                    </div>
+                  </li>
+                )}
+              </Fragment>
             ))}
           </ul>
         )}

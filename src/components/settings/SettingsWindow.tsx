@@ -16,6 +16,7 @@ import { useThemeStore } from '../../stores/themeStore';
 import { IPC_EVENTS } from '../../types/domain';
 import type { ThemeChangedPayload } from '../../types/domain';
 import { SettingsPanel } from './SettingsPanel';
+import { NoticeBar } from '../ui/NoticeBar';
 
 export function SettingsWindow() {
   /* 主题：本窗自订阅广播 */
@@ -40,6 +41,8 @@ export function SettingsWindow() {
   return (
     <div className="win">
       <SettingsPanel variant="window" onRequestClose={() => void closeCurrentWindow()} />
+      {/* [V0.11.2] 设置窗的 IPC 失败（主题、四色、同步配置）原先无处显示 */}
+      <NoticeBar />
     </div>
   );
 }

@@ -5,11 +5,11 @@
  * 范围锁定「今天 00:00 → 明天 00:00」（本地时区，作用字段 startedAt，与 lib/time::rangeBounds('day') 同口径）。
  * 仅取 saved 记录；进行中的会话由调用方叠加（来源 timerStore，避免与 list_records 重复）。
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { errorText, ipc } from '../services/ipc';
 import { startOfDay } from '../lib/time';
 import { IPC_EVENTS, MAX_PAGE_SIZE } from '../types/domain';
-import type { MdSyncReport, TimeRecord } from '../types/domain';
+import type { MdSyncReport, TimeRecord, TimerState } from '../types/domain';
 import { useTauriEvent } from './useTauriEvent';
 
 export interface TodayRecordsData {
@@ -82,6 +82,17 @@ export function useTodayRecords(): TodayRecordsData {
   /* [V0.4.0] Markdown 改时间 / 删组后，今日计时区立即跟上，不必等切窗。 */
   useTauriEvent<MdSyncReport>(IPC_EVENTS.mdSyncChanged, (report) => {
     if (report.kinds.includes('timers')) reload();
+  });
+
+  /* [V0.11.2] 会话结束（手动停止 / 倒计时到点 / 切换事项）后自动重拉。
+     事件到达时那条记录刚由 active 转 saved：调用方叠加的「进行中」行消失，
+     而它还没进 `rows` —— 界面上这段时间会凭空不见，今日总时长也少一块，
+     用户只能切窗或手动刷新才看到。放在 hook 内统一处理，免得两个页面各写一遍。 */
+  const lastStatus = useRef<string | null>(null);
+  useTauriEvent<TimerState>(IPC_EVENTS.timerStateChanged, (next) => {
+    const prev = lastStatus.current;
+    lastStatus.current = next.status;
+    if (prev != null && prev !== 'idle' && next.status === 'idle') reload();
   });
 
   return { loading, error, totalSec, recordCount, rows, reload };

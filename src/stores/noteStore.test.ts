@@ -94,3 +94,40 @@ describe('noteStore.setPinned', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 });
+
+/* [V0.11.2] 正文落盘的返回值契约：`closeNote` / 手机端 `finish` 全靠它决定关不关窗。
+   同时锁住「只回填 savedContent、不回写 note.content」——否则落盘往返期间打的字会被
+   服务端回声覆盖，下次「无变化」判定还会跳过保存，等于静默丢字。 */
+describe('noteStore.saveContent', () => {
+  it('成功返回 true，且不覆盖落盘期间的新输入', async () => {
+    let resolveUpdate: (n: Note) => void = () => {};
+    updateMock.mockReturnValue(
+      new Promise<Note>((resolve) => {
+        resolveUpdate = resolve;
+      }),
+    );
+
+    const pending = useNoteStore.getState().saveContent('第一版');
+    /* 落盘往返期间用户还在打字 */
+    useNoteStore.getState().setLocalContent('第一版 + 又打了几个字');
+    resolveUpdate({ ...baseNote, content: '第一版' });
+
+    await expect(pending).resolves.toBe(true);
+    expect(useNoteStore.getState().savedContent).toBe('第一版');
+    expect(useNoteStore.getState().note?.content, '本地正文不得被服务端回声覆盖').toBe(
+      '第一版 + 又打了几个字',
+    );
+  });
+
+  it('失败返回 false 并留错误文案（调用方据此不关窗）', async () => {
+    updateMock.mockRejectedValue({ code: 'DB_ERROR', message: 'database is locked' });
+
+    await expect(useNoteStore.getState().saveContent('新内容')).resolves.toBe(false);
+    expect(useNoteStore.getState().error).toBeTruthy();
+  });
+
+  it('内容没变：返回 true 且不产生多余 IPC', async () => {
+    await expect(useNoteStore.getState().saveContent(baseNote.content)).resolves.toBe(true);
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+});

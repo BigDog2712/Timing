@@ -284,11 +284,10 @@ async fn import_and_render(
 }
 
 fn open_path(path: &Path) -> AppResult<()> {
+    /* [V0.11.2] Windows 不走 `cmd /C start`：路径由插件 manifest 的 root/file 拼出来，
+    含 `&`/`|` 且不带空格时 cmd 会当命令执行（等价任意命令执行）。explorer 只吃一个参数。 */
     #[cfg(target_os = "windows")]
-    let spawned = Command::new("cmd")
-        .args(["/C", "start", ""])
-        .arg(path)
-        .spawn();
+    let spawned = Command::new("explorer").arg(path).spawn();
     #[cfg(target_os = "macos")]
     let spawned = Command::new("open").arg(path).spawn();
     #[cfg(all(unix, not(target_os = "macos")))]

@@ -10,6 +10,7 @@ import { useRecordsData } from '../../hooks/useRecordsData';
 import type { RecordsRange } from '../../lib/time';
 import { AlertIcon, EmptyDotIcon, iconStroke } from '../../lib/icons';
 import { recordApi } from '../../services/api';
+import { errorText } from '../../services/ipc';
 import { useItemStore } from '../../stores/itemStore';
 import { useUiStore } from '../../stores/uiStore';
 import { DayWeekTabs } from './DayWeekTabs';
@@ -35,10 +36,15 @@ export function RecordsPanel() {
     }
   };
 
+  /* [V0.11.2] 失败要自己接住并给文案：原先只有 try/finally，拒绝会冒泡到全局
+     unhandledrejection，被 ErrorBoundary 显示成「界面异常」+ 后端原始 message，
+     比「这条记录已经不在了，列表已刷新」难懂得多。 */
   const handleReassign = useCallback(
     async (recordId: number, itemId: number) => {
       try {
         await recordApi.update(recordId, { itemId });
+      } catch (err) {
+        useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
       } finally {
         reload();
       }
@@ -50,6 +56,8 @@ export function RecordsPanel() {
     async (recordId: number) => {
       try {
         await recordApi.remove({ id: recordId });
+      } catch (err) {
+        useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
       } finally {
         reload();
       }

@@ -69,7 +69,7 @@ export function RecordEditSheet({ record }: RecordEditSheetProps) {
       });
       bumpRecords();
       useUiStore.getState().setNotice({ text: '记录已更新', tone: 'info' });
-      closeSheet();
+      closeSheet('recordEdit');
     } catch (err) {
       /* 后端 INVALID_DURATION 也会走到这里（例如记录被并发改动）：同样回退时间框 */
       setError(errorText(err));
@@ -86,7 +86,7 @@ export function RecordEditSheet({ record }: RecordEditSheetProps) {
       await recordApi.remove({ id: record.id });
       bumpRecords();
       useUiStore.getState().setNotice({ text: '记录已删除', tone: 'info' });
-      closeSheet();
+      closeSheet('recordEdit');
     } catch (err) {
       setError(errorText(err));
     } finally {

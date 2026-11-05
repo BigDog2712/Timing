@@ -164,7 +164,13 @@ export async function closeNote(noteId: number): Promise<void> {
     return;
   }
   // 提交未决正文（与最近落盘值一致时 store 内部自动跳过，幂等）
-  await store.saveContent().catch(() => undefined);
+  const saved = await store.saveContent().catch(() => false);
+  /* [V0.11.2] 落盘失败**不关窗**：窗口销毁后正文只存在于内存里，DB 还是旧内容，
+     用户刚写的字就永久丢了。保留窗口 + 页脚错误文案（noteStore.error），让他能重试。 */
+  if (!saved) {
+    notify(useNoteStore.getState().error ?? '正文没保存成功，窗口先留着，请重试');
+    return;
+  }
   if (isTauri()) {
     try {
       await ipc.closeNoteWindow({ noteId });

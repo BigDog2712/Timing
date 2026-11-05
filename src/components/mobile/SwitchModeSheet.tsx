@@ -88,16 +88,21 @@ export function TodoSwitchSheet({ todoId, title }: TodoSwitchSheetProps) {
     /* 失败提示由 mobileTimerActions 统一弹（notify）；待办原样留在列表里可重试 */
     await mobileTimerActions.startTodo({ id: todoId, title }, mode);
     setBusy(false);
-    closeSheet();
+    closeSheet('todoSwitch');
   };
 
   return (
     <Sheet
       title={`开始「${title}」`}
-      onClose={closeSheet}
+      onClose={() => closeSheet('todoSwitch')}
       footer={
         <div className="m-sheet__foot-row">
-          <button type="button" className="m-btn m-field--grow" disabled={busy} onClick={closeSheet}>
+          <button
+            type="button"
+            className="m-btn m-field--grow"
+            disabled={busy}
+            onClick={() => closeSheet('todoSwitch')}
+          >
             取消
           </button>
           <button type="button" className="m-btn m-btn--primary" disabled={busy} onClick={() => void confirm()}>

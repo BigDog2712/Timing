@@ -22,6 +22,18 @@ use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
 
+/// UTF-8 BOM（`U+FEFF`）。
+///
+/// Windows 记事本「UTF-8 带 BOM」会把它写在文件最前面，而它**不属于**
+/// `char::is_whitespace`——`line.trim()` 剥不掉，于是首行标题永远匹配不上，
+/// 每轮同步都在末尾追加一节（文件无限增长）。所以读写入口统一先剥、写回时补。
+const BOM: char = '\u{feff}';
+
+/// 去掉开头的 BOM（没有就原样返回）。
+fn strip_bom(text: &str) -> &str {
+    text.strip_prefix(BOM).unwrap_or(text)
+}
+
 /// 读一个目标区块的结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SectionState {
@@ -102,7 +114,7 @@ pub fn read_section(path: &Path, heading: &str) -> Result<SectionState, String> 
     }
     let raw = fs::read_to_string(path).map_err(|err| format!("读取文件失败：{err}"))?;
     let mtime_ms = mtime_ms(&meta);
-    let text = raw.replace("\r\n", "\n");
+    let text = strip_bom(&raw).replace("\r\n", "\n");
     match body_in_text(&text, heading) {
         Some(body) => Ok(SectionState::Present { body, mtime_ms }),
         None => Ok(SectionState::MissingHeading { mtime_ms }),
@@ -116,11 +128,15 @@ pub fn write_section(path: &Path, heading: &str, body: &str) -> Result<i64, Stri
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|err| format!("创建落点目录失败：{err}"))?;
     }
-    let (existing, had_crlf) = if path.exists() {
+    let (existing, had_crlf, had_bom) = if path.exists() {
         let raw = fs::read_to_string(path).map_err(|err| format!("读取文件失败：{err}"))?;
-        (raw.replace("\r\n", "\n"), raw.contains("\r\n"))
+        (
+            strip_bom(&raw).replace("\r\n", "\n"),
+            raw.contains("\r\n"),
+            raw.starts_with(BOM),
+        )
     } else {
-        (String::new(), false)
+        (String::new(), false, false)
     };
 
     let body = body.replace("\r\n", "\n");
@@ -141,13 +157,19 @@ pub fn write_section(path: &Path, heading: &str, body: &str) -> Result<i64, Stri
     } else {
         updated
     };
+    /* 原文件带 BOM 就写回去：只剥不补会让 Obsidian / 记事本的「UTF-8 with BOM」变成无 BOM。 */
+    let payload = if had_bom {
+        format!("{BOM}{updated}")
+    } else {
+        updated
+    };
 
-    write_atomic(path, updated.as_bytes())?;
+    write_atomic(path, payload.as_bytes())?;
     /* [V0.4.1] 写盘是「改动用户文件」的动作，正常一天也就几次，值得留一行。 */
     crate::log_info!(
         "md write: {} ({} bytes, backup={backed_up})",
         path.display(),
-        updated.len()
+        payload.len()
     );
     let meta = fs::metadata(path).map_err(|err| format!("读取写入结果失败：{err}"))?;
     Ok(mtime_ms(&meta))

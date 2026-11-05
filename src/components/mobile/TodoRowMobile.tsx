@@ -63,9 +63,10 @@ export function TodoRowMobile({
   const done = todo.doneAt != null;
   const overdue = isTodoOverdue(todo, now);
   const label = todoTimeLabel(todo, now);
-  const longPress = useLongPress(() => {
-    if (!done) onDelete();
-  });
+  /* [V0.11.2] 已完成的行也要能删：原先 `if (!done)` 把回调拦死，
+     而调用方（ItemsPage 完成区）确实传了 onDelete —— 删除入口成了死代码，
+     唯一出路是先把圆圈点回未完成。删除走 `todosActions.remove`，带 3s 撤销。 */
+  const longPress = useLongPress(onDelete);
 
   return (
     <li className="m-todo" data-done={done ? 'true' : 'false'} data-overdue={overdue ? 'true' : 'false'}>

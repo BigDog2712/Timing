@@ -137,7 +137,11 @@ function main() {
   console.log(`JAVA_HOME=${process.env.JAVA_HOME}`);
 
   // 1. 前端静态资源（等价于 tauri.conf.json 的 build.beforeBuildCommand）
-  run(IS_WIN ? 'npm.cmd' : 'npm', ['run', 'build'], { cwd: ROOT, env, shell: IS_WIN });
+  //    [V0.11.2] 必须显式注入 TAURI_ENV_FAMILY=mobile：`vite.config.ts` 靠它决定
+  //    `__TIMING_MOBILE__`，而本脚本是直接调 npm（不经 tauri CLI），不设就会把**桌面版**
+  //    前端打进 APK —— 装到手机上是一个没有 MobileShell 的空白/错版界面。
+  const webEnv = { ...env, TAURI_ENV_FAMILY: 'mobile' };
+  run(IS_WIN ? 'npm.cmd' : 'npm', ['run', 'build'], { cwd: ROOT, env: webEnv, shell: IS_WIN });
 
   // 2. Rust 动态库
   const cargoArgs = [
