@@ -16,16 +16,36 @@ pub fn open_dir(path: &Path) -> Result<(), String> {
     if !path.is_dir() {
         return Err(format!("目录不存在：{}", path.display()));
     }
-    let opener = if cfg!(windows) {
+    spawn(opener(), path, "打开目录失败")
+}
+
+/// 用系统默认程序打开一个**文件**（如 Markdown 日记）。
+///
+/// [V0.11.3] 从 `services::md_sync` 搬过来：那里原先自己拼了一版 `Command::new("explorer")`，
+/// 与这里的平台分支完全重复。搬进来之后只有一个开文件的地方，安全口径也就一处
+/// ——`explorer` / `open` / `xdg-open` 都只吃一个参数、不经 shell 解析，
+/// 而路径里的 `&`、`|`、`^` 在这个前提下没有意义（`cmd /C start` 才有，已弃用）。
+pub fn open_file(path: &Path) -> Result<(), String> {
+    if !path.is_file() {
+        return Err(format!("文件不存在：{}", path.display()));
+    }
+    spawn(opener(), path, "打开文件失败")
+}
+
+fn opener() -> &'static str {
+    if cfg!(windows) {
         "explorer"
     } else if cfg!(target_os = "macos") {
         "open"
     } else {
         "xdg-open"
-    };
+    }
+}
+
+fn spawn(opener: &str, path: &Path, what: &str) -> Result<(), String> {
     Command::new(opener)
         .arg(path)
         .spawn()
         .map(|_| ())
-        .map_err(|err| format!("打开目录失败：{err}"))
+        .map_err(|err| format!("{what}：{err}"))
 }

@@ -44,6 +44,7 @@ mod timer_switch;
 mod timer_threshold;
 mod timer_todo_link;
 mod todo;
+mod todo_list;
 mod todo_nudge;
 mod todo_purge;
 mod todo_start;

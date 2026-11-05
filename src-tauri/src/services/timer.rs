@@ -196,10 +196,33 @@ pub async fn switch(pool: &SqlitePool, item_id: i64, mode: SwitchMode) -> AppRes
             let accumulated = live_duration(&active, now);
             // 与手动结束同一口径，见 ADR-023。
             let discard_old = should_ignore(pool, accumulated).await;
-            session::end_and_start(pool, active.id, item_id, accumulated, now, now, discard_old)
+            /* [V0.11.3] 旧段跨了零点：先按天拆成多条保存，再开新会话。
+            拆开保存与「开会话」是两次写，不是同一个事务——但顺序是安全的：
+            旧段先老实落库，新会话失败也只是「切换没成功」，用户再点一次即可，
+            不会出现「旧段没了、新段也没开」的半截状态。 */
+            if !discard_old
+                && crate::services::timer_split::split_by_day(active.started_at, now, accumulated)
+                    .len()
+                    > 1
+            {
+                crate::services::timer_split::finalize(pool, &active, accumulated, now, now)
+                    .await?;
+                start(pool, Some(item_id)).await?;
+                clock::anchor(now);
+            } else {
+                session::end_and_start(
+                    pool,
+                    active.id,
+                    item_id,
+                    accumulated,
+                    now,
+                    now,
+                    discard_old,
+                )
                 .await?;
-            // 新会话的墙钟起点是 now，重新锚定（旧锚点属于上一段会话）。
-            clock::anchor(now);
+                // 新会话的墙钟起点是 now，重新锚定（旧锚点属于上一段会话）。
+                clock::anchor(now);
+            }
         }
     }
     settings::set_last_item_id(pool, item_id).await?;
@@ -236,7 +259,8 @@ pub async fn resolve_open(
             }
             // 以最后落盘 accumulated_sec 为准；勾了 include_gap 才补算停机间隙（R-2）。
             let base = active.accumulated_sec + gap_sec(&active, ended, include_gap);
-            session::finalize(pool, active.id, base, ended, now).await?;
+            /* [V0.11.3] 「结束并保存」同样分段：崩溃跨夜的会话常常是昨天开始、今天才收尾。 */
+            crate::services::timer_split::finalize(pool, &active, base, ended, now).await?;
             if let Some(rs) = active.running_since {
                 clock::clear_anchor(rs);
             }

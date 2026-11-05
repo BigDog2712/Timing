@@ -40,6 +40,12 @@ const MIGRATE_COLUMNS_V4: &[(&str, &str, &str)] = &[
     ("todos", "auto_start", "INTEGER NOT NULL DEFAULT 0"),
 ];
 
+/// V0.11.3 加列清单：待办绑定事项。
+///
+/// 可空 —— 老数据不回填（回填等于重跑一次标题匹配，同名待办会被绑成一条），
+/// 新建时也不强制选事项。空值由 `todo_start` 兜底并回填，见 `services::todo_start`。
+const MIGRATE_COLUMNS_V5: &[(&str, &str, &str)] = &[("todos", "item_id", "INTEGER")];
+
 /// 执行全部迁移（幂等）。由 `infra::db::init_pool` 调用。
 pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
     // ① 3 张基表（IF NOT EXISTS，幂等）
@@ -62,6 +68,12 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
     }
     // ⑦ v4 版本推进（schema.version=4）
     run_raw(pool, include_str!("../migrations/0004_v0312.sql")).await?;
+    // ⑧ 补 v5 列（待办绑定事项；必须在 todos 表建好之后）
+    for (table, column, def) in MIGRATE_COLUMNS_V5 {
+        ensure_column(pool, table, column, def).await?;
+    }
+    // ⑨ v5 版本推进（schema.version=5）+ 索引
+    run_raw(pool, include_str!("../migrations/0005_v0113.sql")).await?;
     Ok(())
 }
 

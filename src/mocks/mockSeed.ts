@@ -116,8 +116,8 @@ export function seed(): MockState {
     lastItemId: 2,
     seq: 200,
     todos: [
-      { id: 301, title: '整理本周时间周报', plannedAt: t + 3600 * 1000, remindAt: null, remindedAt: null, doneAt: null, sortOrder: 0, createdAt: t, updatedAt: t },
-      { id: 302, title: '给客户回邮件', plannedAt: null, remindAt: null, remindedAt: null, doneAt: null, sortOrder: 1, createdAt: t, updatedAt: t },
+      { id: 301, title: '整理本周时间周报', itemId: 1, plannedAt: t + 3600 * 1000, remindAt: null, remindedAt: null, doneAt: null, sortOrder: 0, createdAt: t, updatedAt: t },
+      { id: 302, title: '给客户回邮件', itemId: null, plannedAt: null, remindAt: null, remindedAt: null, doneAt: null, sortOrder: 1, createdAt: t, updatedAt: t },
     ],
     notes: [],
     reminders: [],

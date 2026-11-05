@@ -36,7 +36,7 @@ async fn migration_adds_nudge_columns() {
         )
         .await
         .as_deref(),
-        Some("4")
+        Some("5")
     );
 }
 
@@ -45,7 +45,7 @@ async fn migration_adds_nudge_columns() {
 async fn light_nudge_fires_at_fifteen_minutes() {
     let pool = fresh_pool("nudge-light").await;
     let now = 1_700_000_000_000;
-    let t = todo::create(&pool, "写周报", None, Some(now + 15 * MIN))
+    let t = todo::create(&pool, "写周报", None, None, Some(now + 15 * MIN))
         .await
         .unwrap();
 
@@ -79,7 +79,7 @@ async fn start_nudge_fires_at_five_minutes() {
     let pool = fresh_pool("nudge-start").await;
     let now = 1_700_000_000_000;
     let start = now + 3 * MIN;
-    let t = todo::create(&pool, "写周报", None, Some(start))
+    let t = todo::create(&pool, "写周报", None, None, Some(start))
         .await
         .unwrap();
     exec(
@@ -108,7 +108,7 @@ async fn start_nudge_fires_at_five_minutes() {
 async fn stale_todo_expires_without_nudging() {
     let pool = fresh_pool("nudge-stale").await;
     let now = 1_700_000_000_000;
-    let t = todo::create(&pool, "昨天的待办", None, Some(now - 2 * 60 * MIN))
+    let t = todo::create(&pool, "昨天的待办", None, None, Some(now - 2 * 60 * MIN))
         .await
         .unwrap();
 
@@ -136,7 +136,7 @@ async fn stale_todo_expires_without_nudging() {
 async fn autostart_due_only_for_fresh_arrivals() {
     let pool = fresh_pool("nudge-auto").await;
     let now = 1_700_000_000_000;
-    let fresh = todo::create(&pool, "刚到点", None, Some(now - MIN))
+    let fresh = todo::create(&pool, "刚到点", None, None, Some(now - MIN))
         .await
         .unwrap();
     exec(
@@ -144,7 +144,7 @@ async fn autostart_due_only_for_fresh_arrivals() {
         &format!("UPDATE todos SET remind_stage = 2 WHERE id = {}", fresh.id),
     )
     .await;
-    let future = todo::create(&pool, "还没到", None, Some(now + 10 * MIN))
+    let future = todo::create(&pool, "还没到", None, None, Some(now + 10 * MIN))
         .await
         .unwrap();
     exec(
@@ -163,7 +163,7 @@ async fn autostart_due_only_for_fresh_arrivals() {
 async fn consented_autostart_ignores_grace_window() {
     let pool = fresh_pool("nudge-consent").await;
     let now = 1_700_000_000_000;
-    let t = todo::create(&pool, "长会之后开始", None, Some(now - 60 * MIN))
+    let t = todo::create(&pool, "长会之后开始", None, None, Some(now - 60 * MIN))
         .await
         .unwrap();
     exec(
@@ -185,7 +185,7 @@ async fn consented_autostart_ignores_grace_window() {
 async fn changing_start_time_resets_stage() {
     let pool = fresh_pool("nudge-reset").await;
     let now = 1_700_000_000_000;
-    let t = todo::create(&pool, "写周报", None, Some(now + 15 * MIN))
+    let t = todo::create(&pool, "写周报", None, None, Some(now + 15 * MIN))
         .await
         .unwrap();
     let due = todo_nudge::due(&pool, STAGE_LIGHT, now).await.unwrap();

@@ -26,9 +26,19 @@ pub const NOTE_MAX_LEN: usize = 500;
 /// 超长 → `ITEM_NAME_TOO_LONG`（ADR-018）。
 pub const ITEM_NAME_MAX_LEN: usize = 60;
 
-/// [V0.4.0] Markdown 同步轮询间隔（秒）。文件监听在 Windows 上要额外依赖 + 处理
-/// 编辑器「先写临时文件再替换」的原子写，轮询 2s 足够便宜也足够跟手。
-pub const MD_SYNC_POLL_SECS: u64 = 2;
+/// [V0.11.3] Markdown 同步轮询间隔**默认值**（秒）。
+///
+/// V0.4.0 起是固定的 2s：够跟手，但一天下来要读几千次文件、每次都跑一遍
+/// 「按天取数 + 渲染 + 比对」，是这台机器上最没必要的常驻开销。
+/// 用户口径：「同步要降，默认十五分钟，可以自己调，也能点手动同步」——
+/// 于是这里改成默认值，真实间隔进配置（`MdSyncConfig::poll_secs`）。
+pub const MD_SYNC_POLL_SECS: u64 = 900;
+
+/// 轮询间隔下限（秒）。低于 1 分钟等于回到轮询式的老毛病。
+pub const MD_SYNC_POLL_MIN_SECS: u64 = 60;
+
+/// 轮询间隔上限（秒）：一天一次。再长就不像「自动同步」了。
+pub const MD_SYNC_POLL_MAX_SECS: u64 = 86_400;
 
 /// 待办标题最大长度（字符，schema-V0.2.0 §todos.title / domain-v020.ts:100「长度 1-200」）。
 pub const TODO_TITLE_MAX_LEN: usize = 200;

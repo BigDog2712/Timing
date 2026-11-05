@@ -76,7 +76,9 @@ pub async fn stop(pool: &SqlitePool) -> AppResult<StopResult> {
             discarded: true,
         });
     }
-    session::finalize(pool, active.id, accumulated, now, now).await?;
+    /* [V0.11.3] 跨零点按天拆开落库：一条 23:40→00:20 的会话变成两天各一段，
+    日记里各归各的日期。不跨天时与 `session::finalize` 等价（内部走同一条路径）。 */
+    crate::services::timer_split::finalize(pool, &active, accumulated, now, now).await?;
     if let Some(rs) = active.running_since {
         clock::clear_anchor(rs);
     }

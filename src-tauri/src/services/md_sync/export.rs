@@ -37,10 +37,14 @@ use crate::repositories::md_sync_todo as repo_todo;
 
 use super::format::{self, NoteRow, TimerEntry, TimerInterval, TodoRow};
 
-/// 渲染结果 + 该范围内的最大更新时间（冲突判定用）。
+/// 渲染结果。
+///
+/// [V0.11.3] 去掉了 `latest_update`：冲突判定改成「Markdown 永远赢」后，这个
+/// 「该范围最大 `updated_at`」再没有读者，但它要额外跑一次 `MAX(updated_at)`
+/// 聚合——每次同步 × 每个落点，纯浪费。结构体留着是因为 `by_kind` 的调用点
+/// 都取 `.body`，拆成裸 `String` 只是改签名，没必要。
 pub struct Exported {
     pub body: String,
-    pub latest_update: i64,
 }
 
 /// 某天的计时区块（进行中的段用系统当前时刻渲染）。
@@ -78,10 +82,6 @@ pub async fn timers_at(pool: &SqlitePool, date: NaiveDate, now: i64) -> AppResul
 
     Ok(Exported {
         body: format::render_timers(&entries),
-        /* 只统计 saved 行的 `updated_at`：active 行每 15s 被 `flush_active` 推进一次，
-        若把它算进来，`latest_update` 会永远「刚刚更新」，冲突判定就总判给数据库侧，
-        把用户刚写进文件的内容覆盖掉。 */
-        latest_update: repo::latest_record_update(pool, from, to).await?,
     })
 }
 
@@ -149,10 +149,8 @@ fn live_duration_sec(active: &repo::RecordWithItem, now: i64) -> i64 {
 pub async fn notes(pool: &SqlitePool, date: NaiveDate) -> AppResult<Exported> {
     let (from, to) = format::day_bounds(date);
     let rows = repo::notes_in_day(pool, from, to).await?;
-    let mut latest = 0;
     let mut note_rows = Vec::new();
     for row in rows {
-        latest = latest.max(row.updated_at);
         note_rows.push(NoteRow {
             id: Some(row.id),
             updated_ms: row.updated_at,
@@ -163,7 +161,6 @@ pub async fn notes(pool: &SqlitePool, date: NaiveDate) -> AppResult<Exported> {
 
     Ok(Exported {
         body: format::render_notes(&note_rows),
-        latest_update: latest,
     })
 }
 
@@ -190,7 +187,6 @@ pub async fn todos(pool: &SqlitePool, date: NaiveDate) -> AppResult<Exported> {
 
     Ok(Exported {
         body: format::render_todos(&todo_rows, date),
-        latest_update: repo_todo::latest_todo_update(pool, from, to).await?,
     })
 }
 

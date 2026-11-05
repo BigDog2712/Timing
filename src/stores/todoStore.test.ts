@@ -26,6 +26,7 @@ function todo(id: number, over: Partial<Todo> = {}): Todo {
   return {
     id,
     title: `待办 ${id}`,
+    itemId: null,
     plannedAt: T0,
     remindAt: T0 - HOUR,
     remindedAt: null,

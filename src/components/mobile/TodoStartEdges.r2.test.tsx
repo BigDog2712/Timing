@@ -68,7 +68,7 @@ import { ItemsPage } from './ItemsPage';
 
 const NOW = 1_764_000_000_000;
 
-const TODO: Todo = { id: 3, title: '写周报', plannedAt: null, remindAt: null, remindedAt: null, doneAt: null, sortOrder: 1, createdAt: NOW, updatedAt: NOW };
+const TODO: Todo = { id: 3, title: '写周报', itemId: null, plannedAt: null, remindAt: null, remindedAt: null, doneAt: null, sortOrder: 1, createdAt: NOW, updatedAt: NOW };
 
 function makeItem(over: Partial<Item> = {}): Item {
   return {

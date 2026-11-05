@@ -15,6 +15,7 @@ fn binding(kind: MdSyncKind, file: &str, heading: &str) -> MdSyncBinding {
 #[test]
 fn accepts_normal_binding() {
     let config = MdSyncConfig {
+        poll_secs: 900,
         enabled: true,
         bindings: vec![binding(MdSyncKind::Timers, "{date}.md", "#### 事项计时")],
     };
@@ -25,6 +26,7 @@ fn accepts_normal_binding() {
 fn rejects_absolute_or_escaping_file() {
     for file in ["C:\\x.md", "a/../../x.md", "/tmp/x.md"] {
         let config = MdSyncConfig {
+            poll_secs: 900,
             enabled: true,
             bindings: vec![binding(MdSyncKind::Timers, file, "#### 事项计时")],
         };
@@ -36,6 +38,7 @@ fn rejects_absolute_or_escaping_file() {
 fn rejects_heading_without_text() {
     for heading in ["事项计时", "####", "####### 太深"] {
         let config = MdSyncConfig {
+            poll_secs: 900,
             enabled: true,
             bindings: vec![binding(MdSyncKind::Timers, "{date}.md", heading)],
         };
@@ -47,6 +50,7 @@ fn rejects_heading_without_text() {
 fn rejects_duplicate_bindings() {
     let item = binding(MdSyncKind::Timers, "{date}.md", "#### 事项计时");
     let config = MdSyncConfig {
+        poll_secs: 900,
         enabled: true,
         bindings: vec![item.clone(), item],
     };
@@ -56,6 +60,7 @@ fn rejects_duplicate_bindings() {
 #[test]
 fn rejects_two_landings_for_one_kind() {
     let config = MdSyncConfig {
+        poll_secs: 900,
         enabled: true,
         bindings: vec![
             binding(MdSyncKind::Notes, "a.md", "#### 便利贴"),

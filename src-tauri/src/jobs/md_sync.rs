@@ -1,10 +1,17 @@
-//! Markdown 双向同步轮询（V0.4.0 / 插件 API v2）。
+//! Markdown 双向同步轮询（V0.4.0 / 插件 API v2；V0.11.3 改为可调间隔）。
 //!
 //! 为什么是轮询而不是 `notify`：
 //! - 不新增平台依赖，Windows / macOS / Linux 行为一致；
 //! - Obsidian / VS Code 保存时常用「写临时文件再 rename」，文件监听会收到多次事件，
-//!   还要自己做去抖；2s 轮询只读目标文件，成本远低于一次编辑器保存；
-//! - 同步本身用 `mtime + 基线` 判定，轮询晚 2s 不会丢改动，只会晚一点看到。
+//!   还要自己做去抖；
+//! - 同步本身用 `mtime + 基线` 判定，轮询晚一点不会丢改动，只会晚一点看到。
+//!
+//! ## 间隔为什么不再是 2 秒
+//!
+//! 2 秒轮询的代价不在「读一个文件」，而在每轮都要按天取数、渲染整段区块、比对字符串
+//! ——一天下来是几千次全量渲染，换来的只是「改完 2 秒内看到」。用户口径：
+//! 「同步要降，默认十五分钟，可以自己调，也能点手动同步」。于是间隔进了配置
+//! （`MdSyncConfig::pollSecs`），本任务每轮**重新读一次配置**再决定睡多久。
 //!
 //! 任务只负责「定时调用 service + 广播」；所有判定在 `services::md_sync`，符合
 //! `jobs` 不直接碰 `repositories` 的分层约定。
@@ -21,13 +28,13 @@ use crate::state::AppState;
 /// 启动 Markdown 同步轮询。首次 tick 立即执行，让启动前改过的文件尽快回灌。
 pub fn spawn_md_sync_watcher(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let mut ticker = tokio::time::interval(Duration::from_secs(MD_SYNC_POLL_SECS));
         loop {
-            ticker.tick().await;
             let app_data_dir = match app.path().app_data_dir() {
                 Ok(dir) => dir,
                 Err(err) => {
                     crate::log_warn!("resolve app data dir failed: {err}");
+                    /* 拿不到目录就按默认节奏再试，不能让任务直接退出。 */
+                    tokio::time::sleep(Duration::from_secs(MD_SYNC_POLL_SECS)).await;
                     continue;
                 }
             };
@@ -37,6 +44,8 @@ pub fn spawn_md_sync_watcher(app: AppHandle) {
                 Ok(None) => {}
                 Err(err) => crate::log_warn!("md sync tick failed: {err}"),
             }
+            let secs = services::md_sync::poll_secs(&pool, &app_data_dir).await;
+            tokio::time::sleep(Duration::from_secs(secs)).await;
         }
     });
 }

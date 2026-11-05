@@ -108,6 +108,8 @@ export interface Todo {
   id: number;
   /** 标题（长度 1-200） */
   title: string;
+  /** [V0.11.3] 绑定的具体事项；null = 还没绑（开始计时时按标题匹配并回填） */
+  itemId: number | null;
   /** 计划执行时刻；null = 未排期 */
   plannedAt: EpochMs | null;
   /** 提醒时刻；null = 无提醒 */
@@ -125,6 +127,8 @@ export interface Todo {
 /** todo_update 的部分更新字段 */
 export interface TodoPatch {
   title?: string;
+  /** [V0.11.3] 改绑 / 解绑事项：省略 = 不动，null = 解绑 */
+  itemId?: number | null;
   plannedAt?: EpochMs | null;
   remindAt?: EpochMs | null;
   sortOrder?: number;
@@ -135,6 +139,8 @@ export interface TodoPatch {
 /** todo_create 入参 */
 export interface TodoCreateParams {
   title: string;
+  /** [V0.11.3] 绑定的事项；省略则按标题自动匹配 */
+  itemId?: number | null;
   plannedAt?: EpochMs | null;
   remindAt?: EpochMs | null;
 }

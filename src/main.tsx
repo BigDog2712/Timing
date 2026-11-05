@@ -21,6 +21,8 @@ import './styles/settings-panel.css';
 import './styles/settings-plugins.css';
 /* [V0.4.0] Markdown 同步页签（md-sync 插件的落点配置） */
 import './styles/settings-sync.css';
+/* [V0.11.3] 同步间隔行（settings-sync.css 已到 299 行，单拆一份守住门禁） */
+import './styles/settings-sync-interval.css';
 /* [V0.4.1] 渲染异常兜底（透明窗里渲染抛错 = 药丸凭空消失，必须留住可点的界面） */
 import './styles/error-boundary.css';
 import './styles/theme-picker.css';

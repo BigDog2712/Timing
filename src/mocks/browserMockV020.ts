@@ -25,6 +25,7 @@ export function createMockApiV020(
       const todo: Todo = {
         id: ++s.seq,
         title,
+        itemId: (a?.itemId as number | null) ?? null,
         plannedAt: (a?.plannedAt as number | null) ?? null,
         remindAt: (a?.remindAt as number | null) ?? null,
         remindedAt: null,

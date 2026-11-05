@@ -25,6 +25,7 @@ const TODOS_HEADING: &str = "#### 待办事项";
 /// 模拟 v0.4.0 用户：保存过只有两种落点的配置。
 async fn save_old_config(env: &Env) {
     let old = MdSyncConfig {
+        poll_secs: 900,
         enabled: true,
         bindings: vec![
             binding(MdSyncKind::Timers, &env.vault, "{date}.md", TIMERS_HEADING),
@@ -63,6 +64,7 @@ async fn a_disabled_saved_binding_stays_disabled() {
     let mut notes = binding(MdSyncKind::Notes, &env.vault, "{date}.md", NOTES_HEADING);
     notes.enabled = false;
     let old = MdSyncConfig {
+        poll_secs: 900,
         enabled: true,
         bindings: vec![
             binding(MdSyncKind::Timers, &env.vault, "{date}.md", TIMERS_HEADING),
@@ -116,6 +118,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
     config::save(
         &env.pool,
         &MdSyncConfig {
+            poll_secs: 900,
             enabled: true,
             bindings: redirected,
         },
@@ -126,6 +129,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
     todo_repo::insert(
         &env.pool,
         "升级后该出现的待办",
+        None,
         Some(at(env.date.succ_opt().unwrap(), 9, 0)),
         None,
         0,

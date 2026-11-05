@@ -34,6 +34,11 @@ export interface MdSyncBinding {
 
 export interface MdSyncConfig {
   enabled: boolean;
+  /**
+   * [V0.11.3] 自动同步间隔（秒）。默认 900（15 分钟）。
+   * 用户口径：「同步要降，默认十五分钟，可以自己调，也能点手动同步」。
+   */
+  pollSecs: number;
   bindings: MdSyncBinding[];
 }
 

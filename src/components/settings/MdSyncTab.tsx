@@ -9,6 +9,9 @@
  *
  * 草稿策略：输入只改本地 state，点「保存并同步」才落 `settings` KV。轮询在后台
  * 仍会跑；如果用户正在编辑（dirty），事件不覆盖草稿，避免「改一半被同步结果冲掉」。
+ *
+ * [V0.11.3] 新增「同步间隔」：默认 15 分钟，可调（1 分钟 ~ 1 天）。原先固定 2 秒，
+ * 一天要全量渲染几千次；用户明确要求降频，并把「立即同步」当作主用法。
  */
 import { useEffect, useState } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
@@ -28,6 +31,21 @@ import { MD_SYNC_KIND_LABELS } from '../../types/domain';
 import { Switch } from '../ui/Switch';
 import { MdSyncBindingCard } from './MdSyncBindingCard';
 
+/** 间隔上下限（分钟）：与后端 `MD_SYNC_POLL_MIN_SECS / MAX_SECS` 同值 */
+const POLL_MIN_MINUTES = 1;
+const POLL_MAX_MINUTES = 1440;
+const POLL_DEFAULT_MINUTES = 15;
+
+/** 秒 → 分钟（配置存秒，界面按分钟说人话） */
+const toMinutes = (secs: number): number => Math.max(POLL_MIN_MINUTES, Math.round(secs / 60));
+
+/** 分钟文案：整点显示「15 分钟」，超过 60 补一个「≈2 小时」的提示感 */
+function describeInterval(minutes: number): string {
+  if (minutes < 60) return `${minutes} 分钟`;
+  const hours = minutes / 60;
+  return Number.isInteger(hours) ? `${minutes} 分钟（${hours} 小时）` : `${minutes} 分钟`;
+}
+
 export function MdSyncTab() {
   const view = useMdSyncStore((s) => s.view);
   const loaded = useMdSyncStore((s) => s.loaded);
@@ -39,6 +57,7 @@ export function MdSyncTab() {
   const run = useMdSyncStore((s) => s.run);
 
   const [enabled, setEnabled] = useState(true);
+  const [pollMin, setPollMin] = useState(String(POLL_DEFAULT_MINUTES));
   const [bindings, setBindings] = useState<MdSyncBinding[]>([]);
   const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -57,6 +76,7 @@ export function MdSyncTab() {
   useEffect(() => {
     if (!view || dirty) return;
     setEnabled(view.config.enabled);
+    setPollMin(String(toMinutes(view.config.pollSecs)));
     setBindings(view.config.bindings.map((binding) => ({ ...binding })));
   }, [view, dirty]);
 
@@ -83,9 +103,25 @@ export function MdSyncTab() {
     if (picked) update(index, { ...current, root: picked });
   };
 
+  /** 间隔输入归一：越界夹到边界，非数字回默认（不让用户卡在一个非法值上）。 */
+  const commitPoll = (raw: string) => {
+    const parsed = Number.parseInt(raw, 10);
+    const minutes = Number.isFinite(parsed)
+      ? Math.min(POLL_MAX_MINUTES, Math.max(POLL_MIN_MINUTES, parsed))
+      : POLL_DEFAULT_MINUTES;
+    setPollMin(String(minutes));
+    setDirty(true);
+    setNotice(null);
+  };
+
   const handleSave = async () => {
+    const minutes = Math.min(
+      POLL_MAX_MINUTES,
+      Math.max(POLL_MIN_MINUTES, Number.parseInt(pollMin, 10) || POLL_DEFAULT_MINUTES),
+    );
     try {
-      await save({ enabled, bindings });
+      await save({ enabled, pollSecs: minutes * 60, bindings });
+      setPollMin(String(minutes));
       setDirty(false);
       setNotice('已保存并同步');
     } catch {
@@ -120,7 +156,8 @@ export function MdSyncTab() {
         <div className="sync__intro">
           <h3 className="sync__title">Markdown 双向同步</h3>
           <p className="sync__hint">
-            数据库或 Markdown 任一侧改动都会在 2 秒内对齐；两边同时改时，最后写入者胜。
+            默认每 {describeInterval(Number.parseInt(pollMin, 10) || POLL_DEFAULT_MINUTES)}自动对齐一次；
+            两边同时改过时，以 Markdown 为准。想立刻同步点「立即同步」。
           </p>
           {view?.installed && (
             <p className="sync__plugin">
@@ -182,6 +219,37 @@ export function MdSyncTab() {
       {notice && <p className="sync__ok">{notice}</p>}
 
       <div id="md-sync-settings" className="sync__body" hidden={!settingsOpen}>
+        {/* [V0.11.3] 同步间隔：原先固定 2 秒，现在默认 15 分钟、可调 */}
+        <div className="sync__interval">
+          <span className="sync__label">同步间隔</span>
+          <label className="num-field">
+            <input
+              className="num-field__input"
+              type="number"
+              inputMode="numeric"
+              min={POLL_MIN_MINUTES}
+              max={POLL_MAX_MINUTES}
+              step={1}
+              value={pollMin}
+              aria-label="自动同步间隔（分钟）"
+              title="输入分钟数后回车或点别处生效"
+              disabled={saving || !enabled}
+              onChange={(e) => setPollMin(e.target.value)}
+              onBlur={(e) => commitPoll(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  commitPoll(e.currentTarget.value);
+                }
+              }}
+            />
+            <span className="num-field__unit">MIN</span>
+          </label>
+          <span className="sync__interval-hint">
+            {POLL_MIN_MINUTES} 分钟 ~ {POLL_MAX_MINUTES / 60} 小时，改动后点「保存并同步」
+          </span>
+        </div>
+
         {bindings.length === 0 ? (
           <p className="sync__empty">
             {loading ? '正在读取落点…' : '这个插件没有声明可同步的落点。'}

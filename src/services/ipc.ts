@@ -210,7 +210,12 @@ export const ipc: IpcApi = {
 
   /* ---- [V0.2.0] 待办域 ---- */
   todoCreate: (params: TodoCreateParams) =>
-    call<Todo>('todo_create', { title: params.title, plannedAt: params.plannedAt, remindAt: params.remindAt }),
+    call<Todo>('todo_create', {
+      title: params.title,
+      itemId: params.itemId ?? null,
+      plannedAt: params.plannedAt,
+      remindAt: params.remindAt,
+    }),
   todoUpdate: (params: TodoUpdateParams) => call<Todo>('todo_update', { id: params.id, patch: params.patch }),
   todoDelete: (params: TodoRefParams) => call<void>('todo_delete', { id: params.id }),
   todoList: (params: TodoListParams) =>

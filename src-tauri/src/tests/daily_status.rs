@@ -55,7 +55,9 @@ async fn statuses_round_trip_independently_per_date() {
 async fn failed_segment_save_rolls_back_todo_soft_delete() {
     let pool = fresh_pool("timer-todo-rollback").await;
     let item = new_item(&pool, "交付报告").await;
-    let todo = todo::create(&pool, "交付报告", None, None).await.unwrap();
+    let todo = todo::create(&pool, "交付报告", None, None, None)
+        .await
+        .unwrap();
     let now = now_ms();
     let record_id = record_session::insert_active(&pool, item, now)
         .await

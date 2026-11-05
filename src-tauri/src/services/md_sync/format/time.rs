@@ -171,29 +171,10 @@ fn shift_year(naive: NaiveDateTime) -> Option<NaiveDateTime> {
 
 /// 本地日界：`[当天 00:00, 次日 00:00)`。
 ///
-/// [V0.11.2] 不再用 `unwrap_or(0)` 兜底。在「午夜拨快一小时」的时区（如
-/// America/Santiago），当天本地 00:00 **不存在**，`earliest()` 返回 `None`，
-/// 原实现给出 `from = 0`（1970 年），同步会把这辈子的记录一次性灌进当天日记。
-/// 现在按 30 分钟粒度向后摸索到第一个真实存在的时刻（最多 1.5 小时，
-/// 覆盖所有已知 DST 跳变量），彻底失败了才退回同刻 UTC——总之绝不给 0。
-pub fn day_bounds(date: NaiveDate) -> (i64, i64) {
-    let start = date.and_hms_opt(0, 0, 0).expect("合法日期");
-    let next = date
-        .succ_opt()
-        .unwrap_or(date)
-        .and_hms_opt(0, 0, 0)
-        .expect("合法日期");
-    let to_ms = |naive: NaiveDateTime| {
-        for step in 0..=3u32 {
-            let probe = naive + chrono::Duration::minutes(i64::from(step) * 30);
-            if let Some(dt) = Local.from_local_datetime(&probe).earliest() {
-                return dt.timestamp_millis();
-            }
-        }
-        naive.and_utc().timestamp_millis()
-    };
-    (to_ms(start), to_ms(next))
-}
+/// [V0.11.3] 实现搬到 `platform::clock::day_bounds`：跨零点分段也要用同一条日界，
+/// 放在这里会让 `services::timer_split` 反过来依赖 md 同步模块。此处 re-export，
+/// 本模块与调用点的写法不变。
+pub use crate::platform::clock::day_bounds;
 
 #[cfg(test)]
 mod tests {

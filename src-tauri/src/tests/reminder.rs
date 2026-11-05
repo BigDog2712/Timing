@@ -104,7 +104,7 @@ async fn clear_removes_both_columns() {
 async fn pending_spans_items_and_todos_sorted() {
     let pool = fresh_pool("rem-pending").await;
     let item = new_item(&pool, "事项").await;
-    let t = todo::create(&pool, "待办", None, None).await.unwrap();
+    let t = todo::create(&pool, "待办", None, None, None).await.unwrap();
     reminder::set(&pool, ReminderTarget::Item, item, 2000)
         .await
         .unwrap();

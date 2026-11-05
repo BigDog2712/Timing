@@ -5,7 +5,7 @@ use sqlx::{QueryBuilder, Sqlite, SqlitePool, Transaction};
 use crate::error::AppResult;
 use crate::models::todo::{Todo, TodoListParams};
 
-const COLS: &str = "id, title, planned_at, remind_at, reminded_at, done_at, sort_order, \
+const COLS: &str = "id, title, item_id, planned_at, remind_at, reminded_at, done_at, sort_order, \
                     created_at, updated_at";
 
 /// 按 id 查询（排除已软删除）。
@@ -51,9 +51,11 @@ pub async fn max_sort_order(pool: &SqlitePool) -> AppResult<i64> {
 }
 
 /// 插入并返回新 id（`updated_at` = 创建时刻，与 items 同法）。
+#[allow(clippy::too_many_arguments)]
 pub async fn insert(
     pool: &SqlitePool,
     title: &str,
+    item_id: Option<i64>,
     planned_at: Option<i64>,
     remind_at: Option<i64>,
     sort_order: i64,
@@ -61,10 +63,11 @@ pub async fn insert(
 ) -> AppResult<i64> {
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO todos \
-         (title, planned_at, remind_at, reminded_at, done_at, sort_order, created_at, updated_at) \
-         VALUES (?, ?, ?, NULL, NULL, ?, ?, ?) RETURNING id",
+         (title, item_id, planned_at, remind_at, reminded_at, done_at, sort_order, created_at, updated_at) \
+         VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?) RETURNING id",
     )
     .bind(title)
+    .bind(item_id)
     .bind(planned_at)
     .bind(remind_at)
     .bind(sort_order)
@@ -85,6 +88,7 @@ pub async fn update(
     pool: &SqlitePool,
     id: i64,
     title: Option<&str>,
+    item_id: Option<Option<i64>>,
     planned_at: Option<Option<i64>>,
     remind_at: Option<Option<i64>>,
     sort_order: Option<i64>,
@@ -95,6 +99,16 @@ pub async fn update(
     qb.push_bind(now);
     if let Some(v) = title {
         qb.push(", title = ").push_bind(v.to_string());
+    }
+    /* [V0.11.3] 绑定事项同样三态：改绑 / 解绑 / 不动。 */
+    match item_id {
+        Some(Some(v)) => {
+            qb.push(", item_id = ").push_bind(v);
+        }
+        Some(None) => {
+            qb.push(", item_id = NULL");
+        }
+        None => {}
     }
     match planned_at {
         Some(Some(v)) => {

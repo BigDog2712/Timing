@@ -104,7 +104,7 @@ async fn v2_settings_seeded_and_version_bumped() {
     }
     assert_eq!(
         setting_value(&pool, "schema.version").await.as_deref(),
-        Some("4")
+        Some("5")
     );
 }
 
@@ -171,7 +171,7 @@ async fn v1_database_upgrades_in_place() {
     );
     assert_eq!(
         setting_value(&pool, "schema.version").await.as_deref(),
-        Some("4")
+        Some("5")
     );
 
     // ③ 再跑一次仍不报错（K-13 幂等），且种子不重复
@@ -193,7 +193,7 @@ async fn init_pool_is_idempotent_at_v2() {
     let p2 = db::init_pool(&dir).await.expect("重复迁移应成功");
     assert_eq!(
         setting_value(&p2, "schema.version").await.as_deref(),
-        Some("4")
+        Some("5")
     );
     assert_eq!(
         scalar_i64(&p2, "SELECT COUNT(*) FROM items WHERE id = 1").await,

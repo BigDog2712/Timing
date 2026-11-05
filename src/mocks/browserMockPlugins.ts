@@ -56,6 +56,7 @@ const DEFAULT_BINDINGS: MdSyncBinding[] = [
 
 let config: MdSyncConfig = {
   enabled: true,
+  pollSecs: 900,
   bindings: DEFAULT_BINDINGS.map((binding) => ({ ...binding })),
 };
 

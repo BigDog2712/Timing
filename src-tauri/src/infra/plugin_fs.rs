@@ -121,6 +121,7 @@ fn validate(manifest: &PluginManifest) -> Result<(), String> {
         }
         let config = MdSyncConfig {
             enabled: true,
+            poll_secs: crate::models::constants::MD_SYNC_POLL_SECS,
             bindings: md_sync.bindings.clone(),
         };
         config

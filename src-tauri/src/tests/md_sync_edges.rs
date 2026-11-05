@@ -37,7 +37,7 @@ fn mtime(env: &super::md_sync::Env) -> std::time::SystemTime {
 }
 
 async fn add(pool: &SqlitePool, title: &str, planned: Option<i64>, now: i64) -> i64 {
-    todo_repo::insert(pool, title, planned, None, 0, now)
+    todo_repo::insert(pool, title, None, planned, None, 0, now)
         .await
         .unwrap()
 }
@@ -214,6 +214,7 @@ async fn h_two_idle_runs_leave_mtime_untouched() {
     config::save(
         &env.pool,
         &MdSyncConfig {
+            poll_secs: 900,
             enabled: true,
             bindings: vec![
                 binding(MdSyncKind::Timers, &env.vault, "{date}.md", TIMERS_HEADING),

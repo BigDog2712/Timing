@@ -156,52 +156,8 @@ impl MdSyncBinding {
     }
 }
 
-/// 最终生效的同步配置（用户保存过就以保存值为准）。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MdSyncConfig {
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-    #[serde(default)]
-    pub bindings: Vec<MdSyncBinding>,
-}
-
-impl Default for MdSyncConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            bindings: Vec::new(),
-        }
-    }
-}
-
-impl MdSyncConfig {
-    pub fn validate(&self) -> Result<(), String> {
-        if self.bindings.len() > MD_SYNC_MAX_BINDINGS {
-            return Err(format!("最多 {MD_SYNC_MAX_BINDINGS} 个落点"));
-        }
-        let mut seen = std::collections::HashSet::new();
-        let mut kinds = std::collections::HashSet::new();
-        for (index, binding) in self.bindings.iter().enumerate() {
-            binding
-                .validate()
-                .map_err(|err| format!("第 {} 个落点：{err}", index + 1))?;
-            if !seen.insert(binding.key()) {
-                return Err(format!("第 {} 个落点与前面的配置重复", index + 1));
-            }
-            /* v2 每个数据种类只有一个落点：设置页按 kind 找状态，多落点会显示串。
-            真要多落点时应升 API 版本并改成按 binding id 匹配。 */
-            if !kinds.insert(binding.kind) {
-                return Err(format!(
-                    "第 {} 个落点重复了「{}」：每个数据种类只能有一个落点",
-                    index + 1,
-                    binding.kind.label()
-                ));
-            }
-        }
-        Ok(())
-    }
-}
+/// 同步配置结构在 `md_sync_config.rs`（V0.11.3 拆出，守住单文件 300 行）。
+pub use crate::models::md_sync_config::MdSyncConfig;
 
 /// 单个落点的运行状态（设置页原样展示，不臆造「成功」）。
 #[derive(Debug, Clone, Serialize)]

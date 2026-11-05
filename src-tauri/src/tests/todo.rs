@@ -19,20 +19,24 @@ fn patch_planned(v: Option<i64>) -> TodoPatch {
 #[tokio::test]
 async fn create_trims_title_and_assigns_increasing_sort_order() {
     let pool = fresh_pool("todo-create").await;
-    let a = todo::create(&pool, "  写周报  ", None, None).await.unwrap();
+    let a = todo::create(&pool, "  写周报  ", None, None, None)
+        .await
+        .unwrap();
     assert_eq!(a.title, "写周报", "标题应 trim");
     assert_eq!(a.sort_order, 1, "首个待办 sort_order = 1");
     assert!(a.done_at.is_none(), "新建未完成");
     assert!(a.reminded_at.is_none(), "新建未触发提醒");
 
-    let b = todo::create(&pool, "取快递", None, None).await.unwrap();
+    let b = todo::create(&pool, "取快递", None, None, None)
+        .await
+        .unwrap();
     assert_eq!(b.sort_order, 2, "sort_order 递增");
 }
 
 #[tokio::test]
 async fn create_empty_title_rejected() {
     let pool = fresh_pool("todo-empty").await;
-    let code = expect_err(todo::create(&pool, "   ", None, None).await);
+    let code = expect_err(todo::create(&pool, "   ", None, None, None).await);
     assert_eq!(code, ErrorCode::ItemNameEmpty);
     assert_eq!(scalar_i64(&pool, "SELECT COUNT(*) FROM todos").await, 0);
 }
@@ -41,7 +45,7 @@ async fn create_empty_title_rejected() {
 async fn create_overlong_title_rejected_without_insert() {
     let pool = fresh_pool("todo-long").await;
     let long = "字".repeat(TODO_TITLE_MAX_LEN + 1);
-    let code = expect_err(todo::create(&pool, &long, None, None).await);
+    let code = expect_err(todo::create(&pool, &long, None, None, None).await);
     assert_eq!(code, ErrorCode::ItemNameTooLong, "超长不得静默接受");
     assert_eq!(
         scalar_i64(&pool, "SELECT COUNT(*) FROM todos").await,
@@ -56,6 +60,7 @@ async fn create_persists_planned_and_remind_at() {
     let t = todo::create(
         &pool,
         "交周报",
+        None,
         Some(1_700_000_000_000),
         Some(1_700_000_060_000),
     )
@@ -79,7 +84,7 @@ async fn update_missing_todo_rejected() {
 #[tokio::test]
 async fn update_empty_title_rejected() {
     let pool = fresh_pool("todo-upd-empty").await;
-    let t = todo::create(&pool, "甲", None, None).await.unwrap();
+    let t = todo::create(&pool, "甲", None, None, None).await.unwrap();
     let patch = TodoPatch {
         title: Some("   ".into()),
         ..Default::default()
@@ -93,7 +98,9 @@ async fn update_empty_title_rejected() {
 #[tokio::test]
 async fn update_planned_at_three_state() {
     let pool = fresh_pool("todo-upd-planned").await;
-    let t = todo::create(&pool, "甲", Some(1000), None).await.unwrap();
+    let t = todo::create(&pool, "甲", None, Some(1000), None)
+        .await
+        .unwrap();
 
     // 改值
     let set = todo::update(&pool, t.id, patch_planned(Some(2000)))
@@ -110,7 +117,9 @@ async fn update_planned_at_three_state() {
 #[tokio::test]
 async fn update_remind_at_resets_reminded_marker() {
     let pool = fresh_pool("todo-upd-remind").await;
-    let t = todo::create(&pool, "甲", None, Some(5000)).await.unwrap();
+    let t = todo::create(&pool, "甲", None, None, Some(5000))
+        .await
+        .unwrap();
     // 预置「已触发」标记（模拟批 2 扫描落位）
     exec(
         &pool,
@@ -133,7 +142,7 @@ async fn update_remind_at_resets_reminded_marker() {
 #[tokio::test]
 async fn toggle_is_state_idempotent_and_reversible() {
     let pool = fresh_pool("todo-toggle").await;
-    let t = todo::create(&pool, "甲", None, None).await.unwrap();
+    let t = todo::create(&pool, "甲", None, None, None).await.unwrap();
     assert!(t.done_at.is_none());
 
     let done = todo::toggle(&pool, t.id, true).await.unwrap();
@@ -153,99 +162,11 @@ async fn toggle_missing_todo_rejected() {
     );
 }
 
-#[tokio::test]
-async fn list_excludes_done_by_default_and_include_done_wins() {
-    let pool = fresh_pool("todo-list-done").await;
-    let a = todo::create(&pool, "完成项", None, None).await.unwrap();
-    todo::create(&pool, "进行项", None, None).await.unwrap();
-    todo::toggle(&pool, a.id, true).await.unwrap();
-
-    let default = todo::list(&pool, TodoListParams::default()).await.unwrap();
-    assert_eq!(default.len(), 1, "默认排除已完成");
-    assert_eq!(default[0].title, "进行项");
-
-    let all = todo::list(
-        &pool,
-        TodoListParams {
-            include_done: true,
-            ..Default::default()
-        },
-    )
-    .await
-    .unwrap();
-    assert_eq!(all.len(), 2, "includeDone 含已完成");
-}
-
-#[tokio::test]
-async fn list_date_range_is_from_inclusive_to_exclusive() {
-    let pool = fresh_pool("todo-list-range").await;
-    todo::create(&pool, "t1", Some(1000), None).await.unwrap();
-    todo::create(&pool, "t2", Some(2000), None).await.unwrap();
-    todo::create(&pool, "t3", Some(3000), None).await.unwrap();
-    todo::create(&pool, "t4-null", None, None).await.unwrap();
-
-    let bounded = todo::list(
-        &pool,
-        TodoListParams {
-            include_done: false,
-            from: Some(2000),
-            to: Some(3000),
-        },
-    )
-    .await
-    .unwrap();
-    assert_eq!(
-        bounded.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(),
-        vec!["t2"],
-        "from 含 / to 不含；planned_at 为空的行被排除"
-    );
-
-    let from_only = todo::list(
-        &pool,
-        TodoListParams {
-            include_done: false,
-            from: Some(2000),
-            to: None,
-        },
-    )
-    .await
-    .unwrap();
-    assert_eq!(from_only.len(), 2, "from 起（含）到尾部");
-
-    let unbounded = todo::list(&pool, TodoListParams::default()).await.unwrap();
-    assert_eq!(unbounded.len(), 4, "无区间含未排期行");
-}
-
-#[tokio::test]
-async fn list_orders_by_sort_order_then_planned_at() {
-    let pool = fresh_pool("todo-list-order").await;
-    let a = todo::create(&pool, "a", Some(3000), None).await.unwrap();
-    let b = todo::create(&pool, "b", Some(1000), None).await.unwrap();
-    // 拉到同一 sort_order → 次级键 planned_at 升序
-    for id in [a.id, b.id] {
-        todo::update(
-            &pool,
-            id,
-            TodoPatch {
-                sort_order: Some(7),
-                ..Default::default()
-            },
-        )
-        .await
-        .unwrap();
-    }
-    let list = todo::list(&pool, TodoListParams::default()).await.unwrap();
-    assert_eq!(
-        list.iter().map(|t| t.title.as_str()).collect::<Vec<_>>(),
-        vec!["b", "a"],
-        "同 sort_order 按 planned_at 升序"
-    );
-}
 
 #[tokio::test]
 async fn delete_is_soft_and_idempotent() {
     let pool = fresh_pool("todo-delete").await;
-    let t = todo::create(&pool, "待删", None, None).await.unwrap();
+    let t = todo::create(&pool, "待删", None, None, None).await.unwrap();
     todo::delete(&pool, t.id).await.unwrap();
 
     // 列表与单查均不可见

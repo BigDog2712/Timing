@@ -72,19 +72,6 @@ pub async fn active_record_in_day(
     Ok(row)
 }
 
-/// 该天记录的最大更新时间（冲突判定：文件 mtime 对比它）。
-pub async fn latest_record_update(pool: &SqlitePool, from: i64, to: i64) -> AppResult<i64> {
-    let value: Option<i64> = sqlx::query_scalar(
-        "SELECT MAX(updated_at) FROM time_records \
-         WHERE status = 'saved' AND deleted_at IS NULL AND started_at >= ? AND started_at < ?",
-    )
-    .bind(from)
-    .bind(to)
-    .fetch_one(pool)
-    .await?;
-    Ok(value.unwrap_or(0))
-}
-
 /// 直接插入一条已保存记录（来源是 Markdown，不经计时状态机）。
 pub async fn insert_saved_record(
     pool: &SqlitePool,

@@ -18,7 +18,7 @@ use super::md_sync::{at, binding, env, file_for, save_binding};
 const HEADING: &str = "#### 待办事项";
 
 async fn add(pool: &SqlitePool, title: &str, planned: Option<i64>, done: bool, now: i64) -> i64 {
-    let id = todo_repo::insert(pool, title, planned, None, 0, now)
+    let id = todo_repo::insert(pool, title, None, planned, None, 0, now)
         .await
         .unwrap();
     if done {

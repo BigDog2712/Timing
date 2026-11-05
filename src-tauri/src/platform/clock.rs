@@ -35,6 +35,36 @@ pub fn start_of_today_ms() -> i64 {
     }
 }
 
+/// 本地日期 `date` 的 `[当天 00:00, 次日 00:00)` epoch 毫秒。
+///
+/// 三个地方共用同一条日界：Markdown 按天取数、跨零点分段、待办的「今天」口径。
+/// 放在 `platform` 而不是某个 service 里，是因为它只依赖时区，与业务无关。
+///
+/// 夏令时缺口（极少数时区的 00:00 不存在）按 30 分钟粒度向后摸索到第一个真实存在的
+/// 时刻（最多 1.5 小时，覆盖所有已知 DST 跳变量），彻底失败了才退回同刻 UTC——
+/// **绝不返回 0**：`unwrap_or(0)` 会让「当天」变成 1970，一次同步就能把全部历史灌进来
+/// （V0.11.2 修的那个 bug）。
+pub fn day_bounds(date: chrono::NaiveDate) -> (i64, i64) {
+    use chrono::{Local, NaiveDateTime, TimeZone};
+
+    let start = date.and_hms_opt(0, 0, 0).expect("合法日期");
+    let next = date
+        .succ_opt()
+        .unwrap_or(date)
+        .and_hms_opt(0, 0, 0)
+        .expect("合法日期");
+    let to_ms = |naive: NaiveDateTime| {
+        for step in 0..=3u32 {
+            let probe = naive + chrono::Duration::minutes(i64::from(step) * 30);
+            if let Some(dt) = Local.from_local_datetime(&probe).earliest() {
+                return dt.timestamp_millis();
+            }
+        }
+        naive.and_utc().timestamp_millis()
+    };
+    (to_ms(start), to_ms(next))
+}
+
 /// 墙钟锚点：记录「某个墙钟时刻对应哪个单调时刻」。
 ///
 /// 用法：会话开始时把 `running_since`（墙钟）与 `Instant::now()` 一起记下；

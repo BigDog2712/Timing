@@ -12,6 +12,8 @@ pub struct Todo {
     pub id: i64,
     /// 标题（trim 后长度 1-`TODO_TITLE_MAX_LEN`）。
     pub title: String,
+    /// [V0.11.3] 绑定的具体事项；null = 还没绑（开始计时时按标题匹配并回填）。
+    pub item_id: Option<i64>,
     /// 计划执行时刻；null = 未排期。
     pub planned_at: Option<i64>,
     /// 提醒时刻；null = 无提醒。
@@ -51,6 +53,9 @@ pub struct TodoListParams {
 pub struct TodoPatch {
     #[serde(default)]
     pub title: Option<String>,
+    /// [V0.11.3] 改绑/解绑事项：`Some(Some(id))` 改绑、`Some(None)` 解绑、`None` 不动。
+    #[serde(default, deserialize_with = "double_option")]
+    pub item_id: Option<Option<i64>>,
     #[serde(default, deserialize_with = "double_option")]
     pub planned_at: Option<Option<i64>>,
     #[serde(default, deserialize_with = "double_option")]

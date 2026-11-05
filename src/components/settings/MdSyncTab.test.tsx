@@ -27,7 +27,7 @@ const VIEW: MdSyncView = {
   pluginName: 'Markdown 同步',
   pluginVersion: '1.0.0',
   today: '2026-10-20',
-  config: { enabled: true, bindings: BINDINGS },
+  config: { enabled: true, pollSecs: 900, bindings: BINDINGS },
   status: {
     lastSyncAt: null,
     lastError: null,
@@ -145,10 +145,31 @@ describe('MdSyncTab —— 同步设置页', () => {
 
     expect(api.save).toHaveBeenCalledWith({
       enabled: true,
+      /* [V0.11.3] 间隔随保存一起提交，测试里没动过 → 默认 15 分钟 = 900 秒 */
+      pollSecs: 900,
       bindings: [BINDINGS[0], BINDINGS[1]].map((binding, index) =>
         index === 0 ? { ...binding, root: 'D:\\NewVault' } : binding,
       ),
     });
     expect(button('立即同步').disabled).toBe(false);
+  });
+
+  it('同步间隔按分钟输入、按秒提交（默认 15 分钟）', async () => {
+    await mount();
+    const input = container.querySelector(
+      'input[aria-label="自动同步间隔（分钟）"]',
+    ) as HTMLInputElement | null;
+    if (!input) throw new Error('找不到同步间隔输入框');
+    expect(input.value).toBe('15');
+
+    await setValue(input, '45');
+    await act(async () => {
+      button('保存并同步').click();
+      await Promise.resolve();
+    });
+
+    expect(api.save).toHaveBeenCalledWith(
+      expect.objectContaining({ pollSecs: 45 * 60 }),
+    );
   });
 });

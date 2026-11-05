@@ -14,10 +14,11 @@ use crate::state::AppState;
 pub async fn todo_create(
     state: State<'_, AppState>,
     title: String,
+    item_id: Option<i64>,
     planned_at: Option<i64>,
     remind_at: Option<i64>,
 ) -> AppResult<Todo> {
-    services::todo::create(&state.pool, &title, planned_at, remind_at).await
+    services::todo::create(&state.pool, &title, item_id, planned_at, remind_at).await
 }
 
 #[tauri::command]

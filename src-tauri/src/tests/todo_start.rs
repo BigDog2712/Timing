@@ -12,7 +12,9 @@ use crate::tests::support::{expect_err, fresh_pool, new_item, scalar_i64};
 #[tokio::test]
 async fn start_moves_todo_out_of_pending_list() {
     let pool = fresh_pool("todo-start").await;
-    let t = todo::create(&pool, "写周报", None, None).await.unwrap();
+    let t = todo::create(&pool, "写周报", None, None, None)
+        .await
+        .unwrap();
 
     let record = todo_start::start(&pool, t.id).await.unwrap();
     assert_eq!(record.status, "active");
@@ -49,7 +51,9 @@ async fn start_moves_todo_out_of_pending_list() {
 async fn start_reuses_item_with_same_name() {
     let pool = fresh_pool("todo-start-reuse").await;
     let item_id = new_item(&pool, "写周报").await;
-    let t = todo::create(&pool, "写周报", None, None).await.unwrap();
+    let t = todo::create(&pool, "写周报", None, None, None)
+        .await
+        .unwrap();
 
     let record = todo_start::start(&pool, t.id).await.unwrap();
     assert_eq!(record.item_id, item_id, "同名事项应复用，不重复建");
@@ -62,10 +66,14 @@ async fn start_reuses_item_with_same_name() {
 #[tokio::test]
 async fn start_rejects_while_timer_running() {
     let pool = fresh_pool("todo-start-busy").await;
-    let first = todo::create(&pool, "写周报", None, None).await.unwrap();
+    let first = todo::create(&pool, "写周报", None, None, None)
+        .await
+        .unwrap();
     todo_start::start(&pool, first.id).await.unwrap();
 
-    let second = todo::create(&pool, "取快递", None, None).await.unwrap();
+    let second = todo::create(&pool, "取快递", None, None, None)
+        .await
+        .unwrap();
     let code = expect_err(todo_start::start(&pool, second.id).await);
     assert_eq!(code, ErrorCode::TimerAlreadyRunning);
     assert_eq!(
@@ -90,7 +98,9 @@ async fn start_rejects_unknown_or_done_todo() {
         ErrorCode::TodoNotFound
     );
 
-    let done = todo::create(&pool, "已完成的", None, None).await.unwrap();
+    let done = todo::create(&pool, "已完成的", None, None, None)
+        .await
+        .unwrap();
     todo::toggle(&pool, done.id, true).await.unwrap();
     assert_eq!(
         expect_err(todo_start::start(&pool, done.id).await),
@@ -102,13 +112,15 @@ async fn start_rejects_unknown_or_done_todo() {
 #[tokio::test]
 async fn after_stop_starts_the_consented_todo() {
     let pool = fresh_pool("todo-autostart").await;
-    let first = todo::create(&pool, "写周报", None, None).await.unwrap();
+    let first = todo::create(&pool, "写周报", None, None, None)
+        .await
+        .unwrap();
     let record = todo_start::start(&pool, first.id).await.unwrap();
     crate::tests::support::allow_short_records(&pool).await;
     crate::tests::support::rewind(&pool, record.id, 2_000).await;
 
     // 用户答应「结束后自动开始」
-    let next = todo::create(&pool, "取快递", None, Some(1_700_000_000_000))
+    let next = todo::create(&pool, "取快递", None, None, Some(1_700_000_000_000))
         .await
         .unwrap();
     let patch = crate::models::todo::TodoPatch {

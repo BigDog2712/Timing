@@ -18,10 +18,17 @@ use crate::repositories::todo as todo_repo;
 use crate::repositories::todo_nudge as nudge_repo;
 use crate::services::{item, timer};
 
-/// 开始待办对应的计时：校验 → 映射事项 → `timer::start` → 软删待办。
+/// 开始待办对应的计时：校验 → 取绑定事项 → `timer::start` → 软删待办。
 ///
 /// 已在计时中 → `TIMER_ALREADY_RUNNING`（调用方据此提示，不改动任何数据）；
 /// 待办不存在（或已完成 / 已删）→ `TODO_NOT_FOUND`。
+///
+/// ## 事项归属：绑定优先，标题兜底（V0.11.3）
+///
+/// 以前一律按标题匹配，问题是**改个标题就裂成两个事项**：待办「写周报」已经计过三小时，
+/// 用户把它改成「写周报（二稿）」，再开始就新建一个同名事项，统计里成了两件事。
+/// 现在 `todos.item_id` 非空就认它；空着才按标题匹配/新建，**并回填**——
+/// 这条待办从此固定绑定，改名不再影响归属（老数据也因此不需要一次性回填）。
 pub async fn start(pool: &SqlitePool, todo_id: i64) -> AppResult<TimeRecord> {
     let todo = todo_repo::find_by_id(pool, todo_id)
         .await?
@@ -32,9 +39,28 @@ pub async fn start(pool: &SqlitePool, todo_id: i64) -> AppResult<TimeRecord> {
     if session::find_active(pool).await?.is_some() {
         return Err(AppError::timer_already_running());
     }
-    let item_id = match item_repo::find_by_name(pool, &todo.title).await? {
-        Some(found) => found.id,
-        None => item::create(pool, &todo.title, None).await?.id,
+    let item_id = match todo.item_id {
+        /* 绑过的事项可能已被删：删了就回落到标题匹配，不要让「开始」直接失败。 */
+        Some(bound) if item_repo::find_by_id(pool, bound).await?.is_some() => bound,
+        _ => {
+            let resolved = match item_repo::find_by_name(pool, &todo.title).await? {
+                Some(found) => found.id,
+                None => item::create(pool, &todo.title, None).await?.id,
+            };
+            todo_repo::update(
+                pool,
+                todo.id,
+                None,
+                Some(Some(resolved)),
+                None,
+                None,
+                None,
+                None,
+                now_ms(),
+            )
+            .await?;
+            resolved
+        }
     };
     let record = timer::start(pool, Some(item_id)).await?;
     // 开始即移出待办区（用户口径：不再在待办区）

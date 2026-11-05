@@ -213,6 +213,7 @@ async fn deleting_a_group_soft_deletes_its_records() {
 async fn invalid_config_uses_dedicated_error_code() {
     let env = env("md-invalid").await;
     let config = MdSyncConfig {
+        poll_secs: 900,
         enabled: true,
         bindings: vec![binding(
             MdSyncKind::Timers,

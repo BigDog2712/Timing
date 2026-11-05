@@ -23,6 +23,7 @@ use serde_json::Error;
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
+use crate::models::constants::{MD_SYNC_POLL_MIN_SECS, MD_SYNC_POLL_SECS};
 use crate::models::md_sync::{MdSyncBinding, MdSyncConfig};
 use crate::repositories::settings;
 use crate::services::plugin;
@@ -57,6 +58,7 @@ pub async fn load(pool: &SqlitePool, app_data_dir: &std::path::Path) -> AppResul
         .and_then(|item| item.md_sync.as_ref())
         .map(|contribution| MdSyncConfig {
             enabled: true,
+            poll_secs: crate::models::constants::MD_SYNC_POLL_SECS,
             bindings: contribution.bindings.clone(),
         });
 
@@ -69,13 +71,15 @@ pub async fn load(pool: &SqlitePool, app_data_dir: &std::path::Path) -> AppResul
         (Some(saved), Some(defaults)) => MdSyncConfig {
             /* 总开关是用户的明确选择，保留。 */
             enabled: saved.enabled,
+            /* 间隔同理：用户调过就用用户的，没调过就是默认 15 分钟。 */
+            poll_secs: saved.poll_secs,
             bindings: merge_bindings(saved.bindings, defaults.bindings),
         },
         (Some(saved), None) => saved,
         (None, Some(defaults)) => defaults,
         (None, None) => MdSyncConfig {
             enabled: false,
-            bindings: Vec::new(),
+            ..MdSyncConfig::default()
         },
     };
 
@@ -96,6 +100,17 @@ fn merge_bindings(saved: Vec<MdSyncBinding>, defaults: Vec<MdSyncBinding>) -> Ve
         }
     }
     merged
+}
+
+/// 自动同步间隔（秒）。读配置失败按默认值——轮询任务不能因为一条坏配置停摆。
+///
+/// [V0.11.3] 放在这里而不是 `mod.rs`：它只读配置，`mod.rs` 那个文件已经贴着
+/// 300 行门禁，而配置文件本来就该是「配置相关的唯一去处」。
+pub async fn poll_secs(pool: &SqlitePool, app_data_dir: &std::path::Path) -> u64 {
+    match load(pool, app_data_dir).await {
+        Ok(loaded) if loaded.config.poll_secs >= MD_SYNC_POLL_MIN_SECS => loaded.config.poll_secs,
+        _ => MD_SYNC_POLL_SECS,
+    }
 }
 
 /// 校验并保存。校验失败返回专用错误码，设置页能把原因显示在输入框下方。

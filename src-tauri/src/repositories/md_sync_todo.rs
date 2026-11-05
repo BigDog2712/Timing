@@ -41,20 +41,6 @@ pub async fn todos_for_block(
     Ok(rows)
 }
 
-/// 待办区块内那些行的最大更新时间（冲突判定：文件 mtime 对比它）。
-pub async fn latest_todo_update(pool: &SqlitePool, from: i64, to: i64) -> AppResult<i64> {
-    let value: Option<i64> = sqlx::query_scalar(
-        "SELECT MAX(t.updated_at) FROM todos t \
-         WHERE t.deleted_at IS NULL AND t.done_at IS NULL \
-           AND (t.planned_at IS NULL OR t.planned_at < ? OR t.planned_at >= ?)",
-    )
-    .bind(from)
-    .bind(to)
-    .fetch_one(pool)
-    .await?;
-    Ok(value.unwrap_or(0))
-}
-
 /// 从 Markdown 改写待办的标题 / 计划时间 / 完成时刻。
 pub async fn update_todo_from_sync(
     pool: &SqlitePool,

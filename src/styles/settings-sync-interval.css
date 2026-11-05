@@ -1,0 +1,30 @@
+/**
+ * Timing — 同步间隔行（V0.11.3）
+ * -----------------------------------------------------------------------------
+ * 从 `settings-sync.css` 单独拆出来：那个文件已 299 行，`.settings` 相关的样式
+ * 又都归它管，门禁上限 300 行，塞不下一行了。
+ *
+ * 只放「一行标签 + 数字输入 + 说明」的排布，控件本身复用 `.num-field`（最短记录
+ * 时长用的同一套），所以不必再造一份输入框样式。
+ */
+.sync__interval {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+}
+
+.sync__interval-hint {
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+}
+
+/* 关掉总开关时间隔无意义，输入跟着变灰 */
+.sync__interval .num-field__input:disabled {
+  color: var(--ink-4);
+  cursor: not-allowed;
+}

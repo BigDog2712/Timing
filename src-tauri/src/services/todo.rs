@@ -15,16 +15,31 @@ pub async fn list(pool: &SqlitePool, params: TodoListParams) -> AppResult<Vec<To
     repo::list(pool, &params).await
 }
 
+/// 新建待办。
+///
+/// [V0.11.3] `item_id` 可显式指定；不指定时**按标题试着匹配一次已有事项**——
+/// 用户写「写周报」而这个事项已经存在，那就直接绑上，不必等他开始计时才发现。
+/// 匹配不到就留空（不凭空造事项：一条还没开始的待办不该污染事项列表），
+/// 由 `todo_start` 在第一次开始时兜底并回填。
 pub async fn create(
     pool: &SqlitePool,
     title: &str,
+    item_id: Option<i64>,
     planned_at: Option<i64>,
     remind_at: Option<i64>,
 ) -> AppResult<Todo> {
     let title = normalize_title(title)?;
+    let bound = match item_id {
+        Some(explicit) => crate::repositories::item::find_by_id(pool, explicit)
+            .await?
+            .map(|item| item.id),
+        None => crate::repositories::item::find_by_name(pool, &title)
+            .await?
+            .map(|item| item.id),
+    };
     let now = now_ms();
     let sort_order = repo::max_sort_order(pool).await? + 1;
-    let id = repo::insert(pool, &title, planned_at, remind_at, sort_order, now).await?;
+    let id = repo::insert(pool, &title, bound, planned_at, remind_at, sort_order, now).await?;
     fetch_or_not_found(pool, id).await
 }
 
@@ -34,10 +49,24 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: TodoPatch) -> AppResult<T
         Some(raw) => Some(normalize_title(raw)?),
         None => None,
     };
+    /* 显式改绑时才校验事项存在；解绑（Some(None)）直接放行。 */
+    let item_id = match patch.item_id {
+        Some(Some(explicit)) => {
+            if crate::repositories::item::find_by_id(pool, explicit)
+                .await?
+                .is_none()
+            {
+                return Err(AppError::item_not_found());
+            }
+            Some(Some(explicit))
+        }
+        other => other,
+    };
     repo::update(
         pool,
         id,
         title.as_deref(),
+        item_id,
         patch.planned_at,
         patch.remind_at,
         patch.sort_order,

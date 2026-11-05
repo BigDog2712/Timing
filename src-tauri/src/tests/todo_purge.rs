@@ -25,23 +25,31 @@ async fn purge_removes_only_past_due_pending_todos() {
     let today_start = 1_700_000_000_000;
     let yesterday = today_start - 1;
 
-    let past = todo::create(&pool, "昨天的截止", Some(yesterday), None)
+    let past = todo::create(&pool, "昨天的截止", None, Some(yesterday), None)
         .await
         .unwrap();
-    let past_noon = todo::create(&pool, "昨天中午", Some(today_start - DAY / 2), None)
+    let past_noon = todo::create(&pool, "昨天中午", None, Some(today_start - DAY / 2), None)
         .await
         .unwrap();
-    let remind_only = todo::create(&pool, "只有昨天的开始", None, Some(yesterday))
+    let remind_only = todo::create(&pool, "只有昨天的开始", None, None, Some(yesterday))
         .await
         .unwrap();
-    let today = todo::create(&pool, "今天截止", Some(today_start + DAY / 2), None)
+    let today = todo::create(&pool, "今天截止", None, Some(today_start + DAY / 2), None)
         .await
         .unwrap();
-    let future = todo::create(&pool, "明天的", Some(today_start + DAY + DAY / 2), None)
+    let future = todo::create(
+        &pool,
+        "明天的",
+        None,
+        Some(today_start + DAY + DAY / 2),
+        None,
+    )
+    .await
+    .unwrap();
+    let undated = todo::create(&pool, "没排期", None, None, None)
         .await
         .unwrap();
-    let undated = todo::create(&pool, "没排期", None, None).await.unwrap();
-    let done = todo::create(&pool, "昨天已完成", Some(yesterday), None)
+    let done = todo::create(&pool, "昨天已完成", None, Some(yesterday), None)
         .await
         .unwrap();
     todo::toggle(&pool, done.id, true).await.unwrap();
@@ -76,9 +84,15 @@ async fn purge_removes_only_past_due_pending_todos() {
 async fn purge_keeps_todo_moved_to_today() {
     let pool = fresh_pool("todo-purge-moved").await;
     let today_start = 1_700_000_000_000;
-    let t = todo::create(&pool, "改期到今天的", Some(today_start - 3_600_000), None)
-        .await
-        .unwrap();
+    let t = todo::create(
+        &pool,
+        "改期到今天的",
+        None,
+        Some(today_start - 3_600_000),
+        None,
+    )
+    .await
+    .unwrap();
 
     // 用户把截止改到今天 → 不该被清
     let patch = TodoPatch {

@@ -125,6 +125,65 @@ pub async fn finalize(
     Ok(())
 }
 
+/// 跨零点分段落库（V0.11.3）：把一条 active 会话按给定分段切成多条 saved。
+///
+/// `segments` 是升序的 `(started_at, ended_at, accumulated_sec)`，由
+/// `services::timer_split::split_by_day` 算好——这里不再判断日界，只负责原子落库。
+///
+/// **原记录 id 保留给最后一段**：撤销条、「刚结束的那条」、md 导入的对位都还指着它。
+/// 前面各段作为新行插入，`target_sec` 置 NULL——倒计时的目标只属于真正结束的那一段，
+/// 否则两段各自显示一个完整目标，统计看着像跑了两次。`mode` 则整段复制：
+/// 它描述的是「这次会话的性质」，拆开也还是同一种。
+pub async fn finalize_split(
+    pool: &SqlitePool,
+    active: &TimeRecord,
+    segments: &[(i64, i64, i64)],
+    now: i64,
+) -> AppResult<()> {
+    let Some(&(last_start, last_end, last_accum)) = segments.last() else {
+        return Err(AppError::invalid_duration());
+    };
+
+    let mut tx = pool.begin().await?;
+    for (start, end, accum) in &segments[..segments.len() - 1] {
+        sqlx::query(
+            "INSERT INTO time_records \
+             (item_id, status, started_at, ended_at, accumulated_sec, running_since, \
+              mode, target_sec, created_at, updated_at) \
+             VALUES (?, 'saved', ?, ?, ?, NULL, ?, NULL, ?, ?)",
+        )
+        .bind(active.item_id)
+        .bind(start)
+        .bind(end)
+        .bind(accum)
+        .bind(&active.mode)
+        .bind(now)
+        .bind(now)
+        .execute(&mut *tx)
+        .await?;
+    }
+    let saved = sqlx::query(
+        "UPDATE time_records \
+         SET status = 'saved', started_at = ?, ended_at = ?, accumulated_sec = ?, \
+             running_since = NULL, updated_at = ? \
+         WHERE id = ? AND status = 'active' AND deleted_at IS NULL",
+    )
+    .bind(last_start)
+    .bind(last_end)
+    .bind(last_accum)
+    .bind(now)
+    .bind(active.id)
+    .execute(&mut *tx)
+    .await?;
+    if saved.rows_affected() != 1 {
+        /* 与 `finalize` 同一口径：会话已被别处结束时不假装成功（tx 丢弃即回滚）。 */
+        return Err(AppError::timer_not_running());
+    }
+    super::todo::soft_delete_for_saved_record(&mut tx, active.id, now).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 /// 撤销结束：saved 回滚为 active（ended_at=NULL，running_since=now）。
 pub async fn reactivate(pool: &SqlitePool, id: i64, running_since: i64, now: i64) -> AppResult<()> {
     sqlx::query(

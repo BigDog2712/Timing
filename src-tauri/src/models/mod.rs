@@ -5,6 +5,7 @@ pub mod constants;
 pub mod enums;
 pub mod item;
 pub mod md_sync;
+pub mod md_sync_config;
 pub mod migration;
 pub mod moyu;
 pub mod note;

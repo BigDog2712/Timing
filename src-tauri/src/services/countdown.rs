@@ -88,7 +88,9 @@ pub async fn tick(pool: &SqlitePool) -> AppResult<Option<CountdownFired>> {
         .map(|item| item.name)
         .unwrap_or_default();
     let ended_at = active.started_at + target_sec * 1000;
-    session::finalize(pool, active.id, target_sec, ended_at, now).await?;
+    /* [V0.11.3] 走分段收尾：23:45 起的 30 分钟倒计时会在零点处拆成两段，
+    与手动结束同一口径（否则「倒计时跨天」仍会整条挂在昨天）。 */
+    crate::services::timer_split::finalize(pool, &active, target_sec, ended_at, now).await?;
     /* [V0.11.2] 到点与手动停止必须同收尾：①清锚点（与 `timer_stop` 一致，
     否则锚点表只增不减，攒满 8 条会把正在用的起点挤掉）；②跑「结束后自动开始」
     （`after_stop`），否则用户答应的「这条结束后开始下一条」只在手动停止时生效。 */

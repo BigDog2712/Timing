@@ -26,7 +26,6 @@ pub mod import;
 pub mod runtime;
 
 use std::path::Path;
-use std::process::Command;
 
 use chrono::Local;
 use sqlx::SqlitePool;
@@ -55,16 +54,23 @@ pub async fn get_view(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyn
     })
 }
 
-/// 保存配置并立刻同步一次；返回保存后的视图（含本轮状态）。
-pub async fn save_config(
+/// 保存配置并立刻同步一次；返回保存后的视图 + 这一轮的报告。
+///
+/// 报告是给命令层用的：导入非零时要广播 `mdSyncChanged`，否则「手动同步」之后
+/// 除设置页以外的窗口都还显示旧数据（V0.11.3 修）。
+pub async fn save_config_with_report(
     pool: &SqlitePool,
     app_data_dir: &Path,
     config: &MdSyncConfig,
-) -> AppResult<MdSyncView> {
+) -> AppResult<(MdSyncView, MdSyncReport)> {
     config::save(pool, config).await?;
-    sync_all(pool, app_data_dir).await?;
-    get_view(pool, app_data_dir).await
+    let report = sync_all(pool, app_data_dir).await?;
+    let view = get_view(pool, app_data_dir).await?;
+    Ok((view, report))
 }
+
+/// 自动同步间隔（秒）——实现放在 `config`（它才是读配置的地方）。
+pub use config::poll_secs;
 
 /// 手动「立即同步」。返回本轮报告，不因单个落点失败而整体报错。
 pub async fn run(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyncReport> {
@@ -106,7 +112,11 @@ pub async fn open(pool: &SqlitePool, app_data_dir: &Path, kind: MdSyncKind) -> A
     if !path.exists() {
         return Err(AppError::io("今日文件尚未生成，请先保存并同步"));
     }
-    open_path(&path)
+    /* [V0.11.3] 开文件交给 `infra::shell_open::open_file`：原先这里自己拼了一份
+    `Command::new("explorer")`，与 infra 那份是同一件事的复制。安全口径也统一到一处
+    ——`explorer` / `open` / `xdg-open` 只吃一个参数、不经 shell 解析
+    （`cmd /C start` 才会把路径里的 `&`/`|` 当命令执行，V0.11.2 已弃用）。 */
+    crate::infra::shell_open::open_file(&path).map_err(AppError::io)
 }
 
 async fn sync_all(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyncReport> {
@@ -197,7 +207,9 @@ async fn sync_binding(
     let expected = render_expected(pool, binding, date)
         .await
         .map_err(|err| err.to_string())?;
-    let (current, mtime) = match &section {
+    /* mtime 仍读出来（`SectionState` 的一部分），但冲突判定不再用它：
+    见下面「Markdown 永远赢」的注释。 */
+    let (current, _mtime) = match &section {
         SectionState::MissingFile => (None, 0),
         /* 标题缺失按「文件侧没有这一节」处理：只补写，不把空内容当删除。 */
         SectionState::MissingHeading { mtime_ms } => (None, *mtime_ms),
@@ -211,17 +223,14 @@ async fn sync_binding(
         Some(body) if body.trim() == expected.body.trim() => expected.body.clone(),
         Some(body) => {
             let file_changed = baseline.as_ref().is_none_or(|base| base.body != *body);
-            let db_changed = baseline
-                .as_ref()
-                .is_none_or(|base| base.body != expected.body);
-            let should_import = if !file_changed && db_changed {
-                false
-            } else if file_changed && !db_changed {
-                true
-            } else {
-                mtime > expected.latest_update
-            };
-            if should_import {
+            /* [V0.11.3] 两边都改过时 **Markdown 赢**。
+            用户口径：「md 文档是第一优先级资料，sql 是第二级」。原先这里是
+            `mtime > expected.latest_update`（最后写入者胜），但两边的时基根本不是一回事：
+            `latest_update` 是应用写库的毫秒墙钟，`mtime` 取决于谁最后碰过文件——
+            Obsidian 关闭时补写、同步盘回写、甚至一次「无改动保存」都会把它推后。
+            结果就是「偶尔 SQL 反向覆盖掉用户手改的日记」，对一份声明为权威的资料不可接受。
+            只有「文件没变、SQL 变了」才导出，其余一律以文件为准。 */
+            if file_changed {
                 let old_body = baseline.as_ref().map_or("", |base| base.body.as_str());
                 let (rendered, count) =
                     import_and_render(pool, binding, date, old_body, body).await?;
@@ -281,19 +290,4 @@ async fn import_and_render(
         .await
         .map_err(|err| err.to_string())?;
     Ok((rendered.body, stats.total()))
-}
-
-fn open_path(path: &Path) -> AppResult<()> {
-    /* [V0.11.2] Windows 不走 `cmd /C start`：路径由插件 manifest 的 root/file 拼出来，
-    含 `&`/`|` 且不带空格时 cmd 会当命令执行（等价任意命令执行）。explorer 只吃一个参数。 */
-    #[cfg(target_os = "windows")]
-    let spawned = Command::new("explorer").arg(path).spawn();
-    #[cfg(target_os = "macos")]
-    let spawned = Command::new("open").arg(path).spawn();
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let spawned = Command::new("xdg-open").arg(path).spawn();
-
-    spawned
-        .map(|_| ())
-        .map_err(|err| AppError::io(format!("打开文件失败：{err}")))
 }
