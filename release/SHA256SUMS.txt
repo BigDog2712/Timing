@@ -1,6 +1,11 @@
-3fd1dfa77e805b0fa669ed47748aa7a8517c42201e5e683fbf74e27338acf534 *Timing-android-0.11.3-debug-arm64.apk
-0f3bde3331755e3ff2670adffb5b5a8c4db0b1df0530155a776dfcfad01b769f *Timing-android-0.11.3-release-arm64-unsigned.apk
+# 0.11.3 及更早的 Android 包全部不可用（2026-11-05 20:55 更正）
+#   · 0.11.3 及之前的 release 包未签名 → 装不上，报「解析软件包时出现问题」
+#   · 0.11.3 debug / release 两个包的 .so 都没内嵌前端资源 → 装上也是白屏
+#   现已删掉这两个坏包。可安装的是下面这个（调试证书签名，arm64）：
+158f7575027f8a67a0a9f6cca59fd6b06a1a208e5c303cd6a46b7ff192c0599c *Timing-android-0.11.3-release-arm64-debugsigned.apk
+
+# 历史产物（保留原样，仅作对照；正式签名上线前请勿分发）
+760462dc0a97b1372e214b28c875b163bcc3c8d951acf675e34249600850f201 *Timing-android-0.11.1-debug-arm64.apk
 4a1a687a357063a79f49a68e3dbd03c7e85da1c16360effcb352e44bb7258fa8 *Timing-android-0.11.2-debug-arm64.apk
 1f4b3b3025e3fd8c6c2dcc8190004a00f5ed024df12c3008681aeb1f90a72bd3 *Timing-android-0.11.2-release-arm64-unsigned.apk
-760462dc0a97b1372e214b28c875b163bcc3c8d951acf675e34249600850f201 *Timing-android-0.11.1-debug-arm64.apk
 418b9b4cb5587831b7013618efd95e18fc68f4d99d3884c7b3af82017cea25a3 *Timing.exe

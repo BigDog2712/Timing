@@ -52,6 +52,21 @@
   开文件的安全口径统一到一处。
 - `services/md_sync/config.rs` 承接 `poll_secs`，`mod.rs` 从 311 行回落到 293 行（≤300 门禁）。
 
+### 出包修复（用户实测反馈：一个装不上、一个打不开）
+
+- **APK 里没有前端**：`scripts/android-apk.mjs` 调 cargo 时没带 `--features custom-protocol`，
+  而这个特性正是「把 `dist/` 编进 `.so`」的开关。不开的话运行时去找 `devUrl`
+  （`http://localhost:1420`），手机上没有那个服务 → 装上就是纯白窗口。
+  桌面端 `build-release.cmd` 一直带着这个参数（注释里还写着不加会白屏），移动端脚本漏了。
+- **release 产物未签名**：Gradle 的 `assembleRelease` 只出 `*-unsigned.apk`（debug 变体才会
+  自动用调试证书签），未签名的包传到手机上，安装器连解析都过不了，报「解析软件包时出现问题」。
+  新增 `scripts/android-sign.mjs`（zipalign → apksigner → 归档进 `release/`），
+  `android-apk.mjs` 检测到 `src-tauri/gen/android/keystore.properties` 时自动签，没有则明确告警。
+- **加了一道自检**：复制 `.so` 后检查里面有没有 `/assets/` 字面量，零命中直接失败并退出，
+  不再产出「装得上但白屏」的包。本轮的坏包就是这么漏出去的。
+- 已删掉 0.11.3 的两个坏包（debug 206M / release 9M），`release/SHA256SUMS.txt` 更正为
+  可安装的 `-release-arm64-debugsigned.apk`。0.11.1 / 0.11.2 的历史包保留原样作对照，同样不可分发。
+
 ## 0.11.2 — 深度巡检：11 处数据与交互缺陷
 
 本轮不引入新功能，只做「把已有功能修对」。三路并行审查（Rust 后端 / 前端状态与副作用 /

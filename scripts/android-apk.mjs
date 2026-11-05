@@ -144,12 +144,17 @@ function main() {
   run(IS_WIN ? 'npm.cmd' : 'npm', ['run', 'build'], { cwd: ROOT, env: webEnv, shell: IS_WIN });
 
   // 2. Rust 动态库
+  //    [V0.11.3] 必须带 `--features custom-protocol`：不开这个特性时 tauri 不把
+  //    dist\ 编进 .so，运行时去找 devUrl（http://localhost:1420）——装到手机上就是
+  //    一个纯白窗口，连不上任何服务器。桌面端 build-release.cmd 同理（那里早就带了）。
   const cargoArgs = [
     'build',
     '--manifest-path',
     join(ROOT, 'src-tauri', 'Cargo.toml'),
     '--target',
     cfg.target,
+    '--features',
+    'custom-protocol',
   ];
   if (release) cargoArgs.push('--release');
   run(IS_WIN ? 'cargo.exe' : 'cargo', cargoArgs, { cwd: ROOT, env, shell: false });
@@ -166,6 +171,18 @@ function main() {
   copyFileSync(built, dest);
   console.log(`\n已复制 → ${dest}`);
 
+  // 3.5 自检：前端资源是否真的编进了 .so
+  //     开了 custom-protocol 后 dist 里每个文件的路径都会以 "/assets/..." 字面量落在
+  //     .so 的只读段；没开就是零命中——那正是「装上去了但一开就白屏」的形态。宁可在这里
+  //     报错，也不要再产一个装不上/打不开的包给用户试。
+  if (!readFileSync(dest).includes('/assets/')) {
+    throw new Error(
+      'libtiming_lib.so 内找不到内嵌前端资源（/assets/ 零命中），这个 APK 装上去会白屏。' +
+        ' 排查：cargo 是否带了 --features custom-protocol；dist/ 是否是 TAURI_ENV_FAMILY=mobile 的产物。',
+    );
+  }
+  console.log('自检：.so 内已内嵌前端资源（/assets/ 有命中）');
+
   // 4. Gradle 打包（跳过 rustBuild*，第 2/3 步已完成）
   const gradle = join(GEN_ANDROID, IS_WIN ? 'gradlew.bat' : 'gradlew');
   const cap = release ? 'Release' : 'Debug';
@@ -175,7 +192,26 @@ function main() {
     shell: IS_WIN,
   });
 
-  console.log(`\n完成：${join(GEN_ANDROID, 'app', 'build', 'outputs', 'apk', cfg.flavor.toLowerCase(), variant)}`);
+  const apkDir = join(GEN_ANDROID, 'app', 'build', 'outputs', 'apk', cfg.flavor.toLowerCase(), variant);
+  console.log(`\n完成：${apkDir}`);
+
+  // 5. 签名
+  //    release 变体的产物恒为 `*-unsigned.apk`，不签名装不上（安装器报「解析软件包时出现问题」）。
+  //    有 keystore.properties 就顺手签掉；没有就明确提示，别让人拿一个装不上的包去试。
+  if (!release) {
+    console.log('debug 变体由 Gradle 自动用调试证书签名，可直接安装。');
+    return;
+  }
+  if (existsSync(join(GEN_ANDROID, 'keystore.properties'))) {
+    console.log('\n检测到 keystore.properties，开始签名…');
+    run(process.execPath, [join(ROOT, 'scripts', 'android-sign.mjs')], { cwd: ROOT, env });
+  } else {
+    console.log(
+      '\n[注意] release 产物未签名，直接装会报「解析软件包时出现问题」。\n' +
+        '       自用：node scripts/android-sign.mjs --debug-key\n' +
+        '       正式：在 src-tauri/gen/android/keystore.properties 配好证书后重跑本脚本',
+    );
+  }
 }
 
 try {
