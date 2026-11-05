@@ -1,0 +1,149 @@
+/**
+ * Timing — 移动端便利贴页（V0.11.0 · Tab ④）
+ * -----------------------------------------------------------------------------
+ * 用户要求：「补齐手机端便利贴功能，数据落点与桌面端一致」。
+ * 落点是同一张 `notes` 表（`mobileNoteActions` 直接走桌面那五条 note 命令），
+ * 所以手机上写的内容回到电脑打开就是同一张；桌面 `md-sync` 插件的 `notes` 绑定
+ * 会把它写进 Obsidian 那天的 md（手机端不需要为同步写任何代码）。
+ *
+ * 两段：
+ *   ① 新建区 —— 一键建一张，**默认绑定当前事项**（与桌面 V0.3.9 口径一致），
+ *      建完直接进编辑页，不让人对着空列表发呆；
+ *   ② 列表 —— 按更新时间倒序，每行两行文本 + 归属事项。点行 = 编辑，长按 = 删除确认。
+ *
+ * 为什么长按删除而不是行内放垃圾桶：手机上一行只有 3.5 个字的横向余量，
+ * 常驻删除键会被拇指误触；长按 + 编辑页里的显式删除两个入口够用。
+ */
+import { useCallback, useEffect, useState } from 'react';
+import { useLongPress } from '../../hooks/useLongPress';
+import { formatClockTime } from '../../lib/format';
+import { AlertIcon, PlusIcon, StickyNoteIcon, iconStroke } from '../../lib/icons';
+import { listNotes, noteErrorText, removeNote } from '../../services/mobileNoteActions';
+import { itemName, useItemStore } from '../../stores/itemStore';
+import { useMobileUiStore } from '../../stores/mobileUiStore';
+import type { Note } from '../../types/domain';
+
+interface NoteRowProps {
+  note: Note;
+  owner: string;
+  onOpen: () => void;
+  onDelete: () => void;
+}
+
+function NoteRow({ note, owner, onOpen, onDelete }: NoteRowProps) {
+  const press = useLongPress(onDelete, onOpen);
+  const text = note.content.trim();
+  return (
+    <li>
+      <div className="m-note" {...press}>
+        <p className="m-note__text" data-empty={text.length === 0 ? 'true' : 'false'}>
+          {text.length === 0 ? '空白便利贴' : text}
+        </p>
+        <p className="m-note__meta">
+          <span className="m-note__owner">{owner}</span>
+          <span className="m-note__time">{formatClockTime(note.updatedAt)}</span>
+        </p>
+      </div>
+    </li>
+  );
+}
+
+export function NotesPage() {
+  const items = useItemStore((s) => s.items);
+  const openSheet = useMobileUiStore((s) => s.openSheet);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  /* 删除是长按触发的危险操作，先记下待删的那条，等第二次点击确认 */
+  const [pendingDelete, setPendingDelete] = useState<Note | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setNotes(await listNotes());
+    } catch (err) {
+      setError(noteErrorText(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const ok = await removeNote(pendingDelete.id);
+    setPendingDelete(null);
+    if (ok) await reload();
+  };
+
+  return (
+    <div className="m-notes">
+      <section className="m-section">
+        <header className="m-section__head">
+          <h2 className="m-section__title">全部便利贴</h2>
+          <span className="m-section__meta">{loading ? '…' : `${notes.length} 张`}</span>
+        </header>
+
+        <button
+          type="button"
+          className="m-btn m-btn--primary m-note__new"
+          onClick={() => {
+            /* `noteId: null` = 新建：由编辑页建行并立即进入书写态（不在这里建完再跳，
+               否则建完就关掉会留下一张永远空白的行） */
+            openSheet({ kind: 'noteEdit', noteId: null });
+          }}
+        >
+          <PlusIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
+          写一张新的
+        </button>
+        <p className="m-hint">
+          <StickyNoteIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
+          默认挂到当前事项；在编辑页可以改归属或解绑。
+        </p>
+
+        {error && (
+          <p className="m-error" role="alert">
+            <AlertIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
+            {error}
+          </p>
+        )}
+
+        {pendingDelete && (
+          <div className="m-confirm" role="alertdialog" aria-label="确认删除便利贴">
+            <p className="m-confirm__text">删除这张便利贴？此操作不可撤销。</p>
+            <div className="m-confirm__actions">
+              <button type="button" className="m-btn m-btn--small" onClick={() => setPendingDelete(null)}>
+                取消
+              </button>
+              <button type="button" className="m-btn m-btn--small m-btn--danger" onClick={() => void confirmDelete()}>
+                删除
+              </button>
+            </div>
+          </div>
+        )}
+
+        {loading ? (
+          <p className="m-empty">正在读取…</p>
+        ) : notes.length === 0 ? (
+          <p className="m-empty">还没有便利贴。点上面的按钮写第一张。</p>
+        ) : (
+          <ul className="m-list m-list--note">
+            {notes.map((note) => (
+              <NoteRow
+                key={note.id}
+                note={note}
+                owner={note.itemId == null ? '随记' : itemName(items, note.itemId)}
+                onOpen={() => openSheet({ kind: 'noteEdit', noteId: note.id })}
+                onDelete={() => setPendingDelete(note)}
+              />
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}

@@ -10,6 +10,8 @@ import './styles/design-tokens-compat.css';
 import './styles/app.css';
 import './styles/utilities.css';
 import './styles/surfaces.css';
+/* [V0.11.0] 收起圆点（环 + 时间）：从 surfaces.css 拆出，守住单文件 ≤300 行 */
+import './styles/dot.css';
 import './styles/overlays.css';
 import './styles/menu.css';
 import './styles/panels.css';
@@ -48,6 +50,8 @@ import './styles/mobile/primitives.css';
 import './styles/mobile/timer.css';
 import './styles/mobile/items.css';
 import './styles/mobile/records.css';
+/* [V0.11.0] 便利贴页（第 5 个 Tab） */
+import './styles/mobile/notes.css';
 import './styles/mobile/settings.css';
 import './styles/mobile/sheets.css';
 import App from './App';

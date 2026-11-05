@@ -15,6 +15,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* [V0.11.0] 允许「正在计时」那一行换行到第二排 */
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
   margin-top: var(--space-3);
   padding: var(--space-4);
   border-radius: var(--m-radius);
@@ -46,6 +49,42 @@
   color: var(--accent-ink);
 }
 
+/* [V0.11.0] 「正在计时」一行：事项名 + 实时读数，占满第二排 */
+.m-summary__live {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.m-summary__live-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-running);
+}
+
+.m-summary__live-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-summary__live-time {
+  margin-left: auto;
+  font-family: var(--font-timer);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-ink);
+}
+
 .m-compose {
   display: flex;
   align-items: center;
@@ -65,8 +104,7 @@
 }
 
 /* 圆圈本体 24px，命中区撑到 44×44（视觉小、手指好点） */
-.m-todo__check {
-  position: relative;
+.m-todo__check {  position: relative;
   flex: 0 0 auto;
   width: var(--m-tap);
   height: var(--m-tap);
@@ -121,6 +159,15 @@
   gap: var(--space-2);
   font-size: var(--text-xs);
   color: var(--ink-3);
+}
+
+/* [V0.11.0] 「点了开始会发生什么」的一行预告（标题没有同名事项时会新建一条） */
+.m-todo__hint {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 正在计时的静态标记：占住「开始」按钮那个槽位（不可点，见 TodoRowMobile 注释）。

@@ -1,0 +1,113 @@
+/* =============================================================================
+ * Timing — 收起圆点（V0.11.0 环 + 时间）
+ * -----------------------------------------------------------------------------
+ * 从 surfaces.css 拆出：那份文件已 296 行，再塞圆点必破"单文件 ≤300 行"门禁。
+ * 与手机端 `.m-ring` 同一套语言，尺寸另算（桌面 76 / 手机 232）。
+ * 颜色一律 currentColor：状态色挂在外层按钮上，轨道与弧各自用 opacity 分层，
+ * 这样换主题 / 换四色自定义时只有一处要管。
+ * ========================================================================== */
+
+.dot {
+  position: relative;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  color: var(--state-idle);
+  transition: transform var(--dur-quick) var(--ease-standard), color var(--dur-base) var(--ease-standard);
+}
+
+.dot:hover {
+  transform: scale(1.04);
+}
+
+.dot:active {
+  transform: scale(0.95);
+}
+
+.dot__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.dot__track {
+  fill: none;
+  stroke: currentColor;
+  opacity: 0.16;
+}
+
+.dot__bar {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+
+/* 正计时在跑：90° 短弧沿轨道行进（与 MainButton / m-ring 同一条动画语言） */
+.dot[data-spin="true"] .dot__bar {
+  animation: dot-march 3.2s linear infinite;
+}
+
+@keyframes dot-march {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+.dot[data-state="running"],
+.dot[data-countdown="true"] {
+  color: var(--color-running);
+}
+
+/* 暂停在小条 / 圆点 / 手机三形态必须同色 */
+.dot[data-state="paused"] {
+  color: var(--color-warn);
+}
+
+.dot[data-state="ended"] {
+  color: var(--color-done);
+}
+
+/* 倒计时剩 ≤60s：环切红并随小条一起闪 */
+.dot[data-warn="true"] {
+  color: var(--color-danger);
+  animation: dot-warn 1s steps(1, end) infinite;
+}
+
+@keyframes dot-warn {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.dot__time {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-timer);
+  font-size: 15px;
+  font-weight: var(--weight-strong);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+  pointer-events: none;
+  /* 时长跳出显示上限时冻结在 99:59:59（formatDuration 保证），这里只防挤压 */
+  white-space: nowrap;
+}
+
+/* 跨小时：8 个字符塞不进 76px 的圆，降到 11px 才有一圈留白 */
+.dot[data-long="true"] .dot__time {
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot[data-spin="true"] .dot__bar,
+  .dot[data-warn="true"] {
+    animation: none;
+  }
+}

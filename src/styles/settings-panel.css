@@ -107,6 +107,17 @@
   box-shadow: var(--inset-top);
 }
 
+/* [V0.11.0] 悬浮形态二选一：复用分段控件的视觉，但不吃满整行（只两项，撑开像两个按钮） */
+.seg--compact {
+  flex: 0 0 auto;
+}
+
+.seg--compact .seg__item {
+  flex: 0 0 auto;
+  min-width: 64px;
+  padding: 0 var(--space-4);
+}
+
 /* ------------------------------ 按钮补充档 ------------------------------ */
 .btn--sm {
   height: var(--btn-sm-h);

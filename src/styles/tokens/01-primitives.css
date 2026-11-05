@@ -141,7 +141,7 @@
   /* ---- 尺寸：命中 ---- */
   --hit-target: 44px;
   --hit-target-small: 26px;
-  --hit-target-dot: 36px;
+  /* [V0.11.0] --hit-target-dot 已删：圆点自身 76px 就够命中，不需要再套一层外扩 */
   --snap-margin: 16px;
   /* [V0.2.3 · 2] 小条靠左：整条离窗口左沿的内缩从 16px 收到 6px（事项名+手柄这组随之左移） */
   --pill-inset: 6px;

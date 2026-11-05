@@ -97,6 +97,9 @@ export function ItemsPage() {
   }, [recordsNonce, reloadToday]);
 
   const { pending, done } = useMemo(() => todoPanelLists(todos, now), [todos, now]);
+  /* [V0.11.0] 事项名集合：待办「开始」走的是后端按标题匹配（或就地新建），
+     标题没有同名事项时给一行灰字预告「会新建一条」，用户不会在事项列表里发现惊喜。 */
+  const itemNames = useMemo(() => new Set(items.map((item) => item.name)), [items]);
   const groups = useMemo(
     () => groupTodayRecords(today.rows, (itemId) => itemName(items, itemId)),
     [today.rows, items],
@@ -151,6 +154,15 @@ export function ItemsPage() {
           <strong className="m-summary__count">{recordCount} 条</strong>
         </div>
         <span className="m-summary__total">{formatMinutes(totalSec)}</span>
+        {/* [V0.11.0] 正在计时的那一条也搬到这一屏：手机在「事项」页看不到秒表时，
+            很容易以为计时没开（桌面端小条常驻，不会有这个疑问） */}
+        {session && (
+          <p className="m-summary__live">
+            <span className="m-summary__live-dot" aria-hidden />
+            <span className="m-summary__live-name">{activeName}</span>
+            <span className="m-summary__live-time">{formatDuration(liveSec)}</span>
+          </p>
+        )}
       </section>
 
       <section className="m-section">
@@ -193,6 +205,9 @@ export function ItemsPage() {
                 now={now}
                 active={session != null && todo.title === activeName}
                 paused={timerStatus === 'paused'}
+                /* [V0.11.0] 正在计时的那条带实时读数 */
+                activeSec={session != null && todo.title === activeName ? liveSec : undefined}
+                hint={itemNames.has(todo.title) ? undefined : '开始后自动建同名事项'}
                 onToggle={(next) => void todosActions.toggle(todo.id, next).catch(() => undefined)}
                 onStart={() => void startTodo(todo)}
                 onDelete={() => todosActions.remove(todo.id)}

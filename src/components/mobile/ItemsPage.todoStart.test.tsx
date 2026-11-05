@@ -208,12 +208,17 @@ describe('暂停态（P2-5）', () => {
 });
 
 describe('这条待办对应的事项正在计时', () => {
-  it('不再给可点的「开始」，只显示静态「计时中」', async () => {
+  it('不再给可点的「开始」，改为带实时读数的静态标记', async () => {
     useTimerStore.setState({ state: { ...IDLE, status: 'running', session: { ...RECORD, itemId: ITEM.id } }, loaded: true });
     const el = await mount();
 
     expect(el.querySelector('button.m-btn--accent')).toBeNull();
-    expect(el.querySelector('.m-todo__live')?.textContent).toBe('计时中');
+    /* [V0.11.0] 文案从固定的「计时中」改成实时读数（`MM:SS`）：
+       只写三个字看不出跑了多久，也分不出是不是自己这一条。
+       「计时中」这一语义改由 `.m-todo__live` 这个槽位本身承载（role=status + 强调色）。
+       未拿到秒数时（activeSec 缺省）仍回落「计时中」——见 TodoRowMobile.test.tsx。 */
+    expect(el.querySelector('.m-todo__live')?.textContent).toMatch(/^\d{2}:\d{2}$/);
+    expect(el.querySelector('.m-todo__live')?.getAttribute('role')).toBe('status');
   });
 });
 

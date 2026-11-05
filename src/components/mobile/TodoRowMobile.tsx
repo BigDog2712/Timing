@@ -19,6 +19,7 @@
  * 手指按住按钮稍久一点就会把待办删掉——那是最不该出现在计时类应用里的手滑。
  */
 import { CheckIcon, iconStroke } from '../../lib/icons';
+import { formatDuration } from '../../lib/format';
 import { isTodoOverdue, todoTimeLabel } from '../../lib/todoTimeLabel';
 import { useLongPress } from '../../hooks/useLongPress';
 import type { Todo } from '../../types/domain';
@@ -42,6 +43,10 @@ interface TodoRowMobileProps {
    * 用户会以为秒表还在走（P2-5）。
    */
   paused?: boolean;
+  /** [V0.11.0] 计时中的实时秒数：让「这条正在计」这件事有读数，而不只是一个词 */
+  activeSec?: number;
+  /** [V0.11.0] 一行灰字说明「点了开始会发生什么」（例如标题没有同名事项时会新建一条） */
+  hint?: string;
 }
 
 export function TodoRowMobile({
@@ -52,6 +57,8 @@ export function TodoRowMobile({
   onDelete,
   active = false,
   paused = false,
+  activeSec,
+  hint,
 }: TodoRowMobileProps) {
   const done = todo.doneAt != null;
   const overdue = isTodoOverdue(todo, now);
@@ -78,14 +85,16 @@ export function TodoRowMobile({
         <span className="m-todo__time" title={label.title ?? undefined}>
           {label.text}
         </span>
+        {hint && <span className="m-todo__hint">{hint}</span>}
       </div>
 
       {!done &&
         (active ? (
           /* `role="status"`：这块只在 idle ⇄ running ⇄ paused 之间出现/换字，
-             作为 live region 播报正合适（P2-8） */
+             作为 live region 播报正合适（P2-8）。
+             [V0.11.0] 带实时读数：只写「计时中」看不出跑了多久，也看不出是不是自己这条。 */
           <span className="m-badge m-badge--accent m-todo__live" role="status">
-            {paused ? '已暂停' : '计时中'}
+            {paused ? '已暂停' : activeSec != null ? formatDuration(activeSec) : '计时中'}
           </span>
         ) : (
           onStart != null && (

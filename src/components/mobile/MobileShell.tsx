@@ -13,12 +13,23 @@
 import { useCallback, useEffect } from 'react';
 import { useAppBootstrap } from '../../hooks/useAppBootstrap';
 import { useMobileBackSheet } from '../../hooks/useMobileBackSheet';
-import { AlertIcon, ListIcon, SettingsIcon, TimerIcon, ClockIcon, iconStroke } from '../../lib/icons';
+import {
+  AlertIcon,
+  ClockIcon,
+  ListIcon,
+  SettingsIcon,
+  StickyNoteIcon,
+  TimerIcon,
+  iconStroke,
+} from '../../lib/icons';
 import { useMobileUiStore, type MobileSheet, type MobileTab } from '../../stores/mobileUiStore';
 import { useUiStore } from '../../stores/uiStore';
 import { CountdownSheet } from './CountdownSheet';
 import { ItemMenuSheet } from './ItemMenuSheet';
 import { ItemsPage } from './ItemsPage';
+import { NoteItemSheet } from './NoteItemSheet';
+import { NoteSheet } from './NoteSheet';
+import { NotesPage } from './NotesPage';
 import { RecordEditSheet } from './RecordEditSheet';
 import { RecordsPage } from './RecordsPage';
 import { RecoverSheet } from './RecoverSheet';
@@ -39,6 +50,8 @@ const TABS: readonly TabDef[] = [
   { id: 'timer', label: '计时', sub: '点一下就开始', Icon: TimerIcon },
   { id: 'items', label: '事项', sub: '待办与今日记录', Icon: ListIcon },
   { id: 'records', label: '记录', sub: '今天 / 本周', Icon: ClockIcon },
+  /* [V0.11.0] 便利贴：数据与桌面同一张 notes 表，见 services/mobileNoteActions */
+  { id: 'notes', label: '便利贴', sub: '随手记，挂到事项上', Icon: StickyNoteIcon },
   { id: 'settings', label: '设置', sub: '外观 · 插件 · 通用', Icon: SettingsIcon },
 ];
 
@@ -74,6 +87,10 @@ function SheetHost({ sheet }: { sheet: MobileSheet }) {
       return <ItemMenuSheet itemId={sheet.itemId} />;
     case 'todoSwitch':
       return <TodoSwitchSheet todoId={sheet.todoId} title={sheet.title} />;
+    case 'noteEdit':
+      return <NoteSheet noteId={sheet.noteId} />;
+    case 'noteItem':
+      return <NoteItemSheet noteId={sheet.noteId} />;
     default:
       return null;
   }
@@ -109,6 +126,7 @@ export function MobileShell() {
         {tab === 'timer' && <TimerPage />}
         {tab === 'items' && <ItemsPage />}
         {tab === 'records' && <RecordsPage />}
+        {tab === 'notes' && <NotesPage />}
         {tab === 'settings' && <SettingsPage />}
       </main>
 

@@ -6,7 +6,7 @@
  * 「这个字段在对面是不是垃圾」的注释。
  *
  * 口径（DESIGN-ANDROID-V1 §7）：
- *   - Tab 只有 4 个（timer / items / records / settings）；
+ *   - Tab 五个（timer / items / records / notes / settings）——[V0.11.0] 补便利贴；
  *   - Sheet 是**覆盖层状态**，不进 Tab 栈：从任意页打开都盖在整壳之上，
  *     返回键先关它，再退 Tab（层级由 MobileShell 的 history 守卫实现）；
  *   - 记录页的编辑 Sheet 保存后要让列表立刻重算分布，所以这里只放一个自增信号，
@@ -15,7 +15,7 @@
 import { create } from 'zustand';
 import type { TimeRecord } from '../types/domain';
 
-export type MobileTab = 'timer' | 'items' | 'records' | 'settings';
+export type MobileTab = 'timer' | 'items' | 'records' | 'notes' | 'settings';
 
 /** 底部 Sheet 的载荷（每种 Sheet 自带它需要的那一条数据，避免二次拉取） */
 export type MobileSheet =
@@ -27,7 +27,11 @@ export type MobileSheet =
    * 计时中点某条待办：先问「这段怎么收尾」（结束并新开 / 仅改归属）。
    * `title` 一起带过来：匹配事项、文案都要用，等待面板时不必再去 store 里找。
    */
-  | { kind: 'todoSwitch'; todoId: number; title: string };
+  | { kind: 'todoSwitch'; todoId: number; title: string }
+  /** [V0.11.0] 便利贴正文编辑（`noteId: null` = 新建一张，落库后由组件回填） */
+  | { kind: 'noteEdit'; noteId: number | null }
+  /** [V0.11.0] 便利贴改归属（选完成再回编辑页，故带上 noteId） */
+  | { kind: 'noteItem'; noteId: number };
 
 interface MobileUiStore {
   tab: MobileTab;

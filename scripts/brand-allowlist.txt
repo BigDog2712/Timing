@@ -86,3 +86,9 @@ scripts/check-version.mjs :: 硬编码 `tickbar`
 # 契约正本：这几行本身就是「旧值 → 新值」的迁移说明，抹掉旧值就没了验收依据。
 docs/phase2/IPC-CONTRACT-v2.md :: com.tickbar.app
 docs/phase2/IPC-CONTRACT-v2.md :: 已从 TickBar 迁移
+
+# ── 8. 发版说明：正文职责就是宣布「改名」并给升级路径 ─────────────────────
+# 0.5.0 Release Notes 必须逐条写出旧包名 / 旧数据目录 / 旧库名，否则用户无从得知
+# 要备份什么、为什么升级得卸载重装。抹掉旧名等于删掉升级指引本身。
+release/RELEASE-NOTES.md
+

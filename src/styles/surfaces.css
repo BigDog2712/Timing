@@ -255,42 +255,4 @@
 }
 
 /* ------------------------------ 状态环 Ring ------------------------------ */
-/* --------------------------- 收起圆点 CollapsedDot --------------------------- */
-.dot {
-  position: relative;
-  width: var(--hit-target-dot);
-  height: var(--hit-target-dot);
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-full);
-}
-
-.dot__ring {
-  position: relative;
-  z-index: 1;
-  width: var(--dot-size);
-  height: var(--dot-size);
-  border-radius: var(--radius-full);
-  border: var(--ring-stroke) solid var(--state-idle);
-  box-shadow: var(--shadow-balloon);
-  transition: border-color var(--dur-base) var(--ease-standard), transform var(--dur-quick) var(--ease-standard);
-}
-
-.dot[data-state="running"] .dot__ring {
-  border-color: var(--color-running);
-}
-
-.dot[data-state="paused"] .dot__ring {
-  /* [Timing 对齐 D9] 裁决三：暂停在小条与圆点两形态必须同色 → --color-warn */
-  border-color: var(--color-warn);
-}
-
-.dot[data-state="ended"] .dot__ring {
-  border-color: var(--color-done);
-  border-width: 3px;
-}
-
-.dot:hover .dot__ring {
-  border-color: var(--line-3);
-  transform: scale(1.06);
-}
+/* [V0.11.0] 收起圆点已迁到 styles/dot.css（环 + 时间重制，本文件让出 38 行守住 300 行上限） */

@@ -5,6 +5,9 @@
 - 验证对象：工程师本轮 7 改 + 5 新（`src/` 侧），**独立核实，不采信自述**
 - 验证方式：门禁实跑 + 全量测试实跑 + 逐行代码审查 + **QA 新补 8 条边界探针**
 - 本机限制：无 MSVC / 无 Android SDK·NDK·JDK → 未跑 `cargo`、未构建 APK、未真机验证
+  > **2026-11-05 补记**：JDK 17 / Android SDK（platform 35·36、build-tools 36.0.0）/ NDK 27.2 已装齐，
+  > `arm64-v8a` release APK 已实机构建通过（8.7 MB，`com.timing.app` v0.5.0）。
+  > 详见 `docs/mobile/TOOLCHAIN-SETUP.md`；真机安装仍未验证（当前无设备）。
 
 ---
 

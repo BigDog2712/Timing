@@ -59,7 +59,8 @@
 .m-tabbar {
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* [V0.11.0] 4 → 5：补了「便利贴」页签 */
+  grid-template-columns: repeat(5, 1fr);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: var(--bg-panel);
   border-top: 1px solid var(--line-2);
