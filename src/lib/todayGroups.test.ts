@@ -80,11 +80,26 @@ describe('groupTodayRecords', () => {
     expect(groups[1].seconds).toBe(120);
   });
 
-  it('同名但不同事项拆成两行（ADR-021 允许同名）', () => {
+  it('今日同名（不同事项 id）视为同一件事：时间连续就并成一行', () => {
     const groups = groupTodayRecords([rec(1, 1000, 60, 2000), rec(2, 500, 10, 900)], nameOf);
-    expect(groups.map((g) => g.itemId)).toEqual([2, 1]);
+    expect(groups).toHaveLength(1);
+    /* 组上的 itemId 取组内最早那条 */
+    expect(groups[0]).toMatchObject({ itemId: 2, name: '开会', seconds: 70, count: 2 });
+  });
+
+  it('今日同名写了两段（不连续）：按时间序列两段，不合并', () => {
+    const t = Date.UTC(2026, 9, 21, 9, 0, 0);
+    const groups = groupTodayRecords(
+      [
+        rec(1, t, 1800, t + 30 * MIN), // 09:00–09:30 第一段
+        rec(2, t + 4 * 60 * MIN, 900, t + 4 * 60 * MIN + 15 * MIN), // 13:00–13:15 第二段（另一个 id，同名）
+      ],
+      nameOf,
+    );
+    expect(groups).toHaveLength(2);
     expect(groups.map((g) => g.name)).toEqual(['开会', '开会']);
-    expect(groups.map((g) => g.seconds)).toEqual([10, 60]);
+    expect(groups.map((g) => g.startedAt)).toEqual([t, t + 4 * 60 * MIN]);
+    expect(groups.map((g) => g.seconds)).toEqual([1800, 900]);
   });
 
   it('按开始时间升序，跨事项也保持时间线顺序', () => {

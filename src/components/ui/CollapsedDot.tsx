@@ -1,24 +1,27 @@
 /**
- * Timing — 收起圆点 CollapsedDot（collapsed.md · V0.11.0 重制）
+ * Timing — 收起圆点 CollapsedDot（V0.11.1 秒表形态）
  * -----------------------------------------------------------------------------
- * [V0.11.0] 从「一枚空心环」升级成**环 + 时间**：与手机端 `TimerRing` 同一个视觉语言
- * （环在外、时分在里、状态由环色与弧长表达），只是尺寸按桌面角落的占位重定。
- * 用户口径：「移植手机端小圆点功能，复现环 + 分钟显示时间效果并保持一致」。
+ * 用户口径（2026-11-05）：「环是图形语言，不应放时间，参考安卓端的图形化语言」。
+ * 所以这一版把上一版的 76px「环 + 时分」推翻，回到**纯图形**：一枚秒表。
  *
- * 几何：外径 76、描边 3、半径 33。手机是 232/8（3.4%），桌面按同比例取 2.6 向上归整到 3
- * ——再细在 100% DPI 的透明窗里会被 Chromium 吸附掉半个像素。
- * 时间字号两档：`MM:SS` 用 15px，跨小时 `HH:MM:SS` 降到 11px（8 个字符塞不进 76px 的圆）。
+ * 三层结构（对齐手机端 `.m-ring` 的语言，只换量纲）：
+ *   1. 外框   —— 1px 细环，恒在，是「表盘」，不表达状态（图上它是浅灰的）；
+ *   2. 进度弧 —— 3.5px 圆头弧，长度/行进复用 `MainButton.arcSpec`（ADR-024 四条规则：
+ *                倒计时收缩 / 正计时 90° 短弧行进 / 暂停 270° 静弧 / 结束整周加粗）；
+ *   3. 指针   —— 一根从圆心指向外缘的针，60 秒一圈，替掉数字去表达「在走」。
  *
- * 语义复用 `MainButton.arcSpec`（ADR-024 裁决过的四条规则）：
- *   倒计时只收缩 / 正计时 90° 短弧行进 / 暂停 270° 静弧 / 结束整周加粗。
- * **不在这里另立一套**——圆点、悬浮条、手机，看到的是同一个「环在说什么」。
+ * 指针角度口径：
+ *   - 正计时 / 空闲：`seconds % 60`，一秒 6°，像秒表；
+ *   - 倒计时：已用比例 × 360°（环在收缩、针在前进，两者同向才读得懂）；
+ *   - 空闲 / 结束：回 12 点。
+ * 暂停时 `useTimerTick` 不再给新值，指针自然冻住——不需要额外的暂停分支。
  *
- * 交互：单击展开回悬浮条；右键只吞事件（V0.3.1 起不再弹菜单）；
- * hover 由原生 title 显示「时长 · 事项名」。
+ * 读数去哪了：`title` 里仍是「时长 · 事项名」，悬停可看；圆点本身不再写字。
+ * 交互不变：单击展开回悬浮条，右键只吞事件。
  */
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { COUNTDOWN_WARN_SEC } from '../../lib/constants';
-import { formatDuration, hasHours } from '../../lib/format';
+import { formatDuration } from '../../lib/format';
 import { arcDashArray, arcDashOffset, isArcVisible } from '../../lib/ringGeometry';
 import { useEndedFlash } from '../../hooks/useEndedFlash';
 import { useTimerTick } from '../../hooks/useTimerTick';
@@ -29,10 +32,18 @@ import { useUiStore } from '../../stores/uiStore';
 import { toVisualState } from '../../types/ui';
 import { arcSpec } from '../pill/MainButton';
 
-const SIZE = 76;
+/* 44px 是「看得清指针、又不占桌面」的折中：再小圆头弧会糊，再大就快赶上小条了 */
+const SIZE = 44;
 const CENTER = SIZE / 2;
-const RADIUS = 33;
-const STROKE = 3;
+/** 表盘外框半径：留 1px 描边余量，避免被 viewBox 切掉半个像素 */
+const RIM_RADIUS = 21;
+const RIM_STROKE = 1.25;
+/** 进度弧半径：比表盘内收 5.5px，两层之间留出呼吸的空隙（同图） */
+const ARC_RADIUS = 15.5;
+const ARC_STROKE = 3.5;
+/** 指针：从圆心出发，长度约为弧半径的 55%，根部一个小圆点收口 */
+const NEEDLE_LEN = 8.5;
+const NEEDLE_STROKE = 2.2;
 
 export function CollapsedDot() {
   const seconds = useTimerTick();
@@ -65,6 +76,13 @@ export function CollapsedDot() {
   const showBar = isArcVisible(arc.frac);
   const text = formatDuration(displaySec);
 
+  /* 指针角度：倒计时按已用比例走，其余按 60 秒一圈（空闲 / 结束回 12 点） */
+  const needleAngle = isCountdown
+    ? (1 - progress) * 360
+    : visual === 'idle' || visual === 'ended'
+      ? 0
+      : (displaySec % 60) * 6;
+
   /* [V0.3.1] 右键主菜单已删除：圆点右键只吞事件，不再弹菜单 */
   const handleContextMenu = (e: ReactMouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -78,23 +96,22 @@ export function CollapsedDot() {
       data-countdown={isCountdown || armedIdle ? 'true' : 'false'}
       data-warn={nearEnd ? 'true' : 'false'}
       data-spin={arc.march ? 'true' : 'false'}
-      data-long={hasHours(displaySec) ? 'true' : 'false'}
       title={`${text} · ${name}`}
       aria-label={`收起状态：${text} · ${name}，单击展开`}
       onClick={toggleCollapsed}
       onContextMenu={handleContextMenu}
     >
       <svg className="dot__svg" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden>
-        {arc.track && (
-          <circle className="dot__track" cx={CENTER} cy={CENTER} r={RADIUS} strokeWidth={STROKE} />
-        )}
+        {/* 表盘：恒在，不随状态变色（状态一律由内圈与指针表达） */}
+        <circle className="dot__rim" cx={CENTER} cy={CENTER} r={RIM_RADIUS} strokeWidth={RIM_STROKE} />
         {showBar && (
           <circle
-            className="dot__bar"
+            className="dot__arc"
             cx={CENTER}
             cy={CENTER}
-            r={RADIUS}
-            strokeWidth={arc.thick ? STROKE + 1 : STROKE}
+            r={ARC_RADIUS}
+            /* 结束整周加粗：与 MainButton / m-ring 同一个「加一点」的口径，按小尺寸折算 */
+            strokeWidth={arc.thick ? ARC_STROKE + 0.8 : ARC_STROKE}
             pathLength={100}
             strokeDasharray={arcDashArray(arc.frac, arc.march)}
             strokeDashoffset={arc.march ? 0 : arcDashOffset(arc.frac)}
@@ -102,8 +119,19 @@ export function CollapsedDot() {
             transform={`rotate(-90 ${CENTER} ${CENTER})`}
           />
         )}
+        {/* 指针：从 12 点起顺时针转，角度由上面的 needleAngle 给 */}
+        <line
+          className="dot__needle"
+          x1={CENTER}
+          y1={CENTER}
+          x2={CENTER}
+          y2={CENTER - NEEDLE_LEN}
+          strokeWidth={NEEDLE_STROKE}
+          strokeLinecap="round"
+          transform={`rotate(${needleAngle} ${CENTER} ${CENTER})`}
+        />
+        <circle className="dot__pin" cx={CENTER} cy={CENTER} r={1.6} />
       </svg>
-      <span className="dot__time">{text}</span>
     </button>
   );
 }

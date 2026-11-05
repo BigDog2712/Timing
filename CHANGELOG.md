@@ -2,6 +2,46 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.1 — 圆点改纯图形秒表 + 今日同名事项合并 + 安卓出包环境
+
+### 桌面端：小圆点重做（ADR-040）
+
+- **推翻 0.11.0 的「76px 环 + 时分」**。用户口径：「环是图形化语言，不应放时间」，
+  并给出参照图（秒表）。新形态 **44px 三层纯图形**：
+  - 表盘：1.25px 细环，恒灰（`--line-3`），不随状态与四色主题变；
+  - 进度弧：3.5px 圆头，`stroke: currentColor`，语义仍复用 `MainButton.arcSpec`
+    （倒计时收缩 / 正计时 90° 行进 / 暂停 270° 静弧 / 结束整周加粗 +0.8px）；
+  - 指针：2.2px 圆头短线 + 中心圆点，**正计时 60 秒一圈**、倒计时按已用比例前进，
+    暂停时随 `useTimerTick` 冻结、空闲 / 结束回 12 点。
+- 圆点里不再有任何文字；读数移到 `title`（悬停看「时长 · 事项名」）。
+- `--dot-size` 76 → **44**；`dot.css` 删除 `.dot__time` / `.dot__track` / `.dot__bar`
+  与 `data-long` 分支，新增 `.dot__rim` / `.dot__arc` / `.dot__needle` / `.dot__pin`。
+- 窗口尺寸无需改：`useWindowAutoFit` 会把 OS 窗口收缩到可见包围盒。
+
+### 桌面端 + 手机端：今日事项按名字认（ADR-040）
+
+- `lib/todayGroups.ts` 分组键由 **itemId** 改为 **名字**：今天同名即同一件事，
+  同名但不同 id 的事项不再各占一行；`itemId` 取组内最早那条，供右键改名 / 便利贴预览。
+- 时间分段不变：间隔 > 60s 另起一行，仍按开始时间升序 —— 「写周报写了两段」看到的就是两行。
+- **数据库与 md 不拆**：记录仍是独立 `records` 行、事项仍一条；`export::timers` 按
+  `item_name` 归并到同一个条目（多段 `intervals`），一天一个 md 文件。
+- 新增 `UNNAMED_FALLBACKS`（`未归类` / `已删除事项` / 空串）：名字不成立时退回按 id，
+  避免所有已删记录挤成一行。
+
+### 构建环境：安卓出包（首次打通）
+
+- 本机已装 Android SDK（`platforms 35/36`、`build-tools 36.0.0`、`ndk 27.2.12479018`、
+  `platform-tools`）与 **OpenJDK 21.0.2**（`C:\Software\jdk-21.0.2`）。
+- 用户级环境变量写入 `JAVA_HOME` / `ANDROID_HOME` / `ANDROID_SDK_ROOT` / `NDK_HOME`。
+- 新增 debug APK 构建产物（`--target aarch64 --apk --debug`）。
+- `src-tauri/gen/android/app/tauri.properties` 的 `versionName` / `versionCode` 同步到 0.11.1 / 1101
+  （此前停留在 0.5.0 / 5000，是 0.5.0 那次改名时漏掉的自动生成文件）。
+
+### 验证
+
+- `npm run typecheck` / `npm run lint --max-warnings=0` / `vitest run`（42 文件 323 条）全绿。
+- `todayGroups.test.ts` 新增两条：同名连续合并、同名两段按时间分列。
+
 ## 0.11.0 — 悬浮形态可切换 + 手机端便利贴 + 事项计时联动
 
 > 版本从 0.5.0 直接跳到 0.11.0：0.2.x–0.5.x 是内部滚动小版本（0.5.0 只做品牌改名），
