@@ -50,7 +50,7 @@
 
 - `infra::shell_open` 新增 `open_file`：md 同步打开今日文件不再自己拼一份 `explorer` 调用，
   开文件的安全口径统一到一处。
-- `services/md_sync/config.rs` 承接 `poll_secs`，`mod.rs` 从 311 行回落到 294 行（≤300 门禁）。
+- `services/md_sync/config.rs` 承接 `poll_secs`，`mod.rs` 从 311 行回落到 293 行（≤300 门禁）。
 
 ## 0.11.2 — 深度巡检：11 处数据与交互缺陷
 
