@@ -1,5 +1,5 @@
 /**
- * TickBar — 倒计时「已设定时长」（V0.2.5 · 5，对齐 Timing v1.7.3 的口径）
+ * Timing — 倒计时「已设定时长」（V0.2.5 · 5，对齐 Timing v1.7.3 的口径）
  * -----------------------------------------------------------------------------
  * 参照 `Timingv1.7.3\src\ElioTimer.Ui\MainForm.cs`：右键选档位**只设定时长**
  * （`countdownMode = true; countdownSeconds = 秒`，小条 idle 时 `TimeText` 直接显示该时长），

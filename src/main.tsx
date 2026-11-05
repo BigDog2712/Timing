@@ -1,5 +1,5 @@
 /**
- * TickBar — 前端入口（只挂载 App，无业务）
+ * Timing — 前端入口（只挂载 App，无业务）
  * 样式加载顺序：design-tokens（唯一裸色值来源）-> app -> surfaces -> panels。
  * design-tokens.css 本身是索引，内部按 §1~§6 顺序 @import ./tokens/*.css。
  */

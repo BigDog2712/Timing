@@ -1,5 +1,5 @@
 /**
- * TickBar — 药丸主视图 PillBar（常驻，AC-01）
+ * Timing — 药丸主视图 PillBar（常驻，AC-01）
  * -----------------------------------------------------------------------------
  * 区域操作以 Timing v1.7.3 MainForm.OnMouseUp 为准；拖动由 usePillDrag 隔离。
  * 键盘：Space 开始/暂停，Enter 结束；Menu / Shift+F10 菜单，Esc 收起。

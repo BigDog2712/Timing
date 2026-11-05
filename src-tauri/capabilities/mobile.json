@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "mobile",
-  "description": "TickBar 移动端最小权限白名单（V1-Android）。只有一扇系统窗口 main：窗口类只留『能显示 / 能定位 / 能读尺寸』——移动端不需要拖拽、置顶、跳过任务栏（那些是桌面浮层语义）。通知走 notification:default（含运行时权限申请与建通道）。",
+  "description": "Timing 移动端最小权限白名单（V1-Android）。只有一扇系统窗口 main：窗口类只留『能显示 / 能定位 / 能读尺寸』——移动端不需要拖拽、置顶、跳过任务栏（那些是桌面浮层语义）。通知走 notification:default（含运行时权限申请与建通道）。",
   "platforms": ["android", "iOS"],
   "windows": ["main"],
   "permissions": [

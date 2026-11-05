@@ -1,5 +1,5 @@
 /**
- * TickBar — 展开面板 ItemPicker（panel.md）
+ * Timing — 展开面板 ItemPicker（panel.md）
  * -----------------------------------------------------------------------------
  * 触发：点「新建事项」/ 手柄。命令：create_item / list_items / switch_item。
  * 覆盖 5 态：Populated / Typing / Empty / Error（`ITEM_NAME_EMPTY`）/ Loading。

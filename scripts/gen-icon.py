@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TickBar 图标生成器 —— 矢量式绘制 + 4x 超采样，产出 master / tray / 预览对比图。
+"""Timing 图标生成器 —— 矢量式绘制 + 4x 超采样，产出 master / tray / 预览对比图。
 
 设计语言（与 src/styles/tokens/*.css 同源）：
   · 底板      —— 超椭圆（同 --ring-radius 的超椭圆口径），深色主题底 #1B1F27 → #0A0B0E

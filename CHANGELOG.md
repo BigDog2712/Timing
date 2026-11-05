@@ -2,6 +2,50 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.5.0 — 品牌更名为 Timing（老数据自动迁移）
+
+**显示名 / 包名 / 安装产物 / 托盘 / 窗口标题**：`TickBar` → **`Timing`**（决策记录见
+`docs/decisions/ADR-036.md`；工程代号与产品的错位从 0.2.0 起就存在）。
+
+| 面 | 旧 | 新 |
+|---|---|---|
+| npm 包 / Rust crate / lib | `tickbar` / `tickbar` / `tickbar_lib` | `timing` / `timing` / `timing_lib` |
+| identifier（Windows 数据目录） | `com.tickbar.app` | `com.timing.app` |
+| 安卓包名（Tauri mobile） | `com.tickbar.app` | `com.timing.app` |
+| DB 文件名 | `tickbar.db` | `timing.db`（迁移时连同 `-wal` / `-shm` 一起映射） |
+| 日志 / 级别变量 / 平台常量 | `tickbar-*.log` / `TICKBAR_LOG` / `__TICKBAR_MOBILE__` | `timing-*.log` / `TIMING_LOG` / `__TIMING_MOBILE__` |
+
+### 迁移：老数据自动搬过来，**只复制、不移动**
+
+首次启动时把 `%APPDATA%\com.tickbar.app` 整棵树复制到 `com.timing.app`，四重校验（逐文件
+字节数 / `PRAGMA integrity_check` / 五表行数 / `schema.version` 可读）通过后才换名上线。
+**老目录永久保留、一字节不动**——回滚到 0.4.x 仍能读到全部老数据。
+
+失败时给三选一（重试 / 以空白数据启动 / 退出），并往老目录写 `migration-failed.txt`；
+选过「以空白数据启动」的人下次启动仍会走覆盖式迁移（空白期数据改名保留，不删除）。
+
+### 契约变化（**命令 65 → 67**，其余不变）
+
+- **命令 65 → 67**：新增 `get_migration_info`（设置页卡片读迁移来源）与 `open_legacy_dir`
+  （打开旧数据目录）。**这是 0.5.0 唯一的契约增量**，理由见 `docs/decisions/ADR-037.md`。
+- 事件 **11 不变**；错误码 **16 不变**；DB schema **v4 不变**（无新表、无新列）。
+- 设置 → 通用页签底部新增「数据迁移」卡片（桌面端；显示数据来源、行数摘要、迁移时间）。
+
+### 升级须知
+
+- **安卓**：包名从 `com.tickbar.app` 改为 `com.timing.app`，系统视为**另一个应用** →
+  **必须先卸载旧版再安装**，不能覆盖升级。**本轮不提供安卓构建产物**（本机无
+  Android SDK/NDK/java；包名与重装路径见 `docs/rename-v0.5.0/PRD.md` §5）。
+- **桌面**：直接覆盖安装即可；老数据在首次启动时自动迁移。回滚到 0.4.x 能读老数据，但
+  读不到 0.5.0 之后新增的记录（单向门）。
+- 旧环境变量 `TICKBAR_LOG` 与 5 个 `tickbar.*` localStorage 键**保留一个版本的只读回落**
+  （命中时日志会打一条弃用 WARN），0.6.0 移除。
+
+### 门禁
+
+新增 `npm run check:brand`：全仓 `git grep -i` 扫描品牌残留（大小写不敏感 + 未跟踪文件），
+归档目录 `android-app/` 强制打印跳过数量而不是静默跳过。
+
 ## [未发布] V1.0-Android：Rust 侧平台门控 + APK 出包
 
 依据 `docs/mobile/DESIGN-ANDROID-V1.md` 执行 **T2 / T3 / T4 / T5 / T13**，前端 T6–T12 已就位。

@@ -31,7 +31,7 @@ function platformCss(): Plugin {
   };
 }
 
-// TickBar — 桌面悬浮应用（Tauri 2 + React 19）
+// Timing — 桌面悬浮应用（Tauri 2 + React 19）
 // 说明：本工程为固定 384x360 DIP 透明置顶层，无 Web 路由、无网络请求。
 // - clearScreen=false：保留 Rust 侧 dev 日志
 // - strictPort 1420：与 src-tauri/tauri.conf.json 的 devUrl 对齐

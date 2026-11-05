@@ -1,5 +1,5 @@
 /**
- * TickBar — 「退出期间」换算单测（V0.4.2）
+ * Timing — 「退出期间」换算单测（V0.4.2）
  * 口径必须与后端 `services::timer::gap_sec` 一致：暂停中不补、负数不补、不足 1 分钟不问。
  */
 import { describe, expect, it } from 'vitest';

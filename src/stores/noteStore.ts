@@ -1,5 +1,5 @@
 /**
- * TickBar — 便利贴 store（V0.2.0 N-4 · 单窗单实例：label = note-{id}）
+ * Timing — 便利贴 store（V0.2.0 N-4 · 单窗单实例：label = note-{id}）
  * -----------------------------------------------------------------------------
  * 数据来源：note_get / note_update / note_delete（Rust 命令）。
  * 口径：

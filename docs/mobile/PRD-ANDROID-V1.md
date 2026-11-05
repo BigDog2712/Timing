@@ -1,9 +1,9 @@
-# TickBar 安卓版 PRD（V1）
+# Timing 安卓版 PRD（V1）
 
 | 项 | 值 |
 |---|---|
 | 版本 | V1 · 2026-11-02 · 产品经理 |
-| 基线 | TickBar **v0.4.1**（Windows 桌面 · Tauri 2.12 / React 19 / Rust / SQLite） |
+| 基线 | Timing **v0.4.1**（Windows 桌面 · Tauri 2.12 / React 19 / Rust / SQLite） |
 | 事实来源 | `docs/phase2/IPC-CONTRACT-v2.md`（65 命令 / 16 错误码）· `IPC-CONTRACT-v3.md`（11 事件）· `src/components/` · `src-tauri/src/app/`、`infra/` |
 | 已定前提 | ① Tauri 2 Android 原生包；② 功能对齐桌面；③ 手机独立本地存储，表结构与桌面 SQLite 对齐（留同步接口） |
 | 本文不含 | 实现方案、测试用例、桌面端改造 |

@@ -1,10 +1,10 @@
 @echo off
-rem Start the TickBar desktop dev mode from a terminal that has the MSVC environment loaded.
+rem Start the Timing desktop dev mode from a terminal that has the MSVC environment loaded.
 rem The Rust msvc target needs link.exe plus the Windows SDK LIB/INCLUDE paths, and VS Build
 rem Tools does not put them on PATH, so a bare npm run tauri dev fails with linker not found.
 rem Keep this file ASCII-only with CRLF endings - cmd.exe reads batch files with the OEM codepage.
 rem Do not use %ProgramFiles(x86)% here: its parentheses break cmd parsing inside if-blocks.
-rem Launched from the desktop shortcut ("TickBar ???"), so every failure path ends in pause:
+rem Launched from the desktop shortcut ("Timing ???"), so every failure path ends in pause:
 rem a double-clicked console closes instantly and the error would be unreadable.
 setlocal
 

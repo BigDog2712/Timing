@@ -1,4 +1,4 @@
-# TickBar v0.4.1
+# Timing v0.5.0
 
 Windows 桌面常驻悬浮计时条：屏幕边缘一条 32px 的小药丸，按一下就开计时，不占工作区。纯本地（SQLite），无账号、无联网。
 
@@ -106,7 +106,7 @@ npm run tauri build -- --no-bundle   # 只出 exe 本体
 npm run tauri build                  # 出 nsis / msi 安装器
 ```
 
-构建产物：`src-tauri/target/release/tickbar.exe`，仓库约定复制到 `release/TickBar.exe`。
+构建产物：`src-tauri/target/release/timing.exe`，仓库约定复制到 `release/Timing.exe`。
 
 ## 文档
 

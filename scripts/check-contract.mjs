@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * TickBar — IPC 契约自检（五处必须互相对齐）
+ * Timing — IPC 契约自检（五处必须互相对齐）
  * -----------------------------------------------------------------------------
  * 命令侧（原有）：
  *   1. src-tauri/src/lib.rs        generate_handler![...] 注册的命令（snake_case）

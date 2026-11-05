@@ -1,5 +1,5 @@
 /**
- * TickBar — 记录汇总面板 RecordsPanel（records-panel.md，AC-16 / AC-17 / AC-18）
+ * Timing — 记录汇总面板 RecordsPanel（records-panel.md，AC-16 / AC-17 / AC-18）
  * -----------------------------------------------------------------------------
  * 命令：stats_summary / list_records / update_record / delete_record。
  * 5 态：Loading（静态骨架）/ Error（重试）/ Empty（引导文案）/ Populated / Edge（滚动）。

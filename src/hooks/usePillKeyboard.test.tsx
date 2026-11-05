@@ -1,5 +1,5 @@
 /**
- * TickBar — 键盘分派单测（V0.3.8：Space 的暂停方向必须触发 onPause 连招）
+ * Timing — 键盘分派单测（V0.3.8：Space 的暂停方向必须触发 onPause 连招）
  * -----------------------------------------------------------------------------
  * 用 `createRoot` + `act`（禁 renderToStaticMarkup，理由见 MainButton.test.tsx）。
  * 断言的是**分派契约**：暂停方向（running + Space）交给 onPause（含 togglePause + 弹菜单），

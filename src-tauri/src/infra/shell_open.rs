@@ -3,7 +3,7 @@
 //! 与 `infra::plugin_fs::open_dir` 的区别：那个是「插件目录不存在就先建好再打开」
 //! （宿主拥有那个目录，建它是合理的）；本函数用于**用户的旧数据目录**——目录不存在
 //! 时应当老实返回错误，而不是替用户造一个空目录出来（否则「打开旧数据目录」会变成
-//! 「在 %APPDATA% 里新建一个 com.tickbar.app」）。
+//! 「在 %APPDATA% 里新建一个 com.timing.app」）。
 
 use std::path::Path;
 use std::process::Command;

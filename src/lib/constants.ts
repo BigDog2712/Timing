@@ -1,5 +1,5 @@
 /**
- * TickBar — 交互阈值常量（对齐 docs/design/design-tokens.json `size.*`）
+ * Timing — 交互阈值常量（对齐 docs/design/design-tokens.json `size.*`）
  * -----------------------------------------------------------------------------
  * 这些是**行为阈值**（毫秒/字符数），非视觉 Token，故以 TS 常量集中管理，
  * 与 design-tokens.json 的 size.longPressMs / clickMaxMs / debounceMs /

@@ -1,4 +1,4 @@
-# TickBar 品牌图标（ICON）
+# Timing 品牌图标（ICON）
 
 来源：`scripts/gen-icon.py`（唯一的真源）。`.png` / `.ico` 都是它的产物，
 **不要手工改图**——改了下次重跑脚本就丢。

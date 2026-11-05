@@ -1,5 +1,5 @@
 /**
- * TickBar — 事项菜单 ItemMenu（[V0.2.3 · 4]）
+ * Timing — 事项菜单 ItemMenu（[V0.2.3 · 4]）
  * -----------------------------------------------------------------------------
  * 触发：右键小条上的事项名（ItemName.onMenu → uiStore.openItemMenu）。
  * 结构对齐 Timing v1.7.3 的「事项行菜单」（MainForm.TodoRowMenuRows）：

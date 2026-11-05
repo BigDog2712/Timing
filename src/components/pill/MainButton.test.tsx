@@ -1,5 +1,5 @@
 /**
- * TickBar — MainButton（状态环）弧语义单测（V0.3.6 / ADR-024）
+ * Timing — MainButton（状态环）弧语义单测（V0.3.6 / ADR-024）
  * -----------------------------------------------------------------------------
  * **禁止 renderToStaticMarkup**：zustand v5 的 `useSyncExternalStore` 在 SSR 下会读到
  * 初始 state（服务端没有 store 快照），把「已 armed / 已 running」的状态渲染成 idle，

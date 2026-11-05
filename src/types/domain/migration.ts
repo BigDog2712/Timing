@@ -1,5 +1,5 @@
 /**
- * TickBar — 迁移可见性类型（V0.5.0 新增，命令 65 → 67）
+ * Timing — 迁移可见性类型（V0.5.0 新增，命令 65 → 67）
  * -----------------------------------------------------------------------------
  * 与 Rust 侧一一对应（`src-tauri/src/models/migration.rs`，两处均 camelCase）：
  *   - `MigrationInfo`   ←  `get_migration_info` 的返回

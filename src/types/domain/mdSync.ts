@@ -1,5 +1,5 @@
 /**
- * TickBar — Markdown 同步域类型（V0.4.0 / 插件 API v2）
+ * Timing — Markdown 同步域类型（V0.4.0 / 插件 API v2）
  * -----------------------------------------------------------------------------
  * 与 `src-tauri/src/models/md_sync.rs` 逐字对应（serde camelCase）。
  * 插件只声明落点；同步执行在 Rust 侧，前端只负责配置与展示状态。

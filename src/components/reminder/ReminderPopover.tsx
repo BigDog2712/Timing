@@ -1,5 +1,5 @@
 /**
- * TickBar — 提醒浮出卡 ReminderPopover（reminder-popover.md · V0.2.0 新增 N-5）
+ * Timing — 提醒浮出卡 ReminderPopover（reminder-popover.md · V0.2.0 新增 N-5）
  * -----------------------------------------------------------------------------
  * 贴近小条浮出的非模态玻璃卡（层 --z-dialog 70，宽 280）。两种态：
  *   - `set`  ：右键「提醒…」→ 选时间（+5/15/60 分 / 明天此时）→ reminder_set；展示既有 pending 可清除。

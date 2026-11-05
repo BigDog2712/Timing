@@ -1,5 +1,5 @@
 /**
- * TickBar — 时长菜单 CountdownMenu（countdown-menu.md · V0.2.0 新增 N-6）
+ * Timing — 时长菜单 CountdownMenu（countdown-menu.md · V0.2.0 新增 N-6）
  * -----------------------------------------------------------------------------
  * 触发：小条右键数字 / 事项右键「倒计时…」。形态：**复用 GlassMenu 的自绘玻璃菜单**。
  * [V0.2.5 · 5] 语义改为参照 Timing v1.7.3 的「先设定、再开始」：

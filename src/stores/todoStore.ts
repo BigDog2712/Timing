@@ -1,5 +1,5 @@
 /**
- * TickBar — 待办 store（V0.2.0 N-2）
+ * Timing — 待办 store（V0.2.0 N-2）
  * -----------------------------------------------------------------------------
  * 数据来源：todo_list / todo_create / todo_update / todo_delete / todo_toggle。
  * 口径：事项窗口需按「已完成 / 待办」分组 → 载入 includeDone=true；本地按 sortOrder 升序。

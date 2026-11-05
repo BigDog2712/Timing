@@ -1,5 +1,5 @@
 /**
- * TickBar — 浏览器降级 Mock：事项域处理器
+ * Timing — 浏览器降级 Mock：事项域处理器
  * -----------------------------------------------------------------------------
  * 拆自 browserMock.ts（单文件 ≤300 行纪律，ADR-017）。**不参与生产**。
  * 覆盖：list / create / update / archive / unarchive / delete 共 6 条命令。

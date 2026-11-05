@@ -1,5 +1,5 @@
 /**
- * TickBar — 开关 Switch（settings-panel.md §3.2）
+ * Timing — 开关 Switch（settings-panel.md §3.2）
  * -----------------------------------------------------------------------------
  * 轨道 40x22 圆角 pill；On 态底 --accent（设置面板唯一强调色来源）；滑块位移用
  * transform（禁 left，遵守动效属性白名单）。role="switch" + aria-checked。

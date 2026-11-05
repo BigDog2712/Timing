@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 
 /**
- * TickBar — 前端 lint（v0.3 首次落地）
+ * Timing — 前端 lint（v0.3 首次落地）
  * -----------------------------------------------------------------------------
  * 目标不是「代码风格统一」（那靠约定与格式化），而是**拦住真实缺陷**：
  *   1. 未定义变量 / 不可能到达的代码 / 重复 case（JS 基本正确性）；

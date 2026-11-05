@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * TickBar — 单文件体积门禁（AGENTS.md「单文件 ≤300 行」的机械执行）
+ * Timing — 单文件体积门禁（AGENTS.md「单文件 ≤300 行」的机械执行）
  * -----------------------------------------------------------------------------
  * 只看逻辑与样式源码：src/**（.ts/.tsx/.css）与 src-tauri/src/**（.rs）。
  * 不扫 tests 之外的生成物、不扫 node_modules / target / dist。

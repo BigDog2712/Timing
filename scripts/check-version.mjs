@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * TickBar — 版本号一致性门禁（AGENTS.md：版本号同步）
+ * Timing — 版本号一致性门禁（AGENTS.md：版本号同步）
  * -----------------------------------------------------------------------------
  * 桌面六处（必须同为同一 MAJOR.MINOR.PATCH）：
  *   1. package.json                      version

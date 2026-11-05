@@ -195,7 +195,7 @@ impl Serialize for AppError {
         分级口径（此前 0 条 ERROR 级日志，所有失败都是 WARN，真故障会被淹掉）：
         - 基础设施类（`DB_ERROR` / `IO_ERROR`）：用户看不出原因、必须留痕 → ERROR；
         - 业务校验类（找不到、名字为空、时长非法…）：界面已经给出明确提示 →
-          只在 `TICKBAR_LOG=debug` 时记 DEBUG，避免把正常操作刷成告警。 */
+          只在 `TIMING_LOG=debug` 时记 DEBUG，避免把正常操作刷成告警。 */
         match self.code {
             ErrorCode::DbError | ErrorCode::IoError => {
                 crate::log_error!("ipc {}: {}", self.code.as_str(), self.message)

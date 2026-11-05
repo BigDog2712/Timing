@@ -1,5 +1,5 @@
 /**
- * TickBar — 计时数字展示（AC-24 等宽不抖动；V0.2.0 倒计时扩展）
+ * Timing — 计时数字展示（AC-24 等宽不抖动；V0.2.0 倒计时扩展）
  * -----------------------------------------------------------------------------
  * 复用 design-tokens.css 锁定的 `.timer-digits` 规则（不可协商）：
  *   font-mono / tabular-nums / "tnum"+"zero" / min-width 5ch / 右对齐 / nowrap。

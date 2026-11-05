@@ -1,5 +1,5 @@
 /**
- * TickBar 领域类型 —— 命令入参 / Patch DTO（自 ./domain.ts 外移）
+ * Timing 领域类型 —— 命令入参 / Patch DTO（自 ./domain.ts 外移）
  * -----------------------------------------------------------------------------
  * 归组：全部命令入参（list_items … save_window_position）+ 两个部分更新 patch
  *      （ItemPatch / RecordPatch）。仅承载「入参形态」，不含返回实体。

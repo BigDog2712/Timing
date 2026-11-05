@@ -56,7 +56,7 @@ fn resolves_tokens_and_env() {
 #[test]
 fn expands_unknown_env_verbatim() {
     assert_eq!(
-        expand_env("%TICKBAR_NO_SUCH_VAR%\\x"),
-        "%TICKBAR_NO_SUCH_VAR%\\x"
+        expand_env("%TIMING_NO_SUCH_VAR%\\x"),
+        "%TIMING_NO_SUCH_VAR%\\x"
     );
 }

@@ -1,4 +1,4 @@
-# 悬而未决登记册（OPEN-DECISIONS）— TickBar
+# 悬而未决登记册（OPEN-DECISIONS）— Timing
 
 > 规范：只追加 + 就地关闭（OPEN → RESOLVED，补 Resolution 字段）。每次 Phase 开始时把未决项复现到工作上下文最前面。  
 > 三类固定 slug：`waiting-on-external-condition`（等外部条件）/ `design-decision-to-evaluate`（设计待评估）/ `existing-design-boundary`（现有设计边界约束）。

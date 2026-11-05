@@ -1,7 +1,7 @@
 {
   "meta": {
-    "product": "TickBar",
-    "appId": "com.tickbar.app",
+    "product": "Timing",
+    "appId": "com.timing.app",
     "version": "0.2.0",
     "phase": "V0.2.0-2 设计系统整体重做（对标 Timing v1.7.0）",
     "designer": "颜好看",
