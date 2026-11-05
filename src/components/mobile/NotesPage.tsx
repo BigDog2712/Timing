@@ -100,7 +100,7 @@ export function NotesPage() {
           <PlusIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
           写一张新的
         </button>
-        <p className="m-hint">
+        <p className="m-hint m-note__tip">
           <StickyNoteIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
           默认挂到当前事项；在编辑页可以改归属或解绑。
         </p>
