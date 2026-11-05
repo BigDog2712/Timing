@@ -226,3 +226,26 @@ export const useUiStore = create<UiStore>((set) => ({
   resetTransient: () => set({ ...CLOSED, reminderPopover: null }),
   flashHighlight: () => set((s) => ({ highlightSeq: s.highlightSeq + 1 })),
 }));
+
+/**
+ * [V0.11.4] 当前是否有任何**用户主动打开**的东西挂在界面上。
+ * 小圆点形态的「移开就收回」（App.tsx）靠它决定要不要收：面板 / 菜单 / 提醒卡 /
+ * 恢复框 / 撤销条 都开着时收起来，等于把用户刚打开的东西一键关掉。
+ * 集中判断，新增浮层时只改这一处。
+ */
+export function hasOpenSurface(): boolean {
+  const s = useUiStore.getState();
+  return Boolean(
+    s.panel !== 'none' ||
+      s.countdownPos ||
+      s.countdownCardPos ||
+      s.reminderPopover ||
+      s.notesListPos ||
+      s.itemMenu ||
+      s.moyuPos ||
+      s.commonItemsPos ||
+      s.inlineEdit ||
+      s.recover ||
+      s.undoRecord,
+  );
+}

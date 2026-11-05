@@ -12,6 +12,7 @@
     "core:window:allow-inner-size",
     "core:window:allow-outer-position",
     "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:event:allow-emit",
     "notification:default"
   ]

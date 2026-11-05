@@ -10,6 +10,7 @@
  * 移动端（Android 包，DESIGN-ANDROID-V1 §1.2）：整个桌面壳被编译期常量短路，
  * 直接渲染 MobileShell（4 Tab + 覆盖层）。手机单窗口，没有 label 路由。
  */
+import { useCallback, useEffect, useRef } from 'react';
 import { Batch2Overlays } from './components/Batch2Overlays';
 import { ItemMenu } from './components/menu/ItemMenu';
 import { MobileShell } from './components/mobile/MobileShell';
@@ -31,7 +32,8 @@ import { useAppBootstrap } from './hooks/useAppBootstrap';
 import { useWindowAutoFit } from './hooks/useWindowAutoFit';
 import { IS_MOBILE } from './lib/platform';
 import { currentWindowKind } from './lib/window';
-import { useUiStore } from './stores/uiStore';
+import { useUiStore, hasOpenSurface } from './stores/uiStore';
+import { useAppearanceStore } from './stores/appearanceStore';
 import { openTodosWindow } from './services/todosActions';
 
 export default function App() {
@@ -61,10 +63,46 @@ function MainWindow() {
   const notesListPos = useUiStore((s) => s.notesListPos);
   const closeNotesList = useUiStore((s) => s.closeNotesList);
   const recover = useUiStore((s) => s.recover);
+  const floatForm = useAppearanceStore((s) => s.floatForm);
+
+  /* [V0.11.4] 小圆点形态下，点开只是「临时看一眼」：鼠标移出窗口就收回圆点。
+     两条护栏：
+       · 延时 300ms 再收，且移回来就取消——否则点开瞬间窗口从 22px 变成一条，
+         指针可能正好落在新窗口外面，会立刻被收回，看起来像「点不动」；
+       · 面板 / 菜单 / 提醒卡 / 恢复框 / 撤销条开着时不收（见 hasOpenSurface）——
+         那些是用户主动打开的，收起来等于替他把东西关掉。
+     悬浮条形态整段短路：条本来就常驻，没有「收回」这回事。 */
+  const leaveTimer = useRef<number | null>(null);
+  const lastExpandAt = useRef(0);
+
+  useEffect(() => {
+    if (!collapsed) lastExpandAt.current = Date.now();
+  }, [collapsed]);
+
+  const cancelCollapse = useCallback(() => {
+    if (leaveTimer.current != null) {
+      window.clearTimeout(leaveTimer.current);
+      leaveTimer.current = null;
+    }
+  }, []);
+
+  const scheduleCollapse = useCallback(() => {
+    if (floatForm !== 'dot' || collapsed) return;
+    cancelCollapse();
+    leaveTimer.current = window.setTimeout(() => {
+      leaveTimer.current = null;
+      /* 刚展开的 400ms 内先不动：让窗口尺寸变化与指针位置先稳定下来 */
+      if (Date.now() - lastExpandAt.current < 400) return;
+      if (hasOpenSurface()) return;
+      useUiStore.getState().setCollapsed(true);
+    }, 300);
+  }, [floatForm, collapsed, cancelCollapse]);
+
+  useEffect(() => cancelCollapse, [cancelCollapse]);
 
   return (
     <div className="layer">
-      <div className="layer__stack">
+      <div className="layer__stack" onMouseEnter={cancelCollapse} onMouseLeave={scheduleCollapse}>
         {collapsed ? <CollapsedDot /> : <PillBar />}
         {!collapsed && <UndoBar />}
         {!collapsed && panel === 'create' && <ItemPicker />}

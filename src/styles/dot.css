@@ -1,8 +1,11 @@
 /* =============================================================================
- * Timing — 收起圆点（V0.11.1 秒表形态）
+ * Timing — 收起圆点（V0.11.1 秒表形态，V0.11.4 缩半 + 改转速）
  * -----------------------------------------------------------------------------
- * 用户口径：「环是图形语言，不应放时间」。三层：表盘细框 / 进度弧 / 指针，
+ * 用户口径：「环是图形语言，不应放时间」。三层：表盘细框 / 进度弧 / 分针，
  * 全部走图形，圆点里没有文字。与手机端 `.m-ring` 同一套语言，量纲另算。
+ *
+ * [V0.11.4] 转速：外环一分钟一圈（当秒针）、内部分针一小时一圈（当分针）。
+ * 尺寸 44px → 22px（用户口径「缩小一倍」），几何量在 CollapsedDot.tsx 里等比减半。
  *
  * 颜色分层：
  *   - 表盘（.dot__rim）恒灰，不随状态变——它是「表壳」，不是信息；
@@ -60,17 +63,27 @@
   fill: currentColor;
 }
 
-/* 正计时在跑：90° 短弧沿轨道行进（与 MainButton / m-ring 同一条动画语言） */
-.dot[data-spin="true"] .dot__arc {
-  animation: dot-march 3.2s linear infinite;
+/* 正计时在跑：整圈沿轨道转，**一分钟一圈**（[V0.11.4] 用户口径：
+   外环当秒针用）。暂停时不是把动画撤掉，而是把它冻在当前角度 —— 撤掉会一下子
+   弹回 12 点，看起来像「重置」，而用户要的是「停住」。 */
+.dot__ring {
+  /* view-box 让 50% 50% 落在 viewBox 中心，而不是元素左上角 */
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: dot-turn 60s linear infinite;
+  animation-play-state: paused;
 }
 
-@keyframes dot-march {
+.dot[data-turn="true"] .dot__ring {
+  animation-play-state: running;
+}
+
+@keyframes dot-turn {
   from {
-    stroke-dashoffset: 0;
+    transform: rotate(0deg);
   }
   to {
-    stroke-dashoffset: -100;
+    transform: rotate(360deg);
   }
 }
 
@@ -101,7 +114,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dot[data-spin="true"] .dot__arc,
+  .dot__ring,
   .dot[data-warn="true"] {
     animation: none;
   }
