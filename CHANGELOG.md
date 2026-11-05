@@ -22,6 +22,80 @@
   导入（CSS 无法像 JS 一样摇树）。桌面 CSS 102 → 86.53 kB，产物里不再有 `.m-*`。
 - 重新出包 `release/TickBar-v0.4.1-android-arm64.apk`（8.6 MB，debug keystore，仅自测安装）。
 
+### 手机端待办直连计时（2026-11-04，全前端）
+
+用户口径：「安卓端关于事项的逻辑与电脑端不同，事项是绑定计时的，待办事项应可以直接开始计时，
+参考电脑端的逻辑进行优化」。桌面一直如此，手机端此前只有空闲态能开计；本轮补齐「已经在计时时点待办」
+这条路径，并修掉 QA 两轮走查暴露的死按钮与零反馈窗口。
+
+**用户可见的变化**
+
+- 计时中（running / paused）点待办「开始」：**原来**后端 `todo_start` 的第一道守卫就回
+  `TIMER_ALREADY_RUNNING`，用户点第二次只得到一句报错、待办还留在列表里；
+  **现在**弹「结束并新开 / 仅改归属」选单，**切换成功后**才把待办移出待办区
+  （切换失败则待办原样保留，可重试）。
+- 已完成待办的「开始」按钮移除：后端对 `done_at` 非空的待办一律回 `TODO_NOT_FOUND`
+  （`services/todo_start.rs` 的守卫），那个按钮点了必报错，是死按钮。要计这件事先点圆圈取消完成，
+  或直接新建一条。
+- 「计时中」标记：**原来**同样按标题匹配，但待办开始后已被软删、不在列表里，标记几乎永不出现；
+  **现在**标记由事项名称匹配驱动，且暂停态显示「**已暂停**」而不是「计时中」——
+  手机端的「继续」入口只在计时页，光看「计时中」分不出秒表还在不在走。
+- 空闲态连点「开始」不再发第二条命令：**原来**第二发必然撞 `TODO_NOT_FOUND`，
+  用户在**已经看到开始计时之后**收到一条「待办不存在」红条；现在由一把锁挡住。
+- 非 idle 时点**另一条**待办不再被「另一条正在开计时」挡住（锁只在 idle 分支内），
+  任何时刻点待办都有明确反馈：要么开始计时，要么弹出选单。
+
+**实现要点**
+
+- 新增 `components/mobile/SwitchModeSheet.tsx`：`SWITCH_MODES` 成为「结束并新开 / 仅改归属」
+  两句话的**唯一文案来源**，`SwitchItemSheet` 与新的 `TodoSwitchSheet` 共用 `SwitchModeSeg`；
+  待办场景（会改写一条正在计时的记录）额外给一次确认，换事项场景（选完还要挑事项）不给。
+- `mobileTimerActions.startTodo(target, mode)` 改造：空闲仍**整条交给后端** `todo_start`
+  （匹配 / 新建 / 软删待办都在 Rust，前端不重写第二套规则）；非 idle 走「先切换、
+  **成功了**才软删待办」，顺序反了就会出现「待办没了、时间也没记到这条上」。
+  三个动作（`switchTo` / `startTodo` / `createAndSwitch`）由 `void` 改为返回 `boolean`，
+  调用方据此决定删不删待办。
+- 同名事项匹配**与后端 `repositories/item.rs:22-33` 的 `find_by_name` 三条口径全对齐**：
+  `name = ? COLLATE BINARY` ≡ `===`；`deleted_at IS NULL`（**归档也算命中**，故用
+  `itemApi.list({ includeArchived: true })`）；`ORDER BY id ASC LIMIT 1`（同名多条取**最小 id**）。
+  **不得改回 `useItemStore.items`**——那是选择器口径（不含归档、按 `is_pinned/sort_order` 排序），
+  拿它匹配会让 idle（走后端）与非 idle（走前端）两条路径选出不同事项，正好造出同名两条，
+  破坏 `todo_start.rs` 写明的不变量。这份带归档的列表只用于本次匹配、不写回 store。
+- 连点锁用 `useRef` 且**只放在 idle 分支内**：`useState` 读到的是本次 render 的闭包快照，
+  两次点击落在同一 commit 时 DOM 上挂的还是旧 handler，锁会被绕过；而把锁提到 `startTodo`
+  首行则会误伤「非 idle 弹选单」这条不发命令的路径（sheet 不弹、notice 不弹，界面零反馈）。
+- `TodoRowMobile.onStart` 改为**可选**（`undefined` = 该行没有「开始」这个动作），
+  已完成区不传；`active` 时同槽位渲染静态标记（`role="status"`），不再是可点按钮。
+
+**契约与门禁**
+
+- **契约零变化**：命令 **67** / 事件 **11** / 错误码 **16**，`check:contract` 输出
+  `67/67/67/67 · 16/16 · 11/11`；DB schema 不变。本轮未新增任何 IPC 命令与事件——
+  新面板 `todoSwitch` 是 `mobileUiStore` 的纯本地 Sheet 载荷，不走 IPC。
+  （本子节记的是**写入时**的 `check:contract` 输出；同段落开篇那句「命令 65」是
+  V1.0-Android（T2–T5）批次完成时的快照，两者不同源。65 → 67 的变动来自改名与数据迁移任务
+  ——新增 `get_migration_info` / `open_legacy_dir` 两条迁移期命令——**不由本轮引入**，
+  故原行按历史记录保留。）
+- `npm run check`：typecheck / contract / size / version / layers / lint 全绿（单文件 ≤300 行，
+  CSS 只用 `var(--*)`，本轮只新增一条 `.m-todo__live` 规则）。
+- `npm test`：vitest 41 个文件全绿（本轮功能新增 **29** 条，分布在
+  `services/mobileTimerActions.test.ts`（11）、`components/mobile/TodoRowMobile.test.tsx`（6）、
+  `ItemsPage.todoStart.test.tsx`（6）、`ItemsPage.guard.test.tsx`（3）、
+  `TodoSwitchSheet.test.tsx`（3）；QA 的 `TodoStartEdges*.test.tsx` 属走查验收集、
+  会随轮次增补，故总数不写死）。
+
+**已知边界（不美化）**
+
+| 边界 | 说明 |
+|---|---|
+| pause 后切换失败无补偿 | running + 「结束并新开」时先 `pause`，若随后 `switch_item` 失败，秒表停在**暂停态**且不自动恢复。**此行为本轮之前就存在**（桌面 `useTimerActions.startOrSwitch` 同模式），修它需先定「失败后该恢复还是保持暂停」的产品口径，两端一起改 |
+| 切换失败可能留下孤儿事项 | `createAndSwitch` 建事项成功但切换失败时，会留下一条同名事项。**可自愈**（重试按名字命中，不会二次新建） |
+| 两条同名待办无法区分 | 「计时中」判定是标题匹配，两条同名待办会**同时**显示标记、且两行都没有「开始」按钮。根治需把 todo→item 做成真绑定（数据模型变更），未在本轮 |
+| 标记播报不一定生效 | `role="status"` 挂在随内容一起新建的节点上，live region 需「先存在后变更」才会播报，部分 TalkBack / VoiceOver 版本可能不读。静态文本本身可读 |
+| 安卓包未构建 | 本机无 Android SDK / NDK / JDK，本轮**未产出 APK、未做真机验证**。验收来自 vitest 全量用例（41 个文件）与代码审查，不含真机手感 |
+
+（全前端改动：未触碰任何 `.rs`，故未跑 cargo 相关门禁。）
+
 ### 依赖与入口（T2）
 
 - `Cargo.toml`：`tauri` 的 `tray-icon` / `image-png` / `image-ico` 与 `autostart` /

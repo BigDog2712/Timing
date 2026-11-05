@@ -8,10 +8,15 @@
  *   ③ 今日记录 —— 按事项 + 时间连续性合并（`lib/todayGroups`），**点行 = 开始这一条**，
  *      长按 = 事项菜单（停止计时 / 编辑 / 归档 / 删除）。
  *
- * 待办「开始」走 `todo_start`：后端按标题匹配事项并**当场移除待办**，
- * 所以这里必须重拉待办 store，否则那一行会留在屏幕上（PRD P0-6 的验收点）。
+ * 待办「开始」（与桌面同一条逻辑，用户视角「待办就是给计时的」）：
+ *   - 空闲 → `todo_start`：后端按标题匹配或新建事项、开计、**当场移除待办**，
+ *     前端不重复这套匹配（两份规则迟早不一致）；
+ *   - 已经在计时 → 此刻要谈的不是「开始」而是「这一段怎么收尾」，弹 `todoSwitch` 选单
+ *     让人选「结束并新开 / 仅改归属」（后端 `todo_start` 这时只会回 TIMER_ALREADY_RUNNING，
+ *     用户体感就是「点了没反应」）。
+ * 两条路径成功后都会重拉待办 store，否则那一行会留在屏幕上（PRD P0-6 的验收点）。
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLongPress } from '../../hooks/useLongPress';
 import { useTimerActions } from '../../hooks/useTimerActions';
 import { useTimerTick } from '../../hooks/useTimerTick';
@@ -27,6 +32,7 @@ import { useMobileUiStore } from '../../stores/mobileUiStore';
 import { itemName, useItemStore } from '../../stores/itemStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { useTodoStore } from '../../stores/todoStore';
+import type { Todo } from '../../types/domain';
 import { TodoRowMobile } from './TodoRowMobile';
 
 interface RecordRowProps {
@@ -57,6 +63,9 @@ export function ItemsPage() {
   const todosError = useTodoStore((s) => s.error);
   const items = useItemStore((s) => s.items);
   const session = useTimerStore((s) => s.state.session);
+  /* 订阅状态只为「计时中 / 已暂停」这句标记的文案（P2-5）：暂停时秒表停着，
+     而移动端的恢复入口只在计时页，文案不区分就看不出来。 */
+  const timerStatus = useTimerStore((s) => s.state.status);
   const liveSec = useTimerTick();
   const today = useTodayRecords();
   const timerActions = useTimerActions();
@@ -66,6 +75,11 @@ export function ItemsPage() {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [showDone, setShowDone] = useState(false);
+  /* 「这条待办正在开计时」的锁（P2-1 / P2-12）。用 `useRef` 而不是 `useState`：
+     两次点击可能落在同一个 commit 里，那时 DOM 上挂的还是上一次 render 的 handler，
+     `useState` 读到的 `starting` 是**闭包快照**（仍为 false），锁形同虚设；
+     `ref.current` 是同步写入，同一同步块内连发也会被挡住。 */
+  const startingRef = useRef(false);
   /* 逾期判定基准每分钟刷新一次；不需要高频 tick */
   const [now, setNow] = useState(() => Date.now());
 
@@ -93,6 +107,27 @@ export function ItemsPage() {
   const recordCount = today.recordCount + (session ? 1 : 0);
   const totalSec = today.totalSec + (session ? liveSec : 0);
   const activeName = itemName(items, session?.itemId ?? null);
+
+  /* 待办「开始」的唯一接线点（待办区；已完成区不传 onStart）。
+     计时状态在**点击那一刻**读：这一行只在 idle / running 之间切换时才需要不同反应，
+     没必要为此让整页订阅状态（`timerStatus` 订阅是给「已暂停」文案用的，与这里无关）。 */
+  const startTodo = async (todo: Todo) => {
+    if (useTimerStore.getState().state.status === 'idle') {
+      /* 锁只在 idle 分支里（P2-13）：真发命令的是这一支，才需要防连发。
+         非 idle 要弹选单，弹选单是同步的、一条命令都不发，
+         不该被「另一条待办正在开计时」挡住——否则用户点第二下界面零反馈，
+         正是这次需求要消灭的「点了没反应」。 */
+      if (startingRef.current) return;
+      startingRef.current = true;
+      try {
+        await mobileTimerActions.startTodo(todo);
+      } finally {
+        startingRef.current = false;
+      }
+      return;
+    }
+    openSheet({ kind: 'todoSwitch', todoId: todo.id, title: todo.title });
+  };
 
   const createTodo = async () => {
     const title = draft.trim();
@@ -157,8 +192,9 @@ export function ItemsPage() {
                 todo={todo}
                 now={now}
                 active={session != null && todo.title === activeName}
+                paused={timerStatus === 'paused'}
                 onToggle={(next) => void todosActions.toggle(todo.id, next).catch(() => undefined)}
-                onStart={() => void mobileTimerActions.startTodo(todo.id)}
+                onStart={() => void startTodo(todo)}
                 onDelete={() => todosActions.remove(todo.id)}
               />
             ))}
@@ -178,7 +214,8 @@ export function ItemsPage() {
                     todo={todo}
                     now={now}
                     onToggle={(next) => void todosActions.toggle(todo.id, next).catch(() => undefined)}
-                    onStart={() => void mobileTimerActions.startTodo(todo.id)}
+                    /* 已完成**不传 onStart**：后端 `todo_start` 对已完成待办只会回
+                       TODO_NOT_FOUND，那个按钮点了必报错。要计它先点圆圈取消完成。 */
                     onDelete={() => todosActions.remove(todo.id)}
                   />
                 ))}

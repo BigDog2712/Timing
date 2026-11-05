@@ -6,6 +6,9 @@
  *   - 仅改归属：只把这一条记录的归属改掉，秒表继续走、总时长不变（仍是一条）。
  * 空闲态没有「切换」可言，这个选择器退化成一个普通的「选一条开始」。
  *
+ * 方式分段与它的一句话说明住在 `SwitchModeSheet.tsx`（事项页「计时中点待办」也用同一份文案，
+ * 两边各写一份必然有一天分叉）。
+ *
  * 新建事项就地完成（输入 + 回车/按钮）：手机上先跳去设置页建事项再回来，
  * 等于把一次点击拆成五次导航。
  */
@@ -17,17 +20,7 @@ import { useItemStore } from '../../stores/itemStore';
 import { useTimerStore } from '../../stores/timerStore';
 import type { SwitchMode } from '../../types/domain';
 import { Sheet } from './Sheet';
-
-interface ModeOption {
-  id: SwitchMode;
-  label: string;
-  hint: string;
-}
-
-const MODES: readonly ModeOption[] = [
-  { id: 'end_and_start', label: '结束并新开', hint: '这段记入记录，新事项从 0 开始' },
-  { id: 'just_switch', label: '仅改归属', hint: '时长连续，仍是同一条记录' },
-];
+import { SwitchModeSeg } from './SwitchModeSheet';
 
 export function SwitchItemSheet() {
   const closeSheet = useMobileUiStore((s) => s.closeSheet);
@@ -86,25 +79,7 @@ export function SwitchItemSheet() {
         </div>
       }
     >
-      {status !== 'idle' && (
-        <div className="m-seg" role="radiogroup" aria-label="切换方式">
-          {MODES.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              role="radio"
-              aria-checked={mode === option.id}
-              className="m-seg__item"
-              data-on={mode === option.id ? 'true' : 'false'}
-              onClick={() => setMode(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {status !== 'idle' && <p className="m-hint">{MODES.find((m) => m.id === mode)?.hint}</p>}
+      {status !== 'idle' && <SwitchModeSeg mode={mode} onChange={setMode} disabled={busy} />}
 
       <ul className="m-list">
         {items.map((item) => (

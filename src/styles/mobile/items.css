@@ -123,6 +123,12 @@
   color: var(--ink-3);
 }
 
+/* 正在计时的静态标记：占住「开始」按钮那个槽位（不可点，见 TodoRowMobile 注释）。
+   颜色/字号沿用 .m-badge--accent，这里只补一条「不许被 flex 压扁」。 */
+.m-todo__live {
+  flex: 0 0 auto;
+}
+
 .m-todo[data-overdue="true"] .m-todo__time {
   color: var(--todo-overdue);
 }

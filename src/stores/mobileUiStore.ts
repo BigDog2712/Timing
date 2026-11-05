@@ -22,7 +22,12 @@ export type MobileSheet =
   | { kind: 'countdown' }
   | { kind: 'switchItem' }
   | { kind: 'recordEdit'; record: TimeRecord }
-  | { kind: 'itemMenu'; itemId: number };
+  | { kind: 'itemMenu'; itemId: number }
+  /**
+   * 计时中点某条待办：先问「这段怎么收尾」（结束并新开 / 仅改归属）。
+   * `title` 一起带过来：匹配事项、文案都要用，等待面板时不必再去 store 里找。
+   */
+  | { kind: 'todoSwitch'; todoId: number; title: string };
 
 interface MobileUiStore {
   tab: MobileTab;

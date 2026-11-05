@@ -24,6 +24,7 @@ import { RecordsPage } from './RecordsPage';
 import { RecoverSheet } from './RecoverSheet';
 import { SettingsPage } from './SettingsPage';
 import { SwitchItemSheet } from './SwitchItemSheet';
+import { TodoSwitchSheet } from './SwitchModeSheet';
 import { TimerPage } from './TimerPage';
 import { UndoToast } from './UndoToast';
 
@@ -71,6 +72,8 @@ function SheetHost({ sheet }: { sheet: MobileSheet }) {
       return <RecordEditSheet record={sheet.record} />;
     case 'itemMenu':
       return <ItemMenuSheet itemId={sheet.itemId} />;
+    case 'todoSwitch':
+      return <TodoSwitchSheet todoId={sheet.todoId} title={sheet.title} />;
     default:
       return null;
   }
@@ -89,7 +92,7 @@ export function MobileShell() {
   useMobileBackSheet(sheet != null);
   /* 恢复面板不可关闭：返回键只把历史条目续上，既不丢决定也不退出应用 */
   const holdRecover = useCallback(() => {
-    window.history.pushState({ tickbarRecover: true }, '');
+    window.history.pushState({ timingRecover: true }, '');
   }, []);
   useMobileBackSheet(recover != null, holdRecover);
 
