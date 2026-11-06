@@ -12,7 +12,7 @@ use tauri::{AppHandle, Manager};
 use crate::error::{AppError, AppResult};
 use crate::infra::native_bridge::NativeBridge;
 use crate::models::md_sync::MdSyncReport;
-use crate::models::native::{MirrorResult, SafStatus};
+use crate::models::native::{MirrorOutResult, MirrorResult, SafStatus};
 use crate::services::md_sync::mirror;
 use crate::state::AppState;
 
@@ -55,28 +55,46 @@ pub async fn open_file(app: &AppHandle, rel: &str) -> AppResult<()> {
 }
 
 /// 跑一轮完整同步。落点为空（用户全关了）或没选目录时返回错误，调用方按需展示。
+///
+/// 两处「先自查再动手」：
+/// - 目录授权：`mirrorIn` 里才失败的话，错误会经原生桥折成一句 `IO_ERROR`，用户在设置页
+///   看到的只有「系统调用失败」——先问一句 `safStatus`，就能给「去选目录」这种能照做的提示；
+/// - 镜像根：**由 Rust 算好绝对路径传给 Kotlin**。两边各自推导（Rust `app_data_dir` vs
+///   Kotlin `activity.dataDir`）在 Android 上恰好相同，但那是巧合而不是约定；一旦某个
+///   版本拼法变了，表现是「同步永远说没改动」，比报错难查得多。
 pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
     let pool = app.state::<AppState>().pool.clone();
-    let native = bridge(app)?;
+
+    if !saf_status(app).await?.granted {
+        return Err(AppError::md_sync_config_invalid(
+            "还没选 Obsidian 日记目录：点「日记目录 → 选择」授权一次",
+        ));
+    }
 
     let rels = mirror::mirror_paths(&pool).await?;
     if rels.is_empty() {
         return Err(AppError::md_sync_config_invalid("没有启用任何落点"));
     }
 
+    let root = mirror_root(app)?;
+    let native = bridge(app)?;
+
     /* 1. vault → 镜像。不存在的路径原生侧直接跳过（vault 里还没有今天的日记）。 */
-    let _: MirrorResult = native
-        .call("mirrorIn", serde_json::json!({ "paths": rels }))
+    let pulled: MirrorResult = native
+        .call("mirrorIn", serde_json::json!({ "root": &root, "paths": &rels }))
         .await?;
 
     /* 2. 与桌面同一套合并。 */
-    let report = mirror::run_in(&pool, &mirror_root(app)?).await?;
+    let mut report = mirror::run_in(&pool, &root).await?;
 
     /* 3. 镜像 → vault。全部路径都交回去，由原生侧按内容差异决定写不写；
        新增文件（今天第一次写日记）也在这一步被创建。 */
-    native
-        .call::<serde_json::Value>("mirrorOut", serde_json::json!({ "paths": rels }))
+    let pushed: MirrorOutResult = native
+        .call("mirrorOut", serde_json::json!({ "root": &root, "paths": &rels }))
         .await?;
 
+    /* 单个文件的读写失败不致命，但要并进报告——否则用户只看到「没有需要同步的改动」。 */
+    report.errors.extend(pulled.errors);
+    report.errors.extend(pushed.errors);
     Ok(report)
 }

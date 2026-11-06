@@ -2,6 +2,33 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.9 — 手机端同步修通：落点显示、报错原文、一个丢数据的洞
+
+0.11.8 的真机包在「设置 → 同步」页跑不通：落点那一行显示成一串 md 文件名，点「立即同步」
+只有一句「系统调用失败，请重试」。四处一起修。
+
+### 修复
+
+- **落点显示**：`SafVault.describe()` 原先取「目录里前三个子项名」拼接，现在取树 URI
+  document id 的路径段（`primary:Documents/Obsidian/日记` → `Documents/Obsidian/日记`），
+  给不出路径才退回 `COLUMN_DISPLAY_NAME`。
+- **报错原文不再被吃**：`SyncPane` 对 `IO_ERROR` 直接显示 `err.message`。手机上同步故障全在
+  原生侧，那句原文是唯一线索。全局 `errorText()` 不动（别处那句润色是对的）。
+- **保存不再因同步失败而失败**：`md_sync_save` 里顺手那轮改成 `if let Ok(...)`，
+  配置照常保存成功，红字只留给「立即同步」。
+- **堵掉覆盖日记的路径**：`mirrorIn` 对「读不出这个文件」原先 `continue` → Rust 判成
+  「vault 里没有今天这一篇」→ 按 SQL 渲染区块写回，覆盖用户手写内容。现在 `mirrorIn`
+  是「整轮成功或一字节不动」，`mirrorOut` 才保留逐文件容错（失败原因经 `errors` 进
+  `MdSyncReport.errors`，设置页照原样显示）。
+
+### 结构调整
+
+- 原生侧参数传递去掉 Jackson 反射（`@InvokeArg` + `parseArgs(Class)`），改 `invoke.getArgs()`
+  的 `org.json` 取值；三个 `@InvokeArg` 类删除。发布包开 R8，反射链被优化掉时症状同样是
+  「系统调用失败」，且更难查。
+- `mirrorIn` / `mirrorOut` 新增 `root` 入参：镜像根由 Rust 的 `app_data_dir()` 算好显式传入，
+  不再让 Kotlin 用 `activity.dataDir` 自行推导（当前版本两者相同，是巧合不是约定）。
+
 ## 0.11.8 — 手机端接回 md 双向同步与悬浮条（双形态）
 
 这一版只动手机端，桌面功能零变更；桌面侧新增的 4 条命令是桩（调用即回 `IO_ERROR`）。

@@ -161,11 +161,28 @@ class SafVault(private val ctx: Context, val treeUri: Uri) {
         return true
     }
 
-    /** 给设置页显示的人话目录名（部分 provider 能给出真实名，给不出就退回 URI）。 */
+    /**
+     * 给设置页显示的人话目录：`Documents/Obsidian/日记` 这种可读路径。
+     *
+     * 原先这里取「目录里前三个子项的名字」拼成 `2026-09-19.md、2026-09-20.md…`——
+     * 明明是选目录，界面上看起来却像是把两个文件当成了落点（V0.11.9 修）。而且
+     * provider 返回顺序不保证，显示的还可能是一年前的文件。
+     *
+     * 树 URI 的 document id 本身就带路径（`primary:Documents/Obsidian/日记`），
+     * 取冒号后那截即可；极少数 provider 给不出路径时退回 `COLUMN_DISPLAY_NAME`。
+     */
     fun describe(): String {
-        val parts = children(rootId).take(3).map { it.name }
-        val suffix = if (parts.isEmpty()) "（空目录）" else parts.joinToString("、")
-        return "$suffix · …"
+        rootId.substringAfter(':', "").takeIf { it.isNotBlank() }?.let { return it }
+        val name = runCatching {
+            resolver.query(
+                uriOf(rootId),
+                arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )?.use { if (it.moveToFirst()) it.getString(0) else null }
+        }.getOrNull()
+        return name?.takeIf { it.isNotBlank() } ?: "已选目录"
     }
 
     companion object {

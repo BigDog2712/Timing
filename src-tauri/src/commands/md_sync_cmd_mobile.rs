@@ -29,13 +29,17 @@ pub async fn md_sync_get(app: AppHandle) -> AppResult<MdSyncView> {
 
 /// 保存配置。目录还没选（或授权失效）时**只保存不报错**：用户多半是先开开关、
 /// 下一步才去选目录；这一步回一句「未授权」会让人以为设置没保存上。
+///
+/// 保存后顺手同步一轮，但**这一轮的失败不算保存失败**：开关已经写进库了，
+/// 回一句红字会让用户以为「没开成功」而反复点。真正的原因留给「立即同步」去说。
 #[tauri::command]
 pub async fn md_sync_save(app: AppHandle, config: MdSyncConfig) -> AppResult<MdSyncView> {
     let pool = app.state::<AppState>().pool.clone();
     md_sync::config::save(&pool, &config).await?;
     if config.enabled && md_sync_mobile::saf_status(&app).await?.granted {
-        let report = md_sync_mobile::sync_once(&app).await?;
-        announce(&app, &report);
+        if let Ok(report) = md_sync_mobile::sync_once(&app).await {
+            announce(&app, &report);
+        }
     }
     md_sync::get_view(&pool).await
 }

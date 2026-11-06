@@ -36,4 +36,16 @@ pub struct OverlayStatus {
 pub struct MirrorResult {
     /// 存在的文件才会出现在这里；不存在的路径说明「vault 里还没有今天的日记」。
     pub files: Vec<String>,
+    /// 单个文件读写失败的原因。不是致命错误（其余文件照常同步），但要让用户看见。
+    #[serde(default)]
+    pub errors: Vec<String>,
+}
+
+/// 写回结果：真正落盘的文件数与失败原因。
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MirrorOutResult {
+    pub written: u32,
+    #[serde(default)]
+    pub errors: Vec<String>,
 }

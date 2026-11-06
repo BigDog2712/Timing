@@ -15,8 +15,20 @@
 import { useCallback, useEffect, useState } from 'react';
 import { MD_SYNC_KIND_LABELS } from '../../types/domain';
 import type { MdSyncConfig, MdSyncReport, MdSyncView, SafStatus } from '../../types/domain';
-import { errorText } from '../../services/ipc';
+import { errorText, IpcError } from '../../services/ipc';
 import { mobileNative } from '../../services/mobileNative';
+
+/**
+ * 同步失败时的提示。
+ *
+ * `errorText()` 把 `IO_ERROR` 统一润色成「系统调用失败，请重试」——那句话在别处是对的，
+ * 在这一页却是灾难：手机上的同步失败**全都**来自原生桥（SAF 授权、目录读写），后端给的
+ * 原文（「原生桥 mirrorIn 失败：…」）恰好是唯一能定位问题的线索，被润色掉就只剩盲猜。
+ */
+function syncErrorText(err: unknown): string {
+  if (err instanceof IpcError && err.code === 'IO_ERROR' && err.message) return err.message;
+  return errorText(err);
+}
 
 function reportText(report: MdSyncReport): string {
   if (report.errors.length > 0) return report.errors.join('；');
@@ -41,7 +53,7 @@ export function SyncPane() {
   }, []);
 
   useEffect(() => {
-    void reload().catch((err) => setNote(errorText(err)));
+    void reload().catch((err) => setNote(syncErrorText(err)));
   }, [reload]);
 
   const save = async (next: MdSyncConfig) => {
@@ -51,7 +63,7 @@ export function SyncPane() {
       setView(await mobileNative.syncSave(next));
       setNote('已保存');
     } catch (err) {
-      setNote(errorText(err));
+      setNote(syncErrorText(err));
     } finally {
       setBusy(false);
     }
@@ -71,7 +83,7 @@ export function SyncPane() {
       setNote(reportText(await mobileNative.syncRun()));
       setView(await mobileNative.syncView());
     } catch (err) {
-      setNote(errorText(err));
+      setNote(syncErrorText(err));
     } finally {
       setBusy(false);
     }
@@ -84,7 +96,7 @@ export function SyncPane() {
       setNote(reportText(await mobileNative.syncRun()));
       setView(await mobileNative.syncView());
     } catch (err) {
-      setNote(errorText(err));
+      setNote(syncErrorText(err));
     } finally {
       setBusy(false);
     }
