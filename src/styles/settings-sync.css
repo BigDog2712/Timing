@@ -38,12 +38,6 @@
   color: var(--ink-3);
 }
 
-.sync__plugin {
-  margin: var(--space-1) 0 0;
-  font-size: var(--text-cap);
-  color: var(--ink-4);
-}
-
 .sync__enable {
   display: flex;
   flex: none;
@@ -251,17 +245,6 @@
   color: var(--danger);
 }
 
-.sync__warn {
-  margin: 0;
-  padding: var(--space-2);
-  border: 1px solid var(--warn);
-  border-radius: var(--radius-sm);
-  background: var(--warn-wash);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  color: var(--ink-2);
-}
-
 .sync__ok {
   margin: 0;
   padding: var(--space-2);
@@ -293,7 +276,6 @@
   color: var(--ink-4);
 }
 
-.sync__foot code,
-.sync__warn code {
+.sync__foot code {
   font-family: var(--font-mono);
 }

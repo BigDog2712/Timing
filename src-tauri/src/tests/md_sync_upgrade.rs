@@ -1,16 +1,17 @@
-//! 升级路径：插件后来新增了第三种落点，**已有用户**能不能拿到它。
+//! 升级路径：内核后来新增了第三种落点，**已有用户**能不能拿到它。
 //!
 //! 这是本轮唯一一个会让功能「只对新装用户可用」的坑。`config::load` 原本是
 //! `saved.or(defaults)`（保存值整体优先），而 v0.4.0 的用户保存过的配置里只有
 //! timers + notes 两条。设置页只渲染 `config.bindings`、没有「添加落点」入口，
 //! 所以 saved 一旦存在，`todos` 就永远进不了生效配置——待办区块一次也不会被写出来。
 //!
-//! 修法见 `config::merge_bindings`：saved 的总开关、顺序与内容原样保留，插件默认值里
+//! 修法见 `config::merge_bindings`：saved 的总开关、顺序与内容原样保留，默认值里
 //! **saved 完全没有的 kind** 追加到末尾。用户主动禁用（`enabled: false`）的落点仍在
 //! saved 里，因此不会被默认值重新打开。
 //!
-//! 这里的「插件默认值」就是仓库里真实的 `plugins/md-sync`：扫描的 dev 源优先于
-//! `app_data` 下的测试插件，所以 `config::load` 拿到的是它声明的那三条落点。
+//! [V0.11.5] 这里的「默认值」已从插件换成**内核默认值**
+//! （`models::md_sync_config::default_bindings()`）：同步搬进内核后，这条升级路径
+//! 依然存在（以后再加第四种 kind 还是同一个问题），所以这些用例一个都不能少。
 
 use crate::infra::md_file;
 use crate::models::md_sync::{MdSyncBinding, MdSyncConfig, MdSyncKind};
@@ -36,13 +37,11 @@ async fn save_old_config(env: &Env) {
 }
 
 #[tokio::test]
-async fn a_saved_config_gets_the_new_kind_from_the_plugin() {
+async fn a_saved_config_gets_the_new_kind_from_the_kernel() {
     let env = env("md-upgrade").await;
     save_old_config(&env).await;
 
-    let view = services::md_sync::get_view(&env.pool, &env.app_data)
-        .await
-        .unwrap();
+    let view = services::md_sync::get_view(&env.pool).await.unwrap();
 
     assert_eq!(view.config.bindings.len(), 3, "新 kind 应被补齐");
     assert_eq!(
@@ -73,9 +72,7 @@ async fn a_disabled_saved_binding_stays_disabled() {
     };
     config::save(&env.pool, &old).await.unwrap();
 
-    let view = services::md_sync::get_view(&env.pool, &env.app_data)
-        .await
-        .unwrap();
+    let view = services::md_sync::get_view(&env.pool).await.unwrap();
     let saved = view
         .config
         .bindings
@@ -95,9 +92,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
     let env = env("md-upgrade-write").await;
     save_old_config(&env).await;
 
-    let view = services::md_sync::get_view(&env.pool, &env.app_data)
-        .await
-        .unwrap();
+    let view = services::md_sync::get_view(&env.pool).await.unwrap();
     let merged = view.config.bindings.clone();
     let todos = merged
         .iter()
@@ -107,7 +102,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
     assert_eq!(todos.heading, TODOS_HEADING);
     assert!(!todos.file.trim().is_empty());
 
-    /* 把落点全部指向临时目录再跑：目的是不碰插件里声明的真实路径（作者本机日记）。 */
+    /* 把落点全部指向临时目录再跑：目的是不碰内核默认值里的真实路径（用户文档目录）。 */
     let redirected: Vec<MdSyncBinding> = merged
         .into_iter()
         .map(|mut item| {
@@ -138,9 +133,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
     .await
     .unwrap();
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
 
     let text = std::fs::read_to_string(file_for(&env)).unwrap();

@@ -162,7 +162,6 @@ async fn toggle_missing_todo_rejected() {
     );
 }
 
-
 #[tokio::test]
 async fn delete_is_soft_and_idempotent() {
     let pool = fresh_pool("todo-delete").await;

@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import { COUNTDOWN_WARN_SEC, DEBOUNCE_MS } from '../../lib/constants';
+import { COUNTDOWN_WARN_SEC, DEBOUNCE_MS, HIGHLIGHT_MS } from '../../lib/constants';
 import { clientToLayer } from '../../lib/fitBounds';
 import { defaultCountdownSec } from '../../lib/countdown';
 import { useTimerActions } from '../../hooks/useTimerActions';
@@ -35,8 +35,7 @@ import { NewItemEntry } from './NewItemEntry';
 import { NoteHandle } from './NoteHandle';
 import { TimerDisplay } from './TimerDisplay';
 
-/** [V0.3.1] 高亮闪烁总时长：CSS 动画 0.8s/次 × 3 次，留一点余量再摘属性 */
-const HIGHLIGHT_MS = 2500;
+/** [V0.3.1] 高亮闪烁总时长见 `lib/constants` 的 `HIGHLIGHT_MS`（圆点形态共用同一个值） */
 
 const RING_LABEL: Record<VisualState, string> = {
   idle: '开始计时',

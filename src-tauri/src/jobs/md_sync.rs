@@ -1,4 +1,4 @@
-//! Markdown 双向同步轮询（V0.4.0 / 插件 API v2；V0.11.3 改为可调间隔）。
+//! Markdown 双向同步轮询（V0.4.0；V0.11.3 改为可调间隔；V0.11.5 起不再读插件目录）。
 //!
 //! 为什么是轮询而不是 `notify`：
 //! - 不新增平台依赖，Windows / macOS / Linux 行为一致；
@@ -21,7 +21,6 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 
 use crate::app::events;
-use crate::models::constants::MD_SYNC_POLL_SECS;
 use crate::services;
 use crate::state::AppState;
 
@@ -29,22 +28,13 @@ use crate::state::AppState;
 pub fn spawn_md_sync_watcher(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
-            let app_data_dir = match app.path().app_data_dir() {
-                Ok(dir) => dir,
-                Err(err) => {
-                    crate::log_warn!("resolve app data dir failed: {err}");
-                    /* 拿不到目录就按默认节奏再试，不能让任务直接退出。 */
-                    tokio::time::sleep(Duration::from_secs(MD_SYNC_POLL_SECS)).await;
-                    continue;
-                }
-            };
             let pool = app.state::<AppState>().pool.clone();
-            match services::md_sync::tick(&pool, &app_data_dir).await {
+            match services::md_sync::tick(&pool).await {
                 Ok(Some(report)) => events::emit_md_sync_changed(&app, &report),
                 Ok(None) => {}
                 Err(err) => crate::log_warn!("md sync tick failed: {err}"),
             }
-            let secs = services::md_sync::poll_secs(&pool, &app_data_dir).await;
+            let secs = services::md_sync::poll_secs(&pool).await;
             tokio::time::sleep(Duration::from_secs(secs)).await;
         }
     });

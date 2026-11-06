@@ -35,7 +35,7 @@ pub fn list(app_data_dir: &Path) -> PluginListResult {
     for hit in plugin_fs::scan(app_data_dir) {
         let dir = hit.dir.to_string_lossy().to_string();
         match hit.manifest {
-            Ok(manifest) => {
+            Ok((manifest, warnings)) => {
                 if let Some(winner) = seen.get(&manifest.id) {
                     plugins.push(PluginInfo {
                         id: format!("{}:{}", hit.source.as_str(), manifest.id),
@@ -51,7 +51,7 @@ pub fn list(app_data_dir: &Path) -> PluginListResult {
                             source_label(winner)
                         )),
                         quick_timers: Vec::new(),
-                        md_sync: None,
+                        warnings: Vec::new(),
                     });
                     continue;
                 }
@@ -67,7 +67,7 @@ pub fn list(app_data_dir: &Path) -> PluginListResult {
                     enabled: manifest.enabled,
                     error: None,
                     quick_timers: manifest.contributes.quick_timers,
-                    md_sync: manifest.contributes.md_sync,
+                    warnings,
                 });
             }
             Err(error) => {
@@ -89,7 +89,7 @@ pub fn list(app_data_dir: &Path) -> PluginListResult {
                     enabled: false,
                     error: Some(error),
                     quick_timers: Vec::new(),
-                    md_sync: None,
+                    warnings: Vec::new(),
                 });
             }
         }

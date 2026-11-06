@@ -1,6 +1,6 @@
-//! Markdown 同步命令（V0.4.0 / 插件 API v2）。
+//! Markdown 同步命令（V0.4.0；V0.11.5 起为内核功能，不再依赖插件目录）。
 //!
-//! 四个命令都只做「取路径 → 调 service → 返回」：
+//! 四个命令都只做「取 pool → 调 service → 返回」：
 //! - `md_sync_get`：设置页初始化；
 //! - `md_sync_save`：校验 + 落 `settings` KV + 立刻同步；
 //! - `md_sync_run`：手动同步；
@@ -9,7 +9,7 @@
 use tauri::{AppHandle, Manager};
 
 use crate::app::events;
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::models::md_sync::{MdSyncConfig, MdSyncKind, MdSyncReport, MdSyncView};
 use crate::services;
 use crate::state::AppState;
@@ -28,33 +28,29 @@ fn announce(app: &AppHandle, report: &MdSyncReport) {
 
 #[tauri::command]
 pub async fn md_sync_get(app: AppHandle) -> AppResult<MdSyncView> {
-    let dir = app.path().app_data_dir().map_err(AppError::io)?;
     let pool = app.state::<AppState>().pool.clone();
-    services::md_sync::get_view(&pool, &dir).await
+    services::md_sync::get_view(&pool).await
 }
 
 #[tauri::command]
 pub async fn md_sync_save(app: AppHandle, config: MdSyncConfig) -> AppResult<MdSyncView> {
-    let dir = app.path().app_data_dir().map_err(AppError::io)?;
     let pool = app.state::<AppState>().pool.clone();
     /* 保存会顺手同步一轮；把那一轮的报告也拿出来广播，结果与「立即同步」一致。 */
-    let (view, report) = services::md_sync::save_config_with_report(&pool, &dir, &config).await?;
+    let (view, report) = services::md_sync::save_config_with_report(&pool, &config).await?;
     announce(&app, &report);
     Ok(view)
 }
 
 #[tauri::command]
 pub async fn md_sync_run(app: AppHandle) -> AppResult<MdSyncReport> {
-    let dir = app.path().app_data_dir().map_err(AppError::io)?;
     let pool = app.state::<AppState>().pool.clone();
-    let report = services::md_sync::run(&pool, &dir).await?;
+    let report = services::md_sync::run(&pool).await?;
     announce(&app, &report);
     Ok(report)
 }
 
 #[tauri::command]
 pub async fn md_sync_open(app: AppHandle, kind: MdSyncKind) -> AppResult<()> {
-    let dir = app.path().app_data_dir().map_err(AppError::io)?;
     let pool = app.state::<AppState>().pool.clone();
-    services::md_sync::open(&pool, &dir, kind).await
+    services::md_sync::open(&pool, kind).await
 }

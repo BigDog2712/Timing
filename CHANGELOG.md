@@ -2,6 +2,49 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.5 — 圆点放大 / 外环增长 / 置顶重申 / 高亮覆盖圆点 / md 同步内核化 + 插件 API v3
+
+用户口径：「小圆点太小了，放大 1.5 倍；外圈那条环不要长度固定地绕圈，要从 12 点随着时间往前
+延伸，60 秒长满一圈后重来；小圆点形态老被别的窗口盖住；托盘双击的高亮对小圆点不生效」，
+外加架构侧决定：Markdown 同步从插件搬进内核，插件 API 升到 v3。
+
+### 小圆点：33px + 增长弧 + 可高亮
+
+- **22px → 33px**（1.5 倍）：`--dot-size` 与 `CollapsedDot` 全部几何常量等比放大，描边单独微调
+  （1.1 / 2.4 / 1.5）——严格等比在 1x 屏上会糊。
+- **外环弧改为「从起点增长」**：正计时（running / paused）用 `frac = (displaySec % 60) / 60`
+  配 `stroke-dashoffset`，弧从 12 点生长，60 秒长满一圈后重来；暂停时弧冻在当前长度，靠颜色
+  区分暂停。原先那套「90° 固定短弧 + 整组 `<g>` CSS 转 60s」连同 `data-turn` / `dot-turn` 一起删除。
+- 倒计时 / 待命 / 结束 / 空闲**不改口径**：仍复用 `MainButton.arcSpec`。
+- **托盘双击高亮覆盖圆点**：`HIGHLIGHT_MS` 提到 `lib/constants`，圆点自己订阅 `highlightSeq`，
+  挂 `data-highlight`，用 `inset` box-shadow 画内侧环（窗口贴内容，外发光会被裁掉）。
+  `dot-warn` 改的是 opacity、高亮改的是 box-shadow，两者可同时成立。
+
+### 主窗恒定置顶
+
+`alwaysOnTop: true` 只建窗那一刻生效。收起成圆点时前端会 `set_position` + `set_size`，几何变动后
+主窗实测会被别的窗口盖住。现在 `show_main()` 之后重申一次置顶，主窗的 `Moved` / `Resized`
+事件后再重申一次（失败只记日志，不新增 IPC 命令）。
+
+### Markdown 同步：插件 → 内核，出厂默认关
+
+- 默认三档落点（timers / notes / todos）改由内核 `default_bindings()` 给出，标题走
+  `MdSyncKind::label()`；`Default::default().enabled = false`，**`enabled` 的 serde default 同步改成
+  `false`**（只改 Default 不改 serde，JSON 缺字段就会变 true，两处口径分叉）。
+- 老用户保存值里 `enabled: true` 原样保留；`merge_bindings` 仍是「保存值在前、只补缺 kind」，
+  用户改过的根目录不会被默认值静默覆盖。
+- `config::load` / `poll_secs` 去掉 `app_data_dir` 参数，`Loaded` 与 `installed()` 删除；
+  `CONFIG_KEY` 值 `plugin.md-sync.config` 不动（老用户磁盘上的键）。
+- 删掉仓库内 `plugins/md-sync/`（`plugin.json` + `README.md`），`plugin_dev` 测试文件随之删除。
+
+### 插件 API v3
+
+- `PLUGIN_API_VERSION` 2 → 3；`contributes.mdSync` **下架**：字段保留（`Option<serde_json::Value>`，
+  能「看见它存在」但不解析），`PluginInfo` 增加`warnings: Vec<String>`。
+- 写了 `mdSync` 的清单**不再拒载**，改为黄字警告（插件仍生效）；红字 `error` 仍是「没生效」。
+- `permissions` / `engines` / `author` / `homepage` / `dependencies` 只写进规格与类型，本轮不解析、
+  不校验（解析留给 v0.11.6）。
+
 ## 0.11.4 — 小圆点：缩一半、改成钟表口径、点开是临时的
 
 用户口径：「悬浮形态小圆点太大了，缩小一倍；外环应一分钟转一圈，内部分针一小时转一圈；

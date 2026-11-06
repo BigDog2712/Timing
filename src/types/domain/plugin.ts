@@ -1,15 +1,14 @@
 /**
- * Timing — 插件域类型（V0.3.2）
+ * Timing — 插件域类型（V0.3.2 起；V0.11.5 升到 API v3）
  * -----------------------------------------------------------------------------
  * 与 `src-tauri/src/models/plugin.rs` 逐字对应（`#[serde(rename_all = "camelCase")]`）。
  *
  * 插件是**声明式**的：宿主读 `<插件目录>/plugin.json`（启动头），不执行插件代码。
  * - v1：`quickTimers`（摸鱼菜单的预设行）；
- * - v2：新增 `mdSync`（Markdown 双向同步落点）。
+ * - v2：`mdSync`（Markdown 双向同步落点）——**[v3] 已下架**（同步已归内核）；
+ * - v3：只定下了权限 / engines / 依赖几个字段的形状，运行时一个都没实现。
  * 字段语义见 `docs/plugin-spec.md`。
  */
-
-import type { MdSyncContribution } from './mdSync';
 
 /** 摸鱼菜单的一行：事项名 + 目标倒计时分钟数 */
 export interface QuickTimer {
@@ -33,7 +32,7 @@ export interface PluginInfo {
   id: string;
   name: string;
   version: string;
-  /** 启动头声明的 API 版本；宿主当前支持 2 */
+  /** 启动头声明的 API 版本；宿主当前支持 3 */
   apiVersion: number;
   description: string;
   source: PluginSource;
@@ -44,8 +43,11 @@ export interface PluginInfo {
   error: string | null;
   /** 该插件声明的快捷计时（未生效时后端也会回填，但不会进合并结果） */
   quickTimers: QuickTimer[];
-  /** [v2] 该插件声明的 Markdown 同步落点；未生效时为 null */
-  mdSync: MdSyncContribution | null;
+  /**
+   * [v3] 非致命提示：插件**仍生效**，但有东西被忽略了（例如清单里还写着 `mdSync`）。
+   * 与 `error` 是两个层级——`error` 非空 = 该插件没生效。
+   */
+  warnings: string[];
 }
 
 export interface PluginListResult {

@@ -1,8 +1,8 @@
 /**
- * Timing — 设置 · 同步页签（V0.4.0 / 插件 API v2）
+ * Timing — 设置 · 同步页签（V0.4.0 起；V0.11.5 起是**内核功能**，不再是插件贡献点）
  * -----------------------------------------------------------------------------
- * 这是 md-sync 插件的「快捷设置落点」入口：
- * - 总开关：停止读写但保留配置；
+ * 落点入口：
+ * - 总开关：停止读写但保留配置（出厂默认关，用户自己打开）；
  * - 每个数据种类一张卡：根目录（原生文件夹选择）、文件模板、标题行；
  * - 保存后立即同步一次；「立即同步」只读现有配置；
  * - 状态来自 Rust 侧最后一次运行，失败原因原样展示，不假装成功。
@@ -67,10 +67,11 @@ export function MdSyncTab() {
     void load();
   }, [load]);
 
-  /* 关掉总开关时把落点设置自动收起来；重新打开、或插件未安装时展开。 */
+/* 关掉总开关时把落点设置自动收起来；重新打开时展开。
+   [V0.11.5] 去掉「插件未安装就展开」——同步已是内核功能，没有装没装这回事。 */
   useEffect(() => {
-    setSettingsOpen(enabled || !view?.installed);
-  }, [enabled, view?.installed]);
+    setSettingsOpen(enabled);
+  }, [enabled]);
 
   /* 第一次拿到视图 / 保存后重新拿到视图时，把草稿同步过来；dirty 时不动。 */
   useEffect(() => {
@@ -159,9 +160,10 @@ export function MdSyncTab() {
             默认每 {describeInterval(Number.parseInt(pollMin, 10) || POLL_DEFAULT_MINUTES)}自动对齐一次；
             两边同时改过时，以 Markdown 为准。想立刻同步点「立即同步」。
           </p>
-          {view?.installed && (
-            <p className="sync__plugin">
-              插件：{view.pluginName} v{view.pluginVersion}
+          {/* [V0.11.5] 出厂默认关：三档落点已备好，但要用户自己把总开关打开。 */}
+          {loaded && !enabled && (
+            <p className="sync__hint">
+              同步出厂默认关闭：三档落点已经备好，把右侧「启用」打开即可开始。
             </p>
           )}
         </div>
@@ -209,12 +211,6 @@ export function MdSyncTab() {
         </button>
       )}
 
-      {loaded && view && !view.installed && (
-        <p className="sync__warn">
-          未检测到声明 mdSync 的插件。把 <code>plugins/md-sync</code> 放进插件目录后，到「插件」页签点「重新加载」。
-        </p>
-      )}
-
       {error && <p className="sync__error">{error}</p>}
       {notice && <p className="sync__ok">{notice}</p>}
 
@@ -252,7 +248,7 @@ export function MdSyncTab() {
 
         {bindings.length === 0 ? (
           <p className="sync__empty">
-            {loading ? '正在读取落点…' : '这个插件没有声明可同步的落点。'}
+            {loading ? '正在读取落点…' : '没有可同步的落点。'}
           </p>
         ) : (
           bindings.map((binding, index) => (

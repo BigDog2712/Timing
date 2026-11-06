@@ -24,50 +24,33 @@ pub(super) const TODOS_HEADING: &str = "#### 待办事项";
 /* 夹具对本目录的其他用例模块可见：`md_sync_live` 复用同一套临时库 + 落点配置。 */
 pub(super) struct Env {
     pub(super) pool: SqlitePool,
-    pub(super) app_data: PathBuf,
     pub(super) vault: PathBuf,
     pub(super) date: NaiveDate,
 }
 
 pub(super) async fn env(tag: &str) -> Env {
-    let app_data = unique_dir(tag);
-    std::fs::create_dir_all(&app_data).unwrap();
-    write_test_plugin(&app_data);
-
     let vault = unique_dir(&format!("{tag}-vault"));
     std::fs::create_dir_all(&vault).unwrap();
     let env = Env {
         pool: fresh_pool(tag).await,
-        app_data,
         vault,
         date: Local::now().date_naive(),
     };
-    /* **安全底线，不要删**：插件扫描的 dev 源（仓库 `plugins/`）优先级高于本目录里
-    写的测试插件，所以「还没保存配置 / 只保存了部分落点」的用例会拿到仓库 `md-sync`
-    声明的真实落点——仓库 `plugin.json` 里的占位目录 `%USERPROFILE%\Documents\Timing`
-    （0.5.0 前是作者本机的云同步日记目录）。那样一次 `md_sync::run` 就会把空库内容
-    写进用户的真实日记（本轮真出过这个事故）。这里先把**三种 kind** 都锁到临时目录，
-    配合 `save_binding` 的「按 kind 就地替换」，任何用例都不可能写到仓库之外去。 */
-    for (kind, heading) in [
-        (MdSyncKind::Timers, TIMERS_HEADING),
-        (MdSyncKind::Notes, NOTES_HEADING),
-        (MdSyncKind::Todos, TODOS_HEADING),
-    ] {
-        save_binding(&env.pool, binding(kind, &env.vault, "{date}.md", heading)).await;
-    }
+    /* **安全底线，不要删**：内核默认落点指向 `%USERPROFILE%\Documents\Timing`
+    （用户的真实文档目录），而 `config::load` 会把「保存值里没有的 kind」用默认值补齐。
+    所以每个用例开跑前先把**三种 kind** 一次锁到临时目录——任何用例都不可能写到
+    仓库或用户目录之外去（V0.4.0 出过一次「一次 run 写进作者本机日记」的事故）。 */
+    let seeded = MdSyncConfig {
+        enabled: true,
+        poll_secs: 900,
+        bindings: vec![
+            binding(MdSyncKind::Timers, &env.vault, "{date}.md", TIMERS_HEADING),
+            binding(MdSyncKind::Notes, &env.vault, "{date}.md", NOTES_HEADING),
+            binding(MdSyncKind::Todos, &env.vault, "{date}.md", TODOS_HEADING),
+        ],
+    };
+    config::save(&env.pool, &seeded).await.unwrap();
     env
-}
-
-/// 测试用插件：只声明 mdSync，落点由用例保存的配置覆盖。
-fn write_test_plugin(app_data: &Path) {
-    let dir = app_data.join("plugins").join("md-sync");
-    std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(
-        dir.join("plugin.json"),
-        r#"{"id":"md-sync","name":"测试同步","version":"1.0.0","apiVersion":2,
-            "contributes":{"mdSync":{"bindings":[]}}}"#,
-    )
-    .unwrap();
 }
 
 pub(super) fn binding(kind: MdSyncKind, root: &Path, file: &str, heading: &str) -> MdSyncBinding {
@@ -81,10 +64,10 @@ pub(super) fn binding(kind: MdSyncKind, root: &Path, file: &str, heading: &str) 
 }
 
 pub(super) async fn save_binding(pool: &SqlitePool, binding: MdSyncBinding) {
-    /* **不能整体替换**：`config::load` 现在会把「保存值里没有的 kind」用插件默认值补齐，
-    而测试环境的默认值来自仓库 `plugins/md-sync`（`%USERPROFILE%\Documents\Timing` 占位目录）。
-    整体替换只留一个 kind 时，另外两个 kind 会被补齐成真实路径，一次 run 就写到仓库
-    外面去。所以这里改成「按 kind 就地替换」，其余落点保持 `env()` 预置的临时目录版本。 */
+    /* **不能整体替换**：`config::load` 会把「保存值里没有的 kind」用**内核默认值**补齐，
+    而默认落点指向用户的真实文档目录。整体替换只留一个 kind 时，另外两个 kind 会被
+    补齐成真实路径，一次 run 就写到仓库外面去。所以这里改成「按 kind 就地替换」，
+    其余落点保持 `env()` 预置的临时目录版本。 */
     let mut current = match settings::get_value(pool, config::CONFIG_KEY).await {
         Ok(Some(raw)) => serde_json::from_str::<MdSyncConfig>(&raw).unwrap_or_default(),
         _ => MdSyncConfig::default(),
@@ -132,9 +115,7 @@ async fn exports_planner_format_and_imports_edited_time() {
     )
     .await;
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     assert!(report.exported >= 1);
 
@@ -154,9 +135,7 @@ async fn exports_planner_format_and_imports_edited_time() {
     let edited = md_file::replace_in_text(&text, TIMERS_HEADING, &body);
     std::fs::write(&file, edited).unwrap();
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     assert!(report.kinds.contains(&MdSyncKind::Timers));
 
@@ -188,18 +167,14 @@ async fn deleting_a_group_soft_deletes_its_records() {
         binding(MdSyncKind::Timers, &env.vault, "{date}.md", TIMERS_HEADING),
     )
     .await;
-    services::md_sync::run(&env.pool, &env.app_data)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
 
     let file = file_for(&env);
     let text = std::fs::read_to_string(&file).unwrap();
     let edited = md_file::replace_in_text(&text, TIMERS_HEADING, "");
     std::fs::write(&file, edited).unwrap();
 
-    let report = services::md_sync::run(&env.pool, &env.app_data)
-        .await
-        .unwrap();
+    let report = services::md_sync::run(&env.pool).await.unwrap();
     assert!(report.errors.is_empty(), "{:?}", report.errors);
     let alive = scalar_i64(
         &env.pool,
@@ -227,14 +202,20 @@ async fn invalid_config_uses_dedicated_error_code() {
 }
 
 #[tokio::test]
-async fn view_reports_installed_plugin_and_today() {
+async fn view_reports_kernel_default_bindings_and_today() {
     let env = env("md-view").await;
-    let view = services::md_sync::get_view(&env.pool, &env.app_data)
-        .await
-        .unwrap();
-    assert!(view.installed);
-    assert_eq!(view.plugin_id.as_deref(), Some("md-sync"));
-    assert!(view.plugin_name.is_some());
+    let view = services::md_sync::get_view(&env.pool).await.unwrap();
+
+    /* [V0.11.5] 同步是内核功能：视图不再有「插件装没装」，而是直接给出三档落点。 */
+    let kinds: Vec<MdSyncKind> = view.config.bindings.iter().map(|item| item.kind).collect();
+    assert_eq!(
+        kinds,
+        vec![MdSyncKind::Timers, MdSyncKind::Notes, MdSyncKind::Todos],
+        "三档顺序固定为 timers → notes → todos"
+    );
+    assert_eq!(view.config.bindings[0].heading, TIMERS_HEADING);
+    assert_eq!(view.config.bindings[1].heading, NOTES_HEADING);
+    assert_eq!(view.config.bindings[2].heading, TODOS_HEADING);
     assert_eq!(view.today, env.date.format("%Y-%m-%d").to_string());
 }
 
@@ -246,9 +227,7 @@ async fn missing_file_is_created_with_heading_only_when_there_is_data() {
         binding(MdSyncKind::Timers, &env.vault, "{date}.md", TIMERS_HEADING),
     )
     .await;
-    services::md_sync::run(&env.pool, &env.app_data)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     assert!(!file_for(&env).exists(), "没有数据时不应创建空日记");
 
     let item = new_item(&env.pool, "喝水").await;
@@ -260,9 +239,7 @@ async fn missing_file_is_created_with_heading_only_when_there_is_data() {
         300,
     )
     .await;
-    services::md_sync::run(&env.pool, &env.app_data)
-        .await
-        .unwrap();
+    services::md_sync::run(&env.pool).await.unwrap();
     let text = std::fs::read_to_string(file_for(&env)).unwrap();
     assert!(text.starts_with("#### 事项计时\n- [ ] 喝水"));
 }

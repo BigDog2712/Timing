@@ -103,7 +103,7 @@ mod tests {
                     minutes: *minutes,
                 })
                 .collect(),
-            md_sync: None,
+            warnings: Vec::new(),
         }
     }
 

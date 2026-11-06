@@ -1,8 +1,7 @@
 //! `infra::plugin_fs` 的单元测试（拆出以守住单文件 ≤300 行）。
 
 use super::*;
-use crate::models::md_sync::{MdSyncBinding, MdSyncKind};
-use crate::models::plugin::{EntryKind, MdSyncContribution, PluginContributes, QuickTimer};
+use crate::models::plugin::{EntryKind, PluginContributes, QuickTimer};
 
 fn sample() -> PluginManifest {
     PluginManifest {
@@ -14,6 +13,11 @@ fn sample() -> PluginManifest {
         entry: EntryKind::Manifest,
         enabled: true,
         contributes: PluginContributes::default(),
+        permissions: Vec::new(),
+        engines: serde_json::Value::Null,
+        author: String::new(),
+        homepage: String::new(),
+        dependencies: serde_json::Value::Null,
     }
 }
 
@@ -68,43 +72,45 @@ fn rejects_script_entry() {
     assert!(err.contains("script"));
 }
 
+/* [v3] `contributes.mdSync` 已随内核化下架：写了它**不再拒载**，但必须给一条黄字警告，
+否则作者会以为同步真的由这个插件在跑。 */
 #[test]
-fn md_sync_requires_api_v2_and_valid_binding() {
-    let mut manifest = sample();
-    manifest.contributes.md_sync = Some(MdSyncContribution {
-        bindings: vec![MdSyncBinding {
-            kind: MdSyncKind::Timers,
-            enabled: true,
-            root: "C:\\vault".into(),
-            file: "{date}.md".into(),
-            heading: "#### 事项计时".into(),
-        }],
-    });
-    let err = validate(&manifest).unwrap_err();
-    assert!(err.contains("apiVersion 2"), "{err}");
+fn v3_manifest_with_md_sync_is_accepted_with_a_warning() {
+    let raw = r#"{
+        "id": "old-md-sync",
+        "name": "旧同步插件",
+        "version": "2.0.0",
+        "apiVersion": 3,
+        "contributes": { "mdSync": { "bindings": [] } }
+    }"#;
+    let manifest: PluginManifest = serde_json::from_str(raw).expect("v3 清单应能解析");
 
-    manifest.api_version = 2;
-    assert!(validate(&manifest).is_ok());
-
-    manifest.contributes.md_sync.as_mut().unwrap().bindings[0].heading = "事项计时".into();
-    let err = validate(&manifest).unwrap_err();
-    assert!(err.contains("mdSync"), "{err}");
+    assert!(
+        validate(&manifest).is_ok(),
+        "mdSync 已下架：不校验、也不拒载"
+    );
+    let notes = warnings(&manifest);
+    assert_eq!(notes.len(), 1, "{notes:?}");
+    assert!(notes[0].contains("mdSync"), "{notes:?}");
 }
 
+/* 走一遍真实读盘：`read_manifest` 返回的是 `(清单, 警告)`，插件照常载入。 */
 #[test]
-fn repo_md_sync_plugin_manifest_is_valid() {
-    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("plugins")
-        .join("md-sync");
-    let manifest = read_manifest(&dir).expect("仓库内的 md-sync 启动头应合法");
-    assert_eq!(manifest.id, "md-sync");
-    assert_eq!(manifest.api_version, 2);
-    let md_sync = manifest.contributes.md_sync.expect("应声明 mdSync");
-    assert_eq!(md_sync.bindings.len(), 3);
-    assert_eq!(md_sync.bindings[0].kind, MdSyncKind::Timers);
-    assert_eq!(md_sync.bindings[1].kind, MdSyncKind::Notes);
-    assert_eq!(md_sync.bindings[2].kind, MdSyncKind::Todos);
+fn read_manifest_returns_the_md_sync_warning() {
+    let dir = std::env::temp_dir().join(format!("timing-plugin-v3-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join(MANIFEST_FILE),
+        r#"{"id":"old-md-sync","name":"旧同步插件","version":"2.0.0","apiVersion":3,
+            "contributes":{"mdSync":{"bindings":[]}}}"#,
+    )
+    .unwrap();
+
+    let (manifest, notes) = read_manifest(&dir).expect("v3 清单应能载入");
+    assert_eq!(manifest.api_version, 3);
+    assert_eq!(notes.len(), 1, "{notes:?}");
+
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]

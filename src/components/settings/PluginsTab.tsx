@@ -18,7 +18,6 @@
 import { useEffect } from 'react';
 import { formatMinutes } from '../../lib/format';
 import { pluginApi } from '../../services/api';
-import { MD_SYNC_KIND_LABELS } from '../../types/domain';
 import { usePluginStore } from '../../stores/pluginStore';
 import type { PluginInfo, PluginSource } from '../../types/domain';
 
@@ -36,12 +35,8 @@ function contributions(plugin: PluginInfo): string {
       .join(' · ');
     parts.push(`快捷计时 ${plugin.quickTimers.length} 项：${items}`);
   }
-  if (plugin.mdSync && plugin.mdSync.bindings.length > 0) {
-    const kinds = plugin.mdSync.bindings
-      .map((binding) => MD_SYNC_KIND_LABELS[binding.kind])
-      .join(' · ');
-    parts.push(`Markdown 同步 ${plugin.mdSync.bindings.length} 个落点：${kinds}`);
-  }
+  /* [v3] `mdSync` 贡献点已下架（同步归内核），这里不再展示它；
+     清单里若还写着，由后端 `plugin_fs::warnings` 给黄字提示。 */
   return parts.length > 0 ? parts.join('；') : '无贡献项';
 }
 
@@ -118,6 +113,13 @@ export function PluginsTab({ showOpenDir = true }: PluginsTabProps) {
                     {plugin.dir}
                   </p>
                 )}
+                {/* [v3] 黄字 ≠ 红字：warnings 是「生效但有东西被忽略」，
+                    与下面 error 的「没生效」必须一眼分开。 */}
+                {plugin.warnings.map((note) => (
+                  <p key={note} className="plg__warn">
+                    {note}
+                  </p>
+                ))}
                 {broken && <p className="plg__error">未能载入：{plugin.error}</p>}
               </li>
             );

@@ -36,6 +36,15 @@ export const ITEM_NAME_MAX_CHARS = 60;
 /** 结束态（ENDED）瞬时视觉确认保持时长：900ms */
 export const ENDED_FLASH_MS = 900;
 
+/**
+ * [V0.3.1] 托盘双击高亮保持时长：2500ms。
+ *
+ * 与 CSS 动画配对使用 —— `.pill[data-highlight]` / `.dot[data-highlight]` 都是
+ * 0.8s × 3 次（2.4s），这里留 100ms 余量再摘属性，避免最后一次闪烁被截断。
+ * [V0.11.5] 圆点形态也要闪，常量从 PillBar 提到这里，两条形态共用同一个值。
+ */
+export const HIGHLIGHT_MS = 2500;
+
 /* [V0.3.4] 原 `SHORT_RECORD_SEC = 60`（短记录「保存 / 丢弃」二选一的判定阈值）已删除：
    该弹条整体下架，阈值改由后端「最短记录时长」（`ReferenceSettings.minRecordSeconds`，
    默认 30s，用户可调）承担。二者不是同一件事——前者是**询问**的触发条件，

@@ -31,7 +31,6 @@ mod migration_v2;
 mod moyu_settings;
 mod note;
 mod note_pin;
-mod plugin_dev;
 mod record;
 mod reminder;
 mod settings_reference;

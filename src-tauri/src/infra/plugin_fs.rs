@@ -20,7 +20,6 @@
 
 use std::path::{Path, PathBuf};
 
-use crate::models::md_sync::MdSyncConfig;
 use crate::models::plugin::{PluginManifest, PluginSource, MANIFEST_FILE, PLUGIN_API_VERSION};
 
 /// 启动头体积上限：正常几百字节，64K 已经离谱到只可能是放错了文件。
@@ -31,10 +30,12 @@ pub const MAX_QUICK_TIMERS: usize = 12;
 pub const MAX_QUICK_TIMER_MINUTES: u32 = 1440;
 
 /// 一个子目录的读取结果。
+///
+/// `manifest` 成功时带一份「非致命提示」（[v3] 起有些字段是被忽略而不是拒载的）。
 pub struct ScanHit {
     pub source: PluginSource,
     pub dir: PathBuf,
-    pub manifest: Result<PluginManifest, String>,
+    pub manifest: Result<(PluginManifest, Vec<String>), String>,
 }
 
 /// 用户插件目录（可写、首次自动创建）。
@@ -70,7 +71,9 @@ pub fn scan_roots(app_data_dir: &Path) -> Vec<(PluginSource, PathBuf)> {
 }
 
 /// 读一个插件目录的启动头；失败返回一句能直接给用户看的中文原因。
-pub fn read_manifest(dir: &Path) -> Result<PluginManifest, String> {
+///
+/// 返回 `(清单, 非致命提示)`：与 `String` 错误不同，提示不影响插件生效。
+pub fn read_manifest(dir: &Path) -> Result<(PluginManifest, Vec<String>), String> {
     let path = dir.join(MANIFEST_FILE);
     let meta = std::fs::metadata(&path).map_err(|_| format!("缺少启动头 {MANIFEST_FILE}"))?;
     if meta.len() > MAX_MANIFEST_BYTES {
@@ -86,7 +89,25 @@ pub fn read_manifest(dir: &Path) -> Result<PluginManifest, String> {
     let manifest: PluginManifest =
         serde_json::from_str(raw).map_err(|err| format!("启动头 JSON 不合法：{err}"))?;
     validate(&manifest)?;
-    Ok(manifest)
+    let notes = warnings(&manifest);
+    Ok((manifest, notes))
+}
+
+/// 非致命提示：清单合法、插件照常生效，但有东西**被忽略了**。
+///
+/// 单独一个函数而不是把 `validate` 的返回值改成 `Result<Vec<String>, String>`：
+/// “警告”不该跟“能不能载入”共用一条返回通路，否则调用方一不小心就会把警告当失败。
+/// [v3] 目前只有一条：`contributes.mdSync` 已随内核化下架。
+pub fn warnings(manifest: &PluginManifest) -> Vec<String> {
+    let mut notes = Vec::new();
+    if manifest.contributes.md_sync.is_some() {
+        notes.push(
+            "contributes.mdSync 已在 apiVersion 3 下架：Markdown 同步已归内核，本段被忽略；\
+             同步请在「设置 → 同步」里配置"
+                .to_string(),
+        );
+    }
+    notes
 }
 
 /// 启动头语义校验。做的是「宿主要不要执行它」的判断，不是给作者挑刺。
@@ -115,19 +136,8 @@ fn validate(manifest: &PluginManifest) -> Result<(), String> {
     if manifest.entry == crate::models::plugin::EntryKind::Script {
         return Err("entry=script 暂不支持，当前宿主只执行 manifest".into());
     }
-    if let Some(md_sync) = &manifest.contributes.md_sync {
-        if manifest.api_version < 2 {
-            return Err("mdSync 需要 apiVersion 2".into());
-        }
-        let config = MdSyncConfig {
-            enabled: true,
-            poll_secs: crate::models::constants::MD_SYNC_POLL_SECS,
-            bindings: md_sync.bindings.clone(),
-        };
-        config
-            .validate()
-            .map_err(|err| format!("mdSync 配置不合法：{err}"))?;
-    }
+    /* [v3] `contributes.mdSync` 不在这里校验：它已下架，内容一律忽略（见 `warnings`）。
+    不再校验等于不再支持——报一个“mdSync 配置不合法”会让人以为写了就能用。 */
     if manifest.contributes.quick_timers.len() > MAX_QUICK_TIMERS {
         return Err(format!("quickTimers 最多 {MAX_QUICK_TIMERS} 条"));
     }

@@ -1,7 +1,7 @@
-//! Markdown 双向同步编排（插件 API v2 的 `mdSync` 宿主实现）。
+//! Markdown 双向同步编排（V0.11.5 起是**内核功能**，不再是插件贡献点）。
 //!
-//! 插件只声明落点；真正的读写、冲突判定、数据库更新全在这里。这样插件保持
-//! **声明式**：不执行任何插件代码，也不给前端直连数据库的能力。
+//! 落点默认值来自 `models::md_sync_config::default_bindings()`，用户可在
+//! 「设置 → 同步」里覆盖；读写、冲突判定、数据库更新全在这里。
 //!
 //! 落点有三种：`timers`（事项计时，按 `started_at` 归日）、`notes`（便利贴，按
 //! 「当天动过」归日）、`todos`（待办事项，未完成且计划时间不在当天）。每一种的
@@ -39,17 +39,13 @@ use crate::models::md_sync::{
 };
 use crate::platform::clock::now_ms;
 
-/// 设置页读取：插件身份 + 配置 + 最后一次运行状态 + 今日日期。
-pub async fn get_view(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyncView> {
-    let loaded = config::load(pool, app_data_dir).await?;
+/// 设置页读取：配置 + 最后一次运行状态 + 今日日期。
+pub async fn get_view(pool: &SqlitePool) -> AppResult<MdSyncView> {
+    let config = config::load(pool).await?;
     let status = runtime::lock().await.status.clone();
     Ok(MdSyncView {
-        installed: loaded.installed(),
-        plugin_id: loaded.plugin_id,
-        plugin_name: loaded.plugin_name,
-        plugin_version: loaded.plugin_version,
         today: Local::now().format("%Y-%m-%d").to_string(),
-        config: loaded.config,
+        config,
         status,
     })
 }
@@ -60,12 +56,11 @@ pub async fn get_view(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyn
 /// 除设置页以外的窗口都还显示旧数据（V0.11.3 修）。
 pub async fn save_config_with_report(
     pool: &SqlitePool,
-    app_data_dir: &Path,
     config: &MdSyncConfig,
 ) -> AppResult<(MdSyncView, MdSyncReport)> {
     config::save(pool, config).await?;
-    let report = sync_all(pool, app_data_dir).await?;
-    let view = get_view(pool, app_data_dir).await?;
+    let report = sync_all(pool).await?;
+    let view = get_view(pool).await?;
     Ok((view, report))
 }
 
@@ -73,21 +68,20 @@ pub async fn save_config_with_report(
 pub use config::poll_secs;
 
 /// 手动「立即同步」。返回本轮报告，不因单个落点失败而整体报错。
-pub async fn run(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyncReport> {
-    sync_all(pool, app_data_dir).await
+pub async fn run(pool: &SqlitePool) -> AppResult<MdSyncReport> {
+    sync_all(pool).await
 }
 
 /// 轮询任务用：只在真的从 Markdown 导入了数据时返回 `Some`，避免空转发事件。
-pub async fn tick(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<Option<MdSyncReport>> {
-    let report = sync_all(pool, app_data_dir).await?;
+pub async fn tick(pool: &SqlitePool) -> AppResult<Option<MdSyncReport>> {
+    let report = sync_all(pool).await?;
     Ok(report.touched().then_some(report))
 }
 
 /// 打开某个种类的今日文件；文件还没生成时先同步一次。
-pub async fn open(pool: &SqlitePool, app_data_dir: &Path, kind: MdSyncKind) -> AppResult<()> {
-    let loaded = config::load(pool, app_data_dir).await?;
-    let binding = loaded
-        .config
+pub async fn open(pool: &SqlitePool, kind: MdSyncKind) -> AppResult<()> {
+    let config = config::load(pool).await?;
+    let binding = config
         .bindings
         .iter()
         .find(|binding| binding.kind == kind)
@@ -108,7 +102,7 @@ pub async fn open(pool: &SqlitePool, app_data_dir: &Path, kind: MdSyncKind) -> A
         ));
     }
     /* 先同步一轮：文件存在但标题还没写出来时，也要先补上区块再打开。 */
-    sync_all(pool, app_data_dir).await?;
+    sync_all(pool).await?;
     if !path.exists() {
         return Err(AppError::io("今日文件尚未生成，请先保存并同步"));
     }
@@ -119,10 +113,10 @@ pub async fn open(pool: &SqlitePool, app_data_dir: &Path, kind: MdSyncKind) -> A
     crate::infra::shell_open::open_file(&path).map_err(AppError::io)
 }
 
-async fn sync_all(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyncReport> {
+async fn sync_all(pool: &SqlitePool) -> AppResult<MdSyncReport> {
     /* 先拿锁再读配置：防止上一轮 tick 的旧配置在新配置保存后又写一次旧落点。 */
     let mut rt = runtime::lock().await;
-    let loaded = config::load(pool, app_data_dir).await?;
+    let config = config::load(pool).await?;
     let at = now_ms();
     let mut report = MdSyncReport::new(at);
     let mut next_status = MdSyncStatus {
@@ -131,14 +125,14 @@ async fn sync_all(pool: &SqlitePool, app_data_dir: &Path) -> AppResult<MdSyncRep
         bindings: Vec::new(),
     };
 
-    if !loaded.installed() || !loaded.config.enabled {
+    if !config.enabled {
         rt.status = next_status;
         rt.initialized = true;
         return Ok(report);
     }
 
     let date = Local::now().date_naive();
-    for binding in &loaded.config.bindings {
+    for binding in &config.bindings {
         let mut status = MdSyncBindingStatus::empty(binding.kind);
         if !binding.enabled {
             next_status.bindings.push(status);

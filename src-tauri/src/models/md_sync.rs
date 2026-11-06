@@ -1,9 +1,9 @@
-//! Markdown 同步域模型（V0.4.0 / 插件 API v2）。
+//! Markdown 同步域模型（V0.4.0 起；V0.11.5 从插件贡献点改为**内核功能**）。
 //!
 //! 这一层只定义**数据形状与静态校验**，不碰文件、不碰数据库：
 //! - `MdSyncBinding` = 一个数据种类的落点（根目录 + 相对文件模板 + 标题行）；
-//! - `MdSyncConfig` = 插件默认值 + 用户在「设置 → 同步」里覆盖后的最终配置；
-//! - `MdSyncView` = 设置页一次拿全的视图（插件、配置、运行状态、今日日期）；
+//! - `MdSyncConfig` = 内核默认值 + 用户在「设置 → 同步」里覆盖后的最终配置；
+//! - `MdSyncView` = 设置页一次拿全的视图（配置、运行状态、今日日期）；
 //! - `MdSyncReport` = 一次同步的结果（给命令返回与事件载荷共用）。
 //!
 //! 字段与 `src/types/domain/mdSync.ts` 逐字对应（`rename_all = "camelCase"`）。
@@ -196,14 +196,12 @@ pub struct MdSyncStatus {
 }
 
 /// `md_sync_get` / `md_sync_save` 的返回：设置页一次拿全。
+///
+/// [V0.11.5] 去掉 `installed` / `plugin_id` / `plugin_name` / `plugin_version`：
+/// 同步已是内核功能，没有「插件装没装」这回事了。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MdSyncView {
-    /// 磁盘上是否有启用的、声明了 mdSync 的插件。
-    pub installed: bool,
-    pub plugin_id: Option<String>,
-    pub plugin_name: Option<String>,
-    pub plugin_version: Option<String>,
     /// 今天（本地时区，`YYYY-MM-DD`），前端用它做路径预览。
     pub today: String,
     pub config: MdSyncConfig,

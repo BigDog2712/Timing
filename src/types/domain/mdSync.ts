@@ -1,8 +1,9 @@
 /**
- * Timing — Markdown 同步域类型（V0.4.0 / 插件 API v2）
+ * Timing — Markdown 同步域类型（V0.4.0 起；V0.11.5 从插件贡献点改为**内核功能**）
  * -----------------------------------------------------------------------------
  * 与 `src-tauri/src/models/md_sync.rs` 逐字对应（serde camelCase）。
- * 插件只声明落点；同步执行在 Rust 侧，前端只负责配置与展示状态。
+ * 默认落点由内核给（三个 kind），用户在设置里覆盖；同步执行在 Rust 侧，
+ * 前端只负责配置与展示状态——没有「插件装没装」这回事了。
  */
 
 /** 同步的数据种类 */
@@ -62,10 +63,6 @@ export interface MdSyncStatus {
 
 /** `md_sync_get` / `md_sync_save` 的返回 */
 export interface MdSyncView {
-  installed: boolean;
-  pluginId: string | null;
-  pluginName: string | null;
-  pluginVersion: string | null;
   /** 本地今天，`YYYY-MM-DD`，用于路径预览 */
   today: string;
   config: MdSyncConfig;
@@ -81,11 +78,6 @@ export interface MdSyncReport {
   imported: number;
   kinds: MdSyncKind[];
   errors: string[];
-}
-
-/** 插件启动头里的 mdSync 贡献 */
-export interface MdSyncContribution {
-  bindings: MdSyncBinding[];
 }
 
 /** 事件载荷别名（语义更清楚） */

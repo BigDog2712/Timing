@@ -94,7 +94,8 @@
 .plg__desc,
 .plg__meta,
 .plg__hint,
-.plg__error {
+.plg__error,
+.plg__warn {
   margin: 0;
   font-size: var(--text-cap);
 }
@@ -123,6 +124,13 @@
 
 .plg__error {
   color: var(--danger);
+}
+
+/* [v3] 黄字 = 插件仍生效，但清单里有东西被忽略了（如已下架的 mdSync）；
+   红字 .plg__error 才是「没生效」，两个层级不合并。 */
+.plg__warn {
+  color: var(--warn);
+  line-height: 1.5;
 }
 
 /* 插件来源目录：同 id 放两处时，一眼看出这份是从哪读来的 */

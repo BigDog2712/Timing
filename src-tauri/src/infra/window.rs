@@ -37,8 +37,15 @@ impl PanelPlacement {
 }
 
 /// 显示主窗口。
+///
+/// `alwaysOnTop` 在 `tauri.conf.json` 里配了 `true`，但那只在建窗那一刻生效：
+/// 收起成圆点时前端会 `set_position` + `set_size`（`useWindowAutoFit`），
+/// 几何变动后主窗实测会被别的窗口盖住（[V0.11.5] 用户反馈）。
+/// 所以每次显示都重申一次置顶，运行期再配合 `on_window_event` 的几何后重申。
 pub fn show_main(app: &AppHandle) -> AppResult<()> {
-    main_window(app)?.show().map_err(AppError::io)
+    let window = main_window(app)?;
+    window.show().map_err(AppError::io)?;
+    window.set_always_on_top(true).map_err(AppError::io)
 }
 
 /// 隐藏主窗口。
@@ -57,11 +64,28 @@ pub fn toggle(app: &AppHandle) -> AppResult<()> {
     }
 }
 
-/// 关闭请求拦截：阻止退出，改为隐藏（K-5）。
+/// 窗口事件统一入口。
+///
+/// 两件事：
+/// 1. `CloseRequested` → 阻止退出、改为隐藏（K-5）。
+/// 2. [V0.11.5] 主窗**恒定置顶**（ADR-022：设置项已删除，不可切换；`tauri.conf.json` 的
+///    `alwaysOnTop: true` 只在建窗那一刻生效）。收起成圆点时前端会 `set_position` +
+///    `set_size`，几何变动后部分窗口管理器会把置顶让给别的窗口 —— 实测圆点会被盖住。
+///    所以在主窗的 `Moved` / `Resized` 之后重申一次置顶；失败只记日志，不 panic。
+///    注：置顶本身不改尺寸/位置，不会再次触发这两个事件。
 pub fn on_window_event(window: &Window, event: &WindowEvent) {
     if let WindowEvent::CloseRequested { api, .. } = event {
         api.prevent_close();
         let _ = window.hide();
+        return;
+    }
+
+    if window.label() == MAIN_WINDOW
+        && matches!(event, WindowEvent::Resized(_) | WindowEvent::Moved(_))
+    {
+        if let Err(err) = window.set_always_on_top(true) {
+            crate::log_warn!("main window reassert always-on-top failed: {err}");
+        }
     }
 }
 

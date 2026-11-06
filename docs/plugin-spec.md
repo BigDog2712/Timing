@@ -1,12 +1,19 @@
-# Timing 插件规格（v2 · V0.4.0）
+# Timing 插件规格（v3 · V0.11.5）
 
-> 状态：**已实装**。适用 Timing `0.4.0` 及以后；v1 插件继续有效。
+> 状态：**v1 / v2 已实装；v3 已定义，运行时未实现**（逐项状态见 §10.1 的状态列）。
+> 适用 Timing `0.11.5` 及以后；v1 / v2 插件继续有效。
 > **V0.3.9 起** `quickTimers` 不再注入摸鱼菜单（菜单改为应用内置条目，见 §4 顶部与 ADR-026）。
 > **V0.4.0（apiVersion 2）** 新增 `mdSync` 贡献点：插件声明 Markdown 落点，宿主执行双向同步
 > （ADR-033）。首个 v2 插件是仓库内 `plugins/md-sync`。
 > **当前未发布版本** `mdSync` 新增第三种落点 `todos`（待办事项），并把「哪些数据属于哪一天」
 > 写成了明确口径（见 §5「落点格式」与「同步语义」）。种类扩展**不升 `apiVersion`**：它不改变
 > `bindings` 的 schema，不声明 `todos` 的插件完全不受影响。
+> **V0.11.5（apiVersion 3）** 两件事，一件落地一件只落接口：
+> 1. **`mdSync` 下架**，Markdown 同步整个搬进内核（默认落点写在 `models/md_sync_config.rs`），
+>    仓库内 `plugins/md-sync` 已删除。老插件里写了 `contributes.mdSync` → **忽略并警告**，不拒载（§10.8）。
+> 2. **新增 §10「插件 API v3」**：权限模型、`api.commands` / `api.events` / `api.ui` / `api.desktopPet`
+>    接口形状、生命周期、`entry: script` 语义预留。**本轮不实现运行时**——现在写 v3 插件得到的是
+>    「清单被识别」，不是「代码被跑起来」，边界写在 §10.0。
 > 本文是插件作者与宿主实现之间的唯一契约；与代码冲突时以本文为准，并请提 issue。
 
 ---
@@ -21,6 +28,11 @@ Timing 只**读**这个文件，不执行插件里的任何代码。所以插件
 这条边界是刻意划的：v1 的目标是让"我想把摸鱼 25 分钟改成 40 分钟"这种需求，
 靠改一个数字就能完成，而不是先装一个运行时。v2 的 `mdSync` 同样只声明落点，
 文件读写与冲突判定全部在宿主 Rust 侧完成——插件依旧拿不到数据库或任意文件权限。
+
+> **[v3] 上一段仍然成立：本机不执行插件代码。** 但 v3 的**目标形态**变了——插件将拿到
+> 与宿主同等的权限（不做沙箱、不逐条授权），`entry: script` 预留给这条路。因此 v3 起
+> `plugin.json` 里的 `permissions` 是**声明性**的（写给人看），不是约束性的（§10.3）；
+> 真正限制插件的是「运行时还没实现」这一事实，不是权限表。
 
 ---
 
@@ -58,21 +70,29 @@ Timing 只**读**这个文件，不执行插件里的任何代码。所以插件
 | `id` | string | ✅ | — | 1~48 字符，仅小写字母 / 数字 / `-` / `_`。全局唯一 |
 | `name` | string | ✅ | — | 显示名，非空 |
 | `version` | string | ✅ | — | 显示用，非空（建议 `1.0.0`） |
-| `apiVersion` | number | ✅ | — | `1` 或 `2`。`2` 才能声明 `mdSync`；更高版本拒载，而不是猜语义 |
+| `apiVersion` | number | ✅ | — | `1` / `2` / `3`。`2` 才能声明 `mdSync`（v3 起该贡献点下架）；`4` 及以上拒载，而不是猜语义 |
 | `description` | string | ❌ | `""` | 一行说明，显示在设置页 |
 | `entry` | string | ❌ | `"manifest"` | 启动方式。宿主目前只接受 `"manifest"` |
 | `enabled` | boolean | ❌ | `true` | `false` = 留在盘上但不生效 |
 | `contributes` | object | ❌ | `{}` | 贡献点集合，见 §4 |
+| `permissions` | string[] | ❌ | `[]` | **[v3] 声明性**能力清单（不是限制），见 §10.3。本机不校验（⬜） |
+| `engines` | object | ❌ | `{}` | **[v3]** 兼容声明 `{ "timing": "<semver range>" }`，见 §10.2。本机不校验（⬜） |
+| `author` / `homepage` | string | ❌ | `""` | **[v3]** 展示用；`homepage` 必须是 http(s) 链接 |
+
+> **[v3] 上表只列 v3 无争议的增量字段。** 完整字段全表（含类型、必需性、默认值、约束、
+> 校验失败文案、本机实现状态）在 **§10.2**，那一份才是 v3 的权威口径。
 
 `entry` 的取值含义：
 
 | 值 | 含义 | 宿主行为 |
 |---|---|---|
 | `manifest` | 宿主按声明执行，不跑代码 | ✅ 支持 |
-| `script` | 预留：将来跑插件脚本 | ❌ 拒载，提示"当前宿主只执行 manifest" |
+| `script` | **[v3]** 跑插件脚本（`<插件目录>/main.js`，语义见 §10.7） | ❌ 仍拒载，提示"entry=script 尚未实现运行时，当前宿主只执行 manifest" |
 
 > 为什么不假装支持 `script`：拒载会明确告诉你"这条路还没通"，
 > 而假装支持会让你对着一个"加载成功但什么也没发生"的插件排查半天。
+> v3 把 `script` 的目录约定、模块形态、运行时形态**先定下来**（§10.7），
+> 但宿主仍然拒载——文档定义接口，不等于代码能跑。
 
 ---
 
@@ -124,7 +144,15 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 
 ---
 
-## 5. 贡献点 `mdSync`（apiVersion 2）
+## 5. 贡献点 `mdSync`（v2 起 · **v3 下架**）
+
+> **[v3] 本节已作废，仅作 v2 历史规格保留。**
+> - apiVersion 3 起 `contributes.mdSync` **不再被采用**：宿主忽略它，并在 设置 → 插件 该行
+>   给出黄字警告，插件其余部分照常生效（不拒载，理由见 §10.8）。
+> - Markdown 同步整个搬进内核：默认落点写在 `models/md_sync_config.rs`，用户覆盖值仍在
+>   `settings` KV `plugin.md-sync.config`（键名不改，理由见 §5 末尾「配置键」）。
+> - 仓库内 `plugins/md-sync` 已删除；`quickTimers` 不受影响，v1/v2 插件继续有效。
+> - 下面这些字段约束**只在 v2 宿主上成立**，v3 宿主不再校验它们。
 
 声明「应用数据 → Markdown 落点」的映射。宿主按下表把计时记录 / 便利贴 / 待办事项写进
 指定标题下，并在文件被改动时把差异写回 SQL；插件本身不接触文件。
@@ -177,6 +205,11 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 `enabled: false` 的落点都不会被插件默认值覆盖），但保存值里**完全没有的 kind** 会用
 插件默认值补齐。所以插件新增一种落点后，老用户不必删配置重来——它会在下一轮同步时
 自动出现。这条是必需的：设置页没有「添加落点」入口。
+
+> **[v3] 这段语义原样保留，只是默认值的来源从「插件」换成「内核」。** 判据不变：
+> 合并只按 `kind` 匹配，**不看 `enabled`**——用户主动禁用的落点仍在保存值里（禁用只写
+> `enabled: false`、不删条目），所以不会被默认值"复活"。内置默认值固定三档
+> （`timers` / `notes` / `todos`），见 §5 末尾「配置键」。
 
 ### 落点格式
 
@@ -341,6 +374,16 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 
 改完 `plugin.json` 后到 **设置 → 插件** 点「重新加载」，再到 **设置 → 同步** 确认落点并保存。
 
+### 配置键（v3 起归内核）
+
+| 项 | 结论 |
+|---|---|
+| 默认落点来源 | `src-tauri/src/models/md_sync_config.rs::default_bindings()`，三档固定：`timers` / `notes` / `todos` |
+| 三档默认值 | `root` = `%USERPROFILE%\Documents\Timing`；`file` = `{date}.md`；`heading` = `#### <kind.label()>`（即 `#### 事项计时` / `#### 便利贴` / `#### 待办事项`）；三档 `enabled` 均为 `true` |
+| 总开关出厂值 | **`enabled: false`**（默认关）。判据：首次运行不发生任何文件 IO——`tick` 的第一道闸就是 `enabled`，不建目录、不写 md。插件时代默认开是因为"装了插件"本身是一次明确动作；内核化以后新装用户什么都没做，默认开等于替所有用户决定往 `文档` 里写文件 |
+| 老用户 | 保存值里有 `enabled: true` → 保持开。只有**从没有保存值**的（新装 / 从没用过同步）才拿到 `false` |
+| `settings` 键 | 仍是 `plugin.md-sync.config`，**不改名**。它带 `plugin` 前缀是 V0.4.0 的历史原因；改名收益是"好看"，代价是必须双读旧键做迁移，而漏掉一步就会把用户配好的 OneDrive 路径整体覆盖成内置默认值——用真实数据丢失风险换零收益，不做 |
+
 ---
 
 ## 6. 内置预设
@@ -370,14 +413,15 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 | 文件夹里没有 `plugin.json` | 缺少启动头 plugin.json |
 | JSON 语法错 | 启动头 JSON 不合法：`<serde 原文>` |
 | `id` 大写或含空格 | id 只能用小写字母、数字、- 和 _ |
-| `apiVersion: 3` 或更高 | apiVersion 必须为 1..=2（本机宿主版本更低） |
-| `entry: "script"` | entry=script 暂不支持，当前宿主只执行 manifest |
+| `apiVersion: 4` 或更高 | apiVersion 必须为 1..=3（本机宿主版本更低） |
+| `entry: "script"` | entry=script 尚未实现运行时，当前宿主只执行 manifest |
 | `minutes: 0` 或 `1500` | quickTimers.minutes 必须为 1..=1440 |
 | `quickTimers` 超过 12 条 | quickTimers 最多 12 条 |
-| `mdSync` 但 `apiVersion: 1` | mdSync 需要 apiVersion 2 |
-| `file` 绝对路径 / 含 `..` | mdSync.file 必须是落点根目录内的相对路径 |
-| `heading` 没有 `#` | mdSync.heading 必须是以 # 开头的标题行 |
-| 同一 `kind` 两个落点 | 每个数据种类只能有一个落点 |
+| 声明了 `contributes.mdSync` | **[v3] 警告（黄字，插件仍生效）**：`mdSync` 已在 apiVersion 3 下架，插件仍正常生效；Markdown 同步请在 设置 → 同步 里配置 |
+
+> **[v3] 上面这张表少了三行 v2 时代的 `mdSync` 校验**（`file` 是绝对路径 / `heading` 没有
+> `#` / 同一 `kind` 两个落点）：v3 起宿主**完全不校验** `contributes.mdSync`（§5 已下架），
+> 所以这三种错误不会再出现。它们对应的拦截逻辑已随 `infra/plugin_fs.rs` 的 mdSync 分支一起删除。
 
 改完文件后在 **设置 → 插件** 点「重新加载」，无需重启程序。
 
@@ -411,6 +455,9 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 
 ## 9. 边界（明确不做的事）
 
+> **[v3] 本节描述的是 v1/v2 的边界。** 下面三行在 v3 里被**重新划线**（不再做沙箱、
+> 允许插件 UI），v3 当前真实的「不做清单」在 **§10.9**——以那一节为准。
+
 | 不做 | 原因 |
 |---|---|
 | 执行插件 JS / 脚本 | 需要沙箱与权限模型，v2 仍不做半成品 |
@@ -419,3 +466,298 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 | 插件热重载（文件监听） | 「重新加载」按钮已足够，且语义明确 |
 
 加新贡献点必须同时升 `apiVersion`，并在本文件补一节。
+
+---
+
+## 10. 插件 API v3（V0.11.5 · 接口定义）
+
+### 10.0 一句话：现在写 v3 插件会得到什么
+
+> **v3 把插件从「声明式配置包」升级成「全权限代码包」。本轮只定义接口，不实现运行时。**
+> 宿主已认得 `apiVersion: 3`、已下架 `mdSync`（§5），但**不加载、不执行**任何插件脚本。
+
+| 你在 `plugin.json` 里写 | 现在（V0.11.5）会发生什么 |
+|---|---|
+| `apiVersion: 1` + `quickTimers` | 解析成功，展示在 设置 → 插件 的「贡献项」里，**仍不进摸鱼菜单**（ADR-026） |
+| `apiVersion: 2` + `contributes.mdSync` | 忽略 + 黄字警告，插件仍生效；同步请在 设置 → 同步 配置 |
+| `apiVersion: 3` + `permissions` / `engines` / `author` / `homepage` | 清单被识别、插件列进列表；**这几个字段本轮既不校验也不展示**（⬜） |
+| `entry: "script"` + `main.js` | **拒载**，红字提示「entry=script 尚未实现运行时」 |
+| 任何 `api.*` / `api.desktopPet` 调用 | 不可能发生——没有运行时，代码根本没被执行 |
+| `apiVersion: 4` | **拒载**（`apiVersion 必须为 1..=3`） |
+
+### 10.1 状态列（唯一判据，别靠语气判断）
+
+| 标记 | 含义 |
+|---|---|
+| ✅ | 本轮（V0.11.5）已在本机代码里生效 |
+| ⬜ | 只在本文定义，本机**未实现**——写了不报错，也不会有任何效果 |
+
+> 本轮真正标 ✅ 的 v3 项只有两处：**`apiVersion` 上限升到 3**、**`contributes.mdSync` 忽略 + 警告**。
+> 其余（权限、engines、依赖、UI、桌宠、生命周期、脚本运行时）全部 ⬜。
+> 这条写在前面，是为了让作者一眼看出「哪些承诺现在能兑现」。
+
+### 10.2 启动头字段全表（apiVersion 3）
+
+| 字段 | 类型 | 必需 | 默认 | 状态 | 约束 | 校验失败时的文案 |
+|---|---|---|---|---|---|---|
+| `id` | string | ✅ | — | ✅ | 1~48 字符，仅 `[a-z0-9_-]`；全局唯一（同 id 先到先得，`dev > exe > user`） | `id 只能用小写字母、数字、- 和 _` |
+| `name` | string | ✅ | — | ✅ | 非空（无长度校验） | `name 不能为空` |
+| `version` | string | ✅ | — | ✅ | 非空，建议 `1.0.0` | `version 不能为空` |
+| `apiVersion` | number | ✅ | — | ✅ | `1` / `2` / `3` | `apiVersion 必须为 1..=3（本机宿主版本更低）` |
+| `description` | string | ❌ | `""` | ✅ | 无长度校验，设置页只显示一行 | — |
+| `author` | string | ❌ | `""` | ⬜ | ≤64 字符 | `author 最多 64 个字符` |
+| `homepage` | string | ❌ | `""` | ⬜ | `http://` / `https://` 开头，≤256 字符 | `homepage 必须是 http(s) 链接` |
+| `entry` | string | ❌ | `"manifest"` | ✅ | `manifest` / `script`；`script` 拒载（§10.7） | `entry=script 尚未实现运行时，当前宿主只执行 manifest` |
+| `enabled` | boolean | ❌ | `true` | ✅ | `false` = 留在盘上但不生效 | — |
+| `engines` | object | ❌ | `{}` | ⬜ | `{ "timing": "<semver range>" }`；不满足 → **拒载** | `engines.timing 要求 <range>，当前宿主 <ver> 不满足` |
+| `permissions` | string[] | ❌ | `[]` | ⬜ | 见 §10.3；未知能力 → 警告，不拒载 | （警告）`permissions 里有未知能力：<name>` |
+| `dependencies` | object | ❌ | `{}` | ⬜ | `{ "<plugin-id>": "<semver range>" }`；不满足 → **拒载** | `依赖 <id> 未被识别 / 版本 <v> 不满足 <range>` |
+| `contributes` | object | ❌ | `{}` | ✅ | `quickTimers`（§4）保留；`mdSync`（§5）**已下架** → 忽略 + 警告 | — |
+
+**未知字段的处置**：一律忽略，不报错。与 v1/v2 一致——向前兼容靠这条，不靠白名单。
+
+`engines` / `dependencies` 失败为什么是**拒载**而不是警告：这两个字段是作者在说
+「我需要 X 才能正确工作」。宿主拿低版本去解释它的清单，就是在**猜语义**——而「不认识就
+拒载，不猜」是本文从 §3 起就定下的口径（见 §3 的 `entry` 说明）。声明性字段
+（`permissions` / `author`）写错顶多显示不准，所以给警告。
+
+### 10.3 权限模型：**声明性**，不是约束性
+
+| 问题 | 结论 |
+|---|---|
+| `permissions` 是约束性还是声明性 | **纯声明性。宿主不据此拒绝任何调用** |
+| 未知能力名 | 警告（`permissions 里有未知能力：<name>`），**不拒载** |
+| 声明与实际调用不符 | 本轮不检测（⬜）；运行时落地后**必做**，口径见本节末尾 |
+| 设置页展示 | 展示 `permissions` 的中文说明，**固定带一行灰字**：「声明，不是限制：插件与 Timing 同权限」 |
+
+**为什么是声明性**（三条，每条可核）：
+
+1. **约束性权限要求宿主在调用点上拦截。** 已拍板「插件即全权限、不做沙箱、不逐条授权」
+   → 根本没有拦截点。此时把 `permissions` 写成约束性，等于给用户一个**假的安全感**：
+   界面写着「此插件只能读取待办」，实际它什么都能干。这比不写更坏。
+2. **声明性仍然有用**：它唯一的产出是**可见性**——设置 → 插件 里把 `permissions` 翻译成
+   人话，用户在装之前能看到"它打算干什么"。这是 Obsidian 那套里「看得见」的部分，我们照搬；
+   「拦得住」那部分我们不做，也不假装做。
+3. **必须写清「声明 ≠ 限制」**：否则用户会把声明当沙箱，而一旦误装，损失是不可逆的
+   （插件与宿主同权限，能读写数据库、能改设置、能开窗口）。
+
+**能力名表**（`<域>.<动词>`，全小写，动词只有 `read` / `write` / `open` / `subscribe`）：
+
+| 能力名 | 含义 | 对应 |
+|---|---|---|
+| `timer.read` | 读当前计时状态 | `api.commands.timer.getState` |
+| `timer.write` | 开始 / 暂停 / 恢复 / 停止 / 切换 / 撤销 | `api.commands.timer` 其余方法 |
+| `item.read` / `item.write` | 读 / 增改事项 | `api.commands.item` |
+| `todo.read` / `todo.write` | 读 / 增改删待办 | `api.commands.todo` |
+| `note.read` / `note.write` | 读 / 增改便利贴 | `api.commands.note` |
+| `record.read` | 读历史记录与统计 | `api.commands.record` |
+| `settings.read` / `settings.write` | 读 / 改设置 | `api.commands.settings` |
+| `mdSync.read` / `mdSync.write` | 读配置 / 触发同步 | `api.commands.mdSync` |
+| `window.open` | 打开宿主窗口 | `api.commands.window` |
+| `theme.read` / `theme.write` | 读 / 改主题与强调色 | `api.commands.theme` |
+| `ui.settingsCard` / `ui.panel` / `ui.menu` / `ui.tray` | 挂 UI（§10.4.3） | `api.ui` |
+| `event.subscribe` | 订阅宿主事件（§10.4.2） | `api.events` |
+| `desktopPet` | 创建 / 操纵桌宠（§10.4.4） | `api.desktopPet` |
+| `notify` | 发系统通知 | `infra::notify` |
+
+**「声明与实际调用是否相符」的检测口径**（⬜，运行时落地后必做）：
+
+1. 宿主每次经 `api.*` 的调用记一条 `(pluginId, capability, at)` 到内存环形缓冲；
+2. 在 `onDisable` / `onUnload` 时与 `permissions` 求差集；
+3. 多用了的能力 → 设置页该插件行加一条警告「实际调用了未声明能力：`item.write`」，
+   **不阻断、不追溯、不禁用**（插件即全权限，声明只是描述）；
+4. 少用的不提示——声明多了不构成问题。
+
+### 10.4 API 面（接口形状，全部 ⬜）
+
+> **架构前提（最重要的一条）：插件 API 不是新通道。**
+> 所有 `api.commands.*` 都是既有 67 条 IPC 命令（`generate_handler!`）的**白名单投影**。
+> 插件不直连数据库、不直连 `repositories`；调用路径仍是
+> `插件 → api → commands → services → repositories`（ADR-015 不破）。
+> 因此 v3 **不新增命令、不新增事件、不新增错误码**，插件拿到的错误就是现有那 16 个码。
+
+#### 10.4.1 `api.commands` — 按域分组（白名单）
+
+**开放清单**（参数沿用对应命令的现有签名，见 `docs/phase2/IPC-CONTRACT-v2.md`）：
+
+| 域 | 方法 | 映射命令 |
+|---|---|---|
+| `timer` | `getState` / `start` / `startCountdown` / `pause` / `resume` / `stop` / `discard` / `undoStop` / `switch` | `get_timer_state` / `start_timer` / `start_countdown` / `pause_timer` / `resume_timer` / `stop_timer` / `discard_timer` / `undo_stop` / `switch_item` |
+| `item` | `list` / `create` / `update` / `archive` / `unarchive` | `list_items` / `create_item` / `update_item` / `archive_item` / `unarchive_item` |
+| `todo` | `list` / `create` / `update` / `delete` / `toggle` / `start` | `todo_list` / `todo_create` / `todo_update` / `todo_delete` / `todo_toggle` / `todo_start` |
+| `note` | `list` / `get` / `create` / `update` | `note_list` / `note_get` / `note_create` / `note_update` |
+| `record` | `list` / `stats` | `list_records` / `stats_summary` |
+| `settings` | `get` / `update` | `get_settings` / `update_settings` |
+| `mdSync` | `get` / `save` / `run` / `open` | `md_sync_get` / `md_sync_save` / `md_sync_run` / `md_sync_open` |
+| `window` | `openSettings` / `openTodos` / `openTimer` / `openNote` / `closeNote` | `open_settings_window` / `open_todos_window` / `open_timer_window` / `open_note_window` / `close_note_window` |
+| `theme` | `get` / `set` / `accentGet` / `accentSet` | `theme_get` / `theme_set` / `accent_get` / `accent_set` |
+| `reminder` | `set` / `clear` / `pending` | `reminder_set` / `reminder_clear` / `reminder_pending` |
+| `dailyStatus` | `get` / `set` | `daily_status_get` / `daily_status_set` |
+
+**未列出的命令一律不开放。** 四类明确不给，理由统一：**它们不是"能力"，是宿主对自己的处置权
+或用户不可逆的数据**：
+
+| 不开放 | 命令 | 理由 |
+|---|---|---|
+| 插件自指 | `plugin_list` / `plugin_open_dir` | 插件能列/能处置自己，故障表现是「插件把自己弄没了」，用户无法归因到具体插件 |
+| 一次性数据迁移 | `get_migration_info` / `open_legacy_dir` | 动的是用户数据目录；误调一次就可能搬走或暴露整个库 |
+| 宿主生命周期与主条可见性 | `quit_app` / `set_autostart` / `show_window` / `hide_window` / `toggle_window` / `save_window_position` / `main_window_rect` / `main_work_area` | 主条是宿主唯一的常驻界面，被藏起来后用户只能杀进程；应用自退 / 开机项被改，用户看到的是「Timing 自己出问题」 |
+| 不可逆删除与历史改写 | `delete_item` / `delete_record` / `update_record` / `note_delete` | 都没有撤销入口；这是**数据不可逆**问题，不是权限问题。需要时按名字单独评审开放（在此表加一行 + 升 `apiVersion`） |
+
+#### 10.4.2 `api.events` — 订阅（11 个全开放）
+
+允许订阅**全部**宿主事件（订阅是只读的，`emit` 侧仍在宿主）：
+
+| 事件名 | 载荷 | 触发时机 |
+|---|---|---|
+| `timer:state-changed` | `TimerState` | 计时状态迁移（含托盘重建） |
+| `theme-changed` | 主题 + 四色 | 主题 / 强调色变更 |
+| `countdown-finished` | `CountdownFinished` | 倒计时到点 |
+| `reminder-fired` | `Reminder` | 提醒命中 |
+| `todo-nudge` | `TodoNudge` | 待办两级提醒（T-15 / T-5） |
+| `note-window-opened` | `{ noteId }` | 便利贴窗口创建 / 显示 |
+| `note-window-closed` | `{ noteId }` | 便利贴窗口销毁 |
+| `app:open-new-note` | — | 托盘「便利贴…」要求新建 |
+| `app:open-new-item` | — | 托盘「新建事项…」要求内联命名 |
+| `tray:highlight` | — | 托盘图标双击（主条闪一下） |
+| `md-sync:changed` | `MdSyncReport` | 内核同步把文件改动写回 SQL 后 |
+
+**插件能自定义全局事件吗？不能。** 判据可核：事件名是**全局广播**名字空间，而
+`scripts/check-contract.mjs` 要求「后端 `app/events.rs` 常量 ↔ 前端 `IPC_EVENTS` ↔ 真实 `emit` 点」
+三方一致，且**每个前端声明都必须有 emit 来源**（死常量直接红）。插件自定义的事件名永远
+没有 emit 点——要么让门禁变红，要么被迫开 `EVENT_ALLOWLIST` 白名单，而白名单一旦出现，
+这条保护就等于失效。插件需要的"回调"走 `api.ui` 的 `onUiEvent` 与 Promise 返回值，不新增全局事件名。
+
+#### 10.4.3 `api.ui` — 四个挂载点：宿主渲染声明，不是 HTML
+
+| 挂载点 | 声明方式 | 宿主渲染位置 | 谁能看到 |
+|---|---|---|---|
+| 设置页卡片 | `ui.settingsCard` | 设置 → 插件 → 该插件行下方的「面板」区 | 打开设置窗口的人 |
+| 独立面板 | `ui.panel` | 设置 → 插件 →「打开面板」弹出的宿主窗口（label `plugin-{id}`） | 同上 |
+| 主条菜单项 | `ui.menu` | 主条右键菜单，排在内置条目之后，分组标题 = 插件 `name` | 所有人 |
+| 托盘项 | `ui.tray` | 托盘菜单的「插件」子菜单；**最多 5 项**，超出的按 id 字典序丢弃并记警告 | 所有人 |
+
+**渲染口径**（本节的核心约束）：
+
+| 规则 | 结论 |
+|---|---|
+| 插件给什么 | **声明式节点树**（下表 `UiNode`）。不给 HTML、不给 CSS、不给 React 组件 |
+| 为什么 | 主仓是手写 CSS + `var(--*)` 设计令牌，**禁裸 hex / rgb**（AGENTS.md 硬约束）。插件若给 HTML/CSS：① 打破令牌规则且**门禁拦不住**（`check:size` / `check:layers` 只扫 `src/`）② 引入 XSS（WebView 里插件 HTML 与宿主同源）③ 深浅主题切换立刻失效 |
+| 宿主怎么渲染 | 逐个 `type` 映射到 `src/components/ui/*` 已有组件（`Switch` / `btn` / `num-field`），视觉全部来自设计令牌 |
+| 插件能定制什么 | 只有 `tone`（`default` / `muted` / `warn`）与 `variant`（`primary` / `ghost`）两个**语义枚举**。没有颜色、没有像素、没有类名 |
+| 深浅主题 | 自动跟随 `data-theme`，插件既不需要也不能感知 |
+| 状态存放 | 宿主**不保存**插件 UI 状态。每次渲染由插件现算，重启后重新渲染 |
+
+`UiNode` 形状：
+
+| `type` | 必需字段 | 可选字段 | 渲染为 |
+|---|---|---|---|
+| `text` | `text` | `tone` | 一行正文 |
+| `row` | `label`、`value` | — | 「标签 … 值」一行（值右对齐） |
+| `switch` | `id`、`label`、`checked` | — | `Switch` |
+| `number` | `id`、`label`、`value` | `min`、`max`、`unit` | `num-field` |
+| `textField` | `id`、`label`、`value` | `placeholder` | 单行输入 |
+| `button` | `id`、`label` | `variant` | 按钮 |
+| `divider` | — | — | 分隔线 |
+| `list` | `items: UiNode[]` | — | 纵向排列 |
+
+交互回传：用户改控件 → 宿主调用插件的 `onUiEvent(nodeId, value)`（§10.6），插件返回新的节点树。
+
+#### 10.4.4 `api.desktopPet` — 桌宠（只定义形状，**未实现**）
+
+| 方法 | 参数 | 返回 | 约束 |
+|---|---|---|---|
+| `create` | `{ id: string; size?: number; sprite?: string }` | `Promise<PetHandle>` | `sprite` 是**插件目录内的相对路径**（png / svg），宿主读文件并渲染；`size` 单位 DIP，32~256，缺省 96 |
+| `move` | `(handle, { x: number; y: number })` | `Promise<void>` | 逻辑坐标（DIP），相对主屏左上角 |
+| `say` | `(handle, { text: string; durationMs?: number })` | `Promise<void>` | 气泡；`text` ≤120 字符，`durationMs` 500~10000，缺省 3000 |
+| `setState` | `(handle, { state: 'idle' \| 'busy' \| 'alert' })` | `Promise<void>` | 三个状态由宿主决定动画，插件**不能**自定义动画 |
+| `remove` | `(handle)` | `Promise<void>` | 插件卸载时宿主自动兜底调用 |
+
+- `PetHandle` 是不透明字符串，跨插件不可复用。
+- 同一时刻最多 **3 只**桌宠。
+- 桌宠窗口透明、置顶、不可聚焦、不进任务栏（与主条的 `infra::window` 同一套口径）。
+- **未实现期间不新增错误码**：没有运行时，这些调用不可能发生。运行时落地后若确需新码，
+  走契约评审（union / `errorText()` / 契约文档 §2 三处同步）。
+
+### 10.5 生命周期（⬜）
+
+| 钩子 | 触发时机 | 次数 | 顺序保证 |
+|---|---|---|---|
+| `onLoad` | 清单校验通过且 `enabled: true` 后；进程启动一轮、每次「重新加载」一轮 | 每次加载 1 次 | 全局按来源优先级（`dev → exe → user`）+ id 字典序，**串行**（一次只跑一个插件） |
+| `onEnable` | ①`enabled` 由 `false → true`（下一轮重新加载生效）；②首次加载时紧跟在同一插件的 `onLoad` 之后 | 每次启用 1 次 | 一定在 `onLoad` 之后 |
+| `onDisable` | `enabled` 由 `true → false` | 每次禁用 1 次 | 卸载前的最后一步 |
+| `onUnload` | 进程退出 / 「重新加载」之前 | 每次卸载 1 次 | **逆序**（后加载的先卸载）；只要 `onLoad` 成功过就调，不论当前是否 `enabled` |
+
+| 保障项 | 结论 |
+|---|---|
+| 超时 | 每个钩子 **5 000 ms**。超时 = 记日志 + 继续下一个，**不阻断启动** |
+| `onLoad` 失败 | 插件标 `failed`：`api.*` 全部 reject、`onEnable` 不触发、设置页该行显示原因。**清单仍列在列表里**（不静默消失） |
+| `onEnable` 失败 | 视为 `failed`，同一条口径 |
+| `onDisable` / `onUnload` 失败 | 只记日志。退出路径上不能因为插件卡住用户 |
+| 重入 | 钩子执行期间宿主拒绝同一插件的 `api.*` 调用（返回「插件正在加载」），防止 `onLoad` 里自我调用递归 |
+| 并发 | **全局串行**。插件共享同一个 WebView 与同一个 DB 连接池，并发加载只会让「卡住时是谁卡的」无法归因 |
+
+### 10.6 生命周期与 UI 的回调面（⬜）
+
+插件脚本 `main.js` 的 ESM 默认导出：
+
+```js
+export default {
+  onLoad(api) {},        // 建立 api 引用，注册 ui 声明
+  onEnable(api) {},      // 开始干活
+  onDisable(api) {},     // 停手，释放资源
+  onUnload(api) {},      // 兜底清理
+  onUiEvent(nodeId, value) { return [] } // 返回新的 UiNode[]
+};
+```
+
+### 10.7 `entry: script` 的语义预留（⬜，本机仍拒载）
+
+| 项 | 结论 |
+|---|---|
+| 目录约定 | `<插件目录>/main.js`（固定名，不可配置） |
+| 运行时形态 | WebView 内的**独立 `Web Worker`**，不是主线程、不共享 `window` |
+| 为什么是 Worker | 插件死循环不能锁死主条。同页脚本一旦 `while (true)`，整个界面就冻住，用户只能杀进程 |
+| 通信 | 与宿主只经 `api` 对象（`postMessage`），插件拿不到 `window`、`document`、Tauri 的 `invoke` |
+| 模块形态 | ESM，`export default { onLoad, onEnable, onDisable, onUnload, onUiEvent }` |
+| 现在写会怎样 | **拒载**，`entry=script 尚未实现运行时，当前宿主只执行 manifest` |
+
+> 为什么定成 Worker 而不是"反正没实现，随便写"：目录约定与运行时形态决定了 API 的**同步/异步**
+> 底色（Worker 里只能异步）。现在定错，将来所有插件的 `api.*` 调用签名都要改一遍。
+
+### 10.8 兼容策略
+
+| 插件 `apiVersion` | v3 宿主行为 | 状态 |
+|---|---|---|
+| `1` | 正常载入。`quickTimers` 解析并展示（**仍不**注入摸鱼菜单，ADR-026） | ✅ |
+| `2` | 正常载入。`contributes.mdSync` → **忽略 + 警告**；其余按 v2 语义 | ✅ |
+| `3` | 正常载入。`permissions` / `engines` / `dependencies` / `author` / `homepage` 本轮不校验（§10.1）；`entry: script` 仍拒载 | 部分 ✅ |
+| `4` 及以上 | **拒载**：`apiVersion 必须为 1..=3（本机宿主版本更低）` | ✅ |
+
+**`contributes.mdSync` 为什么是「忽略并警告」而不是「拒载」**（四条，每条可核）：
+
+1. mdSync 的同步逻辑**本来就在宿主**（`services/md_sync`），插件里那几行只是默认落点的**数据**。
+   数据作废不会让插件的其它部分（`quickTimers`）出问题。
+2. 拒载的代价是**整个插件失效**。为一个已经作废的贡献点惩罚插件的全部功能，惩罚大于过错。
+3. 但必须**可见**：设置 → 插件 该行显示黄字警告，插件仍标为生效。
+4. 与「宁缺毋滥」不冲突：那条规则针对的是**宿主必须解释其语义才能运行**的字段
+   （`entry` / `apiVersion`）。`mdSync` 现在不需要解释——宿主有能力、也有正当理由直接忽略它。
+
+设置页文案（给前端照抄）：
+「声明了已下架的贡献点 mdSync（apiVersion 3 起改由内核实现）。插件仍正常生效；Markdown 同步请在 设置 → 同步 里配置。」
+
+### 10.9 明确不做的事（本轮 · 现时边界）
+
+> 这一节取代 §9 在 v3 语境下的含义。
+
+| 不做 | 结论 | 原因 |
+|---|---|---|
+| 加载 / 执行插件脚本 | ❌ 本轮不实现（`entry: script` 拒载） | 运行时涉及 Worker 隔离、API 注入、崩溃回收，是一次独立迭代 |
+| 沙箱 / 逐条授权 | ❌ **永不做** | 主人拍板「插件即全权限」：装了就是自己人。做半套沙箱只会让用户以为有隔离 |
+| `permissions` 参与准入 | ❌ 不做 | §10.3：声明性。约束性权限没有拦截点 = 假安全感 |
+| 插件自定义全局事件 | ❌ 不做 | §10.4.2：事件名三方一致是机械门禁，白名单化等于关掉保护 |
+| 插件给 HTML / CSS | ❌ 不做 | §10.4.3：令牌规则 + XSS + 主题失效 |
+| 插件读写数据库 / 任意文件 | ❌ 不做 | 数据访问一律走 `commands → services → repositories`（ADR-015） |
+| 插件市场 / 远程安装 / 自动更新 | ❌ 不做 | 无签名、无升级通道时上线市场等于分发任意代码 |
+| 桌宠实现 | ❌ 本轮只定义形状 | §10.4.4 |
+| 插件热重载（文件监听） | ❌ 不做 | 「重新加载」按钮已足够，且语义明确 |
