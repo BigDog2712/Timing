@@ -15,6 +15,7 @@ import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 import com.timing.app.native.Prefs
 import com.timing.app.native.SafVault
+import com.timing.app.native.SecretStore
 import com.timing.app.overlay.PillService
 import java.io.File
 
@@ -248,6 +249,53 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
     override fun onResume(activity: AppCompatActivity) {
         super.onResume(activity)
         runCatching { PillService.sync(activity) }
+    }
+
+    // ------------------------------------------------------------ 凭据存储
+
+    /* WebDAV 应用密码（V0.11.13）。Rust 侧 `infra/secret_bridge.rs` 调这三条，
+       加解密与落盘全在 `native/SecretStore.kt`。参数走 `getArgs()`（ADR-055），
+       回值 `JSObject`（ADR-056），失败 `reject` 且把原文带上——不然排障只剩一句「系统调用失败」。
+
+       注意：`secretGet` 在**没有值时不放** `value` 键，Rust 侧 `Option<String>` 才是 `None`；
+       放空串会被当成"存了一个空密码"。 */
+
+    @Command
+    fun secretPut(invoke: Invoke) {
+        val args = invoke.getArgs()
+        val key = args.optString("key")
+        if (key.isBlank()) return invoke.reject("凭据键为空：这是程序错误，请反馈")
+        runCatching { SecretStore.put(activity, key, args.optString("value")) }
+            .onSuccess { invoke.resolve() }
+            .onFailure {
+                invoke.reject("存不下应用密码：${it.message ?: it.javaClass.simpleName}")
+            }
+    }
+
+    @Command
+    fun secretGet(invoke: Invoke) {
+        val key = invoke.getArgs().optString("key")
+        if (key.isBlank()) return invoke.reject("凭据键为空：这是程序错误，请反馈")
+        runCatching { SecretStore.get(activity, key) }
+            .onSuccess { stored ->
+                val res = JSObject()
+                if (stored != null) res.put("value", stored)
+                invoke.resolve(res)
+            }
+            .onFailure {
+                invoke.reject("取不出应用密码：${it.message ?: it.javaClass.simpleName}")
+            }
+    }
+
+    @Command
+    fun secretClear(invoke: Invoke) {
+        val key = invoke.getArgs().optString("key")
+        if (key.isBlank()) return invoke.reject("凭据键为空：这是程序错误，请反馈")
+        runCatching { SecretStore.clear(activity, key) }
+            .onSuccess { invoke.resolve() }
+            .onFailure {
+                invoke.reject("清不掉应用密码：${it.message ?: it.javaClass.simpleName}")
+            }
     }
 
     // ------------------------------------------------------------ 内部

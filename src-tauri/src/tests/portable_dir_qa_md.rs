@@ -77,6 +77,7 @@ async fn d13_saved_root_and_heading_survive_only_missing_kind_is_appended() {
     let dir = temp("qa-d13");
     let pool = db::init_pool(&dir).await.expect("init_pool");
     let old = MdSyncConfig {
+        cloud: None,
         enabled: true,
         poll_secs: 900,
         bindings: vec![

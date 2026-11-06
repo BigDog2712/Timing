@@ -202,6 +202,7 @@ async fn h_two_idle_runs_leave_mtime_untouched() {
     config::save(
         &env.pool,
         &MdSyncConfig {
+            cloud: None,
             poll_secs: 900,
             enabled: true,
             bindings: vec![

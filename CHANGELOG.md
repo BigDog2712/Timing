@@ -2,6 +2,74 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.13 — MD 同步加云端通道（WebDAV / 本地目录）、待传队列、备份可恢复
+
+同步链路从「四跳」改成两端对称：
+
+```
+旧：SQL(PC) → md(PC) → OneDrive → RemotelySave → Obsidian(手机) → SAF → SQL(手机)
+新：SQL(PC) ↔ WebDAV(坚果云) ↔ SQL(手机)
+```
+
+旧链路里 Obsidian 只是桥，却带来两个第三方（OneDrive、Obsidian）和两种授权，任何一跳坏掉
+的症状都是「手机上少了几条」，没有一处日志说得清是哪一跳。新链路是信箱模型，不需要双端同时在线。
+
+**合并逻辑一行没改。** `services/md_sync/mod.rs` 的 `sync_all` / `sync_binding` 与 0.11.12
+逐字节相同（QA 用逐函数体 md5 比对确认），云端那一轮只是换个 root 再跑一遍现成逻辑
+（`mirror::run_in`）。`infra/md_file.rs` 同样零改动。这条是整轮的地基：两份日记、两套落点，
+合并规则全库只有一份。
+
+### 新增
+
+- **云端通道**（`services/md_cloud/`，9 个文件）：两种模式——`localfolder`（指到坚果云同步
+  文件夹，交给坚果云客户端自己传）与 `webdav`（`infra/md_webdav.rs` 直接 GET/PUT）。
+  一轮的顺序不可换：GET 远端今天 → Obsidian 落点 → 云端落点 → 算指纹 → PUT。
+  先 Obsidian 后云端，是为了让 PUT 出去的内容**一定包含本轮所有变更**。
+- **待传队列**（迁移 `0006_v0113.sql` 建 `md_cloud_pending`）：只同步当天有个洞——某天没传
+  成功，第二天按「只同步当天」就永远不补。现在按「有没有没传成功的改动」判定，通常只有一条。
+  **唯一欠账判据是 `pending_since > 0`**，`last_hash` 只负责「内容有没有变」；上传失败只留
+  `pending_since`、下一轮自愈，且时间戳不会被后续重试刷新（写在 SQL 的 `ON CONFLICT` 里，
+  不靠调用方记性）。
+- **备份可查看与恢复**（`services/md_backup.rs`）：留底功能四个月前就有，一直只能写不能读。
+  备份文件名加落点标识 `<tag>__<文件名>-<时间戳>.md`，老备份（无前缀）标「归属未知」、
+  **不删不改名**（`prune` 的淘汰池只收带已知前缀的文件）。恢复是**强制导入**：写文件 →
+  立刻 `import::by_kind` → 再渲染 → 更新基线，全程持同步锁，所以「恢复本身不会再丢一次」。
+- **凭证**：桌面 DPAPI（`infra/secret_dpapi.rs`）存 `<数据根>\webdav.bin`，手机 Keystore +
+  AES-GCM（`native/SecretStore.kt`）存 SharedPreferences。密码不进 `settings` 表、不进日志、
+  不进任何 `Debug` 输出，视图只回 `hasSecret: bool`。解不开就报错，**绝不回落明文**。
+- **契约**：命令 71 → **74**（`md_sync_test` / `md_backup_list` / `md_backup_restore`）、
+  错误码 16 → **17**（`MD_SYNC_REMOTE_ERROR`），事件仍 **11** 条不变（云端结果复用
+  `md-sync:changed`，加事件只会让每个消费者写两遍处理函数）。
+
+### 修复（QA 独立验收发现）
+
+- **Android 编译错误**：`mobile_bridge_plugin` 的泛型 `R` 被 `PluginHandle<Wry>` 钉死，
+  交叉编译报 `E0308`。这是移动端代码第一次真正进编译器——之前它一直没被编过。
+- **`sync_once` 在手机上不查 SAF 就拿不到云端**：SAF 早退写在函数开头，云端分派在末尾，
+  于是「只配 WebDAV、不选日记目录」的用户永远走不到云端。改成三段：先读配置 → 云端可用
+  就直返（全程不碰 SAF）→ 否则走现有 SAF + 镜像三步。
+- **手机云端每轮多跑一次「幽灵 Obsidian 轮」**：`binding.root` 的出厂模板在 Android 上解析
+  进应用沙箱，那一轮只会把区块渲染进用户够不着的目录。改成 ⑤ 桌面专属（`cfg(not(mobile))`）。
+- **今天 412 少了「重拉 → 再合并 → 再 PUT 一次」**（`round_conflict.rs`）。历史欠账仍只跳过
+  不覆盖：那天的文件本身已是合并态，硬覆盖会丢远端的手改。
+- **`prune` 会吃掉用户升级前的老备份**：原来只按 mtime 数 30 份，不认名字。
+- 其他：`USER_AGENT` 改用 `CARGO_PKG_VERSION`（原来硬编码，升版必忘）；空白密码两处判空
+  口径统一成 `trim()`；补 403 分支单测。
+
+### 已知未做（进 v0.11.14）
+
+`restore(target="folder")` 会写进 Obsidian 落点（唯一有数据正确性风险的一条）；
+「测试连接」GET 的是目录本身，个别 DAV 实现会回 405/301 导致假阴性；folder 模式「今天已上传」
+恒显示未上传；手机端 mode 显示与内存不一致；`md_sync_save` 里 `saf_status(...).await?` 的位置。
+另有三个文件已贴 300 行红线（`tests/md_cloud_pending.rs` 296、`models/md_sync_cloud.rs` 295、
+`app/bootstrap.rs` 295），下轮动它们之前要先拆。
+
+### 门禁
+
+`cargo test --lib` 454 passed / 0 failed · `vitest` 49 files / 369 tests · 契约 74/17/11 ·
+`check:size` 519 文件全过（无豁免）· 版本六处 0.11.13 · `cargo clippy --all-targets -D warnings`
+0 warning · `cargo check --target aarch64-linux-android` 0 error。
+
 ## 0.11.12 — 同步配置落一行日志、功能一览页视觉修订
 
 同步逻辑没改。补的是 V0.11.11 装的眼睛里**还缺的一段**，外加一页对外说明的排版。

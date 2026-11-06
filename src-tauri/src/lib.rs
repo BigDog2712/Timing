@@ -38,13 +38,22 @@ mod tests;
 /// Kotlin 的 `TimingNativePlugin` 注册进 `PluginManager`，并交出一个 `PluginHandle`
 /// 供 Rust 侧 `run_mobile_plugin_async` 调用。Kotlin 侧同名类写在
 /// `src-tauri/gen/android/app/src/main/java/com/timing/app/TimingNativePlugin.kt`。
+///
+/// [V0.11.13] **不留泛型 `R`**：插件体里要调 `infra::secret::install_mobile`，而它持有
+/// 一个 `PluginHandle<Wry>`（`register_android_plugin` 只在 `Wry` 上实现，没有别的
+/// 运行时可拿）。带泛型时 `setup` 闭包会把 `R` 钉成 `Wry`，与返回类型 `TauriPlugin<R>`
+/// 冲突（E0308，Android 上硬失败）。`Builder` 本身就是 `Builder<Wry>`，所以这里写死
+/// `Wry` 与调用点一致，桌面侧根本不编这一段。
 #[cfg(target_os = "android")]
-fn mobile_bridge_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+fn mobile_bridge_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     use tauri::Manager;
 
     tauri::plugin::Builder::new("timing-native")
         .setup(|app, api| {
             let handle = api.register_android_plugin("com.timing.app", "TimingNativePlugin")?;
+            /* [V0.11.13] 凭据存储要 `PluginHandle`，只有这里拿得到；桌面在 `bootstrap`
+            里装（数据根决定的 DPAPI 落点）。顺序无关：两条路径互斥。 */
+            infra::secret::install_mobile((*app).clone(), handle.clone());
             app.manage(infra::native_bridge::NativeBridge::new(handle));
             Ok(())
         })
@@ -210,6 +219,11 @@ pub fn run() {
             commands::md_sync_cmd::md_sync_save,
             commands::md_sync_cmd::md_sync_run,
             commands::md_sync_cmd::md_sync_open,
+            /* [V0.11.13] 云端第二落点（ADR-061）：测试连接 / 备份列表 / 备份恢复。
+            移动端同名注册，`md_backup_*` 在那里回 `MD_SYNC_CONFIG_INVALID`。 */
+            commands::md_sync_cmd::md_sync_test,
+            commands::md_sync_cmd::md_backup_list,
+            commands::md_sync_cmd::md_backup_restore,
             // [V0.12.0] 手机端原生能力（SAF 目录 / 悬浮条）；桌面侧四条是桩
             commands::mobile_cmd::md_saf_pick,
             commands::mobile_cmd::md_saf_status,

@@ -29,7 +29,10 @@ pub fn spawn_md_sync_watcher(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
             let pool = app.state::<AppState>().pool.clone();
-            match services::md_sync::tick(&pool).await {
+            /* [V0.11.13] 走云端编排：`cloud` 没配 / 没开 / 没填全时它逐字转交
+            `md_sync::tick`，老配置的行为与 V0.11.12 完全一致（判据在
+            `services::md_cloud::tick`，不在这里写 if）。 */
+            match services::md_cloud::tick(&pool).await {
                 Ok(Some(report)) => events::emit_md_sync_changed(&app, &report),
                 Ok(None) => {}
                 Err(err) => crate::log_warn!("md sync tick failed: {err}"),

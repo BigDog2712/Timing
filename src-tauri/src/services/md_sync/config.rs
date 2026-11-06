@@ -47,6 +47,10 @@ pub async fn load(pool: &SqlitePool) -> AppResult<MdSyncConfig> {
             /* 间隔同理：用户调过就用用户的，没调过就是默认 15 分钟。 */
             poll_secs: saved.poll_secs,
             bindings: merge_bindings(saved.bindings, default_bindings()),
+            /* [V0.11.13] 云端通道**原样带出**：保存值里是 `None` 就还是 `None`。
+            这里绝不能像 bindings 那样「缺就补默认值」——补一个默认云端配置等于
+            升级后自己打开通道，Timing 会开始往坚果云或磁盘第二处写用户文件。 */
+            cloud: saved.cloud,
         },
         None => MdSyncConfig::default(),
     })

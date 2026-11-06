@@ -61,7 +61,13 @@ import type {
   WorkAreaDip,
 } from './models';
 import type { PluginListResult } from './plugin';
-import type { MdSyncConfig, MdSyncKind, MdSyncReport, MdSyncView } from './mdSync';
+import type { MdSyncConfig, MdSyncKind, MdSyncReport } from './mdSync';
+import type {
+  MdBackupItem,
+  MdBackupRestoreResult,
+  MdSyncTestResult,
+  MdSyncViewCloud,
+} from './mdCloud';
 import type { OverlayStatus, OverlayStyle, SafStatus } from './mobile';
 import type { MigrationInfo } from './migration';
 
@@ -191,10 +197,21 @@ export interface IpcApi {
   pluginOpenDir(): Promise<void>;
 
   /* Markdown 同步 [V0.4.0 / 插件 API v2] */
-  mdSyncGet(): Promise<MdSyncView>;
-  mdSyncSave(params: { config: MdSyncConfig }): Promise<MdSyncView>;
+  mdSyncGet(): Promise<MdSyncViewCloud>;
+  /**
+   * [V0.11.13] `secret` 三分语义（后端据此定，见 `commands/md_credential.rs`）：
+   * `Some("")` = 清空已存密码；`Some(pw)` = 写入新密码；`null`/缺省 = **不动**已有密文。
+   * 密码不进 `MdSyncConfig`、不进 `settings` 表、不回传明文（只有 `hasSecret`）。
+   */
+  mdSyncSave(params: { config: MdSyncConfig; secret?: string | null }): Promise<MdSyncViewCloud>;
   mdSyncRun(): Promise<MdSyncReport>;
   mdSyncOpen(params: { kind: MdSyncKind }): Promise<void>;
+  /** [V0.11.13] 测试云端连接；`secret` 缺省 = 用已存密文，空串 = 明确「没填密码」 */
+  mdSyncTest(params: { config: MdSyncConfig; secret?: string | null }): Promise<MdSyncTestResult>;
+  /** [V0.11.13] 备份列表；手机端同名命令回 `MD_SYNC_CONFIG_INVALID`（不支持） */
+  mdBackupList(): Promise<MdBackupItem[]>;
+  /** [V0.11.13] 用一份备份覆盖回去；`target` 缺省 = 按备份文件名推出来的归属 */
+  mdBackupRestore(params: { name: string; target?: string | null }): Promise<MdBackupRestoreResult>;
 
   /* -- 手机端原生能力 [V0.12.0]：SAF 目录 / 悬浮条。桌面调用会回 IO_ERROR --
      存在即「这端有这套能力」，不存在由 isTauri/IS_MOBILE 分支兜住；

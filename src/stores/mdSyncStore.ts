@@ -7,17 +7,22 @@
 import { create } from 'zustand';
 import { mdSyncApi } from '../services/api';
 import { errorText } from '../services/ipc';
-import type { MdSyncConfig, MdSyncReport, MdSyncView } from '../types/domain';
+import type { MdSyncConfig, MdSyncReport, MdSyncViewCloud } from '../types/domain';
 
 interface MdSyncStore {
-  view: MdSyncView | null;
+  /** [V0.11.13] 基础视图 + 云端状态（`md_sync_get` 已返回 `MdSyncViewCloud`） */
+  view: MdSyncViewCloud | null;
   loaded: boolean;
   loading: boolean;
   saving: boolean;
   /** 加载 / 保存失败（逐条落点错误在 view.status.bindings[i].lastError 里） */
   error: string | null;
-  load: () => Promise<MdSyncView | null>;
-  save: (config: MdSyncConfig) => Promise<MdSyncView>;
+  load: () => Promise<MdSyncViewCloud | null>;
+  /**
+   * `secret` 三分语义由后端解释：`''` = 清空密码，`'...'` = 写入，`undefined` = 不动。
+   * store 原样转发，绝不自己拼一个空串——那会把用户的密码清掉。
+   */
+  save: (config: MdSyncConfig, secret?: string | null) => Promise<MdSyncViewCloud>;
   run: () => Promise<MdSyncReport>;
   clearError: () => void;
 }
@@ -42,10 +47,10 @@ export const useMdSyncStore = create<MdSyncStore>((set) => ({
       set({ loading: false });
     }
   },
-  save: async (config) => {
+  save: async (config, secret) => {
     set({ saving: true, error: null });
     try {
-      const view = await mdSyncApi.save(config);
+      const view = await mdSyncApi.save(config, secret);
       set({ view, loaded: true });
       return view;
     } catch (err) {

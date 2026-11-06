@@ -33,8 +33,7 @@ use self::runtime::Runtime;
 use crate::error::{AppError, AppResult};
 use crate::infra::md_file::{self, SectionState};
 use crate::models::md_sync::{
-    MdSyncBinding, MdSyncBindingStatus, MdSyncConfig, MdSyncKind, MdSyncReport, MdSyncStatus,
-    MdSyncView,
+    MdSyncBinding, MdSyncBindingStatus, MdSyncKind, MdSyncReport, MdSyncStatus, MdSyncView,
 };
 use crate::platform::clock::now_ms;
 
@@ -47,20 +46,6 @@ pub async fn get_view(pool: &SqlitePool) -> AppResult<MdSyncView> {
         config,
         status,
     })
-}
-
-/// 保存配置并立刻同步一次；返回保存后的视图 + 这一轮的报告。
-///
-/// 报告是给命令层用的：导入非零时要广播 `mdSyncChanged`，否则「手动同步」之后
-/// 除设置页以外的窗口都还显示旧数据（V0.11.3 修）。
-pub async fn save_config_with_report(
-    pool: &SqlitePool,
-    config: &MdSyncConfig,
-) -> AppResult<(MdSyncView, MdSyncReport)> {
-    config::save(pool, config).await?;
-    let report = sync_all(pool, None).await?;
-    let view = get_view(pool).await?;
-    Ok((view, report))
 }
 
 /// 自动同步间隔（秒）——实现放在 `config`（它才是读配置的地方）。

@@ -1,6 +1,6 @@
 //! 命令层：仅反序列化 -> 调 service -> 序列化，无业务、无 SQL。
 //!
-//! 命令名就是契约面（`lib.rs` 的 65 条注册 + `check:contract` 静态比对），所以
+//! 命令名就是契约面（`lib.rs` 的 74 条注册 + `check:contract` 静态比对），所以
 //! **不能**用 `#[cfg]` 把命令整条剔除。三组「桌面有实现、移动端只能给桩」的命令
 //! 改用 `#[path]` 换文件：模块名与函数名一字不变，`lib.rs` 因此零改动。
 //! 桩只回 `IO_ERROR`（见 `platform::host::desktop_only`），不新增错误码。
@@ -23,6 +23,10 @@ pub mod md_sync_cmd;
 #[cfg(mobile)]
 #[path = "md_sync_cmd_mobile.rs"]
 pub mod md_sync_cmd;
+
+/* [V0.11.13] WebDAV 密码的三分语义（`None` 不动 / 空串清空 / 明文写入）。
+两平台的 `md_sync_save` / `md_sync_test` 共用这一份：凭据口径分叉过一次就再也对不齐。 */
+pub mod md_credential;
 
 /* [V0.12.0] 手机端原生能力（SAF 目录 / 悬浮条）。桌面没有对应语义，
 用桩回 `IO_ERROR`，命令名与注册点两平台一致。 */

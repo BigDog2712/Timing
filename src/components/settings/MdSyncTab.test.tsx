@@ -1,7 +1,7 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MdSyncBinding, MdSyncView } from '../../types/domain';
+import type { MdSyncBinding, MdSyncViewCloud } from '../../types/domain';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 
 const BINDINGS: MdSyncBinding[] = [
@@ -21,9 +21,19 @@ const BINDINGS: MdSyncBinding[] = [
   },
 ];
 
-const VIEW: MdSyncView = {
+const VIEW: MdSyncViewCloud = {
   today: '2026-10-20',
-  config: { enabled: true, pollSecs: 900, bindings: BINDINGS },
+  /* [V0.11.13] `cloud: null` = 老配置口径（V0.11.12 及以前保存的 JSON 没有这个键）。
+     本文件只测落点页签，云端控件不在其中；它必须被**原样带回**而不是被清空。 */
+  config: { enabled: true, pollSecs: 900, bindings: BINDINGS, cloud: null },
+  cloud: {
+    enabled: false,
+    mode: 'localfolder',
+    hasSecret: false,
+    todayPushed: false,
+    pendingDates: [],
+    lastError: null,
+  },
   status: {
     lastSyncAt: null,
     lastError: null,
@@ -43,9 +53,11 @@ const api = vi.hoisted(() => ({
   save: vi.fn(),
   run: vi.fn(),
   open: vi.fn(),
+  test: vi.fn(),
 }));
+const backupApi = vi.hoisted(() => ({ list: vi.fn(), restore: vi.fn() }));
 
-vi.mock('../../services/api', () => ({ mdSyncApi: api }));
+vi.mock('../../services/api', () => ({ mdSyncApi: api, mdBackupApi: backupApi }));
 
 import { MdSyncTab } from './MdSyncTab';
 
@@ -88,8 +100,10 @@ describe('MdSyncTab —— 同步设置页', () => {
     api.get.mockReset();
     api.save.mockReset();
     api.run.mockReset();
+    backupApi.list.mockReset();
+    backupApi.list.mockResolvedValue([]);
     api.get.mockResolvedValue(VIEW);
-    api.save.mockImplementation(async (config: MdSyncView['config']) => ({ ...VIEW, config }));
+    api.save.mockImplementation(async (config: MdSyncViewCloud['config']) => ({ ...VIEW, config }));
     useMdSyncStore.setState({
       view: null,
       loaded: false,
@@ -139,14 +153,30 @@ describe('MdSyncTab —— 同步设置页', () => {
       await Promise.resolve();
     });
 
-    expect(api.save).toHaveBeenCalledWith({
-      enabled: true,
-      /* [V0.11.3] 间隔随保存一起提交，测试里没动过 → 默认 15 分钟 = 900 秒 */
-      pollSecs: 900,
-      bindings: [BINDINGS[0], BINDINGS[1]].map((binding, index) =>
-        index === 0 ? { ...binding, root: 'D:\\NewVault' } : binding,
-      ),
-    });
+    expect(api.save).toHaveBeenCalledWith(
+      {
+        enabled: true,
+        /* [V0.11.3] 间隔随保存一起提交，测试里没动过 → 默认 15 分钟 = 900 秒 */
+        pollSecs: 900,
+        bindings: [BINDINGS[0], BINDINGS[1]].map((binding, index) =>
+          index === 0 ? { ...binding, root: 'D:\\NewVault' } : binding,
+        ),
+        /* [V0.11.13] 云端配置现在由草稿统一持有：老配置（`cloud: null`）回填成「未启用」
+           的空配置，而不是继续传 `null`——`enabled: false` 是硬要求，凭空给 `true` 等于
+           用户按一次保存就把云端通道偷偷打开。 */
+        cloud: {
+          enabled: false,
+          mode: 'localfolder',
+          localRoot: '',
+          baseUrl: '',
+          basePath: '/Timing/md',
+          user: '',
+        },
+      },
+      /* 第二个入参 = 密码：没碰过密码框 → 恒 `undefined`（= 不动已存密文）。
+         断言它是 `undefined` 而不是缺省，是为了钉住「没碰密码框不等于清空密码」。 */
+      undefined,
+    );
     expect(button('立即同步').disabled).toBe(false);
   });
 
@@ -166,6 +196,7 @@ describe('MdSyncTab —— 同步设置页', () => {
 
     expect(api.save).toHaveBeenCalledWith(
       expect.objectContaining({ pollSecs: 45 * 60 }),
+      undefined,
     );
   });
 });

@@ -32,6 +32,7 @@ export * from './domain/models';
 export * from './domain/ipc';
 export * from './domain/plugin';
 export * from './domain/mdSync';
+export * from './domain/mdCloud';
 export * from './domain/migration';
 export * from './domain/mobile';
 export * from './domain-params';

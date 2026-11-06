@@ -41,6 +41,7 @@ pub(super) async fn env(tag: &str) -> Env {
     所以每个用例开跑前先把**三种 kind** 一次锁到临时目录——任何用例都不可能写到
     仓库或用户目录之外去（V0.4.0 出过一次「一次 run 写进作者本机日记」的事故）。 */
     let seeded = MdSyncConfig {
+        cloud: None,
         enabled: true,
         poll_secs: 900,
         bindings: vec![
@@ -188,6 +189,7 @@ async fn deleting_a_group_soft_deletes_its_records() {
 async fn invalid_config_uses_dedicated_error_code() {
     let env = env("md-invalid").await;
     let config = MdSyncConfig {
+        cloud: None,
         poll_secs: 900,
         enabled: true,
         bindings: vec![binding(

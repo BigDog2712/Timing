@@ -2,6 +2,8 @@
 pub mod countdown;
 pub mod daily_status;
 pub mod item;
+pub mod md_backup;
+pub mod md_cloud;
 pub mod md_sync;
 pub mod note;
 pub mod plugin;

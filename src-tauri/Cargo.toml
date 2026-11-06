@@ -1,6 +1,6 @@
 [package]
 name = "timing"
-version = "0.11.12"
+version = "0.11.13"
 description = "Timing — 常驻悬浮计时条（Windows 桌面，纯本地）"
 authors = ["Timing Team"]
 edition = "2021"
@@ -40,6 +40,16 @@ tokio = { version = "1", features = ["time", "rt", "rt-multi-thread"] }
 # Rust 侧数据访问（repositories 只写 SQL + 映射）
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "sqlite", "macros"] }
 
+# [V0.11.13] 云端通道：自己发 GET / PUT + Basic Auth，不引任何 WebDAV 客户端库（ADR-061）。
+# 关掉默认特性是为了不拖 OpenSSL —— 它会拖死 Android 交叉编译。TLS 走 rustls +
+# `rustls-platform-verifier`（读系统根证书），这正是任务书要求的「native roots」意图；
+# 任务书原文写的 `rustls-tls-native-roots` 在 reqwest 0.13 里**不存在**（0.13 删掉了
+# `*-native-roots` 系列特性名），`rustls-no-provider` 是同一意图的现名。
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+# 加密提供者显式选 `ring`：只需 cc，Windows 与 NDK 都能编。rustls 默认的 aws-lc-rs
+# 在 Windows 上要 cmake + NASM，本机构建环境没有。
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+
 # 桌面独占依赖（Android / iOS 上这三个插件没有实现，放进通用段必然链接失败）。
 # 用 `cfg(not(any(android, ios)))` 而不是 `cfg(desktop)`：Cargo 的 target 段只认
 # rustc 内建 cfg，`desktop` 是 tauri-build 给源码用的自定义别名，在 Cargo.toml 里无效。
@@ -62,6 +72,10 @@ rfd = { version = "0.16", default-features = false, features = ["common-controls
 # 该 crate 本身依赖 windows API，声明进跨平台段会让 macOS / Linux 构建失败。
 [target.'cfg(windows)'.dependencies]
 windows-registry = "0.6"
+# [V0.11.13] WebDAV 应用密码的加密存储（DPAPI：`CryptProtectData` / `CryptUnprotectData`）。
+# 已在依赖图里（`Cargo.lock` 有 0.61.2，经 windows-registry 引入），这里只是多开两个 feature
+# → 不新增编译单元。密码明文既不进 `settings` 表也不进日志，只以密文落盘。
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
 
 [features]
 default = []

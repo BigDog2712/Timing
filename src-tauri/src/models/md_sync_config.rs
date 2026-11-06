@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::constants::{MD_SYNC_POLL_MAX_SECS, MD_SYNC_POLL_MIN_SECS, MD_SYNC_POLL_SECS};
 use crate::models::md_sync::{MdSyncBinding, MdSyncKind, MD_SYNC_MAX_BINDINGS};
+use crate::models::md_sync_cloud::MdSyncCloud;
 
 /// 出厂落点根目录。
 ///
@@ -58,6 +59,12 @@ pub struct MdSyncConfig {
     pub poll_secs: u64,
     #[serde(default)]
     pub bindings: Vec<MdSyncBinding>,
+    /// [V0.11.13] 云端第二落点。`None` = 不启用云端通道，行为与 V0.11.12 逐字相同。
+    ///
+    /// 老配置里没有这个键 → `None`：**不给默认值**。升级后自己开通道等于替用户决定
+    /// 「开始往坚果云或磁盘第二处写文件」，而它是对外写操作，必须由用户按下开关。
+    #[serde(default)]
+    pub cloud: Option<MdSyncCloud>,
 }
 
 /// 老配置（V0.4.0~V0.11.2 保存的 JSON）里没有 `pollSecs`，按默认 15 分钟补。
@@ -71,6 +78,7 @@ impl Default for MdSyncConfig {
             enabled: false,
             poll_secs: MD_SYNC_POLL_SECS,
             bindings: default_bindings(),
+            cloud: None,
         }
     }
 }
@@ -103,6 +111,12 @@ impl MdSyncConfig {
                     binding.kind.label()
                 ));
             }
+        }
+        /* 云端通道的校验合一：路径不能与落点重合（两个写者）、WebDAV 必填项要齐。
+        放在最后是因为它的错误文案最长、也最不常触发，先报「间隔不对」更符合用户
+        从上到下改设置页的顺序。 */
+        if let Some(cloud) = &self.cloud {
+            cloud.validate(&self.bindings)?;
         }
         Ok(())
     }

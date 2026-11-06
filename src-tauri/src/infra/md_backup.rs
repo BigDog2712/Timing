@@ -15,20 +15,98 @@
 //! - 只在「文件已存在且内容确实要变」时留底（新建文件没有旧内容可丢）；
 //! - 落点固定 `<app_data_dir>/backups/md/`，**不写进用户 vault**——不在 Obsidian 里
 //!   制造一堆 `.bak`；
-//! - 文件名 `<原文件名>-<yyyyMMdd-HHmmss>.md`，同秒重复写会同名覆盖（可接受：
+//! - 文件名 `<落点标识>__<原文件名>-<yyyyMMdd-HHmmss>.md`，同秒重复写会同名覆盖（可接受：
 //!   同一秒内两次写盘的内容差异极小）；
-//! - 最多保留 `KEEP` 份，按修改时间淘汰（与 `platform::log` 的清理口径一致）；
+//! - 最多保留 `KEEP` 份，按修改时间淘汰——**只淘汰带落点前缀的自家备份**，升级前的
+//!   老文件不计数、不淘汰（V0.11.13 修正，见 `prune`）；
 //! - **任何失败都静默**：留底是附加保险，不能因为它写不出来而挡住同步本身。
+//!
+//! ## 落点标识（V0.11.13 新增）
+//!
+//! 云端通道上线后会有两个（以后三个）落点写同一批日期的文件，`2026-11-06.md` 在备份
+//! 目录里会混成一堆分不清谁是谁。所以文件名前面加一段短标识：`obsidian` / `webdav` /
+//! `folder`。用**注册表 + 最长前缀匹配**而不是「写之前设一个当前落点标记」：注册是幂等的，
+//! 不存在「某次 panic 没复位 → 之后全标错」的窗口，也不需要 RAII 守卫。
+//!
+//! `save(source, text)` 的签名与 `md_file::write_section` **都不动**：`write_section` 的
+//! 唯一调用方是 `sync_binding`，改签名等于改 `sync_all` 的调用链（本轮红线）。
+//! 未注册的落点一律回 `obsidian`——现存写入路径里除云端两轮以外都是 Obsidian 落点。
+//!
+//! 读侧（`list` / `read` / `parse_name`）在 `infra/md_backup_store.rs`，这里转发。
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
 
-/// 保留份数。按「每次真实写盘存一份」估算，够回看最近若干天的日记改写现场。
-const KEEP: usize = 30;
+/* 转发读侧：对外仍是 `md_backup::{list, read, parse_name}`，调用方不必知道拆过文件。
+`allow(unused_imports)` 是必须的——调用点在 T03（`services/md_backup`），在那之前
+本 crate 内没有人 import 这四个名字。 */
+#[allow(unused_imports)]
+pub use crate::infra::md_backup_store::{list, parse_name, read, BackupFile};
+
+/// 备份总数上限。**只数带落点前缀的文件**（见 `prune`）。`pub(crate)` 是为了让
+/// 淘汰规则的断言引用同一个数，而不是在测试里抄一个 30。
+pub(crate) const KEEP: usize = 30;
 
 static ROOT: OnceLock<PathBuf> = OnceLock::new();
+
+/// 「落点根 → 标识」注册表。两个注册点：`app::bootstrap`（Obsidian 出厂根）与
+/// 云端那轮（`services/md_cloud`，跑之前注册）。所以必须能跨线程追加。
+static ROOTS: OnceLock<Mutex<Vec<(PathBuf, &'static str)>>> = OnceLock::new();
+
+/// 登记一个落点根。可重复调用（同目录同标识不会产生第二条），后登记覆盖旧标识。
+pub fn register_root(dir: PathBuf, tag: &'static str) {
+    let tag = match crate::infra::md_backup_store::known_tag(tag) {
+        Some(known) => known,
+        /* 标识不在口径内就回退：写进文件名的词如果 `parse_name` 不认，
+        那份备份在列表里会永远显示「归属未知」，比标错更难发现。 */
+        None => {
+            crate::log_warn!("md backup 落点标识不在口径内：{tag}（按 obsidian 记）");
+            "obsidian"
+        }
+    };
+    let mut roots = match roots().lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    roots.retain(|(seen, _)| *seen != dir);
+    roots.push((dir, tag));
+}
+
+/// `source` 属于哪个落点。最长前缀匹配：`<数据根>\md-webdav` 优先于 `<数据根>\md`。
+pub fn tag_of(source: &Path) -> &'static str {
+    match roots().lock() {
+        Ok(list) => tag_in(&list, source),
+        Err(poisoned) => tag_in(&poisoned.into_inner(), source),
+    }
+}
+
+/// 生效的备份目录（`app::bootstrap` 注入）；未注入时 `save` / `list` 都是 no-op。
+pub(crate) fn backup_root() -> Option<&'static Path> {
+    ROOT.get().map(PathBuf::as_path)
+}
+
+fn roots() -> &'static Mutex<Vec<(PathBuf, &'static str)>> {
+    ROOTS.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+/// 纯匹配逻辑，单测入口：注册表作为参数传进来，不碰全局状态。
+fn tag_in(registered: &[(PathBuf, &'static str)], source: &Path) -> &'static str {
+    let mut best: Option<(usize, &'static str)> = None;
+    for (dir, tag) in registered {
+        /* `Path::starts_with` 按路径分量比较：`...\md-webdav` 不会被当成 `...\md` 的子目录。
+        深度用分量数而不是字节长度，嵌套注册时才是「最长前缀」的本意。 */
+        if !source.starts_with(dir) {
+            continue;
+        }
+        let depth = dir.components().count();
+        if best.is_none_or(|(seen, _)| depth > seen) {
+            best = Some((depth, tag));
+        }
+    }
+    best.map_or("obsidian", |(_, tag)| tag)
+}
 
 /// 由启动装配（`app::bootstrap`）注入落点；未注入时 `save` 为 no-op。
 pub fn set_root(dir: PathBuf) {
@@ -43,7 +121,9 @@ pub fn save(source: &Path, text: &str) {
     save_to(root, source, text);
 }
 
-fn save_to(root: &Path, source: &Path, text: &str) {
+/// `pub(crate)`：单测要能在自己造的临时目录上验文件名与淘汰规则，不能碰全局 `ROOT`
+/// （`OnceLock` 一个进程只认第一份）。
+pub(crate) fn save_to(root: &Path, source: &Path, text: &str) {
     if text.trim().is_empty() {
         return;
     }
@@ -55,7 +135,8 @@ fn save_to(root: &Path, source: &Path, text: &str) {
         .and_then(|value| value.to_str())
         .unwrap_or("md");
     let name = format!(
-        "{}-{}.md",
+        "{}__{}-{}.md",
+        tag_of(source),
         sanitize(stem),
         chrono::Local::now().format("%Y%m%d-%H%M%S")
     );
@@ -78,15 +159,28 @@ fn sanitize(raw: &str) -> String {
         .collect()
 }
 
-/// 超过 `KEEP` 份就按修改时间删最旧的。
+/// 超过 `KEEP` 份就按修改时间删最旧的——**淘汰池只算带已知落点前缀的文件**。
+///
+/// [V0.11.13] 为什么不认名字就删不行：升级到本版之前写下的备份名形如
+/// `2026-11-02-20261102-192610.md`，没有 `<tag>__` 前缀。按 mtime 一视同仁地数份数，
+/// 用户升级后连写几十次就把**升级前的全部历史现场**删光了——而任务书 §4.4-1 的口径是
+/// 「老备份不删、不改名，列表里标归属未知」。
+///
+/// 新口径的后果是可见的：老文件不计数也不淘汰，所以总数是「最多 KEEP 份新备份 +
+/// 历史老备份数」。后者不会增长——新代码只写带前缀的名字，老名字再也不会产生。
 fn prune(root: &Path) {
     let Ok(entries) = fs::read_dir(root) else {
         return;
     };
     let mut files: Vec<(SystemTime, PathBuf)> = entries
         .flatten()
-        .filter(|entry| entry.path().extension().and_then(|ext| ext.to_str()) == Some("md"))
         .filter_map(|entry| {
+            /* `parse_name` 认出前缀（且时间戳成形）才算「本版写的备份」：它同时排除了
+            `readme.md`、编辑器临时文件和用户自己带 `__` 的命名。 */
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !is_managed(&name) {
+                return None;
+            }
             entry
                 .metadata()
                 .and_then(|meta| meta.modified())
@@ -103,6 +197,15 @@ fn prune(root: &Path) {
     for (_, path) in files.iter().take(excess) {
         let _ = fs::remove_file(path);
     }
+}
+
+/// 「这份备份是本版写的」：名字解析得出落点标识。老格式（无前缀）返回 `false`，
+/// 于是**不计数、不淘汰**。
+fn is_managed(name: &str) -> bool {
+    matches!(
+        crate::infra::md_backup_store::parse_name(name),
+        Some((Some(_), _))
+    )
 }
 
 #[cfg(test)]
@@ -128,8 +231,8 @@ mod tests {
         assert_eq!(files.len(), 1);
         let name = files[0].file_name().to_string_lossy().to_string();
         assert!(
-            name.starts_with("2026-10-20-"),
-            "文件名要能看出源文件: {name}"
+            name.starts_with("obsidian__2026-10-20-"),
+            "文件名要同时看出落点与源文件: {name}"
         );
         let body = fs::read_to_string(files[0].path()).expect("备份应可读");
         assert_eq!(body, "# 日记\n\n手写内容", "必须原样保存，不做归一化");
@@ -144,16 +247,19 @@ mod tests {
     }
 
     #[test]
-    fn keeps_only_the_newest_files() {
+    fn keeps_only_the_newest_managed_files() {
         let root = temp_dir("prune");
         fs::create_dir_all(&root).expect("建临时目录");
         for index in 0..(KEEP + 5) {
-            fs::write(root.join(format!("old-{index:03}.md")), "x").expect("写样本");
+            /* 名字必须是本版写的形状（`<tag>__<stem>-<时间戳>.md`）：老格式按 V0.11.13
+            的口径不计数、不淘汰，铺老名字会让这条用例永远空转。 */
+            let name = format!("obsidian__old-{index:03}-20260101-000000.md");
+            fs::write(root.join(name), "x").expect("写样本");
         }
         save_to(&root, Path::new("y.md"), "新内容");
 
         let count = fs::read_dir(&root).expect("读目录").flatten().count();
-        assert!(count <= KEEP, "保留份数应不超过 {KEEP}，实际 {count}");
+        assert_eq!(count, KEEP, "带前缀的备份超过 {KEEP} 份时要淘汰到上限，实际 {count}");
         let _ = fs::remove_dir_all(&root);
     }
 

@@ -94,8 +94,11 @@ async fn run_once(app: &AppHandle, pool: &SqlitePool) {
         }
     }
 
-    match services::md_sync::run(pool).await {
-        Ok(report) => {
+    /* [V0.11.13] 从 `md_sync::run` 换成云端编排 `md_cloud::round`：云端没配时它逐字
+    转交 `md_sync::run`，所以这里只多取一层 `.report`，下面的通知与事件一字不动。 */
+    match services::md_cloud::round(pool).await {
+        Ok(outcome) => {
+            let report = outcome.report;
             /* `run` 只在**整体**不可执行时返回 Err；单个落点失败落在 `report.errors` 里。
             有错误就按失败告知（部分成功也不该说「完成」），其余计数照旧可用。 */
             if report.errors.is_empty() {

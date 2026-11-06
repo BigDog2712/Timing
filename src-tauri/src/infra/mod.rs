@@ -12,8 +12,12 @@
 pub mod appdata_migrate;
 pub mod db;
 pub mod md_backup;
+/* 备份目录的读侧（列表 / 读取 / 名字解析）：从 `md_backup` 拆出来的，只为行数。 */
+pub mod md_backup_store;
 pub mod md_env;
 pub mod md_file;
+/* [V0.11.13] WebDAV 传输：只有 GET / PUT / probe，不认 MdSyncCloud，不碰 services（L4）。 */
+pub mod md_webdav;
 pub mod migrate;
 /* 移动端独占：Android 的 SAF 与悬浮窗只在原生侧有实现，桥也只在移动端编译。 */
 #[cfg(mobile)]
@@ -22,6 +26,13 @@ pub mod notify;
 pub mod plugin_fs;
 pub mod portable_migrate;
 pub mod portable_probe;
+/* [V0.11.13] WebDAV 应用密码的加密存储（DPAPI / Android Keystore）。
+两个实现各占一个文件，`secret` 只做枚举分派；桌面与移动的 cfg 口径与 native_bridge 一致。 */
+pub mod secret;
+#[cfg(mobile)]
+pub mod secret_bridge;
+#[cfg(target_os = "windows")]
+pub mod secret_dpapi;
 pub mod shell_open;
 
 /* 桌面独占（V1-Android）：下面这些模块直接调 tauri 桌面专有 API ——

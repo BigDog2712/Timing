@@ -1,4 +1,4 @@
-//! 迁移执行器（幂等）：`0001_init` → 补列 → `0002_v020` → 补列(v3) → `0003_v030` → 版本推进。
+//! 迁移执行器（幂等）：`0001_init` → 补列 → `0002_v020` → 补列(v3) → `0003_v030` → 版本推进 → `0006_v0113`。
 //!
 //! **K-13 硬约束**：SQLite 不支持 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`，重复
 //! `ADD COLUMN` 报 `duplicate column name`。故 items / time_records / notes 的加列**不能**
@@ -74,6 +74,14 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
     }
     // ⑨ v5 版本推进（schema.version=5）+ 索引
     run_raw(pool, include_str!("../migrations/0005_v0113.sql")).await?;
+    // ⑩ v6 版本推进（schema.version=6）+ 云端待传队列表 `md_cloud_pending`
+    //
+    // 只建新表、不动既有表，所以没有「补列」这一步，也就不会撞 K-13。
+    // 语句顺序是「先建表、后推版本」：中途失败时库仍停在 v5 且表已存在，
+    // 下一次启动重跑本文件即可（建表带 IF NOT EXISTS），不会留下「版本说 6、
+    // 表却不在」这种只有人工 SQL 才能修的残局。错误一律向上抛给 `init_pool`，
+    // 由启动期决定是回滚还是弹迁移失败框——这里不吞、不降级。
+    run_raw(pool, include_str!("../migrations/0006_v0113.sql")).await?;
     Ok(())
 }
 

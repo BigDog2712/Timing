@@ -10,11 +10,15 @@
  * 桌面端仍以真实扫描结果为准；本文件只在 `isTauri() === false` 时被使用。
  */
 import type {
+  MdBackupItem,
   MdSyncBinding,
+  MdSyncCloud,
+  MdSyncCloudStatus,
   MdSyncConfig,
   MdSyncKind,
   MdSyncReport,
-  MdSyncView,
+  MdSyncTestResult,
+  MdSyncViewCloud,
   PluginInfo,
   PluginListResult,
 } from '../types/domain';
@@ -59,12 +63,27 @@ const DEFAULT_BINDINGS: MdSyncBinding[] = [
 ];
 
 /* 落点默认值：与内核 `default_bindings()` 同形（同步已是内核功能，不再由插件声明）。
-   `enabled` 这里给 true 是为走查方便（否则一进页面落点设置是收起的）。 */
+   `enabled` 这里给 true 是为走查方便（否则一进页面落点设置是收起的）。
+
+   [V0.11.13] `cloud` 给一个**未启用**的本地目录模板而不是 `null`：`null` 是「老配置、
+   从没进过云端页」的口径，浏览器里那块就永远渲染不出来，等于没得走查。真机上老用户
+   看到的是 `null`，设置页必须两种都能显示（T05）。 */
 let config: MdSyncConfig = {
   enabled: true,
   pollSecs: 900,
   bindings: DEFAULT_BINDINGS.map((binding) => ({ ...binding })),
+  cloud: {
+    enabled: false,
+    mode: 'localfolder',
+    localRoot: '',
+    baseUrl: '',
+    basePath: '',
+    user: '',
+  },
 };
+
+/* [V0.11.13] 密码只有一个 bool 可走查：mock 不存、也不回显明文（与真机一致）。 */
+let hasSecret = false;
 
 /* [v3] 示例插件换成 v1 的「摸鱼套装」：仓库里那个 `md-sync` 插件已删除，
 若还挂着它，设置页会在浏览器里显示一个实际上已经不存在的东西。 */
@@ -88,7 +107,21 @@ function today(): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-function view(): MdSyncView {
+/* [V0.11.13] 云端状态纯由配置 + `hasSecret` 推出来，不臆造「今天已上传」：
+   浏览器里没有任何东西真的传过，谎报成功会让走查得出错误结论。 */
+function cloudStatus(): MdSyncCloudStatus {
+  const cloud: MdSyncCloud | null = config.cloud;
+  return {
+    enabled: Boolean(cloud?.enabled),
+    mode: cloud?.mode ?? 'localfolder',
+    hasSecret,
+    todayPushed: false,
+    pendingDates: [],
+    lastError: null,
+  };
+}
+
+function view(): MdSyncViewCloud {
   const date = today();
   return {
     today: date,
@@ -105,6 +138,7 @@ function view(): MdSyncView {
         lastDirection: null,
       })),
     },
+    cloud: cloudStatus(),
   };
 }
 
@@ -120,13 +154,35 @@ function result(): PluginListResult {
 let overlayOn = false;
 let overlayStyle = 'dot';
 
+/* [V0.11.13] 备份列表：两条常量事实。第二条 `target: null` 代表老备份（文件名无归属
+   前缀），列表要能标出「归属未知」并让用户自己选恢复目标。 */
+const MOCK_BACKUPS: MdBackupItem[] = [
+  {
+    name: 'obsidian__2026-11-05.md',
+    target: 'obsidian',
+    source: '2026-11-05.md',
+    date: '2026-11-05',
+    atMs: 1762340000000,
+    bytes: 4096,
+  },
+  {
+    name: 'before-upgrade.md',
+    target: null,
+    source: '2026-11-03.md',
+    date: '2026-11-03',
+    atMs: 1762170000000,
+    bytes: 2048,
+  },
+];
+
 export function createMockApiPlugins(): Record<string, (args?: unknown) => unknown> {
   return {
     plugin_list: () => result(),
     plugin_open_dir: () => undefined,
     md_sync_get: () => view(),
     md_sync_save: (args) => {
-      const next = (args as { config?: MdSyncConfig } | undefined)?.config;
+      const payload = args as { config?: MdSyncConfig; secret?: string | null } | undefined;
+      const next = payload?.config;
       if (!next || !Array.isArray(next.bindings)) {
         fail('MD_SYNC_CONFIG_INVALID', '同步设置不合法：缺少落点');
       }
@@ -136,6 +192,9 @@ export function createMockApiPlugins(): Record<string, (args?: unknown) => unkno
         }
       }
       config = next;
+      /* [V0.11.13] 三分语义在 mock 里只落到一个 bool：`undefined` = 没碰密码框（保留），
+         空串 = 用户清空，非空 = 已设置。明文不进 mock 的任何状态，与真机同口径。 */
+      if (typeof payload?.secret === 'string') hasSecret = payload.secret.length > 0;
       return view();
     },
     md_sync_run: (): MdSyncReport => ({
@@ -146,6 +205,29 @@ export function createMockApiPlugins(): Record<string, (args?: unknown) => unkno
       errors: [],
     }),
     md_sync_open: () => undefined,
+    /* [V0.11.13] 测试连接：真机上 `detail` 是人话（不是 HTTP 状态码），mock 照这个口径
+       给，走查时看到的就是用户会看到的那句话。 */
+    md_sync_test: (args): MdSyncTestResult => {
+      const cloud = (args as { config?: MdSyncConfig } | undefined)?.config?.cloud;
+      if (!cloud || !cloud.enabled) return { ok: false, detail: '还没开启云端通道' };
+      if (cloud.mode === 'localfolder') {
+        const root = cloud.localRoot.trim();
+        return root
+          ? { ok: true, detail: `目录可写：${root}` }
+          : { ok: false, detail: '请选择云端通道的本地目录' };
+      }
+      if (!cloud.baseUrl.trim()) return { ok: false, detail: '请填写 WebDAV 服务地址' };
+      if (!cloud.user.trim()) return { ok: false, detail: '请填写 WebDAV 账号' };
+      return { ok: true, detail: '连接正常（浏览器 mock，没有真的发请求）' };
+    },
+    md_backup_list: (): MdBackupItem[] => MOCK_BACKUPS,
+    md_backup_restore: (args) => {
+      const name = (args as { name?: string } | undefined)?.name ?? '';
+      const item = MOCK_BACKUPS.find((backup) => backup.name === name);
+      if (!item) fail('MD_SYNC_CONFIG_INVALID', `「${name}」不是 Timing 的备份文件`);
+      if (!item.date) fail('MD_SYNC_CONFIG_INVALID', `「${name}」读不出日期`);
+      return { date: item.date, target: item.target, imported: 3, written: 1 };
+    },
     /* [V0.12.0] 手机端原生能力：浏览器给「已授权 + 悬浮条可开」的假事实，
        让两个入口都能走查（真机上这两个值来自 Kotlin）。 */
     md_saf_pick: () => ({ granted: true, label: 'Mock/Vault · …' }),

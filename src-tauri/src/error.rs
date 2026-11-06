@@ -5,7 +5,7 @@ use serde::ser::{SerializeStruct, Serializer};
 use serde::Serialize;
 
 /// 统一错误码（V0.1.0 的 11 + V0.2.0 新增 5 + V0.3.0 新增 1 − V0.3.1 下架 1
-/// − V0.3.3 下架 1 + V0.4.0 新增 1，共 16）。
+/// − V0.3.3 下架 1 + V0.4.0 新增 1 + V0.11.13 新增 1，共 17）。
 ///
 /// V0.2.0 五码已全部接线（`TODO_NOT_FOUND` 随待办域；`NOTE_NOT_FOUND` /
 /// `WINDOW_LIMIT_EXCEEDED` / `INVALID_TARGET_SEC` 随批 2 便利贴与倒计时；
@@ -45,6 +45,8 @@ pub enum ErrorCode {
     ItemNameTooLong,
     /* [V0.4.0] */
     MdSyncConfigInvalid,
+    /* [V0.11.13] */
+    MdSyncRemoteError,
 }
 
 impl ErrorCode {
@@ -67,6 +69,7 @@ impl ErrorCode {
             ErrorCode::InvalidColor => "INVALID_COLOR",
             ErrorCode::ItemNameTooLong => "ITEM_NAME_TOO_LONG",
             ErrorCode::MdSyncConfigInvalid => "MD_SYNC_CONFIG_INVALID",
+            ErrorCode::MdSyncRemoteError => "MD_SYNC_REMOTE_ERROR",
         }
     }
 }
@@ -183,6 +186,15 @@ impl AppError {
             ErrorCode::MdSyncConfigInvalid,
             format!("同步设置不合法：{}", message.into()),
         )
+    }
+
+    /// [V0.11.13] 云端通道走不通（`MD_SYNC_REMOTE_ERROR`，ADR-061）。
+    ///
+    /// `message` 由调用点写成人话，本构造器**不加前缀**：这条码覆盖的失败差得很远
+    /// （系统凭据写不进、401、磁盘满、远端目录不存在），一句统一前缀只会把真正的
+    /// 信息挤到后面。设置页对它的处理是「原样透出」，所以 message 就是用户看到的全部。
+    pub fn md_sync_remote(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::MdSyncRemoteError, message)
     }
 }
 

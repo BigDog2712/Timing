@@ -6,6 +6,8 @@
  * 前端只负责配置与展示状态——没有「插件装没装」这回事了。
  */
 
+import type { MdSyncCloud } from './mdCloud';
+
 /** 同步的数据种类 */
 export type MdSyncKind = 'timers' | 'notes' | 'todos';
 
@@ -41,6 +43,15 @@ export interface MdSyncConfig {
    */
   pollSecs: number;
   bindings: MdSyncBinding[];
+  /**
+   * [V0.11.13] 云端第二落点（ADR-061）。
+   *
+   * **必须是 `null` 而不是 `undefined`**：V0.11.12 及以前保存的 JSON 里没有这个键，
+   * Rust 侧的 `Option<MdSyncCloud>` 反序列化出来是 `None`，序列化回前端就是显式的
+   * `null`。写成可选字段（`cloud?:`）会让「没有这个键」与「有这个键但值为 null」
+   * 两种状态在类型上长得一样，而它们在线上是同一个东西 —— 用 `null` 才与线上一致。
+   */
+  cloud: MdSyncCloud | null;
 }
 
 /** 单个落点的运行状态 */

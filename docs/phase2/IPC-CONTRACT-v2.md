@@ -43,12 +43,13 @@
 
 ---
 
-## 2. 错误码清单（共 16 个）
+## 2. 错误码清单（共 17 个）
 
 > 组成：v0.1.0 锁定 11 个 + v0.2.0 新增 5 个 + v0.3.0 新增 1 个 − v0.3.1 下架 1 个
 > （`ITEM_NAME_DUPLICATE`，事项改为允许同名，见 ADR-021）− v0.3.3 下架 1 个
 > （`SHORTCUT_REGISTER_FAILED`，全局快捷键整体下架，见 ADR-022）+ v0.4.0 新增 1 个
-> （`MD_SYNC_CONFIG_INVALID`，见 ADR-033）。
+> （`MD_SYNC_CONFIG_INVALID`，见 ADR-033）+ v0.11.13 新增 1 个
+> （`MD_SYNC_REMOTE_ERROR`，见 ADR-061）。
 > 集合仍为**闭合**：新增与下架都必须同时改 `src-tauri/src/error.rs` 的 `as_str` 与前端
 > `ErrorCode` 联合类型，`npm run check:contract` 会核对两侧逐字一致（ADR-018 / ADR-021 / ADR-022）。
 
@@ -95,6 +96,16 @@
 
 > 为什么不用 `IO_ERROR`：这类失败是**用户配置写错**，不是磁盘 / 系统调用失败；
 > 混用会让设置页把「路径写错」显示成「磁盘故障」。见 ADR-033。
+
+### 2.5 v0.11.13 新增（1）
+
+| code | 触发条件 | 前端处理 | 可重试 |
+|---|---|---|---|
+| `MD_SYNC_REMOTE_ERROR` | 云端通道走不通：系统凭据写不进 / 读不出（DPAPI、Keystore 不可用）、WebDAV 返回 4xx·5xx、远端目录不存在、本地目录不可写（`md_sync_save` 的密码落库、`md_sync_test`） | 设置 → 同步页**原样展示 message**（message 由后端写成人话，如「应用密码保存失败：系统凭据不可用；本轮设置未保存，请重试」） | 视原因（凭据/网络问题修好后重试） |
+
+> 为什么不用 `IO_ERROR`：那条文案是「系统调用失败，请重试」，用户读完不知道「密码其实
+> 没存下来」，会以为存好了、再去和 401 缠一轮。为什么不用 `MD_SYNC_CONFIG_INVALID`：
+> 它不是配置写错——用户什么都没填错，是系统/远端这一环不通。见 ADR-061 §2.5。
 
 ---
 
@@ -166,16 +177,22 @@
 | `save_window_position` | `{ x: number, y: number }` | `void` | `saveWindowPosition` |
 | `quit_app` | `{}` | `void` | `quitApp` |
 
-### 3.8 插件 / Markdown 同步（V0.4.0）
+### 3.8 插件 / Markdown 同步（V0.4.0；V0.11.13 扩云端与备份）
 
 | 命令 | 入参 | 出参 | ipc.ts 方法 |
 |---|---|---|---|
 | `plugin_list` | `{}` | `PluginListResult` | `pluginList` |
 | `plugin_open_dir` | `{}` | `void` | `pluginOpenDir` |
-| `md_sync_get` | `{}` | `MdSyncView` | `mdSyncGet` |
-| `md_sync_save` | `{ config: MdSyncConfig }` | `MdSyncView` | `mdSyncSave` |
+| `md_sync_get` | `{}` | `MdSyncViewCloud` | `mdSyncGet` |
+| `md_sync_save` | `{ config: MdSyncConfig, secret?: string \| null }` | `MdSyncViewCloud` | `mdSyncSave` |
 | `md_sync_run` | `{}` | `MdSyncReport` | `mdSyncRun` |
 | `md_sync_open` | `{ kind: MdSyncKind }` | `void` | `mdSyncOpen` |
+| `md_sync_test` | `{ config: MdSyncConfig, secret?: string \| null }` | `MdSyncTestResult` | `mdSyncTest` |
+| `md_backup_list` | `{}` | `MdBackupItem[]` | `mdBackupList` |
+| `md_backup_restore` | `{ name: string, target?: string \| null }` | `MdBackupRestoreResult` | `mdBackupRestore` |
+
+> `md_sync_*` 的 `secret` 是**密码**，不是配置字段：三分语义见 §4.8。密码不进
+> `MdSyncConfig`、不进 `settings` 表、不回传明文（视图只给 `cloud.hasSecret`）。
 
 ---
 
@@ -393,24 +410,47 @@
 - 错误码：`IO_ERROR`
 
 #### `md_sync_get`
-- 入参：`{}`，出参：`MdSyncView`（`{ installed, pluginId, pluginName, pluginVersion, today, config, status }`）
-- 语义：读插件默认落点 + 用户保存的 KV 覆盖，附最近一次运行状态。
+- 入参：`{}`，出参：`MdSyncViewCloud`（`{ today, config, status, cloud }`；`cloud` 由 `#[serde(flatten)]` 平铺，不是嵌套对象）
+- 语义：读配置（含 `cloud`，老配置为 `null`）+ 落点运行状态 + 云端状态（`hasSecret` / `todayPushed` / `pendingDates` / `lastError`）。
 - 错误码：`DB_ERROR` / `IO_ERROR`
 
 #### `md_sync_save`
-- 入参：`{ config: MdSyncConfig }`，出参：`MdSyncView`
-- 语义：校验并落 `settings` KV（`plugin.md-sync.config`），随后立即同步一次；单个落点失败写进 `status.bindings[].lastError`，不整体报错。
-- 错误码：`MD_SYNC_CONFIG_INVALID` / `DB_ERROR` / `IO_ERROR`
+- 入参：`{ config: MdSyncConfig, secret?: string | null }`，出参：`MdSyncViewCloud`
+- 语义：校验 → 落密码 → 落 `settings` KV（`md-sync.config`）→ **立刻跑一轮云端同步** → 回视图。单个落点失败写进 `status.bindings[].lastError`，不整体报错。
+- `secret` **三分语义**（唯一定义在 `commands/md_credential.rs`）：
+  - `""` → 清空已存密文（用户清空密码框再保存）；
+  - 非空 → 写入密文（DPAPI / Keystore）；
+  - `null` / 缺省 → **一个字节都不动**（用户没碰密码框）。
+- **顺序硬约束**：云端路径校验 → **密码** → 配置 → 云端一轮 → 视图。密码先于配置，是为了让凭据写失败时「配置一个字都没改」，用户重试一次就是完整的一次操作；先写配置会留下「配置填全了、密文没写进去」的半截状态（此后每轮 401，而 `hasSecret: false` 与填满的输入框互相矛盾）。
+- 错误码：`MD_SYNC_CONFIG_INVALID` / `MD_SYNC_REMOTE_ERROR` / `DB_ERROR` / `IO_ERROR`
 
 #### `md_sync_run`
 - 入参：`{}`，出参：`MdSyncReport`（`{ at, imported, exported, kinds, errors }`）
-- 语义：按已保存配置强制同步一轮；错误逐条收集，不因一个落点失败而中断其他落点。
+- 语义：按已保存配置强制跑一轮**含云端**的同步（`md_cloud::round`）；错误逐条收集，不因一个落点失败而中断其他落点。
 - 错误码：`DB_ERROR` / `IO_ERROR`
 
 #### `md_sync_open`
 - 入参：`{ kind: MdSyncKind }`，出参：`void`
 - 语义：先同步一轮（补齐标题区块），再打开该 kind 的**今日文件**；文件仍不存在 → `IO_ERROR`。`kind` 未配置 → `MD_SYNC_CONFIG_INVALID`。
 - 错误码：`MD_SYNC_CONFIG_INVALID` / `IO_ERROR` / `DB_ERROR`
+
+#### `md_sync_test`（[V0.11.13]）
+- 入参：`{ config: MdSyncConfig, secret?: string | null }`，出参：`MdSyncTestResult`（`{ ok, detail }`）
+- 语义：探一次云端通道——`localfolder` 判「这个目录能不能写」（建目录后写一个 `.timing-write-test` 探针并立刻删除）；`webdav` 发一次 GET。`detail` 是**人话**，不是 `HTTP 401`。
+- `secret`：`null`/缺省 → 用已存密文；空串 → 照原样下传，由服务层判「没填密码」（命令层不替它猜语义）。
+- 错误码：`DB_ERROR`（校验失败走 `ok: false` + `detail`，**不抛**）
+
+#### `md_backup_list`（[V0.11.13]）
+- 入参：`{}`，出参：`MdBackupItem[]`（`{ name, target, source, date, atMs, bytes }`，按 `atMs` 降序）
+- 语义：列出备份目录里 Timing 写过的备份。`target` 为 `null` = 老备份（文件名无 `__` 归属前缀）。纯读盘，读不出就是空列表。
+- 错误码：`IO_ERROR`（目录不可读时由 service 兜底为空列表，实际不抛）
+- **手机端**：同名注册，返回 `MD_SYNC_CONFIG_INVALID`「手机端暂不支持备份查看与恢复，请在电脑上操作」。
+
+#### `md_backup_restore`（[V0.11.13]）
+- 入参：`{ name: string, target?: string | null }`，出参：`MdBackupRestoreResult`（`{ date, target, imported, written }`）
+- 语义：用一份备份覆盖回去——文件、SQL、基线三者一起回到那一刻。`name` 来自前端，按**不可信输入**解析；`target` 缺省 = 按备份文件名推出来的归属（老备份要前端让用户自己选）。`target = "webdav"` 时排一笔待传，下一轮把回滚结果也传上去。
+- 错误码：`MD_SYNC_CONFIG_INVALID`（名字 / 日期不可解析、无可恢复落点）/ `IO_ERROR` / `DB_ERROR`
+- **手机端**：同上，返回 `MD_SYNC_CONFIG_INVALID`。
 
 ---
 
@@ -601,8 +641,8 @@ active ──resolve_open_record(discard)─▶ soft-deleted + saved（终态，
 ## 10. Phase 3 一致性校验清单与风险
 
 ### 10.1 交付前自检（缺一即退回）
-- [ ] 全部 67 个命令在 Rust `invoke_handler` 注册（含 §11 / §12 / §3.8 增量；V0.3.4 下架日记域 4 条、V0.4.0 新增 md-sync 4 条、V0.5.0 新增迁移可见性 2 条后的现值），且命令名与本文一致。
-- [ ] 16 个错误码在 `error.rs` 全部可序列化，无 `unwrap()` 泄漏 panic。
+- [ ] 全部 74 个命令在 Rust `invoke_handler` 注册（含 §11 / §12 / §3.8 增量；V0.3.4 下架日记域 4 条、V0.4.0 新增 md-sync 4 条、V0.5.0 新增迁移可见性 2 条、**V0.11.13 新增云端与备份 3 条**后的现值），且命令名与本文一致。
+- [ ] 17 个错误码在 `error.rs` 全部可序列化，无 `unwrap()` 泄漏 panic。
 - [ ] `domain.ts` 每个字段与 §5 DTO 一一对应（含 `null` 联合类型）。
 - [ ] 全项目无 `draft` 残留（命令、DTO、SQL、迁移、类型、文案）。
 - [ ] 全项目无 `confirm_stop` / `cancel_stop` 残留。
@@ -618,9 +658,11 @@ active ──resolve_open_record(discard)─▶ soft-deleted + saved（终态，
 - **R-5 `discard` 必须改 `status`**：软删除 `active` 记录而不改 `status` 会永久占用 `uq_records_open` 的唯一槽，导致此后无法开新会话（见 §4.4）。
 
 > 口径说明（2026-10-20）：§2 的「11 个错误码」与 §10.1 的「29 个命令」是 MVP 锁定值；当前实装
-> **67 命令 / 16 错误码**（含 ADR-020 新增的 `main_work_area`；ADR-021 下架 `ITEM_NAME_DUPLICATE`；
+> **74 命令 / 17 错误码**（含 ADR-020 新增的 `main_work_area`；ADR-021 下架 `ITEM_NAME_DUPLICATE`；
 > ADR-022 下架 `register_shortcut` / `set_always_on_top` / `SHORTCUT_REGISTER_FAILED`；
-> ADR-023 下架日记域 4 条命令；ADR-037 / V0.5.0 新增迁移可见性 2 条命令，见 §12.9）。
+> ADR-023 下架日记域 4 条命令；ADR-037 / V0.5.0 新增迁移可见性 2 条命令，见 §12.9；
+> ADR-061 / V0.11.13 新增 `md_sync_test` / `md_backup_list` / `md_backup_restore` 与
+> `MD_SYNC_REMOTE_ERROR`，见 §12.10）。
 > 以代码为准的机械校验由 `npm run check:contract` 执行（比对 `lib.rs` / `domain.ts` / `ipc.ts` /
 > `error.rs` 四处），本文档的人工数字不再作为门禁。
 
@@ -741,10 +783,10 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 ### 12.8 V1.0-Android 平台差异（不是契约变更）
 
 > 本节登记**同一份契约在两个平台上的行为差异**，与 §12.5/§12.6 的「减量」不同：
-> **命令 67 / 错误码 16 / 事件 11 一个都没少**（V0.5.0 新增的两条迁移命令见 §12.9，移动端同样
-> 全注册、返回 `IO_ERROR`），`check:contract` 输出仍是
-> `67/67/67/67 · 16/16 · 11/11`。Android 分支只是把「桌面才有实现」的少数命令改成
-> 返回 `IO_ERROR` + 一句中文说明，DTO 字段一个不改。
+> **命令 74 / 错误码 17 / 事件 11 一个都没少**（V0.5.0 新增的两条迁移命令见 §12.9，
+> V0.11.13 新增的三条见 §12.10；移动端同样全注册），`check:contract` 输出仍是
+> `74/74/74/74 · 17/17 · 11/11`。Android 分支只是把「桌面才有实现」的少数命令改成
+> 返回 `IO_ERROR` / `MD_SYNC_CONFIG_INVALID` + 一句中文说明，DTO 字段一个不改。
 >
 > 依据：`docs/mobile/DESIGN-ANDROID-V1.md` §1.1 / §1.3 / §1.4 / §1.5 / §3.3。
 
@@ -752,9 +794,9 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 
 | 面 | 桌面 | Android | 变更 |
 |---|---|---|---|
-| 命令 | 65 → **67**（两平台全注册；桌面专属命令在移动端返回 `IO_ERROR`。V0.5.0 新增 2 条见 §12.9） | 无 |
+| 命令 | 65 → **67**（两平台全注册；桌面专属命令在移动端返回 `IO_ERROR`。V0.5.0 新增 2 条见 §12.9；V0.11.13 新增 3 条后为 **74**，见 §12.10） | 无 |
 | 事件 | 11 | **11**（`tray:highlight` / `app:open-*` / `note-window-*` 在移动端无 emit 点） | 无 |
-| 错误码 | 16 | **16**（桩统一 `IO_ERROR`，不新增码） | 无 |
+| 错误码 | 16 → **17**（V0.11.13 新增 `MD_SYNC_REMOTE_ERROR`；其余桩仍统一 `IO_ERROR`） | 无 |
 | DTO | — | 与桌面逐字相同；`Settings.autostartEnabled` 恒 `false`（字段保留） | 无 |
 
 #### 12.8.2 行为差异（同名命令，移动端返回 `IO_ERROR`）
@@ -764,7 +806,8 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 | `main_work_area` / `main_window_rect` | `IO_ERROR`「仅桌面端可用」 | 手机单 Activity 全屏，没有「主条」与多屏工作区，前端 auto-fit 无上界可算 |
 | `quit_app` | `IO_ERROR` | Android 由系统回收进程，不提供「退出应用」入口；前端也不调用 |
 | `open_settings_window` / `open_todos_window` / `open_timer_window` / `open_note_window` / `close_note_window` | `IO_ERROR` | 手机是单窗多页面路由（`MobileShell` 的 4 Tab + Sheet），没有第二个窗口可开 |
-| `md_sync_get` / `md_sync_save` / `md_sync_run` / `md_sync_open` | `IO_ERROR`「移动端暂不支持 Markdown 同步」 | 落点模型不同构（见 12.8.4） |
+| `md_sync_get` / `md_sync_save` / `md_sync_run` / `md_sync_open` / `md_sync_test` | **已实装**（V0.12.0 起走 SAF 编排，见 12.8.4 的历史说明；V0.11.13 加云端那一步） | 落点模型不同构的问题由 `app::md_sync_mobile::sync_once` 吸收，合并规则只有一份 |
+| `md_backup_list` / `md_backup_restore` | `MD_SYNC_CONFIG_INVALID`「手机端暂不支持备份查看与恢复，请在电脑上操作」 | 备份写在应用私有目录，用户看不见也导不出；给一份拿不到的备份比明说更糟 |
 | `show_window` / `hide_window` / `toggle_window` / `save_window_position` | **`Ok(())` 幂等空操作**（不报错） | 前端首帧与「拖动结束落盘」会调它们；语义上「已显示 / 位置无处可存」本来就是成功，回错误只会在控制台刷红 |
 | `set_autostart` | 恒返回 `false`（`get_autostart` 同） | `update_settings` 的 `autostartEnabled` 字段**接受但忽略**（不报错），老配置带该字段过来仍成功 |
 
@@ -860,6 +903,48 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 `check:contract` 会机械校验**四处**数量与名字完全相等（`lib.rs` / `IpcApi` / `ipc.ts` / mock），
 所以「命令名写错、少一处实现」必红。但它**不校验响应体字段**：`MigrationInfo` 的字段改名、
 增删，门禁全程绿。这类变更只能靠评审看 —— 与 ADR-037 里「(c) 方案为什么是最坏的一类」是同一件事。
+
+### 12.10 V0.11.13 契约增量：云端第二落点（ADR-061）
+
+> 背景：同步只落本地 Markdown 时，用户离开电脑就看不到当天数据。V0.11.13 起多一条云端
+> 通道（`localfolder` = 交给坚果云客户端 / `webdav` = Timing 自己 GET·PUT），并把「传了没传、
+> 卡在哪一步」变成设置页上能看见的状态。决策记录见 `docs/decisions/ADR-061.md`。
+
+| 面 | 变更 | 理由 |
+|---|---|---|
+| 命令 | 71 → **74**：新增 `md_sync_test` / `md_backup_list` / `md_backup_restore` | 「测试连接」要在保存前就给出人话；备份要能看见、能覆盖回去——否则出问题时唯一的补救是手动翻目录 |
+| 错误码 | 16 → **17**：新增 `MD_SYNC_REMOTE_ERROR` | 云端失败既不是「配置写错」（`MD_SYNC_CONFIG_INVALID`）也不是「磁盘/系统调用失败」（`IO_ERROR`） |
+| 事件 | **11 不变** | 云端跑完复用既有的 `md-sync:changed`：前端要的是「刷新数据」，不是「哪条通道传的」 |
+| DB schema | **v4 不变** | 待传清单是新增表，但本版没改既有表结构；`md_cloud_pending` 由迁移脚本单独负责并已随 T02 落地 |
+| DTO | `MdSyncConfig.cloud`（`MdSyncCloud \| null`）+ 新增 `MdSyncCloudStatus` / `MdSyncViewCloud` / `MdSyncTestResult` / `MdBackupItem` / `MdBackupRestoreResult` / `CloudMode` | 见 §12.10.1 |
+| 前端 | `md_sync_get` / `md_sync_save` 的出参从 `MdSyncView` 换成 `MdSyncViewCloud` | 后端用 `#[serde(flatten)]` 把云端状态平铺在旁边，基础视图字段一个没动 |
+
+#### 12.10.1 两个 serde 口径（写错不会编译报错）
+
+| 类型 | Rust 口径 | 线上值 |
+|---|---|---|
+| `CloudMode` | `rename_all = "lowercase"` | `"localfolder"` / `"webdav"`（**全小写**，不是 `"localFolder"`） |
+| `MdSyncCloud` / `MdSyncCloudStatus` / … | `rename_all = "camelCase"` | `localRoot` / `baseUrl` / `basePath` / `hasSecret` / `todayPushed` / `pendingDates` / `lastError` |
+
+`MdSyncViewCloud` 的线上形状是 `{ today, config, status, cloud }`——`cloud` 与基础视图**同级**，
+不是 `{ base: {...}, cloud: {...} }`。TS 侧用交叉类型表达：`MdSyncView & { cloud: MdSyncCloudStatus }`。
+
+#### 12.10.2 `secret` 不在配置里
+
+密码是**独立一条链路**（`infra::secret` → DPAPI / Keystore），不在 `MdSyncConfig` 里：
+后者会序列化进 `settings` 表（明文 JSON），还会被「导出整库」带走。视图只回
+`cloud.hasSecret: boolean`，明文**永不出后端**，也不进日志与 `Debug` 输出。
+
+三分语义（`commands/md_credential.rs`，桌面与移动端同一份）：`Some("")` 清空 /
+`Some(明文)` 写入 / `None` 不动。**密码先于配置落库**：凭据写失败时配置一个字都还没改，
+用户重试一次就是完整的一次操作——顺序理由写在 `md_sync_save` 的注释里。
+
+#### 12.10.3 门禁能看见什么、看不见什么
+
+`check:contract` 会核对四处命令名、两侧错误码、三处事件与「每个错误码都有 `errorText()` 文案」。
+它**不校验**：`secret` 的传递语义、`cloud` 字段是否被原样带回、`MdSyncViewCloud` 的字段形状。
+这三件事只能靠测试与评审看——`MdSyncTab.test.tsx` 里那条「保存必须原样带回 `cloud`」的断言
+就是为此钉的。
 
 ---
 

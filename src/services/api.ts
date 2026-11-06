@@ -137,12 +137,23 @@ export const pluginApi = {
   openDir: (): Promise<void> => ipc.pluginOpenDir(),
 };
 
-/* ---- [V0.4.0] Markdown 同步（插件 API v2；执行在 Rust，前端只配置/看状态） ---- */
-export const mdSyncApi = {
+/* ---- [V0.4.0] Markdown 同步（插件 API v2；执行在 Rust，前端只配置/看状态） ----
+   [V0.11.13] 云端第二落点：`save` 的 `secret` 三分语义由后端解释（见 ipc.ts 与 IpcApi 的注释），
+   前端只负责「原样转发用户有没有动密码框」——`undefined` 就是不转发。 */export const mdSyncApi = {
   get: () => ipc.mdSyncGet(),
-  save: (config: MdSyncConfig) => ipc.mdSyncSave({ config }),
+  save: (config: MdSyncConfig, secret?: string | null) => ipc.mdSyncSave({ config, secret }),
   run: () => ipc.mdSyncRun(),
   open: (kind: MdSyncKind): Promise<void> => ipc.mdSyncOpen({ kind }),
+  /** 测试云端连接（本地目录通道只测「能不能写」）；`secret` 省略 = 用已存密文 */
+  test: (config: MdSyncConfig, secret?: string | null) => ipc.mdSyncTest({ config, secret }),
+};
+
+/* ---- [V0.11.13] 备份（ADR-061）----
+   手机端两条同名命令回 `MD_SYNC_CONFIG_INVALID`（「手机端暂不支持…」），前端**不做
+   平台分支**：让后端给一句话，文案只有一处维护面。 */
+export const mdBackupApi = {
+  list: () => ipc.mdBackupList(),
+  restore: (name: string, target?: string | null) => ipc.mdBackupRestore({ name, target }),
 };
 
 export { isTauri };

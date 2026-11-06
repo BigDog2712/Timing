@@ -1,0 +1,93 @@
+/* =============================================================================
+ * Timing — settings-sync-cloud.css（同步页签 · 云端通道卡 + 备份卡，V0.11.13）
+ * -----------------------------------------------------------------------------
+ * 为什么不追加到 settings-sync.css：那个文件 281 行，且是本轮「一个字节不许动」的红线。
+ * 这两张卡又是全新结构，混进去既超限也说不清谁改了谁。
+ *
+ * 规则与 settings-sync.css 一致：只引用 var(--*)，无裸色值。输入框**故意另起类名**
+ * （`sync-cloud__input`）：若复用 `.sync__input`，`input.sync__input` 会先命中云端卡的
+ * 输入框，落点卡的选择器就错了。
+ * 单属性 / 短规则写一行，是多文件共用 300 行门禁下的既有写法（见 settings-sync.css）。
+ * ========================================================================== */
+
+.sync-cloud,
+.sync-backup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+}
+
+.sync-cloud__head,
+.sync-backup__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sync-cloud__input {
+  flex: 1; min-width: 0; height: 26px; padding: 0 var(--space-2);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--bg-panel); font-family: var(--font-mono); font-size: var(--text-cap);
+  color: var(--ink);
+}
+
+.sync-cloud__input:focus { outline: none; border-color: var(--accent); }
+.sync-cloud__input:disabled { color: var(--ink-4); }
+
+.sync-cloud__hint { margin: 0; font-size: var(--text-cap); line-height: 1.5; color: var(--ink-4); }
+.sync-cloud__test { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+
+.sync-cloud__result {
+  overflow-wrap: anywhere;
+  font-size: var(--text-cap); line-height: 1.5; color: var(--ok);
+}
+
+.sync-cloud__result[data-ok="false"] { color: var(--danger); }
+
+.sync-cloud__status {
+  display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3);
+  padding-top: var(--space-2); border-top: 1px solid var(--line);
+  font-size: var(--text-cap); color: var(--ink-3);
+}
+
+/* 上一轮的失败原文可能很长，独占一行才读得顺 */
+.sync-cloud__status .sync__error { flex-basis: 100%; }
+
+.sync-backup__group { display: flex; flex-direction: column; gap: var(--space-2); }
+.sync-backup__date { margin: var(--space-1) 0 0; font-family: var(--font-mono); font-size: var(--text-cap); color: var(--ink-3); }
+
+.sync-backup__row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  padding: var(--space-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--bg-panel);
+}
+
+.sync-backup__target {
+  flex: none; padding: 1px 6px; border: 1px solid var(--line-3);
+  border-radius: var(--radius-sm); font-size: var(--text-cap); color: var(--ink-2);
+}
+
+/* 老备份归属未知：用警示色，别让用户误以为它默认落到 Obsidian */
+.sync-backup__target[data-target="unknown"] { border-color: var(--warn); color: var(--warn); }
+
+.sync-backup__source {
+  min-width: 0; overflow: hidden;
+  font-family: var(--font-mono); font-size: var(--text-cap); color: var(--ink-2);
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sync-backup__facts { margin-left: auto; font-size: var(--text-cap); color: var(--ink-4); }
+
+.sync-backup__confirm {
+  flex-basis: 100%; display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-2); border: 1px solid var(--danger);
+  border-radius: var(--radius-sm); background: var(--danger-wash);
+}
+
+.sync-backup__confirm-text { margin: 0; font-size: var(--text-cap); line-height: 1.6; color: var(--ink); }
+.sync-backup__confirm-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }

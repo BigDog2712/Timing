@@ -120,6 +120,7 @@ async fn a_disabled_config_performs_no_file_io() {
     config::save(
         &pool,
         &MdSyncConfig {
+            cloud: None,
             enabled: false,
             poll_secs: 900,
             bindings: vec![

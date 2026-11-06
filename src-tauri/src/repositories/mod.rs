@@ -1,6 +1,7 @@
 //! 数据访问层：仅 SQL + 行映射，不含业务规则。
 
 pub mod item;
+pub mod md_cloud_pending;
 pub mod md_sync;
 pub mod md_sync_todo;
 pub mod note;

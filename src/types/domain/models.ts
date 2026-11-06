@@ -32,7 +32,7 @@ export type SwitchMode =
 /** 崩溃恢复对话框动作 */
 export type ResolveAction = 'resume' | 'close' | 'discard';
 
-/** 统一错误码（16 个；与 Rust `error.rs::as_str` 逐字一致，check:contract 校验） */
+/** 统一错误码（17 个；与 Rust `error.rs::as_str` 逐字一致，check:contract 校验） */
 export type ErrorCode =
   | 'DB_ERROR'
   | 'ITEM_NOT_FOUND'
@@ -52,7 +52,9 @@ export type ErrorCode =
   /* [V0.3.0] */
   | 'ITEM_NAME_TOO_LONG'
   /* [V0.4.0] */
-  | 'MD_SYNC_CONFIG_INVALID';
+  | 'MD_SYNC_CONFIG_INVALID'
+  /* [V0.11.13] 云端通道走不通（网络 / 远端 / 系统凭据），见 ADR-061 */
+  | 'MD_SYNC_REMOTE_ERROR';
 
 /* ===========================================================================
  * 核心领域实体

@@ -56,7 +56,20 @@ pub async fn open_file(app: &AppHandle, rel: &str) -> AppResult<()> {
 
 /// 跑一轮完整同步。落点为空（用户全关了）或没选目录时返回错误，调用方按需展示。
 ///
-/// 两处「先自查再动手」：
+/// ## 三段式，顺序是硬约定（[V0.11.13] 修正）
+///
+/// ```text
+/// ① config::load（+ 一行配置日志）
+/// ② 云端可用（enabled && is_usable）→ md_cloud::round，全程不碰 SAF、不碰镜像
+/// ③ 否则 → SAF 授权检查 → mirrorIn → mirror::run_in → mirrorOut
+/// ```
+///
+/// ② 必须排在 ③ 的 SAF 检查**之前**：手机上「只配 WebDAV、不选日记目录」是合法用法
+/// （云端模式不需要 Obsidian，手机只当另一个 SQL 端点）。原先云端分派挂在函数末尾，
+/// 于是这类用户永远先被「同步目录未授权」拦住——与任务书 §4.7 / 设计 §2.2 正面冲突。
+/// 反过来，③ 的行为**一个字都没改**：非云端用户仍然先要授权。
+///
+/// 两处「先自查再动手」（只在 ③ 里）：
 /// - 目录授权：`mirrorIn` 里才失败的话，错误会经原生桥折成一句 `IO_ERROR`，用户在设置页
 ///   看到的只有「系统调用失败」——先问一句 `safStatus`，就能给「去选目录」这种能照做的提示；
 /// - 镜像根：**由 Rust 算好绝对路径传给 Kotlin**。两边各自推导（Rust `app_data_dir` vs
@@ -65,19 +78,13 @@ pub async fn open_file(app: &AppHandle, rel: &str) -> AppResult<()> {
 pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
     let pool = app.state::<AppState>().pool.clone();
 
-    if !saf_status(app).await?.granted {
-        /* 措辞里要带「未授权」：`jobs::md_sync_mobile` 靠这个词把「还没配好」和真故障
-           分开，配好之前每 15 分钟一条 warn 会把日志淹掉。 */
-        return Err(AppError::md_sync_config_invalid(
-            "同步目录未授权：点「日记目录 → 选择」给一次授权，程序会记住这个目录",
-        ));
-    }
-
+    /* ① 配置。必须先读：云端分派与镜像路径都要它，而且这一行日志是手机上唯一的
+    「用户到底配了什么」的现场。 */
+    let config = crate::services::md_sync::config::load(&pool).await?;
     /* [V0.11.12] 总开关与各落点的开关状态必须先落一行日志。
     `mirror_paths` 只看落点 `enabled`、不看总开关，而 `sync_all` 见到总开关关闭会
     **静默返回**——于是手机上表现为「镜像搬了文件、合并一行没跑、写回 0 个」，
     界面上还是一次成功。这一行把这两种情况分开。 */
-    let config = crate::services::md_sync::config::load(&pool).await?;
     crate::log_info!(
         "md sync config: enabled={} bindings=[{}]",
         config.enabled,
@@ -94,6 +101,27 @@ pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
             .collect::<Vec<_>>()
             .join(" | ")
     );
+
+    /* ② 云端通道：直接交回云端那轮的完整报告，**不叠加**本地镜像那一轮的计数——
+    云端模式里 Obsidian 那三步不该发生（落点是 `content://`，镜像搬的是用户 vault，
+    与云端那份无关）。判据只在这里判一次，服务层不猜手机想不想连云端。 */
+    if config
+        .cloud
+        .as_ref()
+        .is_some_and(|cloud| cloud.enabled && cloud.is_usable())
+    {
+        let outcome = crate::services::md_cloud::round(&pool).await?;
+        return Ok(outcome.report);
+    }
+
+    /* ③ 非云端：先问授权，再好给「去选目录」这种能照做的提示。 */
+    if !saf_status(app).await?.granted {
+        /* 措辞里要带「未授权」：`jobs::md_sync_mobile` 靠这个词把「还没配好」和真故障
+           分开，配好之前每 15 分钟一条 warn 会把日志淹掉。 */
+        return Err(AppError::md_sync_config_invalid(
+            "同步目录未授权：点「日记目录 → 选择」给一次授权，程序会记住这个目录",
+        ));
+    }
 
     let rels = mirror::mirror_paths(&pool).await?;
     if rels.is_empty() {

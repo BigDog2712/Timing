@@ -66,14 +66,15 @@ import type {
   MdSyncConfig,
   MdSyncKind,
   MdSyncReport,
-  MdSyncView,
+  MdSyncViewCloud,
+  MdSyncTestResult,
+  MdBackupItem,
+  MdBackupRestoreResult,
   MigrationInfo,
 } from '../types/domain';
 import { createMockApi } from '../mocks/browserMock';
-/* [V0.5.0] 错误类型与规范化搬到 ipcError.ts 腾行数（本文件 295 行 → 余量足够新增 2 条命令）。
-   `errorText()` 留在本文件不搬——check-contract.mjs 从这里内联解析 `case '...'`。 */
+/* [V0.5.0] 错误类型与规范化搬到 ipcError.ts 腾行数；`errorText()` 留在本文件——check-contract.mjs 从这里内联解析 `case '...'`。 */
 import { IpcError, normalizeError } from './ipcError';
-
 export { IpcError } from './ipcError';
 
 /** 是否运行在 Tauri（WebView2）运行时 */
@@ -122,8 +123,7 @@ export function errorText(err: unknown): string {
     case 'INVALID_DURATION':
       return '结束时间早于开始时间';
     case 'IO_ERROR':
-      /* [V0.3.0] 此前漏了这一支，会静默落到「操作失败，请稍后重试」——
-         由 check:contract 的「错误码文案覆盖」规则抓出。 */
+      /* [V0.3.0] 曾漏这一支、静默落到通用兜底；现由 check:contract 的覆盖率规则强制。 */
       return '系统调用失败，请重试';
     /* [V0.2.0] */
     case 'NOTE_NOT_FOUND':
@@ -139,10 +139,11 @@ export function errorText(err: unknown): string {
     /* [V0.3.0] 超长与「为空」分开：让表单高亮到正确分支（ADR-018） */
     case 'ITEM_NAME_TOO_LONG':
       return '输入内容过长，请精简后再试';
-    /* [V0.4.0] 同步落点配置校验失败：把后端给的具体原因原样透出，
-       设置页需要它告诉用户「哪个落点、哪一项」不合法。 */
+    /* [V0.4.0] 配置校验 / [V0.11.13] 云端失败：都把后端原因原样透出，设置页靠它说清卡在哪一步。 */
     case 'MD_SYNC_CONFIG_INVALID':
       return err instanceof Error && err.message ? err.message : '同步设置不合法';
+    case 'MD_SYNC_REMOTE_ERROR':
+      return err instanceof Error && err.message ? err.message : '云端同步失败，请检查网络与账号';
     default:
       return err instanceof Error && err.message ? err.message : '操作失败，请稍后重试';
   }
@@ -273,13 +274,17 @@ export const ipc: IpcApi = {
   pluginList: () => call<PluginListResult>('plugin_list'),
   pluginOpenDir: () => call<void>('plugin_open_dir'),
 
-  /* ---- [V0.4.0] Markdown 同步（插件 API v2） ---- */
-  mdSyncGet: () => call<MdSyncView>('md_sync_get'),
-  mdSyncSave: (params: { config: MdSyncConfig }) =>
-    call<MdSyncView>('md_sync_save', { config: params.config }),
+  /* ---- [V0.4.0] Markdown 同步（插件 API v2）/ [V0.11.13] 云端 + 备份（ADR-061） ---- */
+  mdSyncGet: () => call<MdSyncViewCloud>('md_sync_get'),
+  mdSyncSave: (params: { config: MdSyncConfig; secret?: string | null }) =>
+    call<MdSyncViewCloud>('md_sync_save', { config: params.config, secret: params.secret ?? null }),
   mdSyncRun: () => call<MdSyncReport>('md_sync_run'),
-  mdSyncOpen: (params: { kind: MdSyncKind }) =>
-    call<void>('md_sync_open', { kind: params.kind }),
+  mdSyncOpen: (params: { kind: MdSyncKind }) => call<void>('md_sync_open', { kind: params.kind }),
+  mdSyncTest: (params: { config: MdSyncConfig; secret?: string | null }) =>
+    call<MdSyncTestResult>('md_sync_test', { config: params.config, secret: params.secret ?? null }),
+  mdBackupList: () => call<MdBackupItem[]>('md_backup_list'),
+  mdBackupRestore: (params: { name: string; target?: string | null }) =>
+    call<MdBackupRestoreResult>('md_backup_restore', { name: params.name, target: params.target ?? null }),
 
   /* ---- 手机端原生能力 [V0.12.0]：SAF 目录 / 悬浮条 ---- */
   mdSafPick: () => call<SafStatus>('md_saf_pick'),

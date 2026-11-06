@@ -72,6 +72,9 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     // ①' [V0.4.1] Markdown 落点写前留底目录（md-sync 覆写用户日记前存原内容）。
     //     放在数据根而不是 vault 里：不在 Obsidian 的库里堆 .bak。
     crate::infra::md_backup::set_root(data_root.join("backups").join("md"));
+    // [V0.11.13] WebDAV 应用密码的密文落点（DPAPI / Keystore）+ 出厂 Obsidian 落点登记。
+    crate::infra::secret::install_from_data_root(&data_root);
+    crate::infra::md_backup::register_root(data_root.join("md"), "obsidian");
 
     // ② 建库（含迁移）+ ③ 默认设置
     let pool = tauri::async_runtime::block_on(db::init_pool(&data_root))?;
