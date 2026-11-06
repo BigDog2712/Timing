@@ -66,8 +66,10 @@ pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
     let pool = app.state::<AppState>().pool.clone();
 
     if !saf_status(app).await?.granted {
+        /* 措辞里要带「未授权」：`jobs::md_sync_mobile` 靠这个词把「还没配好」和真故障
+           分开，配好之前每 15 分钟一条 warn 会把日志淹掉。 */
         return Err(AppError::md_sync_config_invalid(
-            "还没选 Obsidian 日记目录：点「日记目录 → 选择」授权一次",
+            "同步目录未授权：点「日记目录 → 选择」给一次授权，程序会记住这个目录",
         ));
     }
 
