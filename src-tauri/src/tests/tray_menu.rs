@@ -11,7 +11,7 @@ use crate::infra::tray_menu::{
 use crate::models::enums::TrayStatus;
 
 /// 取节点里的所有 id（按出现顺序）。
-fn ids(nodes: &[TrayNode]) -> Vec<&'static str> {
+pub(super) fn ids(nodes: &[TrayNode]) -> Vec<&'static str> {
     nodes
         .iter()
         .filter_map(|n| match n {
@@ -28,14 +28,14 @@ fn count_separators(nodes: &[TrayNode]) -> usize {
         .count()
 }
 
-fn label_of(nodes: &[TrayNode], id: &str) -> Option<String> {
+pub(super) fn label_of(nodes: &[TrayNode], id: &str) -> Option<String> {
     nodes.iter().find_map(|n| match n {
         TrayNode::Item { id: nid, label, .. } if *nid == id => Some(label.clone()),
         _ => None,
     })
 }
 
-fn enabled_of(nodes: &[TrayNode], id: &str) -> Option<bool> {
+pub(super) fn enabled_of(nodes: &[TrayNode], id: &str) -> Option<bool> {
     nodes.iter().find_map(|n| match n {
         TrayNode::Item {
             id: nid, enabled, ..

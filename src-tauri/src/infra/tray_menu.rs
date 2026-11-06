@@ -7,6 +7,7 @@
 //! `docs/design/pages-V0.2.0/tray-menu.md §1.1` 中依赖尚未交付能力的项（日期视图 /
 //! 关于面板等）不生成（**不产出空占位项**）。批 2 已追加「打开事项 / 编辑固定任务… /
 //! 便利贴…」三个后端已具备能力的项（后两者 emit 应用内事件交由前端弹菜单）。
+//! [V0.11.7] 追加「Markdown 同步」：一次点击跑一轮双向同步，结果走系统通知。
 
 use crate::models::enums::TrayStatus;
 
@@ -25,6 +26,8 @@ pub const ID_OPEN_SETTINGS: &str = "open_settings";
 /* [V0.2.0 批 2] 后端已具备能力的常显项 */
 pub const ID_OPEN_TODOS: &str = "open_todos";
 pub const ID_OPEN_NOTE: &str = "open_note";
+/* [V0.11.7] 一次双向 Markdown 同步（用户口径：不想为了一次同步专门开设置页） */
+pub const ID_MD_SYNC: &str = "md_sync";
 pub const ID_QUIT: &str = "quit";
 
 /// 一条菜单节点：分隔线，或文本项。
@@ -99,6 +102,10 @@ pub fn build_nodes(status: TrayStatus, line: &str) -> Vec<TrayNode> {
     （只显不隐），双击 = 高亮定位。 */
     nodes.push(TrayNode::item(ID_NEW_ITEM, "新建事项", true));
     nodes.push(TrayNode::item(ID_OPEN_TODOS, "打开事项", true));
+    /* [V0.11.7] 紧随「打开事项」：同步的对象就是事项计时，位置贴着数据本身讲。
+    文案纯文本、无符号（P0）；`enabled` 恒真——未启用同步时的反馈由点击侧给通知，
+    不在这里灰置（灰置等于「点了没反应」，用户看不出该去哪儿开）。 */
+    nodes.push(TrayNode::item(ID_MD_SYNC, "Markdown 同步", true));
     nodes.push(TrayNode::item(ID_OPEN_NOTE, "便利贴…", true));
     nodes.push(TrayNode::item(ID_OPEN_SETTINGS, "设置…", true));
     nodes.push(TrayNode::Separator);

@@ -6,11 +6,14 @@
  *   1. 自订阅 theme-changed（主窗不代转，K-21）+ 首帧 theme_get/accent_get；
  *   2. 订阅 timer:state-changed 并拉取一次会话（「进行中」行需要实时时长）；
  *   3. 首帧就绪后自行 show（K-18 防白闪）。
+ *   4. [V0.11.7] 每次重新获得焦点 / 重新可见时重拉**事项**（`useItemsRefreshOnFocus`；
+ *      待办仍由紧随其后的 focus 监听负责，两条互不替代）。
  * 尺寸/透明底由 html[data-window="todos"] 与 .todos--window 承载（见 CSS）；
  * Esc 关窗（todos-panel.md §3.4）。
  */
 import { useEffect } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
+import { useItemsRefreshOnFocus } from '../../hooks/useItemsRefreshOnFocus';
 import { useTodoDeleteFlush } from '../../hooks/useTodoDeleteFlush';
 import { useWindowLeaveHide } from '../../hooks/useWindowLeaveHide';
 import { closeCurrentWindow, showCurrentWindowOnReady } from '../../lib/window';
@@ -71,7 +74,12 @@ export function TodosWindow() {
   }, []);
 
   /* [V0.3.12] 窗口重新获得焦点时重拉待办：主窗那边可能刚做过轻提醒的「推迟」、
-     「现在就开始」或到点自动开始（这些都会改/删待办），不重拉这里就是一份陈旧列表。 */
+     「现在就开始」或到点自动开始（这些都会改/删待办），不重拉这里就是一份陈旧列表。
+     [V0.11.7] 事项列表也在同一处收口：本窗是浮层，`useWindowLeaveHide` 只 hide 不卸载，
+     「再打开」不重新 mount → 首帧那个 effect 不重跑。于是悬浮窗里新建过的事项，这里
+     查不到 → 名字回落「未归类」，`identityOf` 退回 `id:<itemId>` 分组，同一事项被拆成
+     好几行（现场三条记录 19/20/19 就是这么来的）。数据没丢，是**视图快照过期**。 */
+  useItemsRefreshOnFocus();
   useEffect(() => {
     const onFocus = () => {
       void useTodoStore.getState().reload().catch(() => undefined);

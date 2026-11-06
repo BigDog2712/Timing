@@ -5,12 +5,15 @@
 //!
 //! 刷新纪律（K-30 / ADR-013 §3.3.2）：菜单结构**仅在计时状态迁移时重建**，
 //! 秒级时间不每 tick 重建（`emit_timer_state` 只在状态变更路径上调用）。
+//!
+//! 本模块只做「派发」；「Markdown 同步」点完之后那一整套动作在 `app::tray_sync`
+//! （单文件 ≤300 行，ADR-017）。
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::app::events;
+use crate::app::{events, tray_sync};
 use crate::infra::{tray_menu, window};
 use crate::models::enums::{ResolveAction, TrayStatus};
 use crate::models::timer::TraySnapshot;
@@ -133,6 +136,7 @@ fn on_menu_event(app: &AppHandle, id: &str) {
             let _ = window::show_main(app);
             let _ = app.emit(events::APP_OPEN_NEW_NOTE, ());
         }
+        tray_menu::ID_MD_SYNC => tray_sync::spawn(app),
         tray_menu::ID_QUIT => app.exit(0),
         tray_menu::ID_TIMER_START => spawn_action(app, TrayAction::Start),
         tray_menu::ID_TIMER_PAUSE => spawn_action(app, TrayAction::Pause),

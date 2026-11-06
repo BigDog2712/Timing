@@ -29,6 +29,7 @@ import { UndoBar } from './components/undo/UndoBar';
 import { CollapsedDot } from './components/ui/CollapsedDot';
 import { NoticeBar } from './components/ui/NoticeBar';
 import { useAppBootstrap } from './hooks/useAppBootstrap';
+import { useItemsRefreshOnFocus } from './hooks/useItemsRefreshOnFocus';
 import { useWindowAutoFit } from './hooks/useWindowAutoFit';
 import { IS_MOBILE } from './lib/platform';
 import { currentWindowKind } from './lib/window';
@@ -56,6 +57,10 @@ function MainWindow() {
   useAppBootstrap();
   /* [P1 修复] 把真实 OS 窗口收缩到可见内容包围盒：透明空白区不再吞掉桌面点击 */
   useWindowAutoFit();
+  /* [V0.11.7] 本窗与事项窗是两个 webview、两份 store：在事项窗「编辑事项」里改名、
+     或在那边新建的事项，主窗的悬浮条 / 菜单 / 便利贴列表都还停在旧快照上。
+     与事项窗同一处收口（`useItemsRefreshOnFocus`），理由见该 hook 的文件注释。 */
+  useItemsRefreshOnFocus();
 
   const collapsed = useUiStore((s) => s.collapsed);
   const panel = useUiStore((s) => s.panel);

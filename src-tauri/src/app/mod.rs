@@ -31,3 +31,6 @@ pub mod portable_prompt;
 pub mod preboot;
 #[cfg(desktop)]
 pub mod tray;
+/* [V0.11.7] 托盘「Markdown 同步」点完之后做的事（拆出 `tray` 以满足单文件 ≤300 行）。 */
+#[cfg(desktop)]
+pub mod tray_sync;

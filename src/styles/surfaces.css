@@ -125,8 +125,12 @@
      文字与圆环/手柄之间的间隔交给 .pill 的 gap 统一控制 */
   padding: 0 2px;
   border-radius: var(--radius-pill);
-  font-size: var(--text-body);
-  font-weight: var(--weight-medium);
+  /* [V0.11.7] 字号 / 字重与 `.pill__name`（14px / strong）对齐：这格文字点一下就变成
+     事项名，原先 13px / medium → 14px / strong 会「变大变粗」跳一下；中途点开输入框
+     （`.pill__input` 本来就是 14px / strong）又跳回来，一共跳两次。只改字号字重，
+     **颜色仍是 --ink-3 的提示态**（它是占位入口，不是已有数据），hover 保持 --ink。 */
+  font-size: var(--text-task-pill);
+  font-weight: var(--weight-strong);
   color: var(--ink-3);
   transition: color var(--dur-quick) var(--ease-standard);
 }

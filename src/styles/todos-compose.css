@@ -58,7 +58,11 @@
   background: var(--input-bg);
   color: var(--input-text);
   border: 1px solid var(--input-border);
-  font-size: var(--text-xs);
+  /* [V0.11.7] 与它生成的那一行（待办行 `.todo-pend__title` = --text-sm 12.5px）对齐：
+     原先是 --text-xs 11.5px，打完字按 Enter 立刻「变大一号」。也顺手回到全站
+     表单输入的常用档（--text-sm / --text-body），不再单独做一个更小的一档。
+     注：这张卡生成的是**待办行**，不是「今日计时」的记录行（`.todo-row__title`）。 */
+  font-size: var(--text-sm);
   transition: background-color var(--dur-quick) var(--ease-standard);
 }
 

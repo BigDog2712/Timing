@@ -59,5 +59,6 @@ mod todo_purge;
 mod todo_start;
 mod tray_batch2;
 mod tray_menu;
+mod tray_menu_md_sync;
 mod window_geometry;
 mod window_spec;
