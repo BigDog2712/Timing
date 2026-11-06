@@ -39,7 +39,7 @@ import { formatDuration } from '../../lib/format';
 import { arcDashArray, arcDashOffset, isArcVisible } from '../../lib/ringGeometry';
 import { useEndedFlash } from '../../hooks/useEndedFlash';
 import { usePillDrag } from '../../hooks/usePillDrag';
-import { useTimerTick } from '../../hooks/useTimerTick';
+import { useSmoothTimerTick } from '../../hooks/useTimerTick';
 import { findItem, useItemStore } from '../../stores/itemStore';
 import { useCountdownArmStore } from '../../stores/countdownArm';
 import { useTimerStore } from '../../stores/timerStore';
@@ -64,7 +64,11 @@ const NEEDLE_STROKE = 1.5;
 const PIN_RADIUS = 1.2;
 
 export function CollapsedDot() {
-  const seconds = useTimerTick();
+  /* [V0.11.10] 弧与分针改吃「带小数的秒」，逐帧推进。
+     原来一秒一跳：弧每次跳 6°（33px 下约 1.2px），看着是顿的；分针更狠，一分钟才挪一格。
+     文本仍用取整后的秒，读数不会出现 04:59.7 这种中间态。 */
+  const smoothSec = useSmoothTimerTick();
+  const seconds = Math.floor(smoothSec);
   const status = useTimerStore((s) => s.state.status);
   const session = useTimerStore((s) => s.state.session);
   const sessionItemId = session?.itemId ?? null;
@@ -101,7 +105,11 @@ export function CollapsedDot() {
   const armedIdle = status === 'idle' && armedSec != null;
   const displaySec = isCountdown ? remaining : armedIdle ? (armedSec ?? 0) : seconds;
 
-  const progress = isCountdown && session?.targetSec ? remaining / session.targetSec : 1;
+  /* 同一口径的小数版：只给弧和分针用 */
+  const smoothRemaining = isCountdown ? Math.max(0, (session?.targetSec ?? 0) - smoothSec) : 0;
+  const smoothDisplay = isCountdown ? smoothRemaining : armedIdle ? (armedSec ?? 0) : smoothSec;
+
+  const progress = isCountdown && session?.targetSec ? smoothRemaining / session.targetSec : 1;
   const arc = arcSpec(visual, isCountdown || armedIdle, progress);
   /* [V0.11.5] 正计时（running / paused）改「增长弧」：从 12 点起随时间延伸，
      60 秒长满一圈后回到起点重来（用户口径：「不应该长度固定地绕圈」）。
@@ -109,7 +117,7 @@ export function CollapsedDot() {
      `displaySec` 停住 → 弧长自然冻在当前长度，颜色走 --color-warn 区分暂停。
      倒计时 / 待命 / 结束 / 空闲沿用 arcSpec 的静态弧，口径不变。 */
   const growth = !isCountdown && (visual === 'running' || visual === 'paused');
-  const frac = growth ? (displaySec % 60) / 60 : arc.frac;
+  const frac = growth ? (smoothDisplay % 60) / 60 : arc.frac;
   const march = growth ? false : arc.march;
   const thick = growth ? false : arc.thick;
   /* 倒计时剩最后 60s：环切红（与小条同一阈值，令牌 --color-danger） */
@@ -119,12 +127,12 @@ export function CollapsedDot() {
   const text = formatDuration(displaySec);
 
   /* 分针角度：正计时一小时一圈（一秒 0.1°）；倒计时按已用比例整圈；
-     空闲 / 结束回 12 点。暂停时 useTimerTick 不再给新值，针自然冻住。 */
+     空闲 / 结束回 12 点。v0.11.10 起吃小数秒，针是匀速扫过去的，不是每分钟挪一格。 */
   const needleAngle = isCountdown
     ? (1 - progress) * 360
     : visual === 'idle' || visual === 'ended'
       ? 0
-      : (displaySec % 3600) * 0.1;
+      : (smoothDisplay % 3600) * 0.1;
 
   /* [V0.3.1] 右键主菜单已删除：圆点右键只吞事件，不再弹菜单 */
   const handleContextMenu = (e: ReactMouseEvent<HTMLButtonElement>) => {

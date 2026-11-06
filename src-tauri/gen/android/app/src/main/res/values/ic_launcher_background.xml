@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- 桌面图标的底色（src-tauri/icons/icon.png 里那块深色方块）。自适应图标会被系统裁成
+       圆形 / 方形 / squircle，底色必须与前景环所在的那块深色一致，否则边缘会露出一圈白。 -->
+  <color name="ic_launcher_background">#1E232D</color>
+</resources>

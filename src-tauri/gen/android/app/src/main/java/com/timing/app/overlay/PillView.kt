@@ -35,8 +35,16 @@ internal class PillView(context: Context) : View(context) {
     var snap: TimerReader.Snap = TimerReader.Snap.IDLE
         set(value) {
             if (field == value) return
+            /* 只有药丸的宽度依赖文字，才需要重新测量；
+               小圆点尺寸恒定，每 500ms 重排一次 overlay 窗口只会换来一顿一顿的观感。 */
+            val relayout = !dotMode && (
+                field.displaySec != value.displaySec ||
+                    field.item != value.item ||
+                    field.active != value.active ||
+                    field.countdown != value.countdown
+                )
             field = value
-            requestLayout()
+            if (relayout) requestLayout()
             invalidate()
         }
 
@@ -141,7 +149,10 @@ internal class PillView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
-        if (dotMode) drawDot(canvas, w, h) else drawBar(canvas, w, h)
+        /* 逐帧现算的连续秒：弧、分针、文字全部由它派生。
+           只跟着 500ms 一次的读库结果走会变成 6°/秒 的台阶，看着像卡顿。 */
+        val nowSec = snap.displayAt(System.currentTimeMillis())
+        if (dotMode) drawDot(canvas, w, h, nowSec) else drawBar(canvas, w, h, nowSec)
     }
 
     /**
@@ -153,7 +164,7 @@ internal class PillView(context: Context) : View(context) {
      * 也可能压在黑色相机取景框上。只有白环会在白底上隐形，只有黑环会在黑底上隐形，
      * 两条叠着才在哪都能认出来 —— 代价是 0.7dp，近看会有一点点「描边感」。
      */
-    private fun drawDot(canvas: Canvas, w: Float, h: Float) {
+    private fun drawDot(canvas: Canvas, w: Float, h: Float, nowSec: Double) {
         val c = w / 2f
         val edge = minOf(w, h) / 2f - d(0.35f)
 
@@ -179,8 +190,8 @@ internal class PillView(context: Context) : View(context) {
         stroke.color = Tk.PILL_DOT_TRACK
         canvas.drawCircle(c, c, dotTrack, stroke)
 
-        val arc = arcFraction()
-        val needle = needleFraction()
+        val arc = arcFraction(nowSec)
+        val needle = needleFraction(nowSec)
 
         // 时针（分针语义）：正计时 60 分钟一圈，倒计时指在「剩余」的位置
         if (needle > 0f) {
@@ -212,16 +223,14 @@ internal class PillView(context: Context) : View(context) {
         canvas.drawCircle(c, c, dotPivot, fill)
     }
 
-    private fun drawBar(canvas: Canvas, w: Float, h: Float) {
-        val radius = h / 2f
-
-        fill.color = Tk.PILL_BG
-        canvas.drawRoundRect(0f, 0f, w, h, radius, radius, fill)
-
-        stroke.strokeWidth = d(1f)
-        stroke.color = Tk.PILL_LINE_2
-        canvas.drawRoundRect(d(0.5f), d(0.5f), w - d(0.5f), h - d(0.5f), radius, radius, stroke)
-
+    /**
+     * 透明底药丸：**不画底板**，只留内容（用户口径：「默认透明背景、不透明文字」）。
+     *
+     * 去掉深色底板之后，浅色界面上原本靠底板衬托的白字 / 白轨会消失，所以补两条托底：
+     * 1. 文字带一层墨色阴影（阴影层对文字有效，minSdk 24 的硬件画布就支持）；
+     * 2. 状态环先描一层墨线再压白线——和小圆点「墨白双轨」同一套思路。
+     */
+    private fun drawBar(canvas: Canvas, w: Float, h: Float, nowSec: Double) {
         /* 状态环：圆角方形，进度沿轮廓裁一段（比圆弧更像桌面那颗环）。 */
         val left = padH
         val top = (h - ringSize) / 2f
@@ -229,11 +238,15 @@ internal class PillView(context: Context) : View(context) {
         ringPath.reset()
         ringPath.addRoundRect(ringRect, ringRadius, ringRadius, Path.Direction.CW)
 
+        stroke.strokeWidth = d(3.2f)
+        stroke.color = Tk.PILL_TRACK_INK
+        canvas.drawPath(ringPath, stroke)
+
         stroke.strokeWidth = d(2f)
         stroke.color = Tk.PILL_TRACK
         canvas.drawPath(ringPath, stroke)
 
-        val frac = arcFraction()
+        val frac = arcFraction(nowSec)
         if (frac > 0f) {
             val pm = PathMeasure(ringPath, false)
             ringSeg.reset()
@@ -242,16 +255,19 @@ internal class PillView(context: Context) : View(context) {
             canvas.drawPath(ringSeg, stroke)
         }
 
-        // 文字
+        // 文字：白字 + 墨晕托底
         timePaint.textSize = Tk.sp(context, 15f)
         timePaint.color = if (snap.active) Tk.PILL_INK else Tk.PILL_INK_DIM
+        timePaint.setShadowLayer(d(2.5f), 0f, d(0.5f), Tk.PILL_SHADOW)
         val baseY = h / 2f - (timePaint.descent() + timePaint.ascent()) / 2f
+        val shown = timeText(nowSec.toLong())
         var x = left + ringSize + gapRing
-        canvas.drawText(timeText(), x, baseY, timePaint)
-        x += timePaint.measureText(timeText())
+        canvas.drawText(shown, x, baseY, timePaint)
+        x += timePaint.measureText(shown)
 
         if (snap.item.isNotEmpty() && w > x + gapName + d(12f)) {
             namePaint.textSize = Tk.sp(context, 12f)
+            namePaint.setShadowLayer(d(2.5f), 0f, d(0.5f), Tk.PILL_SHADOW)
             val baseY2 = h / 2f - (namePaint.descent() + namePaint.ascent()) / 2f
             canvas.drawText(ellipsized(), x + gapName, baseY2, namePaint)
         }
@@ -259,8 +275,7 @@ internal class PillView(context: Context) : View(context) {
 
     // ------------------------------------------------------------ 计算
 
-    private fun timeText(): String {
-        val total = snap.displaySec
+    private fun timeText(total: Long = snap.displaySec): String {
         val h = total / 3600
         val m = (total % 3600) / 60
         val s = total % 60
@@ -273,24 +288,23 @@ internal class PillView(context: Context) : View(context) {
         return TextUtils.ellipsize(snap.item, namePaint, nameMax, TextUtils.TruncateAt.END).toString()
     }
 
-    /** 环的进度：倒计时按剩余比例回落，正计时按 60 秒一圈循环。 */
-    private fun arcFraction(): Float = when {
+    /** 环的进度：倒计时按剩余比例回落，正计时按 60 秒一圈循环。入参是带小数的秒。 */
+    private fun arcFraction(nowSec: Double): Float = when {
         !snap.active -> 0f
-        snap.countdown && snap.targetSec > 0L ->
-            (snap.displaySec.toFloat() / snap.targetSec).coerceIn(0f, 1f)
-        else -> (snap.elapsedSec % 60) / 60f
+        snap.countdown && snap.targetSec > 0L -> (nowSec / snap.targetSec).coerceIn(0.0, 1.0).toFloat()
+        else -> ((nowSec % 60.0) / 60.0).toFloat()
     }
 
     /**
-     * 时针的比例 —— **分针语义**：正计时 60 分钟转一圈（每分钟走 6°，一分钟跳一格），
-     * 倒计时跟弧同比例（剩多少，针就指哪儿）。老版本第一版误写成秒环，一分钟就转满
-     * 一圈，太快；这里直接沿用修正后的口径。
+     * 分针的比例 —— **分针语义**：正计时一小时转一圈，倒计时跟弧同比例。
+     *
+     * 老版本按整分钟跳（每分钟 6°），看着像秒针掉了一帧；这里用带小数的秒连续推进，
+     * 一小时走一圈的转速没变，但眼睛看到的是一条匀速扫过的针。
      */
-    private fun needleFraction(): Float = when {
+    private fun needleFraction(nowSec: Double): Float = when {
         !snap.active -> 0f
-        snap.countdown && snap.targetSec > 0L ->
-            (snap.displaySec.toFloat() / snap.targetSec).coerceIn(0f, 1f)
-        else -> (snap.elapsedSec / 60 % 60) / 60f
+        snap.countdown && snap.targetSec > 0L -> (nowSec / snap.targetSec).coerceIn(0.0, 1.0).toFloat()
+        else -> ((nowSec % 3600.0) / 3600.0).toFloat()
     }
 
     private fun ringColor(): Int {

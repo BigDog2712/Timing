@@ -12,6 +12,9 @@
  *   5. 托盘双击高亮在圆点形态下也挂得上（`data-highlight`）；
  *   6. 暂停时弧冻在当前长度（不再有 CSS 动画可暂停）。
  *
+ * [V0.11.10] 几何量改吃「带小数的秒」逐帧推进（弧不再一秒一跳），所以数值断言容差放到
+ * 1 位小数 —— `runningSince` 取 `Date.now()`，到真正读值时已经走了十几毫秒。
+ *
  * 断言的是**结构契约**（属性值 / 元素在不在），不做截图：33px 的环好不好看要靠人眼，
  * 但「第 60 秒整圈消失」这种缺陷一定能被 `stroke-dashoffset` 的数值钉死在结构上。
  *
@@ -132,15 +135,15 @@ describe('外环增长：frac = (displaySec % 60) / 60', () => {
     setTimer(59, 'running');
     const r = render();
     expect(r.arc).not.toBeNull();
-    expect(fracOf(r)).toBeCloseTo(59 / 60, 6);
-    expect(r.offset).toBeCloseTo(100 * (1 - 59 / 60), 6);
+    expect(fracOf(r)).toBeCloseTo(59 / 60, 1);
+    expect(r.offset).toBeCloseTo(100 * (1 - 59 / 60), 1);
   });
 
   it('1 秒 → 只画出 6°：极短但可见，不是「不可见」', () => {
     setTimer(1, 'running');
     const r = render();
     expect(r.arc).not.toBeNull();
-    expect(fracOf(r)).toBeCloseTo(1 / 60, 6);
+    expect(fracOf(r)).toBeCloseTo(1 / 60, 1);
   });
 
   it('60 / 120 秒 → 归零重来：frac=0，整条弧不渲染', () => {
@@ -155,16 +158,16 @@ describe('外环增长：frac = (displaySec % 60) / 60', () => {
     setTimer(3599, 'running');
     const r = render();
     expect(r.arc).not.toBeNull();
-    expect(fracOf(r)).toBeCloseTo(59 / 60, 6);
+    expect(fracOf(r)).toBeCloseTo(59 / 60, 1);
   });
 });
 
 describe('归零空窗：一秒，每分钟一次', () => {
   /**
    * `isArcVisible` 阈值 `ARC_MIN_FRAC = 0.001`（万分之一周）：
-   * `frac > 0.001` ⟺ `displaySec % 60 > 0.06`。`displaySec` 是**整数秒**，
-   * 所以只有 `displaySec % 60 === 0` 时不可见 —— 空窗 = **1 个 tick = 1 秒**，
-   * 占每 60 秒的 1/60 ≈ 1.67%。
+   * `frac > 0.001` ⟺ 分钟内的第 `0.06` 秒起才画。
+   * [V0.11.10] 弧改吃小数秒之后，空窗从「整 1 秒」缩到 **0.06 秒**——肉眼看不见，
+   * 这正是「整分钟闪一下」被消掉的原因。
    *
    * 既是「算出来的答案」，也是护栏：若 `frac` 被改成 `(displaySec % 60) / 59`
    * 或阈值被调大，下面的边界断言立刻红。
@@ -191,22 +194,22 @@ describe('归零空窗：一秒，每分钟一次', () => {
 describe('分针 needleAngle = (displaySec % 3600) * 0.1', () => {
   it('3599 秒 → 359.9°（几乎回到 12 点）', () => {
     setTimer(3599, 'running');
-    expect(render().needleAngle).toBeCloseTo(359.9, 6);
+    expect(render().needleAngle).toBeCloseTo(359.9, 1);
   });
 
   it('3600 秒 → 0°；与 359.9° 的圆周距离只有 0.1°（向前，不跳变）', () => {
     setTimer(3600, 'running');
     const at = render().needleAngle;
-    expect(at).toBeCloseTo(0, 6);
+    expect(at).toBeCloseTo(0, 1);
     /* 走「向前 0.1°」而不是「倒退 359.9°」 */
     const forward = (at - 359.9 + 360) % 360;
-    expect(forward).toBeCloseTo(0.1, 6);
+    expect(forward).toBeCloseTo(0.1, 1);
     expect(forward).toBeLessThan(1);
   });
 
   it('跨小时不累积：3660 秒 = 60 秒的针位（6°）', () => {
     setTimer(3660, 'running');
-    expect(render().needleAngle).toBeCloseTo(6, 6);
+    expect(render().needleAngle).toBeCloseTo(6, 1);
   });
 });
 
@@ -229,7 +232,7 @@ describe('外环不做整体旋转', () => {
     setTimer(31, 'running');
     const b = render();
     expect(b.svg.getAttribute('viewBox')).toBe('0 0 33 33');
-    expect(b.offset).toBeCloseTo(a.offset - 100 / 60, 6);
+    expect(b.offset).toBeCloseTo(a.offset - 100 / 60, 1);
   });
 });
 
@@ -259,6 +262,6 @@ describe('暂停时弧长冻结', () => {
     const r = render();
     expect(r.dot.dataset.state).toBe('paused');
     expect(r.arc).not.toBeNull();
-    expect(fracOf(r)).toBeCloseTo(42 / 60, 6);
+    expect(fracOf(r)).toBeCloseTo(42 / 60, 1);
   });
 });

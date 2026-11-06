@@ -31,10 +31,32 @@ internal class TimerReader private constructor(private val db: SQLiteDatabase) :
         val running: Boolean,
         val countdown: Boolean,
         val targetSec: Long,
+        /** 已累计的整秒（不含本次 running 段）。绘制时用它现算，才有亚秒精度。 */
+        val accumulatedSec: Long = 0,
+        /** 本轮 running 的起点（墙钟毫秒）。暂停 / 待机时为 null。 */
+        val runningSince: Long? = null,
     ) {
         /** 倒计时显示剩余（不为负），正计时显示已用。 */
         val displaySec: Long
             get() = if (countdown) (targetSec - elapsedSec).coerceAtLeast(0) else elapsedSec
+
+        /**
+         * 带小数的已用秒 —— **绘制专用**。
+         *
+         * 悬浮条每 500ms 才读一次库，如果圆点的弧只跟着这个整数秒走，就是一格一格地跳
+         * （6°/秒 的台阶），看起来像卡顿。真实时间在两次读库之间照样在走，所以这里用
+         * 「累计秒 + 现算的墙钟差」还原连续值，逐帧重绘才有顺滑的扫动。
+         */
+        fun elapsedAt(now: Long): Double {
+            val since = runningSince ?: return accumulatedSec.toDouble()
+            return accumulatedSec + (now - since).coerceAtLeast(0) / 1000.0
+        }
+
+        /** 绘制用的显示值：倒计时给剩余（可为小数），正计时给已用。 */
+        fun displayAt(now: Long): Double {
+            val elapsed = elapsedAt(now)
+            return if (countdown) (targetSec - elapsed).coerceAtLeast(0.0) else elapsed
+        }
 
         /** 倒计时最后一分钟要闪；正计时不闪。 */
         val urgent: Boolean
@@ -63,6 +85,8 @@ internal class TimerReader private constructor(private val db: SQLiteDatabase) :
                 running = runningSince != null,
                 countdown = cursor.getString(4) == "countdown",
                 targetSec = cursor.getLong(5),
+                accumulatedSec = accumulated,
+                runningSince = runningSince,
             )
         }
     }.getOrDefault(Snap.IDLE)

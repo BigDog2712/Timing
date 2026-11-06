@@ -49,27 +49,34 @@ export function AppearanceCard() {
         </div>
       )}
 
-      {/* [V0.2.2] 文字 / 背景不透明度（本机偏好，不写数据库；设置面板自身不受影响） */}
-      <div className="setting-row">
-        <span className="setting-row__label">
-          文字不透明度
-          <span className="setting-row__hint">{Math.round(textOpacity * 100)}%</span>
-        </span>
-        <Slider
-          label="文字不透明度"
-          value={textOpacity}
-          min={TEXT_OPACITY_MIN}
-          onChange={setTextOpacity}
-        />
-      </div>
+      {/* [V0.2.2] 文字 / 背景不透明度（本机偏好，不写数据库；设置面板自身不受影响）
+          [V0.11.10] 手机端不渲染这两行：它们写的是 App 内面板的 --ui-bg / --ui-text-opacity，
+          而手机上的悬浮条是 Kotlin 原生窗口，根本不读这两个值——留着就是「拖了没反应」。
+          悬浮条固定为透明底 + 不透明文字（见 overlay/Tk.kt）。 */}
+      {!IS_MOBILE && (
+        <>
+          <div className="setting-row">
+            <span className="setting-row__label">
+              文字不透明度
+              <span className="setting-row__hint">{Math.round(textOpacity * 100)}%</span>
+            </span>
+            <Slider
+              label="文字不透明度"
+              value={textOpacity}
+              min={TEXT_OPACITY_MIN}
+              onChange={setTextOpacity}
+            />
+          </div>
 
-      <div className="setting-row">
-        <span className="setting-row__label">
-          背景不透明度
-          <span className="setting-row__hint">{Math.round(bgOpacity * 100)}%</span>
-        </span>
-        <Slider label="背景不透明度" value={bgOpacity} onChange={setBgOpacity} />
-      </div>
+          <div className="setting-row">
+            <span className="setting-row__label">
+              背景不透明度
+              <span className="setting-row__hint">{Math.round(bgOpacity * 100)}%</span>
+            </span>
+            <Slider label="背景不透明度" value={bgOpacity} onChange={setBgOpacity} />
+          </div>
+        </>
+      )}
     </section>
   );
 }

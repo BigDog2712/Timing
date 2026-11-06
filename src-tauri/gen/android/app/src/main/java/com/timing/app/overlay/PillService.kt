@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.view.Choreographer
 import android.view.WindowManager
 import com.timing.app.native.Prefs
 
@@ -135,6 +136,7 @@ class PillService : Service() {
     }
 
     private fun shutdown() {
+        setAnimating(false)
         main.removeCallbacksAndMessages(null)
         rotation?.stop(this)
         rotation = null
@@ -210,6 +212,8 @@ class PillService : Service() {
 
         view.dotMode = Prefs.overlayStyle(this) != Prefs.STYLE_BAR && !expanded
         view.snap = snap
+        // 计时中才逐帧重绘；其余时刻停在最后画面上，不占 GPU
+        setAnimating(snap.active && snap.running)
         if (snap.urgent) view.blinkOn = !view.blinkOn else if (!view.blinkOn) view.blinkOn = true
 
         // 宽度随文字 / 形态变，wrap_content 需要主动通知窗口重算
@@ -226,6 +230,33 @@ class PillService : Service() {
             render()
             main.postDelayed(this, 500L)
         }
+    }
+
+    // ------------------------------------------------------------ 逐帧重绘
+
+    /**
+     * 只在「计时中」跑的一条逐帧重绘。
+     *
+     * 读库仍然是 500ms 一次（那是状态检测），但圆点的弧和分针要顺滑，就得按屏幕刷新率
+     * 重画：`Snap` 里存了 `runningSince`，每帧用墙钟现算带小数的秒，弧就是连续扫过去的
+     * 而不是每半秒跳 3°。暂停 / 待机 / 没在计时时立刻停掉，不空转。
+     */
+    private var animating = false
+
+    private val frame = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            if (!animating) return
+            pill?.invalidate()
+            Choreographer.getInstance().postFrameCallback(this)
+        }
+    }
+
+    private fun setAnimating(on: Boolean) {
+        if (on == animating) return
+        animating = on
+        val choreographer = Choreographer.getInstance()
+        choreographer.removeFrameCallback(frame)
+        if (on) choreographer.postFrameCallback(frame)
     }
 
     // ------------------------------------------------------------ 手势动作

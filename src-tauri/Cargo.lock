@@ -4239,7 +4239,7 @@ dependencies = [
 
 [[package]]
 name = "timing"
-version = "0.11.9"
+version = "0.11.10"
 dependencies = [
  "chrono",
  "dirs 7.0.0",

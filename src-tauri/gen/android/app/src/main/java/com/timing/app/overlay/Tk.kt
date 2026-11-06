@@ -7,19 +7,26 @@ import android.util.TypedValue
  * 悬浮条的设计令牌。
  *
  * 值抄自桌面端 `src/styles/tokens/02-theme-dark.css`，但**悬浮条不跟随主题**：它浮在
- * 别人的界面之上，可能是纯白淘宝，也可能是黑色相机取景框。药丸永远用深色底 + 白字，
- * 和灵动岛同口径——这是老版本 `Tk.kt` 里已经定下来的结论，这里只搬有消费方的那几个。
+ * 别人的界面之上，可能是纯白淘宝，也可能是黑色相机取景框。
+ *
+ * [V0.11.10] 药丸不再是「深色底 + 白字」的灵动岛，改成**透明底 + 不透明文字**：底板去掉后
+ * 浅色界面上白字会消失，所以文字统一带墨色阴影、状态环统一「墨线 + 白线」双轨。
  *
  * 全部 `const val`：`PillView.onDraw` 每帧都要读，只读属性会多一次分支。
  */
 internal object Tk {
 
-    /** --bg-plate，92% 不透明。比桌面 94% 略透一点，手机壁纸更花。 */
-    const val PILL_BG = 0xEB0E0F12.toInt()
     const val PILL_INK = 0xFFFFFFFF.toInt()
     const val PILL_INK_DIM = 0x9EFFFFFF.toInt()
-    const val PILL_LINE_2 = 0x1AFFFFFF
+
+    /** 状态环白轨（深色界面上可见）。 */
     const val PILL_TRACK = 0x33FFFFFF
+
+    /** 状态环墨轨：垫在白轨下面，浅色界面上靠它认出轮廓。 */
+    const val PILL_TRACK_INK = 0x40000000
+
+    /** 文字的托底墨晕。透明底上唯一的可读性保障，深底上几乎不可见。 */
+    const val PILL_SHADOW = 0x99000000.toInt()
 
     /** 计时中：--accent 深色档。 */
     const val PILL_ACCENT = 0xFF4DA3E8.toInt()

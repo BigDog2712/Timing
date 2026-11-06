@@ -10,6 +10,7 @@ import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.Invoke
+import app.tauri.plugin.JSArray
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 import com.timing.app.native.Prefs
@@ -132,9 +133,14 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
             done.add(rel)
         }
 
+        /* 数组必须包成 JSArray（= org.json.JSONArray）。
+           直接塞 ArrayList 时，Tauri 把结果序列化成 JSON 的那一步认不出这个类型，
+           会退化成 `String.valueOf(list)`，Rust 收到的是 `"files": "[]"`，
+           报 `invalid type: string "[]", expected a sequence` —— 0.11.9 真机上
+           「立即同步」失败就是这个原因。 */
         val res = JSObject()
-        res.put("files", done)
-        res.put("errors", ArrayList<String>())
+        res.put("files", JSArray(done))
+        res.put("errors", JSArray())
         invoke.resolve(res)
     }
 
@@ -170,7 +176,8 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
 
         val res = JSObject()
         res.put("written", written)
-        res.put("errors", errors)
+        /* 同上：ArrayList 会让 Rust 收到字符串而不是数组。 */
+        res.put("errors", JSArray(errors))
         invoke.resolve(res)
     }
 
