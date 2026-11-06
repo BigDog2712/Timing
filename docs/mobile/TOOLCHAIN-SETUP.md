@@ -88,3 +88,4 @@ node scripts/android-apk.mjs --debug              # debug 变体
 | `tauri android build` 在 symlink 处失败 | Windows 未开开发者模式 | 见 §3-B 脚本路径 |
 | `local.properties` 缺失 | 从未在本机跑过安卓构建 | 写入 `sdk.dir`（已 gitignore） |
 | jniLibs 残留改名前的旧库名 `.so` | 品牌改名前的历史产物（被 gitignore，未入库） | 已删除；运行期加载的是 `timing_lib`（见 `generated/Rust.kt`） |
+| `cargo check --target aarch64-linux-android` 报 `failed to find tool "clang.exe": program not found` | target 装好了，缺的是 NDK 的 clang 不在 `PATH`（`scripts/android-apk.mjs` 会自己注入，手敲 cargo 不会） | 跑之前注入三项：`export PATH="$NDK_HOME/toolchains/llvm/prebuilt/windows-x86_64/bin:$PATH"`、`CC_aarch64_linux_android=aarch64-linux-android24-clang.cmd`、`AR_aarch64_linux_android=llvm-ar.exe`、`CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=aarch64-linux-android24-clang.cmd`。**注意别把这一步和「0 error」混为一谈**：编过只说明能编，要证明 `#[cfg(mobile)]` 的代码真的进了包，得往那段里插一个故意写错的标识符，看安卓红、桌面绿（v0.11.14 验收就这么做的） |

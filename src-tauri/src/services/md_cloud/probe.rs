@@ -5,6 +5,10 @@
 //!
 //! 两个模式的判据不同：本地目录问「能不能写」，WebDAV 问「鉴权与目录通不通」
 //! （`probe` 把 200 与 404 都算通：404 只说明今天那份还没建）。
+//!
+//! [V0.11.14] 修 O8：`probe` 现在给三档结论，405 / 3xx 这一档是「通，但服务端不支持
+//! 直接读目录」。它必须判成**通过**并说清原因——很多服务端对「GET 一个目录」本来就
+//! 回 405，用户却按旧文案以为地址或密码填错了。
 
 use sqlx::SqlitePool;
 
@@ -63,7 +67,7 @@ fn test_folder(cloud: &MdSyncCloud) -> MdSyncTestResult {
     }
 }
 
-/// `Webdav`：`probe` 一次远端目录（200 与 404 都算通）。
+/// `Webdav`：`probe` 一次远端目录，按三档结论给话（[V0.11.14] 修 O8）。
 async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestResult {
     let password = match secret {
         Some(value) if !value.trim().is_empty() => value.to_string(),
@@ -80,9 +84,19 @@ async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestRes
     };
     let target = md_webdav::WebdavTarget::new(&cloud.base_url, &dir, &cloud.user, &password);
     match md_webdav::probe(&target, "").await {
-        Ok(()) => verdict(
+        Ok(md_webdav::ProbeOutcome::Reachable) => verdict(
             true,
             format!("连接正常：{}", md_webdav::redact(&cloud.base_url)),
+        ),
+        /* 地址与账号已经通了，只是服务端不肯对目录发 GET。同步 GET 的是 `{date}.md`
+        这个具体文件，所以这条通道照样能用——文案要让用户看得出「你没填错」，
+        否则他会去反复改一个本来就对的地址。 */
+        Ok(md_webdav::ProbeOutcome::NoDirectoryListing(code)) => verdict(
+            true,
+            format!(
+                "地址与账号能通，但服务端不支持直接读目录（{code}）；\
+                 同步单个文件不受影响，可以保存"
+            ),
         ),
         Err(err) => verdict(false, round_push::fail_text(&err)),
     }

@@ -2,6 +2,82 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.14 — 修 0.11.13 的五条遗留缺陷（恢复落点、测试连接误判、已上传状态、手机端模式、保存假失败）
+
+v0.11.13 交付时列了 8 条真机验收和 5 条下一版欠账，这版就是那 5 条。**没有新功能、没有新命令、
+没有新错误码、没有新迁移**——契约仍是 74 命令 / 17 错误码 / 11 事件。
+
+### 1. 恢复备份会写错文件（唯一的数据正确性问题）
+
+`services/md_backup.rs::root_of` 旧版只认 `webdav` 落点：`folder` 与「`webdav` 但云端没启用」
+都**静默回落**到 `binding.root`——那是 Obsidian 落点。于是「恢复一份本地目录备份」实际改写的
+是 Obsidian 里那份日记，用户以为改的是云端那份，而且没有任何提示。恢复是**覆盖写**，落点写错
+就是数据事故，所以现在解析不出来一律报错、绝不猜：通道没配 / 模式不符 / 根解析失败三种情况
+各给一句带「该去设置里做什么」的话。`folder` 恢复**不排待传**——那条路没有欠账概念，写进目录
+就是同步完了。`obsidian` 与老备份（无前缀、由用户自己选落点）行为不变。
+
+### 2. 「测试连接」把 405/301 报成「连不上」
+
+旧 `infra/md_webdav.rs::probe` 只把 200/404 算通。而不少 WebDAV 服务端对「GET 一个目录」本来
+就回 405（或 301 补尾斜杠），于是凭据没问题的用户看到「WebDAV 服务返回 405」，以为自己填错了
+而放弃——这是上手阻断型的假阴性。现在分三档：200/404 → 通；405/3xx → 「地址与账号能通，
+但服务端不支持直接读目录（可以保存）」且 `ok = true`；401/403/网络错误 → 仍然是错误。
+没有给 `WebdavError` 加变体，编排层的 match 不受影响。
+
+### 3. 本地目录模式「今天已上传」恒假
+
+`services/md_cloud/state.rs` 的 `today_pushed` 读的是 `md_cloud_pending`（行存在 + 无欠账 +
+有指纹），而 `round_folder` 为了「本地目录没有待传概念」从不写这张表。功能是对的、显示在说谎。
+现在 folder 轮**真写成功**（`mirror::run_in` 无 error）后补一次 `mark_synced(date, etag=None, hash)`；
+建目录失败、镜像失败都不记。没有新表、没有新列、没有迁移。
+
+写清了一个已知副作用：模式在 folder 与 webdav 之间来回切时，folder 轮会把该日期的 `etag` 覆盖成
+`NULL`，切回 webdav 后那一天第一次 PUT 就是无条件覆盖。接受它，理由三条：今天那支 PUT 用的是
+本轮 GET 回来的 etag 根本不看这行；剩下的是「切回后又变脏的历史日期」，那份 etag 属于另一个远端，
+留着只会稳定 412 并永久跳过那天；且与「远端这次没回 ETag」的既有语义一致。
+
+### 4. 手机端显示 WebDAV、保存后却按本地目录跑
+
+旧版在 `MdSyncCloudCard` 渲染层把 `mode` 掰成 `webdav`，但 `patch()` 写回内存的仍是
+`localfolder`：用户看的是 WebDAV 表单，保存后落库的是本地目录，同步走进一条在手机上必然失败的
+路径。现在掰值挪到**回填草稿**这一步（`useMdSyncDraft`，带 `modeConverted` 标记），显示与落库
+是同一个值；并且加了一行可见说明，不做静默改配置。后端补兜底：手机上拿到 `localfolder` 配置
+直接回一句能照做的话（`MD_SYNC_CONFIG_INVALID`，不新增错误码），不再走进死路。
+
+### 5. 保存「假失败」
+
+`commands/md_sync_cmd_mobile.rs` 的 `md_sync_save` 里，`saf_status(...).await?` 在配置**已经落库
+之后**才执行：桥一报错，整个保存就返回失败，用户以为没保存上。现在这个检查只用来决定「要不要
+顺手同步一轮」，出错折成 `false` 并落一条 warn；而且**云端可用时不再问 SAF**——「只配 WebDAV、
+不选日记目录」是合法用法，旧口径把 SAF 授权当前置条件，这类用户永远走不到自动同步。
+判据抽成纯函数 `should_autosync(enabled, cloud_usable, saf_granted)`，可被单测钉住。
+
+### 验证
+
+- `cargo test --lib` 454 → **465 passed**；前端 49 files / **370 tests**
+- `cargo clippy --all-targets -- -D warnings` **0 warning**（`cargo clean -p timing` 后重跑，不吃增量缓存）
+- `check:size` **521 文件零豁免**；`check:contract` 74 / 17 / 11 一处未变；`check:layers` 7 条规则全过
+- `cargo check --target aarch64-linux-android` **0 error**（需先按 `docs/mobile/TOOLCHAIN-SETUP.md`
+  注入 NDK clang，否则报 `failed to find tool "clang.exe"`）
+- 红线文件整文件 blob 相同：`services/md_sync/mod.rs`、`services/md_sync/mirror.rs`、`infra/md_file.rs`
+
+### QA 抓到的两处「测试在吹牛」
+
+和 0.11.13 的 `prune_counts_old_style_backups` 是同一类毛病，值得记下来：
+
+- `folder_round_failure_records_nothing` 把落点建在「父级是文件」的路径上，`run` 在
+  `create_dir_all` 就 return 了，**根本走不到记成功态那一段**。把判据改成恒真它照样绿。
+  已换成 `folder_round_partial_failure_records_nothing`（一路写成功、一路失败），变异下真红。
+- `probe` 新增的三条用例只覆盖了错误档，**200/404 两档没有用例**：把成功档也改成报错，三条照样
+  全绿。已补 `probe_200_and_404_are_reachable`。
+
+### 已知缺口（留给 0.11.15）
+
+`restore` 里 `effective == Some("webdav")` 的「恢复后排一笔待传」那一支**零测试**：要走它必须
+解析出真的 `%APP_DIR%\md-webdav`，而 `%APP_DIR%` 在 `infra/md_env.rs` 里是「保留名，永不查环境
+变量」，测试无法把它重定向到临时目录。要么给云端根加一个 `set_root` 式的可注入点（生产改动），
+要么接受这条链路无覆盖。此外 `src-tauri/src/tests/md_webdav.rs` 已到 296 行，下次动前先拆。
+
 ## 0.11.13 — MD 同步加云端通道（WebDAV / 本地目录）、待传队列、备份可恢复
 
 同步链路从「四跳」改成两端对称：

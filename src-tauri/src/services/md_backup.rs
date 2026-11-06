@@ -26,7 +26,7 @@ use crate::error::{AppError, AppResult};
 use crate::infra::md_backup as store;
 use crate::infra::md_file::{self, SectionState};
 use crate::models::md_sync::MdSyncBinding;
-use crate::models::md_sync_cloud::{MdBackupItem, MdBackupRestoreResult, MdSyncCloud};
+use crate::models::md_sync_cloud::{CloudMode, MdBackupItem, MdBackupRestoreResult, MdSyncCloud};
 use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_cloud::pending;
@@ -78,13 +78,9 @@ pub async fn restore(
     算一次 `written`。 */
     let effective = target.or(name_target);
     let config = md_sync::config::load(pool).await?;
-    /* 只有恢复目标是 webdav 才用得着云端配置。 */
-    let cloud = if effective == Some("webdav") {
-        config.cloud.as_ref()
-    } else {
-        None
-    };
-    let groups = group_by_path(&config.bindings, effective, cloud, date)?;
+    /* 云端配置对 `folder` / `webdav` 两个落点才有意义，判据集中在 `root_of` 一处判，
+    这里不做第二遍筛选——两处判据必然漂移。 */
+    let groups = group_by_path(&config.bindings, effective, config.cloud.as_ref(), date)?;
     if groups.is_empty() {
         return Err(AppError::md_sync_config_invalid(
             "没有可恢复的落点：请先在设置里启用一个并填写完整",
@@ -135,6 +131,10 @@ pub async fn restore(
             .unwrap_or_else(|_| pending::fingerprint(b""));
         md_cloud_pending::mark_pending(pool, &date_text, &hash, now_ms()).await?;
     }
+    /* `folder` 落点**不排待传**：本地目录通道没有「待传」这一步，恢复已经直接把备份
+    写进了云端那份所在的目录（写进去就是同步完了，剩下的交给网盘客户端），
+    再排一笔只会在设置页显示一个永远不会被消费的欠账。指纹也不在这里刷：
+    下一轮 folder 轮会把这份内容照原样再写一遍并记下它的指纹。 */
 
     Ok(MdBackupRestoreResult {
         date: date_text,
@@ -146,18 +146,53 @@ pub async fn restore(
 
 /// 某个落点的生效根。
 ///
-/// `webdav` → 云端通道的落点根（它才是云端那份真正待的地方）；云端没启用 / 解析不出来
-/// → 退回该 binding 自己的根——**备份能恢复出来比标得准重要**（标错只影响下一份备份的
-/// 文件名前缀）。`folder` / `None` → binding 自己的根。
-fn root_of(binding: &MdSyncBinding, target: Option<&str>, cloud: Option<&MdSyncCloud>) -> String {
-    if target == Some("webdav") {
-        if let Some(cloud) = cloud.filter(|cloud| cloud.enabled && cloud.is_usable()) {
-            if let Ok(path) = cloud.resolve_root() {
-                return path.to_string_lossy().into_owned();
-            }
-        }
+/// ## 解析不出来必须报错（[V0.11.14] 修 O4）
+///
+/// 旧版只认 `webdav`：`folder` 与「`webdav` 但云端没启用」都**静默回落**到
+/// `binding.root` —— 那是 Obsidian 落点。于是「恢复一份 folder 备份」会改写 Obsidian
+/// 里那份日记，用户以为自己恢复的是云端那份：改到了错的文件，还没有任何提示。
+/// 恢复是**覆盖写**，落点写错就是数据正确性问题，所以这里一律 `Err`、绝不猜。
+///
+/// `obsidian` / `None`（老备份无前缀，前端让用户自己选落点）仍回 `binding.root`：
+/// 那是对这两种输入唯一有意义的解释。
+fn root_of(
+    binding: &MdSyncBinding,
+    target: Option<&str>,
+    cloud: Option<&MdSyncCloud>,
+) -> AppResult<String> {
+    /* 落点名与它要求的通道模式绑在一起写：错误文案要说清「这份备份属于哪个落点」，
+    用户才知道该去设置里切哪一项。 */
+    let (label, need) = match target {
+        Some("webdav") => ("WebDAV", CloudMode::Webdav),
+        Some("folder") => ("本地目录", CloudMode::LocalFolder),
+        _ => return Ok(binding.root.clone()),
+    };
+    let cloud = cloud
+        .filter(|cloud| cloud.enabled && cloud.is_usable())
+        .ok_or_else(|| {
+            AppError::md_sync_config_invalid(format!(
+                "这份备份属于「{label}」落点，但云端通道没开启或没填完整；\
+                 请先在设置里配好「{label}」，或换一个落点恢复"
+            ))
+        })?;
+    if cloud.mode != need {
+        let now = match cloud.mode {
+            CloudMode::LocalFolder => "本地目录",
+            CloudMode::Webdav => "WebDAV",
+        };
+        return Err(AppError::md_sync_config_invalid(format!(
+            "这份备份属于「{label}」落点，但云端通道现在是「{now}」；\
+             请先在设置里切到「{label}」，或换一个落点恢复"
+        )));
     }
-    binding.root.clone()
+    cloud
+        .resolve_root()
+        .map(|path| path.to_string_lossy().into_owned())
+        .map_err(|err| {
+            AppError::md_sync_config_invalid(format!(
+                "「{label}」落点解析不出来：{err}；请先在设置里改好再恢复"
+            ))
+        })
 }
 
 
@@ -173,7 +208,7 @@ fn group_by_path(
         .iter()
         .filter(|binding| binding.enabled && binding.is_configured())
     {
-        let path = md_file::resolve_path(&root_of(binding, target, cloud), &binding.file, date);
+        let path = md_file::resolve_path(&root_of(binding, target, cloud)?, &binding.file, date);
         if !path.is_absolute() {
             return Err(AppError::md_sync_config_invalid(format!(
                 "「{}」的落点无法解析为绝对路径：{}",

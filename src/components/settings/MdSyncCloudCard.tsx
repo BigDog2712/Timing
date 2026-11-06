@@ -8,7 +8,8 @@
  * 2. 密码框**不受控于** `hasSecret`：`secret === null` 的含义是「没碰过」，保存时按
  *    `undefined` 透传（不动已存密文），所以绝不能把 `hasSecret` 反填成 `'******'`；
  * 3. 关掉开关只把字段变灰、不隐藏（用户要能看到自己填过什么）；手机端不渲染「本地目录」，
- *    但**不**偷偷改内存里的 `mode`——静默改用户配置比显示错更糟。
+ *    **[V0.11.14] 并且草稿里的 `mode` 也换成 `webdav`**（在 `useMdSyncDraft` 回填时换），
+ *    本文件只负责把这件事说出来——显示与落库必须是同一个值，静默不一致比显示错更糟。
  */
 import { useState } from 'react';
 import { IS_MOBILE } from '../../lib/platform';
@@ -29,12 +30,12 @@ const MODE_ORDER: CloudMode[] = ['localfolder', 'webdav'];
 
 export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
   const status = useMdSyncStore((s) => s.view?.cloud ?? null);
-  const { cloud, saving, secret, updateCloud, setSecret } = draft;
+  const { cloud, saving, secret, modeConverted, updateCloud, setSecret } = draft;
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<MdSyncTestResult | null>(null);
-  /* 手机端没有可写的本地目录（后端同名命令直接回「暂不支持」），只按 WebDAV 渲染；
-     `cloud.mode` 保持原样，用户不改就照旧存回去。 */
-  const mode: CloudMode = IS_MOBILE && cloud.mode === 'localfolder' ? 'webdav' : cloud.mode;
+  /* 手机端只有 WebDAV 一条路，`mode` 就是草稿里那个值（`useMdSyncDraft` 已把
+     `localfolder` 换掉），这里不再做第二遍掰值——显示与落库必须是同一个值。 */
+  const mode: CloudMode = cloud.mode;
   const disabled = !cloud.enabled || saving;
   const pendingDates = status?.pendingDates ?? [];
   const patch = (next: Partial<MdSyncCloud>) => updateCloud({ ...cloud, ...next });
@@ -79,6 +80,14 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
           </button>
         ))}
       </div>
+
+      {/* 手机端把「本地目录」换成了 WebDAV：这属于改用户配置，必须当面说清，不许静默 */}
+      {modeConverted && (
+        <p className="sync-cloud__hint" data-converted="true">
+          这份配置原来是「本地目录」，手机端不支持（那条路靠电脑上的网盘客户端同步一个目录）；
+          保存后会改成 WebDAV，请把服务地址、远端目录与账号补上。
+        </p>
+      )}
 
       {mode === 'localfolder' ? (
         <div className="sync__field">

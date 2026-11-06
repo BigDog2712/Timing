@@ -149,12 +149,40 @@ pub async fn put(
     })
 }
 
-/// 「这个地址和凭证能不能用」。200 与 404 都算通：404 只说明今天那份还没建，
-/// 目录与鉴权已经验过了。
-pub async fn probe(target: &WebdavTarget, rel: &str) -> Result<(), WebdavError> {
+/// `probe` 的三类结论（[V0.11.14] 修 O8）。
+///
+/// 旧版只有「通 / 不通」两档，于是 405（服务端不支持对目录发 GET）与 3xx（要求补尾
+/// 斜杠）被翻成「连不上」，用户以为自己填错了地址或密码，去改一个本来就对的配置。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProbeOutcome {
+    /// 地址与凭据都对：200（读到正文），或 404（这个文件今天还没建）。
+    Reachable,
+    /// **通了**，但服务端不支持直接读这个路径：405 方法不允许，或 3xx 要求跳转。
+    /// 带出原始状态码，好让上层文案能自证「你没填错」。
+    NoDirectoryListing(u16),
+}
+
+/// 「这个地址和凭证能不能用」。判据分三档（见 `ProbeOutcome`）：200 / 404 算通，
+/// 405 与 3xx 算「通但读不了目录」，其余仍是错误。
+///
+/// 为什么用状态码分类而不是改成 PROPFIND：reqwest 发自定义方法要 `Method::from_bytes`、
+/// 还要处理 `207 Multi-Status` 的 XML，而坚果云 / 群晖 / Nextcloud 的 PROPFIND 返回
+/// 互不一致（有的要 `Depth: 1`、有的对不存在的目录回 207 空集）。判据越复杂，出错时
+/// 越难说清是「服务端怪」还是「我们写错」。状态码分类只有一张表，且能被假服务器逐档
+/// 钉死（`tests/md_webdav.rs`）。同步本身 GET 的是 `{date}.md` 这个具体文件，不是
+/// 目录，所以「读不了目录」不影响这条通道能不能用。
+pub async fn probe(target: &WebdavTarget, rel: &str) -> Result<ProbeOutcome, WebdavError> {
     match get(target, rel).await {
-        Ok(_) => Ok(()),
-        Err(WebdavError::NotFound) => Ok(()),
+        Ok(_) => Ok(ProbeOutcome::Reachable),
+        Err(WebdavError::NotFound) => Ok(ProbeOutcome::Reachable),
+        /* 405 = 服务端不认「GET 一个目录」这个方法；3xx = 要跳转（301 补尾斜杠是最常见
+        的一种）。两者都发生在**鉴权通过之后**，所以绝不是「凭据不对」。
+        reqwest 默认会自己跟随带 `Location` 的 3xx，因此真正落到这一档的，多是响应
+        畸形（没有 `Location`）或跟随后仍被重定向的情形——留着这一档，是为了让「通但
+        读不了目录」永远不会被表达成「连不上」。 */
+        Err(WebdavError::Server(code)) if matches!(code, 405 | 300..=399) => {
+            Ok(ProbeOutcome::NoDirectoryListing(code))
+        }
         Err(err) => Err(err),
     }
 }

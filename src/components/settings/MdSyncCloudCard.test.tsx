@@ -125,15 +125,20 @@ describe('MdSyncCloudCard', () => {
     expect(result()?.getAttribute('data-ok')).toBe('false');
   });
 
-  it('手机端不出现「本地目录」，且不会偷偷把 mode 改掉', async () => {
+  it('手机端不出现「本地目录」；读到 localfolder 配置时给说明，保存落成 webdav', async () => {
     host.mobile = true;
     api.get.mockResolvedValue(viewWith('localfolder'));
     await mount();
+    /* 视图是异步回填的：多冲一次微任务，否则断言的是「还没读到配置」的那一帧 */
+    await act(async () => { await Promise.resolve(); });
     const modes = Array.from(container.querySelectorAll('.seg__item')).map((item) => item.textContent);
     expect(modes).toEqual(['WebDAV']);
-    /* 内存里还是 localfolder → 按 WebDAV 渲染，但保存原样带回，不静默改用户配置 */
     expect(container.textContent).toContain('服务地址');
+    /* 改用户配置必须当面说：没有这行说明就成了静默改配置 */
+    expect(container.querySelector('[data-converted="true"]')).not.toBeNull();
+    expect(container.textContent).toContain('手机端不支持');
+    /* 显示与落库必须一致：界面上是 WebDAV，存下去的也得是 webdav */
     await click('保存');
-    expect(api.save.mock.calls[0][0].cloud.mode).toBe('localfolder');
+    expect(api.save.mock.calls[0][0].cloud.mode).toBe('webdav');
   });
 });

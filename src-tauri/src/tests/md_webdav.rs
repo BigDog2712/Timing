@@ -7,7 +7,7 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{Arc, Mutex};
 
-use crate::infra::md_webdav::{get, put, redact, WebdavError, WebdavTarget};
+use crate::infra::md_webdav::{get, probe, put, redact, ProbeOutcome, WebdavError, WebdavTarget};
 
 /// 假服务器句柄。`pub(crate)` 是为了让 `tests::md_cloud_round` 的 412 重试用同一份实现
 /// （那边要真 HTTP 才能证「重试了一次」，自己再写一份 TCP 桩只会让两份慢慢走偏）。
@@ -192,6 +192,60 @@ async fn auth_header_uses_raw_utf8_bytes() {
         Some("Basic 55So5oi3OuWvhueggUAyMDI0"),
         "percent-encode 后再 base64 会得到另一串，坚果云只回 401 且不说原因"
     );
+}
+
+/// 「测试连接」的三档结论（[V0.11.14] 修 O8）：200/404 通、405/3xx 通但读不了目录、
+/// 401 才是凭据不对。三种输入各一条，缺一档就等于没验分类表。
+///
+/// 先钉「通」的两档：只验错误档的话，把 `Ok(_) | NotFound` 也改成报错，四条错误档用例
+/// 仍然全绿，而用户会看到「都连不上」。
+#[tokio::test]
+async fn probe_200_and_404_are_reachable() {
+    let found = serve("200 OK", "", "# 日记".as_bytes());
+    assert_eq!(
+        probe(&target(&found, "u", "p"), "").await.expect("200 必须算通"),
+        ProbeOutcome::Reachable
+    );
+    let missing = serve("404 Not Found", "", b"");
+    assert_eq!(
+        probe(&target(&missing, "u", "p"), "")
+            .await
+            .expect("404 只说明今天那份还没建，目录与鉴权已经验过"),
+        ProbeOutcome::Reachable
+    );
+}
+
+#[tokio::test]
+async fn probe_405_is_reachable_but_cannot_list_the_directory() {
+    let fake = serve("405 Method Not Allowed", "", b"");
+    let outcome = probe(&target(&fake, "u", "p"), "")
+        .await
+        .expect("405 发生在鉴权之后，不是「连不上」");
+    assert_eq!(
+        outcome,
+        ProbeOutcome::NoDirectoryListing(405),
+        "405 必须自成一档：判成错误会让用户去改一个本来就对的地址"
+    );
+}
+
+#[tokio::test]
+async fn probe_301_is_reachable_but_cannot_list_the_directory() {
+    /* 不带 `Location`：reqwest 默认会自己跟随带 Location 的 3xx，那种情形根本到不了
+    这一层（会变成跟随后那个状态码）。这里钉的是「3xx 不许被翻成凭据错误」。 */
+    let fake = serve("301 Moved Permanently", "", b"");
+    let outcome = probe(&target(&fake, "u", "p"), "")
+        .await
+        .expect("3xx 是「要跳转」，不是「凭据不对」");
+    assert_eq!(outcome, ProbeOutcome::NoDirectoryListing(301));
+}
+
+#[tokio::test]
+async fn probe_401_stays_a_credential_error() {
+    let fake = serve("401 Unauthorized", "", b"");
+    let err = probe(&target(&fake, "u", "p"), "")
+        .await
+        .expect_err("401 必须仍是错误，否则「凭据不对」会被说成「通了」");
+    assert_eq!(err, WebdavError::Auth, "凭据不对这一档不能和 405 混在一起");
 }
 
 #[test]

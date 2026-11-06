@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
+import { IS_MOBILE } from '../../lib/platform';
 import { errorText, mdSyncApi } from '../../services/api';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 import { IPC_EVENTS } from '../../types/domain';
@@ -25,6 +26,11 @@ export interface MdSyncDraft {
   updateBinding(index: number, next: MdSyncBinding): void;
   cloud: MdSyncCloud;
   updateCloud(next: MdSyncCloud): void;
+  /**
+   * `true` = 存的那份是「本地目录」，手机端不支持，已按 WebDAV 显示**并将按 WebDAV 保存**。
+   * 只用于让卡片显示一行说明：改哪里有解释，就不算「静默改用户配置」。
+   */
+  modeConverted: boolean;
   /** `null` = 用户没碰过密码框（保存时按「不动已存密文」透传） */
   secret: string | null;
   setSecret(value: string | null): void;
@@ -49,6 +55,7 @@ export function useMdSyncDraft(): MdSyncDraft {
   const [pollMin, setPollMinState] = useState(String(POLL_DEFAULT_MINUTES));
   const [bindings, setBindings] = useState<MdSyncBinding[]>([]);
   const [cloud, setCloud] = useState<MdSyncCloud>(emptyCloud);
+  const [modeConverted, setModeConverted] = useState(false);
   const [secret, setSecretState] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -56,13 +63,20 @@ export function useMdSyncDraft(): MdSyncDraft {
   useEffect(() => { void load(); }, [load]);
 
   /* 拿到视图就回填草稿；`dirty` 时不动（用户改一半不能被后台同步结果冲掉）。
-     密码不回填：视图只有 `hasSecret`，明文永远不出后端，`secret` 只归用户自己写。 */
+     密码不回填：视图只有 `hasSecret`，明文永远不出后端，`secret` 只归用户自己写。
+     [V0.11.14] 修 O12：手机端不支持「本地目录」，于是**草稿里的 mode 直接换成 webdav**。
+     旧的写法只在渲染时假装成 WebDAV、保存仍回 `localfolder`，落库和界面各说一套；现在
+     显示与落库是同一个值，代价是这一行说明（`modeConverted`）——改配置必须让用户看见。 */
   useEffect(() => {
     if (!view || dirty) return;
     setEnabledState(view.config.enabled);
     setPollMinState(String(toMinutes(view.config.pollSecs)));
     setBindings(view.config.bindings.map((binding) => ({ ...binding })));
-    setCloud(view.config.cloud ?? emptyCloud());
+    const stored = view.config.cloud ?? emptyCloud();
+    const converted = IS_MOBILE && stored.mode === 'localfolder';
+    const next: MdSyncCloud = converted ? { ...stored, mode: 'webdav' } : stored;
+    setCloud(next);
+    setModeConverted(converted);
   }, [view, dirty]);
 
   useTauriEvent<MdSyncReport>(IPC_EVENTS.mdSyncChanged, (report) => {
@@ -114,7 +128,7 @@ export function useMdSyncDraft(): MdSyncDraft {
 
   return {
     enabled, setEnabled, pollMin, setPollMin: setPollMinState, commitPoll, bindings, updateBinding,
-    cloud, updateCloud, secret, setSecret, dirty, saving, loading, loaded, error, notice,
+    cloud, updateCloud, modeConverted, secret, setSecret, dirty, saving, loading, loaded, error, notice,
     clearNotice: () => setNotice(null), save, run, open,
   };
 }

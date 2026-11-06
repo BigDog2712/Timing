@@ -29,6 +29,8 @@ mod state;
 use chrono::Local;
 use sqlx::SqlitePool;
 
+#[cfg(mobile)]
+use crate::error::AppError;
 use crate::error::AppResult;
 use crate::models::md_sync::MdSyncReport;
 use crate::models::md_sync_cloud::{
@@ -45,9 +47,28 @@ pub struct CloudRoundOutcome {
     pub today: String,
 }
 
+/// 手机端拿到 `mode == LocalFolder` 时的口径（[V0.11.14] 修 O12）。
+///
+/// 与 `commands::md_sync_cmd` 的 `NO_BACKUP` 同一口径：能力不在这端，就用既有错误码
+/// `MD_SYNC_CONFIG_INVALID` 回一句**用户能照做**的话，不新增错误码。
+#[cfg(mobile)]
+const NO_LOCAL_FOLDER_ON_MOBILE: &str = "手机端不支持「本地目录」云端通道：请把云端通道改成 WebDAV（本地目录要靠电脑上的网盘客户端同步，手机上写不进去）";
+
 /// 一轮完整同步（含 Obsidian 落点）。云端不可用时与 `md_sync::run` 等价。
 pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
     let config = md_sync::config::load(pool).await?;
+    /* 手机端不支持「本地目录」通道（[V0.11.14] 修 O12）。那条路假设用户电脑上有个
+    网盘客户端在同步一个真实目录，手机上既没有那个目录也没有客户端，`local_root` 里
+    存的多半是一个 Windows 路径。旧版会一路走到 `round_folder`，在「解析不出绝对
+    路径」处变成报告里一行错误、而这一轮仍然「成功」；现在在入口就说清怎么办。
+    前端（`MdSyncCloudCard` / `useMdSyncDraft`）已把这类配置按 WebDAV 显示并落库，
+    这里是兜底：升级前存下的配置、或别的入口写进来的配置，都不会再走进那条死路。 */
+    #[cfg(mobile)]
+    if let Some(cloud) = config.cloud.as_ref() {
+        if cloud.enabled && cloud.mode == CloudMode::LocalFolder {
+            return Err(AppError::md_sync_config_invalid(NO_LOCAL_FOLDER_ON_MOBILE));
+        }
+    }
     let today = today();
     let Some(cloud) = usable(&config) else {
         /* 老配置这条路**连 pending 表都不读**：它没有云端，`pending` 填空是事实。 */
@@ -59,7 +80,7 @@ pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
         });
     };
     let report = match cloud.mode {
-        CloudMode::LocalFolder => round_folder::run(pool, cloud).await?,
+        CloudMode::LocalFolder => round_folder::run(pool, cloud, &today).await?,
         CloudMode::Webdav => round_webdav::run(pool, cloud, &today).await?,
     };
     let pending = match cloud.mode {
@@ -145,4 +166,19 @@ pub(crate) fn usable(config: &MdSyncConfig) -> Option<&MdSyncCloud> {
         .cloud
         .as_ref()
         .filter(|cloud| cloud.enabled && cloud.is_usable())
+}
+
+/// 保存之后要不要顺手跑一轮同步（手机端 `md_sync_save` 的判据，[V0.11.14] 修 N2）。
+///
+/// 抽成纯函数是为了能被单测钉住：真正的调用点要 `AppHandle`（原生桥 + 事件），
+/// 为它造一套夹具比这段判断本身贵得多。
+///
+/// 三条：
+/// 1. 总开关关着 → 不跑（`sync_once` 对关闭状态只会返回一份空报告）；
+/// 2. **云端可用 → 跑，不问 SAF 授权**：`sync_once` 里云端分支排在 SAF 检查**之前**，
+///    「只配 WebDAV、不选日记目录」是合法用法。旧版把 SAF 授权当成前置条件，于是
+///    这类用户永远走不到自动同步——`?` 还会把桥调用失败折成保存失败（N2 的另一半）；
+/// 3. 云端不可用 → 才看 SAF：没授权的那一轮只可能回「同步目录未授权」。
+pub fn should_autosync(enabled: bool, cloud_usable: bool, saf_granted: bool) -> bool {
+    enabled && (cloud_usable || saf_granted)
 }

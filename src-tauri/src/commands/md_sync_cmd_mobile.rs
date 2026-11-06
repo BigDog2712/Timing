@@ -44,6 +44,9 @@ pub async fn md_sync_get(app: AppHandle) -> AppResult<MdSyncViewCloud> {
 ///
 /// 保存后顺手同步一轮，但**这一轮的失败不算保存失败**：开关已经写进库了，
 /// 回一句红字会让用户以为「没开成功」而反复点。真正的原因留给「立即同步」去说。
+/// [V0.11.14] 修 N2：判据（含 SAF 授权检查）整个搬到
+/// `md_cloud::should_autosync`，任何一步失败都只落一行 warn，**绝不影响返回值**——
+/// 旧版 `saf_status(..).await?` 会在配置已经落库之后把「保存」变成失败。
 ///
 /// 密码与桌面同一份三分语义，且同样**先于**配置落库：凭据写失败时配置一个字都还没改，
 /// 用户重试一次就是完整的一次操作（详见 `md_credential`）。
@@ -57,7 +60,23 @@ pub async fn md_sync_save(
     md_credential::apply(secret).await?;
     let pool = app.state::<AppState>().pool.clone();
     md_sync::config::save(&pool, &config).await?;
-    if config.enabled && md_sync_mobile::saf_status(&app).await?.granted {
+
+    /* 云端可用时**不必**问 SAF（`sync_once` 的云端分支排在 SAF 检查之前），也就不该
+    被它挡住；这里连那次原生桥往返都省掉。 */
+    let cloud_usable = md_cloud::usable(&config).is_some();
+    let saf_granted = if cloud_usable {
+        false
+    } else {
+        match md_sync_mobile::saf_status(&app).await {
+            Ok(status) => status.granted,
+            /* 原生桥不可用 / 调用失败只意味着「这次不顺手同步」，与「保存」无关。 */
+            Err(err) => {
+                crate::log_warn!("md sync save: 读不到同步目录授权，跳过顺手同步：{err}");
+                false
+            }
+        }
+    };
+    if md_cloud::should_autosync(config.enabled, cloud_usable, saf_granted) {
         if let Ok(report) = md_sync_mobile::sync_once(&app).await {
             announce(&app, &report);
         }

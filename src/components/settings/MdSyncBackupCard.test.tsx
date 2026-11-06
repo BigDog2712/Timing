@@ -15,6 +15,10 @@ const api = vi.hoisted(() => ({ list: vi.fn(), restore: vi.fn() }));
 vi.mock('../../services/api', () => ({
   mdBackupApi: { list: api.list, restore: api.restore },
   mdSyncApi: { get: vi.fn(async () => null), save: vi.fn(), run: vi.fn(), open: vi.fn() },
+  /* 真 `errorText`（`services/ipc` 那个映射）对 `MD_SYNC_CONFIG_INVALID` 就是「原样透出
+     后端 message」，它自己的映射由 `check:contract` 静态强制；这里只需保证**卡片这一侧**
+     把返回值渲染出来。 */
+  errorText: (err: unknown) => (err instanceof Error ? err.message : '操作失败'),
 }));
 
 import { MdSyncBackupCard } from './MdSyncBackupCard';
@@ -96,6 +100,21 @@ describe('MdSyncBackupCard', () => {
     expect(texts('.sync-backup__confirm .seg__item')).toEqual(['Obsidian 落点', '云端落点']);
     await click(confirmButton());
     expect(api.restore).toHaveBeenCalledWith('legacy.md', 'obsidian');
+  });
+
+  /* [V0.11.14] O4 之后「恢复」多了一条常见失败路径：云端通道没配时不再静默写进
+     Obsidian 落点，而是回 `MD_SYNC_CONFIG_INVALID`。这条用例钉的是**用户看得见**——
+     卡片若把错误吞掉，用户看到的就是「点了确认没反应」。 */
+  it('恢复被后端拒绝时，把原文显示出来而不是静默', async () => {
+    const reason = '这份备份属于「WebDAV」落点，但云端通道没开启或没填完整；'
+      + '请先在设置里配好「WebDAV」，或换一个落点恢复';
+    api.restore.mockRejectedValue(new Error(reason));
+    await mount();
+    await click(container.querySelectorAll('.sync-backup__go')[0]);
+    await click(confirmButton());
+    expect(api.restore).toHaveBeenCalledWith('webdav__2026-11-05.md', 'webdav');
+    expect(texts('.sync__error').join('')).toContain('云端通道没开启或没填完整');
+    expect(container.textContent).not.toContain('已恢复');
   });
 
   it('手机端整卡不渲染，也不去读备份列表', async () => {
