@@ -93,8 +93,36 @@ impl Paths {
 /// 实现走 `Paths::from_app_data_dir` 而不是自己拼一遍：命令层的「反推」与
 /// 测试里的「正拼」必须走同一段代码，否则 `LEGACY_IDENTIFIER` 哪天变了，
 /// 只有其中一侧跟着变。
+///
+/// **谁用哪个**（V0.11.6 起两个函数共存，职责不同）：
+/// - `legacy_dir_of(app_data_dir)` = **迁移执行期**用：那时数据根还没决定（甚至可能
+///   已经不是 `%APPDATA%`），只能从「当前权威数据根」反推同级的旧 identifier 目录；
+/// - `legacy_dir()` = **展示 / 命令层**用：与当前数据根**无关**，恒为
+///   `%APPDATA%\com.tickbar.app`。便携模式下数据根是 `<exe>\data`，用
+///   `legacy_dir_of` 会算出 `<exe>\com.tickbar.app`（一个永不存在的路径）。
 pub fn legacy_dir_of(app_data_dir: &Path) -> Option<PathBuf> {
     Paths::from_app_data_dir(app_data_dir).map(|paths| paths.source)
+}
+
+/// 旧品牌数据目录（**与当前数据根无关**：品牌改名迁移的目标恒在 `%APPDATA%` 下）。
+///
+/// 只用于「告诉用户旧目录在哪」（设置页、诊断快照、`open_legacy_dir`），不参与搬运算。
+///
+/// 实现故意走 `legacy_dir_of` 而不是自己 `base.join(LEGACY_IDENTIFIER)`：
+/// 「旧目录在哪」只允许有一份推导（`legacy_dir_of` 只看父目录 + 固定旧 identifier，
+/// 锚点目录本身叫什么无关紧要），旧名将来再变时两边不会分叉。
+///
+/// 移动端返回 `None`：Android 换包名 = 新应用，系统层面没有「旧目录」这个概念
+/// （`dirs` 也只进桌面 target 段，这里不可能算出路径）。
+#[cfg(desktop)]
+pub fn legacy_dir() -> Option<PathBuf> {
+    let base = data_dir()?;
+    legacy_dir_of(&base.join(LEGACY_IDENTIFIER))
+}
+
+#[cfg(mobile)]
+pub fn legacy_dir() -> Option<PathBuf> {
+    None
 }
 
 /// `dirs::data_dir()`：Windows = `%APPDATA%`（Roaming）。

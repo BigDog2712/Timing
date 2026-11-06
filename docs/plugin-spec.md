@@ -379,7 +379,7 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 | 项 | 结论 |
 |---|---|
 | 默认落点来源 | `src-tauri/src/models/md_sync_config.rs::default_bindings()`，三档固定：`timers` / `notes` / `todos` |
-| 三档默认值 | `root` = `%USERPROFILE%\Documents\Timing`；`file` = `{date}.md`；`heading` = `#### <kind.label()>`（即 `#### 事项计时` / `#### 便利贴` / `#### 待办事项`）；三档 `enabled` 均为 `true` |
+| 三档默认值 | `root` = `%APP_DIR%\md`（V0.11.6 起；落点是数据目录下的 `md\`，桌面版即 `<exe>\data\md`）；`file` = `{date}.md`；`heading` = `#### <kind.label()>`（即 `#### 事项计时` / `#### 便利贴` / `#### 待办事项`）；三档 `enabled` 均为 `true` |
 | 总开关出厂值 | **`enabled: false`**（默认关）。判据：首次运行不发生任何文件 IO——`tick` 的第一道闸就是 `enabled`，不建目录、不写 md。插件时代默认开是因为"装了插件"本身是一次明确动作；内核化以后新装用户什么都没做，默认开等于替所有用户决定往 `文档` 里写文件 |
 | 老用户 | 保存值里有 `enabled: true` → 保持开。只有**从没有保存值**的（新装 / 从没用过同步）才拿到 `false` |
 | `settings` 键 | 仍是 `plugin.md-sync.config`，**不改名**。它带 `plugin` 前缀是 V0.4.0 的历史原因；改名收益是"好看"，代价是必须双读旧键做迁移，而漏掉一步就会把用户配好的 OneDrive 路径整体覆盖成内置默认值——用真实数据丢失风险换零收益，不做 |

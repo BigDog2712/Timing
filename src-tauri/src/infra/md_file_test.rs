@@ -53,6 +53,19 @@ fn resolves_tokens_and_env() {
     assert!(path.ends_with("Diary\\2026\\10\\2026-10-20.md"));
 }
 
+/// [V0.11.6] `%APP_DIR%` 先于 `%VAR%` 展开（ADR-050 §5）：用户环境变量里真有个
+/// `APP_DIR` 时，默认根不能被劫持到别处；且结果必须已是绝对路径，不留占位符。
+#[test]
+fn expands_app_dir_before_env_vars() {
+    let out = expand_env("%APP_DIR%\\md");
+    assert!(!out.contains('%'), "不许留下未展开的占位符：{out}");
+    assert!(
+        std::path::Path::new(&out).is_absolute(),
+        "应是绝对路径：{out}"
+    );
+    assert!(out.to_lowercase().ends_with("md"), "{out}");
+}
+
 #[test]
 fn expands_unknown_env_verbatim() {
     assert_eq!(

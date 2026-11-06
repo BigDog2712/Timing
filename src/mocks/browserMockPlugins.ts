@@ -20,9 +20,13 @@ import type {
 } from '../types/domain';
 import { fail } from './mockSeed';
 
-const MOCK_DIR = '%APPDATA%\\com.timing.app\\plugins';
-/* 落点根目录：仅用于浏览器走查的**占位**路径（不泄露任何本机目录结构） */
-const MOCK_ROOT = '%USERPROFILE%\\Documents\\Timing';
+/* [V0.11.6] 出厂落点是便携的 `<exe>\plugins`（ADR-050 §1）；这里写占位口径，
+   与设置页里真实显示的路径形状一致，不泄露任何本机目录结构。 */
+const MOCK_DIR = '%APP_DIR%\\plugins';
+/* 落点根目录：仅用于浏览器走查的**占位**路径（不泄露任何本机目录结构）。
+   [V0.11.6] 出厂默认值改为 `%APP_DIR%\md`（数据根，见 ADR-050 §5）；浏览器里
+   `app_dir` 未注入 → `resolve_path` 会退回 appdata 口径。mock 只用于展示，可接受。 */
+const MOCK_ROOT = '%APP_DIR%\\md';
 
 const PRESETS = [
   { item: '上厕所', minutes: 10 },

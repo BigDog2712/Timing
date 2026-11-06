@@ -60,6 +60,25 @@ pub fn run() {
             std::process::exit(app::preboot::EXIT_MIGRATION_ABORTED);
         }
         platform::boot_timing::mark("preboot");
+
+        /* [V0.11.6] 数据 / 插件落点（ADR-050）：必须排在品牌改名迁移**之后**
+        （品牌迁移的目标恒在 `%APPDATA%` 内，先把它做完，落点搬运才有一份确定的源），
+        又在 `Builder::default()` **之前**（数据根是日志 / 备份 / 建库的入参）。
+        同一段 `identifier` 复用，不再重新 clone 一份——两处顺序依赖，写两个 block
+        最容易在改动时把先后颠倒。 */
+        match app::portable_boot::prepare(&identifier) {
+            app::portable_boot::BootChoice::Abort => {
+                std::process::exit(app::preboot::EXIT_MIGRATION_ABORTED)
+            }
+            app::portable_boot::BootChoice::NoDataDir => {
+                std::process::exit(app::portable_boot::EXIT_NO_DATA_DIR)
+            }
+            app::portable_boot::BootChoice::NoWebView2 => {
+                std::process::exit(app::portable_boot::EXIT_NO_WEBVIEW2)
+            }
+            app::portable_boot::BootChoice::Proceed => {}
+        }
+        platform::boot_timing::mark("portable_boot");
     }
 
     let builder = tauri::Builder::default();

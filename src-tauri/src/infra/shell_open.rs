@@ -32,6 +32,17 @@ pub fn open_file(path: &Path) -> Result<(), String> {
     spawn(opener(), path, "打开文件失败")
 }
 
+/// 用系统默认浏览器打开一个 URL（[V0.11.6] 便携版缺 WebView2 时给下载页出口）。
+///
+/// 判据与 `open_dir` 同一套：只 `spawn` 不 `wait`，不经 shell 解析。
+/// URL 由调用方写死（不接受用户输入），因此没有参数注入面。
+pub fn open_url(url: &str) -> Result<(), String> {
+    if !url.starts_with("https://") {
+        return Err(format!("只允许打开 https 链接：{url}"));
+    }
+    spawn(opener(), Path::new(url), "打开网页失败")
+}
+
 fn opener() -> &'static str {
     if cfg!(windows) {
         "explorer"

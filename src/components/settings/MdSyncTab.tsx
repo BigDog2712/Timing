@@ -286,7 +286,7 @@ export function MdSyncTab() {
       </div>
 
         <p className="sync__foot">
-          文件模板支持 {'{date}'}、{'{yyyy}'}、{'{MM}'}、{'{dd}'}；根目录支持 {'%USERPROFILE%'} 与开头的 ~。
+          文件模板支持 {'{date}'}、{'{yyyy}'}、{'{MM}'}、{'{dd}'}；根目录支持 {'%APP_DIR%'}、{'%USERPROFILE%'} 与开头的 ~。
           同步只改目标标题下的区块，日记其他内容不动。
         </p>
       </div>

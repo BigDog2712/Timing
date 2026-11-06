@@ -1,0 +1,59 @@
+%% V0.11.6 启动时序（便携落点决策 + 老数据迁移）— as-built
+%% 权威文档：docs/design/v0.11.6-portable-data-dir.md §3、docs/decisions/ADR-050.md
+sequenceDiagram
+  autonumber
+  participant R as lib.rs::run()
+  participant PB as app::preboot
+  participant P as app::portable_boot
+  participant PR as app::portable_prompt
+  participant FS as infra::portable_probe
+  participant A as platform::app_dir
+  participant M as infra::portable_migrate
+  participant B as app::bootstrap
+  participant D as infra::db
+
+  R->>R: boot_timing::start()
+  R->>R: ctx = generate_context!()
+  R->>PB: prepare(Paths::resolve(identifier), identifier)
+  PB-->>R: Proceed | Abort → exit(2)
+  Note over PB: 品牌改名迁移（LEGACY_IDENTIFIER → com.timing.app）<br/>先在 %APPDATA% 内部完成
+  R->>P: prepare(identifier)
+  P->>A: exe_dir()（None → use_appdata("exe-dir-unavailable")）
+  P->>PR: webview2_ok()?（所有桌面启动都跑；缺失 → ask_webview2() → exit(4)）
+  P->>A: appdata_dir(identifier)
+  P->>FS: read_optout(appdata)
+  alt portable-optout.json 存在
+    P->>A: set(Roots{appdata, appdata/plugins, portable:false})
+  else 未选择过
+    loop 探测可写性
+      P->>FS: probe(<exe>\data)
+      FS-->>P: Ok | Err(reason)
+      P->>PR: ask_permission(reason, data_dir)
+      PR-->>P: Proceed(重试) | AppData(detail) | Quit
+    end
+    P->>P: remove_dir(<exe>\data)（探测建出的空目录，否则迁移 rename 必失败）
+    P->>M: run_once(appdata, <exe>\data)
+    M->>M: 判据 → copy_tree → verify → stash_aside(<identifier>.portable-premigrate-<ts>) → rename → write_marker
+    Note over M: 备份落在 %APPDATA%\<identifier> 的**兄弟**目录，不是旧目录里面；永不删除
+    M-->>P: Outcome
+    alt Migrated / NoLegacy / AlreadyPresent
+      P->>P: move_plugins(<data>\plugins → <exe>\plugins，目标不存在才 rename)
+      P->>A: set(Roots{<exe>/data, <exe>/plugins, portable:true})
+    else Failed
+      P->>PR: ask_migrate_failed(reason, source)
+      PR-->>P: Proceed(重试) | AppData(detail) | Quit
+    end
+  end
+  opt 落到 AppData
+    P->>FS: probe(appdata)（不可写 → ask_no_data_dir() → exit(3)）
+    P->>FS: write_optout(appdata, reason, detail)
+    P->>A: set(Roots{appdata, appdata/plugins, portable:false})
+    P->>PR: ask_appdata_notice(appdata)
+  end
+  R->>B: Builder::setup → bootstrap::setup(app)
+  B->>A: data_root() / is_portable()
+  B->>B: record_portable()（读 portable_boot::note() 补记日志）
+  B->>B: log::init / boot_timing::set_dir / md_backup::set_root
+  B->>D: init_pool(&data_root)
+  D-->>B: SqlitePool
+  B->>B: ensure_defaults → manage(AppState) → tray → reclamp → diagnostics → jobs

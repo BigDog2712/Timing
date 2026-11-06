@@ -1,0 +1,173 @@
+%% V0.11.6 落点与迁移相关类型（类图，as-built）
+%% 权威文档：docs/design/v0.11.6-portable-data-dir.md §2、docs/decisions/ADR-050.md
+classDiagram
+  direction LR
+
+  class Roots {
+    +PathBuf data
+    +PathBuf plugins
+    +bool portable
+    +sandbox(app_data_dir) Roots
+  }
+
+  class AppDir {
+    <<platform/app_dir.rs>>
+    -OnceLock~Roots~ ROOTS$
+    +&str TOKEN
+    +&str FALLBACK_IDENTIFIER
+    +set(Roots) bool
+    +get() Option~Roots~
+    +data_root() PathBuf
+    +plugins_root() PathBuf
+    +plugin_base() PathBuf
+    +is_portable() bool
+    +exe_dir() Option~PathBuf~
+    +appdata_dir(identifier) Option~PathBuf~
+    +fallback_appdata() PathBuf
+  }
+
+  class PortableBoot {
+    <<app/portable_boot.rs>>
+    +prepare(identifier) BootChoice
+    +note() Option~Note~
+    -migrate(source, data_dir) Outcome
+    -use_appdata(identifier, reason, detail) BootChoice
+    -set_roots_pair(data, plugins) void
+    -set_roots(appdata, reason) void
+    -move_plugins(data_dir, plugins_dir) void
+    +EXIT_NO_DATA_DIR i32
+    +EXIT_NO_WEBVIEW2 i32
+  }
+
+  class PortablePrompt {
+    <<app/portable_prompt.rs>>
+    +ask_permission(reason, data_dir) Choice
+    +ask_migrate_failed(reason, source) Choice
+    +ask_appdata_notice(appdata) void
+    +ask_no_data_dir(why) void
+    +ask_webview2() void
+    +webview2_ok() bool
+  }
+
+  class Choice {
+    <<enum>>
+    Proceed
+    AppData(detail)
+    Quit
+  }
+
+  class PortableProbe {
+    <<infra/portable_probe.rs>>
+    +&str OPTOUT_FILE$
+    +probe(dir) Result
+    +read_optout(appdata) Option~OptOut~
+    +write_optout(appdata, reason, detail) void
+  }
+
+  class OptOut {
+    +u32 schema
+    +String at
+    +String appVersion
+    +String reason
+    +String exeDir
+    +String dataDir
+    +String detail
+  }
+
+  class PortableMigrate {
+    <<infra/portable_migrate.rs>>
+    -Mutex~Option~Outcome~~ OUTCOME$
+    +run_once(source, target) Outcome
+    +outcome() Option~Outcome~
+    +read_marker(target) Option~String~
+    -execute(source, target) Outcome
+    -stash_aside(target, backup) Result
+    -write_marker(target, facts) Result
+    -append_failure(source, stage, reason)
+    -cleanup_temp(temp) bool
+    -sibling(target, suffix) PathBuf
+    -stamp() String
+  }
+
+  class Outcome {
+    <<enum>>
+    NoLegacy
+    AlreadyPresent
+    Migrated
+    Failed
+  }
+
+  class MigratePrimitives {
+    <<infra/appdata_migrate/*>>
+    +copy_tree(source, dest) CopyStats
+    +verify(temp, source) RowCounts
+    +rename_aside(target, backup) Result
+    +DB_NAME &str
+    +LEGACY_IDENTIFIER &str
+  }
+
+  class AppdataPaths {
+    <<infra/appdata_migrate/paths.rs>>
+    +resolve(identifier) Option~Paths~
+    +legacy_dir() Option~PathBuf~
+    +legacy_dir_of(app_data_dir) Option~PathBuf~
+  }
+
+  class PluginFs {
+    <<infra/plugin_fs.rs>>
+    +user_plugin_dir(root) PathBuf
+    +exe_plugin_dir() Option~PathBuf~
+    +scan_roots(root) Vec
+    +scan_roots_for(root, portable) Vec
+  }
+
+  class MdEnv {
+    <<infra/md_env.rs>>
+    +expand_env(raw) String
+    -app_dir_value() String
+  }
+
+  class MdFile {
+    <<infra/md_file.rs>>
+    +resolve_path(root, file, date) PathBuf
+    +expand_env md_env::expand_env
+  }
+
+  class MdSyncConfig {
+    <<models/md_sync_config.rs>>
+    +&str MD_SYNC_DEFAULT_ROOT
+    +&str MD_SYNC_DEFAULT_FILE
+    +default_bindings() Vec~MdSyncBinding~
+  }
+
+  class Bootstrap {
+    <<app/bootstrap.rs>>
+    +setup(app) Result
+    -record_migration(app, brand_target) void
+  }
+
+  class MigrationCmd {
+    <<commands/migration_cmd.rs>>
+    +get_migration_info(app) MigrationInfo
+    +open_legacy_dir(app) void
+    +resolve_source(...) MigrationSource
+  }
+
+  AppDir ..> Roots
+  PortableBoot ..> AppDir
+  PortableBoot ..> PortableMigrate
+  PortableBoot ..> PortablePrompt
+  PortableBoot ..> PortableProbe
+  PortablePrompt ..> Choice
+  PortableProbe ..> OptOut
+  PortableMigrate ..> MigratePrimitives
+  PortableMigrate ..> AppdataPaths
+  PluginFs ..> AppDir
+  MdEnv ..> AppDir
+  MdFile ..> MdEnv
+  MdSyncConfig ..> MdFile
+  Bootstrap ..> AppDir
+  Bootstrap ..> AppdataPaths
+  Bootstrap ..> PortableBoot
+  MigrationCmd ..> AppDir
+  MigrationCmd ..> AppdataPaths

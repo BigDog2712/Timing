@@ -12,25 +12,31 @@
 //! 因此新增 2 条只读/打开目录命令（命令 65 → 67），**不新增错误码**：
 //! 失败一律 `IO_ERROR`（PRD 铁律：错误码只在 `error.rs` 定义且数量不变）。
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 use crate::error::{AppError, AppResult};
 use crate::infra::appdata_migrate::{self as mig, MigrationOutcome};
 use crate::infra::db;
 use crate::models::migration::{MigrationInfo, MigrationSource};
+use crate::platform::app_dir;
 
 /// 查询「当前数据从哪来」。纯查询：幂等、无副作用、不写任何文件。
+///
+/// [V0.11.6] marker / pending / 库判定全部改用 `app_dir::data_root()`：便携模式下
+/// 数据根是 `<exe>\data`，仍读 `app.path().app_data_dir()` 会去看一个已经不再使用的
+/// 目录（永久显示 `fresh`）。旧目录改用 `mig::legacy_dir()`（恒为
+/// `%APPDATA%\<品牌改名前的 app 标识>`），与当前数据根无关。
 #[tauri::command]
-pub async fn get_migration_info(app: AppHandle) -> AppResult<MigrationInfo> {
-    let app_data_dir = app.path().app_data_dir().map_err(AppError::io)?;
-    let marker = mig::read_marker(&app_data_dir);
-    let pending = mig::read_pending(&app_data_dir);
-    let legacy_dir = mig::legacy_dir_of(&app_data_dir);
+pub async fn get_migration_info(_app: AppHandle) -> AppResult<MigrationInfo> {
+    let data_root = app_dir::data_root();
+    let marker = mig::read_marker(&data_root);
+    let pending = mig::read_pending(&data_root);
+    let legacy_dir = mig::legacy_dir();
     let legacy_exists = legacy_dir.as_ref().is_some_and(|dir| dir.is_dir());
     let legacy_has_data = legacy_dir
         .as_ref()
         .is_some_and(|dir| mig::has_legacy_data(dir));
-    let target_has_db = db::resolve_db_path(&app_data_dir).exists();
+    let target_has_db = db::resolve_db_path(&data_root).exists();
     let skipped = matches!(mig::outcome(), Some(MigrationOutcome::Skipped));
 
     let source = resolve_source(
@@ -56,16 +62,15 @@ pub async fn get_migration_info(app: AppHandle) -> AppResult<MigrationInfo> {
 ///
 /// **路径一律重算，绝不使用 `MigrationInfo.legacyDir` 的回传值**（安全，见
 /// ARCHITECTURE §7 N13）：标记文件是用户目录下的明文 JSON，谁改了它就能让应用
-/// `explorer` 打开任意目录。这里用「权威 `app_data_dir` 的父目录 + 固定旧 identifier」
-/// 现算，前端即使传路径也无处可用（本命令不接受参数）。
+/// `explorer` 打开任意目录。这里用「系统数据根 + 固定旧 identifier」现算，
+/// 前端即使传路径也无处可用（本命令不接受参数）。
 ///
 /// 目录不存在时返回 `IO_ERROR`，**不创建目录**（与 `plugin_open_dir` 的「先建后用」
 /// 有意不同：那是宿主拥有的目录，这是用户的旧数据，替用户造一个空目录只会误导）。
 #[tauri::command]
-pub async fn open_legacy_dir(app: AppHandle) -> AppResult<()> {
-    let app_data_dir = app.path().app_data_dir().map_err(AppError::io)?;
-    let legacy = mig::legacy_dir_of(&app_data_dir)
-        .ok_or_else(|| AppError::io("无法推断旧数据目录（app_data_dir 没有父目录）"))?;
+pub async fn open_legacy_dir(_app: AppHandle) -> AppResult<()> {
+    let legacy =
+        mig::legacy_dir().ok_or_else(|| AppError::io("无法推断旧数据目录（拿不到系统数据根）"))?;
     if !legacy.is_dir() {
         return Err(AppError::io(format!(
             "旧数据目录不存在：{}",

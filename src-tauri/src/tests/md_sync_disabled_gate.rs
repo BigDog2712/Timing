@@ -151,9 +151,13 @@ async fn a_disabled_config_performs_no_file_io() {
 
 /// 全新用户（没有保存值 = 内核默认关）跑一次同步，不能碰用户文档目录。
 ///
-/// 端到端验证：默认值指向 `%USERPROFILE%\Documents\Timing`，若闸门失效，第一次 tick
-/// 就会在真实文档目录里建出 `Timing/<今天的日期>.md`。断言用「存在性不变」而不是
-/// 「不存在」——机器上恰好已有这个目录时（历史遗留）仍能安全通过。
+/// 端到端验证：V0.11.6 起默认根是 `%APP_DIR%\md`（解析到数据目录下的 `md\`，
+/// 桌面版即 `<exe>\data\md`；V0.11.5 及以前是 `%USERPROFILE%\Documents\Timing`）。
+/// 若闸门失效，第一次 tick 就会在那个目录里建出 `<今天的日期>.md`。断言用
+/// 「存在性不变」而不是「不存在」——机器上恰好已有这个目录时仍能安全通过。
+///
+/// 用例名里的 `real_documents_dir` 是 V0.11.5 的措辞，保留是为了不动作例清单；
+/// 判据（存在性不变）与默认根改名无关，仍成立。
 #[tokio::test]
 async fn a_fresh_install_sync_writes_nothing_to_the_real_documents_dir() {
     let pool = fresh_pool("md-kernel-fresh-run").await;

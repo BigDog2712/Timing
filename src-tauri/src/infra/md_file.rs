@@ -46,53 +46,16 @@ pub enum SectionState {
 }
 
 /// 解析落点路径：根目录 + 文件模板，模板里的日期令牌按本地日期替换。
+///
+/// [V0.11.6] 环境变量展开走 `infra::md_env`（+ `%APP_DIR%`）；本文件 298/300 行，
+/// 塞不下那段逻辑，所以整段搬走并在这里 re-export，调用点路径不变。
 pub fn resolve_path(root: &str, file: &str, date: NaiveDate) -> PathBuf {
     let root = expand_env(root);
     let file = expand_tokens(file.trim(), date);
     Path::new(&root).join(file)
 }
 
-/// 展开 `%USERPROFILE%` 与开头的 `~`。找不到环境变量时原样保留，让路径错误可诊断。
-pub fn expand_env(raw: &str) -> String {
-    let mut text = raw.trim().to_string();
-    if text == "~" || text.starts_with("~\\") || text.starts_with("~/") {
-        if let Ok(home) = std::env::var("USERPROFILE").or_else(|_| std::env::var("HOME")) {
-            text = format!("{}{}", home, &text[1..]);
-        }
-    }
-
-    let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if ch != '%' {
-            out.push(ch);
-            continue;
-        }
-        let mut name = String::new();
-        let mut closed = false;
-        for next in chars.by_ref() {
-            if next == '%' {
-                closed = true;
-                break;
-            }
-            name.push(next);
-        }
-        if closed {
-            match std::env::var(&name) {
-                Ok(value) => out.push_str(&value),
-                Err(_) => {
-                    out.push('%');
-                    out.push_str(&name);
-                    out.push('%');
-                }
-            }
-        } else {
-            out.push('%');
-            out.push_str(&name);
-        }
-    }
-    out
-}
+pub use crate::infra::md_env::expand_env;
 
 /// 把 `{date}` / `{yyyy}` / `{MM}` / `{dd}` 换成日期片段。
 pub fn expand_tokens(template: &str, date: NaiveDate) -> String {

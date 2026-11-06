@@ -173,9 +173,18 @@ pub fn read_pending(app_data_dir: &Path) -> Option<PendingMigrate> {
     marker::read_pending(app_data_dir)
 }
 
-/// 旧数据目录（按规则重算，**不读标记文件**）。
-pub fn legacy_dir_of(app_data_dir: &Path) -> Option<PathBuf> {
-    paths::legacy_dir_of(app_data_dir)
+/// 旧品牌数据目录（**与当前数据根无关**，恒为 `%APPDATA%\com.tickbar.app`）。
+///
+/// [V0.11.6] 展示 / 命令层用这个；`paths::legacy_dir_of()` 留给迁移执行期（那时数据根
+/// 还没决定，只能从权威 `app_data_dir` 反推）。两者共存的理由见 `paths.rs` 的注释。
+///
+/// 注意：模块级**不再转发** `legacy_dir_of`。ADR-050 §2 把三处调用点
+/// （`bootstrap` / `diagnostics` / `migration_cmd`）全部换成了本函数，转发层于是没有
+/// 任何调用方——留着它就是 `-D warnings` 下的死码（`appdata_migrate` 不是 pub 模块，
+/// 未使用的 pub fn 一样会被 dead_code 抓到）。`paths::legacy_dir_of` 仍在（本函数的
+/// 实现依赖它，且迁移执行期的口径必须留着），只是不再对外转发。
+pub fn legacy_dir() -> Option<PathBuf> {
+    paths::legacy_dir()
 }
 
 /// 旧目录里是否有旧数据（命令层判定 `unattached` 用）。

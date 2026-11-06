@@ -19,6 +19,9 @@ release/*.msi
 release/*.nsis.zip
 # Android 安装包：可执行产物，体积按 MB 计，不入库（构建方式见 归档说明.md §8）
 release/*.apk
+# 便携版：按版本命名的目录与压缩包（构建产物，不入库）
+release/Timing-*/
+release/*.zip
 
 # --- 临时 / 本地 ---
 *.log

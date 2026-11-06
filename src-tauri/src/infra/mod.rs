@@ -12,10 +12,13 @@
 pub mod appdata_migrate;
 pub mod db;
 pub mod md_backup;
+pub mod md_env;
 pub mod md_file;
 pub mod migrate;
 pub mod notify;
 pub mod plugin_fs;
+pub mod portable_migrate;
+pub mod portable_probe;
 pub mod shell_open;
 
 /* 桌面独占（V1-Android）：下面这些模块直接调 tauri 桌面专有 API ——

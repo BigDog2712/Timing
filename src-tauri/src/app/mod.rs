@@ -24,6 +24,10 @@ pub mod autostart_takeover;
 #[cfg(desktop)]
 pub mod diagnostics;
 #[cfg(desktop)]
+pub mod portable_boot;
+#[cfg(desktop)]
+pub mod portable_prompt;
+#[cfg(desktop)]
 pub mod preboot;
 #[cfg(desktop)]
 pub mod tray;

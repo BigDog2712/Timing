@@ -37,9 +37,9 @@ pub fn verify(temp: &Path, source: &Path) -> Result<RowCounts, String> {
         return Ok(RowCounts::default());
     }
 
-    /* V2 + V3：完整性与行数。临时库是我们自己的副本，可读写打开
+    /* V2 + V3：完整性与行数。临时库是我们自己的副本，正常读写打开
     （只读打开在「-wal 需要恢复」时会失败，而恢复正好是我们想让它做的）。 */
-    let facts = block_on_detached(inspect_db(db, false))?;
+    let facts = block_on_detached(inspect_db(db))?;
     if facts.integrity != "ok" {
         return Err(format!("integrity_check 未通过：{}", facts.integrity));
     }
@@ -47,16 +47,19 @@ pub fn verify(temp: &Path, source: &Path) -> Result<RowCounts, String> {
         return Err("校验失败：settings.schema.version 不可读".to_string());
     }
 
-    /* V4 与源库比对行数。源库**只读**打开，且失败即跳过：WAL 里若有未 checkpoint
-    的事务，只读连接可能报 `SQLITE_READONLY_RECOVERY`——这不是迁移出错，
-    只是我们不该为了校验去改用户的老库。 */
+    /* V4 与源库比对行数。**不直接打开源库**：SQLite 对 WAL 库即使
+    `SQLITE_OPEN_READONLY` 也必须在库文件旁边落地 `-shm`（32 KB）与 `-wal`，
+    而「旧目录一个字节都不改」是迁移的硬承诺（ADR-050 §4）——这句话以前是假的
+    （QA 复现：迁移后源目录多出 `timing.db-shm` / `timing.db-wal`）。
+    做法：把源库连同 `-wal` / `-shm` **复制一份**到影子目录，在影子库上开库比对，
+    比完删影子。源目录只剩读文件/读元数据两类系统调用。 */
     let src_db = if source.join(LEGACY_DB_NAME).exists() {
         source.join(LEGACY_DB_NAME)
     } else {
         source.join(DB_NAME)
     };
     if src_db.exists() {
-        match block_on_detached(inspect_db(src_db, true)) {
+        match shadow_facts(&src_db, temp) {
             Ok(src) => {
                 if src.counts != facts.counts {
                     return Err(format!(
@@ -67,13 +70,53 @@ pub fn verify(temp: &Path, source: &Path) -> Result<RowCounts, String> {
                 }
             }
             Err(_err) => {
-                /* 只读打开失败（多为 WAL 里有未 checkpoint 的事务 → `SQLITE_READONLY_RECOVERY`）：
-                降级为「不比行数」，**不判失败**。我们不该为了校验去改用户的老库。 */
+                /* 影子副本都读不出来（源库损坏 / 权限不足）：降级为「不比行数」，
+                 **不判失败**。V1~V3 已经在副本上验过完整性，这里只是加分项。 */
             }
         }
     }
 
     Ok(facts.counts)
+}
+
+/// 在**影子副本**上读源库事实（源目录一个字节都不碰）。
+///
+/// 为什么不在源库上用 `immutable=1`：那是「我保证这文件不会被改」的承诺，
+/// 而我们并不能保证（用户可能正开着旧版应用）；影子副本没有这个前提依赖。
+fn shadow_facts(src_db: &Path, temp: &Path) -> Result<DbFacts, String> {
+    let mut dir_name = temp.as_os_str().to_os_string();
+    dir_name.push(".v4-src");
+    let dir = PathBuf::from(dir_name);
+
+    /* 上一次被强杀可能留下影子目录：它是我们自己的中间产物，可以直接清。 */
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir)
+        .map_err(|err| format!("建影子目录 {} 失败：{err}", dir.display()))?;
+
+    /* 目录已建好之后**每一步失败都要清掉它**，否则磁盘满 / 目标盘只读时会在数据盘
+    上留一个 `<target>.migrating.v4-src`（用户永远不知道该不该删）。所以填充与分析
+    拆到 `fill_shadow` 里，统一在出口清理。 */
+    let result = fill_shadow(src_db, &dir);
+    let _ = std::fs::remove_dir_all(&dir);
+    result
+}
+
+/// 把源库（含 `-wal` / `-shm`）复制进影子目录并开库读事实。
+fn fill_shadow(src_db: &Path, dir: &Path) -> Result<DbFacts, String> {
+    let name = src_db
+        .file_name()
+        .ok_or_else(|| format!("源库路径没有文件名：{}", src_db.display()))?;
+    /* `-wal` / `-shm` 一起复制：只复制主库会让「尚未 checkpoint 的事务」凭空消失，
+    行数比对就会拿一个更老的快照去比，误判成「行数不一致」。 */
+    for suffix in ["", "-wal", "-shm"] {
+        let from = PathBuf::from(format!("{}{suffix}", src_db.display()));
+        if from.is_file() {
+            let to = dir.join(format!("{}{suffix}", name.to_string_lossy()));
+            std::fs::copy(&from, &to)
+                .map_err(|err| format!("复制源库到影子目录失败（{}）：{err}", from.display()))?;
+        }
+    }
+    block_on_detached(inspect_db(dir.join(name)))
 }
 
 /// V1：逐文件比较字节数（目录结构必须一一对应）。
@@ -112,11 +155,16 @@ fn compare_dir(from: &Path, to: &Path) -> Result<(), String> {
 }
 
 /// 开库读三类事实：完整性、五表行数、`settings.schema.version`。
-async fn inspect_db(path: PathBuf, read_only: bool) -> Result<DbFacts, String> {
+///
+/// **没有 `read_only` 开关，是有意的**：只读打开 SQLite 仍会在库文件旁边落地
+/// `-shm` / `-wal`（V0.11.6 的 QA 实测：源目录多出 32 KB 的 `timing.db-shm`），
+/// 而迁移承诺「旧目录一个字节都不改」。所以本模块只在**自己的副本**上开库
+/// （临时副本 / `shadow_facts` 的影子副本），永远不需要只读模式——留一个恒为
+/// `false` 的开关只会让下一个人以为存在一条只读路径（正是 V0.11.6 踩过的坑）。
+async fn inspect_db(path: PathBuf) -> Result<DbFacts, String> {
     let options = SqliteConnectOptions::new()
         .filename(&path)
-        .create_if_missing(false)
-        .read_only(read_only);
+        .create_if_missing(false);
     let pool = SqlitePoolOptions::new()
         .max_connections(1)
         .connect_with(options)

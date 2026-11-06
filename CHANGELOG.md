@@ -2,6 +2,74 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.6 — 便携数据目录 / 双形态打包
+
+用户口径：「装到哪，数据就放在哪，整个文件夹拷走就能带走全部数据；不能在应用目录写就提醒我，
+别偷偷换个地方」。落点决策见 `docs/decisions/ADR-050.md`，打包链路见 `ADR-051`。
+
+### 数据落点：`<exe>\data`，不可写则明示回退
+
+- 新增 `platform/app_dir.rs`：`Roots { data, plugins, portable }` 用 `OnceLock` 存**一次决策**，
+  日志目录 / md 备份目录 / `db::init_pool` / 插件根全部改从这里取（此前各自算 `app_data_dir()`）。
+- 新增 `app/portable_boot.rs`（顺序与判据）+ `app/portable_prompt.rs`（`rfd` 文案）+
+  `infra/portable_probe.rs`（探测与标记文件读写）。三步都在 `Builder::run()` **之前**跑：
+  `tauri-plugin-dialog` 的 `blocking_show` 不能跑在主线程，而这一步必须在主线程。
+- 可写性判据是「建目录 → 写 16 字节 → 回读比对 → 删」，**不用** `permissions().readonly()`
+  （只看属性位不看 ACL，`C:\Program Files` 上返回 `false` 却写不进去）。
+- 不可写时弹三选一：**提权后重试** / **改用 AppData** / **退出**。选 AppData 后写
+  `%APPDATA%\com.timing.app\portable-optout.json` 作为书面证据，并**再弹一次**说明
+  「数据目录已改为 <路径>」。删掉该文件即恢复探测。
+- 两个落点都不可写 → 提示后 `exit(3)`；便携版缺 WebView2 → 提示（可一键打开下载页）后 `exit(4)`。
+
+### 老数据：只复制、不删除、幂等
+
+- 新增 `infra/portable_migrate.rs`：`%APPDATA%\com.timing.app` → `<exe>\data`，复用
+  `appdata_migrate` 的 `copy_tree` / `verify` / `rename_aside` 原语，**不共用**它的全局缓存。
+- 顺序固定：清残留临时目录 → 判据（目标有库或有标记 = 什么都不做）→ 复制到 `<target>.migrating`
+  → 校验 → 原目标改名备份 → 换名 → 写 `migrated-to-portable.json`（标记在数据目录里，随数据走）。
+- 失败不阻断启动：用户看到的是「重试 / 改用 AppData / 退出」三选一，细节进 `logs/`。
+  只有**写标记文件失败**这一种会额外落 `%APPDATA%\com.timing.app\portable-migrate-failed.txt`
+  （复制 / 校验 / 换名三种失败不写该文件）。
+- **源目录全程只读**，且这条现在是机械成立的：四重校验的 V4 行数比对改在**影子副本**上开库
+  （只读连接同样会让 SQLite 在源目录落地 `-shm` 32 KB / `-wal`，以前那句承诺是假的）。
+- 换名前的旧 `<exe>\data` 备份**挪到** `%APPDATA%\com.timing.app.portable-premigrate-<ts>\`
+  （`source` 的兄弟目录，不是它里面；exe 旁边只留 `Timing.exe` / `data` / `plugins`）。
+  放进 `source` 里会让「旧目录只读」破功，且下次迁移会把备份当用户数据一起复制。
+  跨盘 rename 会 `EXDEV`，退成「复制 → 删原件」。
+
+### Markdown 同步默认根改 `%APP_DIR%\md`
+
+- `MD_SYNC_DEFAULT_ROOT` → `%APP_DIR%\md`（落在 `<exe>\data\md`）。`%APP_DIR%` 在 `expand_env`
+  里**先于** `%VAR%` 展开（否则用户环境变量里有个 `APP_DIR` 就把默认根劫持了），永不留下未展开的占位符。
+- `expand_env` 从 `infra/md_file.rs` 搬到 `infra/md_env.rs`（原文件 298 行顶到门禁上限），
+  对外仍由 `md_file` re-export，调用点零改动。
+- **用户保存过的 root 一个字节都不动**（`merge_bindings` 语义未变；`enabled` 出厂仍 `false`）。
+
+### 插件目录跟着搬
+
+- `plugins` 与 `data` 同级放在 `<exe>\plugins`（不是 `<exe>\data\plugins`）：`plugin_fs::scan_roots`
+  会把同一目录当两个来源扫两遍，同 id 互相判「被跳过」。便携模式下 `exe` 与 `user` 根本就是同一
+  目录，`scan_roots` 末尾按小写路径去重。
+- 迁移时若 `<exe>\plugins` 已存在（便携包自带 `plugins\README.txt` 占位，所以这是**常态**）：
+  **逐个子目录**搬到 `<exe>\plugins\<name>`，撞名的留原地 + WARN，两边都不删不覆盖。整目录放弃
+  会让升级用户的插件文件还在、功能全没（`data\plugins` 不在扫描拓扑里）。
+
+### 双形态打包
+
+- 新增 `scripts/build-desktop.mjs`：`--portable`（`tauri build --no-bundle` + bsdtar 打 zip）/
+  `--installer`（`--bundles nsis`）/ 缺省两者都出，**共用一次 Rust 编译**。
+- `release/*.zip` 走 Windows 自带 bsdtar（`tar -a -cf`），不用 `Compress-Archive`（zip 里路径
+  分隔符是 `\`，跨平台解压出乱码目录）。
+- 前端资源变更靠 `dist/` **内容指纹**判定（`cargo` 不把 `dist/` 当输入，只重建 dist 会在 exe 里
+  留上一版 UI）；指纹变了才 `touch src-tauri/build.rs`。`cargo clean --release -p timing` 退役。
+- 安装包改 `nsis` 单目标 + `installMode: currentUser`（装到 `%LOCALAPPDATA%\Timing`，恒可写），
+  `beforeBuildCommand` 由脚本用 `--config` 覆盖为空，避免前端被编两遍。
+
+### 契约
+
+- **命令 67 / 事件 11 / 错误码 16 全部不变**（ADR-050 §7）：落点信息只在启动期对话框里告知，
+  不经 IPC 暴露；启动期提示一律 `rfd` 原生对话框，不 `emit`。
+
 ## 0.11.5 — 圆点放大 / 外环增长 / 置顶重申 / 高亮覆盖圆点 / md 同步内核化 + 插件 API v3
 
 用户口径：「小圆点太小了，放大 1.5 倍；外圈那条环不要长度固定地绕圈，要从 12 点随着时间往前

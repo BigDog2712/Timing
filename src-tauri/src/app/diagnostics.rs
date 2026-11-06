@@ -32,6 +32,18 @@ pub fn write_snapshot(app: &AppHandle, app_data_dir: &Path) {
         std::env::consts::ARCH
     );
     let _ = writeln!(out, "app_data_dir : {}", app_data_dir.display());
+    /* [V0.11.6] 落点两行（ADR-050 §3）：用户报障时「数据到底在哪、插件放哪」
+    必须是文件里能直接读到的事实，而不是让人去猜 exe 旁边还是 %APPDATA%。 */
+    let _ = writeln!(
+        out,
+        "portable     : {}",
+        crate::platform::app_dir::is_portable()
+    );
+    let _ = writeln!(
+        out,
+        "plugins_dir  : {}",
+        crate::platform::app_dir::plugins_root().display()
+    );
     if let Some(dir) = log::log_dir() {
         let _ = writeln!(out, "log_dir      : {}", dir.display());
     }
@@ -46,14 +58,21 @@ pub fn write_snapshot(app: &AppHandle, app_data_dir: &Path) {
 
     /* [V0.5.0] 迁移现场三行：用户报障时第一眼看「数据从哪来 / 该去哪 / 旧目录在哪」。
     这三行是 PRD M-01 的期望输出，也是 M-05（发现未采用的旧数据）的唯一书面证据。 */
-    let _ = writeln!(out, "migration    : {}", migration_label(app_data_dir));
+    let _ = writeln!(
+        out,
+        "migration    : {}{}",
+        migration_label(app_data_dir),
+        portable_label()
+    );
     match mig::paths_used() {
         Some(used) => {
             let _ = writeln!(out, "migrate_target: {}", used.target.display());
             let _ = writeln!(out, "legacy       : {} (kept)", used.source.display());
         }
         None => {
-            let legacy = mig::legacy_dir_of(app_data_dir)
+            /* [V0.11.6] 旧目录改由 `legacy_dir()` 算（恒为 `%APPDATA%\<品牌改名前的 app 标识>`）：
+            便携模式下从数据根反推会得到 `<exe>\<同名>`，一个永不存在的路径。 */
+            let legacy = mig::legacy_dir()
                 .map(|dir| dir.display().to_string())
                 .unwrap_or_else(|| "-".into());
             let _ = writeln!(out, "migrate_target: <迁移未运行>");
@@ -134,5 +153,18 @@ fn migration_label(app_data_dir: &Path) -> &'static str {
         Some(MigrationOutcome::Migrated(_)) => "migrated",
         Some(MigrationOutcome::Failed(_)) => "failed（详见旧目录 migration-failed.txt）",
         _ => "fresh（全新数据）",
+    }
+}
+
+/// 落点搬运失败的附加标签（`migration` 行后缀）。
+///
+/// 只有 `Failed` 才追加：成功 / 跳过都不该在日常快照里制造噪声，而失败必须能一眼
+/// 看出「品牌改名迁移 OK、但落点搬运挂了」——那是两条完全不同的排查路径。
+fn portable_label() -> String {
+    match crate::infra::portable_migrate::outcome() {
+        Some(crate::infra::portable_migrate::Outcome::Failed { stage, .. }) => {
+            format!("; portable=failed({stage})")
+        }
+        _ => String::new(),
     }
 }

@@ -5,8 +5,18 @@
 //! | 优先级 | 来源 | 路径 | 可写 |
 //! |---|---|---|---|
 //! | 1 | `dev`（仅调试构建） | `<仓库根>/plugins` | 是 |
-//! | 2 | `exe`（随包分发） | `<exe 目录>/plugins` | 视安装位置 |
-//! | 3 | `user` | `%APPDATA%\com.timing.app\plugins` | 是 |
+//! | 2 | `exe`（随包分发，**仅回退 AppData 时**） | `<exe 目录>/plugins` | 视安装位置 |
+//! | 3 | `user` | 便携 `<exe 目录>\plugins` / 回退 `%APPDATA%\com.timing.app\plugins` | 是 |
+//!
+//! [V0.11.6] **便携模式下不产出 `exe`**（ADR-050 §1「插件扫描拓扑」表）：那时
+//! `<exe>\plugins` **就是** `user` 目录，再标一条「随包」会让用户从设置页「打开目录」
+//! 亲手放进去的插件自称随包——文案在骗人。回退 AppData 时 `exe` 与 `user` 是两个
+//! 不同目录，两条都在。
+//!
+//! `scan_roots` 末尾仍做一次**防御性**去重：正常配置（便携+release / 回退 / debug）
+//! 都不会产生重复路径，只有「用户把便携目录整个拷进 `%APPDATA%`」「手建同名目录」
+//! 「调试构建的仓库根恰好等于 exe 目录」这类异常命中；命中即说明扫描根配置有问题，
+//! 值得按日志查一眼。
 //!
 //! 三处合并扫描，**同 id 先到先得**。用户目录首次启动只**建空目录**，不放任何文件：
 //! 插件是用户自己放进去的东西，宿主替用户塞一份"示例"只会让「设置 → 插件」在全新
@@ -58,15 +68,37 @@ fn exe_plugin_dir() -> Option<PathBuf> {
 }
 
 /// 待扫描的根目录（按优先级排序；不保证存在）。
+///
+/// [V0.11.6] 先按 `is_portable()` 决定要不要 `exe` 根，末尾再按**小写路径**做一次
+/// 防御性去重（正常配置不会命中，见模块头部）。按
+/// `to_string_lossy().to_ascii_lowercase()` 比而不是 `PathBuf ==`：Windows 上
+/// `C:\X` 与 `c:\x` 是同一个目录，但 `PathBuf` 判不等。
 pub fn scan_roots(app_data_dir: &Path) -> Vec<(PluginSource, PathBuf)> {
+    scan_roots_for(app_data_dir, crate::platform::app_dir::is_portable())
+}
+
+/// `scan_roots` 的实际实现，便携与否由调用方给。
+///
+/// 为什么拆出一个带参数的版本：`app_dir` 的 `OnceLock` 一旦写入不可清除，测试里
+/// 不能调 `set()`（会污染同进程并行用例），于是「便携 / 回退」两条分支在端到端里
+/// 只有一条跑得到。这个缝让两条都能被单测覆盖，生产路径行为不变。
+pub(crate) fn scan_roots_for(app_data_dir: &Path, portable: bool) -> Vec<(PluginSource, PathBuf)> {
     let mut roots = Vec::new();
     if let Some(dir) = dev_plugin_dir() {
         roots.push((PluginSource::Dev, dir));
     }
-    if let Some(dir) = exe_plugin_dir() {
-        roots.push((PluginSource::Exe, dir));
+    /* 便携模式下 `<exe>\plugins` **就是**用户目录（ADR-050 §1）：再 push 一条 `Exe`
+    会让用户自己放进去的插件被标成「随包」（前端 `SOURCE_LABEL.exe`），而设置页
+    「打开目录」给他的正是这个目录——文案在骗人。回退 AppData 时 `Exe` 与 `User`
+    是两个不同目录，照旧两条都 push。 */
+    if !portable {
+        if let Some(dir) = exe_plugin_dir() {
+            roots.push((PluginSource::Exe, dir));
+        }
     }
     roots.push((PluginSource::User, user_plugin_dir(app_data_dir)));
+    let mut seen = std::collections::HashSet::new();
+    roots.retain(|(_, dir)| seen.insert(dir.to_string_lossy().to_ascii_lowercase()));
     roots
 }
 

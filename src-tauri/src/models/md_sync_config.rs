@@ -16,9 +16,12 @@ use serde::{Deserialize, Serialize};
 use crate::models::constants::{MD_SYNC_POLL_MAX_SECS, MD_SYNC_POLL_MIN_SECS, MD_SYNC_POLL_SECS};
 use crate::models::md_sync::{MdSyncBinding, MdSyncKind, MD_SYNC_MAX_BINDINGS};
 
-/// 出厂落点根目录。保留 `%USERPROFILE%` 形式：设置页把它显示给用户看，
-/// 真正解析在 `infra::md_file::resolve_path`（换用户 / 换机器后仍然指向自己的文档目录）。
-pub const MD_SYNC_DEFAULT_ROOT: &str = r"%USERPROFILE%\Documents\Timing";
+/// 出厂落点根目录。
+///
+/// `%APP_DIR%` = **数据根**（便携 `<exe>\data` / 回退 `%APPDATA%\com.timing.app`），
+/// 不是 exe 目录本身。解析在 `infra::md_env::expand_env`，因此在换用户 / 换机器 /
+/// 换盘符之后仍然跟着应用走（ADR-050 §5）。
+pub const MD_SYNC_DEFAULT_ROOT: &str = r"%APP_DIR%\md";
 
 /// 出厂文件模板：一天一个文件（`2026-11-05.md`）。
 pub const MD_SYNC_DEFAULT_FILE: &str = "{date}.md";

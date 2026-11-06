@@ -117,9 +117,10 @@ pub(crate) fn default_object() -> serde_json::Value {
 pub enum PluginSource {
     /// 调试构建：仓库根的 `plugins/`。
     Dev,
-    /// 随包分发：exe 同级 `plugins/`。
+    /// 随包分发：exe 同级 `plugins/`。**仅回退 AppData 时产出**——便携模式下
+    /// `<exe>\plugins` 就是 `User` 目录，再标「随包」会骗人（ADR-050 §1）。
     Exe,
-    /// 用户目录：`%APPDATA%/com.timing.app/plugins`（可写）。
+    /// 用户目录（可写）：便携 `<exe>\plugins` / 回退 `%APPDATA%/com.timing.app/plugins`。
     User,
 }
 
