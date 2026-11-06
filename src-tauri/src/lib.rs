@@ -32,6 +32,25 @@ mod tests;
 ///
 /// `mobile_entry_point` 是 Android / iOS 的**必需**属性：移动端由原生侧
 /// （`MainActivity`）回调这里，没有 `main()` 可走。桌面侧该属性不展开，行为不变。
+/// 移动端原生桥插件。
+///
+/// 它**不向前端暴露任何命令**（前端走 `commands::mobile_cmd` 的普通命令）；唯一作用是把
+/// Kotlin 的 `TimingNativePlugin` 注册进 `PluginManager`，并交出一个 `PluginHandle`
+/// 供 Rust 侧 `run_mobile_plugin_async` 调用。Kotlin 侧同名类写在
+/// `src-tauri/gen/android/app/src/main/java/com/timing/app/TimingNativePlugin.kt`。
+#[cfg(target_os = "android")]
+fn mobile_bridge_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    use tauri::Manager;
+
+    tauri::plugin::Builder::new("timing-native")
+        .setup(|app, api| {
+            let handle = api.register_android_plugin("com.timing.app", "TimingNativePlugin")?;
+            app.manage(infra::native_bridge::NativeBridge::new(handle));
+            Ok(())
+        })
+        .build()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 冷启动计时起点（T17）：越靠近进程入口越准。这里比 `Builder` 早，也早于任何插件初始化。
@@ -103,6 +122,11 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             let _ = infra::window::show_main(app);
         }));
+
+    /* 移动端原生桥（Android 专属）：SAF 目录与悬浮窗由 Kotlin 实现，Rust 经此调用。
+    桌面没有原生侧可调，`commands::mobile_cmd` 的桌面实现全是桩。 */
+    #[cfg(target_os = "android")]
+    let builder = builder.plugin(mobile_bridge_plugin());
 
     let builder = builder
         // 插件（IPC-CONTRACT-v2 附录 A / Spec §4）
@@ -186,6 +210,11 @@ pub fn run() {
             commands::md_sync_cmd::md_sync_save,
             commands::md_sync_cmd::md_sync_run,
             commands::md_sync_cmd::md_sync_open,
+            // [V0.12.0] 手机端原生能力（SAF 目录 / 悬浮条）；桌面侧四条是桩
+            commands::mobile_cmd::md_saf_pick,
+            commands::mobile_cmd::md_saf_status,
+            commands::mobile_cmd::overlay_set,
+            commands::mobile_cmd::overlay_status,
             // [V0.5.0] 迁移可见性（命令 65 → 67，见 ADR-037）
             commands::migration_cmd::get_migration_info,
             commands::migration_cmd::open_legacy_dir,

@@ -15,8 +15,12 @@ pub mod reminder;
 
 /* 桌面独占（V1-Android）：
 - `monitor`：轮询 `available_monitors()` 做多屏钳制，Android 无该 API；
-- `md_sync`：Markdown 落点是桌面路径，移动端待 SAF（本轮不做，见设计 §1.4）。 */
+- `md_sync`：桌面落点是文件路径，直接读写；手机端走下面的 `md_sync_mobile`。 */
 #[cfg(desktop)]
 pub mod md_sync;
 #[cfg(desktop)]
 pub mod monitor;
+
+/* [V0.12.0] 手机端同步轮询：每轮要先由原生侧镜像 vault，流程与桌面不同。 */
+#[cfg(mobile)]
+pub mod md_sync_mobile;

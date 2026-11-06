@@ -23,6 +23,7 @@ pub mod config;
 pub mod export;
 pub mod format;
 pub mod import;
+pub mod mirror;
 pub mod runtime;
 
 use std::path::Path;
@@ -59,7 +60,7 @@ pub async fn save_config_with_report(
     config: &MdSyncConfig,
 ) -> AppResult<(MdSyncView, MdSyncReport)> {
     config::save(pool, config).await?;
-    let report = sync_all(pool).await?;
+    let report = sync_all(pool, None).await?;
     let view = get_view(pool).await?;
     Ok((view, report))
 }
@@ -69,12 +70,12 @@ pub use config::poll_secs;
 
 /// 手动「立即同步」。返回本轮报告，不因单个落点失败而整体报错。
 pub async fn run(pool: &SqlitePool) -> AppResult<MdSyncReport> {
-    sync_all(pool).await
+    sync_all(pool, None).await
 }
 
 /// 轮询任务用：只在真的从 Markdown 导入了数据时返回 `Some`，避免空转发事件。
 pub async fn tick(pool: &SqlitePool) -> AppResult<Option<MdSyncReport>> {
-    let report = sync_all(pool).await?;
+    let report = sync_all(pool, None).await?;
     Ok(report.touched().then_some(report))
 }
 
@@ -102,7 +103,7 @@ pub async fn open(pool: &SqlitePool, kind: MdSyncKind) -> AppResult<()> {
         ));
     }
     /* 先同步一轮：文件存在但标题还没写出来时，也要先补上区块再打开。 */
-    sync_all(pool).await?;
+    sync_all(pool, None).await?;
     if !path.exists() {
         return Err(AppError::io("今日文件尚未生成，请先保存并同步"));
     }
@@ -113,7 +114,10 @@ pub async fn open(pool: &SqlitePool, kind: MdSyncKind) -> AppResult<()> {
     crate::infra::shell_open::open_file(&path).map_err(AppError::io)
 }
 
-async fn sync_all(pool: &SqlitePool) -> AppResult<MdSyncReport> {
+/// 一轮同步。[`root_override`] 只给移动端用：Android 的落点是 SAF 的 `content://`
+/// 目录，Rust 不认，由原生侧把当天文件镜像到沙箱内再交给这里，于是根目录换成镜像目录、
+/// 其余（文件模板 / 标题 / 合并规则）原样来自配置——规则只此一份。
+pub(super) async fn sync_all(pool: &SqlitePool, root_override: Option<&str>) -> AppResult<MdSyncReport> {
     /* 先拿锁再读配置：防止上一轮 tick 的旧配置在新配置保存后又写一次旧落点。 */
     let mut rt = runtime::lock().await;
     let config = config::load(pool).await?;
@@ -133,6 +137,15 @@ async fn sync_all(pool: &SqlitePool) -> AppResult<MdSyncReport> {
 
     let date = Local::now().date_naive();
     for binding in &config.bindings {
+        /* 移动端把根目录换成镜像目录；`is_configured()` 因此也能通过——手机上用户
+        从未填过 root，配置里那一栏是空的。 */
+        let binding = &match root_override {
+            Some(root) => MdSyncBinding {
+                root: root.to_string(),
+                ..binding.clone()
+            },
+            None => binding.clone(),
+        };
         let mut status = MdSyncBindingStatus::empty(binding.kind);
         if !binding.enabled {
             next_status.bindings.push(status);

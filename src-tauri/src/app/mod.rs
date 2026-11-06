@@ -11,6 +11,9 @@
 
 pub mod bootstrap;
 pub mod events;
+/* [V0.12.0] 手机端一轮同步（镜像 → 合并 → 写回）：命令层与调度层共用这一份编排。 */
+#[cfg(mobile)]
+pub mod md_sync_mobile;
 
 /* 桌面独占（V1-Android）：
 - `tray`：`TrayIconBuilder` / 原生菜单在 Android 上不存在；

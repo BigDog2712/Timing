@@ -62,6 +62,7 @@ import type {
 } from './models';
 import type { PluginListResult } from './plugin';
 import type { MdSyncConfig, MdSyncKind, MdSyncReport, MdSyncView } from './mdSync';
+import type { OverlayStatus, SafStatus } from './mobile';
 import type { MigrationInfo } from './migration';
 
 /**
@@ -194,6 +195,14 @@ export interface IpcApi {
   mdSyncSave(params: { config: MdSyncConfig }): Promise<MdSyncView>;
   mdSyncRun(): Promise<MdSyncReport>;
   mdSyncOpen(params: { kind: MdSyncKind }): Promise<void>;
+
+  /* -- 手机端原生能力 [V0.12.0]：SAF 目录 / 悬浮条。桌面调用会回 IO_ERROR --
+     存在即「这端有这套能力」，不存在由 isTauri/IS_MOBILE 分支兜住；
+     不要把「未授权」当成「不支持」——那是两种完全不同的处理。 */
+  mdSafPick(): Promise<SafStatus>;
+  mdSafStatus(): Promise<SafStatus>;
+  overlaySet(params: { enabled: boolean }): Promise<OverlayStatus>;
+  overlayStatus(): Promise<OverlayStatus>;
 
   /* 迁移可见性 [V0.5.0] —— 命令 65 → 67（ADR-037）。
      两条都无入参：路径由后端重算，绝不接受前端传路径（防「改 marker 文件 →

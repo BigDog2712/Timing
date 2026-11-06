@@ -114,9 +114,12 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     jobs::reminder::spawn_reminder_watcher(app.clone());
     jobs::nudge::spawn_nudge_watcher(app.clone());
     jobs::countdown::spawn_countdown_watcher(app.clone());
-    // md-sync 落点是桌面文件路径，移动端要 SAF（本轮不做，设计 §1.4）
+    /* [V0.12.0] md 同步：桌面直接读写文件路径；手机先由原生侧把当天文件镜像进沙箱，
+    再跑同一套合并逻辑（见 `app::md_sync_mobile`）。 */
     #[cfg(desktop)]
     jobs::md_sync::spawn_md_sync_watcher(app.clone());
+    #[cfg(mobile)]
+    jobs::md_sync_mobile::spawn_md_sync_watcher(app.clone());
     boot_timing::mark("jobs_spawned");
 
     // 移动端跳过了托盘 / 钳制 / 诊断，补一个标记点：启动耗时报告里段落不缺项，

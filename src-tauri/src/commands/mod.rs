@@ -24,6 +24,14 @@ pub mod md_sync_cmd;
 #[path = "md_sync_cmd_mobile.rs"]
 pub mod md_sync_cmd;
 
+/* [V0.12.0] 手机端原生能力（SAF 目录 / 悬浮条）。桌面没有对应语义，
+用桩回 `IO_ERROR`，命令名与注册点两平台一致。 */
+#[cfg(desktop)]
+#[path = "mobile_cmd_desktop.rs"]
+pub mod mobile_cmd;
+#[cfg(mobile)]
+pub mod mobile_cmd;
+
 #[cfg(desktop)]
 pub mod system_cmd;
 #[cfg(mobile)]

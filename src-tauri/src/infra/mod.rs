@@ -15,6 +15,9 @@ pub mod md_backup;
 pub mod md_env;
 pub mod md_file;
 pub mod migrate;
+/* 移动端独占：Android 的 SAF 与悬浮窗只在原生侧有实现，桥也只在移动端编译。 */
+#[cfg(mobile)]
+pub mod native_bridge;
 pub mod notify;
 pub mod plugin_fs;
 pub mod portable_migrate;

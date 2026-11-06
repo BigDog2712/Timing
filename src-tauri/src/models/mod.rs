@@ -8,6 +8,7 @@ pub mod md_sync;
 pub mod md_sync_config;
 pub mod migration;
 pub mod moyu;
+pub mod native;
 pub mod note;
 pub mod nudge;
 pub mod plugin;

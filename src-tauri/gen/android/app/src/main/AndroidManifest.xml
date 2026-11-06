@@ -6,6 +6,13 @@
          前端降级为应用内提示条（PRD D7），不静默失败。 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- V0.12.0 悬浮条：`SYSTEM_ALERT_WINDOW` 是「显示在其他应用上层」，必须在系统设置里
+         由用户显式授予（无法在应用内弹权限框）；前台服务用来让窗口在退到后台后继续存在，
+         Android 14 起 `specialUse` 类型还要求 manifest 里配 subtype property。 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <!-- AndroidTV support -->
     <uses-feature android:name="android.software.leanback" android:required="false" />
 
@@ -27,6 +34,15 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".overlay.PillService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="悬浮条：在应用之外显示当前计时，点击回到主界面" />
+        </service>
 
         <provider
           android:name="androidx.core.content.FileProvider"

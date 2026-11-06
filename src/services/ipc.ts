@@ -25,11 +25,13 @@ import type {
   NoteRefParams,
   NoteUpdateParams,
   OpenNoteWindowParams,
+  OverlayStatus,
   Paginated,
   Reminder,
   ReminderClearParams,
   ReminderSetParams,
   ResolveOpenRecordParams,
+  SafStatus,
   SaveWindowPositionParams,
   SetAutostartParams,
   SetCountdownPresetParams,
@@ -277,6 +279,13 @@ export const ipc: IpcApi = {
   mdSyncRun: () => call<MdSyncReport>('md_sync_run'),
   mdSyncOpen: (params: { kind: MdSyncKind }) =>
     call<void>('md_sync_open', { kind: params.kind }),
+
+  /* ---- 手机端原生能力 [V0.12.0]：SAF 目录 / 悬浮条 ---- */
+  mdSafPick: () => call<SafStatus>('md_saf_pick'),
+  mdSafStatus: () => call<SafStatus>('md_saf_status'),
+  overlaySet: (params: { enabled: boolean }) =>
+    call<OverlayStatus>('overlay_set', { enabled: params.enabled }),
+  overlayStatus: () => call<OverlayStatus>('overlay_status'),
 
   /* ---- 迁移可见性 [V0.5.0]（命令 65 → 67，ADR-037） ---- */
   getMigrationInfo: () => call<MigrationInfo>('get_migration_info'),

@@ -116,6 +116,9 @@ function result(): PluginListResult {
   };
 }
 
+/* [V0.12.0] 悬浮条开关的假状态：浏览器里没有前台服务，但设置页得能来回切。 */
+let overlayOn = false;
+
 export function createMockApiPlugins(): Record<string, (args?: unknown) => unknown> {
   return {
     plugin_list: () => result(),
@@ -142,5 +145,14 @@ export function createMockApiPlugins(): Record<string, (args?: unknown) => unkno
       errors: [],
     }),
     md_sync_open: () => undefined,
+    /* [V0.12.0] 手机端原生能力：浏览器给「已授权 + 悬浮条可开」的假事实，
+       让两个入口都能走查（真机上这两个值来自 Kotlin）。 */
+    md_saf_pick: () => ({ granted: true, label: 'Mock/Vault · …' }),
+    md_saf_status: () => ({ granted: true, label: 'Mock/Vault · …' }),
+    overlay_set: (args) => {
+      overlayOn = Boolean((args as { enabled?: boolean } | undefined)?.enabled);
+      return { permitted: true, enabled: overlayOn };
+    },
+    overlay_status: () => ({ permitted: true, enabled: overlayOn }),
   };
 }

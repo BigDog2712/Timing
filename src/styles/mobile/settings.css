@@ -89,3 +89,26 @@
 .m-notify__state[data-denied="true"] {
   color: var(--color-warn);
 }
+
+/* ============================== 同步页签 [V0.12.0] ============================== */
+/* 目录名可能很长（`Obsidian、Timing、2026 · …`）：这一行允许换行，值自己省略，
+   按钮永远留在可见位置——手机上把按钮挤出去等于这个功能不可用。 */
+.m-sync__row {
+  flex-wrap: wrap;
+}
+
+.m-sync__path,
+.m-sync__heading {
+  margin-left: auto;
+  max-width: 52%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* 未选目录是个「要动手」的状态，用告警色点一下，而不是和普通说明混在一起。 */
+.m-sync__path[data-ok="false"] {
+  color: var(--color-warn);
+}
