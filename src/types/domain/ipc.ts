@@ -62,7 +62,7 @@ import type {
 } from './models';
 import type { PluginListResult } from './plugin';
 import type { MdSyncConfig, MdSyncKind, MdSyncReport, MdSyncView } from './mdSync';
-import type { OverlayStatus, SafStatus } from './mobile';
+import type { OverlayStatus, OverlayStyle, SafStatus } from './mobile';
 import type { MigrationInfo } from './migration';
 
 /**
@@ -201,7 +201,7 @@ export interface IpcApi {
      不要把「未授权」当成「不支持」——那是两种完全不同的处理。 */
   mdSafPick(): Promise<SafStatus>;
   mdSafStatus(): Promise<SafStatus>;
-  overlaySet(params: { enabled: boolean }): Promise<OverlayStatus>;
+  overlaySet(params: { enabled: boolean; style?: OverlayStyle }): Promise<OverlayStatus>;
   overlayStatus(): Promise<OverlayStatus>;
 
   /* 迁移可见性 [V0.5.0] —— 命令 65 → 67（ADR-037）。

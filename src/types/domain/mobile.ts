@@ -16,10 +16,15 @@ export interface SafStatus {
   label: string;
 }
 
+/** 悬浮条形态。`dot` = 小圆点常驻（点一下临时展开），`bar` = 长条常驻 */
+export type OverlayStyle = 'dot' | 'bar';
+
 /** 悬浮条状态 */
 export interface OverlayStatus {
   /** 系统「显示在其他应用上层」权限是否已给。没有它，窗口根本贴不上去 */
   permitted: boolean;
   /** 用户是否打开过开关。**不代表服务在跑**：服务可能被厂商的后台策略杀掉 */
   enabled: boolean;
+  /** 当前形态。与老版本两种形态一一对应，默认 `dot` */
+  style: OverlayStyle;
 }

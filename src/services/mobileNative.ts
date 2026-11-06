@@ -12,6 +12,7 @@ import type {
   MdSyncReport,
   MdSyncView,
   OverlayStatus,
+  OverlayStyle,
   SafStatus,
 } from '../types/domain';
 
@@ -19,7 +20,8 @@ export const mobileNative = {
   safStatus: (): Promise<SafStatus> => ipc.mdSafStatus(),
   safPick: (): Promise<SafStatus> => ipc.mdSafPick(),
   overlayStatus: (): Promise<OverlayStatus> => ipc.overlayStatus(),
-  setOverlay: (enabled: boolean): Promise<OverlayStatus> => ipc.overlaySet({ enabled }),
+  setOverlay: (enabled: boolean, style?: OverlayStyle): Promise<OverlayStatus> =>
+    ipc.overlaySet({ enabled, style }),
   syncView: (): Promise<MdSyncView> => ipc.mdSyncGet(),
   syncSave: (config: MdSyncConfig): Promise<MdSyncView> => ipc.mdSyncSave({ config }),
   syncRun: (): Promise<MdSyncReport> => ipc.mdSyncRun(),

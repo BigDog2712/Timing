@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Build
 import com.timing.app.MainActivity
 
@@ -45,11 +46,25 @@ internal object OverlayNoti {
         }
         return builder
             .setSmallIcon(android.R.drawable.ic_menu_recent_history)
+            // 标题口径照老版本：「事项 · 时长」，一眼就能读出在做什么、做了多久
             .setContentTitle(title(snap))
-            .setContentText(clock(snap.displaySec))
+            .setContentText(subText(snap))
+            // HyperOS 会把「计时」类前台服务通知收纳成岛状样式，靠 category 认门类。
+            // 这不是注册超级岛（那要企业资质 + 上架审核），命中算白捡，命中不了不影响功能。
+            .setCategory(
+                if (snap.active) Notification.CATEGORY_STOPWATCH else Notification.CATEGORY_REMINDER,
+            )
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
             .setShowWhen(false)
             .setContentIntent(open)
+            .addAction(
+                Notification.Action.Builder(
+                    Icon.createWithResource(ctx, android.R.drawable.ic_menu_recent_history),
+                    "打开",
+                    open,
+                ).build(),
+            )
             .build()
     }
 
@@ -60,7 +75,7 @@ internal object OverlayNoti {
         snap: TimerReader.Snap,
         last: String,
     ): String {
-        val fingerprint = title(snap) + "|" + clock(snap.displaySec)
+        val fingerprint = title(snap) + "|" + subText(snap)
         if (fingerprint == last) return last
         runCatching { nm.notify(ID, build(ctx, snap)) }
         return fingerprint
@@ -73,8 +88,19 @@ internal object OverlayNoti {
             Intent.FLAG_ACTIVITY_REORDER_TO_FRONT,
     )
 
-    private fun title(snap: TimerReader.Snap): String =
-        if (!snap.active) "待机" else snap.item.ifEmpty { "计时中" }
+    /** 标题：「事项 · 时长」；待机时单独一个「待机」。 */
+    private fun title(snap: TimerReader.Snap): String = when {
+        !snap.active -> "待机"
+        else -> "${snap.item.ifEmpty { "计时中" }} · ${clock(snap.displaySec)}"
+    }
+
+    /** 副标题：状态本身（与老版本同一套措辞）。 */
+    private fun subText(snap: TimerReader.Snap): String = when {
+        !snap.active -> "点小圆点或长条回到 Timing 开始计时"
+        snap.urgent -> "倒计时最后一分钟"
+        snap.countdown -> if (snap.running) "倒计时进行中" else "已暂停"
+        else -> if (snap.running) "正计时进行中" else "已暂停"
+    }
 
     private fun clock(total: Long): String {
         val h = total / 3600

@@ -28,13 +28,20 @@ pub async fn md_saf_status(
 }
 
 /// 开关悬浮条。开启时若缺「显示在其他应用上层」权限，Kotlin 侧会拉起系统授权页。
+///
+/// `style` 与开关共用一条命令：`dot` / `bar` 切形态，留空表示只改开关。
+/// 不为它单开命令是因为命令表有静态契约门禁，多一条要同步改五处，而它并不需要独立语义。
 #[tauri::command]
 pub async fn overlay_set(
     bridge: State<'_, NativeBridge<tauri::Wry>>,
     enabled: bool,
+    style: Option<String>,
 ) -> AppResult<OverlayStatus> {
     bridge
-        .call("overlaySet", serde_json::json!({ "enabled": enabled }))
+        .call(
+            "overlaySet",
+            serde_json::json!({ "enabled": enabled, "style": style.unwrap_or_default() }),
+        )
         .await
 }
 

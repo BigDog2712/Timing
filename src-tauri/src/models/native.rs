@@ -26,6 +26,8 @@ pub struct OverlayStatus {
     pub permitted: bool,
     /// 用户是否打开过这个开关。**不代表服务在跑**：服务可能被厂商策略杀掉。
     pub enabled: bool,
+    /// 当前形态：`dot`（小圆点常驻）/ `bar`（长条常驻）。与老版本两种形态一一对应。
+    pub style: String,
 }
 
 /// 镜像结果：本轮真正从 SAF 复制进来的文件（相对路径）。

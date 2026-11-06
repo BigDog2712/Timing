@@ -23,7 +23,7 @@ import { ensureNotifyPermission, notifyPermissionText } from '../../services/mob
 import { useMobileUiStore } from '../../stores/mobileUiStore';
 import { mobileNative } from '../../services/mobileNative';
 import { errorText } from '../../services/ipc';
-import type { OverlayStatus } from '../../types/domain';
+import type { OverlayStatus, OverlayStyle } from '../../types/domain';
 
 type TabId = 'look' | 'sync' | 'plugins' | 'gen';
 
@@ -59,7 +59,10 @@ function NotifyRow() {
 }
 
 /**
- * 悬浮条开关。
+ * 悬浮条开关 + 形态。
+ *
+ * 形态与老版本两种一一对应：**小圆点**待机时常驻（点一下临时展开成条看时长），
+ * **长条**一直显示秒数与事项名。默认小圆点——待机时不该在别人屏幕上占一条。
  *
  * 开启时若缺「显示在其他应用上层」权限，原生侧会拉起系统授权页；用户回来后
  * `TimingNativePlugin.onResume` 会把服务真正起来，这里再点一次就是查询新状态。
@@ -84,6 +87,31 @@ function OverlayRow() {
 
   const text = !status ? '—' : status.enabled ? (status.permitted ? '已开启' : '待系统授权') : '已关闭';
 
+  const toggle = (enabled: boolean) => {
+    setBusy(true);
+    setNote('');
+    void mobileNative
+      .setOverlay(enabled)
+      .then((next) => {
+        setStatus(next);
+        if (next.enabled && !next.permitted) {
+          setNote('到系统设置里打开「显示在其他应用上层」，返回后即生效。');
+        }
+      })
+      .catch((err) => setNote(errorText(err)))
+      .finally(() => setBusy(false));
+  };
+
+  const pickStyle = (style: OverlayStyle) => {
+    if (!status || status.style === style) return;
+    setBusy(true);
+    void mobileNative
+      .setOverlay(status.enabled, style)
+      .then(setStatus)
+      .catch((err) => setNote(errorText(err)))
+      .finally(() => setBusy(false));
+  };
+
   return (
     <>
       <div className="setting-row m-notify">
@@ -93,26 +121,39 @@ function OverlayRow() {
           type="button"
           className="m-btn m-btn--small"
           disabled={busy}
-          onClick={() => {
-            setBusy(true);
-            setNote('');
-            void mobileNative
-              .setOverlay(!status?.enabled)
-              .then((next) => {
-                setStatus(next);
-                if (next.enabled && !next.permitted) {
-                  setNote('到系统设置里打开「显示在其他应用上层」，返回后即生效。');
-                }
-              })
-              .catch((err) => setNote(errorText(err)))
-              .finally(() => setBusy(false));
-          }}
+          onClick={() => toggle(!status?.enabled)}
         >
           {status?.enabled ? '关闭' : '开启'}
         </button>
       </div>
+      {status?.enabled && (
+        <div className="setting-row m-overlay-style">
+          <span className="setting-row__label">形态</span>
+          <div className="m-seg">
+            <button
+              type="button"
+              className="m-seg__item"
+              data-on={status.style === 'dot' ? 'true' : 'false'}
+              disabled={busy}
+              onClick={() => pickStyle('dot')}
+            >
+              小圆点
+            </button>
+            <button
+              type="button"
+              className="m-seg__item"
+              data-on={status.style === 'bar' ? 'true' : 'false'}
+              disabled={busy}
+              onClick={() => pickStyle('bar')}
+            >
+              长条
+            </button>
+          </div>
+        </div>
+      )}
       <p className="m-hint">
-        {note || '浮在别的应用上显示当前计时，点一下回到 Timing；暂停、切换仍在主界面。'}
+        {note ||
+          '小圆点：待机时只有一颗球，点一下展开看时长；长条：一直显示秒数与事项名。点一下回 Timing，暂停与切换仍在主界面。'}
       </p>
     </>
   );

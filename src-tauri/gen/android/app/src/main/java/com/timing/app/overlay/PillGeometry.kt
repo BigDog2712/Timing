@@ -48,6 +48,12 @@ internal object PillGeometry {
         return true
     }
 
+    /** 回到默认位：水平居中、状态栏下 4dp（老版本叫「灵动岛位」）。 */
+    fun reset(ctx: Context, p: WindowManager.LayoutParams) {
+        p.x = 0
+        p.y = statusBar(ctx) + Tk.dp(ctx, 4f).toInt()
+    }
+
     fun statusBar(ctx: Context): Int {
         val id = ctx.resources.getIdentifier("status_bar_height", "dimen", "android")
         return if (id > 0) ctx.resources.getDimensionPixelSize(id) else Tk.dp(ctx, 24f).toInt()

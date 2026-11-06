@@ -118,6 +118,7 @@ function result(): PluginListResult {
 
 /* [V0.12.0] 悬浮条开关的假状态：浏览器里没有前台服务，但设置页得能来回切。 */
 let overlayOn = false;
+let overlayStyle = 'dot';
 
 export function createMockApiPlugins(): Record<string, (args?: unknown) => unknown> {
   return {
@@ -150,9 +151,11 @@ export function createMockApiPlugins(): Record<string, (args?: unknown) => unkno
     md_saf_pick: () => ({ granted: true, label: 'Mock/Vault · …' }),
     md_saf_status: () => ({ granted: true, label: 'Mock/Vault · …' }),
     overlay_set: (args) => {
-      overlayOn = Boolean((args as { enabled?: boolean } | undefined)?.enabled);
-      return { permitted: true, enabled: overlayOn };
+      const next = args as { enabled?: boolean; style?: string } | undefined;
+      overlayOn = Boolean(next?.enabled);
+      if (next?.style === 'dot' || next?.style === 'bar') overlayStyle = next.style;
+      return { permitted: true, enabled: overlayOn, style: overlayStyle };
     },
-    overlay_status: () => ({ permitted: true, enabled: overlayOn }),
+    overlay_status: () => ({ permitted: true, enabled: overlayOn, style: overlayStyle }),
   };
 }

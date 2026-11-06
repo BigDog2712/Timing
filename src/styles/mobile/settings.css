@@ -90,6 +90,22 @@
   color: var(--color-warn);
 }
 
+/* 形态切换：两段式分段控件，靠右放。宽度按内容给（「小圆点」「长条」三四个字），
+   不抢满整行——它是个次要选项，和上面的开关行不该长得一样重。 */
+.m-overlay-style .m-seg {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 3px;
+}
+
+.m-overlay-style .m-seg__item {
+  flex: 0 0 auto;
+  /* 命中区仍按 --m-tap：手机上没有「次要控件可以小一点」这回事 */
+  min-height: var(--m-tap);
+  padding: 0 var(--space-4);
+  font-size: var(--text-sm);
+}
+
 /* ============================== 同步页签 [V0.12.0] ============================== */
 /* 目录名可能很长（`Obsidian、Timing、2026 · …`）：这一行允许换行，值自己省略，
    按钮永远留在可见位置——手机上把按钮挤出去等于这个功能不可用。 */

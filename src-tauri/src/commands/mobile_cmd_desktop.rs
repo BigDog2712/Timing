@@ -21,7 +21,7 @@ pub async fn md_saf_status() -> AppResult<SafStatus> {
 }
 
 #[tauri::command]
-pub async fn overlay_set(_enabled: bool) -> AppResult<OverlayStatus> {
+pub async fn overlay_set(_enabled: bool, _style: Option<String>) -> AppResult<OverlayStatus> {
     Err(crate::platform::host::mobile_only("悬浮条"))
 }
 

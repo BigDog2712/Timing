@@ -37,6 +37,9 @@ class OpenArgs {
 @InvokeArg
 class OverlayArgs {
     var enabled: Boolean = false
+
+    /** 形态：`"dot"` 小圆点 / `"bar"` 长条；空串表示这次调用不改形态（只管开关）。 */
+    var style: String = ""
 }
 
 /**
@@ -171,6 +174,11 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
     fun overlaySet(invoke: Invoke) {
         val args = invoke.parseArgs(OverlayArgs::class.java)
         Prefs.setOverlayEnabled(activity, args.enabled)
+        /* 形态与开关是同一条命令：形态只是「长什么样」，不值得为它单开一条 IPC
+           （命令数有静态契约门禁，多一条就要同步改五处）。 */
+        val styleChanged = args.style == "dot" || args.style == "bar"
+        if (args.style == "dot") Prefs.setOverlayStyle(activity, Prefs.STYLE_DOT)
+        if (args.style == "bar") Prefs.setOverlayStyle(activity, Prefs.STYLE_BAR)
 
         if (args.enabled && !Settings.canDrawOverlays(activity)) {
             /* 拉起系统授权页；用户回来后 `onResume` 会真正把服务起来。
@@ -185,6 +193,8 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
             }
         } else {
             PillService.sync(activity)
+            // 服务本来就在跑：切形态要立刻重排，不能等下一次 500ms tick
+            if (styleChanged) PillService.refresh(activity)
         }
         resolveOverlay(invoke)
     }
@@ -221,6 +231,10 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
         val res = JSObject()
         res.put("permitted", Settings.canDrawOverlays(activity))
         res.put("enabled", Prefs.overlayEnabled(activity))
+        res.put(
+            "style",
+            if (Prefs.overlayStyle(activity) == Prefs.STYLE_BAR) "bar" else "dot",
+        )
         invoke.resolve(res)
     }
 }

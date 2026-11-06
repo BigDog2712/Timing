@@ -5,21 +5,30 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PathMeasure
+import android.graphics.RadialGradient
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.View
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * 小条本体（自绘，不走 XML）。
  *
- * 形态对齐老版本 `PillView` 的 BAR 分支：高 32dp 的药丸，左侧一个圆角方形状态环，
- * 中间等宽数字，右侧事项名。**没有搬小圆点（DOT）形态**——那一套是「待机时贴一颗玻璃球」
- * 的取巧，实现成本远高于药丸，而当前需求是「切出去还能看见在跑什么」，药丸已经够用。
+ * 两种形态共用一套绘制与测量逻辑，**逐处对齐老工程 `android-app` 的 `overlay/PillView`**
+ * （2026-11 归档的 0.3.6 原生版，路径 `D:\101-Workshop\261102-Timing`）：
  *
- * 手势不在这里处理：拖动 / 单击由 [PillService] 接管，因为只有它能改 WindowManager
- * 的坐标。这里只负责「长什么样」。
+ * - `dotMode = true`  28dp 小圆点：一颗玻璃表盘。待机时常驻，点一下临时展开成条；
+ * - `dotMode = false` 高 32dp 药丸：圆角方形状态环 + 等宽时间 + 事项名。
+ *
+ * 为什么要两种：待机时谁也不希望屏幕上多一条黑杠，一颗 28dp 的球足够表达「它还在」；
+ * 而计时中要看的是一眼能读的秒数，圆点里那点弧度读不出「已经 47 分钟」。
+ *
+ * 手势不在这里处理 —— 拖动 / 单击 / 长按都由 [PillService] 接管，
+ * 因为只有它能改 WindowManager 的坐标。这里只负责「长什么样」。
  */
 internal class PillView(context: Context) : View(context) {
 
@@ -31,7 +40,16 @@ internal class PillView(context: Context) : View(context) {
             invalidate()
         }
 
-    /** 倒计时最后一分钟的 1 秒闪烁（低于 WCAG 2.3.1 光敏阈值）。 */
+    /** true = 小圆点；false = 药丸。 */
+    var dotMode: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            requestLayout()
+            invalidate()
+        }
+
+    /** 倒计时最后 60s 的 1 秒闪烁（低于 WCAG 2.3.1 光敏阈值）。 */
     var blinkOn: Boolean = true
         set(value) {
             if (field == value) return
@@ -59,8 +77,12 @@ internal class PillView(context: Context) : View(context) {
     private val ringSeg = Path()
     private val ringRect = RectF()
 
+    /** 小圆点的玻璃球面。尺寸变化时重建 —— 每帧 new 一个 Shader 会拖住 overlay 的绘制。 */
+    private var glass: RadialGradient? = null
+
     private fun d(v: Float): Float = v * resources.displayMetrics.density
 
+    // ---- 药丸
     private val padH = d(9f)
     private val ringSize = d(16f)
     private val ringRadius = d(5f)
@@ -69,12 +91,42 @@ internal class PillView(context: Context) : View(context) {
     private val barH = d(32f)
     private val nameMax = d(92f)
 
+    // ---- 小圆点内部比例：轨道贴近外缘，时针只走里圈，两者中间留一圈空隙，
+    //      否则看着像表盘裂了。数值与老版本逐项一致。
+    private val dotSize = d(28f)
+    private val dotRim = d(1.1f)
+    private val dotTrack = d(9.2f)
+    private val dotNeedleIn = d(1.6f)
+    private val dotNeedleOut = d(6.4f)
+    private val dotPivot = d(1.5f)
+
+    // ------------------------------------------------------------ 测量
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        val r = minOf(w, h) / 2f
+        if (r <= 0f) return
+        // 中心全透 → 中段几乎透明 → 边缘 14% 白：看起来是一层薄玻璃，不是一块底
+        glass = RadialGradient(
+            w / 2f, h / 2f, r,
+            intArrayOf(0x00FFFFFF, 0x05FFFFFF, Tk.PILL_DOT_GLASS),
+            floatArrayOf(0f, 0.58f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        if (dotMode) {
+            val s = dotSize.toInt()
+            setMeasuredDimension(s, s)
+            return
+        }
         timePaint.textSize = Tk.sp(context, 15f)
         namePaint.textSize = Tk.sp(context, 12f)
 
         val timeW = timePaint.measureText(timeText())
-        val nameW = if (snap.active && snap.item.isNotEmpty()) namePaint.measureText(ellipsized()) else 0f
+        val nameW =
+            if (snap.active && snap.item.isNotEmpty()) namePaint.measureText(ellipsized()) else 0f
         val content = padH * 2 + ringSize + gapRing + timeW +
             (if (nameW > 0f) gapName + nameW else 0f)
 
@@ -84,9 +136,83 @@ internal class PillView(context: Context) : View(context) {
         )
     }
 
+    // ------------------------------------------------------------ 绘制
+
     override fun onDraw(canvas: Canvas) {
         val w = width.toFloat()
         val h = height.toFloat()
+        if (dotMode) drawDot(canvas, w, h) else drawBar(canvas, w, h)
+    }
+
+    /**
+     * 小圆点 = 一颗玻璃表盘。
+     *
+     * 层序从外到内：墨色外圈 → 玻璃球面 → 内缘高光 → 表盘轨道 → 时针 + 进度弧 → 轴心。
+     *
+     * 之所以外面还留一条墨圈：这个圆点会浮在别人的界面之上，可能压在纯白淘宝上，
+     * 也可能压在黑色相机取景框上。只有白环会在白底上隐形，只有黑环会在黑底上隐形，
+     * 两条叠着才在哪都能认出来 —— 代价是 0.7dp，近看会有一点点「描边感」。
+     */
+    private fun drawDot(canvas: Canvas, w: Float, h: Float) {
+        val c = w / 2f
+        val edge = minOf(w, h) / 2f - d(0.35f)
+
+        stroke.strokeWidth = d(0.7f)
+        stroke.color = Tk.PILL_DOT_EDGE
+        canvas.drawCircle(c, c, edge, stroke)
+
+        fill.shader = glass
+        canvas.drawCircle(c, c, edge - d(0.35f), fill)
+        fill.shader = null
+
+        stroke.strokeWidth = d(0.9f)
+        stroke.color = Tk.PILL_DOT_RIM
+        canvas.drawCircle(c, c, edge - dotRim, stroke)
+
+        // 轨道两层叠着画：墨色当衬底、白线当主轨。
+        // 深色壁纸上墨色几乎不可见 → 看到白环；浅色 App 上白色不可见 → 看到灰环。
+        stroke.strokeWidth = d(3.4f)
+        stroke.color = Tk.PILL_DOT_TRACK_INK
+        canvas.drawCircle(c, c, dotTrack, stroke)
+
+        stroke.strokeWidth = d(1.6f)
+        stroke.color = Tk.PILL_DOT_TRACK
+        canvas.drawCircle(c, c, dotTrack, stroke)
+
+        val arc = arcFraction()
+        val needle = needleFraction()
+
+        // 时针（分针语义）：正计时 60 分钟一圈，倒计时指在「剩余」的位置
+        if (needle > 0f) {
+            val rad = Math.toRadians(-90.0 + 360.0 * needle)
+            val dx = cos(rad).toFloat()
+            val dy = sin(rad).toFloat()
+
+            stroke.strokeWidth = d(1.5f)
+            stroke.color = ringColor()
+            canvas.drawLine(
+                c + dx * dotNeedleIn, c + dy * dotNeedleIn,
+                c + dx * dotNeedleOut, c + dy * dotNeedleOut,
+                stroke,
+            )
+        }
+
+        // 进度弧：正计时 60 秒一圈循环（动感），倒计时按剩余比例回落
+        if (arc > 0f) {
+            stroke.strokeWidth = d(2f)
+            stroke.color = ringColor()
+            canvas.drawArc(
+                c - dotTrack, c - dotTrack, c + dotTrack, c + dotTrack,
+                -90f, 360f * arc, false, stroke,
+            )
+        }
+
+        // 轴心常驻：待机时整颗点只剩它，是个「还活着」的暗示，不是空环
+        fill.color = Tk.PILL_DOT_PIVOT
+        canvas.drawCircle(c, c, dotPivot, fill)
+    }
+
+    private fun drawBar(canvas: Canvas, w: Float, h: Float) {
         val radius = h / 2f
 
         fill.color = Tk.PILL_BG
@@ -107,7 +233,7 @@ internal class PillView(context: Context) : View(context) {
         stroke.color = Tk.PILL_TRACK
         canvas.drawPath(ringPath, stroke)
 
-        val frac = fraction()
+        val frac = arcFraction()
         if (frac > 0f) {
             val pm = PathMeasure(ringPath, false)
             ringSeg.reset()
@@ -116,6 +242,7 @@ internal class PillView(context: Context) : View(context) {
             canvas.drawPath(ringSeg, stroke)
         }
 
+        // 文字
         timePaint.textSize = Tk.sp(context, 15f)
         timePaint.color = if (snap.active) Tk.PILL_INK else Tk.PILL_INK_DIM
         val baseY = h / 2f - (timePaint.descent() + timePaint.ascent()) / 2f
@@ -146,12 +273,24 @@ internal class PillView(context: Context) : View(context) {
         return TextUtils.ellipsize(snap.item, namePaint, nameMax, TextUtils.TruncateAt.END).toString()
     }
 
-    /** 环的进度：倒计时按剩余比例回落，正计时 60 秒一圈循环。 */
-    private fun fraction(): Float = when {
+    /** 环的进度：倒计时按剩余比例回落，正计时按 60 秒一圈循环。 */
+    private fun arcFraction(): Float = when {
         !snap.active -> 0f
-        snap.countdown -> if (snap.targetSec <= 0L) 0f
-        else (snap.displaySec.toFloat() / snap.targetSec).coerceIn(0f, 1f)
+        snap.countdown && snap.targetSec > 0L ->
+            (snap.displaySec.toFloat() / snap.targetSec).coerceIn(0f, 1f)
         else -> (snap.elapsedSec % 60) / 60f
+    }
+
+    /**
+     * 时针的比例 —— **分针语义**：正计时 60 分钟转一圈（每分钟走 6°，一分钟跳一格），
+     * 倒计时跟弧同比例（剩多少，针就指哪儿）。老版本第一版误写成秒环，一分钟就转满
+     * 一圈，太快；这里直接沿用修正后的口径。
+     */
+    private fun needleFraction(): Float = when {
+        !snap.active -> 0f
+        snap.countdown && snap.targetSec > 0L ->
+            (snap.displaySec.toFloat() / snap.targetSec).coerceIn(0f, 1f)
+        else -> (snap.elapsedSec / 60 % 60) / 60f
     }
 
     private fun ringColor(): Int {
