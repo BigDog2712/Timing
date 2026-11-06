@@ -134,7 +134,7 @@ fn validate(manifest: &PluginManifest) -> Result<(), String> {
         ));
     }
     if manifest.entry == crate::models::plugin::EntryKind::Script {
-        return Err("entry=script 暂不支持，当前宿主只执行 manifest".into());
+        return Err("entry=script 尚未实现运行时，当前宿主只执行 manifest".into());
     }
     /* [v3] `contributes.mdSync` 不在这里校验：它已下架，内容一律忽略（见 `warnings`）。
     不再校验等于不再支持——报一个“mdSync 配置不合法”会让人以为写了就能用。 */

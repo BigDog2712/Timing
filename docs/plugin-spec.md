@@ -417,7 +417,9 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 | `entry: "script"` | entry=script 尚未实现运行时，当前宿主只执行 manifest |
 | `minutes: 0` 或 `1500` | quickTimers.minutes 必须为 1..=1440 |
 | `quickTimers` 超过 12 条 | quickTimers 最多 12 条 |
-| 声明了 `contributes.mdSync` | **[v3] 警告（黄字，插件仍生效）**：`mdSync` 已在 apiVersion 3 下架，插件仍正常生效；Markdown 同步请在 设置 → 同步 里配置 |
+| 声明了 `contributes.mdSync` | contributes.mdSync 已在 apiVersion 3 下架：Markdown 同步已归内核，本段被忽略；同步请在「设置 → 同步」里配置 |
+
+> 最后一行为警告，插件仍生效（其余各行为载入失败）。
 
 > **[v3] 上面这张表少了三行 v2 时代的 `mdSync` 校验**（`file` 是绝对路径 / `heading` 没有
 > `#` / 同一 `kind` 两个落点）：v3 起宿主**完全不校验** `contributes.mdSync`（§5 已下架），
@@ -479,7 +481,7 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 | 你在 `plugin.json` 里写 | 现在（V0.11.5）会发生什么 |
 |---|---|
 | `apiVersion: 1` + `quickTimers` | 解析成功，展示在 设置 → 插件 的「贡献项」里，**仍不进摸鱼菜单**（ADR-026） |
-| `apiVersion: 2` + `contributes.mdSync` | 忽略 + 黄字警告，插件仍生效；同步请在 设置 → 同步 配置 |
+| `apiVersion: 2` + `contributes.mdSync` | 忽略 + 黄字警告，插件仍生效（文案见 §10.8） |
 | `apiVersion: 3` + `permissions` / `engines` / `author` / `homepage` | 清单被识别、插件列进列表；**这几个字段本轮既不校验也不展示**（⬜） |
 | `entry: "script"` + `main.js` | **拒载**，红字提示「entry=script 尚未实现运行时」 |
 | 任何 `api.*` / `api.desktopPet` 调用 | 不可能发生——没有运行时，代码根本没被执行 |
@@ -491,6 +493,10 @@ v1 贡献点（v2 继续支持）：声明若干「事项名 + 分钟数」的�
 |---|---|
 | ✅ | 本轮（V0.11.5）已在本机代码里生效 |
 | ⬜ | 只在本文定义，本机**未实现**——写了不报错，也不会有任何效果 |
+
+> **[v3] ⬜ 的一个前提：字段名与类型必须写对。** 写错（例如 `permissions` 写成字符串、
+> `author` 写成数字）按「启动头 JSON 不合法」**拒载**，整个插件不生效；写对了则既不校验
+> 也不展示。不加这条限定，⬜ 会被读成「字段可以乱写」，而实际是「写对了也没用」。
 
 > 本轮真正标 ✅ 的 v3 项只有两处：**`apiVersion` 上限升到 3**、**`contributes.mdSync` 忽略 + 警告**。
 > 其余（权限、engines、依赖、UI、桌宠、生命周期、脚本运行时）全部 ⬜。
@@ -743,8 +749,8 @@ export default {
 4. 与「宁缺毋滥」不冲突：那条规则针对的是**宿主必须解释其语义才能运行**的字段
    （`entry` / `apiVersion`）。`mdSync` 现在不需要解释——宿主有能力、也有正当理由直接忽略它。
 
-设置页文案（给前端照抄）：
-「声明了已下架的贡献点 mdSync（apiVersion 3 起改由内核实现）。插件仍正常生效；Markdown 同步请在 设置 → 同步 里配置。」
+设置页文案（与 §7 表格同一句，两处逐字一致）：
+「contributes.mdSync 已在 apiVersion 3 下架：Markdown 同步已归内核，本段被忽略；同步请在「设置 → 同步」里配置」
 
 ### 10.9 明确不做的事（本轮 · 现时边界）
 

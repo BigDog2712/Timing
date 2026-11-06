@@ -1,7 +1,7 @@
 //! `infra::plugin_fs` 的单元测试（拆出以守住单文件 ≤300 行）。
 
 use super::*;
-use crate::models::plugin::{EntryKind, PluginContributes, QuickTimer};
+use crate::models::plugin::{default_object, EntryKind, PluginContributes, QuickTimer};
 
 fn sample() -> PluginManifest {
     PluginManifest {
@@ -14,10 +14,10 @@ fn sample() -> PluginManifest {
         enabled: true,
         contributes: PluginContributes::default(),
         permissions: Vec::new(),
-        engines: serde_json::Value::Null,
+        engines: default_object(),
         author: String::new(),
         homepage: String::new(),
-        dependencies: serde_json::Value::Null,
+        dependencies: default_object(),
     }
 }
 
@@ -45,6 +45,12 @@ fn parses_inline_manifest_json() {
     assert_eq!(manifest.id, "moyu-kit");
     assert_eq!(manifest.api_version, 1);
     assert!(!manifest.enabled);
+    /* [v3] 缺省必须是 `{}` 而不是 `null`（docs/plugin-spec.md §10.2）：
+    写成裸 `#[serde(default)]` 会得到 `Value::Null`，与规格差一个值，
+    v0.11.6 做硬校验时就得多写一个 `is_null()` 分支。 */
+    assert_eq!(manifest.engines, serde_json::json!({}));
+    assert_eq!(manifest.dependencies, serde_json::json!({}));
+    assert!(manifest.permissions.is_empty());
     assert_eq!(manifest.contributes.quick_timers.len(), 1);
     assert_eq!(manifest.contributes.quick_timers[0].minutes, 25);
     assert!(validate(&manifest).is_ok());

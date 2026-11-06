@@ -81,8 +81,8 @@ pub struct PluginManifest {
     /// [v3] 声明性能力清单（写给人看，不是限制）。
     #[serde(default)]
     pub permissions: Vec<String>,
-    /// [v3] 兼容声明，形如 `{ "timing": "^0.11" }`。
-    #[serde(default)]
+    /// [v3] 兼容声明，形如 `{ "timing": "^0.11" }`。缺省 = `{}`（不是 `null`）。
+    #[serde(default = "default_object")]
     pub engines: serde_json::Value,
     /// [v3] 展示用作者名。
     #[serde(default)]
@@ -90,13 +90,22 @@ pub struct PluginManifest {
     /// [v3] 展示用主页（http(s)）。
     #[serde(default)]
     pub homepage: String,
-    /// [v3] 依赖声明，形如 `{ "<plugin-id>": "^1.0" }`。
-    #[serde(default)]
+    /// [v3] 依赖声明，形如 `{ "<plugin-id>": "^1.0" }`。缺省 = `{}`（不是 `null`）。
+    #[serde(default = "default_object")]
     pub dependencies: serde_json::Value,
 }
 
 fn default_enabled() -> bool {
     true
+}
+
+/// [v3] `engines` / `dependencies` 的缺省值：空对象 `{}`。
+///
+/// 不能用 `#[serde(default)]`（那是 `Value::Null`）：`docs/plugin-spec.md` §10.2 写的默认值
+/// 是 `{}`，且 v0.11.6 做硬校验时 `{}` 是「没声明」的自然形态，`null` 还得单独分支。
+/// 取值口径与「不解析」并不矛盾：这里只定形状，不读里面的键。
+pub(crate) fn default_object() -> serde_json::Value {
+    serde_json::json!({})
 }
 
 /// 插件来源。同 id 冲突时按 Dev > Exe > User 先到先得。
