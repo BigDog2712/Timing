@@ -82,12 +82,14 @@
   .task{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-2);font-size:14px;padding:0 10px}
   .handle{width:32px;height:44px;flex:0 0 auto;display:grid;place-items:center;color:var(--ink-3)}
   .dot{
-    position:relative;width:56px;height:56px;border-radius:50%;
-    background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.22), rgba(255,255,255,.04) 46%, rgba(0,0,0,.28) 100%);
+    position:relative;width:58px;height:58px;flex:0 0 auto;border-radius:50%;
+    background:radial-gradient(circle at 34% 26%, rgba(255,255,255,.16), rgba(255,255,255,.03) 48%, rgba(0,0,0,.30) 100%);
     box-shadow:0 8px 20px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.10);
     display:grid;place-items:center;
   }
-  .dot__time{font-family:var(--mono);font-size:9.5px;color:var(--ink-2);letter-spacing:.02em}
+  .dot svg{position:absolute;inset:0}
+  .dot__arc{transform:rotate(-90deg);transform-origin:29px 29px;stroke-dasharray:150;stroke-dashoffset:96}
+  .dot__time{display:none}
   .stage__caps{font-size:11.5px;color:var(--ink-3);text-align:center;letter-spacing:.01em}
 
   /* ---------- 通用章节 ---------- */
@@ -120,7 +122,7 @@
   .card ul{margin:14px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
   .card li{position:relative;padding-left:14px;font-size:12.8px;color:var(--ink-3);line-height:1.6}
   .card li::before{content:"";position:absolute;left:0;top:.62em;width:4px;height:4px;border-radius:50%;background:rgba(255,255,255,.22)}
-  .card--wide{grid-column:span 2}
+  .grid--tri{grid-template-columns:repeat(3,minmax(0,1fr))}
 
   /* ---------- 速查表 ---------- */
   .table{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -148,7 +150,7 @@
   .path{
     display:block;margin-top:12px;padding:10px 12px;border-radius:9px;background:rgba(0,0,0,.35);
     border:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--ink-2);
-    overflow-x:auto;white-space:nowrap;
+    white-space:normal;overflow-wrap:anywhere;
   }
   .path em{color:var(--amber);font-style:normal}
 
@@ -160,8 +162,7 @@
   @media (max-width: 880px){
     .hero{grid-template-columns:1fr;gap:34px;padding:40px 0 34px}
     .stage{order:-1}
-    .grid{grid-template-columns:1fr}
-    .card--wide{grid-column:span 1}
+    .grid,.grid--tri{grid-template-columns:1fr}
     .duo{grid-template-columns:1fr}
     .flow{grid-template-columns:1fr}
     .flow b{font-size:18px}
@@ -208,8 +209,8 @@
       <div class="eyebrow">桌面端功能一览</div>
       <h1>按一下开始，<br />结束<em>自动落档</em>。</h1>
       <p class="lede">
-        一条贴在屏幕边上的计时小条。点圆环开始计，干完了点一下存下来，
-        记录落进当天的 Markdown。中间不用打开任何笔记软件，也不用先想好怎么分类。
+        一条贴在屏幕边上的计时小条。点圆环开始计，干完点一下存下来，
+        记录落进当天的 Markdown——不用打开笔记软件，也不用手写一行。
       </p>
       <ul class="facts">
         <li>本地 SQLite</li>
@@ -237,6 +238,12 @@
         </span>
       </div>
       <div class="dot">
+        <svg width="58" height="58" viewBox="0 0 58 58" fill="none">
+          <circle cx="29" cy="29" r="24" stroke="rgba(255,255,255,.10)" stroke-width="1.6"/>
+          <circle class="dot__arc" cx="29" cy="29" r="24" stroke="#4DA3E8" stroke-width="2.4" stroke-linecap="round"/>
+          <path d="M29 29L22.4 18.6" stroke="#F3F5F8" stroke-width="1.8" stroke-linecap="round"/>
+          <circle cx="29" cy="29" r="1.6" fill="#F3F5F8"/>
+        </svg>
         <span class="dot__time">42:17</span>
       </div>
       <div class="stage__caps">
@@ -430,7 +437,7 @@
     <div class="sec-head">
       <h2>还有三件小事</h2>
     </div>
-    <div class="grid">
+    <div class="grid grid--tri">
       <article class="card">
         <h3>外观配色</h3>
         <p>深色 / 浅色 / 跟随系统三选一。计时中、提醒、完成、小条底色四个位置各挑一个颜色，另有一个高亮色用于「托盘双击时小条闪三下」。文字与背景不透明度分开调，改完即时生效。</p>
@@ -439,9 +446,9 @@
         <h3>数据与插件</h3>
         <p>数据和插件都在 exe 同级目录，整个文件夹拷走就能用；目录不可写会直接提示，不会偷偷换个地方存。插件是一张声明清单，用来补充「常用摸鱼」预设。</p>
       </article>
-      <article class="card card--wide">
+      <article class="card">
         <h3>托盘</h3>
-        <p>右键托盘是一整套入口：当前状态一行，开始 / 暂停 / 继续 / 结束 / 丢弃按状态出现，下面是新建事项、打开事项、Markdown 同步、便利贴、设置、退出。同步的结果会弹系统通知，未启用、失败、没有变更、正在同步都说得清楚。</p>
+        <p>右键托盘是一整套入口：状态一行，开始 / 暂停 / 继续 / 结束 / 丢弃按状态出现，下面依次是新建事项、打开事项、Markdown 同步、便利贴、设置、退出。同步结果走系统通知，未启用、失败、无变更都说得清楚。</p>
       </article>
     </div>
   </section>

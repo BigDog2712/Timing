@@ -73,6 +73,28 @@ pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
         ));
     }
 
+    /* [V0.11.12] 总开关与各落点的开关状态必须先落一行日志。
+    `mirror_paths` 只看落点 `enabled`、不看总开关，而 `sync_all` 见到总开关关闭会
+    **静默返回**——于是手机上表现为「镜像搬了文件、合并一行没跑、写回 0 个」，
+    界面上还是一次成功。这一行把这两种情况分开。 */
+    let config = crate::services::md_sync::config::load(&pool).await?;
+    crate::log_info!(
+        "md sync config: enabled={} bindings=[{}]",
+        config.enabled,
+        config
+            .bindings
+            .iter()
+            .map(|b| format!(
+                "{}:enabled={},file={},heading={}",
+                b.kind.label(),
+                b.enabled,
+                if b.file.trim().is_empty() { "<空>" } else { b.file.trim() },
+                if b.heading.trim().is_empty() { "<空>" } else { b.heading.trim() }
+            ))
+            .collect::<Vec<_>>()
+            .join(" | ")
+    );
+
     let rels = mirror::mirror_paths(&pool).await?;
     if rels.is_empty() {
         return Err(AppError::md_sync_config_invalid("没有启用任何落点"));
