@@ -110,8 +110,9 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
         }
         original.clear()
 
+        val rels = pathsOf(args)
         val done = ArrayList<String>()
-        for (rel in pathsOf(args)) {
+        for (rel in rels) {
             val found = try {
                 vault.findFile(rel)
             } catch (err: Exception) {
@@ -141,6 +142,9 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
         val res = JSObject()
         res.put("files", JSArray(done))
         res.put("errors", JSArray())
+        /* 真机排查第一现场：请求了几个路径、在 vault 里实际找到几个。两者不等就是
+           「路径对不上」——文件在子目录、或日记不叫 `2026-11-06.md`，都长这样。 */
+        android.util.Log.i("Timing", "mirrorIn: 请求=$rels 取到=$done")
         invoke.resolve(res)
     }
 

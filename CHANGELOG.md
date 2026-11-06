@@ -2,6 +2,25 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.11 — 真机联调出口：日志接进 logcat、镜像现场可追
+
+同步功能本身没改。这一版是「把眼睛装上」——V0.11.9~0.11.10 的「读不回」在真机上是黑盒，
+代码、单测、门禁全绿却查不动，因为**日志只写应用私有目录，release 包 `debuggable=false`
+连 `adb run-as` 都读不到**。
+
+- `platform/log.rs`：Android 上把每行日志镜像进 logcat（tag `Timing`），直接链 NDK 的
+  `liblog`，零新增依赖；`stderr` 在 GUI 应用里不可见，这是唯一出口
+- `md_sync/mod.rs`：每个落点一行 `md sync <种类>: <路径> exists=… dir=… imported=… exported=…`
+  ——「没找到文件 / 文件没变 / 导入 0 条」三者在界面上都是同一句「已写入文件」
+- `app/md_sync_mobile.rs`：`md mirror in: 请求 N 个路径，取到 M 个`、`md mirror out: 写回 N 个`
+- `TimingNativePlugin.kt`：Kotlin 侧同一件事（SAF 里到底找到没找到）
+- `scripts/android-log.mjs` + `npm run android:log`：一键跟随日志，同时写
+  `release/logs/android-latest.log`；`--dump` 导最近 300 行
+- `docs/mobile/android-debug.md`：真机配对、看哪个 tag、各方案能验什么
+
+顺带修正 `md_sync/mod.rs` 模块头里**过期**的冲突说明（还写着「比 mtime，最后写入者胜」，
+V0.11.3 起已经是「Markdown 永远赢」）。
+
 ## 0.11.10 — 手机端图标对齐桌面、同步修好、浮条透明底、圆点改逐帧
 
 - **图标**：`npx tauri icon` 重生成全套；安卓补自适应图标（`mipmap-anydpi-v26`），

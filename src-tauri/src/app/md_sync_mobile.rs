@@ -85,6 +85,15 @@ pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
     let pulled: MirrorResult = native
         .call("mirrorIn", serde_json::json!({ "root": &root, "paths": &rels }))
         .await?;
+    /* [V0.11.11] 真机排查的第一现场：`files` 为空 = vault 里按这个相对路径找不到文件，
+    后面那轮合并只会「按空库渲染」，界面却照样说同步成功。 */
+    crate::log_info!(
+        "md mirror in: 请求 {} 个路径，取到 {} 个 [{}]，errors={:?}",
+        rels.len(),
+        pulled.files.len(),
+        pulled.files.join(", "),
+        pulled.errors
+    );
 
     /* 2. 与桌面同一套合并。 */
     let mut report = mirror::run_in(&pool, &root).await?;
@@ -94,6 +103,11 @@ pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
     let pushed: MirrorOutResult = native
         .call("mirrorOut", serde_json::json!({ "root": &root, "paths": &rels }))
         .await?;
+    crate::log_info!(
+        "md mirror out: 写回 {} 个文件，errors={:?}",
+        pushed.written,
+        pushed.errors
+    );
 
     /* 单个文件的读写失败不致命，但要并进报告——否则用户只看到「没有需要同步的改动」。 */
     report.errors.extend(pulled.errors);

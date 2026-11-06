@@ -3,18 +3,16 @@
 //! 落点默认值来自 `models::md_sync_config::default_bindings()`，用户可在
 //! 「设置 → 同步」里覆盖；读写、冲突判定、数据库更新全在这里。
 //!
-//! 落点有三种：`timers`（事项计时，按 `started_at` 归日）、`notes`（便利贴，按
-//! 「当天动过」归日）、`todos`（待办事项，未完成且计划时间不在当天）。每一种的
-//! 取数口径写在 `export.rs`；三种都走同一套冲突判定。
+//! 落点有三种：`timers`（事项计时，按 `started_at` 归日）、`notes`（便利贴，按「当天
+//! 动过」归日）、`todos`（待办，未完成且计划时间不在当天）。每一种的取数口径写在
+//! `export.rs`；三种都走同一套冲突判定。
 //!
 //! ## 一次同步的判定顺序
 //!
 //! 1. 计算 SQL 应该长什么样（`expected`）与该范围最大 `updated_at`；
 //! 2. 读文件当前区块（`current`）与 mtime；
-//! 3. 取上次写出的基线（`baseline`）：
-//!    - 文件 = 基线、SQL ≠ 基线 → 导出（SQL 侧改的）；
-//!    - 文件 ≠ 基线、SQL = 基线 → 导入（文件侧改的）；
-//!    - 两边都 ≠ 基线 → 比 mtime 与 `updated_at`，最后写入者胜；
+//! 3. 取上次写出的基线（`baseline`）定方向：文件变了 → 导入；只有 SQL 变了 → 导出；
+//!    两边都变 → **Markdown 赢**（V0.11.3 起不再比 mtime，理由见 `sync_binding`）；
 //! 4. 导入后重新渲染，把规范化结果写回文件（时间格式、分组顺序）；
 //! 5. 更新基线，供下一轮判定。标题 / 文件不存在时**不导入**，只按 SQL 补写，
 //!    避免用户改标题时误删数据。
@@ -173,12 +171,14 @@ pub(super) async fn sync_all(pool: &SqlitePool, root_override: Option<&str>) -> 
                 status.exists = outcome.exists;
                 status.last_direction = Some(outcome.direction.to_string());
                 status.last_sync_at = Some(at);
-                if outcome.exported {
-                    report.exported += 1;
-                }
+                report.exported += u32::from(outcome.exported);
                 report.note_imported(binding.kind, outcome.imported);
+                /* [V0.11.11] 真机排查的唯一现场：`adb logcat -s Timing` 能分清「没找到文件」
+                「文件没变」「导入 0 条」——三者在界面上都是同一句「已写入文件」。 */
+                crate::log_info!("md sync {}: {} exists={} dir={} imported={} exported={}", binding.kind.label(), status.path, outcome.exists, outcome.direction, outcome.imported, outcome.exported);
             }
             Err(err) => {
+                crate::log_warn!("md sync {} 失败：{err}", binding.kind.label());
                 status.last_error = Some(err.clone());
                 report
                     .errors

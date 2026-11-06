@@ -174,6 +174,48 @@ pub fn log(level: Level, target: &str, message: &str) {
     if cfg!(debug_assertions) || level <= Level::Warn {
         eprint!("{line}");
     }
+    /* [V0.11.11] Android：`stderr` 在 GUI 应用里不可见，日志只落私有目录；而 release 包
+    `debuggable=false`，`adb run-as` 也读不到那个目录。于是真机上的故障只能靠用户截图
+    复述——0.11.10 的「同步读不回」就是这么熬了几轮。镜像一份进 logcat 是唯一的出口。 */
+    #[cfg(target_os = "android")]
+    logcat::write(level, line.trim_end());
+}
+
+/// Android logcat 出口（tag `Timing`）。
+///
+/// 直接链 NDK 的 `liblog`，不引 crate：整个日志模块刻意零依赖（理由见模块头）。
+/// 只在 Android 编译，桌面构建连这个符号都不存在。
+#[cfg(target_os = "android")]
+mod logcat {
+    use std::ffi::{c_char, CString};
+
+    #[link(name = "log")]
+    extern "C" {
+        fn __android_log_write(prio: i32, tag: *const c_char, text: *const c_char) -> i32;
+    }
+
+    const ANDROID_LOG_DEBUG: i32 = 3;
+    const ANDROID_LOG_INFO: i32 = 4;
+    const ANDROID_LOG_WARN: i32 = 5;
+    const ANDROID_LOG_ERROR: i32 = 6;
+
+    pub fn write(level: super::Level, line: &str) {
+        let prio = match level {
+            super::Level::Error => ANDROID_LOG_ERROR,
+            super::Level::Warn => ANDROID_LOG_WARN,
+            super::Level::Info => ANDROID_LOG_INFO,
+            super::Level::Debug => ANDROID_LOG_DEBUG,
+        };
+        /* 换行会让 logcat 把一条日志拆成多行，先压平；`\0` 会让 CString 构造失败。 */
+        let text = line.replace(['\n', '\r', '\0'], " ");
+        let (Ok(tag), Ok(text)) = (CString::new("Timing"), CString::new(text)) else {
+            return;
+        };
+        /* 返回值是写入的字节数（失败为负）。日志本身不可再抛。 */
+        unsafe {
+            let _ = __android_log_write(prio, tag.as_ptr(), text.as_ptr());
+        }
+    }
 }
 
 /// panic hook：把 panic 信息与（可选的）回溯写到 `panic.log`，再交给默认 hook 打印。
