@@ -78,7 +78,9 @@ mod tests {
     /// - 不跟随 → 只有一次请求、拿到 `302` → `Err(Server(302))`。
     ///
     /// 变异自检：注释掉 `remove_client()` 里的 `.redirect(Policy::none())`，
-    /// 这条必红（`left: None` 即 `Ok(200)`，且请求行会多出一条 `GET /moved`）。
+    /// 这条必红（实测：请求行多出一条 `DELETE /moved`，返回变成 `Ok(200)`）。
+    /// 注意这版 reqwest 对 302 **不重写方法**：跟随一次就是照着 `Location` 再删一次 ——
+    /// 那头可能是别人的文件，比「改写成 GET」更坏。
     #[tokio::test]
     async fn a_redirect_is_a_failure_and_is_never_followed() {
         let fake = serve_redirect_once("/moved");
