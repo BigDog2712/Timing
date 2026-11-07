@@ -70,6 +70,12 @@ mod note;
 mod note_pin;
 mod plugin_v3_matrix;
 mod plugin_v3_wording;
+/* [QA V0.11.18] 「老用户云端配置一个字节都不许丢」的后端半场（PRD A3 / A4 / C2）：
+   用主人活库的**原串**当夹具，`load → save` 后逐字节比。 */
+mod qa_live_config_roundtrip;
+/* [QA V0.11.18] 「第 1 关对 403 放行」的反向攻击（上一轮没验完的那条）：
+   目录 GET 403 **且** 写探针 403 时必须仍然报红，不许把误报换成漏报。 */
+mod qa_probe_403;
 mod portable_dir;
 mod portable_dir_qa;
 mod portable_dir_qa_md;

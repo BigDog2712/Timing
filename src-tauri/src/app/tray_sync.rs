@@ -222,4 +222,46 @@ mod tests {
         let report = MdSyncReport::new(0);
         assert_eq!(sync_body(&report), "没有需要同步的变更");
     }
+
+    /// **QA 独立验收 · V0.11.18 的闸判据**：抢不到闸时**绝不构造 `Gate`**。
+    ///
+    /// ## 这条为什么必须存在（设计 §11 坑 6）
+    ///
+    /// `Gate` 是**无条件 `Drop` 复位**（把 `RUNNING` 写回 `false`）。所以「先 `let _gate = Gate;`
+    /// 再判 `RUNNING`」这种顺序会把**别人正在跑的那一轮**的闸复位掉 —— 防重入静默失效，
+    /// 两轮并发写同一个 `.md`，`write_atomic` 的 temp + rename 互相覆盖，用户的日记被截断。
+    ///
+    /// `try_acquire()` 返回 `Option<Gate>` 让「抢不到」在类型上就**拿不到闸**，但类型只能防
+    /// 住「拿到了却不用」，防不住有人把 `Gate` 改成可空变体或者事后补一个 `Gate::new()`。
+    /// 所以这里用**可观测的原子量**钉住：抢失败之后 `RUNNING` 必须仍是 `true`。
+    ///
+    /// 两个场景写在**同一个测试**里（不是两条）：`RUNNING` 是进程级静态，两个测试并行跑会
+    /// 互相把对方的闸拨掉，红的会是随机一条 —— 那种红没人能复现，比没有测试更糟。
+    #[test]
+    fn try_acquire_never_steals_or_resets_the_gate_of_a_running_round() {
+        use std::sync::atomic::Ordering;
+        use super::{try_acquire, RUNNING};
+
+        /* 场景 1：已经有一轮在跑（`spawn` 抢到了闸）。此时点托盘退出 / 再点同步都抢不到，
+           而且**不许**把那一轮的闸复位。 */
+        RUNNING.store(true, Ordering::SeqCst);
+        assert!(try_acquire().is_none(), "闸被占着时必须返回 None（早退）");
+        assert!(
+            RUNNING.load(Ordering::SeqCst),
+            "抢不到闸时**不许**构造 Gate —— 那一轮跑完前闸必须还是关着的"
+        );
+
+        /* 场景 2：闸是空的。抢得到，而且**只有** `Gate` 被 drop 之后才复位
+           （正常返回 / `?` 早退 / panic 三条路径都由 `Drop` 覆盖）。 */
+        RUNNING.store(false, Ordering::SeqCst);
+        let gate = try_acquire().expect("空闸必须抢得到");
+        assert!(RUNNING.load(Ordering::SeqCst), "抢到之后闸必须是关着的");
+        assert!(try_acquire().is_none(), "持有期间再一次抢必须失败（防重入）");
+        drop(gate);
+        assert!(!RUNNING.load(Ordering::SeqCst), "Gate 必须由 Drop 复位");
+        assert!(try_acquire().is_some(), "复位之后必须能再抢到");
+
+        /* 收尾：把静态量还回初值，避免影响同进程里后续用例。 */
+        RUNNING.store(false, Ordering::SeqCst);
+    }
 }
