@@ -36,6 +36,11 @@ mod md_sync_live;
 mod md_sync_live_guard;
 mod md_sync_notes;
 mod md_sync_notes_guard;
+/* [V0.11.16] B4 的持久化层证据：三档 `file`/`root` 各不相同时，「什么都没改的保存」
+   必须原样落库（`settings` 表里的 JSON 逐字段比，不靠 mock 自证）。 */
+mod md_sync_no_touch_save;
+/* [V0.11.16] B2 的文件层证据：三档同名的文件名 → 落点目录只有一个 .md、三个标题都在。 */
+mod md_sync_one_file;
 mod md_sync_pairing;
 mod md_sync_todo_edit;
 mod md_sync_todo_export;
@@ -49,6 +54,8 @@ mod md_webdav_probe;
 mod md_webdav_dir;
 /* `fail_text` 的文案判据（状态码零命中）。 */
 mod md_webdav_text;
+/* [V0.11.16] E8 的本机可验部分：中文远端目录必须**编码一次**上网络（不二次编码）。 */
+mod md_webdav_e8_encoding;
 /* 「写文件」与「建目录」的 URL 必须同源（MKCOL 的 URL 是 PUT 的路径前缀）。 */
 mod md_webdav_url;
 mod migration;

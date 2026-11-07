@@ -216,4 +216,20 @@ async fn no_status_code_leaks_into_any_verdict() {
     assert_eq!(auth.steps.len(), 1, "第 1 关红 → 后续关一次请求都不发");
     assert_eq!(auth.steps[0].key, "account");
     assert!(!auth.steps[0].ok);
+
+    /* [QA] 每个失败场景都必须真的**失败**：只断言「文案里没有三位数字」时，若某一天
+       第 3 关被改成恒判成功（`write_403` 变成绿字），这条用例会照样通过——那正是
+       E5「存在但只读的目录红在第 3 关」唯一的一条兜底。 */
+    for (result, scene, steps) in [
+        (&dir_403, "第 2 关 403", 2usize),
+        (&write_403, "第 3 关 403", 3),
+        (&write_500, "第 3 关 500", 3),
+    ] {
+        assert!(!result.ok, "{scene} 必须整体判失败：{}", result.detail);
+        assert_eq!(result.steps.len(), steps, "{scene} 的关卡数不对");
+        assert!(
+            result.steps.iter().any(|step| !step.ok),
+            "{scene} 必须留下一条失败关"
+        );
+    }
 }
