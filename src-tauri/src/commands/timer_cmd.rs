@@ -17,6 +17,7 @@ pub async fn start_timer(
     item_id: Option<i64>,
 ) -> AppResult<TimeRecord> {
     let record = services::timer::start(&state.pool, item_id).await?;
+    services::md_sync::dirty::mark("timer");
     events::emit_timer_state(&app, &state.pool).await;
     Ok(record)
 }
@@ -30,6 +31,7 @@ pub async fn start_countdown(
     target_sec: i64,
 ) -> AppResult<TimeRecord> {
     let record = services::countdown::start(&state.pool, item_id, target_sec).await?;
+    services::md_sync::dirty::mark("timer");
     events::emit_timer_state(&app, &state.pool).await;
     Ok(record)
 }
@@ -37,6 +39,7 @@ pub async fn start_countdown(
 #[tauri::command]
 pub async fn pause_timer(app: AppHandle, state: State<'_, AppState>) -> AppResult<TimeRecord> {
     let record = services::timer::pause(&state.pool).await?;
+    services::md_sync::dirty::mark("timer");
     events::emit_timer_state(&app, &state.pool).await;
     Ok(record)
 }
@@ -44,6 +47,7 @@ pub async fn pause_timer(app: AppHandle, state: State<'_, AppState>) -> AppResul
 #[tauri::command]
 pub async fn resume_timer(app: AppHandle, state: State<'_, AppState>) -> AppResult<TimeRecord> {
     let record = services::timer::resume(&state.pool).await?;
+    services::md_sync::dirty::mark("timer");
     events::emit_timer_state(&app, &state.pool).await;
     Ok(record)
 }
@@ -53,6 +57,7 @@ pub async fn resume_timer(app: AppHandle, state: State<'_, AppState>) -> AppResu
 #[tauri::command]
 pub async fn stop_timer(app: AppHandle, state: State<'_, AppState>) -> AppResult<StopResult> {
     let result = services::timer::stop(&state.pool).await?;
+    services::md_sync::dirty::mark("timer");
     events::emit_timer_state(&app, &state.pool).await;
     Ok(result)
 }
@@ -60,6 +65,7 @@ pub async fn stop_timer(app: AppHandle, state: State<'_, AppState>) -> AppResult
 #[tauri::command]
 pub async fn discard_timer(app: AppHandle, state: State<'_, AppState>) -> AppResult<()> {
     services::timer::discard(&state.pool).await?;
+    services::md_sync::dirty::mark("timer");
     events::emit_timer_state(&app, &state.pool).await;
     Ok(())
 }
@@ -71,6 +77,7 @@ pub async fn undo_stop(
     record_id: i64,
 ) -> AppResult<TimeRecord> {
     let record = services::timer::undo(&state.pool, record_id).await?;
+    services::md_sync::dirty::mark("timer");
     events::emit_timer_state(&app, &state.pool).await;
     Ok(record)
 }
@@ -88,6 +95,7 @@ pub async fn switch_item(
     mode: SwitchMode,
 ) -> AppResult<TimerState> {
     let timer_state = services::timer::switch(&state.pool, item_id, mode).await?;
+    services::md_sync::dirty::mark("timer");
     events::emit_timer_state(&app, &state.pool).await;
     Ok(timer_state)
 }
@@ -105,6 +113,7 @@ pub async fn resolve_open_record(
     let record =
         services::timer::resolve_open(&state.pool, action, end_at, include_gap.unwrap_or(false))
             .await?;
+    services::md_sync::dirty::mark("timer");
     events::emit_timer_state(&app, &state.pool).await;
     Ok(record)
 }

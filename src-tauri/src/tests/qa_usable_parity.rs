@@ -34,6 +34,8 @@ fn webdav(base_url: &str, base_path: &str, user: &str) -> MdSyncCloud {
         base_url: base_url.into(),
         base_path: base_path.into(),
         user: user.into(),
+        /* [V0.11.19] 三档与「填全」判定无关，这里显式留空保持原夹具语义。 */
+        auto: None,
     }
 }
 
@@ -45,6 +47,8 @@ fn folder(local_root: &str) -> MdSyncCloud {
         base_url: String::new(),
         base_path: String::new(),
         user: String::new(),
+        /* [V0.11.19] 同上：三档不参与 `is_usable()`。 */
+        auto: None,
     }
 }
 

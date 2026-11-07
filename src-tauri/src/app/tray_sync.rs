@@ -41,9 +41,10 @@ static BUSY_NOTICE_SHOWN: AtomicBool = AtomicBool::new(false);
 ///
 /// `Drop` 在正常返回、`?` 早退、unwind 三种路径上都会跑到，这才是复位该在的位置。
 ///
-/// [V0.11.18] `pub(super)`：`app/tray_quit.rs`（退出前同步）要复用同一把闸，
-/// 但 `Gate` 的 `Drop` 语义只该有一处定义。
-pub(super) struct Gate;
+/// [V0.11.19] `pub(crate)`：批 1 的两条后台链（`jobs::md_sync` / `jobs::md_cloud`）
+/// 与托盘 / 退出流程共用**同一把闸**，不许另造第二把（设计 §14 第 7 条）。
+/// `Gate` 的 `Drop` 语义仍然只在这里定义一次。
+pub(crate) struct Gate;
 
 impl Drop for Gate {
     fn drop(&mut self) {
@@ -53,10 +54,11 @@ impl Drop for Gate {
 
 /// 抢闸：抢到 → `Some(Gate)`（作用域结束复位）；抢不到 → `None`，**且不构造 `Gate`**。
 ///
-/// [V0.11.18] 抽成函数是为了让「先试抢、抢不到立刻早退」变成**类型上唯一可能的形状**：
-/// 调用方拿到的是 `Option<Gate>`，写不出「先 `let _gate = Gate;` 再判 `RUNNING`」这种
-/// 会在**别人正在跑的那一轮**身上复位闸的错法（`spawn` 与 `quit_after_sync` 共用）。
-pub(super) fn try_acquire() -> Option<Gate> {
+/// [V0.11.19] 提到 `pub(crate)`：批 1 的两条链从 `jobs/` 里抢它。
+/// 「先试抢、抢不到立刻早退」仍是**类型上唯一可能的形状**：调用方拿到的是
+/// `Option<Gate>`，写不出「先 `let _gate = Gate;` 再判 `RUNNING`」这种会在
+/// **别人正在跑的那一轮**身上复位闸的错法。
+pub(crate) fn try_acquire() -> Option<Gate> {
     /* `swap` 是原子的「读 + 置位」，比 `load` 再 `store` 少一个竞态窗口。 */
     if RUNNING.swap(true, Ordering::SeqCst) {
         return None;
@@ -171,7 +173,7 @@ async fn run_once(app: &AppHandle, pool: &SqlitePool) {
 
     /* [V0.11.13] 从 `md_sync::run` 换成云端编排 `md_cloud::round`：云端没配时它逐字
     转交 `md_sync::run`，所以这里只多取一层 `.report`，下面的通知与事件一字不动。 */
-    match services::md_cloud::round(pool).await {
+    match services::md_cloud::round_manual(pool).await {
         Ok(outcome) => {
             let report = outcome.report;
             /* `run` 只在**整体**不可执行时返回 Err；单个落点失败落在 `report.errors` 里。

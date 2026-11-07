@@ -82,7 +82,9 @@ pub async fn md_sync_save(
 /// 「现在就传上去」，只跑本地落点等于把上传留到下一次轮询（最坏 15 分钟）。
 #[tauri::command]
 pub async fn md_sync_run(app: AppHandle) -> AppResult<MdSyncReport> {
-    let outcome = md_cloud::round(&pool_of(&app)).await?;
+    /* [V0.11.19] 手动入口统一走 `round_manual`：T04 的「点一次立即同步 → 解除清理
+       暂停」只需要挂在那一个函数上，两处手动入口不会各记一份。 */
+    let outcome = md_cloud::round_manual(&pool_of(&app)).await?;
     announce(&app, &outcome.report);
     Ok(outcome.report)
 }
@@ -129,5 +131,9 @@ pub async fn md_backup_restore(
     name: String,
     target: Option<String>,
 ) -> AppResult<MdBackupRestoreResult> {
-    md_backup::restore(&pool_of(&app), &name, target.as_deref()).await
+    let result = md_backup::restore(&pool_of(&app), &name, target.as_deref()).await?;
+    /* 恢复把记录 / 待办 / 便利贴写回 SQL，是一次真实的业务写入，必须让 md 链看见。
+       `md_sync_cmd.rs` 里只允许这一处打标记：`md_sync_save` 自己就会跑一轮同步。 */
+    md_sync::dirty::mark("record");
+    Ok(result)
 }

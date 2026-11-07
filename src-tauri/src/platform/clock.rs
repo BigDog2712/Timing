@@ -17,6 +17,22 @@ pub fn now_ms() -> i64 {
     chrono::Utc::now().timestamp_millis()
 }
 
+/// 「距 `since` 过了多久」的墙钟差值，两个后台 job 判「时间窗口到没到」的唯一口径。
+///
+/// 墙钟回拨（`now < since`，NTP 校时 / 手动改时 / 休眠唤醒都会造成）返回 `i64::MAX`
+/// 当作「已经满足」：让本轮跑一次并重新起算，而不是永远等不到。
+///
+/// 与 `services::timer_time::elapsed_ms` **不是一回事**：那边要走单调锚点，且负差值
+/// 按 0 处理；这里是调度窗口，回拨必须触发而不是吞掉。两条 job 共用这一份，避免各自
+/// 抄一份后其中一份被改坏（全局一致性审查收口）。
+pub fn elapsed_since_ms(now: i64, since: i64) -> i64 {
+    if now < since {
+        i64::MAX
+    } else {
+        now.saturating_sub(since)
+    }
+}
+
 /// 本地时区「今天 00:00」的 epoch 毫秒。
 ///
 /// 待办的三条今日口径共用它：只显示今天 / 过期淡化 / 跨天清理（ADR-032）。

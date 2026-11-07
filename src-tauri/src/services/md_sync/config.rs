@@ -25,6 +25,9 @@ use serde_json::Error;
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
+/* [V0.11.19] 桌面已改事件驱动，运行时不再读「同步间隔」；只有手机端轮询还用它。
+   `#[cfg(mobile)]` 让这两个常量在非手机产物里连 import 都不留（clippy 零告警）。 */
+#[cfg(mobile)]
 use crate::models::constants::{MD_SYNC_POLL_MIN_SECS, MD_SYNC_POLL_SECS};
 use crate::models::md_sync::MdSyncBinding;
 use crate::models::md_sync_config::{default_bindings, MdSyncConfig};
@@ -71,6 +74,10 @@ fn merge_bindings(saved: Vec<MdSyncBinding>, defaults: Vec<MdSyncBinding>) -> Ve
 ///
 /// [V0.11.3] 放在这里而不是 `mod.rs`：它只读配置，`mod.rs` 那个文件已经贴着
 /// 300 行门禁，而配置文件本来就该是「配置相关的唯一去处」。
+///
+/// [V0.11.19] 只剩手机端轮询一个调用方：桌面的 md 链改成事件驱动 + 60s 兜底，
+/// `pollSecs` 在界面上已无入口（PRD §3.3），但仍**原样保留在库里**（§15.2 透传）。
+#[cfg(mobile)]
 pub async fn poll_secs(pool: &SqlitePool) -> u64 {
     match load(pool).await {
         Ok(config) if config.poll_secs >= MD_SYNC_POLL_MIN_SECS => config.poll_secs,

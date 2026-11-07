@@ -37,10 +37,14 @@ pub async fn update_record(
     id: i64,
     patch: RecordPatch,
 ) -> AppResult<TimeRecord> {
-    services::record::update(&state.pool, id, patch).await
+    let record = services::record::update(&state.pool, id, patch).await?;
+    services::md_sync::dirty::mark("record");
+    Ok(record)
 }
 
 #[tauri::command]
 pub async fn delete_record(state: State<'_, AppState>, id: i64) -> AppResult<()> {
-    services::record::delete(&state.pool, id).await
+    services::record::delete(&state.pool, id).await?;
+    services::md_sync::dirty::mark("record");
+    Ok(())
 }

@@ -99,6 +99,15 @@ pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
     })
 }
 
+/// 手动入口（「立即同步」命令 / 托盘那一项）的**唯一**包装。
+///
+/// [V0.11.19] 抽出来不是为了加逻辑，是为了让 T04 变更 A 的「点一次立即同步 → 解除
+/// 清理暂停」只有一个挂载点：两处调用方都不该各自记住「手动轮还要先 resume」。
+/// 本批它与 `round` 等价；退出前那一轮（`tray_quit`）走自己的路径，不从这里进。
+pub async fn round_manual(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
+    round(pool).await
+}
+
 /// 轮询用：只有「值得广播一次」时才返回 `Some`——导入了数据（老口径）、本轮有远端错误
 /// （设置页要能看到它失败过）、待传清单变了。只看 `touched()` 会让「一整天的 401」
 /// 在界面上完全无声。

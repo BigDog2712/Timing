@@ -18,6 +18,8 @@
 //!    避免用户改标题时误删数据。
 
 pub mod config;
+/* [V0.11.19] 业务写入信号（命令层白名单，jobs 下 0 处）。 */
+pub mod dirty;
 pub mod export;
 pub mod format;
 pub mod import;
@@ -49,7 +51,8 @@ pub async fn get_view(pool: &SqlitePool) -> AppResult<MdSyncView> {
     })
 }
 
-/// 自动同步间隔（秒）——实现放在 `config`（它才是读配置的地方）。
+/// [V0.11.19] 桌面改事件驱动后已无「自动同步间隔」这个运行时量；只剩手机端轮询读它。
+#[cfg(mobile)]
 pub use config::poll_secs;
 
 /// 手动「立即同步」。返回本轮报告，不因单个落点失败而整体报错。

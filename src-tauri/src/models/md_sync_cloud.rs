@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::infra::md_env::expand_env;
 use crate::models::md_sync::{MdSyncBinding, MdSyncView, MD_SYNC_ROOT_MAX_LEN};
+use crate::models::md_sync_auto::MdCloudAuto;
 
 /// 云端通道（Webdav 模式）的默认落点根。
 ///
@@ -74,6 +75,10 @@ pub struct MdSyncCloud {
     /// `Webdav` 模式：账号（坚果云要的是「应用密码」对应的账号）。
     #[serde(default)]
     pub user: String,
+    /// [V0.11.19] 云端自动同步三档。`None`（老配置）= 智能 + 15 分钟；
+    /// `skip_serializing_if` 保证「什么都没改的保存」不往老配置里多写一个键。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auto: Option<MdCloudAuto>,
 }
 
 impl MdSyncCloud {

@@ -38,10 +38,15 @@ async fn round_without_cloud_is_the_same_as_run() {
     let via_round = env("cloud-equiv-round").await;
     let via_run = env("cloud-equiv-run").await;
 
-    /* 两个库造同一份数据：一条 10 分钟的已保存记录。 */
+    /* 两个库造同一份数据：一条 10 分钟的已保存记录。
+       `now` 必须在循环外只取一次：两次 `now_ms()` 若跨过秒/分界，两个库里的
+       `started_at` / `ended_at` 会差一瞬，而 `md_sync::format` 把时间打进 md 正文，
+       下面「两个入口写出的文件逐字相同」就会偶发红。`cloud=None` 时 `round` 直接调
+       `md_sync::run`，两边是同一套渲染；本用例没有进行中的记录，`timers_at` 的 `now`
+       不参与正文，所以数据一致即可逐字一致。 */
+    let now = now_ms();
     for fixture in [&via_round, &via_run] {
         let item = new_item(&fixture.pool, "写作").await;
-        let now = now_ms();
         insert_saved(&fixture.pool, item, now - 600_000, now, 600).await;
     }
 

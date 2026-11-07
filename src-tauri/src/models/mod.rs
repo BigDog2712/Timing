@@ -7,6 +7,8 @@ pub mod constants;
 pub mod enums;
 pub mod item;
 pub mod md_sync;
+/* [V0.11.19] 云端自动同步三档（单独成文件：`md_sync_cloud.rs` 只剩 4 行余量）。 */
+pub mod md_sync_auto;
 pub mod md_sync_cloud;
 pub mod md_sync_config;
 /* [V0.11.16] 「测试连接」的三关结果（从 `md_sync_cloud.rs` 搬出，给那个文件腾门禁余量）。 */

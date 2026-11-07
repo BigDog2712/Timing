@@ -31,7 +31,9 @@ pub async fn note_create(
         width,
         height,
     };
-    services::note::create(&state.pool, params).await
+    let note = services::note::create(&state.pool, params).await?;
+    services::md_sync::dirty::mark("note");
+    Ok(note)
 }
 
 #[tauri::command]
@@ -57,6 +59,7 @@ pub async fn note_update(
     #[cfg(desktop)]
     let pin_changed = patch.is_pinned.is_some();
     let note = services::note::update(&state.pool, id, patch).await?;
+    services::md_sync::dirty::mark("note");
     /* [V0.3.0] 置顶是**窗口属性**，光落库不会立刻改变层级；这里把最新值推给窗口。
     窗口未打开时 apply_note_pin 静默跳过，下次 open_note_window 会按列值建窗。
 
@@ -82,6 +85,7 @@ pub async fn note_delete(app: AppHandle, state: State<'_, AppState>, id: i64) ->
         #[cfg(desktop)]
         let _ = window::close_note_window(&app, note.id);
         events::emit_note_window(&app, false, note.id);
+        services::md_sync::dirty::mark("note");
     }
     Ok(())
 }

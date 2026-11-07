@@ -121,6 +121,9 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     再跑同一套合并逻辑（见 `app::md_sync_mobile`）。 */
     #[cfg(desktop)]
     jobs::md_sync::spawn_md_sync_watcher(app.clone());
+    /* [V0.11.19] 云端三档链：与 md 链共用托盘闸，但节奏完全独立（关闭/定时/智能）。 */
+    #[cfg(desktop)]
+    jobs::md_cloud::spawn(app.clone());
     #[cfg(mobile)]
     jobs::md_sync_mobile::spawn_md_sync_watcher(app.clone());
     boot_timing::mark("jobs_spawned");

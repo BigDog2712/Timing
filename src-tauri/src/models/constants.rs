@@ -40,6 +40,44 @@ pub const MD_SYNC_POLL_MIN_SECS: u64 = 60;
 /// 轮询间隔上限（秒）：一天一次。再长就不像「自动同步」了。
 pub const MD_SYNC_POLL_MAX_SECS: u64 = 86_400;
 
+/* [V0.11.19 批 1] 事件驱动 md 同步与云端三档的全部时间/数量常量（设计 §8.1）。
+   唯一出处：改这里的数字，不要到 job 里写第二份字面量；单测与变异自检也读这一份。 */
+/// job 的观察周期（毫秒）。**不是同步周期**：它只决定「多久看一眼 SEQ / 文件」。
+pub const MD_SYNC_WAKE_TICK_MS: u64 = 200;
+/// SQL 业务写入的去抖窗口（毫秒）：窗口内多次写只跑一轮。
+pub const MD_SYNC_DEBOUNCE_MS: u64 = 800;
+/// 外部 md 文件的探测周期与内容去抖窗口（毫秒）。
+pub const MD_SYNC_FILE_TICK_MS: u64 = 1_500;
+/// 无条件兜底扫描周期（秒）：事件漏掉时最坏 60 秒纠正一次。
+pub const MD_SYNC_FALLBACK_SECS: u64 = 60;
+/// 云端「启动后一轮」的延迟（秒）。避开启动期托盘 / 配置 / 网络的竞态。
+pub const MD_CLOUD_STARTUP_DELAY_SECS: u64 = 60;
+/// 智能档「停手 5 分钟」的静默窗口（秒）。
+pub const MD_CLOUD_SMART_IDLE_SECS: u64 = 300;
+/// 智能档 30 分钟上限（秒）：连续写库时最坏也要同步一次。
+pub const MD_CLOUD_SMART_MAX_SECS: u64 = 1_800;
+/// 定时档分钟数下限。
+pub const MD_CLOUD_INTERVAL_MIN_MINUTES: u32 = 5;
+/// 定时档分钟数上限。
+pub const MD_CLOUD_INTERVAL_MAX_MINUTES: u32 = 120;
+/// 定时档默认分钟数（新装与老用户首次看到都是它）；`None` 的老配置按此解释。
+pub const MD_CLOUD_INTERVAL_DEFAULT_MINUTES: u32 = 15;
+/* 下面四个是变更 A（T04）的常量。本批先在这里登记**唯一出处**（§11.2），T02/T03
+   不读写它们；`allow(dead_code)` 是刻意的——与其让 T04 在自己的文件里再写一份字面量，
+   不如先把名字钉在这里、暂时没人调用。T04 接上 `purge/` 后逐个删掉这个属性。 */
+/// 「只留今天」的保留窗口（天）：0 = 只保留当天。
+#[allow(dead_code)]
+pub const MD_CLOUD_PURGE_KEEP_DAYS: i64 = 0;
+/// 单轮清理的文件数上限，防止一次删一整年。
+#[allow(dead_code)]
+pub const MD_CLOUD_PURGE_BATCH: usize = 20;
+/// 连续失败多少天暂停清理，等用户点一次「立即同步」。
+#[allow(dead_code)]
+pub const MD_CLOUD_PURGE_PAUSE_DAYS: u32 = 3;
+/// 追责日志保留行数。
+#[allow(dead_code)]
+pub const MD_CLOUD_PURGE_LOG_KEEP: usize = 400;
+
 /* [V0.11.13] 云端通道（WebDAV）的网络超时与退避。改这几个数之前先看任务书 §4.5 ——
 它们不是「顺手调大一点更稳」，每一条都对应一个具体的失败模式。 */
 /// 建立连接的超时（秒）。

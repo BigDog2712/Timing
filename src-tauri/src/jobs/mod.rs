@@ -16,6 +16,10 @@ pub mod reminder;
 /* 桌面独占（V1-Android）：
 - `monitor`：轮询 `available_monitors()` 做多屏钳制，Android 无该 API；
 - `md_sync`：桌面落点是文件路径，直接读写；手机端走下面的 `md_sync_mobile`。 */
+/* [V0.11.19 批 1] 云端三档链与 md 链共用 `tray_sync::try_acquire()`；`tray_sync`
+   是桌面独占模块，所以这条链也必须桌面独占，手机端仍走 `md_sync_mobile`。 */
+#[cfg(desktop)]
+pub mod md_cloud;
 #[cfg(desktop)]
 pub mod md_sync;
 #[cfg(desktop)]

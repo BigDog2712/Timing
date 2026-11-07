@@ -36,6 +36,12 @@ mod qa_t01_fence_edges;
 /* [QA 独立验收 V0.11.19] T01 真实一轮同步：洞 1 / 洞 2 / P1 三处，全部走
    `services::md_sync::run`，查文件字节与 SQL 软删，不靠纯函数自证。 */
 mod qa_t01_sync_attack;
+/* [V0.11.19 批 1] 两条链的纯判据（C5/C6/C7/C8 与 D2/D4/D5/D6/D8/D9）。
+   桌面独占：被测的 `jobs::md_sync` / `jobs::md_cloud` 都是 `#[cfg(desktop)]`。 */
+#[cfg(desktop)]
+mod md_sync_wake;
+#[cfg(desktop)]
+mod md_cloud_tier;
 mod md_sync;
 /* [V0.11.18] 合并语义的**现状快照**（PRD C9 / 设计 §6）：五条「已知限制」的回归测试。
    拍照，不是修复——行为代码零改动，改行为前先改那个文件里的断言。 */
