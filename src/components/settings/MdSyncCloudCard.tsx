@@ -33,8 +33,9 @@ import { useMdSyncStore } from '../../stores/mdSyncStore';
 import type {
   CloudMode, MdSyncCloud, MdSyncConfig, MdSyncTestResult, MdSyncTestStepKey,
 } from '../../types/domain';
-import { isCloudReady, pollSecsOf } from './mdSyncConfig';
+import { isCloudReady } from './mdSyncConfig';
 import { CLOUD_DIR_HINT } from './mdSyncCopy';
+import { MdSyncCloudAuto } from './MdSyncCloudAuto';
 import type { MdSyncDraft } from './useMdSyncDraft';
 
 interface MdSyncCloudCardProps {
@@ -89,7 +90,8 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
     try {
       const config: MdSyncConfig = {
         enabled: draft.enabled,
-        pollSecs: pollSecsOf(draft.pollMin),
+        /* [V0.11.19] 与保存**同一份来源**（落库原值透传），不再从界面状态推算。 */
+        pollSecs: draft.pollSecs,
         /* [V0.11.16] 与保存**同一个数组**（`draft.resolvedBindings`）：这里若还用
            `draft.bindings`，就会出现「测试按草稿的旧三档跑、保存按新的写」这种没人
            能复现的错。 */
@@ -114,6 +116,8 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
 
   return (
     <div className="sync__fields">
+      {/* [V0.11.19 批 1] 三档控件占原「启用云端通道」Switch 腾出的第一行。 */}
+      <MdSyncCloudAuto draft={draft} />
       <div className="seg seg--compact" role="group" aria-label="云端通道方式">
         {MODE_ORDER.filter((value) => !IS_MOBILE || value !== 'localfolder').map((value) => (
           <button key={value} type="button" className="seg__item" disabled={saving}

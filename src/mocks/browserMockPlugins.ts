@@ -79,6 +79,7 @@ let config: MdSyncConfig = {
     baseUrl: '',
     basePath: '',
     user: '',
+    auto: { schedule: 'smart', intervalMinutes: 15 },
   },
 };
 

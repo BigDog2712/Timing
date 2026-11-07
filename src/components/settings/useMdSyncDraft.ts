@@ -18,7 +18,7 @@ import { errorText, mdSyncApi } from '../../services/api';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 import { IPC_EVENTS } from '../../types/domain';
 import type { MdSyncBinding, MdSyncCloud, MdSyncKind, MdSyncReport } from '../../types/domain';
-import { POLL_DEFAULT_MINUTES, clampMinutes, cloudToSave, emptyCloud, pollSecsOf, toMinutes } from './mdSyncConfig';
+import { MD_SYNC_POLL_SECS, cloudToSave, emptyCloud } from './mdSyncConfig';
 import { NO_SHARED, applyShared, mirrorOf, sharedAfterEdit } from './mdSyncShared';
 import type { MdSyncShared } from './mdSyncShared';
 
@@ -36,10 +36,11 @@ const CLEAN_PARTS: MdSyncDirtyParts = { format: false, sync: false, cloud: false
 export interface MdSyncDraft {
   enabled: boolean;
   setEnabled(next: boolean): void;
-  pollMin: string;
-  /** 打字只改文本；归一（夹边界 / 非数字回默认）放在 `commitPoll` */
-  setPollMin(value: string): void;
-  commitPoll(raw: string): void;
+  /**
+   * [V0.11.19] 落库原值透传（PRD §15.2）：界面已无入口，保存 / 测试连接都取这一份，
+   * 不许从任何界面状态推算。视图未回来时是后端默认值占位，`save()` 会先拦下。
+   */
+  pollSecs: number;
   bindings: MdSyncBinding[];
   /** 单框的统一意图；`{file:null, root:null}` = 用户什么都没动过 */
   shared: MdSyncShared;
@@ -89,7 +90,6 @@ export function useMdSyncDraft(): MdSyncDraft {
   const { view, loaded, loading, saving, error, load, save: storeSave, run: storeRun } = useMdSyncStore();
 
   const [enabled, setEnabledState] = useState(true);
-  const [pollMin, setPollMinState] = useState(String(POLL_DEFAULT_MINUTES));
   const [bindings, setBindings] = useState<MdSyncBinding[]>([]);
   const [shared, setSharedState] = useState<MdSyncShared>(NO_SHARED);
   const [cloud, setCloud] = useState<MdSyncCloud>(emptyCloud);
@@ -110,7 +110,6 @@ export function useMdSyncDraft(): MdSyncDraft {
   useEffect(() => {
     if (!view || dirty) return;
     setEnabledState(view.config.enabled);
-    setPollMinState(String(toMinutes(view.config.pollSecs)));
     setBindings(view.config.bindings.map((binding) => ({ ...binding })));
     const stored = view.config.cloud ?? emptyCloud();
     const converted = IS_MOBILE && stored.mode === 'localfolder';
@@ -132,7 +131,6 @@ export function useMdSyncDraft(): MdSyncDraft {
     setNotice(null);
   };
   const setEnabled = (next: boolean) => { setEnabledState(next); touch('sync'); };
-  const commitPoll = (raw: string) => { setPollMinState(String(clampMinutes(raw))); touch('sync'); };
 
   /* 单框打字：意图用**基准档的值**判断「有没有改过」，所以「打成原值 / 打完再删回原样」
      都会回到 `null`（PRD R-3 的误伤判据，见 `mdSyncShared.test.ts`）。 */
@@ -191,6 +189,9 @@ export function useMdSyncDraft(): MdSyncDraft {
      它**不是**「云端会不会跑一轮」的判据（那个是 `md_cloud::usable`，还要 `is_usable()`）。 */
   const cloudConfigured = view?.config.cloud != null;
 
+  /* 保存与「测试连接」**同一份来源**：老用户 180 就是 180，没读回视图时只是占位。 */
+  const pollSecs = view?.config.pollSecs ?? MD_SYNC_POLL_SECS;
+
   /* 放弃修改：不自己拼回填逻辑，只把 `dirty` 放回 false——上面的回填 effect 依赖
      `[view, dirty]`，会立刻按 `view` 重填草稿。这样「放弃修改」与「切到别的页签再回来」
      走的是**同一条**回填路径，不会出现两套口径。 */
@@ -203,6 +204,9 @@ export function useMdSyncDraft(): MdSyncDraft {
   };
 
   const save = async (): Promise<boolean> => {
+    /* [V0.11.19 / PRD §15.2] 视图还没回来就不许保存：否则会把上面那个 900 占位
+       写进库，老用户手填的 `pollSecs` 当场被改掉，而界面上已经没有入口能改回来。 */
+    if (!view) return false;
     try {
       /* 密码三分的**唯一**出口：`null`（没碰过）→ `undefined`（不动）。写成 `''` 是一条
          「清空密码」的指令，会把用户已存的密文删掉。
@@ -211,10 +215,9 @@ export function useMdSyncDraft(): MdSyncDraft {
          不归一的话，「本地 + 云端」点一下再点回来保存，库里会多出一个空壳 cloud 对象，
          `cloudConfigured` 随之变 true、块④ 从此默认展开。 */
       await storeSave(
-        { enabled, pollSecs: pollSecsOf(pollMin), bindings: resolvedBindings, cloud: cloudToSave(cloud, cloudConfigured) },
+        { enabled, pollSecs, bindings: resolvedBindings, cloud: cloudToSave(cloud, cloudConfigured) },
         secret ?? undefined,
       );
-      setPollMinState(String(clampMinutes(pollMin)));
       setDirty(false);
       setDirtyParts(CLEAN_PARTS);
       /* 落库后三档已被统一，`mirrorOf` 自然等于刚写的值 → 单框不跳 */
@@ -244,7 +247,7 @@ export function useMdSyncDraft(): MdSyncDraft {
   };
 
   return {
-    enabled, setEnabled, pollMin, setPollMin: setPollMinState, commitPoll, bindings,
+    enabled, setEnabled, pollSecs, bindings,
     shared, setSharedFile, setSharedRoot, resolvedBindings, updateBinding,
     cloud, updateCloud, modeConverted, secret, setSecret, dirty, dirtyParts,
     /* 老配置（V0.11.12 及以前）没有 `cloud` 这个键 → `null` → ④ 默认收起 */

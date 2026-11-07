@@ -1,8 +1,11 @@
 /**
  * Timing — 设置 · 同步 · 配置小口径（V0.11.13）
  * -----------------------------------------------------------------------------
- * 从 `MdSyncTab` / `useMdSyncDraft` 里抽出来的**唯一一份**数字与字符串口径：间隔上下限、
- * 分钟↔秒换算、云端通道空配置。
+ * 从 `MdSyncTab` / `useMdSyncDraft` 里抽出来的**唯一一份**数字与字符串口径：
+ * 云端通道空配置、校验原文就地定位、字节格式化。
+ * [V0.11.19 批 1] 块③「同步间隔」整行删除后，那一族「分钟↔秒换算 / 夹值 /
+ * 间隔文案」函数全部退场；分钟数的夹值口径搬到 `mdSyncAuto.ts`
+ * （那边是云端三档的 5–120 分钟，与 md 同步无关）。
  * [V0.11.15] 再加三类纯函数：模板展开（`previewFile` / `subDirOf`）、后端校验原文的
  * 就地定位（`splitBindingError`）、字节格式化（`formatBytes`）。它们都只做「把一份输入
  * 变成另一份字符串」，同样不读 state、不碰网络。
@@ -12,34 +15,14 @@
  */
 import type { MdSyncBinding, MdSyncBindingStatus, MdSyncCloud } from '../../types/domain';
 
-/** 间隔上下限（分钟）：与后端 `MD_SYNC_POLL_MIN_SECS / MAX_SECS` 同值 */
-export const POLL_MIN_MINUTES = 1;
-export const POLL_MAX_MINUTES = 1440;
-export const POLL_DEFAULT_MINUTES = 15;
-
-/** 秒 → 分钟（配置存秒，界面按分钟说人话） */
-export function toMinutes(secs: number): number {
-  return Math.max(POLL_MIN_MINUTES, Math.round(secs / 60));
-}
-
-/** 分钟输入归一：越界夹到边界，非数字回默认（不让用户卡在一个非法值上） */
-export function clampMinutes(raw: string): number {
-  const parsed = Number.parseInt(raw, 10);
-  if (!Number.isFinite(parsed)) return POLL_DEFAULT_MINUTES;
-  return Math.min(POLL_MAX_MINUTES, Math.max(POLL_MIN_MINUTES, parsed));
-}
-
-/** 分钟文本 → 落库口径（秒）：保存与「测试连接」共用这一处 */
-export function pollSecsOf(raw: string): number {
-  return clampMinutes(raw) * 60;
-}
-
-/** 间隔文案：整点补一句「（2 小时）」，用户不必自己心算 */
-export function describeInterval(minutes: number): string {
-  if (minutes < 60) return `${minutes} 分钟`;
-  const hours = minutes / 60;
-  return Number.isInteger(hours) ? `${minutes} 分钟（${hours} 小时）` : `${minutes} 分钟`;
-}
+/**
+ * 后端 `models/constants.rs::MD_SYNC_POLL_SECS` 的镜像，**只作占位**。
+ * [V0.11.19] 界面上已经没有 `pollSecs` 的入口：保存与「测试连接」都必须取
+ * `view.config.pollSecs` 落库原值透传（PRD §15.2）。这里的值只在「视图还没回来」
+ * 那一瞬间用来让类型有个数；`useMdSyncDraft.save()` 开头的 `if (!view) return false;`
+ * 保证它**绝不会被写回库**。
+ */
+export const MD_SYNC_POLL_SECS = 900;
 
 /* 云端通道空配置：`enabled` 必须是 `false`——视图没加载时凭空给 `true`，用户下一次
    保存就会把云端通道偷偷打开。

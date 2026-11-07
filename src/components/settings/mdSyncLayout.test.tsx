@@ -9,7 +9,7 @@ import { useMdSyncStore } from '../../stores/mdSyncStore';
    又会长回来。五条来自 PRD 第九节：
 
    B1 ① 里「日记文件名」输入框只有 1 个（原 3 个），整块 4 个输入框
-   D1 ③ 主路径只有 3 个可编辑控件（总开关 / 间隔 / 日记落点）
+   D1 ③ 主路径只有 2 个可编辑控件（总开关 / 日记落点；[V0.11.19] 间隔框已删）
    D4 三档 root 不同 → 一行提示 + 「逐个设置」；**点开前不挂载那三行**；不点直接保存 → 三档一个不动
    D5 某档被关掉 → 「便利贴这一档已关闭同步。」→ 点开能看见档位开关
    F1/F2/F3 ⑤ 默认折叠、当条记录与列表第一条同源、空列表说「还没有备份。」 */
@@ -133,10 +133,10 @@ describe('数据管理的结构（减法有没有真减掉）', () => {
     expect(container.querySelectorAll('[data-block="data-format"] input[aria-label="日记文件名"]')).toHaveLength(1);
   });
 
-  it('D1：③ 主路径只有 3 个可编辑控件（总开关 / 间隔 / 日记落点）', async () => {
+  it('D1：③ 主路径只有 2 个可编辑控件（总开关 / 日记落点）', async () => {
     await mount();
     const controls = editable('data-sync');
-    expect(controls).toHaveLength(3);
+    expect(controls).toHaveLength(2);
     expect(controls.filter((el) => el.getAttribute('role') === 'switch')).toHaveLength(1);
     expect(container.querySelector('[data-block="data-sync"] input[aria-label="日记落点根目录"]')).not.toBeNull();
     /* 三档行在收起态**根本不挂载**（不是 hidden）：DOM 里一条「文件名与标题来自」都搜不到 */

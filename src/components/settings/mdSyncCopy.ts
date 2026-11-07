@@ -34,13 +34,43 @@ export const COPY = {
   affectedNote: '这三档落点跟着数据根一起搬。',
   /** C14 · ③ hint（[V0.11.18] MD1 逐字改写：用途=日记本 / 方向=双向 / 差异=保留手写） */
   syncHint: '日记本：双向，保留你手写的内容。',
-  /** C16 · ③ 间隔旁 */
-  intervalNote: '1 分钟 ~ 24 小时',
   /** C19 · ④ hint（[V0.11.18] CL7 逐字改写：用途=多端一致 / 特征=轻量） */
   cloudHint: '多端一致用：体积小，读得快。',
   /** C21 · ⑤ hint */
   backupHint: '覆盖前留的底，可打开、可恢复。',
 } as const;
+
+/**
+ * [V0.11.19 批 1] 云端自动同步三档（12-PRD §3.4 / 设计 §11.1，逐字）。
+ * 与 `COPY` 分开：`COPY` 受 A1b「解释性长句 ≤20 字 / 全表 ≤40 字」约束，
+ * 而 `smartNote` 是一句必须说全的行为说明。独立对象也不会打乱「九句正文」那张表。
+ */
+export const AUTO_COPY = {
+  label: '自动同步',
+  off: '关闭',
+  interval: '定时',
+  smart: '智能',
+  every: '每',
+  minutes: '分钟',
+  range: '5 ~ 120 分钟',
+  smartNote: '停手 5 分钟后同步；启动时一次。',
+} as const;
+
+/**
+ * [V0.11.19 变更 A] 块④ 状态区那一行只读文字的四句（设计 §3.9 / §11.1，逐字）。
+ * 优先级由 `mdSyncAuto.ts::purgeNoteOf` 实现，不在组件里写 if 链。
+ * T03 只提供文案与选择器，状态行本身由 T04 接上 `MdSyncCloudStatus.purge` 后渲染。
+ */
+export const PURGE_COPY = {
+  paused: '往期清理已暂停：{n} 份没能删掉。点「立即同步」重试。',
+  failed: '云端只保留今天的日记；有 {n} 份往期没能删掉，下一轮再试。',
+  deleted: '云端只保留今天的日记；上次清理删了 {n} 份。',
+  idle: '云端只保留今天的日记，更早的会在同步后删除。',
+} as const;
+
+/** [V0.11.19 变更 A] 闸③ 目录重合时的逐字红字（不与上面四句互斥，单独显示）。 */
+export const PURGE_OVERLAP_NOTE =
+  '云端目录和日记目录重合了，为安全起见不会清理往期文件。请把「云端目录」换成另一个文件夹。';
 
 /** ① 三档 `file` 不同时的灰字（PRD 4.1 的「三档名称不同」口径） */
 export function mixedFileNote(labels: string[]): string {
@@ -126,4 +156,8 @@ export const REMOVED_PHRASES = [
   /* [V0.11.18] 块④ 正文第一行那个 Switch 的标签 + 卡内小标题：通道位已上移到页签顶部，
      块里不该再出现第二个布尔（PRD 4.3 D4） */
   '启用云端通道',
+  /* [V0.11.19 批 1] ③ 的「同步间隔」整行（标签 + 数字框 + MIN + 说明）一起删除，
+     PRD §3.3 / 判据 C1 要求三个串全页各 0 命中。 */
+  '同步间隔',
+  '1 分钟 ~ 24 小时',
 ] as const;

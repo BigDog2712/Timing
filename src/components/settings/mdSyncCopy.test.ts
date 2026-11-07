@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { POLL_MAX_MINUTES, POLL_MIN_MINUTES, describeInterval } from './mdSyncConfig';
 import {
   CLOSED_TIER_SUFFIX,
   CLOUD_DIR_HINT,
@@ -36,24 +35,23 @@ const EXPECTED = {
 const VALUES = Object.values(COPY);
 
 describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
-  it('九句正文与 PRD 4.0 逐字一致', () => {
+  it('八句正文与 PRD 4.0 逐字一致（C16 已随同步间隔一起删除）', () => {
     expect(COPY.formatHint).toBe(EXPECTED.C3);
     expect(COPY.fileTemplateNote).toBe(EXPECTED.C6);
     expect(COPY.safeNote).toBe(EXPECTED.C8);
     expect(COPY.dataRootHint).toBe(EXPECTED.C9);
     expect(COPY.affectedNote).toBe(EXPECTED.C11);
     expect(COPY.syncHint).toBe(EXPECTED.C14);
-    expect(COPY.intervalNote).toBe(EXPECTED.C16);
     expect(COPY.cloudHint).toBe(EXPECTED.C19);
     expect(COPY.backupHint).toBe(EXPECTED.C21);
   });
 
-  it('C16 与间隔上下限同源（改数字忘了改文案 = 界面自相矛盾）', () => {
-    expect(COPY.intervalNote).toBe(`${POLL_MIN_MINUTES} 分钟 ~ ${POLL_MAX_MINUTES / 60} 小时`);
-    /* v0.11.15 那句长尾（「改动后点下面的『保存并同步』」）按 C16 已删 */
-    expect(COPY.intervalNote).not.toContain('保存并同步');
-    /* `describeInterval` 仍在（别的口径用得到），但它不再进 ③ 的 hint */
-    expect(COPY.syncHint).not.toContain(describeInterval(15));
+  it('C1 / C16：间隔文案整句进 REMOVED_PHRASES，常量表里零命中', () => {
+    expect(COPY).not.toHaveProperty('intervalNote');
+    expect(REMOVED_PHRASES).toContain(EXPECTED.C16);
+    expect(REMOVED_PHRASES).toContain('同步间隔');
+    for (const value of VALUES) expect(value).not.toContain(EXPECTED.C16);
+    for (const value of VALUES) expect(value).not.toContain('同步间隔');
   });
 
   it('A1b：解释性长句恰好 4 句，且都不超过 20 字、也不许再长回来', () => {
@@ -77,6 +75,9 @@ describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
       '再送一份到坚果云。',
       '多久写一次、写到哪个目录。',
       '启用云端通道',
+      /* [V0.11.19 批 1] ③「同步间隔」整行删除 */
+      '同步间隔',
+      '1 分钟 ~ 24 小时',
     ]);
     /* 它们不许悄悄回到常量表里 */
     for (const phrase of REMOVED_PHRASES) {

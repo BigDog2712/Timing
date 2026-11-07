@@ -20,6 +20,26 @@ import type { MdSyncView } from './mdSync';
 /** 云端通道的两种部署方式（线缆值全小写，见上方说明） */
 export type CloudMode = 'localfolder' | 'webdav';
 
+/** [V0.11.19 批 1] 云端自动同步三档（后端 `CloudSchedule` 的 lowercase 线缆值）。 */
+export type CloudSchedule = 'off' | 'interval' | 'smart';
+
+/**
+ * [V0.11.19 批 1] 三档配置。**两个字段必须分开**（PRD §15.2.1 H-2）：
+ * 切档只改 `schedule`，`intervalMinutes` 原样带过，否则「定时 30 → 智能 → 定时」
+ * 会把用户填的 30 盖回 15。
+ */
+export interface MdSyncCloudAuto {
+  schedule: CloudSchedule;
+  intervalMinutes: number;
+}
+
+/** [V0.11.19 变更 A] 块④ 状态区那一行只读文字的数据来源（T04 接后端）。 */
+export interface MdCloudPurgeStatus {
+  paused: boolean;
+  deleted: number;
+  failed: number;
+}
+
 /** 云端通道配置（`MdSyncConfig.cloud`；老配置没有这个字段 → 运行时是 `null`） */
 export interface MdSyncCloud {
   enabled: boolean;
@@ -32,6 +52,11 @@ export interface MdSyncCloud {
   basePath: string;
   /** `webdav`：账号（坚果云要的是「应用密码」对应的账号） */
   user: string;
+  /**
+   * [V0.11.19] 可选：老后端 / 老配置 / 老 mock 没有这个键时前端按「智能 + 15」显示，
+   * **只在用户动过档位时写回**，避免把「没有」写成「默认」而破坏老配置逐字节不变。
+   */
+  auto?: MdSyncCloudAuto;
 }
 
 /** 云端通道的运行时状态（设置页原样展示，不臆造「成功」） */
@@ -45,6 +70,8 @@ export interface MdSyncCloudStatus {
   /** 待上传的日期（升序，`YYYY-MM-DD`） */
   pendingDates: string[];
   lastError: string | null;
+  /** [V0.11.19 变更 A] 往期清理状态；可选，老后端不回这个字段时界面按常态句显示。 */
+  purge?: MdCloudPurgeStatus;
 }
 
 /** `md_sync_get` / `md_sync_save` 的返回：基础视图 + 云端状态（后端 `flatten`） */

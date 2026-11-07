@@ -241,9 +241,9 @@ describe('QA · 文案与「不再暗示汇总」（PRD F1 / F2 / F6）', () => 
     expect(text).toContain('多端一致用：体积小，读得快。');
   });
 
-  it('F1 + REMOVED_PHRASES：六条已删文案全页零命中（textContent / title / aria-label）', async () => {
+  it('F1 + REMOVED_PHRASES：八条已删文案全页零命中（textContent / title / aria-label）', async () => {
     await mount();
-    expect(REMOVED_PHRASES).toHaveLength(6);
+    expect(REMOVED_PHRASES).toHaveLength(8);
     const text = allText();
     for (const phrase of REMOVED_PHRASES) expect(text).not.toContain(phrase);
     /* §4.3 删除项里本批要零命中的三条 */
