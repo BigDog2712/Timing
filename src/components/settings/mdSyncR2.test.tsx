@@ -143,7 +143,7 @@ describe('R1：云端默认进 WebDAV 分段（cloud === null）', () => {
     api.get.mockResolvedValue(view({ cloud: null }));
     await mount();
     await act(async () => { foldToggle('WebDAV 云端同步').click(); await Promise.resolve(); });
-    const segs = Array.from(container.querySelectorAll('.seg__item'));
+    const segs = Array.from(container.querySelectorAll('[data-block="data-cloud"] .seg__item')); // [V0.11.18] 只数块④的分段（页签顶部的「存储通道」也是 .seg__item）
     const on = segs.filter((el) => el.getAttribute('data-on') === 'true').map((el) => el.textContent);
     expect(on).toEqual(['WebDAV']);
     expect(segs.find((el) => el.textContent === 'WebDAV')?.getAttribute('aria-pressed')).toBe('true');

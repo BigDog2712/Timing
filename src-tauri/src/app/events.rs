@@ -60,7 +60,12 @@ pub async fn emit_timer_state(app: &AppHandle, pool: &SqlitePool) {
 #[cfg(desktop)]
 async fn sync_tray(app: &AppHandle, pool: &SqlitePool, state: &crate::models::timer::TimerState) {
     match services::timer::tray_snapshot(pool, state).await {
-        Ok(snapshot) => crate::app::tray::sync_status(app, &snapshot),
+        Ok(snapshot) => {
+            /* [V0.11.18] 同步项的文案随「生效通道」变（PRD TR1）。判据在
+            `tray_sync::sync_label`（它读 `md_cloud::usable`），这里只负责传下去。 */
+            let label = crate::app::tray_sync::sync_label(pool).await;
+            crate::app::tray::sync_status(app, &snapshot, label);
+        }
         Err(err) => crate::log_warn!("build tray snapshot failed: {err}"),
     }
 }
@@ -72,6 +77,28 @@ async fn sync_tray(
     _state: &crate::models::timer::TimerState,
 ) {
 }
+
+/// **只**重建托盘菜单，不广播任何事件（[V0.11.18]，设计 §4.3）。
+///
+/// 为什么需要它：K-30 是「仅在计时状态迁移时重建」，而**通道切换不是状态迁移**。
+/// 没有这个入口，用户改完设置右键托盘还是旧标签，要等下一次开始 / 暂停计时才看到——
+/// 「改了没生效」的经典体感（PRD §3.2「重建时机」）。
+///
+/// 复用 `sync_tray` 而不是自己再装一遍菜单：重建逻辑只有一份，否则「状态迁移时重建」与
+/// 「通道变更时重建」迟早给出两份不同的菜单。
+///
+/// **不发事件**（`refresh_tray` 是 Rust 内部函数调用，没有 `emit`）→ 契约零新增。
+/// 失败不传播：调用点在 `md_sync_save` 的成功路径上，一次菜单重建失败不该让「保存成功」
+/// 变成「保存失败」（`sync_tray` 内部已经 `if let Ok`）。
+#[cfg(desktop)]
+pub async fn refresh_tray(app: &AppHandle, pool: &SqlitePool) {
+    if let Ok(state) = services::timer::state(pool).await {
+        sync_tray(app, pool, &state).await;
+    }
+}
+
+#[cfg(mobile)]
+pub async fn refresh_tray(_app: &AppHandle, _pool: &SqlitePool) {}
 
 /// 读取最新主题 / 四色并广播 `theme-changed`（所有窗口自订阅，K-21）。
 pub async fn emit_theme_changed(app: &AppHandle, pool: &SqlitePool) {

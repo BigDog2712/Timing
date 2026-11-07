@@ -27,6 +27,9 @@ mod md_cloud_folder;
 mod md_cloud_pending;
 mod md_cloud_round;
 mod md_sync;
+/* [V0.11.18] 合并语义的**现状快照**（PRD C9 / 设计 §6）：五条「已知限制」的回归测试。
+   拍照，不是修复——行为代码零改动，改行为前先改那个文件里的断言。 */
+mod md_sync_conflict_semantics;
 mod md_sync_disabled_gate;
 mod md_sync_duration;
 mod md_sync_edges;
@@ -94,5 +97,9 @@ mod todo_start;
 mod tray_batch2;
 mod tray_menu;
 mod tray_menu_md_sync;
+/* [V0.11.18] 托盘同步项的文案（读「生效通道」而非配置）+ 退出前那一轮。
+   桌面独占：`app::tray_sync` 本身就是 `#[cfg(desktop)]`。 */
+#[cfg(desktop)]
+mod tray_sync_quit;
 mod window_geometry;
 mod window_spec;

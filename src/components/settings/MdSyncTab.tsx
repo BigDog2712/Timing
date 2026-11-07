@@ -15,6 +15,8 @@
  *    块①/③ 就地显示，页签顶部只留「保存动作本身」的结果。
  * 4. **[V0.11.16] 页签顶部没有导览句、底部没有注脚**（C1 / C2 整段删除）：
  *    「今天」进了 ① 与 ③ 的只读行，「日记其他内容不动」只留在块①末句（PRD A1 / A2 / A3）。
+ *    [V0.11.18] 页签顶部允许出现一行**控件**（存储通道二选一，PRD 2.2a），但仍然不许
+ *    出现一行**导览说明**。
  *
  * 「立即同步」在 `dirty` 时禁用：草稿里的值还没落库，按它同步一轮等于拿旧配置去跑。
  */
@@ -24,6 +26,7 @@ import { MdBackupSummaryLine } from './MdBackupSummaryLine';
 import { MdDataRootBlock } from './MdDataRootBlock';
 import { MdFormatBlock } from './MdFormatBlock';
 import { MdSyncBackupCard } from './MdSyncBackupCard';
+import { MdSyncChannelSeg } from './MdSyncChannelSeg';
 import { MdSyncCloudCard } from './MdSyncCloudCard';
 import { MdSyncLocalBlock } from './MdSyncLocalBlock';
 import { COPY } from './mdSyncCopy';
@@ -47,6 +50,12 @@ export function MdSyncTab() {
       <header className="data__head">
         <h3 className="data__title">数据管理</h3>
       </header>
+
+      {/* [V0.11.18] 存储通道（PRD 三 / CH1–CH4）：`h3 数据管理` 正下方、**在 `<header>` 之外**。
+          `.data` 是 `display:flex; gap`，所以它自己就带上了与五块一致的间距——不新增 CSS。
+          放进 `.data__head` 会让 `mdSyncA1.test.tsx` 的
+          `expect(head?.textContent).toBe('数据管理')` 立刻红（那是 `toBe` 不是 `toContain`）。 */}
+      <MdSyncChannelSeg draft={draft} />
 
       {globalError && <p className="sync__error">{globalError}</p>}
       {notice && <p className="sync__ok">{notice}</p>}

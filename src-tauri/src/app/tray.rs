@@ -13,7 +13,7 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::app::{events, tray_sync};
+use crate::app::{events, tray_quit, tray_sync};
 use crate::infra::{tray_menu, window};
 use crate::models::enums::{ResolveAction, TrayStatus};
 use crate::models::timer::TraySnapshot;
@@ -31,7 +31,10 @@ const TRAY_ICON_PNG: &[u8] = include_bytes!("../../icons/tray.png");
 
 /// 构建托盘（启动时一次）。初始菜单取空闲态快照。
 pub fn build(app: &AppHandle) -> tauri::Result<()> {
-    let menu = build_menu(app, &TraySnapshot::idle())?;
+    /* [V0.11.18] 启动期配置还没加载，同步项先说「Markdown 同步」——安全默认：
+    说「云端同步」而云端其实没配，比反过来更糟。下一次状态迁移（`events::sync_tray`）
+    就会用 `tray_sync::sync_label` 读到的真值修正它。 */
+    let menu = build_menu(app, &TraySnapshot::idle(), tray_sync::LOCAL_LABEL)?;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
@@ -79,11 +82,15 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
 /// 按当前计时状态重建托盘菜单（状态迁移时调用；见 `events::emit_timer_state`）。
 ///
 /// 托盘可能尚未创建（启动早期 / 无托盘环境）→ 静默跳过。
-pub fn sync_status(app: &AppHandle, snapshot: &TraySnapshot) {
+///
+/// [V0.11.18] `sync_label` 由调用方（`events::sync_tray` 的装配路径）用
+/// `tray_sync::sync_label` 读好传进来：本模块不做「哪个通道生效」的判断，
+/// 那件事的判据只允许有一份（`md_cloud::usable`）。
+pub fn sync_status(app: &AppHandle, snapshot: &TraySnapshot, sync_label: &str) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {
         return;
     };
-    match build_menu(app, snapshot) {
+    match build_menu(app, snapshot, sync_label) {
         Ok(menu) => {
             if let Err(err) = tray.set_menu(Some(menu)) {
                 crate::log_warn!("tray set_menu failed: {err}");
@@ -94,7 +101,11 @@ pub fn sync_status(app: &AppHandle, snapshot: &TraySnapshot) {
 }
 
 /// 由状态快照装配原生菜单。
-fn build_menu(app: &AppHandle, snapshot: &TraySnapshot) -> tauri::Result<Menu<tauri::Wry>> {
+fn build_menu(
+    app: &AppHandle,
+    snapshot: &TraySnapshot,
+    sync_label: &str,
+) -> tauri::Result<Menu<tauri::Wry>> {
     let line = match snapshot.status {
         TrayStatus::Countdown => tray_menu::countdown_status_line(
             &snapshot.item_name,
@@ -103,7 +114,7 @@ fn build_menu(app: &AppHandle, snapshot: &TraySnapshot) -> tauri::Result<Menu<ta
         _ => tray_menu::status_line(snapshot.status, &snapshot.item_name, snapshot.duration_sec),
     };
     let menu = Menu::new(app)?;
-    for node in tray_menu::build_nodes(snapshot.status, &line) {
+    for node in tray_menu::build_nodes(snapshot.status, &line, sync_label) {
         match node {
             tray_menu::TrayNode::Separator => menu.append(&PredefinedMenuItem::separator(app)?)?,
             tray_menu::TrayNode::Item { id, label, enabled } => {
@@ -137,7 +148,9 @@ fn on_menu_event(app: &AppHandle, id: &str) {
             let _ = app.emit(events::APP_OPEN_NEW_NOTE, ());
         }
         tray_menu::ID_MD_SYNC => tray_sync::spawn(app),
-        tray_menu::ID_QUIT => app.exit(0),
+        /* [V0.11.18] 退出不再是无条件 `app.exit(0)`：先跑一轮同步，硬上限 3 秒，
+        超时照样退出（PRD §13.3.1 / B7）。杀进程那条路**什么都不做**（B9）。 */
+        tray_menu::ID_QUIT => tray_quit::quit_after_sync(app),
         tray_menu::ID_TIMER_START => spawn_action(app, TrayAction::Start),
         tray_menu::ID_TIMER_PAUSE => spawn_action(app, TrayAction::Pause),
         tray_menu::ID_TIMER_RESUME => spawn_action(app, TrayAction::Resume),

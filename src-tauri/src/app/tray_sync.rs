@@ -23,7 +23,7 @@ use crate::state::AppState;
 /// 所以连点靠这里挡：一轮同步正在跑时，后续点击**不再起新的一轮**（不是排队，也不并发写文件），
 /// 但会收到一条「还在进行中」的通知——`log_warn` 对点菜单的人是不可见的，
 /// 只写日志等于又一次「点了没反应」。
-static RUNNING: AtomicBool = AtomicBool::new(false);
+pub(super) static RUNNING: AtomicBool = AtomicBool::new(false);
 
 /// 「还在进行中」这句提示本轮是否已经弹过。
 ///
@@ -40,7 +40,10 @@ static BUSY_NOTICE_SHOWN: AtomicBool = AtomicBool::new(false);
 ///    `store(false)` 永不执行 —— 用户看到的就是「托盘菜单点了完全没反应」，且没有任何线索。
 ///
 /// `Drop` 在正常返回、`?` 早退、unwind 三种路径上都会跑到，这才是复位该在的位置。
-struct Gate;
+///
+/// [V0.11.18] `pub(super)`：`app/tray_quit.rs`（退出前同步）要复用同一把闸，
+/// 但 `Gate` 的 `Drop` 语义只该有一处定义。
+pub(super) struct Gate;
 
 impl Drop for Gate {
     fn drop(&mut self) {
@@ -48,20 +51,67 @@ impl Drop for Gate {
     }
 }
 
-/// 托盘「Markdown 同步」入口：抢闸 → 异步跑一轮。
-pub(crate) fn spawn(app: &AppHandle) {
+/// 抢闸：抢到 → `Some(Gate)`（作用域结束复位）；抢不到 → `None`，**且不构造 `Gate`**。
+///
+/// [V0.11.18] 抽成函数是为了让「先试抢、抢不到立刻早退」变成**类型上唯一可能的形状**：
+/// 调用方拿到的是 `Option<Gate>`，写不出「先 `let _gate = Gate;` 再判 `RUNNING`」这种
+/// 会在**别人正在跑的那一轮**身上复位闸的错法（`spawn` 与 `quit_after_sync` 共用）。
+pub(super) fn try_acquire() -> Option<Gate> {
     /* `swap` 是原子的「读 + 置位」，比 `load` 再 `store` 少一个竞态窗口。 */
     if RUNNING.swap(true, Ordering::SeqCst) {
+        return None;
+    }
+    Some(Gate)
+}
+
+/// 托盘「Markdown 同步」这一项的**标签**：读**生效通道**，不读草稿里的选择。
+///
+/// [V0.11.18] 判据是 `md_cloud::usable`（`enabled && is_usable()`），**不是**
+/// `cloud.enabled`：后者只说明用户选了「本地 + 云端」，字段没填全时那一轮实际仍走
+/// `md_sync::run`（`md_cloud::round` 首行就转交），标签若跟着 `enabled` 走，就会出现
+/// 「写着云端同步、其实只写本地」——比不写更糟。这也与 `round` / 轮询 / 手机端四处同源。
+///
+/// 有意让 `infra` 不参与判断：`infra/tray_menu.rs` 只负责把这段文字放进菜单项
+/// （它不许依赖 `services`，见分层门禁），判据留在装配层。
+///
+/// 读配置失败按「只用本地」处理：标签只是提示，为它弹错误或让托盘崩掉都不划算，
+/// 真正的失败会由本轮同步的通知 / 块④ 状态行说出来。
+pub(crate) async fn sync_label(pool: &SqlitePool) -> &'static str {
+    match services::md_sync::config::load(pool).await {
+        Ok(config) => {
+            if services::md_cloud::usable(&config).is_some() {
+                CLOUD_LABEL
+            } else {
+                LOCAL_LABEL
+            }
+        }
+        Err(err) => {
+            crate::log_warn!("tray sync label: load config failed: {err}");
+            LOCAL_LABEL
+        }
+    }
+}
+
+/// 「只用本地」时的菜单项文字（与 `tray.rs` 首次装配用的常量一致）。
+pub(crate) const LOCAL_LABEL: &str = "Markdown 同步";
+/// 「本地 + 云端」生效时的菜单项文字。
+pub(crate) const CLOUD_LABEL: &str = "云端同步";
+
+/// 托盘「Markdown 同步」入口：抢闸 → 异步跑一轮。
+pub(crate) fn spawn(app: &AppHandle) {
+    /* 抢不到就早退：`try_acquire` 只在这一种情况下返回 `None`，而且**没有**构造 `Gate`，
+    所以不会把别人那一轮的闸复位掉。 */
+    let Some(gate) = try_acquire() else {
         crate::log_warn!("tray md sync ignored: previous run still in flight");
         notify_busy_once(app);
         return;
-    }
+    };
     /* 本轮开始：允许下一条「进行中」提示再弹一次。 */
     BUSY_NOTICE_SHOWN.store(false, Ordering::SeqCst);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         /* 抢到闸之后立刻持有：后面 `?` 早退 / panic / 正常结束都由 `Drop` 复位。 */
-        let _gate = Gate;
+        let _gate = gate;
         let pool = app.state::<AppState>().pool.clone();
         run_once(&app, &pool).await;
     });

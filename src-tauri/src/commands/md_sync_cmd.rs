@@ -67,6 +67,12 @@ pub async fn md_sync_save(
     md_credential::apply(secret).await?;
     let pool = pool_of(&app);
     md_sync::config::save(&pool, &config).await?;
+    /* [V0.11.18] 通道可能刚被改（只用本地 ↔ 本地 + 云端），托盘那一项的标签要立刻跟上。
+       K-30 的「仅状态迁移时重建」在这里**不够**：通道切换不是状态迁移（PRD §3.2）。
+       位置在 `config::save` **之后**、`round` **之前**：标签要读的是刚落库的那份配置。
+       这不是新命令、不是新事件 → 契约账面零变；`pool` 复用上面那个变量，不再取一次。 */
+    #[cfg(desktop)]
+    events::refresh_tray(&app, &pool).await;
     let outcome = md_cloud::round(&pool).await?;
     announce(&app, &outcome.report);
     md_cloud::view(&pool).await

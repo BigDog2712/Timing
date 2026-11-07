@@ -27,9 +27,9 @@ const EXPECTED = {
   C8: '只改这三个标题下面的内容，日记其他内容不动。',
   C9: '数据库和备份放这里。',
   C11: '这三档落点跟着数据根一起搬。',
-  C14: '多久写一次、写到哪个目录。',
+  C14: '日记本：双向，保留你手写的内容。',
   C16: '1 分钟 ~ 24 小时',
-  C19: '再送一份到坚果云。',
+  C19: '多端一致用：体积小，读得快。',
   C21: '覆盖前留的底，可打开、可恢复。',
 } as const;
 
@@ -68,8 +68,16 @@ describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
     expect(COPY.safeNote.length).toBeGreaterThan(20);
   });
 
-  it('A2：三条被删掉的句子仍留在 REMOVED_PHRASES 里（供全页零命中断言）', () => {
-    expect([...REMOVED_PHRASES]).toEqual(['以 Markdown 为准', '文件名与标题来自', '文件放在哪个目录']);
+  it('A2：被删掉的句子仍留在 REMOVED_PHRASES 里（供全页零命中断言）', () => {
+    /* [V0.11.18] 追加 3 条：两条旧 hint（MD1 / CL7）+ 块④ 那个 Switch 的标签 */
+    expect([...REMOVED_PHRASES]).toEqual([
+      '以 Markdown 为准',
+      '文件名与标题来自',
+      '文件放在哪个目录',
+      '再送一份到坚果云。',
+      '多久写一次、写到哪个目录。',
+      '启用云端通道',
+    ]);
     /* 它们不许悄悄回到常量表里 */
     for (const phrase of REMOVED_PHRASES) {
       for (const value of VALUES) expect(value).not.toContain(phrase);

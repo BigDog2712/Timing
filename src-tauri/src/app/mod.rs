@@ -37,6 +37,10 @@ pub mod portable_prompt;
 pub mod preboot;
 #[cfg(desktop)]
 pub mod tray;
+/* [V0.11.18] 托盘「退出」之前那一轮同步（PRD §13.3）。与 `tray_sync` 拆开：那边是
+「点同步之后做什么」，这里是「点退出之前做什么」，两者改动的理由不同。 */
+#[cfg(desktop)]
+pub mod tray_quit;
 /* [V0.11.7] 托盘「Markdown 同步」点完之后做的事（拆出 `tray` 以满足单文件 ≤300 行）。 */
 #[cfg(desktop)]
 pub mod tray_sync;

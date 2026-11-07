@@ -43,6 +43,9 @@ export function describeInterval(minutes: number): string {
 
 /* 云端通道空配置：`enabled` 必须是 `false`——视图没加载时凭空给 `true`，用户下一次
    保存就会把云端通道偷偷打开。
+   [V0.11.18] `enabled` 的语义已升格为**存储通道**（`true` = 本地 + 云端，`false` = 只用
+   本地），所以 `false` 这条默认值现在有第二个理由：从没配过云端的人默认「只用本地」，
+   与 PRD A1 的默认态一致。（旧理由仍成立：凭空 `true` 仍会在下一次保存时打开云端。）
    [V0.11.16] 三个默认值（PRD R7 / 裁决 Q1 / QA F1 回修）：`mode` + 服务地址 + 远端目录
    **直接写进值**（不是 placeholder），最常见的那台服务器开箱可用。
    `mode: 'webdav'` 是 F1 修的：v0.11.16 首版留 `localfolder`，于是「服务地址自动默认
@@ -62,6 +65,54 @@ export function emptyCloud(): MdSyncCloud {
     basePath: '/Timing',
     user: '',
   };
+}
+
+/**
+ * [V0.11.18] 存储通道（PRD 三 / CH1–CH4）：页签顶部那个二选一。
+ *
+ * `local` = 只跑 Markdown 同步（写本地 md 文件）；`both` = Markdown 同步 + 云端通道。
+ * 它**不是**「数据搬进云端、本地不落」——SQLite 永远在本机（PRD §10-N6）。
+ */
+export type MdSyncChannel = 'local' | 'both';
+
+/**
+ * 通道的**唯一**判据。整个前端不许出现第二份 `cloud.enabled ? .. : ..`。
+ *
+ * 真相在 `MdSyncCloud.enabled`（`models/md_sync_cloud.rs:64-65`）：`true` = 本地 + 云端，
+ * `false` = 只用本地。老配置 `enabled: true` 直接推出「本地 + 云端」，**读的时候不改盘**，
+ * 所以不需要迁移脚本（选候选 A「新增字段」就必须写迁移，已在设计 §2.2 否决）。
+ *
+ * `draft.cloud` 永远非 null（`useMdSyncDraft` 回填时 `?? emptyCloud()`），本函数因此
+ * 不接受 null：让类型把这条不变量说出来，比在函数体里判 null 更早挡住误用。
+ */
+export function channelOf(cloud: MdSyncCloud): MdSyncChannel {
+  return cloud.enabled ? 'both' : 'local';
+}
+
+/**
+ * 反向：分段控件点击 → 要写进草稿的那份 cloud。**只动 `enabled`**，其余字段原样保留。
+ *
+ * CH4「云端配置已保留，切回即恢复」就是靠这一行成立的：切到「只用本地」不碰地址 /
+ * 远端目录 / 账号，密文本来也不在这里（在 keychain）。
+ */
+export function withChannel(cloud: MdSyncCloud, next: MdSyncChannel): MdSyncCloud {
+  return { ...cloud, enabled: next === 'both' };
+}
+
+/**
+ * 保存前归一：**从没配过**（`wasConfigured === false`）且用户最终停在「只用本地」→ 落
+ * `null`，让这类用户的库与 v0.11.17 完全 diff 为零；配过的人一概不归一（CH4）。
+ *
+ * 不这么做的后果很具体：从没配过云端的人点一下「本地 + 云端」再点回「只用本地」保存，
+ * 落库会从 `cloud: null` 变成 `{enabled:false, mode:'webdav', baseUrl:'https://dav.jianguoyun.com/dav/', …}`
+ * ——库里多出一个「像是配过」的对象，`cloudConfigured` 随之变 `true`，块④ 从此默认展开。
+ *
+ * `wasConfigured` 取**保存动作那一刻的视图值**（`view.config.cloud != null`），不是草稿：
+ * 草稿里的 cloud 永远非 null，判不出「从没配过」。
+ */
+export function cloudToSave(cloud: MdSyncCloud, wasConfigured: boolean): MdSyncCloud | null {
+  if (wasConfigured || cloud.enabled) return cloud;
+  return null;
 }
 
 /**

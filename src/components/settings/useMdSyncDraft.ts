@@ -18,7 +18,7 @@ import { errorText, mdSyncApi } from '../../services/api';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 import { IPC_EVENTS } from '../../types/domain';
 import type { MdSyncBinding, MdSyncCloud, MdSyncKind, MdSyncReport } from '../../types/domain';
-import { POLL_DEFAULT_MINUTES, clampMinutes, emptyCloud, pollSecsOf, toMinutes } from './mdSyncConfig';
+import { POLL_DEFAULT_MINUTES, clampMinutes, cloudToSave, emptyCloud, pollSecsOf, toMinutes } from './mdSyncConfig';
 import { NO_SHARED, applyShared, mirrorOf, sharedAfterEdit } from './mdSyncShared';
 import type { MdSyncShared } from './mdSyncShared';
 
@@ -51,7 +51,11 @@ export interface MdSyncDraft {
   resolvedBindings: MdSyncBinding[];
   /** `part` = 这次改动属于哪一块（① 改 file/heading，③ 改 root/enabled） */
   updateBinding(index: number, next: MdSyncBinding, part: 'format' | 'sync'): void;
+  /** 草稿里的云端配置。**永远非 null**（没配过时是 `emptyCloud()`）。 */
   cloud: MdSyncCloud;
+  /* `[V0.11.18]` 这个 `cloud.enabled` 现在表达的是**存储通道**（`true` = 本地 + 云端，
+  `false` = 只用本地），不再是「云端开关」。界面上的唯一判据是 `mdSyncConfig::channelOf`，
+  不许在组件里再写一份 `cloud.enabled ? .. : ..`。 */
   updateCloud(next: MdSyncCloud): void;
   /**
    * `true` = 存的那份是「本地目录」，手机端不支持，已按 WebDAV 显示**并将按 WebDAV 保存**。
@@ -180,6 +184,13 @@ export function useMdSyncDraft(): MdSyncDraft {
   /** 发给后端的那一份：所有写库 / 测试连接的**唯一**出口 */
   const resolvedBindings = useMemo(() => applyShared(bindings, shared), [bindings, shared]);
 
+  /* `view.config.cloud !== null` = 「**曾经**配过云端」。它有两个用处，语义完全不同，
+     混用会同时错两处：
+     1. 块④ 的默认展开判据（`MdSyncTab` 的 `defaultOpen`）——没配过的人不必先看六个空框；
+     2. `save()` 里 `cloudToSave` 的归一判据（[V0.11.18]，CH4「只归一从没配过的人」）。
+     它**不是**「云端会不会跑一轮」的判据（那个是 `md_cloud::usable`，还要 `is_usable()`）。 */
+  const cloudConfigured = view?.config.cloud != null;
+
   /* 放弃修改：不自己拼回填逻辑，只把 `dirty` 放回 false——上面的回填 effect 依赖
      `[view, dirty]`，会立刻按 `view` 重填草稿。这样「放弃修改」与「切到别的页签再回来」
      走的是**同一条**回填路径，不会出现两套口径。 */
@@ -194,8 +205,15 @@ export function useMdSyncDraft(): MdSyncDraft {
   const save = async (): Promise<boolean> => {
     try {
       /* 密码三分的**唯一**出口：`null`（没碰过）→ `undefined`（不动）。写成 `''` 是一条
-         「清空密码」的指令，会把用户已存的密文删掉。 */
-      await storeSave({ enabled, pollSecs: pollSecsOf(pollMin), bindings: resolvedBindings, cloud }, secret ?? undefined);
+         「清空密码」的指令，会把用户已存的密文删掉。
+         [V0.11.18] `cloud` 走 `cloudToSave` 归一：**从没配过**且停在「只用本地」→ 落
+         `null`（与 v0.11.17 零 diff）；配过的人一概原样保留（CH4 要求地址/目录/账号都在）。
+         不归一的话，「本地 + 云端」点一下再点回来保存，库里会多出一个空壳 cloud 对象，
+         `cloudConfigured` 随之变 true、块④ 从此默认展开。 */
+      await storeSave(
+        { enabled, pollSecs: pollSecsOf(pollMin), bindings: resolvedBindings, cloud: cloudToSave(cloud, cloudConfigured) },
+        secret ?? undefined,
+      );
       setPollMinState(String(clampMinutes(pollMin)));
       setDirty(false);
       setDirtyParts(CLEAN_PARTS);
@@ -230,7 +248,7 @@ export function useMdSyncDraft(): MdSyncDraft {
     shared, setSharedFile, setSharedRoot, resolvedBindings, updateBinding,
     cloud, updateCloud, modeConverted, secret, setSecret, dirty, dirtyParts,
     /* 老配置（V0.11.12 及以前）没有 `cloud` 这个键 → `null` → ④ 默认收起 */
-    cloudConfigured: view?.config.cloud != null,
+    cloudConfigured,
     saving, loading, loaded, error, notice,
     clearNotice: () => setNotice(null), discard, save, run, open,
   };

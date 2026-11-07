@@ -80,7 +80,12 @@ pub fn status_line(status: TrayStatus, item_name: &str, duration_sec: i64) -> St
 ///
 /// 结构：状态组 ─ 控制组（按状态裁剪） ─ 常用组 ─ 退出。
 /// 控制组**不生成不可用项**（方案 Ⅰ：裁剪，而非灰置）。
-pub fn build_nodes(status: TrayStatus, line: &str) -> Vec<TrayNode> {
+///
+/// [V0.11.18] `sync_label` 由**装配层**算好传进来（`app::tray_sync::sync_label`）。
+/// 本模块不许读库：`infra` 不能依赖 `services`（R5，`npm run check:layers` 会拦），
+/// 也不许自己判通道——「生效通道」的判据只允许有一份，就在 `md_cloud::usable`。
+/// **菜单项的数量与 id 不因标签变而变**：通道切换只换那一项的文字，否则菜单结构会跳。
+pub fn build_nodes(status: TrayStatus, line: &str, sync_label: &str) -> Vec<TrayNode> {
     let mut nodes = vec![TrayNode::item(ID_STATUS, line, false), TrayNode::Separator];
 
     match status {
@@ -104,8 +109,10 @@ pub fn build_nodes(status: TrayStatus, line: &str) -> Vec<TrayNode> {
     nodes.push(TrayNode::item(ID_OPEN_TODOS, "打开事项", true));
     /* [V0.11.7] 紧随「打开事项」：同步的对象就是事项计时，位置贴着数据本身讲。
     文案纯文本、无符号（P0）；`enabled` 恒真——未启用同步时的反馈由点击侧给通知，
-    不在这里灰置（灰置等于「点了没反应」，用户看不出该去哪儿开）。 */
-    nodes.push(TrayNode::item(ID_MD_SYNC, "Markdown 同步", true));
+    不在这里灰置（灰置等于「点了没反应」，用户看不出该去哪儿开）。
+    [V0.11.18] 文案参数化：通道 = 只用本地 → `Markdown 同步`（逐字沿用，老用户零变化），
+    本地 + 云端 → `云端同步`（PRD TR1 / §4.2 TR3）。`ID_MD_SYNC` 一个字不动。 */
+    nodes.push(TrayNode::item(ID_MD_SYNC, sync_label, true));
     nodes.push(TrayNode::item(ID_OPEN_NOTE, "便利贴…", true));
     nodes.push(TrayNode::item(ID_OPEN_SETTINGS, "设置…", true));
     nodes.push(TrayNode::Separator);

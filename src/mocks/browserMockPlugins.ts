@@ -236,7 +236,10 @@ export function createMockApiPlugins(): Record<string, (args?: unknown) => unkno
        给，走查时看到的就是用户会看到的那句话。 */
     md_sync_test: (args): MdSyncTestResult => {
       const cloud = (args as { config?: MdSyncConfig } | undefined)?.config?.cloud;
-      if (!cloud || !cloud.enabled) return { ok: false, detail: '还没开启云端通道' };
+      /* 与真机 `probe.rs:44-49` 同序：先看有没有通道，再看 mode 分派。`enabled` **不参与**
+         判定——它现在表达「通道 = 本地 + 云端」，而「只用本地」时真机 LocalFolder 分支不看
+         enabled，回的是目录可写。以前先判 enabled 直接报红：走查看到红、实机看到绿。 */
+      if (!cloud) return { ok: false, detail: '还没配置云端通道' };
       if (cloud.mode === 'localfolder') {
         const root = cloud.localRoot.trim();
         return root

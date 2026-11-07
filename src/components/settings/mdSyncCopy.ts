@@ -32,12 +32,12 @@ export const COPY = {
   dataRootHint: '数据库和备份放这里。',
   /** C11 · ② 仅当确有 `%APP_DIR%` 落点时出现（三档时的原句；不足三档见 `affectedNoteFor`） */
   affectedNote: '这三档落点跟着数据根一起搬。',
-  /** C14 · ③ hint（不再拼 `describeInterval`：间隔值就在下面那个数字框里） */
-  syncHint: '多久写一次、写到哪个目录。',
+  /** C14 · ③ hint（[V0.11.18] MD1 逐字改写：用途=日记本 / 方向=双向 / 差异=保留手写） */
+  syncHint: '日记本：双向，保留你手写的内容。',
   /** C16 · ③ 间隔旁 */
   intervalNote: '1 分钟 ~ 24 小时',
-  /** C19 · ④ hint */
-  cloudHint: '再送一份到坚果云。',
+  /** C19 · ④ hint（[V0.11.18] CL7 逐字改写：用途=多端一致 / 特征=轻量） */
+  cloudHint: '多端一致用：体积小，读得快。',
   /** C21 · ⑤ hint */
   backupHint: '覆盖前留的底，可打开、可恢复。',
 } as const;
@@ -119,4 +119,11 @@ export const REMOVED_PHRASES = [
   '以 Markdown 为准',
   '文件名与标题来自',
   '文件放在哪个目录',
+  /* [V0.11.18] ④ hint 的旧句（PRD 4.2 CL7 的「旧句必须零命中」） */
+  '再送一份到坚果云。',
+  /* [V0.11.18] ③ hint 的旧句（PRD 4.2 MD1） */
+  '多久写一次、写到哪个目录。',
+  /* [V0.11.18] 块④ 正文第一行那个 Switch 的标签 + 卡内小标题：通道位已上移到页签顶部，
+     块里不该再出现第二个布尔（PRD 4.3 D4） */
+  '启用云端通道',
 ] as const;

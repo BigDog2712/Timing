@@ -10,6 +10,16 @@ use crate::infra::tray_menu::{
 };
 use crate::models::enums::TrayStatus;
 
+/// 「只用本地」通道下同步项的那一句（[V0.11.18] PRD §4.2 TR3：逐字沿用，老用户零变化）。
+///
+/// `build_nodes` 从 v0.11.18 起把文案作为参数收进来（判据在装配层，`infra` 不许读库），
+/// 所以三个托盘测试文件都要有这一份。放在这里当**公共常量**：三个文件各写一个字面量，
+/// 将来改文案就会漏其中一个。
+pub(super) const LOCAL: &str = "Markdown 同步";
+
+/// 「本地 + 云端」通道下同步项的那一句（PRD §4.1 TR1）。
+pub(super) const CLOUD: &str = "云端同步";
+
 /// 取节点里的所有 id（按出现顺序）。
 pub(super) fn ids(nodes: &[TrayNode]) -> Vec<&'static str> {
     nodes
@@ -145,7 +155,7 @@ fn format_duration_clamps() {
 #[test]
 fn idle_shows_only_start() {
     let line = status_line(TrayStatus::Idle, "", 0);
-    let nodes = build_nodes(TrayStatus::Idle, &line);
+    let nodes = build_nodes(TrayStatus::Idle, &line, LOCAL);
     let ids = ids(&nodes);
     assert!(ids.contains(&ID_TIMER_START));
     assert!(!ids.contains(&ID_TIMER_PAUSE), "空闲不应出现「暂停」");
@@ -157,7 +167,7 @@ fn idle_shows_only_start() {
 #[test]
 fn running_shows_pause_stop_discard() {
     let line = status_line(TrayStatus::Running, "摸鱼", 10);
-    let nodes = build_nodes(TrayStatus::Running, &line);
+    let nodes = build_nodes(TrayStatus::Running, &line, LOCAL);
     let ids = ids(&nodes);
     assert!(ids.contains(&ID_TIMER_PAUSE));
     assert!(ids.contains(&ID_TIMER_STOP));
@@ -169,7 +179,7 @@ fn running_shows_pause_stop_discard() {
 #[test]
 fn paused_shows_resume_stop_discard() {
     let line = status_line(TrayStatus::Paused, "摸鱼", 10);
-    let nodes = build_nodes(TrayStatus::Paused, &line);
+    let nodes = build_nodes(TrayStatus::Paused, &line, LOCAL);
     let ids = ids(&nodes);
     assert!(ids.contains(&ID_TIMER_RESUME));
     assert!(ids.contains(&ID_TIMER_STOP));
@@ -181,7 +191,7 @@ fn paused_shows_resume_stop_discard() {
 #[test]
 fn constant_items_always_present() {
     for status in [TrayStatus::Idle, TrayStatus::Running, TrayStatus::Paused] {
-        let nodes = build_nodes(status, "空闲 · 点开始正计时");
+        let nodes = build_nodes(status, "空闲 · 点开始正计时", LOCAL);
         let ids = ids(&nodes);
         assert!(ids.contains(&ID_STATUS), "{status:?} 应有状态项");
         /* [V0.3.1] 「显示 / 隐藏」项已移除（小条常驻，不再提供显隐入口） */
@@ -204,7 +214,7 @@ fn constant_items_always_present() {
 fn menu_item_count_within_budget() {
     // 设计稿 §3.1：常态（空闲）≈10 项可点；计时 / 暂停略多。此处只保证「不失控」。
     for status in [TrayStatus::Idle, TrayStatus::Running, TrayStatus::Paused] {
-        let nodes = build_nodes(status, "空闲 · 点开始正计时");
+        let nodes = build_nodes(status, "空闲 · 点开始正计时", LOCAL);
         assert!(
             nodes.len() <= 14,
             "{status:?} 菜单项数 {} 超出预算",
@@ -216,7 +226,7 @@ fn menu_item_count_within_budget() {
 #[test]
 fn discard_item_is_last_of_control_group() {
     // 危险语义改由「位置 + 分隔线 + 文案」承载（设计稿 §3.4）：放弃不在「开始」之前。
-    let nodes = build_nodes(TrayStatus::Running, "摸鱼 · 00:10");
+    let nodes = build_nodes(TrayStatus::Running, "摸鱼 · 00:10", LOCAL);
     let ids = ids(&nodes);
     let pause = ids.iter().position(|i| *i == ID_TIMER_PAUSE).unwrap();
     let stop = ids.iter().position(|i| *i == ID_TIMER_STOP).unwrap();
