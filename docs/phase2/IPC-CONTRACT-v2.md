@@ -658,11 +658,12 @@ active ──resolve_open_record(discard)─▶ soft-deleted + saved（终态，
 - **R-5 `discard` 必须改 `status`**：软删除 `active` 记录而不改 `status` 会永久占用 `uq_records_open` 的唯一槽，导致此后无法开新会话（见 §4.4）。
 
 > 口径说明（2026-10-20）：§2 的「11 个错误码」与 §10.1 的「29 个命令」是 MVP 锁定值；当前实装
-> **74 命令 / 17 错误码**（含 ADR-020 新增的 `main_work_area`；ADR-021 下架 `ITEM_NAME_DUPLICATE`；
+> **78 命令 / 17 错误码**（含 ADR-020 新增的 `main_work_area`；ADR-021 下架 `ITEM_NAME_DUPLICATE`；
 > ADR-022 下架 `register_shortcut` / `set_always_on_top` / `SHORTCUT_REGISTER_FAILED`；
 > ADR-023 下架日记域 4 条命令；ADR-037 / V0.5.0 新增迁移可见性 2 条命令，见 §12.9；
 > ADR-061 / V0.11.13 新增 `md_sync_test` / `md_backup_list` / `md_backup_restore` 与
-> `MD_SYNC_REMOTE_ERROR`，见 §12.10）。
+> `MD_SYNC_REMOTE_ERROR`，见 §12.10；ADR-062 / V0.11.15 新增 `data_root_get` / `data_root_change` /
+> `data_root_open` / `md_backup_open`，错误码与事件零变更，见 §12.11）。
 > 以代码为准的机械校验由 `npm run check:contract` 执行（比对 `lib.rs` / `domain.ts` / `ipc.ts` /
 > `error.rs` 四处），本文档的人工数字不再作为门禁。
 
@@ -945,6 +946,54 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 它**不校验**：`secret` 的传递语义、`cloud` 字段是否被原样带回、`MdSyncViewCloud` 的字段形状。
 这三件事只能靠测试与评审看——`MdSyncTab.test.tsx` 里那条「保存必须原样带回 `cloud`」的断言
 就是为此钉的。
+
+---
+
+### 12.11 V0.11.15 契约增量：数据根可配 + 备份打开（ADR-062）
+
+> 背景：数据根以前只有「默认 `<exe>\data`」与「退回 `%APPDATA%`」两条路，用户不能自己选盘；
+> 备份只能恢复、不能先打开看一眼。V0.11.15 起两者都补上。错误码与事件**一个没加**。
+> 决策记录见 `docs/decisions/ADR-062.md`。
+
+| 面 | 变更 | 理由 |
+|---|---|---|
+| 命令 | 74 → **78**：新增 `data_root_get` / `data_root_change` / `data_root_open` / `md_backup_open` | 设置页要显示「现在到底在哪、能不能写、有没有待生效的新位置」；改位置要能被撤销；备份要能用系统默认程序打开 |
+| 错误码 | **17 不变** | 预检失败的原因（「这个文件夹里已有文件」）本身就是用户唯一的行动依据，走 `IO_ERROR` + 原文透出；不为此新增码 |
+| 事件 | **11 不变** | 数据根切换要重启才生效，没有「运行中变化」需要广播 |
+| DB schema | **v4 不变**，无新迁移 | 指针是 `%APPDATA%\<identifier>\data-root.json`（不在库里），因为它必须在「数据根被决定之前」可读 |
+| DTO | 新增 `DataRootInfo` / `DataRootEntry`（`src/types/domain/dataRoot.ts` 逐字对应） | 见 12.11.1 |
+
+#### 12.11.1 `DataRootInfo` 的线上形状
+
+`rename_all = "camelCase"`：
+
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `current` | `string` | **当前生效**数据根的绝对路径（不是默认值） |
+| `defaultPath` | `string` | `<exe>\data`（出厂值） |
+| `isDefault` | `boolean` | `current === defaultPath` |
+| `writable` / `writableError` | `bool` / `string \| null` | 进页签时探测一次（建目录 + 写 16B + 回读 + 删） |
+| `pending` | `string \| null` | 指针里写的、重启后才生效的新位置 |
+| `previous` | `string \| null` | 「改回旧位置」的目标 |
+| `sizeBytes` | `number` | 五项之和（递归求和） |
+| `entries` | `DataRootEntry[]` | `{ name, isDir, present, bytes }`，顺序固定五项 |
+| `affected` | `string[]` | 受 `%APP_DIR%` 影响、会跟着搬的落点**种类名** |
+| `pluginsInDataRoot` | `boolean` | 回退态下插件目录也在数据根里，块②要追加一句说明 |
+
+#### 12.11.2 `Option` 参数的语义（写错不会编译报错）
+
+`data_root_change(path: Option<String>)`：`None` = **撤销待生效的切换**（只删/改指针，不动任何文件），
+**不是**「没传参」。前端 `change(undefined)` 与 `change(null)` 走同一条路（`ipc.ts` 里 `?? null`）。
+
+撤销的收敛规则：`previous` 为空或 `== <exe>\data` → `clear()` 回默认；`previous` 是另一个自定义根 →
+指针改写成 `{dataDir: previous, previous: <exe>\data}`，**再点一次撤销**才回默认。理由：用户「选错了
+目录」时想回的是上一个能用的位置，直接回默认等于把他之前那次正常切换也一起撤销了。
+
+#### 12.11.3 手机端
+
+`data_root_*` 三条在手机端是桩：`platform::host::desktop_only("<命令名>")` → `IO_ERROR` +
+「仅桌面端可用」。`md_backup_open` 走既有 `MD_SYNC_CONFIG_INVALID` + `NO_BACKUP` 文案。
+**命令名两平台一致**（`lib.rs` 的 `generate_handler!` 不加 `#[cfg]`——命令名就是契约面）。
 
 ---
 
