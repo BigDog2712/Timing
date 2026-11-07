@@ -30,6 +30,12 @@ mod md_cloud_round;
 mod md_section_fence;
 /* [V0.11.19] J15：别人的围栏里有逐字标题时，那一块必须逐字节不变。 */
 mod md_section_fence_j15;
+/* [QA 独立验收 V0.11.19] T01 边界补例：CRLF/BOM、围栏标记尾随空格、闭合标记带
+   语言标注、标题缩进、~~~ 交叉、三句逐字文案（变异自检的两处靶子在这里）。 */
+mod qa_t01_fence_edges;
+/* [QA 独立验收 V0.11.19] T01 真实一轮同步：洞 1 / 洞 2 / P1 三处，全部走
+   `services::md_sync::run`，查文件字节与 SQL 软删，不靠纯函数自证。 */
+mod qa_t01_sync_attack;
 mod md_sync;
 /* [V0.11.18] 合并语义的**现状快照**（PRD C9 / 设计 §6）：五条「已知限制」的回归测试。
    拍照，不是修复——行为代码零改动，改行为前先改那个文件里的断言。 */
