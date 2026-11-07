@@ -65,9 +65,6 @@ src-tauri/src/infra/autostart.rs
 src-tauri/src/app/autostart_takeover.rs
 # TICKBAR_LOG 旧环境变量回落（保留一个版本，命中时打 WARN）。
 src-tauri/src/platform/log.rs
-# 「已从 TickBar 迁移」：数据确实来自旧产品，这句历史表述是对的。
-src/components/settings/MigrationInfoCard.tsx
-src/components/settings/MigrationInfoCard.test.tsx
 # 数据根切换的五项清单：`migrated-from-tickbar-app.json` 是**磁盘上既有的真实文件名**
 # （定义在 `infra/appdata_migrate/marker.rs::MARKER_FILE`，那份文件已在第 5 节整目录豁免）。
 # 这五处是「搬什么」的清单与断言，必须写字面量——它要匹配的正是那个旧文件，

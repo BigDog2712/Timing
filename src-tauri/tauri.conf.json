@@ -54,7 +54,8 @@
         "type": "embedBootstrapper"
       },
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "languages": ["SimpChinese"]
       }
     }
   }
