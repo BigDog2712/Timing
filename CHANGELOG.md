@@ -2,6 +2,92 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.16 — 设置「数据管理」做减法、WebDAV 默认预填与三关自证
+
+用户接着上一版报六条，主诉是「功能说明过于繁复」。五条是减法，第六条是云端默认值要开箱可用，
+并贴回上一版那句红字（「账号能登录，但没有往 /我的坚果云/Timing 写文件的权限」）。
+**没有新迁移、没有新命令、没有新错误码、没有新事件**（78 / 17 / 11 / `0006` 四项全不动）。
+
+### 1. 繁复的真因不是字多，是「同一个概念 × 3 份」
+
+逐块清点现码：22 段说明对应 19 个可编辑控件，其中 12 个是「三个种类各一份」。而三个种类写的是
+**同一个日记文件**、指向**同一个目录**——块① 三个「文件模板」框的默认值本来就全是 `{date}.md`。
+同一句话的重复次数：「同步只改标题下区块」3 处、「以 Markdown 为准」2 处、「文件名与标题来自…」
+3 处、「文件放在哪个目录在第三块改」3 处。所以这一版减的是「三份」，不是减信息：
+**22 → 10 段说明，19 → 10 个输入框，六成改动是删代码。**
+
+### 2. 一个框写三档：单框是「意图」不是「镜像」
+
+块① 的「日记文件名」与块③ 的「日记落点」都从三个框并成一个，但三档 `file` / `root` 在后端
+**各自保留**。判据是 `MdSyncShared{file, root}` 三态：
+
+- `null` = 用户没动过 → 保存时三档原值**一个字节不改**；
+- 字符串 = 亲手改过 → 扇出到三档；
+- `sharedAfterEdit(base, next)` 让「改回原值」视为没改。
+
+`resolvedBindings = applyShared(bindings, shared)` 是保存与「测试连接」**唯一**的出口——两处各拼一次，
+就会出现「测试按旧档跑、保存按新档写」。逐档面板手改时按字段 diff **清掉**对应的共享意图，否则
+扇出会把刚手改的那一档盖回去（手改一档时先把意图固化到其余档，再写本档）。
+
+老用户三档必然不一致（`merge_bindings` 补进来的 `todos` 用 `%APP_DIR%\md`，前两档是 Obsidian 目录），
+所以「没动过就不写」不是优化，是**不擅自搬用户数据**的唯一保证。
+
+### 3. 测试连接从两关变三关（403 才可分诊）
+
+上一版把 403 归成一句并列三种可能的话（目录不属于你 / 只读 / 配额满），用户读完仍不知道动哪个，
+而且那句话**可能本身就是错的**——403 也可能是这一级目录建不出来。改成：
+
+```
+第 1 关 账号  GET {baseUrl}      → 401 = 账号或应用密码不对
+第 2 关 目录  MKCOL 每一级       → 405/301 已存在、201 新建、403 被拒（带出卡在第几级）
+第 3 关 写入  PUT timing-write-test.txt → DELETE  → 403 = 目录在但写不进去
+```
+
+- `ensure_base_dir` 返回 `Result<EnsureOutcome, DirFailure{level, ready, error}>`，`level` 来自
+  `level_path()`（已搬到新文件 `tag.rs`，与日志同源）；`put` 只加一行 `.map_err(|f| f.error)`，
+  `TooDeep` 仍是 `Ok` 变体。
+- 文案侧新增 `FailStage{Push|Account|Dir{level,ready}|Write}` + `fail_text_at`，老签名 `fail_text`
+  保留为 `fail_text_at(Push, …)` 的薄封装 → **文案表仍只有一张**，`\b\d{3}\b` 零命中仍是硬断言。
+- 探针文件名 `timing-write-test.txt`，**不带点前缀**：部分服务端拒收隐藏文件，会把「能写」误判成
+  「不能写」。DELETE 失败只记 WARN、不改绿字（判据是「这个目录收不收文件」，PUT 通过即已证明）。
+- 「只读」与「配额满」服务端不给理由，**不猜**；文案把最后一步交给用户做一次十秒对照实验
+  （往目录里拖个文件：拖得进 = 本月 1 GB 用完，拖不进 = 只读）。
+
+### 4. 默认值开箱可用（`emptyCloud()` 三处）
+
+`mode: 'webdav'`、`baseUrl: 'https://dav.jianguoyun.com/dav/'`、`basePath: '/我的坚果云/Timing'`。
+`emptyCloud()` 只在 `cloud === null`（从未配置）时被调用，已有配置**绝不被覆盖**。
+
+`mode` 这一处是关键：填了值但停在「本地目录」分段，预填值要切一次才看得见，等于没做到「默认自动填写」。
+
+远端目录取 `/我的坚果云/Timing` 而非用户原话的 `/我的坚果云`：坚果云 `dav` 根就是同步文件夹根，
+填根会把每天的 `.md` 撒在用户自己的文件堆里。多一级由 `ensure_base_dir` 自动建，代价为零。
+
+**中文路径不转码**：存中文、显示中文，由 `url` crate 在请求时编码一次（`base_path` 原样拼接，
+`url` 会把非 ASCII 段转 `%E6…`）。存 `%e6…` 会让设置页不可读，且任何一处再编码就成双重编码——
+那是最难查的故障。**坚果云服务端认不认中文目录段只有真机能验**，退路是一个字符串换英文 `/Timing`。
+
+### 5. 界面其余减法
+
+块③ 三行落点并成一行 + 一行聚合状态；`MdSyncPathRow` **降级不删**，进 `MdSyncTierPanel` 的局部
+`useState` 展开（收起时不挂载，所以「文件名与标题来自」在 DOM 里一条都搜不到），仅在三档不同或某档
+被关掉时出现入口。块② 五段说明压成一句，C11 改成按 `affected` 实际档位点名（原先只有一档受影响时
+仍说「这三档」，是假话）。块⑤ 默认折叠，`FoldBlock` 加 `summary` 槽，收起行显示
+「时间 · 覆盖前备份 · 文件名 · 大小」；`useBackupList` 是单一数据源，全页 `md_backup_list` 只调一次。
+页签顶部导览与底部注脚整段删除。
+
+### 6. 数字与代价
+
+- 后端 `cargo test --lib` 492 → **512**；前端 50/385 → **58 files / 462 tests**；
+  `check:size` **571 文件零豁免**；`check:layers` 7 条；`check:brand` 违规 0；clippy 0 warning。
+- 三条零 diff 红线保持：`services/md_sync/`、`infra/md_file.rs`、`components/mobile/`。
+- 每个「测试连接」多两个请求（PUT + DELETE），只在用户点按钮时发生，不进自动同步路径。
+- 新增文件：`mdSyncCopy.ts`、`mdSyncShared.ts`、`MdSyncRootRow.tsx`、`MdSyncTierPanel.tsx`、
+  `useBackupList.ts`、`mdBackupFacts.ts`、`MdBackupSummaryLine.tsx`、`settings-data-slim.css`、
+  `infra/md_webdav/tag.rs`、`infra/md_webdav/probe_file.rs`、`services/md_cloud/text.rs`、
+  `models/md_sync_test_result.rs`。
+- **没跑** `cargo check --target aarch64-linux-android`（手机端零 diff，但这是没跑不是绿）。
+
 ## 0.11.15 — WebDAV 409 逐级补建目录、设置「同步」重组为「数据管理」五块
 
 用户报的两件事：**WebDAV 每轮刷 409**，以及**设置里那一页「逻辑有问题」**（一块堆着六段，没地方再
