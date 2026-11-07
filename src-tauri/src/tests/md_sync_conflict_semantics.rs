@@ -17,6 +17,17 @@
 //! 谁想改这五条里的任何一条，正确动作是：**先改这个文件**（把断言改成新的期望），再改
 //! 产品代码 —— 这样 review 时「行为变了」这件事一定会被看见。
 //!
+//! ## 口径：**本轮不修**
+//!
+//! PRD §13.1 裁决 2 / §10-N13 的原话是「计时『同事项两端各加、互相覆盖』**本轮不修**，
+//! 只补回归测试钉住现状」。所以这个文件（以及它的续篇
+//! `md_sync_conflict_merge_rules.rs`）**只加测试、不改行为**：`git diff` 里
+//! `services/md_sync` 与 `mirror` 的任何**行为**代码都是零改动，动的只有 `tests/`。
+//!
+//! 两句并存不是重复：「本轮不修」说的是**排期**（这件事这一轮不动），
+//! 「这是已知限制，改行为前先改这里」说的是**改法**（要动就先动断言）。前一句会过期，
+//! 后一句不会——所以两句都留着。
+//!
 //! ## 夹具复用，不复制
 //!
 //! `tests/md_sync.rs` 的 `Env` / `env(tag)` / `binding` / `save_binding` / `file_for` 是
@@ -37,14 +48,14 @@ use crate::services;
 use crate::tests::support::{insert_saved, new_item, scalar_i64};
 
 /// 「已知限制」的统一失败信息（PRD C9 的测试命名纪律）。
-const KNOWN: &str = "这是已知限制，改行为前先改这里";
+pub(super) const KNOWN: &str = "这是已知限制，改行为前先改这里";
 
 /// `YYYY-MM-DD HH:MM:SS`（与 `format::format_ts` 同格式，用于手写文件里的时间）
-fn ts(date: NaiveDate, hour: u32, minute: u32) -> String {
+pub(super) fn ts(date: NaiveDate, hour: u32, minute: u32) -> String {
     format!("{} {:02}:{:02}:00", date.format("%Y-%m-%d"), hour, minute)
 }
 
-fn body_of(env: &Env, heading: &str) -> String {
+pub(super) fn body_of(env: &Env, heading: &str) -> String {
     let text = std::fs::read_to_string(file_for(env)).unwrap_or_default();
     md_file::body_in_text(&text, heading).unwrap_or_default()
 }
@@ -53,14 +64,14 @@ fn body_of(env: &Env, heading: &str) -> String {
 ///
 /// 文件还不存在时也成立（`replace_in_text` 在找不到标题时走 `append_section`）——
 /// 「场景 4」正是「软件关着的时候编辑器里已经有一份文件」那一态。
-fn rewrite(env: &Env, heading: &str, body: &str) {
+pub(super) fn rewrite(env: &Env, heading: &str, body: &str) {
     let path = file_for(env);
     let text = std::fs::read_to_string(&path).unwrap_or_default();
     std::fs::write(&path, md_file::replace_in_text(&text, heading, body)).unwrap();
 }
 
 /// 存活 saved 记录：`(id, started_at)`，按开始时刻升序。
-async fn live_records(pool: &SqlitePool) -> Vec<(i64, i64)> {
+pub(super) async fn live_records(pool: &SqlitePool) -> Vec<(i64, i64)> {
     sqlx::query_as::<_, (i64, i64)>(
         "SELECT id, started_at FROM time_records \
          WHERE status = 'saved' AND deleted_at IS NULL ORDER BY started_at",

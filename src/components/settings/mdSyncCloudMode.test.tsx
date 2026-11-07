@@ -1,7 +1,7 @@
 import { act, createElement, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CloudMode, MdSyncCloudStatus, MdSyncConfig, MdSyncTestResult, MdSyncViewCloud } from '../../types/domain';
+import type { CloudMode, MdSyncCloud, MdSyncCloudStatus, MdSyncConfig, MdSyncTestResult, MdSyncViewCloud } from '../../types/domain';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 
 /* [V0.11.18] T2「测试连接与状态行跟随 mode」的判据（PRD A7 / A8 / §13.4.2）。
@@ -30,11 +30,17 @@ import { createMockApiPlugins } from '../../mocks/browserMockPlugins';
 
 (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-function viewWith(mode: CloudMode, over: Partial<MdSyncCloudStatus> = {}): MdSyncViewCloud {
+function viewWith(
+  mode: CloudMode,
+  over: Partial<MdSyncCloudStatus> = {},
+  /* [V0.11.18] A6 要造「开了但没填全」那一档：默认是填全的，按需抹掉字段。 */
+  cloudOver: Partial<MdSyncCloud> = {},
+): MdSyncViewCloud {
   const cloud = {
     enabled: true, mode,
     localRoot: 'D:\\Nutstore\\我的坚果云\\TimingMD',
     baseUrl: 'https://dav.example.com/dav/', basePath: '/Timing/md', user: 'me@example.com',
+    ...cloudOver,
   };
   return {
     today: '2026-11-18',
@@ -167,5 +173,37 @@ describe('测试连接与状态行跟随 mode（T2 / PRD A7 / A8）', () => {
     };
     expect(test({ config: { ...base, cloud: localfolder } }))
       .toEqual({ ok: true, detail: '目录可写：D:\\md' });
+  });
+
+  /* ===== [V0.11.18] A6：选了「本地 + 云端」但没填全 → 状态区只说一句原因 ===== */
+
+  it('A6：WebDAV 缺地址与账号 → 逐字「云端还没填全，暂时不会同步。」且不叠加「今天还没上传」', async () => {
+    api.get.mockResolvedValue(viewWith('webdav', { hasSecret: true }, { baseUrl: '', user: '' }));
+    await mount();
+
+    expect(container.textContent).toContain('云端还没填全，暂时不会同步。');
+    expect(container.querySelector('[data-missing="true"]')).not.toBeNull();
+    expect(container.querySelector('.sync-cloud__status')?.getAttribute('data-ready')).toBe('false');
+    /* 「只显示这一句」：两句并排会被读成「在传、只是没传上去」，事实是压根没跑 */
+    expect(container.textContent).not.toContain('今天还没上传');
+    expect(container.textContent).not.toContain('今天已上传');
+    /* 密码项一并不显示（那是填全之后才该说的状态） */
+    expect(container.textContent).not.toContain('密码已保存');
+  });
+
+  it('A6b：本地目录只看 `localRoot` → 空目录同样报「还没填全」', async () => {
+    api.get.mockResolvedValue(viewWith('localfolder', {}, { localRoot: '   ' }));
+    await mount();
+
+    expect(container.textContent).toContain('云端还没填全，暂时不会同步。');
+    /* 本地目录那条路一次网络请求都不发，地址 / 账号空着不算问题 */
+    expect(container.querySelector('[data-missing="true"]')).not.toBeNull();
+  });
+
+  it('A6c：填全之后那句话消失，回到正常状态行', async () => {
+    await mount();
+    expect(container.textContent).not.toContain('云端还没填全，暂时不会同步。');
+    expect(container.querySelector('.sync-cloud__status')?.getAttribute('data-ready')).toBe('true');
+    expect(container.textContent).toContain('今天还没上传');
   });
 });

@@ -85,7 +85,18 @@ pub fn status_line(status: TrayStatus, item_name: &str, duration_sec: i64) -> St
 /// 本模块不许读库：`infra` 不能依赖 `services`（R5，`npm run check:layers` 会拦），
 /// 也不许自己判通道——「生效通道」的判据只允许有一份，就在 `md_cloud::usable`。
 /// **菜单项的数量与 id 不因标签变而变**：通道切换只换那一项的文字，否则菜单结构会跳。
-pub fn build_nodes(status: TrayStatus, line: &str, sync_label: &str) -> Vec<TrayNode> {
+///
+/// [V0.11.18] `quitting` = 「退出前那一轮同步正在跑」（PRD B7 / §13.3.1「等待反馈」）。
+/// 为真时**只有退出项**变：标签逐字 `正在同步…`、`enabled: false`；其余项一个字不动。
+/// 反馈放在这里而不是发系统通知：用户的手指还停在「退出」那一格，那是他能看到的最省注意力
+/// 的位置，而退出途中弹的通知他既看得到也点不到（通知本身可能被专注助手拦掉）。
+/// **不需要复位**：置真之后进程马上要退出，没有第二条路径会再读这个值。
+pub fn build_nodes(
+    status: TrayStatus,
+    line: &str,
+    sync_label: &str,
+    quitting: bool,
+) -> Vec<TrayNode> {
     let mut nodes = vec![TrayNode::item(ID_STATUS, line, false), TrayNode::Separator];
 
     match status {
@@ -116,7 +127,13 @@ pub fn build_nodes(status: TrayStatus, line: &str, sync_label: &str) -> Vec<Tray
     nodes.push(TrayNode::item(ID_OPEN_NOTE, "便利贴…", true));
     nodes.push(TrayNode::item(ID_OPEN_SETTINGS, "设置…", true));
     nodes.push(TrayNode::Separator);
-    nodes.push(TrayNode::item(ID_QUIT, "退出", true));
+    /* [V0.11.18] 退出前那一轮同步正在跑 → 只把这一项换成「正在同步…」并置灰（PRD B7）。
+    字面量逐字：`正在同步…` 用的是单个 `…`，不是三个点（品牌门禁与 P0 口径都按单字符）。 */
+    nodes.push(if quitting {
+        TrayNode::item(ID_QUIT, "正在同步…", false)
+    } else {
+        TrayNode::item(ID_QUIT, "退出", true)
+    });
     nodes
 }
 

@@ -59,12 +59,27 @@ pub async fn emit_timer_state(app: &AppHandle, pool: &SqlitePool) {
 /// 移动端整段跳过 —— 连 `tray_snapshot` 的查询都不做（没人消费那份快照）。
 #[cfg(desktop)]
 async fn sync_tray(app: &AppHandle, pool: &SqlitePool, state: &crate::models::timer::TimerState) {
+    sync_tray_with(app, pool, state, false).await;
+}
+
+/// 装配菜单的**唯一**实现：`quitting` 只改退出项（PRD B7）。
+#[cfg(desktop)]
+async fn sync_tray_with(
+    app: &AppHandle,
+    pool: &SqlitePool,
+    state: &crate::models::timer::TimerState,
+    quitting: bool,
+) {
     match services::timer::tray_snapshot(pool, state).await {
         Ok(snapshot) => {
             /* [V0.11.18] 同步项的文案随「生效通道」变（PRD TR1）。判据在
             `tray_sync::sync_label`（它读 `md_cloud::usable`），这里只负责传下去。 */
             let label = crate::app::tray_sync::sync_label(pool).await;
-            crate::app::tray::sync_status(app, &snapshot, label);
+            if quitting {
+                crate::app::tray::sync_status_quitting(app, &snapshot, label);
+            } else {
+                crate::app::tray::sync_status(app, &snapshot, label);
+            }
         }
         Err(err) => crate::log_warn!("build tray snapshot failed: {err}"),
     }
@@ -99,6 +114,23 @@ pub async fn refresh_tray(app: &AppHandle, pool: &SqlitePool) {
 
 #[cfg(mobile)]
 pub async fn refresh_tray(_app: &AppHandle, _pool: &SqlitePool) {}
+
+/// 退出前那一轮同步**开始**时调用：把退出项换成 `正在同步…` + 禁用（[V0.11.18]，PRD B7）。
+///
+/// 三条边界：
+/// 1. **只重建菜单**，不发事件（同 `refresh_tray`）→ 契约零新增；
+/// 2. **不复位**：置真之后进程马上退出，没有第二条路径会再读这个值，写复位反而是假的确定性；
+/// 3. 读状态失败就静默跳过：这只是反馈，为它拦下一次退出是本末倒置（真正的退出在
+///    `tray_quit::quit_after_sync` 里，与本函数无关）。
+///
+/// 为什么放在装配层：要「读计时状态 → 读快照 → 读通道标签 → 装菜单」，四步里前两步是
+/// `services`，`infra` 不许碰（R5），所以只能在 `app`。
+#[cfg(desktop)]
+pub async fn mark_tray_quitting(app: &AppHandle, pool: &SqlitePool) {
+    if let Ok(state) = services::timer::state(pool).await {
+        sync_tray_with(app, pool, &state, true).await;
+    }
+}
 
 /// 读取最新主题 / 四色并广播 `theme-changed`（所有窗口自订阅，K-21）。
 pub async fn emit_theme_changed(app: &AppHandle, pool: &SqlitePool) {

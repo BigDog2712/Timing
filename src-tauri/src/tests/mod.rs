@@ -30,6 +30,8 @@ mod md_sync;
 /* [V0.11.18] 合并语义的**现状快照**（PRD C9 / 设计 §6）：五条「已知限制」的回归测试。
    拍照，不是修复——行为代码零改动，改行为前先改那个文件里的断言。 */
 mod md_sync_conflict_semantics;
+/* [V0.11.18] C9 的续篇（第 2、3 条）：为 300 行门禁拆出，夹具从上面那份 `pub(super)` 复用。 */
+mod md_sync_conflict_merge_rules;
 mod md_sync_disabled_gate;
 mod md_sync_duration;
 mod md_sync_edges;

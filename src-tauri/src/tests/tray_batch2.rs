@@ -34,7 +34,7 @@ fn countdown_status_line_format() {
 
 #[test]
 fn countdown_control_group_shows_pause_stop_discard() {
-    let nodes = build_nodes(TrayStatus::Countdown, "摸鱼 · 倒计时 剩 07:26", LOCAL);
+    let nodes = build_nodes(TrayStatus::Countdown, "摸鱼 · 倒计时 剩 07:26", LOCAL, false);
     let ids = ids(&nodes);
     assert!(ids.contains(&ID_TIMER_PAUSE));
     assert!(ids.contains(&ID_TIMER_STOP));
@@ -51,7 +51,7 @@ fn new_tray_items_present_in_all_states() {
         TrayStatus::Countdown,
         TrayStatus::Paused,
     ] {
-        let nodes = build_nodes(status, "空闲 · 点开始正计时", LOCAL);
+        let nodes = build_nodes(status, "空闲 · 点开始正计时", LOCAL, false);
         let ids = ids(&nodes);
         assert!(ids.contains(&ID_OPEN_TODOS), "{status:?} 应含「打开事项」");
         assert!(ids.contains(&ID_OPEN_NOTE), "{status:?} 应含「便利贴…」");

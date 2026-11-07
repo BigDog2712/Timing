@@ -34,7 +34,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     /* [V0.11.18] 启动期配置还没加载，同步项先说「Markdown 同步」——安全默认：
     说「云端同步」而云端其实没配，比反过来更糟。下一次状态迁移（`events::sync_tray`）
     就会用 `tray_sync::sync_label` 读到的真值修正它。 */
-    let menu = build_menu(app, &TraySnapshot::idle(), tray_sync::LOCAL_LABEL)?;
+    let menu = build_menu(app, &TraySnapshot::idle(), tray_sync::LOCAL_LABEL, false)?;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
@@ -87,10 +87,23 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
 /// `tray_sync::sync_label` 读好传进来：本模块不做「哪个通道生效」的判断，
 /// 那件事的判据只允许有一份（`md_cloud::usable`）。
 pub fn sync_status(app: &AppHandle, snapshot: &TraySnapshot, sync_label: &str) {
+    rebuild(app, snapshot, sync_label, false);
+}
+
+/// [V0.11.18] 退出前那一轮同步开始时重建一次：退出项变「正在同步…」+ 禁用（PRD B7）。
+///
+/// 单独一个入口而不是给 `sync_status` 加参数：调用方就两个，而「什么时候该说正在同步」
+/// 是个不该溜进状态迁移路径的判断（K-30 的重建时机就是被这类参数开的洞弄乱的）。
+pub fn sync_status_quitting(app: &AppHandle, snapshot: &TraySnapshot, sync_label: &str) {
+    rebuild(app, snapshot, sync_label, true);
+}
+
+/// 重建托盘菜单的**唯一**实现：`quitting` 只影响退出项（见 `tray_menu::build_nodes`）。
+fn rebuild(app: &AppHandle, snapshot: &TraySnapshot, sync_label: &str, quitting: bool) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {
         return;
     };
-    match build_menu(app, snapshot, sync_label) {
+    match build_menu(app, snapshot, sync_label, quitting) {
         Ok(menu) => {
             if let Err(err) = tray.set_menu(Some(menu)) {
                 crate::log_warn!("tray set_menu failed: {err}");
@@ -105,6 +118,7 @@ fn build_menu(
     app: &AppHandle,
     snapshot: &TraySnapshot,
     sync_label: &str,
+    quitting: bool,
 ) -> tauri::Result<Menu<tauri::Wry>> {
     let line = match snapshot.status {
         TrayStatus::Countdown => tray_menu::countdown_status_line(
@@ -114,7 +128,7 @@ fn build_menu(
         _ => tray_menu::status_line(snapshot.status, &snapshot.item_name, snapshot.duration_sec),
     };
     let menu = Menu::new(app)?;
-    for node in tray_menu::build_nodes(snapshot.status, &line, sync_label) {
+    for node in tray_menu::build_nodes(snapshot.status, &line, sync_label, quitting) {
         match node {
             tray_menu::TrayNode::Separator => menu.append(&PredefinedMenuItem::separator(app)?)?,
             tray_menu::TrayNode::Item { id, label, enabled } => {

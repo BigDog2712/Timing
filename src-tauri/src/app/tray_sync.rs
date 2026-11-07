@@ -125,23 +125,50 @@ fn notify_busy_once(app: &AppHandle) {
     notify_or_log(app, "Markdown 同步", "上一次同步还在进行中，请稍候");
 }
 
+/// 点同步时「压根不会跑到云端那一半」的判据（**纯函数**，便于单测）。
+///
+/// 返回 `(通知标题, 通知正文)`；`None` = 这一下会真的跑，不用提前解释。
+///
+/// 两档，都是「点了才发现」的那种情况：
+/// 1. 总开关关着（出厂默认）→ 告诉他去哪儿开（v0.11.7 既有口径，一个字不改）；
+/// 2. **通道选了「本地 + 云端」但没填全**（[V0.11.18]，PRD §3.2 边界表 / 判据 B4）
+///    → 正文逐字 `先在设置里填好云端`，标题用 `云端同步`（与菜单项此刻的文字同一份常量）。
+///
+/// 第 2 档为什么不是「标签说真话」就完了：`sync_label` 读的是**生效通道**
+/// （`enabled && is_usable()`），未填全时菜单项显示的是 `Markdown 同步`——也就是说
+/// 「点『云端同步』→ 提示先在设置里填好云端」这一帧永远不会发生。两条判据必须并存：
+/// 标签管「点之前知道会发生什么」，这条管「点了之后知道为什么只写了一半」。
+///
+/// 判据用后端的 `is_usable()`，**不在前端或这里重算字段**：填全的定义只允许有一份。
+pub(crate) fn blocked_notice(config: &crate::models::md_sync::MdSyncConfig) -> Option<(&'static str, &'static str)> {
+    if !config.enabled {
+        return Some((LOCAL_LABEL, "先在设置里打开 Markdown 同步"));
+    }
+    match config.cloud.as_ref() {
+        Some(cloud) if cloud.enabled && !cloud.is_usable() => {
+            Some((CLOUD_LABEL, "先在设置里填好云端"))
+        }
+        _ => None,
+    }
+}
+
 /// 真正的一轮同步 + 三种可见反馈（未启用 / 失败 / 完成）。
 async fn run_once(app: &AppHandle, pool: &SqlitePool) {
     /* 判据直接用服务层读配置的那套（`md_sync::config::load`，与设置页 / 轮询任务同源），
     不在这里另造一份「是否启用」的状态或缓存。 */
-    match services::md_sync::config::load(pool).await {
-        Ok(config) if !config.enabled => {
-            /* 出厂默认是关的。关了还静默跑一遍空同步，用户看到的是「点了没反应」，
-            分不清是没生效还是没变化——所以明确告诉他去哪儿开。 */
-            notify_or_log(app, "Markdown 同步", "先在设置里打开 Markdown 同步");
-            return;
-        }
-        Ok(_) => {}
+    let config = match services::md_sync::config::load(pool).await {
+        Ok(config) => config,
         Err(err) => {
             crate::log_warn!("tray md sync load config failed: {err}");
             notify_or_log(app, "Markdown 同步失败", &err.to_string());
             return;
         }
+    };
+    /* 「不会跑」的两档都在 `blocked_notice` 里（纯函数，可单测）：命中就只弹那一条，
+    **不继续**跑——跑了就会紧跟一条「完成 / 没有变更」，两条通知互相拆台。 */
+    if let Some((title, body)) = blocked_notice(&config) {
+        notify_or_log(app, title, body);
+        return;
     }
 
     /* [V0.11.13] 从 `md_sync::run` 换成云端编排 `md_cloud::round`：云端没配时它逐字

@@ -19,7 +19,7 @@ use super::tray_menu::{enabled_of, ids, label_of, CLOUD, LOCAL};
 #[test]
 fn md_sync_item_exists_with_plain_label() {
     for status in [TrayStatus::Idle, TrayStatus::Running, TrayStatus::Paused] {
-        let nodes = build_nodes(status, "空闲 · 点开始正计时", LOCAL);
+        let nodes = build_nodes(status, "空闲 · 点开始正计时", LOCAL, false);
         assert_eq!(
             label_of(&nodes, ID_MD_SYNC).as_deref(),
             Some("Markdown 同步"),
@@ -40,8 +40,8 @@ fn md_sync_item_exists_with_plain_label() {
 /// 菜单高度跳一下（PRD B5）。所以这里对两档各数一遍，并把 id 序列整串钉死。
 #[test]
 fn sync_item_label_switches_but_menu_shape_does_not() {
-    let local = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", LOCAL);
-    let cloud = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", CLOUD);
+    let local = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", LOCAL, false);
+    let cloud = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", CLOUD, false);
 
     assert_eq!(label_of(&local, ID_MD_SYNC).as_deref(), Some(LOCAL));
     assert_eq!(label_of(&cloud, ID_MD_SYNC).as_deref(), Some(CLOUD));
@@ -64,7 +64,7 @@ fn sync_item_id_is_still_md_sync() {
 /// 所以钉**相邻**关系，而不只是「存在」。
 #[test]
 fn md_sync_item_sits_between_open_todos_and_note() {
-    let nodes = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", LOCAL);
+    let nodes = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", LOCAL, false);
     let ids = ids(&nodes);
     let pos = |want: &str| ids.iter().position(|id| *id == want).expect("节点应存在");
 
@@ -91,7 +91,7 @@ fn md_sync_item_sits_between_open_todos_and_note() {
 /// P0：纯文本、无 emoji、无字符符号（与状态行同一口径）。
 #[test]
 fn md_sync_label_has_no_symbols_or_emoji() {
-    let nodes: Vec<TrayNode> = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", LOCAL);
+    let nodes: Vec<TrayNode> = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", LOCAL, false);
     let label = label_of(&nodes, ID_MD_SYNC).expect("节点应存在");
     assert!(
         label
@@ -99,4 +99,43 @@ fn md_sync_label_has_no_symbols_or_emoji() {
             .all(|c| c.is_alphanumeric() || c.is_whitespace()),
         "文案只允许文字与空格：{label}"
     );
+}
+
+/* ===== [V0.11.18] B7：退出前那一轮同步 → 退出项「立刻」变 `正在同步…` + 禁用 ===== */
+
+/// PRD §13.3.1「等待反馈」与判据 B7 的纯函数层证据。
+///
+/// 这一格是**唯一的**退出反馈：退出途中不发系统通知（§13.3.1「不发通知」），也不做
+/// 进度条 / 对话框（N15）。所以「标签变了 + 变灰了」这两件事本身就是判据，逐字钉住。
+///
+/// 层次说明：本测试只证明**菜单内容**对；「点了托盘之后菜单真的会重建」那一步要
+/// `AppHandle`，由 `app::events::mark_tray_quitting` 接线，仍属人工验证项（B7 要人点）。
+#[test]
+fn quit_item_shows_busy_state_while_syncing() {
+    let idle = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", LOCAL, false);
+    let busy = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", LOCAL, true);
+
+    assert_eq!(label_of(&idle, ID_QUIT).as_deref(), Some("退出"));
+    assert_eq!(enabled_of(&idle, ID_QUIT), Some(true));
+
+    /* 逐字：单个 `…`，不是三个点 —— B7 的判据写的是「标签逐字」 */
+    assert_eq!(label_of(&busy, ID_QUIT).as_deref(), Some("正在同步…"));
+    assert_eq!(enabled_of(&busy, ID_QUIT), Some(false), "同步期间不能再点一次退出");
+
+    /* 只有退出项变：id 序列与其余各项的文字 / 启用态一个字不动（菜单高度不许跳） */
+    assert_eq!(ids(&idle), ids(&busy), "退出项变字不该改变菜单结构");
+    for id in [
+        ID_NEW_ITEM,
+        ID_OPEN_TODOS,
+        ID_MD_SYNC,
+        ID_OPEN_NOTE,
+        ID_OPEN_SETTINGS,
+    ] {
+        assert_eq!(label_of(&idle, id), label_of(&busy, id), "{id} 的文字不该变");
+        assert_eq!(
+            enabled_of(&idle, id),
+            enabled_of(&busy, id),
+            "{id} 的启用态不该变"
+        );
+    }
 }

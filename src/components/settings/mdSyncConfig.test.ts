@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MdSyncCloud } from '../../types/domain';
-import { channelOf, cloudToSave, emptyCloud, withChannel } from './mdSyncConfig';
+import { channelOf, cloudToSave, emptyCloud, isCloudReady, withChannel } from './mdSyncConfig';
 
 /* [V0.11.18] T1 的**单一真相**在这里被钉死：`cloud.enabled` 就是存储通道。
    本文件只测三个纯函数，不挂载组件——「界面上有没有真的用上」由
@@ -83,5 +83,42 @@ describe('cloudToSave —— 保存前的归一', () => {
     const shell = withChannel(withChannel(emptyCloud(), 'both'), 'local');
     expect(shell).toEqual(emptyCloud());
     expect(cloudToSave(shell, false)).toBeNull();
+  });
+});
+
+/* [V0.11.18] A6 的判据。**与后端 `md_cloud::usable` + `is_usable()` 逐条同口径**，
+   改一边必须改另一边（`src-tauri/src/models/md_sync_cloud.rs::is_usable`）。
+   四档的取值直接抄后端的 if/match，不凭印象： */
+describe('isCloudReady —— 「开了且填全了」', () => {
+  it('enabled:false → 不算（后端 `usable` 先 filter enabled）', () => {
+    expect(isCloudReady(configured({ enabled: false }))).toBe(false);
+    expect(isCloudReady(emptyCloud())).toBe(false);
+  });
+
+  it('localfolder：只看 localRoot，空 / 全空白都不算', () => {
+    expect(isCloudReady(configured({ mode: 'localfolder', localRoot: '' }))).toBe(false);
+    expect(isCloudReady(configured({ mode: 'localfolder', localRoot: '   ' }))).toBe(false);
+  });
+
+  it('localfolder：localRoot 有值就算，**地址 / 账号空着也不扣分**（那条路不发网络请求）', () => {
+    expect(isCloudReady(configured({
+      mode: 'localfolder', localRoot: 'D:\\md', baseUrl: '', basePath: '', user: '',
+    }))).toBe(true);
+  });
+
+  it('webdav：baseUrl / basePath / user 三个缺一不可（逐项扫一遍，漏一个就是假绿）', () => {
+    const webdav = (over: Partial<MdSyncCloud>) => configured({ mode: 'webdav', ...over });
+    expect(isCloudReady(webdav({}))).toBe(true);
+    expect(isCloudReady(webdav({ baseUrl: '' }))).toBe(false);
+    expect(isCloudReady(webdav({ basePath: '  ' }))).toBe(false);
+    expect(isCloudReady(webdav({ user: '' }))).toBe(false);
+  });
+
+  it('密码不参与判定：它不在 `MdSyncCloud` 里（密文归后端 keychain）', () => {
+    /* 结构上就没有这个字段 —— 这条断言的作用是「有人给类型加 password 时这里会提醒他
+       去同步改后端 `is_usable`」，而不是在测一个不存在的属性。 */
+    expect(Object.keys(configured())).toEqual([
+      'enabled', 'mode', 'localRoot', 'baseUrl', 'basePath', 'user',
+    ]);
   });
 });

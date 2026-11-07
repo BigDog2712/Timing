@@ -118,6 +118,11 @@ pub(crate) fn quit_after_sync(app: &AppHandle) {
            下次启动 `pending_since == 0` 判为已上传 → 那一段永远补不回来。 */
 
         /* ③ 退出前那一轮（静默，成败只落日志） */
+        /* [V0.11.18] B7：先把退出项换成 `正在同步…` + 禁用再开跑。
+        位置在 ② 之后、③ 之前：抢到闸（= 这一下真的会跑）才有「正在同步」可言；
+        而标签必须在 `run_before_quit` **之前**落地，否则用户点完到菜单变字之间隔着一次
+        网络往返，那几十毫秒正好是「点了没反应」的窗口。 */
+        crate::app::events::mark_tray_quitting(&app, &pool).await;
         crate::log_info!("quit: sync start");
         match tokio::time::timeout(QUIT_SYNC_BUDGET, run_before_quit(&pool)).await {
             Ok(true) => crate::log_info!("quit: sync done"),

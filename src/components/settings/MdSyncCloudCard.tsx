@@ -33,7 +33,7 @@ import { useMdSyncStore } from '../../stores/mdSyncStore';
 import type {
   CloudMode, MdSyncCloud, MdSyncConfig, MdSyncTestResult, MdSyncTestStepKey,
 } from '../../types/domain';
-import { pollSecsOf } from './mdSyncConfig';
+import { isCloudReady, pollSecsOf } from './mdSyncConfig';
 import { CLOUD_DIR_HINT } from './mdSyncCopy';
 import type { MdSyncDraft } from './useMdSyncDraft';
 
@@ -70,6 +70,9 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
      已被删掉的 `Switch` 组件。所以删 Switch 不破坏「只用本地时块④ 变灰」，
      分段控件写 `enabled` 之后灰/亮立刻跟着走（PRD A5：变灰、**不隐藏**）。 */
   const disabled = !cloud.enabled || saving;
+  /* [V0.11.18] A6：「开了但没填全」→ 状态区只说一句原因，不报「今天还没上传」。
+     口径与后端 `md_cloud::usable` 逐条对齐，见 `mdSyncConfig::isCloudReady` 的函数头。 */
+  const ready = isCloudReady(cloud);
   const pendingDates = status?.pendingDates ?? [];
   const patch = (next: Partial<MdSyncCloud>) => updateCloud({ ...cloud, ...next });
 
@@ -228,7 +231,9 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
 
       {/* 状态一律以 `status` 为准：没拿到视图时宁可不显示，也不假装「已开启 / 已上传」 */}
       {cloud.enabled && status && (
-        <div className="sync-cloud__status" data-mode={mode}>
+        <div className="sync-cloud__status" data-mode={mode} data-ready={ready ? 'true' : 'false'}>
+          {ready ? (
+            <>
           {/* [V0.11.18] 「密码」这一项**只在 WebDAV 下有意义**：`state.rs:24-28` 的
               `has_secret` 无条件读 `KEY_WEBDAV`，而本地目录走的是文件系统、根本没有
               「应用密码」这回事。不门控就是一句恒定的错话（localfolder 用户永远是
@@ -243,6 +248,20 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
             <span>待补传 {pendingDates.length} 天：{pendingDates.slice(0, 3).join('、')}…</span>
           )}
           {status.lastError && <p className="sync__error">{status.lastError}</p>}
+            </>
+          ) : (
+            /* [V0.11.18] A6（PRD §3.1 边界表 / 判据 A6）：选了「本地 + 云端」但字段没填全。
+               这一刻 **只**显示这一句，**不叠加**「今天还没上传」——两句并排，用户会读成
+               「在传、只是没传上去」，而事实是**压根没跑**（`md_cloud::usable` 返回 `None`，
+               `round()` 逐字转交 `md_sync::run`，云端那一半一次都没动）。
+               `lastError` 也一起不显示：那是上一份配置留下的旧结论，跟「还没填全」无关，
+               并排出来只会让人以为「填全了就会继续报这个错」。
+               判据取**草稿**而不是 `status`：视图里的 `MdSyncCloudStatus` 没有字段本身
+               （只有 `enabled/mode/hasSecret/…`），前端拿不到，而新增字段等于改契约 78。
+               取草稿的副作用是「改了输入框但还没保存」时提示也跟着变——那正好是
+               「照你现在填的这份，会不会跑」，比拿旧的落库值更贴合作者当下在做的事。 */
+            <span data-missing="true">云端还没填全，暂时不会同步。</span>
+          )}
         </div>
       )}
     </div>

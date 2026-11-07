@@ -20,7 +20,7 @@ use super::md_sync::{at, env};
 /* `run_before_quit` 与 `QUIT_SYNC_BUDGET` 在 `app/tray_quit.rs`（[V0.11.18] 为行数门禁拆出），
 `sync_label` / `try_acquire` 留在 `app/tray_sync.rs`：闸的 `Drop` 语义只该有一处定义。 */
 use crate::app::tray_quit::run_before_quit;
-use crate::app::tray_sync::sync_label;
+use crate::app::tray_sync::{blocked_notice, sync_label};
 use crate::models::md_sync::MdSyncConfig;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::repositories::settings;
@@ -145,4 +145,66 @@ async fn run_before_quit_writes_before_exit_when_enabled() {
     let text = std::fs::read_to_string(env.vault.join(format!("{}.md", env.date.format("%Y-%m-%d"))))
         .expect("退出前那一轮应写出今日文件");
     assert!(text.contains("收尾写盘"));
+}
+
+/* ===== [V0.11.18] B4：点了「同步」之后才知道云端没填全 ===== */
+
+/// 填全了的一份 `cloud`（`webdav` 三件套都在）——判据的「对照档」。
+fn filled_webdav() -> MdSyncCloud {
+    MdSyncCloud {
+        enabled: true,
+        mode: CloudMode::Webdav,
+        base_url: "https://dav.jianguoyun.com/dav/".into(),
+        base_path: "/Timing".into(),
+        user: "me@example.com".into(),
+        ..MdSyncCloud::default()
+    }
+}
+
+/// TR2 / B4：四档一次钉住（纯函数，不落库、不发通知）。
+///
+/// 为什么这条与 `sync_label` 的判据并存而不是二选一：标签读**生效通道**
+/// （`enabled && is_usable()`），未填全时菜单项显示 `Markdown 同步` —— 所以
+/// 「点『云端同步』→ 提示先在设置里填好云端」这一帧**永远不会发生**。两条判据各自成立：
+/// 标签管「点之前知道会发生什么」，这条管「点了之后知道为什么只写了一半」。
+#[test]
+fn blocked_notice_covers_off_and_not_filled() {
+    /* ① 总开关关着（出厂默认）→ 告诉他去哪儿开，正文逐字沿用 v0.11.7 */
+    let mut config = MdSyncConfig::default();
+    assert_eq!(
+        blocked_notice(&config),
+        Some(("Markdown 同步", "先在设置里打开 Markdown 同步"))
+    );
+
+    /* ② 开着 + 选了「本地 + 云端」但地址 / 目录 / 账号全空
+          → 正文逐字 `先在设置里填好云端`，标题用菜单项此刻的 `云端同步` */
+    config.enabled = true;
+    config.cloud = Some(MdSyncCloud {
+        enabled: true,
+        mode: CloudMode::Webdav,
+        ..MdSyncCloud::default()
+    });
+    assert_eq!(blocked_notice(&config), Some(("云端同步", "先在设置里填好云端")));
+
+    /* ③ 只填了两个字段也不算填全（`is_usable` 要求三个都非空）——这一档最容易写漏 */
+    config.cloud = Some(MdSyncCloud {
+        user: String::new(),
+        ..filled_webdav()
+    });
+    assert_eq!(blocked_notice(&config), Some(("云端同步", "先在设置里填好云端")));
+
+    /* ④ 填全了 → 不再插话，这一下会真的跑 */
+    config.cloud = Some(filled_webdav());
+    assert_eq!(blocked_notice(&config), None);
+
+    /* ⑤ 只用本地（字段都留着、`enabled: false`）→ 一句都不用说 */
+    config.cloud = Some(MdSyncCloud {
+        enabled: false,
+        ..filled_webdav()
+    });
+    assert_eq!(blocked_notice(&config), None);
+
+    /* ⑥ 从没配过云端（`cloud: None`）→ 同样是纯本地，不插话 */
+    config.cloud = None;
+    assert_eq!(blocked_notice(&config), None);
 }

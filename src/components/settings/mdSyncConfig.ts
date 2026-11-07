@@ -116,6 +116,34 @@ export function cloudToSave(cloud: MdSyncCloud, wasConfigured: boolean): MdSyncC
 }
 
 /**
+ * 云端通道是否「开了且填全了」——[V0.11.18] A6 那句 `云端还没填全，暂时不会同步。` 的判据。
+ *
+ * **与后端 `services/md_cloud/mod.rs::usable` + `models/md_sync_cloud.rs::is_usable` 同口径，
+ * 改一边必须改另一边。** 逐条对齐（不要凭印象重写）：
+ *
+ * 1. `enabled` 为假 → 不可用（后端 `usable` 先 `.filter(|c| c.enabled && …)`，
+ *    `is_usable` 自己再判一次 `enabled`）；
+ * 2. `mode === 'localfolder'` → 只看 `localRoot` 非空白（**不看地址 / 账号**，
+ *    那条路一次网络请求都不发）；
+ * 3. `mode === 'webdav'` → `baseUrl` / `basePath` / `user` **三个都要**非空白。
+ *    密码**不参与**：它不在 `MdSyncCloud` 里（密文归 `infra::secret`），后端这一判也不看它
+ *    ——「有账号没密码」在界面上仍算「填全」，真正的失败由「测试连接」/ `lastError` 说。
+ *
+ * 三处都用 `.trim()` 判空白串，与后端的 `.trim().is_empty()` 一致：
+ * 用户敲一个空格不等于填了。
+ *
+ * 为什么要在前端再写一份（后端已经有 `is_usable`）：前端拿不到 `is_usable`——视图只回
+ * `MdSyncCloudStatus`（`enabled / mode / hasSecret / todayPushed / pendingDates / lastError`），
+ * **没有字段本身**。新增一个命令或给状态加字段等于改契约 78，本轮不允许，所以在前端纯函数里
+ * 对齐一份，并靠 `mdSyncConfig.test.ts` 的四档用例钉住。
+ */
+export function isCloudReady(cloud: MdSyncCloud): boolean {
+  if (!cloud.enabled) return false;
+  if (cloud.mode === 'localfolder') return cloud.localRoot.trim() !== '';
+  return cloud.baseUrl.trim() !== '' && cloud.basePath.trim() !== '' && cloud.user.trim() !== '';
+}
+
+/**
  * 文件模板展开（`{date}` / `{yyyy}` / `{MM}` / `{dd}` → 今天）。
  *
  * [V0.11.15] 从 `MdSyncBindingCard` 提上来：拆块之后 ①（只读预览）与 ③（每行路径）
