@@ -32,6 +32,7 @@ pub(crate) mod folder;
 mod gate;
 mod kv;
 mod ledger;
+pub(crate) mod overlap;
 mod webdav;
 
 use std::path::Path;

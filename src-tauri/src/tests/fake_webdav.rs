@@ -98,6 +98,53 @@ pub(crate) fn serve_412_on_put(body: &'static [u8], etag: &'static str) -> Fake 
     }
 }
 
+/// 「第一个请求回 302 + `Location`，之后的请求回 200」的假服务器。
+///
+/// 只为一件事存在：证明 DELETE **不跟随**重定向。跟随了就会看到第二个请求，而且它
+/// 打在 `Location` 上、拿回一个 200 —— 这就是「假成功 → 水位推进 → 这一天永久漏删」
+/// 的入口。用「所有请求都回同一份 302」的 `serve` 验不出来：那样跟随一圈也是 302，
+/// 只能靠命中次数兜底，路径落到哪没被盯。
+pub(crate) fn serve_redirect_once(location_path: &'static str) -> Fake {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("本地端口应可绑定");
+    let port = listener.local_addr().expect("应能取到本地地址").port();
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let log = seen.clone();
+    let location = format!("http://127.0.0.1:{port}{location_path}");
+    std::thread::spawn(move || {
+        for (index, stream) in listener.incoming().enumerate() {
+            let Ok(mut stream) = stream else { return };
+            let raw = read_request(&mut stream);
+            log.lock().expect("假服务器记录锁").push(raw);
+            let head = if index == 0 {
+                /* `Connection: close` 是必须的：复用同一条连接的话，即便实现跟随了
+                   重定向，这里也只看到一次连接建立，命中次数就分不清了。 */
+                format!(
+                    "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                )
+            } else {
+                "HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".to_string()
+            };
+            let _ = stream.write_all(head.as_bytes());
+            let _ = stream.flush();
+        }
+    });
+    Fake {
+        base_url: format!("http://127.0.0.1:{port}"),
+        seen,
+    }
+}
+
+/// 假服务器收到的请求行（每个请求取第一行）：失败信息里最有用的是「它到底打了几次、
+/// 每次打到哪」。
+pub(crate) fn request_lines(fake: &Fake) -> Vec<String> {
+    fake.seen
+        .lock()
+        .expect("假服务器记录锁")
+        .iter()
+        .map(|raw| raw.lines().next().unwrap_or_default().to_string())
+        .collect()
+}
+
 /// 读到 `\r\n\r\n` 只是头结束；PUT 还带 body，必须按 `Content-Length` 读满，
 /// 否则 reqwest 会在写 body 时撞上「连接已关闭」。
 ///

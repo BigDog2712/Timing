@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 
 use crate::models::md_cloud_purge::OVERLAP_TEXT;
 use crate::models::md_sync::{MdSyncBinding, MdSyncKind};
-use crate::services::md_cloud::purge::folder::{overlaps_binding, remove_one, RemoveErr};
+use crate::services::md_cloud::purge::folder::{remove_one, RemoveErr};
+use crate::services::md_cloud::purge::overlap::overlaps_binding;
 
 fn temp_dir(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("timing-purge-guard-{tag}-{}", std::process::id()));

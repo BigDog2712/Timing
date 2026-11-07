@@ -3,7 +3,9 @@
 //! 断言来源：`docs/Spec-v1.md` §6 / §9 与 `docs/phase2/IPC-CONTRACT-v2.md`，
 //! 以行为（输入→可观测输出/错误码）为准，不绑定实现内部细节。
 
-mod support;
+/* `pub(crate)`：`src/` 里的模块级单测也要借这份夹具（`purge/folder.rs` 的
+   日期名边界用例要真 pool，`infra/md_webdav/remove.rs` 要假服务器）。 */
+pub(crate) mod support;
 
 mod appdata_migrate;
 mod appdata_migrate_edges;
@@ -14,7 +16,7 @@ mod daily_status;
 mod data_root_pointer;
 mod data_root_transfer;
 /* 假 WebDAV 服务器（V0.11.15 从 `md_webdav.rs` 搬出）：`Fake` / `serve` / `serve_412_on_put`。 */
-mod fake_webdav;
+pub(crate) mod fake_webdav;
 /* 路由式假服务器（V0.11.15）：409 补建的判据要「目录存不存在」这个真实状态。 */
 mod fake_webdav_dir;
 mod item;

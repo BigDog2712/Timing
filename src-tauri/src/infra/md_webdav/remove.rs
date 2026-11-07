@@ -65,12 +65,51 @@ fn remove_client() -> &'static Client {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tests::fake_webdav::{request_lines, serve_redirect_once};
 
-    #[test]
-    fn remove_client_never_follows_redirects() {
-        /* 这条断言的是构造形状，不是网络行为：`Policy::none()` 一旦被删，
-           `delete_file` 就会在 301/302/303 上把 DELETE 改成 GET，水位静默推进。 */
-        let client = remove_client();
-        assert!(format!("{client:?}").contains("Client"), "Client 应可构造");
+    /// 3xx **必须是失败**，且**不许跟着 `Location` 再发一次**。
+    ///
+    /// 上一版这条断的是「`{client:?}` 里有个 `Client` 字」—— 把 `.redirect(Policy::none())`
+    /// 整行删掉它照样绿，等于什么都没盯（本项目已经三轮栽在这种「写得像测试」上）。
+    /// 现在改成真 HTTP：假服务器第一个请求回 `302 + Location`、之后回 `200`，
+    ///
+    /// - 跟随了 → 第二个请求打在 `/moved` 上、拿回 `200` → `delete_file` 变成 `Ok(200)`，
+    ///   而生产里这意味着「以为删了」→ 水位推进 → 这个日期**永久漏删**；
+    /// - 不跟随 → 只有一次请求、拿到 `302` → `Err(Server(302))`。
+    ///
+    /// 变异自检：注释掉 `remove_client()` 里的 `.redirect(Policy::none())`，
+    /// 这条必红（`left: None` 即 `Ok(200)`，且请求行会多出一条 `GET /moved`）。
+    #[tokio::test]
+    async fn a_redirect_is_a_failure_and_is_never_followed() {
+        let fake = serve_redirect_once("/moved");
+        let target = WebdavTarget {
+            base_url: fake.base_url.clone(),
+            base_path: "/Timing".into(),
+            user: "u".into(),
+            password: "p".into(),
+        };
+
+        let outcome = delete_file(&target, "2026-02-03.md").await;
+        /* 先断言线上发生了什么，再断言返回什么：变异时最有用的信息是「它多打了一次、
+           而且打到了 /moved」，只看 `left: None` 看不出这一层。 */
+        let lines = request_lines(&fake);
+        assert_eq!(
+            lines.len(),
+            1,
+            "DELETE 不许跟着 Location 再发一次，实际请求：{lines:?}，返回：{outcome:?}"
+        );
+        assert!(
+            lines[0].starts_with("DELETE /Timing/2026-02-03.md "),
+            "请求行必须是「读到的那个文件名」拼出来的那个，实际：{lines:?}"
+        );
+        assert!(
+            !lines.iter().any(|line| line.contains("/moved")),
+            "3xx 的落点一次都不许被访问，实际：{lines:?}"
+        );
+        assert_eq!(
+            outcome.err(),
+            Some(WebdavError::Server(302)),
+            "3xx 必须算失败：跟随了重定向就会拿到 200，那正是假成功的入口（实际请求：{lines:?}）"
+        );
     }
 }

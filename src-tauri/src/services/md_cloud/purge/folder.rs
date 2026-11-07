@@ -32,9 +32,8 @@ use chrono::NaiveDate;
 use sqlx::SqlitePool;
 
 use super::gate::past_keep_window;
-use crate::models::md_cloud_purge::OVERLAP_TEXT;
+use super::overlap::overlaps_binding;
 use crate::models::md_sync::MdSyncBinding;
-use crate::models::md_sync_cloud::normalize_path;
 use crate::repositories::md_cloud_pending::{self, CloudPendingRow};
 use crate::services::md_cloud::pending;
 
@@ -171,74 +170,14 @@ pub(crate) fn remove_one(
 
 /// 闸③ 先过、再枚举 —— 本模块唯一「先判后读」的入口。
 ///
-/// 拆成独立函数是为了让「顺序」有一个**可被测试钉住的形状**：单测直接调它，
-/// 就能证明「拒绝时零枚举」（`ENUMERATIONS == 0`）。
+/// 判定本体在 `overlap.rs`（只有本路用得上）；留在这里是为了让「闸③ 必须先于枚举」
+/// 在**一个函数体里**看得出顺序，单测也能直接钉住「拒绝时零枚举」（`ENUMERATIONS == 0`）。
 fn guarded_entries(
     root: &Path,
     bindings: &[MdSyncBinding],
 ) -> Result<io::Result<Vec<fs::DirEntry>>, String> {
     overlaps_binding(root, bindings)?;
     Ok(entries_of(root))
-}
-
-/// 闸③：`root` 与任何 `md_sync` 落点「相同或互为父子」→ `Err(逐字红字)`。
-///
-/// 三步判定，**任何一步判不出来也拒绝**：
-///
-/// 1. 规范化字符串比较（`normalize_path`：展开占位符 → `/`→`\` → 去尾 `\` → 小写）。
-///    不碰文件系统，覆盖「就是同一个目录」这种最常见的错配；
-/// 2. 两侧都 `canonicalize`（Windows 上走 GetFinalPathNameByHandle，会解析符号链接 /
-///    junction / 8.3 短名 / 相对段，返回 `\\?\C:\…`），去掉统一前缀再按第 1 步规则比；
-/// 3. 只有一侧成功（另一侧目录还不存在）→ 视为不重合（不存在的目录里没有文件）。
-///    但**落点根自己必须 canonicalize 成功**：`round_folder` 刚 `create_dir_all` 过它，
-///    拿不到真实路径只能是权限 / 盘符问题 → 判不出来就拒绝。
-///
-/// 四条边界写死在这里，别处不再判一遍：大小写（比较前统一小写）、`..` 与相对路径
-/// （第 1 步不下结论）、8.3 短名与 junction（只有 canonicalize 能识别，所以第 2 步不是
-/// 加固而是必需品）、保守默认（判不出来就拒绝）。
-pub(crate) fn overlaps_binding(root: &Path, bindings: &[MdSyncBinding]) -> Result<(), String> {
-    let mine = normalize_path(&root.to_string_lossy());
-    let mine_real = fs::canonicalize(root)
-        .map(|path| strip_verbatim(&path.to_string_lossy()))
-        .map_err(|_| OVERLAP_TEXT.to_string())?;
-    for binding in bindings {
-        if binding.root.trim().is_empty() {
-            continue;
-        }
-        if conflicts(&mine, &normalize_path(&binding.root)) {
-            return Err(OVERLAP_TEXT.to_string());
-        }
-        let Ok(theirs) = fs::canonicalize(&binding.root) else {
-            continue;
-        };
-        if conflicts(&mine_real, &strip_verbatim(&theirs.to_string_lossy())) {
-            return Err(OVERLAP_TEXT.to_string());
-        }
-    }
-    Ok(())
-}
-
-/// 两个**已规范化**的路径是否相同或互为父子。含 `..` 时不下结论（交给真实路径那一步）。
-fn conflicts(mine: &str, theirs: &str) -> bool {
-    if mine.is_empty()
-        || theirs.is_empty()
-        || has_parent_segment(mine)
-        || has_parent_segment(theirs)
-    {
-        return false;
-    }
-    mine == theirs
-        || mine.starts_with(&format!("{theirs}\\"))
-        || theirs.starts_with(&format!("{mine}\\"))
-}
-
-fn has_parent_segment(path: &str) -> bool {
-    path.split('\\').any(|segment| segment == "..")
-}
-
-/// `canonicalize` 在 Windows 上返回 `\\?\C:\…`：两侧同样处理才能逐字比。
-fn strip_verbatim(path: &str) -> String {
-    path.trim_start_matches(r"\\?\").to_lowercase()
 }
 
 /// 本模块**唯一**的目录枚举入口（别处不许直接枚举）。测试靠计数器断言「零枚举」。
@@ -251,7 +190,12 @@ fn entries_of(root: &Path) -> io::Result<Vec<fs::DirEntry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::md_cloud_purge::OVERLAP_TEXT;
     use crate::models::md_sync::MdSyncKind;
+
+    fn day(value: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(value, "%Y-%m-%d").expect("测试日期")
+    }
 
     fn temp_dir(tag: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("timing-purge-folder-{tag}-{}", std::process::id()));
@@ -263,6 +207,54 @@ mod tests {
     fn binding(root: &Path) -> MdSyncBinding {
         MdSyncBinding { kind: MdSyncKind::Timers, enabled: true, file: "{date}.md".into(),
             root: root.display().to_string(), heading: "#### 事项计时".into() }
+    }
+
+    /// 写一份文件；给了 `key` 就再记一行 pending（指纹与文件一致）—— 即「Timing 写过、
+    /// 没人动过」。`key` 就是「宽松解析会把这一天读成什么」。
+    async fn seed(pool: &SqlitePool, root: &Path, name: &str, key: Option<&str>) {
+        let body = format!("body {name}");
+        fs::write(root.join(name), &body).expect("写样本");
+        let Some(key) = key else { return };
+        md_cloud_pending::mark_synced(pool, key, None, &pending::fingerprint(body.as_bytes()))
+            .await
+            .expect("记 pending 行");
+    }
+
+    /// 日期名形状边界，**经 `candidates` 这个真实入口**验（不直呼 `gate.rs` 那个函数：
+    /// 全库它只许有 3 处命中）。
+    ///
+    /// 每个坏名字都配了「按宽松解释算出来的那一天」的 pending 行：一旦有人把解析放宽成
+    /// `NaiveDate::from_str`（它认 `2026-2-3`，还把 `26-02-03` 读成公元 26 年），这些文件
+    /// 就会带着证据变成候选 → 这条红。没有这批行的话闸⑤(a) 会先把它们全拒掉，
+    /// 断言「一个都没有」就变成恒真 —— 这正是上一轮那条假测试栽的坑。
+    ///
+    /// 最后那个**合规**的日期文件是反证：它证据一样、只是名字对，必须出现在结果里。
+    #[tokio::test]
+    async fn only_strict_date_names_survive_the_six_gates() {
+        let pool = crate::tests::support::fresh_pool("purge-folder-shapes").await;
+        let root = temp_dir("shapes");
+        for (name, loose_key) in [
+            ("2026-2-3.md", Some("2026-02-03")),
+            ("26-02-03.md", Some("0026-02-03")),
+            ("2026-13-45.md", Some("2026-13-45")),
+            ("2026-02-30.md", Some("2026-02-30")),
+            /* 后缀那条不造 pending 行：它早在日期逻辑之前就出局，硬造一行只会和
+               `2026-2-3.md` 争同一个 key（后写的那行把指纹盖掉，前一档就被闸⑤ 挡住、
+               「看起来没红」，等于白测）。 */
+            ("2026-02-03.md.bak", None),
+        ] {
+            seed(&pool, &root, name, loose_key).await;
+        }
+        seed(&pool, &root, "2026-02-04.md", Some("2026-02-04")).await;
+
+        let found: Vec<String> = candidates(&pool, &root, &[], day("2026-11-07"), 0, None)
+            .await
+            .expect("不重合要放行")
+            .into_iter()
+            .map(|candidate| candidate.name)
+            .collect();
+        assert_eq!(found, vec!["2026-02-04.md".to_string()], "只该有那一个严格日期名");
+        let _ = fs::remove_dir_all(&root);
     }
 
     /// 设计 §3.4.3 用例①：目录重合 → 拒绝，**且一次都没有枚举**。

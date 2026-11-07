@@ -101,8 +101,14 @@ mod tests {
             "2025-01-01-backup.md",
             "timing-write-test.txt",
             "2025-1-5.md",
-            "notes.md",
+            /* 五个坏名字各挡一类放宽：非补零（`chrono::NaiveDate::from_str` 认它）、
+               两位年（会被读成公元 26 年）、月份越界、日历里没有的日子、后缀挂尾巴。 */
+            "2026-2-3.md",
+            "26-02-03.md",
             "2026-13-45.md",
+            "2026-02-30.md",
+            "2026-02-03.md.bak",
+            "notes.md",
         ] {
             fs::write(root.join(name), "x").expect("写样本");
         }
