@@ -56,7 +56,8 @@ pub const MAX_LEVELS: usize = 8;
 pub enum ProbeOutcome {
     /// 地址与凭据都对：200（读到正文），或 404（这个文件今天还没建）。
     Reachable,
-    /// **通了**，但服务端不支持直接读这个路径：405 方法不允许，或 3xx 要求跳转。
+    /// **通了**，但服务端不支持直接读这个路径：405 方法不允许、3xx 要求跳转，
+    /// 或 403 拒绝（坚果云对**目录** GET 就回 403，对 `{date}.md` 却是好的）。
     /// 带出原始状态码，好让上层文案能自证「你没填错」。
     NoDirectoryListing(u16),
 }
@@ -116,17 +117,24 @@ impl WebdavTarget {
 }
 
 /// 「这个地址和凭证能不能用」。判据分三档（见 `ProbeOutcome`）：200 / 404 算通，
-/// 405 与 3xx 算「通但读不了目录」，其余仍是错误。
+/// 405 / 3xx / 403 算「通但读不了目录」，其余仍是错误。
 ///
 /// 同步本身 GET 的是 `{date}.md` 这个具体文件，不是目录，所以「读不了目录」不影响
 /// 这条通道能不能用。注意它**不**证明「能写」——那要 `ensure_base_dir` 说了算
 /// （「测试连接」两件事都做，见 `services/md_cloud/probe.rs`）。
+///
+/// [V0.11.17] B1：坚果云不允许对**目录**发 GET，回 `403`（`fail_on_status` 把它归一成
+/// `Forbidden`）。这个 403 发生在**鉴权通过之后**，与账号、与「这一层不允许访问」都无关
+/// ——真能同步就是证据。归进 `NoDirectoryListing` 后第 1 关放行，但**不据此收工**：
+/// 是不是真能用，仍由第 3 关那次真写裁决（`probe.rs` 无条件跑到 `write_probe`）。
 pub async fn probe(target: &WebdavTarget, rel: &str) -> Result<ProbeOutcome, WebdavError> {
     match super::get(target, rel).await {
         Ok(_) => Ok(ProbeOutcome::Reachable),
         Err(WebdavError::NotFound) => Ok(ProbeOutcome::Reachable),
         /* 405 = 服务端不认「GET 一个目录」这个方法；3xx = 要跳转（301 补尾斜杠是最常见
-        的一种）。两者都发生在**鉴权通过之后**，所以绝不是「凭据不对」。 */
+        的一种）；403 = 服务端干脆拒绝读这个路径（坚果云）。三者都发生在**鉴权通过
+        之后**，所以绝不是「凭据不对」。 */
+        Err(WebdavError::Forbidden) => Ok(ProbeOutcome::NoDirectoryListing(403)),
         Err(WebdavError::Server(code)) if matches!(code, 405 | 300..=399) => {
             Ok(ProbeOutcome::NoDirectoryListing(code))
         }

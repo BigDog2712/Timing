@@ -124,13 +124,15 @@ fn forbidden_text(stage: FailStage<'_>, label: &str, dir: &str) -> String {
         ),
         FailStage::Dir { level, ready: 0 } => format!(
             "云端目录{label}的第一级「{level}」建不出来：这个位置不允许程序新建文件夹。\
-             请到坚果云网页版 → 我的坚果云 → 新建文件夹，名字用「{last}」，再点「测试连接」。{}",
+             首次使用请先到坚果云网页版，在「我的坚果云」下新建文件夹，名字用「{last}」，\
+             再点「测试连接」。{}",
             non_ascii_hint(dir),
             last = last_segment(level)
         ),
         FailStage::Dir { level, ready } => format!(
             "「{parent}」已就绪，但「{level}」这一级建不出来：这个位置不允许程序新建文件夹。\
-             请到坚果云网页版 → 我的坚果云 → 新建文件夹，名字用「{last}」，再点「测试连接」。{}",
+             请到坚果云网页版，在「我的坚果云」下新建文件夹，名字用「{last}」，\
+             再点「测试连接」。{}",
             non_ascii_hint(dir),
             parent = parent_path(level, ready),
             last = last_segment(level)

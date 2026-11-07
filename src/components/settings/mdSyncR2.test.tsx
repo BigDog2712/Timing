@@ -153,7 +153,7 @@ describe('R1：云端默认进 WebDAV 分段（cloud === null）', () => {
     expect(baseUrlInput.value).toBe('https://dav.jianguoyun.com/dav/');
     const values = Array.from(container.querySelectorAll('input')).map((el) => el.value);
     expect(values).toContain('https://dav.jianguoyun.com/dav/');
-    expect(values).toContain('/我的坚果云/Timing');
+    expect(values).toContain('/Timing');
   });
 
   it('E2 不回归：已配置过群晖地址时原样显示，默认值不出现', async () => {
@@ -170,7 +170,8 @@ describe('R1：云端默认进 WebDAV 分段（cloud === null）', () => {
     expect(values).toContain('https://synology.example.com/dav/');
     expect(values).toContain('/Timing/md');
     expect(values).not.toContain('https://dav.jianguoyun.com/dav/');
-    expect(values).not.toContain('/我的坚果云/Timing');
+    /* 默认目录是 /Timing（精确元素比对）：已有配置是 /Timing/md，不被默认值顶掉 */
+    expect(values).not.toContain('/Timing');
   });
 });
 

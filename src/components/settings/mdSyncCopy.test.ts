@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { POLL_MAX_MINUTES, POLL_MIN_MINUTES, describeInterval } from './mdSyncConfig';
 import {
   CLOSED_TIER_SUFFIX,
+  CLOUD_DIR_HINT,
   COPY,
   EXPLAIN_KEYS,
   MIXED_ROOT_PREFIX,
@@ -121,5 +122,19 @@ describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
        调用时就会破，而破的表现是一句没有主语的话出现在界面上 */
     expect(affectedNoteFor([])).toBe('');
     expect(affectedNoteFor([])).not.toContain('跟着数据根一起搬');
+  });
+
+  it('[V0.11.17 B3] 块④远端目录下的静态小字逐字正确，且不含裸状态码', () => {
+    /* 手抄 PRD 那句话，防止常量被改错一个字却没人发现 */
+    expect(CLOUD_DIR_HINT).toBe(
+      '首次使用请先到坚果云网页版，在「我的坚果云」下新建名为 Timing 的文件夹。',
+    );
+    /* 它必须指向默认目录名 Timing（与 `emptyCloud().basePath === '/Timing'` 同源） */
+    expect(CLOUD_DIR_HINT).toContain('Timing');
+    expect(CLOUD_DIR_HINT).toContain('新建');
+    /* 用户可见文案里不许出现裸三位状态码 */
+    expect(/\b\d{3}\b/.test(CLOUD_DIR_HINT)).toBe(false);
+    /* 它不是被删掉的那三句之一 */
+    for (const phrase of REMOVED_PHRASES) expect(CLOUD_DIR_HINT).not.toContain(phrase);
   });
 });

@@ -124,7 +124,7 @@ async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestRes
     let target = md_webdav::WebdavTarget::new(&cloud.base_url, &dir, &cloud.user, &password);
 
     /* 第 1 关：地址与凭据。`NoDirectoryListing` 也是通过——同步 GET 的是 `{date}.md`
-    这个具体文件，服务端不肯对目录发 GET 不影响这条通道。 */
+    这个具体文件，服务端不肯对目录发 GET 不影响这条通道。403 也归进这一类（B1）。 */
     let listing = match md_webdav::probe(&target, "").await {
         Ok(md_webdav::ProbeOutcome::Reachable) => None,
         Ok(md_webdav::ProbeOutcome::NoDirectoryListing(code)) => Some(code),
@@ -135,7 +135,12 @@ async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestRes
     };
     let mut steps = vec![step("account", true, None)];
 
-    /* 第 2 关：目录就绪。失败时 `DirFailure` 带出「卡在第几级」，文案据此分诊。 */
+    /* 第 2 关：目录就绪。失败时 `DirFailure` 带出「卡在第几级」，文案据此分诊。
+    [V0.11.17] B2：MKCOL 的 403 可能是「这个目录已经存在」（坚果云对已存在的目录也回
+    403 而不是 405）。不能据此判死——记为「可能已存在、待写入验证」，继续第 3 关；真的
+    写不进去才回到这一关的文案（见下）。403 以上的其余错误仍立刻停（401 / 409 / 5xx
+    的成因与「已存在」无关）。 */
+    let mut maybe_existing: Option<md_webdav::dir::DirFailure> = None;
     let created = match md_webdav::dir::ensure_base_dir(&target).await {
         Ok(md_webdav::dir::EnsureOutcome::Ready { created, .. }) => created,
         Ok(md_webdav::dir::EnsureOutcome::TooDeep { levels }) => {
@@ -146,6 +151,15 @@ async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestRes
                 md_webdav::dir::MAX_LEVELS
             );
             return stopped(steps, "dir", text);
+        }
+        Err(failure) if is_mkcol_forbidden(&failure.error) => {
+            /* 状态码只进日志；用户可见的结论留到第 3 关之后再说。 */
+            crate::log_info!(
+                "md cloud test: mkcol {} maybe=existing defer=write-probe",
+                failure.level
+            );
+            maybe_existing = Some(failure);
+            0
         }
         Err(failure) => {
             let text = fail_text_at(
@@ -159,22 +173,49 @@ async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestRes
             return stopped(steps, "dir", text);
         }
     };
-    steps.push(step("dir", true, None));
+    /* 没有「待验证」时才当场点亮第 2 关；有待验证的，等第 3 关写完再判。 */
+    if maybe_existing.is_none() {
+        steps.push(step("dir", true, None));
+    }
 
     /* 第 3 关：真写一次再删掉。这是唯一能把「目录建得出来但写不进去」从 403 里分离
-    出来的手段（PRD Q3 的裁决理由）。 */
-    if let Err(err) = md_webdav::probe_file::write_probe(&target).await {
-        let text = fail_text_at(FailStage::Write, &err, &target.base_path);
-        return stopped(steps, "write", text);
+    出来的手段（PRD Q3 的裁决理由）。B1 的 403 与 B2 的 MKCOL 403 都必须走到这里：
+    **最终绿灯的唯一判据是「真的写过一份文件」**，这一关不许被跳过或弱化。 */
+    match md_webdav::probe_file::write_probe(&target).await {
+        Ok(()) => {
+            if maybe_existing.is_some() {
+                /* 写进去了 → 目录确实在，补上第 2 关的「已就绪」 */
+                steps.push(step("dir", true, None));
+            }
+            steps.push(step("write", true, None));
+        }
+        Err(err) => {
+            if let Some(failure) = maybe_existing {
+                /* 目录可能已存在但写不进去：用第 2 关的位置信息分诊，带上那一级路径 */
+                let text = fail_text_at(
+                    FailStage::Dir {
+                        level: &failure.level,
+                        ready: failure.ready,
+                    },
+                    &failure.error,
+                    &target.base_path,
+                );
+                return stopped(steps, "dir", text);
+            }
+            let text = fail_text_at(FailStage::Write, &err, &target.base_path);
+            return stopped(steps, "write", text);
+        }
     }
-    steps.push(step("write", true, None));
 
     let mut detail = String::from("账号、目录、写入都通过");
     if created > 0 {
         detail.push_str(&format!("（新建 {created} 级目录）"));
     }
+    if maybe_existing.is_some() {
+        detail.push_str("（目录可能已存在，已按写入结果确认）");
+    }
     if let Some(code) = listing {
-        /* 状态码只进日志（全项目同一条纪律）：绿字里带 `405` 对用户零信息量，
+        /* 状态码只进日志（全项目同一条纪律）：绿字里带 `405` / `403` 对用户零信息量，
            而排障时「服务端到底回了什么」恰恰是第一条要看的线索。 */
         crate::log_info!("md cloud test: dir listing unsupported code={code}");
         detail.push_str("（服务端不支持直接读目录，已按正常处理）");
@@ -184,4 +225,13 @@ async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestRes
         detail,
         steps,
     }
+}
+
+/// MKCOL 的 403 是不是「可能已存在」（B2）。`fail_on_status` 把 403 归一成 `Forbidden`，
+/// 但 `Server(403)` 也一并认——判据只关心「是不是 403」，不关心它走的是哪个变体。
+fn is_mkcol_forbidden(err: &md_webdav::WebdavError) -> bool {
+    matches!(
+        err,
+        md_webdav::WebdavError::Forbidden | md_webdav::WebdavError::Server(403)
+    )
 }

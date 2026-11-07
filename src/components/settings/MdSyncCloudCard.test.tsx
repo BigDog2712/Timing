@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn(), run: vi.fn(), open:
 vi.mock('../../services/api', () => ({ mdSyncApi: api, mdBackupApi: { list: vi.fn(), restore: vi.fn() } }));
 
 import { MdSyncCloudCard } from './MdSyncCloudCard';
+import { CLOUD_DIR_HINT } from './mdSyncCopy';
 import { useMdSyncDraft } from './useMdSyncDraft';
 import type { MdSyncDraft } from './useMdSyncDraft';
 
@@ -226,7 +227,9 @@ describe('MdSyncCloudCard', () => {
 
     const urls = Array.from(container.querySelectorAll('input')).map((el) => el.value);
     expect(urls).toContain('https://dav.jianguoyun.com/dav/');
-    expect(urls).toContain('/我的坚果云/Timing');
+    expect(urls).toContain('/Timing');
+    /* [V0.11.17] B3：远端目录框下有一行静态小字，逐字等于常量 */
+    expect(container.textContent).toContain(CLOUD_DIR_HINT);
     /* 「值」而不是「灰字」：placeholder 是提示，用户必须先删掉才能填自己的 */
     const baseUrl = container.querySelector('input[placeholder="https://dav.jianguoyun.com/dav/"]') as HTMLInputElement;
     expect(baseUrl.value).toBe('https://dav.jianguoyun.com/dav/');

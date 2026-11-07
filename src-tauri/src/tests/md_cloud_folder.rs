@@ -23,7 +23,7 @@ use crate::services::md_cloud::{self, pending};
 use crate::services::md_sync::config;
 use crate::services::md_sync::mirror;
 use crate::tests::md_sync::{binding, env, save_binding, NOTES_HEADING};
-use crate::tests::support::{insert_saved, new_item, unique_dir};
+use crate::tests::support::{insert_saved, new_item, scalar_i64, unique_dir};
 
 /// 把云端通道设成 `LocalFolder`（`local_root` 由调用方给，可以是「看起来合法但写不进去」）。
 async fn set_folder_cloud(pool: &sqlx::SqlitePool, local_root: &Path) {
@@ -113,7 +113,75 @@ async fn folder_round_failure_records_nothing() {
     );
 }
 
-/// 根目录建出来了，但**其中一个落点**写不出去 → 仍然一行都不许记（[V0.11.14] 修 O3）。
+/// [V0.11.17] B4：本地目录通道仍要**比对文件与 SQL**。
+///
+/// 主人的原话：「在云端使用本地同步时，云端不再同步，但依然要比对此文件与 sql 中是否
+/// 有变动」。`round_folder::run` 不往 WebDAV 发任何请求（现状，不动），但它经
+/// `mirror::run_in(pool, root)` 把 root 里那份 `{date}.md` 的手改导回 SQL：
+/// `sync_all(Some(root))` → `sync_binding` → 文件侧变更时 `import_and_render`。
+///
+/// 这条用例就是那件事的机器判据：**先**在 root 里放一段 SQL 里没有的手写便利贴，
+/// 跑一轮 `round_folder::run`，**再**断言 SQL 查得到、且 `md_cloud_pending` 记了指纹
+/// （设置页那栏不再是「今天还没上传」）。
+#[tokio::test]
+async fn folder_round_imports_handwritten_md_back_into_sql() {
+    let fixture = env("cloud-folder-import").await;
+    let cloud_dir = unique_dir("cloud-folder-import-target");
+    set_folder_cloud(&fixture.pool, &cloud_dir).await;
+
+    /* 前提：SQL 里一条便利贴都没有（下面的手写段落是**净新增**）。 */
+    let before = scalar_i64(
+        &fixture.pool,
+        "SELECT COUNT(*) FROM notes WHERE deleted_at IS NULL",
+    )
+    .await;
+    assert_eq!(before, 0, "用例前提：SQL 里本来没有便利贴");
+
+    /* 在云端目录里手写一段便利贴：只有文件侧有，SQL 侧没有。 */
+    fs::create_dir_all(&cloud_dir).expect("建临时云端目录应成功");
+    let today = crate::services::md_cloud::today();
+    let rel = format!("{today}.md");
+    let handwritten = "云端手写的这一段";
+    let body = format!(
+        "{NOTES_HEADING}\n| 更新时间 | 事项 | 内容 |\n|---|---|---|\n| {today} 09:00:00 | 生活 | {handwritten} |\n"
+    );
+    fs::write(cloud_dir.join(&rel), body).expect("写手写日记应成功");
+
+    let outcome = md_cloud::round(&fixture.pool).await.expect("round 应成功");
+    assert!(outcome.report.errors.is_empty(), "{:?}", outcome.report.errors);
+
+    /* ① SQL 里查得到这段手写内容（= 文件侧变动被导回） */
+    let contents: Vec<String> = sqlx::query_scalar(
+        "SELECT content FROM notes WHERE deleted_at IS NULL",
+    )
+    .fetch_all(&fixture.pool)
+    .await
+    .expect("查询便利贴应成功");
+    assert!(
+        contents.iter().any(|text| text == handwritten),
+        "手写的便利贴必须被导回 SQL，实际是 {contents:?}"
+    );
+
+    /* ② 设置页那栏不是「今天还没上传」：`md_cloud_pending` 记了指纹 */
+    let status = md_cloud::status(&fixture.pool).await.expect("status 应成功");
+    assert!(
+        status.today_pushed,
+        "比对完并写回之后，「今天已上传」不能还是假的"
+    );
+    let row = md_cloud_pending::get(&fixture.pool, &outcome.today)
+        .await
+        .expect("查询应成功")
+        .expect("成功的一轮必须留下指纹行");
+    assert_eq!(row.pending_since, 0, "写进目录就是同步完了，不该有欠账");
+    /* 指纹必须是**云端那份文件**的（写回后重新渲染过的内容） */
+    let bytes = fs::read(cloud_dir.join(&rel)).expect("云端目录里应有今日文件");
+    assert_eq!(
+        row.last_hash,
+        Some(pending::fingerprint(&bytes)),
+        "指纹要取云端那份文件"
+    );
+}
+
 ///
 /// 这是 `wrote_ok` 判据唯一能生效的形状：第一个落点写成功，于是 `today_hash` **取得到**
 /// 指纹，`mark_synced` 完全够得着；只有「本轮 `errors` 非空」这一个条件能拦住它。

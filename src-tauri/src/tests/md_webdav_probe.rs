@@ -81,8 +81,8 @@ async fn mkcol_forbidden_names_the_level_and_stops_at_dir() {
     server.fail_mkcol_at(DIR, 403);
 
     let result = probe(&server).await;
-    assert!(!result.ok, "第 2 关红 → 整体不许绿");
-    assert_eq!(result.steps.len(), 2, "第 3 关一次请求都不该发");
+    assert!(!result.ok, "目录建不出来、写也失败 → 整体不许绿");
+    assert_eq!(result.steps.len(), 2, "红在第 2 关（第 2 关不再当场判死，但最终仍停在它）");
     assert!(result.steps[0].ok, "第 1 关（账号）应通过");
     assert_eq!(result.steps[1].key, "dir");
     assert!(!result.steps[1].ok);
@@ -93,11 +93,56 @@ async fn mkcol_forbidden_names_the_level_and_stops_at_dir() {
     assert!(text.contains("新建文件夹"), "必须给一个用户当场能做的动作：{text}");
     /* 摘要句就是那一关的原文（不拼接、不改写） */
     assert_eq!(result.detail, text);
-    /* 一次 MKCOL 都不许碰探针文件 */
-    assert!(!server
-        .method_paths()
-        .iter()
-        .any(|hit| hit.contains("timing-write-test")));
+    /* [V0.11.17] B2：MKCOL 403 不再当场判死——第 3 关真的试写过（探针 PUT 发过），
+       写不进去才回到第 2 关的话。这条同时钉住「403 继续走第 3 关」。 */
+    assert!(
+        server
+            .method_paths()
+            .iter()
+            .any(|hit| hit.contains("timing-write-test")),
+        "403 之后必须继续走第 3 关的写探针：{:?}",
+        server.method_paths()
+    );
+}
+
+/// [V0.11.17] B1：目录 GET 回 403（坚果云）不再红在「账号」关；最终是绿字，
+/// 但绿字建立在**真的写过一份文件**之上（第 3 关照常跑）。
+#[tokio::test]
+async fn directory_get_403_is_not_an_account_failure() {
+    let server = DirServer::new(&[]);
+    server.fail_get_with(403); // 目录 GET 被拒，但 PUT 文件是好的
+
+    let result = probe(&server).await;
+    assert!(result.ok, "GET 目录 403 不该判死整条通道：{}", result.detail);
+    assert_eq!(result.steps.len(), 3, "三关都要走到");
+    assert!(result.steps.iter().all(|step| step.ok), "三关全绿：{:?}", result.steps);
+    assert!(result.detail.contains("服务端不支持直接读目录"), "{}", result.detail);
+    /* 绿字必须有实写支撑：末两条是 PUT → DELETE 探针 */
+    let paths = server.method_paths();
+    assert!(
+        paths.iter().any(|hit| hit.starts_with("PUT ") && hit.ends_with("/timing-write-test.txt")),
+        "绿字必须建立在真写过一份文件之上：{paths:?}"
+    );
+    assert_no_status_code(&result, "GET 目录 403");
+}
+
+/// [V0.11.17] B2：目录**已存在**、MKCOL 回 403，但能写进去 → 整体绿，三关如实显示。
+/// 这条是「能写进去就不许报红」的直接机器判据。
+#[tokio::test]
+async fn mkcol_403_on_existing_dir_is_green_when_writable() {
+    /* 网页版里已建好 /我的坚果云/Timing：`dirs` 是服务器真实状态，PUT 的父级在 */
+    let server = DirServer::new(&[DIR]);
+    /* 第 2 级 MKCOL 回 403（坚果云对已存在的目录也这么回） */
+    server.fail_mkcol_at(DIR, 403);
+
+    let result = probe(&server).await;
+    assert!(result.ok, "目录已在、文件也写进去了 → 不许报红：{}", result.detail);
+    assert_eq!(result.steps.len(), 3, "三关如实显示：{:?}", result.steps);
+    assert!(result.steps.iter().all(|step| step.ok));
+    /* 第 2 关可以被标记为「已就绪」——green 时它必须出现且是 ok */
+    assert_eq!(result.steps[1].key, "dir");
+    assert!(result.steps[1].ok);
+    assert_no_status_code(&result, "MKCOL 403 但可写");
 }
 
 #[tokio::test]

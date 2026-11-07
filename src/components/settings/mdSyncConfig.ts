@@ -49,14 +49,17 @@ export function describeInterval(minutes: number): string {
    填写」这条要做到得先手动切一次分段——预填值存在但不在用户眼前，等于没做到。
    **只在 `cloud === null`（从未配置过）时生效**——已有配置一律原样回填，绝不被默认值
    覆盖（PRD 6.1 的硬口径，E2 仍然成立）。
-   `%` 一律不出现：中文路径存中文、显示中文，编码交给 `url` crate 在发请求时做一次。 */
+   `%` 一律不出现：中文路径存中文、显示中文，编码交给 `url` crate 在发请求时做一次。
+   [V0.11.17] B3：`basePath` 从 `/我的坚果云/Timing` 改成 `/Timing`——坚果云的 `dav` 根
+   就是「我的坚果云」，`/Timing` 是它下面那一级；少一级中文目录，真机少一次编码/权限
+   歧义。配套提示见 `mdSyncCopy.ts::CLOUD_DIR_HINT`（首次使用到网页版新建这个文件夹）。 */
 export function emptyCloud(): MdSyncCloud {
   return {
     enabled: false,
     mode: 'webdav',
     localRoot: '',
     baseUrl: 'https://dav.jianguoyun.com/dav/',
-    basePath: '/我的坚果云/Timing',
+    basePath: '/Timing',
     user: '',
   };
 }

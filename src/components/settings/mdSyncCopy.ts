@@ -47,6 +47,19 @@ export function mixedFileNote(labels: string[]): string {
   return `${labels.join('、')}用的是另外的名字；改上面的名字会三档统一。`;
 }
 
+/**
+ * [V0.11.17] B3 · 块④「远端目录」输入框下的静态小字。
+ *
+ * 默认目录改成 `/Timing`（坚果云 `dav` 根就是「我的坚果云」），首次使用得先在网页版把
+ * 这个文件夹建出来，否则 MKCOL 会被拒。这行字只解释「为什么要建、在哪建、叫什么」，
+ * 不随任何状态变化——所以是常量，不是从 `status` 推出来的句子。
+ *
+ * 单独一个键、**不进 `COPY`**：`COPY` 的每一项都受 A1b 的「解释性长句 ≤20 字 / 全表
+ * ≤40 字」约束，而这是一句必须说全的操作指引（网页版 → 我的坚果云 → 新建 Timing）。
+ */
+export const CLOUD_DIR_HINT =
+  '首次使用请先到坚果云网页版，在「我的坚果云」下新建名为 Timing 的文件夹。';
+
 /** ③ 三档 `root` 不同时的提示行前缀（PRD 4.4） */
 export const MIXED_ROOT_PREFIX = '三档落点不同：';
 

@@ -27,6 +27,7 @@ import type {
 } from '../../types/domain';
 import { Switch } from '../ui/Switch';
 import { pollSecsOf } from './mdSyncConfig';
+import { CLOUD_DIR_HINT } from './mdSyncCopy';
 import type { MdSyncDraft } from './useMdSyncDraft';
 
 interface MdSyncCloudCardProps {
@@ -143,7 +144,7 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
             <label className="sync__field">
               <span className="sync__label">远端目录</span>
               <input className="sync-cloud__input" value={cloud.basePath} disabled={disabled} spellCheck={false}
-                placeholder="/Timing/md" onChange={(event) => patch({ basePath: event.target.value })} />
+                placeholder="/Timing" onChange={(event) => patch({ basePath: event.target.value })} />
             </label>
             <label className="sync__field">
               <span className="sync__label">账号</span>
@@ -151,6 +152,9 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
                 placeholder="坚果云登录邮箱" onChange={(event) => patch({ user: event.target.value })} />
             </label>
           </div>
+          {/* [V0.11.17] B3：默认目录 /Timing 要用户先在网页版建好这个文件夹。文案在
+              `mdSyncCopy.ts::CLOUD_DIR_HINT`（不在组件里写死）。 */}
+          <p className="sync-cloud__hint">{CLOUD_DIR_HINT}</p>
           <label className="sync__field">
             <span className="sync__label">应用密码</span>
             <div className="sync__row">
