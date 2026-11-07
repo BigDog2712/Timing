@@ -66,19 +66,21 @@ pub(super) fn try_acquire() -> Option<Gate> {
 
 /// 托盘「Markdown 同步」这一项的**标签**：读**生效通道**，不读草稿里的选择。
 ///
-/// [V0.11.18] 判据是 `md_cloud::usable`（`enabled && is_usable()`），**不是**
-/// `cloud.enabled`：后者只说明用户选了「本地 + 云端」，字段没填全时那一轮实际仍走
-/// `md_sync::run`（`md_cloud::round` 首行就转交），标签若跟着 `enabled` 走，就会出现
-/// 「写着云端同步、其实只写本地」——比不写更糟。这也与 `round` / 轮询 / 手机端四处同源。
+/// 判据 = `config.enabled` **且** `md_cloud::usable`（`cloud.enabled && is_usable()`）。
+/// 两条缺一不可，各挡一句假话：
+/// - 只看 `cloud.enabled`：字段没填全时那一轮仍走 `md_sync::run`，「云端同步」是骗人；
+/// - 只看 `usable()`：它**不含顶层总开关**（还服务 `round` / 轮询 / 手机端 / 备份，不动它），
+///   总开关关着而云端填全时写着「云端同步」，点下去弹的却是「先在设置里打开 Markdown 同步」。
 ///
-/// 有意让 `infra` 不参与判断：`infra/tray_menu.rs` 只负责把这段文字放进菜单项
-/// （它不许依赖 `services`，见分层门禁），判据留在装配层。
-///
-/// 读配置失败按「只用本地」处理：标签只是提示，为它弹错误或让托盘崩掉都不划算，
-/// 真正的失败会由本轮同步的通知 / 块④ 状态行说出来。
+/// `infra` 不参与判断（分层门禁）：`tray_menu` 只负责把文字放进菜单项。读配置失败按
+/// 「只用本地」处理——标签只是提示，为它崩掉托盘不划算，真失败由通知 / 块④ 状态行说。
 pub(crate) async fn sync_label(pool: &SqlitePool) -> &'static str {
     match services::md_sync::config::load(pool).await {
         Ok(config) => {
+            /* 总开关关着 → 这一轮连 `md_sync::run` 都不会进，说「云端同步」是假话。 */
+            if !config.enabled {
+                return LOCAL_LABEL;
+            }
             if services::md_cloud::usable(&config).is_some() {
                 CLOUD_LABEL
             } else {
@@ -125,28 +127,24 @@ fn notify_busy_once(app: &AppHandle) {
     notify_or_log(app, "Markdown 同步", "上一次同步还在进行中，请稍候");
 }
 
-/// 点同步时「压根不会跑到云端那一半」的判据（**纯函数**，便于单测）。
+/// 点同步时「压根不会跑到云端那一半」的判据（**纯函数**，便于单测）：
+/// `Some((通知标题, 通知正文))`；`None` = 这一下会真的跑。
 ///
-/// 返回 `(通知标题, 通知正文)`；`None` = 这一下会真的跑，不用提前解释。
+/// **标题规范：必须与用户刚刚点的那一项标签逐字相同**——通知是对「你刚做的动作」的回应，
+/// 不是对「你可能想要的动作」的回应。这两档下 `sync_label` 都返回 `LOCAL_LABEL`
+/// （总开关关着 / 未填全），所以标题都是它。写成「云端同步」就成了自相矛盾的画面：
+/// 点的是写着「Markdown 同步」的那一项，弹出来的却自称「云端同步」。
+/// 两档靠**正文**区分（去开总开关 / 去填全字段），都指向设置页同一个地方。
 ///
-/// 两档，都是「点了才发现」的那种情况：
-/// 1. 总开关关着（出厂默认）→ 告诉他去哪儿开（v0.11.7 既有口径，一个字不改）；
-/// 2. **通道选了「本地 + 云端」但没填全**（[V0.11.18]，PRD §3.2 边界表 / 判据 B4）
-///    → 正文逐字 `先在设置里填好云端`，标题用 `云端同步`（与菜单项此刻的文字同一份常量）。
-///
-/// 第 2 档为什么不是「标签说真话」就完了：`sync_label` 读的是**生效通道**
-/// （`enabled && is_usable()`），未填全时菜单项显示的是 `Markdown 同步`——也就是说
-/// 「点『云端同步』→ 提示先在设置里填好云端」这一帧永远不会发生。两条判据必须并存：
-/// 标签管「点之前知道会发生什么」，这条管「点了之后知道为什么只写了一半」。
-///
-/// 判据用后端的 `is_usable()`，**不在前端或这里重算字段**：填全的定义只允许有一份。
+/// 两档并存不是冗余：标签管「点之前知道会同步到哪」，这条管「点了之后知道为什么只写了一半」。
+/// 判据直接用后端的 `is_usable()`，**不在这里重算字段**：填全的定义只允许有一份。
 pub(crate) fn blocked_notice(config: &crate::models::md_sync::MdSyncConfig) -> Option<(&'static str, &'static str)> {
     if !config.enabled {
         return Some((LOCAL_LABEL, "先在设置里打开 Markdown 同步"));
     }
     match config.cloud.as_ref() {
         Some(cloud) if cloud.enabled && !cloud.is_usable() => {
-            Some((CLOUD_LABEL, "先在设置里填好云端"))
+            Some((LOCAL_LABEL, "先在设置里填好云端"))
         }
         _ => None,
     }

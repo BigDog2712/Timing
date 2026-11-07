@@ -64,9 +64,10 @@ type Tier = (&'static str, MdSyncConfig, Option<(&'static str, &'static str)>);
 ///
 /// 也就是说「未填全」那一档的标题 = 菜单项**此刻**显示的 `Markdown 同步`，不是 `云端同步`。
 ///
-/// **但实现给的是 `云端同步`**（`tray_sync.rs` 的 `blocked_notice` 用 `CLOUD_LABEL`）——
-/// 本表的「期望」列因此记的是**现状**（照片口径），冲突单独挂在
-/// `qa_b4_notice_title_should_equal_the_menu_item_label`（`#[ignore]`，等你拍板）。
+/// **实现已按此改**（`blocked_notice` 的那一档从 `CLOUD_LABEL` 改成 `LOCAL_LABEL`，
+/// 主理人裁决「通知标题必须与用户刚刚点的那一项标签逐字相同」）。本表因此记的是**判据**，
+/// 不再是「现状照片」；`qa_b4_notice_title_should_equal_the_menu_item_label` 同步去掉
+/// 已去掉那个 `ignore` 标记，成为常驻用例。
 fn tiers() -> Vec<Tier> {
     let base = |enabled: bool, cloud: Option<MdSyncCloud>| MdSyncConfig {
         enabled,
@@ -104,22 +105,22 @@ fn tiers() -> Vec<Tier> {
                     ..MdSyncCloud::default()
                 }),
             ),
-            Some((CLOUD_LABEL, V0118_BODY)),
+            Some((LOCAL_LABEL, V0118_BODY)),
         ),
         (
             "4 · webdav 只缺 base_path（两个填了、一个空）",
             base(true, Some(missing_base_path)),
-            Some((CLOUD_LABEL, V0118_BODY)),
+            Some((LOCAL_LABEL, V0118_BODY)),
         ),
         (
             "5 · webdav 只缺 user（全角/半角空白也算空）",
             base(true, Some(missing_user)),
-            Some((CLOUD_LABEL, V0118_BODY)),
+            Some((LOCAL_LABEL, V0118_BODY)),
         ),
         (
             "6 · localfolder 载体、没选落点目录 —— 另一条判据，别漏",
             base(true, Some(missing_root)),
-            Some((CLOUD_LABEL, V0118_BODY)),
+            Some((LOCAL_LABEL, V0118_BODY)),
         ),
         (
             "7 · 填全了（webdav）→ 不插话",
@@ -178,7 +179,12 @@ fn qa_blocked_notice_two_bodies_never_swap() {
     assert_eq!(not_filled.1, V0118_BODY, "② 的正文必须与 PRD §14.2 逐字一致");
 
     assert_ne!(off.1, not_filled.1, "两档必须给不同的去处");
-    assert_ne!(off.0, not_filled.0, "两档的标题也不该一样（一个本地、一个云端）");
+
+    /* [V0.11.18 裁决后] 两档的**标题相同**（都是 `LOCAL_LABEL`）：这两档下菜单项都写着
+       「Markdown 同步」，通知标题必须与用户刚点的那一项逐字相同。区分靠正文，不靠标题。
+       这里改成断言「相等」，就是为了让将来有人把某一档标题改回 `CLOUD_LABEL` 时当场变红。 */
+    assert_eq!(off.0, not_filled.0, "两档标题都该是用户刚点的那一项的文字");
+    assert_eq!(off.0, LOCAL_LABEL);
 }
 
 /// 标题必须是**菜单项用的那个常量**，不是另抄一份字面量。

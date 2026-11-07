@@ -33,10 +33,11 @@ pub(super) async fn store(pool: &SqlitePool, cfg: &MdSyncConfig) {
 async fn qa_sync_label_follows_effective_channel_not_the_selection() {
     let pool = fresh_pool("qa-blocked-label").await;
 
-    /* ① 选了云端（字段还填全了）但 Markdown 总开关关着。
-       实测：标签是 `云端同步`。PRD 没有任何一条钉住这一帧（B3 只钉正文，
-       且 B3 的前提是「通道 = 只用本地」），所以这里**按现状断言**、不按理想断言，
-       另在报告里作为「判据未覆盖的一帧」提出（总开关关着时标签仍叫云端同步）。 */
+    /* ① 选了云端（字段还填全了）但 Markdown 总开关关着 → 标签是 `Markdown 同步`。
+       [V0.11.18 裁决后] 这一帧已被修掉：`md_cloud::usable()` 不看顶层 `config.enabled`，
+       所以 `sync_label` 单独判了一次。原实现给的是 `云端同步` —— 那句是假话：
+       总开关关着时这一轮连 `md_sync::run` 都不会进，点下去弹的却是「先在设置里打开
+       Markdown 同步」。断言因此从「现状照片」改成「判据」。 */
     store(
         &pool,
         &MdSyncConfig {
@@ -48,8 +49,8 @@ async fn qa_sync_label_follows_effective_channel_not_the_selection() {
     .await;
     assert_eq!(
         sync_label(&pool).await,
-        CLOUD_LABEL,
-        "总开关关着、但通道选了云端：标签按 `usable()`（不看总开关）→ 云端同步"
+        LOCAL_LABEL,
+        "总开关关着：不会跑云端，标签必须是「Markdown 同步」（`sync_label` 单独判了总开关）"
     );
 
     /* ② 开了 + 选了云端 + 没填全 → 标签回落本地（`usable()` 为 None） */
@@ -91,24 +92,20 @@ async fn qa_sync_label_follows_effective_channel_not_the_selection() {
     assert!(blocked_notice(&not_filled).is_some(), "未填全档确实会说话");
 }
 
-/// **与 PRD §14.2 的冲突点，等你拍板**（`#[ignore]` 是刻意的：不把正在打包的树弄红，
-/// 但每次跑测试都会在汇总里以「1 ignored」露头）。
+/// **决议已落地**（原先挂着一个 `ignore` 标记等主理人拍板）：判据胜，改的是代码。
 ///
 /// 判据说（§14.2 · B4 修订，原文逐字）：
 /// > ① 菜单项标签仍逐字 `Markdown 同步`（因为未填全 → 不生效，标签诚实）；
 /// > ② 点它 → 系统通知**标题** `Markdown 同步`、**正文**逐字 `先在设置里填好云端`
 ///
-/// 实现给的是 `CLOUD_LABEL`（`云端同步`）。工程师在 `blocked_notice` 上方的注释写的是
-/// 「标题用菜单项此刻的 `云端同步`」——但同一个提交里 `tray_sync_quit.rs` 的测试注释又写
-/// 「未填全时菜单项显示 `Markdown 同步`」，**同一份代码里两句话互相矛盾**，且后者与实现一致。
+/// 改之前实现给的是 `CLOUD_LABEL`（`云端同步`），而同一份配置下菜单项写着 `Markdown 同步`
+/// ——「点的是这个、弹的是那个」。决议：**通知标题必须与用户刚刚点的那一项标签逐字相同**，
+/// 于是 `blocked_notice` 的那一档从 `CLOUD_LABEL` 改成 `LOCAL_LABEL`。
 ///
 /// 断言刻意不写字面量：直接拿同一个库里 `sync_label` 的结果比 `blocked_notice` 的标题。
-/// 这样「两处各抄一份文案」的实现会红，「共用同一个常量」的实现会绿。
-///
-/// 裁决结果的处理：**改代码**（`CLOUD_LABEL` → `LOCAL_LABEL`）→ 删掉 `#[ignore]` 即绿；
-/// **改判据** → 把这段注释的依据换成新条文，本用例删掉。
+/// 这样「两处各抄一份文案」的实现会红，「共用同一个常量」的实现会绿 —— 这条比字面量断言强，
+/// 所以它值得从「挂起」转正。
 #[tokio::test]
-#[ignore = "PRD §14.2 ② 要求标题为 Markdown 同步，实现给云端同步；等主理人拍板"]
 async fn qa_b4_notice_title_should_equal_the_menu_item_label() {
     let pool = fresh_pool("qa-blocked-title").await;
     let not_filled = MdSyncConfig {

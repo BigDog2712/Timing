@@ -20,7 +20,7 @@ use super::md_sync::{at, env};
 /* `run_before_quit` 与 `QUIT_SYNC_BUDGET` 在 `app/tray_quit.rs`（[V0.11.18] 为行数门禁拆出），
 `sync_label` / `try_acquire` 留在 `app/tray_sync.rs`：闸的 `Drop` 语义只该有一处定义。 */
 use crate::app::tray_quit::run_before_quit;
-use crate::app::tray_sync::{blocked_notice, sync_label};
+use crate::app::tray_sync::{blocked_notice, sync_label, LOCAL_LABEL};
 use crate::models::md_sync::MdSyncConfig;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::repositories::settings;
@@ -116,6 +116,39 @@ async fn sync_label_is_local_when_channel_off() {
     assert_eq!(sync_label(&env.pool).await, "Markdown 同步");
 }
 
+/// [V0.11.18] 第 5 档：**总开关关着、但云端字段全都填好了** → 仍然说「Markdown 同步」。
+///
+/// 这一档是「标签说假话」的第二个入口，和「未填全」那条同病：
+/// `md_cloud::usable()` **不看顶层 `config.enabled`**（它只判 `cloud.enabled && is_usable()`），
+/// 所以不单独判一次的话，托盘会写着「云端同步」——而点下去弹的是
+/// 「先在设置里打开 Markdown 同步」。用户点的是「云端同步」那四个字，得到的回应却在说
+/// 另一个开关，他没法把这两件事连起来。
+///
+/// 修法只在 `sync_label` 里加一层，**不动 `usable()`**：它还服务 `round` / 轮询 /
+/// 手机端 / 备份四处，改语义要一起承担。
+#[tokio::test]
+async fn sync_label_is_local_when_master_switch_is_off_even_if_cloud_is_filled() {
+    let env = env("tray-label-off-filled").await;
+    let mut current = config::load(&env.pool).await.unwrap();
+    current.enabled = false;
+    /* 字段一个不少（`is_usable() == true`），只有总开关关着 */
+    current.cloud = Some(MdSyncCloud {
+        enabled: true,
+        mode: CloudMode::Webdav,
+        base_url: "https://dav.jianguoyun.com/dav/".into(),
+        base_path: "/Timing".into(),
+        user: "me@example.com".into(),
+        ..MdSyncCloud::default()
+    });
+    store(&env.pool, &current).await;
+
+    assert_eq!(
+        sync_label(&env.pool).await,
+        "Markdown 同步",
+        "总开关关着时这一轮连 md_sync::run 都不会进，写「云端同步」就是假话"
+    );
+}
+
 /// PRD §13.3.1「同步未启用 → 不跑、不等，直接退出」。
 ///
 /// 返回值就是「要不要等」的那个信号：`false` = 没有要写的东西。
@@ -177,21 +210,23 @@ fn blocked_notice_covers_off_and_not_filled() {
     );
 
     /* ② 开着 + 选了「本地 + 云端」但地址 / 目录 / 账号全空
-          → 正文逐字 `先在设置里填好云端`，标题用菜单项此刻的 `云端同步` */
+          → 正文逐字 `先在设置里填好云端`；**标题是 `LOCAL_LABEL`**——
+          用户点的那一项此刻就写着「Markdown 同步」（未填全 → `sync_label` 也返回它），
+          通知标题若写「云端同步」就是另一句假话。 */
     config.enabled = true;
     config.cloud = Some(MdSyncCloud {
         enabled: true,
         mode: CloudMode::Webdav,
         ..MdSyncCloud::default()
     });
-    assert_eq!(blocked_notice(&config), Some(("云端同步", "先在设置里填好云端")));
+    assert_eq!(blocked_notice(&config), Some((LOCAL_LABEL, "先在设置里填好云端")));
 
     /* ③ 只填了两个字段也不算填全（`is_usable` 要求三个都非空）——这一档最容易写漏 */
     config.cloud = Some(MdSyncCloud {
         user: String::new(),
         ..filled_webdav()
     });
-    assert_eq!(blocked_notice(&config), Some(("云端同步", "先在设置里填好云端")));
+    assert_eq!(blocked_notice(&config), Some((LOCAL_LABEL, "先在设置里填好云端")));
 
     /* ④ 填全了 → 不再插话，这一下会真的跑 */
     config.cloud = Some(filled_webdav());
