@@ -34,6 +34,11 @@ mod md_cloud_purge;
 mod md_cloud_purge_batch;
 mod md_cloud_purge_guard;
 mod md_cloud_purge_webdav;
+/* [QA 独立验收 V0.11.19] T04 变更 A：LocalFolder 半场（I9a/I9b/I9c + 闸③父子 + 闸⑤a +
+   分通道暂停）与 WebDAV 半场（水位停在失败项之前 + 403/429 同 401 整批停）。
+   两份都在验收方手里重写，不复用工程师的机验结论。 */
+mod qa_t04_acceptance;
+mod qa_t04_webdav_failures;
 /* [V0.11.19] 变更 B：围栏状态机（洞 1 / 洞 2）与三档诊断的单元判据。 */
 mod md_section_fence;
 /* [V0.11.19] J15：别人的围栏里有逐字标题时，那一块必须逐字节不变。 */

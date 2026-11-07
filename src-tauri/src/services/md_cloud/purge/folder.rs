@@ -20,8 +20,8 @@
 //! 闸③ **必须先于任何一次目录枚举**：顺序最容易被后人顺手调换（把枚举挪到 guard 前面，
 //! 编译一样过、行为却变成「先读了主人的日记目录，再拒绝」）。所以本模块只有一个
 //! **先闸后枚举**的入口 `guarded_entries`，`candidates` 的第一句就是它；它内部那个
-//! 枚举函数带一个只在测试里累加的计数器（`ENUMERATIONS`），单测靠它断言「闸③ 拒绝时
-//! 一次都没枚举」。
+//! 枚举函数带一个只在测试里累加的计数器（`ENUMERATIONS`，**thread-local**：全局的话
+//! 并行跑的别的用例会一起加），单测靠它断言「闸③ 拒绝时一次都没枚举」。
 
 use std::collections::HashMap;
 use std::fs;
@@ -38,11 +38,19 @@ use crate::repositories::md_cloud_pending::{self, CloudPendingRow};
 use crate::services::md_cloud::pending;
 
 #[cfg(test)]
-use std::sync::atomic::{AtomicUsize, Ordering};
+thread_local! {
+    /// 「闸③ 拒绝时零枚举、放行时恰好一次」（设计 §3.4.3）。**必须是 thread-local**：
+    /// `candidates` 这个真实入口也走枚举，别的用例并行跑会把全局计数器一起加，
+    /// 「0 次」偶发变 1、「恰好一次」偶发变 2 —— 那是测试自造的不确定性。
+    /// 前提：一个用例一个线程（`#[tokio::test]` 默认 current_thread）。
+    static ENUMERATIONS: std::cell::Cell<usize> = std::cell::Cell::new(0);
+}
 
-/// 只在测试里累加：证明「闸③ 拒绝时零枚举、放行时恰好一次」（设计 §3.4.3）。
+/// 本线程到目前为止枚举了几次目录（仅测试）。
 #[cfg(test)]
-static ENUMERATIONS: AtomicUsize = AtomicUsize::new(0);
+fn enumerations() -> usize {
+    ENUMERATIONS.with(std::cell::Cell::get)
+}
 
 /// 一个待删项。`bytes` 是闸⑤ 判定时读到的那一份，留底用的就是它 —— **不再读第二次**
 /// （第二次读到的可能已经是别人写的内容，底就留错了）。
@@ -183,7 +191,7 @@ fn guarded_entries(
 /// 本模块**唯一**的目录枚举入口（别处不许直接枚举）。测试靠计数器断言「零枚举」。
 fn entries_of(root: &Path) -> io::Result<Vec<fs::DirEntry>> {
     #[cfg(test)]
-    ENUMERATIONS.fetch_add(1, Ordering::SeqCst);
+    ENUMERATIONS.with(|count| count.set(count.get() + 1));
     Ok(fs::read_dir(root)?.filter_map(Result::ok).collect())
 }
 
@@ -265,10 +273,10 @@ mod tests {
         let root = temp_dir("overlap-same");
         fs::write(root.join("2026-11-04.md"), "x").expect("写样本");
 
-        ENUMERATIONS.store(0, Ordering::SeqCst);
+        ENUMERATIONS.with(|count| count.set(0));
         let outcome = guarded_entries(&root, &[binding(&root)]);
         assert_eq!(outcome.err(), Some(OVERLAP_TEXT.to_string()), "必须是逐字红字");
-        assert_eq!(ENUMERATIONS.load(Ordering::SeqCst), 0, "拒绝时一次枚举都不许发生");
+        assert_eq!(enumerations(), 0, "拒绝时一次枚举都不许发生");
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -279,10 +287,10 @@ mod tests {
         let other = temp_dir("enumerate-other");
         fs::write(root.join("2026-11-04.md"), "x").expect("写样本");
 
-        ENUMERATIONS.store(0, Ordering::SeqCst);
+        ENUMERATIONS.with(|count| count.set(0));
         let outcome = guarded_entries(&root, &[binding(&other)]);
         assert!(outcome.expect("不重合要放行").is_ok());
-        assert_eq!(ENUMERATIONS.load(Ordering::SeqCst), 1, "只许枚举一次");
+        assert_eq!(enumerations(), 1, "只许枚举一次");
         let _ = fs::remove_dir_all(&root);
         let _ = fs::remove_dir_all(&other);
     }
