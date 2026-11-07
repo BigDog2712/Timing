@@ -14,7 +14,7 @@ use crate::models::md_sync::MdSyncReport;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_cloud::{pending, round_push};
 use crate::tests::md_sync::{env, TIMERS_HEADING};
-use crate::tests::md_webdav::{header_value, serve_412_on_put};
+use crate::tests::fake_webdav::{header_value, serve_412_on_put};
 use crate::tests::support::{insert_saved, new_item, unique_dir};
 use crate::platform::clock::now_ms;
 

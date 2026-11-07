@@ -53,7 +53,7 @@ pub(super) async fn resolve(
         Err(err) => {
             backoff::on_failure(now_ms()).await;
             crate::log_warn!("md cloud out: {today}.md fail={}", fail_tag(&err));
-            report.errors.push(fail_text(&err));
+            report.errors.push(fail_text(&err, &target.base_path));
             return Ok(());
         }
     };
@@ -115,7 +115,7 @@ pub(super) async fn resolve(
             );
             report.errors.push(format!(
                 "{today} 远端也改过，重试一次仍未成功（下一轮自动重试）：{}",
-                fail_text(&err)
+                fail_text(&err, &target.base_path)
             ));
         }
     }

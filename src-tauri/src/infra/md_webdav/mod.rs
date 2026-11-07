@@ -1,4 +1,5 @@
-//! WebDAV 传输层（V0.11.13，ADR-061）：只有 GET / PUT / probe 三个动作。
+//! WebDAV 传输层（V0.11.13，ADR-061）：GET / PUT 在本文；`probe` 与 MKCOL 在
+//! `dir.rs`（对目录发请求的那一半，判定表只有一张）。
 //!
 //! `{date}.md` 一天一个文件，路径能直接算（`md_file::expand_tokens`），所以不引 WebDAV
 //! 客户端库、也不发 PROPFIND：坚果云单次列举上限 750 条且不支持 infinity PROPFIND，
@@ -20,9 +21,15 @@ use reqwest::{Client, StatusCode};
 
 use crate::models::constants::{MD_CLOUD_CONNECT_SECS, MD_CLOUD_READ_SECS};
 
+/* 对**目录**发请求的那一半（`probe` 与 MKCOL）：判定表只有一张，见 `dir.rs` 头注释。
+`probe` / `ProbeOutcome` re-export 出来，调用点不必知道拆过（两处都是 L4 叶子）。 */
+pub mod dir;
+pub use dir::{probe, ProbeOutcome};
+
 /// 服务端日志里能分辨出是谁在写。版本号随 `Cargo.toml` 走，不单独维护一份——
 /// [V0.11.13] 硬编码 `"Timing/0.11.13"` 那种写法下次升版必忘。
-const USER_AGENT: &str = concat!("Timing/", env!("CARGO_PKG_VERSION"));
+/* `pub(super)`：`dir.rs` 的 MKCOL 专用 Client 要复用同一个 UA（同一版本串）。 */
+pub(super) const USER_AGENT: &str = concat!("Timing/", env!("CARGO_PKG_VERSION"));
 
 /// 一次 WebDAV 调用的全部参数。`password` 是**应用密码**（坚果云登录密码必然失败）。
 #[derive(Clone)]
@@ -72,10 +79,10 @@ impl WebdavTarget {
         }
     }
 
-    /// `base_url` + 规范化目录 + 百分号编码后的 `rel`。`rel` 允许为空（`probe` 要测目录本身）。
-    /// 本机参数不合法返回 `Network` 而不新增变体：多一个变体会让编排层的 match 多一条
-    /// 永远走不到的分支。
-    pub fn url_for(&self, rel: &str) -> Result<String, WebdavError> {
+    /// `base_url` 的可用形态：去尾斜杠 + 两项校验。`url_for` 与 `dir::dir_url` **共用**
+    /// 这一份，于是「写一份文件」与「建目录」两条路径拼出的 URL 必然逐字符一致
+    /// （设计 §2.2：`base_path` 在两处都是原样拼接、不过 `encode_rel`）。
+    pub fn validated_base(&self) -> Result<&str, WebdavError> {
         let base = self.base_url.trim().trim_end_matches('/');
         if base.is_empty() {
             return Err(WebdavError::Network("WebDAV 地址还没填".into()));
@@ -86,6 +93,14 @@ impl WebdavTarget {
                 redact(base)
             )));
         }
+        Ok(base)
+    }
+
+    /// `base_url` + 规范化目录 + 百分号编码后的 `rel`。`rel` 允许为空（`probe` 要测目录本身）。
+    /// 本机参数不合法返回 `Network` 而不新增变体：多一个变体会让编排层的 match 多一条
+    /// 永远走不到的分支。
+    pub fn url_for(&self, rel: &str) -> Result<String, WebdavError> {
+        let base = self.validated_base()?;
         let rel = rel.trim().trim_start_matches('/');
         if rel.split('/').any(|segment| segment == "..") {
             return Err(WebdavError::Network("远端相对路径不能包含 ..".into()));
@@ -128,7 +143,44 @@ pub async fn get(target: &WebdavTarget, rel: &str) -> Result<GetOutcome, WebdavE
 
 /// 写远端一份文件。`if_match = Some(etag)` 时发 `If-Match`；`None` 就是无条件 PUT——
 /// **不发** `If-None-Match: *`：那会把「覆盖已存在文件」变成 412，而覆盖是常态。
+///
+/// ## 409 补建目录内建于本层（设计 §1.1）
+///
+/// RFC 4918 里 `PUT → 409` 只有**一个**成因（父集合不存在），补建后重试一次是 HTTP
+/// 语义的一部分，不是业务策略。放在编排层要三处各写一遍（`round_push::push_today` /
+/// `push_history` / `round_conflict` 的 412 重试），漏一处就是「补传成功、今天失败」
+/// 这种极难复现的错；而且不需要穿参数、不需要每轮状态机——第一次 409 后目录已经建
+/// 出来，同一轮后续文件的 PUT 不会再 409，天然只有一次级联。
 pub async fn put(
+    target: &WebdavTarget,
+    rel: &str,
+    bytes: &[u8],
+    if_match: Option<&str>,
+) -> Result<PutOutcome, WebdavError> {
+    match send_put(target, rel, bytes, if_match).await {
+        Err(WebdavError::Server(409)) => match dir::ensure_base_dir(target).await? {
+            dir::EnsureOutcome::Ready { .. } => {
+                /* 只重试**一次**：第二次仍 409 = 目录明明建了却被拒（配额 / 只读挂载 /
+                服务端策略），再试只是多一次请求，文案也解释不了更多。 */
+                send_put(target, rel, bytes, if_match).await
+            }
+            /* 太深：一个请求都没发（`ensure_base_dir` 的纯函数判定）。降级成
+            `Server(409)`——PUT 确实是 409，不改写它的本义；`fail_text` 会说
+            「请到网页版按这个路径手动建好目录」。 */
+            dir::EnsureOutcome::TooDeep { levels } => {
+                crate::log_warn!(
+                    "md cloud mkcol: {} levels={levels} skip=too-deep",
+                    target.base_path
+                );
+                Err(WebdavError::Server(409))
+            }
+        },
+        other => other,
+    }
+}
+
+/// 不补建的裸 PUT（409 原样上抛）。
+async fn send_put(
     target: &WebdavTarget,
     rel: &str,
     bytes: &[u8],
@@ -147,44 +199,6 @@ pub async fn put(
     Ok(PutOutcome {
         etag: etag_of(&response),
     })
-}
-
-/// `probe` 的三类结论（[V0.11.14] 修 O8）。
-///
-/// 旧版只有「通 / 不通」两档，于是 405（服务端不支持对目录发 GET）与 3xx（要求补尾
-/// 斜杠）被翻成「连不上」，用户以为自己填错了地址或密码，去改一个本来就对的配置。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ProbeOutcome {
-    /// 地址与凭据都对：200（读到正文），或 404（这个文件今天还没建）。
-    Reachable,
-    /// **通了**，但服务端不支持直接读这个路径：405 方法不允许，或 3xx 要求跳转。
-    /// 带出原始状态码，好让上层文案能自证「你没填错」。
-    NoDirectoryListing(u16),
-}
-
-/// 「这个地址和凭证能不能用」。判据分三档（见 `ProbeOutcome`）：200 / 404 算通，
-/// 405 与 3xx 算「通但读不了目录」，其余仍是错误。
-///
-/// 为什么用状态码分类而不是改成 PROPFIND：reqwest 发自定义方法要 `Method::from_bytes`、
-/// 还要处理 `207 Multi-Status` 的 XML，而坚果云 / 群晖 / Nextcloud 的 PROPFIND 返回
-/// 互不一致（有的要 `Depth: 1`、有的对不存在的目录回 207 空集）。判据越复杂，出错时
-/// 越难说清是「服务端怪」还是「我们写错」。状态码分类只有一张表，且能被假服务器逐档
-/// 钉死（`tests/md_webdav.rs`）。同步本身 GET 的是 `{date}.md` 这个具体文件，不是
-/// 目录，所以「读不了目录」不影响这条通道能不能用。
-pub async fn probe(target: &WebdavTarget, rel: &str) -> Result<ProbeOutcome, WebdavError> {
-    match get(target, rel).await {
-        Ok(_) => Ok(ProbeOutcome::Reachable),
-        Err(WebdavError::NotFound) => Ok(ProbeOutcome::Reachable),
-        /* 405 = 服务端不认「GET 一个目录」这个方法；3xx = 要跳转（301 补尾斜杠是最常见
-        的一种）。两者都发生在**鉴权通过之后**，所以绝不是「凭据不对」。
-        reqwest 默认会自己跟随带 `Location` 的 3xx，因此真正落到这一档的，多是响应
-        畸形（没有 `Location`）或跟随后仍被重定向的情形——留着这一档，是为了让「通但
-        读不了目录」永远不会被表达成「连不上」。 */
-        Err(WebdavError::Server(code)) if matches!(code, 405 | 300..=399) => {
-            Ok(ProbeOutcome::NoDirectoryListing(code))
-        }
-        Err(err) => Err(err),
-    }
 }
 
 /// 把 `scheme://user:pass@host/...` 的 userinfo 段抹成 `***@`。也用来洗 `reqwest` 的

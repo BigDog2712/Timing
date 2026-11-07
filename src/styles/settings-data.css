@@ -1,0 +1,150 @@
+/* =============================================================================
+ * Timing — settings-data.css（设置 · 数据管理页签，V0.11.15）
+ * -----------------------------------------------------------------------------
+ * 消费规则与 settings-sync*.css 一致：只引用 var(--*)，无裸色值。
+ *
+ * 为什么另起一份：settings-sync.css 已是 281 行（本轮不动它），而且这一轮新增的是
+ * **壳**（页签标题、五块容器、底部 sticky 条、黄条、徽标）——与 ③④⑤ 的 `sync__*`
+ * 是两套结构，混在一起既超行数也说不清谁改了谁。
+ * ③④⑤ 继续用 `sync__*` / `sync-cloud__*` / `sync-backup__*`（设计 §8-6）。
+ * 单属性 / 短规则写一行，是多文件共用 300 行门禁下的既有写法。
+ * ========================================================================== */
+
+.data {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.data__head { padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); }
+
+.data__title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.data__hint { margin: var(--space-1) 0 0; font-size: var(--text-xs); line-height: 1.5; color: var(--ink-3); }
+
+/* ---- 折叠块（FoldBlock） ---- */
+.data__block {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+}
+
+.data__block-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.data__block-main { min-width: 0; }
+.data__block-title-row { display: flex; align-items: center; gap: var(--space-2); }
+
+.data__block-title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* 「未保存」标记：被改过的块自己在标题旁说清楚，不靠用户去猜底部条指的是哪一块 */
+.data__dirty {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-cap);
+  line-height: 1.5;
+  color: var(--warn);
+}
+
+.data__block-hint { margin: 2px 0 0; font-size: var(--text-cap); line-height: 1.5; color: var(--ink-3); }
+
+.data__block-actions { display: flex; flex: none; align-items: center; gap: var(--space-2); }
+
+.data__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.data__body[hidden] { display: none; }
+
+/* ---- 块内通用零件 ---- */
+.data__row { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.data__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.data__label { font-size: var(--text-cap); color: var(--ink-3); }
+
+.data__input {
+  flex: 1; min-width: 0; height: 26px; padding: 0 var(--space-2);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--bg-panel); font-family: var(--font-mono); font-size: var(--text-cap);
+  color: var(--ink);
+}
+
+.data__input:focus { outline: none; border-color: var(--accent); }
+.data__input:disabled { color: var(--ink-4); }
+
+/* 当前数据根：只读可选中复制。用户要能把路径复制到资源管理器里核对（验收 C1） */
+.data__path {
+  margin: 0; overflow-wrap: anywhere;
+  font-family: var(--font-mono); font-size: var(--text-cap); line-height: 1.5; color: var(--ink-2);
+  user-select: text;
+}
+
+.data__badge {
+  flex: none; padding: 0 6px; border: 1px solid var(--line-3);
+  border-radius: var(--radius-sm); font-size: var(--text-cap); color: var(--ink-3);
+}
+
+.data__badge[data-ok="false"] { border-color: var(--danger); color: var(--danger); }
+.data__note { margin: 0; font-size: var(--text-cap); line-height: 1.5; color: var(--ink-4); }
+
+/* 待生效黄条：切换成功不等于生效（重启才生效），所以它是提示不是错误 */
+.data__warn {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  margin: 0; padding: var(--space-2); border: 1px solid var(--warn);
+  border-radius: var(--radius-sm); background: var(--bg-panel);
+  font-size: var(--text-cap); line-height: 1.5; color: var(--ink-2);
+}
+
+.data__warn-text { flex: 1; min-width: 0; margin: 0; }
+
+/* 五项清单：确认对话框逐行列出来，体积右对齐才扫得动 */
+.data__entries { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+
+.data__entry {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  font-family: var(--font-mono); font-size: var(--text-cap); color: var(--ink-2);
+}
+
+.data__entry-name { min-width: 0; overflow-wrap: anywhere; }
+.data__entry-size { flex: none; color: var(--ink-3); }
+
+/* 页面内确认条（不用 window.confirm：桌面 WebView 里它可能被拦成「什么都没发生」） */
+.data__confirm {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-2); border: 1px solid var(--accent);
+  border-radius: var(--radius-sm); background: var(--bg-panel);
+}
+
+.data__confirm-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+
+/* ---- 底部 sticky 操作条：五块共用的**唯一**保存入口（PRD A6） ---- */
+.data__bar {
+  position: sticky; bottom: 0;
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) 0; border-top: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+
+.data__bar-hint { margin-right: auto; font-size: var(--text-cap); color: var(--warn); }
+
+/* ⑤ 每行「打开」的失败原文：独占整行，否则挤在 flex 行里只剩半句（PRD D2） */
+.sync-backup__row .sync__error { flex-basis: 100%; }

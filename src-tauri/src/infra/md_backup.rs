@@ -43,7 +43,7 @@ use std::time::SystemTime;
 `allow(unused_imports)` 是必须的——调用点在 T03（`services/md_backup`），在那之前
 本 crate 内没有人 import 这四个名字。 */
 #[allow(unused_imports)]
-pub use crate::infra::md_backup_store::{list, parse_name, read, BackupFile};
+pub use crate::infra::md_backup_store::{list, parse_name, path_of, read, BackupFile};
 
 /// 备份总数上限。**只数带落点前缀的文件**（见 `prune`）。`pub(crate)` 是为了让
 /// 淘汰规则的断言引用同一个数，而不是在测试里抄一个 30。

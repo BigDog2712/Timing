@@ -10,6 +10,13 @@ mod appdata_migrate_edges;
 mod boot_timing;
 mod countdown;
 mod daily_status;
+/* [V0.11.15] 数据根指针与搬迁（指针优先于 optout；`VACUUM INTO` 的参数绑定）。 */
+mod data_root_pointer;
+mod data_root_transfer;
+/* 假 WebDAV 服务器（V0.11.15 从 `md_webdav.rs` 搬出）：`Fake` / `serve` / `serve_412_on_put`。 */
+mod fake_webdav;
+/* 路由式假服务器（V0.11.15）：409 补建的判据要「目录存不存在」这个真实状态。 */
+mod fake_webdav_dir;
 mod item;
 mod item_batch2;
 mod md_backup_restore;
@@ -36,6 +43,12 @@ mod md_sync_todo_import;
 mod md_sync_todos;
 mod md_sync_upgrade;
 mod md_webdav;
+/* MKCOL / 409 补建（V0.11.15，设计 §6.3）。 */
+mod md_webdav_dir;
+/* `fail_text` 的文案判据（状态码零命中）。 */
+mod md_webdav_text;
+/* 「写文件」与「建目录」的 URL 必须同源（MKCOL 的 URL 是 PUT 的路径前缀）。 */
+mod md_webdav_url;
 mod migration;
 mod migration_v2;
 mod moyu_settings;

@@ -2,14 +2,12 @@
  * Timing — IPC 唯一出口（K-11）
  * -----------------------------------------------------------------------------
  * 契约：docs/phase2/IPC-CONTRACT-v2.md §3；类型：src/types/domain.ts（IpcApi）。
- * 规则（硬）：
- *   1. 组件内**禁止**直接 `invoke`；一切经本文件的 `ipc.*`。
+ * 规则（硬）：1. 组件内**禁止**直接 `invoke`；一切经本文件的 `ipc.*`。
  *   2. 集中 try/catch：后端 `Err` 序列化为 `{ code, message }`，此处规范化为 IpcError。
  *   3. 事件订阅统一经 `onIpcEvent`，其返回的 unlisten 必须由调用方在 cleanup 调用（K-8）。
  * 非 Tauri 环境（纯浏览器 dev）自动降级到 src/mocks/browserMock，便于 UI 走查。
  */
 import { invoke } from '@tauri-apps/api/core';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type {
   AccentColors,
   AccentSetParams,
@@ -73,6 +71,7 @@ import type {
   MigrationInfo,
 } from '../types/domain';
 import { createMockApi } from '../mocks/browserMock';
+import type { DataRootInfo } from '../types/domain/dataRoot';
 /* [V0.5.0] 错误类型与规范化搬到 ipcError.ts 腾行数；`errorText()` 留在本文件——check-contract.mjs 从这里内联解析 `case '...'`。 */
 import { IpcError, normalizeError } from './ipcError';
 export { IpcError } from './ipcError';
@@ -96,11 +95,8 @@ async function call<T>(cmd: string, args: Record<string, unknown> = {}): Promise
   }
 }
 
-/** 订阅后端事件；非 Tauri 环境返回 no-op unlisten。 */
-export async function onIpcEvent<T>(event: string, handler: (payload: T) => void): Promise<UnlistenFn> {
-  if (!isTauri()) return () => undefined;
-  return listen<T>(event, (e) => handler(e.payload as T));
-}
+/* [V0.11.15] 事件订阅搬到 `ipcEvent.ts` 腾行数（`check:contract` 不解析它，见那边头注释）。 */
+export { onIpcEvent } from './ipcEvent';
 
 /** 业务错误码 -> 面向用户的中文提示 */
 export function errorText(err: unknown): string {
@@ -285,12 +281,16 @@ export const ipc: IpcApi = {
   mdBackupList: () => call<MdBackupItem[]>('md_backup_list'),
   mdBackupRestore: (params: { name: string; target?: string | null }) =>
     call<MdBackupRestoreResult>('md_backup_restore', { name: params.name, target: params.target ?? null }),
+  /* ---- [V0.11.15] 数据根 + 备份「打开」（桌面独占）。`change(null)` = 撤销，不是没传参 ---- */
+  dataRootGet: () => call<DataRootInfo>('data_root_get'),
+  dataRootChange: (params: { path?: string | null }) => call<DataRootInfo>('data_root_change', { path: params.path ?? null }),
+  dataRootOpen: () => call<void>('data_root_open'),
+  mdBackupOpen: (params: { name: string }) => call<void>('md_backup_open', { name: params.name }),
 
   /* ---- 手机端原生能力 [V0.12.0]：SAF 目录 / 悬浮条 ---- */
   mdSafPick: () => call<SafStatus>('md_saf_pick'),
   mdSafStatus: () => call<SafStatus>('md_saf_status'),
-  overlaySet: (params: { enabled: boolean; style?: OverlayStyle }) =>
-    call<OverlayStatus>('overlay_set', { enabled: params.enabled, style: params.style }),
+  overlaySet: (params: { enabled: boolean; style?: OverlayStyle }) => call<OverlayStatus>('overlay_set', { enabled: params.enabled, style: params.style }),
   overlayStatus: () => call<OverlayStatus>('overlay_status'),
 
   /* ---- 迁移可见性 [V0.5.0]（命令 65 → 67，ADR-037） ---- */

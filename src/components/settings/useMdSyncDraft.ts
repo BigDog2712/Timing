@@ -15,6 +15,17 @@ import { IPC_EVENTS } from '../../types/domain';
 import type { MdSyncBinding, MdSyncCloud, MdSyncKind, MdSyncReport } from '../../types/domain';
 import { POLL_DEFAULT_MINUTES, clampMinutes, emptyCloud, pollSecsOf, toMinutes } from './mdSyncConfig';
 
+/**
+ * 哪一块被改过。①（`format`）和③（`sync`）**共用同一个 `bindings` 数组**，所以脏标记
+ * 必须按「谁动的」记，不能按数据形状记——这是拆块之后最容易写错的地方：
+ * 两处都调 `updateBinding`，只差第三个入参。
+ */
+export type MdSyncDirtyPart = 'format' | 'sync' | 'cloud';
+export type MdSyncDirtyParts = Record<MdSyncDirtyPart, boolean>;
+
+/** 干净态：`{}` 不写成共享常量也行，但共享一份能保证 `discard()` 与初始值逐字段一致 */
+const CLEAN_PARTS: MdSyncDirtyParts = { format: false, sync: false, cloud: false };
+
 export interface MdSyncDraft {
   enabled: boolean;
   setEnabled(next: boolean): void;
@@ -23,7 +34,8 @@ export interface MdSyncDraft {
   setPollMin(value: string): void;
   commitPoll(raw: string): void;
   bindings: MdSyncBinding[];
-  updateBinding(index: number, next: MdSyncBinding): void;
+  /** `part` = 这次改动属于哪一块（① 改 file/heading，③ 改 root/enabled） */
+  updateBinding(index: number, next: MdSyncBinding, part: 'format' | 'sync'): void;
   cloud: MdSyncCloud;
   updateCloud(next: MdSyncCloud): void;
   /**
@@ -35,12 +47,18 @@ export interface MdSyncDraft {
   secret: string | null;
   setSecret(value: string | null): void;
   dirty: boolean;
+  /** 按块拆的脏标记（块标题旁的「未保存」用它） */
+  dirtyParts: MdSyncDirtyParts;
+  /** `view.config.cloud !== null`：④ 的默认展开判据（没配过的人不必先看六个空输入框） */
+  cloudConfigured: boolean;
   saving: boolean;
   loading: boolean;
   loaded: boolean;
   error: string | null;
   notice: string | null;
   clearNotice(): void;
+  /** 放弃修改：按 `view` 回填 + 清干净标记（页面内，不刷新、不落库） */
+  discard(): void;
   /** `true` = 保存成功（失败文案在 `error`，调用方不必自己拼） */
   save(): Promise<boolean>;
   run(): Promise<void>;
@@ -58,6 +76,7 @@ export function useMdSyncDraft(): MdSyncDraft {
   const [modeConverted, setModeConverted] = useState(false);
   const [secret, setSecretState] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [dirtyParts, setDirtyParts] = useState<MdSyncDirtyParts>(CLEAN_PARTS);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => { void load(); }, [load]);
@@ -84,16 +103,31 @@ export function useMdSyncDraft(): MdSyncDraft {
     if (report.imported > 0) setNotice(`已从 Markdown 同步 ${report.imported} 条更新`);
   });
 
-  /* 任何改动都置 dirty 并清掉上一次的绿色提示（旧提示不该替新输入背书） */
-  const touch = () => { setDirty(true); setNotice(null); };
-  const setEnabled = (next: boolean) => { setEnabledState(next); touch(); };
-  const commitPoll = (raw: string) => { setPollMinState(String(clampMinutes(raw))); touch(); };
-  const updateBinding = (index: number, next: MdSyncBinding) => {
-    setBindings((current) => current.map((item, i) => (i === index ? next : item)));
-    touch();
+  /* 任何改动都置 dirty 并清掉上一次的绿色提示（旧提示不该替新输入背书）。
+     `part` 只影响「哪一块标题旁显示未保存」，不影响 `dirty` 本身——底部条只看 `dirty`。 */
+  const touch = (part: MdSyncDirtyPart) => {
+    setDirty(true);
+    setDirtyParts((current) => (current[part] ? current : { ...current, [part]: true }));
+    setNotice(null);
   };
-  const updateCloud = (next: MdSyncCloud) => { setCloud(next); touch(); };
-  const setSecret = (value: string | null) => { setSecretState(value); touch(); };
+  const setEnabled = (next: boolean) => { setEnabledState(next); touch('sync'); };
+  const commitPoll = (raw: string) => { setPollMinState(String(clampMinutes(raw))); touch('sync'); };
+  const updateBinding = (index: number, next: MdSyncBinding, part: 'format' | 'sync') => {
+    setBindings((current) => current.map((item, i) => (i === index ? next : item)));
+    touch(part);
+  };
+  const updateCloud = (next: MdSyncCloud) => { setCloud(next); touch('cloud'); };
+  const setSecret = (value: string | null) => { setSecretState(value); touch('cloud'); };
+
+  /* 放弃修改：不自己拼回填逻辑，只把 `dirty` 放回 false——上面的回填 effect 依赖
+     `[view, dirty]`，会立刻按 `view` 重填草稿。这样「放弃修改」与「切到别的页签再回来」
+     走的是**同一条**回填路径，不会出现两套口径。 */
+  const discard = () => {
+    setDirty(false);
+    setDirtyParts(CLEAN_PARTS);
+    setSecretState(null); /* 明文不进后端就作废；下次保存回到「不动已存密文」 */
+    setNotice(null);
+  };
 
   const save = async (): Promise<boolean> => {
     try {
@@ -102,6 +136,7 @@ export function useMdSyncDraft(): MdSyncDraft {
       await storeSave({ enabled, pollSecs: pollSecsOf(pollMin), bindings, cloud }, secret ?? undefined);
       setPollMinState(String(clampMinutes(pollMin)));
       setDirty(false);
+      setDirtyParts(CLEAN_PARTS);
       setSecretState(null); /* 密码已进后端（或已清空），本地不留明文；下次保存回到「不动」 */
       setNotice('已保存并同步');
       return true;
@@ -128,7 +163,10 @@ export function useMdSyncDraft(): MdSyncDraft {
 
   return {
     enabled, setEnabled, pollMin, setPollMin: setPollMinState, commitPoll, bindings, updateBinding,
-    cloud, updateCloud, modeConverted, secret, setSecret, dirty, saving, loading, loaded, error, notice,
-    clearNotice: () => setNotice(null), save, run, open,
+    cloud, updateCloud, modeConverted, secret, setSecret, dirty, dirtyParts,
+    /* 老配置（V0.11.12 及以前）没有 `cloud` 这个键 → `null` → ④ 默认收起 */
+    cloudConfigured: view?.config.cloud != null,
+    saving, loading, loaded, error, notice,
+    clearNotice: () => setNotice(null), discard, save, run, open,
   };
 }

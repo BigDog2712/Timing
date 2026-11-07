@@ -1,5 +1,9 @@
 //! 业务层：计时状态机、事项规则、记录编排、设置读写。所有业务逻辑归属此处。
 pub mod countdown;
+/* [V0.11.15] 数据根（`%APP_DIR%`）的落点信息与切换。桌面独占：`appdata_dir` 与原生
+选目录对话框都只在桌面存在，手机端走 `commands/data_root_cmd_mobile.rs` 的桩。 */
+#[cfg(desktop)]
+pub mod data_root;
 pub mod daily_status;
 pub mod item;
 pub mod md_backup;

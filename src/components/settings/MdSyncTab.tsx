@@ -1,159 +1,128 @@
 /**
- * Timing — 设置 · 同步页签（V0.4.0 起；V0.11.5 起是**内核功能**，不再是插件贡献点）
+ * Timing — 设置 · 数据管理页签（V0.11.15，PRD 三 / 设计 §5）
  * -----------------------------------------------------------------------------
- * 本文件只留版面：标题 + 总开关 + 折叠 / 间隔行 / 云端通道卡 / 落点卡列表 / 两个按钮 /
- * 备份卡。状态与副作用在 `useMdSyncDraft`，数字口径在 `mdSyncConfig`——[V0.11.13] 拆开很
- * 实在：拆之前 298 行，新增云端与备份两块已无处可放。草稿策略：输入只改本地 state，点
- * 「保存并同步」才落 `settings` KV；轮询照旧在后台跑，`dirty` 时事件不覆盖草稿。
+ * 本文件只留**壳**：标题 + 一句总览 + 全局保存结果 + 五块挂载 + 底部 sticky 操作条。
+ * 每块自己负责自己的字段与红字；状态与副作用在 `useMdSyncDraft`，数字口径在 `mdSyncConfig`。
+ *
+ * 三条口径（改之前先看这里）：
+ * 1. **五块顺序固定**：① Markdown 落点设置 → ② SQLite 落点设置 → ③ Markdown 同步 →
+ *    ④ WebDAV 云端同步 → ⑤ 备份数据管理。不随配置变化（PRD A2）。
+ * 2. **保存入口只有一个**：底部条。五块里只有 ② 自带按钮（打开文件夹 / 更改位置…），
+ *    因为它保存的是**另一份东西**（数据根指针），混进「保存并同步」就再也说不清谁存了谁
+ *    （PRD A6）。这是「改了不知道去哪保存」的唯一防线，别加第二个保存按钮。
+ * 3. **红字只出现在出问题的那个块里**：能定位到具体落点（`第 N 个落点：…`）的原文交给
+ *    块①/③ 就地显示，页签顶部只留「保存动作本身」的结果。
+ *
+ * 「立即同步」在 `dirty` 时禁用：草稿里的值还没落库，按它同步一轮等于拿旧配置去跑。
  */
-import { useEffect, useState } from 'react';
-import { ChevronDownIcon, ChevronRightIcon, SettingsIcon, iconStroke } from '../../lib/icons';
-import { pickFolder } from '../../services/folderPicker';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
-import { MD_SYNC_KIND_LABELS } from '../../types/domain';
 import { Switch } from '../ui/Switch';
+import { FoldBlock } from './FoldBlock';
+import { MdDataRootBlock } from './MdDataRootBlock';
+import { MdFormatBlock } from './MdFormatBlock';
 import { MdSyncBackupCard } from './MdSyncBackupCard';
-import { MdSyncBindingCard } from './MdSyncBindingCard';
 import { MdSyncCloudCard } from './MdSyncCloudCard';
-import {
-  POLL_MAX_MINUTES,
-  POLL_MIN_MINUTES,
-  clampMinutes,
-  describeInterval,
-} from './mdSyncConfig';
+import { MdSyncLocalBlock } from './MdSyncLocalBlock';
+import { clampMinutes, describeInterval, splitBindingError } from './mdSyncConfig';
 import { useMdSyncDraft } from './useMdSyncDraft';
 
 export function MdSyncTab() {
   const draft = useMdSyncDraft();
   /* 落点的运行状态与「今天」不属于草稿（草稿只管用户能改的东西），直接读视图 */
-  const view = useMdSyncStore((s) => s.view);
-  const { enabled, bindings, pollMin, saving, loading, loaded, dirty, error, notice } = draft;
-  const [settingsOpen, setSettingsOpen] = useState(true);
+  const today = useMdSyncStore((s) => s.view?.today ?? '');
+  const { bindings, enabled, saving, loading, dirty, dirtyParts, cloudConfigured, error, notice } = draft;
 
-  /* 关掉总开关时把落点设置自动收起来；重新打开时展开。
-     [V0.11.5] 去掉「插件未安装就展开」——同步已是内核功能，没有装没装这回事。 */
-  useEffect(() => {
-    setSettingsOpen(enabled);
-  }, [enabled]);
-
-  const handlePick = async (index: number) => {
-    const current = bindings[index];
-    if (!current) return;
-    const picked = await pickFolder(
-      `选择「${MD_SYNC_KIND_LABELS[current.kind]}」落点根目录`,
-      current.root.includes('%') ? undefined : current.root,
-    );
-    if (picked) draft.updateBinding(index, { ...current, root: picked });
-  };
+  const blocked = saving || loading || bindings.length === 0;
+  /* 能定位到某一行的原文交给块①/③，「保存动作本身」的失败才留在页签顶部 */
+  const inline = error ? splitBindingError(error, bindings.length) : null;
+  const globalError = error && !inline ? error : null;
 
   return (
-    <div className="sync">
-      <div className="sync__bar">
-        <div className="sync__intro">
-          <h3 className="sync__title">Markdown 双向同步</h3>
-          <p className="sync__hint">
-            默认每 {describeInterval(clampMinutes(pollMin))}自动对齐一次；
-            两边同时改过时，以 Markdown 为准。想立刻同步点「立即同步」。
-          </p>
-          {/* [V0.11.5] 出厂默认关：三档落点已备好，但要用户自己把总开关打开。 */}
-          {loaded && !enabled && (
-            <p className="sync__hint">
-              同步出厂默认关闭：三档落点已经备好，把右侧「启用」打开即可开始。
-            </p>
-          )}
-        </div>
-        <div className="sync__enable">
-          <span className="sync__label">启用</span>
-          <Switch checked={enabled} label="启用 Markdown 同步" disabled={saving}
-            onChange={(next) => draft.setEnabled(next)} />
-          <button type="button" className="sync__fold-btn" aria-expanded={settingsOpen}
-            aria-controls="md-sync-settings" aria-label={settingsOpen ? '收起同步设置' : '展开同步设置'}
-            title={settingsOpen ? '收起设置' : '展开设置'}
-            onClick={() => setSettingsOpen((value) => !value)}>
-            {settingsOpen
-              ? <ChevronDownIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
-              : <ChevronRightIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />}
-          </button>
-        </div>
-      </div>
+    <div className="data">
+      <header className="data__head">
+        <h3 className="data__title">数据管理</h3>
+        <p className="data__hint">
+          从上到下五块：写成什么样 → 数据库放哪 → 多久写一次 → 云端第二份 → 备份。
+          改完点最下面的「保存并同步」。
+        </p>
+      </header>
 
-      {!settingsOpen && (
-        <button type="button" className="sync__folded" aria-controls="md-sync-settings"
-          onClick={() => setSettingsOpen(true)}>
-          <SettingsIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
-          <span>{enabled ? '落点设置已收纳' : '同步已关闭，落点设置已自动收纳'}</span>
-          <span className="sync__folded-meta">{bindings.length} 个落点</span>
-          <ChevronRightIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
-        </button>
-      )}
-
-      {error && <p className="sync__error">{error}</p>}
+      {globalError && <p className="sync__error">{globalError}</p>}
       {notice && <p className="sync__ok">{notice}</p>}
 
-      <div id="md-sync-settings" className="sync__body" hidden={!settingsOpen}>
-        {/* [V0.11.3] 同步间隔：原先固定 2 秒，现在默认 15 分钟、可调 */}
-        <div className="sync__interval">
-          <span className="sync__label">同步间隔</span>
-          <label className="num-field">
-            <input className="num-field__input" type="number" inputMode="numeric"
-              min={POLL_MIN_MINUTES} max={POLL_MAX_MINUTES} step={1} value={pollMin}
-              aria-label="自动同步间隔（分钟）" title="输入分钟数后回车或点别处生效"
-              disabled={saving || !enabled}
-              onChange={(e) => draft.setPollMin(e.target.value)}
-              onBlur={(e) => draft.commitPoll(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  draft.commitPoll(e.currentTarget.value);
-                }
-              }} />
-            <span className="num-field__unit">MIN</span>
-          </label>
-          <span className="sync__interval-hint">
-            {POLL_MIN_MINUTES} 分钟 ~ {POLL_MAX_MINUTES / 60} 小时，改动后点「保存并同步」
-          </span>
-        </div>
+      <FoldBlock
+        id="data-format"
+        title="Markdown 落点设置"
+        hint="管「写成什么样」：每个种类的文件模板与标题行。放哪个目录在第三块里改。"
+        dirty={dirtyParts.format}
+      >
+        <MdFormatBlock draft={draft} />
+      </FoldBlock>
 
-        <MdSyncCloudCard draft={draft} />
+      <FoldBlock
+        id="data-root"
+        title="SQLite 落点设置"
+        hint="数据库、日志、备份与 Markdown 出厂落点所在的目录。改位置会先复制、再核对、最后写指针。"
+      >
+        <MdDataRootBlock />
+      </FoldBlock>
 
-        {bindings.length === 0 ? (
-          <p className="sync__empty">{loading ? '正在读取落点…' : '没有可同步的落点。'}</p>
-        ) : (
-          bindings.map((binding, index) => (
-            <MdSyncBindingCard
-              key={`${binding.kind}-${index}`}
-              binding={binding}
-              status={view?.status.bindings.find((item) => item.kind === binding.kind)}
-              today={view?.today ?? ''}
-              disabled={saving}
-              onChange={(next) => draft.updateBinding(index, next)}
-              onPick={() => void handlePick(index)}
-              onOpen={() => void draft.open(binding.kind)}
-            />
-          ))
+      <FoldBlock
+        id="data-sync"
+        title="Markdown 同步"
+        hint={`默认每 ${describeInterval(clampMinutes(draft.pollMin))}自动对齐一次；两边同时改过时，以 Markdown 为准。`}
+        dirty={dirtyParts.sync}
+        actions={(
+          /* 总开关放标题右侧：它管的就是这一摊（PRD 4.3），云端有自己的开关（块④） */
+          <Switch checked={enabled} label="启用 Markdown 同步" disabled={saving}
+            onChange={(next) => draft.setEnabled(next)} />
         )}
+      >
+        <MdSyncLocalBlock draft={draft} />
+      </FoldBlock>
 
-        <div className="sync__actions">
-          <button type="button" className="btn btn--ghost"
-            disabled={saving || loading || bindings.length === 0 || dirty}
-            title={dirty ? '有未保存的修改，先保存再同步' : '按已保存的配置同步一轮'}
-            onClick={() => void draft.run()}>
-            立即同步
-          </button>
-          <button type="button" className="btn btn--primary"
-            disabled={saving || loading || bindings.length === 0}
-            onClick={() => void draft.save()}>
-            {saving ? '保存中…' : '保存并同步'}
-          </button>
-        </div>
+      <FoldBlock
+        id="data-cloud"
+        title="WebDAV 云端同步"
+        hint="把今天的 Markdown 再送一份到坚果云或本地目录。没配过时默认收起。"
+        dirty={dirtyParts.cloud}
+        /* 没配过云端（`cloud === null`）的人不必先看六个空输入框（PRD 三） */
+        defaultOpen={cloudConfigured}
+      >
+        <MdSyncCloudCard draft={draft} />
+      </FoldBlock>
 
+      <FoldBlock
+        id="data-backup"
+        title="备份数据管理"
+        hint="每次覆盖 Markdown 前留的底：可以直接用系统默认程序打开看，也可以恢复。"
+      >
         <MdSyncBackupCard />
+      </FoldBlock>
 
-        <p className="sync__foot">
-          文件模板支持 {'{date}'}、{'{yyyy}'}、{'{MM}'}、{'{dd}'}；根目录支持 {'%APP_DIR%'}、{'%USERPROFILE%'} 与开头的 ~。
-          同步只改目标标题下的区块，日记其他内容不动。
-        </p>
+      <div className="data__bar" data-dirty={dirty ? 'true' : 'false'}>
+        <span className="data__bar-hint">{dirty ? '有未保存的修改' : ''}</span>
+        <button type="button" className="btn btn--ghost" disabled={!dirty} onClick={draft.discard}>
+          放弃修改
+        </button>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          disabled={blocked || dirty}
+          title={dirty ? '有未保存的修改，先保存再同步' : '按已保存的配置同步一轮'}
+          onClick={() => void draft.run()}
+        >
+          立即同步
+        </button>
+        <button type="button" className="btn btn--primary" disabled={blocked} onClick={() => void draft.save()}>
+          {saving ? '保存中…' : '保存并同步'}
+        </button>
       </div>
+
+      <p className="data__note">
+        {today ? `今天：${today}。` : ''}
+        同步只改目标标题下的区块，日记其他内容不动。
+      </p>
     </div>
   );
 }

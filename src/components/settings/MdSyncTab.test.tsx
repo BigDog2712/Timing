@@ -2,29 +2,19 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MdSyncBinding, MdSyncViewCloud } from '../../types/domain';
+import type { DataRootInfo } from '../../types/domain/dataRoot';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 
+/* [V0.11.15] 本文件只测**壳**：五块顺序 / 折叠 aria / 底部条 / 脏标记归属 / 保存。
+   每块的字段口径在自己那份测试里（`MdFormatBlock.test.tsx` / `MdDataRootBlock.test.tsx`）。 */
+
 const BINDINGS: MdSyncBinding[] = [
-  {
-    kind: 'timers',
-    enabled: true,
-    root: 'C:\\Vault',
-    file: '{date}.md',
-    heading: '#### 事项计时',
-  },
-  {
-    kind: 'notes',
-    enabled: true,
-    root: 'C:\\Vault',
-    file: '{date}.md',
-    heading: '#### 便利贴',
-  },
+  { kind: 'timers', enabled: true, root: 'C:\\Vault', file: '{date}.md', heading: '#### 事项计时' },
+  { kind: 'notes', enabled: true, root: 'C:\\Vault', file: '{date}.md', heading: '#### 便利贴' },
 ];
 
 const VIEW: MdSyncViewCloud = {
   today: '2026-10-20',
-  /* [V0.11.13] `cloud: null` = 老配置口径（V0.11.12 及以前保存的 JSON 没有这个键）。
-     本文件只测落点页签，云端控件不在其中；它必须被**原样带回**而不是被清空。 */
   config: { enabled: true, pollSecs: 900, bindings: BINDINGS, cloud: null },
   cloud: {
     enabled: false,
@@ -48,16 +38,32 @@ const VIEW: MdSyncViewCloud = {
   },
 };
 
-const api = vi.hoisted(() => ({
-  get: vi.fn(),
-  save: vi.fn(),
-  run: vi.fn(),
-  open: vi.fn(),
-  test: vi.fn(),
-}));
-const backupApi = vi.hoisted(() => ({ list: vi.fn(), restore: vi.fn() }));
+const DATA_ROOT: DataRootInfo = {
+  current: 'D:\\Timing\\data',
+  defaultPath: 'C:\\Program Files\\Timing\\data',
+  isDefault: false,
+  writable: true,
+  writableError: null,
+  pending: null,
+  previous: null,
+  sizeBytes: 2048,
+  entries: [],
+  affected: [],
+  pluginsInDataRoot: false,
+};
 
-vi.mock('../../services/api', () => ({ mdSyncApi: api, mdBackupApi: backupApi }));
+const api = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn(), run: vi.fn(), open: vi.fn(), test: vi.fn() }));
+const backupApi = vi.hoisted(() => ({ list: vi.fn(), restore: vi.fn(), open: vi.fn() }));
+const rootApi = vi.hoisted(() => ({ get: vi.fn(), change: vi.fn(), open: vi.fn() }));
+
+vi.mock('../../services/api', () => ({
+  mdSyncApi: api,
+  mdBackupApi: backupApi,
+  dataRootApi: rootApi,
+  /* 真 `errorText` 是传输层那个码→人话的映射；这里只需要「能渲染出一句话」这一层 */
+  errorText: (err: unknown) => (err instanceof Error ? err.message : '操作失败'),
+  rawIpcText: (err: unknown) => (err instanceof Error ? err.message : '操作失败'),
+}));
 
 import { MdSyncTab } from './MdSyncTab';
 
@@ -79,38 +85,36 @@ async function mount(): Promise<void> {
 }
 
 function button(text: string): HTMLButtonElement {
-  const found = Array.from(container.querySelectorAll('button')).find((item) =>
-    item.textContent?.includes(text),
-  );
+  const found = Array.from(container.querySelectorAll('button')).find((item) => item.textContent?.includes(text));
   if (!found) throw new Error(`找不到按钮：${text}`);
   return found as HTMLButtonElement;
 }
 
-async function setValue(input: HTMLInputElement, value: string): Promise<void> {
+async function setValue(target: HTMLInputElement, value: string): Promise<void> {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   if (!setter) throw new Error('无法设置 input value');
   await act(async () => {
-    setter.call(input, value);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
+    setter.call(target, value);
+    target.dispatchEvent(new Event('input', { bubbles: true }));
   });
 }
 
-describe('MdSyncTab —— 同步设置页', () => {
+const block = (id: string) => container.querySelector(`[data-block="${id}"]`);
+const input = (label: string) => container.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement | null;
+const barHint = () => container.querySelector('.data__bar-hint')?.textContent;
+
+describe('MdSyncTab —— 数据管理页签壳', () => {
   beforeEach(() => {
     api.get.mockReset();
     api.save.mockReset();
     api.run.mockReset();
     backupApi.list.mockReset();
     backupApi.list.mockResolvedValue([]);
+    rootApi.get.mockReset();
+    rootApi.get.mockResolvedValue(DATA_ROOT);
     api.get.mockResolvedValue(VIEW);
     api.save.mockImplementation(async (config: MdSyncViewCloud['config']) => ({ ...VIEW, config }));
-    useMdSyncStore.setState({
-      view: null,
-      loaded: false,
-      loading: false,
-      saving: false,
-      error: null,
-    });
+    useMdSyncStore.setState({ view: null, loaded: false, loading: false, saving: false, error: null });
   });
 
   afterEach(async () => {
@@ -120,83 +124,107 @@ describe('MdSyncTab —— 同步设置页', () => {
     container?.remove();
   });
 
-  it('加载后按 kind 展示两个落点，并把日期令牌展开到预览', async () => {
+  it('页签标题是「数据管理」，五块按固定顺序排列（PRD A1/A2）', async () => {
     await mount();
-    expect(api.get).toHaveBeenCalledTimes(1);
-    expect(container.textContent).toContain('事项计时');
-    expect(container.textContent).toContain('便利贴');
-    expect(container.textContent).toContain('C:\\Vault\\2026-10-20.md');
+    expect(container.querySelector('.data__title')?.textContent).toBe('数据管理');
+    expect(Array.from(container.querySelectorAll('.data__block-title')).map((el) => el.textContent))
+      .toEqual(['Markdown 落点设置', 'SQLite 落点设置', 'Markdown 同步', 'WebDAV 云端同步', '备份数据管理']);
   });
 
-  it('关闭总开关后自动收纳落点设置，重新打开后展开', async () => {
-    api.get.mockResolvedValue({ ...VIEW, config: { ...VIEW.config, enabled: false } });
+  it('每块的 chevron 都能收起/展开，收起后 body 是 hidden 且 aria-controls 指向存在的元素（PRD A3）', async () => {
     await mount();
-    expect(container.textContent).toContain('同步已关闭，落点设置已自动收纳');
-    expect(container.querySelector('#md-sync-settings')?.hasAttribute('hidden')).toBe(true);
+    const toggle = block('data-format')?.querySelector('.sync__fold-btn') as HTMLButtonElement;
+    const bodyId = toggle.getAttribute('aria-controls') as string;
+    expect(container.querySelector(`#${bodyId}`)).not.toBeNull();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
 
-    const total = container.querySelector('[aria-label="启用 Markdown 同步"]') as HTMLButtonElement;
     await act(async () => {
-      total.click();
+      toggle.click();
+      await Promise.resolve();
     });
-
-    expect(container.querySelector('#md-sync-settings')?.hasAttribute('hidden')).toBe(false);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector(`#${bodyId}`)?.hasAttribute('hidden')).toBe(true);
   });
 
-  it('改草稿后「立即同步」禁用，保存把新根目录交给后端', async () => {
+  it('改①的标题行只在块①出现「未保存」，底部条同时出现；「放弃修改」回滚（PRD A4）', async () => {
     await mount();
-    const input = container.querySelector('input.sync__input') as HTMLInputElement;
-    await setValue(input, 'D:\\NewVault');
+    const heading = input('便利贴标题行');
+    if (!heading) throw new Error('找不到块①的标题行输入框');
+    await setValue(heading, '#### 便利贴（改过）');
+
+    expect(block('data-format')?.querySelector('.data__dirty')?.textContent).toBe('未保存');
+    /* ①和③共用同一个 bindings 数组：脏标记必须按「谁动的」记，否则这一条会红 */
+    expect(block('data-sync')?.querySelector('.data__dirty')).toBeNull();
+    expect(barHint()).toBe('有未保存的修改');
     expect(button('立即同步').disabled).toBe(true);
 
     await act(async () => {
-      button('保存并同步').click();
+      button('放弃修改').click();
       await Promise.resolve();
     });
 
-    expect(api.save).toHaveBeenCalledWith(
-      {
-        enabled: true,
-        /* [V0.11.3] 间隔随保存一起提交，测试里没动过 → 默认 15 分钟 = 900 秒 */
-        pollSecs: 900,
-        bindings: [BINDINGS[0], BINDINGS[1]].map((binding, index) =>
-          index === 0 ? { ...binding, root: 'D:\\NewVault' } : binding,
-        ),
-        /* [V0.11.13] 云端配置现在由草稿统一持有：老配置（`cloud: null`）回填成「未启用」
-           的空配置，而不是继续传 `null`——`enabled: false` 是硬要求，凭空给 `true` 等于
-           用户按一次保存就把云端通道偷偷打开。 */
-        cloud: {
-          enabled: false,
-          mode: 'localfolder',
-          localRoot: '',
-          baseUrl: '',
-          basePath: '/Timing/md',
-          user: '',
-        },
-      },
-      /* 第二个入参 = 密码：没碰过密码框 → 恒 `undefined`（= 不动已存密文）。
-         断言它是 `undefined` 而不是缺省，是为了钉住「没碰密码框不等于清空密码」。 */
-      undefined,
-    );
+    expect(input('便利贴标题行')?.value).toBe('#### 便利贴');
+    expect(container.querySelector('.data__dirty')).toBeNull();
+    expect(barHint()).toBe('');
+    expect(button('放弃修改').disabled).toBe(true);
     expect(button('立即同步').disabled).toBe(false);
   });
 
-  it('同步间隔按分钟输入、按秒提交（默认 15 分钟）', async () => {
+  it('改③的根目录只在块③出现「未保存」（与上一条互为镜像）', async () => {
     await mount();
-    const input = container.querySelector(
-      'input[aria-label="自动同步间隔（分钟）"]',
-    ) as HTMLInputElement | null;
-    if (!input) throw new Error('找不到同步间隔输入框');
-    expect(input.value).toBe('15');
+    const target = input('便利贴落点根目录');
+    if (!target) throw new Error('找不到块③的根目录输入框');
+    await setValue(target, 'D:\\NewVault');
 
-    await setValue(input, '45');
+    expect(block('data-sync')?.querySelector('.data__dirty')?.textContent).toBe('未保存');
+    expect(block('data-format')?.querySelector('.data__dirty')).toBeNull();
+  });
+
+  it('五块里只有一个「保存」按钮，且在底部 sticky 条里（PRD A6）', async () => {
+    await mount();
+    const saves = Array.from(container.querySelectorAll('button'))
+      .filter((el) => el.textContent?.includes('保存'));
+    expect(saves).toHaveLength(1);
+    expect(container.querySelector('.data__bar')?.contains(saves[0])).toBe(true);
+  });
+
+  it('「保存并同步」把草稿交给后端，成功后「未保存」与底部提示一起消失', async () => {
+    await mount();
+    const target = input('事项计时落点根目录');
+    if (!target) throw new Error('找不到块③的根目录输入框');
+    await setValue(target, 'D:\\NewVault');
+
     await act(async () => {
       button('保存并同步').click();
       await Promise.resolve();
     });
 
     expect(api.save).toHaveBeenCalledWith(
-      expect.objectContaining({ pollSecs: 45 * 60 }),
+      expect.objectContaining({
+        enabled: true,
+        pollSecs: 900,
+        bindings: [{ ...BINDINGS[0], root: 'D:\\NewVault' }, BINDINGS[1]],
+      }),
+      /* 没碰密码框 → `undefined`（不动已存密文） */
       undefined,
     );
+    expect(container.textContent).toContain('已保存并同步');
+    expect(container.querySelector('.data__dirty')).toBeNull();
+    expect(barHint()).toBe('');
+  });
+
+  it('保存失败且能定位到落点时，红字落在块里，页签顶部不再重复一遍', async () => {
+    api.save.mockRejectedValue(new Error('第 2 个落点：标题行必须以 # 开头'));
+    await mount();
+    await act(async () => {
+      button('保存并同步').click();
+      await Promise.resolve();
+    });
+
+    const inline = Array.from(block('data-format')?.querySelectorAll('.sync__error') ?? []);
+    expect(inline.map((el) => el.textContent)).toContain('标题行必须以 # 开头');
+    /* 顶部只剩「保存动作本身」的失败，落点级别的原文不在这里（PRD 六·通用规则） */
+    const top = container.querySelector('.data') as HTMLElement;
+    expect(top.querySelector(':scope > .sync__error')).toBeNull();
   });
 });

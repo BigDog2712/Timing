@@ -17,7 +17,7 @@
 #![allow(dead_code)]
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use crate::infra::md_backup::backup_root;
@@ -117,6 +117,23 @@ pub(crate) fn list_in(root: &Path) -> Vec<BackupFile> {
     同一秒写入的多份备份否则每次列出来的顺序都不一样。 */
     out.sort_by(|a, b| b.at_ms.cmp(&a.at_ms).then_with(|| a.name.cmp(&b.name)));
     out
+}
+
+/// 备份文件的**完整路径**（`md_backup_open` 用）。
+///
+/// 名字来自前端，按不可信输入处理：拒绝 `..`、`/`、`\` 与空串。这条路径最终交给
+/// 系统默认程序去**打开**，`join` 一旦被 `..` 带出备份目录，后果就不是「读错文件」
+/// 而是「打开任意文件」——所以这里比 `read_in` 更严（连 `..` 出现在中间也拒）。
+pub fn path_of(name: &str) -> Result<PathBuf, String> {
+    if name.trim().is_empty()
+        || name.contains("..")
+        || name.contains('/')
+        || name.contains('\\')
+    {
+        return Err("备份文件名不合法".into());
+    }
+    let root = backup_root().ok_or_else(|| "备份目录还没准备好".to_string())?;
+    Ok(root.join(name))
 }
 
 pub(crate) fn read_in(root: &Path, name: &str) -> Result<Vec<u8>, String> {

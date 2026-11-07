@@ -120,13 +120,13 @@ pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResu
         Err(err) if round_push::fatal(&err) => {
             backoff::on_failure(now).await;
             crate::log_warn!("md cloud in: {today}.md fail={}", round_push::fail_tag(&err));
-            report.errors.push(round_push::fail_text(&err));
+            report.errors.push(round_push::fail_text(&err, &target.base_path));
             return Ok(report);
         }
         Err(err) => {
             backoff::on_failure(now).await;
             crate::log_warn!("md cloud in: {today}.md fail={}", round_push::fail_tag(&err));
-            report.errors.push(round_push::fail_text(&err));
+            report.errors.push(round_push::fail_text(&err, &target.base_path));
             false
         }
     };

@@ -1,6 +1,8 @@
 //! 领域模型 / DTO（字段一律 camelCase，与 `src/types/domain.ts` 严格对齐）。
 
 pub mod common;
+/* [V0.11.15] 数据根落点的对外形状（`dataRootGet` / `dataRootChange` 的返回）。 */
+pub mod data_root;
 pub mod constants;
 pub mod enums;
 pub mod item;

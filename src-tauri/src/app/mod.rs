@@ -24,6 +24,9 @@ pub mod md_sync_mobile;
 移动端不写这两份快照——出问题时看日志与 `boot_timing` 即可。 */
 #[cfg(desktop)]
 pub mod autostart_takeover;
+/* [V0.11.15] 自定义数据根的启动期接线（拆出 `portable_boot` 是为了那边的 300 行门禁）。 */
+#[cfg(desktop)]
+pub mod data_root_boot;
 #[cfg(desktop)]
 pub mod diagnostics;
 #[cfg(desktop)]

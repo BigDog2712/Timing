@@ -21,7 +21,9 @@ type TabId = 'look' | 'plugins' | 'sync' | 'gen';
 const TABS: readonly TabDef<TabId>[] = [
   { id: 'look', label: '外观配色' },
   { id: 'plugins', label: '插件' },
-  { id: 'sync', label: '同步' },
+  /* [V0.11.15] 页签名「同步」→「数据管理」。`id` 保持 'sync'：它只是 `aria-controls` /
+     条件渲染的内部标识，改它对用户零收益，却要牵动 TabId 联合类型与 tabpanel 模板串。 */
+  { id: 'sync', label: '数据管理' },
   { id: 'gen', label: '通用' },
 ];
 

@@ -18,6 +18,14 @@ pub mod theme_cmd;
 pub mod timer_cmd;
 pub mod todo_cmd;
 
+/* [V0.11.15] 数据根三条命令（桌面真实实现 / 手机桩）。与 `md_sync_cmd` 同形的
+`#[cfg] + #[path]` 手法：模块名与函数名一字不变，`lib.rs` 因此不用挂 `#[cfg]`。 */
+#[cfg(desktop)]
+pub mod data_root_cmd;
+#[cfg(mobile)]
+#[path = "data_root_cmd_mobile.rs"]
+pub mod data_root_cmd;
+
 #[cfg(desktop)]
 pub mod md_sync_cmd;
 #[cfg(mobile)]

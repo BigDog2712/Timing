@@ -260,18 +260,19 @@ fn record_portable() {
     use crate::infra::portable_migrate::{self as pm, Outcome};
 
     if let Some(note) = app::portable_boot::note() {
-        match note.fallback {
-            Some(reason) => crate::log_info!(
-                "portable: data root = {} (portable={}, reason: {reason})",
-                note.data.display(),
-                note.portable
-            ),
-            None => crate::log_info!(
-                "portable: data root = {} (portable={})",
-                note.data.display(),
-                note.portable
-            ),
-        }
+        /* [V0.11.15] `data root:` 是排障 grep 的稳定前缀（设计 §8-8）：一行同时给出最终
+        落点、是不是便携、以及**为什么**（`source`）。 */
+        crate::log_info!(
+            "data root: {} portable={} source={} fallback={}",
+            note.data.display(),
+            note.portable,
+            note.source,
+            note.fallback.unwrap_or("-")
+        );
+    }
+    /* 指针在、但这次用户选了「按默认流程启动」：这一句是那条路的唯一书面证据。 */
+    if let Some(skipped) = app::data_root_boot::skipped() {
+        crate::log_warn!("data root: pointer skipped this run, unusable at {skipped}");
     }
 
     match pm::outcome() {

@@ -11,6 +11,8 @@
 
 pub mod appdata_migrate;
 pub mod db;
+/* [V0.11.15] 数据根可配：指针文件（`data-root.json`）与剩余空间预检。 */
+pub mod disk_space;
 pub mod md_backup;
 /* 备份目录的读侧（列表 / 读取 / 名字解析）：从 `md_backup` 拆出来的，只为行数。 */
 pub mod md_backup_store;
@@ -26,6 +28,7 @@ pub mod notify;
 pub mod plugin_fs;
 pub mod portable_migrate;
 pub mod portable_probe;
+pub mod root_pointer;
 /* [V0.11.13] WebDAV 应用密码的加密存储（DPAPI / Android Keystore）。
 两个实现各占一个文件，`secret` 只做枚举分派；桌面与移动的 cfg 口径与 native_bridge 一致。 */
 pub mod secret;

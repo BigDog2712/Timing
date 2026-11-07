@@ -36,6 +36,20 @@ export class IpcError extends Error {
  * 命令未注册、mock 抛裸字符串）形态各异，这里统一收口，保证上层只需认
  * `IpcError` 一种类型（`errorText()` 依赖这一点）。
  */
+/**
+ * `IO_ERROR`（以及任何业务错误）的**原文**，不做润色（[V0.11.15]）。
+ *
+ * 与 `errorText()` 的分工：那个是「业务错误的通用说法」，会把 `IO_ERROR` 统一说成
+ * 「系统调用失败，请重试」——而数据根预检的拒绝原因（「这个文件夹里已有文件，请选一个
+ * 空文件夹或新建一个」）是用户唯一的行动依据，润色掉之后他无从下手。
+ * 与 `SyncPane.syncErrorText` 同一口径：能照做的原文 > 好看的空话。
+ */
+export function rawIpcText(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message;
+  if (typeof err === 'string' && err.length > 0) return err;
+  return '操作失败，请重试';
+}
+
 export function normalizeError(raw: unknown): IpcError {
   if (raw instanceof IpcError) return raw;
   if (raw && typeof raw === 'object') {

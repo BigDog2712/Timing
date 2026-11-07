@@ -22,7 +22,7 @@ use std::path::PathBuf;
 use chrono::NaiveDate;
 use sqlx::SqlitePool;
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, AppResult, ErrorCode};
 use crate::infra::md_backup as store;
 use crate::infra::md_file::{self, SectionState};
 use crate::models::md_sync::MdSyncBinding;
@@ -47,6 +47,17 @@ pub fn items() -> Vec<MdBackupItem> {
             bytes: file.bytes,
         })
         .collect()
+}
+
+/// 用系统默认程序打开一份备份（PRD 8.2-5）。
+///
+/// 只做「打开」，不做「在文件夹中显示」（PRD 待决 2 已定）。失败一律 `IO_ERROR` +
+/// **原文**（设计 §9-5）：名字不合法 / 文件已被删 / 系统没有 .md 关联，三种原因对用户
+/// 是三句完全不同的行动指令，不能被润色成同一句「系统调用失败，请重试」。
+pub fn open(name: &str) -> AppResult<()> {
+    let path = store::path_of(name).map_err(|err| AppError::new(ErrorCode::IoError, err))?;
+    crate::infra::shell_open::open_file(&path)
+        .map_err(|err| AppError::new(ErrorCode::IoError, err))
 }
 
 /// 用一份备份覆盖回去：文件、SQL、基线三者一起回到备份那一刻。

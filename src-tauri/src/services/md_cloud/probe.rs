@@ -3,8 +3,11 @@
 //! 从 `mod.rs` 拆出来是为了让那边只剩「判据 + 分派」（它贴着 150 行预算）：这里只做
 //! 一次探测，不写任何状态——不建 `{date}.md`、不落 `pending`、不改配置。
 //!
-//! 两个模式的判据不同：本地目录问「能不能写」，WebDAV 问「鉴权与目录通不通」
-//! （`probe` 把 200 与 404 都算通：404 只说明今天那份还没建）。
+//! 两个模式都问「能不能写」：本地目录写一个探针文件；WebDAV 走 `probe`（地址与凭据）
+//! + `ensure_base_dir`（目录就绪）两关。
+//!
+//! 只有地址通、目录没建出来，同步照样一路 409——V0.11.15 修的就是这个
+//! 「测试连接绿字、同步却写不上去」。
 //!
 //! [V0.11.14] 修 O8：`probe` 现在给三档结论，405 / 3xx 这一档是「通，但服务端不支持
 //! 直接读目录」。它必须判成**通过**并说清原因——很多服务端对「GET 一个目录」本来就
@@ -67,7 +70,22 @@ fn test_folder(cloud: &MdSyncCloud) -> MdSyncTestResult {
     }
 }
 
-/// `Webdav`：`probe` 一次远端目录，按三档结论给话（[V0.11.14] 修 O8）。
+/// `Webdav`：**两件事**都过才绿字（V0.11.15 修 409）。
+///
+/// 旧版只做 `probe`（判地址 + 凭据），于是「测试连接」绿字而同步一路 409——绿字必须
+/// 等于**真的能写**。现在的判据是「地址与凭据可用」+「云端目录已就绪」：
+///
+/// ```text
+/// probe(target, "")        → Err → 红字 fail_text（早退，不建目录）
+/// ensure_base_dir(target)
+///   Ready{created: 0}      → 绿字「连接正常，云端目录「/Timing/md」已就绪」
+///   Ready{created: n}      → 绿字「…已补建云端目录…（新建 n 级）」
+///   TooDeep{levels}        → 红字「…有 {levels} 级，程序最多自动建 8 级…」
+///   Err(e)                 → 红字 fail_text
+/// ```
+///
+/// `probe` 自己的三档语义（`Reachable` / `NoDirectoryListing`）**没变**：后者的信息量
+/// （「服务端不支持直接读目录，但同步单个文件不受影响」）追加在绿字末尾，别丢。
 async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestResult {
     let password = match secret {
         Some(value) if !value.trim().is_empty() => value.to_string(),
@@ -83,21 +101,44 @@ async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestRes
         Err(err) => return verdict(false, err),
     };
     let target = md_webdav::WebdavTarget::new(&cloud.base_url, &dir, &cloud.user, &password);
-    match md_webdav::probe(&target, "").await {
-        Ok(md_webdav::ProbeOutcome::Reachable) => verdict(
-            true,
-            format!("连接正常：{}", md_webdav::redact(&cloud.base_url)),
-        ),
-        /* 地址与账号已经通了，只是服务端不肯对目录发 GET。同步 GET 的是 `{date}.md`
-        这个具体文件，所以这条通道照样能用——文案要让用户看得出「你没填错」，
-        否则他会去反复改一个本来就对的地址。 */
-        Ok(md_webdav::ProbeOutcome::NoDirectoryListing(code)) => verdict(
-            true,
+    /* 第一关：地址与凭据。`NoDirectoryListing` 也是通过——同步 GET 的是 `{date}.md`
+    这个具体文件，服务端不肯对目录发 GET 不影响这条通道。 */
+    let listing = match md_webdav::probe(&target, "").await {
+        Ok(md_webdav::ProbeOutcome::Reachable) => None,
+        Ok(md_webdav::ProbeOutcome::NoDirectoryListing(code)) => Some(code),
+        Err(err) => return verdict(false, round_push::fail_text(&err, &target.base_path)),
+    };
+    /* 第二关：目录就绪。这才证明「能写」，也是本轮修 409 的落地点。 */
+    let (mut detail, ok) = match md_webdav::dir::ensure_base_dir(&target).await {
+        Ok(md_webdav::dir::EnsureOutcome::Ready { created: 0, .. }) => (
             format!(
-                "地址与账号能通，但服务端不支持直接读目录（{code}）；\
-                 同步单个文件不受影响，可以保存"
+                "连接正常，云端目录{}已就绪",
+                round_push::dir_label(&target.base_path)
             ),
+            true,
         ),
-        Err(err) => verdict(false, round_push::fail_text(&err)),
+        Ok(md_webdav::dir::EnsureOutcome::Ready { created, .. }) => (
+            format!(
+                "连接正常，已补建云端目录{}（新建 {created} 级）",
+                round_push::dir_label(&target.base_path)
+            ),
+            true,
+        ),
+        Ok(md_webdav::dir::EnsureOutcome::TooDeep { levels }) => (
+            format!(
+                "远端目录{}有 {levels} 级，程序最多自动建 {} 级；\
+                 请到网盘网页版手动建好，或把目录改浅一点",
+                round_push::dir_label(&target.base_path),
+                md_webdav::dir::MAX_LEVELS
+            ),
+            false,
+        ),
+        Err(err) => (round_push::fail_text(&err, &target.base_path), false),
+    };
+    if let Some(code) = listing {
+        if ok {
+            detail.push_str(&format!("（服务端不支持直接读目录，{code} 已按正常处理）"));
+        }
     }
+    verdict(ok, detail)
 }

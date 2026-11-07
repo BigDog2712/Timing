@@ -13,6 +13,7 @@
  * 约束：本文件**不得** import stores 或 React（否则与 actions 形成环）。
  */
 import { errorText, ipc, isTauri } from './ipc';
+import { rawIpcText } from './ipcError';
 import type {
   CreateItemParams,
   Item,
@@ -154,9 +155,21 @@ export const pluginApi = {
 export const mdBackupApi = {
   list: () => ipc.mdBackupList(),
   restore: (name: string, target?: string | null) => ipc.mdBackupRestore({ name, target }),
+  /** [V0.11.15] 用系统默认程序打开一份备份（失败原因用 `rawIpcText` 原文透出） */
+  open: (name: string): Promise<void> => ipc.mdBackupOpen({ name }),
+};
+
+/* ---- [V0.11.15] 数据根（② SQLite 落点，PRD 4.2）----
+   `change()` 不传参 = **撤销**待生效的切换（后端把 `None` 解释成撤销，不是「没传参」）。
+   失败原因的文案由调用方用 `rawIpcText` 原文透出：预检的拒绝理由（「这个文件夹里已有
+   文件」）是用户唯一的行动依据，被 `errorText()` 润色成「系统调用失败」就没用了。 */
+export const dataRootApi = {
+  get: () => ipc.dataRootGet(),
+  change: (path?: string | null) => ipc.dataRootChange({ path: path ?? null }),
+  open: (): Promise<void> => ipc.dataRootOpen(),
 };
 
 export { isTauri };
 /* 错误文案也走门面：视图层要的是「给用户看的一句话」，不是传输层对象。
    从本文件再导出，组件就不必为了一个文案函数直接 import services/ipc。 */
-export { errorText };
+export { errorText, rawIpcText };

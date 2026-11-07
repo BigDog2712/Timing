@@ -1,4 +1,4 @@
-//! 备份归属标识（设计 §2.4 / §3.4）。
+//! 备份归属标识（设计 §2.4 / §3.4）+ 「打开一份备份」的名字校验（V0.11.15，设计 §4.1）。
 //!
 //! 全局状态（`ROOT` / `ROOTS` 都是 `OnceLock`）在这里是个坑：一个进程只认第一份。
 //! 所以除了「注册表真的记得住、真按最长前缀取」那一条，其余全部走吃目录参数的
@@ -179,4 +179,37 @@ fn read_refuses_names_that_escape_the_backup_dir() {
     assert!(read_in(&dir, "..").is_err());
     assert!(read_in(&dir, "").is_err());
     let _ = fs::remove_dir_all(&dir);
+}
+
+/// `md_backup_open` 的入口：名字校验必须**先于**「备份目录准备好没有」。
+///
+/// 断言的是**文案**而不是「有没有报错」：`backup_root()` 是 `OnceLock`，没设过时
+/// `path_of` 也会报错。若只断言 `is_err()`，这套用例在某些机器上会因为「目录未就绪」
+/// 而绿——那是测试在吹牛（本仓库已经踩过两次）。
+#[test]
+fn path_of_refuses_names_that_escape_the_backup_dir() {
+    for name in ["../timing.db", "sub/x.md", "a\\b.md", "", "   "] {
+        let err = md_backup::path_of(name).expect_err("必须拒绝");
+        assert_eq!(err, "备份文件名不合法", "名字 {name:?} 要先被名字检查拦下");
+    }
+    /* 名字合法时不可能是「不合法」这一句：要么给出路径，要么只差「目录未就绪」。 */
+    match md_backup::path_of("obsidian__2026-11-06-20261106-093000.md") {
+        Ok(path) => assert!(
+            path.ends_with("obsidian__2026-11-06-20261106-093000.md"),
+            "路径必须落在备份根下：{}",
+            path.display()
+        ),
+        Err(err) => assert_eq!(err, "备份目录还没准备好"),
+    }
+}
+
+/// `services::md_backup::open` 的失败口径：`IO_ERROR` + **原文**（不套「系统调用失败:」）。
+///
+/// 预检类失败（名字不合法 / 文件已被删 / 系统没有 .md 关联）的三句原因是三种不同的
+/// 行动指令，被统一前缀润色掉之后用户就无从下手（设计 §9-5）。
+#[test]
+fn open_backup_reports_raw_io_error_text() {
+    let err = crate::services::md_backup::open("").expect_err("空名字必须失败");
+    assert_eq!(err.code, crate::error::ErrorCode::IoError);
+    assert_eq!(err.message, "备份文件名不合法", "原文不许加前缀");
 }

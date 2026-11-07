@@ -4,12 +4,19 @@
  * 备份是「每次覆盖前留的底」，事实全来自后端（`md_backup_list`）。恢复是破坏性操作，二次
  * 确认用页面内的确认条而不是 `window.confirm`——桌面 WebView 里它可能被拦成「什么都没发生」，
  * 用户会误以为已经恢复了。手机端整卡不渲染。
+ *
+ * [V0.11.15] 变成块⑤的**正文**（`<section>` / `<header>` 交给 `FoldBlock`），每行新增
+ * 「打开」：用系统默认程序打开那份 `.md`（PRD 4.5 / 需求 3.6）。打开失败（文件已被删、
+ * 系统没有 .md 关联）**必须原文就地显示**——用 `rawIpcText` 而不是 `errorText()`，
+ * 后者会把 `IO_ERROR` 润色成「系统调用失败，请重试」，用户就再也看不到
+ * 「文件不存在：obsidian__2026-11-05.md」这句话了（PRD D2）。
  */
 import { useCallback, useEffect, useState } from 'react';
 import { IS_MOBILE } from '../../lib/platform';
-import { errorText, mdBackupApi } from '../../services/api';
+import { errorText, mdBackupApi, rawIpcText } from '../../services/api';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 import type { MdBackupItem } from '../../types/domain';
+import { formatBytes } from './mdSyncConfig';
 
 type KnownTarget = 'obsidian' | 'webdav' | 'folder';
 type BackupGroup = { date: string | null; items: MdBackupItem[] };
@@ -19,12 +26,6 @@ const TIME = { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-dig
 
 function targetLabel(target: MdBackupItem['target']): string {
   return target === null ? '归属未知' : TARGET_LABELS[target];
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${bytes} B`;
 }
 
 function formatAt(atMs: number): string { return new Date(atMs).toLocaleString('zh-CN', TIME); }
@@ -57,6 +58,9 @@ function BackupBody() {
   const [pending, setPending] = useState<MdBackupItem | null>(null);
   const [pickTarget, setPickTarget] = useState<KnownTarget>('obsidian');
   const [restoring, setRestoring] = useState(false);
+  /* 「打开」的失败原文按备份名存：红字要落在**那一行**，不能糊在列表顶上 */
+  const [openError, setOpenError] = useState<{ name: string; text: string } | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -90,15 +94,26 @@ function BackupBody() {
     }
   };
 
+  /* 用系统默认程序打开这份备份。失败原因原文照给（`rawIpcText`），不吞成「打开失败」 */
+  const open = async (item: MdBackupItem) => {
+    setOpening(item.name);
+    setOpenError(null);
+    setDone(null);
+    try {
+      await mdBackupApi.open(item.name);
+    } catch (err) {
+      setOpenError({ name: item.name, text: rawIpcText(err) });
+    } finally {
+      setOpening(null);
+    }
+  };
+
   return (
-    <section className="sync-backup">
-      <header className="sync-backup__head">
-        <div>
-          <h3 className="sync__kind">备份与恢复</h3>
-          <p className="sync__desc">每次覆盖 Markdown 前都会先留一份底；下面列出来的就是那些底。</p>
-        </div>
+    <>
+      <div className="sync-backup__head">
+        <p className="sync__desc">每次覆盖 Markdown 前都会先留一份底；下面列出来的就是那些底。</p>
         <button type="button" className="btn btn--ghost" disabled={loading} onClick={() => void refresh()}>刷新</button>
-      </header>
+      </div>
 
       {error && <p className="sync__error">{error}</p>}
       {done && <p className="sync__ok">{done}</p>}
@@ -113,10 +128,16 @@ function BackupBody() {
                 {targetLabel(item.target)}</span>
               <span className="sync-backup__source" title={item.name}>{item.source}</span>
               <span className="sync-backup__facts">{item.date ?? '—'} · {formatBytes(item.bytes)} · {formatAt(item.atMs)}</span>
+              <button type="button" className="btn btn--ghost sync-backup__open"
+                disabled={opening === item.name} onClick={() => void open(item)}>
+                {opening === item.name ? '打开中…' : '打开'}
+              </button>
               <button type="button" className="btn btn--ghost sync-backup__go" disabled={restoring}
-                onClick={() => { setDone(null); setError(null); setPickTarget('obsidian'); setPending(item); }}>
+                onClick={() => { setDone(null); setError(null); setOpenError(null); setPickTarget('obsidian'); setPending(item); }}>
                 恢复
               </button>
+
+              {openError?.name === item.name && <p className="sync__error">{openError.text}</p>}
 
               {pending?.name === item.name && (
                 <div className="sync-backup__confirm">
@@ -145,6 +166,6 @@ function BackupBody() {
           ))}
         </div>
       ))}
-    </section>
+    </>
   );
 }

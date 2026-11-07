@@ -88,6 +88,37 @@ pub fn ask_migrate_failed(reason: &str, source: Option<&Path>) -> Choice {
     )
 }
 
+/// 「你设的数据目录现在用不了」三选一（V0.11.15，设计 §3.2）。
+///
+/// 与 `ask_permission` 的区别：那边问的是「应用旁边能不能写」（optout 的入口），这里问
+/// 的是「**用户自己选过**的那个目录还能不能用」。因此文案必须点名那个目录，否则用户
+/// 会以为是程序把数据丢了。第三个选项是「这次按默认流程启动」而不是「改用 AppData」：
+/// 指针**保留**，下次启动仍先试它（插回移动盘就好）。
+pub fn ask_data_root_unavailable(reason: &str, data_dir: &Path, default_data: &Path) -> Choice {
+    let body = format!(
+        "你指定的数据目录现在用不了：\n  {}\n\n\
+         原因：{reason}\n\n\
+         请检查它是否被拔掉 / 改名 / 权限被回收，然后点「重试」。\n\n\
+         点「这次按默认流程启动」会先按默认位置启动（这次不会再问，也不再搬数据）：\n  {}\n\
+         你设的路径会保留，下次启动仍先试它。",
+        data_dir.display(),
+        default_data.display(),
+    );
+    tri(
+        MessageDialog::new()
+            .set_level(MessageLevel::Warning)
+            .set_title("指定的数据目录用不了")
+            .set_description(body)
+            .set_buttons(MessageButtons::YesNoCancelCustom(
+                "重试".to_string(),
+                "这次按默认流程启动".to_string(),
+                "退出".to_string(),
+            ))
+            .show(),
+        reason,
+    )
+}
+
 /// 「已改用 AppData」二次显式告知（`Info` + OK）：回退必须可见、必须给出目录位置。
 pub fn ask_appdata_notice(appdata: &Path) {
     let body = format!(
@@ -179,12 +210,18 @@ pub fn webview2_ok() -> bool {
 }
 
 /// `YesNoCancelCustom` 的三值归一化（两种回报形态都要认）。
+///
+/// 两个自定义文案各属一个对话框：「改用 AppData」在权限 / 迁移失败的框里，「这次按默认
+/// 流程启动」在自定义数据根不可用的框里。两个都归到 `AppData` —— 这个变体的语义是
+/// 「这次先走默认流程」，不是「写 optout」（写不写由调用方决定）。
 fn tri(result: MessageDialogResult, detail: &str) -> Choice {
     match result {
         MessageDialogResult::Yes | MessageDialogResult::Ok => Choice::Proceed,
         MessageDialogResult::No => Choice::AppData(detail.to_string()),
         MessageDialogResult::Custom(text) if text == "重试" => Choice::Proceed,
-        MessageDialogResult::Custom(text) if text == "改用 AppData" => {
+        MessageDialogResult::Custom(text)
+            if text == "改用 AppData" || text == "这次按默认流程启动" =>
+        {
             Choice::AppData(detail.to_string())
         }
         /* 取消 / 关闭窗口 / 未知文案一律按「退出」处理：不替用户做选择。 */

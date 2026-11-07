@@ -124,6 +124,12 @@ pub async fn md_backup_list() -> AppResult<Vec<MdBackupItem>> {
     Err(AppError::md_sync_config_invalid(NO_BACKUP))
 }
 
+/// 备份在手机上没有可用落点（理由见 `NO_BACKUP`）：沿用同一句话，不新增错误码。
+#[tauri::command]
+pub async fn md_backup_open(_name: String) -> AppResult<()> {
+    Err(AppError::md_sync_config_invalid(NO_BACKUP))
+}
+
 #[tauri::command]
 pub async fn md_backup_restore(
     _app: AppHandle,

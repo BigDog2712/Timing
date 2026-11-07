@@ -109,6 +109,14 @@ pub async fn md_backup_list() -> AppResult<Vec<MdBackupItem>> {
 
 /// 用一份备份覆盖回去。`target` 是落点标识，`None` = 按备份文件名推出来的归属
 /// （老备份无前缀，前端让用户自己选）。`name` 来自前端，由 service 按不可信输入解析。
+/// 用系统默认程序打开一份备份（PRD 8.2-5）。`name` 来自前端，由 service 按不可信
+/// 输入解析（拒绝 `..` / `/` / `\` / 空串）——这条路径要把文件交给系统去**执行**，
+/// 路径注入的后果不是「读错文件」而是「打开任意文件」。
+#[tauri::command]
+pub async fn md_backup_open(name: String) -> AppResult<()> {
+    md_backup::open(&name)
+}
+
 #[tauri::command]
 pub async fn md_backup_restore(
     app: AppHandle,

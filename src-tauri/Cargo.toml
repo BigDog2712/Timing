@@ -1,6 +1,6 @@
 [package]
 name = "timing"
-version = "0.11.14"
+version = "0.11.15"
 description = "Timing — 常驻悬浮计时条（Windows 桌面，纯本地）"
 authors = ["Timing Team"]
 edition = "2021"
@@ -75,7 +75,13 @@ windows-registry = "0.6"
 # [V0.11.13] WebDAV 应用密码的加密存储（DPAPI：`CryptProtectData` / `CryptUnprotectData`）。
 # 已在依赖图里（`Cargo.lock` 有 0.61.2，经 windows-registry 引入），这里只是多开两个 feature
 # → 不新增编译单元。密码明文既不进 `settings` 表也不进日志，只以密文落盘。
-windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+# [V0.11.15] 数据根切换前的剩余空间预检（`GetDiskFreeSpaceExW`）：只多开一个 feature
+# → 不新增编译单元，Cargo.lock 不变。
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+    "Win32_Storage_FileSystem",
+] }
 
 [features]
 default = []

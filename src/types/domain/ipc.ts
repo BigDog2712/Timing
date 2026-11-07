@@ -69,6 +69,7 @@ import type {
   MdSyncViewCloud,
 } from './mdCloud';
 import type { OverlayStatus, OverlayStyle, SafStatus } from './mobile';
+import type { DataRootInfo } from './dataRoot';
 import type { MigrationInfo } from './migration';
 
 /**
@@ -212,6 +213,16 @@ export interface IpcApi {
   mdBackupList(): Promise<MdBackupItem[]>;
   /** [V0.11.13] 用一份备份覆盖回去；`target` 缺省 = 按备份文件名推出来的归属 */
   mdBackupRestore(params: { name: string; target?: string | null }): Promise<MdBackupRestoreResult>;
+  /** [V0.11.15] 用系统默认程序打开一份备份；失败回 `IO_ERROR` + 原文（文件已被删 / 名字不合法） */
+  mdBackupOpen(params: { name: string }): Promise<void>;
+
+  /* 数据根 [V0.11.15]（PRD 4.2）—— 桌面独占，手机端三条回 `IO_ERROR`（「仅桌面端可用」）。
+     命令层一次都不判路径，判据全在 Rust 的 `services::data_root`。 */
+  dataRootGet(): Promise<DataRootInfo>;
+  /** `path` 为 `null` = **撤销**待生效的切换（不是「没传参」，见设计 §8-4） */
+  dataRootChange(params: { path?: string | null }): Promise<DataRootInfo>;
+  /** 资源管理器打开当前数据根；目录不存在回 `IO_ERROR`，**不创建**目录 */
+  dataRootOpen(): Promise<void>;
 
   /* -- 手机端原生能力 [V0.12.0]：SAF 目录 / 悬浮条。桌面调用会回 IO_ERROR --
      存在即「这端有这套能力」，不存在由 isTauri/IS_MOBILE 分支兜住；

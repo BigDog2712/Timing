@@ -3,6 +3,9 @@
  * -----------------------------------------------------------------------------
  * 从 `MdSyncTab` 拆出（那个文件已 298 行，新增控件只能另起文件）。
  *
+ * [V0.11.15] 变成块④的**正文**：自带的 `<section>` / `<header>` 去掉了，标题「WebDAV
+ * 云端同步」与折叠交给 `FoldBlock`（再套一层卡会得到两层边框）。
+ *
  * 三条纪律：
  * 1. **要落库的值一律走 `draft`**，本文件只留「与保存无关」的界面状态（测试连接结果）；
  * 2. 密码框**不受控于** `hasSecret`：`secret === null` 的含义是「没碰过」，保存时按
@@ -10,6 +13,9 @@
  * 3. 关掉开关只把字段变灰、不隐藏（用户要能看到自己填过什么）；手机端不渲染「本地目录」，
  *    **[V0.11.14] 并且草稿里的 `mode` 也换成 `webdav`**（在 `useMdSyncDraft` 回填时换），
  *    本文件只负责把这件事说出来——显示与落库必须是同一个值，静默不一致比显示错更糟。
+ *
+ * 总开关留在正文第一行而不是标题右侧：它要顺手清掉本地的 `testResult`（上一次的绿字
+ * 不该替刚关掉的通道背书），那个 state 在本文件里，抬到块标题上就得多绕一圈。
  */
 import { useState } from 'react';
 import { IS_MOBILE } from '../../lib/platform';
@@ -61,15 +67,19 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
   };
 
   return (
-    <section className="sync-cloud">
-      <header className="sync-cloud__head">
-        <div>
-          <h3 className="sync__kind">云端通道</h3>
-          <p className="sync__desc">把今天的 Markdown 再送一份到云端目录或 WebDAV；换机器时把它同步过来就能接着用。</p>
+    <div className="sync__fields">
+      <div className="sync__card-head">
+        <div className="sync__card-title">
+          <span className="sync__label">启用云端通道</span>
+          <p className="sync__desc">
+            把今天的 Markdown 再送一份到云端目录或 WebDAV；换机器时把它同步过来就能接着用。
+          </p>
         </div>
-        <Switch checked={cloud.enabled} label="启用云端通道" disabled={saving}
-          onChange={(next) => { setTestResult(null); patch({ enabled: next }); }} />
-      </header>
+        <div className="sync__card-tools">
+          <Switch checked={cloud.enabled} label="启用云端通道" disabled={saving}
+            onChange={(next) => { setTestResult(null); patch({ enabled: next }); }} />
+        </div>
+      </div>
 
       <div className="seg seg--compact" role="group" aria-label="云端通道方式">
         {MODE_ORDER.filter((value) => !IS_MOBILE || value !== 'localfolder').map((value) => (
@@ -161,6 +171,6 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
           {status.lastError && <p className="sync__error">{status.lastError}</p>}
         </div>
       )}
-    </section>
+    </div>
   );
 }

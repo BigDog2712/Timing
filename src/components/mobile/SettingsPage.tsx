@@ -29,7 +29,8 @@ type TabId = 'look' | 'sync' | 'plugins' | 'gen';
 
 const TABS: readonly { id: TabId; label: string }[] = [
   { id: 'look', label: '外观' },
-  { id: 'sync', label: '同步' },
+  /* [V0.11.15] 只改 label，`id` 仍是 'sync'：手机端 SyncPane 的结构本轮一字不动 */
+  { id: 'sync', label: '数据管理' },
   { id: 'plugins', label: '插件' },
   { id: 'gen', label: '通用' },
 ];

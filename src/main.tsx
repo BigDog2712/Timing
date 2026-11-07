@@ -25,6 +25,8 @@ import './styles/settings-sync.css';
 import './styles/settings-sync-interval.css';
 /* [V0.11.13] 云端通道卡 + 备份卡（settings-sync.css 是本轮不许动的红线，新结构另起一份） */
 import './styles/settings-sync-cloud.css';
+/* [V0.11.15] 数据管理页签的壳：折叠块 / 底部 sticky 条 / 黄条 / 徽标（③④⑤ 仍用 sync__*） */
+import './styles/settings-data.css';
 /* [V0.4.1] 渲染异常兜底（透明窗里渲染抛错 = 药丸凭空消失，必须留住可点的界面） */
 import './styles/error-boundary.css';
 import './styles/theme-picker.css';

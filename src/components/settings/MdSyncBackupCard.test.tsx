@@ -11,14 +11,18 @@ vi.mock('../../lib/platform', () => ({
   HOST_OS: 'desktop',
 }));
 
-const api = vi.hoisted(() => ({ list: vi.fn(), restore: vi.fn() }));
+const api = vi.hoisted(() => ({ list: vi.fn(), restore: vi.fn(), open: vi.fn() }));
 vi.mock('../../services/api', () => ({
-  mdBackupApi: { list: api.list, restore: api.restore },
+  mdBackupApi: { list: api.list, restore: api.restore, open: api.open },
   mdSyncApi: { get: vi.fn(async () => null), save: vi.fn(), run: vi.fn(), open: vi.fn() },
   /* 真 `errorText`（`services/ipc` 那个映射）对 `MD_SYNC_CONFIG_INVALID` 就是「原样透出
-     后端 message」，它自己的映射由 `check:contract` 静态强制；这里只需保证**卡片这一侧**
-     把返回值渲染出来。 */
-  errorText: (err: unknown) => (err instanceof Error ? err.message : '操作失败'),
+     后端 message」，它自己的映射由 `check:contract` 静态强制；这里加一个前缀，是为了让
+     「哪一处用了哪个函数」在断言里可分辨（恢复用 errorText、打开用 rawIpcText）。 */
+  errorText: (err: unknown) => `[润色] ${err instanceof Error ? err.message : '操作失败'}`,
+  /* [V0.11.15] 「打开」失败必须原文透出：`errorText()` 会把 `IO_ERROR` 润色成
+     「系统调用失败，请重试」，所以卡片用的是 `rawIpcText`。实现若换成 `errorText`，
+     下面那条「打开」用例里的 `[润色]` 前缀就会露出来 → 变红。 */
+  rawIpcText: (err: unknown) => (err instanceof Error ? err.message : '操作失败'),
 }));
 
 import { MdSyncBackupCard } from './MdSyncBackupCard';
@@ -54,6 +58,7 @@ describe('MdSyncBackupCard', () => {
     host.mobile = false;
     api.list.mockReset();
     api.restore.mockReset();
+    api.open.mockReset();
     api.list.mockResolvedValue(ITEMS);
     useMdSyncStore.setState({ view: null, loaded: false, loading: false, saving: false, error: null });
   });
@@ -115,6 +120,34 @@ describe('MdSyncBackupCard', () => {
     expect(api.restore).toHaveBeenCalledWith('webdav__2026-11-05.md', 'webdav');
     expect(texts('.sync__error').join('')).toContain('云端通道没开启或没填完整');
     expect(container.textContent).not.toContain('已恢复');
+  });
+
+  /* [V0.11.15] 需求 3.6：备份能在系统默认程序里打开看。用 `rawIpcText` 而不是
+     `errorText()`——后者会把 `IO_ERROR` 润色成「系统调用失败，请重试」，
+     用户就再也看不到「文件不存在：…」这句唯一能照做的话（PRD D2）。 */
+  it('点「打开」把备份名交给后端，失败时原文就地显示、不带润色', async () => {
+    api.open.mockRejectedValue(new Error('文件不存在：obsidian__2026-11-05.md'));
+    await mount();
+    /* 组内按 atMs 倒序：同一天里 webdav 在前，所以按归属标签找 Obsidian 那一行 */
+    const row = Array.from(container.querySelectorAll('.sync-backup__row'))
+      .find((el) => el.textContent?.includes('Obsidian 落点')) as HTMLElement;
+    const openButton = Array.from(row.querySelectorAll('button'))
+      .find((el) => el.textContent === '打开');
+    await click(openButton);
+
+    expect(api.open).toHaveBeenCalledWith('obsidian__2026-11-05.md');
+    expect(row.querySelector('.sync__error')?.textContent).toBe('文件不存在：obsidian__2026-11-05.md');
+    expect(container.textContent).not.toContain('[润色]');
+  });
+
+  it('打开成功时不显示红字', async () => {
+    api.open.mockResolvedValue(undefined);
+    await mount();
+    const row = container.querySelector('.sync-backup__row') as HTMLElement;
+    await click(Array.from(row.querySelectorAll('button')).find((el) => el.textContent === '打开'));
+
+    expect(api.open).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.sync__error')).toBeNull();
   });
 
   it('手机端整卡不渲染，也不去读备份列表', async () => {

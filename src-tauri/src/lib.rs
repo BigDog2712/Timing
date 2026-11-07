@@ -224,6 +224,12 @@ pub fn run() {
             commands::md_sync_cmd::md_sync_test,
             commands::md_sync_cmd::md_backup_list,
             commands::md_sync_cmd::md_backup_restore,
+            /* [V0.11.15] 数据管理重组：数据根三条 + 备份「打开」（命令 74 → 78）。
+            不加 `#[cfg]` —— 命令名就是契约面，手机端同名注册、内部回 IO_ERROR。 */
+            commands::data_root_cmd::data_root_get,
+            commands::data_root_cmd::data_root_change,
+            commands::data_root_cmd::data_root_open,
+            commands::md_sync_cmd::md_backup_open,
             // [V0.12.0] 手机端原生能力（SAF 目录 / 悬浮条）；桌面侧四条是桩
             commands::mobile_cmd::md_saf_pick,
             commands::mobile_cmd::md_saf_status,

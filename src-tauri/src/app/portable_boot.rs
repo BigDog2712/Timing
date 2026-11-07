@@ -24,6 +24,7 @@
 //!
 //! 本层跑在 `platform::log::init` **之前**：结果缓存在模块自己的 `Mutex` 里，由
 //! `bootstrap` 在日志就绪后补记（`appdata_migrate` 的既有手法）。
+//! 第 ① 步（自定义数据根）在 `app::data_root_boot`：要弹三选框，正文放这会破 300 行。
 
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -64,6 +65,9 @@ pub struct Note {
     pub portable: bool,
     /// 为什么回退（`None` = 没回退）
     pub fallback: Option<&'static str>,
+    /// 落点来源，`bootstrap` 补记的 `data root:` 一行里就是 `source=`：
+    /// `pointer` / `portable` / `portable-optout.json` / `permission-denied` / …
+    pub source: &'static str,
 }
 
 /// 启动期缓存（`log::init` 之后由 `bootstrap` 补记）。
@@ -90,7 +94,11 @@ pub fn prepare(identifier: &str) -> BootChoice {
         return BootChoice::NoWebView2;
     }
 
-    /* ① 用户已经明确选过 AppData：不再探测、不再询问（删除标记即可恢复探测）。 */
+    /* ①【V0.11.15】自定义数据根优先（指针 > optout > 探测），正文在 `data_root_boot`。 */
+    if let Some(choice) = super::data_root_boot::apply(identifier) {
+        return choice;
+    }
+    /* ② 用户已经明确选过 AppData：不再探测、不再询问（删除标记即可恢复探测）。 */
     if let Some(appdata) = app_dir::appdata_dir(identifier) {
         if fs_probe::read_optout(&appdata).is_some() {
             set_roots(&appdata, "portable-optout.json");
@@ -200,14 +208,14 @@ fn use_appdata(identifier: &str, reason: &'static str, detail: &str) -> BootChoi
     BootChoice::Proceed
 }
 
-/// 注入便携落点。
+/// 注入便携落点（`<exe>\data`）。
 fn set_roots_pair(data: &Path, plugins: &Path) {
     app_dir::set(Roots {
         data: data.to_path_buf(),
         plugins: plugins.to_path_buf(),
         portable: true,
     });
-    cache_note(data, true, None);
+    cache_note(data, true, None, "portable");
 }
 
 /// 注入 AppData 落点。
@@ -217,16 +225,23 @@ fn set_roots(appdata: &Path, reason: &'static str) {
         plugins: appdata.join("plugins"),
         portable: false,
     });
-    cache_note(appdata, false, Some(reason));
+    cache_note(appdata, false, Some(reason), reason);
 }
 
-/// 缓存启动期补记（`bootstrap` 在日志就绪后读一次）。
-fn cache_note(data: &Path, portable: bool, fallback: Option<&'static str>) {
+/// 缓存启动期补记（`bootstrap` 在日志就绪后读一次）。`pub(super)`：`data_root_boot`
+/// 注入自定义根之后也要留一条同样形状的记录。
+pub(super) fn cache_note(
+    data: &Path,
+    portable: bool,
+    fallback: Option<&'static str>,
+    source: &'static str,
+) {
     if let Ok(mut guard) = NOTE.lock() {
         *guard = Some(Note {
             data: data.to_path_buf(),
             portable,
             fallback,
+            source,
         });
     }
 }

@@ -68,6 +68,15 @@ src-tauri/src/platform/log.rs
 # 「已从 TickBar 迁移」：数据确实来自旧产品，这句历史表述是对的。
 src/components/settings/MigrationInfoCard.tsx
 src/components/settings/MigrationInfoCard.test.tsx
+# 数据根切换的五项清单：`migrated-from-tickbar-app.json` 是**磁盘上既有的真实文件名**
+# （定义在 `infra/appdata_migrate/marker.rs::MARKER_FILE`，那份文件已在第 5 节整目录豁免）。
+# 这五处是「搬什么」的清单与断言，必须写字面量——它要匹配的正是那个旧文件，
+# 换成常量或新名字就搬不到它。行级豁免，只放这一串，不放行任何别的旧名。
+src-tauri/src/models/data_root.rs :: migrated-from-tickbar-app.json
+src-tauri/src/tests/data_root_transfer.rs :: migrated-from-tickbar-app.json
+src/types/domain/dataRoot.ts :: migrated-from-tickbar-app.json
+src/mocks/browserMockPlugins.ts :: migrated-from-tickbar-app.json
+src/components/settings/MdDataRootBlock.test.tsx :: migrated-from-tickbar-app.json
 # 5 个 localStorage 键的只读回落（新键优先，老键兜底一个版本）。
 src/lib/storageKeys.ts
 src/lib/storageKeys.test.ts

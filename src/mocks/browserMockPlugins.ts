@@ -150,6 +150,33 @@ function result(): PluginListResult {
   };
 }
 
+/* [V0.11.15] 数据根的假状态：`current` 恒为出厂落点占位，`change` 只动 `pending`
+   ——与真机同口径（写指针、**重启后**才生效），这样块②的待生效黄条能在浏览器里走查。 */
+const MOCK_DATA_ROOT = '%APP_DIR%';
+let mockPending: string | null = null;
+
+function dataRootInfo(): Record<string, unknown> {
+  return {
+    current: MOCK_DATA_ROOT,
+    defaultPath: MOCK_DATA_ROOT,
+    isDefault: MOCK_DATA_ROOT === '%APP_DIR%',
+    writable: true,
+    writableError: null,
+    pending: mockPending,
+    previous: null,
+    sizeBytes: 65_200_000,
+    entries: [
+      { name: 'timing.db', isDir: false, present: true, bytes: 18_400_000 },
+      { name: 'backups', isDir: true, present: true, bytes: 42_100_000 },
+      { name: 'logs', isDir: true, present: true, bytes: 3_200_000 },
+      { name: 'md', isDir: true, present: true, bytes: 1_100_000 },
+      { name: 'migrated-from-tickbar-app.json', isDir: false, present: false, bytes: 0 },
+    ],
+    affected: ['事项计时', '便利贴', '待办事项'],
+    pluginsInDataRoot: false,
+  };
+}
+
 /* [V0.12.0] 悬浮条开关的假状态：浏览器里没有前台服务，但设置页得能来回切。 */
 let overlayOn = false;
 let overlayStyle = 'dot';
@@ -227,6 +254,23 @@ export function createMockApiPlugins(): Record<string, (args?: unknown) => unkno
       if (!item) fail('MD_SYNC_CONFIG_INVALID', `「${name}」不是 Timing 的备份文件`);
       if (!item.date) fail('MD_SYNC_CONFIG_INVALID', `「${name}」读不出日期`);
       return { date: item.date, target: item.target, imported: 3, written: 1 };
+    },
+    /* [V0.11.15] 数据根三条 + 备份「打开」。
+       `change(null)` = 撤销：把 pending 清掉，与真机「改写/删除指针」同口径。 */
+    data_root_get: () => dataRootInfo(),
+    data_root_change: (args) => {
+      const path = (args as { path?: string | null } | undefined)?.path ?? null;
+      mockPending = path;
+      return dataRootInfo();
+    },
+    data_root_open: () => undefined,
+    md_backup_open: (args) => {
+      const name = (args as { name?: string } | undefined)?.name ?? '';
+      if (!MOCK_BACKUPS.some((backup) => backup.name === name)) {
+        /* 与真机同一句原文：走查时「删掉备份再点打开」要能看到这句话（PRD D2）。 */
+        fail('IO_ERROR', `文件不存在：${name}`);
+      }
+      return undefined;
     },
     /* [V0.12.0] 手机端原生能力：浏览器给「已授权 + 悬浮条可开」的假事实，
        让两个入口都能走查（真机上这两个值来自 Kotlin）。 */
