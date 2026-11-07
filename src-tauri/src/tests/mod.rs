@@ -78,6 +78,15 @@ mod qa_live_config_roundtrip;
 /* [QA V0.11.18] 「第 1 关对 403 放行」的反向攻击（上一轮没验完的那条）：
    目录 GET 403 **且** 写探针 403 时必须仍然报红，不许把误报换成漏报。 */
 mod qa_probe_403;
+/* [QA 复验 V0.11.18] A6 的「填全」判据：前端 `isCloudReady` 与后端 `usable()` 共用一张
+   十档表，任何一边改口径都会红在那一侧。 */
+mod qa_usable_parity;
+/* [QA 复验 V0.11.18] B7b：`build_nodes(quitting=true)` 只改退出项（逐字 `正在同步…`）。 */
+mod qa_tray_quitting;
+/* [QA 复验 V0.11.18] B4：`blocked_notice` 的十档表 + 「标题取自菜单项常量」。
+   与工程师那份的区别：用常量不用字面量、补 `localfolder` 载体、把优先级顺序也钉住。 */
+mod qa_blocked_notice;
+mod qa_blocked_notice_label;
 mod portable_dir;
 mod portable_dir_qa;
 mod portable_dir_qa_md;

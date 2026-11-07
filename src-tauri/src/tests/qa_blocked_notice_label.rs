@@ -1,0 +1,132 @@
+//! `blocked_notice` 的真库半场（PRD §14.2）：标签读生效通道、通知标题该取哪个常量。
+//!
+//! 拆成两个文件是因为「单文件 ≤300 行」硬门禁（ADR-017，零豁免）：`qa_blocked_notice.rs`
+//! 放十档纯函数表，这里放需要真库的 `sync_label` 对照。夹具与常量从那边 `use` 过来，
+//! **绝不复制**（复制一份 `webdav_filled` 就等于复制一份「填全」的定义，两处会漂）。
+//!
+//! ## 这一层管不到的（如实交代）
+//!
+//! `run_once` 里「命中就只弹这一条并 `return`」要 `AppHandle`（真托盘 + 真通知），单元层拿不到，
+//! 只能静态核对：`tray_sync.rs` 那个分支体只有 `notify_or_log` + `return`，`return` 之后才是
+//! `md_cloud::round`。所以「只弹一条、不紧跟一条完成/没有变更」形状上成立，但无自动化证据。
+
+use sqlx::SqlitePool;
+
+use super::qa_blocked_notice::{webdav_filled, V0118_BODY};
+use crate::app::tray_sync::{blocked_notice, sync_label, CLOUD_LABEL, LOCAL_LABEL};
+use crate::models::md_sync::MdSyncConfig;
+use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
+use crate::repositories::settings;
+use crate::services::md_sync::config;
+use crate::tests::support::fresh_pool;
+
+/// 真库直写配置（绕过 `config::validate`：判据里有「`enabled: true` 但字段空」这一档，
+/// 而 `validate_webdav` 会拒绝它，可它在真机上确实存在）。
+pub(super) async fn store(pool: &SqlitePool, cfg: &MdSyncConfig) {
+    let raw = serde_json::to_string(cfg).expect("配置应能序列化");
+    settings::set_value(pool, config::CONFIG_KEY, &raw, 0)
+        .await
+        .expect("写 settings 应成功");
+}
+
+#[tokio::test]
+async fn qa_sync_label_follows_effective_channel_not_the_selection() {
+    let pool = fresh_pool("qa-blocked-label").await;
+
+    /* ① 选了云端（字段还填全了）但 Markdown 总开关关着。
+       实测：标签是 `云端同步`。PRD 没有任何一条钉住这一帧（B3 只钉正文，
+       且 B3 的前提是「通道 = 只用本地」），所以这里**按现状断言**、不按理想断言，
+       另在报告里作为「判据未覆盖的一帧」提出（总开关关着时标签仍叫云端同步）。 */
+    store(
+        &pool,
+        &MdSyncConfig {
+            enabled: false,
+            cloud: Some(webdav_filled()),
+            ..MdSyncConfig::default()
+        },
+    )
+    .await;
+    assert_eq!(
+        sync_label(&pool).await,
+        CLOUD_LABEL,
+        "总开关关着、但通道选了云端：标签按 `usable()`（不看总开关）→ 云端同步"
+    );
+
+    /* ② 开了 + 选了云端 + 没填全 → 标签回落本地（`usable()` 为 None） */
+    let not_filled = MdSyncConfig {
+        enabled: true,
+        cloud: Some(MdSyncCloud {
+            enabled: true,
+            mode: CloudMode::Webdav,
+            ..MdSyncCloud::default()
+        }),
+        ..MdSyncConfig::default()
+    };
+    store(&pool, &not_filled).await;
+    assert_eq!(
+        sync_label(&pool).await,
+        LOCAL_LABEL,
+        "没填全 = 这一轮仍走 md_sync::run，标签写「云端同步」就是骗人（PRD §14.2）"
+    );
+
+    /* ③ 同一份配置下：标签说本地、通知正文说云端。两句各说一件事（状态 vs 动作），不打架；
+       标题该取哪个常量见下面那条挂起用例。 */
+    assert_eq!(
+        blocked_notice(&not_filled).map(|(_, body)| body),
+        Some(V0118_BODY),
+        "未填全档的正文必须逐字"
+    );
+
+    /* ④ 开了 + 填全了 → 标签云端，且不再插话（这一下会真的跑） */
+    store(
+        &pool,
+        &MdSyncConfig {
+            enabled: true,
+            cloud: Some(webdav_filled()),
+            ..MdSyncConfig::default()
+        },
+    )
+    .await;
+    assert_eq!(sync_label(&pool).await, CLOUD_LABEL, "填全时标签必须是云端");
+    assert!(blocked_notice(&not_filled).is_some(), "未填全档确实会说话");
+}
+
+/// **与 PRD §14.2 的冲突点，等你拍板**（`#[ignore]` 是刻意的：不把正在打包的树弄红，
+/// 但每次跑测试都会在汇总里以「1 ignored」露头）。
+///
+/// 判据说（§14.2 · B4 修订，原文逐字）：
+/// > ① 菜单项标签仍逐字 `Markdown 同步`（因为未填全 → 不生效，标签诚实）；
+/// > ② 点它 → 系统通知**标题** `Markdown 同步`、**正文**逐字 `先在设置里填好云端`
+///
+/// 实现给的是 `CLOUD_LABEL`（`云端同步`）。工程师在 `blocked_notice` 上方的注释写的是
+/// 「标题用菜单项此刻的 `云端同步`」——但同一个提交里 `tray_sync_quit.rs` 的测试注释又写
+/// 「未填全时菜单项显示 `Markdown 同步`」，**同一份代码里两句话互相矛盾**，且后者与实现一致。
+///
+/// 断言刻意不写字面量：直接拿同一个库里 `sync_label` 的结果比 `blocked_notice` 的标题。
+/// 这样「两处各抄一份文案」的实现会红，「共用同一个常量」的实现会绿。
+///
+/// 裁决结果的处理：**改代码**（`CLOUD_LABEL` → `LOCAL_LABEL`）→ 删掉 `#[ignore]` 即绿；
+/// **改判据** → 把这段注释的依据换成新条文，本用例删掉。
+#[tokio::test]
+#[ignore = "PRD §14.2 ② 要求标题为 Markdown 同步，实现给云端同步；等主理人拍板"]
+async fn qa_b4_notice_title_should_equal_the_menu_item_label() {
+    let pool = fresh_pool("qa-blocked-title").await;
+    let not_filled = MdSyncConfig {
+        enabled: true,
+        cloud: Some(MdSyncCloud {
+            enabled: true,
+            mode: CloudMode::Webdav,
+            ..MdSyncCloud::default()
+        }),
+        ..MdSyncConfig::default()
+    };
+    store(&pool, &not_filled).await;
+
+    let menu_label = sync_label(&pool).await;
+    let notice_title = blocked_notice(&not_filled).expect("未填全必须有话说").0;
+    assert_eq!(
+        notice_title, menu_label,
+        "点了写着「{menu_label}」的那一项，通知标题却是「{notice_title}」——用户会以为点错了东西"
+    );
+}
+
