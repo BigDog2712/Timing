@@ -24,7 +24,8 @@ use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::infra::md_backup as store;
-use crate::infra::md_file::{self, SectionState};
+use crate::infra::md_file;
+use crate::infra::md_section::SectionState;
 use crate::models::md_sync::MdSyncBinding;
 use crate::models::md_sync_cloud::{CloudMode, MdBackupItem, MdBackupRestoreResult, MdSyncCloud};
 use crate::platform::clock::now_ms;
@@ -110,9 +111,13 @@ pub async fn restore(
                 crate::log_warn!("md backup restore: {name} 里没有「{}」，跳过", binding.heading);
                 continue;
             };
+            /* 恢复是用户明确要求覆盖，诊断不阻断（阻断的语义是「本轮不写」，与恢复相反）。
+            `read_section` 现在返回 `SectionRead`，取 `.state` 即可，形状与 v0.11.18 一致。 */
             let body_old = match md_file::read_section(path, &binding.heading) {
-                Ok(SectionState::Present { body, .. }) => body,
-                Ok(_) => String::new(),
+                Ok(read) => match read.state {
+                    SectionState::Present { body, .. } => body,
+                    _ => String::new(),
+                },
                 Err(err) => return Err(AppError::io(err)),
             };
             /* ⑤ 先写回去：`write_section` 内部会把当前（坏）内容再留一份底，

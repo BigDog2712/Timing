@@ -26,6 +26,10 @@ mod md_cloud_conflict;
 mod md_cloud_folder;
 mod md_cloud_pending;
 mod md_cloud_round;
+/* [V0.11.19] 变更 B：围栏状态机（洞 1 / 洞 2）与三档诊断的单元判据。 */
+mod md_section_fence;
+/* [V0.11.19] J15：别人的围栏里有逐字标题时，那一块必须逐字节不变。 */
+mod md_section_fence_j15;
 mod md_sync;
 /* [V0.11.18] 合并语义的**现状快照**（PRD C9 / 设计 §6）：五条「已知限制」的回归测试。
    拍照，不是修复——行为代码零改动，改行为前先改那个文件里的断言。 */

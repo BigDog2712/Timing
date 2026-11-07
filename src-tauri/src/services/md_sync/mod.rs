@@ -31,7 +31,8 @@ use sqlx::SqlitePool;
 
 use self::runtime::Runtime;
 use crate::error::{AppError, AppResult};
-use crate::infra::md_file::{self, SectionState};
+use crate::infra::md_file;
+use crate::infra::md_section::{self, SectionState};
 use crate::models::md_sync::{
     MdSyncBinding, MdSyncBindingStatus, MdSyncKind, MdSyncReport, MdSyncStatus, MdSyncView,
 };
@@ -158,6 +159,10 @@ pub(super) async fn sync_all(pool: &SqlitePool, root_override: Option<&str>) -> 
                 status.last_sync_at = Some(at);
                 report.exported += u32::from(outcome.exported);
                 report.note_imported(binding.kind, outcome.imported);
+                /* 非阻断诊断：落点行显示逐字原文，完成通知里带种类前缀。 */
+                let label = binding.kind.label();
+                status.last_error = outcome.warnings.first().cloned();
+                outcome.warnings.iter().for_each(|warn| report.errors.push(format!("「{label}」{warn}")));
                 /* [V0.11.11] 真机排查的唯一现场：`adb logcat -s Timing` 能分清「没找到文件」
                 「文件没变」「导入 0 条」——三者在界面上都是同一句「已写入文件」。 */
                 crate::log_info!("md sync {}: {} exists={} dir={} imported={} exported={}", binding.kind.label(), status.path, outcome.exists, outcome.direction, outcome.imported, outcome.exported);
@@ -165,9 +170,7 @@ pub(super) async fn sync_all(pool: &SqlitePool, root_override: Option<&str>) -> 
             Err(err) => {
                 crate::log_warn!("md sync {} 失败：{err}", binding.kind.label());
                 status.last_error = Some(err.clone());
-                report
-                    .errors
-                    .push(format!("「{}」{err}", binding.kind.label()));
+                report.errors.push(format!("「{}」{err}", binding.kind.label()));
             }
         }
         next_status.bindings.push(status);
@@ -186,6 +189,7 @@ struct BindingOutcome {
     imported: u32,
     direction: &'static str,
     exists: bool,
+    warnings: Vec<String>,
 }
 
 async fn sync_binding(
@@ -195,7 +199,10 @@ async fn sync_binding(
     date: chrono::NaiveDate,
     path: &Path,
 ) -> Result<BindingOutcome, String> {
-    let section = md_file::read_section(path, &binding.heading)?;
+    let read = md_file::read_section(path, &binding.heading)?;
+    /* 阻断级诊断：本轮既不写也不导入（不写保住手改内容，不导入不触发删除块）。 */
+    let warnings = read.guard(binding.kind.label(), &md_section::heading_text(&binding.heading))?;
+    let section = read.state;
     let expected = render_expected(pool, binding, date)
         .await
         .map_err(|err| err.to_string())?;
@@ -203,8 +210,9 @@ async fn sync_binding(
     见下面「Markdown 永远赢」的注释。 */
     let (current, _mtime) = match &section {
         SectionState::MissingFile => (None, 0),
-        /* 标题缺失按「文件侧没有这一节」处理：只补写，不把空内容当删除。 */
-        SectionState::MissingHeading { mtime_ms } => (None, *mtime_ms),
+        /* 标题缺失按「文件侧没有这一节」处理：只补写，不把空内容当删除。
+        `Blocked` 同档：它在上面已 return，这里只为穷尽 match。 */
+        SectionState::MissingHeading { mtime_ms } | SectionState::Blocked { mtime_ms } => (None, *mtime_ms),
         SectionState::Present { body, mtime_ms } => (Some(body.clone()), *mtime_ms),
     };
 
@@ -238,6 +246,8 @@ async fn sync_binding(
         SectionState::MissingFile | SectionState::MissingHeading { .. } => {
             !target.trim().is_empty()
         }
+        /* 阻断级诊断已在上面 return，这里只为穷尽 match：写 false 是「宁可少写不多写」。 */
+        SectionState::Blocked { .. } => false,
         SectionState::Present { body, .. } => body.trim_end() != target.trim_end(),
     };
     if needs_write {
@@ -256,6 +266,7 @@ async fn sync_binding(
             "none"
         },
         exists: path.exists(),
+        warnings,
     })
 }
 

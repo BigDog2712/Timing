@@ -7,9 +7,14 @@
 //!
 //! ## 标题匹配规则
 //!
-//! - 标题行必须符合 CommonMark：`#` 后跟空格（`#### 事项计时`）；
+//! - 标题行必须符合 CommonMark：`#` 后跟空格（`#### 事项计时`），`#` 之前最多 3 个空格；
 //! - 区块结束于**下一个 level ≤ 当前 level 的标题**，所以区块里允许更深的子标题；
-//! - 行尾空白不敏感，标题文本区分大小写。
+//! - 行尾空白不敏感，标题文本区分大小写；
+//! - **代码围栏里的行不是标题**（`md_fence` / `md_section` 的判定，本文件只负责把同一份
+//!   位图传给它们——围栏状态机在整个 crate 里只有一份，各写一份必然漂移）。
+//!
+//! 判定（哪些行算标题、区块到哪儿结束、三档诊断）全在 `infra::md_section`；本文件只剩
+//! 读写与拼接，所以它变短了而不是撞 300 行门禁。
 //!
 //! ## 换行符
 //!
@@ -22,6 +27,9 @@ use std::path::{Path, PathBuf};
 
 use chrono::NaiveDate;
 
+use super::md_fence;
+use super::md_section::{self, SectionRead, SectionState};
+
 /// UTF-8 BOM（`U+FEFF`）。
 ///
 /// Windows 记事本「UTF-8 带 BOM」会把它写在文件最前面，而它**不属于**
@@ -32,17 +40,6 @@ const BOM: char = '\u{feff}';
 /// 去掉开头的 BOM（没有就原样返回）。
 fn strip_bom(text: &str) -> &str {
     text.strip_prefix(BOM).unwrap_or(text)
-}
-
-/// 读一个目标区块的结果。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum SectionState {
-    /// 文件不存在（父目录也不一定存在）。
-    MissingFile,
-    /// 文件存在，但没有目标标题行。
-    MissingHeading { mtime_ms: i64 },
-    /// 找到标题行；`body` 是标题与下一个同级标题之间的内容（已去掉首尾空行）。
-    Present { body: String, mtime_ms: i64 },
 }
 
 /// 解析落点路径：根目录 + 文件模板，模板里的日期令牌按本地日期替换。
@@ -67,9 +64,16 @@ pub fn expand_tokens(template: &str, date: NaiveDate) -> String {
 }
 
 /// 读取目标区块；文件不存在 / 标题不存在都返回明确状态，不伪造空内容。
-pub fn read_section(path: &Path, heading: &str) -> Result<SectionState, String> {
+///
+/// 返回 `SectionRead`：`.state` 是 v0.11.18 的三档状态 + 新增的 `Blocked`，
+/// `.issues` 是诊断。**围栏位图在这里算一次、标题扫描也只一趟**，`section_end` 与
+/// `diagnose` 吃的是同一份结果——任何一个自己再扫一遍都是本轮禁止的写法。
+pub fn read_section(path: &Path, heading: &str) -> Result<SectionRead, String> {
     if !path.exists() {
-        return Ok(SectionState::MissingFile);
+        return Ok(SectionRead {
+            state: SectionState::MissingFile,
+            issues: Vec::new(),
+        });
     }
     let meta = fs::metadata(path).map_err(|err| format!("读取文件信息失败：{err}"))?;
     if !meta.is_file() {
@@ -78,10 +82,28 @@ pub fn read_section(path: &Path, heading: &str) -> Result<SectionState, String> 
     let raw = fs::read_to_string(path).map_err(|err| format!("读取文件失败：{err}"))?;
     let mtime_ms = mtime_ms(&meta);
     let text = strip_bom(&raw).replace("\r\n", "\n");
-    match body_in_text(&text, heading) {
-        Some(body) => Ok(SectionState::Present { body, mtime_ms }),
-        None => Ok(SectionState::MissingHeading { mtime_ms }),
-    }
+    let lines: Vec<&str> = text.split('\n').collect();
+    let fences = md_fence::scan(&lines);
+    let scan = md_section::scan_headings(&lines, &fences, heading);
+    let head = scan.hit;
+    let end = head.map_or(lines.len(), |(head_idx, level)| {
+        md_section::section_end(&lines, &fences, head_idx, level)
+    });
+    let issues = md_section::diagnose(&fences, heading, &scan, end);
+    /* 阻断级优先于「没找到标题」：`Mismatched` 恰恰发生在找不到配置标题时，
+    若先落 MissingHeading 就会在文件末尾追加第二节（设计 §8.8 明确不许）。 */
+    let state = if issues.iter().any(|issue| issue.blocks()) {
+        SectionState::Blocked { mtime_ms }
+    } else {
+        match head {
+            None => SectionState::MissingHeading { mtime_ms },
+            Some((head_idx, _)) => SectionState::Present {
+                body: trim_newlines(&lines[head_idx + 1..end].join("\n")),
+                mtime_ms,
+            },
+        }
+    };
+    Ok(SectionRead { state, issues })
 }
 
 /// 写入目标区块（文件不存在则创建；标题不存在则追加到末尾）。
@@ -139,20 +161,25 @@ pub fn write_section(path: &Path, heading: &str, body: &str) -> Result<i64, Stri
 }
 
 /// 从整篇 Markdown 里取出标题下的内容（不含标题行）。
+///
+/// 薄包装：与 `read_section` 走**同一套**判定（同一份围栏位图），但不出诊断——调用方
+/// 是「恢复备份」与若干用例，它们要的是文本本身，不是三档诊断。
 pub fn body_in_text(text: &str, heading: &str) -> Option<String> {
     let lines: Vec<&str> = text.split('\n').collect();
-    let (head_idx, level) = find_heading(&lines, heading)?;
-    let end = section_end(&lines, head_idx, level);
+    let fences = md_fence::scan(&lines);
+    let (head_idx, level) = md_section::find_heading(&lines, &fences, heading)?;
+    let end = md_section::section_end(&lines, &fences, head_idx, level);
     Some(trim_newlines(&lines[head_idx + 1..end].join("\n")))
 }
 
 /// 用 `body` 替换标题下的内容，保留标题行与后续内容。
 pub fn replace_in_text(text: &str, heading: &str, body: &str) -> String {
     let lines: Vec<&str> = text.split('\n').collect();
-    let Some((head_idx, level)) = find_heading(&lines, heading) else {
+    let fences = md_fence::scan(&lines);
+    let Some((head_idx, level)) = md_section::find_heading(&lines, &fences, heading) else {
         return append_section(text, heading, body);
     };
-    let end = section_end(&lines, head_idx, level);
+    let end = md_section::section_end(&lines, &fences, head_idx, level);
 
     let mut out: Vec<&str> = Vec::with_capacity(lines.len() + 8);
     out.extend_from_slice(&lines[..=head_idx]);
@@ -186,41 +213,6 @@ pub fn append_section(text: &str, heading: &str, body: &str) -> String {
         out.push('\n');
     }
     out
-}
-
-/// 返回 `(标题行下标, 标题等级)`。
-fn find_heading(lines: &[&str], heading: &str) -> Option<(usize, usize)> {
-    let target = heading.trim();
-    lines
-        .iter()
-        .enumerate()
-        .find(|(_, line)| line.trim() == target && heading_level(line).is_some())
-        .and_then(|(idx, line)| heading_level(line).map(|level| (idx, level)))
-}
-
-/// 区块结束行：下一个 level ≤ 当前 level 的标题；没有则到文件末尾。
-fn section_end(lines: &[&str], head_idx: usize, level: usize) -> usize {
-    lines
-        .iter()
-        .enumerate()
-        .skip(head_idx + 1)
-        .find(|(_, line)| heading_level(line).is_some_and(|next| next <= level))
-        .map(|(idx, _)| idx)
-        .unwrap_or(lines.len())
-}
-
-fn heading_level(line: &str) -> Option<usize> {
-    let trimmed = line.trim_start();
-    let level = trimmed.chars().take_while(|c| *c == '#').count();
-    if !(1..=6).contains(&level) {
-        return None;
-    }
-    let rest = &trimmed[level..];
-    if rest.is_empty() || rest.starts_with(' ') || rest.starts_with('\t') {
-        Some(level)
-    } else {
-        None
-    }
 }
 
 fn trim_newlines(value: &str) -> String {
