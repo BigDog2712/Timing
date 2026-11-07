@@ -4,6 +4,15 @@
 //! 放十档纯函数表，这里放需要真库的 `sync_label` 对照。夹具与常量从那边 `use` 过来，
 //! **绝不复制**（复制一份 `webdav_filled` 就等于复制一份「填全」的定义，两处会漂）。
 //!
+//! ## 本文件的头号判据是**不变量**，不是一组例子
+//!
+//! 「通知标题必须与用户刚刚点的那一项标签逐字相同」是对**所有**弹通知的档位都成立的规矩，
+//! 所以它必须用一条**遍历式**断言钉住：拿配置空间的笛卡尔积逐个比
+//! `blocked_notice(cfg).title` 与 `sync_label(cfg)`。手抄两档写成两条例子不算钉住——
+//! 将来新增第三档时，那两条例子照样绿。
+//!
+//! 维护契约见 `config_space()` 的文档：只有出现**不在这几个维度上**的新判据才需要改它。
+//!
 //! ## 这一层管不到的（如实交代）
 //!
 //! `run_once` 里「命中就只弹这一条并 `return`」要 `AppHandle`（真托盘 + 真通知），单元层拿不到，
@@ -12,7 +21,7 @@
 
 use sqlx::SqlitePool;
 
-use super::qa_blocked_notice::{webdav_filled, V0118_BODY};
+use super::qa_blocked_notice::{localfolder_filled, webdav_filled, V0118_BODY};
 use crate::app::tray_sync::{blocked_notice, sync_label, CLOUD_LABEL, LOCAL_LABEL};
 use crate::models::md_sync::MdSyncConfig;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
@@ -127,3 +136,148 @@ async fn qa_b4_notice_title_should_equal_the_menu_item_label() {
     );
 }
 
+/* ===== 不变量：通知标题 ≡ 用户刚点的那一项的文字 ===== */
+
+/// 配置空间的笛卡尔积：`enabled`（2）× `cloud`（9）。
+///
+/// **这不是手抄一遍档位清单。** `blocked_notice` 的输入只有 `MdSyncConfig`，它读的字段只有
+/// `enabled`、`cloud` 有没有、`cloud.enabled`、`cloud.mode` 和「四个字段空不空」——把这些
+/// 维度枚举成交叉积，将来在**同一组字段**上新增一档（比如「密码未设置也算没填全」）会自动
+/// 落在某个格子里被断言，不需要有人记得回来改这里。
+///
+/// **唯一需要维护的情形**：出现了不在这三个维度上的新判据（按时间、按网络状态、按上次
+/// 失败次数……），那时要把那个维度加进这个函数。除此之外，新增档位零维护。
+fn config_space() -> Vec<(String, MdSyncConfig)> {
+    let blank_webdav = || MdSyncCloud {
+        enabled: true,
+        mode: CloudMode::Webdav,
+        ..MdSyncCloud::default()
+    };
+    let cleared = |f: fn(&mut MdSyncCloud)| {
+        let mut cloud = webdav_filled();
+        f(&mut cloud);
+        cloud
+    };
+
+    let clouds: Vec<(String, Option<MdSyncCloud>)> = vec![
+        ("cloud=None（从没配过）".into(), None),
+        (
+            "选了「只用本地」（字段全在、cloud.enabled=false）".into(),
+            Some(MdSyncCloud {
+                enabled: false,
+                ..webdav_filled()
+            }),
+        ),
+        ("webdav 三项全空".into(), Some(blank_webdav())),
+        ("webdav 只缺 baseUrl".into(), Some(cleared(|c| c.base_url.clear()))),
+        ("webdav 只缺 basePath".into(), Some(cleared(|c| c.base_path.clear()))),
+        ("webdav 只缺 user".into(), Some(cleared(|c| c.user.clear()))),
+        ("webdav 填全".into(), Some(webdav_filled())),
+        (
+            "localfolder 没选落点目录".into(),
+            Some(MdSyncCloud {
+                enabled: true,
+                mode: CloudMode::LocalFolder,
+                ..MdSyncCloud::default()
+            }),
+        ),
+        ("localfolder 填全".into(), Some(localfolder_filled())),
+    ];
+
+    let mut cells = Vec::with_capacity(clouds.len() * 2);
+    for enabled in [false, true] {
+        for (label, cloud) in &clouds {
+            cells.push((
+                format!("总开关={enabled} / {label}"),
+                MdSyncConfig {
+                    enabled,
+                    cloud: cloud.clone(),
+                    ..MdSyncConfig::default()
+                },
+            ));
+        }
+    }
+    cells
+}
+
+/// **主判据（不变量）**：凡是会弹通知的格子，标题必须逐字等于同一份配置下菜单项的文字。
+///
+/// 这一条替代得上「把两档抄成两条例子」：交叉积里每个 `Some(..)` 的格子都被比一次，
+/// 新增档位落在哪个格子里都会被它逮到。
+#[tokio::test]
+async fn qa_notice_title_always_equals_the_menu_item_label() {
+    let pool = fresh_pool("qa-notice-invariant").await;
+    let mut notice_cells = 0usize;
+
+    for (name, cfg) in config_space() {
+        /* 同一个池反复覆盖写：`sync_label` 每次现读配置，所以每格读到的都是本格的配置。 */
+        store(&pool, &cfg).await;
+        let menu = sync_label(&pool).await;
+
+        if let Some((title, body)) = blocked_notice(&cfg) {
+            notice_cells += 1;
+            assert!(!body.trim().is_empty(), "格 {name}：给了标题却没给正文");
+            assert_eq!(
+                title, menu,
+                "格 {name}：用户点的是写着「{menu}」的那一项，通知标题却是「{title}」——\
+                 标题必须与刚点的那一项逐字相同（PRD §14.2 / 主理人裁决）"
+            );
+        }
+    }
+
+    /* 防空转：`blocked_notice` 哪天恒返回 None，上面一个格子都不会进，这条要红。 */
+    assert!(notice_cells >= 2, "至少两档会弹通知，实际只有 {notice_cells} 档");
+}
+
+/// 反向：**不该插话**的档位连标题都不产生，也就没有「标题不符」可言。
+///
+/// 与上面那条合起来的完整意思是：`blocked_notice` 要么返回 `None`（无标题），
+/// 要么返回一个**与菜单项文字相同**的标题——不存在第三种形态。
+#[test]
+fn qa_tiers_that_let_it_run_produce_no_title_at_all() {
+    let cases: Vec<(&str, MdSyncConfig)> = vec![
+        (
+            "填全了（webdav）",
+            MdSyncConfig {
+                enabled: true,
+                cloud: Some(webdav_filled()),
+                ..MdSyncConfig::default()
+            },
+        ),
+        (
+            "填全了（localfolder）",
+            MdSyncConfig {
+                enabled: true,
+                cloud: Some(localfolder_filled()),
+                ..MdSyncConfig::default()
+            },
+        ),
+        (
+            "选了「只用本地」、字段全在",
+            MdSyncConfig {
+                enabled: true,
+                cloud: Some(MdSyncCloud {
+                    enabled: false,
+                    ..webdav_filled()
+                }),
+                ..MdSyncConfig::default()
+            },
+        ),
+        (
+            "从没配过云端（cloud=None）",
+            MdSyncConfig {
+                enabled: true,
+                cloud: None,
+                ..MdSyncConfig::default()
+            },
+        ),
+    ];
+
+    for (name, cfg) in cases {
+        assert_eq!(
+            blocked_notice(&cfg),
+            None,
+            "档 {name}：这一下会真的跑，不该插话（插了就只能紧跟一条「完成」，两条通知互相拆台）"
+        );
+    }
+}

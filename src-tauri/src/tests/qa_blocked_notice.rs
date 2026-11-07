@@ -42,7 +42,7 @@ pub(super) fn webdav_filled() -> MdSyncCloud {
 }
 
 /// 一份填全的本地文件夹（`is_usable() == true` 的另一载体）。
-fn localfolder_filled() -> MdSyncCloud {
+pub(super) fn localfolder_filled() -> MdSyncCloud {
     let root = unique_dir("qa-blocked-localroot");
     std::fs::create_dir_all(&root).expect("建临时落点目录应成功");
     MdSyncCloud {
