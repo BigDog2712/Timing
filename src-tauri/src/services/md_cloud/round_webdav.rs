@@ -153,7 +153,12 @@ pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResu
     }
 
     /* ⑧ PUT 今天。空内容且没读到远端 → 本地这一轮什么都没合出来，PUT 会把远端清空。 */
-    if text.trim().is_empty() && !got_remote {
+    let skip_empty = text.trim().is_empty() && !got_remote;
+    /* `#[cfg(not(mobile))]`：手机上不装 ⑩，这个基准值也就没有第二个读者 —— 不给
+       Android 留一条「定义了没人用」的告警。 */
+    #[cfg(not(mobile))]
+    let errors_before_push = report.errors.len();
+    if skip_empty {
         crate::log_info!("md cloud out: {today}.md skip=empty");
     } else {
         round_push::push_today(
@@ -167,9 +172,22 @@ pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResu
         )
         .await?;
     }
+    /* ⑩ 的前置条件①：**本轮 ⑧ 真的 PUT 成功过**。
+       `skip=empty` 算未成功：一个请求都没发，此时去删就是拿未知的连通性赌破坏性操作。
+       用「调用前后的 errors.len() 之差」判，不去解析错误文案（文案会改，长度不会）。
+       必须在 ⑨ **之前**取值：⑨ 的失败不该影响「今天这份传上去了」这个事实。 */
+    #[cfg(not(mobile))]
+    let push_ok = !skip_empty && report.errors.len() == errors_before_push;
 
     /* ⑨ 历史欠账。 */
     round_push::push_history(pool, &target, &cloud_root, today, &mut report).await?;
+
+    /* ⑩ 往期真删（变更 A 的唯一挂点，在 ⑨ 之后）。清理失败**不进** `report.errors`：
+       I11 要求失败的 DELETE 不许把「今天上传成功」这条主链路染红（见 `purge/mod.rs` 头）。 */
+    #[cfg(not(mobile))]
+    if push_ok {
+        super::purge::run_webdav(pool, &target, &cloud_root, today).await?;
+    }
 
     /* 每轮必打：这是「今天传了但历史有欠账」的唯一可见出口。 */
     let pending_dates = pending::dates(pool).await.unwrap_or_default();

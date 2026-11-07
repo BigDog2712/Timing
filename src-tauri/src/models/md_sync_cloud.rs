@@ -229,7 +229,8 @@ fn check_text(value: &str, max: usize, what: &str) -> Result<(), String> {
 /// 统一成 `\` 再比：两端都过同一个变换，所以「`/` 与 `\` 混写」也能认出来。大小写不敏感
 /// 是 Windows 口径；Android 上大小写敏感，但那里 `LocalFolder` 模式不开放（手机端只有
 /// WebDAV），为一个用不到的差异留分支不值得。
-fn normalize_path(raw: &str) -> String {
+/// [V0.11.19 变更 A] `pub(crate)`：往期清理的闸③（目录重合）复用这一步，**不许再写一份**。
+pub(crate) fn normalize_path(raw: &str) -> String {
     expand_env(raw)
         .replace('/', "\\")
         .trim_end_matches('\\')
@@ -249,6 +250,8 @@ pub struct MdSyncCloudStatus {
     /// `pending_since > 0` 的日期（升序）。
     pub pending_dates: Vec<String>,
     pub last_error: Option<String>,
+    /// [V0.11.19 变更 A] 往期清理状态，**只反映当前生效通道**（另一条通道的那份不回传）。
+    pub purge: super::md_cloud_purge::MdCloudPurgeStatus,
 }
 
 /// `md_sync_get` / `md_sync_save` 的返回：基础视图 + 云端状态拼成一个 JSON。

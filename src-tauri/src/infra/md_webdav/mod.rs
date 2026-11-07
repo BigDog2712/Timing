@@ -24,6 +24,8 @@ use crate::models::constants::{MD_CLOUD_CONNECT_SECS, MD_CLOUD_READ_SECS};
 判定表只有一张（见 `dir.rs` 头注释）；`probe` / `ProbeOutcome` re-export 出来，调用点不必知道拆过。 */
 pub mod dir;
 pub mod probe_file;
+/* [V0.11.19 变更 A] 往期真删的 DELETE：`redirect(none)` + 返回状态码。**不是**探针那个。 */
+pub mod remove;
 pub(crate) mod tag;
 pub use dir::{probe, ProbeOutcome};
 

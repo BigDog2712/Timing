@@ -269,4 +269,32 @@ describe('MdSyncCloudCard', () => {
     await click('保存');
     expect(api.save.mock.calls[0][0].cloud.mode).toBe('webdav');
   });
+
+  /* [V0.11.19 变更 A] 块④ 那一行只读文字：四句选择器在 `mdSyncAuto.ts`，这里钉
+     「状态真的接到界面上」；没接上时它永远是常态句（T03 刻意留的那一档）。 */
+  it('往期清理只在 ready 分支里显示一行，且四句按状态选', async () => {
+    const idle = '云端只保留今天的日记，更早的会在同步后删除。';
+    await mount();
+    await act(async () => { await Promise.resolve(); });
+    const line = () => container.querySelector('[data-purge="true"]')?.textContent;
+    expect(line()).toBe(idle);
+
+    const view = viewWith('webdav');
+    api.get.mockResolvedValue({ ...view,
+      cloud: { ...view.cloud, purge: { paused: false, deleted: 5, failed: 0 } } });
+    await act(async () => { root.unmount(); });
+    await mount();
+    await act(async () => { await Promise.resolve(); });
+    expect(line()).toBe('云端只保留今天的日记；上次清理删了 5 份。');
+
+    /* 没填全的那一档不叠加这一行（「云端还没填全」只显示它自己那句） */
+    api.get.mockResolvedValue({
+      ...view,
+      config: { ...view.config, cloud: { ...view.config.cloud!, baseUrl: '' } },
+    });
+    await act(async () => { root.unmount(); });
+    await mount();
+    await act(async () => { await Promise.resolve(); });
+    expect(line()).toBeUndefined();
+  });
 });

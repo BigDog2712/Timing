@@ -121,14 +121,32 @@ pub fn save(source: &Path, text: &str) {
     save_to(root, source, text);
 }
 
+/// 与 `save` 完全相同，但**告诉调用方到底留没留下**（[V0.11.19 变更 A] 闸⑥ 只认它）。
+///
+/// `save` 在四种情况下都是静默 no-op：ROOT 未注入、文本全空白、`create_dir_all` 失败、
+/// `fs::write` 失败。后两种正是「磁盘满 / 目录被占住」——**恰恰是最需要留底的时候**。
+/// 拿「调用过 `save`」当证据，等于在磁盘满的机器上一边删一边没有底。
+///
+/// 为什么不是改 `save` 的签名：`save` 的唯一调用方是 `write_section`，改签名等于改
+/// `sync_all` 的整条调用链（本轮红线）。这里只是把同一个 `save_to` 的布尔结果交出去。
+pub fn save_checked(source: &Path, text: &str) -> bool {
+    let Some(root) = ROOT.get() else {
+        return false;
+    };
+    save_to(root, source, text)
+}
+
 /// `pub(crate)`：单测要能在自己造的临时目录上验文件名与淘汰规则，不能碰全局 `ROOT`
 /// （`OnceLock` 一个进程只认第一份）。
-pub(crate) fn save_to(root: &Path, source: &Path, text: &str) {
+///
+/// 返回 `true` 只代表「文件真的写进备份目录了」。`prune` 之后再无失败点，
+/// 所以这一句就是「有没有底」的**唯一**答案。
+pub(crate) fn save_to(root: &Path, source: &Path, text: &str) -> bool {
     if text.trim().is_empty() {
-        return;
+        return false;
     }
     if fs::create_dir_all(root).is_err() {
-        return;
+        return false;
     }
     let stem = source
         .file_stem()
@@ -141,9 +159,10 @@ pub(crate) fn save_to(root: &Path, source: &Path, text: &str) {
         chrono::Local::now().format("%Y%m%d-%H%M%S")
     );
     if fs::write(root.join(name), text).is_err() {
-        return;
+        return false;
     }
     prune(root);
+    true
 }
 
 /// 文件名里只留字母数字与 `-` `_`，避免把路径分隔符带进备份目录。

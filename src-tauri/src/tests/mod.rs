@@ -26,6 +26,12 @@ mod md_cloud_conflict;
 mod md_cloud_folder;
 mod md_cloud_pending;
 mod md_cloud_round;
+/* [V0.11.19 变更 A] 往期真删的行为判据。拆成四份，各验一件事：
+   六道闸主路径 / 收敛（批上限 + 暂停） / 纯判定（闸③ 路径比较 + 闸⑥ 留底） / WebDAV 路。 */
+mod md_cloud_purge;
+mod md_cloud_purge_batch;
+mod md_cloud_purge_guard;
+mod md_cloud_purge_webdav;
 /* [V0.11.19] 变更 B：围栏状态机（洞 1 / 洞 2）与三档诊断的单元判据。 */
 mod md_section_fence;
 /* [V0.11.19] J15：别人的围栏里有逐字标题时，那一块必须逐字节不变。 */

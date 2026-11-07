@@ -9,6 +9,8 @@ pub mod item;
 pub mod md_sync;
 /* [V0.11.19] 云端自动同步三档（单独成文件：`md_sync_cloud.rs` 只剩 4 行余量）。 */
 pub mod md_sync_auto;
+/* [V0.11.19 变更 A] 往期清理的记账：六个 KV 键的唯一出处 + 状态投影。 */
+pub mod md_cloud_purge;
 pub mod md_sync_cloud;
 pub mod md_sync_config;
 /* [V0.11.16] 「测试连接」的三关结果（从 `md_sync_cloud.rs` 搬出，给那个文件腾门禁余量）。 */

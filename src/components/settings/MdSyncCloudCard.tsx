@@ -34,6 +34,7 @@ import type {
   CloudMode, MdSyncCloud, MdSyncConfig, MdSyncTestResult, MdSyncTestStepKey,
 } from '../../types/domain';
 import { isCloudReady } from './mdSyncConfig';
+import { purgeNoteOf } from './mdSyncAuto';
 import { CLOUD_DIR_HINT } from './mdSyncCopy';
 import { MdSyncCloudAuto } from './MdSyncCloudAuto';
 import type { MdSyncDraft } from './useMdSyncDraft';
@@ -252,6 +253,9 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
             <span>待补传 {pendingDates.length} 天：{pendingDates.slice(0, 3).join('、')}…</span>
           )}
           {status.lastError && <p className="sync__error">{status.lastError}</p>}
+          {/* [V0.11.19 变更 A] 块④ 只加这一行只读文字（Q5）：不加开关、不加按钮、
+              不加折叠块、不加数字框。文案由 `purgeNoteOf` 选（优先级唯一在那边）。 */}
+          <span data-purge="true">{purgeNoteOf(status.purge)}</span>
             </>
           ) : (
             /* [V0.11.18] A6（PRD §3.1 边界表 / 判据 A6）：选了「本地 + 云端」但字段没填全。

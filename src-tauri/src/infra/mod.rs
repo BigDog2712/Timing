@@ -25,6 +25,8 @@ pub mod md_section;
 /* [V0.11.13] WebDAV 传输：只有 GET / PUT / probe，不认 MdSyncCloud，不碰 services（L4）。 */
 pub mod md_webdav;
 pub mod migrate;
+/* [V0.11.19 变更 A] 往期清理的追责面：`md-cloud-purge.log` 追加 + 行数截断。 */
+pub mod purge_log;
 /* 移动端独占：Android 的 SAF 与悬浮窗只在原生侧有实现，桥也只在移动端编译。 */
 #[cfg(mobile)]
 pub mod native_bridge;

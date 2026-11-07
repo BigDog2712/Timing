@@ -20,6 +20,10 @@ T04 接上命令之前没有调用方，必被判死码。与 `models/md_sync_cl
 pub mod backoff;
 pub mod pending;
 pub mod probe;
+/* [V0.11.19 变更 A] 往期真删：骨架（`purge/mod.rs`）+ 两路互不合并的取证。
+   手机端不装挂点（`round_webdav` / `round_folder` 的 ⑩ 都是 `#[cfg(not(mobile))]`），
+   但模块本身编译到两端：`purge::status` 是设置页共用的只读投影，且这里没有平台 API。 */
+pub mod purge;
 pub mod round_conflict;
 pub mod round_folder;
 pub mod round_push;
@@ -36,6 +40,7 @@ use sqlx::SqlitePool;
 use crate::error::AppError;
 use crate::error::AppResult;
 use crate::models::md_sync::MdSyncReport;
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync_cloud::{
     CloudMode, MdSyncCloud, MdSyncCloudStatus, MdSyncTestResult, MdSyncViewCloud,
 };
@@ -83,7 +88,7 @@ pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
         });
     };
     let report = match cloud.mode {
-        CloudMode::LocalFolder => round_folder::run(pool, cloud, &today).await?,
+        CloudMode::LocalFolder => round_folder::run(pool, cloud, &config.bindings, &today).await?,
         CloudMode::Webdav => round_webdav::run(pool, cloud, &today).await?,
     };
     let pending = match cloud.mode {
@@ -103,8 +108,16 @@ pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
 ///
 /// [V0.11.19] 抽出来不是为了加逻辑，是为了让 T04 变更 A 的「点一次立即同步 → 解除
 /// 清理暂停」只有一个挂载点：两处调用方都不该各自记住「手动轮还要先 resume」。
-/// 本批它与 `round` 等价；退出前那一轮（`tray_quit`）走自己的路径，不从这里进。
+/// 退出前那一轮（`tray_quit`）走自己的路径，不从这里进。
 pub async fn round_manual(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
+    /* 暂停是「连续 3 个自然日失败」，解除它必须有人明确表达「现在就再试一次」。
+       只清**当前生效通道**的那份：另一条通道的现场（可能是另一套失败原因）不动。 */
+    let config = md_sync::config::load(pool).await?;
+    let channel = match config.cloud.as_ref().map_or(CloudMode::LocalFolder, |cloud| cloud.mode) {
+        CloudMode::LocalFolder => PurgeChannel::Folder,
+        CloudMode::Webdav => PurgeChannel::Webdav,
+    };
+    purge::resume(pool, channel).await?;
     round(pool).await
 }
 

@@ -32,14 +32,19 @@ use sqlx::SqlitePool;
 use super::{absorb, pending};
 use crate::error::AppResult;
 use crate::infra::md_backup;
-use crate::models::md_sync::MdSyncReport;
+use crate::models::md_sync::{MdSyncBinding, MdSyncReport};
 use crate::models::md_sync_cloud::MdSyncCloud;
 use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_sync::{self, mirror};
 
 /// 一轮：Obsidian 落点 → 云端落点（同一个目录，写进去即同步完）。
-pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResult<MdSyncReport> {
+pub async fn run(
+    pool: &SqlitePool,
+    cloud: &MdSyncCloud,
+    bindings: &[MdSyncBinding],
+    today: &str,
+) -> AppResult<MdSyncReport> {
     let mut report = MdSyncReport::new(now_ms());
     let root: PathBuf = match cloud.resolve_root() {
         Ok(path) => path,
@@ -67,8 +72,17 @@ pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResu
     let wrote_ok = cloud_report.errors.is_empty();
     absorb(&mut report, cloud_report);
     if wrote_ok {
-        if let Some(hash) = today_hash(pool, &root).await {
-            md_cloud_pending::mark_synced(pool, today, None, &hash).await?;
+        let hash = today_hash(pool, &root).await;
+        if let Some(hash) = hash.as_ref() {
+            md_cloud_pending::mark_synced(pool, today, None, hash).await?;
+        }
+        /* ⑩' 往期清理：与 WebDAV 的「⑨ 之后」并列，**不是同一个函数**（两路取证不同）。
+           复用上面同一个 `wrote_ok`；额外要求 `today_hash` 拿到了 —— `wrote_ok` 为真却
+           找不到本轮落点文件，说明「没报错、却不知道写到了哪儿」（模板改成子目录 / 写到
+           别处），这一档本身可疑，去做不可逆的删除是唯一不该选的方向。 */
+        #[cfg(not(mobile))]
+        if hash.is_some() {
+            super::purge::run_folder(pool, &root, bindings, today).await?;
         }
     }
     Ok(report)
