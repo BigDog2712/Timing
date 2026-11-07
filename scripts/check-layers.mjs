@@ -11,15 +11,17 @@
  *   L5 Rust `commands` 不得直接依赖 `repositories`（必须经 service）
  *   L6 Rust 全域不得出现 `eprintln!`（结构化日志，见 platform/log.rs）
  *   L7 编译期平台常量 `__TIMING_MOBILE__` 只允许出现在 `src/lib/platform.ts`
+ *   L8 业务写入信号 `dirty::mark(` 只允许出现在 `src-tauri/src/commands/`
+ *      （`jobs/` 与 `services/` 下 0 命中；见下方 L8 哨兵）
  *
  * 每一条都是「改坏了 CI 就红」的判据，而不是「建议」。
  *
- * ## L7 的哨兵（防「绿着空转」）
+ * ## L7 / L8 的哨兵（防「绿着空转」）
  *
- * L7 是**按符号名 grep** 的规则：符号一改名而本脚本没跟着改，规则就会去扫一个
- * 根本不存在的符号，于是打印「7 条规则全部通过」，而保护已经消失（PRD R7 警告的
- * 最隐蔽回归）。所以末尾有哨兵：该符号必须同时出现在「声明处 + 两处 define」，
- * 少一处即红色退出，逼人把三处一起改。
+ * L7 / L8 都是**按符号名 grep** 的规则：符号一改名而本脚本没跟着改，规则就会去扫
+ * 一个根本不存在的符号，于是打印「N 条规则全部通过」，而保护已经消失（PRD R7 警告
+ * 的最隐蔽回归）。所以末尾有哨兵：L7 要求该常量同时出现在「声明处 + 两处 define」；
+ * L8 要求 `dirty.rs` 里真的存在 `pub fn mark(`。少一处即红色退出，逼人一起改。
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
@@ -63,6 +65,7 @@ const R = {
   L5: rule('L5', 'Rust commands 不得 use crate::repositories'),
   L6: rule('L6', 'Rust 不得使用 eprintln!（用 crate::log_*!）'),
   L7: rule('L7', `编译期平台常量 ${PLATFORM_SYMBOL} 只允许出现在 src/lib/platform.ts`),
+  L8: rule('L8', '业务写入信号 dirty::mark( 只允许出现在 src-tauri/src/commands/'),
 };
 
 function scan(files, pattern, target, allow = () => false) {
@@ -107,6 +110,22 @@ scan(rsFiles, /\beprintln!\(/, R.L6);
    也让「桌面产物里不该有移动代码」这条摇树前提失效。唯一读取点是 platform.ts。 */
 scan(feFiles, new RegExp(PLATFORM_SYMBOL), R.L7, (rel) => rel === 'src/lib/platform.ts');
 
+/* L8：脏标记是白名单（设计 §4.6），唯一合法信号源是命令层的 25 处业务写入。
+   批 1 的自检清单只有一条人工 `grep -rn "dirty::mark" src-tauri/src/jobs/`，
+   `services/` 完全没查；而 T04 新增的 `services/md_cloud/purge/*` 会写
+   `md_cloud.purge.*` KV —— 这正是「没有任何门禁看着」的写盘触发器：
+   一处误标就会把秒级心跳变成全天持续写 md + 每轮一份备份。
+   把整条白名单固化成机器规则：jobs/ 与 services/ 一律 0 命中。 */
+scan(
+  rsFiles.filter(
+    (f) =>
+      f.startsWith('src-tauri/src/jobs/') ||
+      f.startsWith('src-tauri/src/services/'),
+  ),
+  /\bdirty::mark\s*\(/,
+  R.L8,
+);
+
 /* L7 哨兵：被扫描的符号必须真的存在（否则规则「绿着空转」）。 */
 const SENTINEL_SITES = [
   ['src/lib/platform.ts', `declare const ${PLATFORM_SYMBOL}`],
@@ -126,6 +145,28 @@ if (sentinelFailures.length) {
   for (const line of sentinelFailures) console.error(`  ✗ ${line}`);
   console.error(`\n规则：L7 的正则用的是本脚本的 PLATFORM_SYMBOL = '${PLATFORM_SYMBOL}'。`);
   console.error('符号改名时必须同批改本常量（否则 L7 会「绿着空转」——门禁绿但保护消失）。');
+  process.exit(1);
+}
+
+/* L8 哨兵：L8 扫的是字面量 `dirty::mark(`。若 `dirty.rs` 里把 `mark` 改了名
+   （或整个模块搬走），规则会去扫一个不存在的符号、打印「8 条规则全部通过」，
+   而白名单保护已经消失 —— 与 L7 完全同型的坑。要求定义处逐字仍在。 */
+const L8_SENTINEL_SITES = [
+  ['src-tauri/src/services/md_sync/dirty.rs', 'pub fn mark('],
+];
+const l8SentinelFailures = [];
+for (const [file, needle] of L8_SENTINEL_SITES) {
+  if (!existsSync(join(root, file))) {
+    l8SentinelFailures.push(`${file} 不存在；哨兵要求它里面出现 ${needle}`);
+    continue;
+  }
+  if (!read(file).includes(needle)) l8SentinelFailures.push(`${file} 里找不到 ${needle}`);
+}
+if (l8SentinelFailures.length) {
+  console.error('[layers] FAILED — L8 哨兵未通过：脏标记的定义不在预期位置\n');
+  for (const line of l8SentinelFailures) console.error(`  ✗ ${line}`);
+  console.error('\n规则：L8 的正则写死 `\\bdirty::mark\\s*\\(`。符号改名时必须同批改本规则与哨兵，');
+  console.error('否则 L8 会「绿着空转」——门禁绿但白名单保护消失（同 L7 的坑）。');
   process.exit(1);
 }
 

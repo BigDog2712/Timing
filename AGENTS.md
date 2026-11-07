@@ -45,8 +45,8 @@ cd src-tauri && cargo fmt --check
 
 - **单文件 ≤300 行**（前后端一致）→ `npm run check:size`
   确需豁免写 `scripts/size-allowlist.json`，**必须**带 `owner` + `expires`（到期即红）。降到 300 行内后脚本会提示删除条目——不允许永久豁免。
-- **分层只能向下** → `npm run check:layers`（7 条 grep 规则）
-  L1 `components` 不 `invoke`；L2 `stores` 不碰 `ipc.`；L3 只有 `lib/window.ts` 引 `@tauri-apps/api/window`；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `lib/platform.ts`（带哨兵，防「绿着空转」）。
+- **分层只能向下** → `npm run check:layers`（8 条 grep 规则）
+  L1 `components` 不 `invoke`；L2 `stores` 不碰 `ipc.`；L3 只有 `lib/window.ts` 引 `@tauri-apps/api/window`；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）。
 - **IPC 契约** → `npm run check:contract`
   命令 4 处一致（`generate_handler!` / `IpcApi` / `ipc.ts` / `browserMock`）、错误码 2 处一致、事件三方一致（后端常量 / `IPC_EVENTS` / emit 点）、禁止事件名字面量、**每个错误码必须在 `errorText()` 里有 case**（否则静默落到通用兜底）。
 - **版本号 6 处一致 + 归档冻结表 1 处** → `npm run check:version`
