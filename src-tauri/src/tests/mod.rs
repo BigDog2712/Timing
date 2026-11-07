@@ -52,6 +52,8 @@ mod md_webdav;
 mod md_webdav_probe;
 /* MKCOL / 409 补建（V0.11.15，设计 §6.3）。 */
 mod md_webdav_dir;
+/* [QA G2] `level_path` 搬到 `tag.rs` 之后，「卡在第几级」填的仍是对的那一级。 */
+mod md_webdav_level;
 /* `fail_text` 的文案判据（状态码零命中）。 */
 mod md_webdav_text;
 /* [V0.11.16] E8 的本机可验部分：中文远端目录必须**编码一次**上网络（不二次编码）。 */
