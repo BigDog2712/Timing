@@ -175,4 +175,64 @@ describe('③「今天 / 保存后」那行（QA G1）', () => {
     );
     expect(pathLine()).toBe('保存后：C:\\Vault\\2026-11-07-asd.md');
   });
+
+  /* ===== 反向风险（QA 点名要打的两处）=====
+
+     判据比的是**当前草稿值 vs 已落库值**，不是「有没有被改过」这个标记。所以「改了又改回去」
+     必须回到「今天：」——若判据退化成「改过就永远说保存后」，这两条会红。 */
+
+  it('单框改成 D:\\x 再改回原值 → 回到「今天：」（不是永远说「保存后」）', async () => {
+    await mount();
+    await setValue(singleRoot(), 'D:\\x');
+    expect(pathLine()).toBe('保存后：D:\\x\\2026-11-07.md');
+
+    /* 改回已落库的值：`sharedAfterEdit(基准值, 新值)` 判定「改回原值 = 没改」，
+       root 于是回到 `mirrorOf` → 与 `storedBase` 相等 */
+    await setValue(singleRoot(), 'C:\\Vault');
+    expect(pathLine()).toBe('今天：C:\\Vault\\2026-11-07.md');
+  });
+
+  it('逐档改成 D:\\x 再手改回去 → 也回到「今天：」', async () => {
+    await mount();
+    await act(async () => { button('逐个设置').click(); await Promise.resolve(); });
+    const timersRoot = () => Array.from(container.querySelectorAll('.sync__card'))
+      .find((card) => card.querySelector('.sync__kind')?.textContent === '事项计时')
+      ?.querySelector('input') as HTMLInputElement;
+
+    await setValue(timersRoot(), 'D:\\x');
+    expect(pathLine()).toBe('保存后：D:\\x\\2026-11-07.md');
+
+    await setValue(timersRoot(), 'C:\\Vault');
+    expect(pathLine()).toBe('今天：C:\\Vault\\2026-11-07.md');
+  });
+
+  it('`view` 还没加载的那一帧：这一行根本不渲染，不许闪一下「保存后：」', async () => {
+    /* 视图永远不回来 = 首帧 + 加载态。`bindings` 此时是 `[]`，块③由 `MdSyncLocalBlock`
+       的 `bindings.length === 0` 分支接管，`MdSyncRootRow` 整个不挂载 —— 所以既没有
+       `.sync__path`，也不会有任何「保存后：」。 */
+    api.get.mockReturnValue(new Promise(() => {}));
+    await mount();
+
+    expect(block('data-sync')?.querySelector('.sync__path')).toBeNull();
+    expect(container.textContent).not.toContain('保存后');
+    expect(container.textContent).not.toContain('今天：');
+    expect(block('data-sync')?.textContent).toContain('正在读取落点…');
+  });
+
+  it('配置里没有计时那一档时，基准档回退到第一档，这一行照常工作', async () => {
+    /* `storedBase` 缺失（`view.config.bindings` 里没有那一档）在正常流程里到不了——
+       草稿的 `bindings` 就是从 `view.config.bindings` 回填的。但 `baseOf` 的回退
+       （缺 timers 时取 `bindings[0]`）必须成立，否则这一行会白屏或抛错。
+       用手改过的两档配置钉住这条。 */
+    const base = view();
+    api.get.mockResolvedValue({
+      ...base,
+      config: { ...base.config, bindings: [{ ...BINDINGS[1], root: 'C:\\Vault' }] },
+      status: { lastSyncAt: null, lastError: null, bindings: [] },
+    });
+    await mount();
+
+    /* 只剩便利贴一档 → 它就是基准档；`status.bindings` 里没有它 → 退回前端拼的路径 */
+    expect(pathLine()).toBe('今天：C:\\Vault\\2026-11-07.md');
+  });
 });
