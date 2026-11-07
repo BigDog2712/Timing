@@ -42,6 +42,11 @@ mod qa_t01_sync_attack;
 mod md_sync_wake;
 #[cfg(desktop)]
 mod md_cloud_tier;
+/* [QA 独立复验 V0.11.19 批 1] 自己补的 2 条最缺边界：三档等号边界帧
+   （covered 同毫秒 / Max 1799-1800 / 连败节流 / 不从 pollSecs 反推）与
+   BOM+CRLF 真实文件走 FileWatch::probe。本轮两条变异自检的靶子都在这里。 */
+#[cfg(desktop)]
+mod qa_batch1_edges;
 mod md_sync;
 /* [V0.11.18] 合并语义的**现状快照**（PRD C9 / 设计 §6）：五条「已知限制」的回归测试。
    拍照，不是修复——行为代码零改动，改行为前先改那个文件里的断言。 */
