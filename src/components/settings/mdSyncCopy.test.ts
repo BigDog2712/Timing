@@ -7,6 +7,7 @@ import {
   MIXED_ROOT_PREFIX,
   REMOVED_PHRASES,
   SHORT_PATH_MAX,
+  affectedNoteFor,
   mixedFileNote,
   mixedRootNote,
   mixedRootTitle,
@@ -102,5 +103,19 @@ describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
   it('③ 某一档被关掉时的提示是「…这一档已关闭同步。」', () => {
     expect(`${['便利贴'].join('、')}${CLOSED_TIER_SUFFIX}`).toBe('便利贴这一档已关闭同步。');
     expect(CLOSED_TIER_SUFFIX).toBe('这一档已关闭同步。');
+  });
+
+  it('C11 只在实际受影响的那几档上说：三档用原句，不足三档逐一点名', () => {
+    /* 三档 → PRD 4.0 的原句（逐字，与 `EXPECTED.C11` 同源） */
+    expect(affectedNoteFor(['事项计时', '便利贴', '待办事项'])).toBe(EXPECTED.C11);
+    expect(affectedNoteFor(['待办事项'])).toBe('待办事项跟着数据根一起搬。');
+    expect(affectedNoteFor(['便利贴', '待办事项'])).toBe('便利贴、待办事项跟着数据根一起搬。');
+    /* 一档都没有时调用方不渲染这一行（`affected.length > 0` 判在组件里），
+       但函数本身也不许拼出「跟着数据根一起搬。」这种没有主语的半句话 */
+    expect(affectedNoteFor([])).toBe('跟着数据根一起搬。');
+    /* 除了三档那一帧，任何一帧都不许出现「这三档」 */
+    for (const labels of [['待办事项'], ['便利贴', '待办事项']]) {
+      expect(affectedNoteFor(labels)).not.toContain('这三档');
+    }
   });
 });

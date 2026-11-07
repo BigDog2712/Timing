@@ -30,6 +30,7 @@
 //! 到底建没建，日志也全是假的。所以 MKCOL 走 `mkcol_client()`（`redirect(none)`）：
 //! 3xx 一律当「已存在」，这是本轮唯一说得清的判据。
 
+use std::borrow::Cow;
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -187,11 +188,9 @@ pub async fn ensure_base_dir(target: &WebdavTarget) -> Result<EnsureOutcome, Dir
     })
 }
 
-/// 只关心「建好了没」的调用方（`put` 的 409 补建）：丢掉关卡信息。
-///
-/// `put` 的 409 语义在 v0.11.15 就已经定死（「再 409 = 配额 / 只读」，见模块头），
-/// 那里不需要知道卡在第几级；留着 `DirFailure` 会让那句 `match` 多三行，
-/// 而 `mod.rs` 是本轮点名「不许变长」的四个临界文件之一。
+/// 只关心「建好了没」的调用方（`put` 的 409 补建）：丢掉关卡信息。`put` 的 409 语义在
+/// v0.11.15 已定死（「再 409 = 配额 / 只读」），那里不需要知道卡在第几级；留着 `DirFailure`
+/// 会让那句 `match` 多三行，而 `mod.rs` 是本轮点名「不许变长」的四个临界文件之一。
 pub async fn ensure_base_dir_err(target: &WebdavTarget) -> Result<EnsureOutcome, WebdavError> {
     ensure_base_dir(target).await.map_err(|failure| failure.error)
 }
@@ -280,17 +279,20 @@ fn mkcol_method() -> Method {
         .clone()
 }
 
-/// 日志里的分类型词。**与 `services::md_cloud::round_push::fail_tag` 是同一套词表**
-/// （排障 grep 的契约）：`infra` 不许依赖 `services`（L4），所以这里只能有一份副本。
-fn fail_tag(err: &WebdavError) -> &'static str {
+/// 日志里的分类型词。**与 `services::md_cloud::text::fail_tag` 是同一套词表**（排障 grep
+/// 的契约）：`infra` 不许依赖 `services`（L4），所以只能有一份副本；两份是否真一致由
+/// `tests/md_webdav_text.rs::log_vocabulary_agrees` 机测。
+/// [QA F5] `Server` 带状态码（`fail=Server(409)`）：丢码就分不清「父集合缺失」（可补建）
+/// 与服务端故障（只能等）。
+pub(crate) fn fail_tag(err: &WebdavError) -> Cow<'static, str> {
     match err {
-        WebdavError::Auth => "Auth",
-        WebdavError::Forbidden => "Forbidden",
-        WebdavError::RateLimited => "RateLimited",
-        WebdavError::Precondition => "Precondition",
-        WebdavError::NotFound => "NotFound",
-        WebdavError::Timeout => "Timeout",
-        WebdavError::Network(_) => "Network",
-        WebdavError::Server(_) => "Server",
+        WebdavError::Auth => Cow::Borrowed("Auth"),
+        WebdavError::Forbidden => Cow::Borrowed("Forbidden"),
+        WebdavError::RateLimited => Cow::Borrowed("RateLimited"),
+        WebdavError::Precondition => Cow::Borrowed("Precondition"),
+        WebdavError::NotFound => Cow::Borrowed("NotFound"),
+        WebdavError::Timeout => Cow::Borrowed("Timeout"),
+        WebdavError::Network(_) => Cow::Borrowed("Network"),
+        WebdavError::Server(code) => Cow::Owned(format!("Server({code})")),
     }
 }

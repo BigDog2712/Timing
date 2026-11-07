@@ -43,14 +43,17 @@ export function describeInterval(minutes: number): string {
 
 /* 云端通道空配置：`enabled` 必须是 `false`——视图没加载时凭空给 `true`，用户下一次
    保存就会把云端通道偷偷打开。
-   [V0.11.16] 两个默认值（PRD R7 / 裁决 Q1）：服务地址与远端目录**直接写进值**（不是
-   placeholder），最常见的那台服务器开箱可用。**只在 `cloud === null`（从未配置过）时
-   生效**——已有配置一律原样回填，绝不被默认值覆盖（PRD 6.1 的硬口径）。
+   [V0.11.16] 三个默认值（PRD R7 / 裁决 Q1 / QA F1 回修）：`mode` + 服务地址 + 远端目录
+   **直接写进值**（不是 placeholder），最常见的那台服务器开箱可用。
+   `mode: 'webdav'` 是 F1 修的：v0.11.16 首版留 `localfolder`，于是「服务地址自动默认
+   填写」这条要做到得先手动切一次分段——预填值存在但不在用户眼前，等于没做到。
+   **只在 `cloud === null`（从未配置过）时生效**——已有配置一律原样回填，绝不被默认值
+   覆盖（PRD 6.1 的硬口径，E2 仍然成立）。
    `%` 一律不出现：中文路径存中文、显示中文，编码交给 `url` crate 在发请求时做一次。 */
 export function emptyCloud(): MdSyncCloud {
   return {
     enabled: false,
-    mode: 'localfolder',
+    mode: 'webdav',
     localRoot: '',
     baseUrl: 'https://dav.jianguoyun.com/dav/',
     basePath: '/我的坚果云/Timing',

@@ -13,22 +13,32 @@
 //!    v0.11.15 那句「账号能登录，但没有写文件的权限。请确认…或…或…」把三种可能并列，
 //!    用户读完仍然不知道该动哪一个，而且其中两种是错的（可能是目录建不出来）。
 
+use std::borrow::Cow;
+
 use crate::infra::md_webdav::WebdavError;
 
 /// 远端错误 → 日志里的分类词（`md cloud out: <date>.md fail=<这个>`）。
 ///
 /// 与 `infra::md_webdav::dir::fail_tag` 是同一套词表（排障 grep 的契约）：`services`
 /// 可以依赖 `infra`，但两个模块各自持有一份是为了「日志词表不跨层传递」。
-pub(crate) fn fail_tag(err: &WebdavError) -> &'static str {
+/// 两份必须逐变体一致——由 `tests/md_webdav_text.rs::log_vocabulary_agrees` 机器断言，
+/// 不再只靠这句注释。
+///
+/// [QA F5] `Server` 变体带上状态码（`fail=Server(400)`）：v0.11.16 首版一律退化成
+/// `fail=Server`，排障时分不清「远端目录名有服务端不接受的字符」（400）与「服务端自己
+/// 出错」（5xx）——这两种的处置完全相反（改名字 vs 等一等）。**只进日志**：用户可见文案
+/// 里 `\b\d{3}\b` 仍然零命中（`no_bare_status_code_in_any_fail_text` 守着）。
+pub(crate) fn fail_tag(err: &WebdavError) -> Cow<'static, str> {
     match err {
-        WebdavError::Auth => "Auth",
-        WebdavError::Forbidden => "Forbidden",
-        WebdavError::RateLimited => "RateLimited",
-        WebdavError::Precondition => "Precondition",
-        WebdavError::NotFound => "NotFound",
-        WebdavError::Timeout => "Timeout",
-        WebdavError::Network(_) => "Network",
-        WebdavError::Server(_) => "Server",
+        WebdavError::Auth => Cow::Borrowed("Auth"),
+        WebdavError::Forbidden => Cow::Borrowed("Forbidden"),
+        WebdavError::RateLimited => Cow::Borrowed("RateLimited"),
+        WebdavError::Precondition => Cow::Borrowed("Precondition"),
+        WebdavError::NotFound => Cow::Borrowed("NotFound"),
+        WebdavError::Timeout => Cow::Borrowed("Timeout"),
+        WebdavError::Network(_) => Cow::Borrowed("Network"),
+        /* 表外 4xx / 5xx：码本身就是唯一能分诊的信息，别丢 */
+        WebdavError::Server(code) => Cow::Owned(format!("Server({code})")),
     }
 }
 

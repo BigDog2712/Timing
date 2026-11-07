@@ -27,19 +27,19 @@ export function targetLabel(target: MdBackupItem['target']): string {
 const pad = (value: number): string => String(value).padStart(2, '0');
 
 /**
- * `MM-DD HH:mm`（24 小时制）——折叠标题下那一行用。
+ * `MM-DD HH:mm`（24 小时制）——**⑤ 唯一的时间格式**：折叠标题下那一行与展开后的列表行
+ * 共用这一个函数。
  *
- * PRD F2 要求它与展开后列表第一条**同源同值**，所以这里带月份与日期：只显示时间的话，
- * 「最近那份」是三天前的备份时用户会以为它是今天的。
+ * [QA F4] v0.11.16 首版这里有两个函数（`formatAtShort` / `formatAtFull`），于是同一个
+ * 页面上出现两种时间：摘要行 `11-07 22:14`、列表行 `2026/11/07 22:14`。这本身就是缺陷，
+ * 而且 `formatAtFull` 还偏离了 v0.11.15 的 `11/07 22:14`（PRD F4 要求逐字一致）。
+ *
+ * 为什么不回退到 `toLocaleString`：它随平台输出 `11-07` 或 `11/07`（zh-CN 在不同运行
+ * 时就出现过两种分隔符），逐字一致根本做不到——这才是有意改掉它的原因。
+ *
+ * 行内不带年份不歧义：列表按日期分组、组标题带年份；摘要行说「最近」。
  */
 export function formatAtShort(atMs: number): string {
   const at = new Date(atMs);
   return `${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
-}
-
-/** `YYYY/MM/DD HH:mm`——展开后列表行用（与 v0.11.15 逐字一致：多了年份好对照日期分组） */
-export function formatAtFull(atMs: number): string {
-  const at = new Date(atMs);
-  const date = `${at.getFullYear()}/${pad(at.getMonth() + 1)}/${pad(at.getDate())}`;
-  return `${date} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
 }

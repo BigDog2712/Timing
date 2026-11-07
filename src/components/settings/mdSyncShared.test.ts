@@ -19,7 +19,7 @@ import type { MdSyncDraft } from './useMdSyncDraft';
    这条 bug 一旦溜进去就违反 PRD N2（老用户三档被一次「什么都没改的保存」统一掉，
    且不可逆），所以必须有机器证据，不能只靠手点。
 
-   前四条是纯函数（不挂载）；后三条挂真 Hook——「逐档手改作废统一意图」只存在于
+   前四条是纯函数（不挂载）；后四条挂真 Hook——「逐档手改把统一意图固化到其余档」只存在于
    `useMdSyncDraft` 里，纯函数测不到它。 */
 
 const BINDINGS: MdSyncBinding[] = [
@@ -144,7 +144,7 @@ describe('useMdSyncDraft —— 统一意图的读写与作废', () => {
     expect(current().dirtyParts.format).toBe(false);
   });
 
-  it('逐档手改 → 作废该字段的意图（否则保存时的扇出会把刚改的那一档盖回去）', async () => {
+  it('逐档手改 → 意图先固化到其余档，再让本档写新值（[QA F2] 修掉了「填的值凭空消失」）', async () => {
     await mount();
     await act(async () => { current().setSharedRoot('D:\\md'); await Promise.resolve(); });
     await act(async () => {
@@ -153,8 +153,24 @@ describe('useMdSyncDraft —— 统一意图的读写与作废', () => {
     });
 
     expect(current().shared.root).toBeNull();
-    /* 意图作废后不再扇出：计时档与待办档回到各自原值，只有被手改的那一档变 */
+    /* 三档真实落库值：单框填的 D:\md 落到其余两档，被手改那档保留手改值。
+       首版这里是 ['C:\Vault','C:\Manual','%APP_DIR%\md']——用户亲手打的 D:\md 丢了。 */
+    expect(current().bindings.map((binding) => binding.root))
+      .toEqual(['D:\\md', 'C:\\Manual', 'D:\\md']);
+    /* 意图已固化 → `resolvedBindings` 与 `bindings` 同值（保存不会再多改一遍） */
     expect(current().resolvedBindings.map((binding) => binding.root))
+      .toEqual(['D:\\md', 'C:\\Manual', 'D:\\md']);
+  });
+
+  it('没有意图时逐档手改不扇出（N2：一次什么都没改的保存不许统一三档）', async () => {
+    await mount();
+    await act(async () => {
+      current().updateBinding(1, { ...BINDINGS[1], root: 'C:\\Manual' }, 'sync');
+      await Promise.resolve();
+    });
+
+    expect(current().shared.root).toBeNull();
+    expect(current().bindings.map((binding) => binding.root))
       .toEqual(['C:\\Vault', 'C:\\Manual', '%APP_DIR%\\md']);
   });
 

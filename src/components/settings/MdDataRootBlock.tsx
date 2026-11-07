@@ -22,7 +22,7 @@ import { IS_MOBILE } from '../../lib/platform';
 import { dataRootApi, rawIpcText } from '../../services/api';
 import type { DataRootInfo } from '../../types/domain/dataRoot';
 import { MdDataRootChange } from './MdDataRootChange';
-import { COPY } from './mdSyncCopy';
+import { affectedNoteFor } from './mdSyncCopy';
 
 export function MdDataRootBlock() {
   /* 守卫放外层：hooks 必须无条件按序调用，函数内提前 return 会打破这条规则 */
@@ -117,10 +117,11 @@ function DataRootBody() {
             </div>
           )}
 
-          {/* C11：只在确有三档 `%APP_DIR%` 落点时出现，且压成一句（受影响的是哪三档,
-              上面那句话已经不必再念一遍） */}
+          {/* C11：只在确有 `%APP_DIR%` 落点时出现。`affected` 是**子集**（老用户常见只有
+              待办一项写成 `%APP_DIR%`），所以句子由 `affectedNoteFor` 按实际档数生成——
+              首版无条件说「这三档」，在只有一档受影响时是假话（QA F3）。 */}
           {info.affected.length > 0 && (
-            <p className="data__note">{COPY.affectedNote}</p>
+            <p className="data__note">{affectedNoteFor(info.affected)}</p>
           )}
 
           {/* 回退态下插件就在数据根里：切换不会复制它，这是唯一会说「插件不见了」的场景 */}

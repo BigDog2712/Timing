@@ -177,21 +177,22 @@ describe('一个框写三档 —— 端到端（三档 file 与 root 全不同�
     expect(rootsOf(saved)).toEqual(['C:\\Vault', 'C:\\Vault2', '%APP_DIR%\\md']);
   });
 
-  it('先改日记落点、再在逐档面板改一档 → 被手改那档用他改的值（该字段的统一意图作废）', async () => {
+  it('先改日记落点、再在逐档面板改一档 → 统一意图先落到其余档，被手改那档用他改的值', async () => {
     await mount();
     await setValue(input('日记落点根目录') as HTMLInputElement, 'D:\\md');
     /* 此时统一意图生效：保存的话三档都会是 D:\md */
     await act(async () => { button('逐个设置').click(); await Promise.resolve(); });
 
     await setValue(input('便利贴落点根目录') as HTMLInputElement, 'D:\\manual');
-    const saved = await save();
+    /* [QA F2 回修] 手改那一刻意图就固化了：单框显示的上限那档仍是 D:\md，不会当场跳回 C:\Vault */
+    expect(input('日记落点根目录')?.value).toBe('D:\\md');
 
-    /* **当前口径**（`useMdSyncDraft.updateBinding`：手改即作废该字段的统一意图）：
-       被手改那一档是手改值，另外两档回到各自原值——用户打过的 `D:\md` 不会落到这两档上。
-       这与设计 §3.2 的代码片段一致，但与设计 §3.2「边界 3」的散文（那里写 timers 仍为
-       D:\md）不一致；若产品口径要改成「手改只覆盖一档、其余仍按统一意图」，改法是
-       把 updateBinding 里的「清成 null」换成「把意图落到其余档」，判据就是这条用例。 */
-    expect(rootsOf(saved)).toEqual(['C:\\Vault', 'D:\\manual', '%APP_DIR%\\md']);
+    const saved = await save();
+    /* 期望：单框填的 D:\md 落到**其余各档**，被手改那一档保留手改值。
+       首版这里是 ['C:\\Vault','D:\\manual','%APP_DIR%\\md']——用户亲手打的 D:\md 凭空消失。 */
+    expect(rootsOf(saved)).toEqual(['D:\\md', 'D:\\manual', 'D:\\md']);
+    /* 只影响 root：file 三档仍是原值（改了 root 不该顺手把 file 也统一掉） */
+    expect(filesOf(saved)).toEqual(['{date}.md', '{date}-notes.md', '{date}-todos.md']);
   });
 });
 
@@ -243,6 +244,10 @@ describe('文案减法与备份块的端到端判据', () => {
     expect(first?.querySelector('.sync-backup__facts')?.textContent).toContain('2026-11-07');
     /* 折叠行的时间与列表第一条是同一个时刻（`atMs` 最大的那条） */
     expect(summary).toContain(formatAtShort(ITEMS[1].atMs));
+    /* [QA F4] 两处时间**同一个格式**：列表行也必须是 `MM-DD HH:mm`，
+       且整页不能再出现 `YYYY/MM/DD` 那种旧形态（同一页两种时间本身就是缺陷） */
+    expect(first?.querySelector('.sync-backup__facts')?.textContent).toContain(formatAtShort(ITEMS[1].atMs));
+    expect(container.textContent).not.toContain('2026/11/07');
   });
 
   it('F2/F3：`md_backup_list` 只发一次；空列表时那一行说「还没有备份。」', async () => {

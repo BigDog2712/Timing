@@ -141,17 +141,37 @@ export function useMdSyncDraft(): MdSyncDraft {
     touch('sync');
   };
 
-  /* 逐档面板手改 → **作废对应字段的统一意图**：不然保存时的扇出会把刚改的那一档盖回去。
-     按字段 diff 而不是「整条清空」：只改了 `root` 就不该顺手丢掉 `file` 的意图。 */
+  /* 逐档面板手改 → 该字段的**统一意图先固化到其余各档**，再让本档写新值。
+   *
+   * [QA F2 回修] v0.11.16 首版是「手改即把意图清成 null」：单框填了 `D:\md`、展开逐档把
+   * 便利贴改成 `D:\manual`、保存 → 落库 `['C:\Vault','D:\manual','%APP_DIR%\md']`，
+   * 用户亲手打的 `D:\md` 凭空消失（单框还会当场跳回原值）。设计 §3.2「边界 3」的散文
+   * 本来就写着「timers 仍为 D:\md」，代码现在才和它一致。
+   *
+   * 两条边界不许动：
+   * 1. **只处理被改的那个字段**：改了 `root` 不该顺手把 `file` 的意图也固化掉（它仍是
+   *    「待执行」，保存时才统一）；
+   * 2. **没有意图时不扇出**：`shared[field] === null` 时其余各档原样保留——这是 PRD N2
+   *    那条「一次什么都没改的保存不许统一三档」的另一半。 */
   const updateBinding = (index: number, next: MdSyncBinding, part: 'format' | 'sync') => {
     const prev = bindings[index];
-    setBindings((current) => current.map((item, i) => (i === index ? next : item)));
-    if (prev && (next.root !== prev.root || next.file !== prev.file)) {
-      setSharedState((current) => ({
-        file: next.file !== prev.file ? null : current.file,
-        root: next.root !== prev.root ? null : current.root,
-      }));
-    }
+    const editedFile = prev ? next.file !== prev.file : false;
+    const editedRoot = prev ? next.root !== prev.root : false;
+    setBindings((current) => current.map((item, i) => {
+      /* 被编辑的字段：本档写新值，其余档先吃下已生效的统一意图（没有就保持原值） */
+      const spread = (field: 'file' | 'root', edited: boolean): string => {
+        if (!edited) return item[field];
+        return i === index ? next[field] : shared[field] ?? item[field];
+      };
+      const file = spread('file', editedFile);
+      const root = spread('root', editedRoot);
+      return i === index ? { ...next, file, root } : { ...item, file, root };
+    }));
+    /* 意图已经落到三档上，这个字段的 shared 可以退休了（留着会让保存时的扇出再覆盖一次） */
+    setSharedState((current) => ({
+      file: editedFile ? null : current.file,
+      root: editedRoot ? null : current.root,
+    }));
     touch(part);
   };
   const updateCloud = (next: MdSyncCloud) => { setCloud(next); touch('cloud'); };

@@ -210,18 +210,26 @@ describe('MdSyncCloudCard', () => {
 
   /* ===== [V0.11.16] 默认预填（PRD E1 / E2，裁决 Q1）===== */
 
-  it('E1：从未配置过云端时，两个框的**值**（不是 placeholder）已经是默认值', async () => {
+  it('E1：从未配置过云端时，打开就在 WebDAV 段，且两个框的**值**（不是 placeholder）已预填', async () => {
     const bare = viewWith('webdav');
     api.get.mockResolvedValue({ ...bare, config: { ...bare.config, cloud: null } });
     await mount();
     await act(async () => { await Promise.resolve(); });
-    /* `emptyCloud()` 的 `mode` 仍是 `localfolder`（改它等于改第三个出厂默认值，本轮不做），
-       所以先切到 WebDAV 那一段再看那两个字段——E1 判的是「值已预填」，不是「默认停在哪个页签」 */
-    await click('WebDAV');
+
+    /* [QA F1] 不点任何分段：默认就停在 WebDAV。这一帧正是 v0.11.16 首版做错的地方
+       （`emptyCloud().mode` 留成 `localfolder`，预填值藏在另一个分段后面）。 */
+    const segs = Array.from(container.querySelectorAll('.seg__item'));
+    const on = segs.filter((item) => item.getAttribute('data-on') === 'true').map((item) => item.textContent);
+    expect(on).toEqual(['WebDAV']);
+    /* WebDAV 段的字段真的挂上了：否则下面那两个值只是「藏在没渲染的树里」 */
+    expect(container.textContent).toContain('服务地址');
 
     const urls = Array.from(container.querySelectorAll('input')).map((el) => el.value);
     expect(urls).toContain('https://dav.jianguoyun.com/dav/');
     expect(urls).toContain('/我的坚果云/Timing');
+    /* 「值」而不是「灰字」：placeholder 是提示，用户必须先删掉才能填自己的 */
+    const baseUrl = container.querySelector('input[placeholder="https://dav.jianguoyun.com/dav/"]') as HTMLInputElement;
+    expect(baseUrl.value).toBe('https://dav.jianguoyun.com/dav/');
   });
 
   it('E2：已配置过的地址原样显示，不被默认值改写', async () => {

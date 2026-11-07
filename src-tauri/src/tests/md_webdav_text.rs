@@ -8,7 +8,7 @@ use crate::infra::md_webdav::WebdavError;
 /* `fail_text` 走 `round_push::`（既有 3 个调用点的路径，本轮要求一字不改）；
    `dir_label` / `fail_text_at` / `FailStage` 走 `text::`（文案表的定义处）。 */
 use crate::services::md_cloud::round_push::fail_text;
-use crate::services::md_cloud::text::{FailStage, dir_label, fail_text_at};
+use crate::services::md_cloud::text::{FailStage, dir_label, fail_tag, fail_text_at};
 
 /// ⑩ 纯函数：文案分两类，且**都不含任何裸状态码**（`\b\d{3}\b` 零命中）。
 ///
@@ -177,4 +177,55 @@ fn non_ascii_hint_only_for_non_ascii_paths() {
     /* 与「名字」无关的失败不加：超时是网络问题，不是目录名问题 */
     let timeout = fail_text_at(FailStage::Account, &WebdavError::Timeout, "/我的坚果云/Timing");
     assert!(!timeout.contains(hint), "{timeout}");
+}
+
+/// ⑭ [QA F5] 日志词表：`Server` 带状态码，且两份实现逐变体一致。
+///
+/// 这轮之前「`infra::dir` 与 `services::text` 是同一套词表」只是两处注释的自称——
+/// 谁改一边都不会红。现在它是机器判据：排障 grep（`fail=Server(400)`）的契约在这里。
+///
+/// 为什么必须是 `Server(<码>)` 而不是 `Server`：400（名字里有服务端不接受的字符 →
+/// 改目录名）与 5xx（服务端自己出错 → 等一等自动重试）的处置完全相反，丢码就只能靠猜。
+#[test]
+fn log_vocabulary_agrees_and_carries_status_code() {
+    let cases = [
+        WebdavError::Auth,
+        WebdavError::Forbidden,
+        WebdavError::RateLimited,
+        WebdavError::Precondition,
+        WebdavError::NotFound,
+        WebdavError::Timeout,
+        WebdavError::Network("连不上".into()),
+        WebdavError::Server(400),
+        WebdavError::Server(409),
+        WebdavError::Server(503),
+    ];
+
+    for err in &cases {
+        let service = fail_tag(err).to_string();
+        let infra = crate::infra::md_webdav::dir::fail_tag(err).to_string();
+        assert_eq!(service, infra, "两份日志词表必须逐变体一致（{err:?}）");
+        /* 词表是给 `fail={}` 用的：不许有空格、不许是空串 */
+        assert!(!service.is_empty() && !service.contains(' '), "{service}");
+    }
+
+    /* 非 `Server` 变体沿用 v0.11.13 起的旧词，别顺手改名（已有日志靠它 grep） */
+    assert_eq!(fail_tag(&WebdavError::Auth).to_string(), "Auth");
+    assert_eq!(fail_tag(&WebdavError::Forbidden).to_string(), "Forbidden");
+    assert_eq!(fail_tag(&WebdavError::NotFound).to_string(), "NotFound");
+    assert_eq!(fail_tag(&WebdavError::Network("x".into())).to_string(), "Network");
+
+    /* `Server` 带码：三个码互不相同，且不是退化后的裸 `Server` */
+    for code in [400u16, 409, 423, 503] {
+        let tag = fail_tag(&WebdavError::Server(code)).to_string();
+        assert_eq!(tag, format!("Server({code})"));
+        assert_ne!(tag, "Server", "退化回裸 `Server` 就分不清是哪一类了");
+    }
+
+    /* 这条词表**只进日志**：`fail_text` 的输出里仍然一个三位数都没有（F5 不得污染文案） */
+    for code in [400u16, 409, 423, 503] {
+        let err = WebdavError::Server(code);
+        let text = fail_text(&err, "/Timing/md");
+        assert!(!three_digit_run(&text), "日志词表不许渗进用户文案：{text}");
+    }
 }

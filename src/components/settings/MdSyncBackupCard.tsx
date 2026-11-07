@@ -21,7 +21,7 @@ import { IS_MOBILE } from '../../lib/platform';
 import { mdBackupApi, rawIpcText } from '../../services/api';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 import type { MdBackupItem } from '../../types/domain';
-import { TARGET_LABELS, formatAtFull, type KnownTarget, targetLabel } from './mdBackupFacts';
+import { TARGET_LABELS, formatAtShort, type KnownTarget, targetLabel } from './mdBackupFacts';
 import { formatBytes } from './mdSyncConfig';
 import type { MdBackupList } from './useBackupList';
 
@@ -116,7 +116,9 @@ function BackupBody({ list }: MdSyncBackupCardProps) {
               <span className="sync-backup__target" data-target={item.target ?? 'unknown'}>
                 {targetLabel(item.target)}</span>
               <span className="sync-backup__source" title={item.name}>{item.source}</span>
-              <span className="sync-backup__facts">{item.date ?? '—'} · {formatBytes(item.bytes)} · {formatAtFull(item.atMs)}</span>
+              {/* [QA F4] 时间格式与折叠摘要行**同一个函数**（`formatAtShort`）：
+                  首版这里是 `2026/11/07 22:14`、摘要行是 `11-07 22:14`，同一页面两种格式。 */}
+              <span className="sync-backup__facts">{item.date ?? '—'} · {formatBytes(item.bytes)} · {formatAtShort(item.atMs)}</span>
               <button type="button" className="btn btn--ghost sync-backup__open"
                 disabled={opening === item.name} onClick={() => void open(item)}>
                 {opening === item.name ? '打开中…' : '打开'}

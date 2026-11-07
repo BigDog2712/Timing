@@ -178,4 +178,35 @@ describe('MdDataRootBlock —— ② SQLite 落点设置', () => {
     expect(container.innerHTML).toBe('');
     expect(rootApi.get).not.toHaveBeenCalled();
   });
+
+  /* ===== [V0.11.16] C11 按实际受影响的档数说话（QA F3）===== */
+
+  it('C11：三档都受影响时用 PRD 4.0 的原句「这三档」', async () => {
+    await mount();
+    expect(container.textContent).toContain('这三档落点跟着数据根一起搬。');
+  });
+
+  it('C11：只有一档受影响时不许说「这三档」，点名那一档', async () => {
+    /* 老用户常见形态：前两档是 Obsidian 绝对路径，只有待办写成 `%APP_DIR%\md` */
+    rootApi.get.mockResolvedValue({ ...INFO, affected: ['待办事项'] });
+    await mount();
+
+    expect(container.textContent).toContain('待办事项跟着数据根一起搬。');
+    expect(container.textContent).not.toContain('这三档');
+  });
+
+  it('C11：两档受影响时逐一点名（不进「这三档」那一句）', async () => {
+    rootApi.get.mockResolvedValue({ ...INFO, affected: ['便利贴', '待办事项'] });
+    await mount();
+
+    expect(container.textContent).toContain('便利贴、待办事项跟着数据根一起搬。');
+    expect(container.textContent).not.toContain('这三档');
+  });
+
+  it('C11：一档都不受影响时那句整行不出现（不凭空吓人）', async () => {
+    rootApi.get.mockResolvedValue({ ...INFO, affected: [] });
+    await mount();
+
+    expect(container.textContent).not.toContain('跟着数据根一起搬');
+  });
 });

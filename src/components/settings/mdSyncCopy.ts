@@ -30,7 +30,7 @@ export const COPY = {
   safeNote: '只改这三个标题下面的内容，日记其他内容不动。',
   /** C9 · ② hint */
   dataRootHint: '数据库和备份放这里。',
-  /** C11 · ② 仅当确有 `%APP_DIR%` 落点时出现 */
+  /** C11 · ② 仅当确有 `%APP_DIR%` 落点时出现（三档时的原句；不足三档见 `affectedNoteFor`） */
   affectedNote: '这三档落点跟着数据根一起搬。',
   /** C14 · ③ hint（不再拼 `describeInterval`：间隔值就在下面那个数字框里） */
   syncHint: '多久写一次、写到哪个目录。',
@@ -49,6 +49,22 @@ export function mixedFileNote(labels: string[]): string {
 
 /** ③ 三档 `root` 不同时的提示行前缀（PRD 4.4） */
 export const MIXED_ROOT_PREFIX = '三档落点不同：';
+
+/**
+ * C11 的**实际那一句**（[QA F3] 回修）。
+ *
+ * v0.11.16 首版无条件用「这**三档**落点跟着数据根一起搬。」，而后端
+ * `data_root::affected_kinds` 返回的是**子集**（老用户常见 `timers=C:\Vault,
+ * notes=C:\Vault2, todos=%APP_DIR%\md` → 只有待办一项）。此时那句话是假的：另外两档是
+ * 绝对路径，换数据根根本不搬。
+ *
+ * 三档齐全时仍用 PRD 4.0 的原句（逐字），否则点名到底是哪几档。"这"→"待办事项"这类
+ * 点名比一个含糊的量词有用：用户要判断「我改数据根会不会动到这一档」。
+ */
+export function affectedNoteFor(labels: string[]): string {
+  if (labels.length === 3) return COPY.affectedNote;
+  return `${labels.join('、')}跟着数据根一起搬。`;
+}
 
 /** ③ 某一档被关掉时的提示行（PRD 4.4） */
 export const CLOSED_TIER_SUFFIX = '这一档已关闭同步。';
