@@ -7,6 +7,8 @@
 
 use std::fs;
 
+use chrono::NaiveDate;
+
 use crate::infra::md_webdav::WebdavTarget;
 use crate::models::md_cloud_purge::{channel_key, PurgeChannel, PurgeKey};
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
@@ -47,10 +49,7 @@ async fn webdav_round_never_touches_the_local_mirror() {
     assert_eq!(state.last_failed, 2, "两个都记账");
     assert_eq!(state.last_deleted, 0);
     assert_eq!(state.fail_days, 1, "失败按自然日记一天");
-    assert!(
-        !state.paused,
-        "第一天失败不该暂停（要连续 3 个自然日，I12）"
-    );
+    assert!(!state.paused, "第一天失败不该暂停（要连续 3 个自然日，I12）");
     let _ = fs::remove_dir_all(&root);
 }
 
@@ -186,6 +185,92 @@ async fn webdav_purge_deletes_the_date_file_by_its_exact_name() {
         2
     );
     assert_eq!(list_names(&root).len(), 2, "这条路只删远端（I5）");
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// I10：401 一出现就整批中断 —— **一份都不再试**（假服务器记下的请求数必须是 1），
+/// 水位不动，`day` 照样写。401 在「同一份凭据」下不会因为换一个文件就好。
+#[tokio::test]
+async fn webdav_401_aborts_the_whole_batch() {
+    let fixture = env("purge-webdav-401").await;
+    let root = unique_dir("purge-webdav-401");
+    fs::create_dir_all(&root).expect("建镜像目录");
+    for date in ["2019-10-05", "2019-10-06", "2019-10-07"] {
+        seed_past(&fixture.pool, &root, date).await;
+    }
+    let fake = crate::tests::fake_webdav::serve("401 Unauthorized", "", b"");
+    let target = WebdavTarget::new(&fake.base_url, "/Timing", "u", "wrong");
+
+    purge::run_webdav(&fixture.pool, &target, &root, &md_cloud::today())
+        .await
+        .expect("清理不该返回错误");
+
+    assert_eq!(fake.count(), 1, "401 之后一份都不许再发（I10）");
+    assert_eq!(
+        kv(&fixture.pool, PurgeChannel::Webdav, PurgeKey::Upto).await,
+        None,
+        "中断的那批不推进水位"
+    );
+    assert_eq!(
+        kv(&fixture.pool, PurgeChannel::Webdav, PurgeKey::Day)
+            .await
+            .as_deref(),
+        Some(md_cloud::today().as_str()),
+        "提前中断也写 day：今天别再试了"
+    );
+    let state = state_of(&fixture.pool, PurgeChannel::Webdav).await;
+    assert_eq!(state.last_failed, 1, "第一份 401 就中断，只记一份失败");
+    assert_eq!(state.fail_days, 1);
+    assert_eq!(list_names(&root).len(), 3, "镜像一个文件都不动");
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// I12：连续第 3 个自然日失败 → 暂停；之后那一轮**一个请求都不发**，直到用户点
+/// 「立即同步」（`purge::resume`）。造法：state 写成「昨天已失败 2 天」+ 本轮稳定失败
+/// 一次，`failDays` 到 3 就该置 `paused`（不需要假服务器，也就不会 flaky）。
+#[tokio::test]
+async fn three_failed_days_pause_the_channel() {
+    let fixture = env("purge-webdav-pause").await;
+    let root = unique_dir("purge-webdav-pause");
+    fs::create_dir_all(&root).expect("建镜像目录");
+    seed_past(&fixture.pool, &root, "2019-11-05").await;
+
+    let today = md_cloud::today();
+    let yesterday = (NaiveDate::parse_from_str(&today, "%Y-%m-%d").expect("今天")
+        - chrono::Duration::days(1))
+    .format("%Y-%m-%d")
+    .to_string();
+    settings::set_value(
+        &fixture.pool,
+        channel_key(PurgeChannel::Webdav, PurgeKey::State),
+        &format!(r#"{{"failDays":2,"lastFailDay":"{yesterday}","paused":false}}"#),
+        0,
+    )
+    .await
+    .expect("写 state");
+
+    let dead = WebdavTarget::new("http://127.0.0.1:1", "/Timing", "u", "p");
+    purge::run_webdav(&fixture.pool, &dead, &root, &today)
+        .await
+        .expect("失败的一轮不是 Err");
+
+    let state = state_of(&fixture.pool, PurgeChannel::Webdav).await;
+    assert_eq!(state.fail_days, 3, "连续第 3 个自然日");
+    assert!(state.paused, "到 3 就该暂停（I12）");
+
+    /* 暂停之后这一轮：一个请求都不发（用假服务器计数，比「文件没变」更直接）。 */
+    let fake = crate::tests::fake_webdav::serve("204 No Content", "", b"");
+    let live = WebdavTarget::new(&fake.base_url, "/Timing", "u", "p");
+    purge::run_webdav(&fixture.pool, &live, &root, &today)
+        .await
+        .expect("暂停时直接返回");
+    assert_eq!(fake.count(), 0, "暂停后 0 条 DELETE");
+
+    purge::resume(&fixture.pool, PurgeChannel::Webdav)
+        .await
+        .expect("解除暂停");
+    assert!(!state_of(&fixture.pool, PurgeChannel::Webdav).await.paused);
+    assert!(list_names(&root).len() == 1);
     let _ = fs::remove_dir_all(&root);
 }
 

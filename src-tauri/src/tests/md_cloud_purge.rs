@@ -132,6 +132,36 @@ async fn folder_round_deletes_past_files_and_keeps_today() {
         state_of(&fixture.pool, PurgeChannel::Folder).await.last_deleted,
         3
     );
+
+    /* I3：同一天再跑一轮 → `day` 已经等于今天，整轮早退，记的份数一个都不许被改写。 */
+    purge::run_folder(&fixture.pool, &root, &[], &today)
+        .await
+        .expect("同一天第二轮应当直接返回");
+    assert_eq!(
+        state_of(&fixture.pool, PurgeChannel::Folder).await.last_deleted,
+        3,
+        "第二轮没有重写 state（早退在 `begin`）"
+    );
+
+    /* I4：换日之后首轮只处理**新过期的那一天**，不是把整段历史重删一遍。 */
+    settings::set_value(
+        &fixture.pool,
+        channel_key(PurgeChannel::Folder, PurgeKey::Day),
+        "2000-01-01",
+        0,
+    )
+    .await
+    .expect("把 day 改成很久以前，模拟换日");
+    seed_past(&fixture.pool, &root, "2019-01-08").await;
+    purge::run_folder(&fixture.pool, &root, &[], &today)
+        .await
+        .expect("次日首轮");
+    assert!(!root.join("2019-01-08.md").exists(), "新过期的那一天被删");
+    assert_eq!(
+        state_of(&fixture.pool, PurgeChannel::Folder).await.last_deleted,
+        1,
+        "只处理了那一天（水位挡住了更早的）"
+    );
     let _ = fs::remove_dir_all(&root);
 }
 

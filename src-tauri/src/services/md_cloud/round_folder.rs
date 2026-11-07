@@ -82,7 +82,10 @@ pub async fn run(
            别处），这一档本身可疑，去做不可逆的删除是唯一不该选的方向。 */
         #[cfg(not(mobile))]
         if hash.is_some() {
-            super::purge::run_folder(pool, &root, bindings, today).await?;
+            /* 同 `round_webdav` 的 ⑩：清理的任何失败都不许污染这一轮的 report（I11）。 */
+            if let Err(err) = super::purge::run_folder(pool, &root, bindings, today).await {
+                crate::log_warn!("md cloud purge: 记账失败（不影响本轮同步）{err:?}");
+            }
         }
     }
     Ok(report)

@@ -186,7 +186,12 @@ pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResu
        I11 要求失败的 DELETE 不许把「今天上传成功」这条主链路染红（见 `purge/mod.rs` 头）。 */
     #[cfg(not(mobile))]
     if push_ok {
-        super::purge::run_webdav(pool, &target, &cloud_root, today).await?;
+        /* 只可能失败在记账层（sqlite），DELETE 本身的失败一律记账、不返回 Err。
+           这里吞掉并留一条 WARN：⑧ 已经把今天传上去了，这一轮的 report 该原样交出去，
+           清理是后台维护动作，不许把主链路折成 Err（PRD I11）。 */
+        if let Err(err) = super::purge::run_webdav(pool, &target, &cloud_root, today).await {
+            crate::log_warn!("md cloud purge: 记账失败（不影响本轮同步）{err:?}");
+        }
     }
 
     /* 每轮必打：这是「今天传了但历史有欠账」的唯一可见出口。 */
