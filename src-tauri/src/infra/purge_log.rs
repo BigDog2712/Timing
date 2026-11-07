@@ -21,17 +21,25 @@ use crate::models::constants::MD_CLOUD_PURGE_LOG_KEEP;
 /// 固定文件名：不随日期滚动（要看的正是「连着几天删了什么」）。
 const FILE_NAME: &str = "md-cloud-purge.log";
 
-/// 记一行 `<date>\t<outcome>\t<本地时间 ISO>`。
+/// 记一行 `<date>\t<outcome>[\t<目标>]\t<本地时间 ISO>`。
 ///
 /// `outcome` 是 `status=204` 或 `removed`（两路各一套口径，与主日志同一个词）。
-pub fn append(date: &str, outcome: &str) {
+/// `target` 只有 LocalFolder 那条路给得出（绝对路径）：I16 要在**这个文件**里抽查
+/// 「删的是不是 `yyyy-MM-dd.md`、父目录是不是配的 localRoot」——主日志会滚动，抽查
+/// 时多半已经滚没了，所以目标必须落在追责面这一份上。WebDAV 那条传空串（远端路径
+/// 就是文件本身的名字，第一列已经有了，再写一遍是冗余）。
+pub fn append(date: &str, outcome: &str, target: &str) {
     /* 日志目录没注入（单测 / 手机端）就静默返回：这条链路不该为「没有日志目录」做任何事。 */
     let Some(dir) = crate::platform::log::log_dir() else {
         return;
     };
     let path = dir.join(FILE_NAME);
     let stamp = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S");
-    let line = format!("{date}\t{outcome}\t{stamp}\n");
+    let line = if target.is_empty() {
+        format!("{date}\t{outcome}\t{stamp}\n")
+    } else {
+        format!("{date}\t{outcome}\t{target}\t{stamp}\n")
+    };
     let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) else {
         crate::log_warn!("追责日志打不开：{FILE_NAME}（不影响清理）");
         return;
