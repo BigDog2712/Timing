@@ -26,6 +26,7 @@ vi.mock('../../services/api', () => ({
 }));
 
 import { MdSyncBackupCard } from './MdSyncBackupCard';
+import { useBackupList } from './useBackupList';
 
 (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -38,11 +39,18 @@ const ITEMS: MdBackupItem[] = [
 
 let container: HTMLDivElement; let root: Root;
 
+/** [V0.11.16] 卡片不再自己拉列表：吃 `useBackupList` 那一份（设置页只调一次 IPC） */
+function Harness() {
+  const list = useBackupList();
+  return createElement(MdSyncBackupCard, { list });
+}
+
 async function mount(): Promise<void> {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  await act(async () => { root.render(createElement(MdSyncBackupCard)); await Promise.resolve(); });
+  await act(async () => { root.render(createElement(Harness)); await Promise.resolve(); });
+  await act(async () => { await Promise.resolve(); });
 }
 
 const texts = (selector: string) => Array.from(container.querySelectorAll(selector)).map((el) => el.textContent);
@@ -150,10 +158,9 @@ describe('MdSyncBackupCard', () => {
     expect(container.querySelector('.sync__error')).toBeNull();
   });
 
-  it('手机端整卡不渲染，也不去读备份列表', async () => {
+  it('手机端整卡不渲染（列表也不去读，见 `useBackupList.test`）', async () => {
     host.mobile = true;
     await mount();
     expect(container.innerHTML).toBe('');
-    expect(api.list).not.toHaveBeenCalled();
   });
 });

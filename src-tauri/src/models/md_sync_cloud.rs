@@ -258,13 +258,10 @@ pub struct MdSyncViewCloud {
     pub cloud: MdSyncCloudStatus,
 }
 
-/// 「测试连接」的结果。`ok = false` 时 `detail` 是**人话**（不是 `HTTP 401`）。
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MdSyncTestResult {
-    pub ok: bool,
-    pub detail: String,
-}
+/* 「测试连接」的结果搬去 `models/md_sync_test_result.rs`（本文件 295 行、贴到门禁）。
+   `pub use` 让外部路径（`models::md_sync_cloud::MdSyncTestResult`）一个字都不用改：
+   命令层、服务层与 `probe.rs` 三处引用保持原样。 */
+pub use super::md_sync_test_result::{MdSyncTestResult, MdSyncTestStep};
 
 /// 备份列表的一项（备份文件名里能读出的事实）。
 #[derive(Debug, Clone, Serialize)]

@@ -25,6 +25,9 @@ pub mod round_folder;
 pub mod round_push;
 pub mod round_webdav;
 mod state;
+/* [V0.11.16] 远端错误的文案表（从 `round_push` 搬出）：「测试连接」的三关也要用同一张。
+   `pub(crate)` 是为了让 `tests/md_webdav_text.rs` 能直接断言 `fail_text_at` 的关卡分支。 */
+pub(crate) mod text;
 
 use chrono::Local;
 use sqlx::SqlitePool;

@@ -22,7 +22,9 @@ import { IS_MOBILE } from '../../lib/platform';
 import { errorText, mdSyncApi } from '../../services/api';
 import { pickFolder } from '../../services/folderPicker';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
-import type { CloudMode, MdSyncCloud, MdSyncConfig, MdSyncTestResult } from '../../types/domain';
+import type {
+  CloudMode, MdSyncCloud, MdSyncConfig, MdSyncTestResult, MdSyncTestStepKey,
+} from '../../types/domain';
 import { Switch } from '../ui/Switch';
 import { pollSecsOf } from './mdSyncConfig';
 import type { MdSyncDraft } from './useMdSyncDraft';
@@ -33,6 +35,12 @@ interface MdSyncCloudCardProps {
 
 const MODE_LABELS: Record<CloudMode, string> = { localfolder: '本地目录', webdav: 'WebDAV' };
 const MODE_ORDER: CloudMode[] = ['localfolder', 'webdav'];
+
+/**
+ * [V0.11.16] 三关的**界面标签**。后端的 `key` 是契约（`account` / `dir` / `write`），
+ * 中文标签归前端：改「目录」这个说法不必动 Rust。
+ */
+const STEP_LABELS: Record<MdSyncTestStepKey, string> = { account: '账号', dir: '目录', write: '写入' };
 
 export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
   const status = useMdSyncStore((s) => s.view?.cloud ?? null);
@@ -55,7 +63,13 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
     setTesting(true);
     try {
       const config: MdSyncConfig = {
-        enabled: draft.enabled, pollSecs: pollSecsOf(draft.pollMin), bindings: draft.bindings, cloud,
+        enabled: draft.enabled,
+        pollSecs: pollSecsOf(draft.pollMin),
+        /* [V0.11.16] 与保存**同一个数组**（`draft.resolvedBindings`）：这里若还用
+           `draft.bindings`，就会出现「测试按草稿的旧三档跑、保存按新的写」这种没人
+           能复现的错。 */
+        bindings: draft.resolvedBindings,
+        cloud,
       };
       /* 与保存同一条口径：`secret === null` → `undefined`（拿已存密文去测） */
       setTestResult(await mdSyncApi.test(config, secret ?? undefined));
@@ -66,14 +80,16 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
     }
   };
 
+  /* 失败那一关（`steps` 只含走过的关，所以最多一个 `ok === false`） */
+  const failedStep = testResult?.steps?.find((item) => !item.ok) ?? null;
+
   return (
     <div className="sync__fields">
       <div className="sync__card-head">
         <div className="sync__card-title">
           <span className="sync__label">启用云端通道</span>
-          <p className="sync__desc">
-            把今天的 Markdown 再送一份到云端目录或 WebDAV；换机器时把它同步过来就能接着用。
-          </p>
+          {/* [V0.11.16] C19 收到块标题下（`MdSyncTab` 的 `hint` =「再送一份到坚果云。」）：
+              卡里再写一遍就是同一句话说两次（PRD A1：每块标题下只有一句）。 */}
         </div>
         <div className="sync__card-tools">
           <Switch checked={cloud.enabled} label="启用云端通道" disabled={saving}
@@ -111,7 +127,9 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
               选择目录
             </button>
           </div>
-          <p className="sync-cloud__hint">这个目录就是云端那份 TimingMD 的落点，换机器时把它同步过去即可。</p>
+          {/* [V0.11.16] C20：原来这里还有一句「这个目录就是云端那份 TimingMD 的落点，
+              换机器时把它同步过去即可。」——输入框的 placeholder 已经写着落点目录，
+              删掉（PRD A2 要求这类重复话全页零命中）。 */}
         </div>
       ) : (
         <div className="sync__fields">
@@ -152,9 +170,25 @@ export function MdSyncCloudCard({ draft }: MdSyncCloudCardProps) {
               {testing ? '测试中…' : '测试连接'}
             </button>
             {testResult && (
-              <span className="sync-cloud__result" data-ok={testResult.ok ? 'true' : 'false'}>
-                {testResult.detail}
-              </span>
+              <div className="sync-cloud__result" data-ok={testResult.ok ? 'true' : 'false'}>
+                {/* [V0.11.16] 三关逐步点亮（PRD E3/E6）：红在哪一关就停在那一关，
+                    后面关不显示；`steps` 缺失（浏览器 mock / 老后端）时退回一句 `detail`。 */}
+                {testResult.steps && testResult.steps.length > 0 ? (
+                  <>
+                    <span className="sync-cloud__steps">
+                      {testResult.steps.map((item, index) => (
+                        <span key={item.key} className="sync-cloud__step" data-ok={item.ok ? 'true' : 'false'}>
+                          {index > 0 ? ' ' : ''}{STEP_LABELS[item.key]} {item.ok ? '✓' : '✗'}
+                        </span>
+                      ))}
+                    </span>
+                    {/* 失败只说那一件事：那一关的原文，不改写、不拼接 */}
+                    {failedStep?.detail && <p className="sync__error">{failedStep.detail}</p>}
+                  </>
+                ) : (
+                  <span>{testResult.detail}</span>
+                )}
+              </div>
             )}
           </div>
         </div>

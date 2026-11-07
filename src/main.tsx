@@ -27,6 +27,8 @@ import './styles/settings-sync-interval.css';
 import './styles/settings-sync-cloud.css';
 /* [V0.11.15] 数据管理页签的壳：折叠块 / 底部 sticky 条 / 黄条 / 徽标（③④⑤ 仍用 sync__*） */
 import './styles/settings-data.css';
+/* [V0.11.16] 做完减法之后的那几个新位置（①的「今天」/③的聚合行与逐档提示/④三关/⑤当条记录） */
+import './styles/settings-data-slim.css';
 /* [V0.4.1] 渲染异常兜底（透明窗里渲染抛错 = 药丸凭空消失，必须留住可点的界面） */
 import './styles/error-boundary.css';
 import './styles/theme-picker.css';

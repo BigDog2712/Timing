@@ -1,5 +1,4 @@
-//! WebDAV 传输层（V0.11.13，ADR-061）：GET / PUT 在本文；`probe` 与 MKCOL 在
-//! `dir.rs`（对目录发请求的那一半，判定表只有一张）。
+//! WebDAV 传输层（V0.11.13，ADR-061）：GET / PUT 在本文，`probe` / MKCOL 在 `dir.rs`，测试连接的探针在 `probe_file.rs`（后两者不进本文：它已贴到 300 行门禁）。
 //!
 //! `{date}.md` 一天一个文件，路径能直接算（`md_file::expand_tokens`），所以不引 WebDAV
 //! 客户端库、也不发 PROPFIND：坚果云单次列举上限 750 条且不支持 infinity PROPFIND，
@@ -24,11 +23,12 @@ use crate::models::constants::{MD_CLOUD_CONNECT_SECS, MD_CLOUD_READ_SECS};
 /* 对**目录**发请求的那一半（`probe` 与 MKCOL）：判定表只有一张，见 `dir.rs` 头注释。
 `probe` / `ProbeOutcome` re-export 出来，调用点不必知道拆过（两处都是 L4 叶子）。 */
 pub mod dir;
+pub mod probe_file;
 pub use dir::{probe, ProbeOutcome};
 
 /// 服务端日志里能分辨出是谁在写。版本号随 `Cargo.toml` 走，不单独维护一份——
 /// [V0.11.13] 硬编码 `"Timing/0.11.13"` 那种写法下次升版必忘。
-/* `pub(super)`：`dir.rs` 的 MKCOL 专用 Client 要复用同一个 UA（同一版本串）。 */
+/* `pub(super)`：`dir.rs` 与 `probe_file.rs` 的请求都要带同一个 UA（同一版本串）。 */
 pub(super) const USER_AGENT: &str = concat!("Timing/", env!("CARGO_PKG_VERSION"));
 
 /// 一次 WebDAV 调用的全部参数。`password` 是**应用密码**（坚果云登录密码必然失败）。
@@ -158,7 +158,7 @@ pub async fn put(
     if_match: Option<&str>,
 ) -> Result<PutOutcome, WebdavError> {
     match send_put(target, rel, bytes, if_match).await {
-        Err(WebdavError::Server(409)) => match dir::ensure_base_dir(target).await? {
+        Err(WebdavError::Server(409)) => match dir::ensure_base_dir_err(target).await? {
             dir::EnsureOutcome::Ready { .. } => {
                 /* 只重试**一次**：第二次仍 409 = 目录明明建了却被拒（配额 / 只读挂载 /
                 服务端策略），再试只是多一次请求，文案也解释不了更多。 */

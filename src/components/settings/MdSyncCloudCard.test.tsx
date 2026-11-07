@@ -16,6 +16,7 @@ vi.mock('../../services/api', () => ({ mdSyncApi: api, mdBackupApi: { list: vi.f
 
 import { MdSyncCloudCard } from './MdSyncCloudCard';
 import { useMdSyncDraft } from './useMdSyncDraft';
+import type { MdSyncDraft } from './useMdSyncDraft';
 
 (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -33,10 +34,14 @@ function viewWith(mode: CloudMode): MdSyncViewCloud {
 /** 真 Hook + 真卡：只有这样才能钉住「没碰密码框 → secret 是 undefined」这条链路 */
 function Harness(): ReactElement {
   const draft = useMdSyncDraft();
+  /* 测试要能直接调 `setSharedFile`：这里把草稿抬到一个模块变量上 */
+  draftRef = draft;
   return createElement('div', null,
     createElement(MdSyncCloudCard, { draft }),
     createElement('button', { type: 'button', onClick: () => void draft.save() }, '保存'));
 }
+
+let draftRef: MdSyncDraft | null = null;
 
 let container: HTMLDivElement; let root: Root;
 
@@ -85,7 +90,8 @@ describe('MdSyncCloudCard', () => {
     expect(container.textContent).toContain('服务地址');
     expect(container.querySelector('input[placeholder="https://dav.jianguoyun.com/dav/"]')).not.toBeNull();
     await click('本地目录');
-    expect(container.textContent).toContain('换机器时把它同步过去即可');
+    /* [V0.11.16] C20 已删：本地目录不再有那句「换机器时把它同步过去即可」 */
+    expect(container.textContent).not.toContain('换机器时把它同步过去即可');
     expect(container.textContent).not.toContain('应用密码');
     await click('WebDAV');
     expect(container.textContent).toContain('服务地址');
@@ -123,6 +129,117 @@ describe('MdSyncCloudCard', () => {
     await click('测试连接');
     expect(result()?.textContent).toBe('账号或应用密码不对');
     expect(result()?.getAttribute('data-ok')).toBe('false');
+  });
+
+  /* ===== [V0.11.16] 三关逐步点亮（PRD E3 / E6 / E7）===== */
+
+  it('E3：三关全绿 → 「账号 ✓ 目录 ✓ 写入 ✓」', async () => {
+    api.test.mockResolvedValueOnce({
+      ok: true,
+      detail: '账号、目录、写入都通过',
+      steps: [
+        { key: 'account', ok: true, detail: null },
+        { key: 'dir', ok: true, detail: null },
+        { key: 'write', ok: true, detail: null },
+      ],
+    });
+    await mount();
+    await click('测试连接');
+
+    const steps = result()?.querySelector('.sync-cloud__steps');
+    expect(steps?.textContent).toBe('账号 ✓ 目录 ✓ 写入 ✓');
+    expect(result()?.querySelectorAll('.sync-cloud__step[data-ok="false"]')).toHaveLength(0);
+    /* 全绿时不再画任何红字 */
+    expect(container.querySelector('.sync__error')).toBeNull();
+  });
+
+  it('E6：红在第 1 关时只显示「账号 ✗」+ 那一句，第 2、3 关不出现', async () => {
+    api.test.mockResolvedValueOnce({
+      ok: false,
+      detail: '账号或应用密码不对（坚果云要用应用密码…）',
+      steps: [{ key: 'account', ok: false, detail: '账号或应用密码不对（坚果云要用应用密码…）' }],
+    });
+    await mount();
+    await click('测试连接');
+
+    const steps = result()?.querySelector('.sync-cloud__steps')?.textContent ?? '';
+    expect(steps).toBe('账号 ✗');
+    expect(steps).not.toContain('目录');
+    expect(steps).not.toContain('写入');
+    const detail = result()?.querySelector('.sync__error')?.textContent ?? '';
+    expect(detail).toContain('账号或应用密码不对');
+    /* E7：三行里不出现三位数字状态码 */
+    expect(/\d{3}/.test(result()?.textContent ?? '')).toBe(false);
+  });
+
+  it('E7：第 3 关的失败文案以红字落在结论行下方，且不带裸状态码', async () => {
+    api.test.mockResolvedValueOnce({
+      ok: false,
+      detail: '文件夹已就绪，但写不进去文件。',
+      steps: [
+        { key: 'account', ok: true, detail: null },
+        { key: 'dir', ok: true, detail: null },
+        { key: 'write', ok: false, detail: '文件夹已就绪，但写不进去文件。' },
+      ],
+    });
+    await mount();
+    await click('测试连接');
+
+    expect(result()?.querySelector('.sync-cloud__steps')?.textContent).toBe('账号 ✓ 目录 ✓ 写入 ✗');
+    expect(result()?.querySelector('.sync__error')?.textContent).toBe('文件夹已就绪，但写不进去文件。');
+    expect(/\d{3}/.test(result()?.textContent ?? '')).toBe(false);
+  });
+
+  it('后端没给 steps（浏览器 mock / 老后端）→ 退回只显示 detail，不崩', async () => {
+    api.test.mockResolvedValueOnce({ ok: true, detail: '连接正常' });
+    await mount();
+    await click('测试连接');
+    expect(result()?.querySelector('.sync-cloud__steps')).toBeNull();
+    expect(result()?.textContent).toBe('连接正常');
+  });
+
+  it('「测试连接」用的是 resolvedBindings（与保存同一个数组）', async () => {
+    api.test.mockResolvedValueOnce({ ok: true, detail: '连接正常' });
+    await mount();
+    /* 在块①那个单框里改一下文件名（统一意图），但**先不保存** */
+    await act(async () => { draftRef?.setSharedFile('{date}-asd.md'); await Promise.resolve(); });
+    await click('测试连接');
+    const config = api.test.mock.calls[0][0];
+    expect(config.bindings[0].file).toBe('{date}-asd.md');
+  });
+
+  /* ===== [V0.11.16] 默认预填（PRD E1 / E2，裁决 Q1）===== */
+
+  it('E1：从未配置过云端时，两个框的**值**（不是 placeholder）已经是默认值', async () => {
+    const bare = viewWith('webdav');
+    api.get.mockResolvedValue({ ...bare, config: { ...bare.config, cloud: null } });
+    await mount();
+    await act(async () => { await Promise.resolve(); });
+    /* `emptyCloud()` 的 `mode` 仍是 `localfolder`（改它等于改第三个出厂默认值，本轮不做），
+       所以先切到 WebDAV 那一段再看那两个字段——E1 判的是「值已预填」，不是「默认停在哪个页签」 */
+    await click('WebDAV');
+
+    const urls = Array.from(container.querySelectorAll('input')).map((el) => el.value);
+    expect(urls).toContain('https://dav.jianguoyun.com/dav/');
+    expect(urls).toContain('/我的坚果云/Timing');
+  });
+
+  it('E2：已配置过的地址原样显示，不被默认值改写', async () => {
+    const mine = viewWith('webdav');
+    api.get.mockResolvedValue({
+      ...mine,
+      config: {
+        ...mine.config,
+        cloud: { ...mine.config.cloud!, baseUrl: 'https://synology.example.com/dav/', basePath: '/Timing/md' },
+      },
+    });
+    await mount();
+    await act(async () => { await Promise.resolve(); });
+
+    const urls = Array.from(container.querySelectorAll('input')).map((el) => el.value);
+    expect(urls).toContain('https://synology.example.com/dav/');
+    expect(urls).toContain('/Timing/md');
+    expect(urls).not.toContain('https://dav.jianguoyun.com/dav/');
   });
 
   it('手机端不出现「本地目录」；读到 localfolder 配置时给说明，保存落成 webdav', async () => {

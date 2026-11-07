@@ -24,6 +24,15 @@ interface FoldBlockProps {
   hint?: string;
   /** 标题右侧的动作槽（例如 ③ 的总开关） */
   actions?: ReactNode;
+  /**
+   * 标题下的附加一行（[V0.11.16] 块⑤的「当条记录」）。
+   *
+   * 为什么加一个槽而不是让块自己画：五块必须共用**同一套折叠语义**（`aria-expanded` /
+   * `aria-controls` / `hidden` 三件套漏一处就是「视觉上收起了、键盘还能 Tab 进去」）。
+   * 数据在子组件里（备份列表），所以由调用方从上面把它抬进来——`hint` 是纯字符串，
+   * 装不下一个会被数据驱动的行。
+   */
+  summary?: ReactNode;
   /** 这一块被改过（标题旁显示「未保存」） */
   dirty?: boolean;
   defaultOpen?: boolean;
@@ -35,6 +44,7 @@ export function FoldBlock({
   title,
   hint,
   actions,
+  summary,
   dirty = false,
   defaultOpen = true,
   children,
@@ -62,6 +72,8 @@ export function FoldBlock({
             {dirty && <span className="data__dirty">未保存</span>}
           </div>
           {hint && <p className="data__block-hint">{hint}</p>}
+          {/* 折叠态也可见：块⑤收起来时用户要能一眼看到「最近那份底是什么」 */}
+          {summary}
         </div>
         <div className="data__block-actions">
           {actions}

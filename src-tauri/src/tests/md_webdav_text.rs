@@ -5,7 +5,10 @@
 //! 已经把 300 行预算用在大半在假服务器上了。
 
 use crate::infra::md_webdav::WebdavError;
-use crate::services::md_cloud::round_push::{dir_label, fail_text};
+/* `fail_text` 走 `round_push::`（既有 3 个调用点的路径，本轮要求一字不改）；
+   `dir_label` / `fail_text_at` / `FailStage` 走 `text::`（文案表的定义处）。 */
+use crate::services::md_cloud::round_push::fail_text;
+use crate::services::md_cloud::text::{FailStage, dir_label, fail_text_at};
 
 /// ⑩ 纯函数：文案分两类，且**都不含任何裸状态码**（`\b\d{3}\b` 零命中）。
 ///
@@ -18,9 +21,12 @@ use crate::services::md_cloud::round_push::{dir_label, fail_text};
 #[test]
 fn fail_text_carries_real_path() {
     let dir = "/Timing/md";
-    /* 带路径的三类：文案里必须出现用户填的那串目录。 */
+    /* 带路径的三类：文案里必须出现用户填的那串目录。
+       [V0.11.16] 403 那一条的关键词从「账号能登录」改成「写不进去」：R9 把旧那句
+       「账号能登录，但没有写文件的权限」拆成了「建不出来」/「写不进去」两句，自动同步
+       路径（`fail_text` == `Push` 关卡）拿到的是后者。 */
     let with_path = [
-        (WebdavError::Forbidden, "账号能登录"),
+        (WebdavError::Forbidden, "写不进去"),
         (WebdavError::Server(409), "这台服务器不允许程序自动建"),
         (WebdavError::Server(400), "不接受的字符"),
     ];
@@ -73,9 +79,12 @@ fn three_digit_run(text: &str) -> bool {
 ///
 /// 上一条只挑了 5 个变体（403 / 409 / 400 / 423 / 503），于是给 `Auth` 文案塞一句
 /// 「（返回 401）」它照样绿——用户能看到的每一句都得过这道闸，不是抽查。
+///
+/// [V0.11.16] 扩到 `fail_text_at` 的**全部关卡** × 全部变体：403 拆成四句之后，
+/// 「哪一句里漏了状态码」是新出现的风险面。
 #[test]
 fn no_bare_status_code_in_any_fail_text() {
-    let dir = "/Timing/md";
+    let dir = "/我的坚果云/Timing";
     let all = [
         WebdavError::Auth,
         WebdavError::Forbidden,
@@ -101,5 +110,71 @@ fn no_bare_status_code_in_any_fail_text() {
             !three_digit_run(&empty),
             "{err:?}（空路径）的文案里出现了裸状态码：{empty}"
         );
+        /* 四个关卡（`Dir` 的 ready=0 / ready>0 是两句不同的话，都要过） */
+        for stage in [
+            FailStage::Push,
+            FailStage::Account,
+            FailStage::Dir { level: dir, ready: 0 },
+            FailStage::Dir { level: dir, ready: 1 },
+            FailStage::Write,
+        ] {
+            let at = fail_text_at(stage, &err, dir);
+            assert!(!three_digit_run(&at), "{err:?} 在某一关漏了状态码：{at}");
+        }
     }
+}
+
+/// ⑫ R9：同一个 403 在**不同关卡**上说不同的话，各给一个动作。
+///
+/// 这是本轮「用户自己能分辨」的核心判据：v0.11.15 那句把三种可能并列，用户读完仍不
+/// 知道该动哪一个；现在「建不出来」与「写不进去」由程序自己在第 2 / 3 关分开。
+#[test]
+fn forbidden_text_splits_by_stage() {
+    let dir = "/我的坚果云/Timing";
+
+    let push = fail_text_at(FailStage::Push, &WebdavError::Forbidden, dir);
+    assert!(push.contains("写不进去"), "{push}");
+    assert!(!push.contains("建不出来"), "自动同步的 403 不该说目录建不出来：{push}");
+    assert!(push.contains("拖一个文件"), "要给出那个对照实验：{push}");
+    /* 旧签名 == `Push` 关卡：既有 3 个调用点的语义一个字都没变 */
+    assert_eq!(push, fail_text(&WebdavError::Forbidden, dir));
+
+    let account = fail_text_at(FailStage::Account, &WebdavError::Forbidden, dir);
+    assert!(account.contains("账号能登录"), "{account}");
+    assert!(account.contains("同一台服务端"), "{account}");
+
+    let first = fail_text_at(FailStage::Dir { level: dir, ready: 0 }, &WebdavError::Forbidden, dir);
+    assert!(first.contains("第一级"), "第一级就没建出来：{first}");
+    assert!(first.contains(dir), "{first}");
+
+    let deeper = fail_text_at(FailStage::Dir { level: dir, ready: 1 }, &WebdavError::Forbidden, dir);
+    assert!(deeper.contains("这一级建不出来"), "{deeper}");
+    assert!(deeper.contains("「/我的坚果云」已就绪"), "要点明上级已经就绪：{deeper}");
+    assert!(deeper.contains("名字用「Timing」"), "动作要具体到那一段名字：{deeper}");
+    assert!(!deeper.contains("拖一个文件"), "第 2 关不该说第 3 关的话：{deeper}");
+
+    let write = fail_text_at(FailStage::Write, &WebdavError::Forbidden, dir);
+    assert_eq!(write, push, "第 3 关与自动同步说同一句：目录都已就绪");
+}
+
+/// ⑬ R13 退路：路径含中文时追加一句可执行的退路（英文路径不加）。
+#[test]
+fn non_ascii_hint_only_for_non_ascii_paths() {
+    let hint = "改成英文再试一次";
+    let chinese = fail_text_at(
+        FailStage::Dir { level: "/我的坚果云/Timing", ready: 1 },
+        &WebdavError::Forbidden,
+        "/我的坚果云/Timing",
+    );
+    assert!(chinese.contains(hint), "{chinese}");
+
+    let ascii = fail_text_at(
+        FailStage::Dir { level: "/Vault/Timing", ready: 1 },
+        &WebdavError::Forbidden,
+        "/Vault/Timing",
+    );
+    assert!(!ascii.contains(hint), "纯英文路径不该出现中文退路：{ascii}");
+    /* 与「名字」无关的失败不加：超时是网络问题，不是目录名问题 */
+    let timeout = fail_text_at(FailStage::Account, &WebdavError::Timeout, "/我的坚果云/Timing");
+    assert!(!timeout.contains(hint), "{timeout}");
 }

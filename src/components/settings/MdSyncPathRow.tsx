@@ -11,7 +11,7 @@
 import type { MdSyncBinding, MdSyncBindingStatus } from '../../types/domain';
 import { MD_SYNC_KIND_LABELS } from '../../types/domain';
 import { Switch } from '../ui/Switch';
-import { previewFile } from './mdSyncConfig';
+import { bindingStatusText, previewFile } from './mdSyncConfig';
 
 interface MdSyncPathRowProps {
   binding: MdSyncBinding;
@@ -25,23 +25,9 @@ interface MdSyncPathRowProps {
   error?: string;
 }
 
-/** 运行状态一行字：`已写入 Markdown · 10:32` / `无变化` / `上次同步失败` / `尚未同步` */
-function statusText(status: MdSyncBindingStatus | undefined): string {
-  if (!status) return '尚未同步';
-  if (status.lastError) return '上次同步失败';
-  if (status.lastSyncAt == null) return '尚未同步';
-  const direction =
-    status.lastDirection === 'import'
-      ? '已从 Markdown 导入'
-      : status.lastDirection === 'export'
-        ? '已写入 Markdown'
-        : '无变化';
-  const time = new Date(status.lastSyncAt).toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-  return `${direction} · ${time}`;
-}
+/* [V0.11.16] 原来这里有一个私有的 `statusText`：现在搬到 `mdSyncConfig`
+   （逐档行与块③的聚合行必须是**同一套状态词**，两处各写一份就会出现「上面说已写入、
+   下面说无变化」这种自相矛盾的界面）。 */
 
 export function MdSyncPathRow({
   binding,
@@ -63,9 +49,8 @@ export function MdSyncPathRow({
       <header className="sync__card-head">
         <div className="sync__card-title">
           <h5 className="sync__kind">{label}</h5>
-          <p className="sync__desc">
-            文件名与标题来自「Markdown 落点设置」：<code>{file}</code>
-          </p>
+          {/* [V0.11.16] C17：这里原本还有一行「文件名与标题来自「Markdown 落点设置」：
+              `2026-11-07.md`」——它与块①的那句话重复，PRD A2 要求全页零命中，删掉。 */}
         </div>
         <div className="sync__card-tools">
           <Switch
@@ -96,7 +81,7 @@ export function MdSyncPathRow({
 
       <div className="sync__card-foot">
         <span className="sync__status" data-error={status?.lastError ? 'true' : 'false'}>
-          {statusText(status)}
+          {bindingStatusText(status)}
         </span>
         <button
           type="button"

@@ -14,7 +14,8 @@
 //! | `MKCOL` | 否则 | `dirs.insert(path)` → 201 |
 //! | `PUT` | `parent(path) ∉ dirs` | 409 |
 //! | `PUT` | 否则 | `put_status`（默认 201）+ `ETag` |
-//! | 其余 | — | 404（今天还没记，正常结果） |
+//! | `GET` | — | `get_status`（默认 404 = 今天还没记，正常结果） |
+//! | 其余 | — | 404 |
 //!
 //! ## 不变式：`""` 恒在 `dirs` 里
 //!
@@ -48,6 +49,8 @@ pub(crate) struct DirServer {
     /// `"*"` = 所有 MKCOL 都回这个码；其余键是**具体路径**。
     mkcol_fail: Arc<Mutex<HashMap<String, u16>>>,
     put_status: Arc<Mutex<u16>>,
+    /// `GET` 一律回这个码。默认 404 = 「今天还没记」，正是正常结果。
+    get_status: Arc<Mutex<u16>>,
 }
 
 impl DirServer {
@@ -63,12 +66,14 @@ impl DirServer {
         ));
         let mkcol_fail: Arc<Mutex<HashMap<String, u16>>> = Arc::new(Mutex::new(HashMap::new()));
         let put_status: Arc<Mutex<u16>> = Arc::new(Mutex::new(201));
+        let get_status: Arc<Mutex<u16>> = Arc::new(Mutex::new(404));
 
-        let (log, dirs_in, fail_in, put_in) = (
+        let (log, dirs_in, fail_in, put_in, get_in) = (
             seen.clone(),
             dirs.clone(),
             mkcol_fail.clone(),
             put_status.clone(),
+            get_status.clone(),
         );
         std::thread::spawn(move || {
             for stream in listener.incoming() {
@@ -80,7 +85,7 @@ impl DirServer {
                     path: path.clone(),
                     raw,
                 });
-                let (code, extra) = route(&method, &path, &dirs_in, &fail_in, &put_in);
+                let (code, extra) = route(&method, &path, &dirs_in, &fail_in, &put_in, &get_in);
                 let head = format!(
                     "HTTP/1.1 {code} {}\r\n{extra}Content-Length: 0\r\nConnection: close\r\n\r\n",
                     reason(code)
@@ -96,6 +101,7 @@ impl DirServer {
             dirs,
             mkcol_fail,
             put_status,
+            get_status,
         }
     }
 
@@ -120,6 +126,15 @@ impl DirServer {
     /// PUT 一律回 `code`（`409` 用来钉「补建之后仍 409 不许改写成语义」）。
     pub(crate) fn fail_put_with(&self, code: u16) -> &Self {
         *self.put_status.lock().expect("假服务器状态锁") = code;
+        self
+    }
+
+    /// `GET` 一律回 `code`（`401` 用来钉「第 1 关红在第 1 关」）。
+    ///
+    /// 默认 404：`probe` 把 404 判成「通」（同步 GET 的是 `{date}.md`，今天还没记很正常），
+    /// 所以默认值本身就是「一切正常」。要制造第 1 关失败必须显式改这里。
+    pub(crate) fn fail_get_with(&self, code: u16) -> &Self {
+        *self.get_status.lock().expect("假服务器状态锁") = code;
         self
     }
 
@@ -156,8 +171,35 @@ impl DirServer {
 fn request_line(raw: &str) -> (String, String) {
     let mut parts = raw.lines().next().unwrap_or("").split_whitespace();
     let method = parts.next().unwrap_or("").to_string();
+    /* 记**原样**（可能带百分号编码）：`non_ascii_base_path_builds_the_same_url_as_put`
+       正是靠读这份原文来证明「没有二次编码」。 */
     let path = parts.next().unwrap_or("").to_string();
     (method, path)
+}
+
+/// `%E6%88%91…` → `我…`。**只用于路由匹配**，不用于记录。
+///
+/// [V0.11.16] 路由表（`fail_mkcol_at` 的键、`dirs` 集合）用的是**用户填的中文路径**，
+/// 而 `url` crate 会把非 ASCII 段转成百分号编码。不解码的话「第 2 关在中文目录的某一级
+/// 403」永远匹配不上 override，用例会照着一个假规则绿——那比没有这条用例更糟。
+/// 记录（`hits()` / `method_paths()`）仍保留原文，否则会削弱「没有二次编码」那条证据。
+pub(super) fn decode_path(raw: &str) -> String {
+    let bytes = raw.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut at = 0;
+    while at < bytes.len() {
+        if bytes[at] == b'%' && at + 2 < bytes.len() {
+            let hex = std::str::from_utf8(&bytes[at + 1..at + 3]).ok();
+            if let Some(value) = hex.and_then(|digits| u8::from_str_radix(digits, 16).ok()) {
+                out.push(value);
+                at += 3;
+                continue;
+            }
+        }
+        out.push(bytes[at]);
+        at += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
 }
 
 /// 去掉最后一段。`parent("/Timing")` = `""`（根）。
@@ -174,7 +216,12 @@ fn route(
     dirs: &Arc<Mutex<HashSet<String>>>,
     mkcol_fail: &Arc<Mutex<HashMap<String, u16>>>,
     put_status: &Arc<Mutex<u16>>,
+    get_status: &Arc<Mutex<u16>>,
 ) -> (u16, String) {
+    /* 路由一律按**解码后的中文路径**匹配（见 `decode_path` 的说明）；响应里的
+    `Location` 用原文 `path`，那才是服务端真正会写的东西。 */
+    let decoded = decode_path(path);
+    let path = decoded.as_str();
     match method {
         "MKCOL" => {
             let forced = {
@@ -214,6 +261,9 @@ fn route(
                 (code, String::new())
             }
         }
+        /* `GET` 只用于 `md_webdav::probe`（第 1 关）。默认 404 = 「今天还没记」，
+           `probe` 判成通；要制造「账号/凭据不对」必须显式 `fail_get_with(401)`。 */
+        "GET" => (*get_status.lock().expect("假服务器状态锁"), String::new()),
         _ => (404, String::new()),
     }
 }
@@ -228,6 +278,7 @@ fn reason(code: u16) -> &'static str {
         307 => "Temporary Redirect",
         308 => "Permanent Redirect",
         400 => "Bad Request",
+        401 => "Unauthorized",
         403 => "Forbidden",
         405 => "Method Not Allowed",
         409 => "Conflict",

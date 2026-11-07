@@ -43,6 +43,8 @@ mod md_sync_todo_import;
 mod md_sync_todos;
 mod md_sync_upgrade;
 mod md_webdav;
+/* [V0.11.16] 「测试连接」三关的分诊证据（第 2 关带层级 / 第 3 关拖文件对照实验）。 */
+mod md_webdav_probe;
 /* MKCOL / 409 补建（V0.11.15，设计 §6.3）。 */
 mod md_webdav_dir;
 /* `fail_text` 的文案判据（状态码零命中）。 */

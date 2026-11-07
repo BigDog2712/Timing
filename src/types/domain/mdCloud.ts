@@ -50,10 +50,29 @@ export interface MdSyncCloudStatus {
 /** `md_sync_get` / `md_sync_save` 的返回：基础视图 + 云端状态（后端 `flatten`） */
 export type MdSyncViewCloud = MdSyncView & { cloud: MdSyncCloudStatus };
 
-/** 测试连接的结果；`ok = false` 时 `detail` 是给人看的一句话，不是 `HTTP 401` */
+/**
+ * 「测试连接」的三个关卡标识。**这是契约**（后端 `MdSyncTestStep.key` 的字面量），
+ * 中文标签在前端（`STEP_LABELS`）：改标签不必动 Rust，改这里的字符串就等于破契约。
+ */
+export type MdSyncTestStepKey = 'account' | 'dir' | 'write';
+
+/** 一关的结论（[V0.11.16] 三关分诊，PRD R8） */
+export interface MdSyncTestStep {
+  key: MdSyncTestStepKey;
+  ok: boolean;
+  /** 这一关失败时的一句人话；`null` = 通过 */
+  detail: string | null;
+}
+
+/** 测试连接的结果；`ok = false` 时 `detail` 是给人看的一句话，不是 `HTTP 403` */
 export interface MdSyncTestResult {
   ok: boolean;
   detail: string;
+  /**
+   * 只含**已经走过**的关（失败即停）。**可选**：浏览器 mock 与更老的后端没有这个字段，
+   * 前端据 `steps` 缺失退回「只显示 `detail`」那条渲染路径。
+   */
+  steps?: MdSyncTestStep[];
 }
 
 /** 备份列表的一项（事实全部读自备份文件名） */

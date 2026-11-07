@@ -1,0 +1,59 @@
+/* =============================================================================
+ * Timing — settings-data-slim.css（数据管理 · 做减法之后的那几个新位置，V0.11.16）
+ * -----------------------------------------------------------------------------
+ * 为什么不追加到 settings-sync.css：那个文件 281 行，本轮是「一个字节不许动」的红线；
+ * settings-data.css（折叠壳）也不该被塞进「某个块的内部行」。
+ *
+ * 规则与其余样式文件一致：只引用 var(--*)，无裸色值；单属性 / 短规则写一行
+ * （多文件共用 300 行门禁下的既有写法，见 settings-sync.css）。
+ *
+ * 五个类各管一处：
+ *   .sync__today       ① 文件名框右侧那行只读「今天：…」
+ *   .sync__heading-row ① 三个标题行各一段（没有种类说明、没有指路行）
+ *   .sync__tier-hint   ③ 异常时那一行提示 + 「逐个设置」
+ *   .sync__agg         ③ 聚合状态 + 「打开今日文件」
+ *   .sync-cloud__steps ④ 三关结论（账号 ✓ 目录 ✓ 写入 ✓）
+ *   .sync__latest      ⑤ 折叠标题下的当条记录
+ * ========================================================================== */
+
+.sync__today {
+  flex: none; max-width: 18ch; overflow: hidden;
+  font-family: var(--font-mono); font-size: var(--text-cap); color: var(--ink-4);
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sync__heading-row {
+  display: flex; flex-direction: column; gap: var(--space-1);
+}
+
+.sync__tier-hint {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--bg-field);
+}
+
+.sync__tier-text {
+  min-width: 0; overflow: hidden;
+  font-size: var(--text-cap); color: var(--ink-3);
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sync__tier-close { align-self: flex-start; height: 26px; padding: 0 var(--space-2); }
+
+.sync__agg {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--line);
+}
+
+.sync-cloud__steps {
+  display: inline-flex; flex-wrap: wrap; gap: var(--space-2);
+  font-size: var(--text-cap); color: var(--ink-3);
+}
+
+.sync-cloud__step[data-ok="false"] { color: var(--danger); }
+
+.sync__latest {
+  margin: var(--space-1) 0 0; overflow: hidden;
+  font-family: var(--font-mono); font-size: var(--text-cap); color: var(--ink-4);
+  text-overflow: ellipsis; white-space: nowrap;
+}

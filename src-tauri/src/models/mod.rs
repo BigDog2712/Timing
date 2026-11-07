@@ -9,6 +9,8 @@ pub mod item;
 pub mod md_sync;
 pub mod md_sync_cloud;
 pub mod md_sync_config;
+/* [V0.11.16] 「测试连接」的三关结果（从 `md_sync_cloud.rs` 搬出，给那个文件腾门禁余量）。 */
+pub mod md_sync_test_result;
 pub mod migration;
 pub mod moyu;
 pub mod native;

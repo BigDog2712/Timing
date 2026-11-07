@@ -1,12 +1,17 @@
 /**
- * Timing — 设置 · 同步 · 草稿编排（V0.11.13）
+ * Timing — 设置 · 数据管理 · 草稿编排（V0.11.13 → V0.11.16）
  * -----------------------------------------------------------------------------
  * 从 `MdSyncTab` 拆出（那里 298 行、贴到 300 行门禁）：切的口子是「状态与副作用」对
  * 「版面」。数字口径见 `mdSyncConfig.ts`。
- * 只允许**一份实例**：`MdSyncTab` 调本 Hook 并把结果传给两张卡。卡片各自再调一次会得到
+ * 只允许**一份实例**：`MdSyncTab` 调本 Hook 并把结果传给各块。卡片各自再调一次会得到
  * 两套互不相干的 state——用户在卡里填的地址按「保存」时读不到。
+ *
+ * [V0.11.16] 新增 `shared`：块①的「日记文件名」框与块③的「日记落点」框**不是**三档的
+ * 镜像，是「一条待执行的统一意图」（见 `mdSyncShared.ts`）。判据只有一条：
+ * **用户亲手改过那个框才扇出三档**。任一档被逐档面板手改时，对应字段的意图立刻作废，
+ * 否则保存时的扇出会把刚改的那一档盖回去。
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
 import { IS_MOBILE } from '../../lib/platform';
 import { errorText, mdSyncApi } from '../../services/api';
@@ -14,6 +19,8 @@ import { useMdSyncStore } from '../../stores/mdSyncStore';
 import { IPC_EVENTS } from '../../types/domain';
 import type { MdSyncBinding, MdSyncCloud, MdSyncKind, MdSyncReport } from '../../types/domain';
 import { POLL_DEFAULT_MINUTES, clampMinutes, emptyCloud, pollSecsOf, toMinutes } from './mdSyncConfig';
+import { NO_SHARED, applyShared, mirrorOf, sharedAfterEdit } from './mdSyncShared';
+import type { MdSyncShared } from './mdSyncShared';
 
 /**
  * 哪一块被改过。①（`format`）和③（`sync`）**共用同一个 `bindings` 数组**，所以脏标记
@@ -34,6 +41,14 @@ export interface MdSyncDraft {
   setPollMin(value: string): void;
   commitPoll(raw: string): void;
   bindings: MdSyncBinding[];
+  /** 单框的统一意图；`{file:null, root:null}` = 用户什么都没动过 */
+  shared: MdSyncShared;
+  /** 块①「日记文件名」框写这里（内部按「改回原值视为没改」归一） */
+  setSharedFile(value: string): void;
+  /** 块③「日记落点」框写这里 */
+  setSharedRoot(value: string): void;
+  /** 发给后端的数组 = `applyShared(bindings, shared)`。**保存与「测试连接」共用这一份** */
+  resolvedBindings: MdSyncBinding[];
   /** `part` = 这次改动属于哪一块（① 改 file/heading，③ 改 root/enabled） */
   updateBinding(index: number, next: MdSyncBinding, part: 'format' | 'sync'): void;
   cloud: MdSyncCloud;
@@ -72,6 +87,7 @@ export function useMdSyncDraft(): MdSyncDraft {
   const [enabled, setEnabledState] = useState(true);
   const [pollMin, setPollMinState] = useState(String(POLL_DEFAULT_MINUTES));
   const [bindings, setBindings] = useState<MdSyncBinding[]>([]);
+  const [shared, setSharedState] = useState<MdSyncShared>(NO_SHARED);
   const [cloud, setCloud] = useState<MdSyncCloud>(emptyCloud);
   const [modeConverted, setModeConverted] = useState(false);
   const [secret, setSecretState] = useState<string | null>(null);
@@ -85,7 +101,8 @@ export function useMdSyncDraft(): MdSyncDraft {
      密码不回填：视图只有 `hasSecret`，明文永远不出后端，`secret` 只归用户自己写。
      [V0.11.14] 修 O12：手机端不支持「本地目录」，于是**草稿里的 mode 直接换成 webdav**。
      旧的写法只在渲染时假装成 WebDAV、保存仍回 `localfolder`，落库和界面各说一套；现在
-     显示与落库是同一个值，代价是这一行说明（`modeConverted`）——改配置必须让用户看见。 */
+     显示与落库是同一个值，代价是这一行说明（`modeConverted`）——改配置必须让用户看见。
+     [V0.11.16] 回填时**不碰 `shared`**：意图只在用户输入时产生，回填代表「按已存的显示」。 */
   useEffect(() => {
     if (!view || dirty) return;
     setEnabledState(view.config.enabled);
@@ -112,12 +129,36 @@ export function useMdSyncDraft(): MdSyncDraft {
   };
   const setEnabled = (next: boolean) => { setEnabledState(next); touch('sync'); };
   const commitPoll = (raw: string) => { setPollMinState(String(clampMinutes(raw))); touch('sync'); };
+
+  /* 单框打字：意图用**基准档的值**判断「有没有改过」，所以「打成原值 / 打完再删回原样」
+     都会回到 `null`（PRD R-3 的误伤判据，见 `mdSyncShared.test.ts`）。 */
+  const setSharedFile = (value: string) => {
+    setSharedState((current) => ({ ...current, file: sharedAfterEdit(mirrorOf(bindings, 'file'), value) }));
+    touch('format');
+  };
+  const setSharedRoot = (value: string) => {
+    setSharedState((current) => ({ ...current, root: sharedAfterEdit(mirrorOf(bindings, 'root'), value) }));
+    touch('sync');
+  };
+
+  /* 逐档面板手改 → **作废对应字段的统一意图**：不然保存时的扇出会把刚改的那一档盖回去。
+     按字段 diff 而不是「整条清空」：只改了 `root` 就不该顺手丢掉 `file` 的意图。 */
   const updateBinding = (index: number, next: MdSyncBinding, part: 'format' | 'sync') => {
+    const prev = bindings[index];
     setBindings((current) => current.map((item, i) => (i === index ? next : item)));
+    if (prev && (next.root !== prev.root || next.file !== prev.file)) {
+      setSharedState((current) => ({
+        file: next.file !== prev.file ? null : current.file,
+        root: next.root !== prev.root ? null : current.root,
+      }));
+    }
     touch(part);
   };
   const updateCloud = (next: MdSyncCloud) => { setCloud(next); touch('cloud'); };
   const setSecret = (value: string | null) => { setSecretState(value); touch('cloud'); };
+
+  /** 发给后端的那一份：所有写库 / 测试连接的**唯一**出口 */
+  const resolvedBindings = useMemo(() => applyShared(bindings, shared), [bindings, shared]);
 
   /* 放弃修改：不自己拼回填逻辑，只把 `dirty` 放回 false——上面的回填 effect 依赖
      `[view, dirty]`，会立刻按 `view` 重填草稿。这样「放弃修改」与「切到别的页签再回来」
@@ -125,6 +166,7 @@ export function useMdSyncDraft(): MdSyncDraft {
   const discard = () => {
     setDirty(false);
     setDirtyParts(CLEAN_PARTS);
+    setSharedState(NO_SHARED);
     setSecretState(null); /* 明文不进后端就作废；下次保存回到「不动已存密文」 */
     setNotice(null);
   };
@@ -133,10 +175,12 @@ export function useMdSyncDraft(): MdSyncDraft {
     try {
       /* 密码三分的**唯一**出口：`null`（没碰过）→ `undefined`（不动）。写成 `''` 是一条
          「清空密码」的指令，会把用户已存的密文删掉。 */
-      await storeSave({ enabled, pollSecs: pollSecsOf(pollMin), bindings, cloud }, secret ?? undefined);
+      await storeSave({ enabled, pollSecs: pollSecsOf(pollMin), bindings: resolvedBindings, cloud }, secret ?? undefined);
       setPollMinState(String(clampMinutes(pollMin)));
       setDirty(false);
       setDirtyParts(CLEAN_PARTS);
+      /* 落库后三档已被统一，`mirrorOf` 自然等于刚写的值 → 单框不跳 */
+      setSharedState(NO_SHARED);
       setSecretState(null); /* 密码已进后端（或已清空），本地不留明文；下次保存回到「不动」 */
       setNotice('已保存并同步');
       return true;
@@ -162,7 +206,8 @@ export function useMdSyncDraft(): MdSyncDraft {
   };
 
   return {
-    enabled, setEnabled, pollMin, setPollMin: setPollMinState, commitPoll, bindings, updateBinding,
+    enabled, setEnabled, pollMin, setPollMin: setPollMinState, commitPoll, bindings,
+    shared, setSharedFile, setSharedRoot, resolvedBindings, updateBinding,
     cloud, updateCloud, modeConverted, secret, setSecret, dirty, dirtyParts,
     /* 老配置（V0.11.12 及以前）没有 `cloud` 这个键 → `null` → ④ 默认收起 */
     cloudConfigured: view?.config.cloud != null,

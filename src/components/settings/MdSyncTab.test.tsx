@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MdSyncBinding, MdSyncViewCloud } from '../../types/domain';
 import type { DataRootInfo } from '../../types/domain/dataRoot';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
+import { REMOVED_PHRASES } from './mdSyncCopy';
 
 /* [V0.11.15] 本文件只测**壳**：五块顺序 / 折叠 aria / 底部条 / 脏标记归属 / 保存。
    每块的字段口径在自己那份测试里（`MdFormatBlock.test.tsx` / `MdDataRootBlock.test.tsx`）。 */
@@ -172,8 +173,8 @@ describe('MdSyncTab —— 数据管理页签壳', () => {
 
   it('改③的根目录只在块③出现「未保存」（与上一条互为镜像）', async () => {
     await mount();
-    const target = input('便利贴落点根目录');
-    if (!target) throw new Error('找不到块③的根目录输入框');
+    const target = input('日记落点根目录');
+    if (!target) throw new Error('找不到块③的日记落点输入框');
     await setValue(target, 'D:\\NewVault');
 
     expect(block('data-sync')?.querySelector('.data__dirty')?.textContent).toBe('未保存');
@@ -190,8 +191,8 @@ describe('MdSyncTab —— 数据管理页签壳', () => {
 
   it('「保存并同步」把草稿交给后端，成功后「未保存」与底部提示一起消失', async () => {
     await mount();
-    const target = input('事项计时落点根目录');
-    if (!target) throw new Error('找不到块③的根目录输入框');
+    const target = input('日记落点根目录');
+    if (!target) throw new Error('找不到块③的日记落点输入框');
     await setValue(target, 'D:\\NewVault');
 
     await act(async () => {
@@ -203,7 +204,11 @@ describe('MdSyncTab —— 数据管理页签壳', () => {
       expect.objectContaining({
         enabled: true,
         pollSecs: 900,
-        bindings: [{ ...BINDINGS[0], root: 'D:\\NewVault' }, BINDINGS[1]],
+        /* [V0.11.16] 单框写三档：两档原本同值（`C:\\Vault`），用户手改了 → 一起变成新值 */
+        bindings: [
+          { ...BINDINGS[0], root: 'D:\\NewVault' },
+          { ...BINDINGS[1], root: 'D:\\NewVault' },
+        ],
       }),
       /* 没碰密码框 → `undefined`（不动已存密文） */
       undefined,
@@ -211,6 +216,34 @@ describe('MdSyncTab —— 数据管理页签壳', () => {
     expect(container.textContent).toContain('已保存并同步');
     expect(container.querySelector('.data__dirty')).toBeNull();
     expect(barHint()).toBe('');
+  });
+
+  /* ===== [V0.11.16] 文案减法的机器判据（PRD A1 / A2 / A3）===== */
+
+  it('A1：页签顶部没有导览句、底部没有注脚，四块标题下各只有一句', async () => {
+    await mount();
+    expect(container.querySelector('.data__head')?.textContent).toBe('数据管理');
+    /* 底部注脚（C2：「今天：…。同步只改目标标题下的区块，日记其他内容不动。」）整段删除：
+       块①里那句 `.data__note` 是 C8 的安全句，只能留在块里，不能再出现在页签层 */
+    const page = container.querySelector('.data') as HTMLElement;
+    expect(page.querySelector(':scope > .data__note')).toBeNull();
+    for (const id of ['data-root', 'data-sync', 'data-cloud', 'data-backup']) {
+      expect(block(id)?.querySelectorAll('.data__block-hint')).toHaveLength(1);
+    }
+  });
+
+  it('A2：三句被删掉的话全页零命中（含④⑤的折叠体，它们仍然挂载）', async () => {
+    await mount();
+    const text = container.textContent ?? '';
+    for (const phrase of REMOVED_PHRASES) {
+      expect(text).not.toContain(phrase);
+    }
+  });
+
+  it('A3：「日记其他内容不动」全页恰好 1 处（块①末句），同一句话说三遍的毛病已收掉', async () => {
+    await mount();
+    const text = container.textContent ?? '';
+    expect(text.split('日记其他内容不动').length - 1).toBe(1);
   });
 
   it('保存失败且能定位到落点时，红字落在块里，页签顶部不再重复一遍', async () => {

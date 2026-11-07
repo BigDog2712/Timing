@@ -1,25 +1,35 @@
-//! 「测试连接」：在**未保存**的配置上先验一遍，回答「这么填能用吗」（设计 §3.5）。
+//! 「测试连接」：在**未保存**的配置上先验一遍，回答「这么填能用吗」（设计 §3.5 / §4.4）。
 //!
-//! 从 `mod.rs` 拆出来是为了让那边只剩「判据 + 分派」（它贴着 150 行预算）：这里只做
-//! 一次探测，不写任何状态——不建 `{date}.md`、不落 `pending`、不改配置。
+//! 从 `md_cloud/mod.rs` 拆出来是为了让那边只剩「判据 + 分派」：这里只做一次探测，
+//! 不写任何状态——不建 `{date}.md`、不落 `pending`、不改配置。
 //!
-//! 两个模式都问「能不能写」：本地目录写一个探针文件；WebDAV 走 `probe`（地址与凭据）
-//! + `ensure_base_dir`（目录就绪）两关。
+//! ## 三关（[V0.11.16]，PRD R8/R9）
 //!
-//! 只有地址通、目录没建出来，同步照样一路 409——V0.11.15 修的就是这个
-//! 「测试连接绿字、同步却写不上去」。
+//! ```text
+//! 第 1 关 账号   probe(target, "")            → 地址通、凭据对
+//! 第 2 关 目录   dir::ensure_base_dir(target) → 每一级 MKCOL 就绪（失败带出「卡在第几级」）
+//! 第 3 关 写入   probe_file::write_probe      → PUT 一个探针文件，随后 DELETE
+//! ```
 //!
-//! [V0.11.14] 修 O8：`probe` 现在给三档结论，405 / 3xx 这一档是「通，但服务端不支持
-//! 直接读目录」。它必须判成**通过**并说清原因——很多服务端对「GET 一个目录」本来就
-//! 回 405，用户却按旧文案以为地址或密码填错了。
+//! 每关失败即 `return`，后续关**不出现**（PRD E6「红在第 1 关时第 2、3 关不显示通过」
+//! 由数据结构保证，不靠前端藏）。`ok` / `detail` 的语义一个字没变：老渲染路径不退化。
+//!
+//! 为什么不用「一个 `if dir_exists` 去猜」：`403` 在 MKCOL 与 PUT 上成因不同，而「目录
+//! 在不在」这个布尔量在 PUT 403 时**恰恰可能为真**（目录在，但只读 / 配额满）——用它
+//! 分诊会把「写不进去」误报成「建不出来」，用户去网页版建一个已经存在的目录。
+//!
+//! ## 旧口径仍然有效
+//!
+//! [V0.11.14] 修 O8：`probe` 给三档结论，405 / 3xx 这一档是「通，但服务端不支持直接
+//! 读目录」——必须判成**通过**并说清原因（很多服务端对「GET 一个目录」本来就回 405）。
 
 use sqlx::SqlitePool;
 
-use super::round_push;
+use super::text::{FailStage, dir_label, fail_text_at};
 use crate::error::AppResult;
 use crate::infra::md_webdav;
 use crate::infra::secret as secret_store;
-use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud, MdSyncTestResult};
+use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud, MdSyncTestResult, MdSyncTestStep};
 use crate::models::md_sync_config::MdSyncConfig;
 
 /// 在给定配置上测一次。`secret = Some(..)` 用用户刚输入的密码，`None` 用已存的那份。
@@ -43,15 +53,38 @@ pub async fn test_connection(
     }
 }
 
+/// 还没走到第一关就结束（没配通道 / 字段不合法 / 没密码）：`steps` 为空，
+/// 前端据此退回「只显示 `detail`」那条老渲染路径。
 fn verdict(ok: bool, detail: impl Into<String>) -> MdSyncTestResult {
     MdSyncTestResult {
         ok,
         detail: detail.into(),
+        steps: Vec::new(),
     }
 }
 
-/// `LocalFolder`：判「这个目录能不能写」。探针文件名带点前缀，写完立刻删掉——
-/// 测连接不该在用户的同步目录里留下一份内容可疑的文件。
+fn step(key: &str, ok: bool, detail: Option<String>) -> MdSyncTestStep {
+    MdSyncTestStep {
+        key: key.to_string(),
+        ok,
+        detail,
+    }
+}
+
+/// 停在某一关：**只把走过的关带出去**，失败那一关的 `detail` 同时充当摘要句
+/// （不拼接、不改写——用户看到的就是那一关要说的话）。
+fn stopped(mut steps: Vec<MdSyncTestStep>, key: &str, detail: String) -> MdSyncTestResult {
+    steps.push(step(key, false, Some(detail.clone())));
+    MdSyncTestResult {
+        ok: false,
+        detail,
+        steps,
+    }
+}
+
+/// `LocalFolder`：判「这个目录能不能写」。探针写完立刻删掉。
+///
+/// 这条路只有一个动作，所以 `steps` 是空 vec：硬造三关只会让界面多出两行假结论。
 fn test_folder(cloud: &MdSyncCloud) -> MdSyncTestResult {
     let root = match cloud.resolve_root() {
         Ok(path) => path,
@@ -70,22 +103,10 @@ fn test_folder(cloud: &MdSyncCloud) -> MdSyncTestResult {
     }
 }
 
-/// `Webdav`：**两件事**都过才绿字（V0.11.15 修 409）。
+/// `Webdav`：三关都过才绿字。
 ///
-/// 旧版只做 `probe`（判地址 + 凭据），于是「测试连接」绿字而同步一路 409——绿字必须
-/// 等于**真的能写**。现在的判据是「地址与凭据可用」+「云端目录已就绪」：
-///
-/// ```text
-/// probe(target, "")        → Err → 红字 fail_text（早退，不建目录）
-/// ensure_base_dir(target)
-///   Ready{created: 0}      → 绿字「连接正常，云端目录「/Timing/md」已就绪」
-///   Ready{created: n}      → 绿字「…已补建云端目录…（新建 n 级）」
-///   TooDeep{levels}        → 红字「…有 {levels} 级，程序最多自动建 8 级…」
-///   Err(e)                 → 红字 fail_text
-/// ```
-///
-/// `probe` 自己的三档语义（`Reachable` / `NoDirectoryListing`）**没变**：后者的信息量
-/// （「服务端不支持直接读目录，但同步单个文件不受影响」）追加在绿字末尾，别丢。
+/// 绿字的判据是「**真的写过一份文件**」：只验地址与凭据（v0.11.14 之前）会让
+/// 「测试连接绿字、同步一路 409/403」反复出现。
 async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestResult {
     let password = match secret {
         Some(value) if !value.trim().is_empty() => value.to_string(),
@@ -101,44 +122,66 @@ async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestRes
         Err(err) => return verdict(false, err),
     };
     let target = md_webdav::WebdavTarget::new(&cloud.base_url, &dir, &cloud.user, &password);
-    /* 第一关：地址与凭据。`NoDirectoryListing` 也是通过——同步 GET 的是 `{date}.md`
+
+    /* 第 1 关：地址与凭据。`NoDirectoryListing` 也是通过——同步 GET 的是 `{date}.md`
     这个具体文件，服务端不肯对目录发 GET 不影响这条通道。 */
     let listing = match md_webdav::probe(&target, "").await {
         Ok(md_webdav::ProbeOutcome::Reachable) => None,
         Ok(md_webdav::ProbeOutcome::NoDirectoryListing(code)) => Some(code),
-        Err(err) => return verdict(false, round_push::fail_text(&err, &target.base_path)),
+        Err(err) => {
+            let text = fail_text_at(FailStage::Account, &err, &target.base_path);
+            return stopped(vec![], "account", text);
+        }
     };
-    /* 第二关：目录就绪。这才证明「能写」，也是本轮修 409 的落地点。 */
-    let (mut detail, ok) = match md_webdav::dir::ensure_base_dir(&target).await {
-        Ok(md_webdav::dir::EnsureOutcome::Ready { created: 0, .. }) => (
-            format!(
-                "连接正常，云端目录{}已就绪",
-                round_push::dir_label(&target.base_path)
-            ),
-            true,
-        ),
-        Ok(md_webdav::dir::EnsureOutcome::Ready { created, .. }) => (
-            format!(
-                "连接正常，已补建云端目录{}（新建 {created} 级）",
-                round_push::dir_label(&target.base_path)
-            ),
-            true,
-        ),
-        Ok(md_webdav::dir::EnsureOutcome::TooDeep { levels }) => (
-            format!(
+    let mut steps = vec![step("account", true, None)];
+
+    /* 第 2 关：目录就绪。失败时 `DirFailure` 带出「卡在第几级」，文案据此分诊。 */
+    let created = match md_webdav::dir::ensure_base_dir(&target).await {
+        Ok(md_webdav::dir::EnsureOutcome::Ready { created, .. }) => created,
+        Ok(md_webdav::dir::EnsureOutcome::TooDeep { levels }) => {
+            let text = format!(
                 "远端目录{}有 {levels} 级，程序最多自动建 {} 级；\
                  请到网盘网页版手动建好，或把目录改浅一点",
-                round_push::dir_label(&target.base_path),
+                dir_label(&target.base_path),
                 md_webdav::dir::MAX_LEVELS
-            ),
-            false,
-        ),
-        Err(err) => (round_push::fail_text(&err, &target.base_path), false),
-    };
-    if let Some(code) = listing {
-        if ok {
-            detail.push_str(&format!("（服务端不支持直接读目录，{code} 已按正常处理）"));
+            );
+            return stopped(steps, "dir", text);
         }
+        Err(failure) => {
+            let text = fail_text_at(
+                FailStage::Dir {
+                    level: &failure.level,
+                    ready: failure.ready,
+                },
+                &failure.error,
+                &target.base_path,
+            );
+            return stopped(steps, "dir", text);
+        }
+    };
+    steps.push(step("dir", true, None));
+
+    /* 第 3 关：真写一次再删掉。这是唯一能把「目录建得出来但写不进去」从 403 里分离
+    出来的手段（PRD Q3 的裁决理由）。 */
+    if let Err(err) = md_webdav::probe_file::write_probe(&target).await {
+        let text = fail_text_at(FailStage::Write, &err, &target.base_path);
+        return stopped(steps, "write", text);
     }
-    verdict(ok, detail)
+    steps.push(step("write", true, None));
+
+    let mut detail = String::from("账号、目录、写入都通过");
+    if created > 0 {
+        detail.push_str(&format!("（新建 {created} 级目录）"));
+    }
+    if let Some(code) = listing {
+        /* 状态码只进日志（全项目同一条纪律）：绿字里带 `405` 对用户零信息量，
+           而排障时「服务端到底回了什么」恰恰是第一条要看的线索。 */
+        crate::log_info!("md cloud test: dir listing unsupported code={code}");
+        detail.push_str("（服务端不支持直接读目录，已按正常处理）");
+    }
+    MdSyncTestResult {
+        ok: true,
+        detail,
+        steps,
+    }
 }

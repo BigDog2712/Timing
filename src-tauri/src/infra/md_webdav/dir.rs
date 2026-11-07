@@ -67,6 +67,24 @@ pub enum EnsureOutcome {
     TooDeep { levels: usize },
 }
 
+/// MKCOL 链的失败：**哪一级**、**上级就绪几级**、**因为什么**（[V0.11.16] 坑 3）。
+///
+/// `error` 保持 `WebdavError` 原样：状态码 → 错误码的判据仍只有 `fail_on_status`
+/// 一处；`level` / `ready` 是给文案用的位置信息，**不进错误码、不进网络层**。
+///
+/// 为什么必须带出位置：`403` 在 MKCOL 与 PUT 上成因不同，而「目录在不在」这个布尔量
+/// 在 PUT 403 时恰恰可能为真（目录在，但只读 / 配额满）。用它分诊会把「写不进去」
+/// 误报成「建不出来」，用户去网页版建一个已经存在的目录。关卡是程序已经知道的事实，
+/// 用它不花任何代价。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirFailure {
+    /// 卡住的那一级，形如 `/我的坚果云/Timing`（与 `level_path()` 同源，日志同一个词）
+    pub level: String,
+    /// 已经就绪的上级级数（0 = 第一级就没建出来）
+    pub ready: usize,
+    pub error: WebdavError,
+}
+
 impl WebdavTarget {
     /// `base_path` 的段（空 → 空 vec）。`/` 与空串都得到 0 级。
     pub fn dir_levels(&self) -> Vec<&str> {
@@ -115,7 +133,11 @@ pub async fn probe(target: &WebdavTarget, rel: &str) -> Result<ProbeOutcome, Web
 }
 
 /// 按需把 `base_path` 逐级建出来。调用方只在「PUT 409」与「测试连接」两处用它。
-pub async fn ensure_base_dir(target: &WebdavTarget) -> Result<EnsureOutcome, WebdavError> {
+///
+/// [V0.11.16] 返回类型从 `Result<_, WebdavError>` 变成 `Result<_, DirFailure>`：
+/// 「目录建不出来」与「文件写不进去」都可能是 403，**只有关卡能分辨它们**。
+/// `TooDeep` 仍是 `Ok` 变体（不是错误，语气由调用方决定，v0.11.15 的口径不动）。
+pub async fn ensure_base_dir(target: &WebdavTarget) -> Result<EnsureOutcome, DirFailure> {
     let levels = target.dir_levels();
     let total = levels.len();
     if total == 0 {
@@ -128,7 +150,11 @@ pub async fn ensure_base_dir(target: &WebdavTarget) -> Result<EnsureOutcome, Web
     /* `..` 检查**先于任何请求**：服务端会把它规范化掉，于是 MKCOL 会建到用户没填的
     层级上去；`url_for` 在文件路径上同样拒（设计 §2.2 最后一行）。 */
     if levels.contains(&"..") {
-        return Err(WebdavError::Network("远端目录不能包含 ..".into()));
+        return Err(DirFailure {
+            level: level_path(target, total),
+            ready: 0,
+            error: WebdavError::Network("远端目录不能包含 ..".into()),
+        });
     }
     if total > MAX_LEVELS {
         return Ok(EnsureOutcome::TooDeep { levels: total });
@@ -136,8 +162,17 @@ pub async fn ensure_base_dir(target: &WebdavTarget) -> Result<EnsureOutcome, Web
     let mut created = 0usize;
     /* 浅 → 深，顺序不可换：每一级的父级必须先存在，否则必然 409。 */
     for level in 1..=total {
-        if mkcol(target, level).await? {
-            created += 1;
+        match mkcol(target, level).await {
+            Ok(true) => created += 1,
+            Ok(false) => {}
+            /* 已经在的就留着（模块头红线：不回滚、不删远端任何东西），只把位置带出去 */
+            Err(error) => {
+                return Err(DirFailure {
+                    level: level_path(target, level),
+                    ready: level - 1,
+                    error,
+                })
+            }
         }
     }
     crate::log_info!(
@@ -150,6 +185,15 @@ pub async fn ensure_base_dir(target: &WebdavTarget) -> Result<EnsureOutcome, Web
         created,
         levels: total,
     })
+}
+
+/// 只关心「建好了没」的调用方（`put` 的 409 补建）：丢掉关卡信息。
+///
+/// `put` 的 409 语义在 v0.11.15 就已经定死（「再 409 = 配额 / 只读」，见模块头），
+/// 那里不需要知道卡在第几级；留着 `DirFailure` 会让那句 `match` 多三行，
+/// 而 `mod.rs` 是本轮点名「不许变长」的四个临界文件之一。
+pub async fn ensure_base_dir_err(target: &WebdavTarget) -> Result<EnsureOutcome, WebdavError> {
+    ensure_base_dir(target).await.map_err(|failure| failure.error)
 }
 
 /// 建一级目录。`Ok(true)` = 建成了，`Ok(false)` = 已经存在（幂等）。

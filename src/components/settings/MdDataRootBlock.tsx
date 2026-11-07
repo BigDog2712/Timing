@@ -4,7 +4,12 @@
  * 责任边界：显示**当前生效**的数据根 + 可写徽标 + 打开文件夹 + 更改位置… + 待生效黄条
  * + 受 `%APP_DIR%` 影响的落点种类 + 插件提示。改位置的动作细节在 `MdDataRootChange`。
  *
- * 三条必须写进代码里的口径：
+ * [V0.11.16] 说明文字从 4 段压到 1 句（C9 在块标题下、C10 删、C11 改短）：这块**唯一的
+ * 输入动作是两个按钮**，五段文字讲一个只读路径属于 PRD 2.3 点名的「话说得比事多」。
+ * 黄条（C12）与插件提示（C13）是**安全文案，零 diff**：前者说「重启后才生效」，
+ * 后者是回退态下唯一会说「插件不见了」的地方。
+ *
+ * 三条口径（v0.11.15 立、本轮不变）：
  * 1. **只显示 `current`**，不显示 `defaultPath`：后者是出厂值（`<exe>\data`），回退态下
  *    与当前生效目录完全不同，混用会让用户看到错的路径（设计 §8-7）。
  * 2. **待生效不是失败**：切换成功后后端返回的 `pending` 立刻是 `Some(新目录)`，黄条写的
@@ -17,6 +22,7 @@ import { IS_MOBILE } from '../../lib/platform';
 import { dataRootApi, rawIpcText } from '../../services/api';
 import type { DataRootInfo } from '../../types/domain/dataRoot';
 import { MdDataRootChange } from './MdDataRootChange';
+import { COPY } from './mdSyncCopy';
 
 export function MdDataRootBlock() {
   /* 守卫放外层：hooks 必须无条件按序调用，函数内提前 return 会打破这条规则 */
@@ -77,9 +83,8 @@ function DataRootBody() {
           <div className="data__field">
             <span className="data__label">当前数据目录</span>
             <p className="data__path" title={info.current}>{info.current}</p>
-            <p className="data__note">
-              程序、数据库、日志、备份、Markdown 出厂落点都在这里。
-            </p>
+            {/* [V0.11.16] C10：这里原本还有一句「程序、数据库、日志、备份、Markdown
+                出厂落点都在这里。」——块标题下的 hint 已经说过同一件事，删掉。 */}
           </div>
 
           <div className="data__row">
@@ -112,11 +117,10 @@ function DataRootBody() {
             </div>
           )}
 
+          {/* C11：只在确有三档 `%APP_DIR%` 落点时出现，且压成一句（受影响的是哪三档,
+              上面那句话已经不必再念一遍） */}
           {info.affected.length > 0 && (
-            <p className="data__note">
-              这些落点写成 %APP_DIR%，会跟着数据根一起搬：{info.affected.join('、')}。
-              写成绝对路径的落点不受影响。
-            </p>
+            <p className="data__note">{COPY.affectedNote}</p>
           )}
 
           {/* 回退态下插件就在数据根里：切换不会复制它，这是唯一会说「插件不见了」的场景 */}
