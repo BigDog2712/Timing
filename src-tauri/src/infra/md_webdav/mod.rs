@@ -20,15 +20,15 @@ use reqwest::{Client, StatusCode};
 
 use crate::models::constants::{MD_CLOUD_CONNECT_SECS, MD_CLOUD_READ_SECS};
 
-/* 对**目录**发请求的那一半（`probe` 与 MKCOL）：判定表只有一张，见 `dir.rs` 头注释。
-`probe` / `ProbeOutcome` re-export 出来，调用点不必知道拆过（两处都是 L4 叶子）。 */
+/* 对**目录**发请求的那一半（`probe` / MKCOL），加探针 `probe_file` 与日志词表 `tag`（[QA G2] 从 `dir.rs` 搬出）：
+判定表只有一张（见 `dir.rs` 头注释）；`probe` / `ProbeOutcome` re-export 出来，调用点不必知道拆过。 */
 pub mod dir;
 pub mod probe_file;
+pub(crate) mod tag;
 pub use dir::{probe, ProbeOutcome};
 
-/// 服务端日志里能分辨出是谁在写。版本号随 `Cargo.toml` 走，不单独维护一份——
-/// [V0.11.13] 硬编码 `"Timing/0.11.13"` 那种写法下次升版必忘。
-/* `pub(super)`：`dir.rs` 与 `probe_file.rs` 的请求都要带同一个 UA（同一版本串）。 */
+/// 服务端日志里能分辨出是谁在写。版本号随 `Cargo.toml` 走，[V0.11.13] 硬编码版本串下次升版必忘。
+/// `pub(super)`：`dir.rs` / `probe_file.rs` 的请求都要带同一个 UA（同一版本串）。
 pub(super) const USER_AGENT: &str = concat!("Timing/", env!("CARGO_PKG_VERSION"));
 
 /// 一次 WebDAV 调用的全部参数。`password` 是**应用密码**（坚果云登录密码必然失败）。

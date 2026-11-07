@@ -51,7 +51,7 @@ export function mixedFileNote(labels: string[]): string {
 export const MIXED_ROOT_PREFIX = '三档落点不同：';
 
 /**
- * C11 的**实际那一句**（[QA F3] 回修）。
+ * C11 的**实际那一句**（[QA F3] 回修，[QA G3] 补兜底）。
  *
  * v0.11.16 首版无条件用「这**三档**落点跟着数据根一起搬。」，而后端
  * `data_root::affected_kinds` 返回的是**子集**（老用户常见 `timers=C:\Vault,
@@ -60,8 +60,13 @@ export const MIXED_ROOT_PREFIX = '三档落点不同：';
  *
  * 三档齐全时仍用 PRD 4.0 的原句（逐字），否则点名到底是哪几档。"这"→"待办事项"这类
  * 点名比一个含糊的量词有用：用户要判断「我改数据根会不会动到这一档」。
+ *
+ * **空数组返回空串**（[QA G3]）：v0.11.16 首版会拼出「跟着数据根一起搬。」——一句没有
+ * 主语的话。函数自己必须安全，不能指望调用方先判 `affected.length > 0`（那种约定在
+ * 下一次调用时就会破）。调用方按「空串即不渲染这一行」处理。
  */
 export function affectedNoteFor(labels: string[]): string {
+  if (labels.length === 0) return '';
   if (labels.length === 3) return COPY.affectedNote;
   return `${labels.join('、')}跟着数据根一起搬。`;
 }

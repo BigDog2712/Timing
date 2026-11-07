@@ -179,10 +179,12 @@ fn non_ascii_hint_only_for_non_ascii_paths() {
     assert!(!timeout.contains(hint), "{timeout}");
 }
 
-/// ⑭ [QA F5] 日志词表：`Server` 带状态码，且两份实现逐变体一致。
+/// ⑭ [QA F5 / G2] 日志词表：`Server` 带状态码，且两份实现逐变体一致。
 ///
-/// 这轮之前「`infra::dir` 与 `services::text` 是同一套词表」只是两处注释的自称——
-/// 谁改一边都不会红。现在它是机器判据：排障 grep（`fail=Server(400)`）的契约在这里。
+/// 这轮之前「`infra::md_webdav::tag` 与 `services::text` 是同一套词表」只是两处注释的
+/// 自称——谁改一边都不会红。现在它是机器判据：排障 grep（`fail=Server(400)`）的契约在这里。
+/// [QA G2] `fail_tag` 从 `dir.rs` 搬到 `tag.rs`（那边只剩 2 行余量），import 跟着改；
+/// 判据一个字没变——搬文件不该顺手放宽断言。
 ///
 /// 为什么必须是 `Server(<码>)` 而不是 `Server`：400（名字里有服务端不接受的字符 →
 /// 改目录名）与 5xx（服务端自己出错 → 等一等自动重试）的处置完全相反，丢码就只能靠猜。
@@ -203,7 +205,7 @@ fn log_vocabulary_agrees_and_carries_status_code() {
 
     for err in &cases {
         let service = fail_tag(err).to_string();
-        let infra = crate::infra::md_webdav::dir::fail_tag(err).to_string();
+        let infra = crate::infra::md_webdav::tag::fail_tag(err).to_string();
         assert_eq!(service, infra, "两份日志词表必须逐变体一致（{err:?}）");
         /* 词表是给 `fail={}` 用的：不许有空格、不许是空串 */
         assert!(!service.is_empty() && !service.contains(' '), "{service}");

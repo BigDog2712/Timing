@@ -41,8 +41,15 @@ export function MdSyncRootRow({ draft }: MdSyncRootRowProps) {
   const root = sharedValue(bindings, shared, 'root');
   const file = sharedValue(bindings, shared, 'file');
   const saved = view?.status.bindings.find((item) => item.kind === base.kind);
-  /* 草稿与已保存一致 → 后端给的路径就是真相；不一致 → 说清「保存后」会写到哪 */
-  const same = root === base.root && file === base.file;
+  /* [QA G1] 判据是「草稿是否等于**已落库**的那一档」，不是「草稿是否等于基准档」。
+     v0.11.16 首版写成 `root === base.root && file === base.file`，而 `base` 是**草稿**里的
+     基准档——F2 之后逐档手改会把值写进 `bindings`，于是 `same` 恒为 true，`保存后：` 那个
+     分支成了死代码。用户看到的是同一屏两处路径自相矛盾：上面那行「今天：C:\Vault\…」
+     （后端旧值），紧挨着的逐档行已经是「D:\x\…」。
+     比 `view.config.bindings`（后端已落库那份）就回到本意：草稿与已落库不同 → 说「保存后」。
+     `view` 变了本组件本来就会重渲染（下面 `useMdSyncStore` 整份订阅），不需要额外依赖。 */
+  const storedBase = view?.config.bindings.find((item) => item.kind === base.kind);
+  const same = storedBase !== undefined && root === storedBase.root && file === storedBase.file;
   const joined = `${root.trim() || '尚未设置根目录'}\\${previewFile(file, today)}`;
   const pathText = same ? `今天：${saved?.path || joined}` : `保存后：${joined}`;
 

@@ -110,12 +110,16 @@ describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
     expect(affectedNoteFor(['事项计时', '便利贴', '待办事项'])).toBe(EXPECTED.C11);
     expect(affectedNoteFor(['待办事项'])).toBe('待办事项跟着数据根一起搬。');
     expect(affectedNoteFor(['便利贴', '待办事项'])).toBe('便利贴、待办事项跟着数据根一起搬。');
-    /* 一档都没有时调用方不渲染这一行（`affected.length > 0` 判在组件里），
-       但函数本身也不许拼出「跟着数据根一起搬。」这种没有主语的半句话 */
-    expect(affectedNoteFor([])).toBe('跟着数据根一起搬。');
     /* 除了三档那一帧，任何一帧都不许出现「这三档」 */
     for (const labels of [['待办事项'], ['便利贴', '待办事项']]) {
       expect(affectedNoteFor(labels)).not.toContain('这三档');
     }
+  });
+
+  it('G3：空数组返回空串（不许拼出没有主语的「跟着数据根一起搬。」）', () => {
+    /* 函数自己必须安全：不能指望调用方先判 `affected.length > 0` —— 那种约定在下一次
+       调用时就会破，而破的表现是一句没有主语的话出现在界面上 */
+    expect(affectedNoteFor([])).toBe('');
+    expect(affectedNoteFor([])).not.toContain('跟着数据根一起搬');
   });
 });

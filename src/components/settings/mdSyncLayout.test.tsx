@@ -243,4 +243,7 @@ describe('数据管理的结构（减法有没有真减掉）', () => {
     await mount();
     expect(block('data-backup')?.querySelector('.sync__latest')?.textContent).toBe('还没有备份。');
   });
+
+  /* [QA G1] 「今天 / 保存后」那两行另开 `mdSyncTodayLine.test.tsx`：
+     本文件已贴到 300 行门禁，再塞会红（`check:size` 零豁免）。 */
 });

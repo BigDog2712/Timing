@@ -73,6 +73,9 @@ function DataRootBody() {
     }
   };
 
+  /* C11 的那一句话：`affected` 是子集，句子按实际档数生成；一档都没有 → 空串 → 整行不显示 */
+  const affectedNote = info ? affectedNoteFor(info.affected) : '';
+
   return (
     <>
       {loading && !info && <p className="sync__empty">正在读取数据落点…</p>}
@@ -119,10 +122,10 @@ function DataRootBody() {
 
           {/* C11：只在确有 `%APP_DIR%` 落点时出现。`affected` 是**子集**（老用户常见只有
               待办一项写成 `%APP_DIR%`），所以句子由 `affectedNoteFor` 按实际档数生成——
-              首版无条件说「这三档」，在只有一档受影响时是假话（QA F3）。 */}
-          {info.affected.length > 0 && (
-            <p className="data__note">{affectedNoteFor(info.affected)}</p>
-          )}
+              首版无条件说「这三档」，在只有一档受影响时是假话（QA F3）。
+              [QA G3] 判据收在 `affectedNote` 这一个字符串上：空串 = 不渲染这一行。
+              函数自己已经把空数组兜成空串，这里不再重复判 `length > 0`（两处条件迟早不同步）。 */}
+          {affectedNote && <p className="data__note">{affectedNote}</p>}
 
           {/* 回退态下插件就在数据根里：切换不会复制它，这是唯一会说「插件不见了」的场景 */}
           {info.pluginsInDataRoot && (

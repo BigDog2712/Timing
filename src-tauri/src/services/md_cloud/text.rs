@@ -19,10 +19,10 @@ use crate::infra::md_webdav::WebdavError;
 
 /// 远端错误 → 日志里的分类词（`md cloud out: <date>.md fail=<这个>`）。
 ///
-/// 与 `infra::md_webdav::dir::fail_tag` 是同一套词表（排障 grep 的契约）：`services`
+/// 与 `infra::md_webdav::tag::fail_tag` 是同一套词表（排障 grep 的契约）：`services`
 /// 可以依赖 `infra`，但两个模块各自持有一份是为了「日志词表不跨层传递」。
-/// 两份必须逐变体一致——由 `tests/md_webdav_text.rs::log_vocabulary_agrees` 机器断言，
-/// 不再只靠这句注释。
+/// 两份必须逐变体一致——由 `tests/md_webdav_text.rs::log_vocabulary_agrees_and_carries_status_code`
+/// 机器断言，不再只靠这句注释。
 ///
 /// [QA F5] `Server` 变体带上状态码（`fail=Server(400)`）：v0.11.16 首版一律退化成
 /// `fail=Server`，排障时分不清「远端目录名有服务端不接受的字符」（400）与「服务端自己

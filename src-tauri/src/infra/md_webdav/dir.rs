@@ -30,7 +30,6 @@
 //! 到底建没建，日志也全是假的。所以 MKCOL 走 `mkcol_client()`（`redirect(none)`）：
 //! 3xx 一律当「已存在」，这是本轮唯一说得清的判据。
 
-use std::borrow::Cow;
 use std::sync::OnceLock;
 use std::time::Duration;
 
@@ -40,7 +39,9 @@ use reqwest::{Client, Method};
 use crate::models::constants::{MD_CLOUD_CONNECT_SECS, MD_CLOUD_READ_SECS};
 
 /* `probe` 复用的 GET、状态码归一化、TLS 初始化用的 UA 都在 `mod.rs`：两条路径的
-「什么算成功」必须只有一处判据。 */
+「什么算成功」必须只有一处判据。日志词表（`fail_tag` / `level_path`）在 `tag.rs`：
+[QA G2] 它们不是「对目录发请求」的一部分，留在本文件只为撞 300 行门禁。 */
+use super::tag::{fail_tag, level_path};
 use super::{fail_on_status, map_reqwest, WebdavError, WebdavTarget, USER_AGENT};
 
 /// 最多自动建几级目录。9 级以上的 `basePath` 几乎只可能是拼错的地址：发 20 次 MKCOL
@@ -245,12 +246,6 @@ async fn mkcol(target: &WebdavTarget, level: usize) -> Result<bool, WebdavError>
     }
 }
 
-/// 第 `level` 级的相对路径（只给日志用：`/Timing/md` 这种形态，与 `base_path` 同源）。
-fn level_path(target: &WebdavTarget, level: usize) -> String {
-    let levels = target.dir_levels();
-    format!("/{}", levels[..level.min(levels.len())].join("/"))
-}
-
 /// MKCOL 专用 Client：**禁止跟随重定向**（理由见模块头）。
 ///
 /// 不共用 `mod.rs` 的 `client()`：GET / PUT 的 3xx 语义与 MKCOL 不同（`probe` 要把
@@ -277,22 +272,4 @@ fn mkcol_method() -> Method {
     METHOD
         .get_or_init(|| Method::from_bytes(b"MKCOL").expect("MKCOL 是合法的 HTTP 方法名"))
         .clone()
-}
-
-/// 日志里的分类型词。**与 `services::md_cloud::text::fail_tag` 是同一套词表**（排障 grep
-/// 的契约）：`infra` 不许依赖 `services`（L4），所以只能有一份副本；两份是否真一致由
-/// `tests/md_webdav_text.rs::log_vocabulary_agrees` 机测。
-/// [QA F5] `Server` 带状态码（`fail=Server(409)`）：丢码就分不清「父集合缺失」（可补建）
-/// 与服务端故障（只能等）。
-pub(crate) fn fail_tag(err: &WebdavError) -> Cow<'static, str> {
-    match err {
-        WebdavError::Auth => Cow::Borrowed("Auth"),
-        WebdavError::Forbidden => Cow::Borrowed("Forbidden"),
-        WebdavError::RateLimited => Cow::Borrowed("RateLimited"),
-        WebdavError::Precondition => Cow::Borrowed("Precondition"),
-        WebdavError::NotFound => Cow::Borrowed("NotFound"),
-        WebdavError::Timeout => Cow::Borrowed("Timeout"),
-        WebdavError::Network(_) => Cow::Borrowed("Network"),
-        WebdavError::Server(code) => Cow::Owned(format!("Server({code})")),
-    }
 }
