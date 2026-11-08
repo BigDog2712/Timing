@@ -25,10 +25,45 @@
 //! 改成 `folder::remove_one(&cand.path, &cand.bytes, |p, t| { crate::infra::md_backup::save(p, t); true })`
 //! （注意 `mod.rs` 没有 `use crate::infra::md_backup;`，所以变异必须写全路径才编得过；
 //! 写成裸 `md_backup::save` 是 `E0433` 编译错，不是本条的判据在起作用）：
-//! 本条必须**同时报两处** —— ①「留底参数不是 `save_checked`」；② 负向 needle
-//! `md_backup::save(` 与 `|p, t|` 各命中 1 行。所以下面把问题**收集起来最后一起断言**，
-//! 否则第一处 panic 会把第二处挡住，「红两处」就成了没验过的说法。
+//! 本条会把**所有**命中的问题一起报出来（不写死条数：正负两类判据各自命中多少就报多少）。
+//! 为什么非要「收集后一起断言」：连着写 `assert` 时第一处 panic 会把后面的判据全挡住，
+//! 于是「多判据都红」永远是没验过的说法 —— 我这版第一稿就是先 `assert_eq` 再 `assert`，
+//! 自测变异只报了 1 处才发现。
+//!
+//! ## 换参数名绕不过去（有一条断言不看 needle）
+//!
+//! needle 有个天然弱点：`|p, t| { …save_checked(a, b); true }` 只要把参数改成 `|a, b|`，
+//! 五个 needle 与正向断言**全都穿过去**（`save_checked` 还在行里、`save(` 不匹配
+//! `save_checked(`、`|p, t|` 不匹配 `|a, b|`）—— 而它恰恰是最贴近真实的退化：留底调了、
+//! 返回值丢了。所以另有一条**不看 needle、只看竖线**的断言：正确写法那一行本来一个 `|`
+//! 都没有（递进去的是函数本身，不是闭包），任何闭包都会带竖线、不管参数叫什么名。
+//! 那 5 个 needle 仍保留作纵深（挡「参数没换但文件别处又冒出恒真闭包」这种更绕的形状）。
+//!
 //! `cp` 还原后必须重新变绿。红→绿的实测结果写在当轮提交说明里。
+//!
+//! ## 第二条：备份根注入（`app/bootstrap.rs:74`）——比闸⑥ 更上游的那一环
+//!
+//! 这条链有四环，任何一环松掉，「留底才许删」都会**静默**失效（不报错、不删、水位不动）：
+//!
+//! 1. `app/bootstrap.rs:74` → `md_backup::set_root(data_root.join("backups").join("md"))`
+//!    —— 全仓**唯一**的生产注入点（另一处是 `tests/md_cloud_purge.rs:33` 的测试自设）；
+//! 2. `infra/md_backup.rs:132` → `save_checked` 第一句是
+//!    `let Some(root) = ROOT.get() else { return false };`，`ROOT` 是 `OnceLock`，
+//!    没人注入就**恒 false**；
+//! 3. `services/md_cloud/purge/folder.rs:168` → `if !save(path, &text) { return Err(NoBackup) }`；
+//! 4. `purge/mod.rs:166` 把它接到 `remove_one` 上（就是上面第一条用例守的那一格）。
+//!
+//! **删掉第 1 环的后果**：654 条照旧全绿（每个 purge 用例都自己 `set_root`，`tests/` 里
+//! `bootstrap` 零命中），而真机上 T04 一份都不删、不报错、水位不推进，日志安静刷
+//! `skip=no_backup` —— 用户以为「本来就没东西可清理」。这一环比闸⑥ 更危险：闸⑥ 错了至少
+//! 还有人盯着，注入点错了整条功能无声死掉。
+//!
+//! **为什么也不能真端到端**：`ROOT` 同样是进程级 `OnceLock`，且 `bootstrap` 要 Tauri
+//! `AppHandle` 与真实 `data_root`，同进程内造不出来 —— 与闸⑥ 同因，先例仍是
+//! `purge_is_wired_into_both_rounds`。
+//!
+//! **自证能红**：注释掉 `bootstrap.rs:74` → 本条红、**只有本条红**（其余照旧绿）；还原后
+//! 全绿。本轮实测记录见提交说明。
 
 /// 只看非注释行：`//` 行里出现这些 needle 是合法的（本文件的文档就在写它们）。
 /// 与 `purge_is_wired_into_both_rounds` 的 `calls()` 同一套口径，便于后人一起改。
@@ -65,6 +100,13 @@ fn folder_round_passes_save_checked_as_the_backup_argument() {
         if !call.contains("md_backup::save_checked") {
             problems.push(format!("留底参数必须是 md_backup::save_checked 本身，实际是：{call}"));
         }
+        /* ③ 不看 needle 的那条：正确写法这一行没有任何 `|`。见模块头「换参数名绕不过去」。 */
+        if call.contains('|') {
+            problems.push(format!(
+                "`remove_one` 的调用那一行不许出现 `|`：正确写法是直接传 `md_backup::save_checked`，\
+                 任何闭包（不管参数叫什么名）都在把闸⑥ 退化成「调了一下」：{call}"
+            ));
+        }
     }
 
     /* ② 负向：不许把留底包成闭包。这五个 needle 是最小覆盖，每一个都对应一种「看着还行、
@@ -95,6 +137,49 @@ fn folder_round_passes_save_checked_as_the_backup_argument() {
     assert!(
         problems.is_empty(),
         "闸⑥ 接线判据失败（共 {} 处）：\n{}",
+        problems.len(),
+        problems.join("\n")
+    );
+}
+
+/// 备份根必须在启动时注入、且落在 `backups/md` —— `ROOT` 没人设，闸⑥ 恒 false。
+///
+/// 链条与后果见模块头「第二条」；这里只落两条判据，都走源码文本：
+/// 1. `bootstrap.rs` 非注释行里 `md_backup::set_root(` **恰好 1 处**：0 处 = `ROOT` 永不
+///    注入、整条 T04 静默死；多 1 处 = 有第二条注入路径（若落点不同，留底与 `KEEP=30`
+///    的清理会分家）；
+/// 2. 那一行必须含 `data_root.join("backups").join("md")`：落点不许漂。
+///
+/// 块注释风险已核：`grep -n set_root src-tauri/src/app/bootstrap.rs` 只有 `:74` 一行，
+/// 该文件 9 处 `/* … */` 里都没有这个字符串，所以 `code_lines()` 只滤 `//` 不会误红。
+///
+/// 变异自检（红→绿）：注释掉 `bootstrap.rs:74` → 本条红且只有本条红；还原后绿。
+#[test]
+fn bootstrap_injects_the_backup_root_that_gates_every_delete() {
+    let source = include_str!("../app/bootstrap.rs");
+    let mut problems: Vec<String> = Vec::new();
+
+    let calls: Vec<&str> = code_lines(source)
+        .filter(|line| line.contains("md_backup::set_root("))
+        .collect();
+    if calls.len() != 1 {
+        problems.push(format!(
+            "`md_backup::set_root(` 只许有一处（0 处 = ROOT 永不注入、闸⑥ 恒 false；\
+             多一处 = 有第二条注入路径），实际 {} 处：{calls:?}",
+            calls.len()
+        ));
+    }
+    if let Some(call) = calls.first() {
+        if !call.contains(r#"data_root.join("backups").join("md")"#) {
+            problems.push(format!(
+                "留底根必须落在 data_root/backups/md（要与 KEEP=30 的清理同一处），实际是：{call}"
+            ));
+        }
+    }
+
+    assert!(
+        problems.is_empty(),
+        "备份根注入判据失败（共 {} 处）：\n{}",
         problems.len(),
         problems.join("\n")
     );
