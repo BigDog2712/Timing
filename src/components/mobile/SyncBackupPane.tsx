@@ -1,5 +1,5 @@
 /**
- * Timing — 移动端「数据管理 · 备份与恢复」（V0.11.22）
+ * Timing — 移动端「数据管理 · 备份与恢复」（V0.11.22；[V0.11.23] 加「导出」）
  * -----------------------------------------------------------------------------
  * 桌面上那张卡（`settings/MdSyncBackupCard`）在 v0.11.21 之前对手机是**整卡不渲染**的，
  * 后端 `md_backup_*` 也一律回「请在电脑上操作」。这一轮把它搬上来。
@@ -61,6 +61,10 @@ export function SyncBackupPane() {
   const [pending, setPending] = useState<MdBackupItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState('');
+  /* [V0.11.23] 导出的结果：按备份名存。取消与成功是两句不同的话，但**都不是红字** */
+  const [exported, setExported] = useState<{ name: string; saved: boolean; file: string } | null>(
+    null,
+  );
   /* 失败原文按备份名存：红字要落在**那一条**，不能糊在列表顶上 */
   const [failure, setFailure] = useState<{ name: string; text: string } | null>(null);
 
@@ -94,6 +98,28 @@ export function SyncBackupPane() {
     }
   };
 
+  /*
+   * 导出（[V0.11.23]）：把那份 `.md` 交给系统「保存到…」，用户自己挑位置。
+   *
+   * 与恢复不同，它**不看归属**——导出的是副本，不需要落点，`obsidian__` 的老底也能导出来留档。
+   * 用户在选择器里按返回时后端回 `saved: false`：那是取消，不是失败，所以不许进 `failure`
+   * （红字只留给「名字不合法 / 备份已不在 / 写不进去」这三种真失败）。
+   */
+  const exportOne = async (item: MdBackupItem) => {
+    setBusy(true);
+    setDone('');
+    setFailure(null);
+    setExported(null);
+    try {
+      const result = await mobileNative.backupExport(item.name);
+      setExported({ name: item.name, saved: result.saved, file: result.name });
+    } catch (err) {
+      setFailure({ name: item.name, text: rawIpcText(err) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="setting-group">
       <div className="setting-row">
@@ -119,24 +145,47 @@ export function SyncBackupPane() {
                   {targetLabel(item)} · {atText(item.atMs)} · {sizeText(item.bytes)}
                 </span>
               </div>
-              {restorable(item) ? (
+              <div className="m-backup__actions">
+                {restorable(item) ? (
+                  <button
+                    type="button"
+                    className="m-btn m-btn--small"
+                    data-backup-action="restore"
+                    disabled={busy}
+                    onClick={() => {
+                      setDone('');
+                      setFailure(null);
+                      setExported(null);
+                      setPending(item);
+                    }}
+                  >
+                    恢复
+                  </button>
+                ) : (
+                  <span className="m-backup__off">手机上恢复不了</span>
+                )}
                 <button
                   type="button"
                   className="m-btn m-btn--small"
+                  data-backup-action="export"
                   disabled={busy}
-                  onClick={() => {
-                    setDone('');
-                    setFailure(null);
-                    setPending(item);
-                  }}
+                  onClick={() => void exportOne(item)}
                 >
-                  恢复
+                  导出
                 </button>
-              ) : (
-                <span className="m-backup__off">手机上恢复不了</span>
-              )}
+              </div>
 
               {failure?.name === item.name && <p className="m-backup__error">{failure.text}</p>}
+              {exported?.name === item.name && (
+                <p
+                  className={exported.saved ? 'm-hint' : 'm-backup__off'}
+                  data-backup-export={exported.saved ? 'saved' : 'cancelled'}
+                >
+                  {exported.saved
+                    ? `已保存 ${exported.file}：在你刚选的文件夹里`
+                    : '已取消，没有写入任何文件'}
+                </p>
+              )}
               {pending?.name === item.name && (
                 <div className="m-backup__confirm">
                   <p>

@@ -276,6 +276,15 @@ export function createMockApiPlugins(): Record<string, (args?: unknown) => unkno
       }
       return undefined;
     },
+    /* [V0.11.23] 导出备份：浏览器里没有「保存到…」，直接回「已保存」并回显去掉前缀的名字，
+       让走查能看到成功那一句（失败与取消两条路要真机才走得出来）。 */
+    md_backup_export: (args) => {
+      const name = (args as { name?: string } | undefined)?.name ?? '';
+      if (!MOCK_BACKUPS.some((backup) => backup.name === name)) {
+        fail('IO_ERROR', `这份备份已经不在了（备份只保留最近 30 份）：${name}`);
+      }
+      return { saved: true, name: name.replace(/^[a-z]+__/, '') };
+    },
     /* [V0.12.0] 手机端原生能力：浏览器给「已授权 + 悬浮条可开」的假事实，
        让两个入口都能走查（真机上这两个值来自 Kotlin）。 */
     md_saf_pick: () => ({ granted: true, label: 'Mock/Vault · …' }),

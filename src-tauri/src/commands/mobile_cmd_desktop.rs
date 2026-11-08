@@ -8,6 +8,7 @@
 //! 不返回空结果伪装成功。
 
 use crate::error::AppResult;
+use crate::models::md_backup_export::MdBackupExport;
 use crate::models::native::{OverlayStatus, SafStatus};
 
 #[tauri::command]
@@ -28,4 +29,12 @@ pub async fn overlay_set(_enabled: bool, _style: Option<String>) -> AppResult<Ov
 #[tauri::command]
 pub async fn overlay_status() -> AppResult<OverlayStatus> {
     Err(crate::platform::host::mobile_only("悬浮条"))
+}
+
+/// [V0.11.23] 备份导出是手机专属：电脑上备份就在 `data\backups\md\` 里，卡片上的
+/// 「打开」直接能看、想留档把文件复制走即可。给它一个「另存为」只是多一条要维护的
+/// 路径，所以这里如实回「仅手机端可用」，不假装成功。
+#[tauri::command]
+pub async fn md_backup_export(_name: String) -> AppResult<MdBackupExport> {
+    Err(crate::platform::host::mobile_only("导出备份"))
 }

@@ -94,3 +94,35 @@ describe('悬浮窗事件链两端同名（P8）', () => {
     expect(READER).toContain('SQLiteDatabase.OPEN_READWRITE');
   });
 });
+
+/* 同一个原生插件文件，但断言的是另一件事：导出走系统的「保存到…」。
+   不共用上面那个 `PLUGIN` 常量——它只在 P8 的 describe 里可见，跨块引用会让「挪文件」
+   这种小重构同时红两组用例，看不出到底坏在哪。 */
+describe('备份导出走系统「保存到…」（V0.11.23，PRD P6）', () => {
+  const EXPORT = code('../../../src-tauri/gen/android/app/src/main/java/com/timing/app/TimingNativePlugin.kt');
+
+  /** 必须是 `ACTION_CREATE_DOCUMENT`：用户自己挑位置，程序不替他定（PRD 五-1）。 */
+  it('p6_uses_create_document_intent', () => {
+    expect(EXPORT).toContain('Intent.ACTION_CREATE_DOCUMENT');
+    expect(EXPORT).toContain('Intent.CATEGORY_OPENABLE');
+    expect(EXPORT).toContain('Intent.EXTRA_TITLE');
+  });
+
+  /** 字节从 Rust 指定的那份文件读、写进系统给的 URI。 */
+  it('p6_streams_bytes_into_the_chosen_uri', () => {
+    expect(EXPORT).toContain('contentResolver.openOutputStream(uri)');
+    expect(EXPORT).toMatch(/File\(path\)\.readBytes\(\)/);
+  });
+
+  /** 取消不是失败：回 `saved: false`，不 reject。 */
+  it('p6_cancel_resolves_instead_of_rejecting', () => {
+    expect(EXPORT).toMatch(/res\.put\("saved", false\)[\s\S]{0,80}invoke\.resolve\(res\)/);
+  });
+
+  /** 写失败要留痕：原文进 logcat，并且把原文交给用户（不许 `getOrDefault` 吞掉）。 */
+  it('p6_write_failure_is_logged_and_echoed', () => {
+    expect(EXPORT).toContain('android.util.Log.w("TimingExport"');
+    expect(EXPORT).toMatch(/invoke\.reject\("写入失败：/);
+    expect(EXPORT).not.toContain('getOrDefault');
+  });
+});

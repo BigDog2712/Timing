@@ -7,6 +7,8 @@ pub mod data_root;
 pub mod daily_status;
 pub mod item;
 pub mod md_backup;
+/* [V0.11.23] 备份导出：名字校验 / 路径闸 / 导出名。放 services 才够得着桌面用例。 */
+pub mod md_backup_export;
 pub mod md_cloud;
 pub mod md_sync;
 pub mod note;

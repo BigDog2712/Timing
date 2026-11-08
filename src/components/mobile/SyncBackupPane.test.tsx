@@ -16,12 +16,14 @@ import type { MdBackupItem } from '../../types/domain';
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   restore: vi.fn(),
+  exportOne: vi.fn(),
 }));
 
 vi.mock('../../services/mobileNative', () => ({
   mobileNative: {
     backupList: mocks.list,
     backupRestore: mocks.restore,
+    backupExport: mocks.exportOne,
   },
 }));
 
@@ -74,12 +76,17 @@ beforeEach(() => {
   root = createRoot(host);
   mocks.list.mockReset();
   mocks.restore.mockReset();
+  mocks.exportOne.mockReset();
   mocks.list.mockResolvedValue([WEBDAV, OBSIDIAN]);
   mocks.restore.mockResolvedValue({
     date: '2026-11-06',
     target: 'webdav',
     imported: 12,
     written: 1,
+  });
+  mocks.exportOne.mockResolvedValue({
+    saved: true,
+    name: '2026-11-06-20261108-120000.md',
   });
 });
 
@@ -119,12 +126,14 @@ describe('手机端备份与恢复', () => {
     expect(text()).not.toContain('会用这份备份覆盖当前内容');
   });
 
-  /** 手机上只认云端那份：`obsidian__` 的备份不给「恢复」按钮，只留一句说明。 */
+  /** 手机上只认云端那份：`obsidian__` 的备份不给「恢复」按钮，只留一句说明。
+   *  [V0.11.23] 但「导出」要给——导出是副本，不需要落点。 */
   it('p6_obsidian_backup_has_no_restore_button', async () => {
     await mount();
     const row = host.querySelector('[data-backup-name="obsidian__2026-11-05-20261107-120000.md"]');
     expect(row).not.toBeNull();
-    expect(row?.querySelector('button')).toBeNull();
+    expect(row?.querySelector('[data-backup-action="restore"]')).toBeNull();
+    expect(row?.querySelector('[data-backup-action="export"]')).not.toBeNull();
     expect(row?.textContent).toContain('手机上恢复不了');
   });
 
@@ -133,5 +142,60 @@ describe('手机端备份与恢复', () => {
     mocks.list.mockResolvedValue([]);
     await mount();
     expect(text()).toContain('还没有备份');
+  });
+
+  /* ---------------- [V0.11.23] 导出（PRD P1 / P3 / P4 / P5） ---------------- */
+
+  /** P1：每一条都有「导出」——包括手机上恢复不了的那条（导出是副本，不需要落点）。 */
+  it('p1_every_backup_can_be_exported', async () => {
+    await mount();
+    expect(host.querySelectorAll('[data-backup-action="export"]')).toHaveLength(2);
+  });
+
+  /** P3：点一次只发一条命令，参数就是这一条的名字；导出不许顺手动恢复。 */
+  it('p3_export_sends_one_command', async () => {
+    await mount();
+    await act(async () => {
+      $('[data-backup-action="export"]').click();
+    });
+    expect(mocks.exportOne).toHaveBeenCalledTimes(1);
+    expect(mocks.exportOne).toHaveBeenCalledWith(WEBDAV.name);
+    expect(text()).toContain('已保存 2026-11-06-20261108-120000.md');
+    expect(mocks.restore).not.toHaveBeenCalled();
+  });
+
+  /** P4：用户在选择器里按返回 → 只有一句「已取消」，**不许出现红字**。 */
+  it('p4_cancel_is_not_an_error', async () => {
+    mocks.exportOne.mockResolvedValue({ saved: false, name: '2026-11-06-20261108-120000.md' });
+    await mount();
+    await act(async () => {
+      $('[data-backup-action="export"]').click();
+    });
+    expect(text()).toContain('已取消，没有写入任何文件');
+    expect(host.querySelector('.m-backup__error')).toBeNull();
+  });
+
+  /** 真失败才给红字，而且是原文（「备份已不在」与「写不进去」是两句不同的行动指令）。 */
+  it('p3_export_failure_shows_raw_text', async () => {
+    mocks.exportOne.mockRejectedValue(
+      new Error('这份备份已经不在了（备份只保留最近 30 份）：webdav__x.md'),
+    );
+    await mount();
+    await act(async () => {
+      $('[data-backup-action="export"]').click();
+    });
+    const err = host.querySelector('.m-backup__error');
+    expect(err).not.toBeNull();
+    expect(err?.textContent).toContain('只保留最近 30 份');
+  });
+
+  /** P5：导出只读——不刷新列表（刷新会让人以为「多了一份备份」）。 */
+  it('p5_export_does_not_reload_list', async () => {
+    await mount();
+    const before = mocks.list.mock.calls.length;
+    await act(async () => {
+      $('[data-backup-action="export"]').click();
+    });
+    expect(mocks.list.mock.calls.length).toBe(before);
   });
 });

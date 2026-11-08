@@ -235,6 +235,8 @@ pub fn run() {
             commands::mobile_cmd::md_saf_status,
             commands::mobile_cmd::overlay_set,
             commands::mobile_cmd::overlay_status,
+            // [V0.11.23] 备份导出（命令 78 → 79）；桌面侧是 `mobile_only` 桩
+            commands::mobile_cmd::md_backup_export,
             // [V0.5.0] 迁移可见性（命令 65 → 67，见 ADR-037）
             commands::migration_cmd::get_migration_info,
             commands::migration_cmd::open_legacy_dir,

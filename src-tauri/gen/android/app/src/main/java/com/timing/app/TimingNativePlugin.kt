@@ -29,10 +29,12 @@ private const val UNAUTHORIZED =
 /**
  * 原生能力桥（Rust ⇄ Kotlin）。
  *
- * 两类能力：
+ * 三类能力：
  * 1. **SAF 目录**：选目录、把当天文件镜像进沙箱、把改动写回。合并规则在 Rust，这里只搬字节。
  * 2. **悬浮条**：前台服务 + OVERLAY 窗口。显示只读数据库；短按把「开始 / 暂停 / 继续」
  *    交给前端走同一套状态机（[V0.11.22]），长按回主界面。
+ * 3. **备份导出**（[V0.11.23]）：系统「保存到…」→ 用户挑位置 → 把 Rust 指定的那份备份
+ *    写进去。路径与名字都由 Rust 算，这里只搬字节。
  *
  * 与 Rust 的对应关系：Rust 侧 `infra/native_bridge.rs` 用 `run_mobile_plugin_async`
  * 调这里的 `@Command`；类名在 `lib.rs` 的 `register_android_plugin("com.timing.app",
@@ -232,6 +234,81 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
         runCatching { activity.startActivity(Intent.createChooser(intent, "打开日记")) }
             .getOrElse { return invoke.reject("没有能打开 Markdown 的应用") }
         invoke.resolve()
+    }
+
+    // ------------------------------------------------------------ 备份导出（[V0.11.23]）
+
+    /**
+     * 上一次导出要写出去的那个文件。
+     *
+     * 为什么不在回调里再读一遍 `invoke.getArgs()`：`@ActivityCallback` 拿到的是同一个
+     * `Invoke`，但参数能不能再读没有任何保证（resolve/reject 之后它就被释放了）。
+     * 落一个字段，回调只认它；每次点导出无条件覆盖，所以「上一次取消的路径」不会串过来。
+     */
+    private var pendingExport: String? = null
+
+    /**
+     * 导出一份备份：系统「保存到…」→ 用户挑位置 → 把那几个字节写进去。
+     *
+     * `path` 由 Rust 算好（`services::md_backup_export::source`：名字校验 + 路径闸 + 建议名），
+     * 这里**只搬字节**。为什么不让字节过桥：Rust 与 Kotlin 在同一个进程、同一个私有目录，
+     * 让 Kotlin 直接读那个文件比 base64 过一遍 JSON 省事，也不会把一份 md 撑成两倍大。
+     *
+     * 名字也没在这里改：Kotlin 拿到的 `name` 已经是去掉落点前缀的导出名，只用作
+     * `EXTRA_TITLE`（扩展名随它走，所以存下来仍是 `.md`）。
+     */
+    @Command
+    fun exportBackup(invoke: Invoke) {
+        val args = invoke.getArgs()
+        val name = args.optString("name")
+        val path = args.optString("path")
+        if (name.isEmpty() || path.isEmpty()) return invoke.reject("导出缺少文件名")
+        if (!File(path).isFile) {
+            return invoke.reject("这份备份已经不在了（备份只保留最近 30 份）")
+        }
+
+        pendingExport = path
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            /* `text/markdown` 是准的那个。个别文件管理器按 MIME 过滤、看不到目标目录时，
+               退路是把这一行改成 `text/plain`——扩展名由 EXTRA_TITLE 带，不受影响。 */
+            type = "text/markdown"
+            putExtra(Intent.EXTRA_TITLE, name)
+        }
+        runCatching { startActivityForResult(invoke, intent, "onExportPicked") }
+            .getOrElse {
+                pendingExport = null
+                invoke.reject("打不开系统保存对话框：${it.message ?: it.javaClass.simpleName}")
+            }
+    }
+
+    /**
+     * 保存对话框的回执。
+     *
+     * **取消不 reject**：与 `onFolderPicked` 同口径——按返回是正常操作，报错只会让界面弹
+     * 一句无意义的红字。写失败则相反：必须带原文 reject、并留一条 logcat，否则
+     * 「写不进去」和「用户取消」在界面上长得一模一样（v0.11.22 在 `TimerReader` 上刚踩过）。
+     */
+    @ActivityCallback
+    fun onExportPicked(invoke: Invoke, result: ActivityResult) {
+        val path = pendingExport
+        pendingExport = null
+        val uri = result.data?.data
+        val res = JSObject()
+        if (result.resultCode != Activity.RESULT_OK || uri == null || path == null) {
+            res.put("saved", false)
+            return invoke.resolve(res)
+        }
+        try {
+            val bytes = File(path).readBytes()
+            activity.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                ?: return invoke.reject("系统没有给出可写的目标位置")
+            res.put("saved", true)
+            invoke.resolve(res)
+        } catch (err: Exception) {
+            android.util.Log.w("TimingExport", "导出失败 uri=$uri: ${err.message}", err)
+            invoke.reject("写入失败：${err.message ?: err.javaClass.simpleName}")
+        }
     }
 
     // ------------------------------------------------------------ 悬浮条

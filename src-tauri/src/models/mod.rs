@@ -6,6 +6,8 @@ pub mod data_root;
 pub mod constants;
 pub mod enums;
 pub mod item;
+/* [V0.11.23] 备份导出的返回形状（`md_sync_cloud.rs` 已顶到 300 行门禁）。 */
+pub mod md_backup_export;
 pub mod md_sync;
 /* [V0.11.19] 云端自动同步三档（单独成文件：`md_sync_cloud.rs` 只剩 4 行余量）。 */
 pub mod md_sync_auto;

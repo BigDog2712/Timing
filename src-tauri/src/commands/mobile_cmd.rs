@@ -8,6 +8,7 @@ use tauri::State;
 
 use crate::error::AppResult;
 use crate::infra::native_bridge::NativeBridge;
+use crate::models::md_backup_export::MdBackupExport;
 use crate::models::native::{OverlayStatus, SafStatus};
 
 /// 弹系统目录选择器。用户取消时 `granted = false`，不是错误——
@@ -50,4 +51,39 @@ pub async fn overlay_status(
     bridge: State<'_, NativeBridge<tauri::Wry>>,
 ) -> AppResult<OverlayStatus> {
     bridge.call("overlayStatus", serde_json::json!({})).await
+}
+
+/// 导出一份备份（[V0.11.23]）：系统「保存到…」由 Kotlin 拉起，用户自己挑位置。
+///
+/// 这里只做两件事：让 `services::md_backup_export::source` 把名字验好、路径算好，
+/// 再把「文件路径 + 建议文件名」交给原生。**字节不过桥**——Rust 与 Kotlin 在同一个
+/// 进程、同一个私有目录里，让 Kotlin 直接读那个文件比 base64 过一遍 JSON 更省事。
+///
+/// 桌面没有对应能力（备份就在 `data\backups\md\`，卡片上「打开」直接能看），
+/// 所以 `mobile_cmd_desktop.rs` 那边是 `mobile_only` 桩。
+#[tauri::command]
+pub async fn md_backup_export(
+    bridge: State<'_, NativeBridge<tauri::Wry>>,
+    name: String,
+) -> AppResult<MdBackupExport> {
+    let (path, export_name) = crate::services::md_backup_export::source(&name)?;
+    let ack: ExportAck = bridge
+        .call(
+            "exportBackup",
+            serde_json::json!({
+                "name": export_name,
+                "path": path.to_string_lossy(),
+            }),
+        )
+        .await?;
+    Ok(MdBackupExport {
+        saved: ack.saved,
+        name: export_name,
+    })
+}
+
+/// Kotlin 的回执。只有「写没写下去」这一个事实，文件名以 Rust 这份为准（Kotlin 拿的是副本）。
+#[derive(serde::Deserialize)]
+struct ExportAck {
+    saved: bool,
 }

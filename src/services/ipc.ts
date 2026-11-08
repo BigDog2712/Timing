@@ -67,6 +67,7 @@ import type {
   MdSyncViewCloud,
   MdSyncTestResult,
   MdBackupItem,
+  MdBackupExport,
   MdBackupRestoreResult,
   MigrationInfo,
 } from '../types/domain';
@@ -276,16 +277,16 @@ export const ipc: IpcApi = {
     call<MdSyncViewCloud>('md_sync_save', { config: params.config, secret: params.secret ?? null }),
   mdSyncRun: () => call<MdSyncReport>('md_sync_run'),
   mdSyncOpen: (params: { kind: MdSyncKind }) => call<void>('md_sync_open', { kind: params.kind }),
-  mdSyncTest: (params: { config: MdSyncConfig; secret?: string | null }) =>
-    call<MdSyncTestResult>('md_sync_test', { config: params.config, secret: params.secret ?? null }),
+  mdSyncTest: (params: { config: MdSyncConfig; secret?: string | null }) => call<MdSyncTestResult>('md_sync_test', { config: params.config, secret: params.secret ?? null }),
   mdBackupList: () => call<MdBackupItem[]>('md_backup_list'),
-  mdBackupRestore: (params: { name: string; target?: string | null }) =>
-    call<MdBackupRestoreResult>('md_backup_restore', { name: params.name, target: params.target ?? null }),
+  mdBackupRestore: (params: { name: string; target?: string | null }) => call<MdBackupRestoreResult>('md_backup_restore', { name: params.name, target: params.target ?? null }),
   /* ---- [V0.11.15] 数据根 + 备份「打开」（桌面独占）。`change(null)` = 撤销，不是没传参 ---- */
   dataRootGet: () => call<DataRootInfo>('data_root_get'),
   dataRootChange: (params: { path?: string | null }) => call<DataRootInfo>('data_root_change', { path: params.path ?? null }),
   dataRootOpen: () => call<void>('data_root_open'),
   mdBackupOpen: (params: { name: string }) => call<void>('md_backup_open', { name: params.name }),
+  /* [V0.11.23] 导出备份（手机专属）：取消 → `saved:false`，不算失败 */
+  mdBackupExport: (params: { name: string }) => call<MdBackupExport>('md_backup_export', { name: params.name }),
 
   /* ---- 手机端原生能力 [V0.12.0]：SAF 目录 / 悬浮条 ---- */
   mdSafPick: () => call<SafStatus>('md_saf_pick'),

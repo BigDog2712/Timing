@@ -125,3 +125,11 @@ export interface MdBackupRestoreResult {
   /** 写回的文件数（三个种类常落同一个文件，通常是 1） */
   written: number;
 }
+
+/** [V0.11.23] 导出一份备份的结果（手机专属：系统「保存到…」） */
+export interface MdBackupExport {
+  /** `true` = 已写进用户挑的位置；`false` = 用户在选择器里取消了（**不是失败**） */
+  saved: boolean;
+  /** 实际建议的文件名（去掉落点前缀后的那份） */
+  name: string;
+}

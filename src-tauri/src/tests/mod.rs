@@ -65,6 +65,9 @@ mod md_cloud_tier_plan;
 /* [V0.11.22] 手机端备份恢复的归属判据：手机只有 WebDAV 一个落点，
    obsidian__ / 老备份一律拒绝。判据在 services 里，桌面用例才够得着。 */
 mod md_backup_mobile;
+/* [V0.11.23] 备份导出的四道闸（名字 / 形态 / 落点 / 存在）。
+   与 `md_backup_mobile` 同一个理由：判据在 `services`，桌面目标够得着。 */
+mod md_backup_export;
 /* [QA 独立复验 V0.11.19 批 1] 自己补的 2 条最缺边界：三档等号边界帧
    （covered 同毫秒 / Max 1799-1800 / 连败节流 / 不从 pollSecs 反推）与
    BOM+CRLF 真实文件走 FileWatch::probe。本轮两条变异自检的靶子都在这里。 */

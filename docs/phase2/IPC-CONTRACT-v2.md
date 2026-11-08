@@ -190,6 +190,7 @@
 | `md_sync_test` | `{ config: MdSyncConfig, secret?: string \| null }` | `MdSyncTestResult` | `mdSyncTest` |
 | `md_backup_list` | `{}` | `MdBackupItem[]` | `mdBackupList` |
 | `md_backup_restore` | `{ name: string, target?: string \| null }` | `MdBackupRestoreResult` | `mdBackupRestore` |
+| `md_backup_export` | `{ name: string }` | `MdBackupExport` | `mdBackupExport` |
 
 > `md_sync_*` 的 `secret` 是**密码**，不是配置字段：三分语义见 §4.8。密码不进
 > `MdSyncConfig`、不进 `settings` 表、不回传明文（视图只给 `cloud.hasSecret`）。
@@ -444,13 +445,20 @@
 - 入参：`{}`，出参：`MdBackupItem[]`（`{ name, target, source, date, atMs, bytes }`，按 `atMs` 降序）
 - 语义：列出备份目录里 Timing 写过的备份。`target` 为 `null` = 老备份（文件名无 `__` 归属前缀）。纯读盘，读不出就是空列表。
 - 错误码：`IO_ERROR`（目录不可读时由 service 兜底为空列表，实际不抛）
-- **手机端**：同名注册，返回 `MD_SYNC_CONFIG_INVALID`「手机端暂不支持备份查看与恢复，请在电脑上操作」。
+- **手机端**：[V0.11.22] 起**已实装**，与桌面同一份 `store::list`（早期版本回「请在电脑上操作」的说法已作废）。
 
 #### `md_backup_restore`（[V0.11.13]）
 - 入参：`{ name: string, target?: string | null }`，出参：`MdBackupRestoreResult`（`{ date, target, imported, written }`）
 - 语义：用一份备份覆盖回去——文件、SQL、基线三者一起回到那一刻。`name` 来自前端，按**不可信输入**解析；`target` 缺省 = 按备份文件名推出来的归属（老备份要前端让用户自己选）。`target = "webdav"` 时排一笔待传，下一轮把回滚结果也传上去。
 - 错误码：`MD_SYNC_CONFIG_INVALID`（名字 / 日期不可解析、无可恢复落点）/ `IO_ERROR` / `DB_ERROR`
-- **手机端**：同上，返回 `MD_SYNC_CONFIG_INVALID`。
+- **手机端**：[V0.11.22] 起**已实装**，且只放行 `webdav__` 归属的备份（`obsidian__` / 无前缀老备份一律拒绝并说明去电脑上做）——手机只有云端一个落点，恢复是覆盖写，猜错落点就是数据正确性问题。
+
+#### `md_backup_export`（[V0.11.23]）
+- 入参：`{ name: string }`，出参：`MdBackupExport`（`{ saved: boolean, name: string }`）
+- 语义：把一份备份**交给用户**——手机拉起系统「保存到…」（`ACTION_CREATE_DOCUMENT`），由用户挑位置，程序只把那份文件的字节写进选中的 URI。`name` 按不可信输入解析；出参 `name` 是**去掉落点前缀**后的建议文件名（`webdav__2026-11-06-….md` → `2026-11-06-….md`），去前缀不影响备份根里那份的任何恢复路径。
+- `saved: false` = 用户在选择器里取消，**不是失败**（不抛错）；真正失败才抛 `IO_ERROR` + 原文（名字不合法 / 备份已被 30 份上限挤掉 / 选择器打不开 / 写流失败）。
+- **桌面端**：`mobile_only("导出备份")` → `IO_ERROR`「仅手机端可用」。电脑上备份就在 `data\backups\md\`，卡片上的「打开」直接能看，不需要另存为。
+- 不广播事件、不写库：导出只读备份、只写外部文件。
 
 ---
 
@@ -658,12 +666,13 @@ active ──resolve_open_record(discard)─▶ soft-deleted + saved（终态，
 - **R-5 `discard` 必须改 `status`**：软删除 `active` 记录而不改 `status` 会永久占用 `uq_records_open` 的唯一槽，导致此后无法开新会话（见 §4.4）。
 
 > 口径说明（2026-10-20）：§2 的「11 个错误码」与 §10.1 的「29 个命令」是 MVP 锁定值；当前实装
-> **78 命令 / 17 错误码**（含 ADR-020 新增的 `main_work_area`；ADR-021 下架 `ITEM_NAME_DUPLICATE`；
+> **79 命令 / 17 错误码**（含 ADR-020 新增的 `main_work_area`；ADR-021 下架 `ITEM_NAME_DUPLICATE`；
 > ADR-022 下架 `register_shortcut` / `set_always_on_top` / `SHORTCUT_REGISTER_FAILED`；
 > ADR-023 下架日记域 4 条命令；ADR-037 / V0.5.0 新增迁移可见性 2 条命令，见 §12.9；
 > ADR-061 / V0.11.13 新增 `md_sync_test` / `md_backup_list` / `md_backup_restore` 与
 > `MD_SYNC_REMOTE_ERROR`，见 §12.10；ADR-062 / V0.11.15 新增 `data_root_get` / `data_root_change` /
-> `data_root_open` / `md_backup_open`，错误码与事件零变更，见 §12.11）。
+> `data_root_open` / `md_backup_open`，错误码与事件零变更，见 §12.11；V0.11.23 新增
+> `md_backup_export`（手机专属，桌面是桩），错误码与事件零变更，见 §12.12）。
 > 以代码为准的机械校验由 `npm run check:contract` 执行（比对 `lib.rs` / `domain.ts` / `ipc.ts` /
 > `error.rs` 四处），本文档的人工数字不再作为门禁。
 
@@ -808,7 +817,8 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 | `quit_app` | `IO_ERROR` | Android 由系统回收进程，不提供「退出应用」入口；前端也不调用 |
 | `open_settings_window` / `open_todos_window` / `open_timer_window` / `open_note_window` / `close_note_window` | `IO_ERROR` | 手机是单窗多页面路由（`MobileShell` 的 4 Tab + Sheet），没有第二个窗口可开 |
 | `md_sync_get` / `md_sync_save` / `md_sync_run` / `md_sync_open` / `md_sync_test` | **已实装**（V0.12.0 起走 SAF 编排，见 12.8.4 的历史说明；V0.11.13 加云端那一步） | 落点模型不同构的问题由 `app::md_sync_mobile::sync_once` 吸收，合并规则只有一份 |
-| `md_backup_list` / `md_backup_restore` | `MD_SYNC_CONFIG_INVALID`「手机端暂不支持备份查看与恢复，请在电脑上操作」 | 备份写在应用私有目录，用户看不见也导不出；给一份拿不到的备份比明说更糟 |
+| `md_backup_list` / `md_backup_restore` | **已实装**（V0.11.22） | 备份的「看」与「覆盖回去」全程在应用内完成，一个字节都不需要用户摸到文件；恢复另受归属限制（只认 `webdav__`） |
+| `md_backup_export` | 手机**已实装**（V0.11.23，系统「保存到…」）；桌面是 `mobile_only` 桩 | 这是唯一一个**反方向**的能力：只有手机需要「把私有目录里的文件拿出来」 |
 | `show_window` / `hide_window` / `toggle_window` / `save_window_position` | **`Ok(())` 幂等空操作**（不报错） | 前端首帧与「拖动结束落盘」会调它们；语义上「已显示 / 位置无处可存」本来就是成功，回错误只会在控制台刷红 |
 | `set_autostart` | 恒返回 `false`（`get_autostart` 同） | `update_settings` 的 `autostartEnabled` 字段**接受但忽略**（不报错），老配置带该字段过来仍成功 |
 
@@ -946,6 +956,34 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 它**不校验**：`secret` 的传递语义、`cloud` 字段是否被原样带回、`MdSyncViewCloud` 的字段形状。
 这三件事只能靠测试与评审看——`MdSyncTab.test.tsx` 里那条「保存必须原样带回 `cloud`」的断言
 就是为此钉的。
+
+---
+
+### 12.12 V0.11.23 契约增量：备份导出（手机专属）
+
+> 背景：手机端备份「能列、能恢复、拿不出来」——拿不出来的备份对用户不可验证（发不出、留不了档、
+> 换机前拷不走）。V0.11.23 补一条只读命令，把那份 `.md` 交给系统「保存到…」。错误码与事件**一个没加**。
+
+| 面 | 变更 | 理由 |
+|---|---|---|
+| 命令 | 78 → **79**：新增 `md_backup_export` | 「导出」需要一个动作，且路径必须由 Rust 算（名字校验 + 「必须落在备份根内」那道闸）；让前端直接调原生插件等于把备份目录的知识复制一份到 Kotlin |
+| 错误码 | **17 不变** | 名字不合法 / 备份已被挤掉 / 写流失败都是「原因本身就是行动依据」，走 `IO_ERROR` + 原文 |
+| 事件 | **11 不变** | 导出不改变任何应用内状态，没有要广播的东西 |
+| DB schema | **`0006` 不变**，无新迁移 | 导出只读备份、只写外部文件 |
+| DTO | 新增 `MdBackupExport`（`{ saved, name }`，单独成文件：`md_sync_cloud.rs` 已顶到 300 行门禁） | 见 §4.8 |
+| 平台 | 手机真实现 / 桌面 `mobile_only` 桩 | 电脑上备份就在 `data\backups\md\`，「另存为」只是多一条要维护的路径 |
+
+#### 12.12.1 为什么字节不过桥
+
+Rust 与 Kotlin 在同一个进程、同一个私有目录：Rust 只把「哪个文件」与「建议叫什么名」交给原生，
+Kotlin 自己读那个文件、写进用户选中的 `content://`。过桥要 base64 一份 md，既多一次编码，
+又让一份几 KB 的文件在 JSON 里变成两倍大。
+
+#### 12.12.2 为什么不是 `ACTION_SEND` / `MediaStore`
+
+- `ACTION_SEND` 解决「发出去」，不解决「留一份在自己看得见的地方」；
+- `MediaStore.Downloads` 要 API 29+（本项目 `minSdk 24`），而且**跳过了用户选择**——写哪儿由程序定，
+  正是「看不见的落点」那个老毛病。SAF 选择器在 API 24+ 都可用。
 
 ---
 

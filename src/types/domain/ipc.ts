@@ -63,6 +63,7 @@ import type {
 import type { PluginListResult } from './plugin';
 import type { MdSyncConfig, MdSyncKind, MdSyncReport } from './mdSync';
 import type {
+  MdBackupExport,
   MdBackupItem,
   MdBackupRestoreResult,
   MdSyncTestResult,
@@ -215,6 +216,11 @@ export interface IpcApi {
   mdBackupRestore(params: { name: string; target?: string | null }): Promise<MdBackupRestoreResult>;
   /** [V0.11.15] 用系统默认程序打开一份备份；失败回 `IO_ERROR` + 原文（文件已被删 / 名字不合法） */
   mdBackupOpen(params: { name: string }): Promise<void>;
+  /**
+   * [V0.11.23] 导出一份备份到用户挑的位置（`ACTION_CREATE_DOCUMENT`）。
+   * 手机专属；桌面回 `IO_ERROR`「仅手机端可用」。用户取消 → `saved: false`，**不是错误**。
+   */
+  mdBackupExport(params: { name: string }): Promise<MdBackupExport>;
 
   /* 数据根 [V0.11.15]（PRD 4.2）—— 桌面独占，手机端三条回 `IO_ERROR`（「仅桌面端可用」）。
      命令层一次都不判路径，判据全在 Rust 的 `services::data_root`。 */

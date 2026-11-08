@@ -15,6 +15,7 @@
  */
 import { ipc } from './ipc';
 import type {
+  MdBackupExport,
   MdBackupItem,
   MdBackupRestoreResult,
   MdSyncConfig,
@@ -47,4 +48,9 @@ export const mobileNative = {
    */
   backupRestore: (name: string): Promise<MdBackupRestoreResult> =>
     ipc.mdBackupRestore({ name, target: null }),
+  /**
+   * 导出一份备份到用户挑的位置（[V0.11.23]）。手机专属：桌面上这条命令回
+   * `IO_ERROR`「仅手机端可用」。**用户取消 → `saved: false`，不是错误**。
+   */
+  backupExport: (name: string): Promise<MdBackupExport> => ipc.mdBackupExport({ name }),
 };

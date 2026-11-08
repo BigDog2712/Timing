@@ -2,6 +2,44 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.23 — 手机端备份导出：把那份 `.md` 交到用户手里
+
+上一版的备份只差最后一截：**能列、能恢复、拿不出来**。拿不出来的备份对用户不可验证——发不出去、
+留不了档、换机前也拷不走。这一版补的就是这一截：走系统「保存到…」，用户自己挑位置。
+
+### 1. 新命令 `md_backup_export`（契约 78 → 79）
+
+- 入参 `{ name }`，出参 `MdBackupExport { saved, name }`；**错误码 17 / 事件 11 / 迁移 `0006` 都不动**。
+- `saved: false` = 用户在选择器里按了返回，**不是失败**（不抛错、界面不出红字）。
+- 桌面侧是 `mobile_only("导出备份")` 桩：电脑上备份就在 `data\backups\md\`，卡片上的「打开」
+  直接能看，不需要另存为。
+
+### 2. 判据在 `services`，不在 `#[cfg(mobile)]` 的命令文件里
+
+`services::md_backup_export::resolve_in(root, name)` 是纯函数，四道闸：
+
+1. 名字：空串 / `..` / `/` / `\` 一律不认；
+2. 形态：`parse_name` 不认的名字（`readme.md`、时间戳不合形）不是备份；
+3. 落点：`canonicalize` 之后**必须仍在备份根内**（防符号链接把路径带出去）；
+4. 存在：备份只保 30 份，用户点的那条可能刚被挤掉——给一句能照做的原话。
+
+`root` 是参数而不是全局 `OnceLock`：这样桌面目标的用例能在临时目录上验它（`md_backup` 的根
+一个进程只认第一份，碰不得）。
+
+### 3. 原生与界面
+
+- `TimingNativePlugin.exportBackup`：`ACTION_CREATE_DOCUMENT` + `CATEGORY_OPENABLE` +
+  `EXTRA_TITLE`（导出名去掉落点前缀，扩展名随名字走）；写回走 `contentResolver.openOutputStream`。
+  取消 → `resolve { saved: false }`；写失败 → `Log.w("TimingExport", …)` + 原文交给用户。
+- 字节**不过桥**：Rust 与 Kotlin 同一个进程、同一个私有目录，Rust 只交「哪个文件 + 建议叫什么名」。
+- `SyncBackupPane`：每条备份都有「导出」（导出是副本，不需要落点，`obsidian__` 的老底也能导），
+  「恢复」仍只在 `webdav__` 上出现；结果落在那一行下面，取消用弱化色、不用红。
+
+### 4. 数字
+
+前端 70 文件 **573** 用例（基线 564，+9）；Rust **679/0**（基线 669，+10）；`npm run check` EXIT 0
+（契约 79 / 17 / 11、size 634、version 0.11.23 六处、layers 8、brand 0、eslint 0）；安卓目标 0 warning。
+
 ## 0.11.22 — 手机端收敛：只走云端 · 备份能恢复 · 悬浮窗能计时
 
 主人三句话，三件事：「手机端无法使用云端的本地同步，此功能去除，仅保留云端同步」/
