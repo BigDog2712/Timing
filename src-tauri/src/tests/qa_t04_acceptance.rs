@@ -4,114 +4,34 @@
 //! 「反面对照」（该删的确实删了 / 该拒的确实整段没动手），避免「怎么都不删也算绿」。
 //!
 //! 与工程师那四份的区别（不重复造同一件事）：
-//! - `i9a`：今天那份连跑两轮仍在，**且追责面 `md-cloud-purge.log` 真的落盘**、格式逐字
-//!   （工程师自承那侧没断言过落盘：`log_dir()` 在测试里为 None，`append` 直接静默返回）；
-//! - `i9b`：手工把水位改成 `2099-01-01`（验收方自造，不引用任何一条既有结论）；
+//! - `i9b`：手工把水位改成 `2099-01-01`（验收方自造，不引用任何一条既有结论），
+//!   并配一条对照轮证明「0 行」不是因为夹具本来就删不掉；
 //! - `i9c`：**日期语义**用「换一个 `today` 入参」证明 —— `run_folder` 的 `today` 是入参
 //!   不是自己取时钟，于是「昨天的今天」在下一轮变成往期后**确实被删**。这一格原先被判
 //!   「做不出稳定夹具」，实际只需要把系统时钟挪进参数；
 //! - `gate3_*`：闸③ 的**父子**方向走 `run_folder` 真实入口（工程师那条只造了「同一个目录」）；
 //! - `gate5a_*`：名字合法但**没有 pending 行** → 不删（闸⑤ 的另一段证据）；
 //! - `folder_is_not_paused_*`：WebDAV 通道连败暂停，folder 那一轮照删（分通道的硬约束）。
+//!
+//! 追责面（`md-cloud-purge.log` 真实落盘 + I16 格式）与 I9a 在 `qa_t04_audit_log.rs`。
 
 use std::fs;
-use std::path::Path;
-use std::sync::OnceLock;
 
 use crate::models::md_cloud_purge::{channel_key, PurgeChannel, PurgeKey, OVERLAP_TEXT, PurgeState};
 use crate::repositories::settings;
 use crate::services::md_cloud::{self, purge};
-use crate::tests::md_cloud_purge::{
-    binding_of, ensure_backup_root, kv, list_names, seed_past, state_of,
-};
+use crate::tests::md_cloud_purge::{binding_of, kv, list_names, seed_past, state_of};
 use crate::tests::md_sync::env;
+use crate::tests::qa_t04_audit_log::{audit_dir, audit_lines};
 use crate::tests::support::unique_dir;
 
-/// 追责面文件名（设计 §3.7）。
-const AUDIT: &str = "md-cloud-purge.log";
-
-/// 注入日志目录（`LOG_DIR` 是 `OnceLock`，一个进程只认第一份），返回 `<root>/logs`。
-///
-/// 每个进程用独立目录（`unique_dir` 带 pid + 序号 + 纳秒）：断言「这个文件里恰好有
-/// 我这两行」时，不能被同一台机器上另一次 `cargo test` 留下的旧行污染。
-fn audit_dir() -> std::path::PathBuf {
-    static ONCE: OnceLock<std::path::PathBuf> = OnceLock::new();
-    ONCE.get_or_init(|| {
-        ensure_backup_root();
-        let dir = unique_dir("qa-t04-logs");
-        crate::platform::log::init(&dir);
-        dir.join("logs")
-    })
-    .clone()
-}
-
-fn audit_lines() -> Vec<String> {
-    fs::read_to_string(audit_dir().join(AUDIT))
-        .unwrap_or_default()
-        .lines()
-        .map(str::to_string)
-        .collect()
-}
-
-/// I9a + I16 + 落盘：今天那份连跑两轮仍在；往期在追责面里各一行、格式逐字。
-#[tokio::test]
-async fn i9a_today_survives_two_rounds_and_the_audit_log_really_lands() {
-    let fixture = env("qa-t04-i9a").await;
-    let root = unique_dir("qa-t04-i9a");
-    let dates = ["2018-03-05", "2018-03-06"];
-    for date in dates {
-        seed_past(&fixture.pool, &root, date).await;
-    }
-    let today = md_cloud::today();
-    fs::write(root.join(format!("{today}.md")), "今天的日记").expect("写当天文件");
-
-    for round in 1..=2 {
-        purge::run_folder(&fixture.pool, &root, &[], &today)
-            .await
-            .expect("清理不该返回错误");
-        assert!(
-            root.join(format!("{today}.md")).is_file(),
-            "第 {round} 轮之后今天那份必须还在（I9a）"
-        );
-    }
-    for date in dates {
-        assert!(!root.join(format!("{date}.md")).exists(), "{date} 该被删");
-    }
-
-    /* 追责面：真的多出两行，且 `<date>\t<removed>\t<绝对路径>\t<ISO>` 四列都在。 */
-    let lines = audit_lines();
-    let mine: Vec<&String> = lines
-        .iter()
-        .filter(|line| line.starts_with("2018-03-"))
-        .collect();
-    assert_eq!(mine.len(), dates.len(), "两份各一行，实际 {mine:?}");
-    for line in mine {
-        let cols: Vec<&str> = line.split('\t').collect();
-        assert_eq!(
-            cols.len(),
-            4,
-            "LocalFolder 那一路必须带目标（绝对路径）：{line:?}"
-        );
-        assert_eq!(cols[1], "removed", "第二列是 outcome：{line:?}");
-        assert!(
-            Path::new(cols[2]).is_absolute() && cols[2].ends_with(&format!("{}.md", cols[0])),
-            "第三列必须是「删掉的那个绝对路径」：{line:?}"
-        );
-        assert!(
-            cols[3].len() >= 19 && cols[3].as_bytes()[10] == b'T',
-            "第四列是 ISO 本地时间（`2026-11-08T01:29:32`）：{line:?}"
-        );
-    }
-    assert!(
-        !lines.iter().any(|line| line.starts_with(&today)),
-        "今天那份一次都不许出现在追责面里，实际 {lines:?}"
-    );
-    let _ = fs::remove_dir_all(&root);
-}
 
 /// I9b（验收方自造）：手工把水位改成 `2099-01-01` —— 今天那份**仍然不删**。
 #[tokio::test]
 async fn i9b_a_watermark_poisoned_to_2099_never_removes_today() {
+    /* 同 i9a：先注入日志目录。否则下面那条「日志 0 条 purge:」是**空断言** ——
+       `log_dir()` 为 None 时 `append` 本来就什么都不写，绿了也证明不了任何事。 */
+    let _ = audit_dir();
     let fixture = env("qa-t04-i9b").await;
     let root = unique_dir("qa-t04-i9b");
     seed_past(&fixture.pool, &root, "2018-04-05").await;
@@ -144,6 +64,38 @@ async fn i9b_a_watermark_poisoned_to_2099_never_removes_today() {
             .as_deref(),
         Some("2099-01-01"),
         "被短路的这一轮不许改写水位"
+    );
+    /* I9b 的第三条判据：日志 0 条 purge:。追责面一行都没有 = 一条删除都没发生。 */
+    assert!(
+        !audit_lines()
+            .iter()
+            .any(|line| line.starts_with("2018-04-05")),
+        "这一轮一条删除都不许发生"
+    );
+
+    /* **对照**：把水位清掉再跑一轮 —— 同一份往期立刻被删、追责面真的多出一行。
+       没有这一段，上面那条「0 行」可能只是「这个夹具本来就删不掉」（闸⑤ 没证据之类），
+       整条用例就是空跑。 */
+    settings::set_value(
+        &fixture.pool,
+        channel_key(PurgeChannel::Folder, PurgeKey::Upto),
+        "",
+        0,
+    )
+    .await
+    .expect("清掉水位");
+    purge::run_folder(&fixture.pool, &root, &[], &today)
+        .await
+        .expect("对照轮");
+    assert!(
+        !root.join("2018-04-05.md").exists(),
+        "对照：水位清掉后它就该被删，否则上面那条 0 行证明不了任何事"
+    );
+    assert!(
+        audit_lines()
+            .iter()
+            .any(|line| line.starts_with("2018-04-05")),
+        "对照：追责面必须真的落下一行（证明这条路是通的）"
     );
     let _ = fs::remove_dir_all(&root);
 }

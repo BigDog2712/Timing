@@ -74,6 +74,53 @@ async fn seed_four(pool: &sqlx::SqlitePool, root: &std::path::Path, month: &str)
     dates
 }
 
+/// `404` 是**成功**（幂等：本来就不在）。这条分支原先**没有任何用例盯着**。
+///
+/// 删掉 `remove.rs` 里那三行（`if code == 404 { return Ok(404) }`）不会报错、不会暂停、
+/// 门禁也全绿 —— 行为只是变成「每个 404 的日期都不推进水位、不清账」，于是那些日期
+/// 每一轮都重打一次 404，**永久停在同一格**（I15 的收敛路径正是靠 404 反复出现走完的）。
+#[tokio::test]
+async fn a_404_is_a_success_and_advances_the_watermark() {
+    let fixture = env("qa-t04-404").await;
+    let root = unique_dir("qa-t04-404");
+    fs::create_dir_all(&root).expect("建镜像目录");
+    let dates = ["2018-11-05", "2018-11-06"];
+    for date in dates {
+        seed_past(&fixture.pool, &root, date).await;
+    }
+    let fake = serve("404 Not Found", "", b"");
+    let target = WebdavTarget::new(&fake.base_url, "/Timing", "u", "p");
+
+    purge::run_webdav(&fixture.pool, &target, &root, &md_cloud::today())
+        .await
+        .expect("清理不该返回错误");
+
+    assert_eq!(fake.count(), 2, "两份各一次 DELETE，404 不重试");
+    assert_eq!(
+        kv(&fixture.pool, PurgeChannel::Webdav, PurgeKey::Upto)
+            .await
+            .as_deref(),
+        Some(dates[1]),
+        "404 算成功 → 水位照推（否则这一天永久停住）"
+    );
+    for date in dates {
+        assert!(
+            md_cloud_pending::get(&fixture.pool, date)
+                .await
+                .expect("查 pending")
+                .is_none(),
+            "{date}：404 成功也要清账"
+        );
+    }
+    assert_eq!(
+        state_of(&fixture.pool, PurgeChannel::Webdav)
+            .await
+            .last_deleted,
+        2
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
 /// I11：第 3 个失败、第 4 个成功 → 水位必须停在**第 2 个**。
 #[tokio::test]
 async fn i11_the_watermark_stops_before_the_first_failure() {

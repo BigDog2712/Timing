@@ -38,6 +38,7 @@ mod md_cloud_purge_webdav;
    分通道暂停）与 WebDAV 半场（水位停在失败项之前 + 403/429 同 401 整批停）。
    两份都在验收方手里重写，不复用工程师的机验结论。 */
 mod qa_t04_acceptance;
+mod qa_t04_audit_log;
 mod qa_t04_webdav_failures;
 /* [V0.11.19] 变更 B：围栏状态机（洞 1 / 洞 2）与三档诊断的单元判据。 */
 mod md_section_fence;
