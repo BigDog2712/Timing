@@ -36,13 +36,37 @@ pub(crate) fn seed_legacy_extras(dir: &Path) {
     std::fs::write(plugin.join("plugin.json"), br#"{"id":"demo"}"#).expect("写插件");
 }
 
+/// 把 `dir` 就地变成「老数据目录」（真库 + logs + plugins）。
+pub(crate) async fn seed_legacy_db(dir: &Path) {
+    let pool = db::init_pool(dir).await.expect("init_pool 应成功");
+    pool.close().await;
+    seed_legacy_extras(dir);
+}
+
 /// 真库 + logs + plugins 的「老数据目录」（`init_pool` 走真实迁移，结构同发布版）。
 pub(crate) async fn legacy_with_db(tag: &str) -> PathBuf {
     let dir = temp(tag);
-    let pool = db::init_pool(&dir).await.expect("init_pool 应成功");
-    pool.close().await;
-    seed_legacy_extras(&dir);
+    seed_legacy_db(&dir).await;
     dir
+}
+
+/// 夹具根里**除白名单之外**的所有条目名（顶层就够：迁移的中间产物全是 target 的兄弟）。
+///
+/// 为什么按「根里还剩什么」审计，而不是按名字点名 `<target>.migrating` /
+/// `<target>.migrating.v4-src`：点名法只覆盖写那个断言时想到的两种后缀 —— 实现将来多
+/// 一种中间产物就假绿；反过来，谁在夹具里留下同名残留就假红，而那个「谁」根本不在本
+/// 用例的控制范围里。整个根扫一遍，两个方向的误判都没有了。
+fn residue_in(root: &Path, allowed: &[&str]) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(root) else {
+        return Vec::new();
+    };
+    let mut out: Vec<String> = entries
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().to_string())
+        .filter(|name| !allowed.contains(&name.as_str()))
+        .collect();
+    out.sort();
+    out
 }
 
 /// 整棵树 → 相对路径(小写) → **全部字节**。用来证明「源一个字节都没变」。
@@ -96,12 +120,21 @@ fn shadow_sibling(target: &Path) -> PathBuf {
 // ---------------------------------------------------------------------------
 #[tokio::test]
 async fn a2_second_run_neither_copies_nor_touches_target() {
-    let source = legacy_with_db("qa-a2-src").await;
-    let target = temp("qa-a2-dst");
-    assert!(matches!(
-        mig::run_once(&source, &target),
-        mig::Outcome::Migrated(_)
-    ));
+    /* 独立夹具根：`source` 与 `target` 都在 `root` 里面，于是**所有**按 target 派生的
+       中间产物（`<target>.migrating` / `<target>.migrating.v4-src` / 将来新增的任何后缀）
+       都落在同一个目录下，收尾时用「根里除了 source 和 target 不许有别的东西」一句审计
+       干净。原来 source/target 是两个互不相干的随机目录、残留按名字点名，见 `residue_in`
+       的注释：漏一种后缀是假绿，别人留下同名东西是假红 —— QA 记录的那条 flaky 就是
+       「分不清是谁留下的」。 */
+    let root = temp("qa-a2");
+    let source = root.join("source");
+    let target = root.join("target");
+    seed_legacy_db(&source).await;
+
+    match mig::run_once(&source, &target) {
+        mig::Outcome::Migrated(_) => {}
+        other => panic!("第一次应迁移成功，实为 {other:?}"),
+    }
 
     let sentinel_doc = target.join("qa-sentinel.txt");
     std::fs::write(&sentinel_doc, b"do-not-touch").expect("写哨兵");
@@ -121,11 +154,12 @@ async fn a2_second_run_neither_copies_nor_touches_target() {
         db_before,
         "第二次跑不许覆盖目标库"
     );
-    assert!(!temp_sibling(&target).exists(), "第二次不该留下临时目录");
-    assert!(
-        !shadow_sibling(&target).exists(),
-        "V4 影子副本目录必须被清理，实留：{}",
-        shadow_sibling(&target).display()
+    /* 临时目录 / V4 影子副本目录 / 以及任何以后新增的中间产物，一并靠这一句守住。
+       真实存在的条目名会原样打出来，报告里直接能看出是谁留下的。 */
+    assert_eq!(
+        residue_in(&root, &["source", "target"]),
+        Vec::<String>::new(),
+        "迁移在夹具根里留下了中间产物（临时目录 / 影子副本未清理）"
     );
 }
 

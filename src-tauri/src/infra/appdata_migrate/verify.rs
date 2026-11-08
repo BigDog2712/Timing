@@ -88,16 +88,41 @@ fn shadow_facts(src_db: &Path, temp: &Path) -> Result<DbFacts, String> {
     dir_name.push(".v4-src");
     let dir = PathBuf::from(dir_name);
 
-    /* 上一次被强杀可能留下影子目录：它是我们自己的中间产物，可以直接清。 */
-    let _ = std::fs::remove_dir_all(&dir);
+    /* 上一次被强杀可能留下影子目录：它是我们自己的中间产物，可以直接清。
+    **清不掉就不能往下走** —— `create_dir_all` 对已存在的目录是静默成功，接着
+    `fill_shadow` 会往一个脏目录里复制：源里没有 `-wal`、残留里却有，SQLite 就会拿
+    那个陈旧 WAL 回放，行数比对随即得出一个与本次迁移无关的结论。Windows 上
+    `remove_dir_all` 失败通常是杀软/索引器短暂持有句柄，属于「这一次不查」，不是失败。 */
+    if let Err(err) = std::fs::remove_dir_all(&dir) {
+        if dir.exists() {
+            return Err(format!(
+                "影子目录 {} 清理不掉（{err}），跳过行数比对",
+                dir.display()
+            ));
+        }
+    }
     std::fs::create_dir_all(&dir)
         .map_err(|err| format!("建影子目录 {} 失败：{err}", dir.display()))?;
+
+    /* 建好之后必须是空的：上面那句 `remove_dir_all` 与这里之间可能被别的进程塞进东西
+    （同一个 target 被并发搬两次），脏目录一律不查，理由同上。 */
+    let dirty = std::fs::read_dir(&dir)
+        .map(|mut entries| entries.next().is_some())
+        .unwrap_or(true);
+    if dirty {
+        let _ = std::fs::remove_dir_all(&dir);
+        return Err(format!("影子目录 {} 非空，跳过行数比对", dir.display()));
+    }
 
     /* 目录已建好之后**每一步失败都要清掉它**，否则磁盘满 / 目标盘只读时会在数据盘
     上留一个 `<target>.migrating.v4-src`（用户永远不知道该不该删）。所以填充与分析
     拆到 `fill_shadow` 里，统一在出口清理。 */
     let result = fill_shadow(src_db, &dir);
-    let _ = std::fs::remove_dir_all(&dir);
+    /* 出口清理失败**不改变校验结论**（副本已经读完），但必须留痕：残留的影子目录正是
+    下一次「读到脏目录」的源头，`let _ =` 静默吞掉等于把问题藏起来。 */
+    if let Err(err) = std::fs::remove_dir_all(&dir) {
+        crate::log_warn!("shadow: 清理影子目录 {} 失败：{err}", dir.display());
+    }
     result
 }
 
