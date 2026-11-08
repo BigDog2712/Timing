@@ -21,15 +21,18 @@ fn active_conflict(err: sqlx::Error) -> AppError {
     err.into()
 }
 
-/// 查询全局唯一 active 会话（排除已软删除）。
+/// 查询全局唯一 active 会话（排除已软删除）；脏数据多条时取最早一条（边界②）。
 pub async fn find_active(pool: &SqlitePool) -> AppResult<Option<TimeRecord>> {
+    Ok(find_all_active(pool).await?.into_iter().next())
+}
+
+/// 全部 active 会话，`started_at` 升序；崩溃恢复（边界②）与退出收尾共用。
+pub async fn find_all_active(pool: &SqlitePool) -> AppResult<Vec<TimeRecord>> {
     let sql = format!(
         "SELECT {COLS} FROM time_records \
-         WHERE status = 'active' AND deleted_at IS NULL LIMIT 1"
+         WHERE status = 'active' AND deleted_at IS NULL ORDER BY started_at ASC, id ASC"
     );
-    Ok(sqlx::query_as::<_, TimeRecord>(&sql)
-        .fetch_optional(pool)
-        .await?)
+    Ok(sqlx::query_as::<_, TimeRecord>(&sql).fetch_all(pool).await?)
 }
 
 /// 新建 active 会话并返回新 id。

@@ -112,10 +112,18 @@ pub(crate) fn quit_after_sync(app: &AppHandle) {
         };
         let pool = app.state::<AppState>().pool.clone();
 
-        /* ② 【批 2 挂点】按 running_since 收尾并保存，必须在同步之前。
+        /* ② 按 running_since 收尾并保存，必须在同步之前（[批 2 · V0.11.24] 落地，
+           PRD §13.3.2-②：托盘退出时若有 active 记录，按「关闭时间」结束）。
            顺序反过来（先同步、后收尾）会永久丢一段：③ 那一轮导出的是**收尾前**的秒数，
            而 `round_webdav` 的 `last_hash` 会把「少了最后那一段」的版本记成已同步 →
-           下次启动 `pending_since == 0` 判为已上传 → 那一段永远补不回来。 */
+           下次启动 `pending_since == 0` 判为已上传 → 那一段永远补不回来。
+           收尾是纯本机写库（毫秒级），套 `timeout` 反而会在慢盘上被整体放弃——
+           那一放弃丢的是用户刚计的那一段（见 QUIT_SYNC_BUDGET 的注释）。 */
+        match services::timer_recover::close_active_for_quit(&pool).await {
+            Ok(0) => {}
+            Ok(n) => crate::log_info!("quit: closed {n} active record(s) at close time"),
+            Err(err) => crate::log_warn!("quit: close active failed: {err}"),
+        }
 
         /* ③ 退出前那一轮（静默，成败只落日志） */
         /* [V0.11.18] B7：先把退出项换成 `正在同步…` + 禁用再开跑。

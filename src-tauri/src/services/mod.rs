@@ -20,6 +20,7 @@ pub mod settings;
 pub mod theme;
 pub mod timer;
 pub mod timer_flush;
+pub mod timer_recover;
 pub mod timer_split;
 pub mod timer_stop;
 pub mod timer_time;

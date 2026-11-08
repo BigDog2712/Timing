@@ -15,7 +15,7 @@ use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
 use crate::models::constants::{SYSTEM_ITEM_ID, UNDO_TOLERANCE_MS, UNDO_WINDOW_MS};
-use crate::models::enums::{record_status, timer_status, ResolveAction, SwitchMode};
+use crate::models::enums::{record_status, timer_status, SwitchMode};
 // 托盘快照相关类型仅桌面用（移动端没有菜单可填），故只进桌面编译。
 #[cfg(desktop)]
 use crate::models::enums::{timer_mode, TrayStatus};
@@ -230,53 +230,11 @@ pub async fn switch(pool: &SqlitePool, item_id: i64, mode: SwitchMode) -> AppRes
     state(pool).await
 }
 
-/// 崩溃恢复：处理启动时发现的 active 会话。
-///
-/// `include_gap`（V0.4.2）把「退出期间」并入累计——见 `gap_sec`。默认 false，
-/// 即 R-2「应用关着就停表」；勾选后由用户显式承担这段空档。
-pub async fn resolve_open(
-    pool: &SqlitePool,
-    action: ResolveAction,
-    end_at: Option<i64>,
-    include_gap: bool,
-) -> AppResult<Option<TimeRecord>> {
-    let Some(active) = session::find_active(pool).await? else {
-        return Ok(None);
-    };
-    let now = clock::now_ms();
-    match action {
-        ResolveAction::Resume => {
-            // 不带 gap 时重置 running_since=now：不把崩溃停机时长计入（R-2）。
-            let base = active.accumulated_sec + gap_sec(&active, now, include_gap);
-            session::set_accum_and_running(pool, active.id, base, Some(now), now).await?;
-            clock::anchor(now);
-            repo::find_by_id(pool, active.id).await
-        }
-        ResolveAction::Close => {
-            let ended = end_at.unwrap_or(now);
-            if ended < active.started_at {
-                return Err(AppError::invalid_duration());
-            }
-            // 以最后落盘 accumulated_sec 为准；勾了 include_gap 才补算停机间隙（R-2）。
-            let base = active.accumulated_sec + gap_sec(&active, ended, include_gap);
-            /* [V0.11.3] 「结束并保存」同样分段：崩溃跨夜的会话常常是昨天开始、今天才收尾。 */
-            crate::services::timer_split::finalize(pool, &active, base, ended, now).await?;
-            if let Some(rs) = active.running_since {
-                clock::clear_anchor(rs);
-            }
-            repo::find_by_id(pool, active.id).await
-        }
-        ResolveAction::Discard => {
-            // 必须置 saved + 软删除，释放 uq_records_open 唯一槽（R-5）。
-            // 累计同样以最后落盘值为准（不补算崩溃间隙，R-2）；记录都不要了，gap 更无从谈起。
-            session::discard(pool, active.id, active.accumulated_sec, now, now).await?;
-            if let Some(rs) = active.running_since {
-                clock::clear_anchor(rs);
-            }
-            Ok(None)
-        }
-    }
-}
+/* [V0.11.24] 崩溃恢复（含边界②多条 active 收尾）移到 `services/timer_recover.rs`，
+在此 re-export：`services::timer::resolve_open` 的对外路径不变（commands / app/tray.rs /
+测试的调用点都不用动）。托盘退出的 `close_active_for_quit` 只有一个调用点，直接走
+`services::timer_recover::` 全路径（app/tray_quit.rs ② 位），不做二次转发。 */
+pub use crate::services::timer_recover::resolve_open;
 
 /* [V0.11.2] 周期落盘移到 `services/timer_flush.rs`：跨进程让路的判据与理由太长，
 留在本文件会破 300 行。沿用 timer_time / timer_stop 的老路子在此 re-export，
@@ -285,7 +243,7 @@ pub use crate::services::timer_flush::flush_active;
 
 /* 时间口径（live_duration / elapsed_ms / floor_sec）已移到 `services/timer_time.rs`
 并在此 re-export——调用点写法不变，但单文件回到 300 行内。 */
-pub(crate) use crate::services::timer_time::{elapsed_ms, floor_sec, gap_sec, live_duration};
+pub(crate) use crate::services::timer_time::{elapsed_ms, floor_sec, live_duration};
 
 /* [V0.3.4] 手动结束（含「最短记录时长」判定）移到 `services/timer_stop.rs`，同样在此
 re-export：`services::timer::stop` 的对外路径不变。`should_ignore` 是阈值判定的唯一入口，

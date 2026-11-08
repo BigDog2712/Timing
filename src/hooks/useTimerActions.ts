@@ -41,8 +41,11 @@ export interface TimerActions {
   startOrSwitch: (itemId: number) => Promise<void>;
   /** 丢弃当前会话：结束并软删除该记录（上下文菜单「丢弃本次记录」） */
   discardCurrent: () => Promise<void>;
-  /** 崩溃恢复三选一；`includeGap` = 把退出期间并入累计（默认 false，R-2） */
-  resolveRecover: (action: ResolveAction, includeGap?: boolean) => Promise<void>;
+  /**
+   * 崩溃恢复（批 2 · V0.11.24）：`includeGap` = 空档并入累计（选项 A）；
+   * `endAt` = 结束时刻（选项 B 传关闭时间 `runningSince`；省略 = now，暂停分支）。
+   */
+  resolveRecover: (action: ResolveAction, includeGap?: boolean, endAt?: number) => Promise<void>;
 }
 
 export function useTimerActions(): TimerActions {
@@ -182,9 +185,9 @@ export function useTimerActions(): TimerActions {
   }, [notify]);
 
   const resolveRecover = useCallback(
-    async (action: ResolveAction, includeGap = false) => {
+    async (action: ResolveAction, includeGap = false, endAt?: number) => {
       try {
-        await ipc.resolveOpenRecord({ action, includeGap });
+        await ipc.resolveOpenRecord({ action, includeGap, endAt });
         useUiStore.getState().setRecover(null);
         await useTimerStore.getState().refresh();
       } catch (err) {

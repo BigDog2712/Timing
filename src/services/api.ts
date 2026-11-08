@@ -107,9 +107,12 @@ export const timerApi = {
   startCountdown: (itemId: number | null, targetSec: number) =>
     ipc.startCountdown({ itemId: itemId ?? undefined, targetSec }),
   setCountdownPresets: (presets: number[]) => ipc.setCountdownPreset({ presets }),
-  /** 崩溃恢复三选一；`includeGap` = 把退出期间并入累计（默认 false） */
-  resolveOpenRecord: (action: ResolveAction, includeGap = false) =>
-    ipc.resolveOpenRecord({ action, includeGap }),
+  /**
+   * 崩溃恢复（批 2 · V0.11.24）；`includeGap` = 空档并入累计（选项 A）；
+   * `endAt` = 结束时刻（选项 B 传关闭时间 `runningSince`；省略 = now）。
+   */
+  resolveOpenRecord: (action: ResolveAction, includeGap = false, endAt?: number) =>
+    ipc.resolveOpenRecord({ action, includeGap, endAt }),
 };
 
 /* ---- 提醒 ---- */
