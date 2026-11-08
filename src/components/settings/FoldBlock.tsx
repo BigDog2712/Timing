@@ -8,9 +8,14 @@
  * 漏一处就是「视觉上收起了、键盘还能 Tab 进去」（验收 A3 点名要看的东西）。
  * 沿用 `sync__fold-btn` 那套既有习惯（图标按钮 + aria 三件套），样式落在 `data__*`。
  *
- * `defaultOpen` 会被「晚到的值」修正一次（`MdSyncTab` 的视图是异步加载的，④ 的默认
+ * `defaultOpen` 会被「晚到的值」修正一次（`MdSyncTab` 的视图是异步加载的，⑤ 的默认
  * 展开判据 `cloud === null` 在首帧还读不出来）；用户自己点过之后就不再改，避免把
  * 用户刚收起的块又弹开。
+ *
+ * [V0.11.26] **默认值 true → false**（PRD R2 / O4）：六块全部默认折叠，展开状态不记忆。
+ * 参数默认值改掉（不是每个调用点传 `false`）是为了防下一个调用点不小心拿到 true。
+ * 「晚到的值修正一次」那个 effect **保留不动**：`defaultOpen` 恒 false 后它无事可做，
+ * 但删它属于顺手重构，本轮不做（PRD §3.2）。
  */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -46,7 +51,7 @@ export function FoldBlock({
   actions,
   summary,
   dirty = false,
-  defaultOpen = true,
+  defaultOpen = false,
   children,
 }: FoldBlockProps) {
   const [open, setOpen] = useState(defaultOpen);

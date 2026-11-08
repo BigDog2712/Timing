@@ -13,7 +13,13 @@
  * 为什么不各写一份：保存按一处算、「测试连接」按另一处算，很快就出现「测试通过、保存后
  * 不生效」这类没人能复现的故障。本文件是纯函数，不读 state、不碰网络。
  */
-import type { MdSyncBinding, MdSyncBindingStatus, MdSyncCloud } from '../../types/domain';
+import type {
+  CloudMode,
+  MdSyncBinding,
+  MdSyncBindingStatus,
+  MdSyncCloud,
+  MdSyncCloudChannel,
+} from '../../types/domain';
 
 /**
  * 后端 `models/constants.rs::MD_SYNC_POLL_SECS` 的镜像，**只作占位**。
@@ -24,21 +30,36 @@ import type { MdSyncBinding, MdSyncBindingStatus, MdSyncCloud } from '../../type
  */
 export const MD_SYNC_POLL_SECS = 900;
 
-/* 云端通道空配置：`enabled` 必须是 `false`——视图没加载时凭空给 `true`，用户下一次
-   保存就会把云端通道偷偷打开。
-   [V0.11.18] `enabled` 的语义已升格为**存储通道**（`true` = 本地 + 云端，`false` = 只用
-   本地），所以 `false` 这条默认值现在有第二个理由：从没配过云端的人默认「只用本地」，
-   与 PRD A1 的默认态一致。（旧理由仍成立：凭空 `true` 仍会在下一次保存时打开云端。）
-   [V0.11.16] 三个默认值（PRD R7 / 裁决 Q1 / QA F1 回修）：`mode` + 服务地址 + 远端目录
-   **直接写进值**（不是 placeholder），最常见的那台服务器开箱可用。
-   `mode: 'webdav'` 是 F1 修的：v0.11.16 首版留 `localfolder`，于是「服务地址自动默认
-   填写」这条要做到得先手动切一次分段——预填值存在但不在用户眼前，等于没做到。
-   **只在 `cloud === null`（从未配置过）时生效**——已有配置一律原样回填，绝不被默认值
-   覆盖（PRD 6.1 的硬口径，E2 仍然成立）。
+/* [V0.11.26] 两条通路各自的空配置。
+   `enabled` 必须是 `false`——视图没加载时凭空给 `true`，用户下一次保存就会把这条通路
+   偷偷打开。`false` 也是 PRD A1 的默认态（两条通路都关着 = 只写 Obsidian 那份）。
+   预填值（服务地址 + 远端目录）沿用 [V0.11.16] 的裁定：最常见的那台服务器开箱可用，
+   而预填值存在但不在用户眼前等于没做到，所以直接写进值里。
    `%` 一律不出现：中文路径存中文、显示中文，编码交给 `url` crate 在发请求时做一次。
    [V0.11.17] B3：`basePath` 从 `/我的坚果云/Timing` 改成 `/Timing`——坚果云的 `dav` 根
-   就是「我的坚果云」，`/Timing` 是它下面那一级；少一级中文目录，真机少一次编码/权限
-   歧义。配套提示见 `mdSyncCopy.ts::CLOUD_DIR_HINT`（首次使用到网页版新建这个文件夹）。 */
+   就是「我的坚果云」，`/Timing` 是它下面那一级；配套提示见 `mdSyncCopy.ts::CLOUD_DIR_HINT`。 */
+export function emptyWebdav(): MdSyncCloudChannel {
+  return {
+    enabled: false,
+    baseUrl: 'https://dav.jianguoyun.com/dav/',
+    basePath: '/Timing',
+    user: '',
+  };
+}
+
+/** 块④ 本地同步的空配置：`enabled: false` 的理由同上；落点目录**不给默认值**（没有「常见目录」）。 */
+export function emptyLocal(): MdSyncCloudChannel {
+  return { enabled: false, localRoot: '' };
+}
+
+/**
+ * [V0.11.26] 「从没配过云端」那一档的空配置 —— **只服务手机端面板与 legacy 载荷**。
+ *
+ * 桌面已经不用它了（块⑤ 用 `emptyWebdav()`）。留着这个导出是因为
+ * `components/mobile/SyncCloudPane.tsx` 是零 diff 红线，它读的仍是 `config.cloud`。
+ *
+ * @deprecated 桌面请用 `emptyWebdav()` / `emptyLocal()`。
+ */
 export function emptyCloud(): MdSyncCloud {
   return {
     enabled: false,
@@ -51,79 +72,90 @@ export function emptyCloud(): MdSyncCloud {
 }
 
 /**
- * [V0.11.18] 存储通道（PRD 三 / CH1–CH4）：页签顶部那个二选一。
+ * [V0.11.26] 保存前归一（**逐通路**，承接原 `cloudToSave` 的防空壳职责）。
  *
- * `local` = 只跑 Markdown 同步（写本地 md 文件）；`both` = Markdown 同步 + 云端通道。
- * 它**不是**「数据搬进云端、本地不落」——SQLite 永远在本机（PRD §10-N6）。
+ * `wasConfigured === false`（这条通路从未落库）且用户最终停在这个通路的「关」→ 落 `null`，
+ * 让这类用户的库与新装同形；配过的人一概不归一（CH4 的继承者：关掉不删配置）。
+ *
+ * 不这么做的后果很具体：从没配过云端的人打开块⑤ 又关掉开关就保存，落库会从「没有这个键」
+ * 变成 `{enabled:false, baseUrl:'https://dav.jianguoyun.com/dav/', …}` ——库里多出一个
+ * 「像是配过」的对象。两条通路都做这件事，所以「两块都从未配置且都关」时 JSON 与新装同形（O13）。
+ *
+ * `wasConfigured` 取**保存动作那一刻的视图值**（`view.config.cloudFolder != null`），
+ * 不是草稿：草稿里的通路永远非空，判不出「从没配过」。
  */
-export type MdSyncChannel = 'local' | 'both';
-
-/**
- * 通道的**唯一**判据。整个前端不许出现第二份 `cloud.enabled ? .. : ..`。
- *
- * 真相在 `MdSyncCloud.enabled`（`models/md_sync_cloud.rs:64-65`）：`true` = 本地 + 云端，
- * `false` = 只用本地。老配置 `enabled: true` 直接推出「本地 + 云端」，**读的时候不改盘**，
- * 所以不需要迁移脚本（选候选 A「新增字段」就必须写迁移，已在设计 §2.2 否决）。
- *
- * `draft.cloud` 永远非 null（`useMdSyncDraft` 回填时 `?? emptyCloud()`），本函数因此
- * 不接受 null：让类型把这条不变量说出来，比在函数体里判 null 更早挡住误用。
- */
-export function channelOf(cloud: MdSyncCloud): MdSyncChannel {
-  return cloud.enabled ? 'both' : 'local';
-}
-
-/**
- * 反向：分段控件点击 → 要写进草稿的那份 cloud。**只动 `enabled`**，其余字段原样保留。
- *
- * CH4「云端配置已保留，切回即恢复」就是靠这一行成立的：切到「只用本地」不碰地址 /
- * 远端目录 / 账号，密文本来也不在这里（在 keychain）。
- */
-export function withChannel(cloud: MdSyncCloud, next: MdSyncChannel): MdSyncCloud {
-  return { ...cloud, enabled: next === 'both' };
-}
-
-/**
- * 保存前归一：**从没配过**（`wasConfigured === false`）且用户最终停在「只用本地」→ 落
- * `null`，让这类用户的库与 v0.11.17 完全 diff 为零；配过的人一概不归一（CH4）。
- *
- * 不这么做的后果很具体：从没配过云端的人点一下「本地 + 云端」再点回「只用本地」保存，
- * 落库会从 `cloud: null` 变成 `{enabled:false, mode:'webdav', baseUrl:'https://dav.jianguoyun.com/dav/', …}`
- * ——库里多出一个「像是配过」的对象，`cloudConfigured` 随之变 `true`，块④ 从此默认展开。
- *
- * `wasConfigured` 取**保存动作那一刻的视图值**（`view.config.cloud != null`），不是草稿：
- * 草稿里的 cloud 永远非 null，判不出「从没配过」。
- */
-export function cloudToSave(cloud: MdSyncCloud, wasConfigured: boolean): MdSyncCloud | null {
-  if (wasConfigured || cloud.enabled) return cloud;
+export function channelToSave(
+  channel: MdSyncCloudChannel,
+  wasConfigured: boolean,
+): MdSyncCloudChannel | null {
+  if (wasConfigured || channel.enabled) return channel;
   return null;
 }
 
 /**
- * 云端通道是否「开了且填全了」——[V0.11.18] A6 那句 `云端还没填全，暂时不会同步。` 的判据。
+ * 块④ 是否「开了且填了落点目录」——`云端目录还没填，暂时不会同步。`（L4）的判据。
  *
- * **与后端 `services/md_cloud/mod.rs::usable` + `models/md_sync_cloud.rs::is_usable` 同口径，
- * 改一边必须改另一边。** 逐条对齐（不要凭印象重写）：
+ * **与后端 `models/md_sync_channel.rs::is_usable_folder` 同口径，改一边必须改另一边**：
+ * `enabled` 为假 → 不可用；`localRoot` 去空白后为空 → 不可用。
+ */
+export function isLocalReady(channel: Pick<MdSyncCloudChannel, 'enabled' | 'localRoot'>): boolean {
+  if (!channel.enabled) return false;
+  return (channel.localRoot ?? '').trim() !== '';
+}
+
+/**
+ * 块⑤ 是否「开了且三件套齐」——`云端还没填全，暂时不会同步。` 的判据。
  *
- * 1. `enabled` 为假 → 不可用（后端 `usable` 先 `.filter(|c| c.enabled && …)`，
- *    `is_usable` 自己再判一次 `enabled`）；
- * 2. `mode === 'localfolder'` → 只看 `localRoot` 非空白（**不看地址 / 账号**，
- *    那条路一次网络请求都不发）；
- * 3. `mode === 'webdav'` → `baseUrl` / `basePath` / `user` **三个都要**非空白。
- *    密码**不参与**：它不在 `MdSyncCloud` 里（密文归 `infra::secret`），后端这一判也不看它
- *    ——「有账号没密码」在界面上仍算「填全」，真正的失败由「测试连接」/ `lastError` 说。
+ * **与后端 `is_usable_webdav` 同口径**：`baseUrl` / `basePath` / `user` **三个都要**非空白。
+ * 密码**不参与**：它不在通路结构里（密文归 `infra::secret`），后端这一判也不看它——
+ * 「有账号没密码」在界面上仍算「填全」，真正的失败由「测试连接」/ `lastError` 说。
  *
- * 三处都用 `.trim()` 判空白串，与后端的 `.trim().is_empty()` 一致：
- * 用户敲一个空格不等于填了。
+ * 三处都用 `.trim()` 判空白串：用户敲一个空格不等于填了。
+ */
+export function isWebdavReady(
+  channel: Pick<MdSyncCloudChannel, 'enabled' | 'baseUrl' | 'basePath' | 'user'>,
+): boolean {
+  if (!channel.enabled) return false;
+  return (
+    (channel.baseUrl ?? '').trim() !== ''
+    && (channel.basePath ?? '').trim() !== ''
+    && (channel.user ?? '').trim() !== ''
+  );
+}
+
+/**
+ * 通路 → 「测试连接」的 legacy 载荷（`probe.rs` 是红线文件，只认带 `mode` 的旧形状）。
  *
- * 为什么要在前端再写一份（后端已经有 `is_usable`）：前端拿不到 `is_usable`——视图只回
- * `MdSyncCloudStatus`（`enabled / mode / hasSecret / todayPushed / pendingDates / lastError`），
- * **没有字段本身**。新增一个命令或给状态加字段等于改契约 78，本轮不允许，所以在前端纯函数里
- * 对齐一份，并靠 `mdSyncConfig.test.ts` 的四档用例钉住。
+ * `enabled` **恒 `true`**：探测是只读动作，不该被开关拦（PRD §4.3「测试连接保持可点」，
+ * 设计 §四-4 同裁定）。地址/目录/账号原样带过去，缺项由后端给既有的错误文案。
+ *
+ * `mode` 由调用方给（块④ `localfolder`、块⑤ `webdav`）——去 mode 的通路结构里没有这个信息。
+ */
+export function legacyCloudForTest(
+  mode: CloudMode,
+  channel: MdSyncCloudChannel,
+): MdSyncCloud {
+  return {
+    enabled: true,
+    mode,
+    localRoot: channel.localRoot ?? '',
+    baseUrl: channel.baseUrl ?? '',
+    basePath: channel.basePath ?? '',
+    user: channel.user ?? '',
+    auto: channel.auto,
+  };
+}
+
+/**
+ * [V0.11.26] legacy `MdSyncCloud` 是否「开了且填全」——**只服务手机端两个红线面板**。
+ *
+ * 桌面已改成 `isLocalReady / isWebdavReady` 两条通路各判一次；这里按 `mode` 分派到那两个
+ * 函数，保证「同一份判据」而不是第二份实现。
+ *
+ * @deprecated 桌面请用 `isLocalReady` / `isWebdavReady`。
  */
 export function isCloudReady(cloud: MdSyncCloud): boolean {
-  if (!cloud.enabled) return false;
-  if (cloud.mode === 'localfolder') return cloud.localRoot.trim() !== '';
-  return cloud.baseUrl.trim() !== '' && cloud.basePath.trim() !== '' && cloud.user.trim() !== '';
+  return cloud.mode === 'localfolder' ? isLocalReady(cloud) : isWebdavReady(cloud);
 }
 
 /**

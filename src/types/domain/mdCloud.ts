@@ -40,7 +40,13 @@ export interface MdCloudPurgeStatus {
   failed: number;
 }
 
-/** 云端通道配置（`MdSyncConfig.cloud`；老配置没有这个字段 → 运行时是 `null`） */
+/** 云端通道配置（`MdSyncConfig.cloud`；老配置没有这个字段 → 运行时是 `null`）
+ *
+ * [V0.11.26] **legacy 只读形 / 测试连接载荷**：新保存形里 `cloud` 键不再出现
+ * （两条通路各一份 `MdSyncCloudChannel`）。这个结构还活着的原因只有两个：
+ * ① 老 JSON 的反序列化入口；② 「测试连接」的载荷载体——后端 `probe.rs` 是红线文件，
+ * 它只认这一份带 `mode` 的形状，所以前端按被测通路现拼一份（`legacyCloudForTest`）。
+ */
 export interface MdSyncCloud {
   enabled: boolean;
   mode: CloudMode;
@@ -59,6 +65,29 @@ export interface MdSyncCloud {
   auto?: MdSyncCloudAuto;
 }
 
+/**
+ * [V0.11.26] 一条通路自己的配置（后端 `MdSyncCloudChannel`，camelCase）。
+ *
+ * 它是旧 `MdSyncCloud` 的**去 mode 超集**：没有 `mode`——块④ 就是本地、块⑤ 就是 WebDAV，
+ * 「这条通路是哪种载体」由它在页签里的位置决定（PRD R6 / §4.2）。
+ *
+ * 四个字符串字段在后端都是 `#[serde(default)] String`（永远序列化出来，可能是 `""`），
+ * 这里标可选只是为了构造方便；判「填没填全」一律走 `isLocalReady / isWebdavReady`。
+ */
+export interface MdSyncCloudChannel {
+  enabled: boolean;
+  /** folder 通路：落点目录（绝对路径） */
+  localRoot?: string;
+  /** webdav 通路：服务地址 */
+  baseUrl?: string;
+  /** webdav 通路：远端目录 */
+  basePath?: string;
+  /** webdav 通路：账号 */
+  user?: string;
+  /** 该通路自己的三档（`undefined` = 老配置，读作默认「智能 + 15 分钟」） */
+  auto?: MdSyncCloudAuto;
+}
+
 /** 云端通道的运行时状态（设置页原样展示，不臆造「成功」） */
 export interface MdSyncCloudStatus {
   enabled: boolean;
@@ -74,8 +103,16 @@ export interface MdSyncCloudStatus {
   purge?: MdCloudPurgeStatus;
 }
 
-/** `md_sync_get` / `md_sync_save` 的返回：基础视图 + 云端状态（后端 `flatten`） */
-export type MdSyncViewCloud = MdSyncView & { cloud: MdSyncCloudStatus };
+/**
+ * `md_sync_get` / `md_sync_save` 的返回：基础视图 + 两块状态（后端 `flatten`）。
+ *
+ * [V0.11.26] `+local`：块④ 本地同步自己的状态（`view.local`），块⑤ 读 `view.cloud`。
+ * 两块互不共用一行数字——串了就是「本地写过了 → 云端显示今天已上传」。
+ */
+export type MdSyncViewCloud = MdSyncView & {
+  cloud: MdSyncCloudStatus;
+  local: MdSyncCloudStatus;
+};
 
 /**
  * 「测试连接」的三个关卡标识。**这是契约**（后端 `MdSyncTestStep.key` 的字面量），

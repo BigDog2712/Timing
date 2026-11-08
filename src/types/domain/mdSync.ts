@@ -6,7 +6,7 @@
  * 前端只负责配置与展示状态——没有「插件装没装」这回事了。
  */
 
-import type { MdSyncCloud } from './mdCloud';
+import type { MdSyncCloud, MdSyncCloudChannel } from './mdCloud';
 
 /** 同步的数据种类 */
 export type MdSyncKind = 'timers' | 'notes' | 'todos';
@@ -46,12 +46,24 @@ export interface MdSyncConfig {
   /**
    * [V0.11.13] 云端第二落点（ADR-061）。
    *
-   * **必须是 `null` 而不是 `undefined`**：V0.11.12 及以前保存的 JSON 里没有这个键，
-   * Rust 侧的 `Option<MdSyncCloud>` 反序列化出来是 `None`，序列化回前端就是显式的
-   * `null`。写成可选字段（`cloud?:`）会让「没有这个键」与「有这个键但值为 null」
-   * 两种状态在类型上长得一样，而它们在线上是同一个东西 —— 用 `null` 才与线上一致。
+   * [V0.11.26] **legacy 只读形**：老配置反序列化入口 + 「测试连接」载荷载体。
+   * 桌面产物里后端 `skip_serializing_if` 掉了这个键，读回来运行时是 `undefined`；
+   * 类型上**仍写成必填的 `| null`**，因为 `components/mobile` 那两个面板是零 diff 红线，
+   * 它们写的是 `config.cloud !== null`（改成 `?` 会让红线文件编译不过）。
+   * 「从未配置」的两种线上形状（缺键 / null）在判据里等价：`?? emptyCloud()` 兜住前者。
+   *
+   * 新保存形里这个键**必须不出现**（O11）；「测试连接」按被测通路现拼一份
+   * （`mdSyncConfig::legacyCloudForTest`），因为 `probe.rs` 只认带 `mode` 的旧结构。
    */
   cloud: MdSyncCloud | null;
+  /**
+   * [V0.11.26] 块④ 本地同步通路（后端 `cloudFolder`）。`undefined` / `null` = 从未配置。
+   *
+   * 两条通路**各持一份**，互不镜像：改块④ 的落点目录不许动到块⑤ 的三件套（O13）。
+   */
+  cloudFolder?: MdSyncCloudChannel | null;
+  /** [V0.11.26] 块⑤ 云端同步通路（后端 `cloudWebdav`）。 */
+  cloudWebdav?: MdSyncCloudChannel | null;
 }
 
 /** 单个落点的运行状态 */
