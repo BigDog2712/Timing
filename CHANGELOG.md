@@ -2,6 +2,42 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.26 — 手机同步「建不了云端落点目录 permission denied」：`\` 不是 POSIX 的分隔符
+
+故障修复，零新增命令 / 零错误码变化。主人原话：「错误信息 建不了云端落点目录 permission
+denied（os error 13）／测试连接成功 但无法将日记写回本地」。
+
+### 根因
+
+出厂落点模板是 `r"%APP_DIR%\md-webdav"`（Windows 写顺手了）。手机的数据根是
+`/data/user/0/com.timing.app`（Tauri `getDataDir` = `activity.dataDir`，**不是** `.../files`），
+展开后得到 `/data/user/0/com.timing.app\md-webdav`——在 POSIX 上 `\` 是**普通字符**，
+这整串是**一个**路径分量，于是 mkdir 的父目录成了 `/data/user/0`（root 所有、应用不可写）
+→ `EACCES`（os error 13）。
+
+「测试连接」只碰网络（GET 目录 / MKCOL / PUT 探针），一个本地目录都不建，所以它永远是绿的。
+
+### 改了什么
+
+- 分隔符归一放在 `infra::md_env` 展开的**最后一步**：`%APP_DIR%\md-webdav`、`%APP_DIR%\md`、
+  用户自填的根目录三条路一起受益。判据是纯函数
+  `resolve_template(raw, app_dir, mobile)`——`mobile` 是**参数**不是 `cfg!`，桌面目标的用例
+  也能断言 Android 那一支（本项目第四次踩「判据被 `cfg` 遮住」）。
+- `normalize_separators` **只在非 Windows 上动手**：桌面落点一个字节没变。
+- 「建不了云端落点目录」的文案补上**具体路径**（`services::md_cloud::root_dir_error`）：
+  落点有两个可能、两端系统又不同，缺了路径这句话只能靠猜。
+- 每轮多一行 `md cloud: root=<路径>` 日志：手机沙箱用户看不见，「今天的日记写到哪了」只有日志能答。
+
+### 判据
+
+Q1 出厂模板在 POSIX 上落成数据根的**直接子目录** / Q2 Windows 上逐字不变 / Q3 用户自填目录同样归一 /
+Q4 错误必须带路径 / Q5 模板仍用 `%APP_DIR%` 占位 / Q6 云端落点与 Obsidian 落点不重叠。
+变异：把 `normalize_separators` 的 `if mobile` 改成 `if false` → Q1/Q3 当场红，还原后绿。
+Q7（真机：同步后数据根下真的出现 `<日期>.md`）只有主人能验。
+
+门禁：契约 79/17/11、size 640、version 0.11.26 六处、layers 8、brand 0、eslint 0；
+`cargo test --lib` 696/0/1ign（+9）；`npm test` 582；安卓目标 0 warning。
+
 ## 0.11.25 — 手机点「测试连接」闪退：根证书从运行时状态改成编译期常量
 
 故障修复，零新增命令 / 零错误码变化。主人原话：「点击测试链接  软件闪退」——手机端设置里的「测试连接」。

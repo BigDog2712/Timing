@@ -1,4 +1,12 @@
-# ===== 最新：0.11.25（手机 + 桌面都出）=====
+# ===== 最新：0.11.26（手机 + 桌面都出）=====
+#   手机同步报「建不了云端落点目录 permission denied」修掉了：出厂落点的 `\` 在 POSIX 上
+#   不是分隔符（展开后父目录成了 /data/user/0）→ 按平台归一 + 错误带上完整路径。
+#   契约 79 / 17 / 11、迁移 0006 都没动。
+42beaa1a8715b3d08615e45c92bd51fae850dc81533f24e9c9c4fbec50e05397 *Timing-0.11.26-portable.zip
+4e09bb54da96a8aee5991e8933aa0f54a730f52139d6d220e3f5743fb4cc777a *Timing-0.11.26-setup.exe
+09815a5bc0b95ea5da1f39185b9f41e55f07f4b4bde51ee8c8888aa0b06cf636 *Timing-android-0.11.26-release-arm64-debugsigned.apk
+
+# ===== 上一版：0.11.25（手机 + 桌面都出）=====
 #   手机点「测试连接」闪退修掉了：根证书换成编译期内置（webpki-roots），
 #   不再依赖 Android 上需要 Kotlin 侧初始化的平台验证器。契约 79 / 17 / 11、迁移 0006 都没动。
 3375cb4c2287f61c0c6ec1f4e90fdb1c85688bde5aed688bb5ce5f1fbd04b5d8 *Timing-0.11.25-portable.zip

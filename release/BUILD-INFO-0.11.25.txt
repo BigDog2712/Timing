@@ -1,6 +1,0 @@
-product: Timing
-version: 0.11.25
-git_commit: 8206c33cfca9b67b3071c4046718c5d2e3341d34
-git_dirty: clean
-built_at_utc: 2026-11-08T12:12:58.603Z
-build_profile: release
