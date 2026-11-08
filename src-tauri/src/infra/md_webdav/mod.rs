@@ -24,6 +24,9 @@ use crate::models::constants::{MD_CLOUD_CONNECT_SECS, MD_CLOUD_READ_SECS};
 判定表只有一张（见 `dir.rs` 头注释）；`probe` / `ProbeOutcome` re-export 出来，调用点不必知道拆过。 */
 pub mod dir;
 pub mod probe_file;
+
+/// TLS 后端（[V0.11.25]）：内置根证书，不依赖运行时的平台验证器。见本模块文件头。
+pub mod tls;
 /* [V0.11.19 变更 A] 往期真删的 DELETE：`redirect(none)` + 返回状态码。**不是**探针那个。 */
 pub mod remove;
 pub(crate) mod tag;
@@ -131,7 +134,7 @@ impl fmt::Debug for WebdavTarget {
 /// 取远端一份文件。404 是正常结果（今天还没记），由调用方解释。
 pub async fn get(target: &WebdavTarget, rel: &str) -> Result<GetOutcome, WebdavError> {
     let url = target.url_for(rel)?;
-    let response = client()
+    let response = client()?
         .get(&url)
         .basic_auth(&target.user, Some(&target.password))
         .send()
@@ -189,7 +192,7 @@ async fn send_put(
     if_match: Option<&str>,
 ) -> Result<PutOutcome, WebdavError> {
     let url = target.url_for(rel)?;
-    let mut request = client()
+    let mut request = client()?
         .put(&url)
         .basic_auth(&target.user, Some(&target.password))
         .body(bytes.to_vec());
@@ -217,23 +220,23 @@ pub fn redact(url: &str) -> String {
 }
 
 /// 复用一个 Client（连接池 + TLS 会话都在里面）。超时按任务书 §4.5：连 10s / 读 30s。
-fn client() -> &'static Client {
-    static CLIENT: OnceLock<Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        /* `rustls-no-provider` 必须自己装加密提供者，否则 `build()` 建 TLS 配置时 panic
-        （reqwest 0.13.5 `default_rustls_crypto_provider`）。用 ring：只需 cc，
-        Windows 与 NDK 都能编，与 Cargo.toml 的选择一致。 */
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        Client::builder()
-            .connect_timeout(Duration::from_secs(MD_CLOUD_CONNECT_SECS))
-            .timeout(Duration::from_secs(MD_CLOUD_READ_SECS))
-            .user_agent(USER_AGENT)
-            .build()
-            /* 建 Client 失败只可能是系统 TLS 配置坏了。**不** panic：release 是
-            `panic = "abort"`，一次构造失败会带走整个进程。退回默认 Client 只是丢掉
-            超时设置，那一轮同步还有自己的退避。 */
-            .unwrap_or_else(|_| Client::new())
-    })
+///
+/// 返回 `Result` 而不是 `&'static Client`：建不出来要能让界面出红字。**不回退**
+/// `Client::new()`——它内部是 `build().expect(..)`，而 `release` 是 `panic = "abort"`，
+/// 一次构造失败就会带走整个进程（手机点「测试连接」闪退的其中一种形状）。
+fn client() -> Result<&'static Client, WebdavError> {
+    static CLIENT: OnceLock<Result<Client, String>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            tls::builder()?
+                .connect_timeout(Duration::from_secs(MD_CLOUD_CONNECT_SECS))
+                .timeout(Duration::from_secs(MD_CLOUD_READ_SECS))
+                .user_agent(USER_AGENT)
+                .build()
+                .map_err(|err| format!("建不出 HTTP 客户端：{err}"))
+        })
+        .as_ref()
+        .map_err(|err| WebdavError::Network(err.clone()))
 }
 
 /// 状态码 → 错误。成功 `Ok(())`；表外的 4xx / 5xx 一律 `Server(code)`。

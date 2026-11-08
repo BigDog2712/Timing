@@ -2,6 +2,42 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.25 — 手机点「测试连接」闪退：根证书从运行时状态改成编译期常量
+
+故障修复，零新增命令 / 零错误码变化。主人原话：「点击测试链接  软件闪退」——手机端设置里的「测试连接」。
+
+### 根因
+
+reqwest 0.13 的 `rustls-no-provider` 会拖 `rustls-platform-verifier`（读系统根证书）。那个后端
+**在 Android 上必须先由 Kotlin 侧初始化 context**，否则验证时
+`global().expect("Expect rustls-platform-verifier to be initialized")` 直接 panic；而
+`[profile.release] panic = "abort"` → 进程当场被杀。本项目没有引那个 AAR，也没有初始化调用。
+
+桌面正常（Windows 走 SChannel，不需要 init），本地用例也发现不了（打的是假 HTTP 服务端，
+走不到证书校验）——于是「桌面绿、手机崩」藏了三轮。
+
+### 改了什么
+
+- 新增 `infra/md_webdav/tls.rs`：`root_store()` / `client_config()` / `builder()`，根证书来自
+  `webpki-roots`（编译期常量，无 JNI、无初始化动作）。
+- 三处 Client（`client()` / `mkcol_client()` / `remove_client()`）改成
+  `OnceLock<Result<Client, String>>`：失败缓存、对外回 `WebdavError::Network(文案)`（走既有
+  `fail_text_at` 出红字），**不再回退** `Client::new()`。
+- `remove.rs` 的 `.expect("DELETE 专用 Client 必须带 Policy::none()")` 删掉——注释写着「不 panic」，
+  代码却 panic。仍不退回默认 Client：那会丢掉 `redirect(Policy::none())`，DELETE 跟随 3xx 会
+  「删了另一个文件还报成功」。
+- `Cargo.toml` 新增 `webpki-roots = "1"`。
+
+### 代价
+
+企业自签 / 内网私有 CA 不再被信任（红字「证书校验失败」，不是闪退）。公网 CA 全部照常。
+
+### 验收
+
+`tests/md_webdav_tls.rs` 三条 + 一条 `#[ignore]` 真网络握手（手跑：坚果云端点 → HTTP 401，
+证书已通过）。变异自证：注释 `roots.extend(..)` → `roots_are_built_in` 红（0 条），还原后绿。
+门禁 EXIT 0（契约 79/17/11、size 639、version 六处 0.11.25）；cargo 687/0/1ign；安卓目标 0 warning。
+
 ## 0.11.24 — 异常退出恢复：两条路都带数字，不再让你心算
 
 批 2 落地（12-PRD §13.5，排期从 0.11.20 顺延三轮后补上）。**改造一个已存在的对话框**，不是新建弹窗。

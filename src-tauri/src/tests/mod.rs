@@ -112,6 +112,8 @@ mod md_webdav_text;
 mod md_webdav_e8_encoding;
 /* 「写文件」与「建目录」的 URL 必须同源（MKCOL 的 URL 是 PUT 的路径前缀）。 */
 mod md_webdav_url;
+/* 根证书必须是编译期内置的：平台验证器在 Android 上要 Kotlin 侧初始化，没有就 abort。 */
+mod md_webdav_tls;
 mod migration;
 mod migration_v2;
 mod moyu_settings;

@@ -4447,7 +4447,7 @@ dependencies = [
 
 [[package]]
 name = "timing"
-version = "0.11.24"
+version = "0.11.25"
 dependencies = [
  "chrono",
  "dirs 7.0.0",
@@ -4466,6 +4466,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "thiserror 2.0.21",
  "tokio",
+ "webpki-roots",
  "windows-registry",
  "windows-sys 0.61.2",
 ]
@@ -5053,6 +5054,15 @@ name = "webpki-root-certs"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e49d0e65abc00c142e8f9428da991da9f1a250c39be97459901eb12b9b49f62a"
+dependencies = [
+ "rustls-pki-types",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "1.0.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5f280bbb2b287bc8e7de7e3852945a0ff50d1bbcb5ed42b6c7a568c546df171"
 dependencies = [
  "rustls-pki-types",
 ]

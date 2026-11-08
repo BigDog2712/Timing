@@ -1,6 +1,6 @@
 [package]
 name = "timing"
-version = "0.11.24"
+version = "0.11.25"
 description = "Timing — 常驻悬浮计时条（Windows 桌面，纯本地）"
 authors = ["Timing Team"]
 edition = "2021"
@@ -49,6 +49,12 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls-no-p
 # 加密提供者显式选 `ring`：只需 cc，Windows 与 NDK 都能编。rustls 默认的 aws-lc-rs
 # 在 Windows 上要 cmake + NASM，本机构建环境没有。
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+# [V0.11.25] 根证书用**编译期常量**，不再走 `rustls-platform-verifier`。
+# 0.11.24 及之前信任「系统根证书」，而那个后端在 Android 上必须先由 Kotlin 侧
+# 初始化 context（`Expect rustls-platform-verifier to be initialized` 就是它的 panic），
+# 本项目没有那个 AAR → 手机上第一次做 HTTPS 校验就 abort（`panic = "abort"`）。
+# webpki-roots 是纯数据 crate：无 cc、无 JNI、两端同一份根，手机点「测试连接」不再崩。
+webpki-roots = "1"
 
 # 桌面独占依赖（Android / iOS 上这三个插件没有实现，放进通用段必然链接失败）。
 # 用 `cfg(not(any(android, ios)))` 而不是 `cfg(desktop)`：Cargo 的 target 段只认

@@ -30,7 +30,7 @@ pub async fn write_probe(target: &WebdavTarget) -> Result<(), WebdavError> {
 /// `DELETE` 一个远端文件。`404` 视为成功（已经不在那儿了）。
 pub async fn delete(target: &WebdavTarget, rel: &str) -> Result<(), WebdavError> {
     let url = target.url_for(rel)?;
-    let response = super::client()
+    let response = super::client()?
         .delete(&url)
         .basic_auth(&target.user, Some(&target.password))
         .send()

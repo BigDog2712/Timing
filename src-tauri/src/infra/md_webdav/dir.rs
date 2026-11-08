@@ -207,7 +207,7 @@ pub async fn ensure_base_dir_err(target: &WebdavTarget) -> Result<EnsureOutcome,
 /// 建一级目录。`Ok(true)` = 建成了，`Ok(false)` = 已经存在（幂等）。
 async fn mkcol(target: &WebdavTarget, level: usize) -> Result<bool, WebdavError> {
     let url = target.dir_url(level)?;
-    let response = mkcol_client()
+    let response = mkcol_client()?
         .request(mkcol_method(), &url)
         .basic_auth(&target.user, Some(&target.password))
         /* 空 body，且**显式**写 `Content-Length: 0`：部分服务端要求 MKCOL 带一个长度 0
@@ -259,20 +259,22 @@ async fn mkcol(target: &WebdavTarget, level: usize) -> Result<bool, WebdavError>
 /// 不共用 `mod.rs` 的 `client()`：GET / PUT 的 3xx 语义与 MKCOL 不同（`probe` 要把
 /// 3xx 当「通但读不了目录」，那依赖 reqwest 的默认跟随把带 `Location` 的响应走完），
 /// 共用一份会让两边互相拖累。
-fn mkcol_client() -> &'static Client {
-    static CLIENT: OnceLock<Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        /* 与 `mod.rs::client()` 同一段理由：`rustls-no-provider` 必须自己装加密提供者。
-        重复安装只会在第二次返回 Err，忽略即可。 */
-        let _ = rustls::crypto::ring::default_provider().install_default();
-        Client::builder()
-            .connect_timeout(Duration::from_secs(MD_CLOUD_CONNECT_SECS))
-            .timeout(Duration::from_secs(MD_CLOUD_READ_SECS))
-            .user_agent(USER_AGENT)
-            .redirect(Policy::none())
-            .build()
-            .unwrap_or_else(|_| Client::new())
-    })
+fn mkcol_client() -> Result<&'static Client, WebdavError> {
+    static CLIENT: OnceLock<Result<Client, String>> = OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            /* TLS 与 `mod.rs::client()` 同一份（内置根证书，见 `tls` 模块头）：
+            这里只多一条 `redirect(none)`。 */
+            super::tls::builder()?
+                .connect_timeout(Duration::from_secs(MD_CLOUD_CONNECT_SECS))
+                .timeout(Duration::from_secs(MD_CLOUD_READ_SECS))
+                .user_agent(USER_AGENT)
+                .redirect(Policy::none())
+                .build()
+                .map_err(|err| format!("建不出 HTTP 客户端：{err}"))
+        })
+        .as_ref()
+        .map_err(|err| WebdavError::Network(err.clone()))
 }
 
 fn mkcol_method() -> Method {
