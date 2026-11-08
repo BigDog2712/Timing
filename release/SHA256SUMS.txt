@@ -1,4 +1,8 @@
-# 可安装的只有最后那个（调试证书签名，arm64）
+# ===== 最新：0.11.21（只有手机包；桌面仍用 0.11.20）=====
+#   手机端第一次能自己配云端（WebDAV + 三档）。桌面零改动。
+05f20b3aa87a7e10f85d4406836143e15e5a2024768233c2881da75c751f9e3c *Timing-android-0.11.21-release-arm64-debugsigned.apk
+
+# ===== 历史：0.11.4 及更早 =====
 #   0.11.4：22px 小圆点 / 外环 60s 一圈 / 分针 3600s 一圈 / 点开临时展开 + 补 unlisten 权限
 a6d0fe4717393e82fb1552dbbfada308051a23016f351f5cb433b78aa288e95c *Timing-android-0.11.4-release-arm64-debugsigned.apk
 
