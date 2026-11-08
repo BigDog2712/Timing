@@ -1,0 +1,2 @@
+# 本版只有手机包；桌面端 v0.11.22 零改动，仍用 0.11.20 那两个（校验和见 SHA256SUMS-0.11.20.txt）
+6b504fe65d1ea64f8960ed85c99a5d6dbb49c90120338da93e4b9a853b154d60 *Timing-android-0.11.22-release-arm64-debugsigned.apk
