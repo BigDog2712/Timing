@@ -215,8 +215,11 @@ fn prepare(cloud: &MdSyncCloud, report: &mut MdSyncReport) -> Option<PathBuf> {
     /* 注册必须在云端那轮**之前**：`write_section` 靠注册表决定备份文件名前缀，
     登记晚了本轮的备份就会标成 `obsidian`。 */
     md_backup::register_root(root.clone(), "webdav");
+    /* 落点每轮记一行：手机上这是**唯一**能回答「今天的日记到底写到哪了」的现场
+    （沙箱目录用户看不见）。 */
+    crate::log_info!("md cloud: root={}", root.display());
     if let Err(err) = fs::create_dir_all(&root) {
-        report.errors.push(format!("建不了云端落点目录：{err}"));
+        report.errors.push(super::root_dir_error(&root, &err));
         return None;
     }
     Some(root)

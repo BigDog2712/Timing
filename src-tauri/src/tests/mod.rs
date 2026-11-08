@@ -28,6 +28,9 @@ mod md_cloud_conflict;
 mod md_cloud_folder;
 mod md_cloud_pending;
 mod md_cloud_round;
+/* [V0.11.26] 落点**路径形态**与「建不了目录」文案：`\` 不是 POSIX 的分隔符，
+   少一个路径就会让一次故障多绕一轮。 */
+mod md_cloud_root_path;
 /* [V0.11.19 变更 A] 往期真删的行为判据。拆成四份，各验一件事：
    六道闸主路径 / 收敛（批上限 + 暂停） / 纯判定（闸③ 路径比较 + 闸⑥ 留底） / WebDAV 路。 */
 mod md_cloud_purge;

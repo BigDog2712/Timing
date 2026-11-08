@@ -187,6 +187,16 @@ pub(crate) fn absorb(target: &mut MdSyncReport, extra: MdSyncReport) {
     target.errors.extend(extra.errors);
 }
 
+/// 建落点目录失败的文案：**必须带路径**（[V0.11.26]）。
+///
+/// 之前的文案是「建不了云端落点目录：permission denied (os error 13)」——一个路径都没有。
+/// 而落点有两个可能（出厂 `md-webdav` / 用户填的目录），两端操作系统又完全不同，缺了路径
+/// 这条消息就只能靠猜：正是它让一次 `\` 当分隔符的故障多绕了一轮。错误里唯一有诊断价值
+/// 的就是那个路径，别省这几个字。
+pub fn root_dir_error(root: &std::path::Path, err: &std::io::Error) -> String {
+    format!("建不了云端落点目录 {}：{err}", root.display())
+}
+
 /// 云端通道是否「开了且填全了」。桌面托盘 / 轮询 / 手机 `sync_once` / 手机失败日志
 /// 的「未授权还该不该静默」四处判据共用——写第二份必然漂移。
 pub(crate) fn usable(config: &MdSyncConfig) -> Option<&MdSyncCloud> {

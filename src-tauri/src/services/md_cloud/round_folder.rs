@@ -59,8 +59,9 @@ pub async fn run(
     /* 必须在云端那轮**之前**登记：`write_section` 靠注册表决定备份文件名前缀，
     登记晚了本轮的备份就会标成 `obsidian`。 */
     md_backup::register_root(root.clone(), "folder");
+    crate::log_info!("md cloud: root={}", root.display());
     if let Err(err) = fs::create_dir_all(&root) {
-        report.errors.push(format!("建不了云端落点目录：{err}"));
+        report.errors.push(super::root_dir_error(&root, &err));
         return Ok(report);
     }
 
