@@ -11,6 +11,8 @@ pub mod md_backup_export;
 pub mod md_sync;
 /* [V0.11.19] 云端自动同步三档（单独成文件：`md_sync_cloud.rs` 只剩 4 行余量）。 */
 pub mod md_sync_auto;
+/* [V0.11.26] 单通路结构 + 老配置折算（块④/⑤ 拆分的判据唯一实现体）。 */
+pub mod md_sync_channel;
 /* [V0.11.19 变更 A] 往期清理的记账：六个 KV 键的唯一出处 + 状态投影。 */
 pub mod md_cloud_purge;
 pub mod md_sync_cloud;

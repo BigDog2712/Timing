@@ -30,6 +30,7 @@ use super::round_conflict;
 use super::{backoff, pending};
 use crate::error::AppResult;
 use crate::infra::md_webdav::{self, WebdavError, WebdavTarget};
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncReport;
 use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending as repo;
@@ -80,7 +81,7 @@ pub(crate) async fn push_today(
     match md_webdav::put(target, &rel, text.as_bytes(), etag).await {
         Ok(outcome) => {
             backoff::on_success().await;
-            repo::mark_synced(pool, today, outcome.etag.as_deref(), &hash).await?;
+            repo::mark_synced(pool, PurgeChannel::Webdav, today, outcome.etag.as_deref(), &hash).await?;
             crate::log_info!(
                 "md cloud out: {}.md bytes={} etag={}",
                 today,
@@ -108,14 +109,14 @@ pub(super) async fn push_history(
     today: &str,
     report: &mut MdSyncReport,
 ) -> AppResult<()> {
-    for date in pending::dates(pool).await? {
+    for date in pending::dates(pool, PurgeChannel::Webdav).await? {
         if date == today {
             continue;
         }
         let rel = format!("{date}.md");
         let path = cloud_root.join(&rel);
         if !path.exists() {
-            repo::clear(pool, &date).await?;
+            repo::clear(pool, PurgeChannel::Webdav, &date).await?;
             crate::log_info!("md cloud out: {date}.md skip=missing");
             continue;
         }
@@ -127,12 +128,14 @@ pub(super) async fn push_history(
                 continue;
             }
         };
-        let etag = repo::get(pool, &date).await?.and_then(|row| row.etag);
+        let etag = repo::get(pool, PurgeChannel::Webdav, &date)
+            .await?
+            .and_then(|row| row.etag);
         let hash = pending::fingerprint(&bytes);
         match md_webdav::put(target, &rel, &bytes, etag.as_deref()).await {
             Ok(outcome) => {
                 backoff::on_success().await;
-                repo::mark_synced(pool, &date, outcome.etag.as_deref(), &hash).await?;
+                repo::mark_synced(pool, PurgeChannel::Webdav, &date, outcome.etag.as_deref(), &hash).await?;
                 crate::log_info!(
                     "md cloud out: {date}.md put=ok bytes={} etag={}",
                     bytes.len(),

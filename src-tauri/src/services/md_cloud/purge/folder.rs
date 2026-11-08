@@ -31,6 +31,7 @@ use sqlx::SqlitePool;
 
 use super::gate::past_keep_window;
 use super::overlap::overlaps_binding;
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncBinding;
 use crate::repositories::md_cloud_pending::{self, CloudPendingRow};
 use crate::services::md_cloud::pending;
@@ -94,7 +95,7 @@ pub(crate) async fn candidates(
     /* 闸⑤(a) 的查询形状：候选枚举完调一次 `list()` 建映射，循环里只查内存。
        单批 20 条 × 每轮一次，若循环里查库，首轮大扫（200 天 / 10 批）会白打 200 次。
        读不到就当「没有任何证据」→ 一条都不删（安全的一侧）。 */
-    let rows = md_cloud_pending::list(pool).await.unwrap_or_default();
+    let rows = md_cloud_pending::list(pool, PurgeChannel::Folder).await.unwrap_or_default();
     let index: HashMap<&str, &CloudPendingRow> =
         rows.iter().map(|row| (row.date.as_str(), row)).collect();
 
@@ -219,9 +220,8 @@ mod tests {
         let body = format!("body {name}");
         fs::write(root.join(name), &body).expect("写样本");
         let Some(key) = key else { return };
-        md_cloud_pending::mark_synced(pool, key, None, &pending::fingerprint(body.as_bytes()))
-            .await
-            .expect("记 pending 行");
+        md_cloud_pending::mark_synced(pool, PurgeChannel::Folder, key, None,
+            &pending::fingerprint(body.as_bytes())).await.expect("记 pending 行");
     }
 
     /// 日期名形状边界，**经 `candidates` 这个真实入口**验（不直呼 `gate.rs` 那个函数：全库它只许

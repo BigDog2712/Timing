@@ -33,6 +33,7 @@ use super::{backoff, pending};
 use crate::error::AppResult;
 use crate::infra::md_backup;
 use crate::infra::md_webdav::{self, WebdavTarget};
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncReport;
 use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending as repo;
@@ -61,7 +62,7 @@ pub(super) async fn resolve(
     /* 远端已经是「刚才要 PUT 的那一份」，只差记账：`clear` 而不是 `mark_synced`——
     这一轮没拿到可信的 ETag，拿旧的去做 `If-Match` 会稳定 412。 */
     if pending::fingerprint(&remote.bytes) == hash {
-        repo::clear(pool, today).await?;
+        repo::clear(pool, PurgeChannel::Webdav, today).await?;
         crate::log_info!("md cloud out: {today}.md skip=unchanged");
         return Ok(());
     }
@@ -82,7 +83,7 @@ pub(super) async fn resolve(
     super::absorb(report, merged);
     let text = text_of(cloud_root, today);
     let merged_hash = pending::fingerprint(text.as_bytes());
-    if pending::record_if_changed(pool, today, &text, now_ms()).await? {
+    if pending::record_if_changed(pool, PurgeChannel::Webdav, today, &text, now_ms()).await? {
         crate::log_info!("md cloud out: {today}.md 合并后内容有变化");
     }
 
@@ -101,7 +102,7 @@ pub(super) async fn resolve(
         Ok(outcome) => {
             /* 重试成功=服务端恢复正常：不清掉退避会让下一轮凭空 `skip=backoff`。 */
             backoff::on_success().await;
-            repo::mark_synced(pool, today, outcome.etag.as_deref(), &merged_hash).await?;
+            repo::mark_synced(pool, PurgeChannel::Webdav, today, outcome.etag.as_deref(), &merged_hash).await?;
             crate::log_info!(
                 "md cloud out: {today}.md put=ok retry bytes={} etag={}",
                 text.len(),

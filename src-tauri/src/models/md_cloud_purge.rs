@@ -13,11 +13,24 @@
 
 use serde::{Deserialize, Serialize};
 
-/// 通道。水位 / 扫过日 / 暂停状态都按它分开。
+/// 通路。水位 / 扫过日 / 暂停状态都按它分开。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PurgeChannel {
     Webdav,
     Folder,
+}
+
+impl PurgeChannel {
+    /// 通路标识的**唯一**字符串出处（[V0.11.26]）。
+    ///
+    /// `md_cloud_pending.channel` 列的取值与它同源（设计 §八 3：不许出现第三种拼法）。
+    /// 要新增取值（比如第三条通路）时，这里改一行、调用方全部跟走。
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PurgeChannel::Webdav => "webdav",
+            PurgeChannel::Folder => "folder",
+        }
+    }
 }
 
 /// 键的种类。

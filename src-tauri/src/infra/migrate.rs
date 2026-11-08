@@ -82,7 +82,26 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
     // 表却不在」这种只有人工 SQL 才能修的残局。错误一律向上抛给 `init_pool`，
     // 由启动期决定是回滚还是弹迁移失败框——这里不吞、不降级。
     run_raw(pool, include_str!("../migrations/0006_v0113.sql")).await?;
+    // ⑪ v7（V0.11.26）：`md_cloud_pending` 按通路隔离（加 `channel` 列、改主键）。
+    //
+    // 0007 是**重建表**（CREATE + INSERT SELECT + DROP + RENAME），不像前面的迁移
+    // 靠 IF NOT EXISTS 幂等：runner 每次启动都重跑全部迁移，第二次撞到主键就会
+    // 让启动失败。所以这一步**必须**由版本门只放行一次——`schema.version` 在
+    // 0006 之后是 6，0007 执行完自己推进到 7，此后永远跳过。
+    if schema_version(pool).await? < 7 {
+        run_raw(pool, include_str!("../migrations/0007_v01127.sql")).await?;
+    }
     Ok(())
+}
+
+/// 读 `settings.schema.version`（缺失按 0：全新库的种子在 0002 里写入）。
+async fn schema_version(pool: &SqlitePool) -> AppResult<i64> {
+    let value: Option<String> =
+        sqlx::query_scalar("SELECT value FROM settings WHERE key = 'schema.version'")
+            .fetch_optional(pool)
+            .await
+            .map_err(AppError::db)?;
+    Ok(value.and_then(|text| text.parse().ok()).unwrap_or(0))
 }
 
 /// 仅当列不存在时执行 `ALTER TABLE ... ADD COLUMN`（幂等守卫）。

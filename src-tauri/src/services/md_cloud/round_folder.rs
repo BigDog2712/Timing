@@ -32,16 +32,20 @@ use sqlx::SqlitePool;
 use super::{absorb, pending};
 use crate::error::AppResult;
 use crate::infra::md_backup;
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::{MdSyncBinding, MdSyncReport};
-use crate::models::md_sync_cloud::MdSyncCloud;
+use crate::models::md_sync_channel::MdSyncCloudChannel;
 use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_sync::{self, mirror};
 
-/// 一轮：Obsidian 落点 → 云端落点（同一个目录，写进去即同步完）。
+/// 一轮：Obsidian 落点 → 本地镜像落点（同一个目录，写进去即同步完）。
+///
+/// [V0.11.26] 参数从 `&MdSyncCloud` 改为 `&MdSyncCloudChannel`（folder 通路自己的
+/// 那份配置），判据与落点解析全部走通路结构；记账固定带 `PurgeChannel::Folder`。
 pub async fn run(
     pool: &SqlitePool,
-    cloud: &MdSyncCloud,
+    channel: &MdSyncCloudChannel,
     /* 只在 `#[cfg(not(mobile))]` 的往期清理那一步用到；手机上不装挂点，参数就没人读。
        不加这个属性，安卓目标会多一条 `unused variable` —— 桌面 0 warning 是项目口径。 */
     #[cfg_attr(mobile, allow(unused_variables))]
@@ -49,7 +53,7 @@ pub async fn run(
     today: &str,
 ) -> AppResult<MdSyncReport> {
     let mut report = MdSyncReport::new(now_ms());
-    let root: PathBuf = match cloud.resolve_root() {
+    let root: PathBuf = match channel.resolve_root_folder() {
         Ok(path) => path,
         Err(err) => {
             report.errors.push(err);
@@ -78,7 +82,7 @@ pub async fn run(
     if wrote_ok {
         let hash = today_hash(pool, &root).await;
         if let Some(hash) = hash.as_ref() {
-            md_cloud_pending::mark_synced(pool, today, None, hash).await?;
+            md_cloud_pending::mark_synced(pool, PurgeChannel::Folder, today, None, hash).await?;
         }
         /* ⑩' 往期清理：与 WebDAV 的「⑨ 之后」并列，**不是同一个函数**（两路取证不同）。
            复用上面同一个 `wrote_ok`；额外要求 `today_hash` 拿到了 —— `wrote_ok` 为真却

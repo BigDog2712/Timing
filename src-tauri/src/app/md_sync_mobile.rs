@@ -71,12 +71,11 @@ pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
     crate::log_info!(
         "md sync config: enabled={} cloud={} bindings=[{}]",
         config.enabled,
-        match config.cloud.as_ref() {
+        match config.cloud_webdav.as_ref() {
             Some(cloud) => format!(
-                "enabled={} mode={:?} usable={}",
+                "enabled={} usable={}",
                 cloud.enabled,
-                cloud.mode,
-                cloud.is_usable()
+                cloud.is_usable_webdav()
             ),
             None => "<无>".to_string(),
         },
@@ -95,7 +94,7 @@ pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
     );
 
     /* ② 云端通道：直接交回云端那轮的完整报告，**不叠加**任何本地计数。 */
-    if crate::services::md_cloud::usable(&config).is_some() {
+    if crate::services::md_cloud::usable_webdav(&config).is_some() {
         let outcome = crate::services::md_cloud::round(&pool).await?;
         return Ok(outcome.report);
     }

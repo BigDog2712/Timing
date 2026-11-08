@@ -24,7 +24,7 @@ use crate::models::md_sync_auto::{CloudSchedule, MdCloudAuto};
 use crate::models::md_sync_config::MdSyncConfig;
 use crate::platform::clock::elapsed_since_ms;
 
-use super::usable;
+use super::usable_webdav;
 
 /// 一条同步链自己的记账。全是进程内状态，不落 KV ——「云端不可用不写任何 KV」是硬约束。
 #[derive(Debug, Clone, Default)]
@@ -125,18 +125,21 @@ pub enum SyncPlan {
 /// 分派判据的**唯一**出口。三条，顺序即优先级：
 ///
 /// 1. 总开关关着 → `Legacy`（此时 `round` 里的本地那半会早退，云端那半也不该跑）；
-/// 2. 云端不可用（没配 / 没填全 / `localfolder` 在手机上不成立）→ `Legacy`；
-/// 3. 否则 → `Cloud`，档位取 `cloud.auto`，老配置没有这个键时按「智能 + 15」。
+/// 2. webdav 通路不可用（没配 / 没填全）→ `Legacy`；
+/// 3. 否则 → `Cloud`，档位取 webdav 通路的 `auto`，老配置没有这个键时按「智能 + 15」。
+///
+/// [V0.11.26] 只看 webdav 通路：手机端只有云端块（R7），桌面调度链另外为 folder
+/// 通路自建一套 `TierState`，不经过本函数。
 pub fn plan_of(config: &MdSyncConfig) -> SyncPlan {
-    if !config.enabled || usable(config).is_none() {
+    if !config.enabled || usable_webdav(config).is_none() {
         return SyncPlan::Legacy {
             poll_secs: config.poll_secs,
         };
     }
     let auto = config
-        .cloud
+        .cloud_webdav
         .as_ref()
-        .and_then(|cloud| cloud.auto.clone())
+        .and_then(|channel| channel.auto.clone())
         .unwrap_or_default();
     SyncPlan::Cloud { auto }
 }

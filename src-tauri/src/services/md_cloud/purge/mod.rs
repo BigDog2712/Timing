@@ -92,7 +92,7 @@ pub(crate) async fn run_webdav(
                 purge_log::append(&key, &format!("status={code}"), "");
                 /* 先删成功再清账（PRD §2.6）：先清后删，一旦 DELETE 失败，那天的欠账信息
                    就没了，而远端文件还在。最坏结果只剩「清账失败」→ 下一轮重传（§3.8-4）。 */
-                md_cloud_pending::clear(pool, &key).await?;
+                md_cloud_pending::clear(pool, channel, &key).await?;
                 outcome.deleted += 1;
                 if !failed_before {
                     outcome.contiguous = Some(*date);
@@ -180,7 +180,7 @@ pub(crate) async fn run_folder(
                 purge_log::append(&key, "removed", &abs.to_string());
                 /* 留底 → 删 → 再清账（§3.4.2）：那行 `last_hash` 是闸⑤ 的取证依据，
                    先清后删且删失败，这一天就永远进不了候选。 */
-                md_cloud_pending::clear(pool, &key).await?;
+                md_cloud_pending::clear(pool, channel, &key).await?;
                 outcome.deleted += 1;
                 if !failed_before {
                     outcome.contiguous = Some(cand.date);

@@ -26,8 +26,10 @@ use crate::error::{AppError, AppResult, ErrorCode};
 use crate::infra::md_backup as store;
 use crate::infra::md_file;
 use crate::infra::md_section::SectionState;
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncBinding;
-use crate::models::md_sync_cloud::{CloudMode, MdBackupItem, MdBackupRestoreResult, MdSyncCloud};
+use crate::models::md_sync_channel::MdSyncCloudChannel;
+use crate::models::md_sync_cloud::{MdBackupItem, MdBackupRestoreResult};
 use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_cloud::pending;
@@ -126,9 +128,14 @@ pub async fn restore(
     算一次 `written`。 */
     let effective = target.or(name_target);
     let config = md_sync::config::load(pool).await?;
-    /* 云端配置对 `folder` / `webdav` 两个落点才有意义，判据集中在 `root_of` 一处判，
-    这里不做第二遍筛选——两处判据必然漂移。 */
-    let groups = group_by_path(&config.bindings, effective, config.cloud.as_ref(), date)?;
+    /* [V0.11.26] 云端配置按落点名取对应通路（webdav → cloudWebdav、folder → cloudFolder），
+    判据集中在 `root_of` 一处判，这里不做第二遍筛选——两处判据必然漂移。 */
+    let channel = match effective {
+        Some("webdav") => config.cloud_webdav.as_ref(),
+        Some("folder") => config.cloud_folder.as_ref(),
+        _ => None,
+    };
+    let groups = group_by_path(&config.bindings, effective, channel, date)?;
     if groups.is_empty() {
         return Err(AppError::md_sync_config_invalid(
             "没有可恢复的落点：请先在设置里启用一个并填写完整",
@@ -181,7 +188,8 @@ pub async fn restore(
         let hash = fs::read(groups[0].0.as_path())
             .map(|bytes| pending::fingerprint(&bytes))
             .unwrap_or_else(|_| pending::fingerprint(b""));
-        md_cloud_pending::mark_pending(pool, &date_text, &hash, now_ms()).await?;
+        md_cloud_pending::mark_pending(pool, PurgeChannel::Webdav, &date_text, &hash, now_ms())
+            .await?;
     }
     /* `folder` 落点**不排待传**：本地目录通道没有「待传」这一步，恢复已经直接把备份
     写进了云端那份所在的目录（写进去就是同步完了，剩下的交给网盘客户端），
@@ -210,35 +218,34 @@ pub async fn restore(
 fn root_of(
     binding: &MdSyncBinding,
     target: Option<&str>,
-    cloud: Option<&MdSyncCloud>,
+    channel: Option<&MdSyncCloudChannel>,
 ) -> AppResult<String> {
-    /* 落点名与它要求的通道模式绑在一起写：错误文案要说清「这份备份属于哪个落点」，
-    用户才知道该去设置里切哪一项。 */
-    let (label, need) = match target {
-        Some("webdav") => ("WebDAV", CloudMode::Webdav),
-        Some("folder") => ("本地目录", CloudMode::LocalFolder),
+    /* 落点名与它要求的通路绑在一起写：错误文案要说清「这份备份属于哪个落点」，
+    用户才知道该去设置里开哪一块。[V0.11.26] 通路结构自带归属，mode 比对整段消失。 */
+    let (label, ready, resolve): (
+        &str,
+        Box<dyn Fn(&MdSyncCloudChannel) -> bool>,
+        Box<dyn Fn(&MdSyncCloudChannel) -> Result<std::path::PathBuf, String>>,
+    ) = match target {
+        Some("webdav") => (
+            "WebDAV",
+            Box::new(|c| c.is_usable_webdav()),
+            Box::new(|c| c.resolve_root_webdav()),
+        ),
+        Some("folder") => (
+            "本地目录",
+            Box::new(|c| c.is_usable_folder()),
+            Box::new(|c| c.resolve_root_folder()),
+        ),
         _ => return Ok(binding.root.clone()),
     };
-    let cloud = cloud
-        .filter(|cloud| cloud.enabled && cloud.is_usable())
-        .ok_or_else(|| {
-            AppError::md_sync_config_invalid(format!(
-                "这份备份属于「{label}」落点，但云端通道没开启或没填完整；\
-                 请先在设置里配好「{label}」，或换一个落点恢复"
-            ))
-        })?;
-    if cloud.mode != need {
-        let now = match cloud.mode {
-            CloudMode::LocalFolder => "本地目录",
-            CloudMode::Webdav => "WebDAV",
-        };
-        return Err(AppError::md_sync_config_invalid(format!(
-            "这份备份属于「{label}」落点，但云端通道现在是「{now}」；\
-             请先在设置里切到「{label}」，或换一个落点恢复"
-        )));
-    }
-    cloud
-        .resolve_root()
+    let channel = channel.filter(|c| ready(c)).ok_or_else(|| {
+        AppError::md_sync_config_invalid(format!(
+            "这份备份属于「{label}」落点，但对应通路没开启或没填完整；\
+             请先在设置里配好「{label}」，或换一个落点恢复"
+        ))
+    })?;
+    resolve(channel)
         .map(|path| path.to_string_lossy().into_owned())
         .map_err(|err| {
             AppError::md_sync_config_invalid(format!(
@@ -252,7 +259,7 @@ fn root_of(
 fn group_by_path(
     bindings: &[MdSyncBinding],
     target: Option<&str>,
-    cloud: Option<&MdSyncCloud>,
+    channel: Option<&MdSyncCloudChannel>,
     date: NaiveDate,
 ) -> AppResult<Vec<(PathBuf, Vec<MdSyncBinding>)>> {
     let mut groups: Vec<(PathBuf, Vec<MdSyncBinding>)> = Vec::new();
@@ -260,7 +267,7 @@ fn group_by_path(
         .iter()
         .filter(|binding| binding.enabled && binding.is_configured())
     {
-        let path = md_file::resolve_path(&root_of(binding, target, cloud)?, &binding.file, date);
+        let path = md_file::resolve_path(&root_of(binding, target, channel)?, &binding.file, date);
         if !path.is_absolute() {
             return Err(AppError::md_sync_config_invalid(format!(
                 "「{}」的落点无法解析为绝对路径：{}",

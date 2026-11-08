@@ -74,7 +74,7 @@ async fn sync_tray_with(
         Ok(snapshot) => {
             /* [V0.11.18] 同步项的文案随「生效通道」变（PRD TR1）。判据在
             `tray_sync::sync_label`（它读 `md_cloud::usable`），这里只负责传下去。 */
-            let label = crate::app::tray_sync::sync_label(pool).await;
+            let label = crate::app::tray_label::sync_label(pool).await;
             if quitting {
                 crate::app::tray::sync_status_quitting(app, &snapshot, label);
             } else {

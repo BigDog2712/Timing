@@ -1,14 +1,24 @@
-//! 云端第二落点的编排（V0.11.13，ADR-061）。**唯一入口**：桌面托盘 / 桌面轮询 /
-//! 手机 `sync_once` 都从这里进，谁都不要在调用点自己判 `cloud.mode`。
+//! 云端两条通路的编排（V0.11.13，ADR-061；V0.11.26 双通路拆分，设计 §1.3）。
+//!
+//! **唯一入口**：桌面托盘 / 桌面调度链 / 手机 `sync_once` 都从这里进，
+//! 谁都不要在调用点自己判「通路可不可用」。
 //!
 //! ## 判据（写死在这里，别处不许再判一遍）
 //!
-//! 1. `cloud` 为 `None` / `!enabled` / `!is_usable()` → **就是** `md_sync::run`。
-//!    这不是顺手兜底，而是「老配置（V0.11.12 及以前保存的 JSON 没有 cloud 键）的行为
-//!    必须逐字不变」的落点：多一次网络、多一个目录、多一行 pending，任何一样都会让
-//!    一次正常升级变成「Timing 突然开始碰别的地方」；
-//! 2. `LocalFolder` → 只多写一个本地目录，见 `round_folder`；
-//! 3. `Webdav` → GET / PUT 由 Timing 自己做，见 `round_webdav`。
+//! `usable_folder` / `usable_webdav` 是「这条通路会不会跑」的**唯一出口**
+//! （托盘标签、调度链、`round`、`plan_of` 四处共用）：
+//!
+//! 1. 两条通路都不可用 → **就是** `md_sync::run`。这不是顺手兜底，而是「老配置
+//!    （V0.11.12 及以前保存的 JSON 没有 cloud 键）的行为必须逐字不变」的落点；
+//! 2. folder 可用 → `round_folder::run`（只写一个本地目录，零网络代码）；
+//! 3. webdav 可用 → `round_webdav::run`（GET / PUT 由 Timing 自己做）。
+//!
+//! ## [V0.11.26] 一轮的形状（R4：双通路同时开）
+//!
+//! `round()` = 先本地同步轮、后云端轮，顺序各跑一遍，**报告级失败互不阻断**
+//! （`report.errors` 各自落各自的块）；`Err` 级（DB / 配置加载失败）两条通路
+//! 本来都跑不了，照旧 `?` 上抛。调度链（`jobs/md_cloud.rs`）每通路独立到点，
+//! 用 `round_channel` 只跑自己那一条。
 //!
 //! 云端失败只进 `report.errors`，**不折成 `AppError`**：那会让托盘拿不到本轮的导入
 //! 导出计数，也让手机端把一轮部分成功的同步当成整体失败。也因此**不新增存储**。
@@ -42,11 +52,12 @@ use sqlx::SqlitePool;
 #[cfg(mobile)]
 use crate::error::AppError;
 use crate::error::AppResult;
-use crate::models::md_sync::MdSyncReport;
 use crate::models::md_cloud_purge::PurgeChannel;
+use crate::models::md_sync::MdSyncReport;
 use crate::models::md_sync_cloud::{
-    CloudMode, MdSyncCloud, MdSyncCloudStatus, MdSyncTestResult, MdSyncViewCloud,
+    MdSyncCloudStatus, MdSyncTestResult, MdSyncViewCloud,
 };
+use crate::models::md_sync_channel::MdSyncCloudChannel;
 use crate::models::md_sync_config::MdSyncConfig;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_sync;
@@ -58,48 +69,96 @@ pub struct CloudRoundOutcome {
     pub today: String,
 }
 
-/// 手机端拿到 `mode == LocalFolder` 时的口径（[V0.11.14] 修 O12）。
+/// 手机端拿到 folder 通路 enabled 时的口径（[V0.11.14] 修 O12）。
 ///
 /// 与 `commands::md_sync_cmd` 的 `NO_BACKUP` 同一口径：能力不在这端，就用既有错误码
 /// `MD_SYNC_CONFIG_INVALID` 回一句**用户能照做**的话，不新增错误码。
 #[cfg(mobile)]
-const NO_LOCAL_FOLDER_ON_MOBILE: &str = "手机端不支持「本地目录」云端通道：请把云端通道改成 WebDAV（本地目录要靠电脑上的网盘客户端同步，手机上写不进去）";
+const NO_LOCAL_FOLDER_ON_MOBILE: &str = "手机端不支持「本地同步」通路：请把云端同步改成 WebDAV（本地目录要靠电脑上的网盘客户端同步，手机上写不进去）";
 
-/// 一轮完整同步（含 Obsidian 落点）。云端不可用时与 `md_sync::run` 等价。
+/// 一轮完整同步（含 Obsidian 落点）。两条通路都不可用时与 `md_sync::run` 等价。
+///
+/// [V0.11.26] 双通路：folder 在前（零网络、快、失败面小），webdav 在后；
+/// 各自独立判可用、独立记错（`absorb` 合报告）。Obsidian 半轮（`md_sync::run`）
+/// 在两条通路各自的 `round_*::run` 内部各跑一次——与设计 §1.3 的分派图一致。
 pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
     let config = md_sync::config::load(pool).await?;
-    /* 手机端不支持「本地目录」通道（[V0.11.14] 修 O12）。那条路假设用户电脑上有个
-    网盘客户端在同步一个真实目录，手机上既没有那个目录也没有客户端，`local_root` 里
-    存的多半是一个 Windows 路径。旧版会一路走到 `round_folder`，在「解析不出绝对
-    路径」处变成报告里一行错误、而这一轮仍然「成功」；现在在入口就说清怎么办。
-    前端（`MdSyncCloudCard` / `useMdSyncDraft`）已把这类配置按 WebDAV 显示并落库，
-    这里是兜底：升级前存下的配置、或别的入口写进来的配置，都不会再走进那条死路。 */
+    /* 手机端不支持 folder 通路（[V0.11.14] 修 O12）。那条路假设用户电脑上有个网盘
+    客户端在同步一个真实目录，手机上既没有那个目录也没有客户端。读时物化会把老
+    `localfolder` 配置折算成 folder.enabled=true，这里是兜底：升级前存下的配置、
+    或别的入口写进来的配置，都不会再走进那条死路。 */
     #[cfg(mobile)]
-    if let Some(cloud) = config.cloud.as_ref() {
-        if cloud.enabled && cloud.mode == CloudMode::LocalFolder {
-            return Err(AppError::md_sync_config_invalid(NO_LOCAL_FOLDER_ON_MOBILE));
-        }
+    if config
+        .cloud_folder
+        .as_ref()
+        .is_some_and(|channel| channel.enabled)
+    {
+        return Err(AppError::md_sync_config_invalid(
+            NO_LOCAL_FOLDER_ON_MOBILE,
+        ));
     }
-    let today = today();
-    let Some(cloud) = usable(&config) else {
+    let folder = usable_folder(&config);
+    let webdav = usable_webdav(&config);
+    if folder.is_none() && webdav.is_none() {
         /* 老配置这条路**连 pending 表都不读**：它没有云端，`pending` 填空是事实。 */
+        let today = today();
         let report = md_sync::run(pool).await?;
         return Ok(CloudRoundOutcome {
             report,
             pending: Vec::new(),
             today,
         });
-    };
-    let report = match cloud.mode {
-        CloudMode::LocalFolder => round_folder::run(pool, cloud, &config.bindings, &today).await?,
-        CloudMode::Webdav => round_webdav::run(pool, cloud, &today).await?,
-    };
-    let pending = match cloud.mode {
-        CloudMode::LocalFolder => Vec::new(),
-        CloudMode::Webdav => md_cloud_pending::pending_dates(pool)
-            .await
-            .unwrap_or_default(),
-    };
+    }
+    let today = today();
+    let mut report = MdSyncReport::new(crate::platform::clock::now_ms());
+    if let Some(channel) = folder {
+        let part = round_folder::run(pool, channel, &config.bindings, &today).await?;
+        absorb(&mut report, part);
+    }
+    if let Some(channel) = webdav {
+        let part = round_webdav::run(pool, channel, &today).await?;
+        absorb(&mut report, part);
+    }
+    let pending = md_cloud_pending::pending_dates(pool, PurgeChannel::Webdav)
+        .await
+        .unwrap_or_default();
+    Ok(CloudRoundOutcome {
+        report,
+        pending,
+        today,
+    })
+}
+
+/// 调度链专用：只跑**一条**通路的轮（该通路自己的 Obsidian 半轮包含在内）。
+///
+/// 通路不可用时什么也不做（返回空报告）：调度链在 `decide` 之前已判过可用，
+/// 这里只是防御「判据两次读取之间配置被改」。不回落 `md_sync::run`——那会让
+/// 「folder 到点但 folder 恰好被关掉」的一轮偷偷跑一次 Obsidian 半轮。
+pub async fn round_channel(
+    pool: &SqlitePool,
+    channel: PurgeChannel,
+) -> AppResult<CloudRoundOutcome> {
+    let config = md_sync::config::load(pool).await?;
+    let today = today();
+    let mut report = MdSyncReport::new(crate::platform::clock::now_ms());
+    let mut pending = Vec::new();
+    match channel {
+        PurgeChannel::Folder => {
+            if let Some(ch) = usable_folder(&config) {
+                let part = round_folder::run(pool, ch, &config.bindings, &today).await?;
+                absorb(&mut report, part);
+            }
+        }
+        PurgeChannel::Webdav => {
+            if let Some(ch) = usable_webdav(&config) {
+                let part = round_webdav::run(pool, ch, &today).await?;
+                absorb(&mut report, part);
+                pending = md_cloud_pending::pending_dates(pool, channel)
+                    .await
+                    .unwrap_or_default();
+            }
+        }
+    }
     Ok(CloudRoundOutcome {
         report,
         pending,
@@ -109,18 +168,13 @@ pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
 
 /// 手动入口（「立即同步」命令 / 托盘那一项）的**唯一**包装。
 ///
-/// [V0.11.19] 抽出来不是为了加逻辑，是为了让 T04 变更 A 的「点一次立即同步 → 解除
-/// 清理暂停」只有一个挂载点：两处调用方都不该各自记住「手动轮还要先 resume」。
+/// [V0.11.19] 抽出来是为了让「点一次立即同步 → 解除清理暂停」只有一个挂载点。
+/// [V0.11.26] 双通路各 resume 各的：两条通路的失败现场互不合并，暂停也互不牵连。
 /// 退出前那一轮（`tray_quit`）走自己的路径，不从这里进。
 pub async fn round_manual(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
-    /* 暂停是「连续 3 个自然日失败」，解除它必须有人明确表达「现在就再试一次」。
-       只清**当前生效通道**的那份：另一条通道的现场（可能是另一套失败原因）不动。 */
-    let config = md_sync::config::load(pool).await?;
-    let channel = match config.cloud.as_ref().map_or(CloudMode::LocalFolder, |cloud| cloud.mode) {
-        CloudMode::LocalFolder => PurgeChannel::Folder,
-        CloudMode::Webdav => PurgeChannel::Webdav,
-    };
-    purge::resume(pool, channel).await?;
+    /* 暂停是「连续 3 个自然日失败」，解除它必须有人明确表达「现在就再试一次」。 */
+    purge::resume(pool, PurgeChannel::Folder).await?;
+    purge::resume(pool, PurgeChannel::Webdav).await?;
     round(pool).await
 }
 
@@ -129,11 +183,11 @@ pub async fn round_manual(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
 /// 在界面上完全无声。
 pub async fn tick(pool: &SqlitePool) -> AppResult<Option<MdSyncReport>> {
     let config = md_sync::config::load(pool).await?;
-    if usable(&config).is_none() {
+    if usable_folder(&config).is_none() && usable_webdav(&config).is_none() {
         /* 老配置：逐字转交，包括它的 `Some/None` 口径。 */
         return md_sync::tick(pool).await;
     }
-    let before = md_cloud_pending::pending_dates(pool)
+    let before = md_cloud_pending::pending_dates(pool, PurgeChannel::Webdav)
         .await
         .unwrap_or_default();
     let outcome = round(pool).await?;
@@ -142,22 +196,28 @@ pub async fn tick(pool: &SqlitePool) -> AppResult<Option<MdSyncReport>> {
     Ok(changed.then_some(outcome.report))
 }
 
-/// 设置页要的云端状态。正文在 `state`（读侧投影，不是分派判据）。
-pub async fn status(pool: &SqlitePool) -> AppResult<MdSyncCloudStatus> {
-    state::status(pool).await
+/// 设置页要的某一条通路的状态。正文在 `state`（读侧投影，不是分派判据）。
+pub async fn status(pool: &SqlitePool, channel: PurgeChannel) -> AppResult<MdSyncCloudStatus> {
+    state::status_for(pool, channel).await
 }
 
-/// 设置页一次拿全：基础视图 + 云端状态（`#[serde(flatten)]`，不改 `MdSyncView`）。
+/// 设置页一次拿全：基础视图 + 两块状态（`#[serde(flatten)]`，不改 `MdSyncView`）。
 pub async fn view(pool: &SqlitePool) -> AppResult<MdSyncViewCloud> {
     state::view(pool).await
 }
 
 /// 保存前的路径校验（运行时兜底）：复用模型那一份，不在这里重写一遍比对。
 pub fn check_paths(config: &MdSyncConfig) -> Result<(), String> {
-    match &config.cloud {
-        Some(cloud) => cloud.validate(&config.bindings),
-        None => Ok(()),
+    if let Some(channel) = &config.cloud_folder {
+        channel.validate_folder(&config.bindings)?;
     }
+    if let Some(channel) = &config.cloud_webdav {
+        channel.validate_webdav()?;
+    }
+    if let Some(cloud) = &config.cloud {
+        cloud.validate(&config.bindings)?;
+    }
+    Ok(())
 }
 
 /// 「测试连接」。正文在 `probe`（它要建临时探针文件，不占这里的判据预算）。
@@ -188,34 +248,32 @@ pub(crate) fn absorb(target: &mut MdSyncReport, extra: MdSyncReport) {
 }
 
 /// 建落点目录失败的文案：**必须带路径**（[V0.11.26]）。
-///
-/// 之前的文案是「建不了云端落点目录：permission denied (os error 13)」——一个路径都没有。
-/// 而落点有两个可能（出厂 `md-webdav` / 用户填的目录），两端操作系统又完全不同，缺了路径
-/// 这条消息就只能靠猜：正是它让一次 `\` 当分隔符的故障多绕了一轮。错误里唯一有诊断价值
-/// 的就是那个路径，别省这几个字。
 pub fn root_dir_error(root: &std::path::Path, err: &std::io::Error) -> String {
     format!("建不了云端落点目录 {}：{err}", root.display())
 }
 
-/// 云端通道是否「开了且填全了」。桌面托盘 / 轮询 / 手机 `sync_once` / 手机失败日志
-/// 的「未授权还该不该静默」四处判据共用——写第二份必然漂移。
-pub(crate) fn usable(config: &MdSyncConfig) -> Option<&MdSyncCloud> {
+/// folder 通路是否「开了且填全了」。托盘标签 / 调度链 / `round` / `plan_of` 共用——
+/// 写第二份必然漂移。总开关**不在**这里判（调用方按自己的语义叠加，与 v0.11.18 的
+/// `usable` 口径一致）。
+pub(crate) fn usable_folder(config: &MdSyncConfig) -> Option<&MdSyncCloudChannel> {
     config
-        .cloud
+        .cloud_folder
         .as_ref()
-        .filter(|cloud| cloud.enabled && cloud.is_usable())
+        .filter(|channel| channel.is_usable_folder())
+}
+
+/// webdav 通路是否「开了且填全了」。与 `usable_folder` 同一口径。
+pub(crate) fn usable_webdav(config: &MdSyncConfig) -> Option<&MdSyncCloudChannel> {
+    config
+        .cloud_webdav
+        .as_ref()
+        .filter(|channel| channel.is_usable_webdav())
 }
 
 /// 保存之后要不要顺手跑一轮同步（手机端 `md_sync_save` 的判据，[V0.11.14] 修 N2）。
 ///
-/// 抽成纯函数是为了能被单测钉住：真正的调用点要 `AppHandle`（原生桥 + 事件），
-/// 为它造一套夹具比这段判断本身贵得多。
-///
-/// 三条：
 /// 1. 总开关关着 → 不跑（`sync_once` 对关闭状态只会返回一份空报告）；
-/// 2. **云端可用 → 跑，不问 SAF 授权**：`sync_once` 里云端分支排在 SAF 检查**之前**，
-///    「只配 WebDAV、不选日记目录」是合法用法。旧版把 SAF 授权当成前置条件，于是
-///    这类用户永远走不到自动同步——`?` 还会把桥调用失败折成保存失败（N2 的另一半）；
+/// 2. **云端可用 → 跑，不问 SAF 授权**；
 /// 3. 云端不可用 → 才看 SAF：没授权的那一轮只可能回「同步目录未授权」。
 pub fn should_autosync(enabled: bool, cloud_usable: bool, saf_granted: bool) -> bool {
     enabled && (cloud_usable || saf_granted)

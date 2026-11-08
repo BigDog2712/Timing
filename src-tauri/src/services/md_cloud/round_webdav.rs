@@ -40,8 +40,9 @@ use super::{absorb, backoff, pending, round_push};
 use crate::error::AppResult;
 use crate::infra::md_webdav::{self, WebdavError, WebdavTarget};
 use crate::infra::{md_backup, secret};
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncReport;
-use crate::models::md_sync_cloud::MdSyncCloud;
+use crate::models::md_sync_channel::MdSyncCloudChannel;
 use crate::platform::clock::now_ms;
 use crate::services::md_sync::mirror;
 /* ⑤ 只在桌面存在（见 `run` 里那句 cfg 的说明），手机上这个 import 会变成死码。 */
@@ -49,7 +50,14 @@ use crate::services::md_sync::mirror;
 use crate::services::md_sync;
 
 /// 一轮：远端 → 两个本地落点 → 远端。
-pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResult<MdSyncReport> {
+///
+/// [V0.11.26] 参数从 `&MdSyncCloud` 改为 `&MdSyncCloudChannel`（webdav 通路自己的
+/// 那份配置），记账固定带 `PurgeChannel::Webdav`。
+pub async fn run(
+    pool: &SqlitePool,
+    channel: &MdSyncCloudChannel,
+    today: &str,
+) -> AppResult<MdSyncReport> {
     let now = now_ms();
     let mut report = MdSyncReport::new(now);
 
@@ -74,18 +82,18 @@ pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResu
     };
 
     /* ② 落点根 + 备份标识 + 目录。 */
-    let cloud_root = match prepare(cloud, &mut report) {
+    let cloud_root = match prepare(channel, &mut report) {
         Some(root) => root,
         None => return Ok(report),
     };
-    let dir = match cloud.remote_dir() {
+    let dir = match channel.remote_dir() {
         Ok(dir) => dir,
         Err(err) => {
             report.errors.push(err);
             return Ok(report);
         }
     };
-    let target = WebdavTarget::new(&cloud.base_url, &dir, &cloud.user, &password);
+    let target = WebdavTarget::new(&channel.base_url, &dir, &channel.user, &password);
     let rel = format!("{today}.md");
     let local_path = cloud_root.join(&rel);
 
@@ -148,7 +156,7 @@ pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResu
 
     /* ⑦ 指纹。读的是**合并之后**的文件：内容没变就没有欠账，不需要知道方向。 */
     let text = fs::read_to_string(&local_path).unwrap_or_default();
-    if pending::record_if_changed(pool, today, &text, now).await? {
+    if pending::record_if_changed(pool, PurgeChannel::Webdav, today, &text, now).await? {
         crate::log_info!("md cloud: today={today} 本地内容有变化");
     }
 
@@ -195,7 +203,7 @@ pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResu
     }
 
     /* 每轮必打：这是「今天传了但历史有欠账」的唯一可见出口。 */
-    let pending_dates = pending::dates(pool).await.unwrap_or_default();
+    let pending_dates = pending::dates(pool, PurgeChannel::Webdav).await.unwrap_or_default();
     crate::log_info!(
         "md cloud: pending=[{}] today={today}",
         pending_dates.join(",")
@@ -204,8 +212,8 @@ pub async fn run(pool: &SqlitePool, cloud: &MdSyncCloud, today: &str) -> AppResu
 }
 
 /// 登记备份标识 + 建目录。返回解析后的落点根；`None` = 原因已写进 `report.errors`。
-fn prepare(cloud: &MdSyncCloud, report: &mut MdSyncReport) -> Option<PathBuf> {
-    let root = match cloud.resolve_root() {
+fn prepare(channel: &MdSyncCloudChannel, report: &mut MdSyncReport) -> Option<PathBuf> {
+    let root = match channel.resolve_root_webdav() {
         Ok(path) => path,
         Err(err) => {
             report.errors.push(err);

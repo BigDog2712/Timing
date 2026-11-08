@@ -44,3 +44,6 @@ pub mod tray_quit;
 /* [V0.11.7] 托盘「Markdown 同步」点完之后做的事（拆出 `tray` 以满足单文件 ≤300 行）。 */
 #[cfg(desktop)]
 pub mod tray_sync;
+/* [V0.11.26] 托盘同步项的三态标签 + blocked 拦截判据（从 `tray_sync` 迁出）。 */
+#[cfg(desktop)]
+pub mod tray_label;

@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::models::constants::{MD_SYNC_POLL_MAX_SECS, MD_SYNC_POLL_MIN_SECS, MD_SYNC_POLL_SECS};
 use crate::models::md_sync::{MdSyncBinding, MdSyncKind, MD_SYNC_MAX_BINDINGS};
+use crate::models::md_sync_channel::MdSyncCloudChannel;
 use crate::models::md_sync_cloud::MdSyncCloud;
 
 /// 出厂落点根目录。
@@ -63,8 +64,18 @@ pub struct MdSyncConfig {
     ///
     /// 老配置里没有这个键 → `None`：**不给默认值**。升级后自己开通道等于替用户决定
     /// 「开始往坚果云或磁盘第二处写文件」，而它是对外写操作，必须由用户按下开关。
-    #[serde(default)]
+    ///
+    /// [V0.11.26] 职责收窄为两件事：① 老 JSON 反序列化入口（`load()` 读时折算成
+    /// 两条通路，内存置 `None`，磁盘不动）；② 「测试连接」载荷载体（前端现拼）。
+    /// 新保存形**必须不出现这个键**（`skip_serializing_if`，出现即 bug）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloud: Option<MdSyncCloud>,
+    /// [V0.11.26] 块④ 本地同步通路。`None` = 从未配置（与新装同形）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cloud_folder: Option<MdSyncCloudChannel>,
+    /// [V0.11.26] 块⑤ 云端同步通路。`None` = 从未配置（与新装同形）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cloud_webdav: Option<MdSyncCloudChannel>,
 }
 
 /// 老配置（V0.4.0~V0.11.2 保存的 JSON）里没有 `pollSecs`，按默认 15 分钟补。
@@ -79,6 +90,8 @@ impl Default for MdSyncConfig {
             poll_secs: MD_SYNC_POLL_SECS,
             bindings: default_bindings(),
             cloud: None,
+            cloud_folder: None,
+            cloud_webdav: None,
         }
     }
 }
@@ -112,9 +125,16 @@ impl MdSyncConfig {
                 ));
             }
         }
-        /* 云端通道的校验合一：路径不能与落点重合（两个写者）、WebDAV 必填项要齐。
-        放在最后是因为它的错误文案最长、也最不常触发，先报「间隔不对」更符合用户
-        从上到下改设置页的顺序。 */
+        /* 云端两条通路各自校验（[V0.11.26]）：folder 查目录重合（两个写者）、webdav
+        查三件套。放在最后是因为它的错误文案最长、也最不常触发，先报「间隔不对」更符合
+        用户从上到下改设置页的顺序。legacy `cloud` 有值（保存兑底前的老客户端载荷）时
+        照旧校验，判据实现在 `MdSyncCloudChannel`（委托），不写第二份。 */
+        if let Some(folder) = &self.cloud_folder {
+            folder.validate_folder(&self.bindings)?;
+        }
+        if let Some(webdav) = &self.cloud_webdav {
+            webdav.validate_webdav()?;
+        }
         if let Some(cloud) = &self.cloud {
             cloud.validate(&self.bindings)?;
         }

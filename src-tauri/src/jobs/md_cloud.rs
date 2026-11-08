@@ -1,10 +1,7 @@
-//! 云端自动同步三档链（V0.11.19 批 1，设计 §4.1 / §4.3 / §4.4）。
+//! 云端自动同步三档链（V0.11.19 批 1，设计 §4.1 / §4.3 / §4.4；V0.11.26 双通路，设计 §1.3）。
 //!
 //! 与 `jobs/md_sync.rs` **解耦**：md 链只调 `md_sync::run`（写 Obsidian 那份），
-//! 本链才调 `md_cloud::round`（本地那份 + 云端落点）。`round` 内部本来就会再跑一次
-//! `md_sync::run`（`round_webdav.rs` / `round_folder.rs`），所以本链不会漏掉本地那一步。
-//! 反过来说，写 md 的频率不再驱动云端节奏 —— 用户在 Obsidian 里每改一个字就往网盘
-//! 传一次，正是 PRD §3.4 要停掉的事。
+//! 本链才调 `md_cloud`（云端落点 + 各通路自己那半 Obsidian）。
 //!
 //! ## 三档
 //!
@@ -16,22 +13,24 @@
 //! 默认 `智能`，**不从 `pollSecs` 反推档位**（PRD §15.2：老值语义不同，反推会得到
 //! 「定时 3 分钟」这种谁都没选过的档）。
 //!
-//! ## 两条链互撞
+//! ## [V0.11.26] 双通路各自到点（R4 / R5）
 //!
-//! 与 md 链、托盘点击共用 `tray_sync::try_acquire()`。云链抢不到就跳过这一轮、
-//! 等自己的下一个触发点；**不排队、不 sleep 重试**（§14 第 8 条）。云链晚一轮是零代价，
-//! 抢闸却会破坏 `Gate` 的复位语义。
+//! folder / webdav 各持一份 `TierState` 与各自的 `auto`；任一通路到点 → 抢
+//! `tray_sync::try_acquire()`（共用一把闸，抢不到跳过本轮、不排队不重试——既有口径）
+//! → `round_channel(pool, 该通路)` 只跑自己那一条。同一秒双通路到点时后到者跳过，
+//! 等下一个触发点（设计 §四 3 的默认口径）。
 //!
-//! 通道 = 只用本地 / 云端没填全 / 总开关关闭时，`usable()` 为 `None`，本链**整轮不跑**：
-//! 不调 `round`、不写任何 KV、连日志都不刷。
+//! 通路 = 没填全 / 总开关关闭时，`usable_folder / usable_webdav` 为 `None`，
+//! 那条通路**整轮不跑**：不调 round、不写任何 KV、连日志都不刷。
 
 use std::time::Duration;
 
 use tauri::{AppHandle, Manager};
 
 use crate::models::constants::{MD_CLOUD_SMART_IDLE_SECS, MD_CLOUD_SMART_MAX_SECS};
-use crate::models::md_sync::MdSyncConfig;
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync_auto::{CloudSchedule, MdCloudAuto};
+use crate::models::md_sync_channel::MdSyncCloudChannel;
 use crate::platform::clock::now_ms;
 use crate::services::{md_cloud, md_sync};
 use crate::state::AppState;
@@ -44,23 +43,35 @@ use crate::state::AppState;
    写的是 `crate::jobs::md_cloud::{decide, TierState, TierReason}`，转出后一个字都不用改。 */
 pub(crate) use crate::services::md_cloud::tier::{decide, TierReason, TierState};
 
-/// 老配置没有 `auto` 键 → 智能 + 15 分钟；越界的分钟数在 `interval_secs()` 里夹。
-fn auto_of(config: &MdSyncConfig) -> MdCloudAuto {
-    config
-        .cloud
-        .as_ref()
-        .and_then(|cloud| cloud.auto.clone())
+/// 一条通路自己的调度记账（[V0.11.26]：双通路 = 双份，互不干扰）。
+struct ChannelTier {
+    tier: TierState,
+    prev_schedule: Option<CloudSchedule>,
+}
+
+impl Default for ChannelTier {
+    fn default() -> Self {
+        Self {
+            tier: TierState {
+                startup_ms: now_ms(),
+                ..TierState::default()
+            },
+            prev_schedule: None,
+        }
+    }
+}
+
+/// 通路自己的三档；没有这个键 → 智能 + 15 分钟（与 `plan_of` 同口径）。
+fn auto_of(channel: Option<&MdSyncCloudChannel>) -> MdCloudAuto {
+    channel
+        .and_then(|channel| channel.auto.clone())
         .unwrap_or_default()
 }
 
 /// 启动云端三档链。桌面独占：`tray_sync` 是 `#[cfg(desktop)]`。
 pub fn spawn(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let mut tier = TierState {
-            startup_ms: now_ms(),
-            ..TierState::default()
-        };
-        let mut prev_schedule: Option<CloudSchedule> = None;
+        let mut states = [ChannelTier::default(), ChannelTier::default()];
         loop {
             let pool = app.state::<AppState>().pool.clone();
             let now = now_ms();
@@ -72,53 +83,69 @@ pub fn spawn(app: AppHandle) {
                     continue;
                 }
             };
-            /* 「云端会不会跑一轮」只认 `usable`（唯一出口），并且总开关也必须是开的：
-               总开关关着时 `round` 里的本地那半会早退，但云端那半仍会写文件 —— 那会
-               打破 C5「零文件 IO」。不可用时整轮跳过：不调 round、不写 KV、不刷日志。 */
-            if config.enabled && md_cloud::usable(&config).is_some() {
-                let auto = auto_of(&config);
-                /* 切档时计时器从「现在」起算（PRD §3.4 边界表）：只记一次锚点，
-                   不动 `interval_minutes` —— 切档不重置用户填过的分钟数（H-2）。 */
-                if prev_schedule != Some(auto.schedule) {
-                    if prev_schedule.is_some() {
-                        tier.last_attempt_ms = Some(now);
-                        tier.startup_done = true;
+            if config.enabled {
+                for (index, channel) in [PurgeChannel::Folder, PurgeChannel::Webdav]
+                    .into_iter()
+                    .enumerate()
+                {
+                    /* 「这条通路会不会跑」只认 `usable_*`（唯一出口），并且总开关也必须是开的：
+                       总开关关着时 `round` 里的本地那半会早退，但云端那半仍会写文件。 */
+                    let usable = match channel {
+                        PurgeChannel::Folder => md_cloud::usable_folder(&config),
+                        PurgeChannel::Webdav => md_cloud::usable_webdav(&config),
+                    };
+                    let Some(channel_cfg) = usable else { continue };
+                    let state = &mut states[index];
+                    let auto = auto_of(Some(channel_cfg));
+                    /* 切档时计时器从「现在」起算（PRD §3.4 边界表）：只记一次锚点，
+                       不动 `interval_minutes` —— 切档不重置用户填过的分钟数（H-2）。 */
+                    if state.prev_schedule != Some(auto.schedule) {
+                        if state.prev_schedule.is_some() {
+                            state.tier.last_attempt_ms = Some(now);
+                            state.tier.startup_done = true;
+                        }
+                        state.prev_schedule = Some(auto.schedule);
                     }
-                    prev_schedule = Some(auto.schedule);
-                }
-                if let Some(reason) = decide(
-                    &tier,
-                    auto.schedule,
-                    auto.interval_secs(),
-                    now,
-                    md_sync::dirty::last_write_ms(),
-                ) {
-                    /* 抢不到闸 → 本轮跳过，等下一个触发点；不排队、不 sleep 重试。 */
-                    if let Some(_gate) = crate::app::tray_sync::try_acquire() {
-                        let next_in = match reason {
-                            TierReason::Interval => auto.interval_secs(),
-                            TierReason::Max => MD_CLOUD_SMART_MAX_SECS,
-                            TierReason::Idle | TierReason::Startup => MD_CLOUD_SMART_IDLE_SECS,
-                        };
-                        crate::log_info!(
-                            "md cloud tier: schedule={} next_in={}",
-                            auto.schedule.label(),
-                            next_in
-                        );
-                        let outcome = md_cloud::round(&pool).await;
-                        tier.last_attempt_ms = Some(now_ms());
-                        tier.startup_done = true;
-                        match outcome {
-                            Ok(round) if round.report.errors.is_empty() => {
-                                tier.last_success_ms = Some(now_ms());
+                    if let Some(reason) = decide(
+                        &state.tier,
+                        auto.schedule,
+                        auto.interval_secs(),
+                        now,
+                        md_sync::dirty::last_write_ms(),
+                    ) {
+                        /* 抢不到闸 → 本轮跳过，等下一个触发点；不排队、不 sleep 重试。
+                           双通路同秒到点时后到者同此口径（设计 §四 3）。 */
+                        if let Some(_gate) = crate::app::tray_sync::try_acquire() {
+                            let next_in = match reason {
+                                TierReason::Interval => auto.interval_secs(),
+                                TierReason::Max => MD_CLOUD_SMART_MAX_SECS,
+                                TierReason::Idle | TierReason::Startup => {
+                                    MD_CLOUD_SMART_IDLE_SECS
+                                }
+                            };
+                            crate::log_info!(
+                                "md cloud tier: channel={} schedule={} next_in={}",
+                                channel.as_str(),
+                                auto.schedule.label(),
+                                next_in
+                            );
+                            let outcome = md_cloud::round_channel(&pool, channel).await;
+                            state.tier.last_attempt_ms = Some(now_ms());
+                            state.tier.startup_done = true;
+                            match outcome {
+                                Ok(round) if round.report.errors.is_empty() => {
+                                    state.tier.last_success_ms = Some(now_ms());
+                                }
+                                Ok(round) => {
+                                    crate::log_warn!(
+                                        "md cloud tier: round finished with errors: {}",
+                                        round.report.errors.join("；")
+                                    );
+                                }
+                                Err(err) => {
+                                    crate::log_warn!("md cloud tier: round failed: {err}")
+                                }
                             }
-                            Ok(round) => {
-                                crate::log_warn!(
-                                    "md cloud tier: round finished with errors: {}",
-                                    round.report.errors.join("；")
-                                );
-                            }
-                            Err(err) => crate::log_warn!("md cloud tier: round failed: {err}"),
                         }
                     }
                 }

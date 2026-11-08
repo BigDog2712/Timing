@@ -13,7 +13,7 @@ use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager};
 
-use crate::app::{events, tray_quit, tray_sync};
+use crate::app::{events, tray_label, tray_quit, tray_sync};
 use crate::infra::{tray_menu, window};
 use crate::models::enums::{ResolveAction, TrayStatus};
 use crate::models::timer::TraySnapshot;
@@ -34,7 +34,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     /* [V0.11.18] 启动期配置还没加载，同步项先说「Markdown 同步」——安全默认：
     说「云端同步」而云端其实没配，比反过来更糟。下一次状态迁移（`events::sync_tray`）
     就会用 `tray_sync::sync_label` 读到的真值修正它。 */
-    let menu = build_menu(app, &TraySnapshot::idle(), tray_sync::LOCAL_LABEL, false)?;
+    let menu = build_menu(app, &TraySnapshot::idle(), tray_label::LOCAL_LABEL, false)?;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)

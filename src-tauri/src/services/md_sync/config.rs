@@ -30,6 +30,7 @@ use crate::error::{AppError, AppResult};
 #[cfg(mobile)]
 use crate::models::constants::{MD_SYNC_POLL_MIN_SECS, MD_SYNC_POLL_SECS};
 use crate::models::md_sync::MdSyncBinding;
+use crate::models::md_sync_channel::split_legacy;
 use crate::models::md_sync_config::{default_bindings, MdSyncConfig};
 use crate::repositories::settings;
 
@@ -37,6 +38,13 @@ use crate::repositories::settings;
 pub const CONFIG_KEY: &str = "plugin.md-sync.config";
 
 /// 读取最终生效配置。解析失败按「没有保存值」处理，避免一条坏 JSON 让设置页打不开。
+///
+/// ## [V0.11.26] 读时推断（设计 §1.1 难点 2）
+///
+/// 老 JSON 里的 `cloud` 键（`mode='localfolder'/'webdav'` 二选一）在这里被
+/// `split_legacy` **纯内存**折算成两条通路（`cloudFolder` / `cloudWebdav`），
+/// 内存中的 `cloud` 置 `None`。磁盘上的老 JSON 一个字节不动：不保存就重启 = 零 diff。
+/// 「读不改盘」不需要迁移脚本；落新结构发生在用户下一次保存。
 pub async fn load(pool: &SqlitePool) -> AppResult<MdSyncConfig> {
     let saved = match settings::get_value(pool, CONFIG_KEY).await? {
         Some(raw) => serde_json::from_str::<MdSyncConfig>(&raw).ok(),
@@ -44,17 +52,27 @@ pub async fn load(pool: &SqlitePool) -> AppResult<MdSyncConfig> {
     };
 
     Ok(match saved {
-        Some(saved) => MdSyncConfig {
-            /* 总开关是用户的明确选择，保留（内核默认关，老用户存过 true 就还是 true）。 */
-            enabled: saved.enabled,
-            /* 间隔同理：用户调过就用用户的，没调过就是默认 15 分钟。 */
-            poll_secs: saved.poll_secs,
-            bindings: merge_bindings(saved.bindings, default_bindings()),
-            /* [V0.11.13] 云端通道**原样带出**：保存值里是 `None` 就还是 `None`。
-            这里绝不能像 bindings 那样「缺就补默认值」——补一个默认云端配置等于
-            升级后自己打开通道，Timing 会开始往坚果云或磁盘第二处写用户文件。 */
-            cloud: saved.cloud,
-        },
+        Some(saved) => {
+            /* 老键在 → 折算；新键在（或都在）→ 原样。两路互不覆盖：
+               已落新结构的配置 `cloud` 恒为 `None`（`skip_serializing_if`）。 */
+            let (folder, webdav) = if saved.cloud.is_some() {
+                split_legacy(saved.cloud.as_ref())
+            } else {
+                (saved.cloud_folder, saved.cloud_webdav)
+            };
+            MdSyncConfig {
+                /* 总开关是用户的明确选择，保留（内核默认关，老用户存过 true 就还是 true）。 */
+                enabled: saved.enabled,
+                /* 间隔同理：用户调过就用用户的，没调过就是默认 15 分钟。 */
+                poll_secs: saved.poll_secs,
+                bindings: merge_bindings(saved.bindings, default_bindings()),
+                /* [V0.11.13] 云端通道**原样带出**的旧口径已由读时推断接管：内存里
+                `cloud` 恒为 `None`（老 JSON 的那份已折进两条通路，磁盘不动）。 */
+                cloud: None,
+                cloud_folder: folder,
+                cloud_webdav: webdav,
+            }
+        }
         None => MdSyncConfig::default(),
     })
 }
@@ -86,11 +104,22 @@ pub async fn poll_secs(pool: &SqlitePool) -> u64 {
 }
 
 /// 校验并保存。校验失败返回专用错误码，设置页能把原因显示在输入框下方。
+///
+/// [V0.11.26] 保存前兑底归一（设计 §三 B12）：老客户端（或测试路径）只发 legacy
+/// `cloud` 时也能落新结构——折算成两条通路后，`cloud` 键**必须不出现**在 JSON 里。
 pub async fn save(pool: &SqlitePool, config: &MdSyncConfig) -> AppResult<()> {
-    config
+    let mut normalized = config.clone();
+    if normalized.cloud.is_some() {
+        let legacy = normalized.cloud.take();
+        let (folder, webdav) = split_legacy(legacy.as_ref());
+        /* 显式的新键优先（理论上不会与 legacy 同时出现），折算结果只补缺。 */
+        normalized.cloud_folder = normalized.cloud_folder.or(folder);
+        normalized.cloud_webdav = normalized.cloud_webdav.or(webdav);
+    }
+    normalized
         .validate()
         .map_err(AppError::md_sync_config_invalid)?;
-    let raw = serde_json::to_string(config)
+    let raw = serde_json::to_string(&normalized)
         .map_err(|err: Error| AppError::md_sync_config_invalid(err.to_string()))?;
     settings::set_value(pool, CONFIG_KEY, &raw, crate::platform::clock::now_ms()).await
 }
@@ -99,6 +128,8 @@ pub async fn save(pool: &SqlitePool, config: &MdSyncConfig) -> AppResult<()> {
 mod tests {
     use super::*;
     use crate::models::md_sync::MdSyncKind;
+    use crate::tests::support::fresh_pool;
+    use serde_json::json;
 
     fn binding(kind: MdSyncKind, heading: &str) -> MdSyncBinding {
         MdSyncBinding {
@@ -108,6 +139,85 @@ mod tests {
             file: "{date}.md".into(),
             heading: heading.into(),
         }
+    }
+
+    /// 老配置写入（模拟老版本留下的 JSON 形状）。
+    async fn seed(pool: &SqlitePool, cloud: serde_json::Value) {
+        let raw = json!({
+            "enabled": true,
+            "pollSecs": 900,
+            "bindings": [],
+            "cloud": cloud,
+        });
+        settings::set_value(pool, CONFIG_KEY, &raw.to_string(), 0)
+            .await
+            .expect("写老配置应成功");
+    }
+
+    /// [V0.11.26] 读时推断：`mode='localfolder'` → folder 全盘承接、webdav 关着留原值，
+    /// 且内存里的 `cloud` 恒为 `None`（磁盘不动由「不调用 save」保证）。
+    #[tokio::test]
+    async fn load_materializes_legacy_localfolder_into_two_channels() {
+        let pool = fresh_pool("cfg-split-local").await;
+        seed(
+            &pool,
+            json!({
+                "enabled": true, "mode": "localfolder", "localRoot": r"D:\Nutstore",
+                "baseUrl": "https://old.example/dav/", "basePath": "/Old", "user": "old@x",
+                "auto": {"schedule": "interval", "intervalMinutes": 30},
+            }),
+        )
+        .await;
+        let config = load(&pool).await.expect("老配置应能读回");
+        assert!(config.cloud.is_none(), "物化之后内存里不许再留 legacy 键");
+        let folder = config.cloud_folder.as_ref().expect("folder 侧必须物化");
+        assert!(folder.enabled && folder.is_usable_folder());
+        assert_eq!(folder.local_root, r"D:\Nutstore");
+        assert_eq!(
+            folder.auto.as_ref().map(|a| a.interval_minutes),
+            Some(30),
+            "活跃通路 auto 原样承接"
+        );
+        let webdav = config.cloud_webdav.as_ref().expect("webdav 侧必须物化");
+        assert!(!webdav.enabled && !webdav.is_usable_webdav(), "非活跃侧关着");
+        assert_eq!(webdav.base_url, "https://old.example/dav/", "三件套留原值不丢");
+        assert_eq!(webdav.auto, None, "非活跃通路 auto 承接为 None");
+        /* 磁盘零写：读两次，原始 JSON 一个字节没变。 */
+        let raw = settings::get_value(&pool, CONFIG_KEY)
+            .await
+            .expect("读回应成功")
+            .expect("键应仍在");
+        assert!(raw.contains(r#""mode":"localfolder""#), "磁盘上仍是老结构：{raw}");
+        assert!(!raw.contains("cloudFolder"), "读不改盘：新键不许落盘：{raw}");
+    }
+
+    /// [V0.11.26] 保存兜底：只发 legacy `cloud` 的载荷也能落新结构，`cloud` 键不再出现。
+    #[tokio::test]
+    async fn save_normalizes_legacy_payload_into_new_shape() {
+        let pool = fresh_pool("cfg-split-save").await;
+        let config = MdSyncConfig {
+            enabled: true,
+            poll_secs: 900,
+            bindings: default_bindings(),
+            cloud: Some(crate::models::md_sync_cloud::MdSyncCloud {
+                enabled: true,
+                mode: crate::models::md_sync_cloud::CloudMode::Webdav,
+                base_url: "https://dav.jianguoyun.com/dav/".into(),
+                base_path: "/Timing".into(),
+                user: "me@example.com".into(),
+                ..Default::default()
+            }),
+            ..MdSyncConfig::default()
+        };
+        save(&pool, &config).await.expect("保存应成功");
+        let raw = settings::get_value(&pool, CONFIG_KEY)
+            .await
+            .expect("读回应成功")
+            .expect("键应仍在");
+        assert!(!raw.contains(r#""cloud":"#), "新保存形不许出现 legacy 键：{raw}");
+        let parsed: MdSyncConfig = serde_json::from_str(&raw).expect("落库值必须能读回");
+        assert!(parsed.cloud_webdav.as_ref().is_some_and(|w| w.enabled));
+        assert!(parsed.cloud_folder.as_ref().is_some_and(|f| !f.enabled));
     }
 
     #[test]

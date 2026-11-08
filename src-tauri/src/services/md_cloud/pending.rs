@@ -18,6 +18,7 @@
 use sqlx::SqlitePool;
 
 use crate::error::AppResult;
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::repositories::md_cloud_pending;
 
 /// FNV-1a 64 的 offset basis（`MD_CLOUD_FNV` 口径见 <http://www.isthe.com/chongo/tech/comp/fnv/>）。
@@ -40,24 +41,26 @@ pub fn fingerprint(bytes: &[u8]) -> String {
 ///
 /// `pending_since` 的「不重置」由 `mark_pending` 的 `ON CONFLICT` 保证，这里不判断：
 /// 调用方这一层记性（先读再判再写）中间任何一条早退分支都会把欠账时间刷成当下。
+/// [V0.11.26] 记账按通路隔离（`channel` 参数透传给仓库层）。
 pub async fn record_if_changed(
     pool: &SqlitePool,
+    channel: PurgeChannel,
     date: &str,
     text: &str,
     now: i64,
 ) -> AppResult<bool> {
     let hash = fingerprint(text.as_bytes());
-    let last = md_cloud_pending::get(pool, date)
+    let last = md_cloud_pending::get(pool, channel, date)
         .await?
         .and_then(|row| row.last_hash);
     if last.as_deref() == Some(hash.as_str()) {
         return Ok(false);
     }
-    md_cloud_pending::mark_pending(pool, date, &hash, now).await?;
+    md_cloud_pending::mark_pending(pool, channel, date, &hash, now).await?;
     Ok(true)
 }
 
 /// 有欠账的日期（升序）。
-pub async fn dates(pool: &SqlitePool) -> AppResult<Vec<String>> {
-    md_cloud_pending::pending_dates(pool).await
+pub async fn dates(pool: &SqlitePool, channel: PurgeChannel) -> AppResult<Vec<String>> {
+    md_cloud_pending::pending_dates(pool, channel).await
 }
