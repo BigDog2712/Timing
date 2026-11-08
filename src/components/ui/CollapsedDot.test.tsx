@@ -12,8 +12,15 @@
  *   5. 托盘双击高亮在圆点形态下也挂得上（`data-highlight`）；
  *   6. 暂停时弧冻在当前长度（不再有 CSS 动画可暂停）。
  *
- * [V0.11.10] 几何量改吃「带小数的秒」逐帧推进（弧不再一秒一跳），所以数值断言容差放到
- * 1 位小数 —— `runningSince` 取 `Date.now()`，到真正读值时已经走了十几毫秒。
+ * [V0.11.10] 几何量改吃「带小数的秒」逐帧推进（弧不再一秒一跳）。
+ *
+ * [0.11.20-debt] 修 flaky：`dashoffset = 100 × (1 − frac)` 量纲是 100，1 位小数的容差
+ * 0.05 折算成时间只有 **30ms**（0.05 ÷ (100/60) = 0.03 s）。`runningSince` 取 `Date.now()`，
+ * 冷启动第一次跑（模块转译 + React 首次挂载）轻松超过 30ms → 偶发红、第二次又绿。
+ * 修法不是放宽容差，而是**把时钟钉死**：`vi.useFakeTimers()` + `vi.setSystemTime()` 之后
+ * `Date.now()` 恒等于 `FIXED_NOW`，`delta = 0`；rAF / 定时器 / `performance` 一起假掉
+ * （`toFake` 显式列出），`useSmoothTimerTick` 的逐帧循环不会插进来重算一次。
+ * 时钟钉死之后容差反而**收紧**到 6 位小数（5e-7）：漂移 1ms 都会红，这才叫钉住了。
  *
  * 断言的是**结构契约**（属性值 / 元素在不在），不做截图：33px 的环好不好看要靠人眼，
  * 但「第 60 秒整圈消失」这种缺陷一定能被 `stroke-dashoffset` 的数值钉死在结构上。
@@ -24,7 +31,7 @@
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CollapsedDot } from './CollapsedDot';
 import { ARC_MIN_FRAC } from '../../lib/ringGeometry';
@@ -36,10 +43,28 @@ import type { TimeRecord } from '../../types/domain';
 // React 19 的 act 需要显式声明「当前是测试环境」，否则每渲染一次打一条 warning
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+/** 钉死的「现在」（2026-01-01T00:00:00Z）：`session()` 与 `computeLiveSecFloat` 同源，
+ * `delta` 必然是 0，几何量与手算值逐位相等。 */
+const FIXED_NOW = Date.UTC(2026, 0, 1, 0, 0, 0);
+
+/** 假掉的时间源：时钟 + 逐帧 + 定时器 + `performance`，全部由用例控制，不与真实耗时赛跑。 */
+const FAKED_TIMERS = [
+  'Date',
+  'performance',
+  'setTimeout',
+  'clearTimeout',
+  'setInterval',
+  'clearInterval',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+] as const;
+
 let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: [...FAKED_TIMERS] });
+  vi.setSystemTime(FIXED_NOW);
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -53,6 +78,7 @@ afterEach(() => {
     root.unmount();
   });
   container.remove();
+  vi.useRealTimers();
 });
 
 /** 造一个「已计 `sec` 秒」的会话（`runningSince` 取现在，delta 为 0，秒数确定）。 */
@@ -130,13 +156,16 @@ function remount() {
 
 describe('外环增长：frac = (displaySec % 60) / 60', () => {
   /* 手算：0 → 0；1 → 1/60；59 → 59/60；60/120 → 0；3599 → 59/60。
-     dashoffset 随之为 100（空）/ 98.333 / 1.667 / 100 / 100 / 1.667。 */
+     dashoffset 随之为 100（空）/ 98.333 / 1.667 / 100 / 100 / 1.667。
+     时钟已钉死（见 `FIXED_NOW`），所以这里容差收到 6 位小数：任何大于 1ms 的漂移都会红。 */
   it('59 秒 → frac=59/60，弧几乎满圈（dashoffset≈1.667）', () => {
     setTimer(59, 'running');
     const r = render();
+    /* 先证明「时间真的没走」：这一句红了，说明假时钟没生效，下面的精确断言也就不作数 */
+    expect(Date.now()).toBe(FIXED_NOW);
     expect(r.arc).not.toBeNull();
-    expect(fracOf(r)).toBeCloseTo(59 / 60, 1);
-    expect(r.offset).toBeCloseTo(100 * (1 - 59 / 60), 1);
+    expect(fracOf(r)).toBeCloseTo(59 / 60, 6);
+    expect(r.offset).toBeCloseTo(100 * (1 - 59 / 60), 6);
   });
 
   it('1 秒 → 只画出 6°：极短但可见，不是「不可见」', () => {
