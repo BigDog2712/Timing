@@ -128,7 +128,7 @@ async fn a_disabled_config_performs_no_file_io() {
                 binding(MdSyncKind::Notes, &vault, "{date}.md", NOTES_HEADING),
                 trap,
             ],
-        },
+        ..MdSyncConfig::default() },
     )
     .await
     .expect("关闭状态本身是合法配置");

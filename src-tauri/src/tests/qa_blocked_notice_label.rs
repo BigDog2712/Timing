@@ -21,9 +21,10 @@
 
 use sqlx::SqlitePool;
 
-use super::qa_blocked_notice::{localfolder_filled, webdav_filled, V0118_BODY};
-use crate::app::tray_sync::{blocked_notice, sync_label, CLOUD_LABEL, LOCAL_LABEL};
+use super::qa_blocked_notice::{cfg_of, localfolder_filled, webdav_filled, V0118_BODY};
+use crate::app::tray_label::{blocked_notice, sync_label, CLOUD_LABEL, LOCAL_LABEL};
 use crate::models::md_sync::MdSyncConfig;
+use crate::models::md_sync_channel;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::repositories::settings;
 use crate::services::md_sync::config;
@@ -47,15 +48,7 @@ async fn qa_sync_label_follows_effective_channel_not_the_selection() {
        所以 `sync_label` 单独判了一次。原实现给的是 `云端同步` —— 那句是假话：
        总开关关着时这一轮连 `md_sync::run` 都不会进，点下去弹的却是「先在设置里打开
        Markdown 同步」。断言因此从「现状照片」改成「判据」。 */
-    store(
-        &pool,
-        &MdSyncConfig {
-            enabled: false,
-            cloud: Some(webdav_filled()),
-            ..MdSyncConfig::default()
-        },
-    )
-    .await;
+    store(&pool, &cfg_of(false, Some(webdav_filled()))).await;
     assert_eq!(
         sync_label(&pool).await,
         LOCAL_LABEL,
@@ -63,15 +56,14 @@ async fn qa_sync_label_follows_effective_channel_not_the_selection() {
     );
 
     /* ② 开了 + 选了云端 + 没填全 → 标签回落本地（`usable()` 为 None） */
-    let not_filled = MdSyncConfig {
-        enabled: true,
-        cloud: Some(MdSyncCloud {
+    let not_filled = cfg_of(
+        true,
+        Some(MdSyncCloud {
             enabled: true,
             mode: CloudMode::Webdav,
             ..MdSyncCloud::default()
         }),
-        ..MdSyncConfig::default()
-    };
+    );
     store(&pool, &not_filled).await;
     assert_eq!(
         sync_label(&pool).await,
@@ -88,15 +80,7 @@ async fn qa_sync_label_follows_effective_channel_not_the_selection() {
     );
 
     /* ④ 开了 + 填全了 → 标签云端，且不再插话（这一下会真的跑） */
-    store(
-        &pool,
-        &MdSyncConfig {
-            enabled: true,
-            cloud: Some(webdav_filled()),
-            ..MdSyncConfig::default()
-        },
-    )
-    .await;
+    store(&pool, &cfg_of(true, Some(webdav_filled()))).await;
     assert_eq!(sync_label(&pool).await, CLOUD_LABEL, "填全时标签必须是云端");
     assert!(blocked_notice(&not_filled).is_some(), "未填全档确实会说话");
 }
@@ -117,15 +101,14 @@ async fn qa_sync_label_follows_effective_channel_not_the_selection() {
 #[tokio::test]
 async fn qa_b4_notice_title_should_equal_the_menu_item_label() {
     let pool = fresh_pool("qa-blocked-title").await;
-    let not_filled = MdSyncConfig {
-        enabled: true,
-        cloud: Some(MdSyncCloud {
+    let not_filled = cfg_of(
+        true,
+        Some(MdSyncCloud {
             enabled: true,
             mode: CloudMode::Webdav,
             ..MdSyncCloud::default()
         }),
-        ..MdSyncConfig::default()
-    };
+    );
     store(&pool, &not_filled).await;
 
     let menu_label = sync_label(&pool).await;
@@ -138,21 +121,14 @@ async fn qa_b4_notice_title_should_equal_the_menu_item_label() {
 
 /* ===== 不变量：通知标题 ≡ 用户刚点的那一项的文字 ===== */
 
-/// 配置空间的笛卡尔积：`enabled`（2）× `cloud`（9）。
+/// 配置空间的笛卡尔积：`enabled`（2）× 老形状 `cloud`（9）× 新双通路 3×3（18）。
 ///
-/// **这不是手抄一遍档位清单。** `blocked_notice` 的输入只有 `MdSyncConfig`，它读的字段只有
-/// `enabled`、`cloud` 有没有、`cloud.enabled`、`cloud.mode` 和「四个字段空不空」——把这些
-/// 维度枚举成交叉积，将来在**同一组字段**上新增一档（比如「密码未设置也算没填全」）会自动
-/// 落在某个格子里被断言，不需要有人记得回来改这里。
-///
-/// **唯一需要维护的情形**：出现了不在这三个维度上的新判据（按时间、按网络状态、按上次
-/// 失败次数……），那时要把那个维度加进这个函数。除此之外，新增档位零维护。
+/// **这不是手抄一遍档位清单。** 它读的字段只有总开关、两条通路各自「有没有 / 开没开 /
+/// 填没填全」，把这些维度枚举成交叉积，将来在同一组字段上新增一档会自动落在某个格子里
+/// 被断言。**唯一需要维护的情形**：出现了不在这几个维度上的新判据（按时间、按网络状态、
+/// 按上次失败次数……），那时把那个维度加进来；除此之外新增档位零维护。
 fn config_space() -> Vec<(String, MdSyncConfig)> {
-    let blank_webdav = || MdSyncCloud {
-        enabled: true,
-        mode: CloudMode::Webdav,
-        ..MdSyncCloud::default()
-    };
+    let blank_webdav = || MdSyncCloud { enabled: true, mode: CloudMode::Webdav, ..MdSyncCloud::default() };
     let cleared = |f: fn(&mut MdSyncCloud)| {
         let mut cloud = webdav_filled();
         f(&mut cloud);
@@ -184,17 +160,56 @@ fn config_space() -> Vec<(String, MdSyncConfig)> {
         ("localfolder 填全".into(), Some(localfolder_filled())),
     ];
 
-    let mut cells = Vec::with_capacity(clouds.len() * 2);
+    let mut cells: Vec<(String, MdSyncConfig)> = Vec::with_capacity(clouds.len() * 2 + 12);
     for enabled in [false, true] {
         for (label, cloud) in &clouds {
-            cells.push((
-                format!("总开关={enabled} / {label}"),
-                MdSyncConfig {
-                    enabled,
-                    cloud: cloud.clone(),
-                    ..MdSyncConfig::default()
-                },
-            ));
+            cells.push((format!("总开关={enabled} / {label}"), cfg_of(enabled, cloud.clone())));
+        }
+    }
+
+    /* [V0.11.26] 新维度：**两条通路各自开不开**。老形状（二选一）永远造不出
+       「folder 开 + webdav 开」这一格，而块④⑤ 两个独立开关正是这次改造的判据本体。
+       每格三态（关 / 开但空 / 开且填全），两条通路交叉 = 3 × 3 × 总开关 2 = 18 格。 */
+    let folder_of = |state: u8| match state {
+        0 => None,
+        1 => Some(md_sync_channel::MdSyncCloudChannel {
+            enabled: true,
+            ..Default::default()
+        }),
+        _ => Some(md_sync_channel::MdSyncCloudChannel {
+            enabled: true,
+            local_root: localfolder_filled().local_root.clone(),
+            ..Default::default()
+        }),
+    };
+    let webdav_of = |state: u8| match state {
+        0 => None,
+        1 => Some(md_sync_channel::MdSyncCloudChannel {
+            enabled: true,
+            ..Default::default()
+        }),
+        _ => Some(md_sync_channel::MdSyncCloudChannel {
+            enabled: true,
+            base_url: "https://dav.jianguoyun.com/dav/".into(),
+            base_path: "/Timing".into(),
+            user: "me@example.com".into(),
+            ..Default::default()
+        }),
+    };
+    let names = ["关", "开但空", "开且填全"];
+    for enabled in [false, true] {
+        for (folder_state, folder_name) in names.iter().enumerate() {
+            for (webdav_state, webdav_name) in names.iter().enumerate() {
+                cells.push((
+                    format!("总开关={enabled} / folder={folder_name} / webdav={webdav_name}"),
+                    MdSyncConfig {
+                        enabled,
+                        cloud_folder: folder_of(folder_state as u8),
+                        cloud_webdav: webdav_of(webdav_state as u8),
+                        ..MdSyncConfig::default()
+                    },
+                ));
+            }
         }
     }
     cells

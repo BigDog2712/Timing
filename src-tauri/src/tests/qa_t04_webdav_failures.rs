@@ -105,7 +105,7 @@ async fn a_404_is_a_success_and_advances_the_watermark() {
     );
     for date in dates {
         assert!(
-            md_cloud_pending::get(&fixture.pool, date)
+            md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, date)
                 .await
                 .expect("查 pending")
                 .is_none(),
@@ -158,7 +158,7 @@ async fn i11_the_watermark_stops_before_the_first_failure() {
         dates[3]
     );
     for (index, date) in dates.iter().enumerate() {
-        let left = md_cloud_pending::get(&fixture.pool, date)
+        let left = md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, date)
             .await
             .expect("查 pending");
         let should_stay = index == 2;

@@ -18,10 +18,11 @@
 //! 只能静态核对：`tray_sync.rs` 那个分支体只有 `notify_or_log` + `return`，`return` 之后才是
 //! `md_cloud::round`。所以「只弹一条、不紧跟一条完成/没有变更」形状上成立，但无自动化证据。
 
-use crate::app::tray_sync::{blocked_notice, CLOUD_LABEL, LOCAL_LABEL};
+use crate::app::tray_label::{blocked_notice, CLOUD_LABEL, LOCAL_LABEL};
 use crate::infra::tray_menu::{build_nodes, TrayNode, ID_MD_SYNC};
 use crate::models::enums::TrayStatus;
 use crate::models::md_sync::MdSyncConfig;
+use crate::models::md_sync_channel;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::tests::support::unique_dir;
 
@@ -56,6 +57,21 @@ pub(super) fn localfolder_filled() -> MdSyncCloud {
 /// `(档名, 配置, 期望)`；`期望 == None` = 不该插话、这一下会真的跑。
 type Tier = (&'static str, MdSyncConfig, Option<(&'static str, &'static str)>);
 
+/// 老形状（`cloud` 单键）→ 新双通路配置。
+///
+/// [V0.11.26] `blocked_notice` / `sync_label` 已改读 `cloudFolder` / `cloudWebdav`，
+/// 而本表记的是「老用户升级上来的那一刻」——那正是 `split_legacy` 的输入形状。
+/// 用生产同款折算（不另写一份私有映射），表里的档位语义因此逐档不变。
+pub(super) fn cfg_of(enabled: bool, cloud: Option<MdSyncCloud>) -> MdSyncConfig {
+    let (folder, webdav) = md_sync_channel::split_legacy(cloud.as_ref());
+    MdSyncConfig {
+        enabled,
+        cloud_folder: folder,
+        cloud_webdav: webdav,
+        ..MdSyncConfig::default()
+    }
+}
+
 /// 十档判据。顺序 = `blocked_notice` 的优先级顺序（① 总开关 > ② 未填全 > ③ 放行）。
 ///
 /// **标题取哪个常量，是从 PRD §14.2 的 B4 修订里读出来的，不是从实现里抄的**：
@@ -69,12 +85,6 @@ type Tier = (&'static str, MdSyncConfig, Option<(&'static str, &'static str)>);
 /// 不再是「现状照片」；`qa_b4_notice_title_should_equal_the_menu_item_label` 同步去掉
 /// 已去掉那个 `ignore` 标记，成为常驻用例。
 fn tiers() -> Vec<Tier> {
-    let base = |enabled: bool, cloud: Option<MdSyncCloud>| MdSyncConfig {
-        enabled,
-        cloud,
-        ..MdSyncConfig::default()
-    };
-
     let mut missing_base_path = webdav_filled();
     missing_base_path.base_path = "   ".into(); // 全空格也算空：`.trim()` 之后是 ""
 
@@ -92,12 +102,12 @@ fn tiers() -> Vec<Tier> {
         ),
         (
             "2 · 总开关关着，但云端早就配好了 —— ① 优先，仍是 v0.11.7 原文",
-            base(false, Some(webdav_filled())),
+            cfg_of(false, Some(webdav_filled())),
             Some((LOCAL_LABEL, V0117_BODY)),
         ),
         (
             "3 · 开着 + 选云端 + webdav 三项全空",
-            base(
+            cfg_of(
                 true,
                 Some(MdSyncCloud {
                     enabled: true,
@@ -109,27 +119,27 @@ fn tiers() -> Vec<Tier> {
         ),
         (
             "4 · webdav 只缺 base_path（两个填了、一个空）",
-            base(true, Some(missing_base_path)),
+            cfg_of(true, Some(missing_base_path)),
             Some((LOCAL_LABEL, V0118_BODY)),
         ),
         (
             "5 · webdav 只缺 user（全角/半角空白也算空）",
-            base(true, Some(missing_user)),
+            cfg_of(true, Some(missing_user)),
             Some((LOCAL_LABEL, V0118_BODY)),
         ),
         (
             "6 · localfolder 载体、没选落点目录 —— 另一条判据，别漏",
-            base(true, Some(missing_root)),
+            cfg_of(true, Some(missing_root)),
             Some((LOCAL_LABEL, V0118_BODY)),
         ),
         (
             "7 · 填全了（webdav）→ 不插话",
-            base(true, Some(webdav_filled())),
+            cfg_of(true, Some(webdav_filled())),
             None,
         ),
         (
             "8 · 选了「只用本地」（字段都留着、enabled=false）→ 不插话",
-            base(
+            cfg_of(
                 true,
                 Some(MdSyncCloud {
                     enabled: false,
@@ -140,18 +150,58 @@ fn tiers() -> Vec<Tier> {
         ),
         (
             "9 · 从没配过云端（cloud=None）但总开关开着 → 纯本地，不插话",
-            base(true, None),
+            cfg_of(true, None),
             None,
         ),
         (
             "10 · 填全了（localfolder）→ 不插话，与 webdav 同权",
-            base(true, Some(localfolder_filled())),
+            cfg_of(true, Some(localfolder_filled())),
             None,
+        ),
+        (
+            "11 · [V0.11.26] folder 开着缺目录、webdav 填全 → 不插话（云端那一半会真跑）",
+            MdSyncConfig {
+                enabled: true,
+                cloud_folder: Some(md_sync_channel::MdSyncCloudChannel {
+                    enabled: true,
+                    local_root: String::new(),
+                    ..Default::default()
+                }),
+                cloud_webdav: md_sync_channel::split_legacy(Some(&webdav_filled())).1,
+                ..MdSyncConfig::default()
+            },
+            None,
+        ),
+        (
+            "12 · [V0.11.26] 两通路都开且都填全 → 不插话（互不阻断的另一面）",
+            MdSyncConfig {
+                enabled: true,
+                cloud_folder: md_sync_channel::split_legacy(Some(&localfolder_filled())).0,
+                cloud_webdav: md_sync_channel::split_legacy(Some(&webdav_filled())).1,
+                ..MdSyncConfig::default()
+            },
+            None,
+        ),
+        (
+            "13 · [V0.11.26] 两通路都开、两条都没填全 → 拦下（这一下什么都不上台面）",
+            MdSyncConfig {
+                enabled: true,
+                cloud_folder: Some(md_sync_channel::MdSyncCloudChannel {
+                    enabled: true,
+                    ..Default::default()
+                }),
+                cloud_webdav: Some(md_sync_channel::MdSyncCloudChannel {
+                    enabled: true,
+                    ..Default::default()
+                }),
+                ..MdSyncConfig::default()
+            },
+            Some((LOCAL_LABEL, V0118_BODY)),
         ),
     ]
 }
 
-/// 主表：八档逐档对照，失败信息里带档名（不用逐个 `#[test]` 也能定位）。
+/// 主表：十三档逐档对照，失败信息里带档名（不用逐个 `#[test]` 也能定位）。
 #[test]
 fn qa_blocked_notice_tier_table() {
     for (name, config, expected) in tiers() {
@@ -166,15 +216,14 @@ fn qa_blocked_notice_two_bodies_never_swap() {
     let off = blocked_notice(&MdSyncConfig::default()).expect("总开关关着必须有话说");
     assert_eq!(off.1, V0117_BODY, "① 的正文必须逐字沿用 v0.11.7");
 
-    let not_filled = blocked_notice(&MdSyncConfig {
-        enabled: true,
-        cloud: Some(MdSyncCloud {
+    let not_filled = blocked_notice(&cfg_of(
+        true,
+        Some(MdSyncCloud {
             enabled: true,
             mode: CloudMode::Webdav,
             ..MdSyncCloud::default()
         }),
-        ..MdSyncConfig::default()
-    })
+    ))
     .expect("未填全必须有话说");
     assert_eq!(not_filled.1, V0118_BODY, "② 的正文必须与 PRD §14.2 逐字一致");
 

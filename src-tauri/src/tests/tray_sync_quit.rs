@@ -20,9 +20,9 @@ use super::md_sync::{at, env};
 /* `run_before_quit` 与 `QUIT_SYNC_BUDGET` 在 `app/tray_quit.rs`（[V0.11.18] 为行数门禁拆出），
 `sync_label` / `try_acquire` 留在 `app/tray_sync.rs`：闸的 `Drop` 语义只该有一处定义。 */
 use crate::app::tray_quit::run_before_quit;
-use crate::app::tray_sync::{blocked_notice, sync_label, LOCAL_LABEL};
+use crate::app::tray_label::{blocked_notice, sync_label, CLOUD_LABEL, FOLDER_LABEL, LOCAL_LABEL};
 use crate::models::md_sync::MdSyncConfig;
-use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
+use crate::models::md_sync_channel::MdSyncCloudChannel;
 use crate::repositories::settings;
 use crate::services::md_sync::config;
 use crate::tests::support::{insert_saved, new_item, unique_dir};
@@ -52,22 +52,41 @@ async fn sync_label_is_local_when_cloud_never_configured() {
     );
 }
 
-/// TR1b 第 2 档：`enabled: true` 且填全了 → 「云端同步」。
+/// TR1b 第 2 档：webdav 通路填全了 → 「云端同步」。
 #[tokio::test]
-async fn sync_label_is_cloud_when_channel_is_usable() {
+async fn sync_label_is_cloud_when_webdav_channel_is_usable() {
     let env = env("tray-label-usable").await;
-    let root = unique_dir("tray-cloud-root");
-    std::fs::create_dir_all(&root).unwrap();
     let mut current = config::load(&env.pool).await.unwrap();
-    current.cloud = Some(MdSyncCloud {
+    current.cloud_webdav = Some(MdSyncCloudChannel {
         enabled: true,
-        mode: CloudMode::LocalFolder,
-        local_root: root.display().to_string(),
-        ..MdSyncCloud::default()
+        base_url: "https://dav.jianguoyun.com/dav/".into(),
+        base_path: "/Timing".into(),
+        user: "me@example.com".into(),
+        ..Default::default()
     });
     store(&env.pool, &current).await;
 
-    assert_eq!(sync_label(&env.pool).await, "云端同步");
+    assert_eq!(sync_label(&env.pool).await, CLOUD_LABEL);
+}
+
+/// TR1b 第 2b 档（[V0.11.26] 新增第三态，PRD L7）：只有 folder 通路填全 → 「本地同步」。
+///
+/// 旧实现把这一档也说成「云端同步」——`localfolder` 那时是云端通道的一个 mode。
+/// 拆分后两条通路各有名字，标签必须跟着分开，否则用户以为点的是网盘那份。
+#[tokio::test]
+async fn sync_label_is_folder_when_only_folder_channel_is_usable() {
+    let env = env("tray-label-folder").await;
+    let root = unique_dir("tray-folder-root");
+    std::fs::create_dir_all(&root).unwrap();
+    let mut current = config::load(&env.pool).await.unwrap();
+    current.cloud_folder = Some(MdSyncCloudChannel {
+        enabled: true,
+        local_root: root.display().to_string(),
+        ..Default::default()
+    });
+    store(&env.pool, &current).await;
+
+    assert_eq!(sync_label(&env.pool).await, FOLDER_LABEL, "只有本地通路在跑，标签必须是第三态");
 }
 
 /// TR1b 第 3 档：**选了本地 + 云端但没填全** → 仍说「Markdown 同步」。
@@ -80,13 +99,12 @@ async fn sync_label_is_cloud_when_channel_is_usable() {
 async fn sync_label_stays_local_when_selected_but_not_filled() {
     let env = env("tray-label-half").await;
     let mut current = config::load(&env.pool).await.unwrap();
-    current.cloud = Some(MdSyncCloud {
+    current.cloud_webdav = Some(MdSyncCloudChannel {
         enabled: true,
-        mode: CloudMode::Webdav,
         base_url: String::new(),
         base_path: "/Timing".into(),
         user: String::new(),
-        ..MdSyncCloud::default()
+        ..Default::default()
     });
     store(&env.pool, &current).await;
 
@@ -103,13 +121,12 @@ async fn sync_label_is_local_when_channel_off() {
     let env = env("tray-label-off").await;
     let mut current = config::load(&env.pool).await.unwrap();
     /* 地址 / 目录 / 账号**都留着**，只把通道关掉（CH4：切回即恢复） */
-    current.cloud = Some(MdSyncCloud {
+    current.cloud_webdav = Some(MdSyncCloudChannel {
         enabled: false,
-        mode: CloudMode::Webdav,
         base_url: "https://dav.jianguoyun.com/dav/".into(),
         base_path: "/Timing".into(),
         user: "me@example.com".into(),
-        ..MdSyncCloud::default()
+        ..Default::default()
     });
     store(&env.pool, &current).await;
 
@@ -132,13 +149,12 @@ async fn sync_label_is_local_when_master_switch_is_off_even_if_cloud_is_filled()
     let mut current = config::load(&env.pool).await.unwrap();
     current.enabled = false;
     /* 字段一个不少（`is_usable() == true`），只有总开关关着 */
-    current.cloud = Some(MdSyncCloud {
+    current.cloud_webdav = Some(MdSyncCloudChannel {
         enabled: true,
-        mode: CloudMode::Webdav,
         base_url: "https://dav.jianguoyun.com/dav/".into(),
         base_path: "/Timing".into(),
         user: "me@example.com".into(),
-        ..MdSyncCloud::default()
+        ..Default::default()
     });
     store(&env.pool, &current).await;
 
@@ -183,14 +199,13 @@ async fn run_before_quit_writes_before_exit_when_enabled() {
 /* ===== [V0.11.18] B4：点了「同步」之后才知道云端没填全 ===== */
 
 /// 填全了的一份 `cloud`（`webdav` 三件套都在）——判据的「对照档」。
-fn filled_webdav() -> MdSyncCloud {
-    MdSyncCloud {
+fn filled_webdav() -> MdSyncCloudChannel {
+    MdSyncCloudChannel {
         enabled: true,
-        mode: CloudMode::Webdav,
         base_url: "https://dav.jianguoyun.com/dav/".into(),
         base_path: "/Timing".into(),
         user: "me@example.com".into(),
-        ..MdSyncCloud::default()
+        ..Default::default()
     }
 }
 
@@ -214,32 +229,31 @@ fn blocked_notice_covers_off_and_not_filled() {
           用户点的那一项此刻就写着「Markdown 同步」（未填全 → `sync_label` 也返回它），
           通知标题若写「云端同步」就是另一句假话。 */
     config.enabled = true;
-    config.cloud = Some(MdSyncCloud {
+    config.cloud_webdav = Some(MdSyncCloudChannel {
         enabled: true,
-        mode: CloudMode::Webdav,
-        ..MdSyncCloud::default()
+        ..Default::default()
     });
     assert_eq!(blocked_notice(&config), Some((LOCAL_LABEL, "先在设置里填好云端")));
 
     /* ③ 只填了两个字段也不算填全（`is_usable` 要求三个都非空）——这一档最容易写漏 */
-    config.cloud = Some(MdSyncCloud {
+    config.cloud_webdav = Some(MdSyncCloudChannel {
         user: String::new(),
         ..filled_webdav()
     });
     assert_eq!(blocked_notice(&config), Some((LOCAL_LABEL, "先在设置里填好云端")));
 
     /* ④ 填全了 → 不再插话，这一下会真的跑 */
-    config.cloud = Some(filled_webdav());
+    config.cloud_webdav = Some(filled_webdav());
     assert_eq!(blocked_notice(&config), None);
 
     /* ⑤ 只用本地（字段都留着、`enabled: false`）→ 一句都不用说 */
-    config.cloud = Some(MdSyncCloud {
+    config.cloud_webdav = Some(MdSyncCloudChannel {
         enabled: false,
         ..filled_webdav()
     });
     assert_eq!(blocked_notice(&config), None);
 
     /* ⑥ 从没配过云端（`cloud: None`）→ 同样是纯本地，不插话 */
-    config.cloud = None;
+    config.cloud_webdav = None;
     assert_eq!(blocked_notice(&config), None);
 }

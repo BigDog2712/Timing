@@ -10,6 +10,7 @@
 use std::fs;
 
 use crate::infra::md_webdav::WebdavTarget;
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncReport;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_cloud::{pending, round_push};
@@ -43,7 +44,7 @@ async fn conflict_retries_once_then_keeps_the_debt() {
     /* 先按 ⑦ 的口径记一笔欠账：412 的补救走完之后它必须还在。 */
     let since = 1_000i64;
     assert!(
-        pending::record_if_changed(&fixture.pool, &today, local, since)
+        pending::record_if_changed(&fixture.pool, PurgeChannel::Webdav, &today, local, since)
             .await
             .expect("记账应成功"),
         "第一次看到内容 → 必须记一笔"
@@ -89,7 +90,7 @@ async fn conflict_retries_once_then_keeps_the_debt() {
         "仍 412 要记进 report.errors，不能静默：{detail}"
     );
 
-    let row = md_cloud_pending::get(&fixture.pool, &today)
+    let row = md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, &today)
         .await
         .expect("查询应成功")
         .expect("欠账行应还在");

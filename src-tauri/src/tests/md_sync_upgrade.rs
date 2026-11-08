@@ -33,6 +33,7 @@ async fn save_old_config(env: &Env) {
             binding(MdSyncKind::Timers, &env.vault, "{date}.md", TIMERS_HEADING),
             binding(MdSyncKind::Notes, &env.vault, "{date}.md", NOTES_HEADING),
         ],
+        ..MdSyncConfig::default()
     };
     config::save(&env.pool, &old).await.unwrap();
 }
@@ -71,6 +72,7 @@ async fn a_disabled_saved_binding_stays_disabled() {
             binding(MdSyncKind::Timers, &env.vault, "{date}.md", TIMERS_HEADING),
             notes,
         ],
+        ..MdSyncConfig::default()
     };
     config::save(&env.pool, &old).await.unwrap();
 
@@ -119,7 +121,7 @@ async fn the_merged_binding_can_actually_write_the_block() {
             poll_secs: 900,
             enabled: true,
             bindings: redirected,
-        },
+        ..MdSyncConfig::default() },
     )
     .await
     .unwrap();

@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use crate::infra::md_file;
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncReport;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::repositories::md_cloud_pending;
@@ -139,12 +140,12 @@ async fn pending_only_moves_when_the_file_content_changes() {
     let later = 9_000i64;
 
     assert!(
-        pending::record_if_changed(&fixture.pool, "2026-11-06", "第一版", first)
+        pending::record_if_changed(&fixture.pool, PurgeChannel::Webdav, "2026-11-06", "第一版", first)
             .await
             .expect("记账应成功"),
         "第一次看到内容 → 必须记一笔"
     );
-    let row = md_cloud_pending::get(&fixture.pool, "2026-11-06")
+    let row = md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, "2026-11-06")
         .await
         .expect("查询应成功")
         .expect("应有行");
@@ -156,24 +157,24 @@ async fn pending_only_moves_when_the_file_content_changes() {
     );
 
     assert!(
-        !pending::record_if_changed(&fixture.pool, "2026-11-06", "第一版", later)
+        !pending::record_if_changed(&fixture.pool, PurgeChannel::Webdav, "2026-11-06", "第一版", later)
             .await
             .expect("记账应成功"),
         "内容没变 → 不该产生新欠账"
     );
-    let row = md_cloud_pending::get(&fixture.pool, "2026-11-06")
+    let row = md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, "2026-11-06")
         .await
         .expect("查询应成功")
         .expect("行应仍在");
     assert_eq!(row.pending_since, first, "没变化时连时间也不该动");
 
     assert!(
-        pending::record_if_changed(&fixture.pool, "2026-11-06", "第二版", later)
+        pending::record_if_changed(&fixture.pool, PurgeChannel::Webdav, "2026-11-06", "第二版", later)
             .await
             .expect("记账应成功"),
         "内容变了 → 再欠一笔"
     );
-    let row = md_cloud_pending::get(&fixture.pool, "2026-11-06")
+    let row = md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, "2026-11-06")
         .await
         .expect("查询应成功")
         .expect("行应仍在");
@@ -231,7 +232,7 @@ async fn webdav_without_a_secret_never_touches_the_network() {
     );
     /* 编排在取密码处就返回了：既没建云端落点目录，也没排欠账。 */
     assert!(
-        md_cloud_pending::get(&fixture.pool, &outcome.today)
+        md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, &outcome.today)
             .await
             .expect("查询应成功")
             .is_none(),
@@ -268,6 +269,7 @@ fn check_paths_reuses_the_model_validation() {
             local_root: vault.display().to_string(),
             ..Default::default()
         }),
+        ..crate::models::md_sync_config::MdSyncConfig::default()
     };
     assert!(
         md_cloud::check_paths(&config).is_err(),

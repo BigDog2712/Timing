@@ -19,6 +19,7 @@ fn accepts_normal_binding() {
         poll_secs: 900,
         enabled: true,
         bindings: vec![binding(MdSyncKind::Timers, "{date}.md", "#### 事项计时")],
+        ..MdSyncConfig::default()
     };
     assert!(config.validate().is_ok());
 }
@@ -31,7 +32,8 @@ fn rejects_absolute_or_escaping_file() {
             poll_secs: 900,
             enabled: true,
             bindings: vec![binding(MdSyncKind::Timers, file, "#### 事项计时")],
-        };
+        ..MdSyncConfig::default()
+    };
         assert!(config.validate().is_err(), "{file} 应被拒绝");
     }
 }
@@ -44,7 +46,8 @@ fn rejects_heading_without_text() {
             poll_secs: 900,
             enabled: true,
             bindings: vec![binding(MdSyncKind::Timers, "{date}.md", heading)],
-        };
+        ..MdSyncConfig::default()
+    };
         assert!(config.validate().is_err(), "{heading} 应被拒绝");
     }
 }
@@ -57,6 +60,7 @@ fn rejects_duplicate_bindings() {
         poll_secs: 900,
         enabled: true,
         bindings: vec![item.clone(), item],
+        ..MdSyncConfig::default()
     };
     assert!(config.validate().is_err());
 }
@@ -71,6 +75,7 @@ fn rejects_two_landings_for_one_kind() {
             binding(MdSyncKind::Notes, "a.md", "#### 便利贴"),
             binding(MdSyncKind::Notes, "b.md", "#### 便利贴"),
         ],
+        ..MdSyncConfig::default()
     };
     assert!(config.validate().is_err());
 }

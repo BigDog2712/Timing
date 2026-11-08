@@ -36,6 +36,7 @@ fn config(server: &DirServer) -> MdSyncConfig {
             user: "qa@example.com".into(),
             ..Default::default()
         }),
+        ..MdSyncConfig::default()
     }
 }
 

@@ -19,6 +19,7 @@ use chrono::NaiveDate;
 use crate::error::ErrorCode;
 use crate::infra::md_backup as store;
 use crate::infra::md_file;
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending;
@@ -170,7 +171,11 @@ async fn restoring_into_the_cloud_channel_requires_a_resolvable_webdav_root() {
         "拒绝恢复时一个字节都不许写"
     );
     assert!(
-        md_cloud_pending::get(&fixture.pool, &fixture.date.format("%Y-%m-%d").to_string())
+        md_cloud_pending::get(
+        &fixture.pool,
+        PurgeChannel::Webdav,
+        &fixture.date.format("%Y-%m-%d").to_string(),
+    )
             .await
             .expect("查询应成功")
             .is_none(),

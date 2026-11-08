@@ -25,6 +25,8 @@ mod md_backup_restore;
 mod md_backup_target;
 mod md_cloud_autosync;
 mod md_cloud_conflict;
+/* [V0.11.26] 双通路的两条隔离判据：账本不串、轮次不串（PRD R1 / R2）。 */
+mod md_cloud_dual;
 mod md_cloud_folder;
 mod md_cloud_pending;
 mod md_cloud_round;

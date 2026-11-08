@@ -6,6 +6,7 @@
 use sqlx::SqlitePool;
 
 use crate::infra::migrate;
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::{MdSyncBinding, MdSyncKind};
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::models::md_sync_config::MdSyncConfig;
@@ -80,7 +81,7 @@ async fn migration_keeps_existing_rows() {
         )
         .await
         .as_deref(),
-        Some("6")
+        Some("7")
     );
     for (index, table) in TABLES.iter().enumerate() {
         assert_eq!(
@@ -126,15 +127,15 @@ async fn pending_queue_three_states() {
     let today = "2026-11-06";
 
     assert!(
-        repo::get(&pool, today).await.expect("查询应成功").is_none(),
+        repo::get(&pool, PurgeChannel::Webdav, today).await.expect("查询应成功").is_none(),
         "还没改过时不应有行"
     );
 
     // ① 本地内容变了：登记欠账。
-    repo::mark_pending(&pool, today, "hash-a", 1_000)
+    repo::mark_pending(&pool, PurgeChannel::Webdav, today, "hash-a", 1_000)
         .await
         .expect("mark_pending 应成功");
-    let row = repo::get(&pool, today)
+    let row = repo::get(&pool, PurgeChannel::Webdav, today)
         .await
         .expect("查询应成功")
         .expect("登记后应有行");
@@ -143,15 +144,15 @@ async fn pending_queue_three_states() {
     assert_eq!(row.etag, None, "还没传成功过，不该有 etag");
     assert!(row.is_pending());
     assert_eq!(
-        repo::pending_dates(&pool).await.expect("查询应成功"),
+        repo::pending_dates(&pool, PurgeChannel::Webdav).await.expect("查询应成功"),
         vec![today.to_string()]
     );
 
     // ② 又改了一次：`pending_since` 必须还是第一次那个时刻。
-    repo::mark_pending(&pool, today, "hash-b", 5_000)
+    repo::mark_pending(&pool, PurgeChannel::Webdav, today, "hash-b", 5_000)
         .await
         .expect("重复 mark_pending 应成功");
-    let row = repo::get(&pool, today)
+    let row = repo::get(&pool, PurgeChannel::Webdav, today)
         .await
         .expect("查询应成功")
         .expect("行应仍在");
@@ -166,19 +167,19 @@ async fn pending_queue_three_states() {
     );
 
     // 升序：昨天的欠账排在今天前面。
-    repo::mark_pending(&pool, "2026-11-05", "hash-old", 2_000)
+    repo::mark_pending(&pool, PurgeChannel::Webdav, "2026-11-05", "hash-old", 2_000)
         .await
         .expect("mark_pending 应成功");
     assert_eq!(
-        repo::pending_dates(&pool).await.expect("查询应成功"),
+        repo::pending_dates(&pool, PurgeChannel::Webdav).await.expect("查询应成功"),
         vec!["2026-11-05".to_string(), today.to_string()]
     );
 
     // ③ 上传成功：欠账归 0，同时留下 etag 与指纹。
-    repo::mark_synced(&pool, today, Some("W/\"abc\""), "hash-b")
+    repo::mark_synced(&pool, PurgeChannel::Webdav, today, Some("W/\"abc\""), "hash-b")
         .await
         .expect("mark_synced 应成功");
-    let row = repo::get(&pool, today)
+    let row = repo::get(&pool, PurgeChannel::Webdav, today)
         .await
         .expect("查询应成功")
         .expect("行应仍在");
@@ -187,22 +188,22 @@ async fn pending_queue_three_states() {
     assert_eq!(row.last_hash.as_deref(), Some("hash-b"));
     assert!(!row.is_pending());
     assert_eq!(
-        repo::pending_dates(&pool).await.expect("查询应成功"),
+        repo::pending_dates(&pool, PurgeChannel::Webdav).await.expect("查询应成功"),
         vec!["2026-11-05".to_string()],
         "已传的那天要从补传清单里消失"
     );
 
     // 清掉一行后 get 回到 None；list 仍按 date 升序。
-    repo::clear(&pool, "2026-11-05")
+    repo::clear(&pool, PurgeChannel::Webdav, "2026-11-05")
         .await
         .expect("clear 应成功");
     assert!(
-        repo::get(&pool, "2026-11-05")
+        repo::get(&pool, PurgeChannel::Webdav, "2026-11-05")
             .await
             .expect("查询应成功")
             .is_none()
     );
-    let all = repo::list(&pool).await.expect("list 应成功");
+    let all = repo::list(&pool, PurgeChannel::Webdav).await.expect("list 应成功");
     assert_eq!(all.len(), 1);
     assert_eq!(all[0].date, today);
 }
@@ -235,6 +236,7 @@ fn cloud_folder_must_not_share_a_root_with_bindings() {
         poll_secs: 900,
         bindings: vec![binding(MdSyncKind::Timers, r"D:\vault")],
         cloud: Some(folder),
+        ..MdSyncConfig::default()
     };
     let err = config
         .validate()
@@ -249,6 +251,7 @@ fn cloud_folder_must_not_share_a_root_with_bindings() {
         poll_secs: 900,
         bindings: vec![binding(MdSyncKind::Timers, r"D:\vault")],
         cloud: Some(ok),
+        ..MdSyncConfig::default()
     };
     assert!(config.validate().is_ok());
 }
@@ -265,6 +268,7 @@ fn cloud_webdav_rejects_parent_segment_and_bare_host() {
         poll_secs: 900,
         bindings: vec![binding(MdSyncKind::Timers, r"D:\vault")],
         cloud: Some(webdav),
+        ..MdSyncConfig::default()
     };
     assert!(config.validate().is_err(), ".. 段必须被拒绝");
 

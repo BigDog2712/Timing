@@ -210,7 +210,7 @@ async fn h_two_idle_runs_leave_mtime_untouched() {
                 binding(MdSyncKind::Notes, &env.vault, "{date}.md", NOTES_HEADING),
                 binding(MdSyncKind::Todos, &env.vault, "{date}.md", HEADING),
             ],
-        },
+        ..MdSyncConfig::default() },
     )
     .await
     .unwrap();

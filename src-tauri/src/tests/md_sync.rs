@@ -49,6 +49,7 @@ pub(super) async fn env(tag: &str) -> Env {
             binding(MdSyncKind::Notes, &env.vault, "{date}.md", NOTES_HEADING),
             binding(MdSyncKind::Todos, &env.vault, "{date}.md", TODOS_HEADING),
         ],
+        ..MdSyncConfig::default()
     };
     config::save(&env.pool, &seeded).await.unwrap();
     env
@@ -198,6 +199,7 @@ async fn invalid_config_uses_dedicated_error_code() {
             "{date}.md",
             "事项计时",
         )],
+        ..MdSyncConfig::default()
     };
     let code = expect_err(config::save(&env.pool, &config).await);
     assert_eq!(code, ErrorCode::MdSyncConfigInvalid);

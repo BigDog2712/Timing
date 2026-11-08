@@ -41,9 +41,13 @@ pub(crate) async fn seed_past(pool: &sqlx::SqlitePool, root: &Path, date: &str) 
     let path = root.join(format!("{date}.md"));
     let body = format!("#### 事项计时\n\n| {date} 09:00:00 | 读书 | 25 分 |\n");
     fs::write(&path, &body).expect("写往期文件");
-    md_cloud_pending::mark_synced(pool, date, None, &pending::fingerprint(body.as_bytes()))
-        .await
-        .expect("记 pending 行");
+    /* [V0.11.26] 欠账账本按通路各记一份，所以夹具两条通路都记：一份往期文件在真实使用里
+       通常是「两条通路都同步过」，而各条清理链只会清自己那一条（互不串账正是要验的事）。 */
+    for channel in [PurgeChannel::Folder, PurgeChannel::Webdav] {
+        md_cloud_pending::mark_synced(pool, channel, date, None, &pending::fingerprint(body.as_bytes()))
+            .await
+            .expect("记 pending 行");
+    }
     path
 }
 
@@ -98,7 +102,7 @@ async fn folder_round_deletes_past_files_and_keeps_today() {
             "{date} 是 Timing 写过且没被改过的往期，应当被删"
         );
         assert!(
-            md_cloud_pending::get(&fixture.pool, date)
+            md_cloud_pending::get(&fixture.pool, PurgeChannel::Folder, date)
                 .await
                 .expect("查 pending")
                 .is_none(),
@@ -188,7 +192,7 @@ async fn folder_round_skips_a_file_whose_bytes_changed() {
     assert!(!root.join("2019-02-05.md").exists(), "其余照删");
     assert!(!root.join("2019-02-07.md").exists(), "其余照删");
     assert!(
-        md_cloud_pending::get(&fixture.pool, "2019-02-06")
+        md_cloud_pending::get(&fixture.pool, PurgeChannel::Folder, "2019-02-06")
             .await
             .expect("查 pending")
             .is_some(),

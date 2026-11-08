@@ -15,6 +15,7 @@
 use std::fs;
 use std::path::Path;
 
+use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncKind;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::platform::clock::now_ms;
@@ -56,7 +57,7 @@ async fn folder_round_success_records_today_as_pushed() {
     let outcome = md_cloud::round(&fixture.pool).await.expect("round 应成功");
     assert!(outcome.report.errors.is_empty(), "{:?}", outcome.report.errors);
 
-    let status = md_cloud::status(&fixture.pool).await.expect("status 应成功");
+    let status = md_cloud::status(&fixture.pool, PurgeChannel::Folder).await.expect("status 应成功");
     assert!(
         status.today_pushed,
         "本地目录模式写完一轮之后，「今天已上传」不能还是假的"
@@ -68,7 +69,7 @@ async fn folder_round_success_records_today_as_pushed() {
         .expect("算镜像路径应成功");
     let target = cloud_dir.join(rels.first().expect("至少要有一个落点文件"));
     let bytes = fs::read(&target).expect("云端目录里应出现今日文件");
-    let row = md_cloud_pending::get(&fixture.pool, &outcome.today)
+    let row = md_cloud_pending::get(&fixture.pool, PurgeChannel::Folder, &outcome.today)
         .await
         .expect("查询应成功")
         .expect("写成功就该留下这一行");
@@ -102,10 +103,10 @@ async fn folder_round_failure_records_nothing() {
         !outcome.report.errors.is_empty(),
         "建不了目录必须进报告，否则用户以为这一轮成功"
     );
-    let status = md_cloud::status(&fixture.pool).await.expect("status 应成功");
+    let status = md_cloud::status(&fixture.pool, PurgeChannel::Folder).await.expect("status 应成功");
     assert!(!status.today_pushed, "没写出去的一轮不许说「今天已上传」");
     assert!(
-        md_cloud_pending::get(&fixture.pool, &outcome.today)
+        md_cloud_pending::get(&fixture.pool, PurgeChannel::Folder, &outcome.today)
             .await
             .expect("查询应成功")
             .is_none(),
@@ -163,12 +164,12 @@ async fn folder_round_imports_handwritten_md_back_into_sql() {
     );
 
     /* ② 设置页那栏不是「今天还没上传」：`md_cloud_pending` 记了指纹 */
-    let status = md_cloud::status(&fixture.pool).await.expect("status 应成功");
+    let status = md_cloud::status(&fixture.pool, PurgeChannel::Folder).await.expect("status 应成功");
     assert!(
         status.today_pushed,
         "比对完并写回之后，「今天已上传」不能还是假的"
     );
-    let row = md_cloud_pending::get(&fixture.pool, &outcome.today)
+    let row = md_cloud_pending::get(&fixture.pool, PurgeChannel::Folder, &outcome.today)
         .await
         .expect("查询应成功")
         .expect("成功的一轮必须留下指纹行");
@@ -222,13 +223,13 @@ async fn folder_round_partial_failure_records_nothing() {
         "第一个落点应已写出来——否则这条用例证不到 `wrote_ok`"
     );
 
-    let status = md_cloud::status(&fixture.pool).await.expect("status 应成功");
+    let status = md_cloud::status(&fixture.pool, PurgeChannel::Folder).await.expect("status 应成功");
     assert!(
         !status.today_pushed,
         "有落点没写出去的一轮不许说「今天已上传」"
     );
     assert!(
-        md_cloud_pending::get(&fixture.pool, &outcome.today)
+        md_cloud_pending::get(&fixture.pool, PurgeChannel::Folder, &outcome.today)
             .await
             .expect("查询应成功")
             .is_none(),

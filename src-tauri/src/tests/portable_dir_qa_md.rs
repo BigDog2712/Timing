@@ -96,6 +96,7 @@ async fn d13_saved_root_and_heading_survive_only_missing_kind_is_appended() {
                 heading: "#### 便利贴".into(),
             },
         ],
+        ..MdSyncConfig::default()
     };
     let raw = serde_json::to_string(&old).expect("序列化");
     settings::set_value(&pool, md_config::CONFIG_KEY, &raw, 1)

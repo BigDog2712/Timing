@@ -10,6 +10,7 @@
 
 use crate::models::md_sync::{MdSyncBinding, MdSyncKind};
 use crate::models::md_sync_auto::{CloudSchedule, MdCloudAuto};
+use crate::models::md_sync_channel;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::models::md_sync_config::MdSyncConfig;
 use crate::services::md_cloud::tier::{decide, mobile_rounds, plan_of, SyncPlan, TierState};
@@ -36,12 +37,17 @@ fn webdav() -> MdSyncCloud {
     }
 }
 
+/// 老形状（`cloud` 单键）→ 新双通路：判据全体只看 `cloud_webdav`，
+/// 因此这里用生产同款 `split_legacy` 折算，避免测试自带一份私有映射。
 fn config(enabled: bool, cloud: Option<MdSyncCloud>) -> MdSyncConfig {
+    let (folder, webdav) = md_sync_channel::split_legacy(cloud.as_ref());
     MdSyncConfig {
         enabled,
         poll_secs: 900,
         bindings: vec![binding()],
-        cloud,
+        cloud_folder: folder,
+        cloud_webdav: webdav,
+        ..MdSyncConfig::default()
     }
 }
 

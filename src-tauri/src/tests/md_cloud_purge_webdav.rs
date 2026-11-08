@@ -84,8 +84,10 @@ async fn the_two_channels_never_share_accounting() {
     let _ = fs::remove_dir_all(&root);
 }
 
-/// 块④ 只读**当前生效通道**：切到 WebDAV 时，folder 的暂停位不该显示成「已暂停」。
-
+/// [V0.11.26] 块④/⑤ **各读自己那条通路**：folder 的暂停位不会串到 webdav 那一栏。
+///
+/// 旧实现只有「当前生效通道」一份 state；拆分后两条通路各有各的 `state` 键，
+/// `status(pool, channel)` 必须只看被问的那一条。
 #[tokio::test]
 async fn status_reports_only_the_active_channel() {
     let fixture = env("purge-status").await;
@@ -111,19 +113,12 @@ async fn status_reports_only_the_active_channel() {
     });
     config::save(&fixture.pool, &stored).await.expect("存配置");
 
-    let status = md_cloud::status(&fixture.pool).await.expect("status");
-    assert!(!status.purge.paused, "生效通道是 webdav，folder 的暂停位不该露出来");
+    let status = md_cloud::status(&fixture.pool, PurgeChannel::Webdav).await.expect("status");
+    assert!(!status.purge.paused, "webdav 那一栏不该读出 folder 的暂停位");
     assert_eq!(status.purge.failed, 0);
 
-    /* 切回 folder，同一份 state 就该看见了。 */
-    stored.cloud = Some(MdSyncCloud {
-        enabled: true,
-        mode: CloudMode::LocalFolder,
-        local_root: root.display().to_string(),
-        ..Default::default()
-    });
-    config::save(&fixture.pool, &stored).await.expect("存配置");
-    let status = md_cloud::status(&fixture.pool).await.expect("status");
+    /* 问 folder 那条，同一份 state 就该看见了。 */
+    let status = md_cloud::status(&fixture.pool, PurgeChannel::Folder).await.expect("status");
     assert!(status.purge.paused);
     assert_eq!(status.purge.failed, 2);
 }
@@ -159,7 +154,7 @@ async fn webdav_purge_deletes_the_date_file_by_its_exact_name() {
         );
         assert!(!request.contains(".."), "路径里不许出现 `..`");
         assert!(
-            md_cloud_pending::get(&fixture.pool, date)
+            md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, date)
                 .await
                 .expect("查 pending")
                 .is_none(),

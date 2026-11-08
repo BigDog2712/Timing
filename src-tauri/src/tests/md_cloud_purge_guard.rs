@@ -176,7 +176,7 @@ async fn folder_round_refuses_a_directory_that_overlaps_a_binding() {
         "红字逐字进 state"
     );
     /* 块④ 的红字位是 `status.lastError`：`MdCloudPurgeStatus` 不在线缆里带这句话。 */
-    let status = md_cloud::status(&fixture.pool).await.expect("status");
+    let status = md_cloud::status(&fixture.pool, PurgeChannel::Folder).await.expect("status");
     assert_eq!(status.last_error.as_deref(), Some(OVERLAP_TEXT));
     let _ = fs::remove_dir_all(&root);
 }
