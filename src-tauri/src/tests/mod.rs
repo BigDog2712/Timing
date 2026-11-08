@@ -34,6 +34,9 @@ mod md_cloud_purge;
 mod md_cloud_purge_batch;
 mod md_cloud_purge_guard;
 mod md_cloud_purge_webdav;
+/* [V0.11.19 收口] 闸⑥ 的**接线**判据：删的是主人的文件（永久删除），
+   所以「递进去的留底函数是 `save_checked` 本身」必须有机验，不能只靠注入式单测。 */
+mod md_cloud_purge_wiring;
 /* [QA 独立验收 V0.11.19] T04 变更 A：LocalFolder 半场（I9a/I9b/I9c + 闸③父子 + 闸⑤a +
    分通道暂停）与 WebDAV 半场（水位停在失败项之前 + 403/429 同 401 整批停）。
    两份都在验收方手里重写，不复用工程师的机验结论。 */
