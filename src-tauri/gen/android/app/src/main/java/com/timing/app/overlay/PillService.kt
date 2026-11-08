@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
+import android.util.Log
 import android.view.Choreographer
 import android.view.WindowManager
 import com.timing.app.native.Prefs
@@ -33,6 +34,29 @@ class PillService : Service() {
     companion object {
         /** 小圆点形态下，点一下展开成条，看几秒再收回（老版本同一个数）。 */
         private const val EXPAND_MS = 3500L
+
+        /** logcat 标签（与 `TimerReader` 同一个）：`adb logcat -s TimingPill`。 */
+        private const val TAG = "TimingPill"
+
+        /**
+         * 事件名。**必须**与前端 `hooks/usePillAction.ts` 的 `PILL_TOGGLE_EVENT` 一致——
+         * 两边各写一份字符串，改一处忘另一处的表现是「点了没反应」，而且两边都不报错。
+         */
+        internal const val EVENT_TOGGLE = "pill:toggle"
+
+        /**
+         * 「有人按了一下」的投递口（[V0.11.22]）。
+         *
+         * 由 `TimingNativePlugin.onLoad()` 赋值、`onDestroy()` 置空。返回 `true` = 事件真的
+         * 投出去了（有 JS 在听）；`false` / `null` = 没人在听，调用方退回「打开主界面」。
+         *
+         * 为什么用静态量而不是让 Service 持有 Activity：Service 的生命周期比 Activity 长，
+         * 直接持有会泄漏；这里只握一个由插件赋值的函数引用，插件自己在 `onDestroy` 里清掉。
+         */
+        internal var bridge: ((String) -> Boolean)? = null
+
+        /** 库还没建出来 / 打开失败时的重试间隔。 */
+        private const val REOPEN_MS = 5_000L
 
         /** 设置里改了形态 / 归位：让正在跑的服务立刻重排，不用等下一帧。 */
         private const val ACTION_REFRESH = "com.timing.app.action.OVERLAY_REFRESH"
@@ -65,6 +89,7 @@ class PillService : Service() {
     private lateinit var wm: WindowManager
     private lateinit var nm: NotificationManager
     private var reader: TimerReader? = null
+    private var lastOpenTryMs = 0L
 
     private var pill: PillView? = null
     private var lp: WindowManager.LayoutParams? = null
@@ -83,7 +108,7 @@ class PillService : Service() {
         wm = getSystemService(WindowManager::class.java)
         nm = getSystemService(NotificationManager::class.java)
         runCatching { OverlayNoti.ensureChannel(nm) }
-        // 库可能还没建（首启），那就一直是待机——不要因此让服务起不来
+        // 库可能还没建（首启），那就先待机——不要因此让服务起不来
         reader = TimerReader.open(this)
         rotation = RotationWatcher { main.post { reflow() } }.also { it.start(this) }
     }
@@ -114,7 +139,7 @@ class PillService : Service() {
      * 部分 ROM 上比两参版本更稳；低版本仍走两参（三参版本是 API 29 才有的）。
      */
     private fun enterForeground(): Boolean = runCatching {
-        val snap = reader?.read() ?: TimerReader.Snap.IDLE
+        val snap = ensureReader()?.read() ?: TimerReader.Snap.IDLE
         val notification = OverlayNoti.build(this, snap)
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(
@@ -147,6 +172,29 @@ class PillService : Service() {
         lp = null
         reader?.close()
         reader = null
+    }
+
+    /**
+     * 拿一个能用的读库连接（[V0.11.22]）。
+     *
+     * v0.11.21 及之前 `reader` 只在 `onCreate` 开一次：库那时还没建出来（首启）、或
+     * 打开失败（WAL + 只读的老问题）就**永久待机**，表现正是主人报的那一句
+     * 「主界面唤起计时，悬浮窗无法计时」。现在改成失败后每 5 秒重试一次——
+     * 重试本身很便宜（一次 open），但它是这条链路唯一的自愈点。
+     */
+    private fun ensureReader(): TimerReader? {
+        reader?.let { return it }
+        val now = System.currentTimeMillis()
+        if (now - lastOpenTryMs < REOPEN_MS) return null
+        lastOpenTryMs = now
+        val opened = TimerReader.open(this)
+        if (opened == null) {
+            Log.w(TAG, "timing.db 还打不开（服务启动时可能还没建库），5 秒后重试")
+            return null
+        }
+        reader = opened
+        lastW = -1 // 库刚换上：触发一次重新测量，否则宽度可能停在待机那一版
+        return opened
     }
 
     // ------------------------------------------------------------ 窗口
@@ -197,7 +245,7 @@ class PillService : Service() {
 
     private fun render() {
         val view = pill ?: return
-        val snap = reader?.read() ?: TimerReader.Snap.IDLE
+        val snap = ensureReader()?.read() ?: TimerReader.Snap.IDLE
 
         // 从「没在跑」变成「在跑」：圆点先展开几秒把时长亮出来。
         // 老版本靠「点小圆点开始计时」来触发这一步；这版开始动作在 Rust，所以改成
@@ -262,16 +310,29 @@ class PillService : Service() {
     // ------------------------------------------------------------ 手势动作
 
     /**
-     * 短按。
+     * 短按（[V0.11.22] 恢复老版本的三档手感，但状态机仍在 Rust）。
      *
-     * 老版本三档：待机 → 开始计时；圆点未展开 → 展开；其余 → 暂停/继续。
-     * 这版不能改计时状态，所以退化成两档：**圆点未展开先展开看时长，其余一律回主界面**。
-     * 也就是说「先点一下看看到底多久了，再点一下进去操作」，不会误触暂停。
+     * ```text
+     * 待机                  → 开始计时
+     * 圆点形态 + 未展开      → 展开看时长（3.5 秒后收回），不动状态
+     * 其余（药丸 / 已展开）  → 暂停 / 继续
+     * 长按                  → 回主界面（PillDrag 回调）
+     * ```
+     *
+     * 「能操作」不等于「在这里改状态」：本类一个字节都不写库，只把「有人按了一下」交给
+     * `TimingNativePlugin.trigger`，由前端调 `togglePause()` 走 Rust 那一份状态机。
+     * 事件投不出去（WebView 已销毁 / 前端没挂监听）就退回打开主界面——宁可多一步，
+     * 也不做「点了没反应」。
      */
     private fun onTap() {
-        if (Prefs.overlayStyle(this) == Prefs.STYLE_DOT && !expanded) {
+        val snap = ensureReader()?.read() ?: TimerReader.Snap.IDLE
+        /* 圆点未展开、且确实有一场计时在：先给用户看时长。这是唯一「不吃掉这一按」的分支。 */
+        if (snap.active && Prefs.overlayStyle(this) == Prefs.STYLE_DOT && !expanded) {
             expandTemporarily()
-        } else {
+            return
+        }
+        if (bridge?.invoke(EVENT_TOGGLE) != true) {
+            Log.w(TAG, "没有前端在听 $EVENT_TOGGLE：退回打开主界面")
             openApp()
         }
     }

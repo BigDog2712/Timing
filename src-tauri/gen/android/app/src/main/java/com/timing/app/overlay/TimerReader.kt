@@ -2,6 +2,7 @@ package com.timing.app.overlay
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
+import android.util.Log
 import java.io.Closeable
 import java.io.File
 
@@ -67,7 +68,11 @@ internal class TimerReader private constructor(private val db: SQLiteDatabase) :
         }
     }
 
-    fun read(now: Long = System.currentTimeMillis()): Snap = runCatching {
+    /* [V0.11.22] 失败必须留痕。
+     v0.11.21 及之前这里是 `runCatching{…}.getOrDefault(Snap.IDLE)`：SQL 一旦因为列缺失 /
+     库被锁 / WAL 没建好而抛异常，悬浮条就**永久待机**，而 logcat 里一个字都没有——
+     用户看到的是「主界面在计时、悬浮窗不动」，排查时没有任何线索。 */
+    fun read(now: Long = System.currentTimeMillis()): Snap = try {
         db.rawQuery(
             "SELECT i.name, r.started_at, r.accumulated_sec, r.running_since, " +
                 "r.mode, r.target_sec " +
@@ -89,21 +94,40 @@ internal class TimerReader private constructor(private val db: SQLiteDatabase) :
                 runningSince = runningSince,
             )
         }
-    }.getOrDefault(Snap.IDLE)
+    } catch (err: Exception) {
+        Log.w(TAG, "read timing.db failed: ${err.message}", err)
+        Snap.IDLE
+    }
 
     override fun close() {
         runCatching { db.close() }
     }
 
     companion object {
-        /** 打开只读连接；库还不存在（首启 / 还没建表）时返回 null，调用方按待机处理。 */
+        /** logcat 标签：`adb logcat -s TimingPill` 一条命令就能看到悬浮条的全部现场。 */
+        private const val TAG = "TimingPill"
+
+        /**
+         * 打开连接；库还不存在（首启 / 还没建表）时返回 null，调用方按待机处理。
+         *
+         * [V0.11.22] 先试**读写**再退只读：WAL 模式的库用 `OPEN_READONLY` 打开时，SQLite 要
+         * 能建 / 写 `-shm`，某些 ROM 或某些时刻会直接抛 `unable to open database file`。
+         * 本进程从不写这个库，读写打开只是为了少一条被拒的理由。
+         *
+         * 两次都失败也**不缓存这个失败**：`PillService` 会退避重试（库可能是首启才建出来的）。
+         */
         fun open(ctx: Context): TimerReader? {
             val file = File(ctx.dataDir, "timing.db")
             if (!file.exists()) return null
-            val db = runCatching {
-                SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READONLY)
-            }.getOrNull() ?: return null
-            return TimerReader(db)
+            for (flags in intArrayOf(SQLiteDatabase.OPEN_READWRITE, SQLiteDatabase.OPEN_READONLY)) {
+                val db = runCatching {
+                    SQLiteDatabase.openDatabase(file.path, null, flags)
+                }.onFailure { err ->
+                    Log.w(TAG, "open timing.db failed (flags=$flags): ${err.message}", err)
+                }.getOrNull()
+                if (db != null) return TimerReader(db)
+            }
+            return null
         }
 
         private fun runningDelta(runningSince: Long?, now: Long): Long =

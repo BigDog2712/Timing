@@ -2,6 +2,56 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.22 — 手机端收敛：只走云端 · 备份能恢复 · 悬浮窗能计时
+
+主人三句话，三件事：「手机端无法使用云端的本地同步，此功能去除，仅保留云端同步」/
+「数据管理的恢复功能可做」/「主界面与悬浮窗计时不同步，主界面唤起计时，悬浮窗无法计时」。
+
+### 1. 手机端只剩云端一条同步通路
+
+- `app/md_sync_mobile.rs::sync_once` 删掉 SAF 三步（`safStatus → mirrorIn → run_in → mirrorOut`）
+  与只为它存在的 `mirror_root()`。云端不可用 → `MD_SYNC_CONFIG_INVALID` +
+  「手机端只同步云端：先在「设置 → 数据管理」里填好服务地址、账号和应用密码，再点保存」。
+- `jobs/md_sync_mobile`：`Legacy` 分支**不再跑轮**（v0.11.21 前它按 `pollSecs` 跑 SAF），
+  只 60 秒醒一次等配置变化。判据是纯函数 `services::md_cloud::tier::mobile_rounds(&plan)`。
+- `commands/md_sync_cmd_mobile::md_sync_run`：云端不可用时不再回落 SAF；可用时仍走
+  `round_manual`（手动 = 现在就再试一次）。
+- 界面：`SyncPane` 移除「日记目录 / 更换 / 三个事项绑定 / 只用本地·本地+云端」，
+  只留云端一块 + 立即同步 + 备份与恢复；`SyncCloudPane` 去掉通道二选一，开关收到块首，
+  **一次写 `config.enabled` 与 `cloud.enabled` 两处**（两个闸并存时「关掉」到底关哪个解释不清）。
+- 后端 SAF 能力保留（`md_saf_status` / `md_sync_open` 仍在 78 条契约面上），
+  下线的是入口与调度，不是代码。
+
+### 2. 手机端备份与恢复（真实现，替换掉「请在电脑上操作」）
+
+- `md_backup_list` → `services::md_backup::items()`；`md_backup_restore` → `restore()`
+  + `md_sync::dirty::mark("record")`（与桌面同口径）。
+- 归属判据 **`services::md_backup::restorable_on_mobile`**：手机只有 WebDAV 一个落点，
+  只放行 `webdav__`；`obsidian__` / `folder` / 无前缀老备份一律拒绝并说清「去电脑上恢复」。
+  放 `services` 而非 `commands`（后者 `#[cfg(mobile)]`，桌面用例够不着——v0.11.21 的同一条教训）。
+- 前端 `SyncBackupPane`：列表（日期·归属·时间·大小）+ **两步确认**（首点只展开确认条）+
+  结果句「已恢复 …：导入 N 条记录」；失败给原文（`rawIpcText`）。
+- `md_backup_open` 仍是桩，但换成自己的话（私有目录里的文件交给系统打开没有意义）。
+
+### 3. 悬浮窗能操作计时，且不再「一直待机」
+
+- `PillService.onTap` 恢复老版本三档手感：待机 → 开始；圆点未展开（且确有计时）→ 展开看时长；
+  其余 → 暂停 / 继续。长按仍是回主界面。
+- **状态机仍只有一份**：Kotlin 不写库，只 `Plugin.trigger("pill:toggle")` 交出去，
+  前端 `hooks/usePillAction`（`addPluginListener('timing-native', …)`）收到后调
+  `togglePause()`。投递前 `hasListener` 探测，没人听就退回「打开主界面」。
+- 读库自愈：`TimerReader.open` 先试 `OPEN_READWRITE` 再退只读；`PillService.ensureReader()`
+  在 reader 为空时每 5 秒重开一次；读失败不再被 `runCatching` 吞掉，异常原文进
+  logcat（`adb logcat -s TimingPill`）。**v0.11.21 之前吞掉它 → 永久待机，且没有一行日志。**
+
+### 验证
+
+`npm run check` EXIT 0（契约 78/17/11、size 631 文件 ≤300、version 0.11.22 六处、layers 8、
+brand 0、eslint 0）；`npm test` 70 文件 **564** 用例（基线 67/547）；`cargo test --lib`
+**669/0**（基线 661）；`cargo check --target aarch64-linux-android` 0 warning。
+变异自证：`mobile_rounds` 改成恒 `true` → `mobile_does_not_run_legacy_plan` 红（8 passed / 1 failed），
+按最小单元还原后与原文件逐字一致。
+
 ## 0.11.21 — 手机端云端同步：一条能跑的路，补上那道门
 
 后端早就通了：`app/md_sync_mobile.rs::sync_once` 先判云端、再判 SAF，`md_sync_get` /

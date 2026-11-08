@@ -13,6 +13,7 @@
 import { useCallback, useEffect } from 'react';
 import { useAppBootstrap } from '../../hooks/useAppBootstrap';
 import { useMobileBackSheet } from '../../hooks/useMobileBackSheet';
+import { usePillAction } from '../../hooks/usePillAction';
 import {
   AlertIcon,
   ClockIcon,
@@ -99,6 +100,9 @@ function SheetHost({ sheet }: { sheet: MobileSheet }) {
 export function MobileShell() {
   /* 与桌面主窗同一套引导：事件订阅 + 首帧数据 + 崩溃恢复检测（`uiStore.recover`） */
   useAppBootstrap();
+  /* [V0.11.22] 悬浮窗那一按的接收端。挂在外壳上而不是某一页：它必须随时在听，
+     用户可能停在任何一个 Tab 上点悬浮窗。 */
+  usePillAction();
 
   const tab = useMobileUiStore((s) => s.tab);
   const setTab = useMobileUiStore((s) => s.setTab);

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.webkit.WebView
 import androidx.activity.result.ActivityResult
 import androidx.appcompat.app.AppCompatActivity
 import app.tauri.annotation.ActivityCallback
@@ -30,7 +31,8 @@ private const val UNAUTHORIZED =
  *
  * 两类能力：
  * 1. **SAF 目录**：选目录、把当天文件镜像进沙箱、把改动写回。合并规则在 Rust，这里只搬字节。
- * 2. **悬浮条**：前台服务 + OVERLAY 窗口，只读数据库显示，点击回主界面。
+ * 2. **悬浮条**：前台服务 + OVERLAY 窗口。显示只读数据库；短按把「开始 / 暂停 / 继续」
+ *    交给前端走同一套状态机（[V0.11.22]），长按回主界面。
  *
  * 与 Rust 的对应关系：Rust 侧 `infra/native_bridge.rs` 用 `run_mobile_plugin_async`
  * 调这里的 `@Command`；类名在 `lib.rs` 的 `register_android_plugin("com.timing.app",
@@ -54,6 +56,31 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
 
     /** `mirrorIn` 时的原文，`mirrorOut` 靠它判断「Rust 到底改没改」。 */
     private val original = HashMap<String, String>()
+
+    /**
+     * 悬浮条那一按的投递口（[V0.11.22]）。
+     *
+     * 为什么用 `trigger` 而不是 `emit`：`Plugin.trigger` 只投给**本案**通过
+     * `plugin:timing-native|registerListener` 注册的 JS channel（前端用
+     * `addPluginListener('timing-native', 'pill:toggle', …)`）。Rust 的 `app.emit` 是另一条
+     * 路，这里够不着它——用错了的表现是「回调永远不响，而且两边都不报错」。
+     *
+     * `hasListener` 是能力探测：WebView 已被销毁时问不到人，就让 Service 退回「打开主界面」。
+     */
+    override fun load(webView: WebView) {
+        PillService.bridge = { event ->
+            if (hasListener(event)) {
+                trigger(event, JSObject())
+                true
+            } else {
+                false
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        PillService.bridge = null
+    }
 
     // ------------------------------------------------------------ SAF
 

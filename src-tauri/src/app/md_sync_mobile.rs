@@ -1,35 +1,36 @@
-//! 手机端一轮同步的编排：镜像进 → Rust 合并 → 写回 vault。
+//! 手机端一轮同步的编排。
 //!
-//! 放在 `app` 层而不是 `services`：`services` 至今不碰任何 Tauri 类型（能被单测直接
-//! 调用），而这一步必须同时用到 `AppHandle`（数据目录）与原生桥。`commands` 与 `jobs`
-//! 都调这里，避免两处各写一遍三步流程、慢慢走偏。
+//! ## [V0.11.22] 只剩云端一条路
 //!
-//! 三步的理由见 `services::md_sync::mirror`：Android 的落点是 `content://` 树 URI，
-//! `std::fs` 不认它，所以只把当天那几个文件搬进沙箱，合并逻辑原样复用桌面那一份。
+//! v0.11.21 之前这里是三段式：云端可用 → 云端那一轮；否则 SAF 三步
+//! （`mirrorIn` → Rust 合并 → `mirrorOut`）。主人这一轮把后者下线了
+//! （原话：「手机端无法使用云端的本地同步，此功能去除，仅保留云端同步」），
+//! 所以现在的入口判定只有两条：
+//!
+//! ```text
+//! ① config::load（+ 一行配置日志，仍是手机上唯一的「用户配了什么」现场）
+//! ② 云端可用（enabled && is_usable）→ md_cloud::round，返回它的报告
+//! ③ 否则 → 明确报错，让用户去填云端
+//! ```
+//!
+//! ③ 不再回落 SAF：回落会让「云端填了一半」表现为「同步成功但没传上去」，
+//! 而 SAF 那条路的落点在手机上已经没有入口可配，回落过去只会拿到「未授权」。
+//!
+//! 留下的两个原生能力：
+//! - `saf_status`：`md_saf_status` 命令还在契约面上，界面虽然不再调用它，命令要能自报状态；
+//! - `open_file`：「在 Obsidian 里打开今天那份」（`md_sync_open`）。
+//!
+//! 原 SAF 三步的编排与 `mirror_root()` 已删除。`services::md_sync::mirror` 本身保留——
+//! 它是纯服务层（可单测），删掉会连带改 `md_saf_*` 两条命令与既有用例，
+//! 与本轮要解决的问题无关。
 
 use tauri::{AppHandle, Manager};
 
 use crate::error::{AppError, AppResult};
 use crate::infra::native_bridge::NativeBridge;
 use crate::models::md_sync::MdSyncReport;
-use crate::models::native::{MirrorOutResult, MirrorResult, SafStatus};
-use crate::services::md_sync::mirror;
+use crate::models::native::SafStatus;
 use crate::state::AppState;
-
-/// 与 `commands::md_sync_cmd_mobile` 及 Kotlin 侧 `MIRROR_DIR` 必须一致。
-const MIRROR_DIR: &str = "md-mirror";
-
-/// 镜像目录绝对路径，顺便建出来。`app_data_dir` 在 Android 就是应用沙箱
-/// （`/data/user/0/com.timing.app`），与 `timing.db` 同级。
-fn mirror_root(app: &AppHandle) -> AppResult<String> {
-    let base = app
-        .path()
-        .app_data_dir()
-        .map_err(AppError::io)?
-        .join(MIRROR_DIR);
-    std::fs::create_dir_all(&base).map_err(AppError::io)?;
-    Ok(base.to_string_lossy().into_owned())
-}
 
 fn bridge(app: &AppHandle) -> AppResult<tauri::State<'_, NativeBridge<tauri::Wry>>> {
     app.try_state::<NativeBridge<tauri::Wry>>()
@@ -37,6 +38,9 @@ fn bridge(app: &AppHandle) -> AppResult<tauri::State<'_, NativeBridge<tauri::Wry
 }
 
 /// 当前 SAF 授权状态。
+///
+/// [V0.11.22] 界面已无入口，但 `md_saf_status` 命令仍在契约面上（78 条之一），
+/// 这条能力必须还能回答「授权还在不在」——排查「为什么手机不同步了」时它是第一句话。
 pub async fn saf_status(app: &AppHandle) -> AppResult<SafStatus> {
     bridge(app)?
         .call("safStatus", serde_json::json!({}))
@@ -46,7 +50,7 @@ pub async fn saf_status(app: &AppHandle) -> AppResult<SafStatus> {
 /// 用系统里装着的那款编辑器打开指定文件（通常是 Obsidian）。
 ///
 /// 手机上「打开文件」不是应用内预览：vault 在共享存储里，交给 `ACTION_VIEW`
-/// 让用户自己装的编辑器接管，也顺带让「在 Obsidian 里改完 → 回来同步」这条链路顺。
+/// 让用户自己装的编辑器接管。
 pub async fn open_file(app: &AppHandle, rel: &str) -> AppResult<()> {
     bridge(app)?
         .call::<serde_json::Value>("safOpen", serde_json::json!({ "rel": rel }))
@@ -54,40 +58,28 @@ pub async fn open_file(app: &AppHandle, rel: &str) -> AppResult<()> {
         .map(|_| ())
 }
 
-/// 跑一轮完整同步。落点为空（用户全关了）或没选目录时返回错误，调用方按需展示。
+/// 跑一轮完整同步：**只有云端那一轮**（见文件头 §① ② ③）。
 ///
-/// ## 三段式，顺序是硬约定（[V0.11.13] 修正）
-///
-/// ```text
-/// ① config::load（+ 一行配置日志）
-/// ② 云端可用（enabled && is_usable）→ md_cloud::round，全程不碰 SAF、不碰镜像
-/// ③ 否则 → SAF 授权检查 → mirrorIn → mirror::run_in → mirrorOut
-/// ```
-///
-/// ② 必须排在 ③ 的 SAF 检查**之前**：手机上「只配 WebDAV、不选日记目录」是合法用法
-/// （云端模式不需要 Obsidian，手机只当另一个 SQL 端点）。原先云端分派挂在函数末尾，
-/// 于是这类用户永远先被「同步目录未授权」拦住——与任务书 §4.7 / 设计 §2.2 正面冲突。
-/// 反过来，③ 的行为**一个字都没改**：非云端用户仍然先要授权。
-///
-/// 两处「先自查再动手」（只在 ③ 里）：
-/// - 目录授权：`mirrorIn` 里才失败的话，错误会经原生桥折成一句 `IO_ERROR`，用户在设置页
-///   看到的只有「系统调用失败」——先问一句 `safStatus`，就能给「去选目录」这种能照做的提示；
-/// - 镜像根：**由 Rust 算好绝对路径传给 Kotlin**。两边各自推导（Rust `app_data_dir` vs
-///   Kotlin `activity.dataDir`）在 Android 上恰好相同，但那是巧合而不是约定；一旦某个
-///   版本拼法变了，表现是「同步永远说没改动」，比报错难查得多。
+/// 云端不可用时给的是 `MD_SYNC_CONFIG_INVALID` + 能照做的一句话，不是 `IO_ERROR`：
+/// 「没填完」是配置问题，润色成「系统调用失败」只会让人反复点。
 pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
     let pool = app.state::<AppState>().pool.clone();
 
-    /* ① 配置。必须先读：云端分派与镜像路径都要它，而且这一行日志是手机上唯一的
-    「用户到底配了什么」的现场。 */
+    /* ① 配置。这一行日志是手机上唯一的「用户到底配了什么」现场：
+    `enabled` 与云端开关同值（前端一次写两处），三个绑定仍是云端那轮的写入口。 */
     let config = crate::services::md_sync::config::load(&pool).await?;
-    /* [V0.11.12] 总开关与各落点的开关状态必须先落一行日志。
-    `mirror_paths` 只看落点 `enabled`、不看总开关，而 `sync_all` 见到总开关关闭会
-    **静默返回**——于是手机上表现为「镜像搬了文件、合并一行没跑、写回 0 个」，
-    界面上还是一次成功。这一行把这两种情况分开。 */
     crate::log_info!(
-        "md sync config: enabled={} bindings=[{}]",
+        "md sync config: enabled={} cloud={} bindings=[{}]",
         config.enabled,
+        match config.cloud.as_ref() {
+            Some(cloud) => format!(
+                "enabled={} mode={:?} usable={}",
+                cloud.enabled,
+                cloud.mode,
+                cloud.is_usable()
+            ),
+            None => "<无>".to_string(),
+        },
         config
             .bindings
             .iter()
@@ -102,65 +94,14 @@ pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
             .join(" | ")
     );
 
-    /* ② 云端通道：直接交回云端那轮的完整报告，**不叠加**本地镜像那一轮的计数——
-    云端模式里 Obsidian 那三步不该发生（落点是 `content://`，镜像搬的是用户 vault，
-    与云端那份无关）。判据只在这里判一次，服务层不猜手机想不想连云端。 */
-    if config
-        .cloud
-        .as_ref()
-        .is_some_and(|cloud| cloud.enabled && cloud.is_usable())
-    {
+    /* ② 云端通道：直接交回云端那轮的完整报告，**不叠加**任何本地计数。 */
+    if crate::services::md_cloud::usable(&config).is_some() {
         let outcome = crate::services::md_cloud::round(&pool).await?;
         return Ok(outcome.report);
     }
 
-    /* ③ 非云端：先问授权，再好给「去选目录」这种能照做的提示。 */
-    if !saf_status(app).await?.granted {
-        /* 措辞里要带「未授权」：`jobs::md_sync_mobile` 靠这个词把「还没配好」和真故障
-           分开，配好之前每 15 分钟一条 warn 会把日志淹掉。 */
-        return Err(AppError::md_sync_config_invalid(
-            "同步目录未授权：点「日记目录 → 选择」给一次授权，程序会记住这个目录",
-        ));
-    }
-
-    let rels = mirror::mirror_paths(&pool).await?;
-    if rels.is_empty() {
-        return Err(AppError::md_sync_config_invalid("没有启用任何落点"));
-    }
-
-    let root = mirror_root(app)?;
-    let native = bridge(app)?;
-
-    /* 1. vault → 镜像。不存在的路径原生侧直接跳过（vault 里还没有今天的日记）。 */
-    let pulled: MirrorResult = native
-        .call("mirrorIn", serde_json::json!({ "root": &root, "paths": &rels }))
-        .await?;
-    /* [V0.11.11] 真机排查的第一现场：`files` 为空 = vault 里按这个相对路径找不到文件，
-    后面那轮合并只会「按空库渲染」，界面却照样说同步成功。 */
-    crate::log_info!(
-        "md mirror in: 请求 {} 个路径，取到 {} 个 [{}]，errors={:?}",
-        rels.len(),
-        pulled.files.len(),
-        pulled.files.join(", "),
-        pulled.errors
-    );
-
-    /* 2. 与桌面同一套合并。 */
-    let mut report = mirror::run_in(&pool, &root).await?;
-
-    /* 3. 镜像 → vault。全部路径都交回去，由原生侧按内容差异决定写不写；
-       新增文件（今天第一次写日记）也在这一步被创建。 */
-    let pushed: MirrorOutResult = native
-        .call("mirrorOut", serde_json::json!({ "root": &root, "paths": &rels }))
-        .await?;
-    crate::log_info!(
-        "md mirror out: 写回 {} 个文件，errors={:?}",
-        pushed.written,
-        pushed.errors
-    );
-
-    /* 单个文件的读写失败不致命，但要并进报告——否则用户只看到「没有需要同步的改动」。 */
-    report.errors.extend(pulled.errors);
-    report.errors.extend(pushed.errors);
-    Ok(report)
+    /* ③ 没有云端 = 没有落点。措辞里必须带「云端」二字：用户照着这句话就知道去哪一页。 */
+    Err(AppError::md_sync_config_invalid(
+        "手机端只同步云端：先在「设置 → 数据管理」里填好服务地址、账号和应用密码，再点保存",
+    ))
 }

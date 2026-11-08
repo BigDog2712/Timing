@@ -4,7 +4,7 @@
  * 这一页是「一条能跑的路没有门」的补门：`sync_once` 早就能跑云端那一轮，手机上却
  * 没有任何地方能填地址、密码、三档。所以判据分两类，缺一类就等于没做：
  *
- * - **填得进去**：三档切档保留分钟数、切通道保留已填字段；
+ * - **填得进去**：三档切档保留分钟数、开关一次写两处且保留已填字段；
  * - **填不对会说话**：没填全只说那一句、密码三分语义、测试连接红在哪一关。
  *
  * 组件是纯 props（不碰 `ipc` / `mobileNative`），所以这里不需要 mock 传输层——
@@ -120,12 +120,19 @@ describe('手机端云端通道', () => {
     expect(onSave.mock.calls[0][1]).toBe('');
   });
 
-  /** P5：切到「只用本地」只改 enabled，地址 / 远端目录 / 账号一个字节不丢。 */
-  it('p5_switching_to_local_keeps_the_filled_fields', () => {
+  /**
+   * P5（[V0.11.22] 改）：开关一次写两处——`config.enabled` 与 `cloud.enabled` 同时翻。
+   *
+   * 为什么不是「只改 cloud.enabled」：`plan_of` 读的是 `config.enabled`，只翻一处会让
+   * 「关掉了」与「还在跑」同时成立（v0.11.21 的通道二选一就是只翻了 cloud.enabled）。
+   * 同时断言已填字段一个字节不丢——关一下再开回来不该重新填一遍。
+   */
+  it('p5_toggle_flips_both_switches_and_keeps_fields', () => {
     mount(view(CLOUD));
-    click('[data-cloud-channel="local"]');
-    click('.m-cloud__actions .m-btn--primary');
-    const config = onSave.mock.calls[0][0] as { cloud: MdSyncCloud };
+    click('[data-cloud-enabled="true"]');
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const config = onSave.mock.calls[0][0] as { enabled: boolean; cloud: MdSyncCloud };
+    expect(config.enabled).toBe(false);
     expect(config.cloud.enabled).toBe(false);
     expect(config.cloud.baseUrl).toBe(CLOUD.baseUrl);
     expect(config.cloud.basePath).toBe(CLOUD.basePath);

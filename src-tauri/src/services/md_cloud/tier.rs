@@ -116,7 +116,7 @@ pub fn decide(
 /// 行为与 v0.11.20 逐字相同。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyncPlan {
-    /// 非云端：沿用 `pollSecs`。
+    /// 非云端：桌面沿用 `pollSecs`；**手机端不跑**（v0.11.22 起只走云端，见 `mobile_rounds`）。
     Legacy { poll_secs: u64 },
     /// 云端可用：按三档判定。
     Cloud { auto: MdCloudAuto },
@@ -139,4 +139,16 @@ pub fn plan_of(config: &MdSyncConfig) -> SyncPlan {
         .and_then(|cloud| cloud.auto.clone())
         .unwrap_or_default();
     SyncPlan::Cloud { auto }
+}
+
+/// 手机端：这份规划**会不会真的跑一轮**（[V0.11.22]）。
+///
+/// v0.11.21 之前 `Legacy` 在手机上是「按 `pollSecs` 跑 SAF 镜像三步」，v0.11.22 起那条
+/// 通路下线（主人：「此功能去除，仅保留云端同步」），于是 `Legacy` 在手机上的含义务必
+/// 变窄成「什么都不跑，只保持醒来等配置变化」。
+///
+/// 这条判定单独成函数而不是写在 watcher 里，理由与 `plan_of` 一样：
+/// `jobs/md_sync_mobile` 是 `#[cfg(mobile)]`，桌面用例够不着；`services` 两端都编。
+pub fn mobile_rounds(plan: &SyncPlan) -> bool {
+    matches!(plan, SyncPlan::Cloud { .. })
 }

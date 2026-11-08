@@ -204,3 +204,69 @@
   font-size: var(--text-xs);
   color: var(--ink-3);
 }
+/* ============================================================ 备份与恢复（V0.11.22）
+   列表只吃三样东西：日期（要大到能扫）、归属 + 时间 + 大小（一行小字）、一个动作。
+   恢复是覆盖写，所以确认条不缩进成旁注——它必须把那一行撑开，让人看清自己要覆盖什么。 */
+.m-backup {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.m-backup__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.m-backup__main {
+  display: flex;
+  flex: 1 1 60%;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.m-backup__date {
+  font-size: var(--text-sm);
+  color: var(--ink-1);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-backup__meta {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* 「手机上恢复不了」不是错误，是事实：用弱化色，不用红——红字留给真的失败 */
+.m-backup__off {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-backup__error {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--danger);
+}
+
+.m-backup__confirm {
+  flex: 1 1 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.m-backup__confirm p {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-xs);
+  line-height: 1.7;
+  color: var(--ink-2);
+}

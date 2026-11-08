@@ -1,45 +1,45 @@
 /**
- * Timing — 移动端「数据管理」页签（V0.12.0；[V0.11.21] 加云端通道）
+ * Timing — 移动端「数据管理」页签（V0.12.0；[V0.11.21] 加云端通道；[V0.11.22] 只留云端）
  * -----------------------------------------------------------------------------
- * 与桌面「设置 → 数据管理」是**同一套配置、同一套合并规则**，差别只在落点怎么表达：
+ * ## 这一页现在是什么
  *
- *   桌面：一个可写的绝对路径（用户在输入框里填 / 用文件夹选择器挑）
- *   手机：一个 SAF 目录授权（`content://` 树 URI，用户点一次「选择目录」）
+ * ```text
+ * 云端同步        开 / 关      ← 一次写 config.enabled 与 cloud.enabled（见 SyncCloudPane）
+ *   三档 / 四字段 / 保存 / 测试连接 / 状态行
+ * 立即同步
+ * 备份与恢复      列表 → 二次确认 → 覆盖回去
+ * ```
  *
- * 所以这一页不显示「根目录」输入框——手机上那个框填什么都没意义，Rust 侧会把根目录
- * 换成沙箱镜像目录。用户只需要选一次目录、决定同步哪几类数据、点同步。
+ * ## [V0.11.22] 为什么本地日记目录整段消失了
  *
- * 三个落点（事项计时 / 便利贴 / 待办）通常指向**同一个** `2026-11-06.md` 的不同标题区块；
- * 页面上仍分开列，是因为「只想同步计时不想同步待办」是真实需求。
+ * 那一套（SAF 目录授权 + 三个事项绑定 + 「只用本地 / 本地 + 云端」）需要用户在手机上指定
+ * 一个真实目录，而主人这条路上根本走不通（原话：「手机端无法使用云端的本地同步，
+ * 此功能去除，仅保留云端同步」）。于是：
  *
- * [V0.11.21] **云端通道回来了**。它走的是另一条路：不需要 SAF（落点是应用沙箱里的
- * `md-webdav` 目录），所以「只配云端、不选日记目录」是合法用法——那个按钮的可用性
- * 因此改成「SAF 已授权 **或** 云端可用」，与 `app::md_sync_mobile::sync_once` 的三段式
- * 对齐。云端那一块在 `SyncCloudPane.tsx`。
+ * - 界面：目录行、三个绑定行、通道二选一全部移除；
+ * - 调度：`jobs/md_sync_mobile` 的 `Legacy` 分支不再跑轮（只 60 秒醒一次等配置变化）；
+ * - 手动：云端不可用时给一句「先填云端」，不再偷偷回落 SAF 拿一句「未授权」。
+ *
+ * 后端的 SAF 能力没有删——`md_saf_status` / `md_sync_open` 仍在契约面上（78 条），
+ * 它们现在的用处是「在 Obsidian 里打开今天那份」以及排障时回答「授权还在不在」。
  */
 import { useCallback, useEffect, useState } from 'react';
-import { MD_SYNC_KIND_LABELS } from '../../types/domain';
-import type {
-  MdSyncConfig,
-  MdSyncReport,
-  MdSyncTestResult,
-  MdSyncViewCloud,
-  SafStatus,
-} from '../../types/domain';
+import type { MdSyncConfig, MdSyncReport, MdSyncTestResult, MdSyncViewCloud } from '../../types/domain';
 import { errorText, IpcError } from '../../services/ipc';
 import { mobileNative } from '../../services/mobileNative';
 import { isCloudReady } from '../settings/mdSyncConfig';
+import { SyncBackupPane } from './SyncBackupPane';
 import { SyncCloudPane } from './SyncCloudPane';
 
 /**
  * 同步失败时的提示。
  *
  * `errorText()` 把 `IO_ERROR` 统一润色成「系统调用失败，请重试」——那句话在别处是对的，
- * 在这一页却是灾难：手机上的同步失败**全都**来自原生桥（SAF 授权、目录读写），后端给的
- * 原文（「原生桥 mirrorIn 失败：…」）恰好是唯一能定位问题的线索，被润色掉就只剩盲猜。
+ * 在这一页却是灾难：手机上的同步失败大多来自原生桥或网络，后端给的原文
+ * （「云端 401…」/「原生桥 … 失败：…」）恰好是唯一能定位问题的线索，被润色掉就只剩盲猜。
  */
 function syncErrorText(err: unknown): string {
-  if (err instanceof IpcError && err.code === 'IO_ERROR' && err.message) return err.message;
+  if (err instanceof IpcError && err.message) return err.message;
   return errorText(err);
 }
 
@@ -52,17 +52,11 @@ function reportText(report: MdSyncReport): string {
 
 export function SyncPane() {
   const [view, setView] = useState<MdSyncViewCloud | null>(null);
-  const [saf, setSaf] = useState<SafStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
 
   const reload = useCallback(async () => {
-    const [nextView, nextSaf] = await Promise.all([
-      mobileNative.syncView(),
-      mobileNative.safStatus(),
-    ]);
-    setView(nextView);
-    setSaf(nextSaf);
+    setView(await mobileNative.syncView());
   }, []);
 
   useEffect(() => {
@@ -92,26 +86,6 @@ export function SyncPane() {
     }
   };
 
-  /** 选目录；选完立刻同步一轮——用户点这个按钮的意图就是「现在开始用这个目录」。 */
-  const pick = async () => {
-    setBusy(true);
-    setNote('');
-    try {
-      const next = await mobileNative.safPick();
-      setSaf(next);
-      if (!next.granted) {
-        setNote('没有选目录，同步还不会开始');
-        return;
-      }
-      setNote(reportText(await mobileNative.syncRun()));
-      setView(await mobileNative.syncView());
-    } catch (err) {
-      setNote(syncErrorText(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const runNow = async () => {
     setBusy(true);
     setNote('');
@@ -129,9 +103,9 @@ export function SyncPane() {
 
   const config = view.config;
   const status = view.status;
-  /* 云端可用 → 不需要 SAF：`sync_once` 的云端分支排在 SAF 检查之前，那一轮根本不碰原生桥。
-     判据取 `isCloudReady`（与桌面、与后端 `is_usable` 三处同口径），不在这里再写第四份。 */
-  const cloudReady = config.cloud !== null && isCloudReady(config.cloud);
+  /* 「能不能同步」只有一个判据：开关 + 填全。取 `isCloudReady`（与桌面、后端 `is_usable`
+     同口径），不在这里写第三份。 */
+  const ready = config.enabled && config.cloud !== null && isCloudReady(config.cloud);
   const statusText =
     status.lastError ??
     (status.lastSyncAt
@@ -143,79 +117,23 @@ export function SyncPane() {
 
   return (
     <>
-      <div className="setting-group">
-        <div className="setting-row">
-          <span className="setting-row__label">Markdown 同步</span>
-          <button
-            type="button"
-            className="m-btn m-btn--small"
-            disabled={busy}
-            onClick={() => void save({ ...config, enabled: !config.enabled })}
-          >
-            {config.enabled ? '已开启' : '已关闭'}
-          </button>
-        </div>
-        <p className="m-hint">
-          把当天的计时、便利贴、待办写进 Obsidian 日记的指定标题下，双向同步：
-          你在文件里删改的内容会被读回应用。
-        </p>
-      </div>
-
       <SyncCloudPane view={view} busy={busy} onSave={save} onTest={test} />
-
-      <div className="setting-group">
-        <div className="setting-row m-sync__row">
-          <span className="setting-row__label">日记目录</span>
-          <span className="m-sync__path" data-ok={saf?.granted ? 'true' : 'false'}>
-            {saf?.granted ? saf.label : '未选择'}
-          </span>
-          <button
-            type="button"
-            className="m-btn m-btn--small"
-            disabled={busy}
-            onClick={() => void pick()}
-          >
-            {saf?.granted ? '更换' : '选择'}
-          </button>
-        </div>
-
-        {config.bindings.map((binding) => (
-          <div className="setting-row m-sync__row" key={binding.kind}>
-            <span className="setting-row__label">{MD_SYNC_KIND_LABELS[binding.kind]}</span>
-            <span className="m-sync__heading">{binding.heading}</span>
-            <button
-              type="button"
-              className="m-btn m-btn--small"
-              disabled={busy}
-              onClick={() =>
-                void save({
-                  ...config,
-                  bindings: config.bindings.map((item) =>
-                    item.kind === binding.kind ? { ...item, enabled: !item.enabled } : item,
-                  ),
-                })
-              }
-            >
-              {binding.enabled ? '同步' : '跳过'}
-            </button>
-          </div>
-        ))}
-        {cloudReady && (
-          <p className="m-hint">云端已可用：这一栏可以不选目录，手机只当云端的另一个写端。</p>
-        )}
-      </div>
 
       <div className="setting-group">
         <button
           type="button"
           className="m-btn m-btn--primary"
-          disabled={busy || !config.enabled || !(saf?.granted || cloudReady)}
+          disabled={busy || !ready}
           onClick={() => void runNow()}
         >
           {busy ? '同步中…' : '立即同步'}
         </button>
-        <p className="m-hint">{note || statusText}</p>
+        <p className="m-hint" data-sync-note={ready ? 'ready' : 'not-ready'}>
+          {note || (ready ? statusText : '云端还没填全，暂时不会同步。')}
+        </p>
       </div>
+
+      <SyncBackupPane />
     </>
   );
 }

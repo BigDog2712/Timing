@@ -62,6 +62,9 @@ mod md_cloud_tier;
 /* [V0.11.21] 手机端与桌面共用的节奏分派：云端可用 → 三档；否则沿用 pollSecs。
    放在 services 里是因为 `jobs/md_sync_mobile` 是 `#[cfg(mobile)]`，桌面用例够不着。 */
 mod md_cloud_tier_plan;
+/* [V0.11.22] 手机端备份恢复的归属判据：手机只有 WebDAV 一个落点，
+   obsidian__ / 老备份一律拒绝。判据在 services 里，桌面用例才够得着。 */
+mod md_backup_mobile;
 /* [QA 独立复验 V0.11.19 批 1] 自己补的 2 条最缺边界：三档等号边界帧
    （covered 同毫秒 / Max 1799-1800 / 连败节流 / 不从 pollSecs 反推）与
    BOM+CRLF 真实文件走 FileWatch::probe。本轮两条变异自检的靶子都在这里。 */

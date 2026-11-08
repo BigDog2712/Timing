@@ -50,6 +50,42 @@ pub fn items() -> Vec<MdBackupItem> {
         .collect()
 }
 
+/// 手机端能恢复哪些备份（[V0.11.22]）。
+///
+/// 备份文件名是 `<落点>__<原文件名>-<时间戳>.md`（`infra::md_backup` 的口径）。手机只有
+/// **WebDAV** 这一个落点，所以：
+///
+/// - `webdav__…` → 放行；
+/// - `obsidian__…` → 拒绝：那个落点是电脑上那个日记目录。手机恢复它的文件没有落点可写，
+///   下一轮云端又用沙箱里的版本覆盖掉，用户会以为「恢复成功了但没用」；
+/// - 无前缀（v0.11.13 之前的老备份）/ 名字不合法 → 拒绝，让用户去电脑上认。
+///
+/// 恢复是**覆盖写**，猜错落点是数据正确性问题（与 v0.11.14 修 O4 同一条道理），
+/// 所以一律拒绝，不做「差不多就按 webdav 算」的推断。
+///
+/// 放在 `services` 而不是 `commands::md_sync_cmd_mobile`：后者是 `#[cfg(mobile)]`，
+/// 桌面目标的用例够不着，判据就只能靠人看。这是 v0.11.21 的同一条教训。
+pub fn restorable_on_mobile(name: &str) -> Result<(), String> {
+    let (target, _source) = store::parse_name(name)
+        .ok_or_else(|| format!("「{name}」不是 Timing 的备份文件名，无法恢复"))?;
+    match target {
+        Some("webdav") => Ok(()),
+        Some("obsidian") => Err(
+            "这份备份属于电脑上那个日记目录，手机上恢复不了：写回去的内容没有落点，\
+             下一轮还会被云端覆盖。请到电脑上恢复"
+                .to_string(),
+        ),
+        Some(other) => Err(format!(
+            "这份备份属于「{other}」落点，手机端只支持云端（WebDAV）；请到电脑上恢复"
+        )),
+        None => Err(
+            "这份备份是老格式，看不出属于哪个落点。为免覆盖错文件，手机端不做推断；\
+             请到电脑上恢复"
+                .to_string(),
+        ),
+    }
+}
+
 /// 用系统默认程序打开一份备份（PRD 8.2-5）。
 ///
 /// 只做「打开」，不做「在文件夹中显示」（PRD 待决 2 已定）。失败一律 `IO_ERROR` +

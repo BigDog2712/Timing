@@ -1,12 +1,20 @@
 //! Markdown 同步命令 —— 移动端实现。
 //!
-//! 与桌面的差别只在「落点怎么读写」：桌面的 root 是真实路径，Rust 直接读；Android 的
-//! 落点是 SAF 的 `content://` 树 URI，Rust 不认。于是把三步编排收在
-//! `app::md_sync_mobile::sync_once`（镜像进 → 合并 → 写回），本层只做取参 / 播报。
+//! ## [V0.11.22] 只走云端
 //!
-//! 合并规则、冲突判定、区块格式因此只有一份，不会出现「手机和电脑算得不一样」。
-//! 密码（`md_credential`）与云端视图（`md_cloud::view`）与桌面逐字相同；**只有备份不落地**，
-//! 理由见 `NO_BACKUP`。
+//! 本地日记目录（SAF）那条同步通路这一轮下线（主人：「此功能去除，仅保留云端同步」）。
+//! 于是本层与桌面的差别只剩一句：**没有云端就没有落点**。落点的合并规则、冲突判定、
+//! 区块格式仍与桌面同一份（`services::md_cloud`）。
+//!
+//! ## 备份在手机上真做了
+//!
+//! v0.11.21 及之前 `md_backup_*` 一律回「请在电脑上操作」，理由是「备份存在应用私有目录，
+//! 用户看不见也导不出」。这个理由对「打开」成立，对「恢复」不成立——恢复是
+//! **读备份 → 写回 SQL + 文件**，全程在应用内完成，一个字节都不需要用户摸到文件。
+//! 所以本轮 `md_backup_list` / `md_backup_restore` 接了真实现，`md_backup_open` 仍是桩
+//! （交给系统打开一份用户拿不到的文件没有意义），但换成了自己的话。
+//!
+//! 归属限制见 [`backup_restorable`]：手机只认 `webdav__`。
 
 use tauri::{AppHandle, Manager};
 
@@ -19,7 +27,7 @@ use crate::models::md_sync::{MdSyncConfig, MdSyncKind, MdSyncReport};
 use crate::models::md_sync_cloud::{
     MdBackupItem, MdBackupRestoreResult, MdSyncTestResult, MdSyncViewCloud,
 };
-use crate::services::{md_cloud, md_sync};
+use crate::services::{md_backup, md_cloud, md_sync};
 use crate::state::AppState;
 
 fn announce(app: &AppHandle, report: &MdSyncReport) {
@@ -28,28 +36,19 @@ fn announce(app: &AppHandle, report: &MdSyncReport) {
     }
 }
 
-/// 备份在手机上没有可用落点：`services::md_backup` 读写的是**数据根**下的 `backups/`，
-/// 而 Android 的数据根是应用私有目录——用户既看不见也导不出（导出要走 SAF，本轮没做）。
-/// 与其给一份「存了但拿不到」的备份，不如明说「请在电脑上操作」。用
-/// `MD_SYNC_CONFIG_INVALID` 而不新增错误码：契约闭集，且这确实属于「这端不提供该能力」。
-const NO_BACKUP: &str = "手机端暂不支持备份查看与恢复，请在电脑上操作";
+/// 手机端能恢复哪些备份：判据在 `services::md_backup::restorable_on_mobile`
+/// （手机只有 WebDAV 一个落点，`obsidian__` / 老备份一律拒绝并说明去哪做）。
+/// 这里只转发——判据放 `services` 是为了让桌面目标的用例够得着。
 
 #[tauri::command]
 pub async fn md_sync_get(app: AppHandle) -> AppResult<MdSyncViewCloud> {
     md_cloud::view(&app.state::<AppState>().pool).await
 }
 
-/// 保存配置。目录还没选（或授权失效）时**只保存不报错**：用户多半是先开开关、
-/// 下一步才去选目录；这一步回一句「未授权」会让人以为设置没保存上。
+/// 保存配置。云端没填全时**只保存不报错**（用户多半是分两步填）；保存后顺手跑一轮，
+/// 但那一轮的失败不算保存失败——开关已经落库，回红字只会让人反复点。
 ///
-/// 保存后顺手同步一轮，但**这一轮的失败不算保存失败**：开关已经写进库了，
-/// 回一句红字会让用户以为「没开成功」而反复点。真正的原因留给「立即同步」去说。
-/// [V0.11.14] 修 N2：判据（含 SAF 授权检查）整个搬到
-/// `md_cloud::should_autosync`，任何一步失败都只落一行 warn，**绝不影响返回值**——
-/// 旧版 `saf_status(..).await?` 会在配置已经落库之后把「保存」变成失败。
-///
-/// 密码与桌面同一份三分语义，且同样**先于**配置落库：凭据写失败时配置一个字都还没改，
-/// 用户重试一次就是完整的一次操作（详见 `md_credential`）。
+/// 密码与桌面同一份三分语义，且同样**先于**配置落库（见 `md_credential`）。
 #[tauri::command]
 pub async fn md_sync_save(
     app: AppHandle,
@@ -61,22 +60,9 @@ pub async fn md_sync_save(
     let pool = app.state::<AppState>().pool.clone();
     md_sync::config::save(&pool, &config).await?;
 
-    /* 云端可用时**不必**问 SAF（`sync_once` 的云端分支排在 SAF 检查之前），也就不该
-    被它挡住；这里连那次原生桥往返都省掉。 */
-    let cloud_usable = md_cloud::usable(&config).is_some();
-    let saf_granted = if cloud_usable {
-        false
-    } else {
-        match md_sync_mobile::saf_status(&app).await {
-            Ok(status) => status.granted,
-            /* 原生桥不可用 / 调用失败只意味着「这次不顺手同步」，与「保存」无关。 */
-            Err(err) => {
-                crate::log_warn!("md sync save: 读不到同步目录授权，跳过顺手同步：{err}");
-                false
-            }
-        }
-    };
-    if md_cloud::should_autosync(config.enabled, cloud_usable, saf_granted) {
+    /* [V0.11.22] 顺手同步的判据收窄成「云端可用」：SAF 那一项不再参与
+    （`should_autosync` 的第三个参数恒 false，函数本身留给桌面与既有用例）。 */
+    if md_cloud::should_autosync(config.enabled, md_cloud::usable(&config).is_some(), false) {
         if let Ok(report) = md_sync_mobile::sync_once(&app).await {
             announce(&app, &report);
         }
@@ -84,21 +70,21 @@ pub async fn md_sync_save(
     md_cloud::view(&pool).await
 }
 
-/// 手动同步。[V0.11.21] 云端可用时改走 `md_cloud::round_manual`，与桌面同一个入口——
-/// 它多做一件事：解除「连续 3 个自然日失败」的清理暂停。手动的语义就是「现在就再试一次」，
-/// 手机与桌面不该有两套。
+/// 手动同步 = 「现在就再试一次」，所以走 `round_manual`（它会解除「连续 3 个自然日失败」
+/// 的清理暂停，与桌面同一个入口）。
 ///
-/// 云端**不可用**时仍走 `md_sync_mobile::sync_once`（不是 `md_cloud::round`）：那一轮
-/// 要的是 SAF 镜像三步，`round` 里的本地那半走的是桌面真实路径，手机上落点根本不存在。
+/// [V0.11.22] 云端不可用时**不再回落 SAF**：回落只会拿到「同步目录未授权」，
+/// 与真正要用户做的事（去填云端）差着两页。这里直接给一句能照做的配置错误。
 #[tauri::command]
 pub async fn md_sync_run(app: AppHandle) -> AppResult<MdSyncReport> {
     let pool = app.state::<AppState>().pool.clone();
     let config = md_sync::config::load(&pool).await?;
-    let report = if md_cloud::usable(&config).is_some() {
-        md_cloud::round_manual(&pool).await?.report
-    } else {
-        md_sync_mobile::sync_once(&app).await?
-    };
+    if md_cloud::usable(&config).is_none() {
+        return Err(AppError::md_sync_config_invalid(
+            "手机端只同步云端：先在「设置 → 数据管理」里填好服务地址、账号和应用密码，再点保存",
+        ));
+    }
+    let report = md_cloud::round_manual(&pool).await?.report;
     announce(&app, &report);
     Ok(report)
 }
@@ -129,22 +115,34 @@ pub async fn md_sync_test(
     md_cloud::test_connection(&pool, &config, provided.as_deref()).await
 }
 
+/// 备份列表：与桌面同一份 `store::list`（按留底时间倒序）。
 #[tauri::command]
 pub async fn md_backup_list() -> AppResult<Vec<MdBackupItem>> {
-    Err(AppError::md_sync_config_invalid(NO_BACKUP))
+    Ok(md_backup::items())
 }
 
-/// 备份在手机上没有可用落点（理由见 `NO_BACKUP`）：沿用同一句话，不新增错误码。
+/// 手机上没有「打开备份」的落点：私有目录里的文件交给系统打开，用户拿到的是一个
+/// 自己找不到的路径。恢复不需要它，所以只留一句能照做的说明。
 #[tauri::command]
 pub async fn md_backup_open(_name: String) -> AppResult<()> {
-    Err(AppError::md_sync_config_invalid(NO_BACKUP))
+    Err(AppError::md_sync_config_invalid(
+        "备份存在应用私有目录里，手机上打不开；要留档请到电脑上操作",
+    ))
 }
 
+/// 用一份备份覆盖回去（写回文件 + 导入 SQL）。归属判据在 [`backup_restorable`]。
 #[tauri::command]
 pub async fn md_backup_restore(
-    _app: AppHandle,
-    _name: String,
-    _target: Option<String>,
+    app: AppHandle,
+    name: String,
+    target: Option<String>,
 ) -> AppResult<MdBackupRestoreResult> {
-    Err(AppError::md_sync_config_invalid(NO_BACKUP))
+    md_backup::restorable_on_mobile(&name).map_err(AppError::md_sync_config_invalid)?;
+    let pool = app.state::<AppState>().pool.clone();
+    /* `target` 由前端原样透传：备份名自己带着归属（`webdav__`），
+    正常路径下前端传 `None`，服务层按文件名解析。 */
+    let result = md_backup::restore(&pool, &name, target.as_deref()).await?;
+    /* 恢复是真实的业务写入，必须让下一轮同步看见（与桌面 `md_sync_cmd` 同口径）。 */
+    md_sync::dirty::mark("record");
+    Ok(result)
 }

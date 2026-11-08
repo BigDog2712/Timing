@@ -12,7 +12,7 @@ use crate::models::md_sync::{MdSyncBinding, MdSyncKind};
 use crate::models::md_sync_auto::{CloudSchedule, MdCloudAuto};
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::models::md_sync_config::MdSyncConfig;
-use crate::services::md_cloud::tier::{decide, plan_of, SyncPlan, TierState};
+use crate::services::md_cloud::tier::{decide, mobile_rounds, plan_of, SyncPlan, TierState};
 
 fn binding() -> MdSyncBinding {
     MdSyncBinding {
@@ -109,4 +109,33 @@ fn off_schedule_never_fires_even_when_cloud_is_ready() {
         ..TierState::default()
     };
     assert_eq!(decide(&state, CloudSchedule::Off, 900, 60 * 60 * 1_000, 0), None);
+}
+
+/* ============================================================ [V0.11.22] 手机端只走云端 */
+
+/// `Cloud` 是手机上唯一会真的跑一轮的规划（PRD P1）。
+#[test]
+fn mobile_runs_cloud_plan() {
+    assert!(mobile_rounds(&plan_of(&config(true, Some(webdav())))));
+}
+
+/// `Legacy`（没配云端 / 总开关关着）在手机上**什么都不跑**（PRD P1/P5）。
+///
+/// 这条是「界面下线了、调度还在跑」那个坑的判据：只要它变绿成 `true`，
+/// 说明有人把 SAF 那一轮又接回手机 watcher 了。
+#[test]
+fn mobile_does_not_run_legacy_plan() {
+    assert!(!mobile_rounds(&SyncPlan::Legacy { poll_secs: 900 }));
+}
+
+/// 三档里的「关闭」仍算 `Cloud` 规划——它跑不跑由 `decide` 判，不是 `mobile_rounds`。
+/// 两层混为一谈会让「关闭档」被读成「手机不同步」，于是手动同步也得跟着禁用。
+#[test]
+fn mobile_off_schedule_is_still_a_cloud_plan() {
+    let mut cloud = webdav();
+    cloud.auto = Some(MdCloudAuto {
+        schedule: CloudSchedule::Off,
+        interval_minutes: 15,
+    });
+    assert!(mobile_rounds(&plan_of(&config(true, Some(cloud)))));
 }

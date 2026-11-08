@@ -1,29 +1,31 @@
 /**
- * Timing — 移动端原生能力的前端门面（V0.12.0；[V0.11.21] 加云端那三条）
+ * Timing — 移动端原生能力的前端门面（V0.12.0；[V0.11.22] 加备份两条、删 SAF 两条）
  * -----------------------------------------------------------------------------
- * 组件不直接碰传输层（`check:layers` L1），所以把这四条命令 + 同步域的三条收在这里。
+ * 组件不直接碰传输层（`check:layers` L1），所以把这批命令收在这里。
  *
- * 名字用「手机端」而不是「同步」：SAF 目录与悬浮条是同一件事——都只有原生侧能做，
- * 桌面上调它们一律回 `IO_ERROR`。前端据此区分「这端没有」与「这端有但没授权」。
+ * 名字用「手机端」而不是「同步」：悬浮条只有原生侧能做，桌面上调它一律回 `IO_ERROR`。
+ * 前端据此区分「这端没有」与「这端有但没授权」。
  *
- * [V0.11.21] `syncView` 的返回类型从 `MdSyncView` 改成 `MdSyncViewCloud`
- * （后端一直是 `#[serde(flatten)]` 平铺，多一个 `cloud` 键），`syncSave` 加 `secret`
- * 三分语义、`syncTest` 新增。三条命令在手机端与桌面**同名注册**，没有新契约。
+ * ## 两个删除点（[V0.11.22]）
+ *
+ * - `safStatus` / `safPick`：本地日记目录那条同步通路这一轮下线，界面已无入口。
+ *   **命令仍在契约面上**（`ipc.mdSafStatus` / `mdSafPick`，78 条之一），
+ *   只是不再有前端调用者——留一条没人调的门面方法比留一个没人的界面更容易误用。
+ * - `secret` 三分语义保持不变：`undefined` = 不动已存密文，`''` = 清空，原串 = 写入。
  */
 import { ipc } from './ipc';
 import type {
+  MdBackupItem,
+  MdBackupRestoreResult,
   MdSyncConfig,
   MdSyncReport,
   MdSyncTestResult,
   MdSyncViewCloud,
   OverlayStatus,
   OverlayStyle,
-  SafStatus,
 } from '../types/domain';
 
 export const mobileNative = {
-  safStatus: (): Promise<SafStatus> => ipc.mdSafStatus(),
-  safPick: (): Promise<SafStatus> => ipc.mdSafPick(),
   overlayStatus: (): Promise<OverlayStatus> => ipc.overlayStatus(),
   setOverlay: (enabled: boolean, style?: OverlayStyle): Promise<OverlayStatus> =>
     ipc.overlaySet({ enabled, style }),
@@ -37,4 +39,12 @@ export const mobileNative = {
   syncTest: (config: MdSyncConfig, secret?: string | null): Promise<MdSyncTestResult> =>
     ipc.mdSyncTest({ config, secret }),
   syncRun: (): Promise<MdSyncReport> => ipc.mdSyncRun(),
+  /** 备份列表：与桌面同一份 `backups/md`（按留底时间倒序）。 */
+  backupList: (): Promise<MdBackupItem[]> => ipc.mdBackupList(),
+  /**
+   * 恢复一份备份（覆盖写）。`target` 传 `null`：归属由备份文件名解析，
+   * 手机端只放行 `webdav__`（判据在后端 `services::md_backup::restorable_on_mobile`）。
+   */
+  backupRestore: (name: string): Promise<MdBackupRestoreResult> =>
+    ipc.mdBackupRestore({ name, target: null }),
 };
