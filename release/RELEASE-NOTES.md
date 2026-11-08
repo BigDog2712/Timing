@@ -1,5 +1,49 @@
 # 发布说明 · Timing
 
+## v0.11.25 — 修掉「手机点测试连接就闪退」（2026-11-08）
+
+**故障修复。** 手机端 → 设置 → 「测试连接」→ App 当场消失；这一版不再消失。
+
+### 根因（一句话）
+
+验证 HTTPS 证书那一步在手机上会 panic。reqwest 0.13 的 `rustls-no-provider` 会拖
+`rustls-platform-verifier`，而那个后端**在 Android 上必须先由 Kotlin 侧初始化 context**
+（本项目没引那个 AAR），没初始化就 `expect(..)` panic；`release` 是 `panic = "abort"`，
+进程当场被杀，连日志都写不出来。
+
+桌面走 SChannel 不需要初始化，所以桌面正常；本地 WebDAV 用例打的是假 HTTP 服务端，
+走不到证书校验——两个条件凑在一起，让这个洞从 0.11.21 藏到今天。
+
+### 这一版改了什么
+
+1. **根证书改成编译期内置**（`webpki-roots`）：无 JNI、无初始化动作、两端同一份根，
+   「忘了初始化」这种失败模式从根上消失。
+2. **拆掉三处 Client 里两个会 panic 的回退**：`Client::new()`（它内部就是 `build().expect(..)`）、
+   `remove.rs` 那句 `expect("DELETE 专用 Client 必须带 Policy::none()")`（注释写着「不 panic」，
+   代码却 panic）。现在构造失败如实回 `Err`，界面出红字。
+3. 新增判据 `tests/md_webdav_tls.rs`：根证书非空 / Client 可建 / 依赖不许删 / 一条联网握手。
+
+### 你会感觉到什么
+
+- 手机点「测试连接」：三关逐步点亮，绿字或红字，**App 不再消失**；
+- 手机「立即同步」「后台自动同步」：同一条通道，一起修好；
+- 用自签证书的私有 WebDAV：**这版不认**（红字「证书校验失败」）。公网证书全部照常。
+
+要不要做「导入自签 CA」，记在 `release` 之外的 `待决事项` 里等你。
+
+### 产物
+
+| 文件 | 体积 | sha256 |
+|---|---|---|
+| `Timing-0.11.25-portable.zip` | 3.7 MB | `3375cb4c…bd04b5d8` |
+| `Timing-0.11.25-setup.exe` | 4.8 MB | `9221b64b…fa86cd` |
+| `Timing-android-0.11.25-release-arm64-debugsigned.apk` | 11.1 MB | `0447adfb…aaa1675` |
+
+桌面包也重出了：改的是两端共用的网络层，桌面虽然本来不崩，但不跟着换会留两套行为。
+BUILD-INFO 显示 `commit 8206c33` / `git_dirty: clean`。
+
+---
+
 ## v0.11.24 — 异常退出恢复（2026-11-08）
 
 **上次软件没正常关（强杀 / 断电），重启后弹的恢复框重做了：两条路都带数字，不用心算。**

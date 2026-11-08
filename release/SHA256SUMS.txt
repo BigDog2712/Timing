@@ -1,4 +1,16 @@
-# ===== 最新：0.11.23（只有手机包；桌面仍用 0.11.20）=====
+# ===== 最新：0.11.25（手机 + 桌面都出）=====
+#   手机点「测试连接」闪退修掉了：根证书换成编译期内置（webpki-roots），
+#   不再依赖 Android 上需要 Kotlin 侧初始化的平台验证器。契约 79 / 17 / 11、迁移 0006 都没动。
+3375cb4c2287f61c0c6ec1f4e90fdb1c85688bde5aed688bb5ce5f1fbd04b5d8 *Timing-0.11.25-portable.zip
+9221b64b93b6896d15e94e5579a8b10c00cd295dd0ff10eabe62df99c5fa86cd *Timing-0.11.25-setup.exe
+0447adfb4309876f24a7c8d468b6fc158b92e288e3154efb63d493797aaa1675 *Timing-android-0.11.25-release-arm64-debugsigned.apk
+
+# ===== 上一版：0.11.24（只有桌面）=====
+#   异常退出恢复框重做：两条路都带具体时间。手机端零 diff，仍用 0.11.23 的 apk。
+6b6d00e61e9bc59a72946a07ddebfbf330d09a9ffeb68153eedfff0c26ccab5b *Timing-0.11.24-portable.zip
+b32f9f7cbbeda69cb793728918c0ebc8ee14f6013d1aa31a7c8b8bd637775057 *Timing-0.11.24-setup.exe
+
+# ===== 更早：0.11.23（只有手机包）=====
 #   手机端备份能导出（系统「保存到…」）。契约 78 → 79，错误码 / 事件 / 迁移都没动。
 48f60ce82a50a262a62ea32f3546a967ba1c7ac3da43c827e2173192cf585dc7 *Timing-android-0.11.23-release-arm64-debugsigned.apk
 
