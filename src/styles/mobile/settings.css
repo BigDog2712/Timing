@@ -128,3 +128,79 @@
 .m-sync__path[data-ok="false"] {
   color: var(--color-warn);
 }
+
+/* ============================== 云端通道 [V0.11.21] ============================== */
+/* 四个输入框各自占一行：手机上一行「标签 + 输入框」会把地址挤成半截，
+   而地址恰恰是最需要看全的那一项（填错一位就是 401 / 404）。 */
+.m-cloud__field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.m-cloud__field .setting-row__label {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-cloud__interval {
+  gap: var(--space-2);
+}
+
+/* 分钟数是个两位整数，不要占满整行——占满会让右边那几个字离得很远 */
+.m-cloud__minutes {
+  max-width: 96px;
+}
+
+.m-cloud__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+}
+
+.m-cloud__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-cloud__result[data-ok="false"] {
+  color: var(--danger);
+}
+
+/* 三关逐步点亮：「红在哪一关」必须一眼分得出来，所以逐关自己的颜色 */
+.m-cloud__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.m-cloud__steps [data-ok="true"] {
+  color: var(--color-done);
+}
+
+.m-cloud__steps [data-ok="false"] {
+  color: var(--danger);
+}
+
+.m-cloud__error {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--danger);
+}
+
+/* 状态行与桌面同形：一条分隔线 + 一串事实，不臆造「成功」 */
+.m-cloud__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}

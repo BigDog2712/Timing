@@ -59,6 +59,9 @@ mod qa_t01_sync_attack;
 mod md_sync_wake;
 #[cfg(desktop)]
 mod md_cloud_tier;
+/* [V0.11.21] 手机端与桌面共用的节奏分派：云端可用 → 三档；否则沿用 pollSecs。
+   放在 services 里是因为 `jobs/md_sync_mobile` 是 `#[cfg(mobile)]`，桌面用例够不着。 */
+mod md_cloud_tier_plan;
 /* [QA 独立复验 V0.11.19 批 1] 自己补的 2 条最缺边界：三档等号边界帧
    （covered 同毫秒 / Max 1799-1800 / 连败节流 / 不从 pollSecs 反推）与
    BOM+CRLF 真实文件走 FileWatch::probe。本轮两条变异自检的靶子都在这里。 */

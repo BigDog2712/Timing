@@ -51,9 +51,9 @@ pub async fn get_view(pool: &SqlitePool) -> AppResult<MdSyncView> {
     })
 }
 
-/// [V0.11.19] 桌面改事件驱动后已无「自动同步间隔」这个运行时量；只剩手机端轮询读它。
-#[cfg(mobile)]
-pub use config::poll_secs;
+/* [V0.11.21] `poll_secs` 的 `pub use` 整条删掉：桌面 v0.11.19 改事件驱动后没有读者，
+手机端这一轮改按三档（`services::md_cloud::tier::plan_of`），非云端仍读配置里的
+`poll_secs`。字段本身保留——老用户库里的值要原样读回，界面已无它的入口。 */
 
 /// 手动「立即同步」。返回本轮报告，不因单个落点失败而整体报错。
 pub async fn run(pool: &SqlitePool) -> AppResult<MdSyncReport> {

@@ -1,7 +1,7 @@
 /**
- * Timing — 移动端「同步」页签（V0.12.0）
+ * Timing — 移动端「数据管理」页签（V0.12.0；[V0.11.21] 加云端通道）
  * -----------------------------------------------------------------------------
- * 与桌面「设置 → 同步」是**同一套配置、同一套合并规则**，差别只在落点怎么表达：
+ * 与桌面「设置 → 数据管理」是**同一套配置、同一套合并规则**，差别只在落点怎么表达：
  *
  *   桌面：一个可写的绝对路径（用户在输入框里填 / 用文件夹选择器挑）
  *   手机：一个 SAF 目录授权（`content://` 树 URI，用户点一次「选择目录」）
@@ -11,12 +11,25 @@
  *
  * 三个落点（事项计时 / 便利贴 / 待办）通常指向**同一个** `2026-11-06.md` 的不同标题区块；
  * 页面上仍分开列，是因为「只想同步计时不想同步待办」是真实需求。
+ *
+ * [V0.11.21] **云端通道回来了**。它走的是另一条路：不需要 SAF（落点是应用沙箱里的
+ * `md-webdav` 目录），所以「只配云端、不选日记目录」是合法用法——那个按钮的可用性
+ * 因此改成「SAF 已授权 **或** 云端可用」，与 `app::md_sync_mobile::sync_once` 的三段式
+ * 对齐。云端那一块在 `SyncCloudPane.tsx`。
  */
 import { useCallback, useEffect, useState } from 'react';
 import { MD_SYNC_KIND_LABELS } from '../../types/domain';
-import type { MdSyncConfig, MdSyncReport, MdSyncView, SafStatus } from '../../types/domain';
+import type {
+  MdSyncConfig,
+  MdSyncReport,
+  MdSyncTestResult,
+  MdSyncViewCloud,
+  SafStatus,
+} from '../../types/domain';
 import { errorText, IpcError } from '../../services/ipc';
 import { mobileNative } from '../../services/mobileNative';
+import { isCloudReady } from '../settings/mdSyncConfig';
+import { SyncCloudPane } from './SyncCloudPane';
 
 /**
  * 同步失败时的提示。
@@ -38,7 +51,7 @@ function reportText(report: MdSyncReport): string {
 }
 
 export function SyncPane() {
-  const [view, setView] = useState<MdSyncView | null>(null);
+  const [view, setView] = useState<MdSyncViewCloud | null>(null);
   const [saf, setSaf] = useState<SafStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
@@ -56,16 +69,26 @@ export function SyncPane() {
     void reload().catch((err) => setNote(syncErrorText(err)));
   }, [reload]);
 
-  const save = async (next: MdSyncConfig) => {
+  /** `secret` 三分语义由后端解释，这里只负责「有没有动过密码框」，不自己拼空串。 */
+  const save = async (next: MdSyncConfig, secret?: string | null) => {
     setBusy(true);
     setNote('');
     try {
-      setView(await mobileNative.syncSave(next));
+      setView(await mobileNative.syncSave(next, secret));
       setNote('已保存');
     } catch (err) {
       setNote(syncErrorText(err));
     } finally {
       setBusy(false);
+    }
+  };
+
+  /** 测试连接：只读探测，不落库（后端 `probe.rs` 首行注释「不写任何状态」）。 */
+  const test = async (next: MdSyncConfig, secret?: string | null): Promise<MdSyncTestResult> => {
+    try {
+      return await mobileNative.syncTest(next, secret);
+    } catch (err) {
+      return { ok: false, detail: syncErrorText(err) };
     }
   };
 
@@ -106,6 +129,9 @@ export function SyncPane() {
 
   const config = view.config;
   const status = view.status;
+  /* 云端可用 → 不需要 SAF：`sync_once` 的云端分支排在 SAF 检查之前，那一轮根本不碰原生桥。
+     判据取 `isCloudReady`（与桌面、与后端 `is_usable` 三处同口径），不在这里再写第四份。 */
+  const cloudReady = config.cloud !== null && isCloudReady(config.cloud);
   const statusText =
     status.lastError ??
     (status.lastSyncAt
@@ -134,6 +160,8 @@ export function SyncPane() {
           你在文件里删改的内容会被读回应用。
         </p>
       </div>
+
+      <SyncCloudPane view={view} busy={busy} onSave={save} onTest={test} />
 
       <div className="setting-group">
         <div className="setting-row m-sync__row">
@@ -172,13 +200,16 @@ export function SyncPane() {
             </button>
           </div>
         ))}
+        {cloudReady && (
+          <p className="m-hint">云端已可用：这一栏可以不选目录，手机只当云端的另一个写端。</p>
+        )}
       </div>
 
       <div className="setting-group">
         <button
           type="button"
           className="m-btn m-btn--primary"
-          disabled={busy || !config.enabled || !saf?.granted}
+          disabled={busy || !config.enabled || !(saf?.granted || cloudReady)}
           onClick={() => void runNow()}
         >
           {busy ? '同步中…' : '立即同步'}

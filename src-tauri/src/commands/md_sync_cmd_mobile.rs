@@ -84,11 +84,21 @@ pub async fn md_sync_save(
     md_cloud::view(&pool).await
 }
 
-/// 手动同步：`sync_once` 内部已含云端那一步（先写 SAF，再走 `md_cloud`），
-/// 本层不再叠一轮，否则同一天会被上传两次。
+/// 手动同步。[V0.11.21] 云端可用时改走 `md_cloud::round_manual`，与桌面同一个入口——
+/// 它多做一件事：解除「连续 3 个自然日失败」的清理暂停。手动的语义就是「现在就再试一次」，
+/// 手机与桌面不该有两套。
+///
+/// 云端**不可用**时仍走 `md_sync_mobile::sync_once`（不是 `md_cloud::round`）：那一轮
+/// 要的是 SAF 镜像三步，`round` 里的本地那半走的是桌面真实路径，手机上落点根本不存在。
 #[tauri::command]
 pub async fn md_sync_run(app: AppHandle) -> AppResult<MdSyncReport> {
-    let report = md_sync_mobile::sync_once(&app).await?;
+    let pool = app.state::<AppState>().pool.clone();
+    let config = md_sync::config::load(&pool).await?;
+    let report = if md_cloud::usable(&config).is_some() {
+        md_cloud::round_manual(&pool).await?.report
+    } else {
+        md_sync_mobile::sync_once(&app).await?
+    };
     announce(&app, &report);
     Ok(report)
 }

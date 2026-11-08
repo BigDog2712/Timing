@@ -42,6 +42,9 @@ use crate::services::md_sync::{self, mirror};
 pub async fn run(
     pool: &SqlitePool,
     cloud: &MdSyncCloud,
+    /* 只在 `#[cfg(not(mobile))]` 的往期清理那一步用到；手机上不装挂点，参数就没人读。
+       不加这个属性，安卓目标会多一条 `unused variable` —— 桌面 0 warning 是项目口径。 */
+    #[cfg_attr(mobile, allow(unused_variables))]
     bindings: &[MdSyncBinding],
     today: &str,
 ) -> AppResult<MdSyncReport> {
