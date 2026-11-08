@@ -1,1 +1,0 @@
-a59bf4fcee513bbe8ab6dff72c8f60e07fe8ee22df479ce44a6c36d6b2943c60 *release/Timing-android-0.11.8-release-arm64-debugsigned.apk
