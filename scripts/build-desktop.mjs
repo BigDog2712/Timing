@@ -25,6 +25,18 @@
  *
  * 用**内容指纹**而不是 mtime：vite 每次 build 都重写文件，mtime 必变，按 mtime 判
  * 「dist 变了」等于每次都判变，退化成每次全量重编。
+ *
+ * ## 构建身份（V0.11.20）
+ *
+ * `target/.timing-dist-stamp` 是**前端内容**指纹，与 commit 无关：装完包无法回答
+ * 「这是哪个 commit 编的」。所以出包时另写一份 `BUILD-INFO.txt`，同时落两处：
+ *
+ *   release/Timing-<ver>-portable/BUILD-INFO.txt   → 进 zip，解压即见
+ *   release/BUILD-INFO-<ver>.txt                   → 与 zip / setup 同级，不解压就能核对
+ *
+ * 内容是 `product / version / git_commit / git_dirty / built_at_utc / build_profile`
+ * 六行键值（UTF-8 + LF）。commit 与干净状态**现场问 git**；git 不可用时写 `unknown`
+ * 而不是让打包失败（见 `gitIdentity`）。
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -78,6 +90,53 @@ const log = (msg) => console.log(`[build] ${msg}`);
 const win = process.platform === 'win32';
 /** 给外部命令用的相对路径（避开 bsdtar / cmd 对盘符冒号的各自解读）。 */
 const relPath = (p) => relative(root, p).split(sep).join('/');
+
+/**
+ * 构建身份（V0.11.20）：包里唯一能回答「这是哪个 commit 编的」的东西。
+ *
+ * 在此之前包里唯一的指纹是 `target/.timing-dist-stamp`，那是**前端 dist 内容哈希**，
+ * 与 commit 无关 —— 同一份 commit 改一次注释也会变，而 checkout 到任意 commit 只要前端
+ * 没变就是同一个值。用户报问题时拿着安装包，我们无法倒推出源码版本。
+ *
+ * **必须现场问 git**（`git rev-parse HEAD` / `git status --porcelain`），不许硬编码、
+ * 不许读缓存文件：硬编码会在某次忘记改的时候静默撒谎，读缓存文件会把上一次的 commit
+ * 贴到这一次的包上 —— 两种都让这份文件失去意义，不如没有。
+ *
+ * `git` 不可用（源码是解压出来的 tarball / 机器上没装 git / git 挂在半路）时返回
+ * `unknown`，**不许让构建脚本崩**：打不出包比打出一个标注「未知来源」的包更糟。
+ */
+function gitIdentity() {
+  const ask = (args) => {
+    const res = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+    if (res.error || res.status !== 0) return null;
+    return typeof res.stdout === 'string' ? res.stdout.trim() : null;
+  };
+  const commit = ask(['rev-parse', 'HEAD']);
+  const porcelain = ask(['status', '--porcelain']);
+  return {
+    commit: commit && commit.length > 0 ? commit : 'unknown',
+    /* 空输出 = 工作树干净；`null`（git 挂了）也只能说「不知道」。 */
+    dirty: porcelain == null ? 'unknown' : porcelain.length === 0 ? 'clean' : 'dirty',
+  };
+}
+
+/** `BUILD-INFO.txt` 正文：键值形式、UTF-8、**LF**（跨平台比对时不会被 CRLF 坑）。 */
+function buildInfoText(identity, builtAtUtc) {
+  return (
+    [
+      'product: Timing',
+      `version: ${version}`,
+      `git_commit: ${identity.commit}`,
+      `git_dirty: ${identity.dirty}`,
+      `built_at_utc: ${builtAtUtc}`,
+      'build_profile: release',
+    ].join('\n') + '\n'
+  );
+}
+
+/* 在**构建开始时**取一次身份：此时工作树状态才是「我编的这份源码」的状态。
+   `built_at_utc` 留到二进制出来之后再取（见第 2 步末尾），两份 BUILD-INFO 用同一个值。 */
+const identity = gitIdentity();
 
 /**
  * 跑一个外部命令；失败即退出（构建脚本没有「继续」的语义）。
@@ -213,6 +272,12 @@ if (!existsSync(exePath)) {
 
 const results = [];
 
+/* `built_at_utc` 在这里取：上一行刚确认过二进制存在，这一刻才是「打完了」。
+   两份 BUILD-INFO（便携目录里 / `release/` 同级）共用这一个值，不会各写一个时间。 */
+const builtAtUtc = new Date().toISOString();
+const buildInfo = buildInfoText(identity, builtAtUtc);
+log(`构建身份：${identity.commit}${identity.dirty === 'dirty' ? '（工作树有改动）' : ''}`);
+
 // ---------------------------------------------------------------------------
 // 3. 便携形态：Timing-<ver>-portable\ + zip
 //
@@ -245,6 +310,9 @@ if (wantPortable) {
       '删掉本文件不影响使用。\r\n',
     'utf8',
   );
+  /* BUILD-INFO.txt 落在 staging 目录里 = 会进 zip = 用户解压即见。
+     这是「绿色版到底是哪个 commit」的唯一答案，必须写。 */
+  writeFileSync(join(stageDir, 'BUILD-INFO.txt'), buildInfo, 'utf8');
 
   rmSync(zipPath, { force: true });
   /* 从 `release/` 打包并点名**目录**，而不是 `-C stageDir .`：后者会把 zip 根当成
@@ -278,6 +346,7 @@ if (wantInstaller) {
     : [];
   if (produced.length !== 1) {
     console.error(`[build] ${nsisDir} 里应有 1 个 *-setup.exe，实得 ${produced.length} 个`);
+    console.error('        旧 setup 请挪进 release/archive/（不要在 bundle 目录里攒着）');
     process.exit(1);
   }
   const target = join(releaseDir, `Timing-${version}-setup.exe`);
@@ -296,6 +365,11 @@ if (wantInstaller) {
 // 通配一加就是不可逆的数据丢失。
 // ---------------------------------------------------------------------------
 
+/* 与 zip / setup 同级的第二份 BUILD-INFO：不用解压就能核对「这个包是哪个 commit」。
+   内容与便携目录里那份**逐字相同**（同一个 `buildInfo` 变量，不是各写一遍）。 */
+const buildInfoPath = join(releaseDir, `BUILD-INFO-${version}.txt`);
+writeFileSync(buildInfoPath, buildInfo, 'utf8');
+
 /* 每版一个校验和文件（`SHA256SUMS-<ver>.txt`），**不覆盖**历史的 `SHA256SUMS.txt`
    ——那份是手写的、含 Android apk 的哈希记录，整份重算会把那段抹掉。 */
 const sumsPath = join(releaseDir, `SHA256SUMS-${version}.txt`);
@@ -308,6 +382,7 @@ console.log('\n[build] 产物：');
 for (const r of results) {
   console.log(`  ${r.kind.padEnd(9)} ${relPath(r.path)}  ${human(r.bytes)}  (${r.note})`);
 }
+console.log(`[build] 构建身份：${relPath(buildInfoPath)}`);
 console.log(`[build] 校验和：${relPath(sumsPath)}`);
 console.log(sumsBody);
 console.log(`[build] 版本 ${version}；便携版数据目录 = 解压后的 Timing.exe 同级 data\\`);
