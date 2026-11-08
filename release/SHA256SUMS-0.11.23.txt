@@ -1,0 +1,2 @@
+# 本版只有手机包；桌面端 v0.11.23 只多了一条 mobile_only 桩（无行为变化），仍用 0.11.20 那两个（校验和见 SHA256SUMS-0.11.20.txt）
+48f60ce82a50a262a62ea32f3546a967ba1c7ac3da43c827e2173192cf585dc7 *Timing-android-0.11.23-release-arm64-debugsigned.apk
