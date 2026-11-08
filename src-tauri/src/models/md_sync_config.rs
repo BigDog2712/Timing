@@ -68,7 +68,13 @@ pub struct MdSyncConfig {
     /// [V0.11.26] 职责收窄为两件事：① 老 JSON 反序列化入口（`load()` 读时折算成
     /// 两条通路，内存置 `None`，磁盘不动）；② 「测试连接」载荷载体（前端现拼）。
     /// 新保存形**必须不出现这个键**（`skip_serializing_if`，出现即 bug）。
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ///
+    /// 例外：**手机产物不跳过**——`components/mobile` 全目录是零 diff 红线，那两个面板读
+    /// 的正是 `config.cloud`，而 `SyncPane` 用的是 `config.cloud !== null`（`undefined`
+    /// 会漏过去）。手机上 `load()` 会把 webdav 通路投影回这个键（见 `services::md_sync::config`），
+    /// 于是它永远有值；留着 `null` 的序列化形状是为了「从未配置」那一档不变成缺键。
+    #[serde(default)]
+    #[cfg_attr(not(mobile), serde(skip_serializing_if = "Option::is_none"))]
     pub cloud: Option<MdSyncCloud>,
     /// [V0.11.26] 块④ 本地同步通路。`None` = 从未配置（与新装同形）。
     #[serde(default, skip_serializing_if = "Option::is_none")]

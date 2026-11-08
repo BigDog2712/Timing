@@ -60,15 +60,23 @@ pub async fn load(pool: &SqlitePool) -> AppResult<MdSyncConfig> {
             } else {
                 (saved.cloud_folder, saved.cloud_webdav)
             };
+            /* [V0.11.26] 手机端兼容：`components/mobile` 全目录是零 diff 红线，两个面板仍读
+               legacy `cloud` 键（`SyncCloudPane` 拿它当草稿、`SyncPane` 拿它判「能不能同步」）。
+               桌面产物 `cloud` 恒 `None`（设计 §1.2 / O11–O13 不受影响），
+               手机产物把 webdav 通路投影回去——手机上本来也只有这一条通路（R7）。 */
+            #[cfg(not(mobile))]
+            let cloud = None;
+            #[cfg(mobile)]
+            let cloud = webdav
+                .as_ref()
+                .map(|channel| channel.to_legacy(crate::models::md_sync_cloud::CloudMode::Webdav));
             MdSyncConfig {
                 /* 总开关是用户的明确选择，保留（内核默认关，老用户存过 true 就还是 true）。 */
                 enabled: saved.enabled,
                 /* 间隔同理：用户调过就用用户的，没调过就是默认 15 分钟。 */
                 poll_secs: saved.poll_secs,
                 bindings: merge_bindings(saved.bindings, default_bindings()),
-                /* [V0.11.13] 云端通道**原样带出**的旧口径已由读时推断接管：内存里
-                `cloud` 恒为 `None`（老 JSON 的那份已折进两条通路，磁盘不动）。 */
-                cloud: None,
+                cloud,
                 cloud_folder: folder,
                 cloud_webdav: webdav,
             }
@@ -109,12 +117,21 @@ pub async fn poll_secs(pool: &SqlitePool) -> u64 {
 /// `cloud` 时也能落新结构——折算成两条通路后，`cloud` 键**必须不出现**在 JSON 里。
 pub async fn save(pool: &SqlitePool, config: &MdSyncConfig) -> AppResult<()> {
     let mut normalized = config.clone();
-    if normalized.cloud.is_some() {
-        let legacy = normalized.cloud.take();
-        let (folder, webdav) = split_legacy(legacy.as_ref());
-        /* 显式的新键优先（理论上不会与 legacy 同时出现），折算结果只补缺。 */
-        normalized.cloud_folder = normalized.cloud_folder.or(folder);
-        normalized.cloud_webdav = normalized.cloud_webdav.or(webdav);
+    if let Some(legacy) = normalized.cloud.take() {
+        #[cfg(not(mobile))]
+        {
+            let (folder, webdav) = split_legacy(Some(&legacy));
+            /* 显式的新键优先（理论上不会与 legacy 同时出现），折算结果只补缺。 */
+            normalized.cloud_folder = normalized.cloud_folder.or(folder);
+            normalized.cloud_webdav = normalized.cloud_webdav.or(webdav);
+        }
+        /* [V0.11.26] 手机端兼容：手机面板只发 legacy `cloud`（红线文件零 diff），
+           它在手机上就是 webdav 那一条通路的草稿——必须以它为准，否则用户在手机上
+           改的地址/账号落不了库。folder 通路原样保留（手机不跑它）。 */
+        #[cfg(mobile)]
+        {
+            normalized.cloud_webdav = split_legacy(Some(&legacy)).1;
+        }
     }
     normalized
         .validate()
