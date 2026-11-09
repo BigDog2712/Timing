@@ -11,6 +11,9 @@
 
 pub mod bootstrap;
 pub mod events;
+/* [V0.11.27] 计时快照 → 安卓悬浮条：与 `events` 分文件，因为桌面那边是空实现而
+`events` 本身要常年保持桌面可编（推送只在手机端有消费者）。 */
+pub mod overlay_push;
 /* [V0.12.0] 手机端一轮同步（镜像 → 合并 → 写回）：命令层与调度层共用这一份编排。 */
 #[cfg(mobile)]
 pub mod md_sync_mobile;

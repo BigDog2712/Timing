@@ -124,6 +124,8 @@ mod migration_v2;
 mod moyu_settings;
 mod note;
 mod note_pin;
+/* [V0.11.27] 悬浮条显示源改成「状态机快照」后的三条易错口径（暂停/待机/原样透传）。 */
+mod overlay_snapshot;
 mod plugin_v3_matrix;
 mod plugin_v3_wording;
 /* [QA V0.11.18] 「老用户云端配置一个字节都不许丢」的后端半场（PRD A3 / A4 / C2）：

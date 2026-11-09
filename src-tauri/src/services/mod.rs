@@ -12,6 +12,8 @@ pub mod md_backup_export;
 pub mod md_cloud;
 pub mod md_sync;
 pub mod note;
+/* [V0.11.27] 悬浮条快照组装（状态机 + 事项名 → 推送载荷）。仅手机端有消费者。 */
+pub mod overlay_push;
 pub mod plugin;
 pub mod plugin_merge;
 pub mod record;

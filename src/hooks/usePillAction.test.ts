@@ -1,12 +1,19 @@
 /**
- * Timing — 悬浮窗那一按的接收端（V0.11.22，PRD P7）
+ * Timing — 悬浮窗那一按的接收端（V0.11.22，PRD P7；[V0.11.27] 加兜底通道）
  * -----------------------------------------------------------------------------
  * 这条链是「Kotlin 探测 → 投事件 → 前端调 `togglePause()`」。三个环节里最容易被写坏的是
  * **注册的取消**：`addPluginListener` 是异步的，组件在注册完成之前卸载时如果不补一次
  * `unregister`，这个 channel 会一直留在插件里；下次重挂载再多一份，于是「点一下悬浮窗，
  * 计时被切换两次」——看起来像随机暂停，实际是监听器泄漏。
  *
- * 这里同时钉住「事件到了就调 togglePause」，以及「非移动端 / 非 Tauri 环境什么都不做」。
+ * [V0.11.27] 真机上还暴露了另一头：事件那条链在 WebView 被销毁 / 监听没挂上时**静默丢**，
+ * 用户看到「点了没反应」。所以原生侧按下的那一刻会先记一个 90 秒有效的标记，本 hook 回到
+ * 前台时问一次 `overlayTakeTap` 补做。四条用例把这条兜底通道钉住：
+ *
+ * 1. 事件到了 → **先**清标记，再切换（顺序反了会切两下）；
+ * 2. 挂载即查一次（App 被悬浮条拉起来，首帧就该补做）；
+ * 3. 标记太旧（> 90s）不补做（昨天那一按不该在今天生效）；
+ * 4. 没有标记时什么都不做（不能每次回前台都切一下）。
  */
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -16,9 +23,14 @@ const mocks = vi.hoisted(() => ({
   add: vi.fn(),
   unregister: vi.fn(),
   togglePause: vi.fn(),
+  invoke: vi.fn(),
+  pending: { on: false, ageMs: -1 },
 }));
 
-vi.mock('@tauri-apps/api/core', () => ({ addPluginListener: mocks.add }));
+vi.mock('@tauri-apps/api/core', () => ({
+  addPluginListener: mocks.add,
+  invoke: mocks.invoke,
+}));
 vi.mock('./useTimerActions', () => ({
   useTimerActions: () => ({ togglePause: mocks.togglePause }),
 }));
@@ -43,7 +55,15 @@ beforeEach(() => {
   mocks.add.mockReset();
   mocks.unregister.mockReset();
   mocks.togglePause.mockReset();
+  mocks.invoke.mockReset();
+  mocks.pending = { on: false, ageMs: -1 };
   mocks.add.mockResolvedValue({ unregister: mocks.unregister });
+  mocks.invoke.mockImplementation(async (cmd: string) => {
+    if (String(cmd).endsWith('|overlayTakeTap')) {
+      return { pending: mocks.pending.on, ageMs: mocks.pending.ageMs };
+    }
+    return null;
+  });
 });
 
 afterEach(() => {
@@ -51,12 +71,20 @@ afterEach(() => {
   host.remove();
 });
 
+/** 渲染并等挂载期的异步（注册 + 首次查标记）落定。 */
+async function mount(): Promise<void> {
+  await act(async () => {
+    root.render(createElement(Probe));
+  });
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
 describe('悬浮窗事件接收（P7）', () => {
   /** 注册参数是契约：插件名与事件名必须与 Kotlin 侧一致（另见 `SyncPane.source.test.ts`）。 */
   it('p7_registers_the_plugin_channel', async () => {
-    await act(async () => {
-      root.render(createElement(Probe));
-    });
+    await mount();
     expect(mocks.add).toHaveBeenCalledTimes(1);
     expect(mocks.add.mock.calls[0][0]).toBe('timing-native');
     expect(mocks.add.mock.calls[0][1]).toBe('pill:toggle');
@@ -65,19 +93,65 @@ describe('悬浮窗事件接收（P7）', () => {
 
   /** 事件到了 → 走主界面那颗大按钮的同一套动作（idle 开始 / running 暂停 / paused 继续）。 */
   it('p7_event_calls_toggle_pause', async () => {
-    await act(async () => {
-      root.render(createElement(Probe));
-    });
+    await mount();
     const handler = mocks.add.mock.calls[0][2] as () => void;
     act(() => handler());
     expect(mocks.togglePause).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * 顺序：**先**清标记再切换。
+   *
+   * 反过来的话，切换那一两百毫秒里用户切到后台再回来，兜底通道会看到标记还在，
+   * 于是同一按被执行两下（表现是「点一下暂停又继续」）。
+   */
+  it('p7_event_clears_the_pending_mark_before_toggling', async () => {
+    await mount();
+    mocks.togglePause.mockClear();
+    mocks.invoke.mockClear();
+
+    const handler = mocks.add.mock.calls[0][2] as () => void;
+    act(() => handler());
+
+    const clearCall = mocks.invoke.mock.calls.findIndex((c) => String(c[0]).endsWith('|overlayClearTap'));
+    expect(clearCall, '事件回调里没有清标记 → 兜底通道会再切一次').toBeGreaterThanOrEqual(0);
+    expect(mocks.togglePause).toHaveBeenCalledTimes(1);
+
+    const order = mocks.invoke.mock.invocationCallOrder[clearCall];
+    expect(order).toBeLessThan(mocks.togglePause.mock.invocationCallOrder[0]);
+  });
+
+  /** 挂载即查一次：App 是被悬浮条拉起来的，首帧就该补做，不能等用户手动切前后台。 */
+  it('p8_mount_drains_the_pending_mark', async () => {
+    mocks.pending = { on: true, ageMs: 1_200 };
+    await mount();
+    expect(mocks.togglePause).toHaveBeenCalledTimes(1);
+  });
+
+  /** 太旧的标记不认：昨天按的那一下不该在今天打开 App 时把计时切走。 */
+  it('p8_stale_mark_is_ignored', async () => {
+    mocks.pending = { on: true, ageMs: 10 * 60_000 };
+    await mount();
+    expect(mocks.togglePause).not.toHaveBeenCalled();
+  });
+
+  /** 没有标记时回前台什么都不做（否则每次回前台都会切一下计时）。 */
+  it('p8_foreground_without_mark_does_nothing', async () => {
+    await mount();
+    mocks.togglePause.mockClear();
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+      window.dispatchEvent(new Event('focus'));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(mocks.togglePause).not.toHaveBeenCalled();
+  });
+
   /** 卸载要注销：不注销 = 同一个事件被执行 N 次（表现是「点一下暂停两次」）。 */
   it('p7_unmount_unregisters', async () => {
-    await act(async () => {
-      root.render(createElement(Probe));
-    });
+    await mount();
     act(() => root.unmount());
     expect(mocks.unregister).toHaveBeenCalledTimes(1);
   });

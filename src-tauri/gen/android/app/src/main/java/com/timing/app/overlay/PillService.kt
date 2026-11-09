@@ -27,7 +27,18 @@ import com.timing.app.native.Prefs
  *
  * 窗口、形态切换、手势、刷新节奏全部照搬；**唯一的差别是不碰计时状态机**：
  * 老版本直接持有 `TimerCore`，点一下就暂停；Tauri 版里状态机在 Rust，原生层再写一遍
- * 就会出现两份计时口径。所以这里只读数据库，短按/长按都只做「展开」「回主界面」。
+ * 就会出现两份计时口径。所以这里一个字节都不写库，短按只把「有人按了一下」投给前端。
+ *
+ * ## 显示源（[V0.11.27] 改过，别改回去）
+ *
+ * ```text
+ * Rust 推来的快照（Prefs.overlaySnapshot）   ← 优先：状态机算出来的
+ *   └─ 没有 → 只读打开 timing.db 现取一次     ← 兜底
+ * ```
+ *
+ * v0.11.22 只有兜底那条，于是「库读不到」＝「悬浮条永远待机，而且一个字都不说」。真机上
+ * 这就是主人报的「主界面在计时，悬浮条和主界面无联系」。现在改成推 + 兜底，并且**两条路
+ * 出问题都会写进通知副标题**（`Snap.note` / `lastTapError`）——排查不用再靠猜。
  */
 class PillService : Service() {
 
@@ -91,6 +102,9 @@ class PillService : Service() {
     private var reader: TimerReader? = null
     private var lastOpenTryMs = 0L
 
+    /** 最近一次「点了但没能打开主界面」的原因（[V0.11.27]）；落进通知副标题。 */
+    private var lastTapError: String? = null
+
     private var pill: PillView? = null
     private var lp: WindowManager.LayoutParams? = null
     private var rotation: RotationWatcher? = null
@@ -139,8 +153,7 @@ class PillService : Service() {
      * 部分 ROM 上比两参版本更稳；低版本仍走两参（三参版本是 API 29 才有的）。
      */
     private fun enterForeground(): Boolean = runCatching {
-        val snap = ensureReader()?.read() ?: TimerReader.Snap.IDLE
-        val notification = OverlayNoti.build(this, snap)
+        val notification = OverlayNoti.build(this, noticeOf(currentSnap()))
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(
                 OverlayNoti.ID,
@@ -197,6 +210,35 @@ class PillService : Service() {
         return opened
     }
 
+    /**
+     * 当前要显示的快照（[V0.11.27]）：**先看 Rust 推来的，再看库**。
+     *
+     * 顺序不能反。推来的那份是状态机算出来的（暂停时 `runningSince` 为 null、倒计时给目标值），
+     * 而库只是它的持久化投影；再说了，库里读不到东西的时候，推来的那份照样是准的
+     * ——这正是这一轮修的那个「主界面在计时、悬浮条不动」。
+     */
+    private fun currentSnap(): TimerReader.Snap {
+        pushedSnap()?.let { return it }
+        val opened = ensureReader()
+            ?: return TimerReader.Snap.IDLE.copy(note = "读不到计时库：" + TimerReader.lastProbe)
+        return opened.read()
+    }
+
+    /**
+     * 从偏好里读 Rust 推来的快照。
+     *
+     * 不设「过期时间」：`runningSince` 是绝对墙钟时刻，一份几小时前推的快照在计时中照样
+     * 能算出正确的时长；设过期反而会把一份**正确**的数据丢掉，退回那条会失败的老路。
+     */
+    private fun pushedSnap(): TimerReader.Snap? =
+        TimerReader.Snap.fromPush(Prefs.overlaySnapshot(this), System.currentTimeMillis())
+
+    /** 通知里要额外说的那句话：先报「点不动」，再报「读不到」，两者都是用户能行动的信息。 */
+    private fun noticeOf(snap: TimerReader.Snap): TimerReader.Snap {
+        val note = lastTapError ?: snap.note
+        return if (note == null) snap else snap.copy(note = note)
+    }
+
     // ------------------------------------------------------------ 窗口
 
     private fun attach() {
@@ -245,7 +287,7 @@ class PillService : Service() {
 
     private fun render() {
         val view = pill ?: return
-        val snap = ensureReader()?.read() ?: TimerReader.Snap.IDLE
+        val snap = currentSnap()
 
         // 从「没在跑」变成「在跑」：圆点先展开几秒把时长亮出来。
         // 老版本靠「点小圆点开始计时」来触发这一步；这版开始动作在 Rust，所以改成
@@ -269,7 +311,7 @@ class PillService : Service() {
             lastW = view.width
             lp?.let { params -> runCatching { wm.updateViewLayout(view, params) } }
         }
-        lastNoti = OverlayNoti.push(nm, this, snap, lastNoti)
+        lastNoti = OverlayNoti.push(nm, this, noticeOf(snap), lastNoti)
     }
 
     /** 500ms 一跳：推进时长 + 倒计时最后 60s 的 1 秒闪烁（与老版本同频）。 */
@@ -325,16 +367,23 @@ class PillService : Service() {
      * 也不做「点了没反应」。
      */
     private fun onTap() {
-        val snap = ensureReader()?.read() ?: TimerReader.Snap.IDLE
+        val snap = currentSnap()
         /* 圆点未展开、且确实有一场计时在：先给用户看时长。这是唯一「不吃掉这一按」的分支。 */
         if (snap.active && Prefs.overlayStyle(this) == Prefs.STYLE_DOT && !expanded) {
             expandTemporarily()
             return
         }
+        /* [V0.11.27] 先记一笔「这一按发生过」，再投事件。
+           前端接到事件的第一件事就是清掉它；万一没人接（WebView 已销毁 / 监听没挂上 /
+           事件在半路丢了），标记会留着，App 回到前台时由前端补做一次。
+           代价只有一次 SharedPreferences 写入，换来的是「点了没反应」不再无解。 */
+        lastTapError = null
+        Prefs.markPendingTap(this)
         if (bridge?.invoke(EVENT_TOGGLE) != true) {
-            Log.w(TAG, "没有前端在听 $EVENT_TOGGLE：退回打开主界面")
+            Log.w(TAG, "没有前端在听 $EVENT_TOGGLE：退回打开主界面（标记保留给前台补做）")
             openApp()
         }
+        render()
     }
 
     private fun expandTemporarily() {
@@ -350,7 +399,19 @@ class PillService : Service() {
         render()
     }
 
+    /**
+     * 回主界面。
+     *
+     * [V0.11.27] 失败不再静默 `runCatching`：从后台服务拉起 Activity 在部分 ROM（尤其
+     * 开了「后台弹出界面」限制的）上会被拦，而这条路径正是「点了没反应、App 也没打开」
+     * 的唯一解释。拦下来就把原因写进通知副标题——用户至少能看见「点不动，因为系统不让」，
+     * 而不是对着一个没反应的药丸。
+     */
     private fun openApp() {
         runCatching { startActivity(OverlayNoti.openIntent(this)) }
+            .onFailure { err ->
+                lastTapError = "点悬浮条没能打开主界面：${err.message ?: err.javaClass.simpleName}"
+                Log.w(TAG, lastTapError!!, err)
+            }
     }
 }

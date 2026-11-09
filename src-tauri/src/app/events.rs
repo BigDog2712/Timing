@@ -44,6 +44,9 @@ pub async fn emit_timer_state(app: &AppHandle, pool: &SqlitePool) {
     match services::timer::state(pool).await {
         Ok(state) => {
             sync_tray(app, pool, &state).await;
+            /* [V0.11.27] 同一处再推一次悬浮条。跟着广播走而不是各记各的时机：
+               这是计时状态的唯一出口，多一个挂点就多一条会漏推的路径。 */
+            crate::app::overlay_push::push(app, pool).await;
             if let Err(err) = app.emit(TIMER_STATE_CHANGED, &state) {
                 crate::log_warn!("emit {TIMER_STATE_CHANGED} failed: {err}");
             }

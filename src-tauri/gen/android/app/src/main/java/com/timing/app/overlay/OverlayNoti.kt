@@ -57,6 +57,9 @@ internal object OverlayNoti {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setShowWhen(false)
+            /* [V0.11.27] 兜底原因可能长（探路清单），展开通知要能看全：
+               这是用户在手机上**唯一**能看到「为什么悬浮条不动」的地方。 */
+            .setStyle(Notification.BigTextStyle().bigText(title(snap) + "\n" + subText(snap)))
             .setContentIntent(open)
             .addAction(
                 Notification.Action.Builder(
@@ -94,8 +97,14 @@ internal object OverlayNoti {
         else -> "${snap.item.ifEmpty { "计时中" }} · ${clock(snap.displaySec)}"
     }
 
-    /** 副标题：状态本身（与老版本同一套措辞）。 */
+    /**
+     * 副标题：状态本身（与老版本同一套措辞）。
+     *
+     * [V0.11.27] `note` 优先：它是「数据没读到 / 点击打不开」的原因，比状态描述重要得多
+     * ——状态描述错了最多不准确，原因不说是彻底没法行动。
+     */
     private fun subText(snap: TimerReader.Snap): String = when {
+        snap.note != null -> snap.note
         !snap.active -> "点小圆点或长条回到 Timing 开始计时"
         snap.urgent -> "倒计时最后一分钟"
         snap.countdown -> if (snap.running) "倒计时进行中" else "已暂停"

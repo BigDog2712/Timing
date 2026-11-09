@@ -24,6 +24,8 @@ pub mod moyu;
 pub mod native;
 pub mod note;
 pub mod nudge;
+/* [V0.11.27] 悬浮条的显示快照：显示源从「原生读库」改成「Rust 状态机推送」。 */
+pub mod overlay;
 pub mod plugin;
 pub mod record;
 pub mod reminder;

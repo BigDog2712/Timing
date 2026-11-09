@@ -82,6 +82,7 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     tauri::async_runtime::block_on(services::settings::ensure_defaults(&pool))?;
     app.manage(AppState::new(pool.clone()));
     boot_timing::mark("defaults_ready");
+    crate::app::overlay_push::push_on_boot(&app, &pool); // [V0.11.27] 冷启动补推悬浮条快照（必须 spawn 的理由见该函数）
 
     // ④' 移动端通知通道：API 26+ 没有通道的通知会被系统静默丢弃，必须在第一次
     //    发送前建好（倒计时 / 提醒都走这条通道）。

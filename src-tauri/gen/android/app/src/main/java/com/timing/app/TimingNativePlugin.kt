@@ -19,6 +19,7 @@ import com.timing.app.native.SafVault
 import com.timing.app.native.SecretStore
 import com.timing.app.overlay.PillService
 import java.io.File
+import org.json.JSONObject
 
 /** 镜像目录名；Rust 侧总是把绝对路径显式传进来，这里只是没传时的兜底。 */
 private const val MIRROR_DIR = "md-mirror"
@@ -347,6 +348,64 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
     @Command
     fun overlayStatus(invoke: Invoke) {
         resolveOverlay(invoke)
+    }
+
+    /**
+     * 悬浮条的显示快照（[V0.11.27]，Rust → Kotlin）。
+     *
+     * 由 Rust 在**每次计时状态迁移**时推来（`app::overlay_push`），落进 `Prefs` 再让服务
+     * 立刻重画。字段名与 `models::overlay::OverlaySnapshot` 的 camelCase 一一对应。
+     *
+     * 为什么不在这里直接读库：v0.11.22 的做法（原生直读 `timing.db`）在真机上失败过一次，
+     * 失败时只有一行被吞掉的异常，用户看到「主界面在计时、悬浮条不动」。显示源改成
+     * 状态机算出来的快照之后，原生侧不需要理解库，也就不会再有两份口径。
+     */
+    @Command
+    fun overlayPush(invoke: Invoke) {
+        val args = invoke.getArgs()
+        val snap = JSONObject().apply {
+            put("status", args.optString("status", "idle"))
+            put("item", args.optString("item", ""))
+            put("accumulatedSec", args.optLong("accumulatedSec", 0L))
+            /* null 要原样保留：`optLong` 对 JSON 的 null 会给 0，而 0 是一个合法的墙钟时刻
+               （1970），拿它当锚点会算出五十六年的时长。 */
+            if (args.isNull("runningSince")) put("runningSince", JSONObject.NULL)
+            else put("runningSince", args.optLong("runningSince", 0L))
+            put("mode", args.optString("mode", "countup"))
+            put("targetSec", args.optLong("targetSec", 0L))
+        }
+        Prefs.setOverlaySnapshot(activity, snap.toString())
+        /* 只在开关打开时叫醒服务：`refresh` 走的是 `startService`，对没开的用户来说
+           那等于「每次开始计时都凭空起一个前台服务 + 一条常驻通知」——功能关了还冒出来，
+           是比不显示更糟的错。快照照存不误：用户之后打开开关，第一帧就该是对的。 */
+        if (Prefs.overlayEnabled(activity)) PillService.refresh(activity)
+        invoke.resolve()
+    }
+
+    /**
+     * 取走「悬浮条被按了一下」的标记（[V0.11.27]，前端在回到前台时调用）。
+     *
+     * 返回 `{pending, ageMs}`：`pending=true` 表示这一按**没有被** WebView 里的监听者接走
+     * （否则前端收到事件时已经清掉了），调用方补做一次切换。
+     *
+     * `ageMs` 让调用方能自己决定要不要认：一个昨天按的标记不该在今天打开 App 时突然
+     * 把计时切一下。
+     */
+    @Command
+    fun overlayTakeTap(invoke: Invoke) {
+        val at = Prefs.pendingTap(activity)
+        val res = JSObject()
+        res.put("pending", at > 0)
+        res.put("ageMs", if (at > 0) System.currentTimeMillis() - at else -1L)
+        if (at > 0) Prefs.clearPendingTap(activity)
+        invoke.resolve(res)
+    }
+
+    /** 事件已经有人接走：把标记清掉，避免回前台时再补做一次（那样会变成两下）。 */
+    @Command
+    fun overlayClearTap(invoke: Invoke) {
+        Prefs.clearPendingTap(activity)
+        invoke.resolve()
     }
 
     /** 从系统授权页返回时补一次：开关已存 true，权限也给了，就该把服务起来。 */
