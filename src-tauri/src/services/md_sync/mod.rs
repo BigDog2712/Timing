@@ -199,8 +199,7 @@ async fn sync_binding(
     binding: &MdSyncBinding,
     date: chrono::NaiveDate,
     path: &Path,
-    /* [V0.11.33] 日记模板路径（全局一份）：经 `sync_all`（持有 config）传下，红线豁免 +2 净 0 已裁决放行。 */
-    template: &str,
+    template: &str, /* [V0.11.33] 日记模板路径（全局一份）：经 `sync_all`（持有 config）传下，红线豁免 +2 净 0 已裁决放行 */
 ) -> Result<BindingOutcome, String> {
     let read = md_file::read_section(path, &binding.heading)?;
     /* 阻断级诊断：本轮既不写也不导入（不写保住手改内容，不导入不触发删除块）。 */
@@ -254,10 +253,10 @@ async fn sync_binding(
         SectionState::Present { body, .. } => body.trim_end() != target.trim_end(),
     };
     if needs_write {
-        /* [V0.11.33] 首次写出套模板（P16/P17/P18）：文件已存在时它自己短路，零字节不碰。 */
-        crate::infra::md_diary::seed_if_missing(path, template);
+        crate::infra::md_diary::seed_if_missing(path, template); /* [V0.11.33] P16/P17/P18 首次写出套模板：文件已存在时它自己短路，零字节不碰 */
         md_file::write_section(path, &binding.heading, &target)?;
-    }    rt.set_baseline(binding.kind, path, &binding.heading, target);
+    }
+    rt.set_baseline(binding.kind, path, &binding.heading, target);
 
     Ok(BindingOutcome {
         exported: needs_write,

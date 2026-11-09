@@ -5,24 +5,23 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PathMeasure
-import android.graphics.RadialGradient
 import android.graphics.RectF
-import android.graphics.Shader
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.View
 import kotlin.math.ceil
-import kotlin.math.cos
-import kotlin.math.sin
 
 /**
  * 小条本体（自绘，不走 XML）。
  *
  * 两种形态共用一套绘制与测量逻辑，**逐处对齐老工程 `android-app` 的 `overlay/PillView`**
- * （2026-11 归档的 0.3.6 原生版，路径 `D:\101-Workshop\261102-Timing`）：
+ * （2026-11 归档的 0.3.6 原生版，路径 `D:\101-Workshop\261102-Timing`）。
+ * **[V0.11.33] 有意偏离 0.3.6 归档基线（主人口径）：小圆点竖条指针 + 去玻璃层，不回改**——
+ * 30-PRD §七（需求 3）：指针改为有宽度的竖条、删去外面半透明圆框。
  *
- * - `dotMode = true`  28dp 小圆点：一颗玻璃表盘。待机时常驻，点一下临时展开成条；
+ * - `dotMode = true`  28dp 小圆点：素面表盘（墨圈 + 双轨 + 竖条指针 + 轴心）。
+ *   待机时常驻，点一下临时展开成条；
  * - `dotMode = false` 高 32dp 药丸：圆角方形状态环 + 等宽时间 + 事项名。
  *
  * 为什么要两种：待机时谁也不希望屏幕上多一条黑杠，一颗 28dp 的球足够表达「它还在」；
@@ -100,9 +99,6 @@ internal class PillView(context: Context) : View(context) {
     private val ringSeg = Path()
     private val ringRect = RectF()
 
-    /** 小圆点的玻璃球面。尺寸变化时重建 —— 每帧 new 一个 Shader 会拖住 overlay 的绘制。 */
-    private var glass: RadialGradient? = null
-
     private fun d(v: Float): Float = v * resources.displayMetrics.density
 
     // ---- 药丸
@@ -114,29 +110,17 @@ internal class PillView(context: Context) : View(context) {
     private val barH = d(32f)
     private val nameMax = d(92f)
 
-    // ---- 小圆点内部比例：轨道贴近外缘，时针只走里圈，两者中间留一圈空隙，
-    //      否则看着像表盘裂了。数值与老版本逐项一致。
+    // ---- 小圆点内部比例：轨道贴近外缘，竖条指针只走里圈，两者中间留一圈空隙，
+    //      否则看着像表盘裂了。轨道 / 内外径数值与老版本逐项一致；
+    //      [V0.11.33] 指针由 1.5dp 细线改为 2.5dp 宽竖条（PM 建议值），长度/角度语义不变。
     private val dotSize = d(28f)
-    private val dotRim = d(1.1f)
     private val dotTrack = d(9.2f)
     private val dotNeedleIn = d(1.6f)
     private val dotNeedleOut = d(6.4f)
+    private val dotNeedleWidth = d(2.5f)
     private val dotPivot = d(1.5f)
 
     // ------------------------------------------------------------ 测量
-
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        val r = minOf(w, h) / 2f
-        if (r <= 0f) return
-        // 中心全透 → 中段几乎透明 → 边缘 14% 白：看起来是一层薄玻璃，不是一块底
-        glass = RadialGradient(
-            w / 2f, h / 2f, r,
-            intArrayOf(0x00FFFFFF, 0x05FFFFFF, Tk.PILL_DOT_GLASS),
-            floatArrayOf(0f, 0.58f, 1f),
-            Shader.TileMode.CLAMP,
-        )
-    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         if (dotMode) {
@@ -171,9 +155,11 @@ internal class PillView(context: Context) : View(context) {
     }
 
     /**
-     * 小圆点 = 一颗玻璃表盘。
+     * 小圆点 = 一枚素面表盘。
      *
-     * 层序从外到内：墨色外圈 → 玻璃球面 → 内缘高光 → 表盘轨道 → 时针 + 进度弧 → 轴心。
+     * 层序从外到内：墨色外圈 → 表盘轨道（墨白双轨）→ 竖条指针 + 进度弧 → 轴心。
+     * **[V0.11.33] 去掉了 0.3.6 的玻璃球面与内缘高光两层**（主人口径：删去外面半透明
+     * 圆框），保留的各层与老版本逐项一致。
      *
      * 之所以外面还留一条墨圈：这个圆点会浮在别人的界面之上，可能压在纯白淘宝上，
      * 也可能压在黑色相机取景框上。只有白环会在白底上隐形，只有黑环会在黑底上隐形，
@@ -186,14 +172,6 @@ internal class PillView(context: Context) : View(context) {
         stroke.strokeWidth = d(0.7f)
         stroke.color = Tk.PILL_DOT_EDGE
         canvas.drawCircle(c, c, edge, stroke)
-
-        fill.shader = glass
-        canvas.drawCircle(c, c, edge - d(0.35f), fill)
-        fill.shader = null
-
-        stroke.strokeWidth = d(0.9f)
-        stroke.color = Tk.PILL_DOT_RIM
-        canvas.drawCircle(c, c, edge - dotRim, stroke)
 
         // 轨道两层叠着画：墨色当衬底、白线当主轨。
         // 深色壁纸上墨色几乎不可见 → 看到白环；浅色 App 上白色不可见 → 看到灰环。
@@ -210,19 +188,20 @@ internal class PillView(context: Context) : View(context) {
         val arc = if (done) 1f else arcFraction(nowSec)
         val needle = needleFraction(nowSec)
 
-        // 时针（分针语义）：正计时 60 分钟一圈，倒计时指在「剩余」的位置
+        // 竖条指针（分针语义）：正计时 60 分钟一圈，倒计时指在「剩余」的位置。
+        // [V0.11.33] 由 1.5dp drawLine 改为 2.5dp 宽的圆角竖条（主人口径：内部指针改为
+        // 有宽度的竖条即可）。径向长度沿用 dotNeedleIn → dotNeedleOut，角度语义不变；
+        // 用 save/rotate 免去三角函数算四角。
         if (needle > 0f) {
-            val rad = Math.toRadians(-90.0 + 360.0 * needle)
-            val dx = cos(rad).toFloat()
-            val dy = sin(rad).toFloat()
-
-            stroke.strokeWidth = d(1.5f)
-            stroke.color = ringColor()
-            canvas.drawLine(
-                c + dx * dotNeedleIn, c + dy * dotNeedleIn,
-                c + dx * dotNeedleOut, c + dy * dotNeedleOut,
-                stroke,
+            canvas.save()
+            canvas.rotate(-90f + 360f * needle, c, c)
+            fill.color = ringColor()
+            canvas.drawRoundRect(
+                c - dotNeedleWidth / 2f, c - dotNeedleOut,
+                c + dotNeedleWidth / 2f, c - dotNeedleIn,
+                dotNeedleWidth / 2f, dotNeedleWidth / 2f, fill,
             )
+            canvas.restore()
         }
 
         // 进度弧：正计时 60 秒一圈循环（动感），倒计时按剩余比例回落
