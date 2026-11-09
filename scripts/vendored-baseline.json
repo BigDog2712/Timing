@@ -2,9 +2,17 @@
   "_doc": "vendored 基线：Patina 子树（前端 src/app、src/features、src/platform、src/shared；后端 src-tauri/src/{app,commands,infra,models,services}/insight）在归一态的逐文件哈希。不要手改 —— 用 node scripts/check-vendored-diff.mjs --refresh <ref> 重生成；「批次」改动按 scripts/check-vendored-diff.mjs 头注释的批次规则重锚（见 _reanchor），批次之外的临时改动才登记到 scripts/vendored-allowlist.json。注意：allowlist 里登记为 added 的文件在基线中没有哈希，登记后内容变化抓不到。",
   "source": {
     "kind": "git",
-    "ref": "4ef9e1c",
+    "frontend": {
+      "ref": "7bc7bd7",
+      "note": "融合完成态：T01 去前缀只改路径与 11 行相对引用，前端内容哈希按新路径重锚"
+    },
+    "backend": {
+      "ref": "9a7772f",
+      "note": "归一态：T02 后端去子树后的首个提交；T03（日志宏 + 事件常量）在 4ef9e1c 整批重锚，见 _reanchor"
+    },
     "upstream": "https://github.com/Ceceliaee/patina",
-    "note": "融合完成态 7bc7bd7 之上叠加 T02（整层搬迁 + 17 个 _cmd 改名 + crate::patina::* 新前缀）与 T03（日志宏 + 事件常量）。哈希按批次重锚，见 _reanchor；allowlist 只留批次外改动。",
+    "note": "两侧 ref 分开锚定：T01 只动前端，T02 才铺平后端；机械改写批次不逐文件登记，按 _reanchor 整批重锚",
+    "pathMapping": "前端 src/{app,features,platform,shared} 原样、src/App.{tsx,css} 与 src/main.tsx 进 src/app/、src/styles → src/app/styles/；后端 src-tauri/src/{domain,platform,data,engine,app,commands} → 本地 models/infra/services/services/app/commands 下的 insight 命名空间。--upstream 按 UPSTREAM_MAP 反推。",
     "generated": "2026-11-09"
   },
   "roots": [

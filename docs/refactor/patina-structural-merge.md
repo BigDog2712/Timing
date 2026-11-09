@@ -1,9 +1,17 @@
 # Patina 结构归一（Structural Merge）方案
 
-> 状态：待评审 · 版本：v1 · 作者：架构师
+> 状态：**已执行**（2026-11-09） · 版本：v1 · 作者：架构师
 > 适用仓库：`D:\101-Workshop\261109-Timing`（Tauri 2 + React 19，`master`）
-> 本文只出方案，**不含任何源码改动**。文内所有数字均为本机实测，命令写在 §9 附录。
-> 唯一写出的文件：`docs/refactor/patina-structural-merge.md`。
+> 本文是执行前的方案原文，**保留当时的判断与数字不追改**（追改会让「为什么这么定」失去证据）。
+> 执行结果按批次记在下面；后续维护看 `AGENTS.md` 与 `THIRD-PARTY-NOTICES.md`。
+
+| 批次 | commit | 内容 |
+|---|---|---|
+| T01 | `528bb80` | 前端剥掉 `patina/` 前缀：446 文件铺平进 `src/{app,features,platform,shared}` |
+| T02 | `9a7772f` | 后端去子树：`src-tauri/src/patina/*` 按层并入 5 个 `insight/` 命名空间 + 17 个 `_cmd` 后缀 |
+| T03 | `4ef9e1c` | 代码归一化（日志宏 ×153、事件常量 ×9、契约与门禁适配）；收口 `abc62cd` / `fc9bb62` / `cf35f8f` / `37c0be5` |
+| T04 | `56f658c` | 门禁重锚：撤销全部 vendored 路径豁免，新增 L9 双窗隔离 |
+| T05 | 见「T05 补记」提交 | 账本改造（`UPSTREAM_MAP` / `TEXT_MAP` / 分锚 / owner 必填）+ 文档收尾 |
 
 ---
 

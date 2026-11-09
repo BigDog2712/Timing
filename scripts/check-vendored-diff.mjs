@@ -50,9 +50,14 @@
  * 总分歧」，两者互补——前者管「我们自己有没有乱动」，后者管「离上游漂了多远」。
  *
  * 基线的取法（重要）：
- *   基线 = **融合完成态**（commit 7bc7bd7）的哈希快照，不是上游原样。
- *   原因：并入时做过一次**机械改写**——`crate::` → `crate::patina::`（220 个文件）、
- *   内联 `#[cfg(test)] mod tests` 拆成 `*_mod_tests.rs`（35 个文件）、模块树上移。
+ *   基线 = **融合完成态**（前端 commit 7bc7bd7）与 **归一态**（后端 commit 9a7772f）
+ *   的哈希快照，不是上游原样。`source` 因此拆成 frontend / backend 两个锚点：
+ *   T01 只把前端路径剥掉 `patina/` 这一层（内容哈希不变），T02 才把后端铺进宿主六层；
+ *   此后 T02/T03 的机械改写按 `_reanchor` 整批重锚（最新哈希对应 4ef9e1c），
+ *   `_reanchor` 本身就是「哪一批、为什么、动了多大范围」的账。
+ *   原因：并入时做过**机械改写**——`crate::` → `crate::patina::`（后来归一又改回
+ *   `crate::`）、内联 `#[cfg(test)] mod tests` 拆成 `*_mod_tests.rs`（35 个文件）、
+ *   命令模块补 `_cmd` 后缀（17 个文件）、模块树上移。
  *   这些是「搬家」不是「改需求」，用逐文件白名单去表达只会得到 250 条噪音，
  *   而真正要盯的是**搬家之后**谁又动了它。融合期的改动记在 `THIRD-PARTY-NOTICES.md`
  *   第 1–7 条（人读），不在这里重复一遍。
@@ -63,8 +68,8 @@
  *   node scripts/check-vendored-diff.mjs --upstream <dir> 出「与上游差多少」的报告
  *
  * `--upstream` 只报告不卡门：它需要上游副本（解压的 patina-main），属于**查账**动作，
- * 不是每次提交都要跑的事。报告里会把 `crate::patina::` 归一回去，否则 220 个文件的
- * 机械改写会把真正的改动淹掉。
+ * 不是每次提交都要跑的事。报告里会把本地归一态**反推回上游坐标系**（`UPSTREAM_MAP`
+ * + `TEXT_MAP`），否则前缀差异会把真正的改动淹掉。
  */
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -89,6 +94,69 @@ const ROOTS = [
 const BASELINE = join(root, 'scripts', 'vendored-baseline.json');
 const ALLOWLIST = join(root, 'scripts', 'vendored-allowlist.json');
 const HASH_LEN = 16; // 64 bit 足够区分「同一文件的两个版本」，全量 64 位会让清单膨胀三倍
+
+/* 上游相对路径 → 本地相对路径（§6.2）。全部是「前缀 + 尾部原样」，无逐文件特例；
+ * `extra` 是上游 `src/` 根下的 4 个例外：App.tsx / main.tsx / App.css 进 `src/app/`，
+ * styles 进 `src/app/styles/`。顺序无关——反推时按 loc 长度从长到短匹配，
+ * 保证 `src/app/styles/*` 不会被 `src/app` 那条先吃掉。 */
+const UPSTREAM_MAP = [
+  // 前端：4 个域目录是纯前缀剥离
+  {
+    up: 'src/app',
+    loc: 'src/app',
+    extra: [
+      { up: 'src/App.tsx', loc: 'src/app/App.tsx' },
+      { up: 'src/main.tsx', loc: 'src/app/main.tsx' },
+      { up: 'src/App.css', loc: 'src/app/App.css' },
+      { up: 'src/styles', loc: 'src/app/styles' },
+    ],
+  },
+  { up: 'src/features', loc: 'src/features' },
+  { up: 'src/platform', loc: 'src/platform' },
+  { up: 'src/shared', loc: 'src/shared' },
+  // 后端：6 条前缀映射（上游单层目录 → 本地 `<层>/insight/...`）
+  { up: 'src-tauri/src/domain', loc: 'src-tauri/src/models/insight' },
+  { up: 'src-tauri/src/platform', loc: 'src-tauri/src/infra/insight' },
+  { up: 'src-tauri/src/data', loc: 'src-tauri/src/services/insight/data' },
+  { up: 'src-tauri/src/engine', loc: 'src-tauri/src/services/insight/engine' },
+  { up: 'src-tauri/src/app', loc: 'src-tauri/src/app/insight' },
+  { up: 'src-tauri/src/commands', loc: 'src-tauri/src/commands/insight' },
+];
+
+/* 文本归一：本地归一态路径 → 上游路径。**单遍**替换，避免 A→B 之后又被 B→C 二次命中。 */
+const TEXT_MAP = new Map([
+  ['crate::services::insight::data::', 'crate::data::'],
+  ['crate::models::insight::', 'crate::domain::'],
+  ['crate::infra::insight::', 'crate::platform::'],
+  ['crate::commands::insight::', 'crate::commands::'],
+  ['crate::services::insight::engine::', 'crate::engine::'],
+  ['crate::app::insight::', 'crate::app::'],
+]);
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const TEXT_MAP_RE = new RegExp([...TEXT_MAP.keys()].map(escapeRe).join('|'), 'g');
+
+/* N2 的 17 个 `_cmd` 后缀词表（与 §2 命名规范化同源）。归一为「单遍、词表精确匹配」：
+ * 不做泛化 `_cmd` 剥离，避免把普通标识符（如 `xxx_cmd` 变量）也改掉。 */
+const CMD_WORDS = [
+  'activity_read_model',
+  'backup',
+  'diagnostics',
+  'export',
+  'import',
+  'mini_window',
+  'persistence_read',
+  'persistence',
+  'settings',
+  'storage',
+  'tool_notifications',
+  'tools',
+  'tracking',
+  'update',
+  'web_activity_analysis',
+  'web_activity',
+  'window',
+];
+const CMD_RE = new RegExp(`(?<![a-z0-9_])(${CMD_WORDS.map(escapeRe).join('|')})_cmd(?![a-z0-9_])`, 'g');
 
 const toPosix = (p) => p.split(sep).join('/');
 const digest = (buf) => createHash('sha256').update(buf).digest('hex').slice(0, HASH_LEN);
@@ -194,15 +262,22 @@ function refreshBaseline(ref) {
   }
   const payload = {
     _doc:
-      'vendored 基线：Patina 子树（前端 src/app、src/features、src/platform、src/shared，' +
-      '后端 src-tauri/src/{app,commands,infra,models,services}/insight）在归一态的逐文件哈希。' +
+      'vendored 基线：Patina 归一后的逐文件哈希（前端 src/app、src/features、src/platform、src/shared，' +
+      '后端 src-tauri/src/{app,commands,infra,models,services}/insight）。' +
       '不要手改 —— 用 node scripts/check-vendored-diff.mjs --refresh <ref> 重生成，' +
       '日常改动请登记到 scripts/vendored-allowlist.json。',
     source: {
       kind: 'git',
-      ref,
+      // 一次 --refresh 只能取一个 ref，两侧同锚；常态维护的锚点是
+      // 前端 7bc7bd7（融合完成态）、后端 9a7772f（归一态），见现有基线。
+      frontend: { ref, note: '本次重建由同一 ref 计算（正常应为融合完成态 7bc7bd7）' },
+      backend: { ref, note: '本次重建由同一 ref 计算（正常应为归一态 9a7772f，T03 重锚在 4ef9e1c）' },
       upstream: 'https://github.com/Ceceliaee/patina',
-      note: '融合完成态（含 crate::patina:: 路径改写与测试拆分），不是上游原样',
+      note: '两侧 ref 分开锚定：T01 只改前端路径（内容哈希不变），T02 才铺平后端；机械改写批次见 _reanchor',
+      pathMapping:
+        '前端 src/{app,features,platform,shared} 原样、src/App.{tsx,css} 与 src/main.tsx 进 src/app/、' +
+        'src/styles → src/app/styles/；后端 src-tauri/src/{domain,platform,data,engine,app,commands} → ' +
+        '本地 models/infra/services/services/app/commands 下的 insight 命名空间。--upstream 按 UPSTREAM_MAP 反推。',
       generated: new Date().toISOString().slice(0, 10),
     },
     roots: ROOTS,
@@ -217,67 +292,140 @@ function refreshBaseline(ref) {
 // ---------------------------------------------------------------------------
 
 /**
- * 把并入时做过的**机械改写**归一回去，剩下的才算「我们真的改了」。
+ * 把本地**归一态**反推回上游坐标系，剩下的才算「我们真的改了」。
  *
- * 两处：① `crate::` → `crate::patina::`（模块树上移带来的批量路径改写）；
- * ② 文件里的 `#[cfg(test)]` 段落——上游写在文件内联的 `mod tests { … }`，并入时拆成
+ * 三处：① 模块路径（6 条 TEXT_MAP，本地 `crate::services::insight::data::` → 上游
+ *    `crate::data::` 一类反向映射，单遍替换）；
+ * ② 命令模块的 `_cmd` 后缀（N2 给 17 个模块加的，剥离后与上游同名）；
+ * ③ 文件里的 `#[cfg(test)]` 段落——上游写在文件内联的 `mod tests { … }`，并入时拆成
  *    独立文件 `<name>_mod_tests.rs`，本地只剩一句 `#[cfg(test)] mod tests;`。
  *
- * ② 的代价要说清：**测试代码不参与对账**。拆分时是「只搬不改」，但之后谁在
+ * ③ 的代价要说清：**测试代码不参与对账**。拆分时是「只搬不改」，但之后谁在
  * `*_mod_tests.rs` 里动了断言，这份报告不会告诉你——要看测试改动，直接 diff 那些文件。
- * 归一后剩下的差异才是真分叉（当前实测 17 个 Rust 文件 + 4 个前端文件）。
  */
 function normalize(text) {
-  const out = text.replaceAll('crate::patina::', 'crate::');
+  // 单遍：`replace` 不会对替换结果再次扫描，避免 A→B 之后再被 B→C 命中。
+  const mapped = text.replace(TEXT_MAP_RE, (m) => TEXT_MAP.get(m));
+  const out = mapped.replace(CMD_RE, '$1');
   const at = out.indexOf('#[cfg(test)]');
   return at === -1 ? out : out.slice(0, at);
 }
 
+const CMD_COMPACT = (s) => s.replace(CMD_RE, '$1');
+
+/** 本地相对路径 → 上游坐标系键；null = 这条本地文件不在任何映射里（净新增）。 */
+function toUpstreamKey(locRel) {
+  for (const m of UPSTREAM_MAP) {
+    for (const ex of m.extra || []) {
+      if (locRel === ex.loc) return ex.up;
+      if (locRel.startsWith(`${ex.loc}/`)) return `${ex.up}/${locRel.slice(ex.loc.length + 1)}`;
+    }
+  }
+  for (const m of [...UPSTREAM_MAP].sort((a, b) => b.loc.length - a.loc.length)) {
+    if (locRel.startsWith(`${m.loc}/`)) {
+      return CMD_COMPACT(`${m.up}/${locRel.slice(m.loc.length + 1)}`);
+    }
+  }
+  return null;
+}
+
+/** 递归列出 dir 下所有文件（绝对路径）。 */
+function walkFiles(dir) {
+  const out = [];
+  const walk = (d) => {
+    for (const name of readdirSync(d)) {
+      const full = join(d, name);
+      if (statSync(full).isDirectory()) walk(full);
+      else out.push(full);
+    }
+  };
+  walk(dir);
+  return out;
+}
+
 function reportUpstream(dir) {
-  const pairs = [
-    { label: '前端 src/', up: join(dir, 'src'), loc: join(root, 'src', 'patina') },
-    { label: '后端 src/', up: join(dir, 'src-tauri', 'src'), loc: join(root, 'src-tauri', 'src', 'patina') },
-  ];
-  if (!existsSync(pairs[0].up)) {
+  const upBase = join(dir, 'src');
+  if (!existsSync(upBase)) {
     console.error(`[upstream] 目录不存在或结构不符：${dir}`);
     process.exit(1);
   }
-  const collect = (base) => {
-    const map = new Map();
-    const walk = (d) => {
-      for (const name of readdirSync(d)) {
-        const full = join(d, name);
-        if (statSync(full).isDirectory()) walk(full);
-        else {
-          const rel = toPosix(relative(base, full));
-          map.set(rel, normalize(readFileSync(full, 'utf8')));
-        }
+
+  // 上游文件：键 = 相对上游仓库根的 posix 路径（即 UPSTREAM_MAP 的 up 侧原样）
+  const upstream = new Map(); // key -> abs
+  for (const m of UPSTREAM_MAP) {
+    const base = join(dir, m.up);
+    if (!existsSync(base)) {
+      console.error(`[upstream] 映射源不存在：${m.up}（解压目录是否完整？）`);
+      process.exit(1);
+    }
+    for (const full of walkFiles(base)) upstream.set(toPosix(relative(dir, full)), full);
+    for (const ex of m.extra || []) {
+      const exact = join(dir, ex.up);
+      if (!existsSync(exact)) continue;
+      // extra 可能是一棵目录（src/styles）或单个文件（src/App.tsx），两种都要收
+      if (statSync(exact).isDirectory()) {
+        for (const full of walkFiles(exact)) upstream.set(toPosix(relative(dir, full)), full);
+      } else {
+        upstream.set(ex.up, exact);
       }
-    };
-    walk(base);
-    return map;
+    }
+  }
+
+  // 本地文件：键 = 反推后的上游路径；null 记为「仅本地（无对应）」
+  const local = []; // { rel, key, abs }
+  for (const relRoot of ROOTS) {
+    const base = join(root, relRoot);
+    if (!existsSync(base)) continue;
+    for (const full of walkFiles(base)) {
+      const rel = toPosix(relative(root, full));
+      local.push({ rel, key: toUpstreamKey(rel), abs: full });
+    }
+  }
+
+  const stats = {
+    FE: { same: 0, diff: [], onlyUp: [], onlyLoc: [] },
+    BE: { same: 0, diff: [], onlyUp: [], onlyLoc: [] },
   };
+  const sideOf = (key, rel) => ((key ?? rel).startsWith('src-tauri') ? 'BE' : 'FE');
+
+  const localByKey = new Map();
+  for (const f of local) if (f.key) localByKey.set(f.key, f);
+
+  for (const [key, upAbs] of upstream) {
+    const hit = localByKey.get(key);
+    const side = stats[sideOf(key)];
+    if (!hit) {
+      side.onlyUp.push(key);
+      continue;
+    }
+    const same = normalize(readFileSync(upAbs, 'utf8')) === normalize(readFileSync(hit.abs, 'utf8'));
+    if (same) side.same++;
+    else side.diff.push(key);
+  }
+  for (const f of local) {
+    if (f.key && upstream.has(f.key)) continue;
+    stats[sideOf(f.key, f.rel)].onlyLoc.push(f.key ?? f.rel);
+  }
+
   console.log(`[upstream] 对账目录：${dir}`);
-  let real = 0;
-  for (const { label, up, loc } of pairs) {
-    const u = collect(up);
-    const l = collect(loc);
-    const same = [...u.keys()].filter((k) => l.has(k) && u.get(k) === l.get(k));
-    const diff = [...u.keys()].filter((k) => l.has(k) && u.get(k) !== l.get(k));
-    const onlyUp = [...u.keys()].filter((k) => !l.has(k));
-    const onlyLoc = [...l.keys()].filter((k) => !u.has(k));
-    const added = onlyLoc.filter((k) => k.endsWith('_mod_tests.rs'));
-    real += diff.length;
+  let totalDiff = 0;
+  let totalSame = 0;
+  for (const [side, s] of Object.entries(stats)) {
+    const label = side === 'FE' ? '前端' : '后端';
+    const split = s.onlyLoc.filter((k) => k.endsWith('_mod_tests.rs'));
+    const realOnlyLoc = s.onlyLoc.filter((k) => !k.endsWith('_mod_tests.rs'));
+    totalDiff += s.diff.length;
+    totalSame += s.same;
     console.log(
-      `  ${label} 同 ${same.length} · 实质差异 ${diff.length} · 仅上游 ${onlyUp.length}` +
-        ` · 仅本地 ${onlyLoc.length}（测试拆分 ${added.length}）`,
+      `  ${label} 同 ${s.same} · 实质差异 ${s.diff.length} · 仅上游 ${s.onlyUp.length}` +
+        ` · 仅本地 ${s.onlyLoc.length}（测试拆分 ${split.length}）`,
     );
-    for (const k of diff) console.log(`    改 ${k}`);
-    for (const k of onlyUp) console.log(`    删 ${k}`);
-    for (const k of onlyLoc) if (!added.includes(k)) console.log(`    增 ${k}`);
+    for (const k of s.diff.sort()) console.log(`    改 ${k}`);
+    for (const k of s.onlyUp.sort()) console.log(`    删 ${k}`);
+    for (const k of realOnlyLoc.sort()) console.log(`    增 ${k}`);
   }
   console.log(
-    `[upstream] 结论：归一后仍有 ${real} 个文件与上游不同 —— 这些是真正的分叉，` +
+    `[upstream] 结论：合计 同 ${totalSame} · 实质差异 ${totalDiff} —— 这些差值才是真正的分叉，` +
       '合并上游新版时会逐条冲突，改动前请先看清是否必要。',
   );
 }
@@ -339,6 +487,10 @@ for (const kind of ['modified', 'added', 'deleted']) {
   }
 }
 
+/* owner 必填是**整表**约束，不只管当前有差异的条目：一条没有认领人的登记等于没有登记，
+ * 等它哪天真的漂移了，没人能回答「这是谁改的、还作不作数」。 */
+const missingOwner = [...allow.values()].filter((e) => !e.owner || !String(e.owner).trim());
+
 const stale = [...allow.keys()].filter(
   (rel) =>
     !['modified', 'added', 'deleted'].some(
@@ -347,12 +499,17 @@ const stale = [...allow.keys()].filter(
 );
 
 const total = Object.keys(known).length;
+const src = baseline.source ?? {};
+const sourceLabel =
+  src.frontend || src.backend
+    ? `FE ${src.frontend?.ref ?? '?'} / BE ${src.backend?.ref ?? '?'}`
+    : (src.ref ?? '?');
 const summary =
-  `基线 ${baseline.source?.ref ?? '?'} · ${total} 个文件 · ` +
+  `基线 ${sourceLabel} · ${total} 个文件 · ` +
   `改 ${changed.modified.length} / 增 ${changed.added.length} / 删 ${changed.deleted.length} · ` +
   `白名单 ${allow.size} 条`;
 
-if (unlisted.length === 0) {
+if (unlisted.length === 0 && missingOwner.length === 0) {
   console.log(`[vendored] OK — ${summary}`);
   if (stale.length) {
     console.log(`[vendored] 提示：以下白名单条目已与基线一致（改动被还原或基线已更新），可删除 —— ${stale.join(', ')}`);
@@ -362,11 +519,15 @@ if (unlisted.length === 0) {
 
 console.error(`[vendored] FAILED — ${summary}\n`);
 for (const item of unlisted) console.error(`✗ ${item.rel} — ${item.kind}，${item.why}`);
+for (const item of missingOwner) {
+  console.error(`✗ ${item.path} — 登记缺 owner（必填：谁认领这次改动）`);
+}
 console.error(
   '\n规则：src/app/** src/features/** src/platform/** src/shared/** 与后端 5 个 ' +
     'src-tauri/src/<层>/insight/** ' +
     '是 vendored 第三方源码，改动必须登记。\n' +
-    '  登记处：scripts/vendored-allowlist.json —— { path, change: modified|added|deleted, reason, owner }\n' +
+    '  登记处：scripts/vendored-allowlist.json —— { path, change: modified|added|deleted, reason, owner }，' +
+    'owner 必填。\n' +
     '  只是解压产物 / 编辑器换行 / 构建缓存误入？直接还原，不要登记。',
 );
 process.exit(1);

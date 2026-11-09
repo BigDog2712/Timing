@@ -268,11 +268,21 @@ const l9SentinelFailures = [];
 if (L9_MAIN_FILES.length === 0) l9SentinelFailures.push('主窗路径集合为空（L9_MAIN_ROOTS 是否写错？）');
 if (L9_ANALYSIS_FILES.length === 0) l9SentinelFailures.push('分析窗路径集合为空（L9_ANALYSIS_ROOTS 是否写错？）');
 if (l9SpecifierCount === 0) l9SentinelFailures.push('两窗内没有解析出任何相对 import（说明符正则坏了？）');
+/* 例外清单必须指向真实存在的文件：`src/lib/windowApi` 被改名/搬走后，L9_ALLOWED_TARGETS
+ * 会静默变成一张空头支票；后来的人只会看到「例外还有空位」，顺势再塞几条。 */
+for (const target of L9_ALLOWED_TARGETS) {
+  if (!['.ts', '.tsx'].some((ext) => existsSync(join(root, `${target}${ext}`)))) {
+    l9SentinelFailures.push(
+      `例外目标 ${target} 不存在（L9_ALLOWED_TARGETS 是否写错？重命名薄壳必须同批更新）`,
+    );
+  }
+}
 if (l9SentinelFailures.length) {
   console.error('[layers] FAILED — L9 哨兵未通过：双窗隔离规则会「绿着空转」\n');
   for (const line of l9SentinelFailures) console.error(`  ✗ ${line}`);
   console.error('\n规则：L9 依赖路径前缀 + 相对 import 解析；集合为空时它永远不命中。');
   console.error('改目录名必须同批改 L9_MAIN_ROOTS / L9_ANALYSIS_ROOTS，并保留至少一条可解析的相对 import。');
+  console.error('例外清单（L9_ALLOWED_TARGETS）里的文件也必须真实存在，否则例外会静默失效。');
   process.exit(1);
 }
 
