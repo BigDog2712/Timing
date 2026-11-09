@@ -90,7 +90,11 @@ describe('悬浮窗事件链两端同名（P8）', () => {
   /** 读库失败要能自愈：reader 为空要重开，异常要进 logcat（v0.11.21 吞掉它 → 永久待机）。 */
   it('p8_reader_self_heals_and_logs', () => {
     expect(PILL_SERVICE).toContain('ensureReader');
-    expect(READER).toContain('Log.w(TAG, "read timing.db failed');
+    /* [V0.11.27] 日志文案带上了库路径（`read <path> failed`）：报障时要能说出读的是哪个文件。
+       **不钉死整句**，只钉「这是 Log.w + 带 failed」——文案要能改，静默不能回来。 */
+    expect(READER, '读库失败必须留 logcat').toMatch(/Log\.w\(TAG, "read .*failed/);
+    /* 同一个失败还要落到 `note`（→ 通知副标题）：只写 logcat 用户看不见，等于没说话。 */
+    expect(READER).toContain('note = "读库失败：');
     expect(READER).toContain('SQLiteDatabase.OPEN_READWRITE');
   });
 });
