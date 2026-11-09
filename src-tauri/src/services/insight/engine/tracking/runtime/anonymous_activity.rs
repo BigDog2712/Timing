@@ -3,6 +3,7 @@ use super::super::{
     watchdog::RuntimeHealthState,
 };
 use super::loop_state::{record_committed_sample, TrackerTimestampPersistState};
+use crate::models::insight::events::ACTIVE_WINDOW_CHANGED;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 pub(super) async fn record_sample<R: Runtime>(
@@ -22,7 +23,7 @@ pub(super) async fn record_sample<R: Runtime>(
         .replace_active_session(None);
     if changed {
         if let Some(snapshot) = app.state::<TrackingRuntimeSnapshotState>().snapshot() {
-            let _ = app.emit("active-window-changed", &snapshot.window);
+            let _ = app.emit(ACTIVE_WINDOW_CHANGED, &snapshot.window);
         }
         let _ = super::emit_tracking_data_changed(app, "anonymous-activity-updated", now_ms as u64);
     }

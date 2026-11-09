@@ -310,7 +310,7 @@ pub async fn save<R: Runtime + 'static>(
     }
     // Apply the committed preferences even when a separate window operation fails.
     if let Err(error) = refresh_locked(app).await {
-        eprintln!("[tool-notification] refresh after saving preferences: {error}");
+        crate::log_warn!("refresh after saving preferences: {error}");
         let mut inner = state.inner.lock().unwrap_or_else(PoisonError::into_inner);
         inner.snapshot.preferences = preferences.clone();
         inner.snapshot.error = Some(error);

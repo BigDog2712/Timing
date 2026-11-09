@@ -163,7 +163,7 @@ fn reload_runtime_settings<R: Runtime + 'static>(
                     state.update(app.clone(), Arc::clone(&store), settings);
                 }
             }
-            Err(error) => eprintln!("[remote-status-bridge] failed to load settings: {error}"),
+            Err(error) => crate::log_error!("failed to load settings: {error}"),
         }
     });
 }
@@ -190,7 +190,7 @@ fn spawn_runtime_task<R: Runtime + 'static>(
             match result {
                 Ok(()) => return,
                 Err(error) => {
-                    eprintln!("[remote-status-bridge] connection ended: {error}");
+                    crate::log_warn!("connection ended: {error}");
                 }
             }
 

@@ -38,8 +38,8 @@ pub fn pick_directory(initial_path: Option<String>) -> Option<String> {
 pub async fn run(app: AppHandle) -> Result<(), String> {
     loop {
         if let Err(error) = tick(&app).await {
-            eprintln!(
-                "[scheduled-backup] tick failed: category={}",
+            crate::log_error!(
+                "tick failed: category={}",
                 crate::services::insight::data::scheduled_backup::classify_error(&error)
             );
         }

@@ -635,7 +635,7 @@ pub(crate) async fn load_range_in_tx(
                 .bind(sampled_at_ms)
                 .execute(&mut **tx)
                 .await;
-                eprintln!("[read-model] hourly projection unavailable; using facts: {error}");
+                crate::log_warn!("hourly projection unavailable; using facts: {error}");
                 Vec::new()
             }
         }

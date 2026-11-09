@@ -273,7 +273,7 @@ fn log_audio_probe_error(message: String) {
         *last_logged_at_ms = now_ms;
     }
 
-    eprintln!("[audio] {message}");
+    crate::log_error!("{message}");
 }
 
 fn now_ms() -> i64 {

@@ -258,7 +258,7 @@ fn spawn_server<R: Runtime + 'static>(
                     classify_bind_error(&error),
                     0,
                 );
-                eprintln!("[web-activity-bridge] failed to attach listener {address}: {error}");
+                crate::log_error!("failed to attach listener {address}: {error}");
                 return;
             }
         };
@@ -268,7 +268,7 @@ fn spawn_server<R: Runtime + 'static>(
                 changed = shutdown_rx.changed() => {
                     lock_inner(&lifecycle).mark_stopping(generation);
                     if changed.is_err() {
-                        eprintln!("[web-activity-bridge] shutdown channel closed");
+                        crate::log_info!("shutdown channel closed");
                     }
                     return;
                 }
@@ -276,7 +276,7 @@ fn spawn_server<R: Runtime + 'static>(
                     match next {
                         Ok(next) => next,
                         Err(error) => {
-                            eprintln!("[web-activity-bridge] accept failed: {error}");
+                            crate::log_error!("accept failed: {error}");
                             continue;
                         }
                     }
@@ -300,7 +300,7 @@ fn spawn_server<R: Runtime + 'static>(
                         ),
                     )
                     .await;
-                    eprintln!("[web-activity-bridge] client {remote_addr} rejected: too many active clients");
+                    crate::log_warn!("client {remote_addr} rejected: too many active clients");
                     return;
                 };
 
@@ -312,11 +312,11 @@ fn spawn_server<R: Runtime + 'static>(
                 {
                     Ok(Ok(())) => {}
                     Ok(Err(error)) => {
-                        eprintln!("[web-activity-bridge] client {remote_addr} closed: {error}");
+                        crate::log_warn!("client {remote_addr} closed: {error}");
                     }
                     Err(_) => {
                         client_tracker.mark_timeout();
-                        eprintln!("[web-activity-bridge] client {remote_addr} timed out");
+                        crate::log_info!("client {remote_addr} timed out");
                     }
                 }
             });
@@ -354,8 +354,8 @@ async fn acquire_listener_with_retry(
                         category,
                         failure_count,
                     );
-                    eprintln!(
-                        "[web-activity-bridge] bind failed terminally on 127.0.0.1:{port}: {category:?}"
+                    crate::log_error!(
+                        "bind failed terminally on 127.0.0.1:{port}: {category:?}"
                     );
                     return None;
                 }
@@ -368,8 +368,8 @@ async fn acquire_listener_with_retry(
                     failure_count,
                     next_retry_at_ms,
                 );
-                eprintln!(
-                    "[web-activity-bridge] bind failed on 127.0.0.1:{port}: {category:?}; retry {failure_count}"
+                crate::log_warn!(
+                    "bind failed on 127.0.0.1:{port}: {category:?}; retry {failure_count}"
                 );
 
                 tokio::select! {
@@ -379,7 +379,7 @@ async fn acquire_listener_with_retry(
                     changed = shutdown_rx.changed() => {
                         lock_inner(&lifecycle).mark_stopping(generation);
                         if changed.is_err() {
-                            eprintln!("[web-activity-bridge] shutdown channel closed");
+                            crate::log_info!("shutdown channel closed");
                         }
                         return None;
                     }

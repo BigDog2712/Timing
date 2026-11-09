@@ -210,7 +210,7 @@ pub(crate) fn observe<R: Runtime + 'static>(
         let _ = native_signals.try_send(signal);
     });
     if subscription.is_err() {
-        eprintln!("[webview] event registration could not reach UI thread");
+        crate::log_warn!("event registration could not reach UI thread");
     }
     let task: std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>> = Box::pin(
         async move {
@@ -292,7 +292,7 @@ pub(crate) fn observe<R: Runtime + 'static>(
                         });
                     }
                     Signal::Failed(failure) => {
-                        eprintln!("[webview] registration={registration} observed={failure:?}");
+                        crate::log_warn!("registration={registration} observed={failure:?}");
                         let failed_at = Instant::now();
                         let delay = app
                             .state::<WebviewRecoveryState>()
@@ -319,7 +319,7 @@ pub(crate) fn observe<R: Runtime + 'static>(
                                             .await
                                     }
                                 };
-                                eprintln!("[webview] registration={registration} automatic-recovery-exhausted stopped={}", result.is_ok());
+                                crate::log_error!("registration={registration} automatic-recovery-exhausted stopped={}", result.is_ok());
                                 if !matches!(kind, WindowKind::ToolNotification) {
                                     show_recovery_failure(&app);
                                 }
@@ -365,7 +365,9 @@ pub(crate) fn observe<R: Runtime + 'static>(
                         if !current {
                             break;
                         }
-                        eprintln!("[webview] registration={registration} recovery-started failure={failure:?}");
+                        crate::log_warn!(
+                            "registration={registration} recovery-started failure={failure:?}"
+                        );
                         let result = match kind {
                             WindowKind::Main => {
                                 super::main_window::recover_failed_webview(&app, main_generation)
@@ -383,7 +385,10 @@ pub(crate) fn observe<R: Runtime + 'static>(
                                 state.pending = false;
                             }
                         });
-                        eprintln!("[webview] registration={registration} failure={failure:?} recovery_ok={}", result.is_ok());
+                        crate::log_warn!(
+                            "registration={registration} failure={failure:?} recovery_ok={}",
+                            result.is_ok()
+                        );
                     }
                 }
             }
@@ -432,12 +437,9 @@ pub(crate) async fn destroy_and_wait<R: Runtime>(window: &WebviewWindow<R>) -> R
     });
     let app = window.app_handle();
     let label = window.label();
-    eprintln!("[webview] label={label} destruction-requested");
+    crate::log_info!("label={label} destruction-requested");
     let request = window.destroy();
-    eprintln!(
-        "[webview] label={label} destruction-dispatched={}",
-        request.is_ok()
-    );
+    crate::log_info!("label={label} destruction-dispatched={}", request.is_ok());
     let deadline = tokio::time::Instant::now() + Duration::from_secs(4);
     loop {
         // Destroy dispatch is asynchronous. The label must be released before

@@ -12,7 +12,7 @@
 | # | 结论 |
 |---|---|
 | 1 | **前端铺平进 `src/` 顶层，但不并入宿主「层优先」目录**。`src/patina/{app,features,platform,shared}` → `src/{app,features,platform,shared}`。理由见 §1.1：**446 个文件移动、1,642 处相对引用里只有 11 行需要人手重算**（已用解析器逐条模拟验证，改完 2,889 处全部命中，失败 0）。 |
-| 2 | **Rust 铺平进宿主六层，一层一个 `insight/` 命名空间**：`app/insight`、`commands/insight`、`infra/insight`、`models/insight`、`services/insight/{data,engine}`。1301 处 `crate::patina::*` 用 6 条前缀规则改写，编译器全量验证。 |
+| 2 | **Rust 铺平进宿主六层，一层一个 `insight/` 命名空间**：`app/insight`、`commands/insight`、`infra/insight`、`models/insight`、`services/insight/{data,engine}`。1302 处 `crate::patina::*` 改写（1300 单遍正则 + 2 处花括号分组手工改），编译器全量验证。 |
 | 3 | **`data/` 不拆进 `repositories/` 与 `services/`，而是整体落 `services/insight/data/`**。实测 `data ↔ engine` 互引（16 / 32 次），按层拆会造出 `repositories ↔ jobs` 环，与 AGENTS.md 的层序文档冲突。 |
 | 4 | 命名规范化只改 **17 个 Rust 文件**（命令模块补 `_cmd.rs` 后缀）；前端 **0 个改名**。`insight/` 子目录本身完成消歧，不给文件名加产品前缀。 |
 | 5 | 门禁豁免 5 类**全部撤销**：L6（154 处 `eprintln!`）、L3（**1 个文件 2 行** import）、size（152 个超限文件）、eslint（834 → 3 处真修 + 1 个生成文件窄豁免）、contract 字面量（8 处）。每条都有实测方法（§4）。 |
@@ -235,7 +235,7 @@ L9  src/{components,hooks,lib,mocks,services,stores,styles,types}/**  （主窗�
 | B4 | `src-tauri/src/patina/engine/` | `src-tauri/src/services/insight/engine/` | 39 | 与 `data` 互相引用（16/32），必须同层。层内保留 `tracking/`、`tools/`、`web_activity/`、`*_scheduler` 结构。 |
 | B5 | `src-tauri/src/patina/app/` | `src-tauri/src/app/insight/` | 29 | 装配层同义。落进 `app/insight/` 后，`bootstrap.rs` / `tray.rs` / `state.rs` / `import.rs` / `diagnostics.rs` 与宿主同名文件的冲突**自动消失**，0 改名。 |
 | B6 | `src-tauri/src/patina/commands/` | `src-tauri/src/commands/insight/` | 21 | 命令层同义。嵌套一层后 `settings.rs` 与宿主 `settings_cmd.rs` 由目录消歧。 |
-| B7 | `src-tauri/src/patina/mod.rs` | 删除；`flush_coverage` 移到 `src-tauri/src/lib.rs` | 1 | 顶层 `pub mod` 拆成 6 处 `#[cfg(desktop)] mod insight;`；`#![allow(dead_code)]` 改为 6 处 `#[allow(dead_code)]` 挂在 `mod insight;` 上（模块级 allow 覆盖整棵子树）；`patina::flush_coverage` 2 处引用 → `crate::flush_coverage`。 |
+| B7 | `src-tauri/src/patina/mod.rs` | 删除；`flush_coverage` 移到 `src-tauri/src/platform/coverage.rs`（**不是 `lib.rs`**，理由见 §5.2.1⑦） | 1 | 顶层 `pub mod` 拆成 6 处 `#[cfg(desktop)] mod insight;`；`#![allow(dead_code)]` 改为 6 处 `#[allow(dead_code)]` 挂在 `mod insight;` 上（模块级 allow 覆盖整棵子树）；`patina::flush_coverage` 2 处引用 → `crate::platform::coverage::flush_coverage`。 |
 | B8 | （新增） | `src-tauri/src/services/insight/mod.rs` | 1 | 声明 `pub mod data; pub mod engine;`。全案唯一新建文件。 |
 
 合并后的目录规模：
@@ -292,6 +292,10 @@ src-tauri/src/commands/insight/settings_cmd.rs  ← Patina（N2 加后缀）
 ### 4.1 L6：154 处 `eprintln!` → `crate::log_*!`
 
 **实测**：`grep -rnE '\beprintln!\(' src-tauri/src/patina --include=*.rs | wc -l` → **154**（宿主全域 0）。按层分布：`app` 86 / `data` 24 / `platform` 20 / `engine` 20 / `domain` 3 / `mod.rs` 1。宏体跨行的 **26 处**；带 `[tag]` 前缀的 **140 处**（`[backup]` `[tray]` `[startup]` `[main-window]` `[mini]` `[tracker]` `[tools]` `[import]`）。
+
+> **T03 开工实测 = 153，不是 154**：那 1 处是 `patina/mod.rs` 里 `flush_coverage` 的那句，
+> 随 T02 搬到 `platform/coverage.rs` 时已就地改成 `crate::log_error!`（见 §5.2.1⑦）。
+> 所以本节的 154 是「归一前原数」，T03 的作业量是 153。
 
 **判定规则（机械 + 人工复核，两步）：**
 
@@ -407,6 +411,13 @@ console.log(agg);
 | `prefer-const` | **2** | `app/services/startupWarmupService.ts`、`shared/colors/displayColor.ts` | 改成 `const` |
 | `no-control-regex` | **1** | `features/settings/services/remoteBackupUploadDraft.ts` | 保留正则意图，加 `// eslint-disable-next-line no-control-regex -- 按控制字符切片` |
 
+> **⚠ T03 实测：这条 `eslint-disable` 处方不可行。** ESLint 9 的 flat config 默认
+> `linterOptions.reportUnusedDisableDirectives = "warn"`，而子树的 override 还把
+> `no-control-regex` 关着 → 那条 disable 被判「未使用」，在 `--max-warnings=0` 下**直接红**。
+> T03 的处置是**改代码而不是加豁免**：把控制字符判断从正则里拿出来按码点判
+> （`hasReservedOrControlChar()`），语义一字不差、有没有 override 都干净。
+> 这样 T04 撤 override 时，这三处不需要任何 disable 注释。
+
 即：override 从「3 条规则 × 整棵子树」缩成「1 条规则 × 1 个生成目录」，另外 **3 处真修**。**代价接近零**，因为 99.6% 的问题集中在一个生成文件里——这是本次审计最省的一刀。
 
 **判据**：`npm run lint` → 0（`--max-warnings=0`）。并加一条防回退注释：`eslint.config.js` 的 override 块只允许出现 `files: ['src/shared/i18n/generated/**']`。
@@ -424,14 +435,33 @@ console.log(agg);
 
 `check-contract.mjs` 今天对这 8 处的放行条件是 `isVendored(rel)`（路径前缀），归一后失效。
 
+**⚠ T03 实测：字面量不止 8 处。** `grep -rnoE '\.emit\(\s*"'` 是单行正则，漏掉换行写法。
+用 contract 自己的正则（`\.emit\(\s*(…|"[^"]*")`，`\s*` 跨行）实测 = **12 处**：
+
+| 被 12 处计数漏掉的事件 | 位置 | 说明 |
+|---|---|---|
+| `tracking-data-changed` | `app/web_activity.rs`、`engine/tracking/runtime/support.rs`、`engine/tracking/startup.rs` | 3 处都是 `.emit(\n  "tracking-data-changed",` 的换行写法 |
+| `power-watcher-ready` | `platform/windows/power.rs` | 同上（`power-lifecycle-changed` 与它同文件，共 2 处） |
+
+另有 **2 处 `.emit_to(label, "事件名")`**（`main_window/tools_navigation.rs` 的 `main-tools-target-changed`、
+`mini_window.rs` 的 `mini-window-state`）：contract 的字面量正则只认 `.emit(`，不认 `.emit_to(`。
+**但语义相同（前端在 listen），所以 T03 一并常量化。**
+
 **处置：把「路径豁免」换成「双事件通道」，判据更严而不是更松。**
 
 ```
-后端常量：src-tauri/src/app/insight/events.rs    （新建，4 个 pub const）
-前端常量：src/platform/runtime/insightEvents.ts  （新建，3 个名字；power-lifecycle-changed 不进前端）
-emit 侧：8 处字面量 → 常量
-listen 侧：3 个 gateway 的字面量 → 常量
+后端常量：src-tauri/src/models/insight/events.rs   （新建，8 个 pub const）
+前端常量：src/platform/runtime/insightEvents.ts     （新建，6 个名字；power-* 两个不进前端）
+emit 侧：12 处 .emit 字面量 + 2 处 emit_to 字面量 → 常量
+listen 侧：6 个 gateway 的字面量 → 常量
 ```
+
+> **后端常量为什放 `models/insight/` 而不是 `app/insight/`（原稿写法）**：14 个 emit 点里
+> `app` 4 / `commands` 2 / `infra` 2 / `services` 6。放 `app/insight/` 会让 `infra` 与
+> `services` **反向依赖装配层**——`app/mod.rs` 的模块文档写着「禁止：被 `infra` 反向依赖
+> （否则又成环）」，而当前全仓 `services|infra|models` 对 `crate::app::insight` 的引用是 **0**。
+> `models/insight` 是「出边 0 的纯叶子」（§2.2 B1），8 个 `&'static str` 常量最适合它。
+> 连带影响：T04 的 `insightEvents()` 解析器要读 `src-tauri/src/models/insight/events.rs`。
 
 `check-contract.mjs` 增加 `insightEvents()` / `insightFeEvents()` 两个解析器与三条检查：
 1. 后端 insight 常量 ↔ 前端 insight 常量（`power-lifecycle-changed` 例外，登记在脚本里带理由）；
@@ -464,7 +494,7 @@ L2:  src/stores/      +  src/**/*Store.ts        +  src/features/**/stores/
 | ID | 名称 | 主要文件 | 依赖 | 优先级 | 预估规模 |
 |---|---|---|---|---|---|
 | **T01** | 前端去前缀 | 446 移动 + **9 文件 / 12 行**编辑 + 3 个门禁脚本的路径常量 + baseline 路径重写 | 无 | P0 | 大（纯 rename） |
-| **T02** | 后端去子树 | 320 移动 + 1301 引用 + 6 处 `mod` + 17 改名 + 3 个门禁脚本 + baseline 路径重写 | 无 | P0 | 大 |
+| **T02** | 后端去子树 | 320 移动 + 1302 处引用 + 6 处 `mod` + 17 改名 + 3 个门禁脚本 + baseline 路径重写 | 无 | P0 | 大 |
 | **T03** | 代码归一化 | 154 `eprintln!` + 1 处窗口 API + `windowApi.ts` + 3 处 lint + 4 事件常量/11 处字面量 | T01, T02 | P0 | 中 |
 | **T04** | 门禁重锚（撤豁免） | `check-layers` / `check-size` / `check-contract` / `eslint.config.js` / `size-allowlist.json` | T03 | P0 | 中 |
 | **T05** | 账本改造与文档收尾 | `check-vendored-diff.mjs`（`--upstream` 映射）+ `AGENTS.md` / `README.md` / `THIRD-PARTY-NOTICES.md` | T04 | P1 | 小 |
@@ -480,7 +510,7 @@ L2:  src/stores/      +  src/**/*Store.ts        +  src/features/**/stores/
 **因此本方案的硬约束（写死，不许例外）：**
 
 1. **不动 `src-tauri/src/tests/**` 任何一个字节。** 本方案 §2.2 的 6 条映射全部落在 `app/commands/infra/models/services`，与 `tests/` 无交集。
-2. **T02 会改 `src-tauri/src/lib.rs`**（删 `#[cfg(desktop)] mod patina;`、加 `flush_coverage`）。它与对方正在改的 `mod tests;` 那一行**相邻但不相交**。**改动前必须先 `git diff src-tauri/src/lib.rs` 审一遍**；若对方也动了 `lib.rs`，先 rebase 再重跑 `cargo test --lib`，不要直接把我们的版本覆盖上去。
+2. **T02 会改 `src-tauri/src/lib.rs`**（只删 `#[cfg(desktop)] mod patina;`；`flush_coverage` 落在新文件 `platform/coverage.rs`，不进 `lib.rs`）。它与对方正在改的 `mod tests;` 那一行**相邻但不相交**。**改动前必须先 `git diff src-tauri/src/lib.rs` 审一遍**；若对方也动了 `lib.rs`，先 rebase 再重跑 `cargo test --lib`，不要直接把我们的版本覆盖上去。
 3. **不要把对方的工作 stash 掉**（那等于抢占别人的工作区）。正确做法是**开独立 worktree 做本迁移**：
 
 ```bash
@@ -609,7 +639,7 @@ git mv src-tauri/src/patina/app       src-tauri/src/app/insight
 git mv src-tauri/src/patina/commands  src-tauri/src/commands/insight
 ```
 
-`src-tauri/src/patina/mod.rs` 删除；`flush_coverage` 搬进 `lib.rs`；新增 `services/insight/mod.rs`。
+`src-tauri/src/patina/mod.rs` 删除；`flush_coverage` 搬进 **`src-tauri/src/platform/coverage.rs`**（新文件，与 `platform/log.rs` 并列；§5.2.1⑦ 有完整理由）；新增 `services/insight/mod.rs`。
 
 **6 条前缀改写 + 1 条特例**（对 `src-tauri/src/**/*.rs` 单遍正则，禁止二次匹配）：
 
@@ -621,18 +651,31 @@ git mv src-tauri/src/patina/commands  src-tauri/src/commands/insight
 | `crate::patina::commands` | `crate::commands::insight` | 134 |
 | `crate::patina::engine` | `crate::services::insight::engine` | 100 |
 | `crate::patina::app` | `crate::app::insight` | 81 |
-| `crate::patina::flush_coverage` | `crate::flush_coverage` | 2 |
-| **合计** | | **1,301（233 个文件，其中 229 在子树内、4 个宿主文件）** |
+| `crate::patina::flush_coverage` | `crate::platform::coverage::flush_coverage` | 2 |
+| **合计** | | **1,300（233 个文件，其中 229 在子树内、4 个宿主文件）** |
+
+> 七行相加是 **1,300**，不是 1,301。全量改写数 = 1,300（本表单遍正则）+ **2**（两处花括号分组导入
+> 手工改，见 §5.2.1⑤）= **1,302**。原始出现 1,303 = 1,302 + 1 处在 `patina/mod.rs` 文档注释里
+> （该文件删除，不计入改写）。
 
 单遍实现要点：用一次 `re.sub(r'crate::patina::(data|domain|platform|commands|engine|app|flush_coverage)', ...)` 带回调，**不要**写 7 条顺序 sed（`...::data` → `...::insight::data` 会被后续规则再次命中）。
 
 宿主 4 个文件里的引用也随之改写：`app/patina_bridge.rs`、`app/tray.rs`、`commands/window_cmd.rs`、`ipc_commands.rs`。
 
+**两类正则吃不到、必须单独处理的引用**（漏了直接编不过，实测清单）：
+
+| 类别 | 数量 | 位置与做法 |
+|---|---|---|
+| **裸 `patina::` 前缀**（不带 `crate::`，靠 crate 根的 `mod patina` 解析） | **6**（5 处 `patina::app::bootstrap::*` + 1 处 `patina::platform::windows::native_probe::run_if_requested`） | 全在 `src-tauri/src/lib.rs`。删掉 `mod patina;` 后它们会全部 E0433，必须同批改成 `crate::app::insight::…` / `crate::infra::insight::…` |
+| **17 个模块改名后的模块引用**（`settings.rs` → `settings_cmd.rs` 等） | **118**（`ipc_commands.rs` 117 + `commands/insight/import_cmd.rs` 1） | `ipc_commands.rs` 是 `generate_handler!` 的 117 条命令路径；`import_cmd.rs:1` 引用 `settings_cmd::ClassificationSettingMutationDto`。改名不同步 = 命令注册表静默失效（编译期才炸） |
+| **`use crate::app::insight as app;` 的别名** | **2** | `app/insight/tool_notifications.rs`、`commands/insight/import_cmd.rs`。**必须保留 `as app`**：文件内是 `app::scheduled_backup::…` 的写法，去掉别名会全部失效。花括号形式（`use crate::{app::insight as app, services::insight::data::import};`）同样要带别名 |
+
 **`#[cfg(desktop)]` 与 lint 属性**（6 处）：
 
 | 文件 | 加什么 |
 |---|---|
-| `src-tauri/src/lib.rs` | 删 `#[cfg(desktop)] mod patina;`；加 `#[cfg(feature = "patina_coverage")] pub(crate) fn flush_coverage()` |
+| `src-tauri/src/lib.rs` | 只删 `#[cfg(desktop)] mod patina;`；**不加** `flush_coverage`（该函数在 `platform/coverage.rs`） |
+| `src-tauri/src/platform/coverage.rs` | 新建：`#[cfg(feature = "patina_coverage")] pub(crate) fn flush_coverage()`（三重门控见 §5.2.1⑦） |
 | `src-tauri/src/app/mod.rs` | `#[cfg(desktop)] #[allow(dead_code)] pub mod insight;` |
 | `src-tauri/src/commands/mod.rs` | 同上 |
 | `src-tauri/src/infra/mod.rs` | 同上 |
@@ -989,6 +1032,23 @@ function patinaCommands() {
 
 **⚠ 最容易被忽略的一行**：正则多了一个捕获组，取值下标必须从 `m[1]` 改成 **`m[2]`**。忘了改的话，宿主集合会变成 80 个模块名（`item_cmd`、`timer_cmd`…），`check:contract` 会报「Rust 注册了、前端没调用」一片红 —— 好在是**红**，不是静默。
 
+**⚠ 第三处要改：`emitSites()` 里的 `isVendored`。**
+
+上面两处命令正则只是命令面的一半；同一文件里 `emitSites()` 还留着一条**路径豁免**：
+
+```js
+const VENDORED_RS = ['src-tauri/src/app/insight/', /* … 5 个 insight 根 */];
+const isVendored = (rel) => VENDORED_RS.some((p) => rel.replace(/\\/g, '/').startsWith(p));
+…
+if (!isVendored(rel)) literals.push(`${rel}: ${arg}`);
+```
+
+不改它，那 8 处（原文写 8；按 `\s*` 允许换行的正则是 **12 处**，另加 2 处 `emit_to`）上游字面量 emit
+会立刻被判「硬编码事件名」→ `npm run check` 红。但**这条豁免不是 T02 撤的**：T02 只把前缀换成 5 个
+`insight/` 新根，让门禁继续绿；撤掉它是 T03（改用事件常量）之后 T04 的事（§4.5）。
+T03 另加了一个 `insightRustEvents()` 值映射（读 `models/insight/events.rs`），只为让「emit 点」计数
+不因常量化从 17 掉成 11 —— 它不是豁免，不给字面量开口子。
+
 **验证（改完立刻跑）**：
 
 ```bash
@@ -1079,7 +1139,7 @@ ls src-tauri/src/patina/commands/*.rs | wc -l              # 21
 git stash list                                               # 不含本次迁移的未提交内容
 ```
 
-T02 提交后回头核对的 4 个数：**`21`（insight 命令文件）→ `117`（命令条数）→ `1301`（改写前 `crate::patina::` 总数 1,303 减 2 处花括号减 1 处注释）→ `0`（改完 `crate::patina` 残留）**。这四个数对不上，就是哪一步漏了。
+T02 提交后回头核对的 4 个数：**`21`（insight 命令文件）→ `117`（命令条数）→ `1302`（实际改写数 = 1300 单遍正则 + 2 处花括号；原始出现 1303 另含 1 处随 `patina/mod.rs` 删除的注释）→ `0`（改完 `crate::patina` 残留）**。这四个数对不上，就是哪一步漏了。
 
 ---
 
@@ -1319,7 +1379,7 @@ const TEXT_MAP = [
 | B2 | Rust 层依赖矩阵 | 正则提 `crate::patina::<layer>`，按源层聚合 | domain 出边 **0**；platform→domain 15；data→domain 138 / engine 16 / platform 34；engine→data 32 / domain 109 / platform 24；app→data 39 / domain 63 / engine 35 / platform 40；commands→app 26 / data 39 / domain 24 / engine 22 / platform 9 |
 | B3 | `sqlite_pool` 的上行依赖 | `grep -rhn 'crate::patina::' data/sqlite_pool*` | `repositories::mini_window::load` ×2、`activity_read_model::maintain_once` ×2、`schema*`、`sqlite_error` |
 | B4 | 命令层直接用 repositories | `grep -rn 'crate::patina::data::repositories' patina/commands` | **3 文件**（`mini_window.rs` `persistence_read.rs` `settings.rs`） |
-| B5 | `crate::patina::*` 引用 | `git grep -o 'crate::patina::[a-z_]+'` | **1,301 次 / 233 文件**（宿主侧 4 文件） |
+| B5 | `crate::patina::*` 引用 | `git grep -o 'crate::patina::[a-z_]+'` | **原始 1,303 次 / 233 文件；实际改写 1,302 次**（1300 正则 + 2 花括号；另 1 处随 `mod.rs` 删除） |
 | B6 | `eprintln!` | `grep -rnE '\beprintln!\(' src-tauri/src/patina` | **154**（app 86 / data 24 / platform 20 / engine 20 / domain 3 / mod.rs 1）；多行宏 26；带 `[tag]` 140；关键词粗判 error 114 / info 36 / warn 4 |
 | B7 | `#[path]` / 模块单元 / 测试文件 | `grep -rn '#\[path'`、目录并存检测 | patina 内 **90 处 `#[path]`**（全仓 101）；**34 个 file+dir 模块**；**56 个 `*_tests.rs`** |
 | B8 | `.emit("字面量")` | `grep -rnoE '\.emit\(\s*"'` | Patina **8** / 宿主 **0**；4 个事件名，其中 `power-lifecycle-changed` 前端监听 0 |

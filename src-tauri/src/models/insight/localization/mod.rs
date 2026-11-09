@@ -47,10 +47,9 @@ pub fn format_text(locale: Locale, key: &str, args: &[(&str, String)]) -> String
     if let Some(expression) = generated::lookup(locale, key) {
         match evaluate(expression, locale.tag(), &values) {
             Ok(output) => return output,
-            Err(error) => eprintln!(
-                "[i18n] failed to format {key:?} for {}: {error}",
-                locale.tag()
-            ),
+            Err(error) => {
+                crate::log_warn!("failed to format {key:?} for {}: {error}", locale.tag())
+            }
         }
     }
     if locale != generated::SOURCE_LOCALE {
@@ -60,7 +59,7 @@ pub fn format_text(locale: Locale, key: &str, args: &[(&str, String)]) -> String
             }
         }
     }
-    eprintln!("[i18n] missing or invalid native message key {key:?}");
+    crate::log_warn!("missing or invalid native message key {key:?}");
     key.to_owned()
 }
 

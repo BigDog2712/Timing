@@ -172,17 +172,17 @@ pub(crate) async fn prepare_pool_schema(pool: &Pool<Sqlite>, db_path: &Path) -> 
     validate_schema_inspection_coverage()?;
 
     if repair_legacy_schema_before_baseline_normalization(pool).await? {
-        eprintln!("[sql] repaired legacy sqlite schema before baseline normalization");
+        crate::log_info!("repaired legacy sqlite schema before baseline normalization");
     }
 
     if normalize_current_baseline_migration_history_for_pool(pool).await? {
-        eprintln!("[sql] normalized sqlite migration history to the current schema");
+        crate::log_info!("normalized sqlite migration history to the current schema");
     }
 
     run_current_migrations(pool).await?;
 
     if normalize_current_baseline_migration_history_for_pool(pool).await? {
-        eprintln!("[sql] normalized sqlite migration history to the current schema");
+        crate::log_info!("normalized sqlite migration history to the current schema");
     }
 
     if !has_current_schema(pool).await? {

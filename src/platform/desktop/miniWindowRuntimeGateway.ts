@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { MINI_WINDOW_STATE } from "../runtime/insightEvents.ts";
 
 export type MiniEdge = "top" | "left" | "right";
 export type MiniPage = "activity" | "tools";
@@ -50,7 +51,7 @@ export async function sendMiniAction(epoch: number, action: MiniAction): Promise
   return parseMiniSnapshot(await invoke("cmd_mini_window_action", { epoch, action }));
 }
 export function onMiniSnapshot(accept: (snapshot: MiniSnapshot) => void): Promise<() => void> {
-  return listen<unknown>("mini-window-state", ({ payload }) => {
+  return listen<unknown>(MINI_WINDOW_STATE, ({ payload }) => {
     try { accept(parseMiniSnapshot(payload)); } catch (error) { console.warn("mini:state", error); }
   });
 }

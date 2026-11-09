@@ -24,20 +24,20 @@ impl Drop for SnapshotTestDirectory {
             Ok(path) => path,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
             Err(error) => {
-                eprintln!("failed to resolve snapshot test directory for cleanup: {error}");
+                crate::log_warn!("failed to resolve snapshot test directory for cleanup: {error}");
                 return;
             }
         };
         if resolved != self.0
             || resolved.parent() != std::env::temp_dir().canonicalize().ok().as_deref()
         {
-            eprintln!(
+            crate::log_warn!(
                 "snapshot test directory moved outside its owned temporary path; retaining it"
             );
             return;
         }
         if let Err(error) = fs::remove_dir_all(resolved) {
-            eprintln!("failed to clean snapshot test directory: {error}");
+            crate::log_warn!("failed to clean snapshot test directory: {error}");
         }
     }
 }

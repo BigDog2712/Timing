@@ -3,6 +3,7 @@ use crate::app::insight::runtime::now_ms;
 use crate::app::insight::state::{AppExitState, BackgroundEntryState, DesktopBehaviorState};
 use crate::services::insight::data::app_settings_service::{self, AppSettingMutation};
 use crate::services::insight::data::tracking_pause_service;
+use crate::models::insight::events::APP_SETTINGS_CHANGED;
 use crate::models::insight::localization::{Locale, LocalizationState};
 use crate::models::insight::settings::DesktopBehaviorSettings;
 use crate::services::insight::engine::tracking::{
@@ -182,11 +183,11 @@ pub(crate) fn show_main_window<R: Runtime + 'static>(
     let accepted = main_window::show_main_window(app, reason);
     if !accepted && !app.state::<AppExitState>().is_exit_requested() {
         if let Err(error) = ensure_tray_visible(app) {
-            eprintln!("[tray] failed to expose recovery entry: {error}");
+            crate::log_error!("failed to expose recovery entry: {error}");
         }
     }
     if let Err(error) = apply_tray_visibility(app) {
-        eprintln!("[tray] failed to apply visibility: {error}");
+        crate::log_error!("failed to apply visibility: {error}");
     }
     accepted
 }
@@ -195,7 +196,7 @@ pub(crate) fn on_main_window_revealed<R: Runtime>(app: &AppHandle<R>) {
     app.state::<BackgroundEntryState>()
         .clear_forced_visibility();
     if let Err(error) = apply_tray_visibility(app) {
-        eprintln!("[tray] failed to apply visibility: {error}");
+        crate::log_error!("failed to apply visibility: {error}");
     }
 }
 
@@ -232,8 +233,8 @@ fn apply_current_tray_visibility<R: Runtime>(app: &AppHandle<R>) -> Result<(), S
         tray.set_visible(should_show)
             .map_err(|error| format!("failed to set main tray visibility: {error}"))?;
     }
-    eprintln!(
-        "[tray] visibility-applied visible={should_show} created={}",
+    crate::log_info!(
+        "visibility-applied visible={should_show} created={}",
         app.tray_by_id(TRAY_ID).is_some()
     );
     Ok(())
@@ -268,10 +269,10 @@ pub(crate) fn apply_tracking_pause_setting_change<R: Runtime>(
     app.state::<crate::services::insight::engine::tracking::runtime_snapshot::TrackingRuntimeSnapshotState>()
         .note_tracking_policy_change();
     if let Err(error) = refresh_tray_icon(app, None) {
-        eprintln!("[tray] failed to update tracking state icon: {error}");
+        crate::log_error!("failed to update tracking state icon: {error}");
     }
     if let Err(error) = rebuild_tray_menu(app) {
-        eprintln!("[tray] failed to update tracking pause menu label: {error}");
+        crate::log_error!("failed to update tracking pause menu label: {error}");
     }
     tracking_runtime::emit_tracking_data_changed(app, reason, now_ms())
         .map_err(|error| format!("failed to emit tracking pause event: {error}"))?;
@@ -291,10 +292,10 @@ pub(crate) async fn refresh_tracking_pause_from_storage<R: Runtime>(
     let tracking_paused = tracking_pause_service::load_tracking_pause_setting(app).await?;
     update_tracking_pause_runtime_state(app, tracking_paused);
     if let Err(error) = refresh_tray_icon(app, None) {
-        eprintln!("[tray] failed to refresh restored tracking state icon: {error}");
+        crate::log_error!("failed to refresh restored tracking state icon: {error}");
     }
     if let Err(error) = rebuild_tray_menu(app) {
-        eprintln!("[tray] failed to refresh restored tracking state menu: {error}");
+        crate::log_error!("failed to refresh restored tracking state menu: {error}");
     }
     Ok(())
 }
@@ -335,13 +336,13 @@ pub(crate) async fn apply_title_recording_setting_change<R: Runtime>(
     if !enabled {
         if let Err(error) = app_settings_service::disable_active_app_title(app, changed_at_ms).await
         {
-            eprintln!("[tray] failed to seal app title boundary: {error}");
+            crate::log_error!("failed to seal app title boundary: {error}");
         }
     }
     if let Err(error) =
         crate::app::insight::web_activity::seal_active_segment_for_app(app, changed_at_ms).await
     {
-        eprintln!("[tray] failed to seal web title boundary: {error}");
+        crate::log_error!("failed to seal web title boundary: {error}");
     }
     rebuild_tray_menu(app)
         .map_err(|error| format!("failed to update title recording menu: {error}"))?;
@@ -354,10 +355,10 @@ pub(crate) async fn apply_title_recording_setting_change<R: Runtime>(
         },
         changed_at_ms as u64,
     ) {
-        eprintln!("[tray] failed to emit title recording event: {error}");
+        crate::log_error!("failed to emit title recording event: {error}");
     }
-    if let Err(error) = app.emit("app-settings-changed", serde_json::json!({})) {
-        eprintln!("[tray] failed to emit settings refresh event: {error}");
+    if let Err(error) = app.emit(APP_SETTINGS_CHANGED, serde_json::json!({})) {
+        crate::log_error!("failed to emit settings refresh event: {error}");
     }
     Ok(())
 }
@@ -373,7 +374,7 @@ pub(crate) fn apply_language_setting_change<R: Runtime>(
     if let Err(error) = rebuild_tray_menu(app) {
         // The database commit is already authoritative. Keep the runtime locale aligned
         // and retain the last usable native menu until the next rebuild opportunity.
-        eprintln!("[tray] failed to rebuild menu after language update: {error}");
+        crate::log_error!("failed to rebuild menu after language update: {error}");
     }
     Ok(())
 }
@@ -400,7 +401,7 @@ pub(crate) fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent
         let app_handle = app.clone();
         tauri::async_runtime::spawn(async move {
             if let Err(error) = toggle_tracking_paused(app_handle).await {
-                eprintln!("[tray] failed to toggle tracking pause: {error}");
+                crate::log_error!("failed to toggle tracking pause: {error}");
             }
         });
         return;
@@ -410,7 +411,7 @@ pub(crate) fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: MenuEvent
         let app_handle = app.clone();
         tauri::async_runtime::spawn(async move {
             if let Err(error) = toggle_title_recording(app_handle).await {
-                eprintln!("[tray] failed to toggle title recording: {error}");
+                crate::log_error!("failed to toggle title recording: {error}");
             }
         });
         return;
@@ -472,7 +473,7 @@ pub(crate) fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let language_raw =
         tauri::async_runtime::block_on(app_settings_service::load_language_setting(app))
             .unwrap_or_else(|error| {
-                eprintln!("[tray] failed to initialize tray menu language: {error}");
+                crate::log_error!("failed to initialize tray menu language: {error}");
                 None
             });
     let locale = Locale::from_tag(language_raw.as_deref());
@@ -489,7 +490,7 @@ pub(crate) fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let tracking_paused =
         tauri::async_runtime::block_on(tracking_pause_service::load_tracking_pause_setting(app))
             .unwrap_or_else(|error| {
-                eprintln!("[tray] failed to initialize tracking pause menu label: {error}");
+                crate::log_error!("failed to initialize tracking pause menu label: {error}");
                 false
             });
     update_tracking_pause_runtime_state(app, tracking_paused);
@@ -497,7 +498,7 @@ pub(crate) fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let title_enabled =
         tauri::async_runtime::block_on(app_settings_service::load_title_recording_enabled(app))
             .unwrap_or_else(|error: String| {
-                eprintln!("[tray] failed to initialize title recording menu label: {error}");
+                crate::log_error!("failed to initialize title recording menu label: {error}");
                 true
             });
     if let Some(state) = app.try_state::<TitleRecordingRuntimeState>() {
@@ -535,7 +536,7 @@ fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
                 applied_initial_variant = Some(variant);
             }
             Err(error) => {
-                eprintln!("[tray] failed to decode initial {variant:?} icon: {error}");
+                crate::log_error!("failed to decode initial {variant:?} icon: {error}");
                 if let Some(icon) = app.default_window_icon().cloned() {
                     builder = builder.icon(icon);
                 }
@@ -616,7 +617,7 @@ fn refresh_tray_icon_on_main_thread<R: Runtime>(
 
 fn start_taskbar_theme_watcher<R: Runtime>(app: &AppHandle<R>) {
     let Some(state) = app.try_state::<TrayIconRuntimeState>() else {
-        eprintln!("[tray] cannot start taskbar theme watcher without runtime state");
+        crate::log_warn!("cannot start taskbar theme watcher without runtime state");
         return;
     };
     let mut watcher_slot = state.lock_watcher();
@@ -631,14 +632,14 @@ fn start_taskbar_theme_watcher<R: Runtime>(app: &AppHandle<R>) {
         // watcher wait for that same loop to apply a cosmetic update.
         if let Err(error) = app_handle.run_on_main_thread(move || {
             if let Err(error) = refresh_tray_icon_on_main_thread(&handle, Some(theme)) {
-                eprintln!("[tray] failed to update icon after Windows theme change: {error}");
+                crate::log_error!("failed to update icon after Windows theme change: {error}");
             }
         }) {
-            eprintln!("[tray] failed to schedule Windows theme change: {error}");
+            crate::log_error!("failed to schedule Windows theme change: {error}");
         }
     }) {
         Ok(watcher) => *watcher_slot = Some(watcher),
-        Err(error) => eprintln!("[tray] failed to watch Windows taskbar theme: {error}"),
+        Err(error) => crate::log_error!("failed to watch Windows taskbar theme: {error}"),
     }
 }
 

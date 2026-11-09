@@ -1,5 +1,6 @@
 use crate::services::insight::data::app_settings_service;
 use crate::services::insight::data::web_activity_store::SqliteWebActivityStore;
+use crate::models::insight::events::TRACKING_DATA_CHANGED;
 use crate::models::insight::settings::WebActivitySettings;
 use crate::models::insight::tracking::TrackingDataChangedPayload;
 use crate::models::insight::web_activity::{
@@ -150,7 +151,7 @@ pub fn spawn_observation_expiry<R: Runtime + 'static>(app: AppHandle<R>) {
             let delay = match next_expiry_delay(&app).await {
                 Ok(delay) => delay,
                 Err(error) => {
-                    eprintln!("[web-activity] expiry check failed: {error}");
+                    crate::log_error!("expiry check failed: {error}");
                     tokio::time::sleep(Duration::from_secs(3)).await;
                     continue;
                 }
@@ -210,7 +211,7 @@ pub async fn get_bridge_snapshot<R: Runtime>(
 
 fn emit_web_activity_changed<R: Runtime>(app: &AppHandle<R>, changed_at_ms: i64) {
     let _ = app.emit(
-        "tracking-data-changed",
+        TRACKING_DATA_CHANGED,
         TrackingDataChangedPayload::new(WEB_ACTIVITY_CHANGED_REASON, changed_at_ms as u64),
     );
 }

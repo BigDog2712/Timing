@@ -14,7 +14,7 @@ pub(crate) fn register_alert_handler<R: Runtime>(app: &App<R>) {
             let owner = owner.clone();
             tauri::async_runtime::spawn(async move {
                 if let Err(error) = super::tool_notifications::refresh(&owner).await {
-                    eprintln!("[tool-notification] presentation refresh failed: {error}");
+                    crate::log_error!("presentation refresh failed: {error}");
                 }
             });
         });

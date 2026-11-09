@@ -243,8 +243,8 @@ async fn execute_claimed(
             record_execution_failure(pool, &run, &error, now_ms).await?;
         }
         Err(RunExecutionFailure::AfterPublication(error)) => {
-            eprintln!(
-                "[scheduled-backup] reconciling published snapshot after finalization failed: category={}",
+            crate::log_warn!(
+                "reconciling published snapshot after finalization failed: category={}",
                 classify_error(&error)
             );
             reconcile_published_run(app, pool, config, &run.run_key, now_ms).await?;
@@ -490,15 +490,15 @@ async fn cleanup_owned_webdav_failure(
     if let Err(cleanup_error) =
         remote_backup::discard_failed_scheduled_snapshot(&target, &run).await
     {
-        eprintln!(
-            "[scheduled-backup] failed to discard an invalid remote object: category={}",
+        crate::log_warn!(
+            "failed to discard an invalid remote object: category={}",
             classify_error(&cleanup_error)
         );
     }
     if let Some(staging) = run.staging_path.as_deref() {
         if let Err(cleanup_error) = remote_backup::cleanup_scheduled_temp(app, Path::new(staging)) {
-            eprintln!(
-                "[scheduled-backup] failed to discard invalid staging data: category={}",
+            crate::log_warn!(
+                "failed to discard invalid staging data: category={}",
                 classify_error(&cleanup_error)
             );
         }
@@ -858,13 +858,13 @@ async fn finish_success_maintenance(
         if let Err(record_error) =
             repository::set_cleanup_warning(pool, run_key, Some("cleanup_pending"), now_ms).await
         {
-            eprintln!(
-                "[scheduled-backup] failed to record cleanup warning after successful backup: {record_error}"
+            crate::log_warn!(
+                "failed to record cleanup warning after successful backup: {record_error}"
             );
         }
     }
     if let Err(error) = repository::compact_terminal_history(pool).await {
-        eprintln!("[scheduled-backup] failed to compact terminal history: {error}");
+        crate::log_warn!("failed to compact terminal history: {error}");
     }
 }
 

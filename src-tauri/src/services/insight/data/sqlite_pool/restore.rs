@@ -296,7 +296,7 @@ pub(crate) async fn replace_product_db_from_candidate<R: Runtime>(
     }
 
     if let Err(error) = fs::remove_file(&rollback_path) {
-        eprintln!("[sql] restored database is active but rollback cleanup failed: {error}");
+        crate::log_warn!("restored database is active but rollback cleanup failed: {error}");
     }
     Ok(())
 }
@@ -394,7 +394,7 @@ mod tests {
         let rollback_path = dir.join(".patina-restore-rollback-original.db");
         let mut opened_pools = Vec::new();
         let outcome = AssertUnwindSafe(async {
-            eprintln!("restore_marker_commit_fixture={}", dir.display());
+            crate::log_info!("restore_marker_commit_fixture={}", dir.display());
             for (path, name) in [(&rollback_path, "original"), (&db_path, "candidate")] {
                 let pool = open_single_connection_sqlite_pool(path, true).await.unwrap();
                 opened_pools.push(pool.clone());
@@ -410,7 +410,7 @@ mod tests {
                 .open(&marker_path).unwrap();
             let denied = fs::remove_file(&marker_path).unwrap_err();
             assert_eq!(denied.raw_os_error(), Some(32));
-            eprintln!("restore_marker_delete_denied_os_code={:?}", denied.raw_os_error());
+            crate::log_info!("restore_marker_delete_denied_os_code={:?}", denied.raw_os_error());
             let result = prepare_replacement_pool(&db_path).await;
             if let Ok(pool) = &result {
                 opened_pools.push(pool.clone());
@@ -470,7 +470,7 @@ mod tests {
         );
         fs::remove_dir_all(&cleanup_path).unwrap();
         assert!(!cleanup_path.exists());
-        eprintln!(
+        crate::log_info!(
             "restore_marker_commit_fixture_removed={}",
             cleanup_path.display()
         );

@@ -73,12 +73,12 @@ pub(crate) fn apply_startup_desktop_behavior<R: Runtime + 'static>(
     let next = replace_desktop_behavior_settings(app, settings);
     if should_sync_autostart(source) {
         if let Err(error) = apply_autostart(app, next.launch_at_login) {
-            eprintln!("[tray] failed to apply autostart setting: {error}");
+            crate::log_error!("failed to apply autostart setting: {error}");
         }
     }
     let strategy = next.startup_ui_strategy(source);
-    eprintln!(
-        "[startup] source={} strategy={}",
+    crate::log_info!(
+        "source={} strategy={}",
         source.as_str(),
         strategy.as_str()
     );
@@ -98,12 +98,12 @@ fn should_sync_autostart(source: StartupSource) -> bool {
 fn start_in_tray<R: Runtime + 'static>(app: &AppHandle<R>) -> bool {
     app.state::<BackgroundEntryState>().begin_startup();
     if let Err(error) = apply_tray_visibility(app) {
-        eprintln!("[startup] failed to apply tray visibility: {error}");
+        crate::log_error!("failed to apply tray visibility: {error}");
         return show_main_window(app, main_window::MainWindowShowReason::StartupRecovery);
     }
 
     if !main_window::register_hidden_main_window_startup(app) {
-        eprintln!("[startup] hidden main window registration was rejected; showing main window");
+        crate::log_warn!("hidden main window registration was rejected; showing main window");
         return show_main_window(app, main_window::MainWindowShowReason::StartupRecovery);
     }
 
@@ -116,7 +116,7 @@ pub(crate) async fn refresh_desktop_behavior_from_storage<R: Runtime>(
     let settings = app_settings_service::load_desktop_behavior_settings(&app).await?;
     let next = replace_desktop_behavior_settings(&app, settings);
     if let Err(error) = apply_autostart(&app, next.launch_at_login) {
-        eprintln!("[tray] failed to apply autostart setting after settings refresh: {error}");
+        crate::log_error!("failed to apply autostart setting after settings refresh: {error}");
     }
     apply_tray_visibility(&app)
 }

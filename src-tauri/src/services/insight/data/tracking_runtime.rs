@@ -1,5 +1,6 @@
 use crate::services::insight::data::repositories::{icon_cache, sessions, tracker_settings};
 use crate::services::insight::data::sqlite_pool::wait_for_sqlite_pool;
+use crate::models::insight::events::APP_ICON_CHANGED;
 use crate::models::insight::tracking::ActiveSessionSnapshot;
 use crate::services::insight::engine::tracking::ports::{
     IconCacheRead, SessionNameWrite, SharedTrackingDataStore, TrackingDataError,
@@ -209,7 +210,7 @@ pub async fn shared_from_app<R: Runtime>(
         session_name_changed: Arc::new(AtomicBool::new(false)),
         source,
         icon_changed: Arc::new(move |exe| {
-            let _ = event_app.emit("app-icon-changed", exe);
+            let _ = event_app.emit(APP_ICON_CHANGED, exe);
         }),
     }))
 }

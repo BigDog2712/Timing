@@ -124,7 +124,10 @@ scan(
   feFiles,
   /@tauri-apps\/api\/window/,
   R.L3,
-  (rel) => rel === 'src/lib/window.ts' || isVendored(rel),
+  /* [0.12.0 T03] `src/lib/windowApi.ts` 是零业务依赖的纯 re-export 薄壳：分析窗网关
+     经它取窗口 API，避免把宿主 `services/ipc` 拖进分析窗 bundle。这里只放行这两个
+     文件；T04 收口时把白名单改成只剩 windowApi.ts（并补上 webviewWindow 的匹配）。 */
+  (rel) => rel === 'src/lib/window.ts' || rel === 'src/lib/windowApi.ts' || isVendored(rel),
 );
 
 const rsFiles = walk('src-tauri/src', ['.rs']);

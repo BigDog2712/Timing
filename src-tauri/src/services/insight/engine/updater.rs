@@ -254,8 +254,8 @@ fn clear_downloaded_package(inner: &mut UpdaterStateInner) {
 fn remove_downloaded_package_file(package: &DownloadedUpdatePackage) {
     if let Err(error) = fs::remove_file(&package.path) {
         if error.kind() != std::io::ErrorKind::NotFound {
-            eprintln!(
-                "[updater] failed to remove cached update package {}: {error}",
+            crate::log_warn!(
+                "failed to remove cached update package {}: {error}",
                 package.path.display()
             );
         }
@@ -276,7 +276,7 @@ fn release_page_url_for_version(version: &str) -> Option<String> {
 
 fn emit_update_snapshot_changed<R: Runtime>(app: &AppHandle<R>, snapshot: &UpdateSnapshot) {
     if let Err(error) = app.emit(UPDATE_SNAPSHOT_CHANGED_EVENT, snapshot) {
-        eprintln!("[updater] failed to emit update snapshot change: {error}");
+        crate::log_error!("failed to emit update snapshot change: {error}");
     }
 }
 
@@ -337,7 +337,7 @@ pub async fn check_for_updates<R: Runtime>(
 
         if let Some(today) = silent_context {
             if let Err(error) = store.save_last_auto_check_day(&today).await {
-                eprintln!("[updater] failed to persist auto update check state: {error}");
+                crate::log_warn!("failed to persist auto update check state: {error}");
             }
         }
 
@@ -360,8 +360,8 @@ pub async fn run_startup_auto_check<R: Runtime>(
                 if snapshot.status != UpdateStatus::Error {
                     return;
                 }
-                eprintln!(
-                    "[updater] startup auto-check attempt {} failed: {}",
+                crate::log_warn!(
+                    "startup auto-check attempt {} failed: {}",
                     attempt + 1,
                     snapshot
                         .error_message
@@ -370,15 +370,15 @@ pub async fn run_startup_auto_check<R: Runtime>(
                 );
             }
             Err(error) => {
-                eprintln!(
-                    "[updater] startup auto-check attempt {} failed: {error}",
+                crate::log_warn!(
+                    "startup auto-check attempt {} failed: {error}",
                     attempt + 1
                 );
             }
         }
     }
 
-    eprintln!("[updater] startup auto-check exhausted retry budget");
+    crate::log_warn!("startup auto-check exhausted retry budget");
 }
 
 pub async fn download_pending<R: Runtime>(
@@ -492,7 +492,7 @@ pub async fn install_downloaded<R: Runtime>(
     let post_install_reopen_persisted = match store.request_post_install_reopen().await {
         Ok(()) => true,
         Err(error) => {
-            eprintln!("[updater] failed to persist post-install reopen intent: {error}");
+            crate::log_error!("failed to persist post-install reopen intent: {error}");
             false
         }
     };
@@ -515,8 +515,8 @@ pub async fn install_downloaded<R: Runtime>(
             state.set_downloaded_package(downloaded_package);
             if post_install_reopen_persisted {
                 if let Err(clear_error) = store.clear_post_install_reopen().await {
-                    eprintln!(
-                        "[updater] failed to clear post-install reopen intent after install error: {clear_error}"
+                    crate::log_warn!(
+                        "failed to clear post-install reopen intent after install error: {clear_error}"
                     );
                 }
             }
@@ -605,8 +605,8 @@ fn cleanup_stale_update_packages_in_dir(dir: &Path, active_package_path: Option<
         }
         if let Err(error) = fs::remove_file(&path) {
             if error.kind() != std::io::ErrorKind::NotFound {
-                eprintln!(
-                    "[updater] failed to remove stale update package {}: {error}",
+                crate::log_warn!(
+                    "failed to remove stale update package {}: {error}",
                     path.display()
                 );
             }

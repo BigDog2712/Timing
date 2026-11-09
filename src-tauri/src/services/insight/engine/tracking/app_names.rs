@@ -118,7 +118,7 @@ impl NameResolver {
                 return;
             }
             if let Err(error) = confirm(name.to_owned()).await {
-                eprintln!("[tracker] failed to fill session name: {error}");
+                crate::log_warn!("failed to fill session name: {error}");
             }
         }))
     }

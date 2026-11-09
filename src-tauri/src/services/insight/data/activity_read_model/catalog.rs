@@ -329,7 +329,7 @@ pub(super) async fn load_page(
     limit: usize,
 ) -> Result<RecordedAppCatalogPageDto, String> {
     if let Err(error) = maintain_once(pool).await {
-        eprintln!("[read-model] app catalog maintenance deferred to facts: {error}");
+        crate::log_warn!("app catalog maintenance deferred to facts: {error}");
     }
     let safe_limit = limit.clamp(1, 500);
     let normalized_search = search_query.trim().to_ascii_lowercase();
@@ -410,9 +410,7 @@ pub(super) async fn load_page(
             .bind(now_ms())
             .execute(pool)
             .await;
-            eprintln!(
-                "[read-model] app catalog projection unavailable; using facts: {projection_error}"
-            );
+            crate::log_warn!("app catalog projection unavailable; using facts: {projection_error}");
             let rows =
                 fetch_catalog_page_rows(pool, &facts_sql, "", "%%", cursor.as_ref(), safe_limit)
                     .await

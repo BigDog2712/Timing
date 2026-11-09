@@ -106,7 +106,7 @@ pub fn setup(
                 .map_err(std::io::Error::other)?;
             // Resolve interrupted credential saves before backup schedulers start.
             if let Err(error) = tauri::async_runtime::block_on(data::remote_backup_config::snapshot(app.handle())) {
-                eprintln!("[backup] credential recovery unavailable: {error}");
+                crate::log_warn!("credential recovery unavailable: {error}");
             }
             tauri::async_runtime::block_on(data::app_settings_service::migrate_legacy_web_links(app.handle()))
                 .map_err(std::io::Error::other)?;
@@ -127,8 +127,8 @@ pub fn setup(
                     )
                 }
                 Err(error) => {
-                    eprintln!(
-                        "[startup] failed to load desktop behavior settings; showing main window: {error}"
+                    crate::log_warn!(
+                        "failed to load desktop behavior settings; showing main window: {error}"
                     );
                     runtime::StartupContext::new(
                         DesktopBehaviorSettings::default(),
@@ -141,8 +141,8 @@ pub fn setup(
                 if let Err(error) = tauri::async_runtime::block_on(
                     data::app_settings_service::clear_post_install_reopen_main_window(app.handle()),
                 ) {
-                    eprintln!(
-                        "[startup] main window reopened but update intent could not be cleared: {error}"
+                    crate::log_warn!(
+                        "main window reopened but update intent could not be cleared: {error}"
                     );
                 }
             }

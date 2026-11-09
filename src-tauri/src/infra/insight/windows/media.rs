@@ -341,7 +341,7 @@ fn log_media_probe_error(message: String) {
         *last_logged_at_ms = now_ms;
     }
 
-    eprintln!("[media] {message}");
+    crate::log_error!("{message}");
 }
 
 #[cfg(test)]

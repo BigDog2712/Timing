@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { publishAppIconChange } from "../../shared/hooks/appIconChanges.ts";
+import { APP_ICON_CHANGED } from "./insightEvents.ts";
 
 export function installAppIconEvents(): () => void {
   let disposed = false;
@@ -7,7 +8,7 @@ export function installAppIconEvents(): () => void {
   const reconcile = () => {
     if (document.visibilityState === "visible") publishAppIconChange(null);
   };
-  void listen<unknown>("app-icon-changed", ({ payload }) => {
+  void listen<unknown>(APP_ICON_CHANGED, ({ payload }) => {
     if (!disposed && typeof payload === "string" && payload.trim()) publishAppIconChange(payload);
   }).then((stop) => {
     if (disposed) { stop(); return; }

@@ -83,7 +83,7 @@ async fn measure_capacity(
     let maintenance_cpu_ms = initial_cpu_ms
         .zip(process_cpu_ms())
         .map(|(start, end)| end - start);
-    eprintln!("{name}: maintained in {maintenance_ms:.1} ms");
+    crate::log_info!("{name}: maintained in {maintenance_ms:.1} ms");
     let projection_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM activity_hourly_effective")
         .fetch_one(pool)
         .await
@@ -212,7 +212,7 @@ async fn hourly_maintenance_capacity_report() {
         let seed_started = Instant::now();
         seed_native_days(&pool, days, 0).await;
         let seed_ms = seed_started.elapsed().as_secs_f64() * 1000.0;
-        eprintln!("{name}: seeded {days} days in {seed_ms:.1} ms");
+        crate::log_info!("{name}: seeded {days} days in {seed_ms:.1} ms");
         measurements.push(
             measure_capacity(
                 &pool,

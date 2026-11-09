@@ -34,7 +34,7 @@ pub(crate) fn spawn_tracking_runtime_restart_loop<R: Runtime + 'static>(
             let data = match crate::services::insight::data::tracking_runtime::shared_from_app(&app).await {
                 Ok(data) => data,
                 Err(error) => {
-                    eprintln!("[tracker] tracking data store unavailable: {error}");
+                    crate::log_error!("tracking data store unavailable: {error}");
                     sleep(retry_delay.next_delay()).await;
                     continue;
                 }
@@ -58,17 +58,17 @@ pub(crate) fn spawn_tracking_runtime_restart_loop<R: Runtime + 'static>(
                 Err(_) => {
                     // Unwinding does not cancel SQL already dispatched to its
                     // worker. Preserve diagnostics without starting a second writer.
-                    eprintln!(
-                        "[tracker] tracking runtime panicked; restart requires reconciliation"
+                    crate::log_error!(
+                        "tracking runtime panicked; restart requires reconciliation"
                     );
                     return;
                 }
             };
             if let Err(error) = result {
-                eprintln!("[tracker] tracking runtime stopped: {error}");
+                crate::log_error!("tracking runtime stopped: {error}");
                 let delay = retry_delay.next_delay();
-                eprintln!(
-                    "[tracker] restarting tracking runtime in {} seconds...",
+                crate::log_info!(
+                    "restarting tracking runtime in {} seconds...",
                     delay.as_secs()
                 );
                 sleep(delay).await;
@@ -104,7 +104,7 @@ pub(crate) fn spawn_tracking_watchdog_restart_loop<R: Runtime + 'static>(
             let data = match crate::services::insight::data::tracking_runtime::shared_from_app(&app).await {
                 Ok(data) => data,
                 Err(error) => {
-                    eprintln!("[tracker] watchdog data store unavailable: {error}");
+                    crate::log_error!("watchdog data store unavailable: {error}");
                     sleep(retry_delay.next_delay()).await;
                     continue;
                 }
@@ -112,10 +112,10 @@ pub(crate) fn spawn_tracking_watchdog_restart_loop<R: Runtime + 'static>(
             if let Err(error) =
                 tracking_watchdog::watch(app.clone(), runtime_health.clone(), data).await
             {
-                eprintln!("[tracker] watchdog stopped: {error}");
+                crate::log_error!("watchdog stopped: {error}");
                 let delay = retry_delay.next_delay();
-                eprintln!(
-                    "[tracker] restarting watchdog in {} seconds...",
+                crate::log_info!(
+                    "restarting watchdog in {} seconds...",
                     delay.as_secs()
                 );
                 sleep(delay).await;
@@ -132,10 +132,10 @@ fn spawn_tools_runtime_restart_loop<R: Runtime + 'static>(app: AppHandle<R>) {
         let mut retry_delay = RestartBackoff::new();
         loop {
             if let Err(error) = tools_runtime::run(app.clone()).await {
-                eprintln!("[tools] runtime stopped: {error}");
+                crate::log_error!("runtime stopped: {error}");
                 let delay = retry_delay.next_delay();
-                eprintln!(
-                    "[tools] restarting tools runtime in {} seconds...",
+                crate::log_info!(
+                    "restarting tools runtime in {} seconds...",
                     delay.as_secs()
                 );
                 sleep(delay).await;
@@ -152,10 +152,10 @@ pub(crate) fn spawn_scheduled_backup_runtime_restart_loop(app: AppHandle) {
         let mut retry_delay = RestartBackoff::new();
         loop {
             if let Err(error) = crate::app::insight::scheduled_backup::run(app.clone()).await {
-                eprintln!("[scheduled-backup] runtime stopped: {error}");
+                crate::log_error!("runtime stopped: {error}");
                 let delay = retry_delay.next_delay();
-                eprintln!(
-                    "[scheduled-backup] restarting runtime in {} seconds...",
+                crate::log_info!(
+                    "restarting runtime in {} seconds...",
                     delay.as_secs()
                 );
                 sleep(delay).await;
@@ -171,10 +171,10 @@ pub(crate) fn spawn_scheduled_export_runtime_restart_loop(app: AppHandle) {
         let mut retry_delay = RestartBackoff::new();
         loop {
             if let Err(error) = crate::app::insight::scheduled_export::run(app.clone()).await {
-                eprintln!("[scheduled-export] runtime stopped: {error}");
+                crate::log_error!("runtime stopped: {error}");
                 let delay = retry_delay.next_delay();
-                eprintln!(
-                    "[scheduled-export] restarting runtime in {} seconds...",
+                crate::log_info!(
+                    "restarting runtime in {} seconds...",
                     delay.as_secs()
                 );
                 sleep(delay).await;

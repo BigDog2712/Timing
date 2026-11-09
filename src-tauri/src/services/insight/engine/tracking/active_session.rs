@@ -68,7 +68,7 @@ pub(crate) async fn start_session_with_name_scheduler(
             )
             .await
             {
-                eprintln!("[tracker] failed to update icon cache: {error}");
+                crate::log_warn!("failed to update icon cache: {error}");
             }
         });
     }

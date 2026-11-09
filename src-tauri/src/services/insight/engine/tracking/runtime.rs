@@ -12,6 +12,7 @@ use super::{active_session, continuity, transition, watchdog};
 use crate::services::insight::data::repositories::{sessions, tracker_settings};
 #[cfg(test)]
 use crate::models::insight::tracking::TrackingDataChangedPayload;
+use crate::models::insight::events::ACTIVE_WINDOW_CHANGED;
 use crate::models::insight::tracking::TrackingStatusSnapshot;
 #[cfg(test)]
 use crate::models::insight::tracking::TRACKING_REASON_TRACKING_PAUSED_SEALED;
@@ -318,7 +319,7 @@ pub async fn run<R: Runtime>(
             .await;
         if did_change_active_window {
             if let Some(snapshot) = snapshot_state.snapshot() {
-                let _ = app.emit("active-window-changed", &snapshot.window);
+                let _ = app.emit(ACTIVE_WINDOW_CHANGED, &snapshot.window);
             }
             last_emitted_window = Some(window_info.clone());
         }

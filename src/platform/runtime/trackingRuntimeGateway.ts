@@ -12,6 +12,7 @@ import type {
   TrackingDataChangedPayload,
   TrackingWindowSnapshot,
 } from "../../shared/types/tracking.ts";
+import { ACTIVE_WINDOW_CHANGED, TRACKING_DATA_CHANGED } from "./insightEvents.ts";
 
 export async function getCurrentWindow(): Promise<TrackingWindowSnapshot | null> {
   try {
@@ -47,7 +48,7 @@ export async function setAfkThreshold(thresholdSecs: number): Promise<void> {
 export async function onActiveWindowChanged(
   handler: (window: TrackingWindowSnapshot) => void | Promise<void>,
 ): Promise<() => void> {
-  return listen<unknown>("active-window-changed", (event: Event<unknown>) => {
+  return listen<unknown>(ACTIVE_WINDOW_CHANGED, (event: Event<unknown>) => {
     const payload = parseTrackingWindowSnapshot(event.payload);
     if (!payload) {
       console.warn("Ignored invalid active-window payload", event.payload);
@@ -61,7 +62,7 @@ export async function onActiveWindowChanged(
 export async function onTrackingDataChanged(
   handler: (payload: TrackingDataChangedPayload) => void | Promise<void>,
 ): Promise<() => void> {
-  return listen<unknown>("tracking-data-changed", (event: Event<unknown>) => {
+  return listen<unknown>(TRACKING_DATA_CHANGED, (event: Event<unknown>) => {
     const payload = parseTrackingDataChangedPayload(event.payload);
     if (!payload) {
       console.warn("Ignored invalid tracking-data payload", event.payload);

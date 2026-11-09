@@ -347,8 +347,6 @@ export function startStartupWarmup(
       (error: unknown) => ({ error, value: null }),
     )
     : Promise.resolve({ error: null, value: null });
-  let controller: StartupWarmupController;
-
   const ready = (async () => {
     await delay(initialDelayMs);
     const runTask = async (
@@ -475,7 +473,7 @@ export function startStartupWarmup(
       }
     });
 
-  controller = {
+  const controller: StartupWarmupController = {
     cancel: () => {
       cancelled = true;
       for (const taskId of STARTUP_WARMUP_TASKS) {

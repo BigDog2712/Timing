@@ -1,4 +1,5 @@
 use super::ports::{TrackingDataError, TrackingDataStore};
+use crate::models::insight::events::TRACKING_DATA_CHANGED;
 use crate::models::insight::tracking::resolve_interrupted_session_end;
 use crate::models::insight::tracking::{TrackingDataChangedPayload, TRACKING_REASON_STARTUP_SEALED};
 use crate::infra::insight::windows::foreground as tracker;
@@ -112,7 +113,7 @@ fn emit_tracking_data_changed<R: Runtime>(
     changed_at_ms: u64,
 ) -> tauri::Result<()> {
     app.emit(
-        "tracking-data-changed",
+        TRACKING_DATA_CHANGED,
         TrackingDataChangedPayload::new(reason, changed_at_ms),
     )
 }
@@ -122,7 +123,7 @@ fn now_ms() -> i64 {
 }
 
 fn log_startup_error(message: impl AsRef<str>) {
-    eprintln!("[tracker] {}", message.as_ref());
+    crate::log_error!("{}", message.as_ref());
 }
 
 #[cfg(test)]

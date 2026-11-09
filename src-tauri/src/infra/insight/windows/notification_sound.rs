@@ -96,7 +96,7 @@ pub(crate) fn play(sound: Sound) {
         let data = wave(sound);
         // SND_MEMORY | SND_NODEFAULT; synchronous playback keeps the buffer alive.
         if unsafe { PlaySoundW(data.as_ptr(), std::ptr::null_mut(), 0x0004 | 0x0002) } == 0 {
-            eprintln!("[tool-notification] local sound playback failed");
+            crate::log_warn!("local sound playback failed");
         }
     });
 }

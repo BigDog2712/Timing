@@ -5,6 +5,7 @@ use crate::services::insight::data::app_settings_service::commit_app_setting_mut
 use crate::services::insight::data::classification_service::commit_classification_setting_mutations_with_recovery;
 use crate::services::insight::data::repositories::app_settings::AppSettingMutation;
 use crate::services::insight::data::repositories::classification_settings::ClassificationSettingMutation;
+use crate::models::insight::events::APP_SETTINGS_CHANGED;
 use crate::models::insight::settings::parse_boolean_setting;
 use crate::services::insight::engine::tracking::title_state::TitleRecordingRuntimeState;
 use serde_json::json;
@@ -167,7 +168,7 @@ pub async fn cmd_commit_app_settings(
             .await
             .map_err(|error| CommandErrorDto::new("SETTINGS_APPLY_FAILED", error, false))?;
     }
-    app.emit("app-settings-changed", json!({}))
+    app.emit(APP_SETTINGS_CHANGED, json!({}))
         .map_err(|error| {
             CommandErrorDto::new(
                 "SETTINGS_EVENT_FAILED",
@@ -189,7 +190,7 @@ pub async fn cmd_migrate_history_timeline_mode(
     let _guard = state.lock().await;
     let mode = crate::services::insight::data::app_settings_service::migrate_history_timeline_mode(&app, &legacy_mode)
         .await?;
-    let _ = app.emit("app-settings-changed", json!({}));
+    let _ = app.emit(APP_SETTINGS_CHANGED, json!({}));
     Ok(mode)
 }
 

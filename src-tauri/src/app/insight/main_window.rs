@@ -92,8 +92,8 @@ fn log_main_window_event(
     reason: &str,
     result: &str,
 ) {
-    eprintln!(
-        "[main-window] event={event} generation={} load_epoch={} reason={reason} desired_visible={} render_state={} create_in_progress={} destroy_in_progress={} reveal_in_progress={} elapsed_ms={} result={result}",
+    crate::log_info!(
+        "event={event} generation={} load_epoch={} reason={reason} desired_visible={} render_state={} create_in_progress={} destroy_in_progress={} reveal_in_progress={} elapsed_ms={} result={result}",
         snapshot.generation,
         snapshot.load_epoch,
         snapshot.desired_visible,
@@ -135,7 +135,7 @@ pub(crate) fn show_main_window<R: Runtime + 'static>(
     let ensure_result = match ensure_main_window_once(app) {
         Ok(result) => result,
         Err(error) => {
-            eprintln!("[main-window] failed to ensure main window: {error}");
+            crate::log_error!("failed to ensure main window: {error}");
             if let MainWindowShowDecision::Reveal { token } = decision {
                 lifecycle.finish_reveal(token, false);
             }
@@ -244,12 +244,12 @@ pub(crate) fn destroy_hidden_main_window_for_e2e<R: Runtime>(
         return Err("refusing to destroy a visible main window".to_string());
     }
 
-    eprintln!("[main-window] event=e2e-destroy-requested result=accepted");
+    crate::log_info!("event=e2e-destroy-requested result=accepted");
     let result = window
         .destroy()
         .map_err(|error| format!("failed to destroy hidden E2E main window: {error}"));
-    eprintln!(
-        "[main-window] event=e2e-destroy-finished result={}",
+    crate::log_info!(
+        "event=e2e-destroy-finished result={}",
         if result.is_ok() { "success" } else { "error" }
     );
     result
@@ -281,7 +281,7 @@ fn reveal_main_window<R: Runtime + 'static>(
             reason,
             "window-show-error",
         );
-        eprintln!("[main-window] failed to show main window: {error}");
+        crate::log_error!("failed to show main window: {error}");
         recreate_main_window(app, "window-show-error")?;
         return Ok(false);
     }
@@ -296,7 +296,7 @@ fn reveal_main_window<R: Runtime + 'static>(
             reason,
             "native-restore-error",
         );
-        eprintln!("[main-window] failed to restore native foreground window: {error}");
+        crate::log_error!("failed to restore native foreground window: {error}");
         recreate_main_window(app, "native-restore-error")?;
         return Ok(false);
     }
@@ -362,7 +362,7 @@ pub(crate) fn register_hidden_main_window_startup<R: Runtime + 'static>(
     app: &AppHandle<R>,
 ) -> bool {
     let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
-        eprintln!("[startup] hidden registration rejected: window-missing");
+        crate::log_warn!("hidden registration rejected: window-missing");
         return false;
     };
 
@@ -379,8 +379,8 @@ pub(crate) fn register_hidden_main_window_startup<R: Runtime + 'static>(
         .try_hide_for_startup()
     else {
         let snapshot = app.state::<MainWindowLifecycleState>().snapshot();
-        eprintln!(
-            "[startup] hidden registration rejected: lifecycle-desired-visible desired_visible={} generation={}",
+        crate::log_warn!(
+            "hidden registration rejected: lifecycle-desired-visible desired_visible={} generation={}",
             snapshot.desired_visible, snapshot.generation
         );
         return false;
@@ -418,7 +418,7 @@ fn ensure_main_window_once<R: Runtime + 'static>(
             return Ok(MainWindowEnsureResult::Existing(window));
         }
 
-        eprintln!("[main-window] stale Tauri window found without a live native HWND; recreating");
+        crate::log_warn!("stale Tauri window found without a live native HWND; recreating");
         recreate_main_window(app, "stale-native-window")?;
         return Ok(MainWindowEnsureResult::Creating);
     }
@@ -475,8 +475,8 @@ fn ensure_main_window_once<R: Runtime + 'static>(
                     schedule_main_window_ready_timeout(app.clone(), token);
                 }
                 PageLoadEvent::Finished => {
-                    eprintln!(
-                        "[main-window] event=page-load-finished generation={generation} elapsed_ms={} url_scheme={} result=observed",
+                    crate::log_info!(
+                        "event=page-load-finished generation={generation} elapsed_ms={} url_scheme={} result=observed",
                         created_at.elapsed().as_millis(),
                         payload.url().scheme(),
                     );
@@ -555,7 +555,7 @@ fn recreate_main_window<R: Runtime + 'static>(
     let reason = reason.to_owned();
     tauri::async_runtime::spawn(async move {
         if let Err(error) = recovery::rebuild(&app, generation, &reason).await {
-            eprintln!("[main-window] recovery failed: {error}");
+            crate::log_error!("recovery failed: {error}");
         }
     });
     Ok(())
@@ -582,7 +582,7 @@ pub(crate) fn handle_unexpected_main_window_destroyed<R: Runtime + 'static>(
     tauri::async_runtime::spawn(async move {
         tokio::task::yield_now().await;
         if let Err(error) = recreate_main_window(&app, "unexpected-destroy") {
-            eprintln!("[main-window] failed to recover destroyed visible window: {error}");
+            crate::log_error!("failed to recover destroyed visible window: {error}");
         }
     });
 }
@@ -665,7 +665,7 @@ fn schedule_main_window_destroy_after_background<R: Runtime + 'static>(
                 true
             }
             Err(error) => {
-                eprintln!("[main-window] failed to destroy idle main window: {error}");
+                crate::log_error!("failed to destroy idle main window: {error}");
                 false
             }
         };
@@ -723,8 +723,8 @@ fn schedule_main_window_liveness_timeout<R: Runtime + 'static>(
                 );
                 if snapshot.desired_visible && !app.state::<AppExitState>().is_exit_requested() {
                     if let Err(error) = recreate_main_window(&app, "liveness-timeout") {
-                        eprintln!(
-                            "[main-window] failed to recreate unresponsive hidden window: {error}"
+                        crate::log_error!(
+                            "failed to recreate unresponsive hidden window: {error}"
                         );
                     }
                 }

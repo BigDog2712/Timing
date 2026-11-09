@@ -484,7 +484,7 @@ fn verify_audio_apartment(executable: &std::path::Path) -> Result<(), String> {
                             "audio helper resource growth: {field}: {before} -> {current}"
                         );
                     }
-                    eprintln!("NATIVE_AUDIO_RESOURCES before={before} after={current}");
+                    crate::log_info!("NATIVE_AUDIO_RESOURCES before={before} after={current}");
                 } else {
                     baseline = Some(current);
                 }
@@ -495,7 +495,7 @@ fn verify_audio_apartment(executable: &std::path::Path) -> Result<(), String> {
     })();
     assert!(process.stop(CLEANUP_BUDGET));
     result?;
-    eprintln!("NATIVE_AUDIO_APARTMENT repeated_queries=32 retained_mta=true");
+    crate::log_info!("NATIVE_AUDIO_APARTMENT repeated_queries=32 retained_mta=true");
     Ok(())
 }
 
@@ -551,7 +551,7 @@ fn verify_media_resources(executable: &std::path::Path) -> Result<(), String> {
                             "media helper resource growth: {field}: {before} -> {current}"
                         );
                     }
-                    eprintln!(
+                    crate::log_info!(
                         "NATIVE_MEDIA_RESOURCES queries={id} before={before} after={current}"
                     );
                 } else {

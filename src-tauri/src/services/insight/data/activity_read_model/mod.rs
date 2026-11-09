@@ -288,7 +288,7 @@ pub fn spawn_background_worker<R: Runtime + 'static>(app: AppHandle<R>) {
                 }
                 Err(error) => {
                     idle_delay = WORKER_IDLE_DELAY;
-                    eprintln!("[read-model] background maintenance failed: {error}");
+                    crate::log_warn!("background maintenance failed: {error}");
                     sleep(WORKER_IDLE_DELAY).await;
                 }
             }
@@ -332,7 +332,7 @@ impl MaintenanceSchedule {
             }
             Err(error) => {
                 self.retry_after = Some(now + Duration::from_secs(60));
-                eprintln!("[sql] query statistics optimization deferred: {error}");
+                crate::log_warn!("query statistics optimization deferred: {error}");
             }
         }
         Ok(false)

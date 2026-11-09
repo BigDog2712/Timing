@@ -3,6 +3,7 @@ pub mod backup;
 pub mod backup_schedule;
 pub mod browser_title_privacy;
 pub mod classification;
+pub mod events;
 pub mod export_schedule;
 pub mod focus_history;
 pub mod free_focus;

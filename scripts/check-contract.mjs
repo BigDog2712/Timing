@@ -130,6 +130,22 @@ function feEvents(types) {
   return new Set([...types.slice(start, end).matchAll(/'([a-z][a-z0-9:-]+)'/gi)].map((m) => m[1]));
 }
 
+/** 分析窗（insight）事件常量（`models/insight/events.rs`，T03 新建）。
+ *
+ * [0.12.0 T03] insight 子树里的 14 处字面量 emit 已改成常量。若这里不认它们，
+ * 「emit 点」会从 17 掉成 11 —— 事件其实照发，只是脚本看不见来源。**只做值映射**：
+ * 不参与「后端常量必须在前端声明」那条检查（那些事件不进宿主 `IPC_EVENTS`），
+ * `isVendored` 的字面量豁免也原样保留（撤掉它是 T04 的事）。
+ * 常量放 `models/insight/` 而不是文档原写的 `app/insight/`：5 层都有 emit 点，
+ * 放装配层会让 infra / services 反向依赖 app，而 `app/mod.rs` 明文禁止。 */
+function insightRustEvents() {
+  const p = 'src-tauri/src/models/insight/events.rs';
+  if (!existsSync(join(root, p))) return new Map();
+  const map = new Map();
+  for (const m of read(p).matchAll(/pub const (\w+): &str = "([^"]+)"/g)) map.set(m[1], m[2]);
+  return map;
+}
+
 function emitSites(byName) {
   const files = walk('src-tauri/src', '.rs');
   /* vendored 子树（V0.12.0 融合的 Patina）自带一套事件名与常量，前端也在
@@ -153,6 +169,7 @@ function emitSites(byName) {
   const values = new Set();
   const literals = [];
   const counts = new Map();
+  const insightByName = insightRustEvents();
   for (const rel of files) {
     const src = read(rel);
     for (const [name] of byName) {
@@ -168,7 +185,7 @@ function emitSites(byName) {
         continue;
       }
       const ident = arg.split('::').pop();
-      const value = byName.get(ident);
+      const value = byName.get(ident) ?? insightByName.get(ident);
       // 动态变量（如 `name`）无法静态解析，按「已覆盖」处理：字面量检查已拦住硬编码
       if (value) values.add(value);
     }

@@ -11,7 +11,7 @@ use tauri::{AppHandle, Listener, Manager, Runtime};
 
 pub fn start<R: Runtime + 'static>(app: AppHandle<R>) {
     if app.try_state::<WebActivityBridgeRuntimeState>().is_none() {
-        eprintln!("[web-activity-bridge] runtime state is not available");
+        crate::log_warn!("runtime state is not available");
         return;
     }
 
@@ -23,7 +23,7 @@ fn spawn_settings_bootstrap<R: Runtime + 'static>(app: AppHandle<R>) {
     tauri::async_runtime::spawn(async move {
         match load_web_activity_bridge_settings(&app).await {
             Ok(settings) => update_runtime_state(app, settings),
-            Err(error) => eprintln!("[web-activity-bridge] failed to load settings: {error}"),
+            Err(error) => crate::log_error!("failed to load settings: {error}"),
         }
     });
 }
@@ -36,7 +36,7 @@ fn register_event_handlers<R: Runtime + 'static>(app: AppHandle<R>) {
             match load_web_activity_bridge_settings(&settings_app).await {
                 Ok(settings) => update_runtime_state(settings_app, settings),
                 Err(error) => {
-                    eprintln!("[web-activity-bridge] failed to reload settings: {error}")
+                    crate::log_error!("failed to reload settings: {error}")
                 }
             }
         });

@@ -2,6 +2,7 @@ use crate::app::insight::{desktop_behavior, tray};
 use crate::services::insight::data::backup::{self, RestoreStrategy};
 use crate::services::insight::data::remote_backup;
 use crate::models::insight::backup::BackupError;
+use crate::models::insight::events::APP_SETTINGS_CHANGED;
 use crate::services::insight::engine::tracking::runtime as tracking_runtime;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -39,11 +40,11 @@ pub(crate) async fn restore_backup_and_refresh(
     match crate::services::insight::data::tracking_runtime::shared_from_app(&app).await {
         Ok(data) => {
             if let Err(error) = title_state.initialize(data.as_ref()).await {
-                eprintln!("[backup] restore committed but title policy refresh failed: {error}");
+                crate::log_warn!("restore committed but title policy refresh failed: {error}");
             }
         }
         Err(error) => {
-            eprintln!("[backup] restore committed but tracking data reload failed: {error}")
+            crate::log_warn!("restore committed but tracking data reload failed: {error}")
         }
     }
     if strategy == RestoreStrategy::Replace {
@@ -54,23 +55,23 @@ pub(crate) async fn restore_backup_and_refresh(
     drop(scheduled_export_guard);
     drop(scheduled_backup_guard);
     if let Err(error) = remote_backup::cleanup_remote_backup_temp_if_owned(&app, &backup_path) {
-        eprintln!("[backup] restore committed but remote temp cleanup failed: {error}");
+        crate::log_warn!("restore committed but remote temp cleanup failed: {error}");
     }
     if let Err(error) = desktop_behavior::refresh_desktop_behavior_from_storage(app.clone()).await {
-        eprintln!("[backup] restore committed but desktop behavior refresh failed: {error}");
+        crate::log_warn!("restore committed but desktop behavior refresh failed: {error}");
     }
     if let Err(error) = tray::refresh_tracking_pause_from_storage(&app).await {
-        eprintln!("[backup] restore committed but tracking pause refresh failed: {error}");
+        crate::log_warn!("restore committed but tracking pause refresh failed: {error}");
     }
     tracking.note_tracking_policy_change();
     drop(transition_guard);
-    if let Err(error) = app.emit("app-settings-changed", serde_json::json!({})) {
-        eprintln!("[backup] restore committed but settings refresh event failed: {error}");
+    if let Err(error) = app.emit(APP_SETTINGS_CHANGED, serde_json::json!({})) {
+        crate::log_warn!("restore committed but settings refresh event failed: {error}");
     }
     if let Err(error) =
         tracking_runtime::emit_tracking_data_changed(&app, "backup-restored", now_ms())
     {
-        eprintln!("[backup] restore committed but tracking refresh event failed: {error}");
+        crate::log_warn!("restore committed but tracking refresh event failed: {error}");
     }
     Ok(())
 }

@@ -1,3 +1,4 @@
+use crate::models::insight::events::MAIN_TOOLS_TARGET_CHANGED;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
@@ -29,7 +30,7 @@ pub(crate) fn open<R: Runtime>(app: &AppHandle<R>, section: ToolsSection) -> Res
         return Err("Could not open the main window".into());
     }
     // A cold main WebView consumes the pending target after subscribing.
-    let _ = app.emit_to("patina", "main-tools-target-changed", ());
+    let _ = app.emit_to("patina", MAIN_TOOLS_TARGET_CHANGED, ());
     Ok(())
 }
 

@@ -523,7 +523,7 @@ async fn active_probe_uses_the_schema_enforced_single_active_index() {
         .fetch_one(&pool)
         .await
         .unwrap();
-    eprintln!("SQLx SQLite {version}: active probe {plan:?}");
+    crate::log_info!("SQLx SQLite {version}: active probe {plan:?}");
     let active = sqlx::query_scalar::<_, i64>(ACTIVE_SESSION_START_SQL)
         .fetch_optional(&pool)
         .await

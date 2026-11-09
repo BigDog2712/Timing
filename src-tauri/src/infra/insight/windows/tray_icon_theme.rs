@@ -129,8 +129,8 @@ impl TaskbarThemeWatcher {
                 };
                 let initial_status = arm_notification();
                 if initial_status != ERROR_SUCCESS {
-                    eprintln!(
-                        "[tray] Windows taskbar theme notification failed: {}",
+                    crate::log_warn!(
+                        "Windows taskbar theme notification failed: {}",
                         initial_status.0
                     );
                     unsafe {
@@ -151,7 +151,7 @@ impl TaskbarThemeWatcher {
                         break;
                     }
                     if wait.0 != WAIT_OBJECT_0.0 + 1 {
-                        eprintln!("[tray] Windows taskbar theme wait failed: {}", wait.0);
+                        crate::log_warn!("Windows taskbar theme wait failed: {}", wait.0);
                         break;
                     }
 
@@ -159,8 +159,8 @@ impl TaskbarThemeWatcher {
                     // second change cannot fall into the read/re-registration gap.
                     let notify_status = arm_notification();
                     if notify_status != ERROR_SUCCESS {
-                        eprintln!(
-                            "[tray] Windows taskbar theme notification failed: {}",
+                        crate::log_warn!(
+                            "Windows taskbar theme notification failed: {}",
                             notify_status.0
                         );
                         break;
@@ -203,7 +203,7 @@ impl TaskbarThemeWatcher {
             .is_some_and(|thread| !thread.is_finished());
         if thread_is_running {
             if let Err(error) = unsafe { SetEvent(HANDLE(self.stop_event as *mut _)) } {
-                eprintln!("[tray] failed to stop taskbar theme watcher: {error}");
+                crate::log_warn!("failed to stop taskbar theme watcher: {error}");
                 // Never turn a cosmetic watcher failure into a blocking app exit.
                 // Dropping the JoinHandle detaches the already-failing watcher.
                 self.thread.take();
@@ -212,7 +212,7 @@ impl TaskbarThemeWatcher {
         }
         if let Some(thread) = self.thread.take() {
             if thread.join().is_err() {
-                eprintln!("[tray] taskbar theme watcher panicked while stopping");
+                crate::log_error!("taskbar theme watcher panicked while stopping");
             }
         }
     }

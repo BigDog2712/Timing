@@ -300,7 +300,7 @@ async fn file_database_mixed_workload_capacity() {
     std::fs::create_dir_all(&directory).unwrap();
     let path = directory.join(format!("database-contention-{}.json", uuid::Uuid::new_v4()));
     std::fs::write(&path, serde_json::to_vec_pretty(&reports).unwrap()).unwrap();
-    eprintln!(
+    crate::log_info!(
         "PATINA_DATABASE_CONTENTION {}",
         serde_json::to_string(&reports).unwrap()
     );

@@ -3,6 +3,7 @@ mod native;
 mod watcher;
 
 use crate::services::insight::data::mini_window_store;
+use crate::models::insight::events::MINI_WINDOW_STATE;
 use crate::models::insight::mini_window::transition::{visual_geometry, Transition, VisualGeometry};
 use crate::models::insight::mini_window::{bounds, Edge, Interaction, Page, Preferences};
 use serde::{Deserialize, Serialize};
@@ -92,7 +93,7 @@ impl Session {
     }
     fn publish<R: Runtime>(&mut self, app: &AppHandle<R>) {
         self.revision = self.revision.wrapping_add(1);
-        let _ = app.emit_to("mini", "mini-window-state", self.snapshot());
+        let _ = app.emit_to("mini", MINI_WINDOW_STATE, self.snapshot());
     }
     fn reset_protection(&mut self) {
         self.keyboard = false;

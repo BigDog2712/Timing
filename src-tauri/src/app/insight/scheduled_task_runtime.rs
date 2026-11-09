@@ -23,6 +23,6 @@ pub(super) async fn wait_for_wake_or_poll(wake: &Notify) {
 
 pub(super) fn emit_changed(app: &AppHandle, event: &str, owner: &str) {
     if let Err(error) = app.emit(event, serde_json::json!({})) {
-        eprintln!("[{owner}] failed to emit state change: {error}");
+        crate::log_error!("{owner}: failed to emit state change: {error}");
     }
 }

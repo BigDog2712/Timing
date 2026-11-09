@@ -21,7 +21,7 @@ impl Locale {
             Some(value) if value.eq_ignore_ascii_case("ru-RU") => Self::RuRu,
             Some(value) if value.eq_ignore_ascii_case("es") => Self::Es,
             Some(value) if !value.is_empty() => {
-                eprintln!("[i18n] unsupported locale {value:?}; falling back to zh-CN");
+                crate::log_warn!("unsupported locale {value:?}; falling back to zh-CN");
                 SOURCE_LOCALE
             }
             _ => SOURCE_LOCALE,

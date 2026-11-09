@@ -84,7 +84,7 @@ pub(super) async fn run<R: Runtime + 'static>(app: AppHandle<R>, epoch: u64) {
                     current_monitor = None;
                     changed |= !state.failed;
                     state.failed = true;
-                    eprintln!("[mini] layout failed: {error}");
+                    crate::log_error!("layout failed: {error}");
                 }
                 changed |= before
                     != (
@@ -120,7 +120,7 @@ pub(super) async fn run<R: Runtime + 'static>(app: AppHandle<R>, epoch: u64) {
                             }
                             Err(error) => {
                                 state.failed = true;
-                                eprintln!("[mini] placement save failed: {error}");
+                                crate::log_error!("placement save failed: {error}");
                             }
                         }
                     }

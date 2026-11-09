@@ -257,7 +257,7 @@ pub async fn run<R: Runtime + 'static>(
             current_day = day;
         }
         if let Err(error) = tick_and_refresh_if_changed(&app, &store).await {
-            eprintln!("[tools] runtime tick failed: {error}");
+            crate::log_error!("runtime tick failed: {error}");
             wait_for_next_tools_wake(&app, Duration::from_millis(TOOLS_RUNTIME_ERROR_WAKE_MS))
                 .await;
             continue;
@@ -509,7 +509,7 @@ fn notify_tick_events<R: Runtime + 'static>(app: &AppHandle<R>, events: ToolsTic
 
 fn emit_tools_snapshot<R: Runtime>(app: &AppHandle<R>, snapshot: &ToolsRuntimeSnapshot) {
     if let Err(error) = app.emit(TOOLS_RUNTIME_CHANGED_EVENT, snapshot) {
-        eprintln!("[tools] failed to emit tools snapshot: {error}");
+        crate::log_error!("failed to emit tools snapshot: {error}");
     }
 }
 
@@ -574,7 +574,7 @@ async fn apply_mutation_and_refresh_state(
         let error = format!(
             "TOOLS_STATE_REFRESH_PENDING: {outcome}; snapshot refresh failed: {read_error}"
         );
-        eprintln!("[tools] {error}");
+        crate::log_error!("{error}");
         error
     })?;
     emit_snapshot(&snapshot);
@@ -589,7 +589,7 @@ fn send_tool_alert<R: Runtime + 'static>(app: &AppHandle<R>, alert: ToolAlert) {
     }
 
     if let Err(error) = app.emit(TOOLS_ALERT_EVENT, &alert) {
-        eprintln!("[tools] failed to emit tool alert: {error}");
+        crate::log_error!("failed to emit tool alert: {error}");
     }
 }
 

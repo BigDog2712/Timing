@@ -1,3 +1,4 @@
+use crate::models::insight::events::{POWER_LIFECYCLE_CHANGED, POWER_WATCHER_READY};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 use std::thread;
@@ -77,7 +78,7 @@ pub fn start(app_handle: AppHandle) {
         let _ = WTSRegisterSessionNotification(hwnd, NOTIFY_FOR_THIS_SESSION);
 
         let _ = app_handle.emit(
-            "power-watcher-ready",
+            POWER_WATCHER_READY,
             PowerLifecycleEvent {
                 state: "ready".into(),
                 timestamp_ms: now_ms(),
@@ -135,7 +136,7 @@ fn emit_power_event(state: &str) {
             timestamp_ms: now_ms(),
             source: POWER_EVENT_SOURCE.to_string(),
         };
-        let _ = app_handle.emit("power-lifecycle-changed", &event);
+        let _ = app_handle.emit(POWER_LIFECYCLE_CHANGED, &event);
     }
 }
 

@@ -171,7 +171,7 @@ fn now_ms() -> i64 {
 }
 
 fn log_watchdog_error(message: impl AsRef<str>) {
-    eprintln!("[tracker] {}", message.as_ref());
+    crate::log_error!("{}", message.as_ref());
 }
 
 #[cfg(test)]

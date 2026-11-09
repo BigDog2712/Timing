@@ -26,7 +26,9 @@ export function activityDisplayColor(source: string, background: string, mode: "
   if (colorContrast(source, background) >= target)
     return source;
   const rgb = parseHex(source);
-  let [L, a, b] = toLab(rgb);
+  const [L, rawA, rawB] = toLab(rgb);
+  let a = rawA;
+  let b = rawB;
   if (rgb.every(v => v === rgb[0])) {
     a = 0;
     b = 0;

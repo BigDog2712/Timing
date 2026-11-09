@@ -1,3 +1,4 @@
+use crate::models::insight::events::TRACKING_DATA_CHANGED;
 use crate::models::insight::tracking::TrackingDataChangedPayload;
 use tauri::{AppHandle, Emitter, Runtime};
 
@@ -11,11 +12,11 @@ pub fn emit_tracking_data_changed<R: Runtime>(
     changed_at_ms: u64,
 ) -> tauri::Result<()> {
     app.emit(
-        "tracking-data-changed",
+        TRACKING_DATA_CHANGED,
         TrackingDataChangedPayload::new(reason, changed_at_ms),
     )
 }
 
 pub(super) fn log_tracker_error(message: impl AsRef<str>) {
-    eprintln!("[tracker] {}", message.as_ref());
+    crate::log_error!("{}", message.as_ref());
 }
