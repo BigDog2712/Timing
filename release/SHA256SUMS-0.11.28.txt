@@ -1,1 +1,1 @@
-9deeeab87b6efa12e96b6304c0e7a9ac20fca987ef0cc4f35556e20df39d37a8  Timing-android-0.11.28-release-arm64-debugsigned.apk
+f04636c3b3929404aff017c1b79c1b040f1aae2063b6b165adb1f5e8e28714ea  Timing-0.11.28-portable.zip

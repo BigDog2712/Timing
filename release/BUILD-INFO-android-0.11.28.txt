@@ -1,0 +1,14 @@
+product: Timing
+version: 0.11.28
+git_commit: 5818e2a
+git_dirty: true
+built_at_utc: 2026-11-09T00:50:14Z
+build_profile: release
+
+# 说明（手写，非脚本产出）
+# 这个包只有安卓一侧，由 `node scripts/android-apk.mjs` + `node scripts/android-sign.mjs --debug-key` 产出；
+# 那两个脚本不写 BUILD-INFO，这份是事后按实际情况补的。
+#
+# git_dirty: true 的原因：构建时本轮改动还在工作树里（尚未提交）。提交 5818e2a 的文件内容
+# 与构建时逐字一致 —— 构建之后只改过 release/ 下的说明文字，没动任何源码。
+# 因此这个包与「在 5818e2a 的干净树上重建」只差编译时间戳，不差逻辑。
