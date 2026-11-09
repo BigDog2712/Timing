@@ -54,9 +54,11 @@ interface SyncCloudPaneProps {
 }
 
 const SCHEDULES: CloudSchedule[] = ['off', 'interval', 'smart'];
+/* [V0.11.33] 档位标签第二档「定时」→「自动」（R2 已批准解除 components/mobile 红线一次，
+   仅此一处字面量；线缆值 `interval` 与枚举名零改动，P6 两端零命中） */
 const SCHEDULE_LABELS: Record<CloudSchedule, string> = {
   off: '关闭',
-  interval: '定时',
+  interval: '自动',
   smart: '智能',
 };
 

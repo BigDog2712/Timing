@@ -118,20 +118,21 @@ describe('QA · 文案与「不再暗示汇总」（PRD F1 / F2 / F6 → O2 / O7
     container?.remove();
   });
 
-  it('F2：三句 hint 逐字等于 PRD 锁定用稿（块④ 新增 L2）', async () => {
+  it('F2：三句 hint 逐字等于 PRD 锁定用稿（[V0.11.33] 换稿：P2 / P13，主人原话逐字）', async () => {
     await mount();
-    expect(COPY.syncHint).toBe('日记本：双向，保留你手写的内容。');
-    expect(COPY.localHint).toBe('同步目录：交给网盘客户端多端一致。');
-    expect(COPY.cloudHint).toBe('多端一致用：体积小，读得快。');
+    expect(COPY.syncHint).toBe('数据汇总至 md 文档，便于 ai 汇总读写');
+    expect(COPY.localHint).toBe('本地有同步文件夹选择（如坚果云同步），不再需要上传同步');
+    expect(COPY.cloudHint).toBe('WebDAV 多端同步，从云端下载上传多端数据');
     const text = allText();
-    expect(text).toContain('日记本：双向，保留你手写的内容。');
-    expect(text).toContain('同步目录：交给网盘客户端多端一致。');
-    expect(text).toContain('多端一致用：体积小，读得快。');
+    expect(text).toContain('数据汇总至 md 文档，便于 ai 汇总读写');
+    expect(text).toContain('本地有同步文件夹选择（如坚果云同步），不再需要上传同步');
+    expect(text).toContain('WebDAV 多端同步，从云端下载上传多端数据');
   });
 
-  it('F1 + REMOVED_PHRASES：十五条已删文案全页零命中（textContent / title / aria-label）', async () => {
+  it('F1 + REMOVED_PHRASES：十九条已删文案全页零命中（textContent / title / aria-label）', async () => {
     await mount();
-    expect(REMOVED_PHRASES).toHaveLength(15);
+    /* [V0.11.33] 15 → 19：除名 `'WebDAV 云端同步'`（回归为块⑤标题，P4）+ 新增 5 条 */
+    expect(REMOVED_PHRASES).toHaveLength(19);
     const text = allText();
     for (const phrase of REMOVED_PHRASES) expect(text).not.toContain(phrase);
     /* §4.3 删除项里本批要零命中的三条 */
@@ -140,13 +141,9 @@ describe('QA · 文案与「不再暗示汇总」（PRD F1 / F2 / F6 → O2 / O7
     }
   });
 
-  it('F6：「汇总」在折叠态与逐档展开态都零命中', async () => {
-    await mount();
-    expect(allText()).not.toContain('汇总');
-    const tiers = Array.from(container.querySelectorAll('button')).find((el) => el.textContent === '逐个设置');
-    if (tiers) await act(async () => { tiers.click(); await Promise.resolve(); });
-    expect(allText()).not.toContain('汇总');
-  });
+  /* [V0.11.33] F6「汇总」零命中判据作废（记账）：块③ hint 换成主人原话
+     「数据汇总至 md 文档，便于 ai 汇总读写」，其中「汇总」两见是 PRD §八/P13 的
+     逐字要求（25-PRD F6 → 判据变更清单见 30-PRD §十；本条不再可断言）。 */
 
   it('O2：页签顶部没有存储通道分段，`h3 数据管理` 之后直接是六块', async () => {
     await mount();

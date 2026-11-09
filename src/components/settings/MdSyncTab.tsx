@@ -78,10 +78,12 @@ export function MdSyncTab() {
 
       {/* [V0.11.26] 块④ 本地同步：桌面 only（PRD R7 / O19）。手机上只有 WebDAV 一条路，
           本地目录靠电脑上的网盘客户端，手机既没有那个目录也没有客户端。 */}
+      {/* [V0.11.33] 块④⑤标题加 WebDAV 前缀（W1/W2 / P1，主人原话逐字；托盘标签不跟，R5）。
+          折叠按钮 aria 由 FoldBlock 自动派生（`展开WebDAV 本地同步` 等）。 */}
       {!IS_MOBILE && (
         <FoldBlock
           id="data-local"
-          title="本地同步"
+          title="WebDAV 本地同步"
           hint={COPY.localHint}
           dirty={dirtyParts.local}
           actions={(
@@ -95,7 +97,7 @@ export function MdSyncTab() {
 
       <FoldBlock
         id="data-cloud"
-        title="云端同步"
+        title="WebDAV 云端同步"
         hint={COPY.cloudHint}
         dirty={dirtyParts.cloud}
         actions={(

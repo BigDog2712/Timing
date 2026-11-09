@@ -53,14 +53,17 @@ describe('mdSyncAuto —— 纯函数', () => {
     expect(purgeNoteOf({ paused: false, deleted: 0, failed: 0 })).toBe(PURGE_COPY.idle);
   });
 
-  it('三档文案逐字表（§11.1）', () => {
+  it('三档文案逐字表（§11.1；[V0.11.33] 第二档「定时」→「自动」+ smartNote 换稿，W5/W6）', () => {
     expect(AUTO_COPY).toEqual({
-      label: '自动同步', off: '关闭', interval: '定时', smart: '智能',
+      label: '自动同步', off: '关闭', interval: '自动', smart: '智能',
       every: '每', minutes: '分钟', range: '5 ~ 120 分钟',
-      smartNote: '停手 5 分钟后同步；启动时一次。',
+      smartNote: '启动后 1 分钟同步一次；停手 5 分钟同步一次；一直写则每 30 分钟同步一次。',
     });
     expect(REMOVED_PHRASES).toContain('同步间隔');
     expect(REMOVED_PHRASES).toContain('1 分钟 ~ 24 小时');
+    /* [V0.11.33] 旧档位标签与旧 smartNote 进零命中清单（P6 / P7） */
+    expect(REMOVED_PHRASES).toContain('定时');
+    expect(REMOVED_PHRASES).toContain('停手 5 分钟后同步；启动时一次。');
   });
 });
 

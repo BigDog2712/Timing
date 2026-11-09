@@ -98,7 +98,7 @@ async function save(): Promise<MdSyncViewCloud['config']> {
 
 /** [V0.11.26] 六块默认折叠（O4）：三档在块⑤ 里，不先展开就没东西可点 */
 async function openCloud(): Promise<void> {
-  const toggle = container.querySelector('button[aria-label="展开云端同步"]') as HTMLButtonElement | null;
+  const toggle = container.querySelector('button[aria-label="展开WebDAV 云端同步"]') as HTMLButtonElement | null;
   if (!toggle) throw new Error('块⑤ 的折叠按钮不见了');
   await act(async () => { toggle.click(); await Promise.resolve(); });
 }
@@ -146,7 +146,7 @@ describe('QA 批 1 · pollSecs 落库与回读', () => {
 
     /* 改成定时 30：这一步会重建块⑤ 的通路对象（写 auto），是 pollSecs 最容易丢的一帧。 */
     await openCloud();
-    await clickTier('定时');
+    await clickTier('自动');
     await typeMinutes('30');
     const saved = await save();
 

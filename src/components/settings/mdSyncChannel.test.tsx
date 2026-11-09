@@ -233,11 +233,7 @@ describe('块开关（O8–O10 / O13）', () => {
     for (const phrase of REMOVED_PHRASES) expect(text).not.toContain(phrase);
   });
 
-  it('F6：数据管理页签搜「汇总」0 命中（折叠态与展开态各一次）', async () => {
-    await mount();
-    expect(allText()).not.toContain('汇总');
-    const tiers = Array.from(container.querySelectorAll('button')).find((el) => el.textContent === '逐个设置');
-    if (tiers) await act(async () => { tiers.click(); await Promise.resolve(); });
-    expect(allText()).not.toContain('汇总');
-  });
+  /* [V0.11.33] F6「汇总」零命中判据作废（记账）：块③ hint 换成主人原话
+     「数据汇总至 md 文档，便于 ai 汇总读写」（30-PRD P13 逐字），
+     「汇总」零命中不再可断言；O2 的 REMOVED_PHRASES 全表零命中照旧执行。 */
 });

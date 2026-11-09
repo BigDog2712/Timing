@@ -14,6 +14,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MdSyncCloud, MdSyncTestResult, MdSyncViewCloud } from '../../types/domain';
+import { REMOVED_PHRASES } from '../settings/mdSyncCopy';
 import { SyncCloudPane } from './SyncCloudPane';
 
 const CLOUD: MdSyncCloud = {
@@ -154,6 +155,17 @@ describe('手机端云端通道', () => {
     click('.m-cloud__actions .m-btn--primary');
     const config = onSave.mock.calls[0][0] as { cloud: MdSyncCloud };
     expect(config.cloud.auto).toEqual({ schedule: 'interval', intervalMinutes: 30 });
+  });
+
+  /**
+   * [V0.11.33] P6 手机端半（R2 已批准解除 components/mobile 红线一次）：档位第二档
+   * 渲染为「自动」，旧标签「定时」在渲染文本零命中；REMOVED_PHRASES 全表照扫。
+   */
+  it('p6_tier_label_is_auto_and_removed_phrases_absent', () => {
+    mount(view(CLOUD));
+    expect(text()).toContain('自动');
+    expect(text()).not.toContain('定时');
+    for (const phrase of REMOVED_PHRASES) expect(text()).not.toContain(phrase);
   });
 
   /** P7：测试连接红在「目录」→ 只显示走过的关，后面那关不出现。 */

@@ -114,7 +114,7 @@ function button(text: string): HTMLButtonElement {
 
 /** 展开块⑤（六块默认折叠，O4）：不展开的话下面的 `querySelector` 会命中折叠体里的旧节点 */
 async function openCloud(): Promise<void> {
-  const toggle = container.querySelector('button[aria-label="展开云端同步"]') as HTMLButtonElement | null;
+  const toggle = container.querySelector('button[aria-label="展开WebDAV 云端同步"]') as HTMLButtonElement | null;
   if (!toggle) throw new Error('块⑤ 的折叠按钮不见了');
   await act(async () => { toggle.click(); await Promise.resolve(); });
 }
@@ -127,7 +127,7 @@ function tiers(): HTMLButtonElement[] {
 }
 
 /**
- * 点块⑤ 里的按钮。**必须按块限定**：块④ 折叠着也挂在 DOM 里，`关闭` / `定时` /
+ * 点块⑤ 里的按钮。**必须按块限定**：块④ 折叠着也挂在 DOM 里，`关闭` / `自动` /
  * `智能` / `测试连接` 这四个词两块都有，全页 `find` 会点到块④ 那个（它在 DOM 里靠前）。
  */
 async function clickCloud(text: string): Promise<void> {
@@ -194,7 +194,7 @@ describe('MdSyncTab —— 三档控件与删掉的那一行', () => {
     await mount();
     await openCloud();
     const items = tiers();
-    expect(items.map((el) => el.textContent)).toEqual(['关闭', '定时', '智能']);
+    expect(items.map((el) => el.textContent)).toEqual(['关闭', '自动', '智能']);
     expect(items.map((el) => el.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true']);
     expect(cloudText()).toContain(AUTO_COPY.smartNote);
     expect(numberInput()).toBeNull();
@@ -204,10 +204,10 @@ describe('MdSyncTab —— 三档控件与删掉的那一行', () => {
     expect(cloudText()).not.toContain(AUTO_COPY.range);
   });
 
-  it('D2 / D3：只有「定时」渲染数字框（默认 15）与 5 ~ 120 分钟', async () => {
+  it('D2 / D3：只有「自动」档渲染数字框（默认 15）与 5 ~ 120 分钟', async () => {
     await mount();
     await openCloud();
-    await clickCloud('定时');
+    await clickCloud('自动');
     const input = numberInput();
     expect(input?.value).toBe('15');
     expect(cloudText()).toContain(AUTO_COPY.range);
@@ -221,7 +221,7 @@ describe('MdSyncTab —— 三档控件与删掉的那一行', () => {
   it('D7（O9/O10）：关掉块⑤ 的开关 → 三档 disabled、值保留、控件不隐藏', async () => {
     await mount();
     await openCloud();
-    await clickCloud('定时');
+    await clickCloud('自动');
     /* 开关在标题右侧（`MdSyncTab` 的 actions 槽），点它只灰块⑤ 的三档 */
     const toggle = container.querySelector('[aria-label="启用云端同步"]') as HTMLButtonElement;
     await act(async () => { toggle.click(); await Promise.resolve(); });
@@ -239,10 +239,10 @@ describe('MdSyncTab —— 三档控件与删掉的那一行', () => {
     expect(tiers()[1].getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('D5（R5）：两块各一份三档 —— 块⑤ 拨到定时 30 不会让块④ 跟着变', async () => {
+  it('D5（R5）：两块各一份三档 —— 块⑤ 拨到自动 30 不会让块④ 跟着变', async () => {
     await mount();
     await openCloud();
-    await clickCloud('定时');
+    await clickCloud('自动');
     await typeMinutes('30');
 
     const folderGroup = container.querySelector(
@@ -260,13 +260,13 @@ describe('MdSyncTab —— 三档控件与删掉的那一行', () => {
     expect(saved.cloudFolder).toBeNull();
   });
 
-  it('H-2：定时 30 → 智能 → 定时 → 保存，落库分钟数仍是 30', async () => {
+  it('H-2：自动 30 → 智能 → 自动 → 保存，落库分钟数仍是 30', async () => {
     await mount();
     await openCloud();
-    await clickCloud('定时');
+    await clickCloud('自动');
     await typeMinutes('30');
     await clickCloud('智能');
-    await clickCloud('定时');
+    await clickCloud('自动');
     expect(numberInput()?.value).toBe('30');
     const saved = await save();
     expect(saved.cloudWebdav?.auto).toEqual({ schedule: 'interval', intervalMinutes: 30 });

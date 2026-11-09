@@ -141,8 +141,9 @@ describe('MdSyncTab —— 数据管理页签壳', () => {
         'Markdown 落点设置',
         'SQLite 落点设置',
         'Markdown 同步',
-        '本地同步',
-        '云端同步',
+        /* [V0.11.33] 块④⑤标题加 WebDAV 前缀（W1/W2 / P1，主人原话逐字） */
+        'WebDAV 本地同步',
+        'WebDAV 云端同步',
         '备份数据管理',
       ]);
   });

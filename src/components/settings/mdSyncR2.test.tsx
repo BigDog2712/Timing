@@ -146,7 +146,7 @@ describe('R1：块⑤ 从没配过时直接给预填默认值（cloudWebdav === 
   it('O5：不点任何分段（已无分段），块⑤ 的框值就是默认值，且块内零 `.seg__item`', async () => {
     api.get.mockResolvedValue(view({ webdav: null }));
     await mount();
-    await act(async () => { foldToggle('云端同步').click(); await Promise.resolve(); });
+    await act(async () => { foldToggle('WebDAV 云端同步').click(); await Promise.resolve(); }); /* [V0.11.33] P1 前缀派生 aria */
     /* [V0.11.26] 载体分段整组删除（PRD 变更四 / O2）：块⑤ 里零分段按钮 */
     expect(container.querySelectorAll('[data-block="data-cloud"] .seg__item')).toHaveLength(0);
     /* 删了「选边」之后默认值必须**直接**在值里，否则用户看到的是两个空框 */
@@ -165,7 +165,7 @@ describe('R1：块⑤ 从没配过时直接给预填默认值（cloudWebdav === 
       },
     }));
     await mount();
-    await act(async () => { foldToggle('云端同步').click(); await Promise.resolve(); });
+    await act(async () => { foldToggle('WebDAV 云端同步').click(); await Promise.resolve(); });
 
     const values = Array.from(container.querySelectorAll<HTMLInputElement>('[data-block="data-cloud"] input')).map((el) => el.value);
     expect(values).toContain('https://synology.example.com/dav/');
