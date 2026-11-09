@@ -52,14 +52,22 @@ const violations = [];
 
 /* vendored 子树口径（V0.12.0 融合 Patina）：
  *
- * `src/patina/**` 与 `src-tauri/src/patina/**` 是 **原样并入的第三方源码**
+ * 前端那半（`src/app/**`、`src/features/**`、`src/platform/**`、`src/shared/**`）与后端
+ * `src-tauri/src/patina/**` 都是 **原样并入的第三方源码**
  * （Patina 1.10.0，MIT），不是我们写的代码。它的文件尺寸归上游决定，我们也不该为了
  * 行数去改它 —— 拆完就等于放弃「diff 上游、按需同步」的能力，改一处变成逐行冲突。
  * 同理 `#![allow(dead_code)]` 也只加在 `patina/mod.rs` 这一个子树根上。
  *
- * 判据要窄：只认这两条路径前缀，`src/services/**` 之类宿主代码一条都不豁免。
+ * 判据要窄：只认这几条路径前缀，`src/services/**` 之类宿主代码一条都不豁免。
  * 想从严就在下面把 VENDORED 置空，它会照旧逐个报错。 */
-const VENDORED = ['src/patina/', 'src-tauri/src/patina/'];
+/* [0.12.0 T01] 前端剥掉 `src/patina/` 前缀后要认 4 个新根；后端前缀保持原样（T02 才搬）。 */
+const VENDORED = [
+  'src/app/',
+  'src/features/',
+  'src/platform/',
+  'src/shared/',
+  'src-tauri/src/patina/',
+];
 const isVendored = (rel) => VENDORED.some((prefix) => rel.startsWith(prefix));
 const vendoredOversized = [];
 

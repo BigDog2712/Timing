@@ -1,8 +1,8 @@
 import { StrictMode } from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { iconThemeColorStore } from "./platform/persistence/iconThemeColorStore.ts";
-import { configureIconThemeColorPersistence } from "./shared/hooks/useIconThemeColors.ts";
+import { iconThemeColorStore } from "../platform/persistence/iconThemeColorStore.ts";
+import { configureIconThemeColorPersistence } from "../shared/hooks/useIconThemeColors.ts";
 
 configureIconThemeColorPersistence(iconThemeColorStore);
 

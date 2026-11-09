@@ -42,7 +42,7 @@ function platformCss(): Plugin {
 // - strictPort 1420：与 src-tauri/tauri.conf.json 的 devUrl 对齐
 // - target=chrome105：WebView2（Chromium 105+）
 export default defineConfig({
-  /* tailwindcss 只服务 patina 入口：`src/patina/App.css` 里 `@import "tailwindcss" source("./")`
+  /* tailwindcss 只服务 patina 入口：`src/app/App.css` 里 `@import "tailwindcss" source("../")`
      限定扫描范围，主窗口 index.html 不引用该样式表 → 两边样式零交叉。 */
   plugins: [platformCss(), tailwindcss(), react()],
   /* 编译期平台标记（DESIGN-ANDROID-V1 §1.2）：`tauri android dev/build` 会注入

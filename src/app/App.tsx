@@ -1,15 +1,15 @@
 import { lazy, Suspense, useEffect } from "react";
 import "./App.css";
-import AppShell from "./app/AppShellLocaleRoot";
-import { installAppIconEvents } from "./platform/runtime/appIconEventGateway.ts";
-import { resolveCurrentAppWindowLabel } from "./platform/desktop/windowControlGateway";
+import AppShell from "./AppShellLocaleRoot";
+import { installAppIconEvents } from "../platform/runtime/appIconEventGateway.ts";
+import { resolveCurrentAppWindowLabel } from "../platform/desktop/windowControlGateway";
 
 const CURRENT_WINDOW_LABEL = resolveCurrentAppWindowLabel();
-const MiniShell = lazy(() => import("./app/mini/MiniShell"));
-const ToolNotificationShell = lazy(() => import("./app/tool-notification/ToolNotificationShell"));
+const MiniShell = lazy(() => import("./mini/MiniShell"));
+const ToolNotificationShell = lazy(() => import("./tool-notification/ToolNotificationShell"));
 
 if (import.meta.env.DEV && CURRENT_WINDOW_LABEL === "main") {
-  void import("./app/services/resourceDiagnosticsService.ts")
+  void import("./services/resourceDiagnosticsService.ts")
     .then(({ installAppDevelopmentResourceDiagnostics }) => {
       installAppDevelopmentResourceDiagnostics();
     })

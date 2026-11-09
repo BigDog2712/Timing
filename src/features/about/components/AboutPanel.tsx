@@ -1,7 +1,7 @@
 import { useLocaleText } from "../../../shared/i18n/index.ts";
 import { FileText, MessageSquare, Rose } from "lucide-react";
 import type { ReactNode } from "react";
-import appIconUrl from "../../../../../src-tauri/icons/icon.png";
+import appIconUrl from "../../../../src-tauri/icons/icon.png";
 import type { UpdateSnapshot } from "../../../shared/types/update";
 import QuietButton from "../../../shared/components/QuietButton";
 import UpdateStatusPanel from "../../update/components/UpdateStatusPanel";

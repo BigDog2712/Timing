@@ -85,7 +85,7 @@ export default tseslint.config(
        - `prefer-const`：上游写法，纯风格。
      只关这三条，其余规则（未定义变量 / 不可达代码 / 重复 case 等真实缺陷）照旧生效。 */
   {
-    files: ['src/patina/**/*.{ts,tsx}'],
+    files: ['src/{app,features,platform,shared}/**/*.{ts,tsx}'],
     rules: {
       'no-sparse-arrays': 'off',
       'no-control-regex': 'off',

@@ -49,7 +49,7 @@ function typesSource() {
  *
  * 命令表在 `src-tauri/src/ipc_commands.rs`（V0.12.0 融合 Patina 时从 `lib.rs` 拆出：
  * 宿主 79 条 + Patina 118 条，一张 `generate_handler!` 内）。这里只取**宿主**那一段
- * （`crate::commands::…`）——Patina 的命令由 `src/patina/**` 的前端自己调用，
+ * （`crate::commands::…`）——Patina 的命令由 `src/app/**` `src/features/**` 等前端自己调用，
  * 不进 `ipc.ts` / `IpcApi` / `browserMock` 这套宿主契约。
  */
 function rustCommands() {
@@ -127,7 +127,7 @@ function feEvents(types) {
 function emitSites(byName) {
   const files = walk('src-tauri/src', '.rs');
   /* vendored 子树（V0.12.0 融合的 Patina）自带一套事件名与常量，前端也在
-     `src/patina/**` 里自用，不进宿主 `IPC_EVENTS`。它的 `.emit("字面量")` 属上游写法，
+     `src/features/**` 里自用，不进宿主 `IPC_EVENTS`。它的 `.emit("字面量")` 属上游写法，
      不适用宿主 ADR-016 的「事件名只能来自 events.rs 常量」——改写 vendored 代码会让
      后续同步上游变成逐行冲突。**只豁免字面量这一条**，标识符计数仍全仓进行。 */
   const isVendored = (rel) => rel.replace(/\\/g, '/').includes('src-tauri/src/patina/');

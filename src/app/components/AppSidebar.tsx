@@ -2,7 +2,7 @@ import { useLocaleText } from "../../shared/i18n/index.ts";
 import QuietIconAction from "../../shared/components/QuietIconAction";
 import { useEffect, useRef, type CSSProperties } from "react";
 import { Monitor, Clock, Settings2, Sparkles, BarChart3, Info, Menu, ToolCase } from "lucide-react";
-import appIconUrl from "../../../../src-tauri/icons/128x128@2x.png";
+import appIconUrl from "../../../src-tauri/icons/128x128@2x.png";
 
 import type { SidebarNavigationMode } from "../services/sidebarNavigationPreferenceStorage.ts";
 import type { View } from "../types/view";

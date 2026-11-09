@@ -2,7 +2,7 @@ import { useLocaleText } from "../../shared/i18n/index.ts";
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { AppWindow, ArrowUpCircle, Maximize2, Minimize2, Minus, X } from "lucide-react";
 import { openMiniWindow } from "../../platform/desktop/miniWindowRuntimeGateway.ts";
-import appIconUrl from "../../../../src-tauri/icons/128x128@2x.png";
+import appIconUrl from "../../../src-tauri/icons/128x128@2x.png";
 import {
   closeCurrentWindow, minimizeCurrentWindow, startCurrentWindowDrag, toggleCurrentWindowMaximized, } from "../../platform/desktop/windowControlGateway";
 

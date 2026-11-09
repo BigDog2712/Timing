@@ -10,7 +10,8 @@
  *   L4 Rust `infra` 不得依赖 `services`（解环，见 ADR-016）
  *   L5 Rust `commands` 不得直接依赖 `repositories`（必须经 service）
  *   L6 Rust 全域不得出现 `eprintln!`（结构化日志，见 platform/log.rs）
- *      —— vendored 子树（src/patina、src-tauri/src/patina）与 L3 同口径豁免，见 VENDORED
+ *      —— vendored 子树（src/app、src/features、src/platform、src/shared、src-tauri/src/patina）
+ *         与 L3 同口径豁免，见 VENDORED
  *   L7 编译期平台常量 `__TIMING_MOBILE__` 只允许出现在 `src/lib/platform.ts`
  *   L8 业务写入信号 `dirty::mark(` 只允许出现在 `src-tauri/src/commands/`
  *      （`jobs/` 与 `services/` 下 0 命中；见下方 L8 哨兵）
@@ -56,16 +57,25 @@ const relPath = (p) => relative(root, p).split(sep).join('/');
 
 const read = (rel) => readFileSync(join(root, rel), 'utf8');
 
-/* vendored 子树口径（V0.12.0 融合 Patina）：
+/* vendored 子树口径（V0.12.0 融合 Patina）
  *
- * `src/patina/**` 与 `src-tauri/src/patina/**` 是原样并入的第三方源码（Patina 1.10.0，
+ * 前端那半（`src/app/**`、`src/features/**`、`src/platform/**`、`src/shared/**`）与后端
+ * `src-tauri/src/patina/**` 都是原样并入的第三方源码（Patina 1.10.0，
  * MIT）。它按自己的分层组织代码，不认宿主的 L3（窗口 API 单一入口）与 L6（禁 eprintln!）。
  * 改它等于放弃「diff 上游、按需同步」——所以**只对这两条规则**豁免，其余照扫。
  *
  * 代价写在明处：Patina 那 148 处 `eprintln!` 在打包版里没有控制台可看，
  * 它的诊断只活在 dev 终端。要接进宿主日志需要逐处判级别（info/warn/error），
  * 属「按需同步上游」时一并做的事，不在这里机械替换。 */
-const VENDORED = ['src/patina/', 'src-tauri/src/patina/'];
+/* [0.12.0 T01] 前端剥掉 `src/patina/` 前缀后，这两条规则要认的是 4 个新根；
+ * 后端 `src-tauri/src/patina/` 尚未搬（T02），前缀保持原样。 */
+const VENDORED = [
+  'src/app/',
+  'src/features/',
+  'src/platform/',
+  'src/shared/',
+  'src-tauri/src/patina/',
+];
 const isVendored = (rel) => VENDORED.some((prefix) => rel.startsWith(prefix));
 
 const violations = [];
