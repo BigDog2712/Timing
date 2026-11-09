@@ -1,1 +1,3 @@
+205b7394376dbf4f69bb19ed49504b5d6fcc9c663fdad8c1e60fc1470872eb13  Timing-0.11.27-portable.zip
+64d519ed84c8572d6ddffc52955265eb19e2eb6e057aaeb53a4590ff670166fc  Timing-0.11.27-setup.exe
 666f343fe73435798c70132c656bfd755bb1979e87019572a263da6e69ddd442  Timing-android-0.11.27-release-arm64-debugsigned.apk
