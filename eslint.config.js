@@ -77,19 +77,15 @@ export default tseslint.config(
       'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
-  /* vendored 子树（V0.12.0 融合 Patina，MIT）：原样并入的第三方源码。
-     它有自己的 lint 口径，且以下几处是**故意的**写法，改了就变语义：
-       - `no-sparse-arrays`：`generated/resources.ts` 的 i18n 表用 `[,,]` 占位，
-         稀疏数组的 length 是语义的一部分（换成 `undefined` 会变成密数组）；
-       - `no-control-regex`：`displayColor.ts` 按控制字符切片；
-       - `prefer-const`：上游写法，纯风格。
-     只关这三条，其余规则（未定义变量 / 不可达代码 / 重复 case 等真实缺陷）照旧生效。 */
+  /* [0.12.0 T04] 子树 override 已从「3 条规则 × Patina 四域」缩到「1 条规则 × 1 个生成目录」。
+     剩下这条是**生成物**的语义约束：`generated/resources.ts` 的 i18n 表用 `[,,]` 占位，
+     稀疏数组的 length 是语义的一部分（换成 `undefined` 会变成密数组）。
+     另外两条（`no-control-regex` / `prefer-const`）T03 已改代码，不再需要豁免；
+     任何**新增**的 `files:` 范围都视为回退，脚本层由 `npm run lint` 直接挡住。 */
   {
-    files: ['src/{app,features,platform,shared}/**/*.{ts,tsx}'],
+    files: ['src/shared/i18n/generated/**'],
     rules: {
       'no-sparse-arrays': 'off',
-      'no-control-regex': 'off',
-      'prefer-const': 'off',
     },
   },
 );

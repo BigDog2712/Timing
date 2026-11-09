@@ -21,8 +21,11 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 
 - 一个前端 bundle 服务所有窗口：`index.html` → `src/main.tsx`，按 `window.location` / window label 分流（主条 `main`、设置、事项、便利贴 `note-{id}`）。
 - 前端 `src/**`（React + zustand + 自写 CSS，无 UI 框架）。
+- **双窗边界**：主窗（`components` / `hooks` / `lib` / `mocks` / `services` / `stores` / `styles` / `types`）与分析窗（`app` / `features` / `platform` / `shared`）互不 import，只经 IPC 命令/事件交互；唯一例外是 `lib/windowApi.ts`（零业务依赖的窗口 API 薄壳）与 `src-tauri/icons/**` 静态资源。由 L9 机械执行。
+- `src/app/` 是**分析窗**根（原 Patina 的 `src/`），不是应用入口；应用入口是 `src/main.tsx`。没有改名 `src/shell/` 是为了保住搬迁时 446 个文件的相对引用不变。
 - 后端 `src-tauri/src/**` 六层，依赖**只能向下**（ADR-016）：
   `platform`（叶子：clock / log / boot_timing）→ `infra`（窗口 / 托盘菜单 / 通知 / 几何 / 迁移）→ `services`（业务）→ `app`（装配：events / tray / bootstrap / diagnostics）与 `jobs`（调度）→ `commands`（IPC 入口）。
+  其中 `models` / `infra` / `services` / `app` / `commands` 五层各带一个 `insight/` 命名空间（Patina 归一，见 `docs/refactor/patina-structural-merge.md` §2.2）：`models/insight ← infra/insight ← services/insight ← app/insight ← commands/insight`，方向与宿主层序一致。`insight` 是命名空间，不是第 7 层。
 - 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql` … `0007_v01127.sql` 共七支，当前 **schema v7**，`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。**0007 是重建表，不吃重跑**，必须由版本门 `< 7` 只放行一次（见 `infra/migrate.rs` 注释）。
 - **数据目录迁移（V0.5.0）**：`infra/appdata_migrate/`（`paths` / `decide` / `copy` / `verify` / `marker` / `mod`）是 **headless** 的——不依赖 services、不依赖 tauri，所以能用两个临时目录直接跑测试（`run_at(&Paths, skip)`）。编排在 `app/preboot.rs`（桌面独占，跑在 `Builder::run` 之前、`log::init` 之前，故模块内不写日志），两条 IPC 命令在 `commands/migration_cmd.rs`。老库名 `tickbar.db` 与新库名 `timing.db` 的映射只认三种后缀（`""` / `-wal` / `-shm`），定义在 `paths.rs`。
 - IPC 契约：宿主命令 **79** 条 + Patina **118** 条（仅桌面，`#[cfg(desktop)]`），一张表写在 `src-tauri/src/ipc_commands.rs`（`docs/phase2/IPC-CONTRACT-v2.md`）；事件 11 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
@@ -50,9 +53,9 @@ cd src-tauri && cargo fmt --check
 ## 硬约束（全部由 CI 机械执行，不靠记性）
 
 - **单文件 ≤300 行**（前后端一致）→ `npm run check:size`
-  确需豁免写 `scripts/size-allowlist.json`，**必须**带 `owner` + `expires`（到期即红）。降到 300 行内后脚本会提示删除条目——不允许永久豁免。
-- **分层只能向下** → `npm run check:layers`（8 条 grep 规则）
-  L1 `components` 不 `invoke`；L2 `stores` 不碰 `ipc.`；L3 只有 `lib/window.ts` 引 `@tauri-apps/api/window`；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）。
+  超限文件登记在 `scripts/size-allowlist.json` 的**冻结基线**（152 条，由 `--freeze` 扫描生成，禁止手写）。它是**棘轮**：只许减不许增——行数超过冻结值、或出现不在基线里的新超限文件，一律红。拆分后跑 `node scripts/check-size.mjs --freeze` 收紧。
+- **分层只能向下** → `npm run check:layers`（9 条 grep 规则）
+  L1 `components`（含 `app|features|shared` 下的 `components/`）不 `invoke`；L2 `stores`（含 `*Store.ts`、`features/**/stores`）不碰 `ipc.`；L3 只有 `lib/windowApi.ts` 引窗口 API 包（`api/window` 与 `api/webviewWindow`）；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）；L9 双窗隔离——主窗与分析窗不得互相 import，例外只有 `lib/windowApi.ts` 与 `src-tauri/icons/**`（带哨兵：两条路径集合必须非空，防路径写错后绿着空转）。
 - **IPC 契约** → `npm run check:contract`
   命令 4 处一致（`generate_handler!` / `IpcApi` / `ipc.ts` / `browserMock`）、错误码 2 处一致、事件三方一致（后端常量 / `IPC_EVENTS` / emit 点）、禁止事件名字面量、**每个错误码必须在 `errorText()` 里有 case**（否则静默落到通用兜底）。
 - **vendored 改动必须登记** → `npm run check:vendored`

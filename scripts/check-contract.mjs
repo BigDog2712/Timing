@@ -134,8 +134,8 @@ function feEvents(types) {
  *
  * [0.12.0 T03] insight 子树里的 14 处字面量 emit 已改成常量。若这里不认它们，
  * 「emit 点」会从 17 掉成 11 —— 事件其实照发，只是脚本看不见来源。**只做值映射**：
- * 不参与「后端常量必须在前端声明」那条检查（那些事件不进宿主 `IPC_EVENTS`），
- * `isVendored` 的字面量豁免也原样保留（撤掉它是 T04 的事）。
+ * 不参与「后端常量必须在前端声明」那条检查（那些事件不进宿主 `IPC_EVENTS`）。
+ * [0.12.0 T04] 路径前缀的字面量豁免已撤销（T03 已把子树字面量清零）。
  * 常量放 `models/insight/` 而不是文档原写的 `app/insight/`：5 层都有 emit 点，
  * 放装配层会让 infra / services 反向依赖 app，而 `app/mod.rs` 明文禁止。 */
 function insightRustEvents() {
@@ -148,24 +148,10 @@ function insightRustEvents() {
 
 function emitSites(byName) {
   const files = walk('src-tauri/src', '.rs');
-  /* vendored 子树（V0.12.0 融合的 Patina）自带一套事件名与常量，前端也在
-     `src/features/**` 里自用，不进宿主 `IPC_EVENTS`。它的 `.emit("字面量")` 属上游写法，
-     不适用宿主 ADR-016 的「事件名只能来自 events.rs 常量」——改写 vendored 代码会让
-     后续同步上游变成逐行冲突。**只豁免字面量这一条**，标识符计数仍全仓进行。
-     [0.12.0 T02] 后端按层归一后路径前缀换成 5 个 `insight/` 新根（原
-     `src-tauri/src/patina/`）；漏改这一处，8 处上游字面量 emit 会立刻被报红，
-     而它们正是 `src/app/**` 在监听的那 3 个事件名。 */
-  const VENDORED_RS = [
-    'src-tauri/src/app/insight/',
-    'src-tauri/src/commands/insight/',
-    'src-tauri/src/infra/insight/',
-    'src-tauri/src/models/insight/',
-    'src-tauri/src/services/insight/',
-  ];
-  const isVendored = (rel) => {
-    const posix = rel.replace(/\\/g, '/');
-    return VENDORED_RS.some((prefix) => posix.startsWith(prefix));
-  };
+  /* [0.12.0 T04] 字面量 emit 的路径豁免已撤销：T03 把 insight 子树的 14 处
+     `.emit("…")` / `.emit_to(…, "…")` 全部换成了 `models/insight/events.rs` 常量，
+     现在全仓 `.emit(\s*"` = 0，不再需要「vendored 子树不查」这条口子。
+     `insightRustEvents()` 的值映射保留：它让常量化的 emit 点仍被计入「emit 点」。 */
   const values = new Set();
   const literals = [];
   const counts = new Map();
@@ -180,7 +166,7 @@ function emitSites(byName) {
     for (const m of src.matchAll(/\.emit\(\s*(&?)([A-Za-z_][\w:]*|"[^"]*")/g)) {
       const arg = m[2];
       if (arg.startsWith('"')) {
-        if (!isVendored(rel)) literals.push(`${rel}: ${arg}`);
+        literals.push(`${rel}: ${arg}`);
         values.add(arg.slice(1, -1));
         continue;
       }

@@ -5,10 +5,17 @@
  * 只看逻辑与样式源码：src/**（.ts/.tsx/.css）与 src-tauri/src/**（.rs）。
  * 不扫 tests 之外的生成物、不扫 node_modules / target / dist。
  *
- * 白名单（scripts/size-allowlist.json）用于「已知超限、正在拆」的文件：
- * 每条必须带 owner + 到期日，到期后脚本直接失败——防止白名单变成永久豁免。
+ * [0.12.0 T04] 路径豁免已撤销：Patina 归一后每条路径都受同一把尺子。
+ * 现存超限文件全部进入 `scripts/size-allowlist.json` 的**冻结基线**（152 条，由
+ * `--freeze` 扫描生成，不许手写）。基线是**棘轮**：
+ *   · 当前行数 > 冻结值 → 红（只许减不许增）；
+ *   · 当前行数 ≤ 冻结值 → 通过（缩了会提示跑 `--freeze` 收紧）；
+ *   · 不在基线里且 >300 → 红（新超限文件必须拆，不能新增豁免）。
+ *
+ * 维护方式：拆分文件后跑 `node scripts/check-size.mjs --freeze` 重写基线；
+ * 它是**收紧**操作的唯一入口，绝不允许为了变绿手工调大某个数字。
  */
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,82 +48,68 @@ function lineCount(file) {
 }
 
 const allowPath = join(root, 'scripts', 'size-allowlist.json');
-const allow = existsSync(allowPath) ? JSON.parse(readFileSync(allowPath, 'utf8')) : {};
-// `_doc` 之类的注释键不参与条目统计
-for (const key of Object.keys(allow)) if (key.startsWith('_')) delete allow[key];
-const today = new Date().toISOString().slice(0, 10);
-
+const raw = existsSync(allowPath) ? JSON.parse(readFileSync(allowPath, 'utf8')) : {};
+const frozen = raw.files ?? {};
+const relOf = (file) => relative(root, file).split(sep).join('/');
 const files = SCAN.flatMap((d) => walk(join(root, d)));
-const oversized = [];
-const violations = [];
+const measured = files.map((file) => ({ rel: relOf(file), lines: lineCount(file) }));
 
-/* vendored 子树口径（V0.12.0 融合 Patina）：
- *
- * 前端那半（`src/app/**`、`src/features/**`、`src/platform/**`、`src/shared/**`）与后端
- * 5 个 `insight/` 命名空间（`app` / `commands` / `infra` / `models` / `services`）
- * 都是 **原样并入的第三方源码**
- * （Patina 1.10.0，MIT），不是我们写的代码。它的文件尺寸归上游决定，我们也不该为了
- * 行数去改它 —— 拆完就等于放弃「diff 上游、按需同步」的能力，改一处变成逐行冲突。
- * 同理 `#![allow(dead_code)]` 也从单个子树根（原 `patina/mod.rs`）改成挂在 5 个
- * `pub mod insight;` 上的模块级 allow。
- *
- * 判据要窄：只认这几条路径前缀，`src/services/**` 之类宿主代码一条都不豁免。
- * 想从严就在下面把 VENDORED 置空，它会照旧逐个报错。 */
-/* [0.12.0 T02] 后端 `src-tauri/src/patina/` 已按层归一，前缀换成 5 个 `insight/` 新根
- * （docs/refactor/patina-structural-merge.md §2.2）；前端 4 个根由 T01 定下，未动。 */
-const VENDORED = [
-  'src/app/',
-  'src/features/',
-  'src/platform/',
-  'src/shared/',
-  'src-tauri/src/app/insight/',
-  'src-tauri/src/commands/insight/',
-  'src-tauri/src/infra/insight/',
-  'src-tauri/src/models/insight/',
-  'src-tauri/src/services/insight/',
-];
-const isVendored = (rel) => VENDORED.some((prefix) => rel.startsWith(prefix));
-const vendoredOversized = [];
-
-for (const file of files) {
-  const lines = lineCount(file);
-  if (lines <= LIMIT) continue;
-  const rel = relative(root, file).split(sep).join('/');
-  if (isVendored(rel)) {
-    vendoredOversized.push({ rel, lines });
-    continue;
+if (process.argv.includes('--freeze')) {
+  const next = {};
+  for (const { rel, lines } of measured.sort((a, b) => a.rel.localeCompare(b.rel))) {
+    if (lines > LIMIT) next[rel] = lines;
   }
-  const entry = allow[rel];
-  if (!entry) {
-    oversized.push({ rel, lines });
-    continue;
-  }
-  const problems = [];
-  if (!entry.owner) problems.push('缺 owner');
-  if (!entry.expires) problems.push('缺 expires');
-  else if (entry.expires < today) problems.push(`已于 ${entry.expires} 到期`);
-  if (problems.length) violations.push({ rel, lines, problems });
+  const doc =
+    '单文件 ≤300 行（AGENTS.md）的冻结基线。由 `node scripts/check-size.mjs --freeze` 扫描生成，' +
+    '禁止手写。语义是棘轮：每条的数值只许通过重新 --freeze 下调，不允许调大；' +
+    '不在表里的文件超 300 行直接失败。';
+  writeFileSync(allowPath, `${JSON.stringify({ _doc: doc, limit: LIMIT, files: next }, null, 2)}\n`, 'utf8');
+  console.log(`[size] FREEZE — 已写入 ${Object.keys(next).length} 条冻结基线（scripts/size-allowlist.json）`);
+  process.exit(0);
 }
 
-const stale = Object.keys(allow).filter((rel) => {
-  const full = join(root, rel);
-  return !existsSync(full) || lineCount(full) <= LIMIT;
+const newOversized = [];
+const grown = [];
+const tightened = [];
+for (const { rel, lines } of measured) {
+  if (lines <= LIMIT) continue;
+  if (!(rel in frozen)) {
+    newOversized.push({ rel, lines });
+    continue;
+  }
+  const max = typeof frozen[rel] === 'number' ? frozen[rel] : Number(frozen[rel]?.maxLines);
+  if (!Number.isFinite(max)) {
+    newOversized.push({ rel, lines });
+    continue;
+  }
+  if (lines > max) grown.push({ rel, lines, max });
+  else if (lines < max) tightened.push({ rel, lines, max });
+}
+
+const measuredByRel = new Map(measured.map((m) => [m.rel, m.lines]));
+const stale = Object.keys(frozen).filter((rel) => {
+  const lines = measuredByRel.get(rel);
+  return lines === undefined || lines <= LIMIT;
 });
 
-const vendoredNote = vendoredOversized.length
-  ? `；vendored 子树另有 ${vendoredOversized.length} 个超限文件（按 vendored 口径豁免，最大 ${vendoredOversized.reduce((m, f) => Math.max(m, f.lines), 0)} 行）`
-  : '';
-const summary = `扫描 ${files.length} 个文件，上限 ${LIMIT} 行${vendoredNote}`;
+const entries = Object.keys(frozen).length;
+const summary = `扫描 ${files.length} 个文件，上限 ${LIMIT} 行；冻结基线 ${entries} 条（棘轮：只许减不许增）`;
 
-if (oversized.length === 0 && violations.length === 0) {
-  const note = Object.keys(allow).length ? `（白名单 ${Object.keys(allow).length} 条）` : '';
-  console.log(`[size] OK — ${summary}${note}`);
-  if (stale.length) console.log(`[size] 提示：以下白名单条目已不再超限，可删除 —— ${stale.join(', ')}`);
+if (newOversized.length === 0 && grown.length === 0) {
+  console.log(`[size] OK — ${summary}`);
+  if (tightened.length) {
+    console.log(
+      `[size] 提示：${tightened.length} 个条目已低于冻结值，可跑 \`--freeze\` 收紧 —— ` +
+        tightened.map((f) => `${f.rel}(${f.max}→${f.lines})`).join(', '),
+    );
+  }
+  if (stale.length) console.log(`[size] 提示：以下条目已不超限或文件已消失，跑 \`--freeze\` 会移除 —— ${stale.join(', ')}`);
   process.exit(0);
 }
 
 console.error(`[size] FAILED — ${summary}\n`);
-for (const f of oversized) console.error(`✗ ${f.rel} — ${f.lines} 行（超 ${f.lines - LIMIT}）`);
-for (const f of violations) console.error(`✗ ${f.rel} — ${f.lines} 行，白名单不合法：${f.problems.join(' / ')}`);
-console.error('\n规则：单文件 ≤300 行（AGENTS.md 硬约束）；确需豁免请写入 scripts/size-allowlist.json 并带 owner + 到期日。');
+for (const f of newOversized) console.error(`✗ ${f.rel} — ${f.lines} 行（超 ${f.lines - LIMIT}，不在冻结基线里）`);
+for (const f of grown) console.error(`✗ ${f.rel} — ${f.lines} 行，超过冻结值 ${f.max}（+${f.lines - f.max}）；棘轮只许减不许增`);
+console.error('\n规则：单文件 ≤300 行（AGENTS.md 硬约束）；超限文件只能拆分并跑 `--freeze` 收紧基线，');
+console.error('不允许手工调大 scripts/size-allowlist.json 的数值，也不允许新增豁免条目。');
 process.exit(1);

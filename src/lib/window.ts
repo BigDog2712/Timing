@@ -9,20 +9,21 @@
  *    就绪后自行 show（双 rAF + 定时器兜底，与主窗 A0/D-07 同思路，只显示一次）。
  *  - closeCurrentWindow()：自绘标题栏 × 的关闭动作。
  */
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getCurrentWindow } from './windowApi';
 import { ipc, isTauri } from '../services/ipc';
 import { IS_MOBILE } from './platform';
 
 /**
- * 本文件是**全前端唯一的窗口 API 出口**（R2）。
+ * 本文件是**宿主侧唯一的窗口路由出口**（R2）。
  *
- * 任何组件 / hook 都不得直接 `import '@tauri-apps/api/window'`——窗口能力与"多窗口
+ * 任何组件 / hook 都不得直接 import 窗口 API 包——窗口能力与"多窗口
  * 单 bundle"的路由假设强绑定（label 命名、note-{id} 前缀、非 Tauri 的 `?w=` 回退），
  * 散落到各处会让「新增一类窗口」变成全仓搜索。
- * 机械门禁：`grep -rl "@tauri-apps/api/window" src` = 1（只允许本文件）。
+ * 机械门禁：`npm run check:layers` 的 L3 要求全仓只有 `src/lib/windowApi.ts`
+ * 引用 `@tauri-apps/api/*` 的窗口包（本文件经薄壳转出，不再直接依赖）。
  */
-export { getCurrentWindow, LogicalPosition, LogicalSize } from '@tauri-apps/api/window';
-export type { PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window';
+export { getCurrentWindow, LogicalPosition, LogicalSize } from './windowApi';
+export type { PhysicalPosition, PhysicalSize } from './windowApi';
 
 export type WindowKind = 'main' | 'settings' | 'todos' | 'timer' | 'note';
 
