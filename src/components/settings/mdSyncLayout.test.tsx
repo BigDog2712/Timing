@@ -126,11 +126,13 @@ describe('数据管理的结构（减法有没有真减掉）', () => {
     container?.remove();
   });
 
-  it('B1：① 只有 4 个输入框，其中「日记文件名」恰好 1 个', async () => {
+  it('B1：① 只有 5 个输入框，其中「日记文件名」恰好 1 个', async () => {
     await mount();
     const fields = editable('data-format');
-    expect(fields).toHaveLength(4);
+    /* [V0.11.33] 字段只增：+「日记模板路径」（P15 / W8），4 → 5 */
+    expect(fields).toHaveLength(5);
     expect(container.querySelectorAll('[data-block="data-format"] input[aria-label="日记文件名"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-block="data-format"] input[aria-label="日记模板路径"]')).toHaveLength(1);
   });
 
   it('D1：③ 主路径只有 2 个可编辑控件（总开关 / 日记落点）', async () => {

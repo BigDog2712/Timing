@@ -79,6 +79,8 @@ pub async fn load(pool: &SqlitePool) -> AppResult<MdSyncConfig> {
                 cloud,
                 cloud_folder: folder,
                 cloud_webdav: webdav,
+                /* [V0.11.33] 模板路径原样带过（serde default 已兜住缺键 = 空串，零迁移）。 */
+                diary_template: saved.diary_template,
             }
         }
         None => MdSyncConfig::default(),

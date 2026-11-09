@@ -1,22 +1,11 @@
 /**
- * Timing — 设置 · 数据管理 · 草稿编排（V0.11.13 → V0.11.26）
+ * Timing — 设置 · 数据管理 · 草稿编排（V0.11.13 → V0.11.26；[V0.11.33] +diaryTemplate）
  * -----------------------------------------------------------------------------
- * 从 `MdSyncTab` 拆出（那里 298 行、贴到 300 行门禁）：切的口子是「状态与副作用」对
- * 「版面」。数字口径见 `mdSyncConfig.ts`。
- * 只允许**一份实例**：`MdSyncTab` 调本 Hook 并把结果传给各块。卡片各自再调一次会得到
- * 两套互不相干的 state——用户在卡里填的地址按「保存」时读不到。
- *
- * [V0.11.16] 新增 `shared`：块①的「日记文件名」框与块③的「日记落点」框**不是**三档的
- * 镜像，是「一条待执行的统一意图」（见 `mdSyncShared.ts`）。判据只有一条：
- * **用户亲手改过那个框才扇出三档**。任一档被逐档面板手改时，对应字段的意图立刻作废，
- * 否则保存时的扇出会把刚改的那一档盖回去。
- *
- * [V0.11.26] 云端那半从「一份带 mode 的 cloud」拆成**两条通路各自的草稿** `folder` /
- * `webdav`（PRD R4 / R5）：
- * - 两份都**永远非空**（没配过时是 `emptyLocal()` / `emptyWebdav()`），组件不必判 null；
- * - 各改各的：`updateFolder` 只碰 folder、`updateWebdav` 只碰 webdav（O13 互不触碰）；
- * - `modeConverted` 机制**整体退役**：手机端不再渲染块④（`MdSyncTab` 里 `!IS_MOBILE`），
- *   也就不存在「把用户的本地目录掰成 WebDAV 再告诉他」这件事（O19）。
+ * 从 `MdSyncTab` 拆出：口子是「状态与副作用」对「版面」。只允许**一份实例**（卡片各自
+ * 再调会得到两套 state）。[V0.11.16] `shared`：块①文件名框与块③落点框是「一条待执行的
+ * 统一意图」，用户亲手改过才扇出三档（见 `mdSyncShared.ts`）。[V0.11.26] 云端拆成两条
+ * 通路各自草稿 `folder` / `webdav`：永远非空、各改各的（O13）、`modeConverted` 退役
+ * （手机端不渲染块④，O19）。[V0.11.33] 头注释压缩腾位（300 行门禁，禁 allowlist）。
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTauriEvent } from '../../hooks/useTauriEvent';
@@ -67,6 +56,12 @@ export interface MdSyncDraft {
   setSharedFile(value: string): void;
   /** 块③「日记落点」框写这里 */
   setSharedRoot(value: string): void;
+  /**
+   * [V0.11.33] 块①「日记模板路径」草稿（全局一份，R3；脏标记归块① `format`）。
+   * 保存载荷恒带字符串，空串交后端 `skip_serializing_if` 不落盘（P19 零 diff）。
+   */
+  diaryTemplate: string;
+  setDiaryTemplate(value: string): void;
   /** 发给后端的数组 = `applyShared(bindings, shared)`。**保存与「测试连接」共用这一份** */
   resolvedBindings: MdSyncBinding[];
   /** `part` = 这次改动属于哪一块（① 改 file/heading，③ 改 root/enabled） */
@@ -114,6 +109,8 @@ export function useMdSyncDraft(): MdSyncDraft {
   const [enabled, setEnabledState] = useState(true);
   const [bindings, setBindings] = useState<MdSyncBinding[]>([]);
   const [shared, setSharedState] = useState<MdSyncShared>(NO_SHARED);
+  /* [V0.11.33] 日记模板路径草稿（全局一份；「未配置」= 空串，与后端 serde default 同口径） */
+  const [diaryTemplate, setDiaryTemplateState] = useState('');
   const [folder, setFolder] = useState<MdSyncCloudChannel>(emptyLocal);
   const [webdav, setWebdav] = useState<MdSyncCloudChannel>(emptyWebdav);
   const [secret, setSecretState] = useState<string | null>(null);
@@ -132,6 +129,8 @@ export function useMdSyncDraft(): MdSyncDraft {
     if (!view || dirty) return;
     setEnabledState(view.config.enabled);
     setBindings(view.config.bindings.map((binding) => ({ ...binding })));
+    /* [V0.11.33] 模板路径回填：可选字段缺键 → 空串（「未配置」与「清空」同形） */
+    setDiaryTemplateState(view.config.diaryTemplate ?? '');
     setFolder(view.config.cloudFolder ?? emptyLocal());
     setWebdav(view.config.cloudWebdav ?? emptyWebdav());
   }, [view, dirty]);
@@ -159,6 +158,11 @@ export function useMdSyncDraft(): MdSyncDraft {
   const setSharedRoot = (value: string) => {
     setSharedState((current) => ({ ...current, root: sharedAfterEdit(mirrorOf(bindings, 'root'), value) }));
     touch('sync');
+  };
+  /* [V0.11.33] 模板路径改动记在块①（它是「写成什么样」的一部分，与文件名同块） */
+  const setDiaryTemplate = (value: string) => {
+    setDiaryTemplateState(value);
+    touch('format');
   };
 
   /* 逐档面板手改 → 该字段的**统一意图先固化到其余各档**，再让本档写新值。
@@ -247,6 +251,8 @@ export function useMdSyncDraft(): MdSyncDraft {
           cloud: null,
           cloudFolder: channelToSave(folder, folderConfigured),
           cloudWebdav: channelToSave(webdav, webdavConfigured),
+          /* [V0.11.33] 恒带字符串：空串由后端 skip 不落盘（未配置用户 JSON 零 diff，P19） */
+          diaryTemplate,
         },
         secret ?? undefined,
       );
@@ -281,6 +287,7 @@ export function useMdSyncDraft(): MdSyncDraft {
   return {
     enabled, setEnabled, pollSecs, bindings,
     shared, setSharedFile, setSharedRoot, resolvedBindings, updateBinding,
+    diaryTemplate, setDiaryTemplate,
     folder, webdav, updateFolder, updateWebdav, setFolderEnabled, setWebdavEnabled,
     secret, setSecret, dirty, dirtyParts,
     folderConfigured, webdavConfigured,

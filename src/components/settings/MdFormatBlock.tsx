@@ -29,7 +29,8 @@ interface MdFormatBlockProps {
 
 export function MdFormatBlock({ draft }: MdFormatBlockProps) {
   const today = useMdSyncStore((s) => s.view?.today ?? '');
-  const { bindings, shared, saving, loading, error, updateBinding, setSharedFile } = draft;
+  /* [V0.11.33] 模板路径一行进块①（W8 / P15）：全局一份，全局只有这一个入口 */
+  const { bindings, shared, saving, loading, error, updateBinding, setSharedFile, diaryTemplate, setDiaryTemplate } = draft;
   /* 后端那条「第 2 个落点：标题行必须以 # 开头」→ 落到第 2 行下方；不是这种形状
      → `null`，红字退回页签顶部（不猜是哪一行） */
   const inline = error ? splitBindingError(error, bindings.length) : null;
@@ -73,6 +74,20 @@ export function MdFormatBlock({ draft }: MdFormatBlockProps) {
             {mixedFileNote(others.map((item) => item.label))}
           </p>
         )}
+        {/* [V0.11.33] W8：日记模板路径（全局一份，R3）。A1b 纪律不豁免新句——
+            说明交给 placeholder 与 PRD 语义，不加 hint 不进 EXPLAIN_KEYS */}
+        <label className="sync__field">
+          <span className="sync__label">日记模板路径</span>
+          <input
+            className="sync__input"
+            value={diaryTemplate}
+            disabled={saving}
+            spellCheck={false}
+            placeholder="如 %APP_DIR%\模板.md，留空 = 不套模板"
+            aria-label="日记模板路径"
+            onChange={(event) => setDiaryTemplate(event.target.value)}
+          />
+        </label>
       </div>
 
       {bindings.map((binding, index) => {

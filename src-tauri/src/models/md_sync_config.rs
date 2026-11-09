@@ -82,6 +82,10 @@ pub struct MdSyncConfig {
     /// [V0.11.26] 块⑤ 云端同步通路。`None` = 从未配置（与新装同形）。
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cloud_webdav: Option<MdSyncCloudChannel>,
+    /// [V0.11.33] 日记模板路径（全局一份，R3）。空 = 未配置，行为与此前逐字节一致。
+    /// 不进 `validate()`：路径无效是运行期降级（P18），不是保存期错误。
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub diary_template: String,
 }
 
 /// 老配置（V0.4.0~V0.11.2 保存的 JSON）里没有 `pollSecs`，按默认 15 分钟补。
@@ -98,6 +102,7 @@ impl Default for MdSyncConfig {
             cloud: None,
             cloud_folder: None,
             cloud_webdav: None,
+            diary_template: String::new(),
         }
     }
 }

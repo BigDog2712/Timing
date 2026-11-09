@@ -50,6 +50,8 @@ let config: MdSyncConfig = {
   enabled: true,
   pollSecs: 900,
   bindings: DEFAULT_BINDINGS.map((binding) => ({ ...binding })),
+  /* [V0.11.33] mock 补字段保持 roundtrip 同形：后端空串 skip 不落盘，mock 显式空串 */
+  diaryTemplate: '',
   cloud: null,
   cloudFolder: {
     enabled: false,

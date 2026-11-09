@@ -207,9 +207,10 @@ describe('QA · 老用户配置零丢失（O11 / O12 / O13 / O16 / O20）', () =
     /* 定位断言：万一上面那条红了，这几行直接指出是谁动了 */
     expect(saved.pollSecs).toBe(900);
     expect(saved.bindings.map((b) => b.root)).toEqual(LIVE_BINDINGS.map((b) => b.root));
-    /* 老库没有 `auto` 键 → 一次没动控件的保存不许凭空长出来（键序也钉住） */
+    /* 老库没有 `auto` 键 → 一次没动控件的保存不许凭空长出来（键序也钉住）
+       [V0.11.33] 字段只增不改：+`diaryTemplate`（未配置 = 空串，后端 skip 不落盘，P19 记账） */
     expect(Object.keys(saved)).toEqual([
-      'enabled', 'pollSecs', 'bindings', 'cloud', 'cloudFolder', 'cloudWebdav',
+      'enabled', 'pollSecs', 'bindings', 'cloud', 'cloudFolder', 'cloudWebdav', 'diaryTemplate',
     ]);
     expect(saved.cloudFolder).not.toHaveProperty('auto');
     expect(saved.cloudWebdav).not.toHaveProperty('auto');

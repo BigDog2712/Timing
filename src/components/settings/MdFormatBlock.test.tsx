@@ -34,15 +34,19 @@ function view(bindings: MdSyncBinding[]): MdSyncViewCloud {
 
 const updateBinding = vi.fn();
 const setSharedFile = vi.fn();
+/* [V0.11.33] 块①新增「日记模板路径」一行（P15 / W8），替身补两个字段 */
+const setDiaryTemplate = vi.fn();
 
 /** 块①只读 `draft` 的几个字段：给一个最小替身，别的字段不参与本块 */
 function draftOf(
   bindings: MdSyncBinding[],
-  options: { error?: string | null; shared?: MdSyncShared } = {},
+  options: { error?: string | null; shared?: MdSyncShared; diaryTemplate?: string } = {},
 ): MdSyncDraft {
   return {
     bindings,
     shared: options.shared ?? NO_SHARED,
+    diaryTemplate: options.diaryTemplate ?? '',
+    setDiaryTemplate,
     saving: false,
     loading: false,
     error: options.error ?? null,
@@ -93,14 +97,25 @@ describe('MdFormatBlock —— ① 一个日记文件 + 三段标题', () => {
     container?.remove();
   });
 
-  it('B1：整块只有 4 个输入框（文件名 1 + 标题 3），「日记文件名」恰好 1 个', async () => {
+  it('B1：整块只有 5 个输入框（文件名 1 + 模板路径 1 + 标题 3），「日记文件名」恰好 1 个', async () => {
     await mount(draftOf(SAME_FILE));
-    expect(inputs()).toHaveLength(4);
+    /* [V0.11.33] 字段只增：+「日记模板路径」（P15 / W8），4 → 5 */
+    expect(inputs()).toHaveLength(5);
     expect(inputs().filter((item) => item.getAttribute('aria-label') === '日记文件名')).toHaveLength(1);
+    expect(inputs().filter((item) => item.getAttribute('aria-label') === '日记模板路径')).toHaveLength(1);
     expect(container.querySelectorAll('.sync__heading-row')).toHaveLength(3);
     /* 旧的「文件模板」标签与三档指路行都不许再回来（PRD A2 / C4 / C5） */
     expect(container.textContent).not.toContain('文件模板');
     expect(container.textContent).not.toContain('文件放在哪个目录');
+  });
+
+  it('[V0.11.33] 模板路径框回填草稿值，输入走 setDiaryTemplate（P15/P19）', async () => {
+    await mount(draftOf(SAME_FILE, { diaryTemplate: '%APP_DIR%\\模板.md' }));
+    expect(input('日记模板路径')?.value).toBe('%APP_DIR%\\模板.md');
+    await setValue(input('日记模板路径') as HTMLInputElement, 'D:\\t.md');
+    expect(setDiaryTemplate).toHaveBeenCalledWith('D:\\t.md');
+    expect(updateBinding).not.toHaveBeenCalled();
+    expect(setSharedFile).not.toHaveBeenCalled();
   });
 
   it('文件名框右侧只有一行「今天：…」（3 处收成 1 处，C7）', async () => {

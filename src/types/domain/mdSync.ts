@@ -64,6 +64,11 @@ export interface MdSyncConfig {
   cloudFolder?: MdSyncCloudChannel | null;
   /** [V0.11.26] 块⑤ 云端同步通路（后端 `cloudWebdav`）。 */
   cloudWebdav?: MdSyncCloudChannel | null;
+  /**
+   * [V0.11.33] 日记模板路径（全局一份）。可选：老 mock / 老 fixture 不必补字段；
+   * 后端空串 `skip_serializing_if` 不落盘，未配置用户的存储 JSON 与新装同形（P19）。
+   */
+  diaryTemplate?: string;
 }
 
 /** 单个落点的运行状态 */
