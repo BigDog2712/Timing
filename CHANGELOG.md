@@ -188,6 +188,35 @@ WorkBuddy 5575s / Chrome 3157s / Quark 1445s / Weixin 1182s / DeepSeek Harness 1
 **没做的一件**：查账模式**不比 `#[cfg(test)]` 之后的测试代码**（拆分时只搬不改）。谁在
 `*_mod_tests.rs` 里动了断言，这份报告不会提示——这一点写在脚本注释里，不当成已知。
 
+### 深化融合（三）：D2 反向 —— Patina 历史页看得见「我当时在计什么事」
+
+上一轮只打通了「宿主看 Patina」（记录面板顶部那条「同时在用」）。这一轮反过来：
+Patina 的历史页左侧多一张「同期计时」卡片，列出这一天在 Timing 里计过的事项与时长。
+两边合起来才回答得了那个问题——「我说在写方案的那两小时，其实一半在刷浏览器」。
+
+**没有新增 IPC 命令**。宿主已经有 `list_records`（区间内的计时记录）与 `list_items`（事项名），
+两条都是只读，`Paginated<TimeRecord>` 里没有事项名，所以在窗口里 join 一次即可。
+新加一条「聚合好再返回」的命令要动契约四面（`ipc_commands.rs` / `IpcApi` / `ipc.ts` / mock），
+而 `ipc.ts` 正卡在 300 行门禁上；一天几十条记录，两条已有命令跑得动。
+
+**权限单开一份**：`permissions/patina-host-bridge.toml`（`patina-host-bridge`，只放行
+`list_records` + `list_items`），由 `capabilities/patina.json` 引用。没有把它们塞进
+`window-commands.toml`——那份的语义是「Patina 子系统自己的命令面」，宿主命令混进去会让人
+以为 Patina 能调宿主的一切。**写的命令一条都不给**。
+
+**口径**：日期区间取 `startOfLocalDay(presentedDate)` 到次日零点，与宿主记录面板同一个日界；
+过滤走同一条 SQL（`started_at >= from AND started_at < to AND status='saved'`），
+所以两边的「今天」不会打架。**正在计的那一条不计入**（`status='saved'` 才落库统计），
+这与宿主记录面板同口径，不是新规矩。
+
+**失败即空**：命令被拒、库打不开、宿主没就绪 —— 一律退化成空数组，卡片整块不渲染。
+这是旁证块，不该让历史页因为它报错。
+
+**判据**：`buildTimingOverlap` 6 条纯函数用例（同事项合并 / 降序 / 上限 / 无名字丢弃 /
+零秒跳过 / 空）；变异自证两项（排序方向反转 → 3 条红；去掉名字过滤 → 1 条红，还原后 6 绿）；
+`npm test` 690 通过；`npm run check` 全绿；vendored 门禁登记 6 条（1 改 5 增）。
+上游前端原本没有任何用例，`timingOverlap.test.ts` 是本项目给 vendored 加的第一处。
+
 ## 0.11.28（桌面）— 同步文案与日记模板 — 2026-11-09
 
 本轮轮次流水号 0.11.33（文档/commit 标号），桌面出包按双轨 +1 = `0.11.28`。**手机端

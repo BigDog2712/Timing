@@ -35,6 +35,7 @@ import {
   type HistoryTimelineViewportChangeReason,
 } from "../hooks/useHistoryTimelineViewportInteraction.ts";
 import { useHistorySnapshotRuntime } from "../hooks/useHistorySnapshotRuntime.ts";
+import { useTimingOverlap } from "../hooks/useTimingOverlap.ts";
 import {
   readHistoryDayDistributionMode,
   readHistoryTimelineZoomHours,
@@ -64,6 +65,7 @@ import {
 } from "../../../shared/lib/localDate.ts";
 import { resolveTimelineFocusAtReferenceLocalTime } from "../../../shared/lib/timelineAxis.ts";
 import HistoryDaySummaryPanel, { type HistoryDaySummaryView } from "./HistoryDaySummaryPanel.tsx";
+import HistoryTimingOverlap from "./HistoryTimingOverlap.tsx";
 import type { HistoryDayDistributionItem } from "./HistoryDayDistributionPanel.tsx";
 import HistoryDayDistributionQuickActions from "./HistoryDayDistributionQuickActions.tsx";
 import HistoryTimelineDetailsPopover, {
@@ -616,6 +618,11 @@ export default function History({
     };
   }, [presentedDate]);
   const selectedDayDurationMs = selectedDayRange.endMs - selectedDayRange.startMs;
+  /* 宿主侧计时事项（D2 反向）：与宿主记录面板同一个日界、同一个 `list_records` 口径。 */
+  const timingOverlapSlices = useTimingOverlap(
+    selectedDayRange.startMs,
+    selectedDayRange.endMs,
+  );
   const {
     fullDayView: visibleHistoryTimelineView,
     zoomView: timelineZoomTimelineView,
@@ -1049,6 +1056,7 @@ export default function History({
   const renderDaySummary = () => (
     <HistoryDaySummaryPanel copy={historyCopy} view={visibleDaySummaryView} />
   );
+  const renderTimingOverlap = () => <HistoryTimingOverlap slices={timingOverlapSlices} />;
 
   const meaningfulContent = hasMeaningfulHistoryContent({
     contentState, visibleDateKey, requestedDateKey, visibleMappingVersion,
@@ -1099,6 +1107,7 @@ export default function History({
       <div className="flex gap-4 md:gap-5 min-h-0 flex-1">
         <div className="w-5/12 flex flex-col gap-4 md:gap-5 min-h-0 history-left-column">
           {renderDaySummary()}
+          {renderTimingOverlap()}
           <HistoryHourlyActivityPanel
             mode={hourlyActivityChartMode}
             hourlyActivity={hourlyActivity}

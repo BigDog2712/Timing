@@ -1,0 +1,16 @@
+# Patina 窗读宿主数据的只读桥（V0.12.0 · D2 反向）
+#
+# 为什么单独一份：Patina 窗原有的 `main-window-commands`（window-commands.toml）只列
+# Patina 自己的 117 条命令，语义是「这个子系统自己的命令面」。宿主命令混进去会让人
+# 以为 Patina 能调宿主的一切。这里只放两条**只读**命令，名字就把用途说清楚了：
+#   `list_records` 区间内的计时记录 · `list_items` 事项名
+#
+# 为什么需要它：历史页要显示「这一天在 Timing 里计了哪些事」，而 Patina 的库与 Timing
+# 的库是两个库，Patina 侧读不到 `time_records`。
+#
+# 边界：**不给任何写命令**。Patina 窗只读宿主的账，改时限、改事项一律回宿主自己。
+# 引用处：capabilities/patina.json。
+[[permission]]
+identifier = "patina-host-bridge"
+description = "Allows the Patina window to read the host's timer records and item names (read-only bridge for the history page)."
+commands.allow = ["list_records", "list_items"]

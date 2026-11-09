@@ -17,6 +17,7 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-start-dragging",
     "opener:default",
-    "main-window-commands"
+    "main-window-commands",
+    "patina-host-bridge"
   ]
 }
