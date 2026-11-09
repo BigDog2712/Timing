@@ -494,8 +494,16 @@ grep -rnE '\beprintln!\(' src-tauri/src --include=*.rs | wc -l        # 期望 0
 grep -rnE '\.emit\(\s*"' src-tauri/src --include=*.rs | wc -l         # 期望 0
 grep -rn '"tool-presentation-changed"\|"app-settings-changed"\|"tracking-data-changed"' \
   src --include=*.ts --include=*.tsx | grep -v 'insightEvents.ts'      # 期望空
-npm run check:contract                                                # 期望摘要仍为 80(+117)/17/11
+npm run check:contract                                                # 期望摘要仍为 80(+117)/18/11
 ```
+
+> **⚠ 事件名不许再起别名。** `insightRustEvents()` 只解析 `events.rs` 里的
+> `pub const NAME: &str = "…"`。T03 收口时 `app/insight/tool_notifications.rs` 曾用
+> `pub use …::TOOL_PRESENTATION_CHANGED as CHANGED;` 把 7 处 emit 写成 `.emit(CHANGED, ())`
+> —— 别名在 `pub const` 扫描里解析不出来，这 7 个真实发射点对契约**完全不可见**，
+> emit 点计数因此少 7（实测把全名换回来即 17 → 18）。所以判据里的数字会随「契约能看见
+> 多少个发射点」变化，**它不是圣数**；宁可改数字，也不能让别名把发射点藏起来。
+> 事件名一律写全路径 `crate::models::insight::events::NAME` 或直接 `use` 原名，禁止 `as` 别名。
 
 ### 4.6 L1 / L2 扩围（不是撤豁免，是补覆盖）
 

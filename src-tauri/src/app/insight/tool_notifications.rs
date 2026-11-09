@@ -7,7 +7,6 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 mod native;
 pub const WINDOW_LABEL: &str = "tool-notification";
-pub use crate::models::insight::events::TOOL_PRESENTATION_CHANGED as CHANGED;
 
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -121,7 +120,7 @@ pub async fn recover<R: Runtime + 'static>(
     if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
         window.destroy().map_err(|e| e.to_string())?;
     }
-    let _ = app.emit(CHANGED, ());
+    let _ = app.emit(crate::models::insight::events::TOOL_PRESENTATION_CHANGED, ());
     if !exhausted {
         refresh_locked(app).await?;
     }
@@ -184,7 +183,7 @@ async fn refresh_locked<R: Runtime + 'static>(app: &AppHandle<R>) -> Result<(), 
             .target_icon = icon;
     }
     if changed {
-        let _ = app.emit(CHANGED, ());
+        let _ = app.emit(crate::models::insight::events::TOOL_PRESENTATION_CHANGED, ());
     }
     if !present || delivery == Delivery::Dialog {
         if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
@@ -221,7 +220,7 @@ fn ensure_notification<R: Runtime + 'static>(app: &AppHandle<R>) {
             if inner.snapshot.error.is_none() {
                 inner.snapshot.error = Some("Notification window retry limit reached".into());
                 inner.snapshot.revision += 1;
-                let _ = app.emit(CHANGED, ());
+                let _ = app.emit(crate::models::insight::events::TOOL_PRESENTATION_CHANGED, ());
             }
             return;
         }
@@ -241,7 +240,7 @@ fn ensure_notification<R: Runtime + 'static>(app: &AppHandle<R>) {
         inner.snapshot.error = Some(error.clone());
         inner.snapshot.revision += 1;
         drop(inner);
-        let _ = app.emit(CHANGED, ());
+        let _ = app.emit(crate::models::insight::events::TOOL_PRESENTATION_CHANGED, ());
     }
     let owner = app.clone();
     let watchdog = tauri::async_runtime::spawn(async move {
@@ -271,7 +270,7 @@ fn ensure_notification<R: Runtime + 'static>(app: &AppHandle<R>) {
         if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
             let _ = window.destroy();
         }
-        let _ = app.emit(CHANGED, ());
+        let _ = app.emit(crate::models::insight::events::TOOL_PRESENTATION_CHANGED, ());
         ensure_notification(&app);
     });
     state
@@ -315,7 +314,7 @@ pub async fn save<R: Runtime + 'static>(
         inner.snapshot.preferences = preferences.clone();
         inner.snapshot.error = Some(error);
         inner.snapshot.revision += 1;
-        let _ = app.emit(CHANGED, ());
+        let _ = app.emit(crate::models::insight::events::TOOL_PRESENTATION_CHANGED, ());
     }
     Ok(preferences)
 }
@@ -357,7 +356,7 @@ pub async fn ready<R: Runtime + 'static>(
         }
         if inner.snapshot.error.take().is_some() {
             inner.snapshot.revision += 1;
-            let _ = app.emit(CHANGED, ());
+            let _ = app.emit(crate::models::insight::events::TOOL_PRESENTATION_CHANGED, ());
         }
     }
     if let Some(sound) = sound {

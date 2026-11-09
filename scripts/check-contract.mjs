@@ -265,6 +265,22 @@ const { values: rEvents, byName } = rustEvents();
 const fEvents = feEvents(types);
 const { values: emitted, literals } = emitSites(byName);
 
+/* emit 点计数期望值。
+ * 17 → 18 的唯一原因是 `app/insight/tool_notifications.rs` 的 7 处
+ * `.emit(CHANGED, ())` 从 import 别名换成了可解析的
+ * `crate::models::insight::events::TOOL_PRESENTATION_CHANGED`：
+ * `insightRustEvents()` 只解析 `pub const`，别名解析不出来，于是这 7 个发射点
+ * 此前对契约不可见。**不是新增事件，只是把原本就存在的发射点重新纳入统计。** */
+const EXPECTED_EMIT_SITES = 18;
+if (emitted.size !== EXPECTED_EMIT_SITES) {
+  failures.push({
+    label: `emit 点 ${emitted.size} 个，期望 ${EXPECTED_EMIT_SITES} 个`,
+    missing: [],
+    extra: [],
+    hint: '事件常量被别名/间接引用后契约会看不见发射点；新增或改动事件时同批更新本期望值',
+  });
+}
+
 /* 允许「前端声明了、后端永不 emit」的事件：仅限被 feature 开关关掉的能力。
    新增条目必须写清原因与解锁条件，不允许用它掩盖拼写错误。
    [V0.3.3] 原唯一例外 `shortcut:triggered` 已随全局快捷键整体下架（ADR-022）删除，
