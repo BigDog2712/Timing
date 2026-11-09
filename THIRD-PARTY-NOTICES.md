@@ -25,7 +25,10 @@ Timing 0.12.0 起把 **Patina**（自动使用追踪 / 番茄 / 使用上限提�
 2. 命令表并入宿主：Patina 的 117 条命令从「插件注册」改为并入 `src-tauri/src/ipc_commands.rs`
    的单张 `generate_handler!`，权限在 `src-tauri/permissions/window-commands.toml`
    + `capabilities/patina.json` 里按 label 授权（Tauri 的插件命令走独立 ACL 命名空间，
-   与窗口白名单不通用）。
+   与窗口白名单不通用）。**连带后果**：Tauri 只要存在任何 app 级 permission 就不再默认放行
+   应用命令，所以宿主自己的 80 条也必须有清单 —— `src-tauri/permissions/host-commands.toml`
+   + `capabilities/default.json` / `capabilities/mobile.json` 的引用。`mini` 窗口并入
+   `capabilities/patina.json`（标题栏可开），提醒弹窗走 `patina-tool-notification.json`。
 3. 托盘摘除：`src-tauri/src/patina/app/tray.rs` 的 `PATINA_OWN_TRAY = false`，
    托盘入口统一归宿主（宿主托盘「时间统计…」+ 设置页「通用 → 时间统计」）。
 4. 更新器摘除：不注册 `tauri-plugin-updater`、启动不做更新自检、capability 不含

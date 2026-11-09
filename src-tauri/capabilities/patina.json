@@ -1,9 +1,9 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "patina",
-  "description": "Patina 分析窗口（自动使用追踪 / 历史 / 统计 / 分类映射 / 工具）。它是一扇独立窗口，能力面与宿主悬浮条分开：只给 core 窗口基础能力、外部链接与 Patina 自己的命令白名单。[V0.12.0 融合] 不给 `updater:default`：更新统一走 Timing 的安装包，Patina 上游的更新端点指向另一个仓库，留着等于把 Timing 更新成 Patina。",
+  "description": "Patina 分析窗口（自动使用追踪 / 历史 / 统计 / 分类映射 / 工具）。它是一扇独立窗口，能力面与宿主悬浮条分开：只给 core 窗口基础能力、外部链接与 Patina 自己的命令白名单。[V0.12.0 融合] 不给 `updater:default`：更新统一走 Timing 的安装包，Patina 上游的更新端点指向另一个仓库，留着等于把 Timing 更新成 Patina。`mini` 并入本 capability：它是标题栏「迷你窗」按钮开的第二扇 Patina 窗（同一套命令面），漏授权会出现「窗开了、界面全哑、零日志」；桌面提醒弹窗 `tool-notification` 另有更窄的 patina-tool-notification.json。",
   "platforms": ["windows", "macOS", "linux"],
-  "windows": ["patina"],
+  "windows": ["patina", "mini"],
   "permissions": [
     "core:default",
     "core:app:default",

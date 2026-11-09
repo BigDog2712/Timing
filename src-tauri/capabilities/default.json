@@ -5,6 +5,7 @@
   "platforms": ["windows", "macOS", "linux"],
   "windows": ["main", "settings", "todos", "timer", "note-*"],
   "permissions": [
+    "host-commands",
     "core:window:allow-start-dragging",
     "core:window:allow-start-resize-dragging",
     "core:window:allow-show",

@@ -24,9 +24,11 @@ alwaysOnTop` 的悬浮小条，Patina 是常规主窗。共用一个入口 HTML 
    `MAIN_WINDOW_LABEL`）；宿主仍是 `main`。
 2. **入口文件撞车** → Vite `rollupOptions.input` 双入口；`main_window_url()` 生产指向
    `WebviewUrl::App("patina.html")`，debug 指向 `http://127.0.0.1:1420/patina.html`。
-3. **capabilities 按 label 授权** → 新增 `capabilities/patina.json`（`windows: ["patina"]`），
-   **不抄全量白名单**；Patina 的命令集写成 `permissions/window-commands.toml`
-   （`main-window-commands`），逐条列出 117 条。
+3. **capabilities 按 label 授权** → 新增 `capabilities/patina.json`（`windows: ["patina",
+   "mini"]`），**不抄全量白名单**；Patina 的命令集写成 `permissions/window-commands.toml`
+   （`main-window-commands`），逐条列出 117 条。**代价是宿主自己的命令也必须登记**
+   （`permissions/host-commands.toml` / `host-commands`，80 条），详见下面「验收时炸出的
+   第四条」。
 4. **两套托盘/自启/更新器** → 托盘：`tray.rs` 加 `PATINA_OWN_TRAY = false`，`setup_tray` 与
    `apply_current_tray_visibility` 双双短路（后者会在 `tray_by_id().is_none()` 时**主动建**
    托盘，必须单独闸）；自启：Patina 侧从未注册；更新器：不注册 `tauri-plugin-updater`、
@@ -61,20 +63,28 @@ alwaysOnTop` 的悬浮小条，Patina 是常规主窗。共用一个入口 HTML 
 ### 判据与门禁
 
 - `npm run check` EXIT 0：契约 **Rust 80（+Patina 117）/ IpcApi 80 / ipc.ts 80 / mock 80**、
-  错误码 17/17、事件 11/11/emit 17；size 1418 文件（vendored 子树 152 个按专项口径豁免，
-  最大 1936 行）；version 桌面 0.12.0 六处一致 + 手机 0.12.0/12000；layers 8 条 1345 文件；
+  错误码 17/17、事件 11/11/emit 17；size 1419 文件（vendored 子树 152 个按专项口径豁免，
+  最大 1936 行）；version 桌面 0.12.0 六处一致 + 手机 0.12.0/12000；layers 8 条 1346 文件；
   brand 691 命中 0 违规；lint 0。
 - `cargo check --all-targets` EXIT 0，仅 3 条既有警告（`md_sync_channel_test.rs:8` unused
   `super::*`、`overlay.rs:83` `summary` 未用、`patina/engine/tools/mod.rs:755` `fetch_update`
-  已弃用）。前端 682 测试全过（83 文件）。
+  已弃用）。前端 682 测试全过（83 文件）；后端新增 `qa_tray_stats_entry`（托盘「时间统计…」
+  的位置 / 文案 / 四种状态 × 退出中都不消失）。
+- `cargo check --target aarch64-linux-android` EXIT 0（NDK 27.2.12479018）：融合把
+  `webview2-com` / `windows` / `windows-core` 写在通用依赖段，安卓被 Windows API 拖死
+  （16 条 `cannot find function submit in crate windows_threading`），已挪进
+  `[target.'cfg(windows)'.dependencies]`。
 - **实跑验证**（dev，`127.0.0.1`）：`[main-window] event=frontend-ready generation=1
   load_epoch=2 reason=frontend render_state=ready … result=accepted-hidden` —— Patina 窗前端
   真的执行了、`cmd_mark_main_window_ready` 走通（说明 capability 授权有效），且启动时保持
-  隐藏不抢焦点。
+  隐藏不抢焦点。两处入口实测（CDP 直接点真按钮，不是「看代码像对」）：设置 → 通用 →
+  「时间统计 / Patina · MIT / 打开」点下去日志出 `show-requested reason=tray-menu` →
+  `show-succeeded result=visible`；`open_patina_window` 从宿主窗 invoke 返回 `OK`。
+  补完 `host-commands` 后，宿主 `get_migration_info` 等命令恢复返回真实数据。
 - 行数门禁逼出两次压缩：`src/services/ipc.ts` 加完命令到 303 行，按项目既有口径
   （「搬走/压注释腾行数」）压回头注释与新增注释，回到 300。
 
-### 验收前又修的三条（都是融合才暴露的时序问题）
+### 验收前又修的四条（都是融合才暴露的问题）
 
 1. **宿主退出被 Patina 吃掉**：`patina::app::bootstrap::handle_run_event` 的
    `ExitRequested` 只认 Patina 自己的 `AppExitState`，而 Timing 的退出路径
@@ -94,6 +104,23 @@ alwaysOnTop` 的悬浮小条，Patina 是常规主窗。共用一个入口 HTML 
    用户看到的是「App 自己没了」。`begin_destroy_hidden_window` 增加 `render_state == Ready`
    前提，用例 `main_window_lifecycle_refuses_to_destroy_window_before_page_ready`。上游踩不到，
    因为它启动就显示窗口、页面必然先 ready。
+4. **加了 Patina 的命令白名单，宿主 79 条命令全部失效**（本轮最贵的一个坑）。Tauri 2.12 的
+   IPC 门禁在 `tauri/src/webview/mod.rs:2053`：
+   ```rust
+   if (plugin_command.is_some() || has_app_acl_manifest || !is_local) && invoke.acl.is_none()
+   ```
+   只要仓库里存在**任何** app 级 permission，应用命令就不再默认放行。融合把 Patina 的 117 条
+   写成 `permissions/window-commands.toml` 的那一刻，宿主自己的 79 条也一并被要求显式登记。
+   症状极具欺骗性：窗口照常渲染、悬浮条照常出现，只是**所有数据都是空的**，控制台**一句
+   日志都没有**（dev 构建下才把 ACL 拒绝写进 `invoke.resolver.reject`）。用 CDP 从宿主窗
+   `__TAURI_INTERNALS__.invoke` 逐条打才看见实情：`overlay_status not allowed. Command not
+   found`。修法：新增 `permissions/host-commands.toml`（identifier `host-commands`，80 条，
+   与 `ipc_commands.rs` 宿主段逐条对齐），并挂到 `capabilities/default.json`（桌面
+   main/settings/todos/timer/note-*）与 `capabilities/mobile.json`（安卓 main）两份
+   capability —— **少挂一份，对应平台就是全平台静默失效**。同时给 `check-contract.mjs`
+   加两条断言：宿主命令集必须与这份清单逐条相等、两份 capability 都必须引用它。
+   顺手补 `mini` 进 `patina.json` 的 windows（标题栏「迷你窗」按钮真能点到，漏授权同样是
+   「窗开了、界面全哑、零日志」）。
 
 > 排查口径：`tauri dev` 打 `error: process didn't exit successfully` 要分三种看 ——
 > `exit code 1` 多为热重建抢单实例锁（假信号，先杀光 `timing.exe` 复测）、

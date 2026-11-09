@@ -5,6 +5,7 @@
   "platforms": ["android", "iOS"],
   "windows": ["main"],
   "permissions": [
+    "host-commands",
     "core:window:allow-show",
     "core:window:allow-hide",
     "core:window:allow-set-position",

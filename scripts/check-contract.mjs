@@ -265,6 +265,39 @@ check(
   'mocks 必须覆盖全部命令（浏览器 dev 与单测依赖它）；缺一条即红',
 );
 
+/* ---- 应用命令 ACL 清单 ---- */
+/** 7. 宿主命令的 ACL 放行清单
+ *
+ * Tauri 2.12 的 IPC 门禁（tauri/src/webview/mod.rs:2053）：
+ *   if (plugin_command.is_some() || has_app_acl_manifest || !is_local) && invoke.acl.is_none()
+ * 只要仓库里存在任一 app 级 permission（Patina 融合带进来 `permissions/window-commands.toml`），
+ * 应用命令就不再默认放行——没登记的会一律回 `<cmd> not allowed. Command not found`，
+ * 前端表现是「窗口渲染正常、数据全空、控制台零日志」。所以这里把清单钉死。
+ */
+function aclCommands() {
+  const p = 'src-tauri/permissions/host-commands.toml';
+  if (!existsSync(join(root, p))) return new Set();
+  return new Set([...read(p).matchAll(/^\s*"([a-z][a-z0-9_]*)",\s*$/gm)].map((m) => m[1]));
+}
+const acl = aclCommands();
+check(
+  '宿主命令没有登记进 permissions/host-commands.toml',
+  diff(commands, acl),
+  diff(acl, commands),
+  '新增/删除宿主命令必须同步这份 ACL 清单；漏登记会让该命令在运行时静默失效',
+);
+
+/* 清单登记了，还要有人引用它——否则等于没放行。 */
+const capRefs = ['src-tauri/capabilities/default.json', 'src-tauri/capabilities/mobile.json'].filter((p) =>
+  existsSync(join(root, p)) && read(p).includes('"host-commands"'),
+);
+check(
+  'capabilities 没有引用 host-commands',
+  capRefs.length === 2 ? [] : ['default.json / mobile.json 都要引用'],
+  [],
+  '桌面与手机各有一份 capability，两份都要挂 host-commands，否则对应平台上宿主 IPC 全断',
+);
+
 const summary = [
   `命令：Rust ${commands.size}（+Patina ${patinaCmds.size}）/ IpcApi ${api.size} / ipc.ts ${calls.size} / mock ${mocks.size}`,
   `错误码：Rust ${rustCodes.size} / 前端 ${feCodes.size}`,

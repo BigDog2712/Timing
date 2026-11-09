@@ -141,6 +141,8 @@ mod qa_probe_403;
 mod qa_usable_parity;
 /* [QA 复验 V0.11.18] B7b：`build_nodes(quitting=true)` 只改退出项（逐字 `正在同步…`）。 */
 mod qa_tray_quitting;
+/* [V0.12.0 Patina 融合] 托盘「时间统计…」入口：位置、文案口径、四种状态 × 退出中都不消失。 */
+mod qa_tray_stats_entry;
 /* [QA 复验 V0.11.18] B4：`blocked_notice` 的十档表 + 「标题取自菜单项常量」。
    与工程师那份的区别：用常量不用字面量、补 `localfolder` 载体、把优先级顺序也钉住。 */
 mod qa_blocked_notice;
