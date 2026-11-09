@@ -1,6 +1,42 @@
 # Changelog
 
-本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
+本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`。
+**V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
+手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
+
+## 未发布 — 双轨版号：手机与桌面分家（基建，零功能改动）
+
+主人要求「给手机版 Timing 赋予单独版号，不再与电脑端一致」。
+
+### 为什么必须分
+
+双轨之前六处基线被两端共抢：桌面最后出包是 `0.11.27`，手机已到 `0.11.32`，而六处写的是
+`0.11.32` —— **下次出桌面包会从 27 直接跳到 32，中间四个号全不属于它**。
+「统一版号」事实上早已失效，只剩门禁还在硬要求它们相等。
+
+### 口径
+
+新增 `scripts/platform-versions.json` 作单一真源：
+
+- `desktop: "0.11.27"` → 六处（`package.json` / `package-lock.json` ×2 /
+  `src-tauri/Cargo.toml` / `Cargo.lock` / `tauri.conf.json`）必须等于它；
+- `mobile: { versionName: "0.11.33", versionCode: 11033 }` → `scripts/android-apk.mjs`
+  只读它，**不再从 `tauri.conf.json` 派生**。
+
+六处因此**回退**到 `0.11.27`（桌面真实已发版本），不是写错。
+
+### 门禁加两条
+
+1. `mobile.versionCode` 必须与 `versionName` 同源（`major*1_000_000 + minor*1_000 + patch`，
+   与 tauri CLI 一致）。只改一个的话系统按旧号判重，以后再也升不上去。
+2. `mobile.versionName` 不得低于 `release/` 与 `release/archive/` 里已发出 APK 的最大号 ——
+   Android 拒绝降级覆盖安装，用户看到的是「应用未安装」而不是「版本旧了」。
+
+### 验证
+
+`npm run check` EXIT 0；变异三条各自只红对应用例后逐字还原（同源但回退 / 版本码不对 /
+六处之一手滑）。**未出包**：工作区有并行任务（日记模板 T02）未收口，`md_sync_config.rs`
+加了 `diary_template` 但 `config.rs:73` 构造点没补，cargo 编译不过。本轮零功能改动，不出包。
 
 ## 0.11.32 — 便利贴看全文 / 悬浮条点按修好 / 未命名计时（只有手机包）
 
