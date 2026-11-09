@@ -1,5 +1,60 @@
 # 发布说明 · Timing
 
+## v0.11.32 — 便利贴看全文、悬浮条点按修好、未命名计时（只有手机包）（2026-11-09）
+
+主人报四条，其中第 2 条是**真 bug**：0.11.22 起就存在，而且两端都不报错。桌面零改动。
+
+### 悬浮条点按：换掉整条投递路（本轮的重点）
+
+现象能拆开——改形态（原生）有效、切计时（前端）无效——说明"投出去了，没人执行"。
+查下去是这条链上留了一处**别人的反射**：`addPluginListener` 内部发
+`plugin:timing-native|registerListener`，那个命令由 Tauri 实现、走
+`invoke.parseArgs(...)`（Jackson）。本仓为了躲 R8 早把自己那套换成了 `getArgs()`，
+却在这条链上没换。注册失败时：前端 `.catch()` 吞掉、`hasListener` 永远 false，
+于是点按只剩 `expandTemporarily()` —— **圆点展开，计时一动不动**。
+
+现在：`Prefs.markPendingAction(kind)` 先落标记 → `webView.evaluateJavascript(
+"window.__timingPillTap('toggle')")` → 前端执行 → 1.2 秒后原生核对
+（标记被接走 / 快照变了任一成立即算成功，否则把原因写进通知副标题）。
+没有注册、没有反射、没有静默失败。
+
+另外补了一处同样会造成"点了没反应"的坑：**切状态前先 `refresh()`**。App 在后台待久了，
+store 里的 `status` 是旧的，拿旧值发"暂停"必然被后端拒。
+
+**长按落点改计时页**：`openApp()` 先投 `kind='open'`（并落标记）再 `startActivity`；
+前端收到就关掉盖着的面板 + `setTab('timer')`。App 已在前台时 `startActivity` 只走
+`onNewIntent`，不保证有 `visibilitychange`，所以这一投不能省。
+
+### 便利贴：点行 = 看整张（新 `NoteViewSheet`）
+
+列表正文两行封顶只够认出是哪一张，而点行原先直接进编辑页——168px 的输入框，长正文
+还是只能滚着看开头。现在点行进**只读全文**（`pre-wrap`、整块可滚、无 line-clamp），
+底部「编辑」再落到原编辑页（落盘口径一字未改）。点按也从手写的 `pointerup` 分支换成
+正经 `onClick`，长按之后紧跟的那次 click 用 `longPressed` 挡掉，免得"长按删除"顺手打开全文。
+
+### 未命名计时：单击即开始，结束请填名字
+
+数据层没有"匿名记录"：每条记录都挂在一个事项上，"没名字"就落在系统事项「未归类」。
+所以缺的是**结束后补名字**这一步——`stop()` 原先返回 `()`，调用方拿不到"这段属于谁"。
+
+- 悬浮条点按在待机时用 `SYSTEM_ITEM_ID` 开始（不是 `lastItemId`：悬浮条上没有选事项的
+  位置，替你猜反而会记错）；
+- `stop()` 回值改成 `StopResult | null`；新 `hooks/useStopNaming` 判 `isUnnamedRecord`
+  后开 `nameStop` 面板（失败 / 太短被丢弃 / 已有归属三种都不弹）；
+- `NameStopSheet`：显示时长与起点，可输入或点一个常用/最近胶囊；**先找再建**
+  （`matchItemByName` 全等匹配），`recordApi.update(record.id, { itemId })` **只改归属**；
+- 「先不命名」是合法结局，不弹红字。
+
+### 文案
+
+换事项面板底部提示改成「行尾的图钉 = 设为常用」。
+
+### 数值
+
+契约 79/79/79/79、错误码 17、事件 11、迁移 0006 都没动；`npm test` 677 通过（82 文件）、
+`cargo test --lib` 719 通过；安卓 release 构建 arm64 成功；变异自证 6 条全红后逐字还原。
+APK `a6497e05c40b66d3d913e2d0e3119b819267b8cb6370391181dfe3cb0573ef3d`（vc 11032）。
+
 ## v0.11.31 — 常用事项由用户钉，事项页按事项合并，记录页可翻往期（只有手机包）（2026-11-09）
 
 主人对上轮三条待定的回复，本轮全部落地。桌面零改动。

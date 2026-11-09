@@ -61,23 +61,29 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
     private val original = HashMap<String, String>()
 
     /**
-     * 悬浮条那一按的投递口（[V0.11.22]）。
+     * 悬浮条那一按的投递口（[V0.11.22]；[V0.11.32] 换成 `evaluateJavascript`）。
      *
-     * 为什么用 `trigger` 而不是 `emit`：`Plugin.trigger` 只投给**本案**通过
-     * `plugin:timing-native|registerListener` 注册的 JS channel（前端用
-     * `addPluginListener('timing-native', 'pill:toggle', …)`）。Rust 的 `app.emit` 是另一条
-     * 路，这里够不着它——用错了的表现是「回调永远不响，而且两边都不报错」。
+     * ## 为什么不用 `Plugin.trigger` + `addPluginListener` 了
      *
-     * `hasListener` 是能力探测：WebView 已被销毁时问不到人，就让 Service 退回「打开主界面」。
+     * 那条路要两端都「注册成功」：前端 `addPluginListener` 内部发
+     * `plugin:timing-native|registerListener`，而这个命令是 Tauri 自己实现的，走
+     * `invoke.parseArgs(RegisterListenerArgs::class.java)` —— 也就是 **Jackson 反射**。
+     * 本仓为了躲 R8 的反射问题，早把自己的 `parseArgs` 全换成了 `getArgs()`，却在这条链上
+     * 留了别人的反射。注册一旦失败，前端 `.catch()` 把它吞掉、`hasListener` 永远为 false，
+     * 表现就是主人报的「点按只有圆点展开、计时一动不动」，而且两端都不报错。
+     *
+     * 现在只做一件事：把那段 JS 丢给 WebView 执行。没有注册、没有反射、没有中间态。
+     * 名字与前端 `PILL_ENTRY` 必须逐字一致（判据在 `usePillAction.source.test.ts`）。
      */
     override fun load(webView: WebView) {
-        PillService.bridge = { event ->
-            if (hasListener(event)) {
-                trigger(event, JSObject())
-                true
-            } else {
-                false
+        PillService.bridge = { js ->
+            /* Service 在后台线程按的，`evaluateJavascript` 必须在 UI 线程；
+               WebView 已被销毁时 post 仍会走，里面的 runCatching 吃掉异常——
+               这一按不会因此崩掉 App，返回值也不代表"执行成功"（成败由 Service 核对）。 */
+            runCatching {
+                webView.post { runCatching { webView.evaluateJavascript(js, null) } }
             }
+            Unit
         }
     }
 

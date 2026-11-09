@@ -61,6 +61,8 @@ import './styles/mobile/items-done.css';
 import './styles/mobile/records.css';
 /* [V0.11.0] 便利贴页（第 5 个 Tab） */
 import './styles/mobile/notes.css';
+/* [V0.11.32] 结束未命名计时后补名字（独立一份，免得 sheets.css 撑破 300 行） */
+import './styles/mobile/name-stop.css';
 import './styles/mobile/settings.css';
 import './styles/mobile/sheets.css';
 import App from './App';

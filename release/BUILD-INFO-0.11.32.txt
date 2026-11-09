@@ -1,0 +1,34 @@
+product: Timing
+version: 0.11.32
+git_commit: 待提交（基线 07b0aa0）
+git_dirty: true
+built_at_utc: 2026-11-09T02:37:17Z
+build_profile: release
+
+# 说明（手写，非脚本产出）
+# 这个包只有安卓一侧，由 `node scripts/android-apk.mjs` + `node scripts/android-sign.mjs --debug-key` 产出；
+# 那两个脚本不写 BUILD-INFO，这份是事后按实际情况补的。
+#
+# git_dirty: true：构建时本轮改动还在工作树里（尚未提交），基线是 07b0aa0。
+# 构建之后只改过 release/ 下的说明文字、文档，以及把两个超 300 行的测试文件拆开（不参与打包）。
+#
+# 包身自证：
+#   aapt2 → versionCode=11032 / versionName=0.11.32（com.timing.app）
+#   classes.dex 内本轮新增的字面量 "__timingPillTap" ×4（原生 evaluateJavascript 的入口名）
+#   classes.dex 内旧的 "pill:toggle" ×0（上一版那套插件事件名已经彻底消失）
+#   .so 内前端资产 index-DMd8Hp8L.js ×1；上一版 index-BVhH7yNY.js ×0
+#
+# 本轮桌面零代码改动，因此 portable.zip / setup.exe 仍为 0.11.27 的产物。
+#
+# 门禁：npm run check（契约 79 / 79 / 79 / 79、size ≤300、version ×6、layers 8、brand、eslint）
+#       + npm test 677 / 677 通过（82 个文件）
+#       + cargo test --lib 719 passed / 1 ignored
+#       + 安卓 release 构建 BUILD SUCCESSFUL（arm64）
+#
+# 变异自证 6 条（逐条改坏 → 指定用例红 → 逐字还原 → 复跑门禁）：
+#   M1 usePillAction 去掉「切状态前 refresh」→ usePillAction.tap.test「切状态前没有 refresh」红
+#   M2 PillService 把 dispatch 提到 markPendingAction 之前 → usePillAction.source.test「先投后打标记」红
+#   M3 NotesPage 点行改回 noteEdit → MobileSheets.r32.test「点行没有打开看整张面板」红
+#   M4 useStopNaming 去掉 isUnnamedRecord 守卫 → MobileSheets.r32.test「判据不在唯一那处定义上」红
+#   M5 NameStopSheet 的 patch 里带上 startedAt → MobileSheets.r32.test「只许一次 update / 只有 itemId」红
+#   M6 PillService.verify 去掉「标记还在吗」→ usePillAction.tap.test「核对不看标记」红

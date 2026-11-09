@@ -7,7 +7,7 @@
 import { useCallback, useMemo } from 'react';
 import { errorText, ipc } from '../services/ipc';
 import { SYSTEM_ITEM_ID } from '../types/domain';
-import type { ResolveAction, SwitchMode } from '../types/domain';
+import type { ResolveAction, StopResult, SwitchMode } from '../types/domain';
 import { findItem, useItemStore } from '../stores/itemStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useTimerStore } from '../stores/timerStore';
@@ -24,8 +24,8 @@ export interface TimerActions {
   start: (itemId?: number) => Promise<void>;
   /** 依当前状态：idle→开始，running→暂停，paused→继续 */
   togglePause: () => Promise<void>;
-  /** 结束并保存（右键单击 / Enter） */
-  stop: () => Promise<void>;
+  /** 结束并保存（右键单击 / Enter）。返回值给"结束后要不要补名字"那一层判断用 */
+  stop: () => Promise<StopResult | null>;
   /** 撤销结束（撤销条） */
   undo: (recordId: number) => Promise<void>;
   /** 计时中换事项（end_and_start 分段 / just_switch 仅改归属） */
@@ -99,7 +99,14 @@ export function useTimerActions(): TimerActions {
     }
   }, [start, notify]);
 
-  const stop = useCallback(async () => {
+  /**
+   * 结束并保存。
+   *
+   * [V0.11.32] 回值改成 `StopResult | null`：手机端结束一段**未命名**计时要接着问名字，
+   * 而"这段属于哪个事项""有没有因为太短被丢掉"只有这里知道。桌面调用方照旧 `void stop()`
+   * 忽略回值，语义不变。
+   */
+  const stop = useCallback(async (): Promise<StopResult | null> => {
     try {
       const result = await ipc.stopTimer();
       if (result.discarded) {
@@ -114,9 +121,11 @@ export function useTimerActions(): TimerActions {
         useUiStore.getState().beginUndo(result.record);
       }
       await useTimerStore.getState().refresh();
+      return result;
     } catch (err) {
       notify(err);
       await useTimerStore.getState().refresh().catch(() => undefined);
+      return null;
     }
   }, [notify]);
 

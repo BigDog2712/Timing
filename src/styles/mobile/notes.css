@@ -190,3 +190,57 @@
   background: var(--danger-wash);
   color: var(--color-danger);
 }
+
+/* ------------------------------ [V0.11.32] 看整张 ------------------------------
+   列表两行封顶只够认出是哪一张；这一屏把全文按原样铺开（`pre-wrap` 保留换行），
+   面板自己滚动——不要再给这里加 line-clamp，那正是这次要修掉的东西。
+   高度上限按视口算：正文再长也不把底部「编辑」顶出屏幕。 */
+.m-note__full {
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--bg-field);
+  border: 1px solid var(--line-2);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.m-note__full[data-empty="true"] {
+  color: var(--ink-3);
+}
+
+.m-note__viewmeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-note__viewowner,
+.m-note__viewtime {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 归属名可能很长：让它先让位，别把时间挤成一团 */
+.m-note__viewowner {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-note__viewtime {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}

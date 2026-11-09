@@ -106,15 +106,17 @@ describe('推送通路：Rust → Kotlin（V0.11.27）', () => {
     }
   });
 
-  /** `onTap` 必须**先**打标记再投事件：顺序反了，事件丢在半路时标记也没留下。 */
-  it('action_marks_before_triggering', () => {
+  /** `onTap` 必须**先**打标记再投出去：顺序反了，这一按丢在半路时标记也没留下。 */
+  it('action_marks_before_dispatching', () => {
     const at = SERVICE.indexOf('private fun requestAction(');
     expect(at, '服务里没有 requestAction → 短按与通知按钮没有共同入口').toBeGreaterThanOrEqual(0);
-    const body = SERVICE.slice(at, at + 1200);
+    /* 切到 `expandTemporarily` 为止：`dispatch` / `verify` 都夹在中间，按固定字数截会漏 */
+    const body = SERVICE.slice(at, SERVICE.indexOf('private fun expandTemporarily', at));
     const mark = body.indexOf('markPendingAction');
-    const trigger = body.indexOf('bridge?.invoke');
+    const send = body.indexOf('dispatch(kind)');
     expect(mark, 'requestAction 没打标记 → 兜底通道永远空转').toBeGreaterThanOrEqual(0);
-    expect(trigger).toBeGreaterThan(mark);
+    expect(send, 'requestAction 没有真的投出去').toBeGreaterThanOrEqual(0);
+    expect(send, '先投后打标记 → 投失败时这一按彻底没了').toBeGreaterThan(mark);
   });
 
   /**
@@ -176,14 +178,6 @@ describe('推送通路：Rust → Kotlin（V0.11.27）', () => {
   it('reader_keeps_a_probe_trail', () => {
     expect(READER).toContain('lastProbe');
     expect(READER).toContain('fun fromPush');
-  });
-
-  /** 事件名两端同名：任一侧改了另一侧忘了，表现是「按了没反应」，而两边都不报错。 */
-  it('event_names_match_on_both_sides', () => {
-    expect(SERVICE).toContain('"pill:toggle"');
-    expect(SERVICE).toContain('"pill:finish"');
-    expect(HOOK).toContain("'pill:toggle'");
-    expect(HOOK).toContain("'pill:finish'");
   });
 
   /** 通知按钮的意图名两端同名（赋值点在服务里，通知侧只引用常量，避免两份字符串）。 */

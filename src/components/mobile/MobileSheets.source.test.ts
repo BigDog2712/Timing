@@ -35,6 +35,7 @@ const NOTES = code('./NotesPage.tsx');
 const TIMER = code('./TimerPage.tsx');
 const SHEET = code('./Sheet.tsx');
 const DONE_ROW = code('./DoneRow.tsx');
+const SHELL = code('./MobileShell.tsx');
 
 describe('面板关闭：X 必须真的关掉（V0.11.30）', () => {
   /**
@@ -212,8 +213,6 @@ describe('计时页：快捷同步（V0.11.30）', () => {
 });
 
 describe('Sheet 分发：新面板不能静默消失（V0.11.31）', () => {
-  const SHELL = code('./MobileShell.tsx');
-
   /**
    * `SheetHost` 原来是 `default: return null`：以后再加一种面板却忘了接上，
    * 点了没反应、控制台也没有一行字 —— 正是这一整轮在消灭的那类坏法。

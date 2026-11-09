@@ -50,20 +50,25 @@ class PillService : Service() {
         private const val TAG = "TimingPill"
 
         /**
-         * 事件名。**必须**与前端 `hooks/usePillAction.ts` 的 `PILL_TOGGLE_EVENT` 一致——
-         * 两边各写一份字符串，改一处忘另一处的表现是「点了没反应」，而且两边都不报错。
+         * 前端挂在 `window` 上的入口函数名（[V0.11.32]）。
+         *
+         * **必须**与 `src/hooks/usePillAction.ts` 的 `PILL_ENTRY` 逐字一致——两边各写一份
+         * 字符串，改一处忘另一处的表现是「点了没反应」，而且两边都不报错。
+         *
+         * 为什么不再用 `Plugin.trigger` + `addPluginListener`：那条路要 Tauri 自己的
+         * `registerListener` 命令（内部是 Jackson 反射）注册成功，失败会被前端 `.catch()`
+         * 吞掉；表现正是「圆点展开但计时一动不动」。`evaluateJavascript` 没有这层注册。
          */
-        internal const val EVENT_TOGGLE = "pill:toggle"
+        internal const val JS_ENTRY = "__timingPillTap"
 
-        /**
-         * 「结束本次计时」的事件名（[V0.11.28]）。必须与前端 `usePillAction.ts` 的
-         * `PILL_FINISH_EVENT` 一致 —— 同 `pill:toggle`，两边各写一份字符串。
-         */
-        internal const val EVENT_FINISH = "pill:finish"
-
-        /** 落进 `Prefs.PendingAction.kind` 的两种动作。 */
+        /** 落进 `Prefs.PendingAction.kind` 的三种动作。 */
         internal const val KIND_TOGGLE = "toggle"
         internal const val KIND_FINISH = "finish"
+        /** [V0.11.32] 长按进 App —— 前端收到它把落点切到计时页。 */
+        internal const val KIND_OPEN = "open"
+
+        /** 投出去之后多久核对一次「这一按到底有没有被执行」。 */
+        private const val VERIFY_MS = 1_200L
 
         /**
          * 通知栏按钮来的两条意图（[V0.11.28]）。
@@ -78,15 +83,16 @@ class PillService : Service() {
         private const val DONE_FX_MS = 3_000L
 
         /**
-         * 「有人按了一下」的投递口（[V0.11.22]）。
+         * 「把这段 JS 交给 WebView 执行」的投递口（[V0.11.22]；[V0.11.32] 改签名）。
          *
-         * 由 `TimingNativePlugin.onLoad()` 赋值、`onDestroy()` 置空。返回 `true` = 事件真的
-         * 投出去了（有 JS 在听）；`false` / `null` = 没人在听，调用方退回「打开主界面」。
+         * 由 `TimingNativePlugin.load()` 赋值、`onDestroy()` 置空：它内部是
+         * `webView.evaluateJavascript(js)`，所以喂进来的是**一段 JS 表达式**，
+         * 不是事件名。
          *
          * 为什么用静态量而不是让 Service 持有 Activity：Service 的生命周期比 Activity 长，
          * 直接持有会泄漏；这里只握一个由插件赋值的函数引用，插件自己在 `onDestroy` 里清掉。
          */
-        internal var bridge: ((String) -> Boolean)? = null
+        internal var bridge: ((String) -> Unit)? = null
 
         /** 库还没建出来 / 打开失败时的重试间隔。 */
         private const val REOPEN_MS = 5_000L
@@ -407,7 +413,8 @@ class PillService : Service() {
      * 「点按暂停，长按再跳转」。展开照旧给，只是它不再**吃掉**这一按。
      *
      * 「能操作」不等于「在这里改状态」：本类一个字节都不写库，只把「有人按了一下」交给
-     * `TimingNativePlugin.trigger`，由前端调 `togglePause()` 走 Rust 那一份状态机。
+     * 前端（[V0.11.32] 起是直接 `evaluateJavascript` 调 `window.__timingPillTap`），
+     * 由前端调 `togglePause()` 走 Rust 那一份状态机。
      */
     private fun onTap() {
         requestAction(KIND_TOGGLE)
@@ -419,25 +426,49 @@ class PillService : Service() {
     /**
      * 把一个用户动作投给前端（[V0.11.28] 从 `onTap` 里抽出来，通知按钮共用）。
      *
-     * 为什么动作要「先落标记再投事件」：`trigger` 只在 WebView 活着且前端挂着监听时有效，
-     * 而这一按可能发生在进程被回收之后（安卓上很常见）。标记留在盘上，App 回到前台时
-     * 由前端问一次 `overlayTakeTap` 补做——同一按只会被补做一次，因为前端接走时会清掉它。
+     * 为什么动作要「先落标记再投」：投递只在 WebView 活着时有效，而这一按可能发生在
+     * WebView 已被销毁之后（安卓上很常见）。标记留在盘上，App 回到前台时由前端问一次
+     * `overlayTakeTap` 补做——同一按只会被补做一次，因为前端接走时会清掉它。
      *
-     * 标记里带 `kind`：补做必须知道补的是「切换」还是「结束」，猜错比不补更糟。
+     * 标记里带 `kind`：补做必须知道补的是「切换」「结束」还是「回 App」，猜错比不补更糟。
      */
     private fun requestAction(kind: String) {
-        val event = if (kind == KIND_FINISH) EVENT_FINISH else EVENT_TOGGLE
         lastTapError = null
+        /* 先落标记再投：投递失败（WebView 已被销毁）时这一按也不会凭空消失，
+           App 回到前台由 `overlayTakeTap` 补做一次。 */
         Prefs.markPendingAction(this, kind)
-        if (bridge?.invoke(event) != true) {
-            /* [V0.11.29] 这里**不再**打开主界面。
-               主人点名「点按暂停，长按再跳转」——点一下就跳走等于把这个手势弄坏，
-               而且在「只想随手停一下」的场景里会把用户从原来的 App 里拽出来。
-               动作本身不会丢：标记已经落盘，App 回前台时 `overlayTakeTap` 按类型补做一次。
-               代价是「眼前什么都没变」，所以原因必须写进通知副标题——那是此刻唯一的可见处。 */
-            lastTapError = "没连上界面，这一按已记下：回到 App 时补做"
-            Log.w(TAG, "没有前端在听 $event：标记保留给前台补做（不再自动跳转）")
+        val before = Prefs.overlaySnapshot(this)
+        dispatch(kind)
+        /* [V0.11.32] 投出去不等于被执行。1.2 秒后回头看两件事：
+             标记被清掉了（前端接走时会清）、或快照变了（状态真的迁移了）——任一成立即算成功。
+           两条都不成立，就把原因写进通知副标题：那是用户在 App 外面**唯一**能看见的地方。 */
+        main.postDelayed({ verify(kind, before) }, VERIFY_MS)
+        render()
+    }
+
+    /** 把动作交给前端执行（[V0.11.32] 换成直接调 `window.__timingPillTap`）。 */
+    private fun dispatch(kind: String) {
+        val send = bridge
+        if (send == null) {
+            /* 桥还没装上（WebView 没建 / 插件没加载）：标记已经在盘上，等前台补做。 */
+            lastTapError = "界面没打开，这一按已记下：回到 App 时补做"
+            Log.w(TAG, "没有 JS 桥，$kind 只记标记")
+            return
         }
+        send("window.$JS_ENTRY && window.$JS_ENTRY('$kind')")
+    }
+
+    /**
+     * 核对「这一按有没有被执行」，失败原因落到通知副标题。
+     *
+     * 为什么不在 `dispatch` 里同步判断：`evaluateJavascript` 是异步的，`Plugin.trigger`
+     * 那套 `hasListener` 也只能说明"注册过"，说明不了"真的执行了"——本轮修的就是这个问题。
+     */
+    private fun verify(kind: String, before: String) {
+        if (Prefs.pendingAction(this) == null) return // 前端接走了
+        if (Prefs.overlaySnapshot(this) != before) return // 状态确实变了
+        lastTapError = "这一按没生效：界面没接上（回到 App 会自动补做）"
+        Log.w(TAG, "点按没有被执行：$kind 的标记还在，快照也没变")
         render()
     }
 
@@ -464,6 +495,11 @@ class PillService : Service() {
      * 唯一解释。拦下来就把原因写进通知副标题——用户至少能看见「系统不让」。
      */
     private fun openApp() {
+        /* [V0.11.32] 落点由前端定（计时页）。这一投**不能省**：App 已经在前台时
+           `startActivity` 只走一次 `onNewIntent`，不保证有 visibilitychange，
+           兜底通道那边就等不到这一下。 */
+        Prefs.markPendingAction(this, KIND_OPEN)
+        bridge?.invoke("window.$JS_ENTRY && window.$JS_ENTRY('$KIND_OPEN')")
         runCatching { startActivity(OverlayNoti.openIntent(this)) }
             .onFailure { err ->
                 lastTapError = "长按悬浮条没能打开主界面：${err.message ?: err.javaClass.simpleName}"

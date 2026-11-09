@@ -87,9 +87,10 @@ object Prefs {
     }
 
     /**
-     * 一个等着被前端补做的动作（[V0.11.28]）。
+     * 一个等着被前端补做的动作（[V0.11.28]；[V0.11.32] 加 `open`）。
      *
-     * `kind` 只有两个值：`"toggle"`（悬浮条短按 / 通知「暂停·继续」）与 `"finish"`（通知「结束」）。
+     * `kind` 有三个值：`"toggle"`（悬浮条短按 / 通知「暂停·继续」）、`"finish"`
+     * （通知「结束」）与 `"open"`（长按回 App —— 前端要把落点切到计时页）。
      * `at` 是按下那一刻的墙钟毫秒，前端按 90 秒 TTL 判新旧。
      */
     data class PendingAction(val kind: String, val at: Long)

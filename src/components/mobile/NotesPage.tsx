@@ -9,14 +9,16 @@
  * 两段：
  *   ① 新建区 —— 一键建一张，**默认绑定当前事项**（与桌面 V0.3.9 口径一致），
  *      建完直接进编辑页，不让人对着空列表发呆；
- *   ② 列表 —— 按更新时间倒序，每行两行文本 + 归属事项。点行 = 编辑，行尾垃圾桶 / 长按 = 删除确认。
+ *   ② 列表 —— 按更新时间倒序，每行两行文本 + 归属事项。点行 = 看整张（只读面板，
+ *      [V0.11.32] 起不是直接进编辑页：列表两行封顶，长正文在编辑框里也只能滚着看开头），
+ *      行尾垃圾桶 / 长按 = 删除确认。
  *      **全部便利贴都在这**（`note_list` 不带日期过滤），往期的一直能看能删——[V0.11.30]
  *      补了行尾那个看得见的删除键：长按删除是隐形手势，主人找不到就等于没有。
  *
  * 为什么长按删除而不是行内放垃圾桶：手机上一行只有 3.5 个字的横向余量，
  * 常驻删除键会被拇指误触；长按 + 编辑页里的显式删除两个入口够用。
  */
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useLongPress } from '../../hooks/useLongPress';
 import { formatClockTime } from '../../lib/format';
 import { AlertIcon, PlusIcon, StickyNoteIcon, TrashIcon, iconStroke } from '../../lib/icons';
@@ -34,11 +36,31 @@ interface NoteRowProps {
 }
 
 function NoteRow({ note, owner, pending, onOpen, onDelete }: NoteRowProps) {
-  const press = useLongPress(onDelete, onOpen);
+  /* [V0.11.32] 点按改成正经的 `onClick`（长按仍归 `useLongPress`）。
+     上一版把点按挂在 `pointerup` 上：能跑，但「点一下打开」是列表最常用的动作，
+     押在一条手写的指针分支上不值得——WebView 上 pointerup 被父级滚动抢走的版本差异
+     真实存在，而 `onClick` 是浏览器保证的。长按之后紧跟的那次 click 用 `longPressed`
+     挡掉，否则「长按删除」会顺手再打开这张便利贴的全文。 */
+  const longPressed = useRef(false);
+  const press = useLongPress(() => {
+    longPressed.current = true;
+    onDelete();
+  });
   const text = note.content.trim();
   return (
     <li>
-      <div className="m-note" data-pending={pending ? 'true' : 'false'} {...press}>
+      <div
+        className="m-note"
+        data-pending={pending ? 'true' : 'false'}
+        {...press}
+        onClick={() => {
+          if (longPressed.current) {
+            longPressed.current = false;
+            return;
+          }
+          onOpen();
+        }}
+      >
         <p className="m-note__text" data-empty={text.length === 0 ? 'true' : 'false'}>
           {text.length === 0 ? '空白便利贴' : text}
         </p>
@@ -145,7 +167,7 @@ export function NotesPage() {
                   note={note}
                   owner={note.itemId == null ? '随记' : itemName(items, note.itemId)}
                   pending={pendingDelete?.id === note.id}
-                  onOpen={() => openSheet({ kind: 'noteEdit', noteId: note.id })}
+                  onOpen={() => openSheet({ kind: 'noteView', noteId: note.id })}
                   onDelete={() => setPendingDelete(note)}
                 />
                 {/* [V0.11.2] 确认条贴着被删那行展开：原先固定渲染在列表上方，

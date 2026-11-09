@@ -198,7 +198,9 @@ export function SwitchItemSheet() {
 
       {items.length === 0 && <p className="m-empty">还没有事项，在下面输入名称新建一条。</p>}
 
-      <p className="m-hint">行尾的图钉 = 设为常用（与电脑版同一份设置）</p>
+      {/* [V0.11.32] 只说「这一下会做什么」。原先还写了「与电脑版同一份设置」——
+          用户要的是知道按下去会发生什么，不是听实现细节。 */}
+      <p className="m-hint">行尾的图钉 = 设为常用</p>
     </Sheet>
   );
 }

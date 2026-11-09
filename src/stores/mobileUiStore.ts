@@ -28,6 +28,12 @@ export type MobileSheet =
    * `title` 一起带过来：匹配事项、文案都要用，等待面板时不必再去 store 里找。
    */
   | { kind: 'todoSwitch'; todoId: number; title: string }
+  /**
+   * [V0.11.32] 便利贴「看整张」：列表里正文两行封顶，只够认出是哪一张。
+   * 点行先看全文（只读、可滚），要改再点「编辑」——手机上一进来就是输入框，
+   * 长正文会被压在框里滚，等于"看了个开头"。
+   */
+  | { kind: 'noteView'; noteId: number }
   /** [V0.11.0] 便利贴正文编辑（`noteId: null` = 新建一张，落库后由组件回填） */
   | { kind: 'noteEdit'; noteId: number | null }
   /** [V0.11.0] 便利贴改归属（选完成再回编辑页，故带上 noteId） */
@@ -37,7 +43,13 @@ export type MobileSheet =
    * `title` 是用户已经敲在输入框里的内容——从添加框点「时间」进来时草稿已经存在，
    * 再让他到面板里重敲一遍等于把一次输入拆成两次。
    */
-  | { kind: 'todoPlan'; title: string };
+  | { kind: 'todoPlan'; title: string }
+  /**
+   * [V0.11.32] 结束一段「未命名计时」后填名字。
+   * `record` 一起带过来：面板要显示这段的时长，也免得关掉再查一次库。
+   * 只在记录归属仍是系统事项「未归类」时弹（判据在 `lib/unnamed.ts`）。
+   */
+  | { kind: 'nameStop'; record: TimeRecord };
 
 interface MobileUiStore {
   tab: MobileTab;

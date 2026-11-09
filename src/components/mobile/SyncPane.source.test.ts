@@ -62,26 +62,33 @@ describe('悬浮窗事件链两端同名（P8）', () => {
   const READER = code(
     '../../../src-tauri/gen/android/app/src/main/java/com/timing/app/overlay/TimerReader.kt',
   );
-  const PLUGIN = code('../../../src-tauri/gen/android/app/src/main/java/com/timing/app/TimingNativePlugin.kt');
   const HOOK = code('../../hooks/usePillAction.ts');
 
-  /** 事件名是两边各写一份的字符串：改一处忘另一处的表现是「点了没反应」，两边都不报错。 */
-  it('p8_event_name_matches_on_both_sides', () => {
-    const kotlin = /EVENT_TOGGLE\s*=\s*"([^"]+)"/.exec(PILL_SERVICE)?.[1];
-    const ts = /PILL_TOGGLE_EVENT\s*=\s*'([^']+)'/.exec(HOOK)?.[1];
-    expect(kotlin, 'PillService 里找不到 EVENT_TOGGLE').toBeTruthy();
-    expect(ts, 'usePillAction 里找不到 PILL_TOGGLE_EVENT').toBeTruthy();
+  /**
+   * [V0.11.32] 投递口从「Tauri 插件事件」换成「直接调全局函数」，判据跟着换：
+   * 两端那个函数名必须逐字一致（Kotlin `JS_ENTRY` ↔ 前端 `PILL_ENTRY`）。
+   * 名字写错的坏法仍然是「点了没反应，两边都不报错」，所以这条不能删。
+   */
+  it('p8_entry_name_matches_on_both_sides', () => {
+    const kotlin = /JS_ENTRY\s*=\s*"([^"]+)"/.exec(PILL_SERVICE)?.[1];
+    const ts = /PILL_ENTRY\s*=\s*'([^']+)'/.exec(HOOK)?.[1];
+    expect(kotlin, 'PillService 里找不到 JS_ENTRY').toBeTruthy();
+    expect(ts, 'usePillAction 里找不到 PILL_ENTRY').toBeTruthy();
     expect(kotlin).toBe(ts);
   });
 
-  /** 没人在听时必须退回「打开主界面」，不能静默失效。 */
-  it('p8_falls_back_to_opening_the_app', () => {
-    expect(PLUGIN).toContain('hasListener(event)');
-    /* 0.11.28 起有两个动作（切换 / 结束）共用一个投递口，实参是变量 `event`，
-       所以这里钉「bridge 的投递结果判 != true」这个形状，而不是钉死某个常量名。
-       注意别把传输层方法名写字面量：`src/components` 下出现它会被 L1 判红（本文件踩过）。 */
-    expect(PILL_SERVICE).toMatch(/bridge\?\.\w+\(\w+\) != true/);
-    expect(PILL_SERVICE).toContain('openApp()');
+  /**
+   * 投不出去时必须**记下来**，而不是静默失效（[V0.11.29] 起也不再拿「打开主界面」兜底——
+   * 那会把「点一下暂停」变成「点一下跳走」，是另一类坏法）。
+   * 判据钉函数体：先打标记、没有桥时写 `lastTapError`。
+   */
+  it('p8_failure_is_marked_and_spoken', () => {
+    const at = PILL_SERVICE.indexOf('private fun dispatch(');
+    expect(at, '没有 dispatch：投递与核对没有分开').toBeGreaterThanOrEqual(0);
+    const body = PILL_SERVICE.slice(at, PILL_SERVICE.indexOf('private fun verify(', at));
+    expect(body, '没有桥时没有留下可见原因').toContain('lastTapError =');
+    expect(body, '没有桥时也没留下待补做的痕迹').toContain('JS_ENTRY');
+    expect(PILL_SERVICE, '点按又变成跳转了').toContain('KIND_TOGGLE');
   });
 
   /** 原始层不许改计时状态：它只能把「按了一下」交出去。 */

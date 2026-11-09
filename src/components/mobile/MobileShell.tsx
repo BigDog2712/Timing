@@ -28,8 +28,10 @@ import { useUiStore } from '../../stores/uiStore';
 import { CountdownSheet } from './CountdownSheet';
 import { ItemMenuSheet } from './ItemMenuSheet';
 import { ItemsPage } from './ItemsPage';
+import { NameStopSheet } from './NameStopSheet';
 import { NoteItemSheet } from './NoteItemSheet';
 import { NoteSheet } from './NoteSheet';
+import { NoteViewSheet } from './NoteViewSheet';
 import { NotesPage } from './NotesPage';
 import { RecordEditSheet } from './RecordEditSheet';
 import { RecordsPage } from './RecordsPage';
@@ -89,12 +91,16 @@ function SheetHost({ sheet }: { sheet: MobileSheet }) {
       return <ItemMenuSheet itemId={sheet.itemId} />;
     case 'todoSwitch':
       return <TodoSwitchSheet todoId={sheet.todoId} title={sheet.title} />;
+    case 'noteView':
+      return <NoteViewSheet noteId={sheet.noteId} />;
     case 'noteEdit':
       return <NoteSheet noteId={sheet.noteId} />;
     case 'noteItem':
       return <NoteItemSheet noteId={sheet.noteId} />;
     case 'todoPlan':
       return <TodoPlanSheet title={sheet.title} />;
+    case 'nameStop':
+      return <NameStopSheet record={sheet.record} />;
   }
   /* 穷尽性检查：以后再加一种 Sheet 却忘了在这里接上，TS 直接报错，
      而不是 `default: null` 静默什么都不显示——那种坏法点了没反应、控制台也没有一行字。 */

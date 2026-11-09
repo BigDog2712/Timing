@@ -16,6 +16,7 @@
  */
 import { useState } from 'react';
 import { useEndedFlash } from '../../hooks/useEndedFlash';
+import { useStopNaming } from '../../hooks/useStopNaming';
 import { useTimerActions } from '../../hooks/useTimerActions';
 import { useTimerTick } from '../../hooks/useTimerTick';
 import { COUNTDOWN_WARN_SEC } from '../../lib/constants';
@@ -40,6 +41,9 @@ const PRIMARY_LABEL: Record<VisualState, string> = {
 
 export function TimerPage() {
   const actions = useTimerActions();
+  /* [V0.11.32] 结束走这条出口：这段要是挂在「未归类」名下，结束后面板会问名字。
+     直接 `actions.stop()` 会静默把"没名字的一笔"留在库里。 */
+  const stopWithNaming = useStopNaming();
   const seconds = useTimerTick();
   const status = useTimerStore((s) => s.state.status);
   const session = useTimerStore((s) => s.state.session);
@@ -117,7 +121,11 @@ export function TimerPage() {
 
         {/* 结束是独立按钮：不靠长按、不靠右键，任何时候一眼可见 */}
         {status !== 'idle' && (
-          <button type="button" className="m-btn m-btn--danger m-btn--wide" onClick={() => void actions.stop()}>
+          <button
+            type="button"
+            className="m-btn m-btn--danger m-btn--wide"
+            onClick={() => void stopWithNaming()}
+          >
             结束并保存
           </button>
         )}

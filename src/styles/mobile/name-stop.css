@@ -1,0 +1,36 @@
+/* =============================================================================
+ * Timing — 移动端 · 结束未命名计时后补名字（V0.11.32）
+ * -----------------------------------------------------------------------------
+ * 只写这一屏自己的块：输入框 / 按钮 / 提示行都在 primitives.css，Sheet 外壳在 sheets.css。
+ * 配色一律走令牌；可点元素高度 >= 44px（--m-tap 由 primitives 定义）。
+ * ========================================================================== */
+
+/* 这一段的时长与起点：一句话交代"要命名的是哪一笔"，别让人凭记忆猜 */
+.m-name__sum {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 快捷项前面那句小标题：说明"点一下就等于用它"，否则一排胶囊看不出能不能点 */
+.m-name__label {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* 常用 / 最近：一行排不下就换行，不做横向滚动（手机上一行能放 6 个左右，够用） */
+.m-name__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* 事项名可能很长：单个胶囊先让位，别把整行撑出屏幕 */
+.m-name__chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

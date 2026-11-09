@@ -2,6 +2,48 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.32 — 便利贴看全文 / 悬浮条点按修好 / 未命名计时（只有手机包）
+
+主人四条反馈。第 2 条是 0.11.22 起就存在的真 bug，两端都不报错。
+
+### 悬浮条：整条投递路换成 evaluateJavascript
+
+- 删掉 `addPluginListener` / `Plugin.trigger` / `hasListener`：那条路要 Tauri 自己的
+  `registerListener`（内部 `invoke.parseArgs` = Jackson 反射）注册成功，本仓为躲 R8 早把
+  自己的 `parseArgs` 换成 `getArgs()`，唯独这条链没换。注册失败 → 前端 `.catch()` 吞掉 →
+  `hasListener` 恒 false → 点按只剩圆点展开；
+- 新增 `PillService.JS_ENTRY = "__timingPillTap"`（前端 `PILL_ENTRY` 同名）：
+  `markPendingAction(kind)` → `dispatch(kind)`（`evaluateJavascript`）→ 1.2s 后
+  `verify()`（标记还在 + 快照没变 → `lastTapError` 进通知副标题）；
+- 切状态前先 `useTimerStore.refresh()`：后台期间 store 的 `status` 可能是旧的，
+  拿旧值发"暂停"必然被拒；
+- 长按：`openApp()` 先投 `kind='open'` 再 `startActivity`；前端收 `open` →
+  `closeSheet()` + `setTab('timer')`（主人要"应跳转至计时界面"）。
+
+### 便利贴：点行看整张
+
+- 新 `NoteViewSheet` + `kind: 'noteView'`：全文 `pre-wrap`、`max-height: 52vh` 可滚、
+  无 line-clamp；归属与更新时间；底部「编辑」→ `noteEdit`；
+- 点按从 `useLongPress` 的第二实参换成正经 `onClick`，长按后的 click 用 `longPressed` 挡掉；
+- 样式进 `styles/mobile/notes.css`（`.m-note__full` / `.m-note__viewmeta`）。
+
+### 未命名计时
+
+- 悬浮条点按在待机时 `start(SYSTEM_ITEM_ID)`（未命名的一笔，不是 `lastItemId`）；
+- `useTimerActions.stop()` 回值 `() → StopResult | null`（桌面调用方仍 `void`）；
+- 新 `hooks/useStopNaming.ts` + `components/mobile/NameStopSheet.tsx` +
+  `kind: 'nameStop'`：只在 `isUnnamedRecord` 时弹，`discarded` 不弹；
+- 新 `lib/unnamed.ts`（`isUnnamedRecord` / `normalizeName` / `matchItemByName`）：
+  先找再建、全等匹配；`recordApi.update(record.id, { itemId })` 只改归属；
+- 文案：「行尾的图钉 = 设为常用」（删掉"与电脑版同一份设置"）。
+
+### 判据与门禁
+
+`lib/unnamed.test.ts`（9）、`hooks/usePillAction.test.ts`（重写 12）、
+`hooks/usePillAction.tap.test.ts`（6）、`components/mobile/MobileSheets.r32.test.ts`（8），
+另改 `usePillAction.source.test.ts` / `SyncPane.source.test.ts` 各 2 条。
+`npm test` 677 通过；`cargo test --lib` 719；变异自证 6 条（见 `release/BUILD-INFO-0.11.32.txt`）。
+
 ## 0.11.31 — 手机端三条口径定稿（只有手机包）
 
 主人对上轮三条待定的回复：常用事项「是用户自己设置的，参考 pc 端」、事项页改口径「可以」、
