@@ -56,6 +56,28 @@ class PillService : Service() {
         internal const val EVENT_TOGGLE = "pill:toggle"
 
         /**
+         * 「结束本次计时」的事件名（[V0.11.28]）。必须与前端 `usePillAction.ts` 的
+         * `PILL_FINISH_EVENT` 一致 —— 同 `pill:toggle`，两边各写一份字符串。
+         */
+        internal const val EVENT_FINISH = "pill:finish"
+
+        /** 落进 `Prefs.PendingAction.kind` 的两种动作。 */
+        internal const val KIND_TOGGLE = "toggle"
+        internal const val KIND_FINISH = "finish"
+
+        /**
+         * 通知栏按钮来的两条意图（[V0.11.28]）。
+         *
+         * 老版本的通知按钮直接调 `TimerCore.toggle()` / `finish()`；现在状态机在 Rust，
+         * 原生层只能把动作当成**新的输入**原路投给前端，走与短按完全相同的那条链。
+         */
+        internal const val ACTION_TOGGLE = "com.timing.app.action.PILL_TOGGLE"
+        internal const val ACTION_FINISH = "com.timing.app.action.PILL_FINISH"
+
+        /** 「刚结束」的满圈绿环停留多久。老版本有 `Phase.DONE`，这版靠时间窗补一个落点。 */
+        private const val DONE_FX_MS = 3_000L
+
+        /**
          * 「有人按了一下」的投递口（[V0.11.22]）。
          *
          * 由 `TimingNativePlugin.onLoad()` 赋值、`onDestroy()` 置空。返回 `true` = 事件真的
@@ -112,6 +134,10 @@ class PillService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private var expanded = false
     private var lastRunning = false
+    private var lastActive = false
+
+    /** 「刚结束」绿环的到期时刻（墙钟毫秒，0 = 不在这个窗口里）。 */
+    private var doneUntil = 0L
     private var lastW = -1
     private var lastNoti = ""
 
@@ -145,6 +171,12 @@ class PillService : Service() {
 
         // 贴不上（无权限 / 被拦）只影响小条本身，服务与通知照常
         runCatching { attach() }
+        /* 通知栏那两个按钮（[V0.11.28]）：动作本身不在这里执行 —— 状态机在 Rust，
+           原生层只把它当成一次**新的输入**投给前端，走与短按完全相同的那条链。 */
+        when (intent?.action) {
+            ACTION_TOGGLE -> requestAction(KIND_TOGGLE)
+            ACTION_FINISH -> requestAction(KIND_FINISH)
+        }
         return START_STICKY
     }
 
@@ -302,6 +334,16 @@ class PillService : Service() {
 
         view.dotMode = Prefs.overlayStyle(this) != Prefs.STYLE_BAR && !expanded
         view.snap = snap
+
+        /* 「刚结束」：`active` 从 true 掉到 false 的那一帧起，画 3 秒满圈绿环。
+           状态机结束后直接回 idle，不留这个落点的话，用户看到的是「环忽然没了」——
+           和「本来就是待机」长得一模一样，分不清是结束还是坏了。重新开始计时则立刻撤掉。 */
+        val now = System.currentTimeMillis()
+        if (lastActive && !snap.active) doneUntil = now + DONE_FX_MS
+        if (snap.active) doneUntil = 0L
+        lastActive = snap.active
+        view.done = now < doneUntil
+
         // 计时中才逐帧重绘；其余时刻停在最后画面上，不占 GPU
         setAnimating(snap.active && snap.running)
         if (snap.urgent) view.blinkOn = !view.blinkOn else if (!view.blinkOn) view.blinkOn = true
@@ -373,14 +415,24 @@ class PillService : Service() {
             expandTemporarily()
             return
         }
-        /* [V0.11.27] 先记一笔「这一按发生过」，再投事件。
-           前端接到事件的第一件事就是清掉它；万一没人接（WebView 已销毁 / 监听没挂上 /
-           事件在半路丢了），标记会留着，App 回到前台时由前端补做一次。
-           代价只有一次 SharedPreferences 写入，换来的是「点了没反应」不再无解。 */
+        requestAction(KIND_TOGGLE)
+    }
+
+    /**
+     * 把一个用户动作投给前端（[V0.11.28] 从 `onTap` 里抽出来，通知按钮共用）。
+     *
+     * 为什么动作要「先落标记再投事件」：`trigger` 只在 WebView 活着且前端挂着监听时有效，
+     * 而这一按可能发生在进程被回收之后（安卓上很常见）。标记留在盘上，App 回到前台时
+     * 由前端问一次 `overlayTakeTap` 补做——同一按只会被补做一次，因为前端接走时会清掉它。
+     *
+     * 标记里带 `kind`：补做必须知道补的是「切换」还是「结束」，猜错比不补更糟。
+     */
+    private fun requestAction(kind: String) {
+        val event = if (kind == KIND_FINISH) EVENT_FINISH else EVENT_TOGGLE
         lastTapError = null
-        Prefs.markPendingTap(this)
-        if (bridge?.invoke(EVENT_TOGGLE) != true) {
-            Log.w(TAG, "没有前端在听 $EVENT_TOGGLE：退回打开主界面（标记保留给前台补做）")
+        Prefs.markPendingAction(this, kind)
+        if (bridge?.invoke(event) != true) {
+            Log.w(TAG, "没有前端在听 $event：退回打开主界面（标记保留给前台补做）")
             openApp()
         }
         render()

@@ -17,8 +17,16 @@ object Prefs {
     private const val K_OVERLAY_X = "overlay_x"
     private const val K_OVERLAY_Y = "overlay_y"
     private const val K_OVERLAY_STYLE = "overlay_style"
-    /* [V0.11.27] 悬浮条的显示快照（Rust 推来的 JSON）与「有人按了一下」的标记。 */
+    /* [V0.11.27] 悬浮条的显示快照（Rust 推来的 JSON）与「待补做的动作」标记。 */
     private const val K_OVERLAY_SNAP = "overlay_snapshot"
+    private const val K_PENDING_ACTION = "pending_action"
+
+    /**
+     * 0.11.27 只存过「一按的时间戳」（那时只有「切换」一种动作）。
+     *
+     * 现在动作有两种（切换 / 结束），标记改成 `动作@时间戳`；这个旧键只为了让升级前留下的
+     * 标记仍能被补做一次，读到时按 `toggle` 处理。新写法一律走 [markPendingAction]。
+     */
     private const val K_PENDING_TAP = "pending_tap_at"
 
     /** 位置未设置过（与真实坐标 -1 区分不开时用 `POS_UNSET`）。 */
@@ -79,19 +87,43 @@ object Prefs {
     }
 
     /**
-     * 「悬浮条被按了一下」的时间戳（0 = 没有待处理的一按）。
+     * 一个等着被前端补做的动作（[V0.11.28]）。
      *
-     * 用途：那一按要么被 WebView 里的监听者接走（前端会立刻清标记），要么没人接——
-     * 那就留着，等 App 回到前台时由前端补做一次。见 `TimingNativePlugin.overlayTakeTap`。
+     * `kind` 只有两个值：`"toggle"`（悬浮条短按 / 通知「暂停·继续」）与 `"finish"`（通知「结束」）。
+     * `at` 是按下那一刻的墙钟毫秒，前端按 90 秒 TTL 判新旧。
      */
-    fun markPendingTap(ctx: Context) {
-        prefs(ctx).edit().putLong(K_PENDING_TAP, System.currentTimeMillis()).apply()
+    data class PendingAction(val kind: String, val at: Long)
+
+    /**
+     * 记下「用户点了某个动作，但可能没人接」。
+     *
+     * 用途：动作要么被 WebView 里的监听者接走（前端会立刻清标记），要么没人接——
+     * 那就留着，等 App 回到前台时由前端补做一次。见 `TimingNativePlugin.overlayTakeTap`。
+     *
+     * 顺手清掉 0.11.27 的旧键：同一按被两个键各算一次，表现就是「点一下切换两下」。
+     */
+    fun markPendingAction(ctx: Context, kind: String) {
+        prefs(ctx).edit()
+            .putString(K_PENDING_ACTION, "$kind@${System.currentTimeMillis()}")
+            .remove(K_PENDING_TAP)
+            .apply()
     }
 
-    fun pendingTap(ctx: Context): Long = prefs(ctx).getLong(K_PENDING_TAP, 0L)
+    /** 取出还没被接走的动作；没有（或格式坏了）回 null。 */
+    fun pendingAction(ctx: Context): PendingAction? {
+        val raw = prefs(ctx).getString(K_PENDING_ACTION, "") ?: ""
+        if (raw.contains('@')) {
+            val at = raw.substringAfter('@').toLongOrNull() ?: return null
+            val kind = raw.substringBefore('@')
+            return if (kind.isEmpty()) null else PendingAction(kind, at)
+        }
+        // 旧键兜底：0.11.27 只可能是「切换」
+        val legacy = prefs(ctx).getLong(K_PENDING_TAP, 0L)
+        return if (legacy > 0) PendingAction("toggle", legacy) else null
+    }
 
-    fun clearPendingTap(ctx: Context) {
-        prefs(ctx).edit().remove(K_PENDING_TAP).apply()
+    fun clearPendingAction(ctx: Context) {
+        prefs(ctx).edit().remove(K_PENDING_ACTION).remove(K_PENDING_TAP).apply()
     }
 
     private fun prefs(ctx: Context) =

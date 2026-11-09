@@ -393,18 +393,24 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
      */
     @Command
     fun overlayTakeTap(invoke: Invoke) {
-        val at = Prefs.pendingTap(activity)
+        /* [V0.11.28] 标记里多带一个「动作类型」：通知栏的「结束」也要靠这条兜底通道补做，
+           只回一个时间戳的话前端只能猜 —— 猜成「切换」就会把已经结束的计时又开起来。 */
+        val action = Prefs.pendingAction(activity)
         val res = JSObject()
-        res.put("pending", at > 0)
-        res.put("ageMs", if (at > 0) System.currentTimeMillis() - at else -1L)
-        if (at > 0) Prefs.clearPendingTap(activity)
+        res.put("pending", action != null)
+        res.put("action", action?.kind ?: "")
+        res.put(
+            "ageMs",
+            if (action != null) System.currentTimeMillis() - action.at else -1L,
+        )
+        if (action != null) Prefs.clearPendingAction(activity)
         invoke.resolve(res)
     }
 
     /** 事件已经有人接走：把标记清掉，避免回前台时再补做一次（那样会变成两下）。 */
     @Command
     fun overlayClearTap(invoke: Invoke) {
-        Prefs.clearPendingTap(activity)
+        Prefs.clearPendingAction(activity)
         invoke.resolve()
     }
 

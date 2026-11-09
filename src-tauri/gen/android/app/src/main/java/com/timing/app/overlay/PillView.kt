@@ -12,6 +12,7 @@ import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.View
+import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -59,6 +60,20 @@ internal class PillView(context: Context) : View(context) {
 
     /** 倒计时最后 60s 的 1 秒闪烁（低于 WCAG 2.3.1 光敏阈值）。 */
     var blinkOn: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
+    /**
+     * 「刚刚结束」的那 3 秒。
+     *
+     * 老版本有 `Phase.DONE`，环能亮成绿色再退场；现在状态机结束后直接回 idle，
+     * 不补一个视觉落点的话，用户看到的是「环忽然变灰、什么都没有」——分不清是结束还是坏了。
+     * 由 [PillService] 观察 `active` 的下降沿给出，**不碰状态机**。
+     */
+    var done: Boolean = false
         set(value) {
             if (field == value) return
             field = value
@@ -132,7 +147,7 @@ internal class PillView(context: Context) : View(context) {
         timePaint.textSize = Tk.sp(context, 15f)
         namePaint.textSize = Tk.sp(context, 12f)
 
-        val timeW = timePaint.measureText(timeText())
+        val timeW = timePaint.measureText(timeText(snap.displaySec))
         val nameW =
             if (snap.active && snap.item.isNotEmpty()) namePaint.measureText(ellipsized()) else 0f
         val content = padH * 2 + ringSize + gapRing + timeW +
@@ -190,7 +205,9 @@ internal class PillView(context: Context) : View(context) {
         stroke.color = Tk.PILL_DOT_TRACK
         canvas.drawCircle(c, c, dotTrack, stroke)
 
-        val arc = arcFraction(nowSec)
+        /* 刚结束那 3 秒画满一圈绿环：状态机回到 idle 之后弧本来就是 0，不留这一圈的话
+           「结束」和「待机」在视觉上没有区别，绿色也就永远没机会出现。 */
+        val arc = if (done) 1f else arcFraction(nowSec)
         val needle = needleFraction(nowSec)
 
         // 时针（分针语义）：正计时 60 分钟一圈，倒计时指在「剩余」的位置
@@ -246,7 +263,7 @@ internal class PillView(context: Context) : View(context) {
         stroke.color = Tk.PILL_TRACK
         canvas.drawPath(ringPath, stroke)
 
-        val frac = arcFraction(nowSec)
+        val frac = if (done) 1f else arcFraction(nowSec)
         if (frac > 0f) {
             val pm = PathMeasure(ringPath, false)
             ringSeg.reset()
@@ -260,7 +277,7 @@ internal class PillView(context: Context) : View(context) {
         timePaint.color = if (snap.active) Tk.PILL_INK else Tk.PILL_INK_DIM
         timePaint.setShadowLayer(d(2.5f), 0f, d(0.5f), Tk.PILL_SHADOW)
         val baseY = h / 2f - (timePaint.descent() + timePaint.ascent()) / 2f
-        val shown = timeText(nowSec.toLong())
+        val shown = timeTextOf(nowSec)
         var x = left + ringSize + gapRing
         canvas.drawText(shown, x, baseY, timePaint)
         x += timePaint.measureText(shown)
@@ -275,13 +292,24 @@ internal class PillView(context: Context) : View(context) {
 
     // ------------------------------------------------------------ 计算
 
-    private fun timeText(total: Long = snap.displaySec): String {
+    /** 时间文本：不足 1 小时 `MM:SS`，满 1 小时 `HH:MM:SS`（小时也补两位，与老版本/桌面同口径）。 */
+    private fun timeText(total: Long): String {
         val h = total / 3600
         val m = (total % 3600) / 60
         val s = total % 60
-        return if (h > 0) String.format("%d:%02d:%02d", h, m, s)
+        return if (h > 0) String.format("%02d:%02d:%02d", h, m, s)
         else String.format("%02d:%02d", m, s)
     }
+
+    /**
+     * 绘制用的时间文本 —— **倒计时向上取整**。
+     *
+     * 这一条是从老版本 `TimeFmt.clock(ceil = true)` 抄回来的，理由是它写在那边注释里：
+     * 剩 0.4 秒时该显示 `00:01`，而不是提前整整一秒挂着 `00:00` 让用户以为「是不是已经结束了、
+     * 怎么没停」。正计时反过来要向下取整（走满 1 秒才进位），所以两条分支不能合并。
+     */
+    private fun timeTextOf(nowSec: Double): String =
+        timeText(if (snap.countdown) ceil(nowSec).toLong() else nowSec.toLong())
 
     private fun ellipsized(): String {
         namePaint.textSize = Tk.sp(context, 12f)
@@ -308,8 +336,10 @@ internal class PillView(context: Context) : View(context) {
     }
 
     private fun ringColor(): Int {
+        /* 与老版本 `PillView.ringColor` 同一套优先级：结束绿 > 最后一分钟红 > 计时蓝。
+           **暂停不换色**——老版本暂停时仍然是蓝的，变灰会让「暂停」和「没在计时」长得一样。 */
         val base = when {
-            !snap.active || !snap.running -> Tk.PILL_IDLE
+            done -> Tk.PILL_OK
             snap.urgent -> Tk.PILL_DANGER
             else -> Tk.PILL_ACCENT
         }

@@ -77,7 +77,10 @@ describe('悬浮窗事件链两端同名（P8）', () => {
   /** 没人在听时必须退回「打开主界面」，不能静默失效。 */
   it('p8_falls_back_to_opening_the_app', () => {
     expect(PLUGIN).toContain('hasListener(event)');
-    expect(PILL_SERVICE).toMatch(/bridge\?\.invoke\(EVENT_TOGGLE\) != true/);
+    /* 0.11.28 起有两个动作（切换 / 结束）共用一个投递口，实参是变量 `event`，
+       所以这里钉「bridge 的投递结果判 != true」这个形状，而不是钉死某个常量名。
+       注意别把传输层方法名写字面量：`src/components` 下出现它会被 L1 判红（本文件踩过）。 */
+    expect(PILL_SERVICE).toMatch(/bridge\?\.\w+\(\w+\) != true/);
     expect(PILL_SERVICE).toContain('openApp()');
   });
 
