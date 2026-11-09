@@ -3,8 +3,9 @@ use crate::models::insight::settings::WebActivityBridgeSettings;
 use crate::services::insight::engine::web_activity::WebActivityRuntimeState;
 use crate::infra::insight::web_activity_bridge::{
     WebActivityBridgeHttpRequest, WebActivityBridgeHttpResponse, WebActivityBridgeRuntimeDeps,
-    WebActivityBridgeRuntimeState, WEB_ACTIVITY_BRIDGE_SETTINGS_CHANGED_EVENT,
+    WebActivityBridgeRuntimeState,
 };
+use crate::models::insight::events::APP_SETTINGS_CHANGED;
 use std::future::Future;
 use std::pin::Pin;
 use tauri::{AppHandle, Listener, Manager, Runtime};
@@ -30,7 +31,7 @@ fn spawn_settings_bootstrap<R: Runtime + 'static>(app: AppHandle<R>) {
 
 fn register_event_handlers<R: Runtime + 'static>(app: AppHandle<R>) {
     let settings_app = app.clone();
-    app.listen_any(WEB_ACTIVITY_BRIDGE_SETTINGS_CHANGED_EVENT, move |_| {
+    app.listen_any(APP_SETTINGS_CHANGED, move |_| {
         let settings_app = settings_app.clone();
         tauri::async_runtime::spawn(async move {
             match load_web_activity_bridge_settings(&settings_app).await {

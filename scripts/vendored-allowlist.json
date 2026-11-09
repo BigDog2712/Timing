@@ -126,6 +126,66 @@
       "change": "modified",
       "reason": "T02 归一：测试里的 include_str!(\"../../../../tests/fixtures/activity-timing-facts.json\") 是相对源文件目录的路径，文件从 src-tauri/src/patina/data/ 搬进 services/insight/data/ 后深了一层，改为 5 个 ../；上方注释同步写明为什么要 5 层。不改这条只有 cargo test --lib 会炸 —— include_str! 在 #[cfg(test)] 里，cargo check 看不见。",
       "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/models/insight/events.rs",
+      "change": "modified",
+      "reason": "T03 收口：新增 TOOL_PRESENTATION_CHANGED（第 9 个常量），并把前端镜像数量注释 6→7。事件名仍只在本文件出现一次，用作 tool_notifications 与前端 gateway 的唯一出处。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/infra/insight/web_activity_bridge.rs",
+      "change": "modified",
+      "reason": "T03 收口：删掉 WEB_ACTIVITY_BRIDGE_SETTINGS_CHANGED_EVENT（\"app-settings-changed\" 的第二份定义），infra 不再持有事件名字面量。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/web_activity_bridge.rs",
+      "change": "modified",
+      "reason": "T03 收口：import 与 listen_any 改用 models::insight::events::APP_SETTINGS_CHANGED，去掉对 infra 常量的借用。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/tools.rs",
+      "change": "modified",
+      "reason": "T03 收口：监听侧 3 处字面量（app-settings-changed ×2、tracking-data-changed）改 insight_events 常量；TOOLS_ALERT_EVENT / TOOLS_RUNTIME_CHANGED_EVENT 未动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/tracking.rs",
+      "change": "modified",
+      "reason": "T03 收口：删掉局部 const POWER_LIFECYCLE_CHANGED_EVENT（\"power-lifecycle-changed\" 的第二份定义），改用 insight_events::POWER_LIFECYCLE_CHANGED。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/mini_window/watcher.rs",
+      "change": "modified",
+      "reason": "T03 收口：listen 侧 \"power-lifecycle-changed\" 字面量改 insight_events::POWER_LIFECYCLE_CHANGED（第二个消费方）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/services/insight/engine/remote_status_bridge/mod.rs",
+      "change": "modified",
+      "reason": "T03 收口：删掉 SETTINGS_CHANGED_EVENT（\"app-settings-changed\" 的第三份定义），TRACKING_EVENT_NAMES 两个字面量改用 insight_events 常量；emit 与 listen_any 同步。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/tool_notifications.rs",
+      "change": "modified",
+      "reason": "T03 收口：pub const CHANGED = \"tool-presentation-changed\" 搬进 models::insight::events（TOOL_PRESENTATION_CHANGED），此处改为 pub use 别名，8 个 emit 点不动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/platform/runtime/insightEvents.ts",
+      "change": "modified",
+      "reason": "T03 收口：补 TOOL_PRESENTATION_CHANGED（第 7 个前端常量），头注释的 6→7。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/platform/runtime/toolNotificationGateway.ts",
+      "change": "modified",
+      "reason": "T03 收口：listen(\"tool-presentation-changed\") 改用 insightEvents 常量，前端不再有该事件名字面量。",
+      "owner": "ForG"
     }
   ]
 }

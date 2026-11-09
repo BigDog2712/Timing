@@ -9,7 +9,7 @@
 //! `docs/refactor/patina-structural-merge.md` §2.2 B1），所有层都能依赖它。
 //!
 //! 前端镜像：`src/platform/runtime/insightEvents.ts`（同名同值；只收前端真的在 listen 的
-//! 6 个，`POWER_*` 两个是 Rust 内部事件）。
+//! 7 个，`POWER_*` 两个是 Rust 内部事件）。
 //!
 //! 归一前这 14 处都是以字符串字面量作为事件名 emit 的；`check-contract.mjs` 当时靠
 //! 「路径属于 vendored 子树」豁免它们。路径前缀归一后失效，事件名必须有自己的常量。
@@ -26,6 +26,8 @@ pub const TRACKING_DATA_CHANGED: &str = "tracking-data-changed";
 pub const MAIN_TOOLS_TARGET_CHANGED: &str = "main-tools-target-changed";
 /// 迷你窗状态快照（`emit_to` 到 `mini` 窗）。
 pub const MINI_WINDOW_STATE: &str = "mini-window-state";
+/// 工具浮层展示快照（`app/insight/tool_notifications.rs` 广播，前端 `toolNotificationGateway` 监听）。
+pub const TOOL_PRESENTATION_CHANGED: &str = "tool-presentation-changed";
 /// 电源/会话生命周期事件（Rust 内部，前端不监听）。
 pub const POWER_LIFECYCLE_CHANGED: &str = "power-lifecycle-changed";
 /// 电源监听器就绪（Rust 内部，前端不监听）。

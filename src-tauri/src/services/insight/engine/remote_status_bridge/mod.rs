@@ -1,3 +1,4 @@
+use crate::models::insight::events as insight_events;
 use crate::models::insight::settings::RemoteStatusBridgeSettings;
 use crate::services::insight::engine::tracking::runtime_snapshot::TrackingRuntimeSnapshotState;
 use crc32fast::Hasher as Crc32Hasher;
@@ -17,8 +18,10 @@ use tokio_tungstenite::{
     tungstenite::{Error as WsError, Message},
 };
 
-const SETTINGS_CHANGED_EVENT: &str = "app-settings-changed";
-const TRACKING_EVENT_NAMES: [&str; 2] = ["active-window-changed", "tracking-data-changed"];
+const TRACKING_EVENT_NAMES: [&str; 2] = [
+    insight_events::ACTIVE_WINDOW_CHANGED,
+    insight_events::TRACKING_DATA_CHANGED,
+];
 const HEARTBEAT_INTERVAL_SECS: u64 = 60;
 const AUTH_TIMEOUT_SECS: u64 = 5;
 const RECONNECT_BACKOFF_SECS: [u64; 5] = [1, 2, 5, 10, 30];
@@ -128,7 +131,7 @@ pub async fn ensure_machine_id<R: Runtime>(
 
     let machine_id = generate_machine_id();
     store.save_machine_id(&machine_id).await?;
-    app.emit(SETTINGS_CHANGED_EVENT, json!({}))
+    app.emit(insight_events::APP_SETTINGS_CHANGED, json!({}))
         .map_err(|error| format!("failed to emit settings refresh event: {error}"))?;
     Ok(machine_id)
 }
@@ -138,7 +141,7 @@ pub fn start<R: Runtime + 'static>(app: AppHandle<R>, store: Arc<dyn RemoteStatu
 
     let settings_app = app.clone();
     let settings_store = Arc::clone(&store);
-    app.listen_any(SETTINGS_CHANGED_EVENT, move |_| {
+    app.listen_any(insight_events::APP_SETTINGS_CHANGED, move |_| {
         reload_runtime_settings(settings_app.clone(), Arc::clone(&settings_store));
     });
 

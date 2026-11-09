@@ -1,4 +1,5 @@
 use super::{layout, native, MiniWindowState};
+use crate::models::insight::events::POWER_LIFECYCLE_CHANGED;
 use crate::models::insight::mini_window::{bounds, near_handle, release_placement, Point};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
@@ -6,7 +7,7 @@ use tauri::{App, AppHandle, Listener, Manager, Runtime};
 
 pub(crate) fn register_power_handler<R: Runtime>(app: &App<R>) {
     let handle = app.handle().clone();
-    app.listen("power-lifecycle-changed", move |event| {
+    app.listen(POWER_LIFECYCLE_CHANGED, move |event| {
         let Ok(event) = serde_json::from_str::<crate::infra::insight::windows::power::PowerLifecycleEvent>(event.payload()) else { return; };
         let owner = handle.state::<MiniWindowState>();
         match event.state.as_str() {

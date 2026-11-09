@@ -7,7 +7,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 mod native;
 pub const WINDOW_LABEL: &str = "tool-notification";
-pub const CHANGED: &str = "tool-presentation-changed";
+pub use crate::models::insight::events::TOOL_PRESENTATION_CHANGED as CHANGED;
 
 #[derive(Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]

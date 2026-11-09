@@ -1,11 +1,10 @@
 use crate::infra::insight::windows::power::PowerLifecycleEvent;
+use crate::models::insight::events::POWER_LIFECYCLE_CHANGED;
 use tauri::{App, AppHandle, Listener, Manager, Runtime};
-
-const POWER_LIFECYCLE_CHANGED_EVENT: &str = "power-lifecycle-changed";
 
 pub(crate) fn register_power_lifecycle_handler<R: Runtime>(app: &App<R>) {
     let app_handle = app.handle().clone();
-    app.listen(POWER_LIFECYCLE_CHANGED_EVENT, move |event| {
+    app.listen(POWER_LIFECYCLE_CHANGED, move |event| {
         let Ok(event) = serde_json::from_str::<PowerLifecycleEvent>(event.payload()) else {
             crate::log_warn!("ignored malformed power lifecycle event");
             return;

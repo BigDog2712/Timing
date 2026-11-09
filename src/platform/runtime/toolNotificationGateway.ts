@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import type { ToolNotificationPreferences, ToolPresentationAction, ToolPresentationSnapshot } from "../../shared/types/toolNotifications.ts";
+import { TOOL_PRESENTATION_CHANGED } from "./insightEvents.ts";
 import { parseToolAlert } from "./toolsRawDtos.ts";
 
 export function parseNotificationPreferences(value: unknown): ToolNotificationPreferences {
@@ -27,7 +28,7 @@ export async function saveToolNotificationPreferences(patch: Partial<ToolNotific
   return parseNotificationPreferences(await invoke<unknown>("cmd_save_tool_notification_preferences", { patch }));
 }
 export function onToolPresentationChanged(handler: () => void) {
-  return listen("tool-presentation-changed", handler);
+  return listen(TOOL_PRESENTATION_CHANGED, handler);
 }
 export function actOnToolPresentation(alertId: string, action: ToolPresentationAction): Promise<void> {
   return invoke("cmd_tool_presentation_action", { alertId, action });

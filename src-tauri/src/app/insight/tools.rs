@@ -1,4 +1,5 @@
 use crate::services::insight::data::tools_store::SqliteToolsStore;
+use crate::models::insight::events as insight_events;
 use crate::models::insight::tools::{ToolAlert, ToolsRuntimeSnapshot};
 use crate::services::insight::engine::tools::{self, CreateActivityReminderRuleRequest, StartPomodoroRequest};
 use tauri::{App, AppHandle, Listener, Manager, Runtime};
@@ -7,7 +8,7 @@ pub(crate) fn register_alert_handler<R: Runtime>(app: &App<R>) {
     for event in [
         tools::TOOLS_ALERT_EVENT,
         tools::TOOLS_RUNTIME_CHANGED_EVENT,
-        "app-settings-changed",
+        insight_events::APP_SETTINGS_CHANGED,
     ] {
         let owner = app.handle().clone();
         app.listen(event, move |_| {
@@ -20,7 +21,7 @@ pub(crate) fn register_alert_handler<R: Runtime>(app: &App<R>) {
         });
     }
     let app_handle = app.handle().clone();
-    app.listen("tracking-data-changed", move |event| {
+    app.listen(insight_events::TRACKING_DATA_CHANGED, move |event| {
         let payload = serde_json::from_str::<crate::models::insight::tracking::TrackingDataChangedPayload>(
             event.payload(),
         )
@@ -37,7 +38,7 @@ pub(crate) fn register_alert_handler<R: Runtime>(app: &App<R>) {
         }
     });
     let app_handle = app.handle().clone();
-    app.listen("app-settings-changed", move |_| {
+    app.listen(insight_events::APP_SETTINGS_CHANGED, move |_| {
         tools::notify_activity_reminder_change(&app_handle);
     });
 }

@@ -422,7 +422,7 @@ console.log(agg);
 
 **判据**：`npm run lint` → 0（`--max-warnings=0`）。并加一条防回退注释：`eslint.config.js` 的 override 块只允许出现 `files: ['src/shared/i18n/generated/**']`。
 
-### 4.5 contract：8 处 `.emit("字面量")` → insight 事件常量
+### 4.5 contract：14 处 emit 字面量 → insight 事件常量
 
 **实测**：`grep -rnoE '\.emit\(\s*"' src-tauri/src/patina --include=*.rs | wc -l` → **8**（宿主 0）。涉及 4 个事件名：
 
@@ -447,11 +447,21 @@ console.log(agg);
 `mini_window.rs` 的 `mini-window-state`）：contract 的字面量正则只认 `.emit(`，不认 `.emit_to(`。
 **但语义相同（前端在 listen），所以 T03 一并常量化。**
 
+**合计字面量 14 处 = 12 `.emit` + 2 `.emit_to`**（不是本节初稿写的 8 处，也不是中途按单行正则
+得出的 11 处）。三个数字的差别全部来自计数方式：单行 grep 漏 `\n` 写法，contract 正则漏 `.emit_to`。
+
+**只清 `.emit` 字面量不够。** 监听侧（`app.listen` / `listen_any`）与既有的局部 `const`
+（`WEB_ACTIVITY_BRIDGE_SETTINGS_CHANGED_EVENT`、`POWER_LIFECYCLE_CHANGED_EVENT`、
+`remote_status_bridge::SETTINGS_CHANGED_EVENT`、`tool_notifications::CHANGED`）会把同一个
+事件名再定义一遍——emit 侧清零之后，这些副本仍然让「唯一出处」是句空话。T03 的收口判据因此
+升级为**「每个事件名在 insight 五层子树里的字符串字面量恰好出现 1 次，且那一处就在
+`models/insight/events.rs`」**（命令见本节末尾）。
+
 **处置：把「路径豁免」换成「双事件通道」，判据更严而不是更松。**
 
 ```
-后端常量：src-tauri/src/models/insight/events.rs   （新建，8 个 pub const）
-前端常量：src/platform/runtime/insightEvents.ts     （新建，6 个名字；power-* 两个不进前端）
+后端常量：src-tauri/src/models/insight/events.rs   （新建，9 个 pub const）
+前端常量：src/platform/runtime/insightEvents.ts     （新建，7 个名字；power-* 两个不进前端）
 emit 侧：12 处 .emit 字面量 + 2 处 emit_to 字面量 → 常量
 listen 侧：6 个 gateway 的字面量 → 常量
 ```
@@ -460,7 +470,7 @@ listen 侧：6 个 gateway 的字面量 → 常量
 > `app` 4 / `commands` 2 / `infra` 2 / `services` 6。放 `app/insight/` 会让 `infra` 与
 > `services` **反向依赖装配层**——`app/mod.rs` 的模块文档写着「禁止：被 `infra` 反向依赖
 > （否则又成环）」，而当前全仓 `services|infra|models` 对 `crate::app::insight` 的引用是 **0**。
-> `models/insight` 是「出边 0 的纯叶子」（§2.2 B1），8 个 `&'static str` 常量最适合它。
+> `models/insight` 是「出边 0 的纯叶子」（§2.2 B1），9 个 `&'static str` 常量最适合它。
 > 连带影响：T04 的 `insightEvents()` 解析器要读 `src-tauri/src/models/insight/events.rs`。
 
 `check-contract.mjs` 增加 `insightEvents()` / `insightFeEvents()` 两个解析器与三条检查：
@@ -470,8 +480,21 @@ listen 侧：6 个 gateway 的字面量 → 常量
 
 **判据**：
 ```bash
-grep -rnE '\.emit\(\s*"' src-tauri/src --include=*.rs | wc -l   # 期望 0
-npm run check:contract                                          # 期望摘要仍为 80(+117)/17/11
+# 每个事件名在 insight 五层子树里的字符串字面量必须恰好 1 次（那一处 = models/insight/events.rs）
+for n in app-settings-changed app-icon-changed active-window-changed tracking-data-changed \
+         main-tools-target-changed mini-window-state power-lifecycle-changed power-watcher-ready \
+         tool-presentation-changed; do
+  cnt=$(grep -rn "\"$n\"" src-tauri/src/app/insight src-tauri/src/commands/insight \
+        src-tauri/src/infra/insight src-tauri/src/models/insight src-tauri/src/services/insight \
+        --include=*.rs | wc -l)
+  printf '%-28s %s\n' "$n" "$cnt"
+done   # 每行都必须恰好是 1
+
+grep -rnE '\beprintln!\(' src-tauri/src --include=*.rs | wc -l        # 期望 0
+grep -rnE '\.emit\(\s*"' src-tauri/src --include=*.rs | wc -l         # 期望 0
+grep -rn '"tool-presentation-changed"\|"app-settings-changed"\|"tracking-data-changed"' \
+  src --include=*.ts --include=*.tsx | grep -v 'insightEvents.ts'      # 期望空
+npm run check:contract                                                # 期望摘要仍为 80(+117)/17/11
 ```
 
 ### 4.6 L1 / L2 扩围（不是撤豁免，是补覆盖）
