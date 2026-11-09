@@ -129,6 +129,19 @@ function refreshBaseline(ref) {
     process.exit(1);
   }
   const files = hashGitRef(ref);
+  // 重建是唯一能把白名单「洗白」的动作：如果有人带着未登记的改动重建，那些改动就变成
+  // 新基线的一部分，从此再也查不出来。至少要让人看见洗掉了几处。
+  const old = loadJson(BASELINE, null);
+  if (old?.files) {
+    const drift = Object.keys(files).filter((rel) => old.files[rel] && old.files[rel] !== files[rel]);
+    const gone = Object.keys(old.files).filter((rel) => !files[rel]);
+    if (drift.length || gone.length) {
+      console.error(
+        `[vendored] 注意：这次重建会把 ${drift.length} 处改动 / ${gone.length} 处删除固化进基线 —— ` +
+          '如果它们还没登记，重建之后就查不出来了。',
+      );
+    }
+  }
   const payload = {
     _doc:
       'vendored 基线：Patina 子树（src/patina、src-tauri/src/patina）在融合完成态的逐文件哈希。' +
