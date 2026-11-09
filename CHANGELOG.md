@@ -2,6 +2,38 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.28 — 悬浮条按归档原生版对齐（只有手机包）
+
+主人问「悬浮条效果是否和 tickbar 一致」。tickbar = 归档的 `android-app`（com.tickbar.droid 0.3.6），
+本仓 `overlay/` 七个 Kotlin 文件是它的移植版，因此逐文件比对而不是凭印象。
+
+### 补回的四处
+
+1. **倒计时向上取整**：`timeTextOf()` 按 `snap.countdown` 分流（倒计时 `ceil`、正计时 floor）。
+   此前向下取整，设 5:00 立刻显示 `04:59`，最后一秒挂着 `00:00`。
+2. **小时补两位**：`1:05:03` → `01:05:03`（`PillView.timeText` 与 `OverlayNoti.clock` 同步）。
+   通知里的时长**不做 ceil**：入参已是剩余整秒，再取整会显示 `05:01`。
+3. **配色回归档口径**：`ringColor()` = 结束绿 > 最后一分钟红 > 计时蓝，删掉 `PILL_IDLE`
+   （暂停不再变灰）。状态机没有 `Phase.DONE`，绿环由 `PillService` 观察 `active` 下降沿
+   画 3 秒（`DONE_FX_MS`），重新开始立刻撤掉。
+4. **通知栏动作按钮**：计时中 `暂停/继续` + `结束`，待机只给 `开始`；图标取自归档工程的
+   `ic_noti_pause/play/stop`。按钮**不直接改状态**：`getService` → `PillService` →
+   `bridge` → 前端 → Rust，原生仍不写计时库。
+
+### 动作链带类型
+
+`Prefs.markPendingTap(时间戳)` → `markPendingAction(kind)`（`动作@时间戳`）。只存时间戳时，
+「点了结束但没人接」会在回前台时被当成交替执行。`overlayTakeTap` 回值新增 `action`，
+`usePillAction` 两条 channel（`pill:toggle` / `pill:finish`）按它分派 `togglePause()` / `stop()`。
+旧键 `pending_tap_at` 只读不写：升级前留下的标记仍按 `toggle` 补做一次。
+
+### 红线与判据
+
+原生一个字节都不写计时库；契约 79/17/11 不动；无新命令、无新迁移、桌面零代码改动。
+前端 605 例（75 文件，+10）、`cargo test --lib` 719/0、`npm run check` EXIT 0。
+
+---
+
 ## 0.11.27 — 设置页「数据管理」重排 + 悬浮条两个方向接通
 
 一版两件事：桌面是设置页改造（主人四条原话），手机是悬浮条修复（线上故障插队）。
