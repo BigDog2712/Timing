@@ -25,6 +25,17 @@ export const settingsActions = {
     const referenceSettings = await ipc.updateReferenceSettings({ patch });
     useSettingsStore.getState().setReferenceSettings(referenceSettings);
   },
+
+  /**
+   * 打开时间统计（Patina）窗口。[V0.12.0 融合]
+   *
+   * 放在动作层而不是组件里：L1 门禁不许 `src/components` 出现 `ipc.`（ADR-017）。
+   * 窗的生命周期归 Patina 自己（最后可见 / 重建 / 就绪握手），这里只递一次 show 请求；
+   * 它还没就绪时后端返回的成功也是「已请求」，用户点第二次就会出来。
+   */
+  async openPatina(): Promise<void> {
+    await ipc.openPatinaWindow();
+  },
 };
 
 /**

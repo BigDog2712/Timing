@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "patina-tool-notification",
+  "description": "Patina 工具提醒弹窗（番茄钟 / 定时提醒 / 应用使用上限到期）。独立窗口、独立权限：只允许它读事件与回执自己的那条提醒，不继承分析窗口的命令面。",
+  "platforms": ["windows", "macOS", "linux"],
+  "windows": ["tool-notification"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "tool-notification-commands"
+  ]
+}

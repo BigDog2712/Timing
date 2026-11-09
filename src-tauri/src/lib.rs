@@ -17,8 +17,17 @@ mod app;
 mod commands;
 mod error;
 mod infra;
+/// 79 条 IPC 命令表（从 `lib.rs` 拆出：命令清单与装配顺序的变更理由不同）。
+mod ipc_commands;
 mod jobs;
 mod models;
+/// Patina 子系统（vendored，MIT）：自动使用追踪 / 历史 / 分析 / 分类映射 / 工具。
+/// 它有自己的 `app` / `commands` / `platform` 子树，与宿主的同名模块互不可见。
+///
+/// 桌面独占：上游依赖 WebView2 / Win32（`webview2-com` / `windows`），Android 编不进来。
+/// 移动端保持原样——Patina 本来就没有移动版。
+#[cfg(desktop)]
+mod patina;
 mod platform;
 mod repositories;
 mod services;
@@ -145,107 +154,60 @@ pub fn run() {
         // [V0.2.0] 系统通知（批 2 提醒调度用；本波仅注册，不接线）——两平台通用
         .plugin(tauri_plugin_notification::init())
         // [V0.4.0] 原生文件夹选择（设置 → 同步；只开 dialog:allow-open）——两平台通用
-        .plugin(tauri_plugin_dialog::init())
-        // 启动装配：日志 -> 建库 -> 默认设置 -> 状态 -> 托盘 -> 诊断 -> 调度器
-        .setup(|app| app::bootstrap::setup(app.handle().clone()))
-        .invoke_handler(tauri::generate_handler![
-            commands::item_cmd::list_items,
-            commands::item_cmd::create_item,
-            commands::item_cmd::update_item,
-            commands::item_cmd::archive_item,
-            commands::item_cmd::unarchive_item,
-            commands::item_cmd::delete_item,
-            /* [V0.3.4] 日记域四条命令（diary_get_config / diary_set_config / diary_today /
-            diary_open_today）随日记模块整体下架删除，见 ADR-023。 */
-            commands::timer_cmd::start_timer,
-            commands::timer_cmd::pause_timer,
-            commands::timer_cmd::resume_timer,
-            commands::timer_cmd::stop_timer,
-            commands::timer_cmd::discard_timer,
-            commands::daily_status_cmd::daily_status_get,
-            commands::daily_status_cmd::daily_status_set,
-            commands::timer_cmd::undo_stop,
-            commands::timer_cmd::get_timer_state,
-            commands::timer_cmd::switch_item,
-            commands::timer_cmd::resolve_open_record,
-            commands::record_cmd::list_records,
-            commands::record_cmd::stats_summary,
-            commands::record_cmd::update_record,
-            commands::record_cmd::delete_record,
-            commands::settings_cmd::get_settings,
-            commands::settings_cmd::get_reference_settings,
-            commands::settings_cmd::update_reference_settings,
-            commands::settings_cmd::update_settings,
-            commands::settings_cmd::set_autostart,
-            commands::settings_cmd::get_autostart,
-            commands::system_cmd::show_window,
-            commands::system_cmd::main_work_area,
-            commands::system_cmd::main_window_rect,
-            commands::system_cmd::hide_window,
-            commands::system_cmd::toggle_window,
-            commands::system_cmd::save_window_position,
-            commands::system_cmd::quit_app,
-            commands::theme_cmd::theme_get,
-            commands::theme_cmd::theme_set,
-            commands::theme_cmd::accent_get,
-            commands::theme_cmd::accent_set,
-            commands::window_cmd::open_settings_window,
-            commands::window_cmd::open_todos_window,
-            commands::window_cmd::open_timer_window,
-            commands::window_cmd::open_note_window,
-            commands::window_cmd::close_note_window,
-            commands::todo_cmd::todo_create,
-            commands::todo_cmd::todo_update,
-            commands::todo_cmd::todo_delete,
-            commands::todo_cmd::todo_list,
-            commands::todo_cmd::todo_toggle,
-            commands::todo_cmd::todo_start,
-            // [V0.2.0 批 2] 便利贴 / 倒计时 / 提醒（IPC 40 → 52）
-            commands::note_cmd::note_create,
-            commands::note_cmd::note_get,
-            commands::note_cmd::note_list,
-            commands::note_cmd::note_update,
-            commands::note_cmd::note_delete,
-            commands::timer_cmd::start_countdown,
-            commands::countdown_cmd::set_countdown_preset,
-            commands::reminder_cmd::reminder_set,
-            commands::reminder_cmd::reminder_clear,
-            commands::reminder_cmd::reminder_pending,
-            // [V0.3.2] 插件域（声明式插件：读 `<插件目录>/plugin.json` 启动头）
-            commands::plugin_cmd::plugin_list,
-            commands::plugin_cmd::plugin_open_dir,
-            // [V0.4.0] Markdown 同步（插件 API v2 的宿主实现）
-            commands::md_sync_cmd::md_sync_get,
-            commands::md_sync_cmd::md_sync_save,
-            commands::md_sync_cmd::md_sync_run,
-            commands::md_sync_cmd::md_sync_open,
-            /* [V0.11.13] 云端第二落点（ADR-061）：测试连接 / 备份列表 / 备份恢复。
-            移动端同名注册，`md_backup_*` 在那里回 `MD_SYNC_CONFIG_INVALID`。 */
-            commands::md_sync_cmd::md_sync_test,
-            commands::md_sync_cmd::md_backup_list,
-            commands::md_sync_cmd::md_backup_restore,
-            /* [V0.11.15] 数据管理重组：数据根三条 + 备份「打开」（命令 74 → 78）。
-            不加 `#[cfg]` —— 命令名就是契约面，手机端同名注册、内部回 IO_ERROR。 */
-            commands::data_root_cmd::data_root_get,
-            commands::data_root_cmd::data_root_change,
-            commands::data_root_cmd::data_root_open,
-            commands::md_sync_cmd::md_backup_open,
-            // [V0.12.0] 手机端原生能力（SAF 目录 / 悬浮条）；桌面侧四条是桩
-            commands::mobile_cmd::md_saf_pick,
-            commands::mobile_cmd::md_saf_status,
-            commands::mobile_cmd::overlay_set,
-            commands::mobile_cmd::overlay_status,
-            // [V0.11.23] 备份导出（命令 78 → 79）；桌面侧是 `mobile_only` 桩
-            commands::mobile_cmd::md_backup_export,
-            // [V0.5.0] 迁移可见性（命令 65 → 67，见 ADR-037）
-            commands::migration_cmd::get_migration_info,
-            commands::migration_cmd::open_legacy_dir,
-        ]);
+        .plugin(tauri_plugin_dialog::init());
 
-    // K-5：拦截关闭请求 -> 隐藏窗口。移动端没有「关窗即隐藏」的语义（返回键退后台由
-    // 系统管），且 `WindowEvent` 的关窗分支在 Android 上没有触发点，故只在桌面挂。
+    /* Patina 子系统接入（状态 + 插件）。它自己的自启 / 通知 / 单实例注册已在上游
+    `configure` 里摘掉——同一进程只能有一份，宿主的在上面。 */
     #[cfg(desktop)]
-    let builder = builder.on_window_event(infra::window::on_window_event);
+    let builder = patina::app::bootstrap::configure(
+        builder,
+        patina::app::bootstrap::BootstrapInput {
+            app_version: ctx.package_info().version.to_string(),
+        },
+    );
 
-    builder.run(ctx).expect("Timing 启动失败");
+    /* 命令表两平台共用一份：桌面是「宿主 79 + Patina 118」，手机只有宿主 79
+    （`ipc_commands` 里用 `macro_rules!` 拼，Patina 那段带 `#[cfg(desktop)]`）。
+
+    **不要改回插件注册**：插件命令走 `plugin:<name>|...` 的独立 ACL 命名空间，
+    `permissions/window-commands.toml` 里的应用级白名单对插件命令不生效 ——
+    前端每条 IPC 都被拒、没有任何日志，表现为「页面加载完但窗口永不 ready」。 */
+    let builder = builder.invoke_handler(ipc_commands::invoke_handler());
+
+    /* 启动装配：日志 -> 建库 -> 默认设置 -> 状态 -> 托盘 -> 诊断 -> 调度器 */
+    /* Tauri 只允许一个 setup：宿主跑完自己的装配，再进 Patina 的。
+    第二个参数是「本次是否由自启拉起」——Timing 的自启不带 `--autostart`
+    之类参数，事后无法区分，故恒 `false`（Patina 的 StartupSource 走 Manual）。 */
+    #[cfg(desktop)]
+    let builder = builder.setup(|app| {
+        app::bootstrap::setup(app.handle().clone())?;
+        /* Patina 的数据落点要在它自己的 setup 之前定好：它建库时读的是注入值。
+        导入失败只记日志、不阻断启动（历史为空好过应用起不来）。 */
+        if let Err(err) = app::patina_bridge::prepare() {
+            crate::log_warn!("patina: data preparation failed: {err}");
+        }
+        patina::app::bootstrap::setup(app, false)?;
+        Ok(())
+    });
+
+    /* 移动端没有 Patina 子系统，setup 只跑宿主那一套。 */
+    #[cfg(mobile)]
+    let builder = builder.setup(|app| app::bootstrap::setup(app.handle().clone()));
+
+    /* 窗口事件只能挂一个监听：Patina 的后台销毁检测与宿主的关窗拦截串在同一条链上，
+    顺序无依赖（宿主那条只在 `CloseRequested` 上作动作，Patina 侧不消费该分支）。 */
+    #[cfg(desktop)]
+    let builder = builder.on_window_event(|window, event| {
+        patina::app::bootstrap::on_window_event(window, event);
+        infra::window::on_window_event(window, event);
+    });
+
+    /* `run(ctx)` 是「`build` + 空回调 `run`」的简写；桌面需要 `RunEvent`
+    （Patina 的托盘驻留判定 / 退出时停观察者），所以展开成 build + run。 */
+    let application = builder.build(ctx).expect("Timing 启动失败");
+
+    #[cfg(desktop)]
+    application.run(patina::app::bootstrap::handle_run_event);
+    #[cfg(mobile)]
+    application.run(|_handle, _event| {});
 }

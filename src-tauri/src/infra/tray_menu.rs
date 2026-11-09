@@ -26,6 +26,9 @@ pub const ID_OPEN_SETTINGS: &str = "open_settings";
 /* [V0.2.0 批 2] 后端已具备能力的常显项 */
 pub const ID_OPEN_TODOS: &str = "open_todos";
 pub const ID_OPEN_NOTE: &str = "open_note";
+/* [V0.12.0 Patina 融合] 打开时间统计窗口（label `patina`）。与「便利贴…」同性质：
+   只 emit / 路由，真正的窗由 app 层开。位置贴着「打开事项」——统计的对象就是事项计时。 */
+pub const ID_OPEN_STATS: &str = "open_stats";
 /* [V0.11.7] 一次双向 Markdown 同步（用户口径：不想为了一次同步专门开设置页） */
 pub const ID_MD_SYNC: &str = "md_sync";
 pub const ID_QUIT: &str = "quit";
@@ -118,6 +121,9 @@ pub fn build_nodes(
     （只显不隐），双击 = 高亮定位。 */
     nodes.push(TrayNode::item(ID_NEW_ITEM, "新建事项", true));
     nodes.push(TrayNode::item(ID_OPEN_TODOS, "打开事项", true));
+    /* [V0.12.0 Patina 融合] 同一进程里的第二个入口：时间统计（自动活动 / 番茄 / 使用上限）。
+    文案带 `…`，与「设置…」「便利贴…」同口径（点了会开窗，不是立刻执行的动作）。 */
+    nodes.push(TrayNode::item(ID_OPEN_STATS, "时间统计…", true));
     /* [V0.11.7] 紧随「打开事项」：同步的对象就是事项计时，位置贴着数据本身讲。
     文案纯文本、无符号（P0）；`enabled` 恒真——未启用同步时的反馈由点击侧给通知，
     不在这里灰置（灰置等于「点了没反应」，用户看不出该去哪儿开）。

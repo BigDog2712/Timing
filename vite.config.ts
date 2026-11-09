@@ -1,5 +1,10 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import { fileURLToPath } from 'node:url';
+
+/** 双入口的绝对路径：ESM 下没有 __dirname，统一用 import.meta.url 解析 */
+const entry = (file: string): string => fileURLToPath(new URL(file, import.meta.url));
 
 /** 编译期平台标记：`tauri android dev/build` 注入 TAURI_ENV_FAMILY=mobile */
 const IS_MOBILE_BUILD = process.env.TAURI_ENV_FAMILY === 'mobile';
@@ -37,7 +42,9 @@ function platformCss(): Plugin {
 // - strictPort 1420：与 src-tauri/tauri.conf.json 的 devUrl 对齐
 // - target=chrome105：WebView2（Chromium 105+）
 export default defineConfig({
-  plugins: [platformCss(), react()],
+  /* tailwindcss 只服务 patina 入口：`src/patina/App.css` 里 `@import "tailwindcss" source("./")`
+     限定扫描范围，主窗口 index.html 不引用该样式表 → 两边样式零交叉。 */
+  plugins: [platformCss(), tailwindcss(), react()],
   /* 编译期平台标记（DESIGN-ANDROID-V1 §1.2）：`tauri android dev/build` 会注入
      TAURI_ENV_FAMILY=mobile；纯 vite（dev / vitest）下没有这个变量 → false，
      桌面路径与桌面产物完全不受影响（替换成字面量后移动分支可被摇树删除）。 */
@@ -46,6 +53,12 @@ export default defineConfig({
   },
   clearScreen: false,
   server: {
+    /* [0.12.0] 绑死 IPv4 回环，别让 Node 自己挑网卡。
+       `localhost` 在本机被解析成 `::1`，Vite 就只监听 `[::1]:1420`；而 WebView2
+       先把 `localhost` 解析成 `127.0.0.1` → 连接被拒，窗口停在 chrome-error 页，
+       前端永远发不出 ready。`src-tauri/tauri.conf.json` 的 devUrl 与 Patina 窗口的
+       开发地址都是 `127.0.0.1:1420`，三处必须一致。 */
+    host: '127.0.0.1',
     port: 1420,
     strictPort: true,
     watch: {
@@ -66,6 +79,12 @@ export default defineConfig({
     // 业务 chunk 只含自身代码。注意 Vite 8（rolldown）只接受函数形式，传对象会报
     // Expected Function but received Object。
     rollupOptions: {
+      // 双入口：主窗口（计时/事项）+ Patina 分析窗口。两个 HTML 各自独立挂载，
+      // 样式不共享（Timing 手写 CSS / Patina Tailwind），互不污染。
+      input: {
+        main: entry('./index.html'),
+        patina: entry('./patina.html'),
+      },
       output: {
         manualChunks(id: string) {
           if (!id.includes('node_modules')) return;

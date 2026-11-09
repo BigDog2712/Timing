@@ -45,12 +45,25 @@ function typesSource() {
   return files.filter((f) => existsSync(join(root, f))).map(read).join('\n');
 }
 
-/** 1. Rust 注册的命令 */
+/** 1. Rust 注册的命令
+ *
+ * 命令表在 `src-tauri/src/ipc_commands.rs`（V0.12.0 融合 Patina 时从 `lib.rs` 拆出：
+ * 宿主 79 条 + Patina 118 条，一张 `generate_handler!` 内）。这里只取**宿主**那一段
+ * （`crate::commands::…`）——Patina 的命令由 `src/patina/**` 的前端自己调用，
+ * 不进 `ipc.ts` / `IpcApi` / `browserMock` 这套宿主契约。
+ */
 function rustCommands() {
-  const src = read('src-tauri/src/lib.rs');
-  const block = src.match(/generate_handler!\[([\s\S]*?)\n\s*\]\)/);
-  if (!block) throw new Error('lib.rs 里找不到 generate_handler![...]');
-  return new Set([...block[1].matchAll(/commands::\w+::(\w+)/g)].map((m) => m[1]));
+  const src = read('src-tauri/src/ipc_commands.rs');
+  if (!src.includes('generate_handler![')) {
+    throw new Error('ipc_commands.rs 里找不到 generate_handler![...]');
+  }
+  return new Set([...src.matchAll(/crate::commands::\w+::(\w+)/g)].map((m) => m[1]));
+}
+
+/** Patina（vendored 子系统）注册的命令，仅用于「不许与宿主重名」这一条。 */
+function patinaCommands() {
+  const src = read('src-tauri/src/ipc_commands.rs');
+  return new Set([...src.matchAll(/crate::patina::commands::\w+::(\w+)/g)].map((m) => m[1]));
 }
 
 /** 2. IpcApi 接口方法 */
@@ -113,6 +126,11 @@ function feEvents(types) {
 
 function emitSites(byName) {
   const files = walk('src-tauri/src', '.rs');
+  /* vendored 子树（V0.12.0 融合的 Patina）自带一套事件名与常量，前端也在
+     `src/patina/**` 里自用，不进宿主 `IPC_EVENTS`。它的 `.emit("字面量")` 属上游写法，
+     不适用宿主 ADR-016 的「事件名只能来自 events.rs 常量」——改写 vendored 代码会让
+     后续同步上游变成逐行冲突。**只豁免字面量这一条**，标识符计数仍全仓进行。 */
+  const isVendored = (rel) => rel.replace(/\\/g, '/').includes('src-tauri/src/patina/');
   const values = new Set();
   const literals = [];
   const counts = new Map();
@@ -126,7 +144,7 @@ function emitSites(byName) {
     for (const m of src.matchAll(/\.emit\(\s*(&?)([A-Za-z_][\w:]*|"[^"]*")/g)) {
       const arg = m[2];
       if (arg.startsWith('"')) {
-        literals.push(`${rel}: ${arg}`);
+        if (!isVendored(rel)) literals.push(`${rel}: ${arg}`);
         values.add(arg.slice(1, -1));
         continue;
       }
@@ -165,11 +183,22 @@ const check = (label, missing, extra, hint) => {
 
 const types = typesSource();
 const commands = rustCommands();
+const patinaCmds = patinaCommands();
 const api = apiMethods(types);
 const { commands: calls, methods } = ipcCalls();
 
-check('Rust 注册了、前端没调用', diff(commands, calls), diff(calls, commands), 'ipc.ts 的 call() 与 lib.rs 的 handler 必须一一对应');
-check('IpcApi 声明了、Rust 没注册', diff(api, new Set([...commands].map(toCamel))), diff(new Set([...commands].map(toCamel)), api), 'domain 的 IpcApi 与 lib.rs 必须一一对应');
+/* 宿主与 Patina 共用一张 `generate_handler!`：重名不会报错，**先注册的那份静默胜出**，
+   另一边的命令永远调不到，且两端都没有日志（这类「装上了但没人响应」的故障最难查）。
+   所以在这里钉死：两边命令名集合必须不相交。 */
+check(
+  '宿主与 Patina 的命令重名（先注册者静默胜出）',
+  [...patinaCmds].filter((c) => commands.has(c)),
+  [],
+  '给其中一边的命令改名；两边共用一张命令表，重名不会被 Rust 或 Tauri 拦下',
+);
+
+check('Rust 注册了、前端没调用', diff(commands, calls), diff(calls, commands), 'ipc.ts 的 call() 与 ipc_commands.rs 的 handler 必须一一对应');
+check('IpcApi 声明了、Rust 没注册', diff(api, new Set([...commands].map(toCamel))), diff(new Set([...commands].map(toCamel)), api), 'domain 的 IpcApi 与 ipc_commands.rs 必须一一对应');
 check('ipc.ts 方法 与 IpcApi 不一致', diff(methods, api), diff(api, methods), 'ipc.ts 的实现对象必须实现 IpcApi 的每个方法');
 
 const rustCodes = rustErrorCodes();
@@ -237,7 +266,7 @@ check(
 );
 
 const summary = [
-  `命令：Rust ${commands.size} / IpcApi ${api.size} / ipc.ts ${calls.size} / mock ${mocks.size}`,
+  `命令：Rust ${commands.size}（+Patina ${patinaCmds.size}）/ IpcApi ${api.size} / ipc.ts ${calls.size} / mock ${mocks.size}`,
   `错误码：Rust ${rustCodes.size} / 前端 ${feCodes.size}`,
   `事件：后端 ${rEvents.size} / 前端 ${fEvents.size} / emit 点 ${emitted.size}`,
 ].join('；');

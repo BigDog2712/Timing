@@ -1,11 +1,9 @@
 /**
  * Timing — IPC 唯一出口（K-11）
- * -----------------------------------------------------------------------------
- * 契约：docs/phase2/IPC-CONTRACT-v2.md §3；类型：src/types/domain.ts（IpcApi）。
- * 规则（硬）：1. 组件内**禁止**直接 `invoke`；一切经本文件的 `ipc.*`。
- *   2. 集中 try/catch：后端 `Err` 序列化为 `{ code, message }`，此处规范化为 IpcError。
- *   3. 事件订阅统一经 `onIpcEvent`，其返回的 unlisten 必须由调用方在 cleanup 调用（K-8）。
- * 非 Tauri 环境（纯浏览器 dev）自动降级到 src/mocks/browserMock，便于 UI 走查。
+ * 契约：docs/phase2/IPC-CONTRACT-v2.md §3；类型：src/types/domain.ts（IpcApi）；规则（硬）：
+ *   1. 组件内**禁止**直接 `invoke`；一切经本文件的 `ipc.*`。2. 集中 try/catch：后端 `Err` 序列化为
+ *   `{ code, message }`，此处规范化为 IpcError。
+ *   3. 事件订阅统一经 `onIpcEvent`，返回的 unlisten 须由调用方在 cleanup 调用（K-8）；非 Tauri 环境（纯浏览器 dev）自动降级到 src/mocks/browserMock，便于 UI 走查。
  */
 import { invoke } from '@tauri-apps/api/core';
 import type {
@@ -245,6 +243,8 @@ export const ipc: IpcApi = {
   openTodosWindow: () => call<void>('open_todos_window'),
   openSettingsWindow: () => call<void>('open_settings_window'),
   openTimerWindow: () => call<void>('open_timer_window'),
+  /* [V0.12.0] 时间统计窗口 · 宿主命令（Patina 的 `cmd_show_main_window` 被 ACL 锁在 `windows: ["patina"]`） */
+  openPatinaWindow: () => call<void>('open_patina_window'),
   /* [V0.3.4] 日记域四条命令实现随模块下架删除（ADR-023）。 */
 
   /* ---- [V0.2.0] 主题域 ---- */

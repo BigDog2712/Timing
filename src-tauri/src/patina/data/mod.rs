@@ -1,0 +1,35 @@
+pub mod activity_read_model;
+pub mod app_settings_service;
+pub mod backup;
+pub(crate) mod classification_deletion;
+pub mod classification_service;
+pub mod export;
+pub mod icon_cache_service;
+pub mod import;
+pub mod mini_window_store;
+pub mod remote_backup;
+pub mod remote_backup_config;
+pub mod remote_status_store;
+pub mod repositories;
+pub mod scheduled_backup;
+pub mod scheduled_export;
+pub mod schema;
+pub mod schema_contracts;
+pub mod settings_payload_service;
+pub mod sqlite_error;
+pub mod sqlite_pool;
+pub mod storage_migration;
+mod storage_migration_cleanup;
+mod storage_path_safety;
+pub mod storage_restart;
+pub mod tools_store;
+pub mod tracking_pause_service;
+pub mod tracking_runtime;
+pub mod update_store;
+pub mod user_data_maintenance;
+pub mod web_activity_analysis;
+pub mod web_activity_store;
+
+#[cfg(test)]
+mod sqlite_pool_upgrade_tests;
+pub mod tool_notification_store;

@@ -50,10 +50,27 @@ const files = SCAN.flatMap((d) => walk(join(root, d)));
 const oversized = [];
 const violations = [];
 
+/* vendored 子树口径（V0.12.0 融合 Patina）：
+ *
+ * `src/patina/**` 与 `src-tauri/src/patina/**` 是 **原样并入的第三方源码**
+ * （Patina 1.10.0，MIT），不是我们写的代码。它的文件尺寸归上游决定，我们也不该为了
+ * 行数去改它 —— 拆完就等于放弃「diff 上游、按需同步」的能力，改一处变成逐行冲突。
+ * 同理 `#![allow(dead_code)]` 也只加在 `patina/mod.rs` 这一个子树根上。
+ *
+ * 判据要窄：只认这两条路径前缀，`src/services/**` 之类宿主代码一条都不豁免。
+ * 想从严就在下面把 VENDORED 置空，它会照旧逐个报错。 */
+const VENDORED = ['src/patina/', 'src-tauri/src/patina/'];
+const isVendored = (rel) => VENDORED.some((prefix) => rel.startsWith(prefix));
+const vendoredOversized = [];
+
 for (const file of files) {
   const lines = lineCount(file);
   if (lines <= LIMIT) continue;
   const rel = relative(root, file).split(sep).join('/');
+  if (isVendored(rel)) {
+    vendoredOversized.push({ rel, lines });
+    continue;
+  }
   const entry = allow[rel];
   if (!entry) {
     oversized.push({ rel, lines });
@@ -71,7 +88,10 @@ const stale = Object.keys(allow).filter((rel) => {
   return !existsSync(full) || lineCount(full) <= LIMIT;
 });
 
-const summary = `扫描 ${files.length} 个文件，上限 ${LIMIT} 行`;
+const vendoredNote = vendoredOversized.length
+  ? `；vendored 子树另有 ${vendoredOversized.length} 个超限文件（按 vendored 口径豁免，最大 ${vendoredOversized.reduce((m, f) => Math.max(m, f.lines), 0)} 行）`
+  : '';
+const summary = `扫描 ${files.length} 个文件，上限 ${LIMIT} 行${vendoredNote}`;
 
 if (oversized.length === 0 && violations.length === 0) {
   const note = Object.keys(allow).length ? `（白名单 ${Object.keys(allow).length} 条）` : '';

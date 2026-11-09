@@ -4,6 +4,101 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 0.12.0（桌面）— Patina 融合：第二入口并进同一个安装包 — 2026-11-09
+
+主人需求原话：「查看 Timing 的相关工作档案……深度优化 Timing，将 patina 和 Timing
+结合的更完美，且能正常运行」。裁决见 `Active/Timing/for-forg/34-方案-Patina融合.md`
+（ForG）：**宿主是 Timing**，Patina 整套作为**第二入口**（独立窗口 + 独立数据库）并入
+同一个进程、同一个安装包；安卓端与悬浮条一行代码没动。
+
+### 为什么不是「合并成一个应用」
+
+两套东西的窗口模型打架：Timing 是 `decorations:false / transparent / skipTaskbar /
+alwaysOnTop` 的悬浮小条，Patina 是常规主窗。共用一个入口 HTML 会让 Tailwind v4 的 preflight
+落到浮条上（背景被重置、`body` 变成白底）。所以走多入口：`index.html`（宿主）+
+`patina.html`（Patina），各自一棵树。
+
+### 五处硬冲突与处理
+
+1. **窗口 label 撞车** → Patina 主窗 label 改 `patina`（`main_window.rs:17` 的
+   `MAIN_WINDOW_LABEL`）；宿主仍是 `main`。
+2. **入口文件撞车** → Vite `rollupOptions.input` 双入口；`main_window_url()` 生产指向
+   `WebviewUrl::App("patina.html")`，debug 指向 `http://127.0.0.1:1420/patina.html`。
+3. **capabilities 按 label 授权** → 新增 `capabilities/patina.json`（`windows: ["patina"]`），
+   **不抄全量白名单**；Patina 的命令集写成 `permissions/window-commands.toml`
+   （`main-window-commands`），逐条列出 117 条。
+4. **两套托盘/自启/更新器** → 托盘：`tray.rs` 加 `PATINA_OWN_TRAY = false`，`setup_tray` 与
+   `apply_current_tray_visibility` 双双短路（后者会在 `tray_by_id().is_none()` 时**主动建**
+   托盘，必须单独闸）；自启：Patina 侧从未注册；更新器：不注册 `tauri-plugin-updater`、
+   启动不做自检、capability 不含 `updater:default`（上游端点指 `github.com/Ceceliaee/patina`，
+   留着等于把 Timing 更新成 Patina）。
+5. **浮窗重复** → mini 窗口不上（D5）。
+
+### 实现
+
+- **命令表并入宿主**：Patina 的 117 条命令从「插件注册」改为并进
+  `src-tauri/src/ipc_commands.rs` 的单张 `generate_handler!`（宏 `define_invoke_handler!`
+  拼宿主 80 条 + 桌面段 Patina）。**不能改回插件注册**：插件命令走 `plugin:<name>|` 的独立
+  ACL 命名空间，窗口白名单对它不生效，症状是「页面加载完但窗口永不 ready」且无日志。
+- **数据**：`<数据根>/patina/data/patina.db`，与 `timing.db` 并排（`app/patina_bridge.rs`
+  的 `patina_root()` + `set_root_override`）；首启若发现 `%APPDATA%\Patina\patina.db`
+  就 `VACUUM INTO` 导入一次。
+- **单一入口两处**：宿主托盘「时间统计…」（`tray_menu::ID_OPEN_STATS`）与
+  设置 → 通用 → 时间统计（`GeneralTab`）。两处都调到宿主自己新增的
+  `open_patina_window`（`commands/window_cmd.rs`）——**不是**直接 invoke Patina 的
+  `cmd_show_main_window`，因为 ACL 只授权 `windows: ["patina"]`，宿主命令没有 permission
+  声明，天然开放，前端也继续走 typed `IpcApi`。
+- **dev 回环地址修正**（本轮定位的真 bug）：`vite.config.ts` 原来没写 `server.host`，
+  Node 把 `localhost` 解析成 `::1`，Vite 只监听 `[::1]:1420`，而 WebView2 先连
+  `127.0.0.1` → 导航失败 → 落在 `chrome-error://chromewebdata/`，前端永远发不出 ready，
+  8 秒后日志打在 `ready-timeout … result=kept-hidden`（窗永不出现）。现在 `host`、
+  `devUrl`、debug URL 三处统一 `127.0.0.1`；`MAIN_WINDOW_READY_TIMEOUT_SECS` 8 → 60
+  （注释早就写着 60，值没跟上）。
+- **合规**：新增 `THIRD-PARTY-NOTICES.md`（Patina 来源 / MIT 全文 / 本项目 7 条改动清单；
+  Tailwind v4 与 plugin-opener 一并列明），README 加「时间统计（Patina）」一行并在版本段
+  说明 0.12.0 的内容是融合。
+
+### 判据与门禁
+
+- `npm run check` EXIT 0：契约 **Rust 80（+Patina 117）/ IpcApi 80 / ipc.ts 80 / mock 80**、
+  错误码 17/17、事件 11/11/emit 17；size 1418 文件（vendored 子树 152 个按专项口径豁免，
+  最大 1936 行）；version 桌面 0.12.0 六处一致 + 手机 0.12.0/12000；layers 8 条 1345 文件；
+  brand 691 命中 0 违规；lint 0。
+- `cargo check --all-targets` EXIT 0，仅 3 条既有警告（`md_sync_channel_test.rs:8` unused
+  `super::*`、`overlay.rs:83` `summary` 未用、`patina/engine/tools/mod.rs:755` `fetch_update`
+  已弃用）。前端 682 测试全过（83 文件）。
+- **实跑验证**（dev，`127.0.0.1`）：`[main-window] event=frontend-ready generation=1
+  load_epoch=2 reason=frontend render_state=ready … result=accepted-hidden` —— Patina 窗前端
+  真的执行了、`cmd_mark_main_window_ready` 走通（说明 capability 授权有效），且启动时保持
+  隐藏不抢焦点。
+- 行数门禁逼出两次压缩：`src/services/ipc.ts` 加完命令到 303 行，按项目既有口径
+  （「搬走/压注释腾行数」）压回头注释与新增注释，回到 300。
+
+### 验收前又修的三条（都是融合才暴露的时序问题）
+
+1. **宿主退出被 Patina 吃掉**：`patina::app::bootstrap::handle_run_event` 的
+   `ExitRequested` 只认 Patina 自己的 `AppExitState`，而 Timing 的退出路径
+   （`app::tray_quit`、`commands::system_cmd::quit_app`）从不写那个状态 → `prevent_exit()`
+   把退出拦下：窗口没了、托盘没了、进程还在跑 md 同步。修法不补标志位（谁忘了写就又退化），
+   改判 Tauri 自己给的 `code`：`Some(_)` = 有人调了 `app.exit()`，一票否决；`None` 才是
+   「窗口关光了」。判据落成纯函数首参 `explicit_exit`，用例 `explicit_exit_is_never_prevented`。
+2. **Patina 窗每次启动自己弹出来**：`register_hidden_main_window_startup` 以
+   `window.is_visible()` 为前置，而 `WebviewWindowBuilder::visible(false)` 建出来的窗口
+   在这个时点 `is_visible()` 仍返回 true → 上游判定「没资格认领隐藏启动」，回落到显示窗口。
+   宿主本来就起在托盘里，这是行为倒退。改为**认领隐藏就把窗口藏起来**（`window.hide()`），
+   不再要求「它本来没显示」；三条出因各加分支日志（上游只有一句 registration was rejected，
+   这次排查就卡在它上面）。修后 `frontend-ready result=accepted-hidden`。
+3. **后台销毁撞上页面加载 → 进程 abort**：`schedule_main_window_destroy_after_background`
+   的 30 秒计时与首帧赛跑，页面还在 `waiting` 时 `window.destroy()` 撞上正在建的 WebView，
+   tauri-runtime-wry 报 `RefCell already mutably borrowed`；release 是 `panic = "abort"`，
+   用户看到的是「App 自己没了」。`begin_destroy_hidden_window` 增加 `render_state == Ready`
+   前提，用例 `main_window_lifecycle_refuses_to_destroy_window_before_page_ready`。上游踩不到，
+   因为它启动就显示窗口、页面必然先 ready。
+
+> 排查口径：`tauri dev` 打 `error: process didn't exit successfully` 要分三种看 ——
+> `exit code 1` 多为热重建抢单实例锁（假信号，先杀光 `timing.exe` 复测）、
+> `0xc0000409` 才是 panic/abort、`exit code 0` 正常收尾。
+
 ## 0.11.28（桌面）— 同步文案与日记模板 — 2026-11-09
 
 本轮轮次流水号 0.11.33（文档/commit 标号），桌面出包按双轨 +1 = `0.11.28`。**手机端

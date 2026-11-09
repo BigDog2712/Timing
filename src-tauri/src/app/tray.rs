@@ -156,6 +156,18 @@ fn on_menu_event(app: &AppHandle, id: &str) {
                 crate::log_warn!("open todos window failed: {err}");
             }
         }
+        /* [V0.12.0 Patina 融合] 时间统计是同一进程里的第二个窗口（label `patina`）。
+        它自带一套「最后可见 / 重建 / 就绪握手」的生命周期，所以不自己建窗，只把
+        show 请求交给它；`show_main_window` 返回 false 表示窗在重建或还没就绪，
+        此时再点一次托盘即可，不当作错误上报。 */
+        tray_menu::ID_OPEN_STATS => {
+            if !crate::patina::app::tray::show_main_window(
+                app,
+                crate::patina::app::main_window::MainWindowShowReason::TrayMenu,
+            ) {
+                crate::log_warn!("patina main window is not ready yet; retry the tray item");
+            }
+        }
         // 「便利贴…」需前端建窗，故先显主窗再 emit 应用内事件。
         tray_menu::ID_OPEN_NOTE => {
             let _ = window::show_main(app);

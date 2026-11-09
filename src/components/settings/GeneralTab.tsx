@@ -17,6 +17,7 @@
  */
 import { useEffect, useState } from 'react';
 import { errorText } from '../../services/ipc';
+import { IS_MOBILE } from '../../lib/platform';
 import { settingsActions } from '../../services/settingsActions';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { Switch } from '../ui/Switch';
@@ -134,6 +135,26 @@ export function GeneralTab({ showAutostart = true }: GeneralTabProps) {
           <span className="num-field__unit">S</span>
         </label>
       </div>
+
+      {!IS_MOBILE && (
+        /* [V0.12.0 Patina 融合] 时间统计（Patina）的第二个入口：托盘里那条「时间统计…」
+           与这里等价。窗归 Patina 自己管（最后可见 / 重建 / 就绪握手），这里只发请求。
+           桌面独占——Patina 依赖 WebView2，Android 包不含它。 */
+        <div className="setting-row">
+          <span className="setting-row__label">
+            时间统计
+            <span className="setting-row__hint">Patina · MIT</span>
+          </span>
+          <button
+            type="button"
+            className="btn btn--neutral"
+            title="打开时间统计窗口（Patina，MIT 许可；来源声明见 THIRD-PARTY-NOTICES.md）"
+            onClick={() => void run(() => settingsActions.openPatina())}
+          >
+            打开
+          </button>
+        </div>
+      )}
 
       {error && (
         <p className="inline-error" role="alert">

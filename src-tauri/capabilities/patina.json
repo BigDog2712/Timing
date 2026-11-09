@@ -1,0 +1,22 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "patina",
+  "description": "Patina 分析窗口（自动使用追踪 / 历史 / 统计 / 分类映射 / 工具）。它是一扇独立窗口，能力面与宿主悬浮条分开：只给 core 窗口基础能力、外部链接与 Patina 自己的命令白名单。[V0.12.0 融合] 不给 `updater:default`：更新统一走 Timing 的安装包，Patina 上游的更新端点指向另一个仓库，留着等于把 Timing 更新成 Patina。",
+  "platforms": ["windows", "macOS", "linux"],
+  "windows": ["patina"],
+  "permissions": [
+    "core:default",
+    "core:app:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:event:allow-emit",
+    "core:window:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-start-dragging",
+    "opener:default",
+    "main-window-commands"
+  ]
+}

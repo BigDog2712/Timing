@@ -176,6 +176,9 @@ export interface IpcApi {
   openTodosWindow(): Promise<void>;
   openSettingsWindow(): Promise<void>;
   openTimerWindow(): Promise<void>;
+  /* [V0.12.0 Patina 融合] 打开时间统计窗口（label `patina`，同一进程内的第二个入口）。
+     桌面独占：Patina 依赖 WebView2 / Win32，Android 上根本编不进来。 */
+  openPatinaWindow(): Promise<void>;
   /* [V0.3.4] 原日记域四条命令（diaryGetConfig / diarySetConfig / diaryToday / diaryOpenToday）
      随日记模块整体下架删除，见 ADR-023。 */
 

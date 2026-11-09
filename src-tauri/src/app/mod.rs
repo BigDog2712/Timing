@@ -38,6 +38,10 @@ pub mod portable_boot;
 pub mod portable_prompt;
 #[cfg(desktop)]
 pub mod preboot;
+/* Patina 子系统的宿主侧接线（数据落点 + 首启导入）。桌面独占：Patina 自身依赖
+WebView2 / Win32，Android 上根本编不进来。 */
+#[cfg(desktop)]
+pub mod patina_bridge;
 #[cfg(desktop)]
 pub mod tray;
 /* [V0.11.18] 托盘「退出」之前那一轮同步（PRD §13.3）。与 `tray_sync` 拆开：那边是
