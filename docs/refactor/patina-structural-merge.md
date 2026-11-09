@@ -11,7 +11,7 @@
 | T02 | `9a7772f` | 后端去子树：`src-tauri/src/patina/*` 按层并入 5 个 `insight/` 命名空间 + 17 个 `_cmd` 后缀 |
 | T03 | `4ef9e1c` | 代码归一化（日志宏 ×153、事件常量 ×9、契约与门禁适配）；收口 `abc62cd` / `fc9bb62` / `cf35f8f` / `37c0be5` |
 | T04 | `56f658c` | 门禁重锚：撤销全部 vendored 路径豁免，新增 L9 双窗隔离 |
-| T05 | 见「T05 补记」提交 | 账本改造（`UPSTREAM_MAP` / `TEXT_MAP` / 分锚 / owner 必填）+ 文档收尾 |
+| T05 | `d63902b` | 账本改造（`UPSTREAM_MAP` / `TEXT_MAP` / 分锚 / owner 必填）+ 一次性脚本归位 + 文档收尾（sha 由紧随的补记提交写回） |
 
 ---
 
