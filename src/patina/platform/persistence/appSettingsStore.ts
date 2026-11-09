@@ -8,6 +8,7 @@ import {
   type AppSettings,
 } from "../../shared/settings/appSettings.ts";
 import { normalizeSettingsRecord } from "../../shared/settings/appSettingsNormalization.ts";
+import { readHostThemeMode } from "../runtime/hostThemeGateway.ts";
 
 const TRACKER_LAST_HEARTBEAT_KEY = "__tracker_last_heartbeat_ms";
 const TRACKER_LAST_SUCCESSFUL_SAMPLE_KEY = "__tracker_last_successful_sample_ms";
@@ -98,7 +99,12 @@ export async function loadAppSettings(): Promise<AppSettings> {
   for (const row of rows) {
     record[row.key] = row.value;
   }
-  return normalizeSettingsRecord(record);
+  const settings = normalizeSettingsRecord(record);
+  // 主题统一（D3）：深/浅只认宿主。这里把宿主值填进来，设置页的开关、
+  // 渲染前的本地模式才和实际显示一致；渲染本身另由 `useHostThemeMode` 订阅。
+  // 读不到（首帧竞态 / ACL 未就绪）就保留本地值——`theme-changed` 一到会立刻纠正。
+  const hostThemeMode = await readHostThemeMode();
+  return hostThemeMode ? { ...settings, themeMode: hostThemeMode } : settings;
 }
 
 export async function saveAppSetting<K extends keyof AppSettings>(

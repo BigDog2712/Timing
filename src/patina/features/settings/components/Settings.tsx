@@ -3,7 +3,7 @@ import { Save, RefreshCw, Settings2, } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import type { SettingsPageProps } from "../types";
-import type { AppLanguage } from "../../../shared/settings/appSettings.ts";
+import type { AppLanguage, ThemeMode } from "../../../shared/settings/appSettings.ts";
 import QuietPageHeader from "../../../shared/components/QuietPageHeader";
 import QuietButton from "../../../shared/components/QuietButton";
 import SettingsAppearancePanel from "./SettingsAppearancePanel";
@@ -15,6 +15,7 @@ import { useSettingsPageState } from "../hooks/useSettingsPageState";
 import { useWebActivitySetupState } from "../hooks/useWebActivitySetupState";
 import { useSettingsImportState } from "../hooks/useSettingsImportState.ts";
 import { prepareSettingsLanguagePreview } from "../services/settingsLanguagePreview.ts";
+import { writeHostThemeMode } from "../../../platform/runtime/hostThemeGateway.ts";
 
 const SettingsDataExportDialog = lazy(() => import("./SettingsDataExportDialog.tsx"));
 const SettingsDataImportDialog = lazy(() => import("./SettingsDataImportDialog.tsx"));
@@ -118,6 +119,20 @@ export default function Settings({
       }
     }
   }, [draftSettings?.language, handleChange, onToast, UI_TEXT]);
+
+  /* 主题统一（D3）：这个开关写的是**宿主的**主题，不是 Patina 自己的 `theme_mode`。
+     两边是同一个 App，不该出现「主窗深色、分析窗浅色」。写失败要回滚本地 draft，
+     否则界面高亮在 light、实际显示还是 dark，比不给开关更糟。 */
+  const handleThemeModeChange = useCallback(async (nextThemeMode: ThemeMode) => {
+    const previousMode = draftSettings?.themeMode;
+    if (!previousMode || previousMode === nextThemeMode) return;
+    handleChange("themeMode", nextThemeMode);
+    const saved = await writeHostThemeMode(nextThemeMode);
+    if (!saved) {
+      handleChange("themeMode", previousMode);
+      console.error(`[theme] failed to write host theme mode ${nextThemeMode}`);
+    }
+  }, [draftSettings?.themeMode, handleChange]);
 
   useEffect(() => {
     if (!draftSettings) return;
@@ -239,7 +254,7 @@ export default function Settings({
 
           <SettingsAppearancePanel
             themeMode={draftSettings.themeMode}
-            onThemeModeChange={(nextThemeMode) => handleChange("themeMode", nextThemeMode)}
+            onThemeModeChange={(nextThemeMode) => { void handleThemeModeChange(nextThemeMode); }}
             language={draftSettings.language}
             onLanguageChange={(nextLanguage) => { void handleLanguageChange(nextLanguage); }}
             languageDisabled={languageSelectionPending}

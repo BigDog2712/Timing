@@ -1,0 +1,19 @@
+# 主题统一（V0.12.0 · D3）
+#
+# Patina 窗的深/浅只认宿主那一个开关：启动时 `theme_get` 读一次，之后靠宿主的
+# `theme-changed` 广播（K-21，各窗自订阅）。分析窗设置页里的主题选项**写回宿主**
+# （`theme_set`），所以两边永远不会各说各话。
+#
+# 为什么拆成两条而不是一条：提醒弹窗（tool-notification）也画在 Patina 的令牌上，
+# 需要读主题；但它没有设置页，不该有改主题的能力。最小权限各给各的。
+#   `host-theme-read`  → patina.json（分析窗 + 迷你窗）、patina-tool-notification.json
+#   `host-theme-write` → 只给 patina.json
+[[permission]]
+identifier = "host-theme-read"
+description = "Allows the Patina windows to read the host theme mode (read-only)."
+commands.allow = ["theme_get"]
+
+[[permission]]
+identifier = "host-theme-write"
+description = "Allows the Patina analysis window to set the host theme mode from its settings page."
+commands.allow = ["theme_set"]

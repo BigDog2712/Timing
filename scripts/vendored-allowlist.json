@@ -36,6 +36,54 @@
       "change": "added",
       "reason": "新增：只读反桥的 IPC 网关，只调宿主 list_records / list_items；字段按需声明，不跟宿主 DTO 走。",
       "owner": "ForG"
+    },
+    {
+      "path": "src/patina/platform/runtime/hostThemeGateway.ts",
+      "change": "added",
+      "reason": "新增：主题网关（theme_get / theme_set / theme-changed 订阅），失败一律回落本地设置，不抛给界面。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/patina/app/hooks/useHostThemeMode.ts",
+      "change": "added",
+      "reason": "新增：先订阅后读宿主主题，读到的事件不被读回来的旧值覆盖；读不到用本地 theme_mode 兜底。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/patina/app/hooks/useAppThemeMode.ts",
+      "change": "modified",
+      "reason": "D3：主题模式改由 useHostThemeMode 决定（参数降级为回落值），并把实际生效的模式作为返回值——就绪判据必须用它，否则主窗永远判定没渲染好。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/patina/app/hooks/useMainWindowReady.ts",
+      "change": "modified",
+      "reason": "D3：就绪判据与 effect 依赖改用 useAppThemeMode 返回的实际模式（3 处），不再比对本地 themeMode。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/patina/platform/persistence/appSettingsStore.ts",
+      "change": "modified",
+      "reason": "D3：loadAppSettings 用宿主 theme_get 覆盖 theme_mode，使设置页开关与真实显示一致；读不到保留本地值。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/patina/features/settings/components/Settings.tsx",
+      "change": "modified",
+      "reason": "D3：设置页主题选项改为写回宿主（theme_set），失败回滚本地 draft 并记错误日志；另加一条 import 与一个 useCallback。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/patina/platform/runtime/hostThemeGateway.test.ts",
+      "change": "added",
+      "reason": "新增：主题同步器 6 条用例（先订阅后读、旧值不盖事件、读不到不应用、订阅不可用仍读、取消后不再应用、取消早于订阅返回）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/patina/app/hooks/useThemeWiring.source.test.ts",
+      "change": "added",
+      "reason": "新增：源码级接线判据 4 条（就绪判据按位置取实参、依赖里无裸 themeMode、落 DOM 用宿主模式、设置页真写回宿主）。",
+      "owner": "ForG"
     }
   ]
 }

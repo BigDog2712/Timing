@@ -3,6 +3,7 @@ import { applyActivityDisplayTheme } from "../../shared/theme/activityDisplayThe
 import { getThemePreset } from "../../shared/theme/themePresets.ts";
 import { useLayoutEffect } from "react";
 import type { ColorScheme, ThemeMode } from "../../shared/settings/appSettings.ts";
+import { useHostThemeMode } from "./useHostThemeMode.ts";
 
 type EffectiveTheme = "light" | "dark";
 
@@ -50,23 +51,38 @@ export function isDocumentThemeApplied(
     && root.style.colorScheme === effectiveTheme;
 }
 
+/**
+ * 把主题落到 DOM，并返回**实际生效**的模式。
+ *
+ * `themeMode` 现在只是回落值：融合后深/浅由宿主的 `theme_get` / `theme-changed` 决定
+ * （见 `useHostThemeMode`）。返回值必须被就绪判据用上——`isDocumentThemeApplied` 拿
+ * 本地模式去比 DOM 的话，一旦两边不一致，主窗会一直判定「没渲染好」而不显示
+ * （历史坑：窗口能开、永远不 ready）。配色预设（`colorSchemeLight/Dark`）仍归 Patina
+ * 自己，宿主的四色是另一套令牌，不通用。
+ */
 export function useAppThemeMode(
   themeMode: ThemeMode,
   colorSchemeLight: ColorScheme,
   colorSchemeDark: ColorScheme,
-) {
+): ThemeMode {
+  const appliedThemeMode = useHostThemeMode(themeMode);
+
   useLayoutEffect(() => {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-      const dark = themeMode === "dark";
-      applyDocumentTheme(themeMode, dark ? "dark" : "light", dark ? colorSchemeDark : colorSchemeLight);
+      const dark = appliedThemeMode === "dark";
+      applyDocumentTheme(
+        appliedThemeMode,
+        dark ? "dark" : "light",
+        dark ? colorSchemeDark : colorSchemeLight,
+      );
       return undefined;
     }
 
     const mediaQuery = window.matchMedia(COLOR_SCHEME_QUERY);
     const syncTheme = () => {
-      const effectiveTheme = resolveEffectiveTheme(themeMode, mediaQuery.matches);
+      const effectiveTheme = resolveEffectiveTheme(appliedThemeMode, mediaQuery.matches);
       applyDocumentTheme(
-        themeMode,
+        appliedThemeMode,
         effectiveTheme,
         effectiveTheme === "dark" ? colorSchemeDark : colorSchemeLight,
       );
@@ -74,7 +90,7 @@ export function useAppThemeMode(
 
     syncTheme();
 
-    if (themeMode !== "system") {
+    if (appliedThemeMode !== "system") {
       return undefined;
     }
 
@@ -82,5 +98,7 @@ export function useAppThemeMode(
     return () => {
       mediaQuery.removeEventListener("change", syncTheme);
     };
-  }, [ colorSchemeDark, colorSchemeLight, themeMode]);
+  }, [ colorSchemeDark, colorSchemeLight, appliedThemeMode]);
+
+  return appliedThemeMode;
 }

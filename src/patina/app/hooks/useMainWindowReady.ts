@@ -68,7 +68,9 @@ export function useMainWindowReady({
   const themeMode = themeModePreview ?? appSettings.themeMode;
   const colorSchemeLight = colorSchemePreview?.light ?? appSettings.colorSchemeLight;
   const colorSchemeDark = colorSchemePreview?.dark ?? appSettings.colorSchemeDark;
-  useAppThemeMode(themeMode, colorSchemeLight, colorSchemeDark);
+  // 主题统一后「实际生效的模式」由宿主决定，就绪判据必须比对它，
+  // 否则本地模式与宿主不一致时窗口永远判定没渲染好（见 useAppThemeMode 注释）。
+  const appliedThemeMode = useAppThemeMode(themeMode, colorSchemeLight, colorSchemeDark);
 
   useEffect(() => {
     if (!contentReady) {
@@ -104,7 +106,7 @@ export function useMainWindowReady({
         if (
           hasRenderableMainWindowFrame(
             frameRef.current,
-            themeMode,
+            appliedThemeMode,
             colorSchemeLight,
             colorSchemeDark,
           )
@@ -195,7 +197,7 @@ export function useMainWindowReady({
         resolveRetryTimer = null;
       }
     };
-  }, [colorSchemeDark, colorSchemeLight, contentReady, frameRef, themeMode]);
+  }, [appliedThemeMode, colorSchemeDark, colorSchemeLight, contentReady, frameRef]);
 
   return frameRef;
 }
