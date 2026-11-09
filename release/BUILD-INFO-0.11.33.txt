@@ -1,0 +1,61 @@
+Timing · 安卓包构建信息
+============================================================
+version_name : 0.11.33
+version_code : 11033
+package      : com.timing.app
+abi          : arm64-v8a（仅此一份）
+min_sdk      : 24
+signed_with  : ~/.android/debug.keystore · alias=androiddebugkey（调试证书）
+file         : Timing-android-0.11.33-release-arm64-debugsigned.apk
+size_bytes   : 11137060
+sha256       : fe70dd401b90008ef22a67eb59867b77ef0f13790bbc57c0747c5505acbf8a8c
+
+------------------------------------------------------------
+构建溯源
+------------------------------------------------------------
+git_commit   : 8d96006（fix(version): 签名脚本的产物名也走手机版号）
+git_dirty    : false —— 构建开始前 `git status --short` 为空，产物即该 commit 的树
+built_at     : 2026-11-09 11:09–11:12 GMT+8
+build_script : node scripts/android-apk.mjs && node scripts/android-sign.mjs --debug-key
+
+⚠️ 构建**期间**并行会话提交了 d9602f2（T04 Kotlin 小圆点：竖条指针 + 去玻璃层），
+   时间 11:11:41，落在本次构建窗口内。为确认产物里到底有没有它，做了三条包身核对：
+
+   1. aapt2 dump badging        → versionName='0.11.33' versionCode='11033' ✅ 版号正确
+   2. classes.dex 里 RadialGradient → 1 处（T04 会把玻璃层整个删掉，删了就是 0 处）
+      ⇒ **产物不含 T04**，小圆点是 0.11.32 那一版的样子
+   3. lib/arm64-v8a/libtiming_lib.so 里 assets/index-C1yTrFuL.js → 1 处，
+      与 dist/index.html 当前入口逐字相同；diaryTemplate → 1 处
+      ⇒ 前端为 T02 收口后的状态，与 8d96006 一致
+
+   结论：产物 = 8d96006 的树，可追溯。T04 及之后的视觉改动**不在**这个包里。
+
+------------------------------------------------------------
+本次改动（相对 0.11.32）
+------------------------------------------------------------
+本版是**版号基建**，不是功能版。功能面的变化来自并行的「同步文案与日记模板」那条线
+（T01 文案、T02 日记模板配置链路），随树一起带进包，但它们**不是本轮验收范围**。
+
+本轮自己的改动只有版号：
+
+1. 双轨版号：新增 `scripts/platform-versions.json`
+   - desktop=0.11.27 → 六处基线（package.json / package-lock ×2 / Cargo.toml /
+     Cargo.lock / tauri.conf.json）
+   - mobile=0.11.33/11033 → 安卓包自己的号，`android-apk.mjs` 只读它
+2. `android-sign.mjs` 产物命名也改走 mobile（原先读 tauri.conf.json，实测出过一次
+   「包内 0.11.33、文件名 0.11.27」）
+3. `check-version.mjs` 三条新断言
+   - versionCode 必须与 versionName 同源（major*1_000_000+minor*1_000+patch）
+   - 手机版号不得低于 release/ 与 release/archive/ 里已发出的最大号（防降级）
+   - android-apk.mjs / android-sign.mjs 都必须从 platform-versions.json 取号
+
+------------------------------------------------------------
+验证
+------------------------------------------------------------
+npm run check    EXIT 0（契约 79/79/79/79、错误码 17、事件 11、体积 300、分层 8、品牌 0 违规）
+npm test         682 passed / 83 files
+cargo test --lib 719 passed / 0 failed / 1 ignored
+变异自证         4 条（同源但回退 / 版本码不对 / 六处之一手滑 / 签名脚本读回 conf）
+                 各自只红对应用例，逐字还原
+
+⚠️ 调试证书签的包**不能对外分发**，仅供自用与验收。
