@@ -23,9 +23,9 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 - 前端 `src/**`（React + zustand + 自写 CSS，无 UI 框架）。
 - 后端 `src-tauri/src/**` 六层，依赖**只能向下**（ADR-016）：
   `platform`（叶子：clock / log / boot_timing）→ `infra`（窗口 / 托盘菜单 / 通知 / 几何 / 迁移）→ `services`（业务）→ `app`（装配：events / tray / bootstrap / diagnostics）与 `jobs`（调度）→ `commands`（IPC 入口）。
-- 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql`（v1）+ `0002_v020.sql`（v2）+ `0003_v030.sql`（v3）+ `0004_v0312.sql`（v4），`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。
+- 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql` … `0007_v01127.sql` 共七支，当前 **schema v7**，`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。**0007 是重建表，不吃重跑**，必须由版本门 `< 7` 只放行一次（见 `infra/migrate.rs` 注释）。
 - **数据目录迁移（V0.5.0）**：`infra/appdata_migrate/`（`paths` / `decide` / `copy` / `verify` / `marker` / `mod`）是 **headless** 的——不依赖 services、不依赖 tauri，所以能用两个临时目录直接跑测试（`run_at(&Paths, skip)`）。编排在 `app/preboot.rs`（桌面独占，跑在 `Builder::run` 之前、`log::init` 之前，故模块内不写日志），两条 IPC 命令在 `commands/migration_cmd.rs`。老库名 `tickbar.db` 与新库名 `timing.db` 的映射只认三种后缀（`""` / `-wal` / `-shm`），定义在 `paths.rs`。
-- IPC 契约：命令 67 个（`docs/phase2/IPC-CONTRACT-v2.md`）、事件 11 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
+- IPC 契约：宿主命令 **79** 条 + Patina **118** 条（仅桌面，`#[cfg(desktop)]`），一张表写在 `src-tauri/src/ipc_commands.rs`（`docs/phase2/IPC-CONTRACT-v2.md`）；事件 11 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
 - 插件：`plugins/<id>/plugin.json` 是**启动头**，宿主只读不执行（声明式）。目录三处合并扫描
   （dev → exe → user，同 id 先到先得）。v1 贡献点 `quickTimers`（摸鱼菜单预设）；
   **v2 新增 `mdSync`**（Markdown 双向同步落点，宿主实现同步，插件只声明）。
@@ -37,7 +37,7 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 ```bash
 npm run dev          # 前端 + 浏览器 mock（1420）
 npm run tauri dev    # 完整桌面应用
-npm run check        # 全部门禁：typecheck + contract + size + version + layers + brand + lint
+npm run check        # 全部门禁：typecheck + contract + size + vendored + version + layers + brand + lint
 npm run typecheck    # tsc --noEmit，必须 0 错
 npm run lint         # ESLint（只查正确性，不查风格）
 npm test             # vitest（含双端时间公式黄金用例）
@@ -55,11 +55,13 @@ cd src-tauri && cargo fmt --check
   L1 `components` 不 `invoke`；L2 `stores` 不碰 `ipc.`；L3 只有 `lib/window.ts` 引 `@tauri-apps/api/window`；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）。
 - **IPC 契约** → `npm run check:contract`
   命令 4 处一致（`generate_handler!` / `IpcApi` / `ipc.ts` / `browserMock`）、错误码 2 处一致、事件三方一致（后端常量 / `IPC_EVENTS` / emit 点）、禁止事件名字面量、**每个错误码必须在 `errorText()` 里有 case**（否则静默落到通用兜底）。
+- **vendored 改动必须登记** → `npm run check:vendored`
+  `src/patina/**` 与 `src-tauri/src/patina/**` 是源码级并入的第三方代码（Patina，MIT）。基线 = 融合完成态（commit `7bc7bd7`）的逐文件哈希，改一处就要在 `scripts/vendored-allowlist.json` 写一条 `path + change + reason + owner`，否则红。**这是为了保住「能 diff 上游、按需同步」**——顺手的颜色调整攒上十轮，上游发版时全是逐行冲突。
 - **双轨版号** → `npm run check:version`
   真源 `scripts/platform-versions.json`。桌面六处（`package.json` · `package-lock.json` 2 处 · `src-tauri/Cargo.toml` · `src-tauri/Cargo.lock` · `src-tauri/tauri.conf.json`）必须等于 `desktop`；手机 `versionCode` 必须与 `versionName` 同源（`major*1_000_000 + minor*1_000 + patch`）且**不低于 `release/` 已发出的最大号**。另含归档冻结表。**不再需要人工核对**；变更记录写 `CHANGELOG.md`。
   ⚠️ 安卓出包**只能走** `node scripts/android-apk.mjs`：`npm run tauri android build` 会读 `tauri.conf.json` 的桌面号，出来的包版号是错的。
 - CSS 只用 `var(--*)` 令牌，零字面量色值、零 emoji、零紫粉渐变；令牌定义在 `src/styles/design-tokens.css`（索引，实体在 `src/styles/tokens/*.css`，**@import 顺序不可调换**）。
-- 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/types/domain/models.ts::ErrorCode` 与文案 `src/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **16** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
+- 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/types/domain/models.ts::ErrorCode` 与文案 `src/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **17** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
 - 文档目录：现行文档在 `docs/`；`docs/archive/v1/` 只作历史，不作为实现依据。
 
 ## 权限面

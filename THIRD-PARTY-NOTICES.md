@@ -39,6 +39,11 @@ Timing 0.12.0 起把 **Patina**（自动使用追踪 / 番茄 / 使用上限提�
    `src-tauri/src/lib.rs` 的 setup / on_window_event / run 事件串联。
 7. 质量门禁适配：`eslint.config.js` 对 `src/patina/**` 关掉三条上游风格规则；
    行数/分层/契约门禁对 vendored 子树单列口径（见 `scripts/check-size.mjs` 等）。
+8. **改动登记机制**：`scripts/vendored-baseline.json` 固化融合完成态（commit `7bc7bd7`）
+   的逐文件哈希，`scripts/vendored-allowlist.json` 记录此后每一次对 Patina 源码的改动
+   （`path` + `change` + `reason` + `owner`）。`npm run check:vendored` 让未登记的改动
+   直接失败——目的是保住「能 diff 上游、按需同步」的能力，不是为了限制改动。
+   上面第 1–7 条就是基线之前的那批改动，故不在登记表里重复。
 
 ### MIT 许可全文（Patina）
 

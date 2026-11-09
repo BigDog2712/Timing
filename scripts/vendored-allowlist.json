@@ -1,0 +1,4 @@
+{
+  "_doc": "vendored 改动登记表。src/patina/** 与 src-tauri/src/patina/** 是 MIT 第三方源码（Patina），改动必须在这里留一条：path + change(modified|added|deleted) + reason + owner。验收口径是 node scripts/check-vendored-diff.mjs —— 未登记的改动让 npm run check 直接红。融合期（commit 7bc7bd7）那批路径改写与测试拆分不算改动，已固化进基线，见 THIRD-PARTY-NOTICES.md 第 1-7 条。",
+  "entries": []
+}
