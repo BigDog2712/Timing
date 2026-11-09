@@ -2,6 +2,52 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.30 — 点了没反应：五个面板的 X 一起修（只有手机包）
+
+主人一次报 9 条。其中 1/2/8 是同一个 bug。
+
+### 根因：事件对象被当成了 kind
+
+`Sheet` 的关闭按钮是 `onClick={onClose}`（遮罩也是），React 把 MouseEvent 当第一个实参传进
+`closeSheet(kind?)`；旧实现用 `kind != null` 判断「有没有指定类型」——事件对象对它也为真，
+于是 `s.sheet.kind !== <MouseEvent>` 恒成立 → 返回原 state → 面板不动。
+
+裸传的调用点五个（倒计时 / 换事项 / 事项菜单 / 记录编辑 / 便利贴归属），全中。
+
+**为什么长期没被发现**：另外两个出口（下滑抓取柄、Android 返回键）不走 `onClose`，
+手动测试容易被掩盖；单测从来没点过那个 X。
+
+### 改法
+
+1. `mobileUiStore.closeSheet` **只认字符串**，非字符串实参当「不指定类型」→ 直接关
+   （第二道防线，管已经写下的调用点）。
+2. 五个面板各自 `closeSheet('<kind>')`：语义从「碰巧能关」变成「只关我这一张」。
+3. `RecordRow` 改成 `useLongPress(onStart, onEdit)`：点按 = 事项编辑，行尾「▶ 开始」
+   按钮（`m-record__start`）负责计时，长按同义。行内按钮吞掉 `pointerdown/up`，
+   否则外层长按计时器同时启动、松手又弹一次编辑。
+4. 便利贴行内加可见删除键（`m-note__del`），长按删除保留。
+5. 计时页工具条第三个按钮「同步」：调同一个 `mobileNative.syncRun()`，结果走提示条；
+   文案抽成 `lib/mdSyncText`（`SyncPane` 同步改用），失败照说后端原文。
+
+### 判据
+
+- `src/stores/mobileUiStore.test.ts`（5 条，含两条**事件对象**回归本体）；
+- `src/components/mobile/MobileSheets.source.test.ts`（9 条：禁裸传、各关各的 kind、
+  `Sheet` 两个出口、点行 = 编辑（**接线级**）、行尾按钮吞指针、便利贴删除键、同步复用）。
+- 变异三条：退回 `kind != null` → 2 红；改回 `onClose={closeSheet}` → 1 红；
+  `useLongPress` 两个实参对调 → **第一版没红**（只钉 JSX 属性名），加接线断言后才红。
+
+### 没做
+
+快捷事项菜单（近期/常用）、事项页改「已完成待办」+ 待办预计时间/提醒/日期、
+「本周没有往期数据」（查不出复现路径，需要现场信息）。
+
+### 数值
+
+`npm run check` EXIT 0（契约 79/17/11、size 656、version 0.11.30 + versionCode 11030、
+layers 8、brand 0、eslint 0）；`npm test` **623**（77 文件，+14）；安卓 BUILD SUCCESSFUL，
+包 11.1 MB，sha256 `d0b3b3bb…`。包身：前端资产 `index-CTjhEvVP.js` ×1、旧资产 ×0。
+
 ## 0.11.29 — 点按切计时，长按才进 App（只有手机包）
 
 主人原话：「点按暂停 长按再跳转至界面」。0.11.27 / 0.11.28 修的是「悬浮条和主界面没联系」，

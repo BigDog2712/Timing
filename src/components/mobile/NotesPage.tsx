@@ -9,7 +9,9 @@
  * 两段：
  *   ① 新建区 —— 一键建一张，**默认绑定当前事项**（与桌面 V0.3.9 口径一致），
  *      建完直接进编辑页，不让人对着空列表发呆；
- *   ② 列表 —— 按更新时间倒序，每行两行文本 + 归属事项。点行 = 编辑，长按 = 删除确认。
+ *   ② 列表 —— 按更新时间倒序，每行两行文本 + 归属事项。点行 = 编辑，行尾垃圾桶 / 长按 = 删除确认。
+ *      **全部便利贴都在这**（`note_list` 不带日期过滤），往期的一直能看能删——[V0.11.30]
+ *      补了行尾那个看得见的删除键：长按删除是隐形手势，主人找不到就等于没有。
  *
  * 为什么长按删除而不是行内放垃圾桶：手机上一行只有 3.5 个字的横向余量，
  * 常驻删除键会被拇指误触；长按 + 编辑页里的显式删除两个入口够用。
@@ -17,7 +19,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { useLongPress } from '../../hooks/useLongPress';
 import { formatClockTime } from '../../lib/format';
-import { AlertIcon, PlusIcon, StickyNoteIcon, iconStroke } from '../../lib/icons';
+import { AlertIcon, PlusIcon, StickyNoteIcon, TrashIcon, iconStroke } from '../../lib/icons';
 import { listNotes, noteErrorText, removeNote } from '../../services/mobileNoteActions';
 import { itemName, useItemStore } from '../../stores/itemStore';
 import { useMobileUiStore } from '../../stores/mobileUiStore';
@@ -44,6 +46,21 @@ function NoteRow({ note, owner, pending, onOpen, onDelete }: NoteRowProps) {
           <span className="m-note__owner">{owner}</span>
           <span className="m-note__time">{formatClockTime(note.updatedAt)}</span>
         </p>
+        {/* [V0.11.30] 显式删除键：长按删除一直存在，但**看不见就等于没有**（主人反馈
+            「便利贴无任何交互」）。按钮自己吞掉 pointerdown，免得外层长按计时器同时启动。 */}
+        <button
+          type="button"
+          className="m-note__del"
+          aria-label="删除这张便利贴"
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <TrashIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
+        </button>
       </div>
     </li>
   );

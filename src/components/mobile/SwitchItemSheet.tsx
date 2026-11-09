@@ -60,7 +60,7 @@ export function SwitchItemSheet() {
   return (
     <Sheet
       title={status === 'idle' ? '选择事项' : '换事项'}
-      onClose={closeSheet}
+      onClose={() => closeSheet('switchItem')}
       footer={
         <div className="m-sheet__foot-row">
           <input

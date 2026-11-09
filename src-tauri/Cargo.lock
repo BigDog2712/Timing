@@ -4447,7 +4447,7 @@ dependencies = [
 
 [[package]]
 name = "timing"
-version = "0.11.29"
+version = "0.11.30"
 dependencies = [
  "chrono",
  "dirs 7.0.0",

@@ -1,0 +1,17 @@
+product: Timing
+version: 0.11.30
+git_commit: 待提交（基线 33ab45a）
+git_dirty: true
+built_at_utc: 2026-11-09T01:53:00Z
+build_profile: release
+
+# 说明（手写，非脚本产出）
+# 这个包只有安卓一侧，由 `node scripts/android-apk.mjs` + `node scripts/android-sign.mjs --debug-key` 产出；
+# 那两个脚本不写 BUILD-INFO，这份是事后按实际情况补的。
+#
+# git_dirty: true：构建时本轮改动还在工作树里（尚未提交），基线是 33ab45a。
+# 构建之后只改过 release/ 下的说明文字与文档，没动任何源码。
+#
+# 包身自证（详见 05-任务书-v0.11.30 §六）：
+#   aapt2 → versionCode=11030 / versionName=0.11.30
+#   .so 内前端资产 index-CTjhEvVP.js ×1、旧资产 index-jh3N-dDb.js ×0（前端确实换了新的）

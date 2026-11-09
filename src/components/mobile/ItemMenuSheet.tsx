@@ -101,7 +101,7 @@ export function ItemMenuSheet({ itemId }: ItemMenuSheetProps) {
     ) : undefined;
 
   return (
-    <Sheet title={current?.name ?? '事项'} onClose={closeSheet} footer={footer}>
+    <Sheet title={current?.name ?? '事项'} onClose={() => closeSheet('itemMenu')} footer={footer}>
       {mode === 'menu' && (
         <div className="m-actions">
           <button

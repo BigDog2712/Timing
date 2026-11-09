@@ -24,31 +24,13 @@
  * 它们现在的用处是「在 Obsidian 里打开今天那份」以及排障时回答「授权还在不在」。
  */
 import { useCallback, useEffect, useState } from 'react';
-import type { MdSyncConfig, MdSyncReport, MdSyncTestResult, MdSyncViewCloud } from '../../types/domain';
-import { errorText, IpcError } from '../../services/ipc';
+import type { MdSyncConfig, MdSyncTestResult, MdSyncViewCloud } from '../../types/domain';
+/* [V0.11.30] 两句话的出处：计时页的快捷同步按钮也要用同一份（见 lib/mdSyncText） */
+import { syncErrorText, syncReportText } from '../../lib/mdSyncText';
 import { mobileNative } from '../../services/mobileNative';
 import { isCloudReady } from '../settings/mdSyncConfig';
 import { SyncBackupPane } from './SyncBackupPane';
 import { SyncCloudPane } from './SyncCloudPane';
-
-/**
- * 同步失败时的提示。
- *
- * `errorText()` 把 `IO_ERROR` 统一润色成「系统调用失败，请重试」——那句话在别处是对的，
- * 在这一页却是灾难：手机上的同步失败大多来自原生桥或网络，后端给的原文
- * （「云端 401…」/「原生桥 … 失败：…」）恰好是唯一能定位问题的线索，被润色掉就只剩盲猜。
- */
-function syncErrorText(err: unknown): string {
-  if (err instanceof IpcError && err.message) return err.message;
-  return errorText(err);
-}
-
-function reportText(report: MdSyncReport): string {
-  if (report.errors.length > 0) return report.errors.join('；');
-  if (report.imported > 0) return `已从文件读回 ${report.imported} 条改动`;
-  if (report.exported > 0) return '已写入文件';
-  return '没有需要同步的改动';
-}
 
 export function SyncPane() {
   const [view, setView] = useState<MdSyncViewCloud | null>(null);
@@ -90,7 +72,7 @@ export function SyncPane() {
     setBusy(true);
     setNote('');
     try {
-      setNote(reportText(await mobileNative.syncRun()));
+      setNote(syncReportText(await mobileNative.syncRun()));
       setView(await mobileNative.syncView());
     } catch (err) {
       setNote(syncErrorText(err));

@@ -56,6 +56,8 @@ interface MobileUiStore {
    * 关 Sheet。传 `kind` 时**只关这一种**：
    * 异步操作（落盘 / 落库 / 删记录）完成回来时，用户可能已经关掉原 Sheet 又开了另一张，
    * 无条件关闭会把新开的那张一起关掉（[V0.11.2]）。
+   * [V0.11.30] 非字符串实参（例如直接 `onClose={closeSheet}` 传进来的 MouseEvent）一律
+   * 当作「不指定类型」→ 无脑关闭，不再静默吞掉。
    */
   closeSheet: (kind?: MobileSheet['kind']) => void;
   bumpRecords: () => void;
@@ -72,7 +74,13 @@ export const useMobileUiStore = create<MobileUiStore>((set) => ({
   setTab: (tab) => set({ tab }),
   openSheet: (sheet) => set({ sheet }),
   closeSheet: (kind) =>
-    set((s) => (kind != null && s.sheet?.kind !== kind ? s : { sheet: null })),
+    /* [V0.11.30] **只认字符串**。`Sheet` 的关闭按钮是 `onClick={onClose}`，React 会把
+       MouseEvent 当第一个实参传进来；此前 `kind != null` 对事件对象也为真，于是
+       `s.sheet.kind !== <MouseEvent>` 恒成立 → 返回原 state → **X 点了完全没反应**。
+       五个面板（倒计时 / 换事项 / 事项菜单 / 记录编辑 / 便利贴归属）全都中招。
+       门禁里另有一条源码判据禁止 `onClose={closeSheet}` 这种裸传引用，
+       这里这道类型检查是第二道：判据管新代码，这道管已经写下的调用点。 */
+    set((s) => (typeof kind === 'string' && s.sheet?.kind !== kind ? s : { sheet: null })),
   bumpRecords: () => set((s) => ({ recordsNonce: s.recordsNonce + 1 })),
   bumpNotes: () => set((s) => ({ notesNonce: s.notesNonce + 1 })),
   setNotifyIssue: (notifyIssue) => set({ notifyIssue }),

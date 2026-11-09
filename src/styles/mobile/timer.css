@@ -139,10 +139,12 @@
   opacity: 0.9;
 }
 
+/* [V0.11.30] 三个入口并排（倒计时 / 换事项 / 同步）。
+   两列会在第二行尾巴上留半个空格，看着像少画了一个按钮。 */
 .m-timer__tools {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
   width: 100%;
 }
 

@@ -163,3 +163,30 @@
   color: #fff;
   box-shadow: 0 0 0 2px var(--danger-wash);
 }
+
+/* ------------------------------ [V0.11.30] 行内删除键 ------------------------------
+   长按删除保留（老习惯），但**隐形手势找不到就等于没有**。这个按钮是看得见的那条路。
+   绝对定位在右上角，`m-note` 让出 44px 的右侧留白，正文不会压到图标下面。 */
+.m-note {
+  position: relative;
+  padding-right: 44px;
+}
+
+.m-note__del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink-3);
+}
+
+.m-note__del:active {
+  background: var(--danger-wash);
+  color: var(--color-danger);
+}

@@ -61,7 +61,7 @@ export function CountdownSheet() {
   return (
     <Sheet
       title="倒计时"
-      onClose={closeSheet}
+      onClose={() => closeSheet('countdown')}
       footer={
         <div className="m-sheet__foot-row">
           <label className="m-field m-field--grow">

@@ -38,7 +38,7 @@ export function NoteItemSheet({ noteId }: NoteItemSheetProps) {
   };
 
   return (
-    <Sheet title="归属事项" onClose={closeSheet}>
+    <Sheet title="归属事项" onClose={() => closeSheet('noteItem')}>
       {error && (
         <p className="m-error" role="alert">
           <AlertIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />

@@ -5,8 +5,9 @@
  *   ① 今日汇总条 —— 口径只认 `stats_summary`（`useTodayRecords` 内部就是它），
  *      条数取 `list_records` 的行数，进行中的会话额外算一条并叠加实时秒数；
  *   ② 待办区 —— 未完成全部 + 今天完成的（`lib/todoPanelLists`，与桌面 ADR-034 同源）；
- *   ③ 今日记录 —— 按事项 + 时间连续性合并（`lib/todayGroups`），**点行 = 开始这一条**，
- *      长按 = 事项菜单（停止计时 / 编辑 / 归档 / 删除）。
+ *   ③ 今日记录 —— 按事项 + 时间连续性合并（`lib/todayGroups`）。**[V0.11.30] 点行 = 事项编辑**，
+ *      行尾「开始」按钮 / 长按 = 开始这一条。改之前两者是反的：主人点一条事项想看名字/归档，
+ *      结果直接开了一段新计时，而且停在浮层里的 X 还关不掉（见 `mobileUiStore.closeSheet`）。
  *
  * 待办「开始」（与桌面同一条逻辑，用户视角「待办就是给计时的」）：
  *   - 空闲 → `todo_start`：后端按标题匹配或新建事项、开计、**当场移除待办**，
@@ -23,7 +24,7 @@ import { useTimerTick } from '../../hooks/useTimerTick';
 import { useTodayRecords } from '../../hooks/useTodayRecords';
 import { TODO_TITLE_MAX_CHARS } from '../../lib/constants';
 import { formatDuration, formatMinutes, formatRange } from '../../lib/format';
-import { AlertIcon, iconStroke } from '../../lib/icons';
+import { AlertIcon, PlayIcon, iconStroke } from '../../lib/icons';
 import { todoPanelLists } from '../../lib/todoPanelLists';
 import { groupTodayRecords, type TodayGroup } from '../../lib/todayGroups';
 import { mobileTimerActions } from '../../services/mobileTimerActions';
@@ -37,13 +38,15 @@ import { TodoRowMobile } from './TodoRowMobile';
 
 interface RecordRowProps {
   group: TodayGroup;
-  onTap: () => void;
-  onLongPress: () => void;
+  /** 点按整行 = 打开事项编辑（[V0.11.30] 主人口径：「点按事项后应唤起编辑界面」） */
+  onEdit: () => void;
+  /** 行尾「开始」按钮 = 切到这一条继续计时（长按同义，给习惯老手势的人留一条路） */
+  onStart: () => void;
 }
 
-/** 单行今日记录：点 = 开始这一条，长按 = 事项菜单（hook 不能写在 map 里，故独立成组件） */
-function RecordRow({ group, onTap, onLongPress }: RecordRowProps) {
-  const press = useLongPress(onLongPress, onTap);
+/** 单行今日记录：点 = 事项编辑，行尾按钮 / 长按 = 开始这一条（hook 不能写在 map 里，故独立成组件） */
+function RecordRow({ group, onEdit, onStart }: RecordRowProps) {
+  const press = useLongPress(onStart, onEdit);
   return (
     <li>
       <div className="m-record" {...press}>
@@ -53,6 +56,22 @@ function RecordRow({ group, onTap, onLongPress }: RecordRowProps) {
         </span>
         <span className="m-record__range">{formatRange(group.startedAt, group.endedAt)}</span>
         <span className="m-record__dur">{formatDuration(group.seconds)}</span>
+        {/* 行内按钮必须自己吞掉 pointerdown：否则外层的长按计时器仍会启动，
+            松手时整行还会再触发一次「编辑」，等于点了开始又弹菜单。 */}
+        <button
+          type="button"
+          className="m-record__start"
+          aria-label={`开始计时：${group.name}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onStart();
+          }}
+        >
+          <PlayIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
+          开始
+        </button>
       </div>
     </li>
   );
@@ -266,8 +285,8 @@ export function ItemsPage() {
               <RecordRow
                 key={group.key}
                 group={group}
-                onTap={() => void timerActions.startOrSwitch(group.itemId)}
-                onLongPress={() => openSheet({ kind: 'itemMenu', itemId: group.itemId })}
+                onEdit={() => openSheet({ kind: 'itemMenu', itemId: group.itemId })}
+                onStart={() => void timerActions.startOrSwitch(group.itemId)}
               />
             ))}
           </ul>

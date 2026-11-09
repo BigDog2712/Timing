@@ -97,7 +97,7 @@ export function RecordEditSheet({ record }: RecordEditSheetProps) {
   return (
     <Sheet
       title={`编辑记录 · ${formatClockTime(record.startedAt)}`}
-      onClose={closeSheet}
+      onClose={() => closeSheet('recordEdit')}
       footer={
         <div className="m-sheet__foot-row">
           <button type="button" className="m-btn m-btn--danger" disabled={busy} onClick={() => void remove()}>

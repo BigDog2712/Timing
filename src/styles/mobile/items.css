@@ -239,3 +239,35 @@
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary);
 }
+
+/* ------------------------------ [V0.11.30] 行尾「开始」 ------------------------------
+   「点整行 = 开始这一条」和「点整行 = 编辑事项」是同一次点击，只能选一个。
+   主人要的是编辑，于是计时入口挪到行尾这个按钮上——**它必须看得见**，
+   否则「点行不再开始计时」会被当成功能退化。
+   占第 3 列并跨两行，与 `__dur`（第 2 列跨两行）并排。 */
+.m-list--record .m-record {
+  grid-template-columns: 1fr auto auto;
+}
+
+.m-record__start {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--line-2);
+  background: var(--bg-field);
+  color: var(--ink);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.m-record__start:active {
+  background: var(--accent-wash);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
