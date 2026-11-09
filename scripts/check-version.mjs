@@ -2,7 +2,16 @@
 /**
  * Timing — 版本号一致性门禁（AGENTS.md：版本号同步）
  * -----------------------------------------------------------------------------
- * 桌面六处（必须同为同一 MAJOR.MINOR.PATCH）：
+ * V0.11.33 起是**双轨**：桌面与手机各走各的号，真源在 `scripts/platform-versions.json`。
+ *
+ *   桌面 —— 下面六处必须同为 `desktop`。
+ *   手机 —— `mobile` 自己一套，`android-apk.mjs` 直接读它，不再从 tauri.conf.json 派生。
+ *           这里只校验「versionCode 与 versionName 同源」+「没有往回退」。
+ *
+ * 为什么回退也要挡：Android 不允许降级覆盖安装。手机上次装的是 11033，这次给 11032，
+ * 用户看到的是「安装失败」而不是「版本旧了」——所以这条得由门禁拦，不能靠人记。
+ *
+ * 桌面六处（必须同为 `desktop`）：
  *   1. package.json                      version
  *   2. package-lock.json                 version + packages[""].version
  *   3. src-tauri/Cargo.toml              [package] version
@@ -17,13 +26,59 @@
  *   于是「改名 PR」被迫同时改门禁脚本——正是要避免的耦合。这里从
  *   `src-tauri/Cargo.toml` 的 `[package] name` 读，改名就退化为纯数据变更。
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(root, p), 'utf8');
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** 双轨版号的真源。读不到就 FAIL——不许静默退回「六处互相比」。 */
+function platformVersions() {
+  const raw = read('scripts/platform-versions.json');
+  const json = JSON.parse(raw);
+  return { desktop: json.desktop, mobile: json.mobile };
+}
+
+/**
+ * `release/` 与 `release/archive/` 下已发出的安卓包版本号。
+ *
+ * 用它挡「版号往回写」：这两个目录里的文件名是出包脚本与手工归档留下的**事实**，
+ * 比任何一份清单都可靠。
+ */
+function shippedMobile() {
+  const out = [];
+  for (const dir of ['release', join('release', 'archive')]) {
+    let names = [];
+    try {
+      names = readdirSync(join(root, dir));
+    } catch {
+      continue; // 目录还没建（首次出包前就是这么跑的）
+    }
+    for (const n of names) {
+      const m = /^Timing-android-(\d+\.\d+\.\d+)-[^/]*\.apk$/.exec(n);
+      if (m) out.push(m[1]);
+    }
+  }
+  return out;
+}
+
+/** 语义比较（只比三段数字）。返回 <0 表示 a 比 b 旧。 */
+function cmpVer(a, b) {
+  const pa = String(a).split('.').map((n) => Number(n) || 0);
+  const pb = String(b).split('.').map((n) => Number(n) || 0);
+  for (let i = 0; i < 3; i += 1) {
+    if (pa[i] !== pb[i]) return pa[i] - pb[i];
+  }
+  return 0;
+}
+
+/** 与 `android-apk.mjs` / tauri CLI 同一公式：major*1_000_000 + minor*1_000 + patch。 */
+function versionCodeOf(name) {
+  const [maj, min, pat] = String(name).split('.').map((n) => Number(n) || 0);
+  return maj * 1_000_000 + min * 1_000 + pat;
+}
 
 function packageJson() {
   return JSON.parse(read('package.json')).version;
@@ -108,6 +163,7 @@ function archivedEntries() {
 
 const crate = crateName();
 const lock = packageLock();
+const platform = platformVersions();
 
 const entries = [
   ['package.json', packageJson()],
@@ -119,7 +175,6 @@ const entries = [
 ];
 
 const missing = entries.filter(([, v]) => !v);
-const values = new Set(entries.map(([, v]) => v).filter(Boolean));
 const archive = archivedEntries();
 
 const fail = (title, lines) => {
@@ -127,6 +182,15 @@ const fail = (title, lines) => {
   for (const line of lines) console.error(`  ${line}`);
   process.exit(1);
 };
+
+/* 真源读不出来时**立刻停**：下面所有比对都以它为基准，缺了它就会退化成
+   「六处互相比」——那正是双轨要摆脱的旧口径，静默退回比红更糟。 */
+if (!platform.desktop) {
+  fail('scripts/platform-versions.json 里读不到 desktop', [
+    '该文件是双轨版号的单一真源（V0.11.33 起）。',
+    '桌面六处与安卓包号都以它为基准，没有它就无法判断谁该是谁。',
+  ]);
+}
 
 if (!crate) {
   /* 解析不到 crate 名时**不许**继续：`cargoLock(crate)` 会静默返回 undefined，
@@ -145,14 +209,54 @@ if (archive.failures.length) {
   ]);
 }
 
-if (missing.length || values.size !== 1) {
-  console.error('[version] FAILED — 版本号不一致\n');
-  for (const [file, v] of entries) console.error(`  ${v ? ' ' : '?'} ${file.padEnd(42)} ${v ?? '（未解析到）'}`);
-  console.error('\n规则：桌面六处必须同为同一 MAJOR.MINOR.PATCH（AGENTS.md）；改版时一起改，并写 CHANGELOG.md。');
+/* ---------------------------------------------------------------- 桌面：六处 == desktop */
+const off = entries.filter(([, v]) => v !== platform.desktop);
+if (missing.length || off.length) {
+  console.error(`[version] FAILED — 桌面六处与 platform-versions.json 的 desktop（${platform.desktop}）不一致\n`);
+  for (const [file, v] of entries) {
+    const mark = !v ? '?' : v === platform.desktop ? ' ' : '×';
+    console.error(`  ${mark} ${file.padEnd(42)} ${v ?? '（未解析到）'}`);
+  }
+  console.error(
+    '\n规则：桌面六处必须同为 platform-versions.json 里的 desktop；' +
+      '手机版号在同一个文件的 mobile 里，两边互不牵连。改版时一起改，并写 CHANGELOG.md。',
+  );
   process.exit(1);
 }
 
-const version = [...values][0];
+/* ------------------------------------------------------------------ 手机：自己一套 */
+const mobile = platform.mobile;
+if (!mobile?.versionName || !Number.isInteger(mobile.versionCode)) {
+  fail('scripts/platform-versions.json 的 mobile 不完整', [
+    '需要 versionName（"MAJOR.MINOR.PATCH"）与整数 versionCode 两项。',
+    `实际读到：${JSON.stringify(mobile)}`,
+  ]);
+}
+
+/* versionCode 必须能从 versionName 推出来：只改一个的话，系统会按旧号判重，
+   用户装了新版却仍是旧号，下一次升级就再也升不上去。 */
+const expectCode = versionCodeOf(mobile.versionName);
+if (mobile.versionCode !== expectCode) {
+  fail('手机 versionCode 与 versionName 不同源', [
+    `versionName=${mobile.versionName} → 公式算得 ${expectCode}，实际写 ${mobile.versionCode}`,
+    '两者必须同步 +1（公式 major*1_000_000 + minor*1_000 + patch，与 tauri CLI 一致）。',
+  ]);
+}
+
+/* 版号只许增不许减：Android 不允许降级覆盖安装，用户看到的是「应用未安装」，
+   不是「版本旧了」——这条得由门禁拦，不能靠人记（0.11.30 之后连着几轮都动过手机号）。 */
+const shipped = shippedMobile().sort(cmpVer);
+const newest = shipped[shipped.length - 1];
+if (newest && cmpVer(mobile.versionName, newest) < 0) {
+  fail('手机版号往回退了（会导致覆盖安装失败）', [
+    `platform-versions.json 写 ${mobile.versionName}，但 release/ 里已发出 ${newest}`,
+    'Android 拒绝降级覆盖安装，用户看到的是「应用未安装」而不是「版本旧了」。',
+    '要么把 mobile 两项一起加到不低于已发布的最大号，要么确认那个包是误发的并手工挪出 release/。',
+  ]);
+}
+
 console.log(
-  `[version] OK — ${version}（桌面六处口径一致；归档冻结 ${archive.rows.join(' / ')}）`,
+  `[version] OK — 桌面 ${platform.desktop}（六处一致）；` +
+    `手机 ${mobile.versionName} / ${mobile.versionCode}` +
+    `（已发出最大 ${newest ?? '无'}；归档冻结 ${archive.rows.join(' / ')}）`,
 );

@@ -1,12 +1,18 @@
 # AGENTS.md
 
-Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React 19 + Rust）· 当前版本 0.11.3。
+Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React 19 + Rust）· 双轨版号：桌面 0.11.27 / 手机 0.11.33。
 本文件是给编码代理的入口约定。
 
 ## 版本规则（先看这条）
 
 - 产品名 **Timing**；每轮迭代**默认只递增末位**（`0.11.3 → 0.11.4`）。
 - 升 `0.12.0` 或 `1.0.0` **必须先经用户同意**，不得自行进位。
+- **双轨（V0.11.33 起）**：桌面与手机各走各的号，真源是 `scripts/platform-versions.json`。
+  - `desktop` → `package.json` / `package-lock.json`（2 处）/ `src-tauri/Cargo.toml` / `Cargo.lock` / `tauri.conf.json` 六处必须等于它；
+  - `mobile` → 安卓包自己的 `versionName` + `versionCode`，`scripts/android-apk.mjs` 只读它。
+  - 两边**互不牵连**：发手机包不动桌面号，发改桌面号不动手机包。
+  - 为什么分开：桌面最后一次出包是 0.11.27，手机已到 0.11.32，共抢一份号的结果是「手机每发一版就替桌面预支一个号」，下次桌面包会直接跳号。
+  - `versionCode` 只许增不许减（Android 拒绝降级覆盖安装），门禁会扫 `release/` 已发出的 APK 名来挡。
 - 版本变更写 `CHANGELOG.md`；每次改动的流水写 `更新日志.md`（只追加）。
 - 长期规则与技术脉络的权威副本在 ForgeX：`3-ForgeX/Active/Timing/00-规则/`，
   本文件只保留与编码直接相关的那部分。
@@ -49,8 +55,9 @@ cd src-tauri && cargo fmt --check
   L1 `components` 不 `invoke`；L2 `stores` 不碰 `ipc.`；L3 只有 `lib/window.ts` 引 `@tauri-apps/api/window`；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）。
 - **IPC 契约** → `npm run check:contract`
   命令 4 处一致（`generate_handler!` / `IpcApi` / `ipc.ts` / `browserMock`）、错误码 2 处一致、事件三方一致（后端常量 / `IPC_EVENTS` / emit 点）、禁止事件名字面量、**每个错误码必须在 `errorText()` 里有 case**（否则静默落到通用兜底）。
-- **版本号 6 处一致 + 归档冻结表 1 处** → `npm run check:version`
-  `package.json` · `package-lock.json`（2 处）· `src-tauri/Cargo.toml` · `src-tauri/Cargo.lock` · `src-tauri/tauri.conf.json`。**不再需要人工核对**；变更记录写 `CHANGELOG.md`。
+- **双轨版号** → `npm run check:version`
+  真源 `scripts/platform-versions.json`。桌面六处（`package.json` · `package-lock.json` 2 处 · `src-tauri/Cargo.toml` · `src-tauri/Cargo.lock` · `src-tauri/tauri.conf.json`）必须等于 `desktop`；手机 `versionCode` 必须与 `versionName` 同源（`major*1_000_000 + minor*1_000 + patch`）且**不低于 `release/` 已发出的最大号**。另含归档冻结表。**不再需要人工核对**；变更记录写 `CHANGELOG.md`。
+  ⚠️ 安卓出包**只能走** `node scripts/android-apk.mjs`：`npm run tauri android build` 会读 `tauri.conf.json` 的桌面号，出来的包版号是错的。
 - CSS 只用 `var(--*)` 令牌，零字面量色值、零 emoji、零紫粉渐变；令牌定义在 `src/styles/design-tokens.css`（索引，实体在 `src/styles/tokens/*.css`，**@import 顺序不可调换**）。
 - 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/types/domain/models.ts::ErrorCode` 与文案 `src/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **16** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
 - 文档目录：现行文档在 `docs/`；`docs/archive/v1/` 只作历史，不作为实现依据。

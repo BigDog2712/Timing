@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "Timing — 双轨版号的单一真源（V0.11.33 起）。",
+    "",
+    "为什么要有这个文件：桌面最后一次出包是 0.11.27，而手机已经走到 0.11.32。",
+    "在双轨之前，六处基线（package.json 等）被两端共抢：手机每发一版就替桌面预支一个号，",
+    "于是下次出桌面包会从 0.11.27 直接跳到 0.11.32 —— 中间四个号不属于它。",
+    "",
+    "现在的口径：",
+    "  desktop —— 六处基线（package.json / package-lock ×2 / Cargo.toml / Cargo.lock /",
+    "             tauri.conf.json）必须等于它。桌面出包（build-desktop.mjs）读的就是这些。",
+    "  mobile  —— 安卓包自己的号。android-apk.mjs 只读这里，不再从 tauri.conf.json 派生。",
+    "",
+    "versionCode 规则与 tauri CLI 同一公式：major*1_000_000 + minor*1_000 + patch。",
+    "它**只许增不许减**：装过 11033 的手机装不上 11032，回退会让覆盖安装失败。",
+    "门禁 check-version.mjs 会扫 release/ 下已发出的 APK 名来挡这件事。",
+    "",
+    "改手机版号：只动 mobile 两项（versionName 与 versionCode 同步 +1）。",
+    "改桌面版号：只动 desktop，六处跟着改。两边互不牵连。",
+    "",
+    "iOS 落地后再加 ios 字段，不要提前占位。"
+  ],
+  "desktop": "0.11.27",
+  "mobile": {
+    "versionName": "0.11.33",
+    "versionCode": 11033
+  }
+}
