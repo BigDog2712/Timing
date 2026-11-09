@@ -1,0 +1,18 @@
+product: Timing
+version: 0.11.29
+git_commit: 4af313d
+git_dirty: true
+built_at_utc: 2026-11-09T01:28:00Z
+build_profile: release
+
+# 说明（手写，非脚本产出）
+# 这个包只有安卓一侧，由 `node scripts/android-apk.mjs` + `node scripts/android-sign.mjs --debug-key` 产出；
+# 那两个脚本不写 BUILD-INFO，这份是事后按实际情况补的。
+#
+# git_commit 写的是**基线** 4af313d（本轮开工时的 HEAD）。本轮改动在构建时仍在工作树里，
+# 因此 git_dirty: true 是准确的；本轮提交哈希见 CHANGELOG / 任务书（提交后由主理人核对）。
+# 构建之后只改过 release/ 下的说明文字与文档，没动任何源码 —— 想复现就在基线之上重放本轮改动，
+# 产物除编译时间戳外应一致。
+#
+# 包身自证（详见 05-任务书-v0.11.29 §六）：dex 里 `这一按已记下` / `长按悬浮条` / `不再自动跳转`
+# 各 ×1，旧文案 `退回打开主界面` ×0，`performHapticFeedback` ×1。

@@ -43,7 +43,7 @@ import com.timing.app.native.Prefs
 class PillService : Service() {
 
     companion object {
-        /** 小圆点形态下，点一下展开成条，看几秒再收回（老版本同一个数）。 */
+        /** 小圆点形态下，点按之后展开成条停留多久（反馈用，数值与老版本一致）。 */
         private const val EXPAND_MS = 3500L
 
         /** logcat 标签（与 `TimerReader` 同一个）：`adb logcat -s TimingPill`。 */
@@ -394,28 +394,26 @@ class PillService : Service() {
     // ------------------------------------------------------------ 手势动作
 
     /**
-     * 短按（[V0.11.22] 恢复老版本的三档手感，但状态机仍在 Rust）。
+     * 短按（[V0.11.22] 起有两档，[V0.11.29] 定稿为「一下就是一下」）。
      *
      * ```text
-     * 待机                  → 开始计时
-     * 圆点形态 + 未展开      → 展开看时长（3.5 秒后收回），不动状态
-     * 其余（药丸 / 已展开）  → 暂停 / 继续
-     * 长按                  → 回主界面（PillDrag 回调）
+     * 点按  待机 → 开始计时 / running → 暂停 / paused → 继续   （状态机仍在 Rust）
+     * 长按  → 回主界面（PillDrag 回调）
      * ```
+     *
+     * **[V0.11.29] 去掉了「圆点形态下第一下只展开、不动状态」这个分支。** 它是照抄归档
+     * 原生版（那边为了「避免误触暂停」），但本仓的圆点默认形态是**待机也常驻**，于是主人
+     * 按一下只是把它展开成条、计时一秒没停，体感就是「点了没反应」。他的口径很直接：
+     * 「点按暂停，长按再跳转」。展开照旧给，只是它不再**吃掉**这一按。
      *
      * 「能操作」不等于「在这里改状态」：本类一个字节都不写库，只把「有人按了一下」交给
      * `TimingNativePlugin.trigger`，由前端调 `togglePause()` 走 Rust 那一份状态机。
-     * 事件投不出去（WebView 已销毁 / 前端没挂监听）就退回打开主界面——宁可多一步，
-     * 也不做「点了没反应」。
      */
     private fun onTap() {
-        val snap = currentSnap()
-        /* 圆点未展开、且确实有一场计时在：先给用户看时长。这是唯一「不吃掉这一按」的分支。 */
-        if (snap.active && Prefs.overlayStyle(this) == Prefs.STYLE_DOT && !expanded) {
-            expandTemporarily()
-            return
-        }
         requestAction(KIND_TOGGLE)
+        /* 给一个看得见的落点：圆点只有 28dp，切「暂停」时环的颜色本来就不变，
+           不亮一下时长的话用户没法确认这一下按到了。药丸形态里这个调用自己就返回了。 */
+        expandTemporarily()
     }
 
     /**
@@ -432,8 +430,13 @@ class PillService : Service() {
         lastTapError = null
         Prefs.markPendingAction(this, kind)
         if (bridge?.invoke(event) != true) {
-            Log.w(TAG, "没有前端在听 $event：退回打开主界面（标记保留给前台补做）")
-            openApp()
+            /* [V0.11.29] 这里**不再**打开主界面。
+               主人点名「点按暂停，长按再跳转」——点一下就跳走等于把这个手势弄坏，
+               而且在「只想随手停一下」的场景里会把用户从原来的 App 里拽出来。
+               动作本身不会丢：标记已经落盘，App 回前台时 `overlayTakeTap` 按类型补做一次。
+               代价是「眼前什么都没变」，所以原因必须写进通知副标题——那是此刻唯一的可见处。 */
+            lastTapError = "没连上界面，这一按已记下：回到 App 时补做"
+            Log.w(TAG, "没有前端在听 $event：标记保留给前台补做（不再自动跳转）")
         }
         render()
     }
@@ -452,17 +455,18 @@ class PillService : Service() {
     }
 
     /**
-     * 回主界面。
+     * 回主界面（[V0.11.29] 起**只有长按**会走到这里）。
      *
-     * [V0.11.27] 失败不再静默 `runCatching`：从后台服务拉起 Activity 在部分 ROM（尤其
-     * 开了「后台弹出界面」限制的）上会被拦，而这条路径正是「点了没反应、App 也没打开」
-     * 的唯一解释。拦下来就把原因写进通知副标题——用户至少能看见「点不动，因为系统不让」，
-     * 而不是对着一个没反应的药丸。
+     * 短按不再兜底跳转：那是「点一下暂停」这个手势的另一半，跳走就等于手势失效。
+     * 长按是用户明确表达「我要进 App」，所以这条路径保留，并且失败必须说出来——
+     * [V0.11.27] 之前是静默 `runCatching`：从后台服务拉起 Activity 在部分 ROM（尤其
+     * 开了「后台弹出界面」限制的）上会被拦，而这条路径正是「长按了、App 也没打开」的
+     * 唯一解释。拦下来就把原因写进通知副标题——用户至少能看见「系统不让」。
      */
     private fun openApp() {
         runCatching { startActivity(OverlayNoti.openIntent(this)) }
             .onFailure { err ->
-                lastTapError = "点悬浮条没能打开主界面：${err.message ?: err.javaClass.simpleName}"
+                lastTapError = "长按悬浮条没能打开主界面：${err.message ?: err.javaClass.simpleName}"
                 Log.w(TAG, lastTapError!!, err)
             }
     }

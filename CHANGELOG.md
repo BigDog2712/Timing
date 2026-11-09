@@ -2,6 +2,44 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.29 — 点按切计时，长按才进 App（只有手机包）
+
+主人原话：「点按暂停 长按再跳转至界面」。0.11.27 / 0.11.28 修的是「悬浮条和主界面没联系」，
+这版修反过来的毛病：联系有了，但「点一下」和「进 App」还缠在一起。
+
+### 三处偏掉的地方
+
+1. **`onTap()` 一下就是一下**：删掉「圆点形态 + 计时中 + 未展开 → `expandTemporarily();
+   return`」这个分支。第一下只把圆点拉成条、计时一秒没停，体感就是「点了没反应」。
+   展开仍然给（28dp 的圆点、暂停又不换色，不亮一下时长没法确认按到了），
+   只是改成「先切状态，再展开」，不再吃掉这一按。
+2. **`requestAction()` 失败不再跳转**：`bridge?.invoke() != true` 时原先是 `openApp()`，
+   于是「前端没在听」（进程被回收 / WebView 已销毁）的那一按会把人拽进 App。
+   现在只做两件事：`lastTapError` 写进通知副标题（「没连上界面，这一按已记下：回到 App
+   时补做」）+ 标记照旧落盘给 `overlayTakeTap` 补做。**动作不丢，人也不被拽走。**
+3. **长按写明并补反馈**：`PillDrag` 的 KDoc 改成「短按切计时 / 长按打开 App」，
+   命中长按时 `performHapticFeedback(LONG_PRESS)` 震一下——520ms 之后手指还压着，
+   到 Activity 起来之间有一段空白，不震一下用户会以为没按够。
+
+`openApp` 的失败文案同步从「点悬浮条…」改成「长按悬浮条…」：这条路径现在只有长按会走到。
+
+### 判据
+
+`usePillAction.source.test.ts` 新增 `手势语义：点按切计时，长按才跳转（V0.11.29）` 四例：
+`tap_never_opens_the_app`（`onTap` 体里不许出现 `openApp`）、
+`failed_action_does_not_steal_a_tap`（失败分支不许出现 `openApp`，且必须写 `lastTapError`）、
+`long_press_still_opens_the_app`（`::openApp` 接线 + `LONG_PRESS_MS = 520L`）、
+`dot_tap_is_not_swallowed_by_expand`（不许再有「展开后 `return`」）。
+变异三条（改回旧分支 / 加回 `openApp()` / 长按改走 `onTap`）各自红，之后逐字还原。
+
+### 数值
+
+`npm run check` EXIT 0（契约 79/17/11、size 653、version 六处 + `tauri.properties` 11029、
+layers 8、brand 0、eslint 0）；`npm test` **609**（75 文件，+4）；`cargo test --lib` 719/0/1ign
+（后端零改动）；安卓 `BUILD SUCCESSFUL`，包 11,132,964 B，sha256 `bde019c7…`。
+前端资产哈希与 0.11.28 相同（`index-jh3N-dDb.js`）——本轮前端只改了一句注释，
+也顺带证明点按/长按全在原生侧。
+
 ## 0.11.28 — 悬浮条按归档原生版对齐（只有手机包）
 
 主人问「悬浮条效果是否和 tickbar 一致」。tickbar = 归档的 `android-app`（com.tickbar.droid 0.3.6），

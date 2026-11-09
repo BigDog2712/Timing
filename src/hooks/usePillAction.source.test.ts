@@ -212,3 +212,56 @@ describe('推送通路：Rust → Kotlin（V0.11.27）', () => {
     expect(VIEW, 'PillView 里又出现了灰色待机色').not.toContain('PILL_IDLE');
   });
 });
+
+/**
+ * 手势语义定稿（[V0.11.29]）：**点按只切计时，长按才跳转**。
+ *
+ * 主人原话：「点按暂停 长按再跳转至界面」。在此之前有两处会把点按变成跳转：
+ * 1. `onTap` 里「圆点未展开 → 先展开、`return`」，第一下不吃状态；
+ * 2. `requestAction` 投不出去时 `openApp()` 兜底 —— 前端没在听的那一按直接把人拽走。
+ *
+ * 这两条都属于「读起来很合理、用起来很恼人」，所以钉成源码判据：谁想加回来，先红。
+ */
+describe('手势语义：点按切计时，长按才跳转（V0.11.29）', () => {
+  const DRAG = code(
+    '../../src-tauri/gen/android/app/src/main/java/com/timing/app/overlay/PillDrag.kt',
+  );
+
+  /** `onTap` 整个函数体里不许出现 `openApp`。 */
+  it('tap_never_opens_the_app', () => {
+    const at = SERVICE.indexOf('private fun onTap()');
+    expect(at, '服务里没有 onTap').toBeGreaterThanOrEqual(0);
+    const body = SERVICE.slice(at, SERVICE.indexOf('private fun requestAction(', at));
+    expect(body, 'onTap 里出现了 openApp → 点一下会跳走').not.toContain('openApp');
+    expect(body).toContain('requestAction(KIND_TOGGLE)');
+  });
+
+  /** 投不出去时也不许拿「打开主界面」当兜底（那等于把点按偷偷换成跳转）。 */
+  it('failed_action_does_not_steal_a_tap', () => {
+    const at = SERVICE.indexOf('private fun requestAction(');
+    expect(at, '服务里没有 requestAction').toBeGreaterThanOrEqual(0);
+    const body = SERVICE.slice(at, SERVICE.indexOf('fun expandTemporarily', at));
+    expect(body, 'requestAction 里出现 openApp → 前端没在听时点按会跳走').not.toContain('openApp');
+    expect(body, '失败没有留下可见原因').toContain('lastTapError =');
+  });
+
+  /** 长按这一档必须还在：它现在是**唯一**能回主界面的手势。 */
+  it('long_press_still_opens_the_app', () => {
+    expect(SERVICE, '接线断了：长按不再打开主界面').toContain(
+      'PillDrag(this, wm, view, params, ::onTap, ::openApp)',
+    );
+    expect(DRAG).toContain('onLongPress()');
+    expect(DRAG).toContain('LONG_PRESS_MS = 520L');
+  });
+
+  /** 圆点形态下第一下不许再被「只展开」吃掉 —— 展开了但不切状态，就是主人说的「没反应」。 */
+  it('dot_tap_is_not_swallowed_by_expand', () => {
+    const at = SERVICE.indexOf('private fun onTap()');
+    const body = SERVICE.slice(at, SERVICE.indexOf('private fun requestAction(', at));
+    expect(body, 'onTap 里又有「展开后 return」的分支 → 第一下不切状态').not.toMatch(
+      /expandTemporarily\(\)\s*\n\s*return/,
+    );
+    /* 展开本身要留着：它是这一按唯一看得见的落点。 */
+    expect(body).toContain('expandTemporarily()');
+  });
+});
