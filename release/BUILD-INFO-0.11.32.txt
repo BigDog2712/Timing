@@ -1,7 +1,7 @@
 product: Timing
 version: 0.11.32
-git_commit: 待提交（基线 07b0aa0）
-git_dirty: true
+git_commit: 9273776（构建时树 = 07b0aa0 + 本轮改动；提交内容与构建树一致）
+git_dirty: true（构建那一刻未提交）
 built_at_utc: 2026-11-09T02:37:17Z
 build_profile: release
 
@@ -9,7 +9,8 @@ build_profile: release
 # 这个包只有安卓一侧，由 `node scripts/android-apk.mjs` + `node scripts/android-sign.mjs --debug-key` 产出；
 # 那两个脚本不写 BUILD-INFO，这份是事后按实际情况补的。
 #
-# git_dirty: true：构建时本轮改动还在工作树里（尚未提交），基线是 07b0aa0。
+# git_dirty: true：构建时本轮改动还在工作树里（尚未提交），基线是 07b0aa0；
+#   构建完成后提交为 9273776，源码一个字节没再动过（只追加了这点说明文字）。
 # 构建之后只改过 release/ 下的说明文字、文档，以及把两个超 300 行的测试文件拆开（不参与打包）。
 #
 # 包身自证：
