@@ -57,6 +57,7 @@ import './styles/mobile/shell.css';
 import './styles/mobile/primitives.css';
 import './styles/mobile/timer.css';
 import './styles/mobile/items.css';
+import './styles/mobile/items-done.css';
 import './styles/mobile/records.css';
 /* [V0.11.0] 便利贴页（第 5 个 Tab） */
 import './styles/mobile/notes.css';

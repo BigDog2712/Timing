@@ -2,6 +2,61 @@
 
 本文件记录本仓库的版本变更。版本语义 `MAJOR.MINOR.PATCH`，与 `src-tauri/tauri.conf.json` 的 `version` 同步。
 
+## 0.11.31 — 手机端三条口径定稿（只有手机包）
+
+主人对上轮三条待定的回复：常用事项「是用户自己设置的，参考 pc 端」、事项页改口径「可以」、
+记录页「把本周改为往期，可选择本周、近七天、本月、往日等」。
+
+### 换事项：常用 / 最近用过 / 其他事项
+
+- 复用电脑版 `lib/moyu.pinnedItems` + `recentItems`（`RECENT_ITEMS_DEFAULT`），没另写算法；
+- 每行右边图钉 → `itemApi.update({ id, patch: { isPinned: !item.isPinned } })` →
+  `useItemStore.reload()`；`is_pinned` 就是电脑版认的那个字段，不新增本地偏好；
+- 三段互斥；一行 = 「左按钮 + 右图钉」两个并列按钮（`button` 不能套 `button`，WebView 会吞内层点击）。
+
+### 事项页第三段：已完成待办
+
+- 新增 `src/lib/todayDone.ts`：按 `itemId` 完全合并今日记录，多段 = 一行 + 合计 + ×N；
+- 今天打勾的待办即使零记录也出现；计了时没打勾的保留并标「未勾选」；
+- 认领顺序先 `itemId` 再标题（改名不失配、`itemId` 为 null 的也能认）；
+- 删掉上一版的行尾「▶ 开始」与长按开始：这一页不再有计时入口（「不与计时界面功能重复」）；
+- `DoneRow.tsx` 抽成独立组件（行数门禁：`ItemsPage` 331 → 281）。
+
+### 记录页五档
+
+- `RecordsRange = 'day' | 'week' | 'last7' | 'month' | 'date'`；`rangeBounds(range, reference?)`；
+- `rangeLabel` / `rangeHint` / `dateInputValue` / `parseDateInput` / `parseDateTimeInput` / `timeInputValue`
+  一并落在 `lib/time.ts`（页面不算时间）；
+- 往日用原生 `<input type="date">`，`max` 卡今天；档位横滚 `m-seg--scroll`；
+- `useRecordsData(range, reference?)`：只有往日传基准日，其余 `undefined`（避免每帧重查库）。
+
+### 待办排时间 + 提醒可见
+
+- 新 `TodoPlanSheet` + `mobileUiStore` 新 kind `todoPlan`；入口是待办输入框右边的日历按钮，
+  空标题时明说「先写要做什么，再排时间」；
+- 字段口径照电脑版：**开启时间 → `remind_at`**；`create(title, null, at)` 的实参顺序被判据钉死
+  （写进 `planned_at` 会被后端当截止时间逾期清掉）；
+- 过去的时间禁用提交；点击里 `ensureNotifyPermission()`；
+- `jobs::nudge` 增 `notify_nudge`：`#[cfg(mobile)]` 发系统通知，`#[cfg(desktop)]` 空实现。
+
+### 强化
+
+- `SheetHost` 去掉 `default: return null`，改穷尽 switch + `const never: never`。
+
+### 判据与变异
+
+- 新增 `src/lib/time.test.ts` 13 条、`src/lib/todayDone.test.ts` 8 条、
+  `MobileSheets.source.test.ts` +11 条（含「事项页不许再出现计时入口」）；
+- 变异 5 条：取消合并 / 时间写进 `plannedAt` / 图钉写回原值 / 近七天算成八天 /
+  `SheetHost` 退回 `return null` —— 各自只红对应那一条，逐字还原。
+- **行数门禁逼出两次拆分**：`ItemsPage` 331→281、`items.css` 391→241（新 `items-done.css`）。
+
+### 数值
+
+`check` EXIT 0（契约 79/17/11、size 662、version 0.11.31 + vc 11031、layers 8、brand 0、eslint 0）；
+`npm test` 653（79 文件，+30）；`cargo --lib` 719/0/1ign；APK 11,137,060 B `1e964b8f…`；
+`.so` 内前端资产 `index-BVhH7yNY.js` ×1、两个旧资产 ×0；新 Rust 通知文案 ×1。
+
 ## 0.11.30 — 点了没反应：五个面板的 X 一起修（只有手机包）
 
 主人一次报 9 条。其中 1/2/8 是同一个 bug。

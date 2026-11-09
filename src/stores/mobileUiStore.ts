@@ -31,7 +31,13 @@ export type MobileSheet =
   /** [V0.11.0] 便利贴正文编辑（`noteId: null` = 新建一张，落库后由组件回填） */
   | { kind: 'noteEdit'; noteId: number | null }
   /** [V0.11.0] 便利贴改归属（选完成再回编辑页，故带上 noteId） */
-  | { kind: 'noteItem'; noteId: number };
+  | { kind: 'noteItem'; noteId: number }
+  /**
+   * [V0.11.31] 添加待办时排时间（哪天几点、几天后再做）。
+   * `title` 是用户已经敲在输入框里的内容——从添加框点「时间」进来时草稿已经存在，
+   * 再让他到面板里重敲一遍等于把一次输入拆成两次。
+   */
+  | { kind: 'todoPlan'; title: string };
 
 interface MobileUiStore {
   tab: MobileTab;

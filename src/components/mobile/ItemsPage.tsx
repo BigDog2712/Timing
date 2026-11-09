@@ -5,9 +5,9 @@
  *   ① 今日汇总条 —— 口径只认 `stats_summary`（`useTodayRecords` 内部就是它），
  *      条数取 `list_records` 的行数，进行中的会话额外算一条并叠加实时秒数；
  *   ② 待办区 —— 未完成全部 + 今天完成的（`lib/todoPanelLists`，与桌面 ADR-034 同源）；
- *   ③ 今日记录 —— 按事项 + 时间连续性合并（`lib/todayGroups`）。**[V0.11.30] 点行 = 事项编辑**，
- *      行尾「开始」按钮 / 长按 = 开始这一条。改之前两者是反的：主人点一条事项想看名字/归档，
- *      结果直接开了一段新计时，而且停在浮层里的 X 还关不掉（见 `mobileUiStore.closeSheet`）。
+ *   ③ 已完成待办 —— [V0.11.31] 今日记录**按事项合并**（同事项多段 = 一行 + 合计），
+ *      并标出是否打了勾。这一页**不放「开始计时」**，也不显示分段时刻：
+ *      要计时去计时页、要看流水去记录页，三处各管一件事（主人原话「应不与计时界面功能重复」）。
  *
  * 待办「开始」（与桌面同一条逻辑，用户视角「待办就是给计时的」）：
  *   - 空闲 → `todo_start`：后端按标题匹配或新建事项、开计、**当场移除待办**，
@@ -18,64 +18,23 @@
  * 两条路径成功后都会重拉待办 store，否则那一行会留在屏幕上（PRD P0-6 的验收点）。
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLongPress } from '../../hooks/useLongPress';
-import { useTimerActions } from '../../hooks/useTimerActions';
 import { useTimerTick } from '../../hooks/useTimerTick';
 import { useTodayRecords } from '../../hooks/useTodayRecords';
 import { TODO_TITLE_MAX_CHARS } from '../../lib/constants';
-import { formatDuration, formatMinutes, formatRange } from '../../lib/format';
-import { AlertIcon, PlayIcon, iconStroke } from '../../lib/icons';
+import { formatDuration, formatMinutes } from '../../lib/format';
+import { AlertIcon, CalendarClockIcon, iconStroke } from '../../lib/icons';
 import { todoPanelLists } from '../../lib/todoPanelLists';
-import { groupTodayRecords, type TodayGroup } from '../../lib/todayGroups';
+import { groupTodayDone } from '../../lib/todayDone';
 import { mobileTimerActions } from '../../services/mobileTimerActions';
 import { todosActions } from '../../services/todosActions';
 import { useMobileUiStore } from '../../stores/mobileUiStore';
 import { itemName, useItemStore } from '../../stores/itemStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { useTodoStore } from '../../stores/todoStore';
+import { useUiStore } from '../../stores/uiStore';
 import type { Todo } from '../../types/domain';
+import { DoneRow } from './DoneRow';
 import { TodoRowMobile } from './TodoRowMobile';
-
-interface RecordRowProps {
-  group: TodayGroup;
-  /** 点按整行 = 打开事项编辑（[V0.11.30] 主人口径：「点按事项后应唤起编辑界面」） */
-  onEdit: () => void;
-  /** 行尾「开始」按钮 = 切到这一条继续计时（长按同义，给习惯老手势的人留一条路） */
-  onStart: () => void;
-}
-
-/** 单行今日记录：点 = 事项编辑，行尾按钮 / 长按 = 开始这一条（hook 不能写在 map 里，故独立成组件） */
-function RecordRow({ group, onEdit, onStart }: RecordRowProps) {
-  const press = useLongPress(onStart, onEdit);
-  return (
-    <li>
-      <div className="m-record" {...press}>
-        <span className="m-record__name">
-          {group.name}
-          {group.count > 1 && <span className="m-record__count">×{group.count}</span>}
-        </span>
-        <span className="m-record__range">{formatRange(group.startedAt, group.endedAt)}</span>
-        <span className="m-record__dur">{formatDuration(group.seconds)}</span>
-        {/* 行内按钮必须自己吞掉 pointerdown：否则外层的长按计时器仍会启动，
-            松手时整行还会再触发一次「编辑」，等于点了开始又弹菜单。 */}
-        <button
-          type="button"
-          className="m-record__start"
-          aria-label={`开始计时：${group.name}`}
-          onPointerDown={(e) => e.stopPropagation()}
-          onPointerUp={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            onStart();
-          }}
-        >
-          <PlayIcon size={16} strokeWidth={iconStroke(16)} aria-hidden />
-          开始
-        </button>
-      </div>
-    </li>
-  );
-}
 
 export function ItemsPage() {
   const todos = useTodoStore((s) => s.todos);
@@ -87,8 +46,8 @@ export function ItemsPage() {
   const timerStatus = useTimerStore((s) => s.state.status);
   const liveSec = useTimerTick();
   const today = useTodayRecords();
-  const timerActions = useTimerActions();
   const openSheet = useMobileUiStore((s) => s.openSheet);
+  const setNotice = useUiStore((s) => s.setNotice);
   const recordsNonce = useMobileUiStore((s) => s.recordsNonce);
 
   const [draft, setDraft] = useState('');
@@ -119,9 +78,9 @@ export function ItemsPage() {
   /* [V0.11.0] 事项名集合：待办「开始」走的是后端按标题匹配（或就地新建），
      标题没有同名事项时给一行灰字预告「会新建一条」，用户不会在事项列表里发现惊喜。 */
   const itemNames = useMemo(() => new Set(items.map((item) => item.name)), [items]);
-  const groups = useMemo(
-    () => groupTodayRecords(today.rows, (itemId) => itemName(items, itemId)),
-    [today.rows, items],
+  const doneRows = useMemo(
+    () => groupTodayDone(today.rows, todos, (itemId) => itemName(items, itemId)),
+    [today.rows, todos, items],
   );
 
   /* 进行中的会话不在 list_records 里（未 saved），单独一行计入条数与总时长；
@@ -149,6 +108,18 @@ export function ItemsPage() {
       return;
     }
     openSheet({ kind: 'todoSwitch', todoId: todo.id, title: todo.title });
+  };
+
+  /* [V0.11.31] 「排时间」的入口：必须有内容才让排。
+     空标题时先落库再弹面板会出现一条无标题待办（标题是必填 1-200），
+     不如直接说清「先写要做什么」——那种「点了什么都没发生」最伤。 */
+  const planTodo = () => {
+    const title = draft.trim();
+    if (!title) {
+      setNotice({ tone: 'info', text: '先写要做什么，再排时间' });
+      return;
+    }
+    openSheet({ kind: 'todoPlan', title });
   };
 
   const createTodo = async () => {
@@ -201,6 +172,15 @@ export function ItemsPage() {
               if (e.key === 'Enter') void createTodo();
             }}
           />
+          <button
+            type="button"
+            className="m-compose__plan"
+            aria-label="排个时间"
+            disabled={busy}
+            onClick={planTodo}
+          >
+            <CalendarClockIcon size={20} strokeWidth={iconStroke(20)} aria-hidden />
+          </button>
           <button type="button" className="m-btn m-btn--primary" disabled={!draft.trim() || busy} onClick={() => void createTodo()}>
             添加
           </button>
@@ -261,7 +241,7 @@ export function ItemsPage() {
 
       <section className="m-section">
         <header className="m-section__head">
-          <h2 className="m-section__title">今日记录</h2>
+          <h2 className="m-section__title">已完成待办</h2>
           <button type="button" className="m-link" onClick={() => useMobileUiStore.getState().setTab('records')}>
             看全部
           </button>
@@ -277,16 +257,20 @@ export function ItemsPage() {
           </div>
         ) : today.loading ? (
           <p className="m-empty">正在读取今日记录…</p>
-        ) : groups.length === 0 ? (
-          <p className="m-empty">今天还没有记录。回到计时页点一下开始。</p>
+        ) : doneRows.length === 0 ? (
+          <p className="m-empty">
+            今天还没有做完的事。计一段时、或者勾掉一条待办，这里就会出现。
+          </p>
         ) : (
-          <ul className="m-list m-list--record">
-            {groups.map((group) => (
-              <RecordRow
-                key={group.key}
-                group={group}
-                onEdit={() => openSheet({ kind: 'itemMenu', itemId: group.itemId })}
-                onStart={() => void timerActions.startOrSwitch(group.itemId)}
+          <ul className="m-list">
+            {doneRows.map((row) => (
+              <DoneRow
+                key={row.key}
+                row={row}
+                onEdit={() => {
+                  /* 纯待办行没有事项可编辑（`clickable` 为 false 时根本不会走到这里） */
+                  if (row.itemId != null) openSheet({ kind: 'itemMenu', itemId: row.itemId });
+                }}
               />
             ))}
           </ul>

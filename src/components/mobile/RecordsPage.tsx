@@ -1,7 +1,14 @@
 /**
  * Timing — 移动端记录页（Tab ③）
  * -----------------------------------------------------------------------------
- * 日 / 周两档，周以**周一 00:00** 起（`lib/time.rangeBounds`，与后端 `stats_summary` 同口径）。
+ * 五档范围（`lib/time.RecordsRange`）：今天 / 本周 / 近七天 / 本月 / 往日。
+ * 周以**周一 00:00** 起，与后端 `stats_summary` 同口径；**区间算法全部在 `lib/time`**，
+ * 本页只负责选档位与展示，不自己拼时间。
+ *
+ * [V0.11.31] 原来只有「今天 / 本周」两档，主人要的「往期」在手机上根本点不到
+ * （原话「把本周改为往期，可选择本周、近七天、本月、往日等」）。「往日」用系统原生
+ * 日期控件选某一天——自己画日历要重做闰月 / 周首 / 长按翻页，收益只是一个更小的按钮。
+ *
  * 总计与「按事项分布」只取 `stats_summary`（PRD §6 的唯一算法），明细取 `list_records`。
  *
  * 分布条的百分比用 `group.totalSec / totalSec`：两者都来自同一份 summary，
@@ -11,22 +18,41 @@
  * 左滑在 WebView 里要自己实现手势 + 位移阈值 + 回弹，收益是一个更短的路径，
  * 代价是一条可能误触的破坏性手势。这一条记在交付说明里。
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRecordsData } from '../../hooks/useRecordsData';
 import { formatDuration, formatMinutes, formatRange } from '../../lib/format';
 import { AlertIcon, EmptyDotIcon, iconStroke } from '../../lib/icons';
-import type { RecordsRange } from '../../lib/time';
+import {
+  dateInputValue,
+  parseDateInput,
+  rangeHint,
+  rangeLabel,
+  startOfDay,
+  type RecordsRange,
+} from '../../lib/time';
 import { useMobileUiStore } from '../../stores/mobileUiStore';
 import { itemName, useItemStore } from '../../stores/itemStore';
 
+/** 档位顺序就是主人念的顺序：先眼前，再放大，最后才是回头挑一天 */
 const TABS: { key: RecordsRange; label: string }[] = [
   { key: 'day', label: '今天' },
   { key: 'week', label: '本周' },
+  { key: 'last7', label: '近七天' },
+  { key: 'month', label: '本月' },
+  { key: 'date', label: '往日' },
 ];
 
 export function RecordsPage() {
   const [range, setRange] = useState<RecordsRange>('day');
-  const { loading, error, totalSec, recordCount, groups, reload } = useRecordsData(range);
+  /* 「往日」默认落在昨天：先看到一天有数据的区间，而不是一个空页面。
+     值恒为某天 00:00（`startOfDay`），转成 `type="date"` 的字符串只是展示形态。 */
+  const [picked, setPicked] = useState(() => startOfDay(Date.now() - 86_400_000));
+  const today = useMemo(() => startOfDay(Date.now()), []);
+
+  /* 只有「往日」需要基准日，其余档位传 undefined，钩子内部才取「此刻」——
+     传 `Date.now()` 会每次 render 都变，把 `useMemo` 变成每帧重查一次库。 */
+  const reference = range === 'date' ? picked : undefined;
+  const { loading, error, totalSec, recordCount, groups, reload } = useRecordsData(range, reference);
   const nonce = useMobileUiStore((s) => s.recordsNonce);
   const openSheet = useMobileUiStore((s) => s.openSheet);
   const items = useItemStore((s) => s.items);
@@ -36,9 +62,12 @@ export function RecordsPage() {
     if (nonce > 0) reload();
   }, [nonce, reload]);
 
+  const label = rangeLabel(range, picked);
+  const emptyText = `${label}还没有记录。`;
+
   return (
     <div className="m-records">
-      <div className="m-seg" role="tablist" aria-label="记录范围">
+      <div className="m-seg m-seg--scroll" role="tablist" aria-label="记录范围">
         {TABS.map((tab) => (
           <button
             key={tab.key}
@@ -54,9 +83,27 @@ export function RecordsPage() {
         ))}
       </div>
 
+      {/* [V0.11.31] 往日档：选哪一天就查哪一天。`max` 卡在今天——未来还没记录，
+          让人一路翻到明年只会看到空页面。 */}
+      {range === 'date' && (
+        <label className="m-datepick">
+          <span className="m-field__label">看哪一天</span>
+          <input
+            type="date"
+            className="m-input"
+            value={dateInputValue(picked)}
+            max={dateInputValue(today)}
+            onChange={(e) => {
+              const next = parseDateInput(e.target.value);
+              if (next != null) setPicked(next);
+            }}
+          />
+        </label>
+      )}
+
       <section className="m-total">
         <div>
-          <span className="m-total__label">总计</span>
+          <span className="m-total__label">{label}总计</span>
           <strong className="m-total__value">{formatDuration(totalSec)}</strong>
         </div>
         <span className="m-total__meta">{recordCount} 条 · {formatMinutes(totalSec)}</span>
@@ -75,7 +122,7 @@ export function RecordsPage() {
       ) : groups.length === 0 ? (
         <div className="m-empty m-empty--block">
           <EmptyDotIcon size={24} strokeWidth={iconStroke(24)} aria-hidden />
-          <p>这段时间还没有记录。</p>
+          <p>{emptyText}</p>
         </div>
       ) : (
         <>
@@ -108,7 +155,7 @@ export function RecordsPage() {
             <header className="m-section__head">
               <h2 className="m-section__title">明细</h2>
               <span className="m-section__meta">
-                {range === 'day' ? '今天' : '本周'} · 单页最多 100 条
+                {label} · 单页最多 100 条
               </span>
             </header>
             {groups.map((group) => (
@@ -138,9 +185,7 @@ export function RecordsPage() {
         </>
       )}
 
-      <p className="m-hint">
-        {range === 'day' ? '今天 00:00 起 24 小时' : '本周从周一 00:00 起 7 天（周一是第一天）'}
-      </p>
+      <p className="m-hint">{rangeHint(range)}</p>
     </div>
   );
 }

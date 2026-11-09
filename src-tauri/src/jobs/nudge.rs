@@ -19,6 +19,7 @@ use tauri::{AppHandle, Manager};
 use crate::app::events;
 use crate::error::AppResult;
 use crate::models::constants::REMINDER_SCAN_INTERVAL_SECS;
+use crate::models::nudge::TodoNudge;
 use crate::platform::clock::{self, now_ms};
 use crate::services::todo_nudge::{self, STAGE_AUTOSTART, STAGE_LIGHT};
 use crate::services::{self};
@@ -52,12 +53,34 @@ async fn scan_once(app: &AppHandle, pool: &SqlitePool) -> AppResult<()> {
         todo_nudge::mark(pool, &due, now).await?;
         for nudge in &due {
             events::emit_todo_nudge(app, nudge);
+            notify_nudge(app, nudge);
         }
     }
     autostart(app, pool, now).await?;
     // ④ 过期清理（放在最后：先把该弹的、该开的处理完，再清掉过期项）
     purge_overdue(pool).await
 }
+
+/// 待办提醒的**可见出口**（[V0.11.31]）。
+///
+/// 手机端只渲染 `MobileShell`，没有任何组件订阅 `todo-nudge` —— 事件发出去没有接收者，
+/// 待办提醒在手机上等于不存在（主人报了「提醒没反应」之前，更准确的说法是「从来没响过」）。
+/// 桌面那边有手写浮层 `ReminderPopover`，再发一条系统通知只会变成双份打扰，
+/// 所以这里编译期分叉，而不是运行时判断。
+///
+/// 发不出去写 warn：通知权限被拒时系统会静默丢，`notify()` 返回 false 是唯一线索。
+#[cfg(mobile)]
+fn notify_nudge(app: &AppHandle, nudge: &TodoNudge) {
+    let minutes = if nudge.stage == STAGE_LIGHT { "15" } else { "5" };
+    let body = format!("{minutes} 分钟后开始，点开可以现在就开始");
+    if !crate::infra::notify::notify(app, &nudge.title, &body) {
+        crate::log_warn!("todo nudge notify failed: {}", nudge.title);
+    }
+}
+
+/// 桌面端空实现：`ReminderPopover` 已经会为同一条 nudge 浮出卡片（见上面的注释）。
+#[cfg(desktop)]
+fn notify_nudge(_app: &AppHandle, _nudge: &TodoNudge) {}
 
 /// 到点自动开始：空闲直接开始；有会话则只开始用户答应过的（`auto_start=1`）。
 async fn autostart(app: &AppHandle, pool: &SqlitePool, now: i64) -> AppResult<()> {

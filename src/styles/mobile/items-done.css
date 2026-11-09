@@ -1,0 +1,159 @@
+/**
+ * Timing — 手机端事项页（本轮新增块）items-done.css（V0.11.31）
+ * -----------------------------------------------------------------------------
+ * 从 `items.css` 拆出来的三块：换事项的「行 + 星标」、已完成待办的行、待办排时间。
+ * 拆的理由是行数门禁（单文件 ≤300 行），拆的口径是**按功能**而不是按长度切一半：
+ * 这三块全都服务于「事项 / 待办」这一屏，跟日期区间、记录行那些没关系。
+ *
+ * 引入点：`main.tsx`（与 `items.css` 并列，顺序在后，需要覆盖的变量都在 tokens 里）。
+ */
+
+/* ------------------------------ [V0.11.31] 换事项：行 + 星标 ------------------------------
+   一行里有两个动作（切过去 / 改常用），所以**不能**把整行做成一个按钮后在里面塞按钮
+   （HTML 不允许 button 套 button，WebView 会把内层点击吞掉）。改成一排两个并列按钮：
+   左边 `m-list__row` 撑满，右边固定 44px 的星标命中区。 */
+.m-itempick {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-1);
+}
+
+.m-itempick .m-list__row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.m-pin {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--m-tap);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--ink-3);
+}
+
+/* 已设常用：用强调色描边，与「当前」的底色区分开（同一行可能既当前又常用） */
+.m-pin[data-on="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+}
+
+.m-pin:active {
+  background: var(--accent-wash);
+}
+
+/* 分组之间留一点距离，三段标题连在一起会看不出是三个组 */
+.m-itempick__sec {
+  margin-top: var(--space-3);
+}
+
+.m-itempick__sec:first-of-type {
+  margin-top: var(--space-2);
+}
+
+/* ------------------------------ [V0.11.31] 已完成待办的行 ------------------------------
+   三列：名称（可截断）/ 勾选态 / 合计时长。
+   与记录页的 `.m-record` 分开写：那边要显示「时刻区间」且整行可点，这边显示「勾没勾」，
+   硬套同一套 class 会让两边都被迫接受对方不要的列。 */
+.m-done {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  text-align: left;
+}
+
+.m-done__name {
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 勾选态：绿=已完成、灰=未勾选。颜色不是唯一线索（还有图标与文字），
+   色弱用户也能分清——只靠颜色区分状态是这套手机的既有约定之外的坏做法。 */
+.m-done__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  background: var(--bg-field);
+  white-space: nowrap;
+}
+
+.m-done__flag[data-on="true"] {
+  /* `--ok-ink` 是「绿底上的文字色」（深色主题是深绿），用在这里会让字看不见；
+     要的是淡绿底 + 绿字，直接用主绿色做半透明底。 */
+  color: var(--color-done);
+  background: color-mix(in srgb, var(--color-done) 14%, transparent);
+}
+
+.m-done .m-record__count {
+  margin-left: 6px;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* ------------------------------ [V0.11.31] 待办「排时间」入口 ------------------------------
+   与「添加」并列的第二个动作：添加 = 现在就做，排时间 = 到点再提醒。
+   44px 的方形命中区，图标即语义（日历 + 时钟），不写文字——输入框要留出宽度。 */
+.m-compose__plan {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--m-tap);
+  min-height: var(--m-tap);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--bg-card);
+  color: var(--ink-2);
+}
+
+.m-compose__plan:active {
+  background: var(--accent-wash);
+  border-color: var(--accent-line);
+  color: var(--accent-ink);
+}
+
+/* ------------------------------ [V0.11.31] 排时间面板 ------------------------------ */
+.m-plan__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-plan__quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.m-plan__chip[data-on="true"] {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+  border-color: var(--accent-line);
+}
+
+/* 哪天 / 几点并排：两个原生控件各占一半，宽屏（平板）也不会拉成一条长条 */
+.m-plan__fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}

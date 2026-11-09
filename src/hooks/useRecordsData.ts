@@ -48,7 +48,12 @@ function buildGroups(rows: TimeRecord[], items: Item[], byItem: { itemId: number
   }));
 }
 
-export function useRecordsData(range: RecordsRange): RecordsData {
+/**
+ * @param reference [V0.11.31] 「往日」档要指向用户挑的那一天；其余档位与桌面板不传，
+ *   缺省即「此刻」。**别在这里默认 `Date.now()`**——它每次 render 都是新值，
+ *   会被 `useMemo` 当成变化，等于每帧重查一次数据库。
+ */
+export function useRecordsData(range: RecordsRange, reference?: number): RecordsData {
   const items = useItemStore((s) => s.items);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +63,7 @@ export function useRecordsData(range: RecordsRange): RecordsData {
   const [byItem, setByItem] = useState<{ itemId: number; totalSec: number }[]>([]);
   const [nonce, setNonce] = useState(0);
 
-  const bounds = useMemo(() => rangeBounds(range), [range]);
+  const bounds = useMemo(() => rangeBounds(range, reference), [range, reference]);
 
   useEffect(() => {
     let cancelled = false;

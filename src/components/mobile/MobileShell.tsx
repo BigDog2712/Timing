@@ -37,6 +37,7 @@ import { RecoverSheet } from './RecoverSheet';
 import { SettingsPage } from './SettingsPage';
 import { SwitchItemSheet } from './SwitchItemSheet';
 import { TodoSwitchSheet } from './SwitchModeSheet';
+import { TodoPlanSheet } from './TodoPlanSheet';
 import { TimerPage } from './TimerPage';
 import { UndoToast } from './UndoToast';
 
@@ -92,9 +93,13 @@ function SheetHost({ sheet }: { sheet: MobileSheet }) {
       return <NoteSheet noteId={sheet.noteId} />;
     case 'noteItem':
       return <NoteItemSheet noteId={sheet.noteId} />;
-    default:
-      return null;
+    case 'todoPlan':
+      return <TodoPlanSheet title={sheet.title} />;
   }
+  /* 穷尽性检查：以后再加一种 Sheet 却忘了在这里接上，TS 直接报错，
+     而不是 `default: null` 静默什么都不显示——那种坏法点了没反应、控制台也没有一行字。 */
+  const never: never = sheet;
+  return never;
 }
 
 export function MobileShell() {

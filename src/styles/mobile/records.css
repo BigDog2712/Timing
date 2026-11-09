@@ -105,3 +105,32 @@
   font-size: var(--text-xs);
   color: var(--ink-3);
 }
+
+/* ------------------------------ [V0.11.31] 五档范围 / 往日选日期 ------------------------------
+   五个档位各占 1/5 在 375px 屏上只有 66px，「近七天」三个字就要 40px，
+   挤到只剩两个字的宽度。改成**横滚、按内容宽度**：点得到的仍然是 44px 高度，
+   一次能看见四个档位，手指轻轻一划就到「往日」。
+   `flex: 0 0 auto` 覆盖 primitives 里的 `flex: 1 1 0`（那是给两档用的）。 */
+.m-seg--scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.m-seg--scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.m-seg--scroll .m-seg__item {
+  flex: 0 0 auto;
+  padding: 0 var(--space-3);
+  white-space: nowrap;
+}
+
+/* 往日选日期：标签在上、原生日期控件在下（iOS/Android 都会弹出系统选择器） */
+.m-datepick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
