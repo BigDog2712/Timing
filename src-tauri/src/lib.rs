@@ -21,13 +21,6 @@ mod infra;
 mod ipc_commands;
 mod jobs;
 mod models;
-/// Patina 子系统（vendored，MIT）：自动使用追踪 / 历史 / 分析 / 分类映射 / 工具。
-/// 它有自己的 `app` / `commands` / `platform` 子树，与宿主的同名模块互不可见。
-///
-/// 桌面独占：上游依赖 WebView2 / Win32（`webview2-com` / `windows`），Android 编不进来。
-/// 移动端保持原样——Patina 本来就没有移动版。
-#[cfg(desktop)]
-mod patina;
 mod platform;
 mod repositories;
 mod services;
@@ -78,7 +71,7 @@ pub fn run() {
     父进程只看到 `last_error=cooldown`，症状是「活动追踪永久 stalled、采样数恒为 0」，
     且全链路无任何报错。上游写在 `lib.rs::run()` 第一行，融合时漏搬了这一条。 */
     #[cfg(desktop)]
-    if let Some(exit_code) = patina::platform::windows::native_probe::run_if_requested() {
+    if let Some(exit_code) = crate::infra::insight::windows::native_probe::run_if_requested() {
         std::process::exit(exit_code);
     }
 
@@ -170,9 +163,9 @@ pub fn run() {
     /* Patina 子系统接入（状态 + 插件）。它自己的自启 / 通知 / 单实例注册已在上游
     `configure` 里摘掉——同一进程只能有一份，宿主的在上面。 */
     #[cfg(desktop)]
-    let builder = patina::app::bootstrap::configure(
+    let builder = crate::app::insight::bootstrap::configure(
         builder,
-        patina::app::bootstrap::BootstrapInput {
+        crate::app::insight::bootstrap::BootstrapInput {
             app_version: ctx.package_info().version.to_string(),
         },
     );
@@ -197,7 +190,7 @@ pub fn run() {
         if let Err(err) = app::patina_bridge::prepare() {
             crate::log_warn!("patina: data preparation failed: {err}");
         }
-        patina::app::bootstrap::setup(app, false)?;
+        crate::app::insight::bootstrap::setup(app, false)?;
         Ok(())
     });
 
@@ -209,7 +202,7 @@ pub fn run() {
     顺序无依赖（宿主那条只在 `CloseRequested` 上作动作，Patina 侧不消费该分支）。 */
     #[cfg(desktop)]
     let builder = builder.on_window_event(|window, event| {
-        patina::app::bootstrap::on_window_event(window, event);
+        crate::app::insight::bootstrap::on_window_event(window, event);
         infra::window::on_window_event(window, event);
     });
 
@@ -218,7 +211,7 @@ pub fn run() {
     let application = builder.build(ctx).expect("Timing 启动失败");
 
     #[cfg(desktop)]
-    application.run(patina::app::bootstrap::handle_run_event);
+    application.run(crate::app::insight::bootstrap::handle_run_event);
     #[cfg(mobile)]
     application.run(|_handle, _event| {});
 }

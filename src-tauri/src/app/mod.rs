@@ -54,3 +54,10 @@ pub mod tray_sync;
 /* [V0.11.26] 托盘同步项的三态标签 + blocked 拦截判据（从 `tray_sync` 迁出）。 */
 #[cfg(desktop)]
 pub mod tray_label;
+
+/* 分析窗（原 Patina 子系统）的装配层：bootstrap / 托盘 / 状态 / 主窗与迷你窗 / 追踪运行时。
+   桌面独占（上游依赖 WebView2 / Win32）。`allow(dead_code)` 覆盖整棵子树——上游是独立应用，
+   部分入口在融合后被宿主接管，实现留在原地以便吸收上游补丁。 */
+#[cfg(desktop)]
+#[allow(dead_code)]
+pub mod insight;

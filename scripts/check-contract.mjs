@@ -48,22 +48,28 @@ function typesSource() {
 /** 1. Rust 注册的命令
  *
  * 命令表在 `src-tauri/src/ipc_commands.rs`（V0.12.0 融合 Patina 时从 `lib.rs` 拆出：
- * 宿主 79 条 + Patina 118 条，一张 `generate_handler!` 内）。这里只取**宿主**那一段
- * （`crate::commands::…`）——Patina 的命令由 `src/app/**` `src/features/**` 等前端自己调用，
- * 不进 `ipc.ts` / `IpcApi` / `browserMock` 这套宿主契约。
+ * 宿主 80 条 + insight 117 条，一张 `generate_handler!` 内）。这里只取**宿主**那一段
+ * （`crate::commands::…`，且模块名不得是 `insight`）——insight 的命令由
+ * `src/app/**` `src/features/**` 等前端自己调用，不进 `ipc.ts` / `IpcApi` /
+ * `browserMock` 这套宿主契约。
+ *
+ * 负向断言 `(?!insight::)` 是必需的：insight 归一后路径变成
+ * `crate::commands::insight::<模块>::<函数>`，没有它就会把模块名当命令名捕获，
+ * 宿主集合从 80 变成 197 个垃圾项而 `cargo check` 全绿 —— 纯契约层的静默失效。
  */
 function rustCommands() {
   const src = read('src-tauri/src/ipc_commands.rs');
   if (!src.includes('generate_handler![')) {
     throw new Error('ipc_commands.rs 里找不到 generate_handler![...]');
   }
-  return new Set([...src.matchAll(/crate::commands::\w+::(\w+)/g)].map((m) => m[1]));
+  return new Set([...src.matchAll(/crate::commands::(?!insight::)(\w+)::(\w+)/g)].map((m) => m[2]));
 }
 
-/** Patina（vendored 子系统）注册的命令，仅用于「不许与宿主重名」这一条。 */
+/** 分析窗（原 Patina，vendored 子系统）注册的命令，用于「不许与宿主重名」这一条。
+ *  归一后多一层嵌套（`commands::insight::<模块>::<函数>`），单独解析；计数必须恒为 117。 */
 function patinaCommands() {
   const src = read('src-tauri/src/ipc_commands.rs');
-  return new Set([...src.matchAll(/crate::patina::commands::\w+::(\w+)/g)].map((m) => m[1]));
+  return new Set([...src.matchAll(/crate::commands::insight::(\w+)::(\w+)/g)].map((m) => m[2]));
 }
 
 /** 2. IpcApi 接口方法 */
@@ -129,8 +135,21 @@ function emitSites(byName) {
   /* vendored 子树（V0.12.0 融合的 Patina）自带一套事件名与常量，前端也在
      `src/features/**` 里自用，不进宿主 `IPC_EVENTS`。它的 `.emit("字面量")` 属上游写法，
      不适用宿主 ADR-016 的「事件名只能来自 events.rs 常量」——改写 vendored 代码会让
-     后续同步上游变成逐行冲突。**只豁免字面量这一条**，标识符计数仍全仓进行。 */
-  const isVendored = (rel) => rel.replace(/\\/g, '/').includes('src-tauri/src/patina/');
+     后续同步上游变成逐行冲突。**只豁免字面量这一条**，标识符计数仍全仓进行。
+     [0.12.0 T02] 后端按层归一后路径前缀换成 5 个 `insight/` 新根（原
+     `src-tauri/src/patina/`）；漏改这一处，8 处上游字面量 emit 会立刻被报红，
+     而它们正是 `src/app/**` 在监听的那 3 个事件名。 */
+  const VENDORED_RS = [
+    'src-tauri/src/app/insight/',
+    'src-tauri/src/commands/insight/',
+    'src-tauri/src/infra/insight/',
+    'src-tauri/src/models/insight/',
+    'src-tauri/src/services/insight/',
+  ];
+  const isVendored = (rel) => {
+    const posix = rel.replace(/\\/g, '/');
+    return VENDORED_RS.some((prefix) => posix.startsWith(prefix));
+  };
   const values = new Set();
   const literals = [];
   const counts = new Map();

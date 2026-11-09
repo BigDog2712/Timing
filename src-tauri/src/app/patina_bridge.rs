@@ -39,7 +39,7 @@ pub fn prepare() -> Result<Option<PathBuf>, String> {
         .map_err(|err| format!("创建 {} 失败: {err}", data_dir.display()))?;
 
     // 落点在创建之后立刻注入：Patina 的 setup 会拿它建库，晚一步就落到 AppData 去了。
-    crate::patina::platform::app_paths::set_root_override(root.clone());
+    crate::infra::insight::app_paths::set_root_override(root.clone());
 
     let target = data_dir.join("patina.db");
     if target.exists() {
@@ -112,7 +112,7 @@ fn sqlite_url(path: &Path) -> Result<String, String> {
 宿主要在自己的统计里显示「同期电脑活动」，就得读 Patina 的活动库。这里只读、
 不写、不建表：**写入永远是 Patina 自己的事**，宿主插一脚会跟它的补写/回滚逻辑打架。
 
-为什么另开一条连接而不是复用 Patina 的池：那个池是 `patina::data::sqlite_pool` 的
+为什么另开一条连接而不是复用 Patina 的池：那个池是 `crate::services::insight::data::sqlite_pool` 的
 私有状态，借出来等于让宿主代码依赖 vendored 子树的内部实现；而且它是**可写**连接，
 一旦被宿主拿去跑查询，将来有人顺手写一条 UPDATE 就绕过了 Patina 的全部不变量。
 单开一条 `mode=ro` 的池，物理上就写不进去。 */

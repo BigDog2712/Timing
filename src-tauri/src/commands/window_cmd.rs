@@ -69,9 +69,9 @@ show 请求。返回 false = 窗正在重建或还没就绪（点第二次就好
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn open_patina_window(app: AppHandle) -> AppResult<()> {
-    if !crate::patina::app::tray::show_main_window(
+    if !crate::app::insight::tray::show_main_window(
         &app,
-        crate::patina::app::main_window::MainWindowShowReason::TrayMenu,
+        crate::app::insight::main_window::MainWindowShowReason::TrayMenu,
     ) {
         crate::log_warn!("patina main window is not ready yet; the next request will retry");
     }

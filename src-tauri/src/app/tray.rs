@@ -161,9 +161,9 @@ fn on_menu_event(app: &AppHandle, id: &str) {
         show 请求交给它；`show_main_window` 返回 false 表示窗在重建或还没就绪，
         此时再点一次托盘即可，不当作错误上报。 */
         tray_menu::ID_OPEN_STATS => {
-            if !crate::patina::app::tray::show_main_window(
+            if !crate::app::insight::tray::show_main_window(
                 app,
-                crate::patina::app::main_window::MainWindowShowReason::TrayMenu,
+                crate::app::insight::main_window::MainWindowShowReason::TrayMenu,
             ) {
                 crate::log_warn!("patina main window is not ready yet; retry the tray item");
             }

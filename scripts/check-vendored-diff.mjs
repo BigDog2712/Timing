@@ -3,7 +3,8 @@
  * Timing — vendored 差异门禁（Patina 子树「只能按登记改」）
  * -----------------------------------------------------------------------------
  * 前端那半（`src/app/**`、`src/features/**`、`src/platform/**`、`src/shared/**`）与
- * 后端 `src-tauri/src/patina/**` 都是**源码级并入**的第三方代码
+ * 后端 5 个 `insight/` 命名空间（`app` / `commands` / `infra` / `models` / `services`）
+ * 都是**源码级并入**的第三方代码
  * （Patina，MIT），不是我们写的。它的存在价值有一半在「随时能 diff 上游、按需同步」——
  * 而这个能力会被**无声的顺手改动**一点点吃掉：调个颜色、加个 Console、把 300 行拆两半，
  * 每一处都很合理，攒上十轮之后上游发了新版，合并时全是逐行冲突，谁也说不清哪几行是
@@ -36,8 +37,19 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-/* [0.12.0 T01] 前端剥掉 `src/patina/` 前缀后要认 4 个新根；后端前缀保持原样（T02 才搬）。 */
-const ROOTS = ['src/app/', 'src/features/', 'src/platform/', 'src/shared/', 'src-tauri/src/patina/'];
+/* [0.12.0 T02] 前端 4 个根由 T01 定下；后端 `src-tauri/src/patina/` 已按层归一，
+ * 换成 5 个 `insight/` 新根（docs/refactor/patina-structural-merge.md §2.2）。 */
+const ROOTS = [
+  'src/app/',
+  'src/features/',
+  'src/platform/',
+  'src/shared/',
+  'src-tauri/src/app/insight/',
+  'src-tauri/src/commands/insight/',
+  'src-tauri/src/infra/insight/',
+  'src-tauri/src/models/insight/',
+  'src-tauri/src/services/insight/',
+];
 const BASELINE = join(root, 'scripts', 'vendored-baseline.json');
 const ALLOWLIST = join(root, 'scripts', 'vendored-allowlist.json');
 const HASH_LEN = 16; // 64 bit 足够区分「同一文件的两个版本」，全量 64 位会让清单膨胀三倍
@@ -147,7 +159,7 @@ function refreshBaseline(ref) {
   const payload = {
     _doc:
       'vendored 基线：Patina 子树（前端 src/app、src/features、src/platform、src/shared，' +
-      '后端 src-tauri/src/patina）在融合完成态的逐文件哈希。' +
+      '后端 src-tauri/src/{app,commands,infra,models,services}/insight）在归一态的逐文件哈希。' +
       '不要手改 —— 用 node scripts/check-vendored-diff.mjs --refresh <ref> 重生成，' +
       '日常改动请登记到 scripts/vendored-allowlist.json。',
     source: {
@@ -315,7 +327,8 @@ if (unlisted.length === 0) {
 console.error(`[vendored] FAILED — ${summary}\n`);
 for (const item of unlisted) console.error(`✗ ${item.rel} — ${item.kind}，${item.why}`);
 console.error(
-  '\n规则：src/app/** src/features/** src/platform/** src/shared/** 与 src-tauri/src/patina/** ' +
+  '\n规则：src/app/** src/features/** src/platform/** src/shared/** 与后端 5 个 ' +
+    'src-tauri/src/<层>/insight/** ' +
     '是 vendored 第三方源码，改动必须登记。\n' +
     '  登记处：scripts/vendored-allowlist.json —— { path, change: modified|added|deleted, reason, owner }\n' +
     '  只是解压产物 / 编辑器换行 / 构建缓存误入？直接还原，不要登记。',

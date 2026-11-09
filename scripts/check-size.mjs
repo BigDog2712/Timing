@@ -53,20 +53,27 @@ const violations = [];
 /* vendored 子树口径（V0.12.0 融合 Patina）：
  *
  * 前端那半（`src/app/**`、`src/features/**`、`src/platform/**`、`src/shared/**`）与后端
- * `src-tauri/src/patina/**` 都是 **原样并入的第三方源码**
+ * 5 个 `insight/` 命名空间（`app` / `commands` / `infra` / `models` / `services`）
+ * 都是 **原样并入的第三方源码**
  * （Patina 1.10.0，MIT），不是我们写的代码。它的文件尺寸归上游决定，我们也不该为了
  * 行数去改它 —— 拆完就等于放弃「diff 上游、按需同步」的能力，改一处变成逐行冲突。
- * 同理 `#![allow(dead_code)]` 也只加在 `patina/mod.rs` 这一个子树根上。
+ * 同理 `#![allow(dead_code)]` 也从单个子树根（原 `patina/mod.rs`）改成挂在 5 个
+ * `pub mod insight;` 上的模块级 allow。
  *
  * 判据要窄：只认这几条路径前缀，`src/services/**` 之类宿主代码一条都不豁免。
  * 想从严就在下面把 VENDORED 置空，它会照旧逐个报错。 */
-/* [0.12.0 T01] 前端剥掉 `src/patina/` 前缀后要认 4 个新根；后端前缀保持原样（T02 才搬）。 */
+/* [0.12.0 T02] 后端 `src-tauri/src/patina/` 已按层归一，前缀换成 5 个 `insight/` 新根
+ * （docs/refactor/patina-structural-merge.md §2.2）；前端 4 个根由 T01 定下，未动。 */
 const VENDORED = [
   'src/app/',
   'src/features/',
   'src/platform/',
   'src/shared/',
-  'src-tauri/src/patina/',
+  'src-tauri/src/app/insight/',
+  'src-tauri/src/commands/insight/',
+  'src-tauri/src/infra/insight/',
+  'src-tauri/src/models/insight/',
+  'src-tauri/src/services/insight/',
 ];
 const isVendored = (rel) => VENDORED.some((prefix) => rel.startsWith(prefix));
 const vendoredOversized = [];

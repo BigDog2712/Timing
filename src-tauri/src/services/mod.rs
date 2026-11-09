@@ -29,3 +29,9 @@ pub mod timer_time;
 pub mod todo;
 pub mod todo_nudge;
 pub mod todo_start;
+
+/* 分析窗的服务层（原 patina/data + patina/engine：自带 sqlx 池的完整持久化栈 + 调度器）。
+   二者互相引用（16 / 32 次），必须同层；详见 docs/refactor/patina-structural-merge.md §1.2。 */
+#[cfg(desktop)]
+#[allow(dead_code)]
+pub mod insight;

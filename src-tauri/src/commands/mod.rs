@@ -55,3 +55,8 @@ pub mod window_cmd;
 #[cfg(mobile)]
 #[path = "window_cmd_mobile.rs"]
 pub mod window_cmd;
+
+/* 分析窗的命令面（117 条，桌面独占；与宿主 80 条共用 `ipc_commands.rs` 的一张表）。 */
+#[cfg(desktop)]
+#[allow(dead_code)]
+pub mod insight;

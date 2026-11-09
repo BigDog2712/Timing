@@ -1,5 +1,5 @@
 {
-  "_doc": "vendored 改动登记表。前端 src/app/** src/features/** src/platform/** src/shared/** 与后端 src-tauri/src/patina/** 是 MIT 第三方源码（Patina），改动必须在这里留一条：path + change(modified|added|deleted) + reason + owner。验收口径是 node scripts/check-vendored-diff.mjs —— 未登记的改动让 npm run check 直接红。融合期（commit 7bc7bd7）那批路径改写与测试拆分不算改动，已固化进基线，见 THIRD-PARTY-NOTICES.md 第 1-7 条。",
+  "_doc": "vendored 改动登记表。前端 src/app/** src/features/** src/platform/** src/shared/** 与后端 src-tauri/src/app/insight/** src-tauri/src/commands/insight/** src-tauri/src/infra/insight/** src-tauri/src/models/insight/** src-tauri/src/services/insight/** 是 MIT 第三方源码（Patina），改动必须在这里留一条：path + change(modified|added|deleted) + reason + owner。验收口径是 node scripts/check-vendored-diff.mjs —— 未登记的改动让 npm run check 直接红。融合期（commit 7bc7bd7）那批路径改写与测试拆分不算改动，已固化进基线，见 THIRD-PARTY-NOTICES.md 第 1-7 条。",
   "entries": [
     {
       "path": "src/features/history/components/History.tsx",
@@ -119,6 +119,12 @@
       "path": "src/features/about/components/AboutPanel.tsx",
       "change": "modified",
       "reason": "T01 去前缀：资产引用 `../../../../../src-tauri/icons/icon.png` 指向子树之外，深度 5→4，改为 `../../../../src-tauri/icons/icon.png`。仅此 1 行。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/web_activity_analysis.rs",
+      "change": "modified",
+      "reason": "T02 归一：测试里的 include_str!(\"../../../../tests/fixtures/activity-timing-facts.json\") 是相对源文件目录的路径，文件从 src-tauri/src/patina/data/ 搬进 services/insight/data/ 后深了一层，改为 5 个 ../；上方注释同步写明为什么要 5 层。不改这条只有 cargo test --lib 会炸 —— include_str! 在 #[cfg(test)] 里，cargo check 看不见。",
       "owner": "ForG"
     }
   ]
