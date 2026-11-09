@@ -20,9 +20,9 @@
     "",
     "iOS 落地后再加 ios 字段，不要提前占位。"
   ],
-  "desktop": "0.11.28",
+  "desktop": "0.12.0",
   "mobile": {
-    "versionName": "0.11.33",
-    "versionCode": 11033
+    "versionName": "0.12.0",
+    "versionCode": 12000
   }
 }
