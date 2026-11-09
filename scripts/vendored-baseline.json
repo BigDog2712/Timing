@@ -644,7 +644,7 @@
     "src/platform/desktop/miniContentRuntimeGateway.ts": "f63d1cfcc3bd31c3",
     "src/platform/desktop/miniWindowRuntimeGateway.ts": "630ee4f00c987c81",
     "src/platform/desktop/resourceDiagnosticsRuntimeGateway.ts": "851244e3120772e2",
-    "src/platform/desktop/windowControlGateway.ts": "4b461d617456c735",
+    "src/platform/desktop/windowControlGateway.ts": "5c62e11322fb5462",
     "src/platform/persistence/activityDisplaySettingsStore.ts": "da8ec97fea8ab062",
     "src/platform/persistence/activityReadModelGateway.ts": "fc26999ff052a8a9",
     "src/platform/persistence/activityReminderCatalogGateway.ts": "d831b08e6cff7cb8",
