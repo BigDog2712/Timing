@@ -80,6 +80,35 @@ function versionCodeOf(name) {
   return maj * 1_000_000 + min * 1_000 + pat;
 }
 
+/**
+ * 安卓两条脚本都必须从 `platform-versions.json` 取手机版号。
+ *
+ * V0.11.33 分轨当天 `android-apk.mjs` 改对了、`android-sign.mjs` 漏了 —— APK 内部是
+ * `0.11.33 / 11033`，文件名叫 `Timing-android-0.11.27-…apk`。**包没错、名字全错**，
+ * 归档/校验和/安装说明一整套对不上，而且没有任何一处报错。
+ * 判据只认**调用**不认注释：两个文件都会在说明里提到 `tauri.conf.json`（讲清楚为什么
+ * 不能读它），所以用 `readFileSync(...tauri.conf.json` 匹配才不误伤。
+ */
+function androidScriptsUseMobileVersion() {
+  const failures = [];
+  for (const file of ['scripts/android-apk.mjs', 'scripts/android-sign.mjs']) {
+    let src;
+    try {
+      src = read(file);
+    } catch {
+      failures.push(`${file}: 读不到（改名或删除后请同步本断言）`);
+      continue;
+    }
+    if (!src.includes('platform-versions.json')) {
+      failures.push(`${file}: 没有读 platform-versions.json —— 手机版号只在那里`);
+    }
+    if (/readFileSync\([^)]*tauri\.conf\.json/.test(src)) {
+      failures.push(`${file}: 仍在从 tauri.conf.json 读号 → 拿到的是桌面号，包名/版本会错`);
+    }
+  }
+  return failures;
+}
+
 function packageJson() {
   return JSON.parse(read('package.json')).version;
 }
@@ -209,6 +238,17 @@ if (archive.failures.length) {
   ]);
 }
 
+/* 分轨后最隐蔽的坏法：包本身是对的，只有文件名用了桌面号（V0.11.33 实测踩过一次）。 */
+const scriptFailures = androidScriptsUseMobileVersion();
+if (scriptFailures.length) {
+  fail('安卓出包脚本没有统一从 platform-versions.json 取号', [
+    ...scriptFailures,
+    '',
+    '手机版号在 V0.11.33 起独立：`android-apk.mjs` 写进 tauri.properties，`android-sign.mjs` 命名产物，',
+    '两处必须同源。任何一处读 tauri.conf.json，产出的包名或版本号就会是桌面的。',
+  ]);
+}
+
 /* ---------------------------------------------------------------- 桌面：六处 == desktop */
 const off = entries.filter(([, v]) => v !== platform.desktop);
 if (missing.length || off.length) {
@@ -255,8 +295,5 @@ if (newest && cmpVer(mobile.versionName, newest) < 0) {
   ]);
 }
 
-console.log(
-  `[version] OK — 桌面 ${platform.desktop}（六处一致）；` +
-    `手机 ${mobile.versionName} / ${mobile.versionCode}` +
-    `（已发出最大 ${newest ?? '无'}；归档冻结 ${archive.rows.join(' / ')}）`,
-);
+const shippedTail = `已发出最大 ${newest ?? '无'}；归档冻结 ${archive.rows.join(' / ')}`;
+console.log(`[version] OK — 桌面 ${platform.desktop}（六处一致）；手机 ${mobile.versionName} / ${mobile.versionCode}（${shippedTail}）`);

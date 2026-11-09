@@ -186,7 +186,21 @@ function main() {
 
   // 归档到 release\，文件名带上签名来源，免得以后分不清哪个能装
   const tag = debugKey ? 'debugsigned' : 'signed';
-  const version = JSON.parse(readFileSync(join(ROOT, 'src-tauri', 'tauri.conf.json'), 'utf8')).version;
+  /* [V0.11.33] 手机版号独立：这里的 version 必须与上一个脚本写进 APK 的 `versionName` 同源，
+     也就是 `platform-versions.json` 的 `mobile.versionName`。
+     从 `tauri.conf.json` 读会拿到**桌面号**——V0.11.33 实测踩过：
+     APK 里明明是 0.11.33，文件名却成了 `Timing-android-0.11.27-…apk`，
+     于是「recency 看文件名」的归档、校验和、安装说明全部对不上。 */
+  const mobile = JSON.parse(
+    readFileSync(join(ROOT, 'scripts', 'platform-versions.json'), 'utf8'),
+  ).mobile;
+  const version = mobile?.versionName;
+  if (!version) {
+    throw new Error(
+      'scripts/platform-versions.json 里读不到 mobile.versionName' +
+        '（手机版号在 V0.11.33 起独立，不再跟 tauri.conf.json 的桌面号走）',
+    );
+  }
   const destName = input.includes('debug')
     ? `Timing-android-${version}-debug-arm64-${tag}.apk`
     : `Timing-android-${version}-release-arm64-${tag}.apk`;
