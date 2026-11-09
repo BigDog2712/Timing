@@ -16,8 +16,16 @@ const BINDINGS: MdSyncBinding[] = [
 
 const VIEW: MdSyncViewCloud = {
   today: '2026-10-20',
-  config: { enabled: true, pollSecs: 900, bindings: BINDINGS, cloud: null },
+  config: { enabled: true, pollSecs: 900, bindings: BINDINGS, cloud: null, cloudFolder: null, cloudWebdav: null },
   cloud: {
+    enabled: false,
+    mode: 'webdav',
+    hasSecret: false,
+    todayPushed: false,
+    pendingDates: [],
+    lastError: null,
+  },
+  local: {
     enabled: false,
     mode: 'localfolder',
     hasSecret: false,
@@ -125,26 +133,35 @@ describe('MdSyncTab —— 数据管理页签壳', () => {
     container?.remove();
   });
 
-  it('页签标题是「数据管理」，五块按固定顺序排列（PRD A1/A2）', async () => {
+  it('页签标题是「数据管理」，六块按固定顺序排列（PRD O7 / 设计 §1.4）', async () => {
     await mount();
     expect(container.querySelector('.data__title')?.textContent).toBe('数据管理');
     expect(Array.from(container.querySelectorAll('.data__block-title')).map((el) => el.textContent))
-      .toEqual(['Markdown 落点设置', 'SQLite 落点设置', 'Markdown 同步', 'WebDAV 云端同步', '备份数据管理']);
+      .toEqual([
+        'Markdown 落点设置',
+        'SQLite 落点设置',
+        'Markdown 同步',
+        '本地同步',
+        '云端同步',
+        '备份数据管理',
+      ]);
   });
 
-  it('每块的 chevron 都能收起/展开，收起后 body 是 hidden 且 aria-controls 指向存在的元素（PRD A3）', async () => {
+  it('每块的 chevron 都能收起/展开，默认全部收起且收起时 body 是 hidden（PRD O4）', async () => {
     await mount();
     const toggle = block('data-format')?.querySelector('.sync__fold-btn') as HTMLButtonElement;
     const bodyId = toggle.getAttribute('aria-controls') as string;
     expect(container.querySelector(`#${bodyId}`)).not.toBeNull();
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    /* [V0.11.26] 六块默认折叠（O4）：首帧一律 `aria-expanded=false` */
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelector(`#${bodyId}`)?.hasAttribute('hidden')).toBe(true);
 
     await act(async () => {
       toggle.click();
       await Promise.resolve();
     });
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    expect(container.querySelector(`#${bodyId}`)?.hasAttribute('hidden')).toBe(true);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector(`#${bodyId}`)?.hasAttribute('hidden')).toBe(false);
   });
 
   it('改①的标题行只在块①出现「未保存」，底部条同时出现；「放弃修改」回滚（PRD A4）', async () => {
@@ -220,14 +237,14 @@ describe('MdSyncTab —— 数据管理页签壳', () => {
 
   /* ===== [V0.11.16] 文案减法的机器判据（PRD A1 / A2 / A3）===== */
 
-  it('A1：页签顶部没有导览句、底部没有注脚，四块标题下各只有一句', async () => {
+  it('A1：页签顶部没有导览句、底部没有注脚，六块标题下各只有一句', async () => {
     await mount();
     expect(container.querySelector('.data__head')?.textContent).toBe('数据管理');
     /* 底部注脚（C2：「今天：…。同步只改目标标题下的区块，日记其他内容不动。」）整段删除：
        块①里那句 `.data__note` 是 C8 的安全句，只能留在块里，不能再出现在页签层 */
     const page = container.querySelector('.data') as HTMLElement;
     expect(page.querySelector(':scope > .data__note')).toBeNull();
-    for (const id of ['data-root', 'data-sync', 'data-cloud', 'data-backup']) {
+    for (const id of ['data-root', 'data-sync', 'data-local', 'data-cloud', 'data-backup']) {
       expect(block(id)?.querySelectorAll('.data__block-hint')).toHaveLength(1);
     }
   });

@@ -1,17 +1,34 @@
 import { describe, expect, it } from 'vitest';
-import type { MdSyncCloud } from '../../types/domain';
-import { channelOf, cloudToSave, emptyCloud, isCloudReady, withChannel } from './mdSyncConfig';
+import type { MdSyncCloud, MdSyncCloudChannel } from '../../types/domain';
+import {
+  channelToSave,
+  emptyCloud,
+  emptyLocal,
+  emptyWebdav,
+  isCloudReady,
+  isLocalReady,
+  isWebdavReady,
+  legacyCloudForTest,
+} from './mdSyncConfig';
 
-/* [V0.11.18] T1 的**单一真相**在这里被钉死：`cloud.enabled` 就是存储通道。
-   本文件只测三个纯函数，不挂载组件——「界面上有没有真的用上」由
-   `mdSyncChannel.test.tsx` 管。 */
+/* [V0.11.26] 本文件钉的是「两条通路各自的纯判据」：
+   `isLocalReady` / `isWebdavReady`（填没填全）、`channelToSave`（保存前归一）、
+   `legacyCloudForTest`（测试连接载荷）。
+   **与后端同口径**：`models/md_sync_channel.rs::is_usable_folder / is_usable_webdav`、
+   `services/md_sync/config.rs::load/save`，改一边必须改另一边。
 
-/** 一份「配过、且现在只用本地」的真实形态：地址 / 目录 / 账号都有值（主人真实配置就是这样） */
-function configured(over: Partial<MdSyncCloud> = {}): MdSyncCloud {
+   旧的 `channelOf / withChannel / cloudToSave` 已随通道选择器一起退场（PRD 变更一），
+   它们原来的用例按「迁移 / 互不触碰 / 防空壳」三件事平移到这里（O11–O13）。 */
+
+/** 一份「配过、且现在开着」的 folder 通路（主人真实配置的形状） */
+function folderChannel(over: Partial<MdSyncCloudChannel> = {}): MdSyncCloudChannel {
+  return { enabled: true, localRoot: 'D:\\Nutstore\\我的坚果云\\TimingMD', ...over };
+}
+
+/** 一份「配过、且现在开着」的 webdav 通路 */
+function webdavChannel(over: Partial<MdSyncCloudChannel> = {}): MdSyncCloudChannel {
   return {
     enabled: true,
-    mode: 'localfolder',
-    localRoot: 'D:\\Nutstore\\我的坚果云\\TimingMD',
     baseUrl: 'https://dav.jianguoyun.com/dav/',
     basePath: '/Timing',
     user: 'me@example.com',
@@ -19,106 +36,134 @@ function configured(over: Partial<MdSyncCloud> = {}): MdSyncCloud {
   };
 }
 
-describe('channelOf —— 通道的唯一判据', () => {
-  it('enabled:true → 本地 + 云端（老用户零迁移：他存的就是 true）', () => {
-    expect(channelOf(configured({ enabled: true }))).toBe('both');
+describe('emptyLocal / emptyWebdav —— 两块的空配置', () => {
+  it('两条通路默认都关着（凭空 true 会在下一次保存偷偷打开它）', () => {
+    expect(emptyLocal().enabled).toBe(false);
+    expect(emptyWebdav().enabled).toBe(false);
   });
 
-  it('enabled:false → 只用本地（不是「没配置」，是「配过但现在不跑云端」）', () => {
-    expect(channelOf(configured({ enabled: false }))).toBe('local');
+  it('块⑤ 预填服务地址与远端目录（最常见那台服务器开箱可用）', () => {
+    expect(emptyWebdav().baseUrl).toBe('https://dav.jianguoyun.com/dav/');
+    expect(emptyWebdav().basePath).toBe('/Timing');
+    expect(emptyWebdav().user).toBe('');
   });
 
-  it('emptyCloud() → 只用本地（从没配过云端的人的默认态）', () => {
-    expect(channelOf(emptyCloud())).toBe('local');
-  });
-});
-
-describe('withChannel —— 切通道只动 enabled', () => {
-  it('切到只用本地：enabled 变 false，地址 / 目录 / 账号一个不丢（CH4）', () => {
-    const before = configured({ enabled: true });
-    const after = withChannel(before, 'local');
-    expect(after.enabled).toBe(false);
-    /* 逐字段比：少保留一个字段，就等于用户切一次通道丢一次配置 */
-    expect(after.mode).toBe(before.mode);
-    expect(after.localRoot).toBe(before.localRoot);
-    expect(after.baseUrl).toBe(before.baseUrl);
-    expect(after.basePath).toBe(before.basePath);
-    expect(after.user).toBe(before.user);
-  });
-
-  it('切回本地 + 云端：enabled 变 true，其余同样原样', () => {
-    const before = configured({ enabled: false });
-    const after = withChannel(before, 'both');
-    expect(after.enabled).toBe(true);
-    expect(after.baseUrl).toBe(before.baseUrl);
-    expect(after.user).toBe(before.user);
-  });
-
-  it('不原地改对象（React 的 setState 靠引用变化才知道要重渲染）', () => {
-    const before = configured({ enabled: true });
-    expect(withChannel(before, 'local')).not.toBe(before);
-    expect(before.enabled).toBe(true);
+  it('块④ 不给默认落点目录：没有「常见目录」这种东西', () => {
+    expect(emptyLocal().localRoot).toBe('');
   });
 });
 
-describe('cloudToSave —— 保存前的归一', () => {
-  it('从没配过 + 停在只用本地 → 落 null（与 v0.11.17 零 diff）', () => {
-    expect(cloudToSave(emptyCloud(), false)).toBeNull();
+describe('channelToSave —— 逐通路归一（承接地：防空壳）', () => {
+  it('从没配过 + 通路关着 → 落 null（与新装同形）', () => {
+    expect(channelToSave(emptyLocal(), false)).toBeNull();
+    expect(channelToSave(emptyWebdav(), false)).toBeNull();
   });
 
-  it('从没配过 + 选了本地 + 云端 → 落对象（他真的想开云端）', () => {
-    const cloud = withChannel(emptyCloud(), 'both');
-    expect(cloudToSave(cloud, false)).toEqual(cloud);
+  it('从没配过 + 真的开了 → 落对象（他确实想开这条通路）', () => {
+    const channel = { ...emptyWebdav(), enabled: true, user: 'me@example.com' };
+    expect(channelToSave(channel, false)).toEqual(channel);
   });
 
-  it('配过 + 停在只用本地 → 原样保留（CH4：地址 / 目录 / 账号都在库里）', () => {
-    const cloud = configured({ enabled: false });
-    expect(cloudToSave(cloud, true)).toEqual(cloud);
+  it('配过 + 现在关着 → 原样保留（关掉不删配置，CH4 的继承者）', () => {
+    const channel = folderChannel({ enabled: false });
+    expect(channelToSave(channel, true)).toEqual(channel);
   });
 
-  it('这条是防线不是细节：不归一时「点两下」会凭空造出一个空壳 cloud 对象', () => {
-    /* 复现路径：从没配过 → 点「本地 + 云端」→ 点回「只用本地」→ 保存。
-       若直接用草稿里的 cloud，落库就是一个「像配过」的对象，`cloudConfigured` 变 true、
-       块④ 从此默认展开。归一之后是 null。 */
-    const shell = withChannel(withChannel(emptyCloud(), 'both'), 'local');
-    expect(shell).toEqual(emptyCloud());
-    expect(cloudToSave(shell, false)).toBeNull();
+  it('这条是防线不是细节：「开一下再关掉」不许凭空造出一个空壳对象', () => {
+    /* 复现路径：从没配过 → 打开块⑤ → 又关掉 → 保存。
+       若直接用草稿里的通路对象，落库就是一个「像配过」的壳，块⑤ 的 `xxxConfigured`
+       变 true、以后再也回不到「从未配置」那种与新装同形的 JSON（O13）。 */
+    const shell = { ...emptyWebdav(), enabled: true };
+    const closed = { ...shell, enabled: false };
+    expect(channelToSave(closed, false)).toBeNull();
   });
 });
 
-/* [V0.11.18] A6 的判据。**与后端 `md_cloud::usable` + `is_usable()` 逐条同口径**，
-   改一边必须改另一边（`src-tauri/src/models/md_sync_cloud.rs::is_usable`）。
-   四档的取值直接抄后端的 if/match，不凭印象： */
-describe('isCloudReady —— 「开了且填全了」', () => {
-  it('enabled:false → 不算（后端 `usable` 先 filter enabled）', () => {
-    expect(isCloudReady(configured({ enabled: false }))).toBe(false);
-    expect(isCloudReady(emptyCloud())).toBe(false);
+describe('isLocalReady —— 块④「开了且填了落点目录」', () => {
+  it('关着 → 不算（后端 `usable_folder` 同样先判 enabled）', () => {
+    expect(isLocalReady(folderChannel({ enabled: false }))).toBe(false);
+    expect(isLocalReady(emptyLocal())).toBe(false);
   });
 
-  it('localfolder：只看 localRoot，空 / 全空白都不算', () => {
-    expect(isCloudReady(configured({ mode: 'localfolder', localRoot: '' }))).toBe(false);
-    expect(isCloudReady(configured({ mode: 'localfolder', localRoot: '   ' }))).toBe(false);
+  it('空 / 全空白都不算填了', () => {
+    expect(isLocalReady(folderChannel({ localRoot: '' }))).toBe(false);
+    expect(isLocalReady(folderChannel({ localRoot: '   ' }))).toBe(false);
   });
 
-  it('localfolder：localRoot 有值就算，**地址 / 账号空着也不扣分**（那条路不发网络请求）', () => {
-    expect(isCloudReady(configured({
-      mode: 'localfolder', localRoot: 'D:\\md', baseUrl: '', basePath: '', user: '',
-    }))).toBe(true);
+  it('地址 / 账号空着也不扣分（这条通路一次网络请求都不发）', () => {
+    /* 多余的 webdav 字段不参与判据：传进去也不算「填全了」的一部分 */
+    const channel = { enabled: true, localRoot: 'D:\\md', baseUrl: '', user: '' };
+    expect(isLocalReady(channel)).toBe(true);
+  });
+});
+
+describe('isWebdavReady —— 块⑤「开了且三件套齐」', () => {
+  it('关着 → 不算', () => {
+    expect(isWebdavReady(webdavChannel({ enabled: false }))).toBe(false);
+    expect(isWebdavReady(emptyWebdav())).toBe(false);
   });
 
-  it('webdav：baseUrl / basePath / user 三个缺一不可（逐项扫一遍，漏一个就是假绿）', () => {
-    const webdav = (over: Partial<MdSyncCloud>) => configured({ mode: 'webdav', ...over });
-    expect(isCloudReady(webdav({}))).toBe(true);
-    expect(isCloudReady(webdav({ baseUrl: '' }))).toBe(false);
-    expect(isCloudReady(webdav({ basePath: '  ' }))).toBe(false);
-    expect(isCloudReady(webdav({ user: '' }))).toBe(false);
+  it('baseUrl / basePath / user 三个缺一不可（逐项扫一遍，漏一个就是假绿）', () => {
+    expect(isWebdavReady(webdavChannel())).toBe(true);
+    expect(isWebdavReady(webdavChannel({ baseUrl: '' }))).toBe(false);
+    expect(isWebdavReady(webdavChannel({ basePath: '  ' }))).toBe(false);
+    expect(isWebdavReady(webdavChannel({ user: '' }))).toBe(false);
   });
 
-  it('密码不参与判定：它不在 `MdSyncCloud` 里（密文归后端 keychain）', () => {
+  it('密码不参与判定：它不在通路结构里（密文归后端 keychain）', () => {
     /* 结构上就没有这个字段 —— 这条断言的作用是「有人给类型加 password 时这里会提醒他
-       去同步改后端 `is_usable`」，而不是在测一个不存在的属性。 */
-    expect(Object.keys(configured())).toEqual([
-      'enabled', 'mode', 'localRoot', 'baseUrl', 'basePath', 'user',
-    ]);
+       去同步改后端 `is_usable_webdav`」，而不是在测一个不存在的属性。 */
+    expect(Object.keys(webdavChannel())).toEqual(['enabled', 'baseUrl', 'basePath', 'user']);
+  });
+});
+
+describe('legacyCloudForTest —— 测试连接的载荷（红线 probe.rs 只认旧形状）', () => {
+  it('按被测通路现拼：mode 由调用方给，其余字段原样带过去', () => {
+    const payload = legacyCloudForTest('localfolder', folderChannel({ auto: undefined }));
+    expect(payload.mode).toBe('localfolder');
+    expect(payload.localRoot).toBe('D:\\Nutstore\\我的坚果云\\TimingMD');
+    expect(legacyCloudForTest('webdav', webdavChannel()).user).toBe('me@example.com');
+  });
+
+  it('`enabled` 恒 true：探测是只读动作，不该被开关拦（PRD §4.3）', () => {
+    expect(legacyCloudForTest('webdav', emptyWebdav()).enabled).toBe(true);
+    expect(legacyCloudForTest('localfolder', emptyLocal()).enabled).toBe(true);
+  });
+
+  it('缺项原样传空串，让后端给既有错误文案（前端不自己编一句）', () => {
+    expect(legacyCloudForTest('webdav', emptyWebdav()).user).toBe('');
+  });
+});
+
+describe('emptyCloud / isCloudReady —— 手机端红线面板仍在用的兼容层', () => {
+  /* `components/mobile` 全目录零 diff：那两个面板读的还是 legacy `cloud`。
+     这里钉住「兼容层没有第二份判据」——它按 mode 转发到上面两个函数。 */
+
+  function legacy(over: Partial<MdSyncCloud> = {}): MdSyncCloud {
+    return {
+      enabled: true,
+      mode: 'webdav',
+      localRoot: '',
+      baseUrl: 'https://dav.jianguoyun.com/dav/',
+      basePath: '/Timing',
+      user: 'me@example.com',
+      ...over,
+    };
+  }
+
+  it('emptyCloud() 与 emptyWebdav() 同形（同一份预填值）', () => {
+    const cloud = emptyCloud();
+    expect(cloud.mode).toBe('webdav');
+    expect(cloud.baseUrl).toBe(emptyWebdav().baseUrl);
+    expect(cloud.basePath).toBe(emptyWebdav().basePath);
+    expect(cloud.enabled).toBe(false);
+  });
+
+  it('localfolder 走 isLocalReady、webdav 走 isWebdavReady（不另写一份 if）', () => {
+    const local = legacy({ mode: 'localfolder', localRoot: 'D:\\md' });
+    expect(isCloudReady(local)).toBe(isLocalReady(local));
+    const webdav = legacy({ user: '' });
+    expect(isCloudReady(webdav)).toBe(isWebdavReady(webdav));
+    expect(isCloudReady(webdav)).toBe(false);
   });
 });

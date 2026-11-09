@@ -54,8 +54,11 @@ describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
     for (const value of VALUES) expect(value).not.toContain('同步间隔');
   });
 
-  it('A1b：解释性长句恰好 4 句，且都不超过 20 字、也不许再长回来', () => {
-    expect([...EXPLAIN_KEYS].sort()).toEqual(['cloudHint', 'dataRootHint', 'formatHint', 'syncHint']);
+  it('A1b：解释性长句恰好 5 句，且都不超过 20 字、也不许再长回来', () => {
+    /* [V0.11.26] 4 → 5：块④ 本地同步新开一块，它自己也需要一句 hint（PRD §7.1 L2 / F3） */
+    expect([...EXPLAIN_KEYS].sort()).toEqual([
+      'cloudHint', 'dataRootHint', 'formatHint', 'localHint', 'syncHint',
+    ]);
     for (const key of EXPLAIN_KEYS) {
       expect(COPY[key].length).toBeLessThanOrEqual(20);
     }
@@ -78,6 +81,14 @@ describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
       /* [V0.11.19 批 1] ③「同步间隔」整行删除 */
       '同步间隔',
       '1 分钟 ~ 24 小时',
+      /* [V0.11.26] 变更一 / 变更四删掉的两组控件 + 旧块标题（PRD §7.3 全表） */
+      '存储通道',
+      '只用本地',
+      '本地 + 云端',
+      '云端配置已保留，切回即恢复。',
+      '云端通道方式',
+      'WebDAV 云端同步',
+      '本地目录',
     ]);
     /* 它们不许悄悄回到常量表里 */
     for (const phrase of REMOVED_PHRASES) {

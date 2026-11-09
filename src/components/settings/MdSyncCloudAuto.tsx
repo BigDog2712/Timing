@@ -33,7 +33,13 @@ interface MdSyncCloudAutoProps {
   onChange: (next: MdCloudAutoValue) => void;
   /**
    * [V0.11.26] 分钟框的 aria-label 要能区分两块（同一屏里两个「自动同步」）。
-   * 默认沿用块⑤ 的原句，块④ 传自己的那句。
+   * 默认沿用块⑤ 的那句，块④ 传自己的那句。
+   *
+   * [V0.11.26] 措辞从「…同步间隔（分钟）」改成「…同步周期（分钟）」：`REMOVED_PHRASES`
+   * 里钉着 `同步间隔` 这条零命中判据（它属于 V0.11.19 删掉的 ③「同步间隔」整行），
+   * 而 `mdSyncV0118RedAndCopy` 的 F1 会把**每个 `aria-label`** 也搜一遍。两块现在
+   * 恒挂载（折叠也挂载），旧措辞会让那条判据红在一个跟它无关的控件上。
+   * 手机端 `SyncCloudPane` 仍是旧措辞——那是零 diff 红线，且不被这条判据扫到。
    */
   minutesLabel?: string;
 }
@@ -49,7 +55,7 @@ export function MdSyncCloudAuto({
   auto: value,
   disabled,
   onChange,
-  minutesLabel = '云端自动同步间隔（分钟）',
+  minutesLabel = '云端自动同步周期（分钟）',
 }: MdSyncCloudAutoProps) {
   const auto = autoOf(value);
   const [minutesText, setMinutesText] = useState<string | null>(null);

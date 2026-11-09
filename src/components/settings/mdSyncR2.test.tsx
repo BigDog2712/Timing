@@ -6,14 +6,10 @@ import type { DataRootInfo } from '../../types/domain/dataRoot';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 import { formatAtShort } from './mdBackupFacts';
 
-/* [V0.11.16 第 2 轮] QA 独立复核 R1–R4：全部走**真 `MdSyncTab`**（真 Hook + 真组件树），
-   不复用工程师新加的用例、也不信它们的名字。
-   R1 `emptyCloud().mode = 'webdav'`：`cloud === null` 时不点任何分段，WebDAV 已是选中态，
-      两个框的 `value`（不是 placeholder）就是默认值。
-   R2 `updateBinding` 固化统一意图：手改一档时其余档吃下**已生效的**意图；没有意图时不扇出；
-      改 root 不顺手固化 file；固化之后「放弃修改」要整体回滚。
-   R3 C11 按 `affected` 实际档数说话（3 / 2 / 1 / 0），非 3 档帧不许出现「这三档」。
-   R4 时间格式只有一份：摘要行与列表首行逐字同格式，整页不许出现 `YYYY/MM/DD`。 */
+/* [V0.11.16 第 2 轮 / V0.11.26 收口] QA 独立复核 R1–R4，全部走**真 `MdSyncTab`**。
+   R1 `cloudWebdav === null` → 块⑤ 直接给预填默认值，且块内零载体分段（O2 / O5）。
+   R2 `updateBinding` 固化统一意图：手改一档时其余档吃下已生效的意图；没有意图不扇出。
+   R3 C11 按 `affected` 实际档数说话；R4 时间格式只有一份。 */
 
 const BINDINGS: MdSyncBinding[] = [
   { kind: 'timers', enabled: true, root: 'C:\\Vault', file: '{date}.md', heading: '#### 事项计时' },
@@ -26,11 +22,19 @@ const ITEMS: MdBackupItem[] = [
   { name: 'obsidian__2026-11-07.md', target: 'obsidian', source: '2026-11-07.md', date: '2026-11-07', atMs: 1794060840000, bytes: 3276 },
 ];
 
-function view(options: { bindings?: MdSyncBinding[]; cloud?: MdSyncViewCloud['config']['cloud'] } = {}): MdSyncViewCloud {
+function view(options: { bindings?: MdSyncBinding[]; webdav?: MdSyncViewCloud['config']['cloudWebdav'] } = {}): MdSyncViewCloud {
   return {
     today: '2026-11-07',
-    config: { enabled: true, pollSecs: 900, bindings: options.bindings ?? BINDINGS, cloud: options.cloud ?? null },
-    cloud: { enabled: false, mode: 'localfolder', hasSecret: false, todayPushed: false, pendingDates: [], lastError: null },
+    config: {
+      enabled: true,
+      pollSecs: 900,
+      bindings: options.bindings ?? BINDINGS,
+      cloud: null,
+      cloudFolder: null,
+      cloudWebdav: options.webdav ?? null,
+    },
+    cloud: { enabled: false, mode: 'webdav', hasSecret: false, todayPushed: false, pendingDates: [], lastError: null },
+    local: { enabled: false, mode: 'localfolder', hasSecret: false, todayPushed: false, pendingDates: [], lastError: null },
     status: { lastSyncAt: null, lastError: null, bindings: [] },
   };
 }
@@ -132,46 +136,42 @@ function beforeEachReset(): void {
   useMdSyncStore.setState({ view: null, loaded: false, loading: false, saving: false, error: null });
 }
 
-describe('R1：云端默认进 WebDAV 分段（cloud === null）', () => {
+describe('R1：块⑤ 从没配过时直接给预填默认值（cloudWebdav === null）', () => {
   beforeEach(beforeEachReset);
   afterEach(async () => {
     await act(async () => { root?.unmount(); });
     container?.remove();
   });
 
-  it('不点任何分段，WebDAV 已经是选中态，两个框的 value 就是默认值', async () => {
-    api.get.mockResolvedValue(view({ cloud: null }));
+  it('O5：不点任何分段（已无分段），块⑤ 的框值就是默认值，且块内零 `.seg__item`', async () => {
+    api.get.mockResolvedValue(view({ webdav: null }));
     await mount();
-    await act(async () => { foldToggle('WebDAV 云端同步').click(); await Promise.resolve(); });
-    const segs = Array.from(container.querySelectorAll('[data-block="data-cloud"] .seg__item')); // [V0.11.18] 只数块④的分段（页签顶部的「存储通道」也是 .seg__item）
-    const on = segs.filter((el) => el.getAttribute('data-on') === 'true').map((el) => el.textContent);
-    expect(on).toEqual(['WebDAV']);
-    expect(segs.find((el) => el.textContent === 'WebDAV')?.getAttribute('aria-pressed')).toBe('true');
-    expect(segs.find((el) => el.textContent === '本地目录')?.getAttribute('aria-pressed')).toBe('false');
-
+    await act(async () => { foldToggle('云端同步').click(); await Promise.resolve(); });
+    /* [V0.11.26] 载体分段整组删除（PRD 变更四 / O2）：块⑤ 里零分段按钮 */
+    expect(container.querySelectorAll('[data-block="data-cloud"] .seg__item')).toHaveLength(0);
+    /* 删了「选边」之后默认值必须**直接**在值里，否则用户看到的是两个空框 */
     const baseUrlInput = container.querySelector('input[placeholder="https://dav.jianguoyun.com/dav/"]') as HTMLInputElement;
     expect(baseUrlInput.value).toBe('https://dav.jianguoyun.com/dav/');
-    const values = Array.from(container.querySelectorAll('input')).map((el) => el.value);
+    const values = Array.from(container.querySelectorAll<HTMLInputElement>('[data-block="data-cloud"] input')).map((el) => el.value);
     expect(values).toContain('https://dav.jianguoyun.com/dav/');
     expect(values).toContain('/Timing');
   });
 
   it('E2 不回归：已配置过群晖地址时原样显示，默认值不出现', async () => {
     api.get.mockResolvedValue(view({
-      cloud: {
-        enabled: true, mode: 'webdav', localRoot: '',
+      webdav: {
+        enabled: true,
         baseUrl: 'https://synology.example.com/dav/', basePath: '/Timing/md', user: 'me@example.com',
       },
     }));
     await mount();
-    await act(async () => { foldToggle('WebDAV 云端同步').click(); await Promise.resolve(); });
+    await act(async () => { foldToggle('云端同步').click(); await Promise.resolve(); });
 
-    const values = Array.from(container.querySelectorAll('input')).map((el) => el.value);
+    const values = Array.from(container.querySelectorAll<HTMLInputElement>('[data-block="data-cloud"] input')).map((el) => el.value);
     expect(values).toContain('https://synology.example.com/dav/');
     expect(values).toContain('/Timing/md');
     expect(values).not.toContain('https://dav.jianguoyun.com/dav/');
-    /* 默认目录是 /Timing（精确元素比对）：已有配置是 /Timing/md，不被默认值顶掉 */
-    expect(values).not.toContain('/Timing');
+    expect(values).not.toContain('/Timing'); /* 精确元素比对：/Timing/md 不被默认值顶掉 */
   });
 });
 

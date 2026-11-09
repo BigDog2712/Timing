@@ -37,7 +37,7 @@ import { MdSyncTab } from './MdSyncTab';
 
 (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-/** 老用户：界面里已经没有入口的 pollSecs=180，cloud 里没有 auto 键。 */
+/** 老用户：界面里已经没有入口的 pollSecs=180，两条通路的配置里都没有 auto 键。 */
 function oldView(): MdSyncViewCloud {
   return {
     today: '2026-11-07',
@@ -45,10 +45,10 @@ function oldView(): MdSyncViewCloud {
       enabled: true,
       pollSecs: 180,
       bindings: BINDINGS,
-      cloud: {
+      cloud: null,
+      cloudFolder: null,
+      cloudWebdav: {
         enabled: true,
-        mode: 'webdav',
-        localRoot: '',
         baseUrl: 'https://dav.example.com/dav/',
         basePath: '/Timing',
         user: 'me@example.com',
@@ -56,6 +56,10 @@ function oldView(): MdSyncViewCloud {
     },
     cloud: {
       enabled: true, mode: 'webdav', hasSecret: true, todayPushed: false,
+      pendingDates: [], lastError: null,
+    },
+    local: {
+      enabled: false, mode: 'localfolder', hasSecret: false, todayPushed: false,
       pendingDates: [], lastError: null,
     },
     status: { lastSyncAt: null, lastError: null, bindings: [] },
@@ -85,10 +89,6 @@ function button(text: string): HTMLButtonElement {
   return found as HTMLButtonElement;
 }
 
-async function click(text: string): Promise<void> {
-  await act(async () => { button(text).click(); await Promise.resolve(); });
-}
-
 async function save(): Promise<MdSyncViewCloud['config']> {
   const before = api.save.mock.calls.length;
   await act(async () => { button('保存并同步').click(); await Promise.resolve(); });
@@ -96,8 +96,23 @@ async function save(): Promise<MdSyncViewCloud['config']> {
   return api.save.mock.calls[before][0] as MdSyncViewCloud['config'];
 }
 
+/** [V0.11.26] 六块默认折叠（O4）：三档在块⑤ 里，不先展开就没东西可点 */
+async function openCloud(): Promise<void> {
+  const toggle = container.querySelector('button[aria-label="展开云端同步"]') as HTMLButtonElement | null;
+  if (!toggle) throw new Error('块⑤ 的折叠按钮不见了');
+  await act(async () => { toggle.click(); await Promise.resolve(); });
+}
+
+/** 点块⑤ 的档位按钮：块④ 也有一份同名三档（折叠也挂载），不按块限定会点到它 */
+async function clickTier(text: string): Promise<void> {
+  const block = container.querySelector('[data-block="data-cloud"]') as HTMLElement;
+  const found = Array.from(block.querySelectorAll('button')).find((el) => el.textContent === text);
+  if (!found) throw new Error(`块⑤ 里找不到档位：${text}`);
+  await act(async () => { found.click(); await Promise.resolve(); });
+}
+
 async function typeMinutes(value: string): Promise<void> {
-  const input = container.querySelector('[aria-label="云端自动同步间隔（分钟）"]') as HTMLInputElement | null;
+  const input = container.querySelector('[aria-label="云端自动同步周期（分钟）"]') as HTMLInputElement | null;
   if (!input) throw new Error('定时档的数字框没有渲染');
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   await act(async () => {
@@ -129,15 +144,16 @@ describe('QA 批 1 · pollSecs 落库与回读', () => {
     const initial = oldView();
     await mount(initial);
 
-    /* 改成定时 30：这一步会重建 cloud（写 auto），是 pollSecs 最容易丢的一帧。 */
-    await click('定时');
+    /* 改成定时 30：这一步会重建块⑤ 的通路对象（写 auto），是 pollSecs 最容易丢的一帧。 */
+    await openCloud();
+    await clickTier('定时');
     await typeMinutes('30');
     const saved = await save();
 
     expect(saved.pollSecs).toBe(180);
     expect(saved.pollSecs).not.toBe(900);
     expect(saved.pollSecs).not.toBe(15);
-    expect(saved.cloud?.auto).toEqual({ schedule: 'interval', intervalMinutes: 30 });
+    expect(saved.cloudWebdav?.auto).toEqual({ schedule: 'interval', intervalMinutes: 30 });
 
     /* 回读：store 里的 view 是后端返回的那一份，pollSecs 必须原样带回来。 */
     const reread = useMdSyncStore.getState().view;
@@ -146,7 +162,7 @@ describe('QA 批 1 · pollSecs 落库与回读', () => {
     /* 视图回来后再存一次（回填 effect 已跑），仍不许退化成兜底值。 */
     const savedAgain = await save();
     expect(savedAgain.pollSecs).toBe(180);
-    expect(savedAgain.cloud?.auto).toEqual({ schedule: 'interval', intervalMinutes: 30 });
+    expect(savedAgain.cloudWebdav?.auto).toEqual({ schedule: 'interval', intervalMinutes: 30 });
   });
 
   it('视图未回来时点保存不落库，且不许把 900 占位写进去', async () => {

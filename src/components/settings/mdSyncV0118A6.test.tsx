@@ -3,32 +3,40 @@
  * （PRD §14.4 的 A6a / A6b / A6c / A6d）。
  * -----------------------------------------------------------------------------
  * 这一批判据的核心不是「那句话出来了没有」，而是**它是不是一个人站在那里**：
- * §14.4 的「显示规矩（硬）」要求 CL1 出现时块④ 状态区**只**显示这一句 —— 不渲染
+ * §14.4 的「显示规矩（硬）」要求它出现时状态区**只**显示这一句 —— 不渲染
  * `密码已/未设置`、不渲染 `今天已/还没上传`、不渲染 `待补传 N 天`，也不叠加历史 `lastError`。
  *
  * 为什么必须卡这么死：`今天还没上传` 与 `暂时不会同步` 并排，读者会读成「在传、只是还没
- * 传上去」，而事实是**压根没跑**（`md_cloud::usable` 返回 `None`，`round()` 逐字转交
- * `md_sync::run`，云端那一半一次都没动）。同一件事用两个互相抵消的句子说，比一句不说更糟。
+ * 传上去」，而事实是**压根没跑**（`md_cloud::usable_*` 返回 `None`，那一轮一条路都没动）。
+ * 同一件事用两个互相抵消的句子说，比一句不说更糟。
  *
- * 四个用例对应 §14.4 的四条，一条不合并（合并之后红了不知道是哪条塌的）。
+ * [V0.11.26] 判据从「一份带 mode 的 cloud」平移到**两条通路各判一次**（PRD O14）：
+ * 块⑤ 说 `云端还没填全，暂时不会同步。`、块④ 说 `云端目录还没填，暂时不会同步。`（L4）。
+ * 两块各读各的状态（`view.cloud` / `view.local`），所以「哪一句出现在哪一块」本身也是判据。
  */
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MdSyncCloud, MdSyncViewCloud } from '../../types/domain';
+import type { MdSyncCloudChannel, MdSyncViewCloud } from '../../types/domain';
 import type { DataRootInfo } from '../../types/domain/dataRoot';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
+import { LOCAL_MISSING_NOTE } from './MdSyncLocalCard';
+import { WEBDAV_MISSING_NOTE } from './MdSyncWebdavCard';
 
 const CL1 = '云端还没填全，暂时不会同步。';
+/** [V0.11.26] CH4「云端配置已保留，切回即恢复。」整句退役（`REMOVED_PHRASES` 里钉着） */
 const CH4 = '云端配置已保留，切回即恢复。';
 
-const FILLED: MdSyncCloud = {
+const FILLED: MdSyncCloudChannel = {
   enabled: true,
-  mode: 'webdav',
-  localRoot: '',
   baseUrl: 'https://dav.jianguoyun.com/dav/',
   basePath: '/Timing',
   user: 'me@example.com',
+};
+
+const FOLDER: MdSyncCloudChannel = {
+  enabled: true,
+  localRoot: 'D:\\Nutstore\\我的坚果云\\TimingMD',
 };
 
 const DATA_ROOT: DataRootInfo = {
@@ -45,17 +53,33 @@ const DATA_ROOT: DataRootInfo = {
   pluginsInDataRoot: false,
 };
 
-function viewWith(cloud: MdSyncCloud, over: { hasSecret?: boolean; lastError?: string | null; pendingDates?: string[] } = {}): MdSyncViewCloud {
+interface Over {
+  hasSecret?: boolean;
+  lastError?: string | null;
+  pendingDates?: string[];
+  folder?: MdSyncCloudChannel;
+}
+
+function viewWith(webdav: MdSyncCloudChannel, over: Over = {}): MdSyncViewCloud {
+  const folder = over.folder ?? FOLDER;
   return {
     today: '2026-11-07',
-    config: { enabled: true, pollSecs: 900, bindings: [], cloud },
+    config: { enabled: true, pollSecs: 900, bindings: [], cloud: null, cloudFolder: folder, cloudWebdav: webdav },
     cloud: {
-      enabled: cloud.enabled,
-      mode: cloud.mode,
+      enabled: webdav.enabled,
+      mode: 'webdav',
       hasSecret: over.hasSecret ?? false,
       todayPushed: false,
       pendingDates: over.pendingDates ?? [],
       lastError: over.lastError ?? null,
+    },
+    local: {
+      enabled: folder.enabled,
+      mode: 'localfolder',
+      hasSecret: false,
+      todayPushed: false,
+      pendingDates: [],
+      lastError: null,
     },
     status: { lastSyncAt: null, lastError: null, bindings: [] },
   };
@@ -92,11 +116,15 @@ async function mount(view: MdSyncViewCloud): Promise<void> {
   await act(async () => { await Promise.resolve(); });
 }
 
-const missing = () => container.querySelector('[data-missing="true"]');
-const statusBox = () => container.querySelector('.sync-cloud__status');
+/** 只在这两块里找：`data-missing` 与状态行两块都有，不限定就会互相冒充 */
+const inBlock = (id: string, selector: string) =>
+  container.querySelector(`[data-block="${id}"] ${selector}`);
+const missing = () => inBlock('data-cloud', '[data-missing="true"]');
+const missingLocal = () => inBlock('data-local', '[data-missing="true"]');
+const statusBox = () => inBlock('data-cloud', '.sync-cloud__status');
 const statusText = () => (statusBox()?.textContent ?? '').trim();
 
-describe('QA · A6 未填全状态行（PRD §14.4 A6a–A6d）', () => {
+describe('QA · A6 未填全状态行（PRD §14.4 A6a–A6d → O14 两通路各判一次）', () => {
   beforeEach(() => {
     for (const fn of [api.get, api.save, api.run, api.test]) fn.mockReset();
     backupApi.list.mockReset();
@@ -111,17 +139,18 @@ describe('QA · A6 未填全状态行（PRD §14.4 A6a–A6d）', () => {
     container?.remove();
   });
 
-  it('A6a：webdav 下逐个清空 baseUrl / basePath / user，任一为空都出现 CL1（三次各验一次）', async () => {
+  it('A6a（O14 块⑤）：逐个清空 baseUrl / basePath / user，任一为空都出现 CL1（三次各验一次）', async () => {
     const blanks = [
-      { field: 'baseUrl', cloud: { ...FILLED, baseUrl: '' } },
-      { field: 'basePath', cloud: { ...FILLED, basePath: '' } },
-      { field: 'user', cloud: { ...FILLED, user: '' } },
+      { field: 'baseUrl', channel: { ...FILLED, baseUrl: '' } },
+      { field: 'basePath', channel: { ...FILLED, basePath: '' } },
+      { field: 'user', channel: { ...FILLED, user: '' } },
     ] as const;
 
-    for (const { field, cloud } of blanks) {
-      await mount(viewWith(cloud));
+    for (const { field, channel } of blanks) {
+      await mount(viewWith(channel));
       expect(missing(), `清空 ${field} 之后必须出现 CL1`).not.toBeNull();
       expect(missing()?.textContent, `${field} 档的文案`).toBe(CL1);
+      expect(CL1).toBe(WEBDAV_MISSING_NOTE);
       await act(async () => { root.unmount(); });
       container.remove();
     }
@@ -132,9 +161,12 @@ describe('QA · A6 未填全状态行（PRD §14.4 A6a–A6d）', () => {
     expect(missing()).toBeNull();
   });
 
-  it('A6a 补充：localfolder 载体下清空落点目录 → CL1 出现（两载体各自成判据）', async () => {
-    await mount(viewWith({ ...FILLED, mode: 'localfolder', localRoot: '' }));
-    expect(missing()?.textContent).toBe(CL1);
+  it('A6a 补充（O14 块④）：清空落点目录 → 出现 L4 那句，且块⑤ 不受影响', async () => {
+    await mount(viewWith(FILLED, { folder: { ...FOLDER, localRoot: '' } }));
+    expect(missingLocal()?.textContent).toBe(LOCAL_MISSING_NOTE);
+    expect(LOCAL_MISSING_NOTE).toBe('云端目录还没填，暂时不会同步。');
+    /* 两条通路各判各的：块④ 没填全不该让块⑤ 也说自己没填全 */
+    expect(missing()).toBeNull();
   });
 
   it('A6c：CL1 出现时状态区**只有这一句** —— 今天还没上传 / 待补传 / 密码未 各 0 命中', async () => {
@@ -162,17 +194,20 @@ describe('QA · A6 未填全状态行（PRD §14.4 A6a–A6d）', () => {
     expect(statusText()).toContain('今天还没上传');
   });
 
-  it('A6d：通道切到「只用本地」→ CL1 消失，只出现 CH4', async () => {
+  it('A6d（O9 平移）：关掉块⑤ 的开关 → CL1 消失、状态区整块收起，CH4 已经不存在', async () => {
     await mount(viewWith({ ...FILLED, user: '' }));
     expect(missing()).not.toBeNull();
 
-    const local = Array.from(container.querySelectorAll('button'))
-      .find((el) => el.textContent === '只用本地') as HTMLButtonElement;
-    await act(async () => { local.click(); await Promise.resolve(); });
+    const toggle = container.querySelector('[aria-label="启用云端同步"]') as HTMLButtonElement;
+    await act(async () => { toggle.click(); await Promise.resolve(); });
 
-    expect(missing(), '用户主动关掉通道 ≠ 没填全，不该再说「还没填全」').toBeNull();
-    expect(container.querySelector('[data-retained="true"]')?.textContent).toBe(CH4);
-    /* 状态区整块收起（`cloud.enabled && status` 为假） */
+    expect(missing(), '用户主动关掉通路 ≠ 没填全，不该再说「还没填全」').toBeNull();
+    /* CH4「云端配置已保留，切回即恢复。」整句退役：关掉只是不跑，不再另说一句 */
+    expect(container.textContent).not.toContain(CH4);
+    expect(container.querySelector('[data-retained="true"]')).toBeNull();
+    /* 状态区整块收起（`channel.enabled && status` 为假） */
     expect(statusBox()).toBeNull();
+    /* 关掉不隐藏：字段还在，用户随时能看自己填过什么（O10） */
+    expect(inBlock('data-cloud', 'input[placeholder="坚果云登录邮箱"]')).not.toBeNull();
   });
 });

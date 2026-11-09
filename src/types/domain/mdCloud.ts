@@ -108,10 +108,15 @@ export interface MdSyncCloudStatus {
  *
  * [V0.11.26] `+local`：块④ 本地同步自己的状态（`view.local`），块⑤ 读 `view.cloud`。
  * 两块互不共用一行数字——串了就是「本地写过了 → 云端显示今天已上传」。
+ *
+ * `local` 是**可选**的，只有一条理由：手机端不挂载块④（`MdSyncTab` 里 `!IS_MOBILE`），
+ * 而 `components/mobile` 是零 diff 红线（O19）——那里的视图夹具不会带这个键，把类型写成
+ * 必填会让红线文件编译不过。桌面产物里后端（`services/md_cloud/state.rs::view()`）
+ * **恒投这一份**，所以 `MdSyncLocalCard` 读到的永远是真的状态，`?? null` 只是兜底。
  */
 export type MdSyncViewCloud = MdSyncView & {
   cloud: MdSyncCloudStatus;
-  local: MdSyncCloudStatus;
+  local?: MdSyncCloudStatus;
 };
 
 /**

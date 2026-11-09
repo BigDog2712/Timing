@@ -1,35 +1,62 @@
+/**
+ * Timing — 块⑤「云端同步」卡的单测（V0.11.13 → V0.11.26）
+ * -----------------------------------------------------------------------------
+ * 原名 `MdSyncCloudCard.test.tsx`，随组件改名。按 `mode` 选边那批判据整组退场（PRD 变更四）：
+ * 本卡只做 WebDAV 一条通路，本地那一半在 `MdSyncLocalCard`（判据在 `mdSyncCloudMode.test.tsx`）。
+ * 保留：密码三分、三关逐步点亮（E3/E6/E7）、无 steps 退回、`resolvedBindings` 共用、
+ * 默认值预填（E1）、已配置原样（E2）、往期清理四句。
+ * [V0.11.26] 新增：关掉开关时字段 disabled 但可见、测试连接仍可点（O9/O10）；
+ *   状态行只读 `view.cloud`，不串 `view.local`（O15 数据面）。
+ */
 import { act, createElement, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CloudMode, MdSyncViewCloud } from '../../types/domain';
+import type { MdSyncViewCloud } from '../../types/domain';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 
-/* `IS_MOBILE` 是编译期常量：用可变开关做替身，同一文件里分别测手机端 / 桌面端 */
-const host = vi.hoisted(() => ({ mobile: false }));
-vi.mock('../../lib/platform', () => ({
-  get IS_MOBILE() { return host.mobile; },
-  HOST_OS: 'desktop',
+const api = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn(), run: vi.fn(), open: vi.fn(), test: vi.fn() }));
+vi.mock('../../services/api', () => ({
+  mdSyncApi: api,
+  mdBackupApi: { list: vi.fn(), restore: vi.fn() },
+  errorText: (err: unknown) => (err instanceof Error ? err.message : '操作失败'),
 }));
 
-const api = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn(), run: vi.fn(), open: vi.fn(), test: vi.fn() }));
-vi.mock('../../services/api', () => ({ mdSyncApi: api, mdBackupApi: { list: vi.fn(), restore: vi.fn() } }));
-
-import { MdSyncCloudCard } from './MdSyncCloudCard';
+import { MdSyncWebdavCard } from './MdSyncWebdavCard';
 import { CLOUD_DIR_HINT } from './mdSyncCopy';
 import { useMdSyncDraft } from './useMdSyncDraft';
 import type { MdSyncDraft } from './useMdSyncDraft';
 
 (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-function viewWith(mode: CloudMode): MdSyncViewCloud {
-  const cloud = { enabled: true, mode, localRoot: 'D:\\Nutstore\\TimingMD',
-    baseUrl: 'https://dav.example.com/dav/', basePath: '/Timing/md', user: 'me@example.com' };
-  return { today: '2026-11-06',
-    config: { enabled: true, pollSecs: 900, cloud,
-      bindings: [{ kind: 'timers', enabled: true, root: 'C:\\Vault', file: '{date}.md', heading: '#### 事项计时' }] },
-    cloud: { enabled: true, mode, hasSecret: true, todayPushed: true,
-      pendingDates: ['2026-11-04', '2026-11-05'], lastError: null },
-    status: { lastSyncAt: null, lastError: null, bindings: [] } };
+function viewWith(patch: Partial<MdSyncViewCloud['config']> = {},
+  status: { todayPushed?: boolean; localPushed?: boolean } = {}): MdSyncViewCloud {
+  return {
+    today: '2026-11-06',
+    config: {
+      enabled: true,
+      pollSecs: 900,
+      cloud: null,
+      cloudFolder: null,
+      cloudWebdav: {
+        enabled: true,
+        baseUrl: 'https://dav.example.com/dav/',
+        basePath: '/Timing/md',
+        user: 'me@example.com',
+      },
+      bindings: [{ kind: 'timers', enabled: true, root: 'C:\\Vault', file: '{date}.md', heading: '#### 事项计时' }],
+      ...patch,
+    },
+    cloud: {
+      enabled: true, mode: 'webdav', hasSecret: true, todayPushed: status.todayPushed ?? true,
+      pendingDates: ['2026-11-04', '2026-11-05'], lastError: null,
+    },
+    /* 块④ 那一份：故意给相反的值，用来钉住「两块不串一行数字」 */
+    local: {
+      enabled: true, mode: 'localfolder', hasSecret: false, todayPushed: status.localPushed ?? false,
+      pendingDates: [], lastError: null,
+    },
+    status: { lastSyncAt: null, lastError: null, bindings: [] },
+  };
 }
 
 /** 真 Hook + 真卡：只有这样才能钉住「没碰密码框 → secret 是 undefined」这条链路 */
@@ -38,8 +65,9 @@ function Harness(): ReactElement {
   /* 测试要能直接调 `setSharedFile`：这里把草稿抬到一个模块变量上 */
   draftRef = draft;
   return createElement('div', null,
-    createElement(MdSyncCloudCard, { draft }),
-    createElement('button', { type: 'button', onClick: () => void draft.save() }, '保存'));
+    createElement(MdSyncWebdavCard, { draft }),
+    createElement('button', { type: 'button', onClick: () => void draft.save() }, '保存'),
+  );
 }
 
 let draftRef: MdSyncDraft | null = null;
@@ -51,6 +79,7 @@ async function mount(): Promise<void> {
   document.body.appendChild(container);
   root = createRoot(container);
   await act(async () => { root.render(createElement(Harness)); await Promise.resolve(); });
+  await act(async () => { await Promise.resolve(); });
 }
 
 function button(text: string): HTMLButtonElement {
@@ -69,14 +98,14 @@ async function type(selector: string, value: string): Promise<void> {
   await act(async () => { setter?.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); });
 }
 const result = () => container.querySelector('.sync-cloud__result');
+const statusBox = () => container.querySelector('.sync-cloud__status');
 
-describe('MdSyncCloudCard', () => {
+describe('MdSyncWebdavCard（块⑤ 云端同步）', () => {
   beforeEach(() => {
-    host.mobile = false;
     for (const fn of [api.get, api.save, api.test]) fn.mockReset();
-    api.get.mockResolvedValue(viewWith('webdav'));
+    api.get.mockResolvedValue(viewWith());
     api.save.mockImplementation(async (config: MdSyncViewCloud['config']) => ({
-      ...viewWith(config.cloud?.mode ?? 'webdav'), config,
+      ...viewWith(), config,
     }));
     useMdSyncStore.setState({ view: null, loaded: false, loading: false, saving: false, error: null });
   });
@@ -84,18 +113,6 @@ describe('MdSyncCloudCard', () => {
   afterEach(async () => {
     await act(async () => { root?.unmount(); });
     container?.remove();
-  });
-
-  it('切换模式后字段跟着换：WebDAV 五个字段 / 本地目录只看路径', async () => {
-    await mount();
-    expect(container.textContent).toContain('服务地址');
-    expect(container.querySelector('input[placeholder="https://dav.jianguoyun.com/dav/"]')).not.toBeNull();
-    await click('本地目录');
-    /* [V0.11.16] C20 已删：本地目录不再有那句「换机器时把它同步过去即可」 */
-    expect(container.textContent).not.toContain('换机器时把它同步过去即可');
-    expect(container.textContent).not.toContain('应用密码');
-    await click('WebDAV');
-    expect(container.textContent).toContain('服务地址');
   });
 
   it('没碰过密码框时保存透传 undefined（不是空串，否则会清掉已存密码）', async () => {
@@ -107,7 +124,7 @@ describe('MdSyncCloudCard', () => {
     await click('保存');
     const [config, secret] = api.save.mock.calls[0];
     expect(secret).toBeUndefined();
-    expect(config.cloud.mode).toBe('webdav');
+    expect(config.cloudWebdav?.baseUrl).toBe('https://dav.example.com/dav/');
   });
 
   it('输入密码后透传明文，「清除密码」后透传空串', async () => {
@@ -131,8 +148,6 @@ describe('MdSyncCloudCard', () => {
     expect(result()?.textContent).toBe('账号或应用密码不对');
     expect(result()?.getAttribute('data-ok')).toBe('false');
   });
-
-  /* ===== [V0.11.16] 三关逐步点亮（PRD E3 / E6 / E7）===== */
 
   it('E3：三关全绿 → 「账号 ✓ 目录 ✓ 写入 ✓」', async () => {
     api.test.mockResolvedValueOnce({
@@ -199,7 +214,7 @@ describe('MdSyncCloudCard', () => {
     expect(result()?.textContent).toBe('连接正常');
   });
 
-  it('「测试连接」用的是 resolvedBindings（与保存同一个数组）', async () => {
+  it('「测试连接」用的是 resolvedBindings（与保存同一个数组），载荷是 legacy webdav', async () => {
     api.test.mockResolvedValueOnce({ ok: true, detail: '连接正常' });
     await mount();
     /* 在块①那个单框里改一下文件名（统一意图），但**先不保存** */
@@ -207,23 +222,16 @@ describe('MdSyncCloudCard', () => {
     await click('测试连接');
     const config = api.test.mock.calls[0][0];
     expect(config.bindings[0].file).toBe('{date}-asd.md');
+    /* `probe.rs` 是红线文件，只认带 `mode` 的旧形状；探测不吃开关（`enabled` 恒 true） */
+    expect(config.cloud.mode).toBe('webdav');
+    expect(config.cloud.enabled).toBe(true);
+    expect(config.cloud.basePath).toBe('/Timing/md');
   });
 
-  /* ===== [V0.11.16] 默认预填（PRD E1 / E2，裁决 Q1）===== */
-
-  it('E1：从未配置过云端时，打开就在 WebDAV 段，且两个框的**值**（不是 placeholder）已预填', async () => {
-    const bare = viewWith('webdav');
-    api.get.mockResolvedValue({ ...bare, config: { ...bare.config, cloud: null } });
+  it('E1：从未配置过云端时，两个框的**值**（不是 placeholder）已预填', async () => {
+    api.get.mockResolvedValue(viewWith({ cloudWebdav: null }));
     await mount();
     await act(async () => { await Promise.resolve(); });
-
-    /* [QA F1] 不点任何分段：默认就停在 WebDAV。这一帧正是 v0.11.16 首版做错的地方
-       （`emptyCloud().mode` 留成 `localfolder`，预填值藏在另一个分段后面）。 */
-    const segs = Array.from(container.querySelectorAll('.seg__item'));
-    const on = segs.filter((item) => item.getAttribute('data-on') === 'true').map((item) => item.textContent);
-    expect(on).toEqual(['WebDAV']);
-    /* WebDAV 段的字段真的挂上了：否则下面那两个值只是「藏在没渲染的树里」 */
-    expect(container.textContent).toContain('服务地址');
 
     const urls = Array.from(container.querySelectorAll('input')).map((el) => el.value);
     expect(urls).toContain('https://dav.jianguoyun.com/dav/');
@@ -236,38 +244,49 @@ describe('MdSyncCloudCard', () => {
   });
 
   it('E2：已配置过的地址原样显示，不被默认值改写', async () => {
-    const mine = viewWith('webdav');
-    api.get.mockResolvedValue({
-      ...mine,
-      config: {
-        ...mine.config,
-        cloud: { ...mine.config.cloud!, baseUrl: 'https://synology.example.com/dav/', basePath: '/Timing/md' },
-      },
-    });
     await mount();
     await act(async () => { await Promise.resolve(); });
 
     const urls = Array.from(container.querySelectorAll('input')).map((el) => el.value);
-    expect(urls).toContain('https://synology.example.com/dav/');
+    expect(urls).toContain('https://dav.example.com/dav/');
     expect(urls).toContain('/Timing/md');
     expect(urls).not.toContain('https://dav.jianguoyun.com/dav/');
+    expect(urls).not.toContain('/Timing');
   });
 
-  it('手机端不出现「本地目录」；读到 localfolder 配置时给说明，保存落成 webdav', async () => {
-    host.mobile = true;
-    api.get.mockResolvedValue(viewWith('localfolder'));
+  it('O9 / O10：开关关着 → 字段 disabled 但**可见**，「测试连接」仍可点', async () => {
+    api.get.mockResolvedValue(viewWith({
+      cloudWebdav: {
+        enabled: false, baseUrl: 'https://dav.example.com/dav/', basePath: '/Timing/md', user: 'me@example.com',
+      },
+    }));
     await mount();
-    /* 视图是异步回填的：多冲一次微任务，否则断言的是「还没读到配置」的那一帧 */
     await act(async () => { await Promise.resolve(); });
-    const modes = Array.from(container.querySelectorAll('.seg__item')).map((item) => item.textContent);
-    expect(modes).toEqual(['WebDAV']);
+
+    const inputs = Array.from(container.querySelectorAll('input')) as HTMLInputElement[];
+    expect(inputs.length).toBeGreaterThan(0);
+    expect(inputs.every((el) => el.disabled)).toBe(true);
+    /* 关掉不隐藏：用户要能看到自己填过什么 */
     expect(container.textContent).toContain('服务地址');
-    /* 改用户配置必须当面说：没有这行说明就成了静默改配置 */
-    expect(container.querySelector('[data-converted="true"]')).not.toBeNull();
-    expect(container.textContent).toContain('手机端不支持');
-    /* 显示与落库必须一致：界面上是 WebDAV，存下去的也得是 webdav */
-    await click('保存');
-    expect(api.save.mock.calls[0][0].cloud.mode).toBe('webdav');
+    /* 只读探测不受开关拦（PRD §4.3 原样裁定） */
+    expect(button('测试连接').disabled).toBe(false);
+    /* 状态区整块收起：没在跑就不该说「今天还没上传」 */
+    expect(statusBox()).toBeNull();
+  });
+
+  it('O15 数据面：状态行只读 `view.cloud`，`view.local` 的数字不串进来', async () => {
+    await mount();
+    await act(async () => { await Promise.resolve(); });
+    expect(statusBox()?.getAttribute('data-channel')).toBe('webdav');
+    expect(statusBox()?.textContent).toContain('今天已上传');
+
+    /* 反过来再验一次：云端没传、本地传过 → 块⑤ 仍说「今天还没上传」 */
+    await act(async () => { root.unmount(); });
+    container.remove();
+    api.get.mockResolvedValue(viewWith({}, { todayPushed: false, localPushed: true }));
+    await mount();
+    await act(async () => { await Promise.resolve(); });
+    expect(statusBox()?.textContent).toContain('今天还没上传');
   });
 
   /* [V0.11.19 变更 A] 块④ 那一行只读文字：四句选择器在 `mdSyncAuto.ts`，这里钉
@@ -279,7 +298,7 @@ describe('MdSyncCloudCard', () => {
     const line = () => container.querySelector('[data-purge="true"]')?.textContent;
     expect(line()).toBe(idle);
 
-    const view = viewWith('webdav');
+    const view = viewWith();
     api.get.mockResolvedValue({ ...view,
       cloud: { ...view.cloud, purge: { paused: false, deleted: 5, failed: 0 } } });
     await act(async () => { root.unmount(); });
@@ -288,10 +307,11 @@ describe('MdSyncCloudCard', () => {
     expect(line()).toBe('云端只保留今天的日记；上次清理删了 5 份。');
 
     /* 没填全的那一档不叠加这一行（「云端还没填全」只显示它自己那句） */
-    api.get.mockResolvedValue({
-      ...view,
-      config: { ...view.config, cloud: { ...view.config.cloud!, baseUrl: '' } },
-    });
+    api.get.mockResolvedValue(viewWith({
+      cloudWebdav: {
+        enabled: true, baseUrl: '', basePath: '/Timing/md', user: 'me@example.com',
+      },
+    }));
     await act(async () => { root.unmount(); });
     await mount();
     await act(async () => { await Promise.resolve(); });

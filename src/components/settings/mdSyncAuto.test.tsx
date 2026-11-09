@@ -1,12 +1,14 @@
 /**
- * Timing — 批 1 · 三档控件与「同步间隔」整行删除的端到端判据
+ * Timing — 三档控件的端到端判据（V0.11.19 批 1；[V0.11.26] 双通路收口）
  * -----------------------------------------------------------------------------
- * 走真 `MdSyncTab`（不拿替身 draft 自证），覆盖 12-PRD §3.3 / §3.4 / §15.2：
+ * 走真 `MdSyncTab`（不拿替身 draft 自证）。纯函数那半已拆到 `mdSyncAutoPure.test.ts`
+ * （300 行硬门禁，零豁免）。本文件只留 DOM 判据：
  *   C1 全页「同步间隔」/「MIN」/「1 分钟 ~ 24 小时」各 0 命中
- *   C2 老用户 `pollSecs=180` 只改云端账号后保存仍是 180
- *   D1 默认「智能」；D2 定时数字框的范围与夹值；D3 关闭/智能不渲染数字框
- *   D7 通道切到「只用本地」→ 三档 disabled 且值保留
- *   H-2 定时 30 → 智能 → 定时 保存，分钟数仍是 30
+ *   C2 老用户 `pollSecs=180`，只改云端后保存仍是 180
+ *   D1 默认「智能」；D2 定时数字框；D3 关闭/智能不渲染数字框；H-2 切档不丢分钟数
+ *   D5 两块各一份三档（R5）；D7 开关关掉 → 三档 disabled、值保留（O9 / O10）
+ * 六块默认折叠（O4）：DOM 判据一律先 `openCloud()`。折叠体的 `hidden` 不影响
+ * `querySelector` 命中，所以「不展开就断言」会得到一条假绿。
  */
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -14,16 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MdSyncBinding, MdSyncViewCloud } from '../../types/domain';
 import type { DataRootInfo } from '../../types/domain/dataRoot';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
-import {
-  AUTO_MAX_MINUTES,
-  AUTO_MIN_MINUTES,
-  autoOf,
-  clampAutoMinutes,
-  defaultAuto,
-  purgeNoteOf,
-  withSchedule,
-} from './mdSyncAuto';
-import { AUTO_COPY, PURGE_COPY, REMOVED_PHRASES } from './mdSyncCopy';
+import { AUTO_COPY } from './mdSyncCopy';
 
 const BINDINGS: MdSyncBinding[] = [
   { kind: 'timers', enabled: true, root: 'C:\\Vault', file: '{date}.md', heading: '#### 事项计时' },
@@ -31,9 +24,9 @@ const BINDINGS: MdSyncBinding[] = [
   { kind: 'todos', enabled: true, root: '%APP_DIR%\\md', file: '{date}.md', heading: '#### 待办事项' },
 ];
 
-const CLOUD = {
+/** 块⑤ WebDAV 通路（老用户形状：**没有** `auto` 键，读作「智能 + 15」） */
+const WEBDAV = {
   enabled: true,
-  mode: 'webdav' as const,
   localRoot: '',
   baseUrl: 'https://dav.example.com/dav/',
   basePath: '/Timing',
@@ -73,18 +66,24 @@ import { MdSyncTab } from './MdSyncTab';
 let container: HTMLDivElement;
 let root: Root;
 
-/** 老用户：`pollSecs=180`，`cloud` 里**没有** `auto` 键。 */
-function view(over: { pollSecs?: number; cloud?: MdSyncViewCloud['config']['cloud'] } = {}): MdSyncViewCloud {
+/** 老用户：`pollSecs=180`，两条通路的配置里**都没有** `auto` 键。 */
+function view(over: { pollSecs?: number; webdav?: MdSyncViewCloud['config']['cloudWebdav'] } = {}): MdSyncViewCloud {
   return {
     today: '2026-11-07',
     config: {
       enabled: true,
       pollSecs: over.pollSecs ?? 180,
       bindings: BINDINGS,
-      cloud: over.cloud === undefined ? { ...CLOUD } : over.cloud,
+      cloud: null,
+      cloudFolder: null,
+      cloudWebdav: over.webdav === undefined ? { ...WEBDAV } : over.webdav,
     },
     cloud: {
       enabled: true, mode: 'webdav', hasSecret: true, todayPushed: false,
+      pendingDates: [], lastError: null,
+    },
+    local: {
+      enabled: false, mode: 'localfolder', hasSecret: false, todayPushed: false,
       pendingDates: [], lastError: null,
     },
     status: { lastSyncAt: null, lastError: null, bindings: [] },
@@ -113,18 +112,39 @@ function button(text: string): HTMLButtonElement {
   return found as HTMLButtonElement;
 }
 
-async function click(text: string): Promise<void> {
-  await act(async () => { button(text).click(); await Promise.resolve(); });
+/** 展开块⑤（六块默认折叠，O4）：不展开的话下面的 `querySelector` 会命中折叠体里的旧节点 */
+async function openCloud(): Promise<void> {
+  const toggle = container.querySelector('button[aria-label="展开云端同步"]') as HTMLButtonElement | null;
+  if (!toggle) throw new Error('块⑤ 的折叠按钮不见了');
+  await act(async () => { toggle.click(); await Promise.resolve(); });
 }
 
+/** 块⑤ 的三档按钮（按块限定：块④ 也有同名的 `自动同步` 分组） */
 function tiers(): HTMLButtonElement[] {
   return Array.from(
-    container.querySelectorAll('[role="group"][aria-label="自动同步"] button'),
+    container.querySelectorAll('[data-block="data-cloud"] [role="group"][aria-label="自动同步"] button'),
   ) as HTMLButtonElement[];
 }
 
+/**
+ * 点块⑤ 里的按钮。**必须按块限定**：块④ 折叠着也挂在 DOM 里，`关闭` / `定时` /
+ * `智能` / `测试连接` 这四个词两块都有，全页 `find` 会点到块④ 那个（它在 DOM 里靠前）。
+ */
+async function clickCloud(text: string): Promise<void> {
+  const block = container.querySelector('[data-block="data-cloud"]') as HTMLElement | null;
+  if (!block) throw new Error('块⑤ 不在 DOM 里');
+  const found = Array.from(block.querySelectorAll('button')).find((el) => el.textContent === text);
+  if (!found) throw new Error(`块⑤ 里找不到按钮：${text}`);
+  await act(async () => { found.click(); await Promise.resolve(); });
+}
+
+/** 块⑤ 的可见文字（排除块④ 的同名文案：两块各有一份三档，不限定就会互相冒充） */
+function cloudText(): string {
+  return container.querySelector('[data-block="data-cloud"]')?.textContent ?? '';
+}
+
 function numberInput(): HTMLInputElement | null {
-  return container.querySelector('[aria-label="云端自动同步间隔（分钟）"]') as HTMLInputElement | null;
+  return container.querySelector('[aria-label="云端自动同步周期（分钟）"]') as HTMLInputElement | null;
 }
 
 async function typeMinutes(value: string): Promise<void> {
@@ -144,51 +164,6 @@ async function save(): Promise<MdSyncViewCloud['config']> {
   return api.save.mock.calls[before][0] as MdSyncViewCloud['config'];
 }
 
-describe('mdSyncAuto —— 纯函数', () => {
-  it('老配置缺 auto → 智能 + 15；坏值收敛，不写回', () => {
-    expect(defaultAuto()).toEqual({ schedule: 'smart', intervalMinutes: 15 });
-    expect(autoOf(undefined)).toEqual(defaultAuto());
-    expect(autoOf(null)).toEqual(defaultAuto());
-    expect(autoOf({ schedule: 'off', intervalMinutes: 999 }))
-      .toEqual({ schedule: 'off', intervalMinutes: AUTO_MAX_MINUTES });
-  });
-
-  it('D2：1 → 5，999 → 120，非数字回 15', () => {
-    expect(clampAutoMinutes('1')).toBe(AUTO_MIN_MINUTES);
-    expect(clampAutoMinutes('999')).toBe(AUTO_MAX_MINUTES);
-    expect(clampAutoMinutes('')).toBe(15);
-    expect(clampAutoMinutes('abc')).toBe(15);
-    expect(clampAutoMinutes('30')).toBe(30);
-  });
-
-  it('H-2：切档只改 schedule，分钟数原样带过', () => {
-    const auto = { schedule: 'interval' as const, intervalMinutes: 30 };
-    expect(withSchedule(auto, 'smart')).toEqual({ schedule: 'smart', intervalMinutes: 30 });
-    expect(auto.intervalMinutes).toBe(30);
-  });
-
-  it('四句清理文案的优先级与逐字（T04 接状态前先钉住选择器）', () => {
-    expect(purgeNoteOf(undefined)).toBe(PURGE_COPY.idle);
-    expect(purgeNoteOf({ paused: true, deleted: 9, failed: 4 }))
-      .toBe('往期清理已暂停：4 份没能删掉。点「立即同步」重试。');
-    expect(purgeNoteOf({ paused: false, deleted: 0, failed: 3 }))
-      .toBe('云端只保留今天的日记；有 3 份往期没能删掉，下一轮再试。');
-    expect(purgeNoteOf({ paused: false, deleted: 2, failed: 0 }))
-      .toBe('云端只保留今天的日记；上次清理删了 2 份。');
-    expect(purgeNoteOf({ paused: false, deleted: 0, failed: 0 })).toBe(PURGE_COPY.idle);
-  });
-
-  it('三档文案逐字表（§11.1）', () => {
-    expect(AUTO_COPY).toEqual({
-      label: '自动同步', off: '关闭', interval: '定时', smart: '智能',
-      every: '每', minutes: '分钟', range: '5 ~ 120 分钟',
-      smartNote: '停手 5 分钟后同步；启动时一次。',
-    });
-    expect(REMOVED_PHRASES).toContain('同步间隔');
-    expect(REMOVED_PHRASES).toContain('1 分钟 ~ 24 小时');
-  });
-});
-
 describe('MdSyncTab —— 三档控件与删掉的那一行', () => {
   beforeEach(() => {
     for (const fn of [api.get, api.save, api.run, api.test, api.open]) fn.mockReset();
@@ -206,6 +181,7 @@ describe('MdSyncTab —— 三档控件与删掉的那一行', () => {
 
   it('C1：全页「同步间隔」/「MIN」/「1 分钟 ~ 24 小时」各 0 命中', async () => {
     await mount();
+    await openCloud();
     const text = container.textContent ?? '';
     expect(text).not.toContain('同步间隔');
     expect(text).not.toContain('1 分钟 ~ 24 小时');
@@ -216,50 +192,84 @@ describe('MdSyncTab —— 三档控件与删掉的那一行', () => {
 
   it('D1：三档默认「智能」，关闭档不配任何说明句', async () => {
     await mount();
+    await openCloud();
     const items = tiers();
     expect(items.map((el) => el.textContent)).toEqual(['关闭', '定时', '智能']);
     expect(items.map((el) => el.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true']);
-    expect(container.textContent).toContain(AUTO_COPY.smartNote);
+    expect(cloudText()).toContain(AUTO_COPY.smartNote);
     expect(numberInput()).toBeNull();
-    await click('关闭');
+    await clickCloud('关闭');
     expect(tiers()[0].getAttribute('aria-pressed')).toBe('true');
-    expect(container.textContent).not.toContain(AUTO_COPY.smartNote);
-    expect(container.textContent).not.toContain(AUTO_COPY.range);
+    expect(cloudText()).not.toContain(AUTO_COPY.smartNote);
+    expect(cloudText()).not.toContain(AUTO_COPY.range);
   });
 
   it('D2 / D3：只有「定时」渲染数字框（默认 15）与 5 ~ 120 分钟', async () => {
     await mount();
-    await click('定时');
+    await openCloud();
+    await clickCloud('定时');
     const input = numberInput();
     expect(input?.value).toBe('15');
-    expect(container.textContent).toContain(AUTO_COPY.range);
-    expect(container.textContent).toContain(AUTO_COPY.every);
-    expect(container.textContent).toContain(AUTO_COPY.minutes);
-    await click('智能');
+    expect(cloudText()).toContain(AUTO_COPY.range);
+    expect(cloudText()).toContain(AUTO_COPY.every);
+    expect(cloudText()).toContain(AUTO_COPY.minutes);
+    await clickCloud('智能');
     expect(numberInput()).toBeNull();
-    expect(container.textContent).not.toContain(AUTO_COPY.range);
+    expect(cloudText()).not.toContain(AUTO_COPY.range);
   });
 
-  it('D7：切到「只用本地」→ 三档 disabled，值保留（切回仍是原档）', async () => {
+  it('D7（O9/O10）：关掉块⑤ 的开关 → 三档 disabled、值保留、控件不隐藏', async () => {
     await mount();
-    await click('定时');
-    await click('只用本地');
+    await openCloud();
+    await clickCloud('定时');
+    /* 开关在标题右侧（`MdSyncTab` 的 actions 槽），点它只灰块⑤ 的三档 */
+    const toggle = container.querySelector('[aria-label="启用云端同步"]') as HTMLButtonElement;
+    await act(async () => { toggle.click(); await Promise.resolve(); });
+
     for (const item of tiers()) expect(item.disabled).toBe(true);
+    /* 值一个字节不清：关掉只是「别跑」，不是「别记着」（O10 不隐藏） */
     expect(tiers()[1].getAttribute('aria-pressed')).toBe('true');
-    await click('本地 + 云端');
+    expect(numberInput()?.disabled).toBe(true);
+    /* 块④ 的开关不受牵连（O13 互不触碰） */
+    const folderToggle = container.querySelector('[aria-label="启用本地同步"]') as HTMLButtonElement;
+    expect(folderToggle.getAttribute('aria-checked')).toBe('false');
+
+    await act(async () => { toggle.click(); await Promise.resolve(); });
     for (const item of tiers()) expect(item.disabled).toBe(false);
     expect(tiers()[1].getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('D5（R5）：两块各一份三档 —— 块⑤ 拨到定时 30 不会让块④ 跟着变', async () => {
+    await mount();
+    await openCloud();
+    await clickCloud('定时');
+    await typeMinutes('30');
+
+    const folderGroup = container.querySelector(
+      '[data-block="data-local"] [role="group"][aria-label="自动同步"]',
+    ) as HTMLElement;
+    const pressed = Array.from(folderGroup.querySelectorAll('button'))
+      .map((el) => el.getAttribute('aria-pressed'));
+    expect(pressed).toEqual(['false', 'false', 'true']);
+    /* 块④ 的分钟框 aria-label 与块⑤ 不同：同一屏两个「自动同步」必须分得清 */
+    expect(container.querySelector('[aria-label="本地自动同步周期（分钟）"]')).toBeNull();
+
+    const saved = await save();
+    expect(saved.cloudWebdav?.auto).toEqual({ schedule: 'interval', intervalMinutes: 30 });
+    /* 块④ 从未配置过 → `channelToSave` 归一成 `null`，不许长出带默认值的三档 */
+    expect(saved.cloudFolder).toBeNull();
+  });
+
   it('H-2：定时 30 → 智能 → 定时 → 保存，落库分钟数仍是 30', async () => {
     await mount();
-    await click('定时');
+    await openCloud();
+    await clickCloud('定时');
     await typeMinutes('30');
-    await click('智能');
-    await click('定时');
+    await clickCloud('智能');
+    await clickCloud('定时');
     expect(numberInput()?.value).toBe('30');
     const saved = await save();
-    expect(saved.cloud?.auto).toEqual({ schedule: 'interval', intervalMinutes: 30 });
+    expect(saved.cloudWebdav?.auto).toEqual({ schedule: 'interval', intervalMinutes: 30 });
   });
 
   it('C2：老用户 pollSecs=180，只改云端账号后保存仍是 180（视图未回来不许保存）', async () => {
@@ -267,11 +277,12 @@ describe('MdSyncTab —— 三档控件与删掉的那一行', () => {
     const saved = await save();
     expect(saved.pollSecs).toBe(180);
     api.test.mockResolvedValue({ ok: true, detail: '连接正常' });
-    await click('测试连接');
+    await openCloud();
+    await clickCloud('测试连接');
     const tested = api.test.mock.calls[0][0] as MdSyncViewCloud['config'];
     expect(tested.pollSecs).toBe(180);
     /* 老配置没动过档位 → 不许凭空写出 auto 键 */
-    expect(saved.cloud).not.toHaveProperty('auto');
+    expect(saved.cloudWebdav).not.toHaveProperty('auto');
   });
 
   it('视图丢失时点保存不落库（§15.2 的 `if (!view) return false` 守卫）', async () => {

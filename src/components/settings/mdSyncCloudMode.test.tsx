@@ -1,18 +1,26 @@
 import { act, createElement, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CloudMode, MdSyncCloud, MdSyncCloudStatus, MdSyncConfig, MdSyncTestResult, MdSyncViewCloud } from '../../types/domain';
+import type {
+  MdSyncCloudChannel,
+  MdSyncCloudStatus,
+  MdSyncConfig,
+  MdSyncTestResult,
+  MdSyncViewCloud,
+} from '../../types/domain';
 import { useMdSyncStore } from '../../stores/mdSyncStore';
 
-/* [V0.11.18] T2「测试连接与状态行跟随 mode」的判据（PRD A7 / A8 / §13.4.2）。
+/* [V0.11.26] 原「测试连接与状态行跟随 mode」（PRD A7 / A8）在拆分后变成**两块各自**的判据
+   （O14 / O15）：
 
-   单独一个文件而不是往 `MdSyncCloudCard.test.tsx` 里塞：那个文件已经 272 行
-   （`check:size` 是 300 行硬门禁、零豁免），而这一批断言要 60+ 行。
+   1. 两块各有一个「测试连接」——块④ 走 detail 退回路径（`probe` 对 localfolder 回空 `steps`），
+      块⑤ 走三关逐步点亮；
+   2. 状态行各读各的：块④ 读 `view.local`（**不出现密码句**——`has_secret` 恒读 KEY_WEBDAV，
+      对本地通路是错话），块⑤ 读 `view.cloud`；
+   3. 「没填全」两句话各归各块，且**只显示一句**（A6c 口径平移）。
+   4. 两块各自持有 `testResult` state → 结果天然互不残留（O15）。
 
-   真根因在**界面层**两处，不在 `probe`：
-   1. 「测试连接」原来只长在 WebDAV 分支里 → localfolder 用户没有自证入口；
-   2. 状态行的「密码」是 WebDAV 语义硬编码（`state.rs` 的 `has_secret` 无条件读
-      `KEY_WEBDAV`）→ localfolder 用户恒定看到「密码未设置」。 */
+   真根因仍然在界面层，`probe.rs` 零 diff：块④ 用它现拼的 legacy `localfolder` 载荷。 */
 
 const host = vi.hoisted(() => ({ mobile: false }));
 vi.mock('../../lib/platform', () => ({
@@ -23,53 +31,70 @@ vi.mock('../../lib/platform', () => ({
 const api = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn(), run: vi.fn(), open: vi.fn(), test: vi.fn() }));
 vi.mock('../../services/api', () => ({ mdSyncApi: api, mdBackupApi: { list: vi.fn(), restore: vi.fn() } }));
 
-import { MdSyncCloudCard } from './MdSyncCloudCard';
+import { MdSyncLocalCard } from './MdSyncLocalCard';
+import { MdSyncWebdavCard } from './MdSyncWebdavCard';
 import { useMdSyncDraft } from './useMdSyncDraft';
 import type { MdSyncDraft } from './useMdSyncDraft';
 import { createMockApiPlugins } from '../../mocks/browserMockPlugins';
 
 (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-function viewWith(
-  mode: CloudMode,
-  over: Partial<MdSyncCloudStatus> = {},
-  /* [V0.11.18] A6 要造「开了但没填全」那一档：默认是填全的，按需抹掉字段。 */
-  cloudOver: Partial<MdSyncCloud> = {},
-): MdSyncViewCloud {
-  const cloud = {
-    enabled: true, mode,
-    localRoot: 'D:\\Nutstore\\我的坚果云\\TimingMD',
-    baseUrl: 'https://dav.example.com/dav/', basePath: '/Timing/md', user: 'me@example.com',
-    ...cloudOver,
-  };
+function statusOf(enabled: boolean, over: Partial<MdSyncCloudStatus> = {}): MdSyncCloudStatus {
   return {
-    today: '2026-11-18',
+    enabled,
+    mode: 'webdav',
+    hasSecret: false,
+    todayPushed: false,
+    pendingDates: [],
+    lastError: null,
+    ...over,
+  };
+}
+
+function viewWith(
+  folder: MdSyncCloudChannel,
+  webdav: MdSyncCloudChannel,
+  over: { local?: Partial<MdSyncCloudStatus>; cloud?: Partial<MdSyncCloudStatus> } = {},
+): MdSyncViewCloud {
+  return {
+    today: '2026-11-26',
     config: {
-      enabled: true, pollSecs: 900, cloud,
+      enabled: true,
+      pollSecs: 900,
+      cloud: null,
       bindings: [{ kind: 'timers', enabled: true, root: 'C:\\Vault', file: '{date}.md', heading: '#### 事项计时' }],
+      cloudFolder: folder,
+      cloudWebdav: webdav,
     },
-    /* `hasSecret` 这里刻意给 `false`：真实 localfolder 用户从没存过 WebDAV 应用密码，
-       而那正是「密码未设置」那句错话的来源。 */
-    cloud: {
-      enabled: true, mode, hasSecret: false, todayPushed: false, pendingDates: [], lastError: null, ...over,
-    },
+    local: statusOf(folder.enabled, over.local),
+    cloud: statusOf(webdav.enabled, over.cloud),
     status: { lastSyncAt: null, lastError: null, bindings: [] },
   };
 }
 
-function Harness(): ReactElement {
-  /* 真 Hook + 真卡：这一批判据看的是「界面按 mode 分派了什么」，
-     用假 draft 会绕开 `useMdSyncDraft` 的回填（`mode` 就是回填出来的那个值）。 */
-  const draft: MdSyncDraft = useMdSyncDraft();
-  return createElement(MdSyncCloudCard, { draft });
+const LOCAL: MdSyncCloudChannel = { enabled: true, localRoot: 'D:\\Nutstore\\我的坚果云\\TimingMD' };
+const WEBDAV: MdSyncCloudChannel = {
+  enabled: true,
+  baseUrl: 'https://dav.example.com/dav/',
+  basePath: '/Timing/md',
+  user: 'me@example.com',
+};
+
+/** 真 Hook + 真卡：判据看的是「界面按通路分派了什么」，假 draft 会绕开回填。 */
+function harnessOf(Card: (props: { draft: MdSyncDraft }) => ReactElement) {
+  return function Harness(): ReactElement {
+    const draft: MdSyncDraft = useMdSyncDraft();
+    return createElement(Card, { draft });
+  };
 }
 
 let container: HTMLDivElement; let root: Root;
 
-async function mount(): Promise<void> {
+async function mount(Card: (props: { draft: MdSyncDraft }) => ReactElement): Promise<void> {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+  const Harness = harnessOf(Card);
   await act(async () => {
     root.render(createElement(Harness));
     await Promise.resolve();
@@ -88,12 +113,13 @@ async function click(text: string): Promise<void> {
 }
 
 const result = () => container.querySelector('.sync-cloud__result');
+const statusBox = () => container.querySelector('.sync-cloud__status');
 
-describe('测试连接与状态行跟随 mode（T2 / PRD A7 / A8）', () => {
+describe('两块各自的测试连接与状态行（O14 / O15）', () => {
   beforeEach(() => {
     host.mobile = false;
     for (const fn of [api.get, api.save, api.test]) fn.mockReset();
-    api.get.mockResolvedValue(viewWith('localfolder'));
+    api.get.mockResolvedValue(viewWith(LOCAL, WEBDAV));
     useMdSyncStore.setState({ view: null, loaded: false, loading: false, saving: false, error: null });
   });
 
@@ -102,58 +128,55 @@ describe('测试连接与状态行跟随 mode（T2 / PRD A7 / A8）', () => {
     container?.remove();
   });
 
-  it('B2a：载体是本地目录时「测试连接」**在 DOM 里且可点**', async () => {
-    await mount();
-    expect(container.textContent).toContain('落点目录');
+  it('B2a → O15：块④ 有「测试连接」且可点，载荷是 legacy `localfolder`（`enabled` 恒 true）', async () => {
+    await mount(MdSyncLocalCard);
     const test = button('测试连接');
     expect(test.disabled).toBe(false);
+    await click('测试连接');
+    const payload = api.test.mock.calls[0][0] as MdSyncConfig;
+    expect(payload.cloud?.mode).toBe('localfolder');
+    expect(payload.cloud?.localRoot).toBe(LOCAL.localRoot);
+    expect(payload.cloud?.enabled).toBe(true);
   });
 
-  it('B2b：点它只显示一句「目录可写：…」，不渲染三关（steps 为空）', async () => {
+  it('B2b：块④ 的结论只显示一句「目录可写：…」，不渲染三关（steps 为空）', async () => {
     api.test.mockResolvedValueOnce({ ok: true, detail: '目录可写：D:\\Nutstore\\我的坚果云\\TimingMD' });
-    await mount();
+    await mount(MdSyncLocalCard);
     await click('测试连接');
 
     expect(result()?.textContent).toBe('目录可写：D:\\Nutstore\\我的坚果云\\TimingMD');
     expect(result()?.getAttribute('data-ok')).toBe('true');
-    /* localfolder 的 `probe` 返回 `steps: Vec::new()` → 走「只显示 detail」那条退回路径 */
     expect(result()?.querySelector('.sync-cloud__steps')).toBeNull();
     expect(container.querySelector('.sync__error')).toBeNull();
   });
 
-  it('B2c：localfolder + 密码未设置 + 无 lastError → 界面**零红字**', async () => {
-    await mount();
-    expect(container.querySelector('.sync__error')).toBeNull();
-    expect(container.querySelector('[data-ok="false"]')).toBeNull();
-    expect(container.querySelector('.sync-cloud__status')?.getAttribute('data-mode')).toBe('localfolder');
-  });
-
-  it('B2d：localfolder 下状态行**不出现**「密码未设置 / 密码已保存」；WebDAV 下仍在', async () => {
-    await mount();
+  it('B2c：块④ 状态行**不出现**密码句（`has_secret` 恒读 KEY_WEBDAV，对本地是错话）', async () => {
+    await mount(MdSyncLocalCard);
     expect(container.textContent).not.toContain('密码未设置');
     expect(container.textContent).not.toContain('密码已保存');
-    /* 「今天已上传」不门控（localfolder 也走同一条 `mark_synced` 落库路径） */
     expect(container.textContent).toContain('今天还没上传');
-
-    await click('WebDAV');
-    expect(container.textContent).toContain('密码未设置');
+    expect(statusBox()?.getAttribute('data-channel')).toBe('folder');
   });
 
-  it('A8：WebDAV 上点出红字 → 切到本地目录 → 红字**立刻消失**；切回也不复活', async () => {
-    api.get.mockResolvedValue(viewWith('webdav', { hasSecret: true }));
+  it('B2d：块⑤ 状态行仍显示密码项，且读的是 `view.cloud`', async () => {
+    await mount(MdSyncWebdavCard);
+    expect(container.textContent).toContain('密码未设置');
+    expect(statusBox()?.getAttribute('data-channel')).toBe('webdav');
+  });
+
+  it('O15：块⑤ 测出红字后换挂块④ → 结果不残留（两块各自持有 testResult）', async () => {
     api.test.mockResolvedValueOnce({
       ok: false,
       detail: '账号或应用密码不对',
       steps: [{ key: 'account', ok: false, detail: '账号或应用密码不对' }],
     });
-    await mount();
+    await mount(MdSyncWebdavCard);
     await click('测试连接');
     expect(result()?.querySelector('.sync-cloud__steps')?.textContent).toBe('账号 ✗');
 
-    await click('本地目录');
-    expect(result()).toBeNull();
-
-    await click('WebDAV');
+    await act(async () => { root.unmount(); });
+    container.remove();
+    await mount(MdSyncLocalCard);
     expect(result()).toBeNull();
   });
 
@@ -162,11 +185,10 @@ describe('测试连接与状态行跟随 mode（T2 / PRD A7 / A8）', () => {
     const test = handlers.md_sync_test as (args: unknown) => MdSyncTestResult;
     const base: MdSyncConfig = { enabled: true, pollSecs: 900, bindings: [], cloud: null };
 
-    /* `cloud === null` → 报「还没配置云端通道」（与 probe.rs:44 同一句） */
+    /* `cloud === null` → 报「还没配置云端通道」（与 probe.rs 同一句） */
     expect(test({ config: base })).toEqual({ ok: false, detail: '还没配置云端通道' });
 
-    /* `enabled: false` + localfolder → **绿字**。真机 LocalFolder 分支不看 `enabled`；
-       mock 以前先判 `enabled` 直接报红，于是走查看到红、实机看到绿。 */
+    /* `enabled: false` + localfolder → **绿字**：真机 LocalFolder 分支不看 `enabled`。 */
     const localfolder = {
       enabled: false, mode: 'localfolder' as const, localRoot: 'D:\\md',
       baseUrl: '', basePath: '', user: '',
@@ -175,35 +197,34 @@ describe('测试连接与状态行跟随 mode（T2 / PRD A7 / A8）', () => {
       .toEqual({ ok: true, detail: '目录可写：D:\\md' });
   });
 
-  /* ===== [V0.11.18] A6：选了「本地 + 云端」但没填全 → 状态区只说一句原因 ===== */
+  /* ===== O14：两块各自的「没填全」，且**只显示一句** ===== */
 
-  it('A6：WebDAV 缺地址与账号 → 逐字「云端还没填全，暂时不会同步。」且不叠加「今天还没上传」', async () => {
-    api.get.mockResolvedValue(viewWith('webdav', { hasSecret: true }, { baseUrl: '', user: '' }));
-    await mount();
+  it('O14 块⑤：缺地址与账号 → 逐字「云端还没填全，暂时不会同步。」且不叠加其它状态', async () => {
+    api.get.mockResolvedValue(viewWith(LOCAL, { ...WEBDAV, baseUrl: '', user: '' }));
+    await mount(MdSyncWebdavCard);
 
     expect(container.textContent).toContain('云端还没填全，暂时不会同步。');
     expect(container.querySelector('[data-missing="true"]')).not.toBeNull();
-    expect(container.querySelector('.sync-cloud__status')?.getAttribute('data-ready')).toBe('false');
-    /* 「只显示这一句」：两句并排会被读成「在传、只是没传上去」，事实是压根没跑 */
+    expect(statusBox()?.getAttribute('data-ready')).toBe('false');
     expect(container.textContent).not.toContain('今天还没上传');
-    expect(container.textContent).not.toContain('今天已上传');
-    /* 密码项一并不显示（那是填全之后才该说的状态） */
     expect(container.textContent).not.toContain('密码已保存');
   });
 
-  it('A6b：本地目录只看 `localRoot` → 空目录同样报「还没填全」', async () => {
-    api.get.mockResolvedValue(viewWith('localfolder', {}, { localRoot: '   ' }));
-    await mount();
+  it('O14 块④：落点目录是空白 → 逐字「云端目录还没填，暂时不会同步。」（L4），块⑤ 不受影响', async () => {
+    api.get.mockResolvedValue(viewWith({ ...LOCAL, localRoot: '   ' }, WEBDAV));
+    await mount(MdSyncLocalCard);
 
-    expect(container.textContent).toContain('云端还没填全，暂时不会同步。');
-    /* 本地目录那条路一次网络请求都不发，地址 / 账号空着不算问题 */
+    expect(container.textContent).toContain('云端目录还没填，暂时不会同步。');
     expect(container.querySelector('[data-missing="true"]')).not.toBeNull();
+    expect(container.textContent).not.toContain('今天还没上传');
+    /* 块⑤ 那份状态在这里根本不该被读（同一份 view 下它是「填全」） */
+    expect(statusBox()?.getAttribute('data-ready')).toBe('false');
   });
 
   it('A6c：填全之后那句话消失，回到正常状态行', async () => {
-    await mount();
+    await mount(MdSyncWebdavCard);
     expect(container.textContent).not.toContain('云端还没填全，暂时不会同步。');
-    expect(container.querySelector('.sync-cloud__status')?.getAttribute('data-ready')).toBe('true');
+    expect(statusBox()?.getAttribute('data-ready')).toBe('true');
     expect(container.textContent).toContain('今天还没上传');
   });
 });

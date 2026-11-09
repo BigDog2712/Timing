@@ -86,7 +86,7 @@ export function MdSyncLocalCard({ draft }: MdSyncLocalCardProps) {
       <MdSyncAutoControl
         auto={folder.auto}
         disabled={disabled}
-        minutesLabel="本地同步间隔（分钟）"
+        minutesLabel="本地自动同步周期（分钟）"
         onChange={(next: MdSyncCloudAuto) => patch({ auto: next })}
       />
 
