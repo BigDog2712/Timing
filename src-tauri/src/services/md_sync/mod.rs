@@ -51,9 +51,7 @@ pub async fn get_view(pool: &SqlitePool) -> AppResult<MdSyncView> {
     })
 }
 
-/* [V0.11.21] `poll_secs` 的 `pub use` 整条删掉：桌面 v0.11.19 改事件驱动后没有读者，
-手机端这一轮改按三档（`services::md_cloud::tier::plan_of`），非云端仍读配置里的
-`poll_secs`。字段本身保留——老用户库里的值要原样读回，界面已无它的入口。 */
+/* [V0.11.21] `poll_secs` 无界面入口，字段保留只为老库原样读回；手机端按三档跑（tier::plan_of）。 */
 
 /// 手动「立即同步」。返回本轮报告，不因单个落点失败而整体报错。
 pub async fn run(pool: &SqlitePool) -> AppResult<MdSyncReport> {
@@ -155,7 +153,7 @@ pub(super) async fn sync_all(pool: &SqlitePool, root_override: Option<&str>) -> 
             next_status.bindings.push(status);
             continue;
         }
-        match sync_binding(pool, &mut rt, binding, date, &path).await {
+        match sync_binding(pool, &mut rt, binding, date, &path, &config.diary_template).await {
             Ok(outcome) => {
                 status.exists = outcome.exists;
                 status.last_direction = Some(outcome.direction.to_string());
@@ -201,6 +199,8 @@ async fn sync_binding(
     binding: &MdSyncBinding,
     date: chrono::NaiveDate,
     path: &Path,
+    /* [V0.11.33] 日记模板路径（全局一份）：经 `sync_all`（持有 config）传下，红线豁免 +2 净 0 已裁决放行。 */
+    template: &str,
 ) -> Result<BindingOutcome, String> {
     let read = md_file::read_section(path, &binding.heading)?;
     /* 阻断级诊断：本轮既不写也不导入（不写保住手改内容，不导入不触发删除块）。 */
@@ -254,9 +254,10 @@ async fn sync_binding(
         SectionState::Present { body, .. } => body.trim_end() != target.trim_end(),
     };
     if needs_write {
+        /* [V0.11.33] 首次写出套模板（P16/P17/P18）：文件已存在时它自己短路，零字节不碰。 */
+        crate::infra::md_diary::seed_if_missing(path, template);
         md_file::write_section(path, &binding.heading, &target)?;
-    }
-    rt.set_baseline(binding.kind, path, &binding.heading, target);
+    }    rt.set_baseline(binding.kind, path, &binding.heading, target);
 
     Ok(BindingOutcome {
         exported: needs_write,

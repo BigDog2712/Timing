@@ -21,6 +21,8 @@ pub(crate) mod fake_webdav;
 mod fake_webdav_dir;
 mod item;
 mod item_batch2;
+/* [V0.11.33] 日记模板三分支（P16/P17/P18）+ `seed_if_missing` 四条短路单元用例。 */
+mod md_diary_template;
 mod md_backup_restore;
 mod md_backup_target;
 mod md_cloud_autosync;

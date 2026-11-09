@@ -16,6 +16,8 @@ pub mod disk_space;
 pub mod md_backup;
 /* 备份目录的读侧（列表 / 读取 / 名字解析）：从 `md_backup` 拆出来的，只为行数。 */
 pub mod md_backup_store;
+/* [V0.11.33] 日记模板的首次写出：文件不存在且确要写时以模板打底（桌面 only）。 */
+pub mod md_diary;
 pub mod md_env;
 /* [V0.11.19] 代码围栏状态机：全 crate 只有这一份「这一行在不在围栏里」的判定。 */
 pub mod md_fence;
