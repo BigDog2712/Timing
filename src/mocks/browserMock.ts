@@ -155,7 +155,7 @@ export function createMockApi(): Record<string, (args?: any) => unknown> {
       const byItem = [...byMap.entries()]
         .map(([id, sec]) => ({ itemId: id, totalSec: sec }))
         .sort((x, y) => y.totalSec - x.totalSec);
-      const summary: StatsSummary = { totalSec, recordCount: rows.length, byItem };
+      const summary: StatsSummary = { totalSec, recordCount: rows.length, byItem, activity: [] };
       return summary;
     },
     update_record: (a) => {

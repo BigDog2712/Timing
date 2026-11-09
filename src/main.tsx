@@ -15,6 +15,8 @@ import './styles/dot.css';
 import './styles/overlays.css';
 import './styles/menu.css';
 import './styles/panels.css';
+/* [0.12.0] 同期电脑活动条（Patina 融合）：panels.css 已 258 行，单拆一份守住门禁 */
+import './styles/activity-strip.css';
 import './styles/settings-dialog.css';
 import './styles/settings-panel.css';
 /* [V0.3.4] 插件页签样式（从 settings-panel.css 拆出，控制单文件行数） */

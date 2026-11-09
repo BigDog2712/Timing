@@ -42,6 +42,10 @@ pub async fn stats(
         total_sec,
         record_count,
         by_item,
+        /* 同期活动由**命令层**填（`commands::record_cmd::stats_summary`）：它要读的是
+        Patina 的活动库，属于宿主装配层的事。服务层保持纯宿主语义——手机端也编这一份，
+        在这里伸手去够 Patina 会把 `#[cfg]` 铺进业务逻辑。 */
+        activity: Vec::new(),
     })
 }
 

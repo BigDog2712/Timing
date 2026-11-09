@@ -9,7 +9,7 @@ import { errorText, ipc } from '../services/ipc';
 import { rangeBounds, type RecordsRange } from '../lib/time';
 import { itemName, useItemStore } from '../stores/itemStore';
 import { IPC_EVENTS, MAX_PAGE_SIZE } from '../types/domain';
-import type { Item, MdSyncReport, TimeRecord } from '../types/domain';
+import type { ActivitySlice, Item, MdSyncReport, TimeRecord } from '../types/domain';
 import { useTauriEvent } from './useTauriEvent';
 
 export interface RecordGroup {
@@ -25,6 +25,8 @@ interface RecordsData {
   totalSec: number;
   recordCount: number;
   groups: RecordGroup[];
+  /** 同期电脑活动（Patina 活动库，桌面独有；手机 / 库缺失时为空数组） */
+  activity: ActivitySlice[];
   reload: () => void;
 }
 
@@ -61,6 +63,7 @@ export function useRecordsData(range: RecordsRange, reference?: number): Records
   const [recordCount, setRecordCount] = useState(0);
   const [rows, setRows] = useState<TimeRecord[]>([]);
   const [byItem, setByItem] = useState<{ itemId: number; totalSec: number }[]>([]);
+  const [activity, setActivity] = useState<ActivitySlice[]>([]);
   const [nonce, setNonce] = useState(0);
 
   const bounds = useMemo(() => rangeBounds(range, reference), [range, reference]);
@@ -79,6 +82,9 @@ export function useRecordsData(range: RecordsRange, reference?: number): Records
         setTotalSec(summary.totalSec);
         setRecordCount(summary.recordCount);
         setByItem(summary.byItem);
+        /* 后端可能因 Patina 库缺失 / 手机端而回空数组，这里不做存在性判断——
+        空数组本身就是「没有旁证」，下面的渲染按长度自然收起。 */
+        setActivity(summary.activity);
         setRows(page.items);
       } catch (err) {
         if (!cancelled) setError(errorText(err));
@@ -99,5 +105,5 @@ export function useRecordsData(range: RecordsRange, reference?: number): Records
     if (report.kinds.includes('timers')) reload();
   });
 
-  return { loading, error, totalSec, recordCount, groups, reload };
+  return { loading, error, totalSec, recordCount, groups, activity, reload };
 }

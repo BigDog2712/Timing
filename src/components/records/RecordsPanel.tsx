@@ -14,6 +14,7 @@ import { errorText } from '../../services/ipc';
 import { useItemStore } from '../../stores/itemStore';
 import { useUiStore } from '../../stores/uiStore';
 import { DayWeekTabs } from './DayWeekTabs';
+import { ActivityStrip } from './ActivityStrip';
 import { ItemGroup } from './ItemGroup';
 import { TimerDisplay } from '../pill/TimerDisplay';
 import { useHoverClose } from '../../hooks/useHoverClose';
@@ -22,7 +23,7 @@ const SKELETON_ROWS = [0, 1, 2];
 
 export function RecordsPanel() {
   const [range, setRange] = useState<RecordsRange>('day');
-  const { loading, error, totalSec, groups, reload } = useRecordsData(range);
+  const { loading, error, totalSec, groups, activity, reload } = useRecordsData(range);
   const items = useItemStore((s) => s.items);
   const closePanel = useUiStore((s) => s.closePanel);
 
@@ -73,6 +74,9 @@ export function RecordsPanel() {
         <span className="records__total-label">总计</span>
         <TimerDisplay seconds={totalSec} size="lg" />
       </div>
+
+      {/* 同期电脑活动：没有数据时组件自己返回 null，不留空壳 */}
+      <ActivityStrip activity={activity} />
 
       <div className="records__body">
         {loading && (

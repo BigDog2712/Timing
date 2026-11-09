@@ -189,12 +189,30 @@ export interface ItemStats {
   totalSec: Seconds;
 }
 
+/**
+ * 区间内的电脑活动片段（按应用聚合，来自 Patina 的活动库，宿主只读）。
+ * 用于在记录面板回答「这段时间我到底在用什么软件」。
+ * 手机端与 Patina 库缺失时为空数组。
+ */
+export interface ActivitySlice {
+  /** 应用显示名 */
+  app: string;
+  /** 可执行文件名 */
+  exe: string;
+  /** 落在查询区间内的秒数（已按区间裁剪） */
+  sec: Seconds;
+  /** 区间内的会话条数 */
+  samples: number;
+}
+
 /** 汇总统计（stats_summary 返回） */
 export interface StatsSummary {
   totalSec: Seconds;
   recordCount: number;
   /** 按事项聚合（totalSec 降序） */
   byItem: ItemStats[];
+  /** 同期电脑活动（sec 降序），最多 5 条 */
+  activity: ActivitySlice[];
 }
 
 /** 统一失败对象（命令返回 Err 时序列化） */

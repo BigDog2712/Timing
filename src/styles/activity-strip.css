@@ -1,0 +1,53 @@
+/**
+ * Timing — 同期电脑活动条（Patina 融合：记录面板顶部的旁证行）
+ * -----------------------------------------------------------------------------
+ * 单开一个文件而不是塞进 panels.css：那个文件已经 258 行、贴着 300 行门禁，
+ * 而这条窄条属于「Patina 融合」这条线，将来反向入口、跳转都长在这里。
+ *
+ * 一条横向可滚动的窄条，不进 records__body 的纵向滚动区，避免和记录明细抢高度。
+ */
+
+.activity-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.activity-strip__label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.activity-strip__list {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.activity-strip__list::-webkit-scrollbar {
+  display: none;
+}
+
+.activity-strip__chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  font-size: var(--text-xs);
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.activity-strip__sec {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

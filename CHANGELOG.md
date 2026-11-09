@@ -126,6 +126,30 @@ alwaysOnTop` 的悬浮小条，Patina 是常规主窗。共用一个入口 HTML 
 > `exit code 1` 多为热重建抢单实例锁（假信号，先杀光 `timing.exe` 复测）、
 > `0xc0000409` 才是 panic/abort、`exit code 0` 正常收尾。
 
+### 深化融合（一）：运行模型对齐 + 数据互见
+
+计划见 `Active/Timing/for-forg/35-计划-Patina深化融合.md`（D1–D5）。上一轮做到「装得下」，
+这一轮解决「没通」。
+
+**① 活动追踪全灭（P0，真 bug）**：Patina 的前台/媒体/音频数据由**独立子进程**采集——
+父进程用 `--patina-native-probe <kind>` 拉起自己的可执行文件，走 stdin/stdout 管道。
+上游在 `lib.rs::run()` 第一行做这个分派，融合时漏搬。后果链条：子进程不知道这个参数 →
+完整启动整个 Timing → 撞单实例锁 → `exit(0)` → 父进程一个字节都没收到 → 记 `cooldown`。
+最终 `tracking.stalled=true`、`sessions` 停在导入时刻不再增长，**全链路零报错**，
+用户只会觉得「统计不更新了」。修复：`run()` 最前面补 `run_if_requested()` 分派（桌面门控），
+实测常驻探针进程 0 → 5 个，`stalled` → `false`，`sessions` 重新增长。
+
+**② 数据互见（D2 读侧）**：`stats_summary` 的返回体加 `activity: ActivitySlice[]`——
+区间内按应用聚合的电脑活动（按区间裁剪、最多 5 条）。宿主用**独立只读连接**
+（`mode=ro` + 2 s `busy_timeout`）读 `patina.db`，不借 Patina 的连接池：物理上写不进去，
+也不会被将来的顺手 UPDATE 污染它的不变量。记录面板顶部因此多出一条「同时在用」窄条。
+没有新增 IPC 命令——`stats_summary` 本来就带 `from`/`to`，而 `ipc.ts` 正卡在 300 行门禁上。
+
+**判据**：内存库用例钉住跨界裁剪（会话 10 分钟、区间只覆盖 2 分钟 → 120 秒而不是 600）；
+组件用例钉住「空数组整条不渲染」与「时长走 `formatMinutes`」；真库核对今日 Top5 =
+WorkBuddy 5575s / Chrome 3157s / Quark 1445s / Weixin 1182s / DeepSeek Harness 1171s。
+`npm run check` 全绿、`npm test` 684、`cargo test --lib` 全过。
+
 ## 0.11.28（桌面）— 同步文案与日记模板 — 2026-11-09
 
 本轮轮次流水号 0.11.33（文档/commit 标号），桌面出包按双轨 +1 = `0.11.28`。**手机端

@@ -71,6 +71,17 @@ fn mobile_bridge_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    /* Patina 的原生探针是**独立子进程**：父进程用 `--patina-native-probe <kind>` 拉起
+    自己的可执行文件，靠 stdin/stdout 管道收发结果
+    （`patina/platform/windows/native_probe`）。这个分派必须在**任何**初始化之前，
+    尤其要早于单实例插件 —— 晚一步子进程就会去抢单实例锁、以 0 退出，一个字节都没写回，
+    父进程只看到 `last_error=cooldown`，症状是「活动追踪永久 stalled、采样数恒为 0」，
+    且全链路无任何报错。上游写在 `lib.rs::run()` 第一行，融合时漏搬了这一条。 */
+    #[cfg(desktop)]
+    if let Some(exit_code) = patina::platform::windows::native_probe::run_if_requested() {
+        std::process::exit(exit_code);
+    }
+
     // 冷启动计时起点（T17）：越靠近进程入口越准。这里比 `Builder` 早，也早于任何插件初始化。
     platform::boot_timing::start();
 
