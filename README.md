@@ -1,6 +1,8 @@
-# Timing v0.11.3
+# Timing
 
 Windows 桌面常驻悬浮计时条：屏幕边缘一条 32px 的小药丸，按一下就开计时，不占工作区。纯本地（SQLite），无账号、无联网。
+
+> 版本号只有一处出处：本文「## 版本」一节。标题不写版本，免得每次都漂。
 
 形态可切换：**悬浮条**（默认）或 **小圆点**（44px 秒表图形：表盘细框 + 进度弧 + 指针，不写字，与手机端大环同一套弧语义）。
 同一份源码还能编出安卓包（四页签 + 便利贴），见「平台」。
@@ -50,31 +52,42 @@ Tauri 2 + React 19 + TypeScript + Rust。
 
 ```
 .
-├── index.html              # 唯一入口（多窗口共用同一前端 bundle，按 label 分流）
-├── src/                    # React 前端
-│   ├── components/         # pill / panel / menu / todos / note / records / reminder / settings / ui
+├── index.html              # 宿主入口（多窗口共用同一 bundle，按 label 分流）
+├── patina.html             # Patina 入口（0.12.0 起同进程的第二扇窗，独立 bundle）
+├── src/                    # React 前端（宿主与第二窗共用一份源码，按 label 分流）
+│   ├── components/         # pill / panel / menu / todos / note / records / reminder / settings / ui / mobile
 │   ├── stores/             # zustand：timer / todo / note / item / plugin / theme / settings / ui
 │   ├── services/           # ipc 封装 + 各域 action + api.ts 领域门面
-│   ├── hooks/  lib/  types/  styles/
-│   ├── styles/tokens/      # 设计令牌实体（design-tokens.css 是索引，@import 顺序不可调换）
-│   └── mocks/              # 浏览器降级 mock（无 Tauri 环境下 `npm run dev` 可跑）
+│   ├── hooks/  lib/  types/
+│   ├── styles/             # 自写 CSS；tokens/ 是设计令牌实体（design-tokens.css 为索引，@import 顺序不可调换）
+│   ├── mocks/              # 浏览器降级 mock（无 Tauri 环境下 `npm run dev` 可跑）
+│   └── app/  features/  platform/  shared/   # 第二窗（Patina）前端，0.12.0 归一后与宿主同层并列
 ├── src-tauri/              # Rust 后端（依赖只能向下，见 ADR-016）
 │   ├── src/platform/       # 叶子层：clock（单调时钟）/ log / boot_timing
 │   ├── src/infra/          # 平台适配：窗口 / 托盘菜单 / 通知 / 几何 / 迁移
-│   ├── src/services/       # 业务：计时 / 事项 / 待办 / 便利贴 / 设置 / 主题
+│   ├── src/services/       # 业务：计时 / 事项 / 待办 / 便利贴 / 设置 / 主题 / md 同步 / 云端
 │   ├── src/app/            # 装配：events / tray / bootstrap / diagnostics
 │   ├── src/jobs/           # 调度：monitor / flusher / reminder / countdown / restore_notes
 │   ├── src/commands/  src/repositories/  src/models/  src/tests/
+│   ├── src/{app,commands,infra,models,services}/insight/  # 第二窗后端：按宿主同名层归位
 │   ├── capabilities/       # Tauri 2 权限放行清单（只留实际用到的窗口/事件/自启）
 │   └── tauri.conf.json
-├── scripts/                # 五道机械门禁（size / version / layers / contract / build）
+├── android-app/            # 已归档的 Kotlin 原生工程（冻结 0.3.6；check:version 盯着它，改版本会红）
+├── scripts/                # 门禁八步（见「## 开发」）+ 出包（android-* / build-*）
 ├── plugins/                # 插件：一文件夹一插件，内含启动头 plugin.json（规格见 docs/plugin-spec.md）
 │   └── md-sync/            # 首个 v2 插件：计时 / 便利贴 ↔ Markdown 双向同步
 ├── tests/fixtures/         # 双端黄金用例（timer-formula.json，Rust 与 TS 共用）
-├── preview/pill-preview.html   # 小条静态预览（设计对照用，不参与构建）
-├── docs/                   # 规格 / 架构 / 设计 / ADR / QA
+├── preview/                # 静态预览页（设计对照用，不参与构建）
+├── docs/                   # 规格 / 架构 / 设计 / ADR / QA；历史版本在 docs/archive/
 └── release/                # 构建产物落点（不入库，见 .gitignore）
 ```
+
+**两套代码在一个仓里**：宿主（`src/` 的 components / stores / services… + `src-tauri/src/` 同名层）
+与 0.12.0 并入的 Patina。Patina 是 vendored 第三方源码，**结构已归一**：前端
+`app / features / platform / shared` 四个根与宿主目录同层并列（目录名互不冲突），后端收进各层的
+`insight/` 命名空间（`src-tauri/src/{app,commands,infra,models,services}/insight/`）。
+`check:size` 的 300 行豁免**不再是整棵豁免**，改为逐文件基线棘轮（`scripts/size-allowlist.json`，
+只许减不许增）。改动清单见 `THIRD-PARTY-NOTICES.md`，与上游对账靠 `check:vendored`。
 
 ## 开发
 
@@ -82,7 +95,7 @@ Tauri 2 + React 19 + TypeScript + Rust。
 npm install
 npm run dev          # 前端单独跑（浏览器 mock 模式，端口 1420）
 npm run tauri dev    # 完整桌面应用（前端 + Rust 侧联调）
-npm run check        # 全部门禁：typecheck + contract + size + version + layers + lint
+npm run check        # 八步门禁：typecheck + contract + size + vendored + version + layers + brand + lint
 npm run lint         # ESLint（只查正确性，不查代码风格）
 npm test             # vitest（含双端时间公式黄金用例）
 npm run build        # tsc + vite build

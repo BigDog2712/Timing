@@ -28,7 +28,7 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
   其中 `models` / `infra` / `services` / `app` / `commands` 五层各带一个 `insight/` 命名空间（Patina 归一，见 `docs/refactor/patina-structural-merge.md` §2.2）：`models/insight ← infra/insight ← services/insight ← app/insight ← commands/insight`，方向与宿主层序一致。`insight` 是命名空间，不是第 7 层。
 - 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql` … `0007_v01127.sql` 共七支，当前 **schema v7**，`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。**0007 是重建表，不吃重跑**，必须由版本门 `< 7` 只放行一次（见 `infra/migrate.rs` 注释）。
 - **数据目录迁移（V0.5.0）**：`infra/appdata_migrate/`（`paths` / `decide` / `copy` / `verify` / `marker` / `mod`）是 **headless** 的——不依赖 services、不依赖 tauri，所以能用两个临时目录直接跑测试（`run_at(&Paths, skip)`）。编排在 `app/preboot.rs`（桌面独占，跑在 `Builder::run` 之前、`log::init` 之前，故模块内不写日志），两条 IPC 命令在 `commands/migration_cmd.rs`。老库名 `tickbar.db` 与新库名 `timing.db` 的映射只认三种后缀（`""` / `-wal` / `-shm`），定义在 `paths.rs`。
-- IPC 契约：宿主命令 **79** 条 + Patina **118** 条（仅桌面，`#[cfg(desktop)]`），一张表写在 `src-tauri/src/ipc_commands.rs`（`docs/phase2/IPC-CONTRACT-v2.md`）；事件 11 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
+- IPC 契约：宿主命令 **80** 条 + Patina **117** 条（仅桌面，`#[cfg(desktop)]`），一张表写在 `src-tauri/src/ipc_commands.rs`（`docs/phase2/IPC-CONTRACT-v2.md`）；事件 11 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
 - 插件：`plugins/<id>/plugin.json` 是**启动头**，宿主只读不执行（声明式）。目录三处合并扫描
   （dev → exe → user，同 id 先到先得）。v1 贡献点 `quickTimers`（摸鱼菜单预设）；
   **v2 新增 `mdSync`**（Markdown 双向同步落点，宿主实现同步，插件只声明）。
