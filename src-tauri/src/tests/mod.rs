@@ -7,6 +7,17 @@
    日期名边界用例要真 pool，`infra/md_webdav/remove.rs` 要假服务器）。 */
 pub(crate) mod support;
 
+/* MD 同步域的 52 份（2026-11-09 从本层平铺拆进 `md/`，原来光 `md_*` 就占 50 个，
+   连同两个假 WebDAV 服务器一起搬）。文件名已去掉 `md_` 前缀——目录说了是 MD 域。 */
+mod md;
+
+/* **老路径兼容层，别删**：`qa_*.rs` 与 `src/` 里的模块级单测仍按迁走前的名字引
+   （`crate::tests::md_sync::env` / `md_cloud_purge::seed_past` / `fake_webdav::Fake` 等，
+   全仓 10 处，其中 1 处在生产代码 `infra/md_webdav/remove.rs`——它借假服务器验删除）。
+   这四条重导出就是 `md/mod.rs` 头注释里说的「由 `tests/mod.rs` 的 `pub(crate) use`
+   重导出保平」——删掉它们，那 10 处全红。 */
+pub(crate) use md::{cloud_purge as md_cloud_purge, fake_webdav, fake_webdav_dir, sync as md_sync};
+
 mod appdata_migrate;
 mod appdata_migrate_edges;
 mod boot_timing;
@@ -15,112 +26,25 @@ mod daily_status;
 /* [V0.11.15] 数据根指针与搬迁（指针优先于 optout；`VACUUM INTO` 的参数绑定）。 */
 mod data_root_pointer;
 mod data_root_transfer;
-/* 假 WebDAV 服务器（V0.11.15 从 `md_webdav.rs` 搬出）：`Fake` / `serve` / `serve_412_on_put`。 */
-pub(crate) mod fake_webdav;
-/* 路由式假服务器（V0.11.15）：409 补建的判据要「目录存不存在」这个真实状态。 */
-mod fake_webdav_dir;
 mod item;
 mod item_batch2;
-/* [V0.11.33] 日记模板三分支（P16/P17/P18）+ `seed_if_missing` 四条短路单元用例。 */
-mod md_diary_template;
-mod md_backup_restore;
-mod md_backup_target;
-mod md_cloud_autosync;
-mod md_cloud_conflict;
-/* [V0.11.26] 双通路的两条隔离判据：账本不串、轮次不串（PRD R1 / R2）。 */
-mod md_cloud_dual;
-mod md_cloud_folder;
-mod md_cloud_pending;
-mod md_cloud_round;
-/* [V0.11.26] 落点**路径形态**与「建不了目录」文案：`\` 不是 POSIX 的分隔符，
-   少一个路径就会让一次故障多绕一轮。 */
-mod md_cloud_root_path;
-/* [V0.11.19 变更 A] 往期真删的行为判据。拆成四份，各验一件事：
-   六道闸主路径 / 收敛（批上限 + 暂停） / 纯判定（闸③ 路径比较 + 闸⑥ 留底） / WebDAV 路。 */
-mod md_cloud_purge;
-mod md_cloud_purge_batch;
-mod md_cloud_purge_guard;
-mod md_cloud_purge_webdav;
-/* [V0.11.19 收口] 闸⑥ 的**接线**判据：删的是主人的文件（永久删除），
-   所以「递进去的留底函数是 `save_checked` 本身」必须有机验，不能只靠注入式单测。 */
-mod md_cloud_purge_wiring;
 /* [QA 独立验收 V0.11.19] T04 变更 A：LocalFolder 半场（I9a/I9b/I9c + 闸③父子 + 闸⑤a +
    分通道暂停）与 WebDAV 半场（水位停在失败项之前 + 403/429 同 401 整批停）。
    两份都在验收方手里重写，不复用工程师的机验结论。 */
 mod qa_t04_acceptance;
 mod qa_t04_audit_log;
 mod qa_t04_webdav_failures;
-/* [V0.11.19] 变更 B：围栏状态机（洞 1 / 洞 2）与三档诊断的单元判据。 */
-mod md_section_fence;
-/* [V0.11.19] J15：别人的围栏里有逐字标题时，那一块必须逐字节不变。 */
-mod md_section_fence_j15;
 /* [QA 独立验收 V0.11.19] T01 边界补例：CRLF/BOM、围栏标记尾随空格、闭合标记带
    语言标注、标题缩进、~~~ 交叉、三句逐字文案（变异自检的两处靶子在这里）。 */
 mod qa_t01_fence_edges;
 /* [QA 独立验收 V0.11.19] T01 真实一轮同步：洞 1 / 洞 2 / P1 三处，全部走
    `services::md_sync::run`，查文件字节与 SQL 软删，不靠纯函数自证。 */
 mod qa_t01_sync_attack;
-/* [V0.11.19 批 1] 两条链的纯判据（C5/C6/C7/C8 与 D2/D4/D5/D6/D8/D9）。
-   桌面独占：被测的 `jobs::md_sync` / `jobs::md_cloud` 都是 `#[cfg(desktop)]`。 */
-#[cfg(desktop)]
-mod md_sync_wake;
-#[cfg(desktop)]
-mod md_cloud_tier;
-/* [V0.11.21] 手机端与桌面共用的节奏分派：云端可用 → 三档；否则沿用 pollSecs。
-   放在 services 里是因为 `jobs/md_sync_mobile` 是 `#[cfg(mobile)]`，桌面用例够不着。 */
-mod md_cloud_tier_plan;
-/* [V0.11.22] 手机端备份恢复的归属判据：手机只有 WebDAV 一个落点，
-   obsidian__ / 老备份一律拒绝。判据在 services 里，桌面用例才够得着。 */
-mod md_backup_mobile;
-/* [V0.11.23] 备份导出的四道闸（名字 / 形态 / 落点 / 存在）。
-   与 `md_backup_mobile` 同一个理由：判据在 `services`，桌面目标够得着。 */
-mod md_backup_export;
 /* [QA 独立复验 V0.11.19 批 1] 自己补的 2 条最缺边界：三档等号边界帧
    （covered 同毫秒 / Max 1799-1800 / 连败节流 / 不从 pollSecs 反推）与
    BOM+CRLF 真实文件走 FileWatch::probe。本轮两条变异自检的靶子都在这里。 */
 #[cfg(desktop)]
 mod qa_batch1_edges;
-mod md_sync;
-/* [V0.11.18] 合并语义的**现状快照**（PRD C9 / 设计 §6）：五条「已知限制」的回归测试。
-   拍照，不是修复——行为代码零改动，改行为前先改那个文件里的断言。 */
-mod md_sync_conflict_semantics;
-/* [V0.11.18] C9 的续篇（第 2、3 条）：为 300 行门禁拆出，夹具从上面那份 `pub(super)` 复用。 */
-mod md_sync_conflict_merge_rules;
-mod md_sync_disabled_gate;
-mod md_sync_duration;
-mod md_sync_edges;
-mod md_sync_format;
-mod md_sync_legacy_config;
-mod md_sync_live;
-mod md_sync_live_guard;
-mod md_sync_notes;
-mod md_sync_notes_guard;
-/* [V0.11.16] B4 的持久化层证据：三档 `file`/`root` 各不相同时，「什么都没改的保存」
-   必须原样落库（`settings` 表里的 JSON 逐字段比，不靠 mock 自证）。 */
-mod md_sync_no_touch_save;
-/* [V0.11.16] B2 的文件层证据：三档同名的文件名 → 落点目录只有一个 .md、三个标题都在。 */
-mod md_sync_one_file;
-mod md_sync_pairing;
-mod md_sync_todo_edit;
-mod md_sync_todo_export;
-mod md_sync_todo_import;
-mod md_sync_todos;
-mod md_sync_upgrade;
-mod md_webdav;
-/* [V0.11.16] 「测试连接」三关的分诊证据（第 2 关带层级 / 第 3 关拖文件对照实验）。 */
-mod md_webdav_probe;
-/* MKCOL / 409 补建（V0.11.15，设计 §6.3）。 */
-mod md_webdav_dir;
-/* [QA G2] `level_path` 搬到 `tag.rs` 之后，「卡在第几级」填的仍是对的那一级。 */
-mod md_webdav_level;
-/* `fail_text` 的文案判据（状态码零命中）。 */
-mod md_webdav_text;
-/* [V0.11.16] E8 的本机可验部分：中文远端目录必须**编码一次**上网络（不二次编码）。 */
-mod md_webdav_e8_encoding;
-/* 「写文件」与「建目录」的 URL 必须同源（MKCOL 的 URL 是 PUT 的路径前缀）。 */
-mod md_webdav_url;
-/* 根证书必须是编译期内置的：平台验证器在 Android 上要 Kotlin 侧初始化，没有就 abort。 */
-mod md_webdav_tls;
 mod migration;
 mod migration_v2;
 mod moyu_settings;
