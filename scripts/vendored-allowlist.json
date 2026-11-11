@@ -72,42 +72,6 @@
       "change": "modified",
       "reason": "[0.12.1 重锚] 新增：主题同步器 6 条用例（先订阅后读、旧值不盖事件、读不到不应用、订阅不可用仍读、取消后不再应用、取消早于订阅返回）。基线已含该文件，登记口径由 added 改 modified。",
       "owner": "ForG"
-    },
-    {
-      "path": "src/platform/desktop/pillPrefsGateway.ts",
-      "change": "added",
-      "reason": "[0.12.2] 悬浮条外观 / 手柄绑定的读写网关：真源从「两窗各自的 localStorage」搬到宿主设置表（Rust `timing.pill_prefs`）。`loadPillPrefs` / `savePillPrefs` / `seedPillPrefsIfAbsent` / `nudgePillPrefs` 四个函数，只走既有的 `get_settings` / `update_settings` 两条命令，**不新增命令、不新增事件常量**（信号仍用前端常量 `PILL_PREFS_EVENT`，且不再携带载荷）。",
-      "owner": "寇豆码"
-    },
-    {
-      "path": "src/platform/desktop/pillPrefsGateway.test.ts",
-      "change": "added",
-      "reason": "[0.12.2] 网关的 6 条判据：`update_settings` 的入参逐字断言为 `{ patch: { pill: { appearance|handles } } }`（少一层 `pill` 后端只静默忽略，症状是「设置改了、库没变、界面还是好的」）；读一律不 throw（null 表示没有 / 不可用 / 坏形状）；`seedPillPrefsIfAbsent` 只在库里为 null 时写一次；`nudgePillPrefs` 无载荷。",
-      "owner": "寇豆码"
-    },
-    {
-      "path": "src/platform/desktop/hostPillPrefsGateway.ts",
-      "change": "deleted",
-      "reason": "[0.12.2] 0.12.1 的「广播搬运」薄壳整份下线，由 `pillPrefsGateway.ts` 取代（不留两份：留着的唯一后果是下一个人照着旧文件再写一次「写完广播载荷」）。原文件只做 `emit(PILL_PREFS_EVENT, payload)`，值已改由设置表承载。",
-      "owner": "寇豆码"
-    },
-    {
-      "path": "src/features/settings/components/SettingsHandlesPanel.tsx",
-      "change": "modified",
-      "reason": "[0.12.2] 写路径改成 `await savePillPrefs({ handles })` → 成功后才写本窗缓存 / 发无载荷信号 / 更新界面；失败在卡内显示一行 `.inline-error`（不 throw 到 React 边界）。删掉 0.12.1 的「挂载时广播本窗值」，改成挂载时读真源（否则本窗缓存过期时点一次开关就会把另两个形态写回旧值）。",
-      "owner": "寇豆码"
-    },
-    {
-      "path": "src/features/settings/components/host/HostPillLookCard.tsx",
-      "change": "modified",
-      "reason": "[0.12.2] 同上：`await savePillPrefs({ appearance: 完整三项 })` 成功后才更新界面与缓存；失败红字。用 `normalizeAppearance`（纯函数）先算出完整值再发，避免「先落盘再读回来」的二次归一。",
-      "owner": "寇豆码"
-    },
-    {
-      "path": "src/features/settings/components/host/PillPrefsBroadcast.test.tsx",
-      "change": "modified",
-      "reason": "[0.12.2] 三条既有用例（b01/b02/b03）名保留、断言口径改写为「先 savePillPrefs、成功后才 nudgePillPrefs 且界面更新」；b03 改成「挂载读真源、且不写库」；新增 b04（写失败 → 不发信号、界面不改、显示红字）。变异自证靶子：删掉 `commit` 里的 `await savePillPrefs(...)`，b02 必红。",
-      "owner": "寇豆码"
     }
   ]
 }
