@@ -58,7 +58,7 @@ export interface HistoryTimelineSourceItem {
   isLive: boolean;
 }
 
-interface HistoryTimelineSegment {
+export interface HistoryTimelineSegment {
   id: string;
   sourceId: string;
   timelineKey: string;

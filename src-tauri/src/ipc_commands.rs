@@ -40,6 +40,7 @@ macro_rules! define_invoke_handler {
             crate::commands::timer_cmd::get_timer_state,
             crate::commands::timer_cmd::switch_item,
             crate::commands::timer_cmd::resolve_open_record,
+            crate::commands::record_cmd::create_record,
             crate::commands::record_cmd::list_records,
             crate::commands::record_cmd::stats_summary,
             crate::commands::record_cmd::update_record,

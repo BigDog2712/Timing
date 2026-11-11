@@ -22,8 +22,15 @@ const RECORD_LIMIT = 200;
 /* 只声明本功能用到的字段 —— 宿主 DTO 改名时，改这里一处即可，不必让 vendored 侧
    跟着宿主的类型走。 */
 interface RawRecord {
+  id: number;
   itemId: number;
   accumulatedSec: number;
+  /* [P0-02] 泳道要的是**墙钟跨度**（不是累计秒）：起止时间才能与活动轨对齐。
+     宿主 `TimeRecord` 本来就有这三个字段（`src/types/domain/models.ts:86-104`），
+     只是 B1 的聚合卡只用了 `accumulatedSec`，所以此前没声明。 */
+  startedAt: number;
+  endedAt: number | null;
+  runningSince: number | null;
 }
 
 interface RawRecordPage {
@@ -41,29 +48,63 @@ export interface TimingRecordSlice {
   seconds: number;
 }
 
+/** [P0-02] 一条记录在墙钟上的起止（泳道段用）。 */
+export interface TimingRecordSpan {
+  id: number;
+  itemId: number;
+  seconds: number;
+  startedAt: number;
+  /** `null` = 进行中（FUSION-ARCH-v1 §6.2：`endedAt === null` ⇒ 进行中） */
+  endedAt: number | null;
+  /** 当前计时段起点；非 null 表示正在跑。泳道只用它判「进行中」，不做实时秒数。 */
+  runningSince: number | null;
+}
+
 export interface TimingItemName {
   id: number;
   name: string;
 }
 
 /**
- * 取区间内的计时记录。
+ * 取区间内的原始记录（唯一一次 `list_records`，两个消费方各取所需字段）。
  *
  * `from`/`to` 与宿主记录面板用同一对参数、同一个 SQL：两边的「今天」因此是**同一个口径**，
  * 不会出现「宿主说 2 小时、Patina 说 1 小时 40 分」。
  */
-export async function loadTimingRecordSlices(
-  fromMs: number,
-  toMs: number,
-): Promise<TimingRecordSlice[]> {
+async function fetchRecords(fromMs: number, toMs: number): Promise<RawRecord[]> {
   const page = await invoke<RawRecordPage>("list_records", {
     from: fromMs,
     to: toMs,
     limit: RECORD_LIMIT,
   });
-  return (page.items ?? []).map((row) => ({
+  return page.items ?? [];
+}
+
+/** 聚合卡用：只要「哪个事项、多少秒」（历史页左侧「同期计时」一行）。 */
+export async function loadTimingRecordSlices(
+  fromMs: number,
+  toMs: number,
+): Promise<TimingRecordSlice[]> {
+  const rows = await fetchRecords(fromMs, toMs);
+  return rows.map((row) => ({
     itemId: row.itemId,
     seconds: row.accumulatedSec,
+  }));
+}
+
+/** [P0-02] 泳道用：带起止时间的记录。 */
+export async function loadTimingRecordSpans(
+  fromMs: number,
+  toMs: number,
+): Promise<TimingRecordSpan[]> {
+  const rows = await fetchRecords(fromMs, toMs);
+  return rows.map((row) => ({
+    id: row.id,
+    itemId: row.itemId,
+    seconds: row.accumulatedSec,
+    startedAt: row.startedAt,
+    endedAt: row.endedAt,
+    runningSince: row.runningSince,
   }));
 }
 

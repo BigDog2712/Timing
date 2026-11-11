@@ -141,6 +141,7 @@
 | 命令 | 入参 | 出参 | ipc.ts 方法 |
 |---|---|---|---|
 | `list_records` | `{ itemId?: number, from?: number, to?: number, page?: number, limit?: number }` | `Paginated<TimeRecord>` | `listRecords` |
+| `create_record` | `{ itemId: number, startedAt: number, endedAt: number, note?: string \| null }` | `TimeRecord[]` | `createRecord` |
 | `stats_summary` | `{ itemId?: number, from?: number, to?: number }` | `StatsSummary` | `statsSummary` |
 | `update_record` | `{ id: number, patch: RecordPatch }` | `TimeRecord` | `updateRecord` |
 | `delete_record` | `{ id: number }` | `void` | `deleteRecord` |
@@ -305,6 +306,17 @@
 - 出参：`Paginated<TimeRecord>`
 - 语义：仅 `status='saved' AND deleted_at IS NULL`；`itemId` 精确过滤；`from <= started_at < to`；排序 `started_at DESC`；`page` 默认 1、`limit` 默认 20（上限 100）；`total` = 过滤后总数；`hasMore = page * limit < total`。
 - 错误码：`DB_ERROR`
+
+#### `create_record`
+- 入参：`{ "itemId": number, "startedAt": number, "endedAt": number, "note"?: string | null }`
+- 出参：`TimeRecord[]`（**数组**：跨本地零点会被拆成多条，不跨天时长度恒为 1）
+- 语义：把一段**过去**的活动补记为一条（跨天多条）已完成的计时记录（P1-01「补记」）。落库形状与 `stop_timer` 的结束路径逐字一致：`status='saved'`、`running_since=NULL`、`mode='countup'`、`target_sec=NULL`；`accumulatedSec = floor((endedAt − startedAt) / 1000)`，跨本地零点按墙钟占比分段、总秒数守恒（`services::timer_split::split_by_day`），整个过程在一个事务里。
+- 校验：事项不存在或已软删 → `ITEM_NOT_FOUND`；`endedAt <= startedAt`（**含相等**）或时间落在未来 → `INVALID_DURATION`；`note` 超长按 500 字截断（**不报错**）。
+- **幂等**：键是 `(itemId, startedAt)` 二元组（同事项 + 同起点的 `saved` 未删行）。命中即直接返回已存在的那条，不新增、不报错。代价：同事项同毫秒起点的两次不同长度补记会被判重复——**有意的取向：宁可少记，不可重复记**（跨天拆段后首尾两行的区间都不等于原始区间，三元组匹配不上）。
+- **刻意不走的副作用**（详见 `docs/fusion/FUSION-ARCH-P1-v1.md` §3.1）：不过「最短记录时长」阈值（ADR-023 只约束「手动结束 / 切换分段」这两条非显式保存路径）；不联动同名待办软删（补的是过去的账，静默删除**没有撤销入口**）；不结束 / 不切换任何进行中的会话、不复位锚点。副作用只有两条：`md_sync` 脏标记 `record` + 广播 `timer:state-changed`（作为「计时域数据变了」的门铃，载荷里的状态本身不变）。
+- 错误码：`ITEM_NOT_FOUND` / `INVALID_DURATION` / `DB_ERROR`
+- 事件：`timer:state-changed`
+- 平台：桌面与手机**同一份实现**（无 `#[cfg]`）
 
 #### `stats_summary`
 - 入参：`{ "itemId"?: number, "from"?: number, "to"?: number }`
@@ -820,6 +832,7 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 | `md_backup_list` / `md_backup_restore` | **已实装**（V0.11.22） | 备份的「看」与「覆盖回去」全程在应用内完成，一个字节都不需要用户摸到文件；恢复另受归属限制（只认 `webdav__`） |
 | `md_backup_export` | 手机**已实装**（V0.11.23，系统「保存到…」）；桌面是 `mobile_only` 桩 | 这是唯一一个**反方向**的能力：只有手机需要「把私有目录里的文件拿出来」 |
 | `show_window` / `hide_window` / `toggle_window` / `save_window_position` | **`Ok(())` 幂等空操作**（不报错） | 前端首帧与「拖动结束落盘」会调它们；语义上「已显示 / 位置无处可存」本来就是成功，回错误只会在控制台刷红 |
+| `create_record` | **已实装，与桌面逐字同构**（无 `#[cfg]`） | 补记只写 `time_records`，不碰托盘 / 多窗口 / 文件系统，手机端编的是同一份 `services::record::backfill` |
 | `set_autostart` | 恒返回 `false`（`get_autostart` 同） | `update_settings` 的 `autostartEnabled` 字段**接受但忽略**（不报错），老配置带该字段过来仍成功 |
 
 `get_timer_state` 在两端都**只读**：启动时不自动 resolve 未结束会话，崩溃恢复面板因此
@@ -1032,6 +1045,63 @@ Kotlin 自己读那个文件、写进用户选中的 `content://`。过桥要 ba
 `data_root_*` 三条在手机端是桩：`platform::host::desktop_only("<命令名>")` → `IO_ERROR` +
 「仅桌面端可用」。`md_backup_open` 走既有 `MD_SYNC_CONFIG_INVALID` + `NO_BACKUP` 文案。
 **命令名两平台一致**（`lib.rs` 的 `generate_handler!` 不加 `#[cfg]`——命令名就是契约面）。
+
+---
+
+### 12.13 V0.12.1 契约增量：补记（P1-01）
+
+> 背景：分析窗的「活动段」只能看，不能变成 Timing 的记录；用户看到「这段 40 分钟在写代码」，
+> 想把它补成一条计时记录，只能手抄时间再新建。P1-01 给一条**写命令**：命令 **80 → 81**，
+> 错误码与事件**一个没加**（复用既有 17 码与 `timer:state-changed` 作门铃）。
+
+| 面 | 变更 | 理由 |
+|---|---|---|
+| 命令 | 80 → **81**：新增 `create_record`（桌面 + 手机同注册，无 `#[cfg]`） | 「补记」是一次真实写库，必须有一条能被 ACL 管住的命令；分析窗**不直接调它**（`patina-host-bridge.toml` 仍是 3 条只读），走 intent → 药丸执行 |
+| 错误码 | **17 不变** | 三个失败场景（事项不存在 / 时长非法 / 落库失败）都能被既有 `ITEM_NOT_FOUND` / `INVALID_DURATION` / `DB_ERROR` 精确表达；加第 18 码要过契约评审，本轮没有这个必要 |
+| 事件 | **11 不变** | 复用 `timer:state-changed` 作「计时域数据变了」的唯一门铃（两窗的今日已封存秒与活动泳道都收它）。新增事件要改 `EXPECTED_EMIT_SITES`（18 → 19）与 `IPC_EVENTS`（11 → 12），属改门禁 |
+| 权限 ACL | `permissions/host-commands.toml` +1 条（80 → 81）；两份 capability **零改动**（它们只引用 `"host-commands"` 这个 permission 标识，集合自动生效） | 见 `check-contract.mjs` 的 `aclCommands()` / `capRefs` |
+| DB schema | **`0007` 不变**，无新迁移 | 落库形状与 `record_session::finalize` 逐字一致，不新造表 / 状态值 / 列 |
+| DTO | 无新增（返回既有 `TimeRecord[]`） | 复用既有 DTO 是「不新增错误码」的同一条纪律 |
+| 行数纪律 | `src/services/ipc.ts` 300 → **295**（折叠 `listRecords` 腾 6 行，再加 1 行 `createRecord`） | `check-contract.mjs` 只读这一个文件解析命令集合，`call()` 挪不出去；`ipc.ts` 也不在 `size-allowlist.json` 的基线里（顶格 = 硬上限，没有棘轮余量可借） |
+
+#### 12.13.1 为什么返回数组而不是单条
+
+跨本地零点拆段是既有口径（V0.11.3，与「结束一条计时」同一条 `split_by_day` 路径）：一次补记可能
+落 2~3 行。返回数组让「实际写了几行」对调用方透明，也让单测能直接断言拆段结果。不跨天时长度恒为 1。
+
+#### 12.13.2 为什么幂等键不含 `endedAt`
+
+跨天拆段后，「第一行的 `endedAt`」与「最后一行的 `startedAt`」都不等于原始区间，三元组匹配不上；
+而 `(itemId, startedAt)` 在毫秒精度下不可能与真实计时撞车。代价是同事项同毫秒起点的两次**不同长度**
+补记会被判成重复——补账场景的正确取向是「宁可少记一条，不可重复记两条」。
+
+---
+
+### 12.14 V0.12.1 契约增量：两窗收口（设置只剩主界面一个家）
+
+> 背景：桌面原先有三扇「可见窗」——悬浮条 `main`、主界面 `patina`、独立设置窗 `settings`。
+> 本轮把 `settings` 窗整体下线，五个设置内容面搬进主界面 settings 视图；药丸里的内联设置面板
+> 同时删除。**契约四个数一个没变**：命令 81（+Patina 117）/ 错误码 17 / 事件 11-11 / emit 18。
+
+| 面 | 变更 | 理由 |
+|---|---|---|
+| 命令数量 | **81 不变**。`open_patina_window` 的参数结构扩一个可选键，命令集合与数量不动 | 加一条「打开设置」新命令要多四处注册 + 四处文档；而这条命令本来就负责「把主界面叫到前台」，扩落点是它的分内事 |
+| 参数 DTO | `PatinaOpenTarget` + `settings?: bool`（`#[serde(default)]`，`deny_unknown_fields` 保留） | 与既有 `overview: bool` 同构；`deny_unknown_fields` 下旧前端发新键会被拒收，所以前后端**同批**改，不存在版本错配窗口 |
+| 返回 DTO | `MainWindowTargetDto` + `settings: Option<bool>`，`#[serde(skip_serializing_if = "Option::is_none")]` | 不发 settings 时载荷**逐字节不变**（既有 5 份载荷断言一字未动即证据） |
+| 判序 | `history > settings > overview` | 与 `tools > history > settings > overview`（前端网关）同一规则；三键互斥，同时给时按此序取第一个 |
+| 错误码 | **17 不变** | 「窗在重建 / 未就绪」不是错误（`log_warn` + 用户再点一次），沿用 `open_patina_window` 既有语义 |
+| 事件 | **11 不变**，`EXPECTED_EMIT_SITES` 仍 18 | 落点走既有 pending + `MAIN_TOOLS_TARGET_CHANGED`，不新增门铃 |
+| 权限 ACL | 新增 `permissions/patina-host-settings.toml`（`patina-host-settings`），由 `capabilities/patina.json` 引用；`host-commands.toml` **零改动** | 主界面 settings 视图需要写宿主设置（主题/四色/md-sync/数据根…）。与只读桥 `patina-host-bridge` 分开：那份是「读宿主的账」，这份是「改宿主的设置」。`host-theme-write` 仍无人引用，其「分析窗零写命令」的旧叙事已由本节取代 |
+| capability | `capabilities/default.json` 的 `windows` 移除 `"settings"` | 该窗不再创建；留着是幽灵标签 |
+| 手机端 | **不适用** | `open_patina_window` 是 `#[cfg(desktop)]`，手机端编不进来；`host-commands` 的 `open_settings_window` 在手机侧仍回 `desktop_only(..)` |
+
+#### 12.14.1 为什么不删 `open_settings_window`
+
+删命令要同时改四处注册（`lib.rs` / `ipc.ts` / `types/domain/ipc.ts` / mocks）+ 四处文档，并把
+`host-commands.toml` 从 81 改回 80，`check-contract` 的基线跟着动——换来的是「少一条没人调的命令」。
+本轮取「保留定义、断掉全部调用点」：托盘改投 `tools_navigation::open_settings`，
+`settingsActions.openSettings()` 改投 `openPatinaWindow({target:{settings:true}})`。
+判据是「调用点为 0、声明链仍在」，`grep openSettingsWindow` 应只命中接口/包装/门面三处。
 
 ---
 

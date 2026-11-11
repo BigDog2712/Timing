@@ -8,7 +8,9 @@ import { create } from 'zustand';
 import { UNDO_WINDOW_MS } from '../types/domain';
 import type { ReminderTarget, TimeRecord, TodoNudge } from '../types/domain';
 
-export type PanelKind = 'none' | 'create' | 'records' | 'settings' | 'digest';
+export type PanelKind = 'none' | 'create' | 'records' | 'digest';
+/* [0.12.1 T04b] 原 `'settings'` 已从联合类型里删掉：药丸内联设置面板下线后，药丸里
+   再没有任何一支渲染它（设置只有一个家 = 分析窗的 settings 视图）。 */
 
 export interface Notice {
   text: string;

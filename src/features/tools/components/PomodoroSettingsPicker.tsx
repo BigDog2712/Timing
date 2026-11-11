@@ -1,8 +1,9 @@
 import { ChevronDown } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import QuietAnchoredPopover from "../../../shared/components/QuietAnchoredPopover.tsx";
-import { useLocaleText } from "../../../shared/i18n/index.ts";
+import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { parseBoundedMinuteInput } from "../services/toolsNumberInput.ts";
+import { focusSessionCopy } from "../services/focusSessionCopy.ts";
 import ToolDurationInput from "./ToolDurationInput.tsx";
 
 export const POMODORO_DURATION_BOUNDS = [[1, 180], [1, 60], [1, 120], [2, 12]] as const;
@@ -15,6 +16,7 @@ interface Props {
 
 export default function PomodoroSettingsPicker({ values, disabled, onChange }: Props) {
   const text = useLocaleText();
+  const copy = focusSessionCopy(useLocale());
   const id = useId();
   const anchorRef = useRef<HTMLButtonElement>(null);
   const initialFocusRef = useRef<HTMLElement>(null);
@@ -35,7 +37,7 @@ export default function PomodoroSettingsPicker({ values, disabled, onChange }: P
   ];
 
   return <div className="tools-form-field tools-pomodoro-settings-field">
-    <span id={`${id}-label`}>{text.tools.pomodoroTimingSettings}</span>
+    <span id={`${id}-label`}>{copy.settingsTitle}</span>
     <button ref={anchorRef} type="button" disabled={disabled}
       className="qp-input qp-time-picker-trigger tools-pomodoro-settings-trigger"
       aria-labelledby={`${id}-label ${id}-summary`} aria-expanded={open && !disabled}
@@ -45,7 +47,7 @@ export default function PomodoroSettingsPicker({ values, disabled, onChange }: P
       <ChevronDown size={14} aria-hidden="true" />
     </button>
     <QuietAnchoredPopover open={open && !disabled} anchor={anchorRef.current} id={id}
-      ariaLabel={text.tools.pomodoroTimingSettings} containFocus initialFocusRef={initialFocusRef}
+      ariaLabel={copy.settingsTitle} containFocus initialFocusRef={initialFocusRef}
       className="tools-pomodoro-settings-popover"
       onClose={reason => { setOpen(false); if (reason === "escape") anchorRef.current?.focus(); }}>
       <div onKeyDown={event => {

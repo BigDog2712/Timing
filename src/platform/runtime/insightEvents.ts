@@ -23,3 +23,16 @@ export const MAIN_TOOLS_TARGET_CHANGED = 'main-tools-target-changed';
 export const MINI_WINDOW_STATE = 'mini-window-state';
 /** 工具浮层展示快照（`toolNotificationGateway` 监听）。 */
 export const TOOL_PRESENTATION_CHANGED = 'tool-presentation-changed';
+
+/**
+ * [P0-05] 分析窗 → 药丸（label = `main`）的**意图**事件（FUSION-ARCH-v1 §6.4）。
+ *
+ * ⚠️ 它**只由前端 `emitTo` 发出**，Rust 侧完全不 emit、也完全不知情。因此**绝对不能**
+ * 写进宿主的 `IPC_EVENTS`（`src/types/domain/ipc.ts:83`）——`scripts/check-contract.mjs:282-287`
+ * 会把「前端声明了、后端没有 emit 点」判成死常量直接红。契约里的事件数保持 11 不变。
+ *
+ * 对侧常量在宿主 `src/services/hostIntentBridge.ts` 顶部（L9 禁止跨窗 import，
+ * 两边各写一份，改一处必须改两处）。
+ */
+export const HOST_INTENT = 'patina:host-intent';
+

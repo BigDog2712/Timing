@@ -1,19 +1,23 @@
-# 主题统一（V0.12.0 · D3）
+# 主题统一（V0.12.0 · D3 + P0-01 配色单一来源）
 #
-# Patina 窗的深/浅只认宿主那一个开关：启动时 `theme_get` 读一次，之后靠宿主的
-# `theme-changed` 广播（K-21，各窗自订阅）。分析窗设置页里的主题选项**写回宿主**
-# （`theme_set`），所以两边永远不会各说各话。
+# Patina 窗的深/浅与四色都只认宿主那一个开关：启动时 `theme_get` / `accent_get` 各读一次，
+# 之后靠宿主的 `theme-changed` 广播（K-21，各窗自订阅，载荷 `{ mode, accents }` 本就带四色）。
+# [P0-06] 分析窗设置页的「主题模式」开关已下线（深/浅的唯一真相是宿主，分析窗只读），
+# `writeHostThemeMode` 在前端零调用，因此 `capabilities/patina.json` **不再引用**
+# `host-theme-write`。于是「分析窗零写命令」从「零**计时**写」升级成了字面事实。
 #
 # 为什么拆成两条而不是一条：提醒弹窗（tool-notification）也画在 Patina 的令牌上，
-# 需要读主题；但它没有设置页，不该有改主题的能力。最小权限各给各的。
+# 需要读主题与四色；但它没有设置页，不该有改主题的能力。最小权限各给各的。
 #   `host-theme-read`  → patina.json（分析窗 + 迷你窗）、patina-tool-notification.json
-#   `host-theme-write` → 只给 patina.json
+#   `host-theme-write` → **当前没有任何 capability 引用**（原只给 patina.json，P0-06 摘除）
 [[permission]]
 identifier = "host-theme-read"
-description = "Allows the Patina windows to read the host theme mode (read-only)."
-commands.allow = ["theme_get"]
+description = "Allows the Patina windows to read the host theme mode and the host accent colors (read-only)."
+commands.allow = ["theme_get", "accent_get"]
 
+# 保留定义、暂不删除：`theme_set` 本身仍是宿主合法命令（宿主窗口通过 `host-commands` 授权，
+# 与本条无关）。若将来确认永久不需要「某个 Patina 窗写主题」，再连同定义一起删。
 [[permission]]
 identifier = "host-theme-write"
-description = "Allows the Patina analysis window to set the host theme mode from its settings page."
+description = "Allows the Patina analysis window to set the host theme mode from its settings page. [P0-06] Currently granted to no capability: the analysis window's theme-mode switch was removed."
 commands.allow = ["theme_set"]

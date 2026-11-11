@@ -395,7 +395,7 @@
 }
 
 .qp-input::placeholder {
-  color: var(--qp-text-tertiary);
+  color: var(--qp-text-placeholder);
   font-weight: var(--qp-font-weight-medium);
 }
 
@@ -1116,7 +1116,7 @@
 }
 
 .data-app-search input::placeholder {
-  color: var(--qp-text-tertiary);
+  color: var(--qp-text-placeholder);
   font-weight: var(--qp-font-weight-medium);
 }
 

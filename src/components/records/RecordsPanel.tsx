@@ -11,6 +11,7 @@ import type { RecordsRange } from '../../lib/time';
 import { AlertIcon, EmptyDotIcon, iconStroke } from '../../lib/icons';
 import { recordApi } from '../../services/api';
 import { errorText } from '../../services/ipc';
+import { openDigestPanel, openTodayInAnalysis } from '../../services/todayActions';
 import { useItemStore } from '../../stores/itemStore';
 import { useUiStore } from '../../stores/uiStore';
 import { DayWeekTabs } from './DayWeekTabs';
@@ -68,6 +69,20 @@ export function RecordsPanel() {
 
   return (
     <div className="records" role="dialog" aria-label="记录汇总" onKeyDown={handleKeyDown}>
+      {/* [P1-02] E1：「今日摘要」= 一步到摘要面板（药丸右键是另一条一步入口）。 */}
+      <button type="button" className="records__analysis-entry" onClick={openDigestPanel}>
+        今日摘要
+      </button>
+      {/* [P0-03] 药丸「今天」→ 本面板 → 分析窗今天（冷启动也能落到今天：Rust 先写 pending 再 show）。
+          这是「看这一天」；下面 ActivityStrip 的 chip 是「看这个应用」。 */}
+      <button
+        type="button"
+        className="records__analysis-entry"
+        onClick={() => void openTodayInAnalysis()}
+      >
+        在分析窗看这一天 ↗
+      </button>
+
       <DayWeekTabs value={range} onChange={setRange} />
 
       <div className="records__total">
@@ -75,8 +90,9 @@ export function RecordsPanel() {
         <TimerDisplay seconds={totalSec} size="lg" />
       </div>
 
-      {/* 同期电脑活动：没有数据时组件自己返回 null，不留空壳 */}
-      <ActivityStrip activity={activity} />
+      {/* 同期电脑活动：没有数据时组件自己返回 null，不留空壳；
+          [P0-03] chip 可点 → 分析窗看这个应用在这一天的泳道 */}
+      <ActivityStrip activity={activity} onFocusApp={(app) => void openTodayInAnalysis(app)} />
 
       <div className="records__body">
         {loading && (

@@ -1,6 +1,6 @@
 import { AlarmClock } from "lucide-react";
 import { useState } from "react";
-import { useLocaleText } from "../../../shared/i18n/index.ts";
+import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import QuietButton from "../../../shared/components/QuietButton.tsx";
 import QuietSegmentedFilter from "../../../shared/components/QuietSegmentedFilter.tsx";
 import type { FreeFocusAction, PomodoroTaskAction, ToolPomodoroTask, ToolsRuntimeSnapshot } from "../../../shared/types/tools.ts";
@@ -9,6 +9,8 @@ import { formatMinuteInput, parseBoundedMinuteInput } from "../services/toolsNum
 import PomodoroSettingsPicker, { POMODORO_DURATION_BOUNDS } from "./PomodoroSettingsPicker.tsx";
 import PomodoroTaskRow from "./PomodoroTaskRow.tsx";
 import PomodoroTaskEditor from "./PomodoroTaskEditor.tsx";
+import FocusSessionLedgerNote from "./FocusSessionLedgerNote.tsx";
+import { focusSessionCopy } from "../services/focusSessionCopy.ts";
 
 interface PomodoroToolPanelProps {
   snapshot: ToolsRuntimeSnapshot;
@@ -20,6 +22,7 @@ interface PomodoroToolPanelProps {
 
 export default function PomodoroToolPanel({ snapshot, nowMs, busyAction, onAction, onFreeFocus }: PomodoroToolPanelProps) {
   const UI_TEXT = useLocaleText();
+  const copy = focusSessionCopy(useLocale());
   const defaults = () => [snapshot.settings.pomodoroFocusMinutes, snapshot.settings.pomodoroShortBreakMinutes,
     snapshot.settings.pomodoroLongBreakMinutes, snapshot.settings.pomodoroLongBreakEvery].map(formatMinuteInput);
   const [values, setValues] = useState(defaults);
@@ -34,11 +37,12 @@ export default function PomodoroToolPanel({ snapshot, nowMs, busyAction, onActio
     <div className="tools-panel-header tools-focus-header">
       <div className="tools-panel-title"><AlarmClock size={16} /><h2>{UI_TEXT.tools.pomodoroTitle}</h2></div>
       <QuietSegmentedFilter value={mode} options={[
-        { value: "pomodoro", label: UI_TEXT.tools.focusModePomodoro },
+        { value: "pomodoro", label: copy.focusModePomodoro },
         { value: "free", label: UI_TEXT.tools.focusModeFree },
       ]} onChange={value => setMode(value === "free" ? "free" : "pomodoro")} ariaLabel={UI_TEXT.tools.pomodoroTitle} />
     </div>
     {mode === "free" ? <FreeFocusContent tasks={snapshot.freeFocusTasks} nowMs={nowMs} busy={disabled} onAction={onFreeFocus} /> : <>
+    <FocusSessionLedgerNote />
     <div className="tools-mode-content-pane tools-pomodoro-content">
     <form className="tools-subpanel tools-pomodoro-create" onSubmit={(event) => {
       event.preventDefault();
@@ -50,7 +54,7 @@ export default function PomodoroToolPanel({ snapshot, nowMs, busyAction, onActio
       });
     }}>
       <div className="tools-subpanel-header tools-reminder-subpanel-header"><div className="tools-subpanel-title-action">
-        <h3>{UI_TEXT.tools.pomodoroTaskCreate}</h3>
+        <h3>{copy.createTitle}</h3>
       </div></div>
       <div className="tools-pomodoro-name-row">
         <label className="tools-form-field" htmlFor="tools-pomodoro-name"><span>{UI_TEXT.tools.pomodoroTaskName}</span>

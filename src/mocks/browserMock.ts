@@ -9,6 +9,7 @@ import type {
   ItemIdParams,
   RecordPatch,
   StatsSummary,
+  TimeRecord,
   UpdateRecordParams,
   UpdateSettingsParams,
   UndoStopParams,
@@ -176,6 +177,21 @@ export function createMockApi(): Record<string, (args?: any) => unknown> {
       const id = (a as ItemIdParams).id;
       s.records = s.records.filter((r) => r.id !== id);
       return undefined;
+    },
+    /* [P1-01] 补记为一条已完成的计时记录：与 Rust 同口径（saved / runningSince=null /
+       countup / targetSec=null、走 (itemId, startedAt) 幂等）。浏览器 mock 不拆本地零点——
+       拆段是 `services::timer_split` 的职责，这里只为走查弹卡与泳道刷新。 */
+    create_record: (a) => {
+      const itemId = a?.itemId as number, startedAt = a?.startedAt as number, endedAt = a?.endedAt as number;
+      const note = (a?.note as string | null | undefined) ?? null;
+      if (!findItem(itemId)) fail('ITEM_NOT_FOUND', '事项不存在');
+      const t = now();
+      if (endedAt <= startedAt || startedAt >= t || endedAt > t) fail('INVALID_DURATION', '补记时长不合法');
+      const dup = s.records.find((r) => r.itemId === itemId && r.startedAt === startedAt && r.status === 'saved');
+      if (dup) return [dup];
+      const rec: TimeRecord = { id: ++s.seq, itemId, status: 'saved', startedAt, endedAt, accumulatedSec: Math.floor((endedAt - startedAt) / 1000), runningSince: null, note, mode: 'countup', targetSec: null };
+      s.records.push(rec);
+      return [rec];
     },
     resolve_open_record: (a) => {
       const action = a?.action as string;

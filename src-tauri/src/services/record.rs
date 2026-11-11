@@ -11,6 +11,7 @@ use crate::models::stats::StatsSummary;
 use crate::platform::clock::now_ms;
 use crate::repositories::item as item_repo;
 use crate::repositories::record as repo;
+use crate::services::timer_split;
 
 /// 明细分页（仅 saved）。
 pub async fn list(
@@ -113,4 +114,58 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> AppResult<()> {
 
 fn clamp_note(note: &str) -> String {
     note.chars().take(NOTE_MAX_LEN).collect()
+}
+
+/// 把一段**过去**的活动补记为一条（跨本地零点时多条）已完成的计时记录（P1-01）。
+///
+/// 校验 → 幂等查 → 拆段 → 事务内逐段落库 → 按 id 回读。返回**数组**：跨零点会拆成多条
+/// （`timer_split::split_by_day`，与「结束一条计时」同一条路径），让「实际写了几行」对调用方
+/// 透明；不跨天时长度恒为 1，幂等命中时返回已存在的那一条。
+///
+/// **刻意不走的副作用**（见 `docs/fusion/FUSION-ARCH-P1-v1.md` §3.1）：① 不走
+/// `timer_stop::should_ignore`——ADR-023 的 30s 阈值只约束「手动结束 / 切换分段」这两条
+/// **非显式保存**路径，补记是用户显式声明「这段要留下」（S1）；② 不走
+/// `todo::soft_delete_for_saved_record`——该联动的前提是「用户刚刚亲手结束」，补记的是**过去**
+/// 的账，用户很可能还有一个同名待办今天要做，静默软删没有撤销入口（§3.2）；
+/// ③ 不碰 `clock::clear_anchor`、不动任何 active 会话、不调 `todo_start::after_stop`——
+/// 走了最后一条 = 用户点「补记」却凭空开始一个新计时（S4/S5）。
+pub async fn backfill(
+    pool: &SqlitePool,
+    item_id: i64,
+    started_at: i64,
+    ended_at: i64,
+    note: Option<String>,
+) -> AppResult<Vec<TimeRecord>> {
+    if item_repo::find_by_id(pool, item_id).await?.is_none() {
+        return Err(AppError::item_not_found());
+    }
+    let now = now_ms();
+    /* 零/负长度与**未来时间**一并拒（复用 INVALID_DURATION，不新增错误码）：补记是「补过去
+       的账」，落在未来的记录会让「今天总计」超过 24h，且用户无法自证；0 长度记录没有意义。 */
+    if ended_at <= started_at || started_at >= now || ended_at > now {
+        return Err(AppError::invalid_duration());
+    }
+    if let Some(existing) = repo::find_backfill_duplicate(pool, item_id, started_at).await? {
+        /* 幂等命中：直接返回已存在的那条，不新增、不报错（§2.4）。 */
+        return Ok(vec![existing]);
+    }
+    let accumulated_sec = (ended_at - started_at) / 1000;
+    let note = note.as_deref().map(clamp_note);
+    let segments = timer_split::split_by_day(started_at, ended_at, accumulated_sec);
+
+    let mut tx = pool.begin().await?;
+    let mut ids: Vec<i64> = Vec::with_capacity(segments.len());
+    for seg in &segments {
+        ids.push(
+            repo::insert_saved(&mut tx, item_id, seg.started_at, seg.ended_at, seg.accumulated_sec, note.as_deref(), now)
+                .await?,
+        );
+    }
+    tx.commit().await?;
+
+    let mut written: Vec<TimeRecord> = Vec::with_capacity(ids.len());
+    for id in ids {
+        written.push(repo::find_by_id(pool, id).await?.ok_or_else(|| AppError::db("补记写入后读取失败"))?);
+    }
+    Ok(written)
 }

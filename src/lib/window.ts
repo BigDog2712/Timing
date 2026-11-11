@@ -1,8 +1,8 @@
 /**
  * Timing — 多窗口路由与窗口壳辅助（ADR-009 §1：label 路由）
  * -----------------------------------------------------------------------------
- * 载体：Tauri `getCurrentWindow().label`（main / settings / todos / note-{id}）。
- * 非 Tauri（浏览器 dev）回退到 `?w=settings`，便于单窗走查。
+ * 载体：Tauri `getCurrentWindow().label`（main / todos / timer / note-{id}）。
+ * 非 Tauri（浏览器 dev）回退到 `?w=todos` 一类查询参数，便于单窗走查。
  * 另提供：
  *  - markWindowKind()：把窗口类别写到 <html data-window>，供 CSS 按窗切换尺寸/底。
  *  - showCurrentWindowOnReady()：K-18 防白闪三件套——visible:false 创建的窗口在首帧
@@ -25,7 +25,8 @@ import { IS_MOBILE } from './platform';
 export { getCurrentWindow, LogicalPosition, LogicalSize } from './windowApi';
 export type { PhysicalPosition, PhysicalSize } from './windowApi';
 
-export type WindowKind = 'main' | 'settings' | 'todos' | 'timer' | 'note';
+/* [0.12.1] `'settings'` 已下线：独立设置窗不再存在，设置是分析窗里的一个视图 */
+export type WindowKind = 'main' | 'todos' | 'timer' | 'note';
 
 /** 当前窗口 label（Tauri）；非 Tauri 回退 ?w= */
 export function currentWindowLabel(): string {
@@ -46,7 +47,6 @@ export function currentWindowLabel(): string {
 /** 当前窗口类别（label -> kind） */
 export function currentWindowKind(): WindowKind {
   const label = currentWindowLabel();
-  if (label === 'settings') return 'settings';
   if (label === 'todos') return 'todos';
   if (label === 'timer') return 'timer';
   // Tauri 下 label = note-{id}；浏览器 dev 下回退的 `?w=note` 只会得到 'note'（无 id 后缀），
@@ -124,7 +124,7 @@ export function showCurrentWindowOnReady(): () => void {
      窗口 `show()` 之后外壳可能又把按钮加回来——所以显示后再删一次。 */
   const keepOffTaskbar = (win: ReturnType<typeof getCurrentWindow>) => {
     const kind = currentWindowKind();
-    if (kind !== 'settings' && kind !== 'todos' && kind !== 'timer') return;
+    if (kind !== 'todos' && kind !== 'timer') return;
     void win
       .setSkipTaskbar(true)
       .catch(() => undefined);

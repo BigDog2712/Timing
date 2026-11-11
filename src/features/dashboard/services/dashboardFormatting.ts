@@ -1,6 +1,7 @@
 import type { AppStat } from "../../../shared/types/app.ts";
 import type { AppCategory } from "../../../shared/classification/categoryTokens.ts";
 import { AppClassification } from "../../../shared/classification/appClassification.ts";
+import type { CompiledSession } from "../../../shared/lib/sessionReadCompiler.ts";
 
 export interface CategoryDistItem {
   category: AppCategory;
@@ -70,4 +71,72 @@ export function buildCategoryDistribution(stats: AppStat[]): CategoryDistItem[] 
       color: AppClassification.getCategoryColor(cat),
     }))
     .sort((a, b) => b.value - a.value);
+}
+
+/** 事项分布的一行：同一 `displayTitle` 的会话聚合后的结果 */
+export interface TopItemEntry {
+  title: string;
+  duration: number;
+  /** 占今日已计时总量的百分比（整数，与 `TopApplicationItem.percentage` 同口径） */
+  percentage: number;
+  /** 取该事项内**时长最长那条会话**的类别色，让裸条颜色与「这是哪类事」一致 */
+  color: string;
+  exeName: string;
+}
+
+export interface TopItemsResult {
+  /** 截断后的前 N 条（卡里就画这些） */
+  items: TopItemEntry[];
+  /** 截断**之前**的条数。卡头「今日 N 项」用的是它，不是 `items.length` ——
+   *  后者恒等于 limit，"今日 6 项"会变成一句永远正确的假话。 */
+  total: number;
+}
+
+/**
+ * 事项分布（01 §4.2）：`compiledSessions` 按 **`displayTitle`** 聚合 `duration`，取前 N。
+ *
+ * 三条口径：
+ *   · **不出 IPC、不建表** —— `compiledSessions` 已经在 `DashboardReadModel` 里
+ *     （`dashboardReadModel.ts:49`），这是纯函数，`useMemo` 里跑一次。
+ *   · `displayTitle` 为空时退到 `displayName`（`sessionReadCompiler.ts:33-35`：前者是
+ *     归一后的窗口标题，后者是应用显示名；两者都可能被用户规则改写成空串）。
+ *   · 颜色取"这一事项里最长那条会话"的类别色，而不是第一条 —— 同一标题可能横跨
+ *     两个应用（浏览器窗口标题 + 编辑器文件名撞名），取第一条会让颜色随机。
+ */
+export function buildTopItems(sessions: CompiledSession[], limit = 6): TopItemsResult {
+  const buckets = new Map<string, { duration: number; longest: number; exeName: string }>();
+
+  for (const session of sessions) {
+    const title = (session.displayTitle || session.displayName || "").trim();
+    if (!title) continue;
+    const fallbackEnd = session.endTime ?? session.startTime;
+    const duration = Math.max(0, session.duration ?? fallbackEnd - session.startTime);
+    if (duration <= 0) continue;
+
+    const bucket = buckets.get(title);
+    if (bucket) {
+      bucket.duration += duration;
+      if (duration > bucket.longest) {
+        bucket.longest = duration;
+        bucket.exeName = session.exeName;
+      }
+    } else {
+      buckets.set(title, { duration, longest: duration, exeName: session.exeName });
+    }
+  }
+
+  const total = Array.from(buckets.values()).reduce((sum, bucket) => sum + bucket.duration, 0);
+
+  const items = Array.from(buckets.entries())
+    .map(([title, bucket]) => ({
+      title,
+      duration: bucket.duration,
+      percentage: total > 0 ? Math.round((bucket.duration / total) * 100) : 0,
+      color: AppClassification.mapApp(bucket.exeName).color,
+      exeName: bucket.exeName,
+    }))
+    .sort((left, right) => right.duration - left.duration)
+    .slice(0, limit);
+
+  return { items, total: buckets.size };
 }

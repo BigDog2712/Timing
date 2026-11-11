@@ -554,7 +554,7 @@ async fn markdown_export_is_readable_and_escapes_special_text() {
     .unwrap();
     let markdown = std::fs::read_to_string(&path).unwrap();
     assert_eq!(count, 2);
-    assert!(markdown.starts_with("# Patina 活动记录"));
+    assert!(markdown.starts_with("# Timing 活动记录"));
     assert!(markdown.contains("| 开始时间 | 来源名称 | 窗口标题 | 页面标题 |"));
     assert!(markdown.contains("Plan \\| review\\\\notes next"));
     assert!(markdown.contains("—"));
@@ -659,7 +659,7 @@ async fn markdown_uses_english_labels_when_the_app_language_is_english() {
     .await
     .unwrap();
     let markdown = std::fs::read_to_string(&path).unwrap();
-    assert!(markdown.starts_with("# Patina Activity Records"));
+    assert!(markdown.starts_with("# Timing Activity Records"));
     assert!(markdown.contains("| Start Time | Duration (ms) |"));
     let _ = std::fs::remove_file(path);
 }

@@ -104,7 +104,7 @@ function MiniView({ runtime, tracking }: {
       <header className="mini-header">
         <div className="mini-status-icon" {...dragProps}><AppWindow size={14} aria-hidden="true" /></div>
         {(snapshot.expanded || snapshot.transitioning) && !snapshot.suppressed && <MiniToolStatus tracking={tracking}
-          onOpenSection={({ section }) => { void act({ kind: "open_tools", section }); }} />}
+          onOpenSection={({ section }) => { if (section) void act({ kind: "open_tools", section }); }} />}
         <div className="mini-drag-region" {...dragProps} />
         <div className="mini-window-actions">
         <button type="button" className="qp-icon-action qp-icon-action-neutral" aria-label={text.miniWindow.hold} aria-pressed={snapshot?.held ?? false}

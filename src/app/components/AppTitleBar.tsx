@@ -7,13 +7,18 @@ import {
   closeCurrentWindow, minimizeCurrentWindow, startCurrentWindowDrag, toggleCurrentWindowMaximized, } from "../../platform/desktop/windowControlGateway";
 
 
-const APP_TITLE = "Patina";
+const APP_TITLE = "Timing";
 
 type AppTitleBarProps = {
   isMaximized: boolean;
   showUpdateEntry?: boolean;
   onOpenUpdateDialog?: () => void;
   toolsStatusEntry?: ReactNode;
+  /** [P0-04] 「Timing 计时胶囊」槽位。药丸在计时时由 `TimingCapsule` 填，其它时候为 null */
+  timingStatusEntry?: ReactNode;
+  /** ③ tab 段槽位（01 §3.1）。由 `AppTopNav` 填；本组件只负责给它一个 flex 槽，
+   *  不关心它是导航还是别的 —— navItems 不进本组件（顶栏组件不该知道"有哪些区"）。 */
+  navigationSlot?: ReactNode;
 };
 
 function runWindowAction(action: () => Promise<void>, actionName: string) {
@@ -27,6 +32,8 @@ export default function AppTitleBar({
   showUpdateEntry = false,
   onOpenUpdateDialog,
   toolsStatusEntry,
+  timingStatusEntry,
+  navigationSlot,
 }: AppTitleBarProps) {
   const UI_TEXT = useLocaleText();
   const [miniBusy, setMiniBusy] = useState(false);
@@ -70,25 +77,32 @@ export default function AppTitleBar({
         <span className="app-titlebar-name">{APP_TITLE}</span>
       </div>
 
-      {showUpdateEntry ? (
-        <button
-          type="button"
-          className="app-titlebar-update-entry"
-          data-titlebar-update-entry=""
-          onClick={onOpenUpdateDialog}
-        >
-          <ArrowUpCircle size={12} strokeWidth={1.9} aria-hidden="true" />
-          <span>{UI_TEXT.update.sidebarEntry}</span>
-        </button>
-      ) : null}
-
       <div
         className="app-titlebar-drag-region"
         onMouseDown={handleDragMouseDown}
         onDoubleClick={handleDragDoubleClick}
       />
 
-      {toolsStatusEntry}
+      {navigationSlot}
+
+      {/* ④ status 段：吸收五段配平剩下的全部宽度（1100 档 486 / 900 档 322）。
+          更新入口从"brand 之后、drag 之前"挪到这里 —— ① brand 必须锁死 114、
+          ② drag 锁死 96，更新入口留在原处会把 brand 段撑宽（01 §3.1）。 */}
+      <div className="qp-topbar-status" data-titlebar-status="">
+        {timingStatusEntry}
+        {showUpdateEntry ? (
+          <button
+            type="button"
+            className="app-titlebar-update-entry"
+            data-titlebar-update-entry=""
+            onClick={onOpenUpdateDialog}
+          >
+            <ArrowUpCircle size={12} strokeWidth={1.9} aria-hidden="true" />
+            <span>{UI_TEXT.update.sidebarEntry}</span>
+          </button>
+        ) : null}
+        {toolsStatusEntry}
+      </div>
 
       <div className="app-titlebar-controls">
         <button ref={miniEntry} type="button" className="app-titlebar-button" data-titlebar-mini-entry=""

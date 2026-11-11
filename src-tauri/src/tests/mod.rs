@@ -78,6 +78,9 @@ mod portable_dir_qa_plugins;
 mod portable_dir_qa_source;
 mod portable_dir_scan;
 mod record;
+/* [P1-01 补记] `services::record::backfill` 的 8 条可变异判据 + 命令层接线（`record.rs` 已 271 行，
+   再塞 10 条用例必破 300 行硬上限，故单独成文件）。 */
+mod record_backfill;
 mod reminder;
 #[cfg(target_os = "windows")]
 mod secret_dpapi;
@@ -105,4 +108,6 @@ mod tray_menu_md_sync;
 #[cfg(desktop)]
 mod tray_sync_quit;
 mod window_geometry;
+/* [0.12.1 T04b] 「设置只有一个家」的源码哨兵：`open_settings_window` 是别名、不再建窗。 */
+mod window_settings_alias;
 mod window_spec;

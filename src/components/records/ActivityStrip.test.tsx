@@ -35,6 +35,12 @@ function render(activity: ActivitySlice[]) {
   });
 }
 
+function renderWithFocusApp(activity: ActivitySlice[], onFocusApp: (app: string) => void) {
+  act(() => {
+    root.render(createElement(ActivityStrip, { activity, onFocusApp }));
+  });
+}
+
 function slice(over: Partial<ActivitySlice> = {}): ActivitySlice {
   return { app: 'Editor', exe: 'editor.exe', sec: 120, samples: 3, ...over };
 }
@@ -53,5 +59,28 @@ describe('ActivityStrip', () => {
     expect(chips[0].textContent).toContain('2m');
     expect(chips[1].textContent).toContain('Browser');
     expect(chips[1].textContent).toContain('1h');
+  });
+
+  /* [P0-03] chip 由 span 改成 button：点它 = 去分析窗看这个应用这一天。
+     钉住「点下去带的是**可执行名**」这件事——分析窗活动轨用可执行名当身份键，
+     传显示名会静静地不命中（窗开了但一段都不亮）。 */
+  it('点 chip 把可执行名交给 onFocusApp', () => {
+    const seen: string[] = [];
+    renderWithFocusApp([slice(), slice({ app: 'Browser', exe: 'chrome.exe' })], (exe) => {
+      seen.push(exe);
+    });
+    const chips = container.querySelectorAll<HTMLButtonElement>('.activity-strip__chip');
+    expect(chips[0].tagName).toBe('BUTTON');
+    expect(chips[0].getAttribute('aria-label')).toContain('Editor');
+    act(() => chips[1].click());
+    expect(seen).toEqual(['chrome.exe']);
+  });
+
+  it('没有 onFocusApp 时 chip 仍渲染（形状与文案不变，只是不触发跳转）', () => {
+    render([slice()]);
+    const chip = container.querySelector<HTMLButtonElement>('.activity-strip__chip');
+    expect(chip).not.toBeNull();
+    expect(chip?.getAttribute('data-interactive')).toBeNull();
+    expect(() => act(() => chip?.click())).not.toThrow();
   });
 });

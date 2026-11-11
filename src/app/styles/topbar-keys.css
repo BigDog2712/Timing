@@ -1,0 +1,63 @@
+/* topbar-keys.css — 顶栏 ④ status 段内的两个小图标键（胶囊两颗动作键 + 工具入口门）
+ *
+ * 为什么独立成文件：topbar.css 承载顶栏**几何**（五段配平、双轴断点、指标条），
+ * 已经贴着 300 行上限。几何与"键的皮"是两个变更理由不同的东西 —— 前者改一次要
+ * 重验四档窗口，后者只改键的观感。混在一个文件里，下一批改主界面时任何一行新增
+ * 都会把几何一起顶到红线，逼着人去做与本次改动无关的删注释。
+ *
+ * 导入顺序：必须在 topbar.css **之后**（App.css 末位）。本文件的类没有任何外部
+ * 同名定义，顺序不影响结果，但保持"几何先、皮后"的阅读顺序。
+ *
+ * 门与胶囊按钮同形，但**共槽不同时出现**（entries 为空才渲染门），几何互不占用。
+ */
+
+/* ── 28×24：胶囊按钮 38 → 28，给名字列省 20 ──
+ * 必须定宽：名字列是唯一可压项，按钮若是 `0 1 auto`，宽度不够时浏览器会连按钮
+ * 一起压（"名字列还有余量"就成了假象）。
+ * 高度 24 而非 height:100%：胶囊 py-0.5 + 1px 边 → 整体 30~32，落在"≤34"验收内。 */
+.qp-cap-action,
+.qp-topbar-tools-door {
+  display: inline-flex;
+  flex: 0 0 28px;
+  width: 28px;
+  min-width: 28px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--qp-radius-button);
+  background: transparent;
+  padding: 0;
+  color: var(--qp-text-tertiary);
+  cursor: default;
+  transition: background-color var(--qp-motion-fast) var(--qp-motion-ease),
+    color var(--qp-motion-fast) var(--qp-motion-ease);
+}
+
+.qp-cap-action:hover,
+.qp-cap-action:active,
+.qp-topbar-tools-door:hover,
+.qp-topbar-tools-door:active {
+  background: var(--qp-bg-elevated);
+  color: var(--qp-text-primary);
+}
+
+/* 门「面开着」时只换底色、不染 accent：accent 全站只归「当前 tab」一处（01 §2.3），
+ * 门是入口不是状态。 */
+.qp-topbar-tools-door[data-tools-open="true"] {
+  background: var(--qp-bg-elevated);
+  color: var(--qp-text-secondary);
+}
+
+/* 焦点环走 token，与紧邻的 update 键同源（tokens.css 的全局基线段）。 */
+.qp-cap-action:focus-visible,
+.qp-topbar-tools-door:focus-visible {
+  outline: 2px solid var(--qp-focus-ring);
+  outline-offset: -2px;
+}
+
+.qp-topbar-tools-door svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.4;
+}

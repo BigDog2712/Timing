@@ -5,7 +5,9 @@ export type ReminderMode = "event" | "usage";
 export type ReminderFormMode = "relative" | "absolute";
 
 export interface ToolsOpenTarget {
-  section: ToolsSection;
+  /** 省略 = 「进工具面、不指定分区」（顶栏工具入口门 §5.3）——落回工具面自己记住的分区。
+   *  任何带分区的调用（灯、药丸、托盘）都照旧必须写。 */
+  section?: ToolsSection;
 }
 
 export interface ToolStatusChipViewModel {

@@ -1,5 +1,5 @@
 import { useActivityDisplayColor } from "../hooks/useActivityDisplayColor.ts";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import QuietTooltip from "./QuietTooltip.tsx";
 import { ANONYMOUS_ACTIVITY_BACKGROUND } from "../charts/AnonymousActivityPattern.tsx";
 import type { TimelineAxisTick } from "../lib/timelineAxis.ts";
@@ -38,6 +38,15 @@ interface QuietTimelineSegmentProps {
   tooltipClassName?: string;
   disabled?: boolean;
   hideOnPointerDown?: boolean;
+  /**
+   * [P0-05] 传入即「这一段可点」。
+   *
+   * 默认 `undefined` —— 那样 `<span>` 仍是纯展示元素（没有 `role`、不可聚焦、无键盘处理），
+   * 3 处既有用法（overview / expanded / lane）的 DOM 与 a11y 语义**一字不变**。
+   * 只有真的传了这个回调，才升级成 `role="button"` + `tabIndex=0` + Enter/Space 触发，
+   * 影响面因此是可枚举的：目前只有历史页 overview 轨的活动段传。
+   */
+  onActivate?: () => void;
 }
 
 function joinClasses(...classes: Array<string | undefined>) {
@@ -91,6 +100,7 @@ export function QuietTimelineSegment({
   tooltipClassName,
   disabled = false,
   hideOnPointerDown = true,
+  onActivate,
 }: QuietTimelineSegmentProps) {
   const displayColor = useActivityDisplayColor();
   const style: TimelineSegmentStyle = {
@@ -99,6 +109,14 @@ export function QuietTimelineSegment({
     "--qp-timeline-segment-width": `${Math.max(0, widthRatio) * 100}%`,
     "--qp-timeline-segment-color": displayColor(color, "timeline"),
   };
+  /* 键盘可达：段是绝对定位的窄色块，鼠标点得中、Tab 也要能到。只在可点时挂。 */
+  const handleKeyDown = onActivate === undefined
+    ? undefined
+    : (event: KeyboardEvent<HTMLSpanElement>) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      onActivate();
+    };
 
   return (
     <QuietTooltip
@@ -110,7 +128,14 @@ export function QuietTimelineSegment({
       tooltipClassName={tooltipClassName}
       style={style}
     >
-      <span aria-label={ariaLabel} />
+      <span
+        aria-label={ariaLabel}
+        role={onActivate === undefined ? undefined : "button"}
+        tabIndex={onActivate === undefined ? undefined : 0}
+        onClick={onActivate}
+        onKeyDown={handleKeyDown}
+        data-timeline-activatable={onActivate === undefined ? undefined : "true"}
+      />
     </QuietTooltip>
   );
 }

@@ -1,6 +1,7 @@
 //! 记录域命令。
 
-use tauri::State;
+use sqlx::SqlitePool;
+use tauri::{AppHandle, State};
 
 use crate::error::AppResult;
 use crate::models::common::Paginated;
@@ -103,4 +104,46 @@ pub async fn delete_record(state: State<'_, AppState>, id: i64) -> AppResult<()>
     services::record::delete(&state.pool, id).await?;
     services::md_sync::dirty::mark("record");
     Ok(())
+}
+
+/// 把一段**过去**的活动补记为一条已完成的计时记录（P1-01，IPC-CONTRACT-v2 §4.3）。
+///
+/// 返回**数组**：跨本地零点会被拆成多条（`services::timer_split`），让「实际写了几行」对
+/// 调用方透明；不跨天时长度恒为 1，幂等命中时返回已存在的那条。桌面与手机编同一份——
+/// 它不含任何 `#[cfg]`（补记只写 `time_records`，不碰托盘 / 多窗口 / 文件系统）。
+#[tauri::command]
+pub async fn create_record(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    item_id: i64,
+    started_at: i64,
+    ended_at: i64,
+    note: Option<String>,
+) -> AppResult<Vec<TimeRecord>> {
+    let records = services::record::backfill(&state.pool, item_id, started_at, ended_at, note).await?;
+    after_backfill(&app, &state.pool).await;
+    Ok(records)
+}
+
+/// 打「记录域写入」脏标记（§3.1 的 S6）。单独一层只为**可测**：`dirty::seq()` 的前后差是
+/// 「补记到底有没有告诉 md 同步」的唯一机械证据（`AppHandle` 在本仓库造不出来，
+/// 见 `after_backfill` 的注释）；`dirty::mark(` 仍只出现在 `commands/` 下（L8）。
+pub(crate) fn mark_record_dirty() {
+    services::md_sync::dirty::mark("record");
+}
+
+/// 补记写库成功后的两条副作用（FUSION-ARCH-P1-v1 §3.1 的 S6 + S7）。
+///
+/// - S6 `mark_record_dirty()`：记录域写入，让 md 同步在 1.5s 内重导一轮（`dirty.rs` 的
+///   REASONS 里 `record` 就是这一域的键，与 `update_record` / `delete_record` 同口径）；
+/// - S7 `emit_timer_state`：复用它作「计时域数据变了」的**唯一**门铃（两窗的今日已封存秒与
+///   活动泳道都收这一帧）。载荷是当前会话快照，补记不改状态，所以这一帧「状态没变」是幂等
+///   无害的；新增第 12 个事件要改 `EXPECTED_EMIT_SITES`，属改门禁，本轮不动（R5）。
+///
+/// **为什么单独抽成函数**：`AppHandle` 在本仓库造不出来（`tauri` 未开 `test` feature，仓库里
+/// 同类判据一律列为人工验证），但「先打脏标记、再广播」这个顺序与「别忘了打标记」必须能被
+/// 机械钉住 —— 见 `tests::record_backfill::create_record_marks_dirty_and_broadcasts`。
+async fn after_backfill(app: &AppHandle, pool: &SqlitePool) {
+    mark_record_dirty();
+    crate::app::events::emit_timer_state(app, pool).await;
 }

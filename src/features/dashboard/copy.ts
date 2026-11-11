@@ -1,0 +1,171 @@
+import type { Locale } from "../../shared/i18n/index.ts";
+
+/**
+ * 今日五模块 + 便利贴条的**新文案表**（四语言齐备）。
+ *
+ * 为什么不进 `src/shared/i18n/**`（02 §5.3 A12）：那四个 locale 文件是按索引对齐的
+ * **位置数组**，手插一行会让其后全部文案错位；`generated/contract.ts` 还在
+ * `scripts/size-allowlist.json` 里冻结着。所以新文案一律组件侧自有，
+ * 且**必须是 `Record<Locale, …>` 四键齐全** —— 不许写 `locale.startsWith("zh") ? zh : en`
+ * 那种两档写法（`TimingCapsule.tsx:48` 就是那个既有缺陷，ru/es 会静默降级成英文）。
+ *
+ * 已有的键照旧走 `useLocaleText()`（`dashboard.emptyState` / `dashboard.topApps` /
+ * `dashboard.comparedWithYesterday` / `common.*`），本表只放**仓里还没有的**标题与动词。
+ */
+export interface DashboardCopy {
+  /** 页面级 `sr-only h1`：屏幕阅读器的第一句"这是哪一页"，视觉上没有页头（01 §4.1） */
+  pageTitle: string;
+  /** 四卡空态（02 §14.4 / M5）：**四句必须不同**。共用一句的话，用户分不清
+   *  "今天没有计时"和"今天没有待办"——空态是每张卡自己的陈述，不是页面的。
+   *  句式照 `notesEmpty`（§12.3 定稿的陈述句式）：时间 + "还没有" + 东西。 */
+  timerEmpty: string;
+  itemsEmpty: string;
+  appsEmpty: string;
+  todosEmpty: string;
+  /** 输入框 `aria-label`：**不带省略号**。placeholder 里的"…"会被读屏读出来，
+   *  所以 label 与 placeholder 必须是两串（06 T6） */
+  todoComposeLabel: string;
+  /** 设计模块名是「计时分布」；既有 `dashboard.focusShare` 是「专注分布」，语义不同 */
+  timerTitle: string;
+  itemsTitle: string;
+  /** 卡头第一段：今日**全部**事项数（不是列表里那 6 行） */
+  itemsCount: (count: number) => string;
+  /** 卡头第二段：只有总数 > 6（= 列表被截断）时才出现 */
+  itemsMore: (count: number) => string;
+  todosTitle: string;
+  /** 卡头第一段：待办总数，常驻（与事项卡的「今日 N 项」同口径） */
+  todosAll: (count: number) => string;
+  /** 卡头第二段：溢出没排下的条数（量出来的，不是写死的） */
+  todosRest: (count: number) => string;
+  todoCompose: string;
+  todoToggle: (title: string) => string;
+  /** 已勾选行的 checkbox `aria-label`：必须随 `aria-checked` 换词，
+   *  否则读屏对已完成的事还在说"完成"（06 A9 第 5 条） */
+  todoUntoggle: (title: string) => string;
+  todoDelete: (title: string) => string;
+  undoDeleted: (title: string) => string;
+  /** 勾选的撤销条文案：勾选是**立即落库**的，撤销 = 反向再调一次，语义不同于删除 */
+  undoToggled: (title: string) => string;
+  undoAction: string;
+  notesTitle: string;
+  notesCount: (count: number) => string;
+  notesMore: (count: number) => string;
+  notesEmpty: string;
+  appsTop: (count: number) => string;
+  appsFooter: string;
+}
+
+export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
+  "zh-CN": {
+    pageTitle: "今日概览",
+    timerEmpty: "今天还没有计时",
+    itemsEmpty: "今天还没有事项",
+    appsEmpty: "今天还没有用到应用",
+    todosEmpty: "今天还没有待办",
+    todoComposeLabel: "添加待办",
+    timerTitle: "计时分布",
+    itemsTitle: "事项分布",
+    itemsCount: (count) => `今日 ${count} 项`,
+    itemsMore: (count) => `更多 ${count} 项 ▸`,
+    todosTitle: "待办事项",
+    todosAll: (count) => `全部 ${count} 项 ▸`,
+    todosRest: (count) => `还有 ${count} 项 ▸`,
+    todoCompose: "添加待办…",
+    todoToggle: (title) => `完成「${title}」`,
+    todoUntoggle: (title) => `取消完成「${title}」`,
+    todoDelete: (title) => `删除「${title}」`,
+    undoDeleted: (title) => `已删除「${title}」`,
+    undoToggled: (title) => `已完成「${title}」`,
+    undoAction: "撤销",
+    notesTitle: "便利贴",
+    notesCount: (count) => `${count} 张`,
+    notesMore: (count) => `+${count}`,
+    notesEmpty: "今天还没有便利贴",
+    appsTop: (count) => `前 ${count} 项`,
+    appsFooter: "全部分类…",
+  },
+  "en-US": {
+    pageTitle: "Today overview",
+    timerEmpty: "No time tracked today",
+    itemsEmpty: "No items today",
+    appsEmpty: "No apps used today",
+    todosEmpty: "No to-dos today",
+    todoComposeLabel: "Add a to-do",
+    timerTitle: "Time distribution",
+    itemsTitle: "Items",
+    itemsCount: (count) => `${count} today`,
+    itemsMore: (count) => `${count} more ▸`,
+    todosTitle: "To-dos",
+    todosAll: (count) => `All ${count} ▸`,
+    todosRest: (count) => `${count} more ▸`,
+    todoCompose: "Add a to-do…",
+    todoToggle: (title) => `Complete “${title}”`,
+    todoUntoggle: (title) => `Mark “${title}” as not done`,
+    todoDelete: (title) => `Delete “${title}”`,
+    undoDeleted: (title) => `Deleted “${title}”`,
+    undoToggled: (title) => `Completed “${title}”`,
+    undoAction: "Undo",
+    notesTitle: "Notes",
+    notesCount: (count) => `${count}`,
+    notesMore: (count) => `+${count}`,
+    notesEmpty: "No notes today",
+    appsTop: (count) => `Top ${count}`,
+    appsFooter: "All categories…",
+  },
+  "ru-RU": {
+    pageTitle: "Обзор дня",
+    timerEmpty: "Сегодня времени нет",
+    itemsEmpty: "Сегодня занятий нет",
+    appsEmpty: "Сегодня приложения не использовались",
+    todosEmpty: "Сегодня задач нет",
+    todoComposeLabel: "Добавить задачу",
+    timerTitle: "Распределение времени",
+    itemsTitle: "Занятия",
+    itemsCount: (count) => `Сегодня ${count}`,
+    itemsMore: (count) => `Ещё ${count} ▸`,
+    todosTitle: "Задачи",
+    todosAll: (count) => `Все ${count} ▸`,
+    todosRest: (count) => `Ещё ${count} ▸`,
+    todoCompose: "Добавить задачу…",
+    todoToggle: (title) => `Завершить «${title}»`,
+    todoUntoggle: (title) => `Снять отметку «${title}»`,
+    todoDelete: (title) => `Удалить «${title}»`,
+    undoDeleted: (title) => `Удалено «${title}»`,
+    undoToggled: (title) => `Выполнено «${title}»`,
+    undoAction: "Отменить",
+    notesTitle: "Заметки",
+    notesCount: (count) => `${count}`,
+    notesMore: (count) => `+${count}`,
+    notesEmpty: "Сегодня заметок нет",
+    appsTop: (count) => `Топ ${count}`,
+    appsFooter: "Все категории…",
+  },
+  es: {
+    pageTitle: "Resumen de hoy",
+    timerEmpty: "Hoy no hay registros de tiempo",
+    itemsEmpty: "Hoy no hay actividades",
+    appsEmpty: "Hoy no se han usado aplicaciones",
+    todosEmpty: "Hoy no hay tareas",
+    todoComposeLabel: "Añadir tarea",
+    timerTitle: "Distribución del tiempo",
+    itemsTitle: "Actividades",
+    itemsCount: (count) => `${count} hoy`,
+    itemsMore: (count) => `${count} más ▸`,
+    todosTitle: "Tareas",
+    todosAll: (count) => `Todas ${count} ▸`,
+    todosRest: (count) => `${count} más ▸`,
+    todoCompose: "Añadir tarea…",
+    todoToggle: (title) => `Completar «${title}»`,
+    todoUntoggle: (title) => `Desmarcar «${title}»`,
+    todoDelete: (title) => `Eliminar «${title}»`,
+    undoDeleted: (title) => `Eliminado «${title}»`,
+    undoToggled: (title) => `Completado «${title}»`,
+    undoAction: "Deshacer",
+    notesTitle: "Notas",
+    notesCount: (count) => `${count}`,
+    notesMore: (count) => `+${count}`,
+    notesEmpty: "Hoy no hay notas",
+    appsTop: (count) => `Top ${count}`,
+    appsFooter: "Todas las categorías…",
+  },
+};

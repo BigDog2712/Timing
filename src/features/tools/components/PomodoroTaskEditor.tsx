@@ -1,8 +1,9 @@
 import { useId, useRef, useState } from "react";
 import QuietButton from "../../../shared/components/QuietButton.tsx";
 import QuietDialog from "../../../shared/components/QuietDialog.tsx";
-import { useLocaleText } from "../../../shared/i18n/index.ts";
+import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import type { PomodoroTaskAction, ToolPomodoroTask } from "../../../shared/types/tools.ts";
+import { focusSessionCopy } from "../services/focusSessionCopy.ts";
 import { formatMinuteInput } from "../services/toolsNumberInput.ts";
 import PomodoroSettingsPicker from "./PomodoroSettingsPicker.tsx";
 
@@ -15,6 +16,7 @@ interface Props {
 
 export default function PomodoroTaskEditor({ task, busy, onSave, onClose }: Props) {
   const text = useLocaleText();
+  const copy = focusSessionCopy(useLocale());
   const formId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const savingRef = useRef(false);
@@ -33,7 +35,7 @@ export default function PomodoroTaskEditor({ task, busy, onSave, onClose }: Prop
     }
   };
 
-  return <QuietDialog open title={text.tools.pomodoroTaskEdit} initialFocusRef={inputRef}
+  return <QuietDialog open title={copy.editTitle} initialFocusRef={inputRef}
     onClose={() => { if (!savingRef.current && !busy) onClose(); }}
     actions={<>
       <QuietButton disabled={busy} onClick={onClose}>{text.common.cancel}</QuietButton>

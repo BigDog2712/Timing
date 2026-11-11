@@ -24,7 +24,7 @@ export function usePillInlineEdit(): (text: string) => void {
         if (edit.itemId == null) {
           if (status === 'running') {
             useUiStore.getState().setNotice({
-              text: '专注进行中，事项已锁定；请先暂停或结束当前计时。',
+              text: '计时进行中，事项已锁定；请先暂停或结束当前计时。',
               tone: 'info',
             });
             return;

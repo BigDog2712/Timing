@@ -1,193 +1,241 @@
-.dashboard-workspace {
-  width: 100%;
-  max-width: 1820px;
-  align-self: center;
-}
+/* ============================================================================
+ * dashboard.css — 今日五模块的版式（01 §4.3 DOM 骨架 + 几何表）
+ * -----------------------------------------------------------------------------
+ * 旧三面板（页头 + 环卡 + 今日节律 + 应用排行大面板）已整块下线，本文件随之重写。
+ * 记住两条不能再犯的：
+ *   ① 卡片的 1px 边必须是 **outline + outline-offset:-1**，不是 `border`。
+ *      `.qp-panel` 是 border 版 → 内容宽 465.14−2−32 = 431.14，而验收值是 443.14/548.86
+ *      （= 465.14−16−6 / 570.86−16−6）。outline 不占布局，才有 433.14。
+ *      也**不许**去改 `.qp-panel` —— 数据管理/设置两视图内部排版是按 border 版算的。
+ *   ② 所有档位数值只引用 tiers.css 的变量，本文件不写 264/284/144 这类裸数。
+ * ========================================================================== */
 
-.dashboard-left-column {
+/* ── 视图根：错误/重试提示 + 板子，纵向排 ── */
+.qp-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
 
-.dashboard-card-header {
+/* 读取失败提示条（可重试）。用 qp-panel 是**故意**的：它不是五模块之一，
+ * 不参与 443.14/548.86 的列宽验收，用现成的 border 版即可。 */
+.qp-dashboard-notice {
   display: flex;
-  min-height: 24px;
+  flex: 0 0 auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-
-.dashboard-top-app-count {
-  font-size: var(--qp-font-size-compact);
-  line-height: var(--qp-line-height-compact);
-}
-
-.dashboard-focus-card {
-  container-type: inline-size;
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 clamp(300px, 34vh, 390px);
-}
-
-.dashboard-focus-layout {
-  display: grid;
-  grid-template-columns: minmax(142px, 168px) minmax(0, 1fr);
-  align-items: center;
-  gap: 1rem;
-  flex: 1;
-  align-content: center;
-  margin-top: 18px;
-}
-
-.dashboard-focus-chart {
-  height: 170px;
-  max-width: 168px;
-  margin: 0;
-}
-
-.dashboard-focus-ranking {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.dashboard-focus-ranking-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.75rem;
-  min-height: 1.55rem;
+  gap: 12px;
+  padding: 8px 12px;
   font-size: var(--qp-font-size-caption);
   line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-secondary);
 }
 
-.dashboard-focus-ranking-dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  flex: 0 0 auto;
-  border-radius: 999px;
+/* ── 板式：>1052×636 时居中留白，绝不拉伸（01 §4.5 方案 A） ── */
+.qp-main-view {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) var(--qp-mod-note);
+  gap: var(--qp-card-gap);
+  width: min(var(--qp-board-w), 100%);
+  height: min(var(--qp-board-h), 100%);
+  margin: auto;
+  outline: none;
 }
 
-.dashboard-focus-ranking-name {
-  min-width: 0;
-  overflow-wrap: anywhere;
+/* ── 两列 44fr:54fr（1fr 基准 1036 = 1052−16 → 465.14 / 570.86） ── */
+.qp-ws {
+  display: grid;
+  grid-template-columns: minmax(320px, 44fr) minmax(0, 54fr);
+  gap: var(--qp-card-gap);
+  min-height: 0;
 }
 
-@container (max-width: 340px) {
-  .dashboard-focus-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 0.75rem;
-  }
+.qp-col {
+  display: grid;
+  gap: var(--qp-card-gap);
+  min-height: 0;
 }
 
-.dashboard-focus-delta {
+.qp-col-left { grid-template-rows: var(--qp-mod-timer) var(--qp-mod-items); }
+.qp-col-right { grid-template-rows: var(--qp-mod-apps) var(--qp-mod-todos); }
+
+/* ── 卡片（outline 版，见文件头 ①） ── */
+.qp-card {
   display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.25rem;
-  margin-top: 0.65rem;
-  text-align: right;
+  flex-direction: column;
+  min-height: 0;
+  padding: var(--qp-card-pad);
+  border: 0;
+  border-radius: var(--qp-radius-panel);
+  outline: 1px solid var(--qp-border-subtle);
+  outline-offset: -1px;
+  background: var(--qp-bg-panel);
+  overflow: hidden;
 }
 
-@container (min-width: 440px) {
-  .dashboard-focus-layout {
-    grid-template-columns: minmax(190px, 220px) minmax(0, 1fr);
-    gap: 1.5rem;
-  }
+/* 卡头 20 高 + 8 距（几何表，两档同值） */
+.qp-card-head {
+  display: flex;
+  flex: 0 0 var(--qp-card-head-h);
+  height: var(--qp-card-head-h);
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: var(--qp-card-head-gap);
+}
 
-  .dashboard-focus-chart {
-    height: 210px;
-    max-width: 220px;
-  }
+.qp-card-title {
+  margin: 0;
+  font-size: var(--qp-font-size-group-title);
+  font-weight: var(--qp-font-weight-emphasis);
+  line-height: var(--qp-line-height-group-title);
+  color: var(--qp-text-primary);
+  white-space: nowrap;
+}
 
-  .dashboard-focus-ranking {
-    gap: 0.35rem;
-  }
-
-  .dashboard-focus-ranking-row {
-    gap: 1rem;
-    min-height: 1.8rem;
+.qp-card-meta {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--qp-font-size-caption);
+  font-variant-numeric: tabular-nums;
   line-height: var(--qp-line-height-caption);
-  }
+  color: var(--qp-text-tertiary);
+  white-space: nowrap;
 }
 
-.dashboard-pulse-card {
-  flex: 1 1 0;
-  min-height: 260px;
-}
-
-.dashboard-pulse-chart {
-  min-height: 170px;
-}
-
-.dashboard-top-app-progress {
-  transition: width var(--qp-motion-base) var(--qp-motion-ease);
-}
-
-.dashboard-top-app-name-row {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 6px;
-}
-
-.dashboard-top-app-name-row .qp-badge {
+.qp-link-btn {
   flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--qp-font-size-caption);
+  font-weight: var(--qp-font-weight-medium);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-secondary);
+  cursor: default;
+  white-space: nowrap;
 }
 
-@media (max-height: 900px) {
-  .dashboard-focus-card {
-    flex-basis: clamp(250px, 32vh, 320px);
-  }
+.qp-link-btn:hover { color: var(--qp-text-primary); }
 
-  .dashboard-focus-chart {
-    height: 150px;
-  }
-
-  .dashboard-pulse-card {
-    min-height: 225px;
-    max-height: none;
-  }
-
-  .dashboard-pulse-chart {
-    min-height: 150px;
-  }
-}
-
-@media (max-height: 780px) {
-  .dashboard-left-column {
-    overflow-y: auto;
-  }
-}
-
-@media (max-width: 900px) {
-  .dashboard-workspace {
-    gap: 1rem;
-  }
-
-  .dashboard-left-column {
-    width: 42%;
-  }
-}
-
-@media (max-width: 1500px), (max-height: 860px) {
-  .dashboard-focus-card {
-    min-height: 240px;
-  }
-}
-.dashboard-top-app-detail-trigger {
-  appearance: none;
-  color: inherit;
-  cursor: pointer;
-}
-
-.dashboard-top-app-detail-trigger:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--qp-accent-default) 42%, transparent);
+.qp-link-btn:focus-visible {
+  outline: 2px solid var(--qp-focus-ring);
   outline-offset: 2px;
+  border-radius: var(--qp-radius-button);
 }
 
-.dashboard-anonymous-icon {
-  border-radius: var(--qp-radius-control);
+/* 卡头右侧那一组（E3 图标 + meta/action）：包一层是为了让 `space-between` 仍然只有
+ * 两端 —— 直接把图标塞进 `.qp-card-head` 会让它被摊到中间，20 高的头里飘一个 12px 红点。 */
+.qp-card-head-right {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+/* E3：有数据但刷新失败，只给一个 12px 图标（不占版面、不动卡高）。
+ * 颜色用 `--qp-danger`，实测对比度见 `02 §14` 的验收记录。 */
+.qp-refresh-error {
+  display: inline-flex;
+  align-items: center;
+  color: var(--qp-danger);
+}
+
+/* 通栏 footer（应用排行的「全部分类…」）：吃掉列表剩余高度，自己只占 32。
+ * 刻意**不加** border-top：列表最后一行自己的 `.hair` 就是那条分隔线，
+ * 两者相邻会叠成 3px（2px 发丝 + 1px 边），比设计里任何一条线都粗。 */
+.qp-card-footer {
+  flex: 0 0 var(--qp-card-foot-h);
+  height: var(--qp-card-foot-h);
+  margin: 0 calc(-1 * var(--qp-card-pad)) calc(-1 * var(--qp-card-pad));
+  padding: 0 var(--qp-card-pad);
+  border: 0;
+  background: none;
+  text-align: left;
+  font-size: var(--qp-font-size-caption);
+  font-weight: var(--qp-font-weight-medium);
+  line-height: var(--qp-card-foot-h);
+  color: var(--qp-text-secondary);
+  cursor: default;
+}
+
+.qp-card-footer:hover { color: var(--qp-text-primary); background: var(--qp-bg-elevated); }
+
+.qp-card-footer:focus-visible {
+  outline: 2px solid var(--qp-focus-ring);
+  outline-offset: -2px;
+}
+
+
+/* ── 模块级错误（E2）：卡内一块 + 重试 ──
+ * 与空态**必须长得不一样**：空态是"今天没有"，错误是"没读到"。同一句灰字会把
+ * "库挂了"读成"你做完了" —— 这是这一轮最贵的一条区分。
+ * 面积随严重度单调上升：E3 一个 12px 图标 ⊂ E2 卡内一块 ⊂ E5 页级一条。 */
+.qp-module-error {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.qp-module-error-text {
+  margin: 0;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-secondary);
+}
+
+/* ── 空态 / 骨架（五卡共用，只有这一份） ── */
+.qp-empty {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+  text-align: center;
+}
+
+/* ── 骨架（五卡共用）：条高 = 该卡**真实行高**，条数按档位裁 ──
+ * 条高不等于真行高的话，加载完成那一帧整块要重排（最明显的是应用卡 24→32：
+ * 5 条 24 撑 136，真行 5×32 = 160，一下就长出 24）。所以这里不做"统一 24"，
+ * 按 `data-row` 取 `--qp-row-*`；没有 data-row 的（计时卡）落回 readout 24 ——
+ * 计时卡的真实内容就是 5 条读数。
+ * 条数**不在这里**：长档 5 / 短档 4 是档位量，规则在 `tiers.css` 的短档媒体块里。 */
+.qp-skeleton {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--qp-skeleton-gap, var(--qp-row-gap));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.qp-skeleton[data-row="items"] { --qp-skeleton-row: var(--qp-row-items); }
+
+/* 应用排行行间没有 gap（分隔靠行内 `.hair`），骨架也必须是 0：
+ * 保留 4 的话 5 条会撑到 176，而真行是 160。 */
+.qp-skeleton[data-row="app"] {
+  --qp-skeleton-row: var(--qp-row-app);
+  --qp-skeleton-gap: 0px;
+}
+
+.qp-skeleton[data-row="todo"] { --qp-skeleton-row: var(--qp-row-todo); }
+
+.qp-skeleton > span {
+  display: block;
+  flex: 0 0 auto;
+  height: var(--qp-skeleton-row, var(--qp-row-readout));
+  border-radius: var(--qp-radius-button);
+  background: var(--qp-bg-elevated);
 }

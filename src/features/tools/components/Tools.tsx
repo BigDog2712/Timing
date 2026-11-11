@@ -13,6 +13,7 @@ import {
 import { loadToolsIconsForExecutables } from "../services/toolsRuntimeService.ts";
 import type { ToolsOpenTarget, ToolsSection } from "../types.ts";
 import PomodoroToolPanel from "./PomodoroToolPanel.tsx";
+import HostTimingStatusRow from "./HostTimingStatusRow.tsx";
 import ReminderToolPanel from "./ReminderToolPanel.tsx";
 import ToolsSettingsDialog from "./ToolsSettingsDialog.tsx";
 import { useToolPresentation } from "../hooks/useToolPresentation.ts";
@@ -48,10 +49,10 @@ export default function Tools({
   const UI_TEXT = useLocaleText();
   const presentation = useToolPresentation();
   const [activeSection, setActiveSection] = useState<ToolsSection>(() => (
-    initialTarget ? initialTarget.section : readToolsSection()
+    initialTarget?.section ?? readToolsSection()
   ));
   const [visitedSections, setVisitedSections] = useState<ReadonlySet<ToolsSection>>(
-    () => new Set([initialTarget ? initialTarget.section : readToolsSection()]),
+    () => new Set([initialTarget?.section ?? readToolsSection()]),
   );
   const [settingsOpen, setSettingsOpen] = useState(false);
   const handleError = useCallback((message: string) => {
@@ -77,9 +78,8 @@ export default function Tools({
   });
 
   useEffect(() => {
-    if (!initialTarget) return;
-
-    const nextSection = initialTarget.section;
+    const nextSection = initialTarget?.section;
+    if (!nextSection) return;
     setActiveSection(nextSection);
     setVisitedSections((current) => addVisitedSection(current, nextSection));
     rememberToolsSection(nextSection);
@@ -115,6 +115,8 @@ export default function Tools({
         icon={<ToolCase size={18} />}
         title={UI_TEXT.tools.title}
       />
+      {/* [P0-07] 页顶「Timing 计时中」行：番茄钟/自由专注不进时间账，进账的那条计时只在这里可见。 */}
+      <HostTimingStatusRow />
       {presentation.snapshot?.error ? <div role="alert" className="tools-loading qp-panel">
         <span>{UI_TEXT.tools.notificationDisplayFailed}</span>
         <QuietButton onClick={() => { void toolPresentationStore.refresh(true); }}>{UI_TEXT.common.retry}</QuietButton>

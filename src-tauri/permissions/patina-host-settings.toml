@@ -1,0 +1,60 @@
+# Patina（分析窗）改宿主设置的写面（[0.12.1] T04 · 设置搬进主界面）
+#
+# 为什么和 `patina-host-bridge` / `host-theme-read` 分开：
+# 这两份是**只读桥**（历史页读计时记录、启动时读主题与四色），语义是「分析窗只读宿主的账」。
+# 本轮用户拍板把「外观配色 + 计时记录的同步与备份 + 选项」搬进主界面，分析窗就**必须**有
+# 写面——写面单独成一条，名字把用途说清楚：这是**设置页**的能力，不是「分析窗变全能了」。
+#
+# 和 P0-06「配色单一来源」的关系（重要，别把它读成反转）：
+# P0-06 当年把分析窗的「主题模式开关」摘掉，理由是**两个入口**会让用户以为改的是两个 App。
+# 现在入口仍然只有一个，只是那个入口从「独立设置窗 / 悬浮条内联面板」搬到了主界面同一个
+# 设置页里。**单一来源由「全仓只有一个改主色的控件」保证**（判据在
+# `src/features/settings/settingsConvergence.source.test.ts`），不靠权限数量。
+# 换句话说：权限多了 12 条，控件数没多。
+#
+# 12 条各自唯一调用点：
+#   theme_get / theme_set / accent_get / accent_set → src/platform/desktop/hostSettingsGateway.ts
+#     → src/features/settings/components/host/HostThemeCard.tsx（G3 主题与主色）
+#   get_reference_settings / update_reference_settings → 同上 Gateway
+#     → src/features/settings/components/host/HostHighlightCard.tsx（高亮颜色）
+#   get_settings / update_settings / get_autostart / set_autostart / plugin_list / plugin_open_dir
+#     → 同上 Gateway，本批已打通、界面在 T04b 落地（常驻与启动 / 接口面）。
+#   一律**不**进 `main-window-commands`：那条是 Patina 自己 117 条命令的整面授权，
+#   把这 12 条宿主的命令混进去，等于让整面都拿到宿主设置写权限（ACL 是攻击面）。
+#
+# 引用处：capabilities/patina.json。
+[[permission]]
+identifier = "patina-host-settings"
+description = "Allows the Patina analysis window (now hosting the settings page) to read and write the host's theme, accent colors, settings, autostart state, reference settings and plugin directory."
+commands.allow = [
+  "theme_get",
+  "theme_set",
+  "accent_get",
+  "accent_set",
+  "get_settings",
+  "update_settings",
+  "get_autostart",
+  "set_autostart",
+  "get_reference_settings",
+  "update_reference_settings",
+  "plugin_list",
+  "plugin_open_dir",
+  "md_sync_get",
+  "md_sync_save",
+  "md_sync_run",
+  "md_sync_test",
+  "md_sync_open",
+  "md_backup_list",
+  "md_backup_restore",
+  "md_backup_open",
+  "md_backup_export",
+  "md_saf_pick",
+  "md_saf_status",
+  "data_root_get",
+  "data_root_change",
+  "data_root_open",
+  "get_migration_info",
+  "open_legacy_dir",
+  "daily_status_get",
+  "daily_status_set",
+]

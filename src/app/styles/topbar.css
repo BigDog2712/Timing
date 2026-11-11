@@ -1,0 +1,257 @@
+/* ============================================================================
+ * topbar.css — 顶栏五段合流骨架（01 §3 / 02 §2）
+ * -----------------------------------------------------------------------------
+ * 本文件是顶栏几何的**唯一真相源**：段宽、tab 项尺寸、外壳单层内距，以及
+ * 「纵向按窗高 / 横向按窗宽」两个正交断点。
+ *
+ * 为什么必须单独开文件（01 §7.2）：app-shell.css 321 行、quiet-pro.css 1936 行
+ * 都是 size-allowlist 的冻结值，加 1 行即门禁红。本文件里的裸数值是**允许的**
+ * （01 §2.6 的代价条款：tiers 是唯一允许出现魔法数字的地方）；其它文件只引用
+ * 这里定义的变量，不许重算。**本文件自身也受 300 行硬顶**，注释按需压缩。
+ *
+ * 五段配平（border-box，零余量）：
+ *   1100 档 = 114(brand) + 96(drag) + 252(tab) + 486(status) + 152(controls) = 1100
+ *    900 档 = 114        + 96       + 216(tab) + 322(status) + 152          = 900
+ * 纵向配平：顶栏 52 已含 1px 底边（.app-titlebar 的 border-bottom）→ 内容盒 51，
+ * tab 项 44 居中 → 上下各 3.5（不是 4）。
+ *
+ * 这条配平的护栏只有下面几条，**都能实测变红**（数值是 1100×736 档实测）：
+ *   1. .qp-topbar-nav 的 align-items 必须是 center —— 改 flex-start 后 tab 顶到 0（≠3.5）
+ *   2. .qp-tab-ind 的 bottom 必须是 -1px —— 改 0 后指标条底边落在 51（≠52），压不住那 1px
+ *   3. --qp-titlebar-height 回退 36 → 画布高 652、tab 顶 −4.5
+ *   4. 900×636 强制用 52 → 画布 544 < 五模块高和 552（缺 8px，五模块被挤爆）
+ * 反过来说：**顶栏高度是固定值，内容撑不动它** —— "给 tab 容器加 padding 会撑到 53 /
+ * 画布变 635"是错的（对称 padding 只压缩内容盒，实测 titlebar 52 / canvas 636 一动不动）。
+ * ========================================================================== */
+
+/* ── 段宽（两档同值，锁死） ── */
+:root {
+  --qp-brand-w: 114px;   /* 114 − pad 24 − mark 20 − gap 8 = 62 文字列 */
+  --qp-drag-w: 96px;
+  --qp-controls-w: 152px; /* = 4 × 38，与既有 .app-titlebar-button{width:38px} 一致 */
+  --qp-tab-count: 3;
+
+  /* 纵向档位 —— 长档基准（1100×736）。基准 --qp-titlebar-height: 52px 在 tokens.css，
+   * 这里只给短档覆盖，避免两个真相源。 */
+  --qp-nav-item-h: 44px;
+  --qp-nav-icon: 20px;
+  --qp-nav-stroke: 1.9;
+  --qp-nav-label-lh: 18px;
+  --qp-shell-pad: 24px;
+
+  /* 横向档位 */
+  --qp-nav-item-w: 84px;
+}
+
+/* ── 纵向轴：只被**窗高**决定 ──
+ * 画布高 = 窗高 − 顶栏 − 2×内距；只有窗高能保证"五模块高之和 ≤ 画布高"。
+ *
+ * ⚠ **加载顺序**：本块必须晚于 `tokens.css` 加载（`App.css` 里 topbar 排在 tokens 之后）。
+ * `--qp-titlebar-height` 的长档基准 52 定义在 tokens.css，这里只覆盖短档 44；两者选择器
+ * 都是 `:root`，**同特异性 → 后加载的赢**。若哪天有人把 topbar.css 挪到 tokens.css 上面，
+ * 短档会静默变回 52：画布 636−52−40 = 544 < 五模块高和 552，五张卡被挤爆，
+ * 而控制台一个字都不会报。 */
+@media (max-height: 735.98px) {
+  :root {
+    --qp-titlebar-height: 44px;
+    --qp-nav-item-h: 36px;
+    --qp-nav-icon: 16px;
+    --qp-nav-stroke: 2.4;
+    --qp-nav-label-lh: 14px;
+    --qp-shell-pad: 20px;
+  }
+}
+
+/* ── 横向轴：只被**窗宽**决定 ──
+ * 驱动三样宽度派生量：① tab 项宽 84→72 ② status 段两处降级（更新入口 58.6→28、
+ * 胶囊隐藏今日列 省 75.3）③ 灯簇 38→24。
+ * 不许并进高度断点：否则「900 宽 × 800 高」取 84×3 会把状态区挤到 286
+ * （01 §1.1 附 B）。阈值 1000 而非 1024：只区分"接近最小宽"与"正常宽"，与高度轴正交。 */
+@media (max-width: 999.98px) {
+  :root {
+    --qp-nav-item-w: 72px;
+  }
+
+  /* status 宽 = 900 − 114 − 96 − 216 − 152 = 322（宽度派生量，归这一轴）。
+   * 胶囊自然需求 291.8、实得 250 → 名字列只剩 36.22（实测），而「设计评审会议」
+   * 6 字 × 14 = 84 → 被 ellipsis 剪。判据一律按 6 字（84）判，**不按"四个汉字"判**：
+   * 后者把门槛降到刚好过线，等于自欺。
+   * 不能放进 height 断点：「900 宽 × 736 高」是长档，高度轴不动，但宽度只有 900。 */
+  .qp-topbar-status .app-titlebar-update-entry {
+    width: 28px;
+    padding: 0;
+  }
+
+  .qp-topbar-status .app-titlebar-update-entry span {
+    display: none;
+  }
+
+  /* 先砍冗余项：今日累计在环心 / 工具面 / 历史都有一份，名字是「我在计什么」的唯一处。
+   * 省 75.3 → 名字列 111.5（实测），不截断；1100 档完整保留。
+   * 钩子是 `data-titlebar-capsule-today`（TimingCapsule.tsx），不是结构选择器。 */
+  .qp-topbar-status [data-titlebar-capsule-today] {
+    display: none;
+  }
+
+  /* 灯簇降到 24 宽（只降宽不降高）。硬约束：不许给状态段加 `overflow: hidden`，
+   * 也不许做 `max-width` + "+1" 折叠 —— 两者都让"第 3 盏灯存在但看不见"变静默。 */
+  .qp-topbar-status .tools-status-entry-titlebar-item {
+    width: 24px;
+    min-width: 24px;
+    max-width: 24px;
+  }
+}
+
+/* ── ① brand（锁死 114，两档同值） ── */
+.app-titlebar-brand {
+  flex: 0 0 var(--qp-brand-w);
+  width: var(--qp-brand-w);
+  min-width: 0;
+}
+
+.app-titlebar-name {
+  color: var(--qp-text-primary);
+}
+
+/* ── ② drag（锁死 96；不再 flex 撑满，行为不变） ── */
+.app-titlebar-drag-region {
+  flex: 0 0 var(--qp-drag-w);
+  width: var(--qp-drag-w);
+  min-width: var(--qp-drag-w);
+}
+
+/* ── ④ status（吸收删掉一区后的 +84 / +72） ── */
+.qp-topbar-status {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── ⑤ window controls（152 = 4×38） ── */
+.app-titlebar-controls {
+  flex: 0 0 var(--qp-controls-w);
+  width: var(--qp-controls-w);
+}
+
+/* A 版顶栏没有竖分隔；hover 底与 tab 同一档（全屏只允许一种 hover 底）。
+ * 关闭键的 danger hover 保留（.app-titlebar-close 已有，是顶栏唯一允许的彩色 hover）。 */
+.app-titlebar-button {
+  border-left: 0;
+}
+
+.app-titlebar-button:hover {
+  background: var(--qp-bg-elevated);
+}
+
+/* 段内小图标键（胶囊两颗按钮 + 工具入口门）搬到了 topbar-keys.css ——
+ * 本文件只留**几何**，键的皮归那边。别搬回来：这里贴着 300 行上限。 */
+
+/* ── ③ tab 段（252 / 216 = item-w × 3） ── */
+.qp-topbar-nav {
+  position: relative;
+  display: flex;
+  flex: 0 0 calc(var(--qp-nav-item-w) * var(--qp-tab-count));
+  align-self: stretch;
+  align-items: center;
+  gap: 0;
+}
+
+.qp-topbar-tab {
+  display: inline-flex;
+  flex: 0 0 var(--qp-nav-item-w);
+  width: var(--qp-nav-item-w);
+  height: var(--qp-nav-item-h);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 0;
+  border-radius: var(--qp-radius-button);
+  background: transparent;
+  color: var(--qp-text-secondary);
+  cursor: default;
+}
+
+.qp-topbar-tab svg {
+  width: var(--qp-nav-icon);
+  height: var(--qp-nav-icon);
+  stroke-width: var(--qp-nav-stroke);
+}
+
+/* hover 不加描边（.qp-nav-item:hover 有 border-color: subtle，tab 上必须没有，
+ * 否则 hover 会长出一个 1px 框） */
+.qp-topbar-tab:hover {
+  background: var(--qp-bg-elevated);
+  color: var(--qp-text-primary);
+}
+
+/* 选中 = accent 文字 + 2px 底线，**不加底块**（加底块会与 hover 底块撞成"两个选中"） */
+.qp-topbar-tab[aria-current="page"] {
+  background: transparent;
+  color: var(--qp-accent-default);
+}
+
+.qp-topbar-tab[aria-current="page"]:hover { background: var(--qp-bg-elevated); }
+
+/* 容器档焦点环 offset −2（01 §2.4） */
+.qp-topbar-tab:focus-visible {
+  outline: 2px solid var(--qp-focus-ring);
+  outline-offset: -2px;
+}
+
+/* 标签 12/400（M1 之后 --qp-font-weight-medium = 400）。**不许写裸 550**（46 坑 #4） */
+.qp-topbar-tab-label {
+  font-size: var(--qp-font-size-caption);
+  font-weight: var(--qp-font-weight-medium);
+  line-height: var(--qp-nav-label-lh);
+  white-space: nowrap;
+}
+
+/* ── 指标条：全站唯一的动效；也是唯一允许"压线"的元素 ──
+ * bottom: -1px 让 2px 条盖住顶栏那 1px 底边（.qp-topbar-nav 高 = 内容盒 51 →
+ * 占 y50–52，其中 y51–52 正好是底边），读作"这一区接着下面的画布"。 */
+.qp-tab-ind {
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  z-index: 2;
+  width: var(--qp-nav-item-w);
+  height: 2px;
+  border-radius: 0;
+  background: var(--qp-accent-default);
+  transform: translateX(calc(var(--qp-tab-i, 0) * var(--qp-nav-item-w)));
+  transition: transform var(--qp-motion-base) var(--qp-motion-ease);
+}
+
+/* 当前视图不属于任何一个 tab 时不渲染指标条（不猜位置） */
+.qp-topbar-nav[data-tab-active="false"] .qp-tab-ind { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .qp-tab-ind { transition: none; }
+}
+
+[data-qp-motion="reduced"] .qp-tab-ind { transition: none; }
+
+/* ── 外壳内距：收敛成**一层**（01 §3.8） ──
+ * 现状是两层叠加：qp-shell 24 + qp-canvas 20 = 44/侧（1100 档）。设计是 24 → 1052。
+ * 覆盖 Tailwind 的 p-4/md:p-5/lg:p-6（无 layer 的规则优先于 @layer utilities），
+ * 且改为**跟窗高**而不是跟窗宽（Tailwind 的 md/lg 是宽度断点，会在"宽而矮"时错档）。 */
+.qp-shell {
+  padding: var(--qp-shell-pad);
+}
+
+/* 主界面（dashboard）画布内距归零 + 1px 边从 border 换成 outline（outline 不占布局，
+ * 否则 1052 变成内容 1050 → 五模块列宽 464.14/569.86 全差 1px，01 §4.6）。
+ * **只作用于 dashboard**：数据管理/设置沿用视图的 20 内距与 1px border 一个像素都不许动
+ * （它们内部排版是按 border 版算的）。
+ * ⚠ 已知缺陷（本轮引入，第二批第一件事修）：`.qp-view-container-outgoing` 的
+ *   `inset-4 md:inset-5`（16/20）假设画布有 20 内距；dashboard 归零后切走的那一帧
+ *   （≤50ms）旧视图会缩进 20px。第二批把它改成 0。 */
+.qp-canvas[data-presented-view="dashboard"] {
+  padding: 0;
+  border-width: 0;
+  outline: 1px solid var(--qp-border-subtle);
+  outline-offset: -1px;
+}

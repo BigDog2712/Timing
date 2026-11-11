@@ -18,7 +18,7 @@ function contrastWithWhite(rgb: RGB): number {
   return 1.05 / (0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2] + 0.05);
 }
 
-function primaryButtonBackground(accent: string): string {
+export function primaryButtonBackground(accent: string): string {
   const rgb = parse(accent);
   if (contrastWithWhite(rgb) >= 4.5) return accent;
   let insufficient = 0;

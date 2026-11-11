@@ -8,7 +8,7 @@ use tauri::{
     WebviewWindowBuilder, Window, WindowEvent,
 };
 
-use crate::error::{AppError, AppResult};
+use crate::error::{AppError, AppResult, ErrorCode};
 use crate::infra::geometry::{clamp_to_workarea, Rect, WorkArea};
 use crate::infra::window_spec;
 
@@ -152,13 +152,23 @@ pub fn reclamp_main(app: &AppHandle) -> AppResult<bool> {
     reclamp(app, MAIN_WINDOW)
 }
 
-/// 打开 / 聚焦设置面板（单例；ADR-009）。
+/// 打开设置（**别名**；0.12.1 起不再建窗）。
 ///
-/// 已存在 → `show + set_focus`，不重复创建；不存在 → 按 `window_spec::SETTINGS` 创建。
+/// 0.12.1 撤掉独立设置窗之后，「设置」只剩一个家 —— 分析窗（label = `patina`）的
+/// settings 视图。本函数保留原名与签名，只为**兼容旧调用面**：命令
+/// `open_settings_window` 仍在契约里（81 条命令一个不少），前端
+/// `windowApi.openSettingsWindow` 也还在，`plugins/**` 里的旧插件可能还在调它。
+/// 行为改成**委托**给托盘「设置…」同一条通道
+/// （`tools_navigation::open_settings`：先写 pending 落点再 show，冷启动也落得对）。
+///
+/// ⚠️ 别再改回 `open_panel_window`：`window_spec::SETTINGS` 仍登记着
+/// `index.html?w=settings`，一旦按它建窗，桌面上就会多出一扇 392×660 的透明置顶窗 ——
+/// 前端 `currentWindowKind()` 把 label `settings` 兜底成 `'main'`，于是窗里是一条悬浮条，
+/// 点哪儿都没反应；而 `capabilities/default.json` 的 windows 里已经没有这个 label，
+/// 日志近乎为零。这就是 QA 记的「死代码带枪」：代码没人调，但枪是上膛的。
 pub fn open_settings_window(app: &AppHandle) -> AppResult<()> {
-    let spec = window_spec::spec_for(window_spec::SETTINGS.label)
-        .ok_or_else(|| AppError::io("设置窗规格未登记"))?;
-    open_panel_window(app, spec, PanelPlacement::Center)
+    crate::app::insight::main_window::tools_navigation::open_settings(app)
+        .map_err(|err| AppError::new(ErrorCode::IoError, format!("打开设置视图失败: {err}")))
 }
 
 /// 打开 / 聚焦事项窗口（单例；label `todos`；ADR-009）。

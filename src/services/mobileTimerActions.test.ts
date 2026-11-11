@@ -5,9 +5,6 @@
  *   1. 空闲点「开始」→ 只调 `todo_start`（匹配事项 / 新建 / 删待办全在后端，前端不重复）；
  *   2. 计时中点「开始」→ 先换事项，**成功之后**才软删待办（顺序反了就是「待办没了、时间也没记到」）；
  *   3. 换事项失败 → 待办必须原样留着，让人可以重试。
- *
- * 这里 mock 的是 `services/api` 门面（数据边界），不 mock `mobileTimerActions` 本身：
- * 被测的正是这层的时序编排。
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Item, TimeRecord, TimerState, Todo } from '../types/domain';
@@ -199,6 +196,22 @@ describe('计时中：先换事项，成功了才删待办', () => {
     expect(ok).toBe(false);
     expect(todoApi.remove).not.toHaveBeenCalled();
     expect(useUiStore.getState().notice?.text).toBe('已有进行中的计时');
+  });
+
+  it('结束并新开失败 → 恢复原计时，不把失败变成静默暂停', async () => {
+    useTimerStore.setState({ state: runningOn(2), loaded: true });
+    useItemStore.setState({ items: [makeItem({ id: 7, name: '写周报' })], loaded: true });
+    vi.mocked(timerApi.switchItem).mockRejectedValue(new Error('IPC 暂时不可用'));
+    vi.mocked(timerApi.state).mockResolvedValue({
+      ...runningOn(2), status: 'paused', session: makeRecord({ runningSince: null }),
+    });
+
+    const ok = await mobileTimerActions.startTodo(todo, 'end_and_start');
+
+    expect(ok).toBe(false);
+    expect(timerApi.pause).toHaveBeenCalledTimes(1);
+    expect(timerApi.resume).toHaveBeenCalledTimes(1);
+    expect(todoApi.remove).not.toHaveBeenCalled();
   });
 
   it('这条待办的事项正是当前计时事项 → 只把待办收走，不动秒表', async () => {

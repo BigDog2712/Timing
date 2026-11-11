@@ -92,7 +92,7 @@ pub(super) fn create<R: Runtime + 'static>(
     );
     let root = crate::infra::insight::storage_paths::resolve_storage_paths(app)?.webview_root;
     let builder = WebviewWindowBuilder::new(app, "mini", WebviewUrl::App("patina.html".into()))
-        .title("Patina Mini")
+        .title("Timing Mini")
         .inner_size(PANEL_WIDTH, PANEL_HEIGHT)
         .resizable(false)
         .maximizable(false)

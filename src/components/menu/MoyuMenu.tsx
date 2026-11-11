@@ -137,6 +137,8 @@ export function MoyuMenu({ state }: MoyuMenuProps) {
       ariaLabel="摸鱼菜单"
       onClose={close}
       className="menu--moyu"
+      /* [P0-07] 计时语义：摸鱼（倒计时 / 正计时）属「计时」，写 time_records、计入时间账。 */
+      footer={<span data-countdown-ledger="counted">计时 · 计入时间账</span>}
       /* 自动弹出时指针还在小条上：**先移入再移出**才计时收起，宽限 1s（V0.3.9） */
       hoverClose={{ graceMs: 1000, requireEnter: true }}
     />

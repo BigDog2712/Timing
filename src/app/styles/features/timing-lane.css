@@ -1,0 +1,122 @@
+/* =============================================================================
+ * Timing — 历史页「Timing 计时」泳道 + focusApp 高亮环（P0-02 / P0-03 ③）
+ * -----------------------------------------------------------------------------
+ * 为什么单开一份：`src/app/styles/features/history.css` 冻结在 **817 行**（棘轮基线，
+ * +1 行即红），而 `src/app/App.css` 只有 22 行且 free —— 新样式挂在这里，靠 App.css
+ * 那一行 `@import` 接入（TB2-2 要追加「计时中」角标样式，也追加到本文件里，别另起）。
+ *
+ * 三条约束：
+ *  ① 只用 `--qp-*` 令牌（强调色经 B1 的 `hostAccentBridge` 从宿主四色派生，不写字面色值）；
+ *  ② 段的位置/宽度由 JS 给百分比（毫秒比例、不取整），这里只管外观；
+ *  ③ 高亮用 **inset 阴影**而不是 outline：`.qp-timeline-segment` 有 `overflow: hidden`，
+ *     outline 会被父级裁掉，inset 一定看得见。
+ * ========================================================================== */
+
+/* ---------------------------- 泳道容器与标题 ---------------------------- */
+.history-timing-lane {
+  margin-top: 6px;
+}
+
+.history-timing-lane-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.history-timing-lane-title {
+  color: var(--qp-text-primary);
+  font-size: var(--qp-font-size-caption);
+  font-weight: var(--qp-font-weight-emphasis);
+  line-height: var(--qp-line-height-caption);
+}
+
+.history-timing-lane-hint {
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+}
+
+/* 轨道压到 22px：两条轨（活动 48 / 计时 22）合计仍比原来一张卡片矮，
+   左栏与下方的分布卡不会被挤走。 */
+.history-timing-lane-track {
+  height: 22px;
+}
+
+/* ------------------------------ 计时段 ------------------------------ */
+.history-timing-lane-segment {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  min-width: 1px;
+  border-radius: var(--qp-radius-timeline-segment);
+  background: var(--qp-accent-default);
+  /* 半透明而不是纯色：与活动轨的实色块拉开层次，一眼能分出「上=用了什么、下=计了什么」 */
+  opacity: 0.72;
+  cursor: default;
+}
+
+/* 进行中：左侧实色、右端渐隐，暗示「还在长」；不引入动画（动效由全局偏好控制） */
+.history-timing-lane-segment[data-running="true"] {
+  opacity: 0.92;
+  background-image: linear-gradient(
+    90deg,
+    var(--qp-accent-default) 0%,
+    var(--qp-accent-default) 72%,
+    color-mix(in srgb, var(--qp-accent-default) 32%, transparent) 100%
+  );
+}
+
+.history-timing-lane-segment--focus,
+.history-timing-lane-segment[data-focused="true"] {
+  z-index: 2;
+  box-shadow: inset 0 0 0 2px var(--qp-text-primary);
+  opacity: 1;
+}
+
+/* 「进行中」标注（PRD D1）：钉在段右端 = 活动轨「现在」那条竖线，白描边压在色块上也看得清。
+   不加动画——动效开关由全局 `prefers-reduced-motion` / 动效偏好统一控制，本文件不另起。 */
+.history-timing-lane-running {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  white-space: nowrap;
+  color: var(--qp-text-primary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  text-shadow:
+    0 0 3px var(--qp-bg-panel),
+    0 0 3px var(--qp-bg-panel);
+  pointer-events: none;
+}
+
+/* ------------------- 活动轨上的 focusApp 高亮环（P0-03 ③） -------------------
+ * `.qp-timeline-segment` 的可见色块是它的 `::before`（quiet-timeline.css:35-45），
+ * 所以环必须画在 `::before` 上；父级 `overflow: hidden` 决定了只能用 inset 阴影。 */
+.history-horizontal-timeline-segment--focus {
+  z-index: 2;
+}
+
+.history-horizontal-timeline-segment--focus::before {
+  box-shadow: inset 0 0 0 2px var(--qp-text-primary);
+  filter: brightness(1.06) saturate(1.12);
+}
+
+/* ------------------ 可点的活动段（P0-05：点一段 → 在 Timing 计这件事） ------------------
+ * 这条规则落在本文件而不是 `history.css`（那份冻结在 817 行）。选择器挂在共享段的
+ * `data-timeline-activatable` 上：只有真的传了 `onActivate` 的段才有这个属性，
+ * 另外两处用法（expanded / lane）连 DOM 都不变。 */
+.qp-timeline-segment[data-timeline-activatable="true"] {
+  cursor: pointer;
+}
+
+.qp-timeline-segment[data-timeline-activatable="true"]:hover::before {
+  filter: brightness(1.08) saturate(1.1);
+}
+
+/* 键盘可达：`<span role="button" tabIndex=0>` 的焦点环要看得见，且不能被父级裁掉 */
+.qp-timeline-segment[data-timeline-activatable="true"]:focus-visible {
+  outline: 2px solid var(--qp-accent-default);
+  outline-offset: -2px;
+}

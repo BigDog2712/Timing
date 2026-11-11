@@ -7,8 +7,10 @@ import QuietTooltip from "../../../shared/components/QuietTooltip.tsx";
 import { ANONYMOUS_ACTIVITY_STYLE } from "../../../shared/charts/AnonymousActivityPattern.tsx";
 
 import { formatDuration, formatTime } from "../services/historyFormatting.ts";
+import type { HistoryActivityActionTarget } from "./HistoryActivityActionDialog.tsx";
 import type {
   HistoryTimelineDisplayMode,
+  HistoryTimelineSegment,
   HistoryTimelineViewModel,
 } from "../../../shared/lib/activityTimelineCompiler.ts";
 
@@ -26,6 +28,27 @@ interface Props {
   showEmptyMessage?: boolean;
   emptyMessage?: string;
   interactionActive?: boolean;
+  /** [P0-03 ③] focusApp 高亮键（应用可执行名）；为空的段都不亮 */
+  highlightSourceKey?: string | null;
+  /**
+   * [P0-05] 点某一段（或键盘 Enter/Space）要做什么。
+   * 不传 = 段是纯展示（既有的 expanded / lane 两处用法与缩放弹窗行为一字不变）。
+   */
+  onSegmentActivate?: (target: HistoryActivityActionTarget) => void;
+}
+
+/**
+ * 该段是否要被点亮。
+ *
+ * 双判据 + 大小写不敏感，是因为两侧的应用标识来自**不同层的同一张表**：
+ * 段侧 `sourceKey` 是 Patina 归一后的可执行名（`normalizeExecutable` = trim+lowercase），
+ * 而宿主递过来的 `focusApp` 是 `sessions.exe_name` 原值（可能是 `Code.exe`）；
+ * `label` 再兜一层「应用显示名」的调用方式。三条都不中 → 不亮（只落日期，不报错）。
+ */
+function isFocusedSegment(segment: HistoryTimelineSegment, focusKey: string | null): boolean {
+  if (focusKey === null) return false;
+  return segment.sourceKey.toLowerCase() === focusKey
+    || segment.label.trim().toLowerCase() === focusKey;
 }
 
 type TooltipContentStyle = CSSProperties & Record<"--tooltip-color", string>;
@@ -72,11 +95,14 @@ export default function HistoryHorizontalTimeline({
   showEmptyMessage = true,
   emptyMessage,
   interactionActive = false,
+  highlightSourceKey = null,
+  onSegmentActivate,
 }: Props) {
   const displayColor = useActivityDisplayColor();
   const UI_TEXT = useLocaleText();
   const locale = useLocale();
   const copy = UI_TEXT.history.horizontalTimeline;
+  const focusKey = highlightSourceKey === null ? null : highlightSourceKey.trim().toLowerCase() || null;
   const headingTitle = title === undefined ? copy.defaultTitle : title;
   const resolvedEmptyMessage = emptyMessage ?? copy.emptyDay;
   const [viewportWidth, setViewportWidth] = useState(getViewportWidth);
@@ -239,7 +265,18 @@ export default function HistoryHorizontalTimeline({
               )}
               disabled={interactionActive}
               hideOnPointerDown={variant !== "expanded"}
-              className="history-horizontal-timeline-segment"
+              /* [P0-05] 只在「有回调 且 当前没在拖拽视口」时可点：拖拽中松手不该弹卡 */
+              onActivate={onSegmentActivate === undefined || interactionActive
+                ? undefined
+                : () => onSegmentActivate({
+                  appName: label,
+                  exeName: segment.sourceKey,
+                  startTimeMs: segment.startTime,
+                  endTimeMs: segment.endTime,
+                })}
+              className={isFocusedSegment(segment, focusKey)
+                ? "history-horizontal-timeline-segment history-horizontal-timeline-segment--focus"
+                : "history-horizontal-timeline-segment"}
               tooltipClassName="history-horizontal-timeline-tooltip"
             />
           );

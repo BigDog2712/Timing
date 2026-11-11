@@ -135,6 +135,28 @@ commands.allow = [
   "cmd_get_mini_activity_snapshot",
   "cmd_show_main_window",
 ]
+# 分析窗「今日」视图的待办 / 便利贴面（第四轮 UI 落地·第二批）。
+# 为什么另立一条而不是把这些命令塞进 `main-window-commands`：那条是"整面"授权，
+# 分析窗实际只用 5 条，塞进去等于把 todo_update / note_create / note_update 也给了它 ——
+# ACL 是攻击面，只给用得到的。
+# 5 条各自唯一调用点（多一条都不许进 allow，写在这里是为了下一个人加命令时先看调用点）：
+#   note_list   → src/platform/persistence/noteReadRepository.ts:listNoteSummaries → hooks/useTodayNotes → NotesStrip
+#   todo_list   → src/platform/persistence/todoRepository.ts:listPendingTodos → hooks/useTodayTodos → TodosModule
+#   todo_create → src/platform/persistence/todoRepository.ts:createTodo（compose 回车）
+#   todo_toggle → src/platform/persistence/todoRepository.ts:toggleTodo（行首勾选）
+#   todo_delete → src/platform/persistence/todoRepository.ts:deleteTodo（行删除键 + 3s 撤销窗到期）
+# note_create / note_update **不给**：主界面便利贴条是只读的（01 §4.4.1 末段）。
+[[permission]]
+identifier = "patina-todo-notes"
+description = "Allows the Patina analysis window to read today's notes and read/write the to-do card (list, create, toggle, delete only)."
+commands.allow = [
+  "note_list",
+  "todo_list",
+  "todo_create",
+  "todo_toggle",
+  "todo_delete",
+]
+
 [[permission]]
 identifier = "tool-notification-commands"
 description = "Read and act only on the alert assigned to the notification window."

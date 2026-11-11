@@ -2,10 +2,13 @@
  * Timing — App（薄装配层 + 窗口 label 路由，ADR-009 §1）
  * -----------------------------------------------------------------------------
  * 载入时按当前窗口 label 分流（src/lib/window）：
- *   - settings → 独立设置窗，**只渲染 SettingsPanel**（不渲染主窗层）；
  *   - todos    → 独立事项窗，只渲染 TodosWindow；
  *   - note     → 独立便利贴窗（label note-{id}），只渲染 NoteWindow；
  *   - main     → 无画布置层（ADR-020）：药丸 / 面板 / 菜单 / 撤销条 / 对话框由 auto-fit 撑窗口。
+ *
+ * [0.12.1] 设置只剩**一个**家：分析窗（label `patina`）的 settings 视图。独立设置窗
+ * （label `settings`）与药丸里的内联设置面板**都已下线**（T04b 删掉最后一支），所有
+ * 「打开设置」入口都改成把分析窗叫到前台并落到它的 settings 视图。
  *
  * 移动端（Android 包，DESIGN-ANDROID-V1 §1.2）：整个桌面壳被编译期常量短路，
  * 直接渲染 MobileShell（4 Tab + 覆盖层）。手机单窗口，没有 label 路由。
@@ -20,8 +23,6 @@ import { ItemPicker } from './components/panel/ItemPicker';
 import { PillBar } from './components/pill/PillBar';
 import { RecordsPanel } from './components/records/RecordsPanel';
 import { RecoverDialog } from './components/recover/RecoverDialog';
-import { SettingsPanel } from './components/settings/SettingsPanel';
-import { SettingsWindow } from './components/settings/SettingsWindow';
 import { TodayDigest } from './components/todos/TodayDigest';
 import { TodosWindow } from './components/todos/TodosWindow';
 import { TimerWindow } from './components/timer/TimerWindow';
@@ -29,6 +30,7 @@ import { UndoBar } from './components/undo/UndoBar';
 import { CollapsedDot } from './components/ui/CollapsedDot';
 import { NoticeBar } from './components/ui/NoticeBar';
 import { useAppBootstrap } from './hooks/useAppBootstrap';
+import { useHostIntentBridge } from './services/hostIntentBridge';
 import { useItemsRefreshOnFocus } from './hooks/useItemsRefreshOnFocus';
 import { useWindowAutoFit } from './hooks/useWindowAutoFit';
 import { IS_MOBILE } from './lib/platform';
@@ -44,7 +46,6 @@ export default function App() {
 
   const kind = currentWindowKind();
 
-  if (kind === 'settings') return <SettingsWindow />;
   if (kind === 'todos') return <TodosWindow />;
   if (kind === 'timer') return <TimerWindow />;
   if (kind === 'note') return <NoteWindow />;
@@ -55,6 +56,8 @@ export default function App() {
 /** 主窗（label = main）：无画布置层（ADR-020） + 各形态组件 */
 function MainWindow() {
   useAppBootstrap();
+  /* [P0-04/P0-05] 分析窗的意图执行端：挂一次即够（挂两处会让同一条 toggle 连切两下） */
+  useHostIntentBridge();
   /* [P1 修复] 把真实 OS 窗口收缩到可见内容包围盒：透明空白区不再吞掉桌面点击 */
   useWindowAutoFit();
   /* [V0.11.7] 本窗与事项窗是两个 webview、两份 store：在事项窗「编辑事项」里改名、
@@ -113,7 +116,6 @@ function MainWindow() {
         {!collapsed && panel === 'create' && <ItemPicker />}
         {!collapsed && panel === 'records' && <RecordsPanel />}
         {!collapsed && panel === 'digest' && <TodayDigest onClose={() => useUiStore.getState().closePanel()} onViewRecords={() => { useUiStore.getState().closePanel(); void openTodosWindow(); }} />}
-        {!collapsed && panel === 'settings' && <SettingsPanel />}
       </div>
 
       {itemMenu && <ItemMenu />}

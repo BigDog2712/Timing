@@ -144,7 +144,7 @@ mod tests {
     fn spanish_native_messages_and_cardinals_are_available() {
         let locale = Locale::from_tag(Some("es"));
         assert_eq!(locale.tag(), "es");
-        assert_eq!(text(locale, "native.tray.quit"), "Salir de Patina");
+        assert_eq!(text(locale, "native.tray.quit"), "Salir de Timing");
         assert_eq!(
             format_text(
                 locale,
@@ -181,7 +181,7 @@ mod tests {
     fn russian_production_messages_preserve_cardinals_and_user_names() {
         let locale = Locale::from_tag(Some("ru-RU"));
         assert_eq!(locale.tag(), "ru-RU");
-        assert_eq!(text(locale, "native.tray.quit"), "Выйти из Patina");
+        assert_eq!(text(locale, "native.tray.quit"), "Выйти из Timing");
         for (count, noun, minute) in [
             (0, "записей", "минут"),
             (1, "запись", "минута"),

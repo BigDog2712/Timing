@@ -1,8 +1,9 @@
-import { useMainToolsNavigation } from "./hooks/useMainToolsNavigation.ts";
+import { useMainToolsNavigation, type HistoryDateRequest } from "./hooks/useMainToolsNavigation.ts";
 import { type ComponentProps, useCallback, useState } from "react";
 import { useLocale, useLocaleText } from "../shared/i18n/index.ts";
-import AppSidebar from "./components/AppSidebar";
 import AppTitleBar from "./components/AppTitleBar";
+import AppTopNav from "./components/AppTopNav.tsx";
+import TimingCapsule from "./components/TimingCapsule.tsx";
 import AppViewOutlet from "./components/AppViewOutlet.tsx";
 import type { View } from "./types/view";
 import Dashboard from "../features/dashboard/components/Dashboard.tsx";
@@ -61,8 +62,6 @@ import {
   startOfLocalDay,
 } from "../shared/lib/localDate.ts";
 import { useAppSidebarState } from "./hooks/useAppSidebarState.ts";
-
-type HistoryDateRequest = { dateKey: string; requestId: number };
 
 const History = createPreloadableViewComponent<ComponentProps<typeof HistoryView>>("history");
 const Data = createPreloadableViewComponent<ComponentProps<typeof DataView>>("data");
@@ -162,12 +161,8 @@ export default function AppShellContent({
     uiTextLanguage,
   });
 
-  const handleToolsStatusChipOpen = useCallback(async (target: ToolsOpenTarget) => {
-    if (!(await handleNavigate("tools")).navigated) return;
-    setHistoryDateRequest(null);
-    setToolsInitialTarget(target);
-  }, [handleNavigate]);
-  useMainToolsNavigation(handleToolsStatusChipOpen);
+  /* [P0-03] 工具分区跳转（原内联的 handleToolsStatusChipOpen）+ 药丸递来的历史落点，一并收进 hook */
+  const openToolsTarget = useMainToolsNavigation({ navigate: handleNavigate, setHistoryDateRequest, setToolsInitialTarget });
 
   const handleToolsInitialTargetConsumed = useCallback(() => {
     setToolsInitialTarget(null);
@@ -226,7 +221,8 @@ export default function AppShellContent({
   const handleSidebarPreviewNavigate = useCallback((nextView: View) => {
     preloadNavigationView(nextView, "preview");
   }, []);
-  const { navigationMode, sidebarProps } = useAppSidebarState({
+  /* 侧栏已下线（01 §3.1）：三区导航搬进顶栏 ③ 段。只留 navigationMode —— 工具区段轨的标签开关还在读它。 */
+  const { navigationMode } = useAppSidebarState({
     currentView: viewPresentation.presentedView,
     onPrepareNavigate: prepareNavigate,
     onNavigate: handleSidebarNavigate,
@@ -241,22 +237,22 @@ export default function AppShellContent({
     <div
       ref={appFrameRef}
       data-qp-motion={quietMotionMode}
-      className={[
-        "qp-app-frame",
-        isWindowMaximized ? "qp-app-frame-maximized" : "",
-      ].filter(Boolean).join(" ")}
+      className={["qp-app-frame", isWindowMaximized ? "qp-app-frame-maximized" : ""].filter(Boolean).join(" ")}
     >
       <AppTitleBar
         isMaximized={isWindowMaximized}
-        toolsStatusEntry={<ToolsStatusEntry onOpenSection={target => { void handleToolsStatusChipOpen(target); }} />}
+        toolsStatusEntry={<ToolsStatusEntry toolsOpen={presentedView === "tools"} onOpenSection={target => { void openToolsTarget(target); }} />}
+        timingStatusEntry={<TimingCapsule />}
+        navigationSlot={<AppTopNav currentView={presentedView} onPrepareNavigate={prepareNavigate}
+          onNavigate={handleSidebarNavigate} onPreviewNavigate={handleSidebarPreviewNavigate} />}
         {...titleBarUpdateEntry}
       />
 
-      <div className="qp-shell flex-1 min-h-0 p-4 md:p-5 lg:p-6 flex gap-4 md:gap-5 lg:gap-6 overflow-hidden">
+      {/* 无 gap：本容器只有 AppViewOutlet 的 <main> 一个在流子元素，其余三个图层都是 fixed */}
+      <div className="qp-shell flex-1 min-h-0 flex overflow-hidden">
         <QuietToastStack toasts={toasts} />
         <ToolAlertDialog />
         {dialogs}
-        <AppSidebar {...sidebarProps} />
 
         <AppViewOutlet
           {...viewPresentation.outletProps}
@@ -267,15 +263,8 @@ export default function AppShellContent({
                 dashboard={dashboard}
                 icons={icons}
                 readState={dashboardReadState}
-                hourlyActivityChartMode={appSettings.hourlyActivityChartMode}
-                onHourlyActivityChartModeChange={handleHourlyActivityChartModeChange}
-                runtime={{
-                  refreshKey: refreshSignal,
-                  mappingVersion,
-                  mergeThresholdSecs: appSettings.timelineMergeGapSecs,
-                  trackerHealth,
-                }}
-                {...quickClassificationCallbacks}
+                refreshKey={refreshSignal}
+                onOpenMapping={() => { void handleSidebarNavigate("mapping"); }}
               />
             ),
             history: (

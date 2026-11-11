@@ -10,6 +10,7 @@ import { errorText } from '../../services/ipc';
 import { recordApi } from '../../services/api';
 // Added by host agent; this component expects the daily digest status service contract.
 import { getDailyDigestStatuses, setDailyDigestStatus } from '../../services/dailyStatusActions';
+import { openOverviewInAnalysis } from '../../services/todayActions';
 import { formatMinutes } from '../../lib/format';
 import { CheckIcon, ClockIcon, ListIcon, PlayIcon, TrashIcon, iconStroke } from '../../lib/icons';
 import { GlassMenu, type MenuEntry } from '../menu/GlassMenu';
@@ -131,7 +132,12 @@ export function TodayDigest({ onClose, onViewRecords }: TodayDigestProps) {
       {!today.loading && !today.error && !statusesLoading && rows.map((row) => <button key={row.name} type="button" className="today-digest__row" data-active={isCurrentName(row.name)} data-done={row.status === 'done'} onContextMenu={(event) => openMenu(event, row)} onClick={() => void run(() => startRow(row))}><span className="today-digest__mark" data-done={row.status === 'done'} aria-hidden>{row.status === 'done' && <CheckIcon size={12} strokeWidth={iconStroke(16)} />}</span><span className="today-digest__name" title={row.name}>{row.name}</span><span className="today-digest__duration">{formatMinutes(row.totalSec)}</span></button>)}
     </div>
     {actionError && <p className="today-digest__error" role="alert">{actionError}</p>}
-    <footer className="today-digest__footer"><button type="button" className="btn btn--accent btn--sm" onClick={onViewRecords}>查看今日计时</button><button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>关闭</button></footer>
+    <footer className="today-digest__footer">
+      {/* [P1-02] E4：摘要面板 → 分析窗总览页（`{ target: { overview: true } }`，冷启动也成立）。 */}
+      <button type="button" className="btn btn--ghost btn--sm" onClick={() => void openOverviewInAnalysis()}>在分析窗看总览 ↗</button>
+      <button type="button" className="btn btn--accent btn--sm" onClick={onViewRecords}>查看今日计时</button>
+      <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>关闭</button>
+    </footer>
     {menu && <><div className="menu-scrim" onMouseDown={() => setMenu(null)} aria-hidden /><GlassMenu entries={menuEntries(menu.row)} anchor={{ x: menu.x, y: menu.y }} ariaLabel={`事项「${menu.row.name}」操作`} onClose={() => setMenu(null)} /></>}
   </section>;
 }

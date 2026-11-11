@@ -1,0 +1,372 @@
+classDiagram
+  %% FUSION-ARCH-v1 · 数据结构与接口（两窗 + 融合层）
+  %% 约定：H = 宿主自有文件，V = vendored（改动须登记）
+
+  %% ---------------- 跨窗 DTO ----------------
+
+  class PatinaOpenTarget {
+    <<H · src/types/domain/ipc.ts>>
+    +history: HistoryOpenTarget
+  }
+
+  class HistoryOpenTarget {
+    +dateKey: string
+    +focusApp: string | null
+  }
+
+  class MainWindowTargetDto {
+    <<Rust · serde camelCase>>
+    +tools: ToolsSection | None
+    +history: HistoryTarget | None
+  }
+
+  class HistoryTarget {
+    +date_key: String
+    +focus_app: Option~String~
+  }
+
+  class ToolsSection {
+    <<Rust enum, snake_case>>
+    +Pomodoro
+    +Reminders
+  }
+
+  class MainWindowTarget {
+    <<Rust enum, pub(crate)>>
+    +Tools(ToolsSection)
+    +History(HistoryTarget)
+  }
+
+  class ToolsNavigationState {
+    <<V · tools_navigation.rs>>
+    -inner: Mutex~Option~MainWindowTarget~~
+    +take() Option~MainWindowTarget~
+  }
+
+  class HostIntent {
+    <<H/V 两侧同构 union>>
+    +action: start_timer_for_activity | toggle_timer | open_host_settings | show_pill
+    +itemName: string
+  }
+
+  %% ---------------- 宿主四色 ----------------
+
+  class AccentColors {
+    <<host DTO>>
+    +running: string
+    +warn: string
+    +done: string
+    +bar: string | null
+  }
+
+  class ThemeChanged {
+    <<host event payload>>
+    +mode: ThemeMode
+    +accents: AccentColors
+  }
+
+  class HostAccentBridge {
+    <<V · shared/theme/hostAccentBridge.ts (新)>>
+    +applyHostAccents(tokens, accents, variant) Record~string,string~
+    -primaryButtonBackground(accent) string
+    -deepenForNonText(hex, bgLum, target) string
+    -deepenForText(hex, bgLum, target) string
+    -isValidHex(v) boolean
+  }
+
+  class DeriveTheme {
+    <<V · shared/theme/deriveTheme.ts (改: 仅 export)>>
+    +deriveTheme(variant, scheme, override) Record~string,string~
+    +primaryButtonBackground(accent) string
+  }
+
+  class HostThemeGateway {
+    <<V · platform/runtime/hostThemeGateway.ts (改)>>
+    +readHostThemeMode() ThemeMode | null
+    +readHostAccents() AccentColors | null
+    +subscribeHostThemeMode(onMode, onAccents) UnlistenFn | null
+  }
+
+  class UseHostTheme {
+    <<V · app/hooks/useHostThemeMode.ts (改)>>
+    +useHostTheme(localMode) HostTheme
+  }
+
+  class HostTheme {
+    +mode: ThemeMode
+    +accents: AccentColors | null
+  }
+
+  class ApplyDocumentTheme {
+    <<V · app/hooks/useAppThemeMode.ts (改)>>
+    +applyDocumentTheme(mode, effective, scheme) void
+  }
+
+  class HostThemeMode {
+    <<H · src-tauri/permissions/patina-host-theme.toml>>
+    +commands.allow: theme_get, accent_get
+  }
+
+  %% ---------------- 计时态 ----------------
+
+  class TimerState {
+    <<host event payload>>
+    +status: idle | running | paused
+    +session: TimeRecord | null
+    +lastItemId: number | null
+    +liveDurationSec: number
+    +mode: countup | countdown
+    +remainingSec: number | null
+  }
+
+  class TimeRecord {
+    <<host DTO>>
+    +id: number
+    +itemId: number
+    +startedAt: number
+    +endedAt: number | null
+    +accumulatedSec: number
+    +runningSince: number | null
+    +mode: TimerMode
+    +targetSec: number | null
+  }
+
+  class HostTimerGateway {
+    <<V · platform/runtime/hostTimerGateway.ts (新)>>
+    +subscribeHostTimerState(onState) UnlistenFn | null
+    +loadHostItems() TimingItemName[]
+    +computeHostLiveSec(session) number
+  }
+
+  class UseHostTimerState {
+    <<V · app/hooks/useHostTimerState.ts (新)>>
+    +useHostTimerState() HostTimerView
+  }
+
+  class HostTimerView {
+    +status: string
+    +itemName: string | null
+    +liveSec: number
+    +session: TimeRecord | null
+  }
+
+  class TimingCapsule {
+    <<V · app/components/TimingCapsule.tsx (新)>>
+    +render()
+    -onToggle() void
+    -onBackToPill() void
+  }
+
+  class HostTimingStatusRow {
+    <<V · features/tools/components/HostTimingStatusRow.tsx (新)>>
+    +render()
+  }
+
+  class HostIntentGateway {
+    <<V · platform/runtime/hostIntentGateway.ts (新)>>
+    +emitHostIntent(intent) Promise~void~
+  }
+
+  class HostIntentBridge {
+    <<H · src/services/hostIntentBridge.ts (新)>>
+    +useHostIntentBridge(actions) void
+    -dispatch(intent) Promise~void~
+  }
+
+  %% ---------------- 历史时间线 ----------------
+
+  class HistoryTimelineViewModel {
+    <<V · shared/lib/activityTimelineCompiler.ts (冻结 917 行, 只读)>>
+    +segments: HistoryTimelineSegment[]
+    +lanes: HistoryTimelineLane[]
+    +axisTicks: Tick[]
+    +dayStartMs: number
+    +dayEndMs: number
+    +viewportStartMs: number
+    +viewportEndMs: number
+    +viewportDurationMs: number
+    +visibleEndMs: number
+  }
+
+  class HistoryTimelineSegment {
+    +id: string
+    +label: string
+    +color: string
+    +startTime: number
+    +endTime: number
+    +startRatio: number
+    +widthRatio: number
+    +isLive: boolean
+  }
+
+  class TimingRecordSlice {
+    <<V · timingOverlapGateway.ts (改: 补时间字段)>>
+    +itemId: number
+    +seconds: number
+    +startedAt: number | null
+    +endedAt: number | null
+    +runningSince: number | null
+  }
+
+  class TimingLaneSegments {
+    <<V · features/history/services/timingLaneSegments.ts (新)>>
+    +buildTimingLaneSegments(records, items, viewModel, nowMs) TimingLaneSegment[]
+  }
+
+  class TimingLaneSegment {
+    +id: string
+    +itemId: number
+    +label: string
+    +startTime: number
+    +endTime: number
+    +startRatio: number
+    +widthRatio: number
+    +accumulatedSec: number
+    +isLive: boolean
+  }
+
+  class UseTimingSegments {
+    <<V · features/history/hooks/useTimingSegments.ts (新)>>
+    +useTimingSegments(viewModel) TimingLaneSegment[]
+  }
+
+  class HistoryTimingLane {
+    <<V · features/history/components/HistoryTimingLane.tsx (新)>>
+    +render()
+    +onSegmentActivate(seg) void
+  }
+
+  class HistoryActivityActionDialog {
+    <<V · features/history/components/HistoryActivityActionDialog.tsx (新)>>
+    +segment: HistoryTimelineSegment
+    +currentTimer: HostTimerView
+    +onConfirm(itemName) void
+    +onCancel() void
+  }
+
+  class HistoryHorizontalTimeline {
+    <<V · features/history/components/HistoryHorizontalTimeline.tsx (改)>>
+    +viewModel: HistoryTimelineViewModel
+    +mode: HistoryTimelineDisplayMode
+    +onSegmentActivate(seg) void
+  }
+
+  class History {
+    <<V · features/history/components/History.tsx (冻结 1206, 净减后接线)>>
+    +selectedDateRequest: {dateKey, requestId, focusApp}
+    +render()
+  }
+
+  class UseHistoryDistributionItems {
+    <<V · features/history/hooks/useHistoryDistributionItems.ts (新 · 抽取)>>
+    +useHistoryDistributionItems(...) Distribution
+  }
+
+  %% ---------------- 药丸与面板 ----------------
+
+  class TodayEntry {
+    <<H · src/components/pill/TodayEntry.tsx (新)>>
+    +render()
+  }
+
+  class TodayActions {
+    <<H · src/services/todayActions.ts (新)>>
+    +openTodayPanel() void
+    +openTodayInAnalysis(focusApp) Promise~void~
+  }
+
+  class DateKey {
+    <<H · src/lib/dateKey.ts (新)>>
+    +todayDateKey() string
+  }
+
+  class PillBar {
+    <<H · src/components/pill/PillBar.tsx (改, <=293 行)>>
+    +render()
+  }
+
+  class RecordsPanel {
+    <<H · src/components/records/RecordsPanel.tsx (改)>>
+    +render()
+  }
+
+  class ActivityStrip {
+    <<H · src/components/records/ActivityStrip.tsx (改: 可点击)>>
+    +activity: ActivitySlice[]
+    +onFocusApp(exe) void
+  }
+
+  class IpcApi {
+    <<H · src/types/domain/ipc.ts + src/services/ipc.ts>>
+    +openPatinaWindow(target) Promise~void~
+    +accent_get() Promise~AccentColors~
+    +list_records(from,to,limit) Promise~Page~
+    +list_items(includeArchived) Promise~Item[]~
+  }
+
+  class OpenPatinaWindowCmd {
+    <<H · src-tauri/src/commands/window_cmd.rs (改)>>
+    +open_patina_window(app, target) AppResult~void~
+  }
+
+  class TakeMainToolsTargetCmd {
+    <<V · commands/insight/window_cmd.rs (改 DTO)>>
+    +cmd_take_main_tools_target(window) Result~MainWindowTargetDto~
+  }
+
+  %% ---------------- 关系 ----------------
+
+  PatinaOpenTarget *-- HistoryOpenTarget
+  OpenPatinaWindowCmd ..> PatinaOpenTarget : 入参
+  OpenPatinaWindowCmd ..> ToolsNavigationState : 写 pending
+  MainWindowTargetDto ..> MainWindowTarget : 序列化映射
+  MainWindowTarget *-- ToolsSection
+  MainWindowTarget *-- HistoryTarget
+  ToolsNavigationState o-- MainWindowTarget
+  TakeMainToolsTargetCmd ..> ToolsNavigationState : take()
+  HistoryTarget ..> History : dateKey + focusApp 落点
+
+  ThemeChanged *-- AccentColors
+  HostThemeGateway ..> ThemeChanged : listen / accent_get
+  UseHostTheme ..> HostThemeGateway
+  UseHostTheme ..> HostTheme
+  ApplyDocumentTheme ..> DeriveTheme : 生产 28 键
+  ApplyDocumentTheme ..> HostAccentBridge : 覆盖 8 键
+  HostAccentBridge ..> DeriveTheme : 复用 primaryButtonBackground
+  HostThemeMode ..> HostThemeGateway : ACL 放行
+
+  TimerState *-- TimeRecord
+  HostTimerGateway ..> TimerState : listen
+  HostTimerGateway ..> TimeRecord : 时间字段
+  UseHostTimerState ..> HostTimerGateway
+  UseHostTimerState ..> HostTimerView
+  TimingCapsule ..> UseHostTimerState
+  TimingCapsule ..> HostIntentGateway
+  HostTimingStatusRow ..> UseHostTimerState
+  HostTimingStatusRow ..> HostIntentGateway
+  HostIntentGateway ..> HostIntent : emitTo("main")
+  HostIntentBridge ..> HostIntent : listen
+  HostIntentBridge ..> IpcApi : start_timer / create_item / pause / resume
+
+  HistoryTimelineViewModel *-- HistoryTimelineSegment
+  HistoryTimingLane ..> HistoryTimelineViewModel : 同视口同轴
+  HistoryTimingLane ..> UseTimingSegments
+  UseTimingSegments ..> TimingLaneSegments
+  UseTimingSegments ..> TimingRecordSlice : list_records
+  TimingLaneSegments ..> TimingLaneSegment
+  TimingLaneSegments ..> HistoryTimelineViewModel : 复用比例公式
+  HistoryHorizontalTimeline ..> HistoryTimelineSegment
+  HistoryHorizontalTimeline ..> HistoryTimingLane : 同卡片第二条轨
+  History --> HistoryHorizontalTimeline
+  History --> HistoryActivityActionDialog
+  History --> UseHistoryDistributionItems
+  HistoryActivityActionDialog ..> HostIntentGateway : start_timer_for_activity
+  HistoryActivityActionDialog ..> HostTimerView : 已计时先问
+
+  PillBar --> TodayEntry
+  TodayEntry ..> TodayActions
+  TodayActions ..> DateKey
+  TodayActions ..> IpcApi : openPatinaWindow(target)
+  RecordsPanel --> ActivityStrip
+  RecordsPanel ..> TodayActions
+  ActivityStrip ..> TodayActions : chip → focusApp

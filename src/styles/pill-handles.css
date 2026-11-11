@@ -1,0 +1,33 @@
+/* =============================================================================
+ * Timing — 手柄三形态（0.12.1）
+ * -----------------------------------------------------------------------------
+ * 三形态共用一套视觉语言：同一个 12×22 viewBox、同一个 strokeWidth 2.5、
+ * 同一个 --pill-grip-ink；**只有形状**不同（长括号 / 短括号 / 实心点）。
+ *
+ * 这里只放"三形态带来的新规则"。手柄的盒模型（`flex: 0 0 auto` / `width: --grip-w` /
+ * `height:100%` / `place-items:center`）仍留在 surfaces.css 的 `.pill__handle` 里，
+ * 因为它是既有 5 条声明的延续，挪过来只会让「谁在管这个盒子」变成两处。
+ *
+ * 宽度红线（W-01 / R-03）：
+ *   · 命中宽 = --grip-w = 12px，每手柄净占 8(global gap) − 4(margin-left) + 12 = 16px；
+ *   · `.pill__handle` 的 `margin-left: calc(-1 * var(--space-1))`（surfaces.css）**不许再动**，
+ *     事项名到第一个手柄的 4px 净间距全靠它。
+ * 显形只动 opacity，绝不动 width（G-08：hover 前后 offsetWidth 必须相等）。
+ * ========================================================================== */
+
+/* 关掉的手柄：不占位、不吞点击（H-02）。
+   用 display:none 而不是 visibility:hidden —— 后者仍占 16px，三形态连排会把药丸撑宽。 */
+.pill__handle[data-enabled='false'] {
+  display: none;
+}
+
+/* 手柄可点：既有 `.pill__handle` 是 <button>，但没设 cursor，默认是箭头 */
+.pill__handle {
+  cursor: pointer;
+}
+
+/* [§4.2 显影矩阵漏的那一格] 有浮层展开时（data-reveal）手柄一并显形。
+   既有规则在 surfaces.css 只覆盖 :hover / :focus-within / :focus-visible。 */
+.pill[data-reveal='true'] .pill__handle svg {
+  opacity: 1;
+}

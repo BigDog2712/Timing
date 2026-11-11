@@ -51,7 +51,8 @@ export function useAppBootstrap(): void {
     void highlightPill();
   });
 
-  // 托盘「设置…」由 Rust 侧直接 open_settings_window，不再广播事件
+  // 托盘「设置…」由 Rust 侧直接递落点（[0.12.1] 起走 tools_navigation::open_settings，
+  // 落点是分析窗的 settings 视图），不再广播事件
   // （原 IPC_EVENTS.openSettings 后端从未 emit，是死常量，已删除）。
 
   useTauriEvent<unknown>(IPC_EVENTS.openNewItem, () => {

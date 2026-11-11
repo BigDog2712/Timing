@@ -17,8 +17,10 @@
  *   L8 业务写入信号 `dirty::mark(` 只允许出现在 `src-tauri/src/commands/`
  *      （`jobs/` 与 `services/` 下 0 命中；见下方 L8 哨兵）
  *   L9 双窗隔离：主窗（components/hooks/lib/mocks/services/stores/styles/types）与分析窗
- *      （app/features/platform/shared）不得互相 import；唯一例外是零业务依赖的
- *      `src/lib/windowApi.ts`（窗口 API 薄壳）与 `src-tauri/icons/**` 静态资源。
+ *      （app/features/platform/shared）不得互相 import；例外只有三类：零业务依赖的
+ *      `src/lib/windowApi.ts`（窗口 API 薄壳）、`src-tauri/icons/**` 静态资源，
+ *      以及 `src/lib/handle*` 两个纯数据 / 纯 IO 模块（手柄目录与绑定读写，见下方
+ *      `L9_ALLOWED_TARGETS` 的说明 —— 它们是**两窗唯一合法的共享载体**）。
  *
  * 每一条都是「改坏了 CI 就红」的判据，而不是「建议」。
  *
@@ -90,10 +92,25 @@ const L9_MAIN_ROOTS = [
   'src/types/',
 ];
 const L9_ANALYSIS_ROOTS = ['src/app/', 'src/features/', 'src/platform/', 'src/shared/'];
-/* 唯一允许的跨窗引用：窗口 API 薄壳。它只 re-export `@tauri-apps/api/*`，
- * 零业务依赖，正是为了让分析窗不必碰宿主 `services/ipc` 而存在的（§4.2）。
- * `src-tauri/icons/**` 不在两个集合里，静态资源 import 天然不触发本规则。 */
-const L9_ALLOWED_TARGETS = new Set(['src/lib/windowApi']);
+/* 允许被分析窗 import 的**主窗**模块（白名单只增不减，且每一条都必须真实存在，
+ * 由下方 L9 哨兵校验）：
+ *  - `windowApi`：窗口 API 薄壳，只 re-export `@tauri-apps/api/*`，零业务依赖。
+ *  - `handleCatalog`：手柄动作目录，**纯数据 + 零 import**；
+ *  - `handleBindings`：手柄绑定读写，**纯函数 + localStorage**，只 import 前者；
+ *  - `pillAppearance`：药丸外观（文字/背景不透明度、常驻形态）的**纯数据 + 纯 IO**，
+ *    只 import `lib/storageKeys`（同属 `src/lib`，不越界）；[0.12.1 T04] 设置搬进主界面后，
+ *    主界面的外观卡与宿主药丸必须写同一个键，而写路径只能有一条。
+ * 前三条存在的理由：设置页（分析窗 `src/features/settings/**`）必须能读写手柄绑定，
+ * 而分析窗读不到宿主 `src/services/**`（runner）与 `src/stores/**`（appearanceStore 带
+ * zustand 与副作用，加进来等于双窗隔离作废）。所以「能被两窗共享的东西」只能是
+ * 无状态、无传输层依赖的纯模块 —— 这不是洁癖，是门禁的硬约束。
+ * 反例（别照着抄）：任何带 `useState` / `zustand` / `invoke` 的模块都不许进这张表。 */
+const L9_ALLOWED_TARGETS = new Set([
+  'src/lib/windowApi',
+  'src/lib/handleCatalog',
+  'src/lib/handleBindings',
+  'src/lib/pillAppearance',
+]);
 
 const violations = [];
 const rule = (id, desc) => ({ id, desc, hits: [] });
@@ -106,7 +123,10 @@ const R = {
   L6: rule('L6', 'Rust 不得使用 eprintln!（用 crate::log_*!）'),
   L7: rule('L7', `编译期平台常量 ${PLATFORM_SYMBOL} 只允许出现在 src/lib/platform.ts`),
   L8: rule('L8', '业务写入信号 dirty::mark( 只允许出现在 src-tauri/src/commands/'),
-  L9: rule('L9', '双窗隔离：主窗与分析窗不得互相 import（例外 windowApi.ts / icons 资源）'),
+  L9: rule(
+    'L9',
+    '双窗隔离：主窗与分析窗不得互相 import（例外 windowApi.ts / lib/handleCatalog / lib/handleBindings / icons 资源）',
+  ),
 };
 
 function scan(files, pattern, target, allow = () => false) {

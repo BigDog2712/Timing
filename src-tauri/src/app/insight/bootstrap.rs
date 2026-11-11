@@ -297,7 +297,7 @@ fn storage_startup_error(error: String) -> std::io::Error {
         &[("details", error.clone())],
     );
     rfd::MessageDialog::new()
-        .set_title("Patina")
+        .set_title("Timing")
         .set_description(message)
         .set_level(rfd::MessageLevel::Error)
         .show();

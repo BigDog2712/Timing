@@ -3,14 +3,14 @@
  * -----------------------------------------------------------------------------
  * - setAutostart：写/删 HKCU Run，返回**实际生效状态**并回填（AC-21）。
  * - updateReferenceSettings：Timing v1.7.3 参考设置（高亮颜色 / 最短记录时长等）。
- * - openSettings：打开设置入口（Tauri→独立 392×660 单例设置窗；浏览器 dev→主窗内联兜底）。
+ * - openSettings：打开设置入口（[0.12.1] 落点是分析窗的 settings 视图，见下）。
  * 失败即抛 IpcError，由调用方决定提示/回滚。
  *
  * V0.3.3：`setAlwaysOnTop` / `setOpacityEnabled` 随对应设置项下架（窗口恒定置顶，
  * 感知壁纸开关删除，见 ADR-022）。
  * V0.3.4：`setCountdownAutoEnd` 随开关下架——倒计时到点恒结束并保存（ADR-023）。
  */
-import { ipc, isTauri } from './ipc';
+import { errorText, ipc } from './ipc';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useUiStore } from '../stores/uiStore';
 
@@ -39,18 +39,33 @@ export const settingsActions = {
 };
 
 /**
- * 打开设置：Tauri 下开 392×660 独立设置窗（后端单例，ADR-009 §2）；
- * 浏览器 dev 无多窗口能力 → 主窗内联兜底（App.tsx 保留 panel==='settings' 分支）；
- * 建窗失败（如 capabilities 未放行）同样回退内联，避免「点了没反应」的静默失败。
+ * 打开设置：[0.12.1] 独立设置窗已下线，这个入口现在只是 `openSettingsInPatina()` 的别名。
+ *
+ * 保留函数名是因为菜单 / 快捷键 / 桥接消息都在调它；实现只留一份，避免两条落点口径。
+ * [0.12.1 T04b] `open_host_settings` 也改调这里（药丸内联设置面板已删，见
+ * hostIntentBridge.ts）；Rust 侧 `window::open_settings_window` 同样是**别名** ——
+ * 命令还在（契约 81 条冻结），但函数体委托给 `tools_navigation::open_settings`，
+ * 不再按 `window_spec::SETTINGS` 建窗。两侧同一个落点，谁改都别改回建窗那条路。
  */
 export async function openSettings(): Promise<void> {
-  if (isTauri()) {
-    try {
-      await ipc.openSettingsWindow();
-      return;
-    } catch {
-      /* 建窗失败 → 回退内联，不吞掉用户的点击 */
-    }
+  await openSettingsInPatina();
+}
+
+/**
+ * [V0.12.1] 设置落点：把**分析窗**叫到前台并落到设置视图。
+ *
+ * 走 `open_patina_window` 的可选落点参数 —— 命令名与命令条数都不变，只是 `target` 多认
+ * 一个布尔键（判序 `history > settings > overview`，见 Rust `PatinaOpenTarget::into_view`）。
+ * 冷启动也成立：Rust 侧先写 pending 再 show，分析窗起来后自己 take。
+ */
+export async function openSettingsInPatina(): Promise<void> {
+  try {
+    await ipc.openPatinaWindow({ target: { settings: true } });
+  } catch (err) {
+    /* 与分析窗其它落点同口径（FUSION-ARCH-v1 §6.5）：窗没就绪不算错，
+       只有 invoke 真的失败才提示 —— 用户手上有一个可重试的动作 */
+    useUiStore
+      .getState()
+      .setNotice({ text: `没能打开设置，请再点一次。（${errorText(err)}）`, tone: 'danger' });
   }
-  useUiStore.getState().openPanel('settings');
 }

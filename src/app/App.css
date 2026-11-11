@@ -1,5 +1,6 @@
 @import "tailwindcss" source("../");
 @import "./styles/tokens.css";
+@import "./styles/tiers.css";
 @import "./styles/components/quiet-scroll-region.css";
 @import "./styles/quiet-pro.css";
 @import "./styles/components/quiet-select.css";
@@ -12,11 +13,32 @@
 @import "./styles/app-shell.css";
 @import "./styles/mini-window.css";
 @import "./styles/features/settings.css";
+@import "./styles/features/settings-handles.css";
+/* [0.12.1 T04b] 设置页从「药丸内联面板」搬进分析窗：原来只被宿主窗加载的 8 份
+   settings-*.css 一并搬到这里（`features/host/`）。className 一个字都没改，所以样式
+   必须跟过来——否则新面板全部裸奔（这次搬家的**唯一**目的就是这件事）。 */
+@import "./styles/features/host/settings-panel.css";
+@import "./styles/features/host/settings-plugins.css";
+@import "./styles/features/host/settings-dialog.css";
+@import "./styles/features/host/settings-sync.css";
+@import "./styles/features/host/settings-sync-interval.css";
+@import "./styles/features/host/settings-sync-cloud.css";
+@import "./styles/features/host/settings-data.css";
+@import "./styles/features/host/settings-data-slim.css";
+/* 搬家遗留件：宿主 `.btn` / `.btn--danger` / `.inline-error` 三个类的等价定义 */
+@import "./styles/features/host/settings-bits.css";
+@import "./styles/features/settings-groups.css";
 @import "./styles/features/dashboard.css";
+@import "./styles/features/dashboard-modules.css";
+@import "./styles/features/dashboard-todos.css";
+@import "./styles/features/dashboard-notes.css";
 @import "./styles/features/classification.css";
 @import "./styles/features/history.css";
+@import "./styles/features/timing-lane.css";
 @import "./styles/features/data.css";
 @import "./styles/features/destination.css";
 @import "./styles/features/about.css";
 @import "./styles/features/tools.css";
 @import "./styles/motion.css";
+@import "./styles/topbar.css";
+@import "./styles/topbar-keys.css";

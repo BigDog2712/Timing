@@ -1,5 +1,5 @@
 import { useLocaleText } from "../../../shared/i18n/index.ts";
-import { FileText, MessageSquare, Rose } from "lucide-react";
+import { FileText, MessageSquare } from "lucide-react";
 import type { ReactNode } from "react";
 import appIconUrl from "../../../../src-tauri/icons/icon.png";
 import type { UpdateSnapshot } from "../../../shared/types/update";
@@ -20,7 +20,6 @@ type AboutPanelProps = {
   onOpenReleaseNotes: () => void;
   onOpenRepository: () => void;
   onOpenFeedback: () => void;
-  onOpenSupportDialog: () => void;
 };
 
 type AboutLinkButtonProps = {
@@ -61,7 +60,6 @@ export default function AboutPanel({
   onOpenReleaseNotes,
   onOpenRepository,
   onOpenFeedback,
-  onOpenSupportDialog,
 }: AboutPanelProps) {
   const UI_TEXT = useLocaleText();
   const versionLabel = appVersion === "-" || appVersion === "unknown"
@@ -75,7 +73,7 @@ export default function AboutPanel({
             <img src={appIconUrl} alt="" draggable={false} />
           </div>
           <div className="about-center-title-row">
-            <h2>Patina</h2>
+            <h2>Timing</h2>
             <span className="about-center-version qp-text-caption qp-weight-emphasis">{versionLabel}</span>
           </div>
           <p>{UI_TEXT.about.description}</p>
@@ -101,11 +99,6 @@ export default function AboutPanel({
             label={UI_TEXT.update.feedback}
             onClick={onOpenFeedback}
           />
-          <AboutLinkButton
-            icon={<Rose className="about-support-pill-icon" size={14} />}
-            label={UI_TEXT.update.support}
-            onClick={onOpenSupportDialog}
-          />
         </div>
 
         <UpdateStatusPanel
@@ -122,7 +115,6 @@ export default function AboutPanel({
           onOpenUpdateDownload={() => onOpenUpdateDownload?.()}
           onOpenReleaseNotes={onOpenReleaseNotes}
           onOpenFeedback={onOpenFeedback}
-          onOpenSupport={onOpenSupportDialog}
         />
       </section>
     </div>

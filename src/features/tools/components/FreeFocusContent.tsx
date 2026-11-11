@@ -9,6 +9,7 @@ import { freeFocusTime } from "../services/freeFocusViewModel.ts";
 import { readFreeFocusRestSettings, rememberFreeFocusRestSettings } from "../services/freeFocusPreferenceStorage.ts";
 import FreeFocusRestPicker from "./FreeFocusRestPicker.tsx";
 import FreeFocusTaskEditor from "./FreeFocusTaskEditor.tsx";
+import FocusSessionLedgerNote from "./FocusSessionLedgerNote.tsx";
 
 interface Props { tasks: FreeFocusTask[]; nowMs: number; busy: boolean; onAction: (action: FreeFocusAction) => Promise<boolean> }
 export default function FreeFocusContent({ tasks, nowMs, busy, onAction }: Props) {
@@ -18,6 +19,7 @@ export default function FreeFocusContent({ tasks, nowMs, busy, onAction }: Props
   const [editing, setEditing] = useState<FreeFocusTask | null>(null);
   return <>
     <div className="tools-mode-content-pane tools-pomodoro-content tools-free-focus-content">
+      <FocusSessionLedgerNote />
       <form className="tools-subpanel tools-pomodoro-create" onSubmit={event => { event.preventDefault(); if (busy) return;
         void onAction({ kind: "save", id: null, label: label.trim(), ...settings }).then(ok => { if (ok) setLabel(""); }); }}>
         <div className="tools-subpanel-header tools-reminder-subpanel-header"><h3>{text.tools.pomodoroTaskCreate}</h3></div>

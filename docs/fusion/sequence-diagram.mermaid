@@ -1,0 +1,106 @@
+%% FUSION-ARCH-v1 · 三张关键时序图
+%% ① 药丸 → 分析窗「历史 · 今天」（含冷启动未就绪回滚）
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant P as 药丸(label "main")
+    participant S as window_cmd::open_patina_window
+    participant TN as tools_navigation(pending)
+    participant MW as main_window::show_main_window
+    participant A as 分析窗(label "patina")
+    participant AS as AppShell / useMainToolsNavigation
+
+    U->>P: 点「今天」→ 记录面板 → 「在分析窗看这一天」
+    P->>P: todayDateKey() → dateKey
+    P->>S: ipc.openPatinaWindow({target:{history:{dateKey,focusApp?}}})
+    S->>TN: open_history(app, HistoryTarget)
+    TN->>TN: state = Some(History{..})   note: 先写状态（冷启动关键）
+    TN->>MW: show_main_window(app, Reason::Mini)
+    alt 可 reveal
+        MW-->>TN: true
+        TN->>A: emit_to("patina", MAIN_TOOLS_TARGET_CHANGED, ())
+        A->>AS: 回调 → takeMainToolsTarget()
+    else 冷启动 / Creating / Wait
+        MW-->>TN: true
+        Note over TN,A: emit 丢失，但 pending state 已写
+        A->>AS: 挂载即 先订阅 + take()
+    else 建窗/显示硬失败
+        MW-->>TN: false
+        TN->>TN: state.take()  回滚
+        TN-->>S: Err("Could not open the main window")
+        S->>S: log_warn 但返回 Ok（不当错误）
+    end
+    AS->>TN: invoke("cmd_take_main_tools_target")
+    TN-->>AS: {history:{dateKey, focusApp}}
+    AS->>AS: handleNavigate("history") + setHistoryDateRequest({dateKey,focusApp})
+    AS->>A: History 收到 selectedDateRequest → 跳到该日（focusApp → 高亮泳道）
+
+%% ② 分析窗对一段活动「在 Timing 计这件事」（事件 handoff + 已计时先问）
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant A as 分析窗
+    participant TS as useHostTimerState
+    participant HG as hostIntentGateway
+    participant P as 药丸
+    participant HB as hostIntentBridge
+    participant IPC as 宿主 typed IPC
+    participant R as Rust timer 服务
+
+    U->>A: 点「VS Code 14:00–14:30」段
+    A->>A: HistoryActivityActionDialog 打开
+    U->>A: 「在 Timing 计这件事 ▸」
+    A->>TS: 读本地缓存的计时态
+    alt 宿主 idle
+        A->>A: 直接继续
+    else running / paused
+        A->>U: 「正在计『写方案』12:31」[切换并开始][取消]
+        alt 取消
+            A->>A: 清空 selection，不发 intent
+            Note over P,R: 零副作用：不切换 / 不结束 / 不计入切换
+        end
+    end
+    A->>A: 同名事项精确匹配（list_items 缓存）
+    A->>HG: emitHostIntent({action:'start_timer_for_activity', itemName})
+    HG->>P: emitTo('main', 'patina:host-intent', payload)
+    P->>HB: 监听回调 dispatch
+    opt 无同名事项
+        HB->>IPC: create_item({name})
+        IPC->>R: 落库
+    end
+    HB->>IPC: start_timer({itemId})   note: 从「现在」开始，不回填
+    IPC->>R: 状态迁移
+    R->>R: emit_timer_state() → app.emit("timer:state-changed")
+    R-->>P: timer:state-changed
+    R-->>A: timer:state-changed（全窗）
+    A->>A: 胶囊 / 泳道「计时中」角标 ≤2s
+    Note over P: 失败：setNotice(errorText(err)) 只在药丸出现；分析窗靠事件自然收敛
+
+%% ③ 四色变更后两侧 ≤2s 同步
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant HS as 宿主设置 ThemePicker
+    participant HTA as services/themeActions
+    participant R as Rust accent_set
+    participant EV as app.emit("theme-changed")
+    participant HA as 宿主 applyAccents
+    participant AG as 分析窗 hostThemeGateway
+    participant AB as hostAccentBridge
+
+    U->>HS: 「运行色」改成 #C81E1E
+    HS->>HTA: accentSet({running})
+    HTA->>R: invoke("accent_set", {patch:{running}})
+    R->>R: services::theme::set_accents() 落库
+    R->>EV: emit_theme_changed() （全窗广播，K-21）
+    par 宿主窗
+        EV-->>HA: theme-changed
+        HA->>HA: 浅色派生达标 → 写 --color-running
+    and 分析窗
+        EV-->>AG: theme-changed{payload.accents}
+        AG->>AG: 校验 hex（非法丢弃）
+        AG->>AB: applyHostAccents(tokens, accents, variant)
+        AB->>AB: running→accent-default/-muted/button-primary-bg/chart-cursor; done→success; warn→warning
+        AB->>AB: 覆盖 8 个 --qp-* 令牌，其余 20 个中性令牌不动
+    end
+    Note over U,AB: 一次 IPC + 一次广播，无轮询；切窗即见（远小于 2s）

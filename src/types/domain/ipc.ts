@@ -100,6 +100,29 @@ export const IPC_EVENTS = {
   mdSyncChanged: 'md-sync:changed',
 } as const;
 
+/* ---- [P0-03] 宿主 → 分析窗的一次性落点（`open_patina_window` 的可选参数） ----
+命名口径（FUSION-ARCH-v1 §6.6）：药丸窗口 label 是 `main`，分析窗是 `patina`——与 Rust
+insight 侧的定义相反。本类型描述「分析窗该落到哪里」，不是「哪个窗口」。 */
+export interface PatinaHistoryTarget {
+  /** 本地日 `YYYY-MM-DD`（`src/lib/dateKey.ts` 的 `todayDateKey()`；禁用 UTC 截断） */
+  dateKey: string;
+  /** 可选：想在分析窗里聚焦的应用名（`History` 侧以高亮环消费，不做过滤/不滚动定位）。 */
+  focusApp?: string | null;
+}
+
+export interface PatinaOpenTarget {
+  history?: PatinaHistoryTarget; /* 历史页某天；与 overview 二选一（并存时 history 优先） */
+  overview?: boolean; /* `true` = 分析窗总览页（P1-02：摘要面板页脚「在分析窗看总览」） */
+  /* [V0.12.1][依赖 T03] `true` = 分析窗设置页。三键互斥，判序 history > settings > overview；
+     Rust 侧 `PatinaOpenTarget` 是 deny_unknown_fields，T03 同批补这个字段之前会被拒收。 */
+  settings?: boolean;
+}
+
+export interface PatinaOpenWindowParams {
+  /** 省略 = 只把分析窗叫到前台（V0.12.0 原行为） */
+  target?: PatinaOpenTarget | null;
+}
+
 /**
  * 命令 -> Promise<返回值> 映射。实现侧不得在此签名之外新增方法（规格即契约）。
  */
@@ -128,6 +151,7 @@ export interface IpcApi {
 
   /* 记录域 */
   listRecords(params: ListRecordsParams): Promise<Paginated<TimeRecord>>;
+  createRecord(params: { itemId: number; startedAt: number; endedAt: number; note?: string | null }): Promise<TimeRecord[]>;
   statsSummary(params: StatsSummaryParams): Promise<StatsSummary>;
   updateRecord(params: UpdateRecordParams): Promise<TimeRecord>;
   deleteRecord(params: ItemIdParams): Promise<void>;
@@ -177,10 +201,10 @@ export interface IpcApi {
   openSettingsWindow(): Promise<void>;
   openTimerWindow(): Promise<void>;
   /* [V0.12.0 Patina 融合] 打开时间统计窗口（label `patina`，同一进程内的第二个入口）。
-     桌面独占：Patina 依赖 WebView2 / Win32，Android 上根本编不进来。 */
-  openPatinaWindow(): Promise<void>;
-  /* [V0.3.4] 原日记域四条命令（diaryGetConfig / diarySetConfig / diaryToday / diaryOpenToday）
-     随日记模块整体下架删除，见 ADR-023。 */
+     桌面独占：Patina 依赖 WebView2 / Win32，Android 上根本编不进来。
+     [P0-03] 加**可选**落点参数（命令名不变 → 宿主命令数仍 80 条）。 */
+  openPatinaWindow(params?: PatinaOpenWindowParams): Promise<void>;
+  /* [V0.3.4] 原日记域四条命令随日记模块整体下架删除，见 ADR-023。 */
 
   /* 主题域 [V0.2.0] */
   themeGet(): Promise<ThemeSettings>;

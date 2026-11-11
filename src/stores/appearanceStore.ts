@@ -13,64 +13,28 @@
  * 落盘后同步一次 `uiStore.collapsed`，让"改了立刻看得见"，不必重启。
  */
 import { create } from 'zustand';
-import { isKeyEvent, readKeyWithLegacy, writeKey } from '../lib/storageKeys';
+import { isKeyEvent } from '../lib/storageKeys';
+import {
+  type Appearance,
+  type FloatForm,
+  DEFAULT_APPEARANCE,
+  FLOAT_FORM_OPTIONS,
+  TEXT_OPACITY_MIN,
+  readPillAppearance,
+  writePillAppearance,
+} from '../lib/pillAppearance';
 import { useUiStore } from './uiStore';
 
 /* [V0.5.0] 键名只有一处口径（lib/storageKeys.ts）：`timing.appearance.v1`，
-   老键 `tickbar.appearance.v1` 只读回落。本文件不再出现键字面量。 */
+   老键 `tickbar.appearance.v1` 只读回落。本文件不再出现键字面量。
+   [0.12.1 T04] 读 / 写 / 归一化整体搬到 `lib/pillAppearance.ts`：主界面设置页（分析窗）
+   也要写同一个键，而它读不到本文件（zustand + 副作用，L9 双窗隔离）。本文件只剩
+   「store 的壳」：状态、落 DOM 令牌、形态与 `collapsed` 的联动。 */
 
-/** 文字不透明度的下限：再低正文就看不清了 */
-export const TEXT_OPACITY_MIN = 0.2;
-
-/** [V0.11.0] 常驻悬浮形态：悬浮条 / 小圆点 */
-export type FloatForm = 'bar' | 'dot';
-
-export const FLOAT_FORM_OPTIONS: readonly { id: FloatForm; label: string }[] = [
-  { id: 'bar', label: '悬浮条' },
-  { id: 'dot', label: '小圆点' },
-];
-
-export interface Appearance {
-  /** 文字不透明度 0.2–1（1 = 全实） */
-  textOpacity: number;
-  /** 背景板不透明度 0–1（0 = 全透） */
-  bgOpacity: number;
-  /** [V0.11.0] 常驻形态（`bar` 默认） */
-  floatForm: FloatForm;
-}
-
-export const DEFAULT_APPEARANCE: Appearance = { textOpacity: 1, bgOpacity: 1, floatForm: 'bar' };
-
-function clamp(value: number, min: number, max: number): number {
-  if (Number.isNaN(value)) return max;
-  return Math.min(max, Math.max(min, value));
-}
-
-/** 只认两个字面量：存进来别的东西（旧版没有这个键、手改坏了）一律回落到悬浮条 */
-function normalizeFloatForm(value: unknown): FloatForm {
-  return value === 'dot' ? 'dot' : 'bar';
-}
-
-function readStored(): Appearance {
-  try {
-    const raw = readKeyWithLegacy('appearance');
-    if (!raw) return DEFAULT_APPEARANCE;
-    const parsed = JSON.parse(raw) as Partial<Appearance>;
-    return {
-      textOpacity:
-        typeof parsed.textOpacity === 'number'
-          ? clamp(parsed.textOpacity, TEXT_OPACITY_MIN, 1)
-          : DEFAULT_APPEARANCE.textOpacity,
-      bgOpacity:
-        typeof parsed.bgOpacity === 'number'
-          ? clamp(parsed.bgOpacity, 0, 1)
-          : DEFAULT_APPEARANCE.bgOpacity,
-      floatForm: normalizeFloatForm(parsed.floatForm),
-    };
-  } catch {
-    return DEFAULT_APPEARANCE;
-  }
-}
+/* 常量与类型从这里原样转出去：既有调用点（`components/settings/AppearanceCard.tsx`
+   等）继续按老路径 import，不必跟着改。 */
+export { DEFAULT_APPEARANCE, FLOAT_FORM_OPTIONS, TEXT_OPACITY_MIN };
+export type { Appearance, FloatForm } from '../lib/pillAppearance';
 
 /** 把常驻形态落到运行时（`collapsed` 只在这一处由形态决定，其余时候归用户点击） */
 function applyFloatForm(form: FloatForm): void {
@@ -92,29 +56,51 @@ interface AppearanceStore extends Appearance {
   reset: () => void;
 }
 
-export const useAppearanceStore = create<AppearanceStore>((set, get) => {
-  /** 落盘 + 立即生效（同窗口内所有玻璃面同帧跟随） */
+export const useAppearanceStore = create<AppearanceStore>((set) => {
+  /** 落盘（`lib/pillAppearance` 里那唯一一条写路径）+ 立即生效（同窗口内玻璃面同帧跟随） */
   const commit = (patch: Partial<Appearance>) => {
-    const next: Appearance = {
-      textOpacity: clamp(patch.textOpacity ?? get().textOpacity, TEXT_OPACITY_MIN, 1),
-      bgOpacity: clamp(patch.bgOpacity ?? get().bgOpacity, 0, 1),
-      floatForm: normalizeFloatForm(patch.floatForm ?? get().floatForm),
-    };
+    const next = writePillAppearance(patch);
     set(next);
     applyAppearance(next);
-    writeKey('appearance', JSON.stringify(next));
     /* 形态变了才动 collapsed：拖动不透明度滑杆不该把用户展开的条收起来 */
     if (patch.floatForm !== undefined) applyFloatForm(next.floatForm);
   };
 
   return {
-    ...readStored(),
+    ...readPillAppearance(),
     setTextOpacity: (value) => commit({ textOpacity: value }),
     setBgOpacity: (value) => commit({ bgOpacity: value }),
     setFloatForm: (value) => commit({ floatForm: value }),
     reset: () => commit(DEFAULT_APPEARANCE),
   };
 });
+
+/**
+ * [V0.12.1] 从 localStorage **幂等重读**一次外观（跨顶层 WebView 的唯一可证通道）。
+ *
+ * 为什么需要它：`storage` 事件在 WebView2 里跨顶层 WebView（药丸 ← / patina 设置页）
+ * **不保证投递**，不能当唯一通道。`lib/appearanceSync.ts` 在 focus / pointerenter /
+ * visibilitychange 上调本函数——"人回到药丸窗口"即重读，最长延迟 = 一次焦点切换。
+ *
+ * @returns 是否真的变了。没变就什么都不做：药丸每次 mouseenter 都会调它，
+ *   每次都 `setState` 会让药丸跟着鼠标抖。
+ */
+export function rereadAppearance(): boolean {
+  const prev = useAppearanceStore.getState();
+  const next = readPillAppearance();
+  if (
+    next.textOpacity === prev.textOpacity &&
+    next.bgOpacity === prev.bgOpacity &&
+    next.floatForm === prev.floatForm
+  ) {
+    return false;
+  }
+  useAppearanceStore.setState(next);
+  applyAppearance(next);
+  /* 只有形态真变了才重置收起态：别窗只是拖了一下不透明度滑杆，不该把本窗临时展开的条收回去 */
+  if (next.floatForm !== prev.floatForm) applyFloatForm(next.floatForm);
+  return true;
+}
 
 /**
  * 启动时套用一次，并监听其它窗口的改动（设置窗调整后，小条 / 便利贴窗即时跟随）。
@@ -128,12 +114,8 @@ export function initAppearance(): void {
   window.addEventListener('storage', (event) => {
     /* 新键与老键都算：升级前仍开着的旧窗口可能还在写老键 */
     if (!isKeyEvent('appearance', event.key)) return;
-    const next = readStored();
-    const formChanged = next.floatForm !== useAppearanceStore.getState().floatForm;
-    useAppearanceStore.setState(next);
-    applyAppearance(next);
-    /* [V0.11.2] 只有形态真变了才重置收起态。原先无条件 `applyFloatForm`：
-       别窗只是拖了一下不透明度滑杆，本窗「临时展开的小条」也会被按常驻形态收回圆点。 */
-    if (formChanged) applyFloatForm(next.floatForm);
+    /* [V0.12.1] 与 focus / pointerenter 通道共用同一条重读路径（含"没变不动"的判定），
+       否则两处各写一遍 clamp + 形态判定，迟早分叉。 */
+    rereadAppearance();
   });
 }

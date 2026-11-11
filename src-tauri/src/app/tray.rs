@@ -146,9 +146,12 @@ fn on_menu_event(app: &AppHandle, id: &str) {
             let _ = window::show_main(app);
             let _ = app.emit(events::APP_OPEN_NEW_ITEM, ());
         }
+        /* [0.12.1] 设置不再是独立窗：把分析窗叫到前台并落到它的 settings 视图
+           （`open_settings` 走的是 pending 落点通道，先写 state 再 show，冷启动也落得对）。
+           硬失败（窗口正在重建 / 还没就绪）不算用户操作失败 —— 再点一次托盘即可。 */
         tray_menu::ID_OPEN_SETTINGS => {
-            if let Err(err) = window::open_settings_window(app) {
-                crate::log_warn!("open settings window failed: {err}");
+            if let Err(err) = crate::app::insight::main_window::tools_navigation::open_settings(app) {
+                crate::log_warn!("open settings view failed: {err}");
             }
         }
         tray_menu::ID_OPEN_TODOS => {

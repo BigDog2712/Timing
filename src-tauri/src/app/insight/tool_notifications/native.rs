@@ -6,7 +6,7 @@ pub(super) fn create<R: Runtime + 'static>(app: &AppHandle<R>) -> Result<(), Str
     let root = crate::infra::insight::storage_paths::resolve_storage_paths(app)?.webview_root;
     let builder =
         WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::App("patina.html".into()))
-            .title("Patina Notification")
+            .title("Timing Notification")
             .inner_size(520.0, 240.0)
             .resizable(false)
             .maximizable(false)

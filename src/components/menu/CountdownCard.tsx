@@ -84,7 +84,7 @@ export function CountdownCard({ anchor, onClose, onMenu }: CountdownCardProps) {
       className="menu countdown-card"
       role="button"
       tabIndex={0}
-      aria-label="倒计时卡"
+      aria-label="倒计时卡 · 计时 · 计入时间账"
       aria-disabled={locked}
       data-locked={locked ? 'true' : 'false'}
       style={style}
@@ -104,6 +104,8 @@ export function CountdownCard({ anchor, onClose, onMenu }: CountdownCardProps) {
       <div className="countdown-card__mode">倒计时</div>
       <div className="countdown-card__value">{formatDuration(displaySec)}</div>
       <div className="countdown-card__hint">滚轮调整 · 右键设置</div>
+      {/* [P0-07] 语义拆分类的落点：倒计时属「计时」，写 time_records、计入时间账。 */}
+      <div className="countdown-card__hint" data-countdown-ledger="counted">计时 · 计入时间账</div>
     </div>
   );
 }

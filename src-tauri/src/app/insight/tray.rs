@@ -525,7 +525,7 @@ fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .menu(&menu)
-        .tooltip("Patina")
+        .tooltip("Timing")
         .show_menu_on_left_click(false);
 
     let mut applied_initial_variant = None;
@@ -954,7 +954,7 @@ mod tests {
                     "Open main window",
                     "Pause tracking",
                     "Block titles",
-                    "Exit Patina",
+                    "Exit Timing",
                 ],
             ),
             (
@@ -965,7 +965,7 @@ mod tests {
                     "Open main window",
                     "Resume tracking",
                     "Block titles",
-                    "Exit Patina",
+                    "Exit Timing",
                 ],
             ),
             (
@@ -976,7 +976,7 @@ mod tests {
                     "Open main window",
                     "Pause tracking",
                     "Record titles",
-                    "Exit Patina",
+                    "Exit Timing",
                 ],
             ),
             (
@@ -987,7 +987,7 @@ mod tests {
                     "Open main window",
                     "Resume tracking",
                     "Record titles",
-                    "Exit Patina",
+                    "Exit Timing",
                 ],
             ),
         ];

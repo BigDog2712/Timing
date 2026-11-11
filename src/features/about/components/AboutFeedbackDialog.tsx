@@ -3,8 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import QuietDialog from "../../../shared/components/QuietDialog";
 
-import qqChannelDarkUrl from "../assets/qq-channel-dark.jpg";
-import qqChannelLightUrl from "../assets/qq-channel-light.jpg";
 import githubIssuesButtonBlackUrl from "../assets/github-issues-button-black.svg";
 import githubIssuesButtonWhiteUrl from "../assets/github-issues-button-white.svg";
 
@@ -66,17 +64,6 @@ export default function AboutFeedbackDialog({
         <X size={16} aria-hidden />
       </button>
       <div className="about-feedback-dialog-body">
-        <section className="about-feedback-card">
-          <div className="about-feedback-card-heading">
-            <span className="about-qq-channel-mark" aria-hidden />
-            <h4>{copy.qqTitle}</h4>
-          </div>
-          <div className="about-qq-channel-frame">
-            <img className="about-qq-channel-image about-qq-channel-image-light" src={qqChannelLightUrl} alt={copy.qqQrAlt} data-qq-theme="light" draggable={false} />
-            <img className="about-qq-channel-image about-qq-channel-image-dark" src={qqChannelDarkUrl} alt={copy.qqQrAlt} data-qq-theme="dark" draggable={false} />
-          </div>
-        </section>
-
         <section className="about-feedback-card">
           <div className="about-feedback-card-heading">
             <span className="about-github-mark" aria-hidden />

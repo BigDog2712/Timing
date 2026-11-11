@@ -1,0 +1,137 @@
+/* ============================================================================
+ * dashboard-notes.css — 便利贴条（01 §4.3 末行，56px 通栏）
+ * -----------------------------------------------------------------------------
+ * 从 dashboard-todos.css 拆出：那是**待办卡**的全部样式，便利贴是另一张卡，
+ * 两张卡的类名与版式没有一行共用。判据是"一张卡的样式不跨文件" + 单文件 ≤300 行。
+ * 这里只有只读展示的样式，写路径一律不在这条通栏上（便利贴窗属主窗）。
+ * ========================================================================== */
+
+/* ── 便利贴条（56 通栏：head 88 + 卡片流 + more 24） ──
+ * 纵向内距 6：卡的 1px outline 用 `outline-offset: -1` 画在里面，靠的就是这 6；
+ * 内距 0 时卡会贴着通栏上下边，看起来像两条 1px 线粘在一起。 */
+.qp-notes {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 12px;
+  min-height: 0;
+  padding: 6px var(--qp-card-pad);
+  border-radius: var(--qp-radius-panel);
+  outline: 1px solid var(--qp-border-subtle);
+  outline-offset: -1px;
+  background: var(--qp-bg-panel);
+  overflow: hidden;
+}
+
+/* 标题与张数**同一行**（原来 column 排两行，卡头 36 高，比其余四张卡的 20 高一截，
+ * 五卡卡头不在一条水平线上）。现在单行 20，与 `.qp-card-head` 等高。 */
+.qp-notes-head {
+  display: flex;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.qp-notes-title {
+  margin: 0;
+  font-size: var(--qp-font-size-group-title);
+  font-weight: var(--qp-font-weight-emphasis);
+  line-height: var(--qp-line-height-group-title);
+  color: var(--qp-text-primary);
+}
+
+.qp-notes-count {
+  font-size: var(--qp-font-size-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+}
+
+.qp-notes-track {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* 卡高 40 / 36（两档）由 token 给：卡高不是"内容撑出来的"，而是通栏高 − 2×6 再让 4，
+ * 所以必须写死高度，否则空态与 3 张卡之间通栏会跳。
+ * 单行截断靠 `text-overflow` —— 它只在行内/块容器上生效，所以**不能**改成 flex；
+ * 垂直居中就用 line-height 顶满内容盒（−2px 是上下各 1px 的边）。 */
+.qp-note-card {
+  flex: 0 1 280px;
+  min-width: 0;
+  max-width: 280px;
+  height: var(--qp-note-card-h);
+  padding: 0 10px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-control);
+  background: var(--qp-bg-elevated);
+  font-size: var(--qp-font-size-caption);
+  line-height: calc(var(--qp-note-card-h) - 2px);
+  color: var(--qp-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 空态 / 骨架占位：与真卡片同尺寸，避免通栏在 0 张 ↔ 3 张之间跳高度 */
+.qp-note-placeholder {
+  border-style: dashed;
+  background: none;
+  color: var(--qp-text-tertiary);
+}
+
+/* 卡片是 `<button>`（点开看全文）：只改按钮自带的两样东西 —— 字族与水平对齐。
+ * **不要**写 `font: inherit` 简写：它会把上面那行 `font-size/line-height` 一起清成继承值，
+ * 卡片文字会从 caption 变成 body、40 高的卡按 body 行高重排。 */
+button.qp-note-card {
+  font-family: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+/* 便利贴条的错误块（E2）：通栏内容高只有 44，竖向居中的块放不下，
+ * 所以横排一行（文字 + 重试），其余沿用 `.qp-module-error` 的口径。 */
+.qp-notes-error {
+  flex-direction: row;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* 全文对话框：body 封顶 52vh 并**自己滚**（正文可能几十行，不能把对话框顶出窗口）。
+ * `overflow-y` 必须自己写：`qp-dialog-body` 上那个 `qp-scroll-region` 只配滚动条外观
+ * （`scrollbar-gutter` + `::-webkit-scrollbar`），**不含 `overflow` 声明** —— 实测
+ * 只给 `max-height` 时 computed `overflow-y` 仍是 `visible`，873 字的正文会直接压出卡片外。
+ *
+ * 归属说明：这条规则的**真正业主**是共享的 `.qp-dialog-body`，不是每个调用方。
+ * 本轮只在便利贴这一处隔离，是因为给共享层加 `overflow-y` 会同时改 10+ 个对话框的滚动行为
+ * （它们现在都是 `visible`，有的可能正依赖"不裁切"，比如带外溢阴影的 surface）——
+ * 横切改动必须单项改、单项验。共享层修好后这条可以删。 */
+.qp-note-dialog .qp-dialog-body {
+  max-height: 52vh;
+  overflow-y: auto;
+}
+
+/* `pre-wrap` 是这一条的**内容要求**：便利贴里换行是有意义的，折成一行等于改写了用户的话。
+ * 也**不**加 `-webkit-line-clamp` —— 这里就是"看全文"的那一处。 */
+.qp-note-dialog-text {
+  margin: 0;
+  font-size: var(--qp-font-size-body);
+  line-height: var(--qp-line-height-body);
+  color: var(--qp-text-primary);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.qp-notes-more {
+  font-size: var(--qp-font-size-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+  text-align: right;
+}

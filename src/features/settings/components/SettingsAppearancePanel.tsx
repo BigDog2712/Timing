@@ -1,23 +1,31 @@
-import { LOCALE_METADATA, SUPPORTED_LOCALES, useLocaleText } from "../../../shared/i18n/index.ts";
+import { LOCALE_METADATA, SUPPORTED_LOCALES, useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { ChevronRight, Palette } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import QuietActionRow from "../../../shared/components/QuietActionRow";
 import QuietBadge from "../../../shared/components/QuietBadge";
 import QuietDialog from "../../../shared/components/QuietDialog";
 import QuietButton from "../../../shared/components/QuietButton";
 import QuietSelect from "../../../shared/components/QuietSelect";
-import QuietSegmentedFilter from "../../../shared/components/QuietSegmentedFilter";
 import QuietSwitch from "../../../shared/components/QuietSwitch";
 import SettingsPanelHeader from "./SettingsPanelHeader";
 import { SettingsPreferenceGroup, SettingsPreferenceRow } from "./SettingsPreferenceLayout";
-import type { AppLanguage, ColorScheme, ThemeMode } from "../../../shared/settings/appSettings.ts";
+import type { AppLanguage, ColorScheme } from "../../../shared/settings/appSettings.ts";
 import {
   COLOR_SCHEME_OPTIONS, type ThemeLibrary, } from "../../../shared/settings/colorSchemeOptions.ts";
 
+/**
+ * 「显示」分区（P0-06 · 原「外观」）：深/浅已跟随宿主（`useHostTheme`），所以不再有主题模式
+ * 开关——那个开关写回宿主，用户却会以为只改分析窗，是「两个 App」感最典型的一处。主题与
+ * 主色全应用只有宿主一个入口，这里只留一行指路文案。配色预设（28 套）原地保留：它只决定
+ * **中性底色**（`--qp-bg-*` / `--qp-border-*` / `--qp-text-*`），不碰宿主四色派生的 6 个令牌。
+ */
+const COPY = {
+  zh: { ownerHint: "主题与主色在本页「主题与主色」卡里改，全应用共用一份；配色预设只决定这里的中性底色。", neutralOnly: "仅影响中性底色" },
+  en: { ownerHint: "Theme and accents are edited in the card above and shared app-wide; presets only pick the neutral surfaces here.", neutralOnly: "Neutral surfaces only" },
+} as const;
+
 
 type SettingsAppearancePanelProps = {
-  themeMode: ThemeMode;
-  onThemeModeChange: (nextThemeMode: ThemeMode) => void;
   language: AppLanguage;
   onLanguageChange: (nextLanguage: AppLanguage) => void;
   languageDisabled?: boolean;
@@ -29,11 +37,11 @@ type SettingsAppearancePanelProps = {
   onDynamicEffectsChange: (nextChecked: boolean) => void;
   onConfirmColorSchemeChange: (library: ThemeLibrary) => Promise<boolean>;
   colorSchemeConfirming: boolean;
+  /** 「接口」那一组（P0-06 把独立分区并进来：分析窗设置分区 5 → 4） */
+  interfaceSection?: ReactNode;
 };
 
 export default function SettingsAppearancePanel({
-  themeMode,
-  onThemeModeChange,
   language,
   onLanguageChange,
   languageDisabled = false,
@@ -45,20 +53,14 @@ export default function SettingsAppearancePanel({
   onDynamicEffectsChange,
   onConfirmColorSchemeChange,
   colorSchemeConfirming,
+  interfaceSection,
 }: SettingsAppearancePanelProps) {
   const UI_TEXT = useLocaleText();
+  const copy = useLocale().startsWith("zh") ? COPY.zh : COPY.en;
   const confirmationPendingRef = useRef(false);
   const selectedSchemeRef = useRef<HTMLButtonElement>(null);
   const [activeLibrary, setActiveLibrary] = useState<ThemeLibrary | null>(null);
-  const [dialogSnapshot, setDialogSnapshot] = useState<{
-    library: ThemeLibrary;
-    colorScheme: ColorScheme;
-  } | null>(null);
-  const themeModeOptions: Array<{ value: ThemeMode; label: string }> = [
-    { value: "light", label: UI_TEXT.settings.themeModeOptions.light },
-    { value: "dark", label: UI_TEXT.settings.themeModeOptions.dark },
-    { value: "system", label: UI_TEXT.settings.themeModeOptions.system },
-  ];
+  const [dialogSnapshot, setDialogSnapshot] = useState<{ library: ThemeLibrary; colorScheme: ColorScheme } | null>(null);
   const languageOptions: Array<{ value: AppLanguage; label: string }> = SUPPORTED_LOCALES.map((value) => ({
     value,
     label: LOCALE_METADATA[value].label,
@@ -116,17 +118,14 @@ export default function SettingsAppearancePanel({
         title={UI_TEXT.settings.appearanceTitle}
       />
 
+      <div className="mt-3 qp-text-caption text-[var(--qp-text-tertiary)]">{copy.ownerHint}</div>
+
       <div className="mt-5 space-y-5">
-        <SettingsPreferenceGroup title={UI_TEXT.settings.themeGroupTitle}>
+        <SettingsPreferenceGroup
+          title={UI_TEXT.settings.themeGroupTitle}
+          headerAside={<span className="qp-text-caption text-[var(--qp-text-tertiary)]">{copy.neutralOnly}</span>}
+        >
           <QuietActionRow className="settings-preference-list">
-            <SettingsPreferenceRow title={UI_TEXT.settings.themeModeLabel} stacked>
-              <QuietSegmentedFilter
-                variant="control"
-                value={themeMode}
-                options={themeModeOptions}
-                onChange={onThemeModeChange}
-              />
-            </SettingsPreferenceRow>
             <SettingsPreferenceRow title={UI_TEXT.settings.colorSchemeLabel} stacked>
               <div className="settings-theme-entry-list" role="group" aria-label={UI_TEXT.accessibility.settings.colorScheme}>
                 {themeLibraryOptions.map((option) => (
@@ -171,6 +170,7 @@ export default function SettingsAppearancePanel({
             </SettingsPreferenceRow>
           </QuietActionRow>
         </SettingsPreferenceGroup>
+        {interfaceSection}
       </div>
 
       <QuietDialog

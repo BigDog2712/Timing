@@ -140,7 +140,7 @@ where
 {
     let restart_state = app.state::<AppRestartState>();
     if !restart_state.try_request() {
-        return Err("Patina is already preparing to restart".to_string());
+        return Err("Timing is already preparing to restart".to_string());
     }
     if let Err(error) = operation(app.clone()).await {
         restart_state.cancel_request();

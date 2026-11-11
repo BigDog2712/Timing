@@ -2,15 +2,20 @@
 #
 # 为什么单独一份：Patina 窗原有的 `main-window-commands`（window-commands.toml）只列
 # Patina 自己的 117 条命令，语义是「这个子系统自己的命令面」。宿主命令混进去会让人
-# 以为 Patina 能调宿主的一切。这里只放两条**只读**命令，名字就把用途说清楚了：
-#   `list_records` 区间内的计时记录 · `list_items` 事项名
+# 以为 Patina 能调宿主的一切。这里只放三条**只读**命令，名字就把用途说清楚了：
+#   `list_records` 区间内的计时记录 · `list_items` 事项名 · `get_timer_state` 当前计时状态
 #
 # 为什么需要它：历史页要显示「这一天在 Timing 里计了哪些事」，而 Patina 的库与 Timing
 # 的库是两个库，Patina 侧读不到 `time_records`。
+#
+# `get_timer_state` 是 [P0-04] 加的：标题栏「Timing 计时胶囊」的状态主要来自宿主广播
+# `timer:state-changed`（`app.emit` = 全窗，无需授权），但**冷启动**那一刻分析窗的 WebView
+# 才刚创建，那一帧广播已经过去且之后不会再发——只靠订阅会让胶囊在本次会话开始前永远空白。
+# 它只读、不改任何状态，命令表与事件表都不动（契约十个数不变）。
 #
 # 边界：**不给任何写命令**。Patina 窗只读宿主的账，改时限、改事项一律回宿主自己。
 # 引用处：capabilities/patina.json。
 [[permission]]
 identifier = "patina-host-bridge"
-description = "Allows the Patina window to read the host's timer records and item names (read-only bridge for the history page)."
-commands.allow = ["list_records", "list_items"]
+description = "Allows the Patina window to read the host's timer records, item names and current timer state (read-only bridge for the history page and the title-bar timer capsule)."
+commands.allow = ["list_records", "list_items", "get_timer_state"]

@@ -22,7 +22,7 @@ pub(crate) async fn show_desktop() -> Result<(), String> {
         .map_err(|error| error.to_string())?
 }
 
-const MAIN_WINDOW_TITLE: &str = "Patina";
+const MAIN_WINDOW_TITLE: &str = "Timing";
 const MAIN_WINDOW_WIDTH: f64 = 1100.0;
 const MAIN_WINDOW_HEIGHT: f64 = 736.0;
 const MAIN_WINDOW_MIN_WIDTH: f64 = 900.0;

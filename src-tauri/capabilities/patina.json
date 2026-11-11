@@ -18,8 +18,9 @@
     "core:window:allow-start-dragging",
     "opener:default",
     "main-window-commands",
+    "patina-todo-notes",
     "patina-host-bridge",
-    "host-theme-read",
-    "host-theme-write"
+    "patina-host-settings",
+    "host-theme-read"
   ]
 }

@@ -417,7 +417,7 @@ fn show_recovery_failure<R: Runtime + 'static>(app: &tauri::AppHandle<R>) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         rfd::AsyncMessageDialog::new()
-            .set_title("Patina")
+            .set_title("Timing")
             .set_description(message)
             .set_level(rfd::MessageLevel::Error)
             .show()

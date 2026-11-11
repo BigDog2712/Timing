@@ -6,7 +6,6 @@ import type { QuietToastTone } from "../../../shared/types/toast";
 import QuietPageHeader from "../../../shared/components/QuietPageHeader";
 import type { UpdateSnapshot } from "../../../shared/types/update";
 import AboutPanel from "./AboutPanel";
-import AboutSupportDialog from "./AboutSupportDialog";
 import AboutFeedbackDialog from "./AboutFeedbackDialog";
 import {
   getSettingsPageBootstrapCache,
@@ -41,7 +40,6 @@ export default function About({
   const cachedBootstrap = getSettingsPageBootstrapCache();
   const initialVersion = updateSnapshot?.currentVersion ?? cachedBootstrap?.appVersion ?? "-";
   const [appVersion, setAppVersion] = useState(initialVersion);
-  const [supportDialogOpen, setSupportDialogOpen] = useState(false);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -95,15 +93,6 @@ export default function About({
     }
   }, [notify, UI_TEXT]);
 
-  const handleOpenKofiSupport = useCallback(async () => {
-    try {
-      await SettingsRuntimeAdapterService.openKofiSupport();
-    } catch (error) {
-      console.error("open Ko-fi support link failed", error);
-      notify(UI_TEXT.toast.supportOpenFailed, "error");
-    }
-  }, [notify, UI_TEXT]);
-
   const effectiveUpdateSnapshot = updateSnapshot ?? {
     currentVersion: appVersion,
     status: "idle",
@@ -154,19 +143,9 @@ export default function About({
           onOpenFeedback={() => {
             setFeedbackDialogOpen(true);
           }}
-          onOpenSupportDialog={() => {
-            setSupportDialogOpen(true);
-          }}
         />
       </div>
 
-      <AboutSupportDialog
-        open={supportDialogOpen}
-        onClose={() => setSupportDialogOpen(false)}
-        onOpenKofi={() => {
-          void handleOpenKofiSupport();
-        }}
-      />
       <AboutFeedbackDialog
         open={feedbackDialogOpen}
         onClose={() => setFeedbackDialogOpen(false)}

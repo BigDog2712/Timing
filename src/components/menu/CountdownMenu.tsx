@@ -143,6 +143,8 @@ export function CountdownMenu({ state }: CountdownMenuProps) {
       ariaLabel="倒计时时长"
       onClose={close}
       className="menu--countdown"
+      /* [P0-07] 计时语义：倒计时属「计时」，写 time_records、计入时间账（与工具的专注会话相反）。 */
+      footer={<span data-countdown-ledger="counted">计时 · 计入时间账</span>}
     />
   );
 }

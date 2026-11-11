@@ -19,7 +19,6 @@ import { usePillKeyboard } from '../../hooks/usePillKeyboard';
 import { usePauseMoyu } from '../../hooks/usePauseMoyu';
 import { usePillWheel } from '../../hooks/usePillWheel';
 import { countdownActions } from '../../services/countdownActions';
-import { openOrCreateNoteForItem } from '../../services/noteActions';
 import { readCountdownDuration, useCountdownArmStore } from '../../stores/countdownArm';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { openTodosWindow } from '../../services/todosActions';
@@ -27,12 +26,14 @@ import { findItem, useItemStore } from '../../stores/itemStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { useUiStore } from '../../stores/uiStore';
 import type { MenuPos } from '../../stores/uiStore';
+import type { HandleActionCtx } from '../../services/handleActions/guards';
+import { useHandleBindings } from '../../hooks/useHandleBindings';
 import { toVisualState, type VisualState } from '../../types/ui';
+import { HandleCluster } from './HandleCluster';
 import { ItemName } from './ItemName';
 import { InlineNameEntry } from './InlineNameEntry';
 import { MainButton } from './MainButton';
 import { NewItemEntry } from './NewItemEntry';
-import { NoteHandle } from './NoteHandle';
 import { TimerDisplay } from './TimerDisplay';
 
 /** [V0.3.1] 高亮闪烁总时长见 `lib/constants` 的 `HIGHLIGHT_MS`（圆点形态共用同一个值） */
@@ -77,6 +78,9 @@ export function PillBar() {
   const openMoyuMenu = useUiStore((s) => s.openMoyuMenu);
   const openCommonItems = useUiStore((s) => s.openCommonItems);
   const openCommonItemsNew = useUiStore((s) => s.openCommonItemsNew);
+  const openPanel = useUiStore((s) => s.openPanel);
+  /* [0.12.1] 手柄绑定：三形态 × 5 槽。跨窗改动由 appearanceSync 的"人回来就重读"送达 */
+  const handleBindings = useHandleBindings();
 
   /* 未悬停时隐去背景板；任一悬浮层（面板 / 倒计时 / 摸鱼 / 提醒 / 便利贴清单 / 事项菜单）展开期间强制显影，
      避免交互中「药丸凭空消失」 */
@@ -113,7 +117,7 @@ export function PillBar() {
      空闲态的「新建事项」格已改为弹常用事项框（框里自带常驻输入框）。 */
   const beginCreate = useCallback(() => {
     if (status === 'running') {
-      useUiStore.getState().setNotice({ text: '专注进行中，事项已锁定；请先暂停或结束当前计时。', tone: 'info' });
+      useUiStore.getState().setNotice({ text: '计时进行中，事项已锁定；请先暂停或结束当前计时。', tone: 'info' });
       return;
     }
     openInlineEdit({ itemId: null, initial: '' });
@@ -196,6 +200,15 @@ export function PillBar() {
      [V0.3.8] Space 的暂停方向也要自动弹摸鱼菜单（与左键同一回调） */
   const handleKeyDown = usePillKeyboard(status, actions, pauseAndOpenMoyu);
 
+  /* [0.12.1] 手柄派发上下文。`anchor` 不在这里：只有手柄自己知道自己的 rect（见 HandleButton） */
+  const handleCtx: Omit<HandleActionCtx, 'anchor'> = {
+    status,
+    itemId: currentItemId,
+    timer: actions,
+    ui: { openPanel, openNotesList, openCountdownMenu, openMoyuMenu },
+    notice: (text) => useUiStore.getState().setNotice({ text, tone: 'info' }),
+  };
+
   return (
     <div
       ref={pillRef}
@@ -277,12 +290,9 @@ export function PillBar() {
           onMenu={() => void openTodosWindow()}
         />
       )}
-      {/* [V0.2.1 · 1.5] 手柄改绑便利贴：左键开当前事项便利贴，右键开便利贴清单 */}
-      <NoteHandle
-        itemId={currentItemId}
-        onOpenNote={() => void openOrCreateNoteForItem(currentItemId)}
-        onOpenList={openNotesList}
-      />
+      {/* [0.12.1] 三手柄 × 5 槽，替掉原来的「今天」图标位与单个便利贴手柄：
+          today.panel / today.digest = full 的双击（默认），note.current / note.list = full 的左右键 */}
+      <HandleCluster bindings={handleBindings} baseCtx={handleCtx} />
     </div>
   );
 }

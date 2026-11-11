@@ -1,14 +1,12 @@
 import { useLocaleText } from "../../../shared/i18n/index.ts";
 import type { UiText } from "../../../shared/i18n/index.ts";
 import { Dices, Eye, EyeOff, Server, X } from "lucide-react";
-import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import QuietActionRow from "../../../shared/components/QuietActionRow";
 import QuietDialog from "../../../shared/components/QuietDialog";
 import QuietSwitch from "../../../shared/components/QuietSwitch";
 import SettingsPanelHeader from "./SettingsPanelHeader";
 import { SettingsPreferenceGroup } from "./SettingsPreferenceLayout";
-
 import { SettingsRuntimeAdapterService } from "../services/settingsRuntimeAdapterService.ts";
 import { createSettingsToken } from "../services/settingsTokenService.ts";
 
@@ -27,6 +25,7 @@ type SettingsInterfacePanelProps = {
   onRemoteStatusBridgeEnabledChange: (nextChecked: boolean) => void;
   onRemoteStatusBridgeUrlChange: (nextUrl: string) => void;
   onRemoteStatusBridgeTokenChange: (nextToken: string) => void;
+  embedded?: boolean; // P0-06：内嵌进「显示」分区时不带 qp-panel 外壳（避免卡片套卡片）
 };
 
 type TokenFieldProps = {
@@ -331,6 +330,7 @@ export default function SettingsInterfacePanel({
   onRemoteStatusBridgeEnabledChange,
   onRemoteStatusBridgeUrlChange,
   onRemoteStatusBridgeTokenChange,
+  embedded = false,
 }: SettingsInterfacePanelProps) {
   const UI_TEXT = useLocaleText();
   const [webActivityPortDraft, setWebActivityPortDraft] = useState(String(port));
@@ -392,7 +392,7 @@ export default function SettingsInterfacePanel({
 
   return (
     <>
-      <section className="qp-panel p-5 md:p-6">
+      <section className={embedded ? "" : "qp-panel p-5 md:p-6"}>
         <SettingsPanelHeader
           icon={<Server size={16} className="text-[var(--qp-accent-default)]" />}
           title={UI_TEXT.settings.servicesTitle}

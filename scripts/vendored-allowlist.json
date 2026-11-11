@@ -2,6 +2,18 @@
   "_doc": "vendored 改动登记表。前端 src/app/** src/features/** src/platform/** src/shared/** 与后端 src-tauri/src/app/insight/** src-tauri/src/commands/insight/** src-tauri/src/infra/insight/** src-tauri/src/models/insight/** src-tauri/src/services/insight/** 是 MIT 第三方源码（Patina），改动必须在这里留一条：path + change(modified|added|deleted) + reason + owner。验收口径是 node scripts/check-vendored-diff.mjs —— 未登记的改动让 npm run check 直接红。融合期（commit 7bc7bd7）那批路径改写与测试拆分不算改动，已固化进基线，见 THIRD-PARTY-NOTICES.md 第 1-7 条。",
   "entries": [
     {
+      "path": "src/app/styles/features/about.css",
+      "change": "modified",
+      "reason": "修复融合后相对资源路径：关于页图标从 src/features 读取，避免生产包丢图。",
+      "owner": "Qi"
+    },
+    {
+      "path": "src/app/styles/features/settings.css",
+      "change": "modified",
+      "reason": "修复融合后扩展商店徽标路径，保证 Vite 打包真实资源。",
+      "owner": "Qi"
+    },
+    {
       "path": "src/features/history/components/History.tsx",
       "change": "modified",
       "reason": "D2 反向接线：两条 import、一个 useTimingOverlap 调用、一个 renderTimingOverlap，以及日汇总下方那行渲染。除这 5 处外未动上游布局。",
@@ -100,7 +112,7 @@
     {
       "path": "src/app/App.css",
       "change": "modified",
-      "reason": "T01 去前缀：Tailwind v4 扫描根 `@import \"tailwindcss\" source(\"./\")` 随文件从 src/patina/ 搬到 src/app/，`./` 的含义变成 src/app/，features/（220 文件）的类会全部不生成且所有门禁仍绿。改为 `source(\"../\")`（= src/）。其余 21 行 `@import \"./styles/...\"` 因 styles/ 一并落到 src/app/styles/ 而保持有效。",
+      "reason": "T01 去前缀：Tailwind v4 扫描根 `@import \"tailwindcss\" source(\"./\")` 随文件从 src/patina/ 搬到 src/app/，`./` 的含义变成 src/app/，features/（220 文件）的类会全部不生成且所有门禁仍绿。改为 `source(\"../\")`（= src/）。其余 21 行 `@import \"./styles/...\"` 因 styles/ 一并落到 src/app/styles/ 而保持有效。M1 顶栏收口：末尾追加 `@import \"./styles/topbar-keys.css\"`（topbar.css 299/300 行贴线，把 status 段两个小图标键的皮搬出去），24→25 行。",
       "owner": "ForG"
     },
     {
@@ -112,14 +124,14 @@
     {
       "path": "src/app/components/AppTitleBar.tsx",
       "change": "modified",
-      "reason": "T01 去前缀：同上，资产引用 `../../../../src-tauri/icons/128x128@2x.png` 深度 4→3，改为 `../../../src-tauri/...`。仅此 1 行。",
+      "reason": "T01 去前缀：同上，资产引用 `../../../../src-tauri/icons/128x128@2x.png` 深度 4→3，改为 `../../../src-tauri/...`。仅此 1 行。 M1 品牌统一（用户令）：APP_TITLE \"Patina\" → \"Timing\"，与 Rust 侧 7 处显示名同步；aria-label 与窗口标题一并变。品牌段宽度基准不受影响（Patina/Timing 同为 6 个拉丁字符 @12/700）。",
       "owner": "ForG"
     },
     {
       "path": "src/features/about/components/AboutPanel.tsx",
       "change": "modified",
-      "reason": "T01 去前缀：资产引用 `../../../../../src-tauri/icons/icon.png` 指向子树之外，深度 5→4，改为 `../../../../src-tauri/icons/icon.png`。仅此 1 行。",
-      "owner": "ForG"
+      "reason": "T01 去前缀：资产引用 `../../../../../src-tauri/icons/icon.png` 指向子树之外，深度 5→4，改为 `../../../../src-tauri/icons/icon.png`。仅此 1 行。 0.12.0 品牌统一（brand-fix）：① 删掉上游捐赠入口——`Rose` 图标 import、`onOpenSupportDialog` 属性与「支持」药丸按钮（连带 `UpdateStatusPanel` 的 `onOpenSupport` 透传）；② 关于页品牌名硬编码 `<h2>Patina</h2>` → `<h2>Timing</h2>`（这是产品名，不是许可证署名；同页 `GeneralTab` 的 `Patina · MIT` 才是署名，未动）。产品名统一为 Timing，不再向用户募捐。",
+      "owner": "ForG + brand-fix（0.12.0 品牌统一）"
     },
     {
       "path": "src-tauri/src/services/insight/data/web_activity_analysis.rs",
@@ -186,6 +198,564 @@
       "change": "modified",
       "reason": "T03 收口：listen(\"tool-presentation-changed\") 改用 insightEvents 常量，前端不再有该事件名字面量。",
       "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/main_window/tools_navigation.rs",
+      "change": "modified",
+      "reason": "P0-03（TB1-1）：`ToolsNavigationState(Mutex<Option<ToolsSection>>)` 泛化为 `Mutex<Option<PendingView>>`，新增 `open_history(app, HistoryTarget)`；`open_tools` 路径行为逐字不变（先写 state 再 show、硬失败 take 回滚并返回 Err、emit 常量不变），`ToolsSection` 的 serde 形状未动（迷你窗反序列化依赖它）。单测扩一条 history 用例。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/commands/insight/window_cmd.rs",
+      "change": "modified",
+      "reason": "P0-03（TB1-1）：`cmd_take_main_tools_target` 的返回形状从裸枚举改成 `Option<MainWindowTargetDto>`（`{tools?}` 或 `{history?}`），**不新增命令**（insight 仍 117 条），守卫 `require_main_window_string` 不变。日期非法时由宿主命令侧拦下并退化为只 show，未新增错误码（仍 17）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/app/hooks/useMainToolsNavigation.ts",
+      "change": "modified",
+      "reason": "P0-03（TB1-1）：消费新的落点联合类型（tools / history）；把原先内联在 `AppShell` 的 `handleToolsStatusChipOpen` 收成本 hook 的返回值（`AppShell.tsx` 是冻结行数，净预算必须 ≤0）；「先订阅、后 take」的冷启动写法保持不变。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/platform/desktop/mainToolsNavigationGateway.ts",
+      "change": "modified",
+      "reason": "P0-03（TB1-1）：`takeMainToolsTarget()` 返回类型从 `\"pomodoro\"|\"reminders\"|null` 改成带标签的 `MainWindowTarget` 联合（tools / history），并加运行时形状校验（非法载荷抛错，不静默吞）。事件常量 `MAIN_TOOLS_TARGET_CHANGED` 未变。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/app/AppShell.tsx",
+      "change": "modified",
+      "reason": "P0-03（TB1-1）：`handleToolsStatusChipOpen`（原 :165-169）搬进 `useMainToolsNavigation`，腾出行数预算接历史落点；`HistoryDateRequest` 类型改为从 hook import；`selectedDateRequest` 的透传与 `History` 的所有 props 均未变。净行数 385 → 379。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/shared/theme/deriveTheme.ts",
+      "change": "modified",
+      "reason": "P0-01（TB1-2）：**只把 `primaryButtonBackground` 的 `function` 改成 `export function`（1 行，净 0 行）**，让 `hostAccentBridge` 复用它算 `--qp-button-primary-bg`（与 :157 调的是同一个函数，避免出现第二套「向黑混到与白字 ≥4.5:1」的实现——两套实现必然会漂移成两个色）。算法、常量、其余导出一字未改。",
+      "owner": "寇豆码（TB1-2）"
+    },
+    {
+      "path": "src/shared/theme/hostAccentBridge.ts",
+      "change": "added",
+      "reason": "新增（P0-01）：宿主四色 → 分析窗 `--qp-*` 的**唯一**派生点，纯函数无 IPC/无 DOM。按 ARCH §4.3 映射 running → accent-default / accent-muted / button-primary-bg / chart-cursor，done → success，warn → warning；`--qp-danger`/`--qp-participation` 无宿主来源故**显式不覆盖**，`accents.bar` 不映射，其余 20 个中性键（28 套预设）一个不碰。`accents=null`（ACL/宿主库未就绪）返回空对象以回落预设，不白屏。内含 `deepenForNonText`/`deepenForText` 的**逐字复制**（L9 红线禁 import 主窗 `src/lib/theme.ts`），漂移由单测的固定向量 + 源码文本双向哨兵钉住。",
+      "owner": "寇豆码（TB1-2）"
+    },
+    {
+      "path": "src/shared/theme/hostAccentBridge.test.ts",
+      "change": "added",
+      "reason": "新增（P0-01）：11 用例 —— §4.3 全 8 键（深/浅两档各一组整对象精确断言，派生 hex 写死）、键集合恰为 6（多一个即中性底色被误覆盖）、非法 hex 只忽略单键且 dev 下只 warn 一次、`accents=null` 回落预设、`deepenFor*` 固定输入向量，以及与 `src/lib/theme.ts` 的 16 行算法行双向文本哨兵（只读源码字符串，不 import、不执行宿主代码）。",
+      "owner": "寇豆码（TB1-2）"
+    },
+    {
+      "path": "src/platform/desktop/mainToolsNavigationGateway.test.ts",
+      "change": "added",
+      "reason": "新增（B1 复验 · QA）：`takeMainToolsTarget` 的载荷形状 8 用例。这条网关解析的 JSON 由 Rust `cmd_take_main_tools_target` 生成，两侧错位时的症状是「点了今天、窗开了但停在默认页」，无报错无日志。用例照抄 Rust 侧 `wire_shape_tests` 钉住的四份载荷（tools×2 / history×2），并覆盖 null·undefined、focusApp 缺省与空串降级、双键同时存在时的确定判序、以及非法载荷必须抛错而不是静默返回 null。纯新增测试，不改任何生产代码。",
+      "owner": "严过关（QA · B1 复验）"
+    },
+    {
+      "path": "src/shared/lib/activityTimelineCompiler.ts",
+      "change": "modified",
+      "reason": "TB2-1：只把 `interface HistoryTimelineSegment` 改成 `export interface`（净 0 行，917 停住），让 HistoryHorizontalTimeline 能 import type 它做高亮判据；编译器逻辑、比例公式、viewModel 形状一字未改。",
+      "owner": "寇豆码（TB2-1）"
+    },
+    {
+      "path": "src/features/history/components/HistoryHorizontalTimeline.tsx",
+      "change": "modified",
+      "reason": "TB2-1：Props 加可选 highlightSourceKey（默认 null = 全不亮），段 className 由 isFocusedSegment() 双判据（sourceKey 小写化 ∪ label）决定是否加 --focus；未改共享组件 QuietTimelineSegment，3 处既有调用方行为不变。",
+      "owner": "寇豆码（TB2-1）"
+    },
+    {
+      "path": "src/features/history/components/HistoryTimingLane.tsx",
+      "change": "added",
+      "reason": "新增（P0-02）：历史页「Timing 计时」泳道。与活动轨共用同一个 viewModel（视口/日界/「现在」三源同轴）；无记录返回 null 不留空泳道；进行中的段画到 visibleEndMs 并带「进行中」文案（PRD D1）；highlightSourceKey 命中加 class。文案走组件内 COPY，不碰 i18n 位置数组。125 行。",
+      "owner": "寇豆码（TB2-1）"
+    },
+    {
+      "path": "src/features/history/hooks/useTimingSegments.ts",
+      "change": "added",
+      "reason": "新增（P0-02）：取数与投影分离 —— IPC 只依赖 dayStartMs/dayEndMs（翻日期才重查），visibleEndMs 只进 useMemo，否则进行中的段每刷新一次就打一次查询；失败即空数组；卸载 cancelled 挡住跨日回来的旧请求。72 行。",
+      "owner": "寇豆码（TB2-1）"
+    },
+    {
+      "path": "src/features/history/services/timingLaneSegments.ts",
+      "change": "added",
+      "reason": "新增（P0-02）：记录 + 视口 → 与活动轨同坐标的段。比例公式照抄 activityTimelineCompiler.buildSegment，全程不取整（取整到分钟会引入 ≥30s 偏差，直接威胁「两泳道 ±1 分钟对齐」）；endedAt===null 画到 visibleEndMs，runningSince!==null 才出 running 角标；事项名查不到丢段。103 行。",
+      "owner": "寇豆码（TB2-1）"
+    },
+    {
+      "path": "src/features/history/services/timingLaneSegments.test.ts",
+      "change": "added",
+      "reason": "新增（P0-02）：9 用例钉住泳道口径 —— 空输入返回空、14:00-14:30 位置误差 ≤1 分钟、进行中延伸到 visibleEndMs、暂停中延伸到「现在」但不出角标、已结束按 endedAt 收尾、事项名查不到丢段、跨视口裁剪、跨零点被日界裁、开始时间升序。纯新增测试。196 行。",
+      "owner": "寇豆码（TB2-1）"
+    },
+    {
+      "path": "src/features/history/hooks/useHistoryDistributionItems.ts",
+      "change": "added",
+      "reason": "新增（P0-02 前置抽取）：把 History.tsx 原 648-725 的三个 useMemo（应用/类别/网页分布）原样搬出，三个依赖数组变成 hook 入参，判定顺序与 void mappingVersion 保持原样，取数逻辑零改动。目的只是先等量腾出行数（-74）以便冻结 1206 的文件能接泳道。152 行。",
+      "owner": "寇豆码（TB2-1）"
+    },
+    {
+      "path": "src/app/styles/features/timing-lane.css",
+      "change": "added",
+      "reason": "新增（P0-02 / P0-03③）：泳道行 + 高亮环样式。为不碰冻结 817 行的 history.css 而单开，靠 App.css:19 的 @import 接入（后续「计时中」角标请追加到本文件，别另起）。只用 --qp-* 令牌；高亮用 inset 阴影而非 outline（父级 overflow:hidden 会裁掉 outline）。104 行。",
+      "owner": "寇豆码（TB2-1）"
+    },
+    {
+      "path": "src/features/settings/components/SettingsAppearancePanel.tsx",
+      "change": "modified",
+      "reason": "P0-06：「外观」分区改名「显示」，删主题模式开关（深/浅唯一真相为宿主），新增 COPY.ownerHint/neutralOnly 指路文案，interfaceSection 内嵌；28 套配色预设原地保留但只决定中性底色（--qp-bg-*/border/text），不碰宿主四色派生的 6 个令牌。",
+      "owner": "寇豆码（P0-06）"
+    },
+    {
+      "path": "src/features/settings/components/SettingsInterfacePanel.tsx",
+      "change": "modified",
+      "reason": "P0-06：新增 embedded 开关，内嵌进「显示」分区时不渲染 qp-panel 外壳（避免卡片套卡片）。",
+      "owner": "寇豆码（P0-06）"
+    },
+    {
+      "path": "src/shared/i18n/generated/locales/zh-CN.ts",
+      "change": "modified",
+      "reason": "P0-06：仅按下标换值（外观→显示、备份→备份活动库、恢复→恢复活动库、备份与恢复→活动库备份与恢复等），条目数仍 939、与 FRONTEND_MESSAGE_KEYS 逐位对齐，未增删重排。 0.12.0 品牌统一（brand-fix）：把 13 个 key 里的 20 处 `Patina` 逐字换成 `Timing`（`about.feedbackDialog.qqQrAlt` / `about.supportDialog.description` / `backup.itemCounts` / `export.scheduledErrors` / `settings.dataImport.batchesDescription` / `settings.scheduledBackupCleanupWarning` / 4 条 storage.*ConfirmDetail / `settings.webActivityHelpNote` / `settings.webActivityHelpSteps`）。纯 token 替换：条目数仍 939、顺序与下标全部不变（位置数组按索引映射 key，删一项会让后面全体错位且不报类型错）。",
+      "owner": "寇豆码（P0-06） + brand-fix（0.12.0 品牌统一）"
+    },
+    {
+      "path": "src/shared/i18n/generated/locales/en-US.ts",
+      "change": "modified",
+      "reason": "P0-06：同下标同语义换值（与 zh-CN 一致），条目数仍 939、未错位。 0.12.0 品牌统一（brand-fix）：13 个 key / 21 处 `Patina`→`Timing`（含 `Patina Web Sync`→`Timing Web Sync`）。纯 token 替换，条目数仍 939、下标不变。`https://github.com/Ceceliaee/patina-web-sync/...` 是真实仓库地址，保留小写原样（改名就 404，用户装不上扩展）——**文案是品牌，链接是坐标**。",
+      "owner": "寇豆码（P0-06） + brand-fix（0.12.0 品牌统一）"
+    },
+    {
+      "path": "src/shared/i18n/generated/locales/es.ts",
+      "change": "modified",
+      "reason": "P0-06：同下标同语义换值（与 zh-CN 一致），条目数仍 939、未错位。 0.12.0 品牌统一（brand-fix）：13 个 key / 23 处 `Patina`→`Timing`（`Salir de Patina`→`Salir de Timing`，`del canal de Patina`→`del canal de Timing`：只换专有名词，介词不动）。纯 token 替换，条目数仍 939、下标不变；`patina-web-sync` 仓库地址保留小写原样。",
+      "owner": "寇豆码（P0-06） + brand-fix（0.12.0 品牌统一）"
+    },
+    {
+      "path": "src/shared/i18n/generated/locales/ru-RU.ts",
+      "change": "modified",
+      "reason": "P0-06：同下标同语义换值（与 zh-CN 一致），条目数仍 939、未错位。 0.12.0 品牌统一（brand-fix）：13 个 key / 20 处 `Patina`→`Timing`（`Выйти из Patina`→`Выйти из Timing`）。纯 token 替换，条目数仍 939、下标不变；`patina-web-sync` 仓库地址保留小写原样。",
+      "owner": "寇豆码（P0-06） + brand-fix（0.12.0 品牌统一）"
+    },
+    {
+      "path": "src/features/settings/settingsConvergence.source.test.ts",
+      "change": "added",
+      "reason": "新增（P0-06 源码级判据，10 用例）：零主色控件（setAccent/resetAccents 命中集合恰为 ThemePicker.tsx）/ 分区 5→4 / 主题开关下线且设置页一次都不碰 writeHostThemeMode / 三参数单编辑处 / 两套备份文案与数据对象互不混淆 / locale 位置数组与 FRONTEND_MESSAGE_KEYS 逐位对齐（红线）。路径用 fileURLToPath + dirname 锚到仓库根，避开 Vite 对 new URL(字面量, import.meta.url) 的改写。",
+      "owner": "寇豆码（P0-06）"
+    },
+    {
+      "path": "src/platform/runtime/hostTimerGateway.ts",
+      "change": "added",
+      "reason": "新增（P0-04）：订阅宿主 timer:state-changed（app.emit 全窗广播，两窗同源）+ 冷启动读一次只读 get_timer_state；computeHostLiveSec 与宿主 useTimerTick.computeLiveSec 逐字同式（L9 禁 import，两份由 hostTimerFormula.source.test.ts 的源码哨兵钉住）；readHostTodaySettledSec 用 list_records 算今日已封存秒（避开当前会话重复计）。全部 try-catch 退化成「不显示」，不新开命令/事件。189 行。",
+      "owner": "寇豆码（TB2-2）"
+    },
+    {
+      "path": "src/app/hooks/useHostTimerState.ts",
+      "change": "added",
+      "reason": "新增（P0-04）：分析窗唯一计时读数源。状态来自广播（+冷启动补帧）、秒数来自 gateway 那一条公式、hook 只负责每秒推进 nowMs —— 自身不保存「秒数」state，因此不存在第二套累加口径。取数只在状态迁移时重查 list_items/list_records，不跟 tick 走（否则跑一天十万次查询）。129 行。",
+      "owner": "寇豆码（TB2-2）"
+    },
+    {
+      "path": "src/app/components/TimingCapsule.tsx",
+      "change": "added",
+      "reason": "新增（P0-04）：标题栏「Timing 计时胶囊」。事项名 + 已计时（每秒跳）+ 今日累计 + 暂停/继续 + 回药丸；idle 与「还没收到第一帧」都不渲染（不留空壳、冷启动不闪）。暂停/继续/回药丸只发 intent，组件本身不碰传输层。文案走组件内 COPY，零 i18n 改动。132 行。",
+      "owner": "寇豆码（TB2-2）"
+    },
+    {
+      "path": "src/platform/runtime/hostIntentGateway.ts",
+      "change": "added",
+      "reason": "新增（P0-05）：emitHostIntent(intent) → emitTo(\"main\", \"patina:host-intent\", intent)。一个方向一个事件名，无返回值；发失败只 warn 不上抛（分析窗不承担宿主错误文案）。Rust 侧完全不知情，事件不进 IPC_EVENTS（契约 11/11/18 不变）。54 行。",
+      "owner": "寇豆码（TB2-2）"
+    },
+    {
+      "path": "src/features/history/components/HistoryActivityActionDialog.tsx",
+      "change": "added",
+      "reason": "新增（P0-05）：活动段「在 Timing 计这件事」弹卡。宿主 idle 直接开始；running/paused 先问「正在计『X』12:31」+ [切换并开始][取消]；取消只闭卡、零副作用（取消按钮 onClick 即 onClose，函数体内无 store 访问、无 intent、无 invoke）。如实显示「将复用已有事项 / 将新建事项」。弹卡内不出现分类/标签/泳道等分析窗概念。155 行。",
+      "owner": "寇豆码（TB2-2）"
+    },
+    {
+      "path": "src/features/history/components/HistoryActivityActionDialog.test.tsx",
+      "change": "added",
+      "reason": "新增（P0-05）：8 用例。核心两条把「取消零副作用」钉成断言（running / idle 两种状态下 emitHostIntent 一次都不许被调用、onClose 恰好 1 次）；其余覆盖 idle 直接开始（事项名 = 应用名）、running 先问、确认后恰好 1 条 intent、同名复用 vs 新建的如实告知、弹卡文本不含分析窗概念。纯新增测试。209 行。",
+      "owner": "寇豆码（TB2-2）"
+    },
+    {
+      "path": "src/shared/components/QuietTimelineTrack.tsx",
+      "change": "modified",
+      "reason": "TB2-2（P0-05）：QuietTimelineSegment 加默认 undefined 的 onActivate；不传时 span 仍是纯展示元素（无 role、不可聚焦、无键盘处理），expanded / lane 两处既有用法与缩放弹窗的 DOM 与 a11y 语义一字不变；只有真的传了才升级为 role=button + tabIndex=0 + Enter/Space。影响面可枚举：目前仅历史页 overview 轨传入。",
+      "owner": "寇豆码（TB2-2）"
+    },
+    {
+      "path": "src/shared/lib/durationFormatting.ts",
+      "change": "modified",
+      "reason": "TB2-2（P0-04/P0-05）：新增 formatClock(sec) → MM:SS / H:MM:SS（秒表口径），与既有 formatDuration（2m / 1h 5m 概括口径）明确区分、注释写明不可互相替代。胶囊与弹卡共用这一份，避免同一个数字出现两种写法。既有 formatDuration 一字未改。",
+      "owner": "寇豆码（TB2-2）"
+    },
+    {
+      "path": "src/features/tools/components/HostTimingStatusRow.tsx",
+      "change": "added",
+      "reason": "新增（P0-07）：工具页页顶「Timing 计时中：<事项> <时长>」状态行，点击发 emitHostIntent({action:'show_pill'}) 回药丸。复用 TB2-2 的 useHostTimerState + emitHostIntent + formatClock，无第二个读数通道（源码哨兵断言不含 setInterval/addEventListener/listen(/Date.now/formatDuration）；idle 与 ready===false 都不渲染；暂停态文案为「已暂停」而不是「计时中」（时间不涨却说计时中就是撒谎）；aria-label 也带「计入时间账」（aria-label 会盖掉内容文字，不写读屏用户听不到）。84 行。",
+      "owner": "寇豆码（P0-07）"
+    },
+    {
+      "path": "src/features/tools/components/HostTimingStatusRow.test.tsx",
+      "change": "added",
+      "reason": "新增（P0-07）：7 用例钉住状态行口径 —— idle/未就绪不渲染、running 显示事项名与秒表时长、paused 说「已暂停」、点击恰好发 1 条 show_pill intent、aria-label 含账目说明、不出现概括口径时长。纯新增测试。137 行。",
+      "owner": "寇豆码（P0-07）"
+    },
+    {
+      "path": "src/features/tools/components/FocusSessionLedgerNote.tsx",
+      "change": "added",
+      "reason": "新增（P0-07）：「专注会话 · 不计入时间账 · 要算进时间账请用倒计时」提示条，番茄与自由专注两个页签各一份。文案走 focusSessionCopy.ts，不碰 i18n 位置数组。30 行。",
+      "owner": "寇豆码（P0-07）"
+    },
+    {
+      "path": "src/features/tools/services/focusSessionCopy.ts",
+      "change": "added",
+      "reason": "新增（P0-07）：专注会话三条 locale 别名的渲染层覆盖表（番茄模式名 / 编辑番茄 / 专注设置）+ FocusSessionCopy 接口。因为四语 locale 是按索引对齐的位置数组、本轮不许增删，改名只能在渲染层集中做；配套 timingSemantics.test.ts 钉住这三条 locale key 已被组件弃用。47 行。",
+      "owner": "寇豆码（P0-07）"
+    },
+    {
+      "path": "src/features/tools/services/timingSemantics.test.ts",
+      "change": "added",
+      "reason": "新增（P0-07）：9 用例，别名清零的机器判据 —— 专注会话组文案不得含「计时」、计时组文案不得含「专注」、账目说明必须出现在两处、locale 覆盖表必须覆盖三条 key 且这些 key 已被组件弃用。152 行。",
+      "owner": "寇豆码（P0-07）"
+    },
+    {
+      "path": "src/features/tools/components/PomodoroToolPanel.tsx",
+      "change": "modified",
+      "reason": "P0-07：番茄页签改称「专注会话」口径（模式名与编辑入口走 focusSessionCopy 覆盖），并挂 FocusSessionLedgerNote 说明不计入时间账。+4 行（78→82），取数逻辑与番茄计时行为一字未改。",
+      "owner": "寇豆码（P0-07）"
+    },
+    {
+      "path": "src/features/tools/components/FreeFocusContent.tsx",
+      "change": "modified",
+      "reason": "P0-07：自由专注页签挂同一份 FocusSessionLedgerNote（不计入时间账）。+2 行（59→61），计时行为未改。",
+      "owner": "寇豆码（P0-07）"
+    },
+    {
+      "path": "src/features/tools/components/PomodoroTaskEditor.tsx",
+      "change": "modified",
+      "reason": "P0-07：任务编辑器标题改用 focusSessionCopy 的专注会话口径（原「编辑番茄计时」含「计时」二字，与进账组混淆）。+2 行。",
+      "owner": "寇豆码（P0-07）"
+    },
+    {
+      "path": "src/features/tools/components/PomodoroSettingsPicker.tsx",
+      "change": "modified",
+      "reason": "P0-07：设置为「专注设置」口径（原「计时设置」与进账组撞词）。+2 行。",
+      "owner": "寇豆码（P0-07）"
+    },
+    {
+      "path": "src/features/tools/components/Tools.tsx",
+      "change": "modified",
+      "reason": "P0-07：工具页页顶挂 HostTimingStatusRow（若正在计时则显示「Timing 计时中」并可点回药丸）。+2 行（235→237）。",
+      "owner": "寇豆码（P0-07）"
+    },
+    {
+      "path": "src/features/history/hooks/useTimingSegments.test.tsx",
+      "change": "added",
+      "reason": "P1-01 判据④：泳道「记录变更门铃」的回归测试（宿主广播后必须重新取数，否则补记后界面不动）。新文件 3 条用例，不改变上游代码语义。",
+      "owner": "寇豆码（P1-01）"
+    },
+    {
+      "path": "src/features/history/services/itemNameMatch.ts",
+      "change": "added",
+      "reason": "P1-06 纯函数（活动名 → 事项名建议：§4 的「归一化 + 短串包含」两种关系，不引入编辑距离）。上游无对应模块，不改上游语义。",
+      "owner": "寇豆码（P1-06）"
+    },
+    {
+      "path": "src/features/history/services/itemNameMatch.test.ts",
+      "change": "added",
+      "reason": "P1-06 表驱动判据：§4.4 的 14 组（含 6 组负例）+ 1 组补闸，逐行对应设计文档「钉住什么」那一列。",
+      "owner": "寇豆码（P1-06）"
+    },
+    {
+      "path": "src/features/history/components/HistoryActivityActionDialogMatch.test.tsx",
+      "change": "added",
+      "reason": "P1-06 判据②③：弹卡三态呈现与「intent 递解析后的事项名」。单独成文件是因为主弹卡测试已 268 行（再塞必破 300 行上限）。",
+      "owner": "寇豆码（P1-06）"
+    },
+    {
+      "path": "src/platform/desktop/mainToolsNavigationGateway.overview.test.ts",
+      "change": "added",
+      "reason": "P1-02 overview 落点的三条判据（载荷形状 / history 优先 / 只 navigate('dashboard')）。单独成文件是因为主网关测试已 291 行、距 300 行硬上限只剩 9 行（TD-02 同类悬崖）。",
+      "owner": "寇豆码（P1-02）"
+    },
+    {
+      "path": "src/app/styles/tokens.css",
+      "change": "modified",
+      "reason": "M1 字重重建（regular 450→400 / medium 550→400 / emphasis 650→700，仅 medium 改像素）；字体栈删未安装的 IBM Plex 首项；--qp-titlebar-height 36→52（长档基准）；新增 --qp-text-placeholder / --qp-selection-bg / --qp-rail-inset / --qp-focus-ring 四个派生 token（引用式 color-mix，跟随宿主取色）；新增 ::selection。必须在这个文件，因为这里是 --qp-* 的唯一真相源。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/topbar.css",
+      "change": "added",
+      "reason": "新增顶栏五段合流骨架（01 §3）：段宽 114/96/252/486/152、tab 项尺寸、纵向按窗高（max-height:735.98px → 顶栏 44）与横向按窗宽（max-width:999.98px → tab 72）两个正交断点、外壳单层内距 --qp-shell-pad、dashboard 画布内距归零 + border 换 outline。单独成文件是因为 app-shell.css(321) 与 quiet-pro.css(1936) 都是 size 冻结值，加 1 行即红。M1 收口时把 status 段的小图标键（.qp-cap-action / .qp-topbar-tools-door）搬到 topbar-keys.css：本文件涨到 299/300 已贴线，而下一批（主界面五模块）必然要加 CSS，先腾出 48 行余量。纯搬运，零像素变化，四档窗口几何不变。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/topbar-keys.css",
+      "change": "added",
+      "reason": "从 topbar.css 搬出的「④ status 段内小图标键」（.qp-cap-action 胶囊两颗动作键 28×24、.qp-topbar-tools-door 工具入口门 28×24、hover/active/focus-visible/门开着换底/svg 尺寸），共 63 行。存在的理由与 topbar.css 同源：几何与「键的皮」变更理由不同，且 topbar.css 已贴 300 行上限。类名、属性值、选择器一字未改，纯搬运，零像素变化。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/components/AppTopNav.tsx",
+      "change": "added",
+      "reason": "新增顶栏三区导航（主界面/数据管理/设置）：<nav> + aria-current=\"page\"（不是 tablist，理由见文件头注释）；保留 navigateRequestRef 防竞态与 focus/mouseenter/pointerdown 三触发预载，行为对齐 AppSidebar。作为 ReactNode slot 由 AppShell 递给 AppTitleBar，顶栏组件不感知 navItems。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/quiet-pro.css",
+      "change": "modified",
+      "reason": "仅 2 处同值替换（`.qp-input::placeholder` 与 `.data-app-search input::placeholder` 的 color 由 --qp-text-tertiary 改 --qp-text-placeholder），不新增/删除行（1936 行不变）。为的是让新 token 真正有落点：暗色占位符此前是 tertiary，#7f8791 对 panel 只有 3.79:1，换成 --qp-text-placeholder 后 4.78:1。浅色两者同值，零像素变化。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/tools/types.ts",
+      "change": "modified",
+      "reason": "M1 顶栏工具入口门（§5.3）：ToolsOpenTarget.section 改为可选（省略 = 只进工具面、不指定分区）。仅 1 个字段加 `?` + 3 行注释，零运行时改动；受影响的三处调用点（Tools.tsx / useMainToolsNavigation.ts / MiniShell.tsx）各自收窄，行为不变。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/tools/components/ToolStatusButtons.tsx",
+      "change": "modified",
+      "reason": "M1 顶栏工具入口门（§5.3）：新增可选 emptyEntry 槽位 —— entries 为空且调用方传了兜底内容时渲染「工具入口门」，否则保持旧的「空即不渲染」。mini 窗不传该 prop，因此 mini 标题栏零变化（那里宽度是硬预算）。18→24 行。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/tools/components/ToolsStatusEntry.tsx",
+      "change": "modified",
+      "reason": "M1 顶栏工具入口门（§5.3）：新增 toolsOpen?: boolean（只驱动门的 data-tools-open 换底，不参与导航判断）+ 空态门按钮（28×24 ToolCase、aria-label=text.tools.title、点击 onOpenSection({}) 不带分区）。门只在快照已到且无任何灯时出现，避免每次唤醒闪一下门再被灯替换。52→72 行。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/mini/MiniShell.tsx",
+      "change": "modified",
+      "reason": "M1 类型收窄：ToolsOpenTarget.section 变可选后，迷你窗 open_tools 动作（后端要具体分区）在原行加 `if (section)` 守卫。迷你窗永远传具体分区，所以这是纯类型层守门，运行时零变化，行数不变。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/main_window.rs",
+      "change": "modified",
+      "reason": "品牌统一（用户令）：MAIN_WINDOW_TITLE \"Patina\" → \"Timing\"。这是运行时**重建主窗**时 .title() 用的常量（第 441 行），会覆盖 tauri.conf.json 的 productName/title=\"Timing\"，所以此前任务栏标题实际一直显示 Patina、配置里那个 Timing 从未生效。仅 1 个字符串常量，零逻辑改动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/bootstrap.rs",
+      "change": "modified",
+      "reason": "品牌统一（用户令）：存储启动失败 rfd 对话框 .set_title(\"Patina\") → \"Timing\"。仅 1 处字符串，对话框结构与文案正文未动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/webview_recovery.rs",
+      "change": "modified",
+      "reason": "品牌统一（用户令）：WebView 恢复失败对话框 .set_title(\"Patina\") → \"Timing\"。仅 1 处字符串。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/mini_window/native.rs",
+      "change": "modified",
+      "reason": "品牌统一（用户令）：迷你窗 .title(\"Patina Mini\") → \"Timing Mini\"。仅 1 处字符串。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/tool_notifications/native.rs",
+      "change": "modified",
+      "reason": "品牌统一（用户令）：系统通知 .title(\"Patina Notification\") → \"Timing Notification\"。仅 1 处字符串。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/tray.rs",
+      "change": "modified",
+      "reason": "品牌统一（用户令）：托盘 .tooltip(\"Patina\") → \"Timing\"（鼠标悬停可见）。仅 1 处字符串。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/web_activity.rs",
+      "change": "modified",
+      "reason": "品牌统一（用户令）：浏览器扩展桥接的 409 响应 message \"Patina web recording is off.\" → \"Timing ...\"。仅 1 处字符串；同 JSON 里的 code 字段（web-recording-disabled）是契约，未动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/commands/insight/storage_cmd.rs",
+      "change": "modified",
+      "reason": "品牌统一（用户令）：重启占位失败的用户可见文案 \"Patina is already preparing to restart\" → \"Timing ...\"。仅 1 处字符串。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/commands/insight/export_cmd.rs",
+      "change": "modified",
+      "reason": "品牌统一（用户令）：导出文件名前缀 \"Patina-export-\" → \"Timing-export-\"（第 70 行生产代码 1 处 + 第 118/127 行两处测试断言同步改，否则 cargo test 会红）。文件名段其余部分（日期区间、扩展名）未动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/tiers.css",
+      "change": "added",
+      "reason": "第二批新增：主界面五模块档位 token（板式 1052×636 / 860×552、卡间距 16/12、五模块高、行高、环径）。只在 :root + 一个 @media (max-height:735.98px) 里写数值，是 01 §2.6 指定的唯一允许魔法数字的样式文件。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard.css",
+      "change": "modified",
+      "reason": "第二批重写：旧三面板（页头/环卡/今日节律/应用排行大面板）的样式整块下线，换成视图根 + 五模块板式 + .qp-card（outline 版）+ 空态/骨架。原 194 行 → 现 189 行。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-modules.css",
+      "change": "added",
+      "reason": "第二批新增：计时分布 / 事项分布 / 应用排行三张卡的内部版式（环、读数行、裸条、发丝）。从 dashboard.css 拆出，因为单文件 ≤300 行是硬顶。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-todos.css",
+      "change": "added",
+      "reason": "第二批新增：待办卡的样式（compose / 行 / 勾选 / 删除键 / 渐隐 / 撤销条）。便利贴那一段已拆到 dashboard-notes.css。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/Dashboard.tsx",
+      "change": "modified",
+      "reason": "第二批重写：513 行 → 113 行，只留数据装配 + 五模块组合。删 QuietPageHeader、HourlyActivityChart 与旧环形函数（设计五模块里没有今日节律）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/ModuleShell.tsx",
+      "change": "added",
+      "reason": "第二批新增：五张卡共用的卡头（20 高 + 8 距）/ 空态 / 骨架三态外壳。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/TimerModule.tsx",
+      "change": "added",
+      "reason": "第二批新增：计时分布（环 ⌀144 viewBox 144 center 72 r 65 stroke 14 + 环心合计 + 5 行读数 + 弧段↔行 hover 联动）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/ItemsModule.tsx",
+      "change": "added",
+      "reason": "第二批新增：事项分布 6 行裸条（dot/名字/60 裸条/时长）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/AppsModule.tsx",
+      "change": "added",
+      "reason": "第二批新增：应用排行 5 行 + 2px 发丝 + 通栏 footer「全部分类…」。行改为只读，分类入口收口到 footer（详情/分类的第二个出口在历史区与分类映射视图）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/TodosModule.tsx",
+      "change": "added",
+      "reason": "第二批新增：待办卡（compose / 行 / 乐观删除 + 3s 撤销条 / 渐隐 / 可见行数用 ResizeObserver 量）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/NotesStrip.tsx",
+      "change": "added",
+      "reason": "第二批新增：便利贴条（56px 通栏，只读，按 updatedAt 筛今日，最多 3 张 + 「+N」）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/copy.ts",
+      "change": "added",
+      "reason": "第二批新增：五模块 + 便利贴的四语文案表（Record<Locale,…>）。不进 src/shared/i18n/**（那四个 locale 是位置数组，插一行会整体错位，且 contract.ts 行数冻结）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/hooks/useTodayNotes.ts",
+      "change": "added",
+      "reason": "第二批新增：便利贴取数 + 按 updatedAt 落今日本地日筛选（不按 createdAt，否则老用户这条永远空）+ 降序截 3。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/hooks/useTodayTodos.ts",
+      "change": "added",
+      "reason": "第二批新增：待办读写 + 乐观删除/3s 撤销（语义照抄主窗 todoStore.remove/undoRemove，后端无 todo_restore 命令）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/services/dashboardFormatting.ts",
+      "change": "modified",
+      "reason": "第二批新增 buildTopItems（按 displayTitle 聚合 compiledSessions 的 duration，取前 6）+ 一个 TopItemEntry 类型；原有三个函数未动。73 → 132 行。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/platform/persistence/noteReadRepository.ts",
+      "change": "added",
+      "reason": "第二批新增：note_list 只读网关（分析窗自己的 invokeWithCommandError，不引主窗 services/api 与 types/domain-v020，L9）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/platform/persistence/todoRepository.ts",
+      "change": "added",
+      "reason": "第二批新增：todo_list / todo_create / todo_toggle / todo_delete 网关（同上，不引主窗 stores/todoStore）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/shared/types/notes.ts",
+      "change": "added",
+      "reason": "第二批新增：分析窗自有的 NoteSummary 类型（不引 src/types/domain-v020.ts 的 Note —— L9 连 type import 也算跨窗）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/shared/types/todos.ts",
+      "change": "added",
+      "reason": "第二批新增：分析窗自有的 TodoSummary 类型（同上）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-notes.css",
+      "change": "added",
+      "reason": "第二批新增：便利贴条（56px 通栏）的样式。从 dashboard-todos.css 拆出（那个文件到 297 行，改一行就触 300 硬顶）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/about/components/About.tsx",
+      "change": "modified",
+      "reason": "0.12.0 品牌统一（brand-fix）：删掉上游捐赠入口——`AboutSupportDialog` 的 import 与渲染、`supportDialogOpen` state、`handleOpenKofiSupport` 回调（连带 `SettingsRuntimeAdapterService.openKofiSupport` 的调用点）、以及给 `AboutPanel` 的 `onOpenSupportDialog` 透传。反馈对话框（GitHub Issues）保留。其余逻辑零改动。",
+      "owner": "brand-fix"
+    },
+    {
+      "path": "src/features/about/components/AboutFeedbackDialog.tsx",
+      "change": "modified",
+      "reason": "0.12.0 品牌统一（brand-fix）：删掉「Patina QQ 频道二维码」那张卡（整个 `<section className=\"about-feedback-card\">`）与 `qq-channel-dark.jpg` / `qq-channel-light.jpg` 两个 import。上游捐赠/社群入口下线，GitHub Issues 卡（含 `initialFocusRef={githubButtonRef}`）原样保留，所以对话框 Tab 焦点与关闭行为不变。",
+      "owner": "brand-fix"
+    },
+    {
+      "path": "src/features/about/components/AboutSupportDialog.tsx",
+      "change": "deleted",
+      "reason": "0.12.0 品牌统一（brand-fix）：整文件删除。这个组件的唯一职责就是渲染上游捐赠入口——`about.supportDialog.description`（原文「如果 Patina 对你有帮助，欢迎支持持续维护」）+ 微信赞赏码 + Ko-fi 按钮。产品名统一为 Timing 后不再向用户募捐（用户已拍板删入口）。资源表里 `about.supportDialog.*` 字符串按位置数组约束保留，成为不再被引用的死文案。需要时 `git show <base>:<path>` 可取回；`--upstream` 对账里它会显示为「仅上游」。",
+      "owner": "brand-fix"
+    },
+    {
+      "path": "src/features/update/components/UpdateStatusPanel.tsx",
+      "change": "modified",
+      "reason": "0.12.0 品牌统一（brand-fix）：删掉页脚「支持」按钮（捐赠入口）与 `onOpenSupport` 属性（接口声明 + 解构 + 那个 button），保留 `showSupportLinks` 控制的「发布说明 · 反馈」页脚。唯一调用点 `AboutPanel` 一直传 `showSupportLinks={false}`，所以删掉的这半个分支本来就是不可达的；零布局变化。",
+      "owner": "brand-fix"
+    },
+    {
+      "path": "src-tauri/src/models/insight/localization/generated.rs",
+      "change": "modified",
+      "reason": "0.12.0 品牌统一（brand-fix）：4 个 key × 4 语言的用户可见文案里 15 处 `Patina`→`Timing`——`native.export.title`（Patina 活动记录 / Patina Activity Records / Записи активности Patina / Registros de actividad de Patina）、`native.storage.startupFailure`、`native.webview.recoveryFailed`、`native.tray.quit`（Exit Patina / Salir de Patina / Выйти из Patina）。纯字符串字面量替换，`NativeExpr` 结构与 key 分支顺序零改动。中文也是 `Timing`（不音译）。",
+      "owner": "brand-fix"
+    },
+    {
+      "path": "src-tauri/src/models/insight/localization/mod.rs",
+      "change": "modified",
+      "reason": "0.12.0 品牌统一（brand-fix）：跟随文案表改断言，只有 2 行——`native.tray.quit` 的西语 `Salir de Patina`→`Salir de Timing`、俄语 `Выйти из Patina`→`Выйти из Timing`。判据口径就是新品牌名，没有放宽任何断言。同文件 `native.tools.activityReminderDefaultBody` 用例里的 `(\"targetName\", \"Patina\")` 是**测试自填的占位参数**（不是文案表内容），故意不动。",
+      "owner": "brand-fix"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/export/mod_mod_tests.rs",
+      "change": "modified",
+      "reason": "0.12.0 品牌统一（brand-fix）：导出 Markdown 的 H1 断言跟着文案表走，2 行——`# Patina 活动记录`→`# Timing 活动记录`、`# Patina Activity Records`→`# Timing Activity Records`。这是 `native.export.title` 的端到端判据（渲染出来的一级标题），不是把断言改松：断言串与 generated.rs 的新值逐字一致，cargo test 才看得见。",
+      "owner": "brand-fix"
+    },
+    {
+      "path": "src/shared/types/loadStatus.ts",
+      "change": "added",
+      "reason": "LoadStatus 三态判别式联合（loading/ready/error），分析窗自有类型；替代两个布尔（loading+failed 会拼出不存在状态）。供 useTodayTodos/useTodayNotes/ModuleShell 共用",
+      "owner": "land-eng"
     }
   ]
 }

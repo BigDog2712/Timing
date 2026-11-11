@@ -54,7 +54,8 @@ export const mobileTimerActions = {
    *   - `just_switch`（仅改归属）：后端允许运行中直接改，不动秒表。
    */
   async switchTo(itemId: number, mode: SwitchMode): Promise<boolean> {
-    const status = useTimerStore.getState().state.status;
+    const original = useTimerStore.getState().state;
+    const status = original.status;
     try {
       if (status === 'idle') {
         await timerApi.start(itemId);
@@ -62,7 +63,17 @@ export const mobileTimerActions = {
         const wasRunning = status === 'running';
         const needPause = wasRunning && mode === 'end_and_start';
         if (needPause) await timerApi.pause();
-        const next = await timerApi.switchItem(itemId, mode);
+        const next = await timerApi.switchItem(itemId, mode).catch(async (err: unknown) => {
+          /* 暂停是 end_and_start 的前置动作；失败时只恢复原会话。
+             先回读权威状态，避免跨窗操作或 IPC 丢响应后误启动另一条计时。 */
+          if (needPause) {
+            const current = await timerApi.state().catch(() => null);
+            if (current?.status === 'paused' && current.session?.id === original.session?.id) {
+              await timerApi.resume().catch(() => undefined);
+            }
+          }
+          throw err;
+        });
         /* 换完再「继续」：新段是否在跑由后端决定（end_and_start 会新开一条 running）。
            只在后端确实留下暂停态时补 resume，避免撞 TIMER_ALREADY_RUNNING。 */
         if (wasRunning && next.status === 'paused') await timerApi.resume();

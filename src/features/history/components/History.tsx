@@ -1,14 +1,9 @@
-import { objectColor } from "../../../shared/classification/objectColor.ts";
 import type { Locale, UiText } from "../../../shared/i18n/index.ts";
 import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef, } from "react";
 import type { CSSProperties } from "react";
 import { Expand, Minus, Plus, Tags, X, ZoomIn } from "lucide-react";
 
-import {
-  buildHistoryCategoryDistribution,
-  formatDuration,
-  formatTime,
-} from "../services/historyFormatting";
+import { formatDuration, formatTime } from "../services/historyFormatting";
 import { useIconThemeColors, useIconThemeColorSnapshot } from "../../../shared/hooks/useIconThemeColors";
 import { useRequestedAppIcons } from "../../../shared/hooks/useRequestedAppIcons.ts";
 import {
@@ -17,7 +12,6 @@ import {
   type HistorySnapshotLoadOptions,
 } from "../services/historyReadModel";
 import type { TrackerHealthSnapshot } from "../../../shared/types/tracking";
-import { AppClassification } from "../../../shared/classification/appClassification.ts";
 import HistoryHorizontalTimeline from "./HistoryHorizontalTimeline.tsx";
 import QuietIconAction from "../../../shared/components/QuietIconAction";
 import QuietDialog from "../../../shared/components/QuietDialog";
@@ -46,7 +40,6 @@ import {
 } from "../services/historyLayoutPreferenceStorage.ts";
 import {
   buildWebDomainIconMap,
-  buildWebDomainDistribution,
   buildWebTimelineItems,
 } from "../../../shared/lib/webActivityViewModel.ts";
 import { useHistoryTimelineMode } from "../hooks/useHistoryTimelineMode.ts";
@@ -82,10 +75,9 @@ import HistoryDateHeader from "./HistoryDateHeader.tsx";
 import HistoryTimelineDialogDateControls from "./HistoryTimelineDialogDateControls.tsx";
 import HistoryTimelineZoomDialog from "./HistoryTimelineZoomDialog.tsx";
 import { useHistoryDestinationDetailEntry } from "../hooks/useHistoryDestinationDetailEntry.tsx";
-import {
-  createQuickAppClassificationTarget,
-  createQuickWebClassificationTarget,
-} from "../../classification/types.ts";
+import { useHistoryDistributionItems } from "../hooks/useHistoryDistributionItems.ts";
+import HistoryTimingLane from "./HistoryTimingLane.tsx";
+import HistoryActivityActionDialog, { type HistoryActivityActionTarget } from "./HistoryActivityActionDialog.tsx";
 
 interface Props {
   onInitialContentReady?: () => void;
@@ -108,6 +100,7 @@ interface Props {
   selectedDateRequest?: {
     dateKey: string;
     requestId: number;
+    focusApp?: string | null;
   } | null;
   hourlyActivityChartMode: HourlyActivityChartMode;
   onHourlyActivityChartModeChange: (mode: HourlyActivityChartMode) => void;
@@ -196,12 +189,6 @@ function cleanTimelineDetailTitles(samples: TimelineDetailTitle[], appName: stri
 }
 
 const MILLISECONDS_PER_HOUR = 60 * 60_000;
-
-function historyAppDisplayName(exeName: string, appName: string, uiText: UiText) {
-  const mapped = AppClassification.mapApp(exeName, { appName });
-  return mapped.category === "anonymous" ? uiText.common.anonymousActivity
-    : AppClassification.getUserOverride(exeName)?.displayName?.trim() || appName.trim() || mapped.name;
-}
 
 export default function History({
   uiText: UI_TEXT,
@@ -645,84 +632,17 @@ export default function History({
     formatTimelineWindowBoundary(timelineViewport.endMs, selectedDayRange.endMs, locale),
   );
   const timelineZoomHours = timelineViewport.durationMs / MILLISECONDS_PER_HOUR;
-  const appDistributionItems = useMemo<HistoryDayDistributionItem[]>(
-    () => {
-      void mappingVersion;
-      return appSummary.map((app) => {
-        const mapped = AppClassification.mapApp(app.exeName, { appName: app.appName });
-        const appOverride = AppClassification.getUserOverride(app.exeName);
-        const overrideColor = appOverride?.color;
-        const accentColor = objectColor("app", app.exeName, overrideColor, iconThemeColors[app.exeName], mapped.category, mapped.color);
-        const appName = historyAppDisplayName(app.exeName, app.appName, UI_TEXT);
-        return {
-          key: app.exeName,
-          label: appName,
-          duration: app.duration,
-          percentage: app.percentage,
-          color: accentColor,
-          iconSrc: historyIcons[app.exeName],
-          kind: "app",
-          quickClassificationTarget: mapped.category === "anonymous" ? undefined : createQuickAppClassificationTarget({
-            exeName: app.exeName,
-            displayName: appName,
-            category: mapped.category,
-          }),
-          unclassified: mapped.category === "other",
-        };
-      });
-    },
-    [appSummary, historyIcons, iconThemeColors, mappingVersion, UI_TEXT],
-  );
-  const categoryDistributionItems = useMemo<HistoryDayDistributionItem[]>(() => {
-    return buildHistoryCategoryDistribution(appSummary, (app) => {
-      const mapped = AppClassification.mapApp(app.exeName, { appName: app.appName });
-      return {
-        category: mapped.category,
-        label: AppClassification.getCategoryLabel(mapped.category, UI_TEXT),
-        color: AppClassification.getCategoryColor(mapped.category),
-      };
-    });
-  }, [appSummary, UI_TEXT]);
-  const webDistributionItems = useMemo<HistoryDayDistributionItem[]>(
-    () => {
-      if (!webActivityEnabled) return [];
-
-      return buildWebDomainDistribution(
-        visibleDayWebSegments,
-        selectedDayRange,
-        nowMs,
-        webDomainOverrides,
-        webDomainIconThemeColors,
-        webDomainFavicons,
-      )
-        .map((item) => ({
-          key: item.key,
-          label: item.category === "anonymous" ? UI_TEXT.common.anonymousActivity : item.label,
-          duration: item.duration,
-          percentage: item.percentage,
-          color: item.color,
-          iconSrc: item.faviconUrl ?? undefined,
-          category: item.category,
-          kind: "web" as const,
-          quickClassificationTarget: item.category === "anonymous" ? undefined : createQuickWebClassificationTarget({
-            normalizedDomain: item.key,
-            displayName: item.label,
-            category: item.category,
-          }),
-          unclassified: item.category === "other",
-        }));
-    },
-    [
-      nowMs,
-      visibleDayWebSegments,
-      selectedDayRange,
-      webActivityEnabled,
-      webDomainFavicons,
-      webDomainIconThemeColors,
-      webDomainOverrides,
-      UI_TEXT,
-    ],
-  );
+  /* [P0-02 前置抽取] 时段分布的三个数据源已搬进 hooks/useHistoryDistributionItems.ts：
+     本文件冻结在 1206 行、零余量，接新功能前必须先等量腾出空间。 */
+  const {
+    appItems: appDistributionItems,
+    categoryItems: categoryDistributionItems,
+    webItems: webDistributionItems,
+  } = useHistoryDistributionItems({
+    appSummary, historyIcons, iconThemeColors, mappingVersion, uiText: UI_TEXT,
+    visibleDayWebSegments, selectedDayRange, nowMs, webActivityEnabled,
+    webDomainOverrides, webDomainIconThemeColors, webDomainFavicons,
+  });
   const webTimelineItems = useMemo(
     () => {
       if (!webActivityEnabled) return [];
@@ -1067,6 +987,17 @@ export default function History({
     if (contentState === "error" || meaningfulContent) onInitialContentReady?.();
   }, [contentState, meaningfulContent, onInitialContentReady]);
 
+  /* [P0-03 ③] focusApp → 高亮键（纯派生，零 state / 零 effect / 零滚动定位）。
+     「请求日期 == 当前呈现日期」这一条同时兼任生效范围与自动失效：用户翻到别的日期时
+     高亮自己就没了，不需要任何清理逻辑，也不会留着「昨天的应用还亮着」的脏态。
+     overview 轨是 0–24h 定宽的绝对定位容器（段用 left/width 百分比），根本没有横向滚动
+     目标，所以「滚动到该应用」这个动作在本页不成立——点亮就是正解。 */
+  const highlightedApp = selectedDateRequest && visibleDateKey === selectedDateRequest.dateKey
+    ? selectedDateRequest.focusApp ?? null
+    : null;
+  /* [P0-05] 点中的活动段 → 弹「在 Timing 计这件事」（null = 弹卡关着） */
+  const [activityActionTarget, setActivityActionTarget] = useState<HistoryActivityActionTarget | null>(null);
+
   return (
     <div
       className="flex-1 min-h-0 flex flex-col gap-4 md:gap-5 h-full overflow-hidden"
@@ -1099,9 +1030,16 @@ export default function History({
           mode={effectiveHistoryTimelineMode}
           title={historyCopy.timelineAxis}
           actions={showQuietPlaceholder ? null : timelineAxisActions}
+          highlightSourceKey={highlightedApp}
+          onSegmentActivate={setActivityActionTarget}
           showEmptyMessage
           emptyMessage={showTimelineQuietPlaceholder ? "" : undefined}
         />
+        {/* [P0-02] Timing 泳道：与上面那张活动轨**共用同一个 viewModel**，所以视口边界、
+            日界、「现在」三者天然同轴；无记录时组件内部返回 null，不留空泳道。 */}
+        {showQuietPlaceholder ? null : (
+          <HistoryTimingLane viewModel={visibleHistoryTimelineView} highlightSourceKey={highlightedApp} />
+        )}
       </div>
 
       <div className="flex gap-4 md:gap-5 min-h-0 flex-1">
@@ -1201,6 +1139,9 @@ export default function History({
       />
 
       {destinationDetail.dialog}
+      {activityActionTarget && (
+        <HistoryActivityActionDialog target={activityActionTarget} onClose={() => setActivityActionTarget(null)} />
+      )}
     </div>
   );
 }

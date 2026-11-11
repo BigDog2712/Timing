@@ -1,0 +1,87 @@
+/* =============================================================================
+   设置页搬家时的「宿主遗留件」（[0.12.1] T04b）
+   -----------------------------------------------------------------------------
+   为什么需要这一份：设置页从药丸（宿主窗）搬进分析窗时，纪律是**className 一个字都不改**
+   （改了就等于顺手重排视觉，review 时看不清哪一处是搬家、哪一处是改设计）。但有两个类
+   原本定义在宿主入口 CSS 里 —— `src/styles/app.css` 的 `.btn` / `.btn--danger` /
+   `.inline-error` —— 分析窗的样式表从来没有它们，搬过来就成了裸 `<button>` 与一句没颜色的
+   错误文字。
+
+   所以这里按**等价语义**补一份，只覆盖搬家后仍被引用的三个选择器（`MdSyncBackupCard` 的
+   危险按钮、`HostGeneralPanel` 的错误条）。不复制宿主的全部 `.btn--*`：没有引用就没有理由。
+   颜色与圆角一律走 `--qp-*` 令牌（宿主的 `--surface-3` / `--danger` 在分析窗不存在，
+   硬搬会得到一堆 `var()` 失效的空规则，比没有样式更难查）。
+   ============================================================================= */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--qp-radius-chip);
+  font-size: var(--qp-font-size-caption);
+  font-weight: var(--qp-font-weight-emphasis);
+  color: var(--qp-text-primary);
+  background: var(--qp-bg-elevated);
+  cursor: pointer;
+  transition:
+    background-color var(--qp-motion-fast) var(--qp-motion-ease),
+    border-color var(--qp-motion-fast) var(--qp-motion-ease),
+    transform var(--qp-motion-fast) var(--qp-motion-ease);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--qp-bg-panel);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  color: var(--qp-text-tertiary);
+  cursor: not-allowed;
+}
+
+/* 危险动作（「恢复」会覆盖当前文件）：只染文字与描边，不做实心红 ——
+   实心红在这套配色里对比度不够，且它和「删除」不是一回事（恢复本身不丢数据）。 */
+.btn--danger {
+  color: var(--qp-danger);
+  border-color: color-mix(in srgb, var(--qp-danger) 40%, transparent);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--qp-danger) 12%, transparent);
+}
+
+/* 两个 accent 档：搬家后仍被引用的只有这两个（`btn--primary` = 该块的确认动作，
+   `btn--ghost` = 次要动作）。宿主的实心强调蓝在这里换成 accent tint —— 分析窗的配色是
+   「中性底 + 一个 accent」，实心按钮会和药丸抢注意力。 */
+.btn--primary {
+  color: var(--qp-accent-default);
+  border-color: color-mix(in srgb, var(--qp-accent-default) 45%, transparent);
+  background: color-mix(in srgb, var(--qp-accent-default) 10%, transparent);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--qp-border-subtle);
+}
+
+/* 行内错误条：一行字 + 图标，不进卡片、不弹层（这些错误都发生在「刚才那一下」之后）。 */
+.inline-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+  color: var(--qp-danger);
+}
+
+.inline-error svg {
+  flex: 0 0 auto;
+}

@@ -1,0 +1,223 @@
+/* ============================================================================
+ * dashboard-modules.css — 计时分布 / 事项分布 / 应用排行三张卡的版式
+ * -----------------------------------------------------------------------------
+ * 从 dashboard.css 拆出来的第二片：dashboard.css 管板式 + 卡壳 + 空态骨架（那一半
+ * 五张卡共用），本文件管卡里面长什么样。拆的判据是单文件 ≤300 行（AGENTS.md）。
+ * 档位数值照旧只引用 tiers.css。
+ * ========================================================================== */
+
+/* ── 计时分布：环 + 5 行读数 ── */
+.qp-donut-body {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: var(--qp-donut) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--qp-card-gap);
+  min-height: 0;
+}
+
+.qp-donut {
+  position: relative;
+  width: var(--qp-donut);
+  height: var(--qp-donut);
+}
+
+.qp-donut svg { display: block; width: 100%; height: 100%; }
+
+/* 环心是全屏唯一居中块（几何表） */
+.qp-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.qp-donut-total {
+  min-width: 76px;
+  text-align: center;
+  font-size: var(--qp-font-size-metric);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--qp-font-weight-emphasis);
+  line-height: var(--qp-line-height-metric);
+  color: var(--qp-text-primary);
+}
+
+.qp-donut-cap {
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+}
+
+/* 数字列右缘 = 卡内右缘 − 6（01 §4.3 几何表，列内相对坐标）
+ * 左列：465.14−16 = 449.14 → −6 = **443.14**；右列：570.86−16 = 554.86 → −6 = **548.86**
+ * （表里 555 / 549 是同一对值的四舍五入）。
+ * 这 6px 就是 §4.2 说的「右轨」。实现分两种容器，但**结果一致**：
+ *   · 不滚动的读数表 → 容器上一句 padding-right（下面这条）；
+ *   · 会滚动的三个列表 → 用 `qp-scroll-region-stable` 的 `scrollbar-gutter: stable`，
+ *     滚不滚都常驻 6px（`--qp-scrollbar-size: 6px`）。
+ * 为什么不能用"行上 padding-right"：列表一旦溢出就多出滚动条槽，数字列会再左移 6px
+ * —— 实测（1100 档探针）右列数字右缘 439.25 而不是 445.25，四条列的竖线直接断开。 */
+.qp-readouts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-row-gap);
+  margin: 0;
+  /* padding-right 必须写在 padding 简写**之后**（简写会把前面那行清成 0 —— 第一版就是这么
+   * 被吃掉的，实测右缘 449.14 而不是 443.14） */
+  padding: 0 var(--qp-rail-inset) 0 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.qp-readout {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) var(--qp-col-num);
+  align-items: center;
+  gap: 8px;
+  height: var(--qp-row-readout);
+  border-radius: 4px;
+  color: var(--qp-text-secondary);
+}
+
+/* hover 弧段 ↔ 读数行 双向联动（01 §4.2）。只改底色，不动几何（否则 5 行会跳） */
+.qp-readout[data-hover="true"] { background: var(--qp-bg-elevated); }
+
+.qp-readout-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+}
+
+.qp-readout-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-readout-value {
+  text-align: right;
+  font-size: var(--qp-font-size-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-primary);
+  white-space: nowrap;
+}
+
+/* ── 事项分布：6 行裸条（dot / 名字 / 60 裸条 / 数字） ── */
+/* 列表的"重置"只留事项 / 应用两条：待办列表的那一份搬进 `dashboard-todos.css`，
+ * 与 `.qp-todo-row` / `.qp-todo-list` 的其余规则放在一起 —— 一张卡的样式不跨两个文件，
+ * 否则改列宽/间距时要来回翻。 */
+.qp-item-list,
+.qp-app-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.qp-item-list {
+  display: flex;
+  flex-direction: column;
+  align-content: start;
+  gap: var(--qp-row-gap);
+}
+
+.qp-item-row {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: 6px minmax(0, 1fr) var(--qp-bar-max) var(--qp-col-num);
+  align-items: center;
+  gap: 8px;
+  height: var(--qp-row-items);
+}
+
+.qp-item-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-item-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--qp-chart-track);
+  overflow: hidden;
+}
+
+.qp-item-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* ── 应用排行：5 行 + 2px 发丝 + 图标 ── */
+.qp-app-list { display: flex; flex: 1 1 auto; flex-direction: column; }
+
+.qp-app-row {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: 20px minmax(0, 1fr) var(--qp-col-num);
+  align-items: center;
+  gap: 10px;
+  height: var(--qp-row-app);
+}
+
+/* 2px 发丝：几何按 01 §4.3「bottom:0; height:2px; border-radius:0」 */
+.hair {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 0;
+  background: var(--qp-border-subtle);
+}
+
+.qp-app-icon {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 5px;
+  background: var(--qp-bg-elevated);
+  font-size: var(--qp-font-size-compact);
+  font-weight: var(--qp-font-weight-emphasis);
+  line-height: var(--qp-line-height-compact);
+  color: var(--qp-text-tertiary);
+}
+
+.qp-app-icon > img { width: 100%; height: 100%; object-fit: contain; }
+
+.qp-app-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--qp-font-size-body);
+  line-height: var(--qp-line-height-body);
+  color: var(--qp-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-app-value {
+  text-align: right;
+  font-size: var(--qp-font-size-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-secondary);
+  white-space: nowrap;
+}

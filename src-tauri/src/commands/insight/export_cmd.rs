@@ -67,7 +67,7 @@ fn export_file_name(format: &str, start_date: &str, end_date: &str) -> Option<St
     } else {
         format!("{start}-{end}")
     };
-    Some(format!("Patina-export-{date_range}.{extension}"))
+    Some(format!("Timing-export-{date_range}.{extension}"))
 }
 
 #[tauri::command]
@@ -115,7 +115,7 @@ mod tests {
         ] {
             assert_eq!(
                 export_file_name(format, "2026-07-01", "2026-07-12"),
-                Some(format!("Patina-export-20260701-20260712.{extension}")),
+                Some(format!("Timing-export-20260701-20260712.{extension}")),
             );
         }
     }
@@ -124,7 +124,7 @@ mod tests {
     fn single_day_export_file_names_do_not_repeat_the_date() {
         assert_eq!(
             export_file_name("csv", "2026-07-12", "2026-07-12"),
-            Some("Patina-export-20260712.csv".to_string()),
+            Some("Timing-export-20260712.csv".to_string()),
         );
     }
 

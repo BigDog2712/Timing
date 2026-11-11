@@ -73,8 +73,8 @@ export function ThemePicker() {
   return (
     <div className="picker">
       <section className="card">
-        <h3 className="card__title">主题</h3>
-        <div className="theme-cards" role="radiogroup" aria-label="主题">
+        <h3 className="card__title">主题与主色 · 全应用唯一入口</h3>
+        <div className="theme-cards" role="radiogroup" aria-label="主题与主色（全应用唯一入口）">
           {THEME_CARDS.map(({ id, label, Icon }) => {
             const on = id === mode;
             const preview = id === 'system' ? resolved : id;

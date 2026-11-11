@@ -85,7 +85,11 @@
   --pill-h-compact:  30px;
   --radius-pill:     calc(var(--pill-h) / 2);   /* 真胶囊 = 16px */
   --pill-w-min:      116px;
-  --pill-w-max:      288px;
+  /* [0.12.1] 288 → 320：三手柄连排时 name 之后要多出 2×16px（每手柄净 16）。
+     320 让「三手柄全开 + 事项名钉在 --task-w-max 164」刚好 310，留 10px 余量（W-04）。 */
+  --pill-w-max:      320px;
+  /* 撤销条**必须停在 288**：它和药丸不是一个东西，跟着变宽只会让浮出来的条更突兀（W-02） */
+  --undo-w-max:      288px;
   --task-w-max:      164px;
   --pill-pad-l:      8px;
   --pill-pad-r:      7px;
@@ -110,8 +114,9 @@
   --text-timer-pill: 18px;
   --text-task-pill:  14px;   /* Timing TaskEm=14（YaHei UI Bold） */
   --font-timer:      "Segoe UI", "Segoe UI Semibold", "Microsoft YaHei UI", sans-serif;
-  --grip-w:          10px;
-  --grip-hit-w:      10px;
+  /* [0.12.1] 10 → 12：命中宽就是手柄的宽度本身，12 是三连排下不重叠的上限（N6 记债：< WCAG 24） */
+  --grip-w:          12px;
+  --grip-hit-w:      12px;
   --grip-svg-w:      12px;
   --grip-svg-h:      22px;
 

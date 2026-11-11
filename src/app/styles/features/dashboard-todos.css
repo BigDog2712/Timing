@@ -1,0 +1,248 @@
+/* ============================================================================
+ * dashboard-todos.css — 待办卡（01 §4.3 骨架：head / compose / list / fade / undo）
+ * -----------------------------------------------------------------------------
+ * 这一张卡的**全部**样式都在本文件：卡体、输入行、行网格、勾选命中区、渐隐、撤销条。
+ * 之所以单独成文件而不是接着 dashboard.css 写，是因为 dashboard.css 同时承担
+ * 板式 + 卡壳 + 空态骨架（那是五卡共用的），再塞一张卡的内部版式会让"改一行要不要
+ * 先读 200 行"变成常态；判据是单文件 ≤300 行（AGENTS.md）+ 一张卡的样式不跨文件。
+ * 便利贴条曾经也在这里，后来搬去 `dashboard-notes.css`（同一条判据：它们是两张不同的卡）。
+ * 档位数值照旧只引用 tiers.css，本文件不出现 294 / 36 这类裸数。
+ * ========================================================================== */
+
+/* ── 待办卡（DOM 见 01 §4.3：head / compose / list / fade / undo） ── */
+.qp-card-todos { position: relative; }
+
+/* ── 输入行：与行网格共用同一条左侧轨（22 = 卡内 16 + 6） ──
+ * `padding-left: 5` 而不是 6：本行有 1px 实边（行没有），5+1 才让**内容**起点落在 22，
+ * 与 `.qp-todo-row` 的 grid 起点同一竖线。按 padding 数字对齐会差 1px，
+ * 按内容边对齐才对（勾选框中心 34 / 输入起点 52 就是这么来的）。
+ * 加号外面那层 24px 轨是必需的：svg 只有 14，轨道 24 才让图标中心落在 34，
+ * 和行里那个 24×24 勾选按钮同宽 —— 两个"行首标记"必须同轴。 */
+.qp-todo-compose {
+  display: flex;
+  flex: 0 0 var(--qp-todo-compose-h);
+  height: var(--qp-todo-compose-h);
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--qp-row-gap);
+  padding: 0 10px 0 5px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-control);
+  background: var(--qp-bg-elevated);
+  color: var(--qp-text-tertiary);
+}
+
+.qp-compose-icon {
+  display: flex;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+}
+
+.qp-todo-compose:focus-within { border-color: var(--qp-focus-ring); }
+
+.qp-todo-compose input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-primary);
+  outline: none;
+}
+
+.qp-todo-compose input::placeholder { color: var(--qp-text-placeholder); }
+
+.qp-todo-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--qp-row-gap);
+  /* 列表重置（原来挂在 dashboard-modules.css 的三合一选择器上，现在归到本卡） */
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+  /* 撤销条 / 渐隐都是 absolute/sticky，不占行位 → 可见整行数才是几何表那 5 行 */
+}
+
+/* 行网格的左轨 = 6 padding + 24 勾选列 + 6 gap：勾选框中心 34、标题起点 52 */
+.qp-todo-row {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  /* 勾选列 24 而不是 16：命中区 ≥24×24 是 WCAG 2.5.8 AA 的硬下限（02 §5.3 A9），
+   * 16px 的勾选框只是**画出来**那么大，按钮必须有 24 的可点范围。 */
+  grid-template-columns: 24px minmax(0, 1fr) var(--qp-col-num);
+  align-items: center;
+  gap: 6px;
+  height: var(--qp-row-todo);
+  padding-left: 6px;
+}
+
+/* 行内删除键：**绝对定位盖在时间列上**，不进 grid 列宽（否则 44px 数字列被挤窄，
+ * 四条数字列右缘 443.14/548.86 立刻失效）。命中区 24×24 = WCAG 2.5.8 AA 下限（A9）。 */
+.qp-todo-del {
+  position: absolute;
+  right: 0;
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--qp-text-tertiary);
+  opacity: 0;
+  cursor: default;
+}
+
+.qp-todo-row:hover .qp-todo-del,
+.qp-todo-del:focus-visible { opacity: 1; }
+
+/* 删除键出现时藏掉时间，避免两串文字压在 20px 里互相糊 */
+.qp-todo-row:hover .qp-todo-time { opacity: 0; }
+
+.qp-todo-del:focus-visible {
+  outline: 2px solid var(--qp-focus-ring);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* 勾选命中区 **24 宽 × 36 高**（撑满行高），不是 24×24。
+ * 行高 36、命中盒 24×24 时上下各留 6px 行体 —— 点在那儿会命中"行体单击 → 打开待办窗"，
+ * 于是"想勾选却弹出一个窗体"。命中区的**形状按误触后果的代价**定，不按最小合规面积定：
+ * 相邻区域的代价更高时，就把命中区扩过去盖住它。
+ * 视觉方框仍是 16×16 且居中（`align-items: center` 在按钮内部），**一像素不动版式**。
+ * 24 这个宽度仍满足 WCAG 2.5.8 AA 的下限，改的只是高度。 */
+.qp-todo-check {
+  display: flex;
+  align-self: stretch;
+  width: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: default;
+}
+
+/* 视觉方框 16×16 画在按钮里面（按钮 24×24 只是命中区） */
+.qp-todo-box {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--qp-border-strong);
+  border-radius: 5px;
+  background: none;
+  color: var(--qp-bg-panel);
+}
+
+.qp-todo-check[aria-checked="true"] .qp-todo-box {
+  border-color: var(--qp-accent-default);
+  background: var(--qp-accent-default);
+}
+
+.qp-todo-check:focus-visible {
+  outline: 2px solid var(--qp-focus-ring);
+  outline-offset: 2px;
+}
+
+.qp-todo-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--qp-font-size-body);
+  line-height: var(--qp-line-height-body);
+  color: var(--qp-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-todo-row[data-done="true"] .qp-todo-title {
+  color: var(--qp-text-tertiary);
+  text-decoration: line-through;
+}
+
+.qp-todo-time {
+  text-align: right;
+  font-size: var(--qp-font-size-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+  white-space: nowrap;
+}
+
+/* 底部渐隐（01 §4.3 的 .qp-fade-bottom）：只在"还能往下滚"时出现，
+ * 判据是 scrollTop+clientHeight < scrollHeight−1（02 §4.2 #2）——由 hook 算，不靠 CSS。
+ * 16px 而不是 20：16 只盖住一行的下半，20 会把最后一行的字形压掉；
+ * `margin-right` 让出 6px 滚动条槽 —— 不挡的话渐隐会横着压过右轨，把数字列末端糊掉
+ * （列表用 `qp-scroll-region-stable`，那条 6px 是常驻的，不是只有溢出时才有）。
+ *
+ * `flex: 0 0 auto` 不是可选的：这块靠 `margin-top: -16` 把占位抵成 0，若它还能被 flex 压缩
+ * （默认 flex-shrink: 1），列表会把它压到 10.31，净占位变成 −5.69，**列表反而多出 5.69**
+ * （实测长档 clientHeight 204 而非 198、末行被 `overflow: hidden` 咬掉 6px）。
+ * 负 margin + 可压缩高度这个组合必须靠 flex-shrink: 0 收口。 */
+.qp-fade-bottom {
+  position: sticky;
+  bottom: 0;
+  flex: 0 0 auto;
+  height: 16px;
+  margin-top: -16px;
+  margin-right: var(--qp-scrollbar-size);
+  background: linear-gradient(to top, var(--qp-bg-panel), transparent);
+  pointer-events: none;
+}
+
+/* 撤销条：乐观删除 + 窗内撤销（语义照抄主窗 todoStore.remove/undoRemove，AC-32） */
+.qp-undo-bar {
+  position: absolute;
+  right: var(--qp-card-pad);
+  bottom: var(--qp-card-pad);
+  left: var(--qp-card-pad);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-control);
+  background: var(--qp-bg-elevated);
+  box-shadow: var(--qp-shadow-overlay);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-secondary);
+}
+
+.qp-undo-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 撤销键是**普通文字 + 主文本色**，不是强调色加粗：撤销条是一条状态提示（role=status），
+ * 不是需要抢注意力的主操作；强调色留给真正的主按钮（FW-6 的"每屏一个强调色元素"就靠这个）。 */
+.qp-undo-btn {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  font-size: var(--qp-font-size-caption);
+  font-weight: var(--qp-font-weight-regular);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-primary);
+  cursor: default;
+}
+
+.qp-undo-btn:focus-visible {
+  outline: 2px solid var(--qp-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--qp-radius-button);
+}

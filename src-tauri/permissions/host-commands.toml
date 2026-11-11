@@ -12,13 +12,14 @@
 
 [[permission]]
 identifier = "host-commands"
-description = "Timing 宿主应用命令面（80 条）：事项 / 计时 / 记录 / 统计 / 设置 / 主题 / 窗口 / 便利贴 / 待办 / 提醒 / 插件 / Markdown 同步 / 数据根 / 迁移 / 移动端桥 / 打开时间统计窗口。只授权给宿主自己的窗口，Patina 分析窗口另走 main-window-commands。"
+description = "Timing 宿主应用命令面（81 条）：事项 / 计时 / 记录 / 统计 / 设置 / 主题 / 窗口 / 便利贴 / 待办 / 提醒 / 插件 / Markdown 同步 / 数据根 / 迁移 / 移动端桥 / 打开时间统计窗口。只授权给宿主自己的窗口，Patina 分析窗口另走 main-window-commands。"
 commands.allow = [
   "accent_get",
   "accent_set",
   "archive_item",
   "close_note_window",
   "create_item",
+  "create_record",
   "daily_status_get",
   "daily_status_set",
   "data_root_change",

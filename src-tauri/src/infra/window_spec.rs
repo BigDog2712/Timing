@@ -32,7 +32,13 @@ pub struct WindowSpec {
     pub always_on_top: bool,
 }
 
-/// 设置面板（单例；392×660，不可缩放，恒定置顶；ADR-009 §窗口目录 / settings-panel.md §1）。
+/// 设置面板的**历史规格**（392×660，不可缩放，恒定置顶；ADR-009 §窗口目录）。
+///
+/// ⚠️ [0.12.1] 这一条**已经没有建窗入口了**：设置只剩一个家（分析窗 label `patina` 的
+/// settings 视图），`window::open_settings_window` 改成委托给 `tools_navigation::open_settings`。
+/// 保留规格是因为 `spec_for("settings")` 仍被测试与 label 表引用，删掉要连带改测试与
+/// `window_spec` 的用例；但它**不许**再被 `open_panel_window` 拿去建窗 ——
+/// 那样会造出一扇没有任何 capability、前端还认不出 label 的透明置顶窗（QA「死代码带枪」）。
 ///
 /// V0.1.0 主窗 `main` 仍由 `tauri.conf.json` 声明，不在此表（避免重复来源）。
 pub const SETTINGS: WindowSpec = WindowSpec {

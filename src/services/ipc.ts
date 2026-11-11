@@ -169,13 +169,8 @@ export const ipc: IpcApi = {
 
   /* ---- 记录域 ---- */
   listRecords: (params: ListRecordsParams) =>
-    call<Paginated<TimeRecord>>('list_records', {
-      itemId: params.itemId,
-      from: params.from,
-      to: params.to,
-      page: params.page ?? 1,
-      limit: params.limit ?? 20,
-    }),
+    call<Paginated<TimeRecord>>('list_records', { itemId: params.itemId, from: params.from, to: params.to, page: params.page ?? 1, limit: params.limit ?? 20 }),
+  createRecord: (params) => call<TimeRecord[]>('create_record', { itemId: params.itemId, startedAt: params.startedAt, endedAt: params.endedAt, note: params.note ?? null }),
   statsSummary: (params: StatsSummaryParams) =>
     call<StatsSummary>('stats_summary', { itemId: params.itemId, from: params.from, to: params.to }),
   updateRecord: (params: UpdateRecordParams) => call<TimeRecord>('update_record', { id: params.id, patch: params.patch }),
@@ -243,8 +238,8 @@ export const ipc: IpcApi = {
   openTodosWindow: () => call<void>('open_todos_window'),
   openSettingsWindow: () => call<void>('open_settings_window'),
   openTimerWindow: () => call<void>('open_timer_window'),
-  /* [V0.12.0] 时间统计窗口 · 宿主命令（Patina 的 `cmd_show_main_window` 被 ACL 锁在 `windows: ["patina"]`） */
-  openPatinaWindow: () => call<void>('open_patina_window'),
+  /* [V0.12.0] 时间统计窗口 · 宿主命令（`cmd_show_main_window` 被 ACL 锁在 `windows: ["patina"]`）；[P0-03] 只加可选落点（`null` 显式传），命令名与条数不变（本文件卡 300 行，净变化 = 0） */
+  openPatinaWindow: (params) => call<void>('open_patina_window', { target: params?.target ?? null }),
   /* [V0.3.4] 日记域四条命令实现随模块下架删除（ADR-023）。 */
 
   /* ---- [V0.2.0] 主题域 ---- */

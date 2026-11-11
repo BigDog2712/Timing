@@ -1,7 +1,7 @@
 //! 时间记录仓库（time_records 表）：查询 / 汇总 / 编辑 / 软删除。
 //! 计时会话生命周期 SQL 见 `record_session`。
 
-use sqlx::{QueryBuilder, Sqlite, SqlitePool};
+use sqlx::{QueryBuilder, Sqlite, SqliteConnection, SqlitePool};
 
 use crate::error::AppResult;
 use crate::models::record::TimeRecord;
@@ -151,6 +151,59 @@ pub async fn stats_by_item(
     push_filters(&mut qb, item_id, from, to);
     qb.push(" GROUP BY item_id ORDER BY total_sec DESC");
     Ok(qb.build_query_as::<ItemStats>().fetch_all(pool).await?)
+}
+
+/// 补记的幂等键查询：同事项 + 同起点的**已保存**行（P1-01 §2.4）。键取
+/// `(item_id, started_at)` 二元组而非三元组：跨零点拆段后首尾两行的区间都不等于原始区间，
+/// 三元组匹配不上；毫秒精度下「同事项同起点」与真实计时撞车不可能。代价：同事项同毫秒
+/// 起点的两次不同长度补记被判重复——**有意的取向：宁可少记，不可重复记**。
+pub async fn find_backfill_duplicate(
+    pool: &SqlitePool,
+    item_id: i64,
+    started_at: i64,
+) -> AppResult<Option<TimeRecord>> {
+    let sql = format!(
+        "SELECT {COLS} FROM time_records \
+         WHERE item_id = ? AND started_at = ? AND status = 'saved' AND deleted_at IS NULL \
+         ORDER BY id ASC LIMIT 1"
+    );
+    Ok(sqlx::query_as::<_, TimeRecord>(&sql)
+        .bind(item_id)
+        .bind(started_at)
+        .fetch_optional(pool)
+        .await?)
+}
+
+/// 补记落库：纯插入一条 `saved` 行，返回新 id。形状**逐字对齐**
+/// `record_session.rs::finalize_split` 的 INSERT：`status='saved'`、`running_since=NULL`、
+/// `mode='countup'`、`target_sec=NULL`——补记不产生进行中的会话，也不产生倒计时；比那三份
+/// 范式多出来的只有 `note` 一列。取 `&mut SqliteConnection` 而非 pool：调用方要把跨零点的
+/// 多段插入放进**同一个事务**，否则中途失败留下半条账。
+pub async fn insert_saved(
+    conn: &mut SqliteConnection,
+    item_id: i64,
+    started_at: i64,
+    ended_at: i64,
+    accumulated_sec: i64,
+    note: Option<&str>,
+    now: i64,
+) -> AppResult<i64> {
+    let id: i64 = sqlx::query_scalar(
+        "INSERT INTO time_records \
+         (item_id, status, started_at, ended_at, accumulated_sec, running_since, \
+          mode, target_sec, note, created_at, updated_at) \
+         VALUES (?, 'saved', ?, ?, ?, NULL, 'countup', NULL, ?, ?, ?) RETURNING id",
+    )
+    .bind(item_id)
+    .bind(started_at)
+    .bind(ended_at)
+    .bind(accumulated_sec)
+    .bind(note)
+    .bind(now)
+    .bind(now)
+    .fetch_one(&mut *conn)
+    .await?;
+    Ok(id)
 }
 
 /// 追加可选过滤条件（itemId 精确；from 含、to 不含，作用 started_at）。

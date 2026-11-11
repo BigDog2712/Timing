@@ -1,0 +1,127 @@
+/* =============================================================================
+   主界面设置 · G1 手柄卡（[0.12.1] T04）
+   -----------------------------------------------------------------------------
+   只放 **G1 新增面** 的样式：卡头 / 5 行 / 双击代价提示 / 关闭态降墨 / 锚点滚动偏移 /
+   焦点环。其余 4 组沿用 `styles/features/settings.css`，本轮不重排（设计 §11 第 9 条：
+   V-02..V-09 的字重字号审计只强制 G1，其余如实记债到 0.13）。
+
+   两条硬约束：
+    1. **关闭态是降墨不是禁用**（PRD A-07）：`[data-enabled="false"]` 只动 opacity 与边框，
+       绝不 `pointer-events: none` —— 用户要能先配好绑定再打开。
+    2. 焦点环 2px + accent（V-05），且用 `outline` 而不是 `box-shadow`：outline 不参与布局，
+       卡片高度不会因为获得焦点而跳 2px。
+   ============================================================================= */
+
+/* 锚点滚动偏移：分组导航 scrollIntoView 时，卡片标题不该贴着滚动区顶边。
+   60px = 页头（标题 + 保存按钮）的视觉高度留白，纯经验值，改页头时一起看。 */
+.settings-anchor,
+[id^="s-"] {
+  scroll-margin-top: 60px;
+}
+
+.settings-handle-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-control);
+  background: var(--qp-bg-elevated);
+  transition:
+    opacity var(--qp-motion-fast) ease,
+    border-color var(--qp-motion-fast) ease;
+}
+
+/* A-07：关闭态整卡降墨（0.62 仍能读清槽位名），控件全部保持可用 */
+.settings-handle-card[data-enabled="false"] {
+  opacity: 0.62;
+  border-color: color-mix(in srgb, var(--qp-border-subtle) 60%, transparent);
+}
+
+.settings-handle-card[data-enabled="false"]:hover,
+.settings-handle-card[data-enabled="false"]:focus-within {
+  opacity: 1;
+}
+
+.settings-handle-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-handle-card__title {
+  margin: 0;
+  min-width: 0;
+  color: var(--qp-text-primary);
+  font-size: var(--qp-font-size-body);
+  font-weight: var(--qp-font-weight-emphasis);
+  line-height: var(--qp-line-height-body);
+}
+
+.settings-handle-card__rows {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.settings-handle-card__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.settings-handle-card__label {
+  min-width: 0;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+  font-weight: var(--qp-font-weight-medium);
+  line-height: var(--qp-line-height-caption);
+  white-space: nowrap;
+}
+
+/* 双击代价提示（§6.4）：不写出来，用户只会觉得「点了有时候没反应」 */
+.settings-handle-card__hint {
+  margin: 0;
+  color: var(--qp-warning);
+  font-size: var(--qp-font-size-caption);
+  font-weight: var(--qp-font-weight-medium);
+  line-height: var(--qp-line-height-caption);
+}
+
+.settings-handle-card__foot {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+/* V-05 焦点环：卡内所有可聚焦控件统一 2px accent，四层对比 ≥3.0 */
+.settings-handle-card__row :focus-visible,
+.settings-handle-card__head :focus-visible,
+.settings-handle-card__foot :focus-visible {
+  outline: 2px solid var(--qp-accent-default);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* 手柄选择器最多 13 条动作：下拉本身限宽，避免长标签把行撑开 */
+.settings-handle-card__row > :last-child {
+  flex: 0 0 auto;
+  min-width: 132px;
+  max-width: 60%;
+}
+
+@media (max-width: 767px) {
+  .settings-handle-card__row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .settings-handle-card__row > :last-child {
+    max-width: 100%;
+  }
+}

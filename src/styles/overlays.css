@@ -147,7 +147,8 @@
   align-items: center;
   gap: var(--space-5);
   min-height: var(--toast-h);
-  max-width: var(--pill-w-max);
+  /* [0.12.1] 撤销条与药丸分家：药丸随三手柄变宽到 320，撤销条仍停在 288（W-02） */
+  max-width: var(--undo-w-max);
   margin-top: var(--space-3);
   padding: 0 var(--space-5);
   border-radius: var(--radius-md);

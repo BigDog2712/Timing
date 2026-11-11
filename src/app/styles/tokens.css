@@ -1,6 +1,10 @@
 @theme static {
-  --font-sans: "IBM Plex Sans", "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
-  --font-mono: "IBM Plex Mono", "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  /* 01 §2.8：原首发 "IBM Plex Sans/Mono" 在本机 @font-face 0 处、系统内 0 个，从未加载 →
+   * 实际渲染一直是 Segoe UI(拉丁/数字) + 雅黑/苹方(中文)。删掉两个 Plex 栈位是"改了等于没改"
+   * （逐像素不变），但能避免将来真装了 Plex 时 57.84/49.22/35.16/48.00 这批字宽验收值
+   * 集体失真而没有任何判据报警。--font-mono 把 Consolas 提到首位只是把既有事实写明白。 */
+  --font-sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  --font-mono: "Consolas", "SFMono-Regular", "JetBrains Mono", monospace;
 
   --color-bg-app: var(--qp-bg-app);
   --color-bg-canvas: var(--qp-bg-canvas);
@@ -31,9 +35,23 @@
 }
 
 :root {
-  --qp-font-weight-regular: 450;
-  --qp-font-weight-medium: 550;
-  --qp-font-weight-emphasis: 650;
+  /* M1 字重重建（01 §2.2）。**两套字族的档位不一样**，这是本条的要点：
+   *   微软雅黑(中文)：300 = Light ｜ 400/450/500 = Regular ｜ 550/600/650/700 = Bold（三档）
+   *   Segoe UI(拉丁/数字)：300 ｜ 400/450 ｜ 500/550/600 ｜ 650/700（四档，550 走 **Semibold**）
+   * 所以"medium 一直是假的"成立，但要说得准：它在中文上假在 Bold、在拉丁上假在 Semibold，
+   * 从来不是正文档 —— 全仓 70 处引用此前一直渲染成偏粗。
+   * 下面三个值是**真实渲染值**，不是"希望值"：
+   *   regular 450→400 零像素变化（两套字族都落在 Regular）
+   *   emphasis 650→700 零像素变化（都落在 Bold）
+   *   medium 550→400 是**唯一改画面**的一处（Bold/Semibold → Regular）
+   * 验收方式必须是**墨水量**（canvas 灰度总和），不能用字宽：CJK 是 Han 全角，
+   * 各字重 advance 完全相同（实测全档 98.00），"用宽度判中文塌陷"是恒真式、永远绿。
+   * 实测 ink（28px）：雅黑 300=341539 / 400·450·500=469334 / 550·600·650·700=702837；
+   *                 拉丁 300=225501 / 400·450=326524 / 500·550·600=425004 / 650·700=521826。 */
+  --qp-font-weight-regular: 400;
+  /* deprecated: 与 regular 同值，新代码禁用；保留名字只为不波及 70 处引用 */
+  --qp-font-weight-medium: 400;
+  --qp-font-weight-emphasis: 700;
   --qp-font-size-compact: 0.625rem;
   --qp-line-height-compact: 0.875rem;
   --qp-font-size-page-title: 1.125rem;
@@ -66,8 +84,13 @@
   --qp-space-section: 20px;
   --qp-space-group: 14px;
   --qp-row-height: 42px;
-  --qp-titlebar-height: 36px;
+  /* 顶栏 52 = 长档基准（1100×736）。短档 44 的覆盖只写在 topbar.css 的
+   * @media (max-height: 735.98px) 里，不在这里重复定义第二个真相源。全仓消费点只有
+   * quiet-pro.css:19-20 的 .app-titlebar（flex-basis + height），改 token 即两头一起变。 */
+  --qp-titlebar-height: 52px;
   --qp-window-corner-radius: 8px;
+  /* 工具区段轨内缩，设计里散在 5 处；新写的类必须引用它，不许写裸 6px（01 §2.3） */
+  --qp-rail-inset: 6px;
 
   --qp-motion-fast: 120ms;
   --qp-motion-base: 180ms;
@@ -87,6 +110,47 @@
   --qp-shadow-overlay: 0 10px 24px rgba(0, 0, 0, 0.28);
   --qp-shadow-toast: 0 8px 20px rgba(0, 0, 0, 0.3);
   color-scheme: dark;
+}
+
+/* ── 派生色（01 §2.1）：一律用 color-mix 引用既有 --qp-*，**不写死 hex、不进 deriveTheme**。
+ * 理由：deriveTheme 的返回值被 useAppThemeMode 逐条写进 :root 行内样式；宿主换色后
+ * --qp-accent-default 还会被 applyHostAccents 再改一次。写成 CSS 里的引用式 color-mix
+ * 才能自动跟随宿主取色，且 5 套主题预设一行都不用改。
+ * 这块是**默认/回退值**（= 浅色那套），不是"只在 light 下生效"：html 上 data-theme 恒有值，
+ * dark 时会先套用这块、再被下一块同名 token 覆盖。所以**两处同名 token 必须成对出现**，
+ * 漏一个就会在暗色下静默沿用浅色值 —— 那是最难发现的一类 bug。 */
+:root {
+  /* 占位符：浅色**不许**照搬暗色的 40% 混合（会得到 ≈6.3:1，占位比正文还响）。
+   * 直接等于 tertiary = #707070 on panel(#fff) = 4.95:1（正文 15.9:1，层级正确）。 */
+  --qp-text-placeholder: var(--qp-text-tertiary);
+  /* 选中底：浅色 55% → #8ea7ca，对 panel 2.46:1、primary(#171717) 在其上 7.28:1 */
+  --qp-selection-bg: color-mix(in srgb, var(--qp-accent-default) 55%, var(--qp-bg-panel));
+  /* 焦点环（修既有缺陷：全仓 5 处引用、0 处定义，见 topbar.css 顶部注释与 02 §0 末段）。
+   * 74% 是 44 §3.4 的终值；但 74% 那一档在**浅色**最不利的背景（bg-app #f4f4f4）上只有
+   * ≈3.27:1，低于"两主题都不需要运气"的 3.41 下限，所以浅色提一档到 78%（实测对 app 3.58）。
+   * **混合对象必须是 bg-panel，不许写 transparent**：
+   * ① transparent = rgb(0 0 0 / 0)，混出来是 alpha 0.78 的半透明色 → 描边最终颜色取决于
+   *    它压在什么上面，而 tauri.conf.json 里主窗 `"transparent": true`，圆角外就是桌面，
+   *    靠近窗口边缘时会采样到桌面色；quiet-chart-tooltip.css:82/99 那两处还是 SVG `stroke`，
+   *    坐在 tooltip 面上会二次合成 —— 那样"对比度"这个问题会有四个答案。
+   * ② 混具体的 bg-panel 之后环色是一个**定值**（暗 #73839a / 浅 #5e82b4），五种消费点
+   *    （热力图格 / 趋势段 / range 控件 / tab 底 / 两个 SVG hit）多数坐 panel 系面。
+   * 实测对比度（8bit 合成，四层背景）：
+   *   暗 #73839a：app 4.17 / canvas 3.92 / panel 3.57 / elevated 3.72 → 最差 3.57
+   *   浅 #5e82b4：app 3.58 / canvas 3.81 / panel 3.94 / elevated 3.71 → 最差 3.58
+   * 两个主题的全局最差 3.57 / 3.58，都 ≥ WCAG 2.2 SC 1.4.11 的 3.0。
+   * 对照：若混 transparent（= alpha 版），同一环在四层背景上会渲染成 4 个不同色
+   * （暗 #6f7f96/#708097/#728299/#718198），对比度变成四个答案 3.95/3.76/3.52/3.62。 */
+  --qp-focus-ring: color-mix(in srgb, var(--qp-accent-default) 78%, var(--qp-bg-panel));
+}
+
+:root[data-theme="dark"] {
+  /* 暗 40% = #9199a3 on panel(#2d2d2d) = 4.78:1 */
+  --qp-text-placeholder: color-mix(in srgb, var(--qp-text-secondary) 40%, var(--qp-text-tertiary));
+  /* 暗 40% = #535b68：对 panel 2.01:1、primary 在其上 4.65:1。
+   * 可行区间只有 40%–41.4%：再淡看不出选中，再深选中区的字跌破 4.5:1 —— 不许顺手调圆整。 */
+  --qp-selection-bg: color-mix(in srgb, var(--qp-accent-default) 40%, var(--qp-bg-panel));
+  --qp-focus-ring: color-mix(in srgb, var(--qp-accent-default) 74%, var(--qp-bg-panel));
 }
 
 * {
@@ -161,7 +225,7 @@ button {
 }
 
 :where(button, [role="button"], input, select, textarea):focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--qp-accent-default) 58%, white);
+  outline: 2px solid var(--qp-focus-ring);
   outline-offset: 1px;
 }
 
@@ -189,4 +253,12 @@ button {
     font-size: var(--qp-font-size-metric);
     line-height: var(--qp-line-height-metric);
   }
+}
+
+/* 选中色（01 §2.3）。**color 不是可选项**：不写则选中区里的 secondary 文字在暗底只有
+ * 3.24:1，写了才统一到 primary（暗 4.65:1 / 浅 7.28:1）。
+ * 全仓此前 ::selection 规则 0 处，无旧值要覆盖。 */
+::selection {
+  background: var(--qp-selection-bg);
+  color: var(--qp-text-primary);
 }
