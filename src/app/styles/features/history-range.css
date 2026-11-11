@@ -1,0 +1,296 @@
+/*
+ * 历史页 · 区间视图（0.12.1 末）
+ * ==========================================================================
+ * 为什么单开一份：`styles/features/history.css` 冻结在 817 行（size-allowlist 棘轮，
+ * 只许减不许增），`timing-lane.css` / `history-range.css` 都是为绕开这个上限立的。
+ * 与 `timing-lane.css` 同口径：选择器一律挂 `.history-range-*` 前缀，
+ * 不覆盖共享段与既有 history 类，删掉本文件历史页只会少功能、不会变形。
+ *
+ * 只用令牌，不写死颜色 —— 深浅色主题各一份由令牌自己切。
+ * ========================================================================== */
+.history-range-mode-bar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.history-range-scroll {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.history-range-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--qp-card-gap, 16px);
+  align-content: start;
+}
+
+.history-range-grid > .history-range-summary,
+.history-range-grid > .history-range-records {
+  grid-column: 1 / -1;
+}
+
+.history-range-status,
+.history-range-refresh-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: var(--qp-font-size-body);
+  line-height: var(--qp-line-height-body);
+  color: var(--qp-text-secondary);
+}
+
+.history-range-refresh-error {
+  margin-bottom: var(--qp-card-gap, 16px);
+}
+
+/* ---- 四格摘要 ---- */
+.history-range-summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.history-range-summary-metric {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+
+.history-range-summary-metric-value {
+  font-size: var(--qp-font-size-page-title);
+  line-height: var(--qp-line-height-page-title);
+  font-weight: var(--qp-font-weight-emphasis);
+  color: var(--qp-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 逐日柱 ---- */
+.history-range-daily {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--qp-border-subtle);
+}
+
+.history-range-daily-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+
+/* 三级灰小字：摘要格标签与逐日提示语 */
+.history-range-summary-metric-label,
+.history-range-daily-hint {
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+}
+
+.history-range-daily-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 88px;
+}
+
+.history-range-daily-bar {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.history-range-daily-bar-track {
+  display: flex;
+  width: 100%;
+  height: 64px;
+  align-items: flex-end;
+  border-radius: 3px;
+  background: var(--qp-chart-track);
+  overflow: hidden;
+}
+
+.history-range-daily-bar-fill {
+  display: block;
+  width: 100%;
+  border-radius: 3px;
+  background: var(--qp-accent-default);
+  transition: height var(--qp-motion-base) var(--qp-motion-ease);
+}
+
+.history-range-daily-bar[data-empty="true"] .history-range-daily-bar-fill {
+  background: var(--qp-border-subtle);
+}
+
+.history-range-daily-bar:hover .history-range-daily-bar-fill {
+  background: var(--qp-accent-strong, var(--qp-accent-default));
+}
+
+.history-range-daily-bar:focus-visible {
+  outline: 2px solid var(--qp-accent-default);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+
+/* ---- 卡片头 / 空态（排行与记录共用） ---- */
+.history-range-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* 卡头标题：逐日块标题与排行/记录卡标题同一套度量 */
+.history-range-daily-title,
+.history-range-card-title {
+  margin: 0;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  font-weight: var(--qp-font-weight-medium);
+  color: var(--qp-text-secondary);
+}
+
+
+.history-range-empty {
+  margin: 0;
+  padding: 12px 0;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+}
+
+/* ---- 排行榜 ---- */
+.history-range-ranking {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.history-range-rank-list {
+  display: flex;
+  min-height: 0;
+  max-height: 208px;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.history-range-rank-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-range-rank-name {
+  overflow: hidden;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  font-weight: var(--qp-font-weight-medium);
+  color: var(--qp-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-range-rank-track {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--qp-chart-track);
+  overflow: hidden;
+}
+
+.history-range-rank-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--qp-accent-default);
+}
+
+/* 三处"次要小字"共用一套度量：柱标签 / 卡头计数 / 排行数值。
+   分开写时三处会各自漂移（行高 1 与 caption 行高混用过）——合并成一条反而更难写错。 */
+.history-range-daily-bar-label,
+.history-range-card-meta,
+.history-range-rank-value {
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.history-range-rank-meta {
+  opacity: 0.7;
+}
+
+/* ---- 便利贴 / 待办 ---- */
+.history-range-records {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--qp-card-gap, 16px);
+}
+
+.history-range-record-block {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.history-range-record-list {
+  display: flex;
+  max-height: 132px;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.history-range-record-row {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-range-record-text {
+  overflow: hidden;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-range-record-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+}
+
+.history-range-record-time {
+  font-variant-numeric: tabular-nums;
+}

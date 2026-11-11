@@ -11,13 +11,19 @@
  * ========================================================================== */
 
 /* ── 视图根：错误/重试提示 + 板子，纵向排 ── */
+/* [自由调大小 · 0.12.1] 从 `overflow: hidden` 改成**纵向滚动**。
+ * 原来卡片变高没有任何去处：板子高写死、外层裁切 → 拖大只是把同列另一张压小，
+ * 通栏卡往上拖则直接被裁掉半截（症状：「高度拖不动」「卡片显示不完全」）。
+ * 现在板子按内容长高，超出视图就滚起来。横向仍裁：宽度由列宽比控制，不该滚。 */
 .qp-dashboard {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
   height: 100%;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* 读取失败提示条（可重试）。用 qp-panel 是**故意**的：它不是五模块之一，
@@ -39,54 +45,58 @@
  * 组件化之后通栏卡可以有多张（便利贴 / 事项菜单 / 趋势…），第三张起只能落到隐式行上，
  * 而任何**多出来的子元素**（例如加卡工具条）都会先吃掉那个 1fr 行 —— 于是双列区被压到 56px、
  * 卡片互相重叠。改成 flex 后：双列区 `flex:1` 吃剩余空间，通栏卡按 token 各占一行，加多少张都不打架。 */
+/* [自由调大小] `height` → `min-height`：默认内容恰好等于板高，几何一个像素没动；
+ * 一旦拖动让某张卡变高，板子跟着长高（父级可滚），而不是把同列邻居压扁。 */
 .qp-main-view {
   display: flex;
   flex-direction: column;
   gap: var(--qp-card-gap);
   width: min(var(--qp-board-w), 100%);
-  height: min(var(--qp-board-h), 100%);
+  min-height: min(var(--qp-board-h), 100%);
+  /* [可调大小 · 0.12.1 二次修复] **不许被压缩**。
+   * 板子是 flex 子项、父级 `.qp-dashboard` 高 100%，默认 `flex: 0 1 auto` 会把它压回 636：
+   * 内容长到 840 也没用，卡片高度被算回原值。实测（headless Chrome）：
+   * 行高 288 → 480，加这一行前卡片恒 282，加之后 480、板高 840、外层可滚。 */
+  flex: 0 0 auto;
   margin: auto;
-  min-height: 0;
   outline: none;
 }
 
 /* ── 两列 44fr:54fr（1fr 基准 1036 = 1052−16 → 465.14 / 570.86） ── */
+/* [列宽比可拖] 中间夹一格 `--qp-card-gap` 宽的**分隔条**，`column-gap` 归零：
+ * 原来两列之间的间距由 column-gap 提供，现在改由那一格占位，可用宽度不变
+ * （1036 − gap 分给 44fr/54fr），所以默认比例下两列仍是 465.14 / 570.86。
+ * 拖那根条就改这里的 fr 权重（inline 覆盖），见 `useSplitResize`。 */
 .qp-ws {
   display: grid;
-  grid-template-columns: minmax(320px, 44fr) minmax(0, 54fr);
-  gap: var(--qp-card-gap);
+  grid-template-columns: minmax(320px, 44fr) var(--qp-card-gap) minmax(0, 54fr);
+  column-gap: 0;
+  row-gap: var(--qp-card-gap);
   min-height: 0;
   /* [P1 修复] 双列区吃剩余高度；通栏卡按 token 定高，不再靠网格行模板分配 */
-  flex: 1 1 auto;
+  /* [可调大小 · 0.12.1 二次修复] `1 1 auto` → `1 0 auto`：**不许缩**。
+   * 高度不足时它会把 grid 行一起压扁（shrink 到 min-height:0），卡片拖大后行高仍被算回
+   * 容器高，视觉上就是「怎么拖都不变大」。让它只许长、超出由 `.qp-dashboard` 滚。 */
+  flex: 1 0 auto;
 }
 
-/* 通栏槽 `.qp-full-slot`：通栏卡的**定高与手柄锚点都在这一层**。
- * 上一版把定高写成 `.qp-main-view > .qp-notes` / `> .qp-card-timeline`，加上槽之后
- * 便利贴与事项菜单变成了孙节点，那两条选择器再也匹配不上 —— 症状就是通栏卡高度塌到
- * 内容高度（便利贴从 56 掉到 32 左右）、拖拽手柄找不到定位锚点、拖了也没变化。 */
-.qp-full-slot {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 auto;
-  min-height: 0;
-}
-.qp-full-slot > * { flex: 1 1 auto; min-height: 0; }
-/* 兜底定高：用户拖出来的 inline height 写在槽上，会压过这两条 */
-.qp-full-slot[data-card="notes"] { height: var(--qp-mod-note); }
-.qp-full-slot[data-card="timeline"] { height: var(--qp-mod-items); }
-/* [P2 修正] 全量便利贴：一张不少，横向滚动而不是割掉 */
-.qp-full-slot[data-card="notes"] > .qp-notes { overflow-x: auto; }
+
+/* 通栏槽 `.qp-full-slot` 与列宽分隔条 `.qp-split` 在 `dashboard-split.css`：
+ * 定高必须落在槽上（写在 `.qp-main-view > .qp-notes` 会因多一层槽而失效）。 */
 
 
 .qp-col {
   display: grid;
+  /* [单独宽度 · 0.12.1] 每列再切成 4 格：卡按 `grid-column: span N` 占 1~4 格，
+   * 两张 2 格的卡自动并排。默认全是 span 4（占满整列）→ 与今天的像素完全一致。
+   * 改了这里要同步 `contract.ts` 的 `CARD_WIDTH_TRACKS`，否则 span 会溢出成隐式列。 */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--qp-card-gap);
+  /* 行高由**卡槽**决定（`.qp-card-slot` 的 `--qp-slot-h`），不再是一卡一行的网格轨道：
+   * 并排之后一行里有两张卡，共用轨道会让 264 的卡压着 284 的卡。 */
+  align-content: start;
   min-height: 0;
 }
-
-.qp-col-left { grid-template-rows: var(--qp-mod-timer) var(--qp-mod-items); }
-.qp-col-right { grid-template-rows: var(--qp-mod-apps) var(--qp-mod-todos); }
 
 /* ── 卡片（outline 版，见文件头 ①） ── */
 .qp-card {

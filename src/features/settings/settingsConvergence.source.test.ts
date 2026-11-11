@@ -129,7 +129,7 @@ describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
     for (const required of [
       'host-theme-read',             /* theme_get / accent_get：读主题与四色 */
       'main-window-commands',        /* Patina 自己的 117 条命令 */
-      'patina-host-bridge',          /* 3 条只读：list_records / list_items / … */
+      'patina-host-bridge',          /* 5 条只读：list_records / list_items / get_timer_state / note_list / todo_list */
       'patina-host-settings',        /* T04 的写面：设置页整页都在靠它 */
       'core:event:allow-listen',
       'core:event:allow-unlisten',

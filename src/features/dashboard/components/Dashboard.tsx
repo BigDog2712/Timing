@@ -5,15 +5,21 @@ import { buildTopItems } from "../services/dashboardFormatting.ts";
 import { useTodayNotes } from "../hooks/useTodayNotes.ts";
 import { useTodayItems } from "../hooks/useTodayItems.ts";
 import { useTodayTodos } from "../hooks/useTodayTodos.ts";
+import { useTrendDays } from "../hooks/useTrendDays.ts";
+import { usePendingReminders } from "../hooks/usePendingReminders.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import type { DashboardReadModel } from "../services/dashboardReadModel.ts";
 import type { DashboardReadState } from "../hooks/useDashboardStats.ts";
 import AddCardDialog from "../layout/AddCardDialog";
 import CardControls from "../layout/CardControls";
-import { columnRowTokens, type LayoutCard } from "../layout/contract";
+import CardSlot from "../layout/CardSlot.tsx";
+import type { LayoutCard } from "../layout/contract";
 import { buildFocusDistribution, isFocusDimension, type FocusDimension } from "../services/focusDimension.ts";
 import { useDashboardLayout } from "../layout/useDashboardLayout";
 import { useCardResize } from "../layout/useCardResize.ts";
+import { useCardWidthResize } from "../layout/useCardWidthResize.ts";
+import { useSplitResize } from "../layout/useSplitResize.ts";
+import { DEFAULT_SPLIT, FULL_ONLY_CARDS, MAX_SPLIT, MIN_SPLIT, SPLIT_TOTAL } from "../layout/contract";
 import { buildColumnCards, buildFullCard } from "./DashboardCards.tsx";
 
 /**
@@ -73,6 +79,9 @@ export default function Dashboard({
   const todayItems = useTodayItems(refreshKey, refreshIntervalSecs);
   const todosModel = useTodayTodos(refreshKey);
   const notesModel = useTodayNotes(refreshKey);
+  /* [0.12.1] 趋势与提醒各自一条独立源：它们跟"快照"没关系，快照挂了这两张卡照旧能画。 */
+  const trendModel = useTrendDays(refreshKey);
+  const reminderModel = usePendingReminders(refreshKey);
 
   const { compiledSessions, categoryDist, topApplications, totalTrackedTime, dayDeltaTrackedTime } = dashboard;
   const { items: topItems, total: topItemTotal } = useMemo(() => buildTopItems(compiledSessions), [compiledSessions]);
@@ -95,10 +104,37 @@ export default function Dashboard({
     onPreview: (id, height) => layout.setCardHeight(id, height, false),
     onCommit: (id, height) => layout.setCardHeight(id, height, true),
   });
-  const rowStyle = (cards: LayoutCard[]) => {
-    const rows = columnRowTokens(cards);
-    return rows.length > 0 ? { gridTemplateRows: rows.join(" ") } : undefined;
-  };
+  /* [单独宽度] 卡右边缘 12px 拖宽：同上，只改这张卡在自己列里占几格。 */
+  const cardWidthResize = useCardWidthResize({
+    onPreview: (id, width) => layout.setCardWidth(id, width, false),
+    onCommit: (id, width) => layout.setCardWidth(id, width, true),
+  });
+  /* [列宽比可拖] 左列 fr 权重；右列 = SPLIT_TOTAL − split。默认值不写内联样式 ——
+   * CSS 里那一行才是像素验收的正本（465.14 / 570.86），内联再重复一份必然漂。 */
+  const split = layout.layout.split ?? DEFAULT_SPLIT;
+  const splitResize = useSplitResize({
+    split,
+    onPreview: (next) => layout.setSplit(next, false),
+    onCommit: (next) => layout.setSplit(next, true),
+  });
+  const wsStyle = split === DEFAULT_SPLIT
+    ? undefined
+    : {
+      gridTemplateColumns:
+        `minmax(320px, ${split}fr) var(--qp-card-gap) minmax(0, ${SPLIT_TOTAL - split}fr)`,
+    };
+  /* [单独宽度] 行高不再由这一层算：卡槽按 `data-card`/`data-tier` 自己定高，
+   * 两张半宽的卡落进同一行时也各按自己的档位算，不会互相压（见 `CardSlot.tsx` 文件头）。 */
+  /* [卡片跨列] 记一张卡跨列之前在哪一列：收回时回原位，而不是一律甩到左列。 */
+  const spanFromRef = useRef(new Map<LayoutCard["id"], "left" | "right">());
+  const toggleSpan = useCallback((card: LayoutCard) => {
+    if (card.column === "full") {
+      layout.setCardColumn(card.id, spanFromRef.current.get(card.id) ?? "left");
+      return;
+    }
+    spanFromRef.current.set(card.id, card.column);
+    layout.setCardColumn(card.id, "full");
+  }, [layout]);
   const controlsFor = useCallback((card: LayoutCard, label: string, siblings: LayoutCard[]) => {
     const at = siblings.findIndex((item) => item.id === card.id);
     return (
@@ -106,6 +142,10 @@ export default function Dashboard({
         id={card.id}
         tier={card.tier}
         label={label}
+        spanning={card.column === "full"}
+        /* notes / timeline / trend / reminder 天生通栏，给它们一个「收回单列」的键是假选择 */
+        canToggleSpan={!FULL_ONLY_CARDS.includes(card.id)}
+        onToggleSpan={() => toggleSpan(card)}
         canMoveUp={at > 0}
         canMoveDown={at >= 0 && at < siblings.length - 1}
         onMove={(direction) => layout.moveCard(card.id, direction)}
@@ -113,7 +153,7 @@ export default function Dashboard({
         onRemove={() => layout.removeCard(card.id)}
       />
     );
-  }, [layout]);
+  }, [layout, toggleSpan]);
   const labelOf = (id: LayoutCard["id"]) => copy.cardLabels[id] ?? id;
 
   /* [P2] 专注卡的三维度：参数存在卡自己的 `options.dimension` 里（C2：该字典只有这一个键）。 */
@@ -129,12 +169,14 @@ export default function Dashboard({
      加占位卡与手柄时连 4 行都塞不进去。这里只留状态、派生与两端调用。 */
   const cardProps = {
     layout, controlsFor, labelOf, copy,
+    onWidthDown: cardWidthResize.onPointerDown,
     focus, focusDimension,
     onDimensionChange: (next: FocusDimension) => layout.setCardOption("timer", "dimension", next),
     topItems, topItemTotal, topApplications, icons, onOpenMapping,
     todosModel, notesModel, todayItems, snapshotProps,
     totalTrackedTime, dayDeltaTrackedTime,
     snapshotStatus, refreshError, onRetry: readState.retry,
+    trend: trendModel, reminders: reminderModel,
   };
   const renderCards = (cards: LayoutCard[]) => buildColumnCards(cards, cardProps);
   const renderFullCard = (card: LayoutCard) => buildFullCard(card, cardProps);
@@ -180,25 +222,33 @@ export default function Dashboard({
       </div>
 
       <div className="qp-main-view" aria-busy={snapshotStatus === "loading" || undefined}>
-        <div className="qp-ws">
-          <div className="qp-col qp-col-left" style={rowStyle(layout.left)}>
+        <div className="qp-ws" style={wsStyle}>
+          <div className="qp-col qp-col-left">
             {renderCards(layout.left)}
           </div>
-          <div className="qp-col qp-col-right" style={rowStyle(layout.right)}>
+          {/* [列宽比可拖] 分隔条是网格的第二格，宽 = `--qp-card-gap`（与原来的列间距等宽，
+              所以默认比例下两列位置不动）。整条都能抓，不是 2px 细线。 */}
+          <div
+            className="qp-split"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={copy.resizeColumns}
+            aria-valuenow={split}
+            aria-valuemin={MIN_SPLIT}
+            aria-valuemax={MAX_SPLIT}
+            tabIndex={0}
+            onPointerDown={splitResize.onPointerDown}
+          />
+          <div className="qp-col qp-col-right">
             {renderCards(layout.right)}
           </div>
         </div>
-        {/* 通栏卡也套一层定高槽：拖出来的 height 直接写在这里（inline 压过令牌），
+        {/* 通栏卡也套一层槽：拖出来的 height 直接写在这里（inline 压过令牌），
             没有 height 时由 CSS 的 `data-card` 规则给令牌高度。 */}
         {layout.full.map((card) => (
-          <div
-            key={card.id}
-            className="qp-full-slot"
-            data-card={card.id}
-            style={card.height === undefined ? undefined : { height: `${card.height}px` }}
-          >
+          <CardSlot key={card.id} card={card} mode="full">
             {renderFullCard(card)}
-          </div>
+          </CardSlot>
         ))}
       </div>
       {addOpen ? (

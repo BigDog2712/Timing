@@ -15,7 +15,15 @@
 #
 # 边界：**不给任何写命令**。Patina 窗只读宿主的账，改时限、改事项一律回宿主自己。
 # 引用处：capabilities/patina.json。
+#
+# [0.12.1 末] 扩到五条：`note_list` / `todo_list` 随**历史页区间视图**加入。
+# 区间视图要回答"这段时间写了什么、完成了什么"（`features/history` 的区间总览），
+# 而便利贴与待办在 Patina 侧的库里根本没有对应表——只能反向读宿主的。
+# 两条都是纯读、无入参副作用（`note_list` 全量、`todo_list` 带 includeDone），
+# 仍然**零写面**：`create_note` / `update_note` / `todo_toggle` 一条都不给。
+# 注意症状：漏登记不会报错，只会被 ACL 静默拒绝 —— 区间视图里便利贴与待办
+# 永远是空的，两端日志干净（与 0.11.x 的「插件注册 = ACL 静默拒绝」同一个坑）。
 [[permission]]
 identifier = "patina-host-bridge"
-description = "Allows the Patina window to read the host's timer records, item names and current timer state (read-only bridge for the history page and the title-bar timer capsule)."
-commands.allow = ["list_records", "list_items", "get_timer_state"]
+description = "Allows the Patina window to read the host's timer records, item names, current timer state, notes and to-dos (read-only bridge for the history page day/range views and the title-bar timer capsule)."
+commands.allow = ["list_records", "list_items", "get_timer_state", "note_list", "todo_list"]

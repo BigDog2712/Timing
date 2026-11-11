@@ -1,0 +1,81 @@
+/*
+ * 历史页 · 区间视图的逐日时间轴（0.12.1 末）
+ * ==========================================================================
+ * 为什么单开一份：`history-range.css` 已经 296 行，再塞就要撞 size 棘轮（≤300）。
+ * 与它同口径：选择器一律挂 `.history-range-timeline-*`，只依赖令牌，不覆盖别的类，
+ * 删掉本文件时间轴会变成一堆无样式的色块，页面其余部分不受影响。
+ *
+ * 坐标系与单日那根轴一致：块用百分比定位（`left` / `width` 由 `leftRatio` 给出），
+ * 所以两处的"一天有多宽"是同一种读法。
+ * ========================================================================== */
+.history-range-timeline {
+  /* 网格里横跨整行：时间轴按整页宽度读，挤进半列就只剩一团 */
+  grid-column: 1 / -1;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-range-timeline-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.history-range-timeline-row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.history-range-timeline-axis {
+  margin-bottom: 2px;
+}
+
+.history-range-timeline-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 行首是按钮而不是文字：点它 = 回那天的单日视图（与逐日柱同一个落点） */
+.history-range-timeline-label {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-secondary);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  cursor: pointer;
+}
+
+.history-range-timeline-label:hover,
+.history-range-timeline-label:focus-visible {
+  color: var(--qp-text-primary);
+}
+
+.history-range-timeline-track {
+  position: relative;
+  display: block;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--qp-chart-track);
+  overflow: hidden;
+}
+
+.history-range-timeline-block {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  /* 最短 1px：5 分钟专注在 30 天档里只有几像素，低于 1px 会被压没 */
+  min-width: 1px;
+  border-radius: 1px;
+}

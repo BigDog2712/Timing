@@ -1,9 +1,9 @@
-import type { Locale, UiText } from "../../../shared/i18n/index.ts";
+import { useLocale, type Locale, type UiText } from "../../../shared/i18n/index.ts";
 import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef, } from "react";
-import type { CSSProperties } from "react";
-import { Expand, Minus, Plus, Tags, X, ZoomIn } from "lucide-react";
+import type { CSSProperties, ReactNode } from "react";
+import { X } from "lucide-react";
 
-import { formatDuration, formatTime } from "../services/historyFormatting";
+import { formatTime } from "../services/historyFormatting";
 import { useIconThemeColors, useIconThemeColorSnapshot } from "../../../shared/hooks/useIconThemeColors";
 import { useRequestedAppIcons } from "../../../shared/hooks/useRequestedAppIcons.ts";
 import {
@@ -13,7 +13,11 @@ import {
 } from "../services/historyReadModel";
 import type { TrackerHealthSnapshot } from "../../../shared/types/tracking";
 import HistoryHorizontalTimeline from "./HistoryHorizontalTimeline.tsx";
-import QuietIconAction from "../../../shared/components/QuietIconAction";
+import {
+  HistoryMinDurationControl,
+  HistoryTimelineActionButtons,
+  HistoryTimelineModeButton,
+} from "./HistoryTimelineActions.tsx";
 import QuietDialog from "../../../shared/components/QuietDialog";
 import QuietSegmentedFilter, { type QuietSegmentedFilterOption } from "../../../shared/components/QuietSegmentedFilter";
 import type { HourlyActivityChartMode } from "../../../shared/settings/appSettings.ts";
@@ -29,14 +33,9 @@ import {
   type HistoryTimelineViewportChangeReason,
 } from "../hooks/useHistoryTimelineViewportInteraction.ts";
 import { useHistorySnapshotRuntime } from "../hooks/useHistorySnapshotRuntime.ts";
-import { useTimingOverlap } from "../hooks/useTimingOverlap.ts";
 import {
-  readHistoryDayDistributionMode,
   readHistoryTimelineZoomHours,
-  rememberHistoryDayDistributionMode,
   rememberHistoryTimelineZoomHours,
-  resolveEffectiveDayDistributionMode,
-  type DayDistributionMode,
 } from "../services/historyLayoutPreferenceStorage.ts";
 import {
   buildWebDomainIconMap,
@@ -57,10 +56,6 @@ import {
   startOfLocalMonth,
 } from "../../../shared/lib/localDate.ts";
 import { resolveTimelineFocusAtReferenceLocalTime } from "../../../shared/lib/timelineAxis.ts";
-import HistoryDaySummaryPanel, { type HistoryDaySummaryView } from "./HistoryDaySummaryPanel.tsx";
-import HistoryTimingOverlap from "./HistoryTimingOverlap.tsx";
-import type { HistoryDayDistributionItem } from "./HistoryDayDistributionPanel.tsx";
-import HistoryDayDistributionQuickActions from "./HistoryDayDistributionQuickActions.tsx";
 import HistoryTimelineDetailsPopover, {
   resolveTimelineDetailsPopoverPosition,
   type HistoryTimelineDetailsPopoverState,
@@ -75,9 +70,17 @@ import HistoryDateHeader from "./HistoryDateHeader.tsx";
 import HistoryTimelineDialogDateControls from "./HistoryTimelineDialogDateControls.tsx";
 import HistoryTimelineZoomDialog from "./HistoryTimelineZoomDialog.tsx";
 import { useHistoryDestinationDetailEntry } from "../hooks/useHistoryDestinationDetailEntry.tsx";
-import { useHistoryDistributionItems } from "../hooks/useHistoryDistributionItems.ts";
 import HistoryTimingLane from "./HistoryTimingLane.tsx";
 import HistoryActivityActionDialog, { type HistoryActivityActionTarget } from "./HistoryActivityActionDialog.tsx";
+import HistoryRangeHeader from "./HistoryRangeHeader.tsx";
+import HistoryRangeModeBar from "./HistoryRangeModeBar.tsx";
+import HistoryRangeView from "./HistoryRangeView.tsx";
+import { useHistoryRangeData } from "../hooks/useHistoryRangeData.ts";
+import { HISTORY_RANGE_COPY, type HistoryRangeCopy } from "../rangeCopy.ts";
+import type {
+  HistoryRangeCustomBounds,
+  HistoryRangeMode,
+} from "../services/historyRange.ts";
 
 interface Props {
   onInitialContentReady?: () => void;
@@ -114,47 +117,6 @@ const TIMELINE_MIN_SESSION_MINUTES_RANGE = { min: 0, max: 10 } as const;
 const clampMinute = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const startOfDay = startOfLocalDay;
 const startOfMonth = startOfLocalMonth;
-const DAY_SUMMARY_EMPTY_MARK = "—";
-const DAY_SUMMARY_MIN_SPAN_SESSION_MS = 60_000;
-
-interface HistoryDayDistributionView {
-  mode: DayDistributionMode;
-  options: QuietSegmentedFilterOption<DayDistributionMode>[];
-  items: HistoryDayDistributionItem[];
-}
-
-function buildHistoryDayDistributionView({
-  requestedMode,
-  webActivityEnabled,
-  appItems,
-  categoryItems,
-  webItems,
-  text,
-}: {
-  requestedMode: DayDistributionMode;
-  webActivityEnabled: boolean;
-  appItems: HistoryDayDistributionItem[];
-  categoryItems: HistoryDayDistributionItem[];
-  webItems: HistoryDayDistributionItem[];
-  text: UiText["history"];
-}): HistoryDayDistributionView {
-  const mode = resolveEffectiveDayDistributionMode(requestedMode, webActivityEnabled);
-  const options: QuietSegmentedFilterOption<DayDistributionMode>[] = [
-    { value: "app", label: text.distributionByApp },
-    { value: "category", label: text.distributionByCategory },
-  ];
-
-  if (webActivityEnabled) {
-    options.push({ value: "web", label: text.distributionByWeb });
-  }
-
-  return {
-    mode,
-    options,
-    items: mode === "web" ? webItems : mode === "category" ? categoryItems : appItems,
-  };
-}
-
 const formatTimelineWindowBoundary = (timeMs: number, dayEndMs: number, locale: Locale) => (
   timeMs === dayEndMs ? "24:00" : formatTime(timeMs, locale)
 );
@@ -190,7 +152,85 @@ function cleanTimelineDetailTitles(samples: TimelineDetailTitle[], appName: stri
 
 const MILLISECONDS_PER_HOUR = 60 * 60_000;
 
-export default function History({
+/**
+ * 历史页外壳：只决定「看单日」还是「看一段」，两套主体各自完整。
+ *
+ * 为什么外壳不把两套渲染合在一个组件里：单日那套有 60+ 个 hook（快照、时间轴视口、
+ * 泳道、弹窗…），区间那套一个都不需要。合在一起要么违反 hook 顺序（提前 return），
+ * 要么在区间模式下白跑一整套日快照与轮询。拆成两个子组件后，
+ * 切档 = 挂载/卸载，各自负责自己的取数。
+ *
+ * `History.tsx` 同时冻结在 size-allowlist 的 1147 行，所以外壳与单日主体**留在同一文件**
+ * （改名会造出一条新的超限文件 = 变相新增豁免，门禁不允许）。
+ */
+export default function History(props: Props) {
+  const rangeCopy = HISTORY_RANGE_COPY[useLocale()];
+  const [rangeMode, setRangeMode] = useState<HistoryRangeMode>("day");
+  const [customBounds, setCustomBounds] = useState<HistoryRangeCustomBounds | null>(null);
+  const [focusDateKey, setFocusDateKey] = useState<string | null>(null);
+  const rangeData = useHistoryRangeData({
+    mode: rangeMode,
+    customBounds,
+    refreshKey: props.refreshKey ?? 0,
+    labels: rangeCopy,
+    unnamedItemLabel: rangeCopy.unnamedItem,
+  });
+  const rangeBar = (
+    <HistoryRangeModeBar
+      mode={rangeMode}
+      customBounds={customBounds}
+      copy={rangeCopy}
+      uiText={props.uiText}
+      onModeChange={setRangeMode}
+      onCustomBoundsChange={setCustomBounds}
+    />
+  );
+
+  if (rangeMode === "day") {
+    return (
+      <HistoryDayView
+        key={focusDateKey ?? "day"}
+        {...props}
+        initialDateKey={focusDateKey}
+        rangeBar={rangeBar}
+        rangeCopy={rangeCopy}
+      />
+    );
+  }
+
+  return (
+    <div
+      className="flex-1 min-h-0 flex flex-col gap-4 md:gap-5 h-full overflow-hidden"
+      data-history-range-mode={rangeMode}
+    >
+      <HistoryRangeHeader
+        title={props.uiText.history.title}
+        rangeLabel={rangeData.resolvedRange?.label ?? ""}
+        rangeBar={rangeBar}
+      />
+      <HistoryRangeView
+        copy={rangeCopy}
+        uiText={props.uiText}
+        locale={props.locale}
+        data={rangeData}
+        onOpenDay={(dateKey) => {
+          setFocusDateKey(dateKey);
+          setRangeMode("day");
+        }}
+      />
+    </div>
+  );
+}
+
+interface HistoryDayViewProps extends Props {
+  /** 区间视图点某一天时带进来的落点（`null` = 按 `selectedDateRequest` 或今天） */
+  initialDateKey: string | null;
+  rangeBar: ReactNode;
+  /** 区间视图的新文案表（单日与区间共用四格摘要 / 排行 / 明细） */
+  rangeCopy: HistoryRangeCopy;
+}
+
+function HistoryDayView({
   uiText: UI_TEXT,
   locale,
   icons,
@@ -208,11 +248,15 @@ export default function History({
   onHourlyActivityChartModeChange,
   refreshEnabled = true,
   webActivityEnabled = false,
-  onOverridesChanged,
   onQuickActionError,
   onInitialContentReady,
-}: Props) {
-  const requestedInitialDate = selectedDateRequest ? parseLocalDateKey(selectedDateRequest.dateKey) : null;
+  initialDateKey,
+  rangeBar,
+  rangeCopy,
+}: HistoryDayViewProps) {
+  const requestedInitialDate = selectedDateRequest
+    ? parseLocalDateKey(selectedDateRequest.dateKey)
+    : initialDateKey ? parseLocalDateKey(initialDateKey) : null;
   const selectedDateRequestId = selectedDateRequest?.requestId ?? null;
   const selectedDateRequestDateKey = selectedDateRequest?.dateKey ?? null;
   const initialDate = requestedInitialDate ?? new Date();
@@ -251,6 +295,23 @@ export default function History({
     () => (visibleDateKey ? parseLocalDateKey(visibleDateKey) ?? selectedDate : selectedDate),
     [selectedDate, visibleDateKey],
   );
+  /*
+   * [0.12.1 末 · 当日与往期统一] 单日也走区间那套聚合。
+   *
+   * 为什么要这么绕：单日页原本的"活跃时长"是 `session.duration` 累加，区间用的是
+   * 墙钟 `MIN/MAX` 裁剪 —— 跨日会话、含暂停的会话在两种算法下不是同一个数，
+   * 于是同一天看「单日」和看「昨日」四格会差几分钟，用户眼里就是"数据不对"。
+   * 现在两边同源（后端 `cmd_get_activity_aggregate_range` + 同一份聚合函数），
+   * 单日只是 `dayCount === 1` 的区间，版式也就跟着统一了。
+   */
+  const dayRangeData = useHistoryRangeData({
+    mode: "day",
+    customBounds: null,
+    refreshKey,
+    labels: rangeCopy,
+    unnamedItemLabel: rangeCopy.unnamedItem,
+    dayDateKey: visibleDateKey,
+  });
   const historyIconExeNames = useMemo(() => {
     const seen = new Set<string>();
     const result: string[] = [];
@@ -305,9 +366,6 @@ export default function History({
       requestedStartMs: startOfDay(initialDate).getTime(),
     })
   ));
-  const [dayDistributionMode, setDayDistributionMode] = useState<DayDistributionMode>(
-    readHistoryDayDistributionMode,
-  );
   const [timelineDetailsPopover, setTimelineDetailsPopover] = useState<HistoryTimelineDetailsPopoverState | null>(null);
   const timelineDialogBodyRef = useRef<HTMLDivElement | null>(null);
   const timelineViewportInteractionRef = useRef<HTMLDivElement | null>(null);
@@ -340,7 +398,6 @@ export default function History({
 
   useEffect(() => {
     if (webActivityEnabled) return;
-    setDayDistributionMode("app");
     setTimelineDialogMode("app");
   }, [webActivityEnabled]);
 
@@ -592,8 +649,6 @@ export default function History({
   const {
     compiledSessions,
     timelineSessions,
-    summaryActiveDurationMs,
-    appSummary,
     hourlyActivity,
     hourlyCategoryActivity,
   } = historyView;
@@ -605,11 +660,6 @@ export default function History({
     };
   }, [presentedDate]);
   const selectedDayDurationMs = selectedDayRange.endMs - selectedDayRange.startMs;
-  /* 宿主侧计时事项（D2 反向）：与宿主记录面板同一个日界、同一个 `list_records` 口径。 */
-  const timingOverlapSlices = useTimingOverlap(
-    selectedDayRange.startMs,
-    selectedDayRange.endMs,
-  );
   const {
     fullDayView: visibleHistoryTimelineView,
     zoomView: timelineZoomTimelineView,
@@ -632,17 +682,6 @@ export default function History({
     formatTimelineWindowBoundary(timelineViewport.endMs, selectedDayRange.endMs, locale),
   );
   const timelineZoomHours = timelineViewport.durationMs / MILLISECONDS_PER_HOUR;
-  /* [P0-02 前置抽取] 时段分布的三个数据源已搬进 hooks/useHistoryDistributionItems.ts：
-     本文件冻结在 1206 行、零余量，接新功能前必须先等量腾出空间。 */
-  const {
-    appItems: appDistributionItems,
-    categoryItems: categoryDistributionItems,
-    webItems: webDistributionItems,
-  } = useHistoryDistributionItems({
-    appSummary, historyIcons, iconThemeColors, mappingVersion, uiText: UI_TEXT,
-    visibleDayWebSegments, selectedDayRange, nowMs, webActivityEnabled,
-    webDomainOverrides, webDomainIconThemeColors, webDomainFavicons,
-  });
   const webTimelineItems = useMemo(
     () => {
       if (!webActivityEnabled) return [];
@@ -670,67 +709,6 @@ export default function History({
       webDomainOverrides,
     ],
   );
-  const dayDistributionView = buildHistoryDayDistributionView({
-    requestedMode: dayDistributionMode,
-    webActivityEnabled,
-    appItems: appDistributionItems,
-    categoryItems: categoryDistributionItems,
-    webItems: webDistributionItems,
-    text: historyCopy,
-  });
-  const daySummaryView = useMemo<HistoryDaySummaryView>(() => {
-    const activeSessions = compiledSessions.filter((session) => (session.duration ?? 0) > 0);
-    const significantSessions = activeSessions.filter((session) => (
-      (session.duration ?? 0) >= DAY_SUMMARY_MIN_SPAN_SESSION_MS
-    ));
-    const spanSessions = significantSessions.length > 0 ? significantSessions : activeSessions;
-    const firstStartTime = spanSessions.reduce<number | null>((earliest, session) => (
-      earliest === null ? session.startTime : Math.min(earliest, session.startTime)
-    ), null);
-    const lastEndTime = spanSessions.reduce<number | null>((latest, session) => {
-      const endTime = session.endTime ?? session.startTime + Math.max(0, session.duration ?? 0);
-      return latest === null ? endTime : Math.max(latest, endTime);
-    }, null);
-    const peakHour = hourlyActivity.reduce<{
-      hour: string;
-      minutes: number;
-      surroundingMinutes: number;
-    }>((peak, point, index) => {
-      const surroundingMinutes = (hourlyActivity[index - 1]?.minutes ?? 0)
-        + (hourlyActivity[index + 1]?.minutes ?? 0);
-      if (
-        point.minutes > peak.minutes
-        || (point.minutes === peak.minutes && surroundingMinutes > peak.surroundingMinutes)
-      ) {
-        return {
-          hour: point.hour,
-          minutes: point.minutes,
-          surroundingMinutes,
-        };
-      }
-      return peak;
-    }, { hour: "", minutes: 0, surroundingMinutes: -1 });
-
-    return {
-      activeDurationLabel: summaryActiveDurationMs > 0
-        ? formatDuration(summaryActiveDurationMs)
-        : "0m",
-      activeSpanLabel: firstStartTime !== null && lastEndTime !== null
-        ? `${formatTime(firstStartTime, locale)} - ${formatTime(lastEndTime, locale)}`
-        : DAY_SUMMARY_EMPTY_MARK,
-      peakHourLabel: peakHour.minutes > 0
-        ? `${peakHour.hour} · ${formatDuration(peakHour.minutes * 60_000)}`
-        : DAY_SUMMARY_EMPTY_MARK,
-    };
-  }, [compiledSessions, hourlyActivity, summaryActiveDurationMs, locale]);
-  const visibleDaySummaryView = showQuietPlaceholder
-    ? {
-      activeDurationLabel: DAY_SUMMARY_EMPTY_MARK,
-      activeSpanLabel: DAY_SUMMARY_EMPTY_MARK,
-      peakHourLabel: DAY_SUMMARY_EMPTY_MARK,
-    }
-    : daySummaryView;
-
   const minSessionMinutes = clampMinute(
     Math.round(minSessionSecs / 60),
     TIMELINE_MIN_SESSION_MINUTES_RANGE.min,
@@ -864,66 +842,27 @@ export default function History({
   const timelineDialogBodyStyle = timelineDialogSyncedHeight === null
     ? undefined
     : ({ minHeight: `${timelineDialogSyncedHeight}px` } satisfies CSSProperties);
-  const handleDayDistributionModeChange = (mode: DayDistributionMode) => {
-    setDayDistributionMode(mode);
-    rememberHistoryDayDistributionMode(mode);
+  const timelineActionLabels = {
+    modeTitle: historyTimelineModeActionLabel,
+    modeAriaLabel: historyTimelineModeAriaLabel,
+    zoomTitle: historyCopy.openTimelineZoom,
+    openTitle: historyCopy.openTimeline,
   };
   const renderTimelineModeAction = (className = "") => (
-    <QuietIconAction
-      icon={<Tags size={15} />}
-      title={historyTimelineModeActionLabel}
-      ariaLabel={historyTimelineModeAriaLabel}
-      className={`history-timeline-mode-toggle history-horizontal-timeline-action ${className}`.trim()}
-      showTooltip={false}
-      onClick={toggleHistoryTimelineMode}
-    />
-  );
-  const renderTimelineZoomAction = (className = "") => (
-    <QuietIconAction
-      icon={<ZoomIn size={14} />}
-      title={historyCopy.openTimelineZoom}
-      ariaLabel={historyCopy.openTimelineZoom}
-      className={`history-horizontal-timeline-action history-timeline-zoom-open ${className}`.trim()}
-      onClick={openTimelineZoomDialog}
+    <HistoryTimelineModeButton
+      labels={timelineActionLabels}
+      className={className}
+      onToggle={toggleHistoryTimelineMode}
     />
   );
   const timelineAxisActions = (
-    <>
-      {renderTimelineModeAction("history-horizontal-timeline-mode-toggle")}
-      {renderTimelineZoomAction()}
-      <QuietIconAction
-        icon={<Expand size={15} />}
-        title={historyCopy.openTimeline}
-        ariaLabel={historyCopy.openTimeline}
-        className="history-horizontal-timeline-action history-timeline-open"
-        onClick={openTimelineDialog}
-      />
-    </>
-  );
-  const renderTimelineDurationControls = (className = "") => (
-    <div className={`flex max-w-[124px] items-center justify-end gap-1.5 ${className}`.trim()}>
-      <button
-        type="button"
-        onClick={() => updateMinSessionMinutes(minSessionMinutes - 1)}
-        disabled={!canDecreaseMinSession}
-        aria-label={UI_TEXT.accessibility.history.decreaseMinDuration}
-        className="qp-button-secondary inline-flex h-6 w-6 items-center justify-center rounded-[6px] p-0 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <Minus size={11} />
-      </button>
-      <span className="min-w-[62px] text-center qp-text-caption qp-weight-medium tabular-nums text-[var(--qp-text-secondary)]">
-        {UI_TEXT.settings.minuteValue(minSessionMinutes)}
-      </span>
-      <button
-        type="button"
-        onClick={() => updateMinSessionMinutes(minSessionMinutes + 1)}
-        disabled={!canIncreaseMinSession}
-        aria-label={UI_TEXT.accessibility.history.increaseMinDuration}
-        className="qp-button-secondary inline-flex h-6 w-6 items-center justify-center rounded-[6px] p-0 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <Plus size={11} />
-      </button>
-    </div>
+    <HistoryTimelineActionButtons
+      labels={timelineActionLabels}
+      modeClassName="history-horizontal-timeline-mode-toggle"
+      onToggleMode={toggleHistoryTimelineMode}
+      onOpenZoom={openTimelineZoomDialog}
+      onOpenTimeline={openTimelineDialog}
+    />
   );
   const effectiveTimelineDialogMode = webActivityEnabled ? timelineDialogMode : "app";
   const timelineDialogModeOptions: QuietSegmentedFilterOption<TimelineDialogMode>[] = webActivityEnabled
@@ -954,30 +893,6 @@ export default function History({
       onToggleSessionDetails={toggleTimelineSessionDetails}
     />
   );
-  const renderDayDistribution = () => (
-    <HistoryDayDistributionQuickActions
-      panelProps={{
-        title: historyCopy.dayDistribution,
-        mode: dayDistributionView.mode,
-        modeOptions: dayDistributionView.options,
-        items: dayDistributionView.items,
-        showQuietPlaceholder: showQuietPlaceholder || (
-          dayDistributionView.mode === "web" && !webVisualsReady
-        ),
-        placeholderMessage: "",
-        onModeChange: handleDayDistributionModeChange,
-        onDestinationDetailIntentStart: destinationDetail.prepare,
-        onDestinationDetailOpen: destinationDetail.open,
-      }}
-      onSaved={onOverridesChanged}
-      onError={onQuickActionError}
-    />
-  );
-  const renderDaySummary = () => (
-    <HistoryDaySummaryPanel copy={historyCopy} view={visibleDaySummaryView} />
-  );
-  const renderTimingOverlap = () => <HistoryTimingOverlap slices={timingOverlapSlices} />;
-
   const meaningfulContent = hasMeaningfulHistoryContent({
     contentState, visibleDateKey, requestedDateKey, visibleMappingVersion,
     requestedMappingVersion: mappingVersion, timelineContentHidden: showTimelineQuietPlaceholder,
@@ -1022,6 +937,7 @@ export default function History({
         onChangeDate={changeDate}
         onOpenDatePicker={openDatePicker}
         onSelectCalendarDate={selectCalendarDate}
+        rangeBar={rangeBar}
       />
 
       <div className="qp-panel p-5 history-overview-timeline-card">
@@ -1042,10 +958,25 @@ export default function History({
         )}
       </div>
 
-      <div className="flex gap-4 md:gap-5 min-h-0 flex-1">
-        <div className="w-5/12 flex flex-col gap-4 md:gap-5 min-h-0 history-left-column">
-          {renderDaySummary()}
-          {renderTimingOverlap()}
+      {/*
+       * [0.12.1 末 · 当日与往期统一] 单日主体 = 区间视图的 `dayCount === 1` 版本：
+       * **同一组组件、同一套口径**（墙钟裁剪），只是没有逐日柱。
+       * 原来这套「三行摘要 + 计时重叠 + 环形应用分布」是另一份格式、另一份算法，
+       * 同一天在「单日」和「昨日」下会给出不同的数字，用户看到的就是"数据对不上"。
+       * 时间轴 / 泳道 / 每小时活动仍是单日独有 —— 那是时序信息，区间给不了。
+       * 「区间给不了」只对**这一根可缩放的轴**成立：区间另有一份逐日时间轴
+       * （`HistoryRangeTimeline`，一行一天），所以这里把 `showTimeline` 关掉，
+       * 免得同一天在页面上出现两条"时间轴"。
+       */}
+      <HistoryRangeView
+        copy={rangeCopy}
+        uiText={UI_TEXT}
+        locale={locale}
+        data={dayRangeData}
+        onOpenDay={() => undefined}
+        showDailyBars={false}
+        showTimeline={false}
+        extraBlock={(
           <HistoryHourlyActivityPanel
             mode={hourlyActivityChartMode}
             hourlyActivity={hourlyActivity}
@@ -1056,12 +987,8 @@ export default function History({
               hourlyActivityChartMode === "category" ? "total" : "category",
             )}
           />
-        </div>
-
-        <div className="flex-1 qp-panel p-5 flex flex-col overflow-hidden min-h-0 history-app-distribution-card">
-          {renderDayDistribution()}
-        </div>
-      </div>
+        )}
+      />
 
       <HistoryTimelineDetailsPopover
         popover={timelineDetailsPopover}
@@ -1111,7 +1038,16 @@ export default function History({
               className="history-timeline-dialog-date-controls"
             />
             <div className="history-timeline-dialog-actions">
-              {renderTimelineDurationControls("history-timeline-dialog-duration-controls")}
+              <HistoryMinDurationControl
+                minutes={minSessionMinutes}
+                canDecrease={canDecreaseMinSession}
+                canIncrease={canIncreaseMinSession}
+                valueLabel={UI_TEXT.settings.minuteValue(minSessionMinutes)}
+                decreaseLabel={UI_TEXT.accessibility.history.decreaseMinDuration}
+                increaseLabel={UI_TEXT.accessibility.history.increaseMinDuration}
+                className="history-timeline-dialog-duration-controls"
+                onChange={updateMinSessionMinutes}
+              />
             </div>
           </div>
           {effectiveTimelineDialogMode === "web"

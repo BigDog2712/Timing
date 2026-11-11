@@ -6,6 +6,78 @@
 
 ## 0.12.1（桌面）— 2026-11-11
 
+### 主界面：卡片能真的调大了，两张占位卡换成真卡
+
+**「高度拖不动 / 卡片显示不完全」** 两条同源：板高写死 636 且视图根 `overflow: hidden`，
+卡片变高没有任何去处 —— 列内卡只能把同列邻居压扁，通栏卡直接溢出被裁；
+工具条又占 28px（20 + gap 8），把最底下的便利贴切掉一半。
+
+- `.qp-dashboard` 改纵向滚动，`.qp-main-view` 的 `height` 改 `min-height`
+  （默认内容恰好等于板高，几何零变化；拖高才长出去）。
+- `.qp-dashboard-toolbar` 改绝对定位浮动（贴板右缘、指针进入视图才显形），不再吃文档流。
+
+**应用趋势 / 提醒窗口** 从占位换成真卡：
+
+- 趋势 = 一次 `cmd_get_activity_aggregate_range` 带逐日桶边界（与历史页区间视图同一条路），
+  7 根柱按峰值归一，今天用强调色。真实库 7 天逐日与 SQL 独立口径 diff = 0。
+- 提醒 = `reminder_pending`（待触发，不是历史），经 `platform/persistence/reminderReadRepository`
+  读取（不碰分析窗 `api.ts` —— L9 双窗隔离）。
+- `IMPLEMENTED_CARDS` 补 `trend` / `reminder`，加卡列表从此 8 张全可用。
+- 新增 `--qp-mod-trend` / `--qp-mod-reminder` 令牌（长短两档）。
+
+**二次修复：卡片仍然拖不动（flex 压缩链）**
+
+上一轮只解决了「板子有地方长」，但高度仍被两处 flex 压缩吃掉，实测（headless Chrome
+量真实 CSS 链）行高 288 → 480 时卡片恒为 282，一个像素没变：
+
+- `.qp-ws` 是 `flex: 1 1 auto` + `min-height: 0`，高度不足时把 grid 行一起压扁
+  （shrink 到 0），行高被算回容器高 → `1 0 auto`，只许长，超出交给外层滚。
+- `.qp-main-view` 是 `.qp-dashboard` 的 flex 子项，默认 `flex: 0 1 auto` 被压回 636，
+  内容 840 也不作数 → `flex: 0 0 auto`。
+- `columnRowTokens` 把拖过的高度写成 `minmax(0, Npx)`，那个 `0` 下限让它成为
+  「可压缩的建议值」→ 改固定 `Npx`。默认未拖的行仍走 token + minmax 兜底。
+- `MAX_CARD_HEIGHT` 560 → 1000：旧的 560 是为「单卡太高会把同列另一张压没」设的，
+  现在板子跟着长高、同列另一张保持自己的高度，那条前提已不成立。
+
+修后实测：行高 480 → 卡片 480、板高 840、视图可滚；`npm test` 975 条全过，
+新增 `r01c` / `p04d` / `r02a–r02d`（手柄→closest→pointerdown→move→up 整条接线）。
+
+### 单独宽度：每张卡在自己列里占几格（0.12.1 末）
+
+诉求原话「应支持单独宽度调整」。此前宽度只有一根总闸（拖 `.qp-split` 改两列比例），
+单张卡只能选「进哪一列」或「跨满两列」，没有「这张宽一点、那张窄一点」。
+
+- 布局契约加 `LayoutCard.width`（25 / 50 / 75 / 100，缺省 100 = 占满整列）。
+  **按列算，不按板算**：按板算会和 `split` 抢同一块空间，窗口换宽还得重算，
+  两条轴互相牵连。缺省不写键 —— 老布局读出来仍是今天的样子。
+- `.qp-col` 改 `repeat(4, minmax(0, 1fr))`，卡按 `grid-column: span N` 占 1–4 格，
+  两张 2 格的自动并排。默认全 4 格 → 像素零变化（板 1052 / gap 12 时 466.94 + 12 + 573.06）。
+  槽上还留一条 `grid-column: span 4` 兜底：缺了它，一个没带内联样式的槽只占 1 格
+  （实测 107 而不是 466），表现是「列变窄、右边空一片」，代码里看不出错在哪。
+- 新增 `CardSlot`（列内卡与通栏卡共用）：`grid-column`、定高、宽度手柄三样落在槽上。
+  `Dashboard` 不再算 `grid-template-rows`。
+- **定高机制随之更换**：`grid-template-rows` 的前提是「一卡一行」；并排之后两张卡共用一个
+  行高轨道，264 的卡会压着 284 的卡。改由槽自己定高
+  （`.qp-card-slot[data-card][data-tier]` → `--qp-slot-h`），令牌名一字未改
+  （`--qp-mod-timer` / `-s` / `-l` …），所以像素验收照旧。`cardRowToken` / `columnRowTokens` 删除。
+- 新增 `useCardWidthResize`：读 `clientX`、以**列宽**为换算基准（不是板宽 ——
+  取错会让窄列里拖一下跳三档）、吸附四等分、拖动中不落盘、window 挂 move/up、
+  键盘 ←/→ 一档 25%。手柄 12px 横跨列缝，只在 hover/focus 画一条 2px 线。
+
+headless Chrome 实测（真实 CSS，非最小复现）：默认四张卡各占满列（466.94 / 573.06）；
+两张 `span 2` = 227.47 并排、同 y、各按自己档位定高；timer 切 S 档 = 184 且邻卡不受影响；
+timer 拖高 480 与 800 → 槽与卡同为 480 / 800，列高 1056、板子跟着长，无压缩。
+
+判据：`w01a–w01c`（吸附 / 格数 / 自愈不落 100）、`w02a–w02e`（span 真进样式、拖高是定值
+不是 `minmax` 建议值、手柄 aria、通栏不出手柄）、`w03a–w03e`（接线：起点→吸附预览→落盘、
+越界钳到整列、指针移出仍可拖、按卡身不启动、键盘一档）、`p01c`（四条令牌 × 三档 +
+`repeat(4,…)` + 兜底 span）。变异自证 4 处：手柄写死 `span 4` → w02a 红；去掉吸附 →
+w03a/b/c 红；删 todos 令牌 → p01c 红；兜底改 `span 1` → p01c 红。
+`npm run check` 八步全绿（契约 81/117/17/11/18 未动；size 1600；vendored 90 条漂移 0）；
+`npm test` **985 passed / 125 文件**；`vite build` 过，产物含
+`qp-card-slot[data-card=timer]` / `repeat(4,minmax(0,1fr))` / `qp-card-width`。
+
+
 - 独立工程副本保留源工程全部源码及未提交工作；重新安装依赖并构建。
 - 计时切换失败后，仅在权威状态确认原会话仍暂停时恢复计时，避免静默漏计或恢复其他会话。
 - 修正分析窗关于图标、扩展商店徽标的资源相对路径，生产构建不再丢失这些资源。
@@ -58,13 +130,208 @@ localStorage」的项都得再接一次搬运，漏一次就静默失效。本�
   数据与同步 / 通用与启动）搬进主界面 settings 视图，并按主界面风格重排；药丸内联设置面板删除。
   托盘「设置…」与所有设置入口统一改投「主界面 → 设置」。
 - 药丸宽度：`--pill-w-max` 288 → 320，撤销条另立 `--undo-w-max` 保持 288；默认只开「手柄」时
-  药丸宽 278（比改前窄 10px），三手柄全开 310。
+  药丸宽 278（比改前窄 10px），三手柄全开 310（0.12.1 末收紧手柄间距后为 302，见下一节）。
 - 契约：命令 81（+Patina 117）/ 错误码 17 / 事件 11 / emit 18 **四个数一个没变**；新增权限组
   `patina-host-settings` 供主界面设置页写宿主配置。
 - **已知限制**：① 手柄命中宽 12px（32px 条内三连排做不到 WCAG 24px，已记债）；② 主界面改
   `get_settings` 类字段后药丸同会话内可能读到旧缓存，需重开窗（md-sync / 主题 / 手柄绑定不受影响，
   那三处走广播或焦点重读）；③ 旧设置面板 22 个测试文件随组件删除，新面板目前只有冒烟级覆盖，
   0.13 补 RTL 全量回归。
+
+### 0.12.1 末：主界面数据闪烁 + 手柄间距与半手柄弧度
+
+> 版本号仍**不另起**：0.12.1 尚未出包，并入同号。三处都是用户手测报的观感问题。
+
+- **主界面数据闪烁（真 bug，不是动画）**：`useDashboardStats.loadSnapshot` 每次取数都无条件把状态
+  打回 `loading`，而 `ModuleShell.moduleState()` 把 `loading` 映射成骨架条 —— 于是每次
+  `tracking-data-changed`（**每次切前台应用 / 每落一批会话**）四张卡整块换成骨架再换回来，看上去
+  就是数据在闪。改成「当天已有快照就不退回 loading」：`status` 的语义回到「有没有数据可画」，
+  首屏、跨日、错误态无数据重试才出骨架。这与同目录 `useTodayTodos` / `useTodayNotes` 早就在用的
+  写法是同一条纪律（它们的注释里写着「刷新中把列表换成骨架 = 每 30s 闪一次」）。
+- **判据 D-01**（`useDashboardStats.test.tsx`）：首屏必须 `loading`（无快照）+ 第二次刷新期间必须
+  仍是 `ready` 且 `hasSnapshot` 为真。把 keep 分支删掉即红。
+- **手柄之间过宽**：基础 `margin-left` 只管「事项名 → 第一个手柄」那 4px，管不到「手柄 → 手柄」，
+  连排时 pitch 16px 而字形墨迹只有 ~5px 宽 → 眼里是 11px 空档。新增
+  `.pill__handle:not([data-enabled='false']) ~ .pill__handle { margin-left: calc(-2 * var(--space-1)) }`
+  （`pill-handles.css`）：pitch 16 → 12，视觉空档 11 → 7，三手柄全开总宽 310 → 302。
+  用 `~` 不用 `+`：手柄可单独开关，`+` 会在「前一个兄弟 `display:none`」时漏掉，让第一个**可见**
+  手柄仍占 16px。命中宽仍是 12（没为了变窄去缩热区）。
+- **半手柄弧度过大**：原在 4.8px 高度里拱 1.65px，单位跨度拱起是长手柄的两倍，像半个圆圈。
+  控制点 x 7.8 → 7（拱起 1.65 → 1.05），端点与高度不动，与右侧长手柄同一种「浅浅一道弧」。
+- **判据 W-06 / W-07**：W-06 直读样式源码钉那条兄弟规则真的存在（算式从 token 推，删规则也自洽，
+  所以必须另钉接线）；W-07 从渲染出的 `path` 算贝塞尔中点，断言半手柄的**相对曲率**（拱起/跨度）
+  不超过长手柄的 1.4 倍。两条都做过变异自证（改回 7.8 / 改回 −1×space-1 → 各红一次）。
+- 行数：`HandleCluster.test.tsx` 撞 300 行上限，按「行为 vs 几何」拆出 `HandleGeometry.test.tsx`
+  （W-01…W-06 / R-03），未新增 `size-allowlist.json` 条目。
+- 契约四个数（81/17/11/18）、事件表、ACL、Rust 侧：**一个没动**。
+
+### 0.12.1 末：历史页区间视图（昨日 / 本周 / 近 7 天 / 近 30 天 / 自定义）
+
+> 版本号仍**不另起**：0.12.1 尚未出包，并入同号。
+
+主人需求原话：「修改历史数据界面 2.1 支持查看昨日、本周、近7天、近30天数据，支持自定义
+（按日期框选数据）；2.2 数据包含事项、应用、便利贴、等所有数据」。
+
+**为什么原本做不到**：历史页只有「某一天」一种读法 —— 日期头 `←/→` 加日历选日期，主体直接吃
+`cmd_get_day_snapshot` 的唯一日快照。要看七天得手动点七次、自己在脑子里加总；而便利贴与待办
+在那张快照里根本没有入口（快照只含应用与计时记录）。
+
+**形态**：历史页顶部加一排六档 chip（单日 / 昨日 / 本周 / 近 7 天 / 近 30 天 / 自定义）。
+选任一区间档，主体从「单日时间线」整体换成**区间总览**（四格摘要 + 逐日柱 + 排行 + 记录明细）；
+点逐日柱的某一天，等于把 chip 拨回「单日」并跳到那天 —— 区间不叠在单日上，两者是并列的两个主体。
+「自定义」用两个 `date` 输入框，起止反选自动对调，未来日期裁到今天。
+
+- **关键取舍：区间模式下不挂载单日那 60+ 个 hook。** 原 `History.tsx` 是单一组件、1147 行、
+  size-allowlist 零余量（1147/1147）。改为外壳 `History`（只持档位状态）+ 内部 `HistoryDayView`
+  （原组件体）。区间档下 `HistoryDayView` 直接不渲染 —— 否则一进区间页就会并发打出七个
+  `cmd_get_day_snapshot` 与七份 `list_records` 翻页，而它们的结果一个都不用。
+  外壳与区间视图净增的行靠三处前置抽取抵掉：`services/historyDayDistributionView.ts`（环形角度
+  算式）、`services/historyDaySummaryView.ts`（日摘要）、`components/HistoryTimelineActions.tsx`
+  （三个图标动作 + 步进器 + 时长下限）。
+- **四条口径**（全部有单测钉住，不靠注释）：
+  1. **日界一律本地 00:00**，与 `lib/time::rangeBounds('day')`、`historyReadModel::getDayRange`
+     同一条线；**不允许 `toISOString()`**（那是 UTC，跨时区会整档偏一天，手机端 `dateInputValue`
+     踩过同一个坑）。
+  2. **区间右端裁到「现在」**：本周 / 近 7 天 / 近 30 天都含今天且只到此刻
+     （`endMs = min(次日 00:00, nowMs)`）。**昨日是唯一右端早于此刻的档位**，必须放行到
+     今日 00:00 —— 否则「昨天」会把今天上午的记录算进去。这条是变异自证过的。
+  3. **本周 = ISO 周**，周一起算（与数据页「周」档、`getIsoWeek` 同一条线），不是「近 7 天」。
+  4. **应用按墙钟跨日分摊**：一条 23:50→00:20 的会话必须 10 分钟落昨天、20 分钟落今天。
+     口径是 `SUM(MIN(end_time, 桶右) − MAX(start_time, 桶左))`，**不能加 `duration` 列**；
+     事项按 `startedAt + accumulatedSec` 归到开始那天，便利贴按 `createdAt`，待办按 `doneAt`。
+- **数据来源分两路，都不新增命令**：
+  - 应用时长走**后端** `cmd_get_activity_aggregate_range`，直接传逐日桶边界
+    `[startMs, ...days.map(d => d.endMs)]`。后端 `validate_aggregate_boundaries` 要求
+    **首元素 == `startMs` 且末元素 == `endMs`**，否则整条 activity 读失败（"boundaries are
+    invalid"）；这也顺带把日界权威留在 Rust，前端不再猜。
+  - 事项 / 便利贴 / 待办走**反向数据桥**（分析窗读宿主数据的那条只读通道）：`list_records`
+    翻页（100/页，上限 20 页）、`note_list`、`todo_list`（`includeDone`）。
+    `src-tauri/permissions/patina-host-bridge.toml` 的 `commands.allow` 由 3 条扩到 5 条，
+    **全部只读，零写面**。
+- **三态降级**：单源失败降级成空并继续出图，**四源全失败才报错**（复用 `ModuleShell` 的错误态）。
+  有数据可画就不退回 `loading` —— 这是同一天修主界面闪烁时定下的同一条纪律
+  （详见上一节 D-01）。
+- **`nowMs` 必须冻在 state**，不能每次 render 现算：`cacheKey = mode:startKey:endKey`，
+  `nowMs` 一抖 `endMs` 就变，等于每帧换 key、每帧全库查询。
+- **文案不进 `shared/i18n`**：`generated/locales/*.ts` 是按索引对齐的位置数组，手插一行会错位
+  其后全部文案；`generated/contract.ts` 还冻在 1131/1131。新文案走组件侧
+  `rangeCopy.ts` 的 `Record<Locale, HistoryRangeCopy>`（与 `dashboard/copy.ts` 同法）。
+- **判据 36 条**：`historyRange.test.ts` 12 条（档位边界 / 昨日右端 / ISO 周 / 反选对调 /
+  未来裁剪 / DST 日长 / cacheKey）、`historyRangeAggregate.test.ts` 11 条（跨日分摊 / 首桶不丢 /
+  末桶裁剪 / 四类归日）、`HistoryRangeView.test.tsx` 9 条（三态 / 点柱回单日 / 逐日柱数）、
+  `historyRangeBridge.source.test.ts` 4 条（ACL 五条命令逐字）。
+- **变异自证三处**（各自确认变红后还原）：① 昨日右端 `start` → `today` ⇒ `r02` 红；
+  ② `distributeSession` 加 `if (index > 0) continue;` ⇒ `a01` 红；
+  ③ `patina-host-bridge.toml` 删 `note_list` / `todo_list` ⇒ `h01` 红。
+- 契约四个数（81/17/11/18）、事件表、Rust 命令表：**一个没动**（区间聚合用的是既有
+  `cmd_get_activity_aggregate_range`，反向桥用的是既有只读命令）。
+
+### 0.12.1 末补：历史页与数据页合成一个页面（两副面孔）
+
+上一节交付后发现**功能等于没上线**：0.12.1 把侧栏下线、导航收成顶栏三区（主界面 / 数据 /
+设置），`history` 从此没有入口 —— 唯一路径是「数据 → 趋势切到日档 → 点某天的柱子」
+（`Data.tsx:938` 的 `canOpenTrendHistory`）。用户打开「数据」看不到任何变化，反馈「数据界面没变化」。
+
+- **口径：一个页面两副面孔**。`data` 与 `history` 两个 view 都渲染同一个容器
+  `DataHistoryFaces`（新增 70 行），顶部一排面签（数据 / 历史），点面签 = 导航到另一个 view。
+  组件**不持内部状态**，高亮只跟 `currentView` 走 —— 这样 `onOpenHistoryDate`（数据页点柱子）、
+  托盘与悬浮条递来的落点、`updateRelaunchViewStorage` 的恢复全部自动一致，不会出现
+  「面签亮着概览、内容却是历史」。
+- **非活动面不挂载**：两页各自会拉全套快照与聚合（历史单日那套 60+ 个 hook），并排挂等于
+  一进页面就把同一批库查两遍，肉眼只表现为"打开有点慢"。判据 f01/f02 双向钉住。
+- **零新文案、零新命令**：面签复用 `uiText.data.title` / `uiText.history.title`，不碰
+  `shared/i18n`（位置数组 + `contract.ts` 冻 1131/1131）；控件用既有的 `QuietSegmentedFilter`
+  （`semantics="tabs"`），不新增 CSS 文件。
+- **顶栏三区不动**（01 §6）：没有加第四个 tab，只把「数据」区内部变成两个面。
+- 接线：`AppShell` 加 3 行（`onNavigateView` → `handleSidebarNavigate`，与既有 `onOpenMapping`
+  同一写法），`AppShellViews` 把两个 view 的 JSX 提成 `dataNode`/`historyNode` 再交给容器。
+- 判据 4 条（`DataHistoryFaces.test.tsx`）：只挂活动面（两个方向）、点面签调 `onSelect`、
+  `aria-selected` 跟 `active`、tablist 读屏名含两面。**变异自证**：把
+  `active === "history" ? historyNode : dataNode` 改成两个都渲染 ⇒ f01 / f02 齐红。
+- 行数：`AppShell.tsx` 284 → 287（离 300 还有余量，且它的 allowlist 条目已被 P0 删掉）；
+  `AppShellViews.tsx` 241 → 269。
+- 门禁：`npm run check` 八步全绿（含对方修好 typecheck 后）；`npm test` **914 过**；
+  `npm run build` 通过，`data-data-face` 在 `dist/assets/patina-*.js` 里 grep 得到。
+
+### 0.12.1 末补：当日与往期统一成同一套版式与同一套口径
+
+合并出入口后，主人接着问「为什么当日和往期数据格式不同？应统一」。一查，同一排 chip 里
+「单日」和「昨日」实际是**两个产品**：块不一样、应用的分组维度不一样、连时长的算法都是两条。
+
+| | 单日（改前） | 往期 |
+|---|---|---|
+| 摘要 | 活跃时长 / 跨度 / 高峰（三行文本） | 应用 / 事项 / 便利贴 / 待办（四格） |
+| 应用 | 环形图，按**分类**分组 | 条形排行，按**应用**分组，带占比 |
+| 事项 | 只有「计时重叠」 | 有排行 |
+| 便利贴 / 待办 | 没有 | 有明细 |
+| 应用时长口径 | `session.duration` **累加** | 墙钟 `MIN/MAX` **裁剪** |
+
+最后一行才是真问题：跨日会话、含暂停的会话在两种算法下不是同一个数，于是同一天看「单日」
+和看「昨日」四格会差几分钟，用户眼里就是"数据不对"。（时长**格式**其实是统一的，两边都用
+同一个 `formatDuration`，都是 `1h 5m`。）
+
+- **单日 = `dayCount === 1` 的区间**。新增 `resolveHistoryDayRange(dateKey, nowMs, label)`：
+  日界本地 00:00，右端 `min(次日 00:00, nowMs)`（看今天只到此刻），未来日返回 `null`。
+  `useHistoryRangeData` 加 `dayDateKey`，单日也走 `cmd_get_activity_aggregate_range` +
+  同一份 `buildHistoryRangeAggregate`，口径从此只有一份。
+- **单日页主体换成 `<HistoryRangeView showDailyBars={false}>`**：四格摘要 / 应用排行 /
+  事项排行 / 便利贴与待办明细 与区间**同一组组件**；逐日柱关掉（一根柱子不表达趋势，
+  自己点自己也没意义）。时间轴、泳道、每小时活动保留（时序信息区间给不了），
+  每小时活动作为 `extraBlock` 横跨整行、跟着同一块滚动区走。
+- **下线的块**：三行摘要（`HistoryDaySummaryPanel`）、环形应用分布
+  （`HistoryDayDistributionQuickActions`）、计时重叠（`HistoryTimingOverlap`），以及只为它们
+  服务的 `useHistoryDistributionItems` / `useTimingOverlap` 调用与分布模式偏好状态。
+  `History.tsx` 1136 → 1079 行。
+- **代价（已知，主动记录）**：环形卡带的两个交互一并下线 —— 点应用看「目的地详情」、
+  快捷分类。`useHistoryDestinationDetailEntry` 与它的弹窗仍挂在页里但已无触发点。
+  要恢复就把入口挂到应用排行行上（行本身已经是可点的语义位置），列在下一轮。
+- 判据 7 条：`resolveHistoryDayRange` 5 条（整日 / 今天裁到此刻 / 未来日 null / 坏 key null /
+  桶边界首尾闭合）、视图 2 条（单日无柱但四格与四块齐、区间仍有柱）、源码哨兵 1 条
+  （`h05`：单日渲染 `HistoryRangeView` + `showDailyBars={false}` + `mode: "day"`，且旧版式三件
+  不许再出现在 `History.tsx`）。**变异自证**：把 `showDailyBars={false}` 改回 `showDailyBars`
+  ⇒ h05 红。
+- 门禁：`npm test` **928 过**；`check:size` / `check:layers` / `eslint` 绿；`vite build` 通过
+  （`data-history-range-extra` 在 `dist/assets/patina-*.js` 里 grep 得到）。
+  `tsc` 当前红在对方的 `TimerModule` / `TimelineCard` / `focusDimension`（P1 在途），与本轮无关。
+- **踩到一个坑**：用 python 文本模式批量改 `History.tsx` 把整个文件的 LF 写成了 CRLF，
+  于是 `mainToolsNavigationGateway.test.ts` 里那条按字节扫 `;\n` 的源码哨兵直接红
+  （报"找不到 highlightedApp 派生"）。批量改 `.ts/.tsx` 必须走二进制模式。
+
+### 0.12.1 末补：区间也有时间轴（一行一天）
+
+上一轮把单日统一到区间版式后，「时间轴」成了单日独有的一块 —— 区间只有数字和柱子，
+回答不了"那几天几点在忙"。这一轮补上：**每天一条 0–24h 的活动带**，行首点开回单日。
+
+- **为什么不是把单日那根轴拉长**：0–24h 连续坐标在 30 天档上会把一次 3 小时专注压成 0.4%
+  宽，读不出形状也读不出节奏。按天分行、每行各自 0–24h，才能同时看清"哪几天在干活"
+  与"那几天几点在干活"。
+- **为什么要分格取主导**：真实库里一天几百条会话（窗口一切换就是一条，本机实测
+  192–935 条/天，30 天 1.3 万条）。原样画 = 上万个 DOM 节点；且相邻两条常是同一应用的
+  不同窗口，分开画反而看不出连续工作。所以把一天切成固定格、每格取占时最长的应用、
+  再合并相邻同应用的格子。格宽随跨度放大：≤2 天 5 分钟 / ≤7 天 10 分钟 / 更久 15 分钟
+  —— 每天最多 288 / 144 / 96 块，DOM 规模与会话条数解耦。
+- **分母必须是完整一天**，不是"可见窗口"：今天只看到此刻，若拿 `nowMs - 00:00` 当分母，
+  上午的带子会被横向拉满，看着像"今天全天都在忙"。DST 那天由日期算，不写死 24h。
+- **数据源要另取一份**：`cmd_get_activity_aggregate_range` 传了逐日桶边界后，后端已把记录
+  按「天 × 应用」压成"起点落在 00:00、长度等于当日总时长"的行 —— 时长对、位置全丢。
+  时间轴另走 `getSessionsInRangeWithoutTitleSamples`（同一窗口、同一条 `cmd_get_history_range_rows`，
+  日视图本来就在用；不带标题样本，30 天几千条才不会把 IPC 体积翻几倍）。
+- **颜色按应用键解析一次**（`AppClassification` + `objectColor`，与单日时间轴同一条链路），
+  跨天的同一应用必然同色，否则"看色块形状"不成立。段用纯色条 + 原生 `title` 而不是
+  `QuietTimelineSegment`：后者每段挂一个 `QuietTooltip` 实例，几千段光挂载就够卡。
+- 单日档显式 `showTimeline={false}`：那一天上面已经有可缩放、可点段的交互时间轴，
+  再画一行静止的带子是重复。
+- 判据 12 条：几何 10（格宽三档 / 格窗取整 / 相邻格合并 / 同格主导 / 同长按键定序 /
+  跨日按墙钟切 / 今天裁到此刻且分母不变 / 左边界裁剪 / 空日仍出行）、视图 1（区间每天一行
+  且块落在自己那行）、源码哨兵 1（`h06`：hook 取的是**未聚合**会话并真的传进聚合，
+  且单日显式关掉）；另在 `v10`（单日档）补了「不出现逐日带」一条断言。
+  **变异自证三处**：分母改成可见窗口 ⇒ `t09` 红；同长时改取后到者 ⇒ `t07` 红；
+  把 `getSessionsInRangeWithoutTitleSamples` 换成带标题样本的那版 ⇒ `h06` 红。
+- **真实数据核过**（本机 `patina.db` 导出 11-09…11-11 三段喂给纯函数）：昨日 26 块
+  `12:50→18:30`、11-11 16 块 `09:00→17:42`，与库里首末会话时刻（`09:00:48` / `17:41:27`）对得上。
+- 门禁：`npm run check` 八步全绿；`npm test` **946 过**；`vite build` 通过，
+  `history-range-timeline-day` / `-block` 在 `dist/assets/patina-*.js`、类名在 patina 的 CSS 里都 grep 得到。
+  契约四个数（81/17/11/18）、事件表、Rust 命令表、ACL：**一个没动**（用的全是既有命令）。
 
 ## 0.12.0（桌面）— Patina 融合：第二入口并进同一个安装包 — 2026-11-09
 

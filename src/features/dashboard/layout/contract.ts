@@ -31,12 +31,23 @@ export type CardId = (typeof CARD_IDS)[number];
  * 渲染成一张写着「未实现」的占位卡，至少看得见、能移除。
  */
 export const IMPLEMENTED_CARDS: readonly CardId[] = [
-  "timer", "items", "apps", "todos", "notes", "timeline",
+  "timer", "items", "apps", "todos", "notes", "timeline", "trend", "reminder",
 ];
 
 export function isCardImplemented(id: CardId): boolean {
   return IMPLEMENTED_CARDS.includes(id);
 }
+/**
+ * **天生通栏**的卡：它们没有列内行高令牌，也不该被「收回单列」。
+ *
+ * 唯一出处：`normalizeLayout` 拿它判合法列，`Dashboard` 拿它决定卡头要不要出「跨列」键。
+ * 两处各写一份的话，加一张新卡必然只改一处 —— 症状是「点了跨列，刷新弹回去」。
+ */
+export const FULL_ONLY_CARDS: readonly CardId[] = ["notes", "trend", "reminder", "timeline"];
+
+/** 有列内行高令牌的卡：可待在列内，**也可以跨满两列**。 */
+export const ROW_CARDS: readonly CardId[] = ["timer", "items", "apps", "todos"];
+
 /** 档位：S/M/L。默认档必须等于今天的行高，见 `defaultLayout.ts`。 */
 export type CardTier = "S" | "M" | "L";
 /** 列：左列 / 右列 / 通栏（通栏卡排在双列之后，如便利贴）。 */
@@ -59,16 +70,52 @@ export interface LayoutCard {
    * 否则会出现「拖过之后点 S/M/L 没反应」——两个真相源同时生效，用户判断不了哪个算数。
    */
   height?: number;
+  /**
+   * [单独宽度 · 0.12.1] 占**自己那一列**的百分比，只有 25 / 50 / 75 / 100 四档。
+   *
+   * 为什么按「列」而不是「板」：两列的宽度已经由 `split` 那根分隔条决定，若宽度按整块板
+   * 算，同一张卡在窗口换宽后要重算、且和 `split` 抢同一块空间。按列算 = 卡只说
+   * 「我占这一列的四分之几」，两根轴各管各的，改一根不会让另一根跳。
+   *
+   * 缺省（不写）= 100 = 占满整列，所以老布局读出来与今天逐像素一致。
+   * 两张 50% 的卡自动并排；跨列（`column: "full"`）时不生效 —— 那时它本来就是整板宽。
+   */
+  width?: number;
 }
 
 /** 拖动下限：再矮卡头 + 一行数据都放不下，拖到 120 以下没有意义。 */
 export const MIN_CARD_HEIGHT = 120;
-/** 上限：单卡超过这个高度，另一张会被压没（列内共享列高）。 */
-export const MAX_CARD_HEIGHT = 560;
+/** 上限：只防「拖出荒谬高度」，不再防「压没邻居」。
+ * 0.12.1 二次修复后板子会跟着长高、超出的部分外层滚动，同列另一张保持自己的高度
+ * （原先 560 的理由是「列内共享列高」，那条前提已经不成立）。 */
+export const MAX_CARD_HEIGHT = 1000;
 
 export function clampCardHeight(value: number): number {
   if (!Number.isFinite(value)) return MIN_CARD_HEIGHT;
   return Math.round(Math.min(MAX_CARD_HEIGHT, Math.max(MIN_CARD_HEIGHT, value)));
+}
+
+/**
+ * 列内宽度的格数：每列再切成 4 格（`dashboard.css` 的 `.qp-col` 是 `repeat(4, …)`）。
+ *
+ * 为什么是 4：两列之下「整列 / 半列」只够区分一张卡占多数，而 3 档（1/3、2/3）在有 gap 的
+ * 网格里除不尽、吸附后视觉不等宽。4 档既能并排两张（各 2 格），也能「一张 3 格 + 一张 1 格」。
+ * 格数改了要同步 `.qp-col` 的 `repeat(N, …)`，否则 `span` 会溢出成隐式列。
+ */
+export const CARD_WIDTH_TRACKS = 4;
+export const DEFAULT_CARD_WIDTH = 100;
+export const MIN_CARD_WIDTH = DEFAULT_CARD_WIDTH / CARD_WIDTH_TRACKS;
+
+/** 吸附到四等分。宽度是**设定值**，只认整数格；给出 37 这种值就吸到最近的 25 的倍数。 */
+export function clampCardWidth(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_CARD_WIDTH;
+  const snapped = Math.round(value / MIN_CARD_WIDTH) * MIN_CARD_WIDTH;
+  return Math.min(DEFAULT_CARD_WIDTH, Math.max(MIN_CARD_WIDTH, snapped));
+}
+
+/** 卡片占几格（1..4）。缺省 = 4（占满整列）。 */
+export function columnSpan(width?: number): number {
+  return Math.round(clampCardWidth(width ?? DEFAULT_CARD_WIDTH) / MIN_CARD_WIDTH);
 }
 
 export interface DashboardLayout {
@@ -107,15 +154,16 @@ export function clampSplit(value: number): number {
 }
 
 /**
- * 行高令牌：只有这四张卡是「列内的一行」，其余（notes/trend/reminder/timeline）是通栏卡，
- * 高度由自身内容与 CSS 决定，不进 `grid-template-rows`。
+ * **[0.12.1 单独宽度] 高度不再走 `grid-template-rows`**，改由卡槽自己定高
+ * （`.qp-card-slot[data-card][data-tier]` → `--qp-slot-h`，见 `dashboard-split.css`）。
+ *
+ * 为什么换掉那一套（它本来是对的）：`grid-template-rows` 是**一卡一行**的假设。
+ * 加了列内宽度之后，两张 50% 的卡会落在**同一行**、共享一个行高的轨道 ——
+ * 264 与 284 会互相压，短的那张留白、高的那张被裁。行高必须跟着卡走，不能跟着"第几行"走。
+ *
+ * 代价是档位映射从 JS 挪进 CSS：`cardRowToken` / `columnRowTokens` 双双删除，
+ * 令牌名还是那几个 `--qp-mod-*`（数值不改，所以像素验收照旧）。
  */
-export const CARD_ROW_TOKEN: Partial<Record<CardId, string>> = {
-  timer: "--qp-mod-timer",
-  items: "--qp-mod-items",
-  apps: "--qp-mod-apps",
-  todos: "--qp-mod-todos",
-};
 
 /** 可在「加卡」里出现的卡（与 `CARD_IDS` 一致；移除后从这里再添回来）。 */
 export function isCardId(value: unknown): value is CardId {
@@ -138,29 +186,4 @@ export function sanitizeOptions(value: unknown): Record<string, string> | undefi
     if (typeof raw === "string" && raw.length > 0) out[key] = raw;
   }
   return Object.keys(out).length > 0 ? out : undefined;
-}
-
-/**
- * 卡 × 档 → 高度令牌名。
- *
- * `M` 档刻意**不**造 `--qp-mod-timer-m`：M 就是今天那五个 `--qp-mod-*`。
- * 多一份同值副本，改档位时必然出现「改了 S/L、M 没跟上」或反过来。
- */
-export function cardRowToken(id: CardId, tier: CardTier): string | null {
-  const base = CARD_ROW_TOKEN[id];
-  if (!base) return null;
-  return tier === "M" ? base : `${base}-${tier.toLowerCase()}`;
-}
-
-/** 列内行序 → `grid-template-rows` 的值。空列返回 `[]`，调用端据此不写内联样式。 */
-export function columnRowTokens(cards: readonly LayoutCard[]): string[] {
-  return cards
-    .filter((card) => card.column !== "full")
-    .map((card) => {
-      /* 拖过的高度优先：用户亲眼看着拖出来的值，比三档令牌更"真"。 */
-      if (typeof card.height === "number") return `minmax(0, ${clampCardHeight(card.height)}px)`;
-      const token = cardRowToken(card.id, card.tier);
-      return token ? `minmax(0, var(${token}))` : null;
-    })
-    .filter((row): row is string => Boolean(row));
 }

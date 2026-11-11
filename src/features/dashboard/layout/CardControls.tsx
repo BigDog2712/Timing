@@ -8,7 +8,7 @@
  * 交互取舍：P1 只做到「按钮 + 同列拖动」，不做跨列拖拽手柄。理由是换列已经有显式按钮，
  * 而拖拽的落点判定在双列轨道下要先定「插到第几位」，那是 P2 的事。
  */
-import { ChevronDown, ChevronUp, Maximize2, Minimize2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Maximize2, Minimize2, MoveHorizontal, X } from "lucide-react";
 import type { CardId, CardTier } from "./contract";
 
 interface Props {
@@ -17,6 +17,11 @@ interface Props {
   canMoveUp: boolean;
   canMoveDown: boolean;
   label: string;
+  /** 当前是否跨满两列 */
+  spanning: boolean;
+  /** 天生通栏的卡（便利贴 / 事项菜单 / 趋势 / 提醒）不给这颗键 —— 那是假选择 */
+  canToggleSpan: boolean;
+  onToggleSpan: () => void;
   onMove: (direction: -1 | 1) => void;
   onTier: (tier: CardTier) => void;
   onRemove: () => void;
@@ -32,6 +37,9 @@ export default function CardControls({
   canMoveUp,
   canMoveDown,
   label,
+  spanning,
+  canToggleSpan,
+  onToggleSpan,
   onMove,
   onTier,
   onRemove,
@@ -74,6 +82,17 @@ export default function CardControls({
       >
         <Maximize2 size={12} strokeWidth={2} aria-hidden="true" />
       </button>
+      {canToggleSpan ? (
+        <button
+          type="button"
+          className="qp-card-control"
+          aria-pressed={spanning}
+          aria-label={spanning ? `${label} 收回单列` : `${label} 跨满两列`}
+          onClick={onToggleSpan}
+        >
+          <MoveHorizontal size={12} strokeWidth={2} aria-hidden="true" />
+        </button>
+      ) : null}
       <button
         type="button"
         className="qp-card-control"

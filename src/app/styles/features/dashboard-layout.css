@@ -70,13 +70,31 @@
 }
 
 /* ── 加卡入口：靠右的小按钮，与卡头同一行视觉重量 ── */
+/* [自由调大小 · 0.12.1] 工具条**不占文档流**。
+ * 它本来是板子的兄弟节点，占 20 + gap 8 = 28px，而板高仍按 636 算
+ * → 底部便利贴被裁掉一半（症状：「卡片显示不完全」）。
+ * 现在贴板子右上角漂浮、平时透明，指针进入视图区才完全显形：
+ * 既不抢几何，也不会在没人操作时压住卡头。 */
 .qp-dashboard-toolbar {
+  position: absolute;
+  top: 0;
+  /* 板子在视图中居中留白时，对齐**板**的右缘而不是视图右缘 */
+  right: max(0px, calc((100% - var(--qp-board-w)) / 2));
+  z-index: 5;
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: flex-end;
   gap: 16px;
-  min-height: var(--qp-card-head-h);
+  height: var(--qp-card-head-h);
+  /* 常驻淡显而不是全隐形：全透明等于"这两个按钮没了"，
+   * 而"添加卡片"正是用户加回被移除窗口的唯一入口。 */
+  opacity: 0.45;
+  transition: opacity 120ms ease;
+}
+
+.qp-dashboard:hover > .qp-dashboard-toolbar,
+.qp-dashboard:focus-within > .qp-dashboard-toolbar {
+  opacity: 1;
 }
 
 /* ── 加卡弹层：居中面板 + 半透明遮罩 ── */
@@ -264,8 +282,12 @@
   background: transparent;
 }
 
+/* hover 时把线加粗到 2px 并补上通栏卡（便利贴的卡是 `.qp-notes`，不是 `.qp-card`，
+ * 少了第二行它永远不显形 —— 手柄明明在那儿，用户却找不到可以拖的地方）。 */
 .qp-card:hover .qp-card-resize::before,
+.qp-full-slot:hover .qp-card-resize::before,
 .qp-card-resize:focus-visible::before {
+  height: 2px;
   background: var(--qp-border-strong);
 }
 

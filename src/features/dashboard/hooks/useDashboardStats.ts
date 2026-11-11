@@ -55,11 +55,16 @@ export function useDashboardStats(
     const requestId = ++requestIdRef.current;
     const date = new Date();
     const dateKey = formatLocalDateKey(date);
-    setState((current) => ({
-      dateKey,
-      snapshot: current.dateKey === dateKey ? current.snapshot : null,
-      status: "loading",
-    }));
+    /* 已有当天快照时**不退回 loading**：`status` 是「有没有数据可画」的判据，退回 loading 会让
+       四张卡在每次 `tracking-data-changed`（每次切前台应用 / 每落一批会话）整块换成骨架 ——
+       用户看到的就是「主界面数据在闪」。与 `useTodayTodos` / `useTodayNotes` 的 reload 同一条纪律。
+       真的该出骨架的只有三种：首屏、跨日（keep 为 null）、错误态无数据重试（keep 也为 null）。 */
+    setState((current) => {
+      const keep = current.dateKey === dateKey ? current.snapshot : null;
+      return keep
+        ? { dateKey, snapshot: keep, status: current.status }
+        : { dateKey, snapshot: null, status: "loading" };
+    });
     try {
       const nextSnapshot = await loadDashboardSnapshot(date);
       if (requestId !== requestIdRef.current) return;

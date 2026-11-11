@@ -1,4 +1,4 @@
-import { useId, type RefObject } from "react";
+import { useId, type ReactNode, type RefObject } from "react";
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import QuietPageHeader from "../../../shared/components/QuietPageHeader.tsx";
@@ -28,6 +28,9 @@ interface HistoryDateHeaderProps {
   onChangeDate: (delta: number) => void;
   onOpenDatePicker: () => void;
   onSelectCalendarDate: (date: Date) => void;
+  /** 档位条（单日/昨日/本周/近7天/近30天/自定义）。放在日期导航**左侧**，
+      因为它决定的是"看哪一段"，日期导航只决定"这段里的哪一天"——层级更高。 */
+  rangeBar?: ReactNode;
 }
 
 export default function HistoryDateHeader({
@@ -44,6 +47,7 @@ export default function HistoryDateHeader({
   onChangeDate,
   onOpenDatePicker,
   onSelectCalendarDate,
+  rangeBar = null,
 }: HistoryDateHeaderProps) {
   const UI_TEXT = useLocaleText();
   const locale = useLocale();
@@ -55,6 +59,7 @@ export default function HistoryDateHeader({
         title={UI_TEXT.history.title}
         rightSlot={(
           <div className="flex items-center gap-2 shrink-0">
+            {rangeBar}
             <button
               type="button"
               onClick={() => onChangeDate(-1)}

@@ -1,5 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { clampCardHeight, columnRowTokens, LAYOUT_STORAGE_KEY, MAX_CARD_HEIGHT, MIN_CARD_HEIGHT } from "./contract";
+import {
+  clampCardHeight,
+  clampCardWidth,
+  columnSpan,
+  DEFAULT_CARD_WIDTH,
+  LAYOUT_STORAGE_KEY,
+  MAX_CARD_HEIGHT,
+  MAX_SPLIT,
+  MIN_CARD_HEIGHT,
+  MIN_CARD_WIDTH,
+  MIN_SPLIT,
+} from "./contract";
 import { DEFAULT_LAYOUT } from "./defaultLayout";
 import { normalizeLayout } from "./normalizeLayout";
 import { loadLayout, resetLayout, saveLayout } from "./layoutStore";
@@ -41,13 +52,15 @@ describe("normalizeLayout", () => {
     const result = normalizeLayout({
       version: 1,
       cards: [
-        { id: "timer", column: "full", tier: "XL" },
+        /* 行内卡的合法列现在是三档（left / right / **full**，0.12.1 起支持跨列），
+         * 所以这里用 "middle" 这种压根不是列的串来触发 illegal-column。 */
+        { id: "timer", column: "middle", tier: "XL" },
         { id: "notes", column: "left", tier: "M" },
       ],
     });
     expect(result.repaired).toBe(true);
     expect(result.reason).toBe("illegal-column");
-    /* 行内卡不许通栏、通栏卡不许进列；非法档回 M，不删卡。 */
+    /* 非法列回 left / full；通栏卡不许进列；非法档回 M，不删卡。 */
     expect(result.layout.cards).toEqual([
       { id: "timer", column: "left", tier: "M" },
       { id: "notes", column: "full", tier: "M" },
@@ -75,25 +88,47 @@ describe("normalizeLayout", () => {
   });
 });
 
-describe("columnRowTokens", () => {
-  it("b01a_default_layout_reproduces_today_grid_rows_verbatim", () => {
-    const left = columnRowTokens(DEFAULT_LAYOUT.cards.filter((card) => card.column === "left"));
-    const right = columnRowTokens(DEFAULT_LAYOUT.cards.filter((card) => card.column === "right"));
-    /* 与 `.qp-col-left/right` 的令牌序列逐字相同；外面那层 minmax(0, …) 是防溢出用的，见 contract.ts */
-    expect(left).toEqual(["minmax(0, var(--qp-mod-timer))", "minmax(0, var(--qp-mod-items))"]);
-    expect(right).toEqual(["minmax(0, var(--qp-mod-apps))", "minmax(0, var(--qp-mod-todos))"]);
+/**
+ * [单独宽度 · 0.12.1] 宽度是「自己那一列占几格」。
+ *
+ * 行/列两条轴各管各的：`split` 决定两列多宽（全局一个数），`width` 决定一张卡在这一列里
+ * 占四分之几（每卡一个数）。混成一个数的话，窗口换宽就要重算，且两者抢同一块空间。
+ */
+describe("单独宽度", () => {
+  it("w01a_width_snaps_to_quarters_and_never_leaves_the_column", () => {
+    expect(clampCardWidth(37)).toBe(25);
+    expect(clampCardWidth(38)).toBe(50);
+    expect(clampCardWidth(0)).toBe(MIN_CARD_WIDTH);
+    expect(clampCardWidth(9_999)).toBe(DEFAULT_CARD_WIDTH);
+    expect(clampCardWidth(Number.NaN)).toBe(DEFAULT_CARD_WIDTH);
+  });
+
+  it("w01b_span_is_the_quarter_count_and_defaults_to_a_full_column", () => {
+    expect(columnSpan(undefined)).toBe(4);
+    expect(columnSpan(100)).toBe(4);
+    expect(columnSpan(75)).toBe(3);
+    expect(columnSpan(50)).toBe(2);
+    expect(columnSpan(25)).toBe(1);
+  });
+
+  it("w01c_stored_width_is_snapped_and_full_width_is_not_persisted", () => {
+    const snapped = normalizeLayout({
+      version: 1,
+      cards: [{ id: "timer", column: "left", tier: "M", width: 37 }],
+    });
+    expect(snapped.layout.cards[0].width).toBe(25);
+    expect(snapped.repaired).toBe(true);
+    /* 100 = 缺省。写进布局会让「恢复默认」永远判成"已自定义"，也会让老布局多一次无谓自愈 */
+    const full = normalizeLayout({
+      version: 1,
+      cards: [{ id: "timer", column: "left", tier: "M", width: 100 }],
+    });
+    expect(full.layout.cards[0].width).toBeUndefined();
+    expect(full.repaired).toBe(false);
   });
 });
 
 describe("拖拽调整大小（0.12.1）", () => {
-  it("r01a_dragged_height_wins_over_the_tier_token", () => {
-    const rows = columnRowTokens([
-      { id: "timer", column: "left", tier: "M", height: 300 },
-      { id: "items", column: "left", tier: "M" },
-    ]);
-    expect(rows).toEqual(["minmax(0, 300px)", "minmax(0, var(--qp-mod-items))"]);
-  });
-
   it("r01b_out_of_range_heights_are_clamped_not_dropped", () => {
     expect(clampCardHeight(20)).toBe(MIN_CARD_HEIGHT);
     expect(clampCardHeight(9_999)).toBe(MAX_CARD_HEIGHT);
@@ -149,5 +184,48 @@ describe("layoutStore", () => {
     const loaded = loadLayout();
     expect(loaded.repaired).toBe(false);
     expect(window.localStorage.getItem(LAYOUT_STORAGE_KEY)).toBeNull();
+  });
+});
+
+/**
+ * [列宽比可拖 / 卡片跨列 · 0.12.1] 三条判据，各钉一处**会静默失效**的接线。
+ *
+ * 为什么必须钉：这两项都不改变默认画面的一个像素，光看截图分不出"做了"和"没做"，
+ * 而失效的方式又都是零报错（拖了没反应 / 刷新弹回去 / 比例不落盘）。
+ */
+describe("列宽比与跨列", () => {
+  it("b04i_row_card_may_span_full_and_stays_spanning_after_reload", () => {
+    /* 行内卡跨满是合法布局，**不许**被自愈压回 left —— 否则用户点「跨列」，
+     * 刷新就弹回去，而界面上没有任何提示。 */
+    const result = normalizeLayout({
+      version: 1,
+      cards: [
+        { id: "timer", column: "full", tier: "M" },
+        { id: "apps", column: "full", tier: "M" },
+      ],
+    });
+    expect(result.repaired).toBe(false);
+    expect(result.layout.cards.map((card) => card.column)).toEqual(["full", "full"]);
+    /* 天生通栏的卡仍然不许进列，这条不变 */
+    expect(normalizeLayout({
+      version: 1,
+      cards: [{ id: "notes", column: "left", tier: "M" }],
+    }).layout.cards[0].column).toBe("full");
+  });
+
+  it("b04j_split_is_clamped_and_absent_split_is_not_a_repair", () => {
+    const cards = [{ id: "timer", column: "left", tier: "M" as const }];
+    /* 越界夹住：窗口再窄也不许把一列拖成 0 */
+    expect(normalizeLayout({ version: 1, cards, split: 999 }).layout.split).toBe(MAX_SPLIT);
+    expect(normalizeLayout({ version: 1, cards, split: -5 }).layout.split).toBe(MIN_SPLIT);
+    /* 老布局没有 split 键：不能因此判"需自愈"（那会把用户的卡序一起重写一遍） */
+    const legacy = normalizeLayout({ version: 1, cards });
+    expect(legacy.repaired).toBe(false);
+    expect(legacy.layout.split).toBeUndefined();
+  });
+
+  it("b04k_split_round_trips_through_storage", () => {
+    saveLayout({ version: 1, cards: DEFAULT_LAYOUT.cards, split: 55 });
+    expect(loadLayout().layout.split).toBe(55);
   });
 });

@@ -78,12 +78,13 @@ describe("AddCardDialog", () => {
     expect(buttons().some((button) => button.textContent?.includes("专注窗口"))).toBe(false);
     expect(buttons().some((button) => button.textContent?.includes("便利贴窗口"))).toBe(false);
     const items = buttons().filter((button) => button.className.includes("qp-add-card__item"));
-    /* 目录 8 张 - 未实现 2 张（trend / reminder）- 已在板上 2 张（timer / notes）= 4 张。
-     * 目录从 7 张变 8 张是补了漏掉的 `items`：它原先不在表里，移除事项卡之后
-     * 在加卡列表中彻底消失（`isCardKnown` 靠本表查 column）。 */
-    expect(items).toHaveLength(4);
-    /* 未实现的卡不许出现在列表里：点它只会得到一块空白 */
-    expect(buttons().some((button) => button.textContent?.includes("应用趋势"))).toBe(false);
+    /* 目录 8 张 - 已在板上 2 张（timer / notes）= 6 张。
+     * 历史两笔：① 目录原漏 `items`，移除事项卡后它在列表里彻底消失（`isCardKnown` 靠本表查
+     * column）；② `trend` / `reminder` 原先渲染返回 null，点「添加」只得到看不见的空槽 ——
+     * 0.12.1 起两张卡都真渲染了，所以它们**必须**出现在这里，过滤口径只剩"不在板上"。 */
+    expect(items).toHaveLength(6);
+    expect(buttons().some((button) => button.textContent?.includes("应用趋势"))).toBe(true);
+    expect(buttons().some((button) => button.textContent?.includes("提醒窗口"))).toBe(true);
     /* 焦点落在第一项：打开就能 Tab/Enter，不必先点一下。 */
     expect(document.activeElement).toBe(items[0]);
   });

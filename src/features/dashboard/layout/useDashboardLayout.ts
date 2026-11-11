@@ -10,6 +10,9 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   clampCardHeight,
+  clampCardWidth,
+  clampSplit,
+  DEFAULT_CARD_WIDTH,
   DEFAULT_TIER,
   type CardColumn,
   type CardId,
@@ -37,9 +40,16 @@ export interface DashboardLayoutController {
    * 一秒钟几十次序列化会把主线程拖住，手感直接变成"拉不动"。
    */
   setCardHeight: (id: CardId, height: number, save?: boolean) => void;
+  /**
+   * [单独宽度] 列内占几格（25/50/75/100）。存 100 时**删键** ——
+   * 缺省就是 100，多存一个 "width": 100 只会让「恢复默认」判不出来。
+   */
+  setCardWidth: (id: CardId, width: number, save?: boolean) => void;
   /** 组件参数（P2）：一个键一个字，传 `null` 即删键。 */
   setCardOption: (id: CardId, key: string, value: string | null) => void;
   cardOption: (id: CardId, key: string) => string | null;
+  /** 列宽比（拖中间分隔条）：左列 fr 权重，`save=false` 用于拖动过程。 */
+  setSplit: (split: number, save?: boolean) => void;
   reset: () => void;
 }
 
@@ -121,8 +131,23 @@ export function useDashboardLayout(): DashboardLayoutController {
     });
   }, []);
 
-  const setCardOption = useCallback((id: CardId, key: string, value: string | null) => {
-    setLayout((current) => commit({
+  const setCardWidth = useCallback((id: CardId, width: number, save = true) => {
+    const next = clampCardWidth(width);
+    setLayout((current) => {
+      const cards = current.cards.map((card) => {
+        if (card.id !== id) return card;
+        if (next === DEFAULT_CARD_WIDTH) {
+          const { width: _dropped, ...rest } = card;
+          return rest;
+        }
+        return { ...card, width: next };
+      });
+      const layout = { ...current, cards };
+      return save ? commit(layout) : layout;
+    });
+  }, []);
+
+  const setCardOption = useCallback((id: CardId, key: string, value: string | null) => {    setLayout((current) => commit({
       ...current,
       cards: current.cards.map((card) => {
         if (card.id !== id) return card;
@@ -139,6 +164,14 @@ export function useDashboardLayout(): DashboardLayoutController {
     [layout],
   );
 
+  const setSplit = useCallback((split: number, save = true) => {
+    const next = clampSplit(split);
+    setLayout((current) => {
+      const layout = { ...current, split: next };
+      return save ? commit(layout) : layout;
+    });
+  }, []);
+
   const reset = useCallback(() => {
     resetLayout();
     /* 清键后再读：`loadLayout` 的「首次运行」分支给的是出厂布局，不写盘。 */
@@ -151,6 +184,6 @@ export function useDashboardLayout(): DashboardLayoutController {
 
   return {
     layout, left, right, full, has, addCard, removeCard, moveCard,
-    setCardColumn, setCardTier, setCardHeight, setCardOption, cardOption, reset,
+    setCardColumn, setCardTier, setCardHeight, setCardWidth, setCardOption, cardOption, setSplit, reset,
   };
 }

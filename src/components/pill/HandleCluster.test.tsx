@@ -1,11 +1,9 @@
 /**
- * 药丸手柄区的单测（H-01 / H-02 / H-03 / H-05 / H-06 + 宽度算式 W-01…W-05）
+ * 药丸手柄区的**行为**单测（H-01 / H-02 / H-03 / H-05 / H-06 / W-07）
  * -----------------------------------------------------------------------------
  * jsdom **不做布局**：`offsetWidth` 恒为 0、rect 全零、外部 CSS 不参与计算。所以 H-02 的
- * `offsetWidth === 0` 与 §6.1 的宽度算式都不可能靠"量 DOM"验证。替代口径两条，都能红：
- *   ① 结构 + 属性：顺序、`data-enabled`、三种 SVG 同 viewBox；
- *   ② 读**样式源码**（真实文件）把 token 代入 §6.1 算式，断言三手柄全开时 name ≥154、总宽 ≤320。
- *      把 `--pill-w-max` 改回 288 → name 只剩 142 → `w04` 立刻红，这就是那条反证。
+ * `offsetWidth === 0` 不可能靠"量 DOM"验证，改为「结构 + 属性 + 读样式源码」两条口径。
+ * 宽度算式（W-01…W-06 / R-03）已按 0.12.1 末的行数上限拆到 `HandleGeometry.test.tsx`。
  */
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -25,12 +23,6 @@ import { HandleCluster } from './HandleCluster';
 /** `src/components/pill/` → `src/` */
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (rel: string): string => readFileSync(join(SRC, rel), 'utf8');
-
-function token(css: string, name: string): number {
-  const match = new RegExp(`--${name}:\\s*([0-9.]+)px`).exec(css);
-  if (!match) throw new Error(`tokens 里找不到 --${name}`);
-  return Number(match[1]);
-}
 
 type Ctx = Omit<HandleActionCtx, 'anchor'>;
 
@@ -210,69 +202,29 @@ describe('槽位语义：空槽静默，护栏拦截要提示（A-01 / A-07）',
   });
 });
 
-describe('几何：token 与宽度算式（W-01…W-05 / R-03）', () => {
-  const primitives = read('styles/tokens/01-primitives.css');
-  const surfaces = read('styles/surfaces.css');
-  const overlays = read('styles/overlays.css');
+/** 三次贝塞尔中点（t=0.5）相对起点的横向拱起量 + 纵向跨度 */
+function bezier(d: string): { bulge: number; span: number } {
+  const n = (d.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+  const [x0, , x1, , x2, , x3, y3] = n;
+  return {
+    bulge: (x0 + 3 * x1 + 3 * x2 + x3) / 8 - x0,
+    span: Math.abs(y3 - n[1]),
+  };
+}
 
-  it('w01_grip_width_is_12', () => {
-    expect(token(primitives, 'grip-w')).toBe(12);
-    expect(token(primitives, 'grip-hit-w')).toBe(12);
-  });
+describe('W-07：半手柄的字形（拱起量，不是高度）', () => {
+  it('w07_half_glyph_is_flatter_than_before_not_a_half_circle', () => {
+    /* 用户口径（0.12.1 末）：「中间半手柄的弧度过大，应小一点，像最右边那条」。
+       原 4.8px 高度里拱 1.65px，单位跨度拱起是长手柄的两倍 → 像半个圆圈。
+       判据取**相对曲率**（拱起 / 跨度），它与形状语感同向，且不锁字面坐标：
+       改回 7.8 → 0.34 > 长手柄 0.172 的 1.4 倍 → 红。 */
+    render(DEFAULT_HANDLE_BINDINGS, makeCtx());
+    const half = bezier(handleOf('half').querySelector('path')?.getAttribute('d') ?? '');
+    const full = bezier(handleOf('full').querySelector('path')?.getAttribute('d') ?? '');
+    const ratio = (g: { bulge: number; span: number }) => g.bulge / g.span;
 
-  it('w02_pill_max_width_is_320_and_undo_stays_at_288', () => {
-    expect(token(primitives, 'pill-w-max')).toBe(320);
-    expect(token(primitives, 'undo-w-max')).toBe(288);
-    /* 撤销条是唯一必须换变量的消费点；`--pill-w-max` 的消费点只剩 `.pill` 一处 */
-    expect(overlays).toContain('max-width: var(--undo-w-max)');
-    expect(surfaces).toContain('max-width: var(--pill-w-max)');
-  });
-
-  it('r03_name_to_first_handle_gap_is_still_4px', () => {
-    /* 删掉「今天」图标位之后，4px 净间距**只**靠这条 margin-left。再加一次就变 0（R-03）。
-       全仓 grep「今天图标位」= 0（R-01）：它的两个动作已经变成 today.panel / today.digest。 */
-    expect(surfaces).toMatch(/\.pill__handle\s*\{\s*margin-left:\s*calc\(-1 \* var\(--space-1\)\)/);
-    expect(surfaces.match(/margin-left:\s*calc\(-1 \* var\(--space-1\)\)/g)).toHaveLength(1);
-  });
-
-  it('w04_name_width_never_below_154', () => {
-    /* §6.1 的算式（数值全部从样式源码里读，不抄常量）：
-         固定 = pad-l + pad-r + border(1+1) + ring + gap(环↔数字) + timer
-              + (name 前净间距 = gap − margin) + 3 × 每手柄净占
-         每手柄净占 = gap − margin + 命中宽 */
-    const gap = token(primitives, 'space-2');
-    const margin = token(primitives, 'space-1');
-    const perHandle = gap - margin + token(primitives, 'grip-w');
-    const timerWidth = 53; /* 既有 `.timer-digits` 定宽（surfaces.css:147），本轮不动 */
-    const fixed =
-      token(primitives, 'pill-pad-l') +
-      token(primitives, 'pill-pad-r') +
-      2 +
-      token(primitives, 'ring-size') +
-      gap +
-      timerWidth +
-      (gap - margin) +
-      3 * perHandle;
-
-    const pillMax = token(primitives, 'pill-w-max');
-    const nameWidth = Math.min(pillMax - fixed, token(primitives, 'task-w-max'));
-
-    expect(perHandle).toBe(16);
-    expect(fixed).toBe(146);
-    /* 反证：`--pill-w-max` 回落到 288 → name 只剩 142 < 154 → 本条红（W-04） */
-    expect(nameWidth).toBeGreaterThanOrEqual(154);
-    expect(nameWidth).toBe(164);
-    /* 三手柄全开的总宽 = 310，且必须仍 ≤ 上限 */
-    expect(fixed + nameWidth).toBe(310);
-    expect(fixed + nameWidth).toBeLessThanOrEqual(pillMax);
-  });
-
-  it('w05_pill_max_width_leaves_headroom_for_the_frame', () => {
-    /* 药丸窗口 384 - 2 × 每手柄净占 = 352 是"还能塞三个手柄"的物理上限；320 ≤ 352。
-       变异：把 320 改 360 → 本条红。 */
-    const gap = token(primitives, 'space-2');
-    const margin = token(primitives, 'space-1');
-    const perHandle = gap - margin + token(primitives, 'grip-w');
-    expect(token(primitives, 'pill-w-max')).toBeLessThanOrEqual(384 - 2 * perHandle);
+    expect(half.span).toBeCloseTo(4.8, 2);
+    expect(half.bulge).toBeCloseTo(1.05, 2);
+    expect(ratio(half)).toBeLessThanOrEqual(ratio(full) * 1.4);
   });
 });

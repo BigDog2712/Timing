@@ -54,6 +54,13 @@
   --qp-mod-note-s: 44px;
   --qp-mod-note-l: 88px;
 
+  /* ── [0.12.1] 两张通栏真卡（应用趋势 / 提醒窗口）──
+   * 趋势卡要放得下 7 根柱 + 一行日期；高度取「卡头 20 + 8 + 柱 120 + 日期 16 + 上下内距 32」≈ 184。
+   * 提醒卡按 `--qp-row-items` 30 + gap 4 排 5 行 = 166，加卡头与内距 = 200。
+   * 这两个值不进像素验收（默认布局里没有它们），只保证"加进来时内容不被裁"。 */
+  --qp-mod-trend: 184px;
+  --qp-mod-reminder: 200px;
+
   /* ── 行高（几何表：readout 24 / item 30 / app 32 / todo 36，gap 4 → pitch 40） ── */
   --qp-row-readout: 24px;
   --qp-row-items: 30px;
@@ -108,6 +115,9 @@
     --qp-mod-todos-l: 350px;
     --qp-mod-note-s: 40px;
     --qp-mod-note-l: 76px;
+
+    --qp-mod-trend: 164px;
+    --qp-mod-reminder: 180px;
   }
 }
 

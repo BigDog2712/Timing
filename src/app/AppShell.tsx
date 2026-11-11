@@ -256,6 +256,9 @@ export default function AppShellContent({
             onMappingSaved: handleMappingOverridesChanged,
             onMinSessionSecsChange: handleMinSessionSecsChange,
             onOpenHistoryDate: openHistoryForDate,
+            onNavigateView: (nextView: View) => {
+              void handleSidebarNavigate(nextView);
+            },
             onOpenMapping: () => {
               void handleSidebarNavigate("mapping");
             },

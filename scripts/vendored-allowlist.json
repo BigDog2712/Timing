@@ -444,6 +444,102 @@
       "change": "added",
       "reason": "[体积 + 修复 · 0.12.1] 卡片装配从 Dashboard 搬出（Dashboard 顶到 300 行冻结线）。硬纪律：任何卡都不许返回 null —— 上一版对 trend/reminder 返回 null，用户点「添加」只多出看不见的空槽（症状「新增的图窗未显示」「大小也调不了」）。未实现的卡一律渲染 CardPlaceholder（有标题、能移除、能拖高）。",
       "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/useSplitResize.ts",
+      "change": "added",
+      "reason": "列宽比可拖（0.12.1）：两列之间那根分隔条的拖拽。单开文件而不是并入 useCardResize —— 那个 hook 改的是卡高（clientY → px），这个改的是列比例（clientX → fr 权重），换算、上限、落盘时机都不同，合并只会让两边的判据互相污染。px→fr 按容器宽实时换算（不写死系数，否则窄窗拖一格跳一大截）；拖动中不落盘；window 上挂 move/up 让指针移出 8px 窄缝也能继续拖；键盘 ←/→ 走同一条路径。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-split.css",
+      "change": "added",
+      "reason": "从 dashboard.css 拆出（那个文件撞 300 行硬限，312 行）：通栏槽 .qp-full-slot 与列宽分隔条 .qp-split 两节，都是布局语义而不是卡内版式。槽那一节同时修掉一个真 bug —— 定高原写成 .qp-main-view > .qp-notes，加槽之后便利贴变孙节点、选择器失效，高度塌到内容且手柄丢锚点。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/services/trendDays.ts",
+      "change": "added",
+      "reason": "应用趋势卡（0.12.1）：按本地日切桶 + 逐窗口求交集。拆成纯函数是因为三个易错点都是静默的 —— 日界用 UTC 会让整档偏一天、桶边界首尾与查询区间差一毫秒就整条读取失败、按起点归日会让跨午夜的会话少算后一天。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/services/trendDays.test.ts",
+      "change": "added",
+      "reason": "趋势切桶的五条判据：日界与右端裁到此刻、边界首尾对齐、跨午夜分摊、坏行不污染、刚过零点仍七根柱。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/hooks/useTrendDays.ts",
+      "change": "added",
+      "reason": "趋势卡数据源：一次区间查询 cmd_get_activity_aggregate_range 带逐日桶边界，与历史页区间视图同一条路，口径天然一致。刷新纪律沿用有数据不退回 loading。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/hooks/usePendingReminders.ts",
+      "change": "added",
+      "reason": "提醒卡数据源：reminder_pending（待触发的提醒，不是历史），按 remindAt 升序，过点的排最前。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/TrendModule.tsx",
+      "change": "added",
+      "reason": "应用趋势卡：7 根柱按峰值归一（按 24h 归一时每根都矮，看不出走势），今天用强调色。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/ReminderModule.tsx",
+      "change": "added",
+      "reason": "提醒窗口卡：时间/标题/类型/到点标记四列，已过点加重时间而不是整行变红（整行红与删除类危险状态混淆）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/TrendReminder.test.tsx",
+      "change": "added",
+      "reason": "两张新卡的行为判据：峰值归一、今天高亮、极小值留可见边、空态、到点标记。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-trend-reminder.css",
+      "change": "added",
+      "reason": "两张新卡的样式：趋势柱（柱高百分比相对扣掉星期标签的内容盒，否则最高那根顶出卡底被切）、提醒行（时间列宽与 44px 数字列同宽，四张卡行首对齐）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/platform/persistence/reminderReadRepository.ts",
+      "change": "added",
+      "reason": "提醒窗口卡（0.12.1）的只读网关：照 noteReadRepository 的三条边界写 —— 不碰分析窗 api.ts 与 domain-v020.ts（L9 双窗隔离，type import 同样红），命令名 reminder_pending 无入参，脏行丢弃不抛错。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/useCardResize.test.tsx",
+      "change": "added",
+      "reason": "拖拽手柄的接线判据（0.12.1 二次修复）：手柄→closest→pointerdown 起点→move 预览→up 落盘整条链，外加「指针移出卡仍可拖」与「按卡身不启动拖动」。纯函数判据只证算得对，证不了拖得动；这条链路断掉时零报错，表现只有「拖不动」。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/CardSlot.tsx",
+      "change": "added",
+      "reason": "卡槽（0.12.1 单独宽度）：卡在板上占的那一格。宽度要写 `grid-column: span N`、高度要跟着卡走不跟行号走、宽度手柄必须落在卡外（卡是 overflow:hidden，放进去会被裁）。列内卡与通栏卡共用，定高令牌留在 CSS。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/CardSlot.test.tsx",
+      "change": "added",
+      "reason": "卡槽的接线判据：`span N` 真写进样式（缺省 4 格）、拖出来的高度是固定 px 而非 minmax 建议值、宽度手柄挂上且 aria-valuenow 跟当前值、通栏槽不出宽度手柄。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/useCardWidthResize.ts",
+      "change": "added",
+      "reason": "卡宽拖拽（0.12.1）：读 clientX、以**列宽**为换算基准（不是板宽 —— 取错会让窄列里拖一下跳三档），吸附四等分，拖动中不落盘，window 挂 move/up，键盘 ←/→ 走同一条落盘路径。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/useCardWidthResize.test.tsx",
+      "change": "added",
+      "reason": "卡宽手柄的接线判据：手柄→closest(槽)→pointerdown 起点→move 吸附预览→up 落盘；另含越界钳到整列、指针移出仍可拖、按卡身不启动、键盘一档 25%。",
+      "owner": "ForG"
     }
   ]
 }

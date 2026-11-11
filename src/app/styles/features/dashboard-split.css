@@ -1,0 +1,137 @@
+/* ============================================================================
+ * dashboard-split.css — 通栏槽（`.qp-full-slot`）、列内卡槽（`.qp-card-slot`）、
+ *                       列宽分隔条（`.qp-split`）、卡宽手柄（`.qp-card-width`）
+ * -----------------------------------------------------------------------------
+ * 从 `dashboard.css` 拆出：那个文件已经 312 行、撞上 300 行硬限，而这几节都是
+ * **布局**语义（槽怎么定高、手柄怎么抓），不是卡内版式。按语义拆，不加白名单。
+ *
+ * 三节各自守一条曾经真出过事的接线：
+ *   ① 通栏卡的定高必须落在**槽**上。上一版写成 `.qp-main-view > .qp-notes`，
+ *      加槽之后便利贴变成孙节点、选择器再也匹配不上 → 高度塌到内容（56 → 32），
+ *      手柄找不到定位锚点，表现是「通栏卡怎么拖都没反应」。
+ *   ② 分隔条要占**一格真实网格列**（宽 = `--qp-card-gap`），不能靠绝对定位漂在
+ *      两列之间：列宽是 `44fr / 54fr` 算出来的，绝对定位拿不到那个位置。
+ *   ③ 列内卡的定高必须落在槽上（不是网格行）：两张半宽的卡并排时共用行高轨道，
+ *      264 的卡会压着 284 的卡。
+ * ========================================================================== */
+
+/* ── 通栏槽 ── */
+.qp-full-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+.qp-full-slot > * { flex: 1 1 auto; min-height: 0; }
+
+/* 兜底定高：用户拖出来的 inline height 写在槽上，会压过这里每一条 */
+.qp-full-slot[data-card="notes"] { height: var(--qp-mod-note); }
+.qp-full-slot[data-card="timeline"] { height: var(--qp-mod-items); }
+/* [卡片跨列] 行内卡被拉到通栏时用**自己的**行高令牌：与它在列内那一行同值，
+ * 视觉上只是变宽不变高。缺了这四条，跨列后的卡会塌成内容高度。 */
+.qp-full-slot[data-card="timer"] { height: var(--qp-mod-timer); }
+.qp-full-slot[data-card="items"] { height: var(--qp-mod-items); }
+.qp-full-slot[data-card="apps"] { height: var(--qp-mod-apps); }
+.qp-full-slot[data-card="todos"] { height: var(--qp-mod-todos); }
+/* [0.12.1] 两张新通栏卡：各自一条令牌，缺了它们会塌成内容高度（趋势卡尤甚，柱高按百分比算，
+ * 父级高度不定时柱子全是 0）。 */
+.qp-full-slot[data-card="trend"] { height: var(--qp-mod-trend); }
+.qp-full-slot[data-card="reminder"] { height: var(--qp-mod-reminder); }
+/* [P2 修正] 全量便利贴：一张不少，横向滚动而不是割掉 */
+.qp-full-slot[data-card="notes"] > .qp-notes { overflow-x: auto; }
+
+/* ── 列内卡槽（[单独宽度] 0.12.1）── */
+/* 定高落在**槽**上，与 `.qp-full-slot` 同一条纪律：用户拖出来的 inline height 写在槽上，
+ * 压过这里每一条令牌。档位映射从 JS（原 `contract.ts` 的 `cardRowToken`）搬进 CSS ——
+ * 列内卡可以并排，行高必须跟着卡走，不能再由「第几行」决定。
+ * 令牌名与 `--qp-mod-*` 一字不差：M 档用基名，S/L 加后缀，**绝不复制数值**。 */
+.qp-card-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: var(--qp-slot-h);
+  /* 缺省占满整列（4 格）。组件总会写内联 `span N`，这条是**兜底**：
+   * 少了它，一个没带样式的槽只占 1 格 —— 实测卡片宽度 107 而不是 466，
+   * 症状是「列变窄了、右边空一大片」，而代码里看不出哪里错。 */
+  grid-column: span 4;
+}
+.qp-card-slot > * { flex: 1 1 auto; min-height: 0; }
+
+.qp-card-slot[data-card="timer"] { --qp-slot-h: var(--qp-mod-timer); }
+.qp-card-slot[data-card="items"] { --qp-slot-h: var(--qp-mod-items); }
+.qp-card-slot[data-card="apps"] { --qp-slot-h: var(--qp-mod-apps); }
+.qp-card-slot[data-card="todos"] { --qp-slot-h: var(--qp-mod-todos); }
+
+/* 档位覆盖放在基名之后；属性多一个，特异性本来也更高，顺序只是让人读得懂 */
+.qp-card-slot[data-card="timer"][data-tier="S"] { --qp-slot-h: var(--qp-mod-timer-s); }
+.qp-card-slot[data-card="timer"][data-tier="L"] { --qp-slot-h: var(--qp-mod-timer-l); }
+.qp-card-slot[data-card="items"][data-tier="S"] { --qp-slot-h: var(--qp-mod-items-s); }
+.qp-card-slot[data-card="items"][data-tier="L"] { --qp-slot-h: var(--qp-mod-items-l); }
+.qp-card-slot[data-card="apps"][data-tier="S"] { --qp-slot-h: var(--qp-mod-apps-s); }
+.qp-card-slot[data-card="apps"][data-tier="L"] { --qp-slot-h: var(--qp-mod-apps-l); }
+.qp-card-slot[data-card="todos"][data-tier="S"] { --qp-slot-h: var(--qp-mod-todos-s); }
+.qp-card-slot[data-card="todos"][data-tier="L"] { --qp-slot-h: var(--qp-mod-todos-l); }
+
+/* ── 卡右缘的宽度手柄（[单独宽度] 0.12.1）──
+ * 热区 12px，**整个落在卡内右缘的留白里**（卡内距 16px，这段没有内容，也够不到滚动条）。
+ * 为什么不往列缝里伸：缝里站着 `.qp-split`（列宽分隔条，整条约宽都归它），
+ * 两边抢同一条热区时必有一个拖不动；而且右列最右那张卡往右伸 6px 会让
+ * `.qp-dashboard`（overflow-y:auto → 另一轴也变 auto）冒出横向滚动条。 */
+.qp-card-width {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  z-index: 4;
+  cursor: col-resize;
+  touch-action: none;
+}
+.qp-card-width::before {
+  content: "";
+  position: absolute;
+  inset: 10% 2px 10% auto;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+.qp-card-slot:hover .qp-card-width::before,
+.qp-card-width:focus-visible::before {
+  background: var(--qp-border-strong);
+}
+.qp-card-width:focus-visible {
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: -2px;
+}
+
+/* ── 列宽分隔条 ──
+ * 只有 gap 那么宽的一整条，整条都能抓（不是 2px 的细线）：细线在 8px 缝里几乎点不中。 */
+.qp-split {
+  position: relative;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+.qp-split::before {
+  content: "";
+  position: absolute;
+  inset: 8% auto 8% 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: transparent;
+}
+.qp-split:hover::before,
+.qp-split:focus-visible::before {
+  background: var(--qp-border-strong);
+}
+.qp-split:focus-visible {
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: -2px;
+}
