@@ -23,6 +23,14 @@
 - 两根手柄显形统一：2px 圆头、`--qp-border-strong`（3.4:1），只加长不改色（静息隐 → 卡 hover 60% 长 → 自身拉满），禁 border-subtle（1.9:1 静默跌破 3:1）。
 - `--qp-card-inner` 幽灵令牌删除（tokens 有定义、全仓零消费 —— 内高光并入 shadow-rest 第一层）。
 
+**布局层（网格 v2 + 拖拽排序）**：双列模型换成安卓桌面小组件式自由网格。
+
+- 布局契约 v1（`column: left|right|full` + 列内四等分 `width` + `split` 列宽比）整体升级 v2（4 列网格 + 起始列 `x` + 占宽 `w` 1..4 + 占行 `h` 1..2）。基准行高 = 计时分布卡 264px，**所有卡片统一到这个尺寸**，内容多的卡（应用排行/待办）占 2 行而不是把单卡塞高。
+- `LAYOUT_VERSION` 1→2 + 换新键 `patina:dashboard-layout:v2`，旧 v1 数据不迁移（主人认可「旧数据丢弃重来」）。
+- 渲染 `grid-auto-flow: dense` 自动向上补空（小组件桌面行为）；卡定位由 `CardSlot` 写 inline `grid-column: x+1 / span w` + `grid-row: span h`，槽 CSS 兜底 span 1。
+- **拖拽排序**：卡头 grip 六点从装饰层升级成真手柄（命中区 ::after 外扩到 24×20），按住拖动让其它卡让位。新增 `gridFlow.ts`（纯函数复现 dense 落点 + computeDrop 抽出插回吸附 x）、`useCardDrag.ts`（floor 反推目标格、拖动中不落盘、draggingId 驱动 `data-dragging` 视觉）。
+- 三种抓取（拖高 `.qp-card-resize` / 拖宽 `.qp-card-width` / 拖排 `.qp-card-grip`）共用板子一处 onPointerDown，各认各的手柄选择器，互斥不打架。
+
 ## 0.12.1（桌面）— 2026-11-11
 
 ### 主界面：卡片能真的调大了，两张占位卡换成真卡
