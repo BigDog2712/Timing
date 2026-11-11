@@ -3,16 +3,19 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { useCardWidthResize } from "./useCardWidthResize";
-import type { CardId } from "./contract";
+import { COLS, type CardId } from "./contract";
 
 /**
- * [单独宽度 · 0.12.1] 宽度手柄 → 拖动的**接线**判据。
+ * [v2 · 0.12.1末] 卡宽手柄 → 拖动的**接线**判据。
  *
  * 与 `useCardResize.test.tsx` 同一个理由：纯函数证明「算得对」，证明不了「拖得动」。
  * 中间隔着三件事，任何一处断掉都是零报错、只有「拖了没变化」：
  *   ① 手柄是否真在槽里（`.qp-card-width` 在 `.qp-card-slot` 内）；
- *   ② 换算基准是**列宽**还是板宽（取错会让窄列里拖一下跳三档）；
+ *   ② 换算基准是**网格总宽**（`.qp-grid`）而不是别的容器（取错会让窄网格里拖一下跳多档）；
  *   ③ `pointerdown` 有没有先记下起点。
+ *
+ * v2 起宽度是**整数格 w**（1..COLS），不再是百分比：一格 = 网格总宽 / COLS，
+ * 拖动的像素增量换算成格数并吸附到整数。
  */
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -30,7 +33,7 @@ afterEach(() => {
   document.body.style.removeProperty("cursor");
 });
 
-type ResizeFn = (id: CardId, width: number) => void;
+type ResizeFn = (id: CardId, w: number) => void;
 
 function stubWidth(el: Element, width: number) {
   vi.spyOn(el, "getBoundingClientRect").mockReturnValue({
@@ -55,12 +58,12 @@ function mount(): { onPreview: Mock<ResizeFn>; onCommit: Mock<ResizeFn> } {
       { onPointerDown },
       createElement(
         "div",
-        { className: "qp-col" },
+        { className: "qp-grid" },
         createElement(
           "div",
           { className: "qp-card-slot", "data-card": "timer", "data-tier": "M" },
           createElement("section", { className: "qp-card" }),
-          createElement("span", { className: "qp-card-width", "aria-valuenow": 50, tabIndex: 0 }),
+          createElement("span", { className: "qp-card-width", "aria-valuenow": 1, tabIndex: 0 }),
         ),
       ),
     );
@@ -72,12 +75,10 @@ function mount(): { onPreview: Mock<ResizeFn>; onCommit: Mock<ResizeFn> } {
   return spies;
 }
 
-/** 列宽 400、卡当前 200（= 50%）：往右拖 100px 正好一档（+25%）。 */
+/** 网格总宽 400、卡当前占 1 格（400/4 = 100px 一格）：往右拖 100px 正好 +1 格。 */
 function layout400() {
-  const column = container!.querySelector<HTMLElement>(".qp-col")!;
-  const slot = container!.querySelector<HTMLElement>(".qp-card-slot")!;
-  stubWidth(column, 400);
-  stubWidth(slot, 200);
+  const grid = container!.querySelector<HTMLElement>(".qp-grid")!;
+  stubWidth(grid, 400);
 }
 
 function pointer(target: EventTarget, type: string, clientX: number) {
@@ -88,31 +89,31 @@ function pointer(target: EventTarget, type: string, clientX: number) {
   });
 }
 
-describe("卡宽手柄", () => {
-  it("w03a_dragging_the_handle_previews_the_snapped_step_then_commits", () => {
+describe("卡宽手柄（网格 v2）", () => {
+  it("w03a_dragging_the_handle_previews_the_snapped_grid_step_then_commits", () => {
     const spies = mount();
     layout400();
     const handle = container!.querySelector(".qp-card-width")!;
 
     pointer(handle, "pointerdown", 200);
-    /* +90px = +22.5% → 72.5，必须**吸附**到 75 档：不吸附就会存下 72.5 这种值，
-     * 卡片宽度从此和四等分的其它卡对不齐，且下一次拖动的起点也跟着歪。 */
+    /* +90px = +0.9 格，必须**吸附**到 2 格：不吸附就会存下 1.9 这种小数，
+     * 卡片宽度从此和四等分的网格对不齐，且下一次拖动的起点也跟着歪。 */
     pointer(window, "pointermove", 290);
-    expect(spies.onPreview).toHaveBeenCalledWith("timer", 75);
+    expect(spies.onPreview).toHaveBeenCalledWith("timer", 2);
     expect(spies.onCommit).not.toHaveBeenCalled();
     expect(document.body.style.cursor).toBe("col-resize");
 
     pointer(window, "pointerup", 290);
-    expect(spies.onCommit).toHaveBeenCalledWith("timer", 75);
+    expect(spies.onCommit).toHaveBeenCalledWith("timer", 2);
   });
 
-  it("w03b_dragging_past_the_edge_clamps_at_a_full_column", () => {
+  it("w03b_dragging_past_the_edge_clamps_at_the_full_grid_width", () => {
     const spies = mount();
     layout400();
 
     pointer(container!.querySelector(".qp-card-width")!, "pointerdown", 200);
     pointer(window, "pointermove", 900);
-    expect(spies.onPreview).toHaveBeenLastCalledWith("timer", 100);
+    expect(spies.onPreview).toHaveBeenLastCalledWith("timer", COLS);
   });
 
   it("w03c_pointer_leaving_the_handle_keeps_dragging", () => {
@@ -122,7 +123,7 @@ describe("卡宽手柄", () => {
 
     pointer(container!.querySelector(".qp-card-width")!, "pointerdown", 200);
     pointer(document.body, "pointermove", 260);
-    expect(spies.onPreview).toHaveBeenCalledWith("timer", 75);
+    expect(spies.onPreview).toHaveBeenCalledWith("timer", 2);
   });
 
   it("w03d_pointer_down_outside_the_handle_does_not_start_a_drag", () => {
@@ -136,15 +137,15 @@ describe("卡宽手柄", () => {
     expect(document.body.style.cursor).toBe("");
   });
 
-  it("w03e_keyboard_arrows_step_one_quarter_at_a_time", () => {
+  it("w03e_keyboard_arrows_step_one_grid_at_a_time", () => {
     const spies = mount();
     layout400();
     const handle = container!.querySelector<HTMLElement>(".qp-card-width")!;
     act(() => handle.focus());
 
     act(() => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowLeft", bubbles: true }));
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
     });
-    expect(spies.onCommit).toHaveBeenCalledWith("timer", 25);
+    expect(spies.onCommit).toHaveBeenCalledWith("timer", 2);
   });
 });

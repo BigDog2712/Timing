@@ -76,11 +76,12 @@ function columnCard(id: CardId) {
   );
 }
 
-/** 通栏便利贴：外壳在槽 `.qp-full-slot` 上，卡本身是 `.qp-notes`。 */
-function fullSlot(id: CardId) {
+/** [v2] 便利贴：所有卡都套同一个槽 `.qp-card-slot`（没有 `.qp-full-slot` 之分），
+ * 卡体本身是 `.qp-notes`。 */
+function notesCard(id: CardId) {
   return createElement(
     "div",
-    { className: "qp-full-slot", "data-card": id },
+    { className: "qp-card-slot", "data-card": id },
     createElement(
       "div",
       { className: "qp-notes" },
@@ -127,11 +128,11 @@ describe("拖拽手柄", () => {
     expect(spies.onPreview).toHaveBeenCalledWith("apps", 348);
   });
 
-  it("r02c_full_slot_cards_are_draggable_too", () => {
-    /* 便利贴的卡不是 `.qp-card`：上一版 `closest('.qp-card')` 恒为 null，
-     * 手柄明明在、按下去毫无反应。 */
-    const spies = mount(fullSlot("notes"));
-    const slot = container!.querySelector(".qp-full-slot") as HTMLElement;
+  it("r02c_notes_card_in_its_slot_is_draggable_too", () => {
+    /* 便利贴的卡体不是 `.qp-card`：上一版 `closest('.qp-card')` 恒为 null，
+     * 手柄明明在、按下去毫无反应。v2 起 `DRAG_TARGET` 包含 `.qp-card-slot`。 */
+    const spies = mount(notesCard("notes"));
+    const slot = container!.querySelector(".qp-card-slot") as HTMLElement;
     stubHeight(slot, 56);
 
     pointer(container!.querySelector(".qp-card-resize")!, "pointerdown", 300);
