@@ -3,6 +3,7 @@ import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState } fro
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { buildTopItems } from "../services/dashboardFormatting.ts";
 import { useTodayNotes } from "../hooks/useTodayNotes.ts";
+import { useTodayItems } from "../hooks/useTodayItems.ts";
 import { useTodayTodos } from "../hooks/useTodayTodos.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import type { DashboardReadModel } from "../services/dashboardReadModel.ts";
@@ -39,6 +40,8 @@ interface Props {
   readState: DashboardReadState;
   /** 前台刷新信号：便利贴 / 待办两张卡自己按它重拉 */
   refreshKey: number;
+  /** [P2 修正] 事项卡/便利贴的刷新间隔（用户设置里那个值，分析窗不自己拍） */
+  refreshIntervalSecs: number;
   /** 「全部分类…」→ 分类映射视图 */
   onOpenMapping: () => void;
 }
@@ -48,6 +51,7 @@ export default function Dashboard({
   icons,
   readState,
   refreshKey,
+  refreshIntervalSecs,
   onOpenMapping,
 }: Props) {
   const UI_TEXT = useLocaleText();
@@ -69,6 +73,8 @@ export default function Dashboard({
 
   /* 待办 / 便利贴是**独立源**，它们的 hook 提到这一层：E5 的 `hasAnyData()` 必须能看见
    * 这两个源 —— 只统计快照的话，"快照挂了 → 整页覆盖 → 用户以为数据没了"会换了件衣服回来。 */
+  /* [P2 修正] 今日事项（Timing 自己的 items + time_records）：事项维度与事项菜单卡共用一份。 */
+  const todayItems = useTodayItems(refreshKey, refreshIntervalSecs);
   const todosModel = useTodayTodos(refreshKey);
   const notesModel = useTodayNotes(refreshKey);
 
@@ -115,7 +121,7 @@ export default function Dashboard({
   const focus = buildFocusDistribution(focusDimension, {
     categories: categoryDist,
     applications: topApplications,
-    sessions: compiledSessions,
+    items: todayItems.rows,
   });
 
   const renderCards = (cards: LayoutCard[]) => cards.map((card) => {
@@ -179,7 +185,7 @@ export default function Dashboard({
       return (
         <TimelineCard
           controls={controlsFor(card, labelOf(card.id), layout.full)}
-          sessions={compiledSessions}
+          items={todayItems.rows}
           tier={card.tier}
           status={snapshotStatus}
           refreshError={refreshError}

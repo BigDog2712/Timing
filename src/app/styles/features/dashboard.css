@@ -61,7 +61,9 @@
 }
 
 /* 通栏卡的定高：S/M/L 三档沿用模块 token，避免第三张卡起抢空间 */
-.qp-main-view > .qp-notes { flex: 0 1 auto; height: var(--qp-mod-note); }
+.qp-main-view > .qp-notes {
+  /* [P2 修正] 全量便利贴：一张不少，横向滚动而不是割掉 */
+  overflow-x: auto; flex: 0 1 auto; height: var(--qp-mod-note); }
 .qp-main-view > .qp-card-timeline { flex: 0 1 auto; height: var(--qp-mod-items); }
 .qp-main-view > .qp-card-timeline[data-tier="S"] { flex-basis: var(--qp-mod-items-s); }
 .qp-main-view > .qp-card-timeline[data-tier="L"] { flex-basis: var(--qp-mod-items-l); }

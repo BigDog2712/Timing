@@ -1,0 +1,18 @@
+# 分析窗（Patina）读「Timing 自己的事项与计时记录」的白名单。
+#
+# 为什么单开一条权限而不是塞进 patina-host-settings：那条是**设置面**（主题/偏好/同步/
+# 数据根），语义上不该混进业务只读面；标识符同名不同义会让以后审核 ACL 的人判错。
+#
+# 只给两条**只读**命令：
+#   list_items   —— 事项清单（含系统项「未归类」），用于「事项」维度的名字与配色
+#   list_records —— 计时记录（按时间区间取当天），用于「事项」维度与事项菜单卡的时长/时序
+#
+# 写面（创建/改名/删除）**不在**这里：分析窗要做写操作，走既有的 patina:host-intent
+# 事件桥（药丸侧执行），不新增命令、也不扩大这扇只读门。
+[[permission]]
+identifier = "patina-host-data"
+description = "Allows the Patina analysis window to read the host's items and time records (read-only)."
+commands.allow = [
+  "list_items",
+  "list_records",
+]

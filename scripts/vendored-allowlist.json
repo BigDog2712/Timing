@@ -420,6 +420,18 @@
       "change": "modified",
       "reason": "[P1 修复 · 0.12.1] 板式从「两行固定网格」改为 flex 列（`grid-template-rows: minmax(0,1fr) var(--qp-mod-note)` 预设了正好两行，组件化后多一张通栏卡或一条工具条就把 1fr 行吃掉，双列区被压到 56px、卡片重叠）。双列区 `flex:1` 吃掉剩余高度；通栏卡按 token 定高（notes=--qp-mod-note，timeline=--qp-mod-items），`flex: 0 1 auto` 保证空间不足时收缩而不是溢出。卡头右槽加 position: relative，作为工具条绝对定位的锚点。",
       "owner": "ForG"
+    },
+    {
+      "path": "src/platform/persistence/timingReadRepository.ts",
+      "change": "added",
+      "reason": "[P2 修正 · 0.12.1] 分析窗读 Timing 自己事项与计时记录的只读网关：list_items + list_records。上一版「事项」误用了 CompiledSession.displayTitle（应用窗口标题）。ACL 由新 permissions/patina-host-data.toml 放行这两条只读命令；写面仍走 patina:host-intent，不扩大这扇门。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/hooks/useTodayItems.ts",
+      "change": "added",
+      "reason": "[P2 修正 · 0.12.1] 今日事项聚合：items + 当天 time_records → 一行一个事项（名字/累计/首段时刻/段数），进行中记录补上 running 那一段，否则正在计时的事项显示 0m。失败降级空清单 + warn。",
+      "owner": "ForG"
     }
   ]
 }

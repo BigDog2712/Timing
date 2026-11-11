@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { listNoteSummaries } from "../../../platform/persistence/noteReadRepository.ts";
-import { startOfLocalDay } from "../../../shared/lib/localDate.ts";
 import type { NoteSummary } from "../../../shared/types/notes.ts";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
-
-/** 56px 通栏里排得下的张数（01 §4.3：head 88 + 3×note-card(≤280) + more 24） */
-const VISIBLE_NOTES = 3;
 
 export interface TodayNotesState {
   notes: NoteSummary[];
@@ -56,14 +52,15 @@ export function useTodayNotes(refreshKey: number): TodayNotesState {
     return () => { cancelled = true; };
   }, [refreshKey, attempt]);
 
-  const today = useMemo(() => {
-    const from = startOfLocalDay(new Date()).getTime();
-    return rows
-      .filter((note) => note.updatedAt >= from)
-      .sort((left, right) => right.updatedAt - left.updatedAt);
-  }, [rows]);
+  /* [P2 修正 · 0.12.1] 主人口径：「便利贴应显示所有便利贴」。
+     原先按 `updatedAt` 落在今日筛，老用户会看到一条永远只剩今天几张的入口；
+     现在全量返回、按最近改动降序，由卡片决定排几行（通栏可横向滚动）。 */
+  const all = useMemo(
+    () => rows.slice().sort((left, right) => right.updatedAt - left.updatedAt),
+    [rows],
+  );
 
   const retry = useCallback(() => { setAttempt((current) => current + 1); }, []);
 
-  return { notes: today.slice(0, VISIBLE_NOTES), total: today.length, status, retry };
+  return { notes: all, total: all.length, status, retry };
 }

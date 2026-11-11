@@ -29,6 +29,7 @@ import type { QuietToastTone } from "../../shared/types/toast.ts";
 import type { TrackerHealthSnapshot } from "../../shared/types/tracking";
 import { createPreloadableViewComponent } from "../services/viewChunkPreloadService.ts";
 import type { View } from "../types/view";
+import DataHistoryFaces from "./DataHistoryFaces.tsx";
 
 const History = createPreloadableViewComponent<ComponentProps<typeof HistoryView>>("history");
 const Data = createPreloadableViewComponent<ComponentProps<typeof DataView>>("data");
@@ -60,6 +61,8 @@ export interface AppShellViewsProps {
   onMinSessionSecsChange: ComponentProps<typeof HistoryView>["onMinSessionSecsChange"];
   onOpenHistoryDate: (dateKey: string) => Promise<void>;
   onOpenMapping: () => void;
+  /** 数据/历史两个面签的切换（[0.12.1 末] 合并成一个页面的两副面孔） */
+  onNavigateView: (view: View) => void;
   onPrepareImportCategories: ComponentProps<typeof SettingsView>["onPrepareImportCategories"];
   onQuickActionError: (message: string) => void;
   onToast: (message: string, tone?: QuietToastTone) => void;
@@ -102,6 +105,7 @@ export function buildAppShellViews(props: AppShellViewsProps): Record<View, Reac
     onMinSessionSecsChange,
     onOpenHistoryDate,
     onOpenMapping,
+    onNavigateView,
     onPrepareImportCategories,
     onQuickActionError,
     onToast,
@@ -127,6 +131,54 @@ export function buildAppShellViews(props: AppShellViewsProps): Record<View, Reac
     onQuickActionError,
   };
 
+  const dataNode = (
+    <Data
+      onInitialContentReady={onDataContentReady}
+      icons={icons}
+      refreshKey={refreshSignal}
+      trackerHealth={trackerHealth}
+      loadDataTrendSnapshot={loadDataTrendSnapshot}
+      mappingVersion={mappingVersion}
+      mergeThresholdSecs={appSettings.timelineMergeGapSecs}
+      onOpenHistoryDate={(dateKey) => {
+        void onOpenHistoryDate(dateKey);
+      }}
+      onToast={onToast}
+      {...quickClassificationCallbacks}
+      uiLanguage={locale}
+      webActivityEnabled={appSettings.webActivityEnabled}
+    />
+  );
+
+  const historyNode = (
+    <History
+      onInitialContentReady={onHistoryContentReady}
+      icons={icons}
+      refreshKey={refreshSignal}
+      refreshIntervalSecs={appSettings.refreshIntervalSecs}
+      mergeThresholdSecs={appSettings.timelineMergeGapSecs}
+      minSessionSecs={appSettings.minSessionSecs}
+      onMinSessionSecsChange={onMinSessionSecsChange}
+      trackerHealth={trackerHealth}
+      mappingVersion={mappingVersion}
+      getHistorySeedSnapshot={getHistorySeedSnapshot}
+      loadHistorySnapshot={loadHistorySnapshot}
+      selectedDateRequest={historyDateRequest}
+      hourlyActivityChartMode={appSettings.hourlyActivityChartMode}
+      onHourlyActivityChartModeChange={onHourlyActivityChartModeChange}
+      refreshEnabled={historyRefreshEnabled}
+      webActivityEnabled={appSettings.webActivityEnabled}
+      uiText={uiText}
+      locale={locale}
+      {...quickClassificationCallbacks}
+    />
+  );
+
+  /* [0.12.1 末] `data` 与 `history` 是**同一个页面的两副面孔**（见 `DataHistoryFaces.tsx`）：
+     两个 view 渲染同一个容器，只差高亮哪一面。这样「历史」终于有了入口，且不必新开一条
+     导航路径 —— 顶栏三区不动（01 §6）。 */
+  const faceLabels = { data: uiText.data.title, history: uiText.history.title };
+
   return {
     dashboard: (
       <Dashboard
@@ -134,48 +186,26 @@ export function buildAppShellViews(props: AppShellViewsProps): Record<View, Reac
         icons={icons}
         readState={dashboardReadState}
         refreshKey={refreshSignal}
+        refreshIntervalSecs={appSettings.refreshIntervalSecs}
         onOpenMapping={onOpenMapping}
       />
     ),
     history: (
-      <History
-        onInitialContentReady={onHistoryContentReady}
-        icons={icons}
-        refreshKey={refreshSignal}
-        refreshIntervalSecs={appSettings.refreshIntervalSecs}
-        mergeThresholdSecs={appSettings.timelineMergeGapSecs}
-        minSessionSecs={appSettings.minSessionSecs}
-        onMinSessionSecsChange={onMinSessionSecsChange}
-        trackerHealth={trackerHealth}
-        mappingVersion={mappingVersion}
-        getHistorySeedSnapshot={getHistorySeedSnapshot}
-        loadHistorySnapshot={loadHistorySnapshot}
-        selectedDateRequest={historyDateRequest}
-        hourlyActivityChartMode={appSettings.hourlyActivityChartMode}
-        onHourlyActivityChartModeChange={onHourlyActivityChartModeChange}
-        refreshEnabled={historyRefreshEnabled}
-        webActivityEnabled={appSettings.webActivityEnabled}
-        uiText={uiText}
-        locale={locale}
-        {...quickClassificationCallbacks}
+      <DataHistoryFaces
+        active="history"
+        labels={faceLabels}
+        onSelect={onNavigateView}
+        dataNode={dataNode}
+        historyNode={historyNode}
       />
     ),
     data: (
-      <Data
-        onInitialContentReady={onDataContentReady}
-        icons={icons}
-        refreshKey={refreshSignal}
-        trackerHealth={trackerHealth}
-        loadDataTrendSnapshot={loadDataTrendSnapshot}
-        mappingVersion={mappingVersion}
-        mergeThresholdSecs={appSettings.timelineMergeGapSecs}
-        onOpenHistoryDate={(dateKey) => {
-          void onOpenHistoryDate(dateKey);
-        }}
-        onToast={onToast}
-        {...quickClassificationCallbacks}
-        uiLanguage={locale}
-        webActivityEnabled={appSettings.webActivityEnabled}
+      <DataHistoryFaces
+        active="data"
+        labels={faceLabels}
+        onSelect={onNavigateView}
+        dataNode={dataNode}
+        historyNode={historyNode}
       />
     ),
     tools: (
