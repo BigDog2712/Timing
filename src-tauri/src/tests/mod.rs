@@ -109,5 +109,6 @@ mod tray_menu_md_sync;
 mod tray_sync_quit;
 mod window_geometry;
 /* [0.12.1 T04b] 「设置只有一个家」的源码哨兵：`open_settings_window` 是别名、不再建窗。 */
+mod main_window_profile;
 mod window_settings_alias;
 mod window_spec;

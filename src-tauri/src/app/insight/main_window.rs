@@ -423,7 +423,19 @@ fn ensure_main_window_once<R: Runtime + 'static>(
         return Ok(MainWindowEnsureResult::Creating);
     }
 
-    let webview_root = storage_paths::resolve_storage_paths(app)?.webview_root;
+    /* [0.12.1 修复] 这里**不能**再钉 `data_directory(webview_root)`。
+     *
+     * 事故：`tauri.conf.json` 静态创建的 main 用 Tauri 默认 WebView 数据目录，而本函数
+     * （闲置销毁后的重建路径）用 `webview_root`。**localStorage 按数据目录分区**，所以窗口
+     * 被销毁重建一次，悬浮条的手柄绑定与药丸外观就整份换成另一套 —— 用户看到「设置自己变了」，
+     * 且零日志。更要命的是它与「设置页写了药丸读不到」是同一个根因的两种表现
+     * （`lib/pillAppearance.ts::PILL_PREFS_EVENT` 有完整说明）。
+     *
+     * 建窗目录只留一处口径 = Tauri 默认（与 conf 完全一致）。patina / mini / tool-notification
+     * 仍各自钉 `webview_root`：它们要的是 Patina 自己的 profile，与 main 无关，也不能并过来。
+     *
+     * 保留这次 resolve 调用：自定义数据根不可用时它要提前报错，与"建在哪"无关。 */
+    let _ = storage_paths::resolve_storage_paths(app)?;
     let lifecycle = app.state::<MainWindowLifecycleState>();
     let Some(generation) = lifecycle.begin_window_creation() else {
         return Ok(MainWindowEnsureResult::Creating);
@@ -448,7 +460,6 @@ fn ensure_main_window_once<R: Runtime + 'static>(
         /* 建窗时不可见：窗口由前端 `cmd_mark_main_window_ready` 握手后才揭示，
         避免「白底闪一下再变透明」。 */
         .visible(false)
-        .data_directory(webview_root)
         .initialization_script(initialization_script)
         .on_page_load(move |window, payload| {
             match payload.event() {
