@@ -33,3 +33,19 @@ describe("主界面板子结构", () => {
     expect(contract as string).toContain("minmax(0, var(");
   });
 });
+
+/** [0.12.1 修复] 手柄与占位的两条结构判据（同一份事故的两个面）。 */
+describe("拖拽手柄与未实现卡", () => {
+  it("p02b_unimplemented_cards_never_render_null", async () => {
+    const shell = (await import("./ModuleShell.tsx?raw")).default as string;
+    expect(shell).toContain("qp-card-resize");
+    /* 卡渲染已从 `Dashboard.tsx` 拆到 `DashboardCards.tsx`；哨兵跟着搬，念的是
+     * 「卡渲染这一层」而不是某个具体文件名 —— 再拆一次只需把新文件加进这张表。 */
+    const board = await Promise.all([
+      import("./Dashboard.tsx?raw"),
+      import("./DashboardCards.tsx?raw"),
+    ]).then((mods) => mods.map((mod) => mod.default as string).join("\n"));
+    /* 渲染未实现卡时必须落到占位卡，不许 return null（null = 用户点了添加什么都没有） */
+    expect(board).toContain("CardPlaceholder");
+  });
+});

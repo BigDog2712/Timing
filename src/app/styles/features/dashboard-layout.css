@@ -73,7 +73,9 @@
 .qp-dashboard-toolbar {
   display: flex;
   flex: 0 0 auto;
+  align-items: center;
   justify-content: flex-end;
+  gap: 16px;
   min-height: var(--qp-card-head-h);
 }
 
@@ -245,17 +247,29 @@
 /* ── 卡片下边缘的拖拽调整大小（0.12.1） ──
  * 只在最后 8px 内响应，鼠标在这里变成上下箭头；其余区域照常点击。
  * 用伪元素而不是真节点：真节点会参与卡内排版，还会吃掉行的点击。 */
-.qp-card::after {
-  content: "";
+.qp-card-resize {
   position: absolute;
   inset: auto 0 0 0;
   height: 8px;
   cursor: ns-resize;
+  /* 手柄要能收到指针：它是卡内绝对定位的最后一个元素，卡是 overflow:hidden 的 */
+  z-index: 3;
 }
 
-/* 下边缘提示：悬停时露出一条细线，明确「这里能拖」 */
-.qp-card:hover::after {
-  border-bottom: 1px solid var(--qp-border-strong);
-  border-bottom-left-radius: var(--qp-radius-panel);
-  border-bottom-right-radius: var(--qp-radius-panel);
+.qp-card-resize::before {
+  content: "";
+  position: absolute;
+  inset: 2px 0 auto 0;
+  height: 1px;
+  background: transparent;
+}
+
+.qp-card:hover .qp-card-resize::before,
+.qp-card-resize:focus-visible::before {
+  background: var(--qp-border-strong);
+}
+
+.qp-card-resize:focus-visible {
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: -2px;
 }

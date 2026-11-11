@@ -60,11 +60,23 @@
   flex: 1 1 auto;
 }
 
-/* 通栏卡的定高：S/M/L 三档沿用模块 token，避免第三张卡起抢空间 */
-.qp-main-view > .qp-notes {
-  /* [P2 修正] 全量便利贴：一张不少，横向滚动而不是割掉 */
-  overflow-x: auto; flex: 0 1 auto; height: var(--qp-mod-note); }
-.qp-main-view > .qp-card-timeline { flex: 0 1 auto; height: var(--qp-mod-items); }
+/* 通栏槽 `.qp-full-slot`：通栏卡的**定高与手柄锚点都在这一层**。
+ * 上一版把定高写成 `.qp-main-view > .qp-notes` / `> .qp-card-timeline`，加上槽之后
+ * 便利贴与事项菜单变成了孙节点，那两条选择器再也匹配不上 —— 症状就是通栏卡高度塌到
+ * 内容高度（便利贴从 56 掉到 32 左右）、拖拽手柄找不到定位锚点、拖了也没变化。 */
+.qp-full-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  min-height: 0;
+}
+.qp-full-slot > * { flex: 1 1 auto; min-height: 0; }
+/* 兜底定高：用户拖出来的 inline height 写在槽上，会压过这两条 */
+.qp-full-slot[data-card="notes"] { height: var(--qp-mod-note); }
+.qp-full-slot[data-card="timeline"] { height: var(--qp-mod-items); }
+/* [P2 修正] 全量便利贴：一张不少，横向滚动而不是割掉 */
+.qp-full-slot[data-card="notes"] > .qp-notes { overflow-x: auto; }
 
 
 .qp-col {

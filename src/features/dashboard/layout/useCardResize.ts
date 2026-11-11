@@ -1,29 +1,41 @@
 /**
- * [拖拽调整大小 · 0.12.1] 卡片下边缘拖拽改变高度。
+ * [拖拽调整大小 · 0.12.1] 卡片下边缘的**显式手柄**拖动改变高度。
  *
- * 为什么用**事件委托**而不是给每张卡塞一个手柄组件：
- * 四张列内卡分别来自不同模块（TimerModule / ItemsModule / AppsModule / TodosModule），
- * 每张卡都要透传一次手柄 prop —— 五处改动只为挂一个 8px 的拖拽区，成本不对。
- * 委托版本只认 DOM：卡是 `.qp-card`，卡 id 从卡头里的 `[data-card-controls]` 读
- * （那个属性本来就为工具条存在）。模块侧一个字不用改。
+ * 为什么从「几何猜测」改成「显式手柄」：上一版靠 `event.clientY >= rect.bottom - 8`
+ * 判断是不是在卡的下边缘，用户报「图窗大小也没办法调整」—— 靠坐标猜的命中最容易失效
+ * （卡内滚动容器、伪元素、DPR 都能让它差几像素）。现在卡底有一条真的手柄元素
+ * （`.qp-card-resize`，由 `ModuleShell` 渲染），按下它就是拖，不再猜。
  *
  * 三件手感上的事：
- * 1. **拖动中不落盘**（`save=false`）：每像素写一次 localStorage 会把手感拖成"拉不动"，
- *    松手才写一次。
- * 2. 用 `setPointerCapture` 的等价做法（window 上挂 move/up）：指针快速移出卡片也能继续拖，
- *    否则鼠标一离开卡就断，表现为"只能拖一点点"。
- * 3. 只在**下边缘 8px** 内响应，卡内其它地方照常点击（点行、点按钮不受影响）。
+ * 1. **拖动中不落盘**（`save=false`）：每像素写一次 localStorage 会把手感拖成"拉不动"。
+ * 2. window 上挂 move/up：指针快速移出卡片也能继续拖，否则一离开卡就断。
+ * 3. 键盘等价：手柄可 Tab 聚焦，↑/↓ 每次 ±8px 并立刻落盘（同一条路径，不另写一套）。
  */
 import { useCallback, useEffect, useRef } from "react";
 import type { CardId } from "./contract";
 
-const EDGE_PX = 8;
-
 interface Options {
-  /** 拖动中：只更新界面，不落盘 */
   onPreview: (id: CardId, height: number) => void;
-  /** 松手：落盘一次 */
   onCommit: (id: CardId, height: number) => void;
+}
+
+const KEYBOARD_STEP = 8;
+
+/**
+ * 拖拽目标的**唯一**选择器。
+ *
+ * 为什么是两条：四张列内卡是 `.qp-card`（`ModuleShell` 渲染），便利贴不是 ——
+ * 它是 `.qp-notes`，外壳在槽 `.qp-full-slot` 上。上一版只认 `.qp-card`，
+ * 便利贴既没有手柄、就算补了手柄 `closest` 也会返回 null，表现是「这张怎么拖都不动」。
+ */
+const DRAG_TARGET = ".qp-card, .qp-full-slot";
+
+function cardIdOf(card: HTMLElement | null): CardId | null {
+  if (!card) return null;
+  const fromControls = card.querySelector<HTMLElement>("[data-card-controls]")?.dataset.cardControls;
+  if (fromControls) return fromControls as CardId;
+  const fromCard = card.dataset.card;
+  return fromCard ? (fromCard as CardId) : null;
 }
 
 export function useCardResize({ onPreview, onCommit }: Options) {
@@ -49,32 +61,44 @@ export function useCardResize({ onPreview, onCommit }: Options) {
       finish(drag.startHeight + (event.clientY - drag.startY));
     };
     const onCancel = () => finish();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+      const handle = (document.activeElement as HTMLElement | null)?.closest?.(".qp-card-resize");
+      if (!handle) return;
+      const card = handle.closest<HTMLElement>(DRAG_TARGET);
+      const id = cardIdOf(card);
+      if (!card || !id) return;
+      event.preventDefault();
+      const next = card.getBoundingClientRect().height + (event.key === "ArrowDown" ? KEYBOARD_STEP : -KEYBOARD_STEP);
+      onCommit(id, next);
+    };
 
     window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("keydown", onKey);
     };
-  }, [finish, onPreview]);
+  }, [finish, onPreview, onCommit]);
 
-  /** 挂在 `.qp-dashboard` 容器的 onPointerDown 上。 */
+  /** 挂在 `.qp-dashboard` 容器的 onPointerDown 上：只认手柄，不猜坐标。 */
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLElement>) => {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement | null;
-    const card = target?.closest<HTMLElement>(".qp-card");
-    if (!card) return;
-    const rect = card.getBoundingClientRect();
-    if (event.clientY < rect.bottom - EDGE_PX) return;
+    const handle = target?.closest<HTMLElement>(".qp-card-resize");
+    if (!handle) return;
+    const card = handle.closest<HTMLElement>(DRAG_TARGET);
+    const id = cardIdOf(card);
+    if (!card || !id) return;
 
-    const id = card.querySelector<HTMLElement>("[data-card-controls]")?.dataset.cardControls;
-    if (!id) return;
-
-    dragRef.current = { id: id as CardId, startY: event.clientY, startHeight: rect.height };
+    dragRef.current = { id, startY: event.clientY, startHeight: card.getBoundingClientRect().height };
     document.body.style.cursor = "ns-resize";
     event.preventDefault();
+    handle.focus();
   }, []);
 
   return { onPointerDown };

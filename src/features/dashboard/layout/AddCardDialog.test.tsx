@@ -55,13 +55,14 @@ describe("AddCardDialog", () => {
       }),
     );
 
-    const target = buttons().find((button) => button.textContent?.includes("应用趋势"));
+    /* 只列**真能渲染**的卡：trend / reminder 已从目录里筛掉（上一版加了它们只得到空槽） */
+    const target = buttons().find((button) => button.textContent?.includes("事项菜单"));
     expect(target).toBeTruthy();
     act(() => target?.click());
 
-    expect(added).toEqual(["trend"]);
+    expect(added).toEqual(["timeline"]);
     const stored = normalizeLayout(JSON.parse(window.localStorage.getItem(LAYOUT_STORAGE_KEY) ?? "null"));
-    expect(stored.layout.cards.map((card) => card.id)).toContain("trend");
+    expect(stored.layout.cards.map((card) => card.id)).toContain("timeline");
   });
 
   it("b06a_dialog_lists_only_absent_cards_and_focuses_the_first", () => {
@@ -77,7 +78,12 @@ describe("AddCardDialog", () => {
     expect(buttons().some((button) => button.textContent?.includes("专注窗口"))).toBe(false);
     expect(buttons().some((button) => button.textContent?.includes("便利贴窗口"))).toBe(false);
     const items = buttons().filter((button) => button.className.includes("qp-add-card__item"));
-    expect(items).toHaveLength(5);
+    /* 目录 8 张 - 未实现 2 张（trend / reminder）- 已在板上 2 张（timer / notes）= 4 张。
+     * 目录从 7 张变 8 张是补了漏掉的 `items`：它原先不在表里，移除事项卡之后
+     * 在加卡列表中彻底消失（`isCardKnown` 靠本表查 column）。 */
+    expect(items).toHaveLength(4);
+    /* 未实现的卡不许出现在列表里：点它只会得到一块空白 */
+    expect(buttons().some((button) => button.textContent?.includes("应用趋势"))).toBe(false);
     /* 焦点落在第一项：打开就能 Tab/Enter，不必先点一下。 */
     expect(document.activeElement).toBe(items[0]);
   });

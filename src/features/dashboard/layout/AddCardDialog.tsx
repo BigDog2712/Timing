@@ -8,11 +8,14 @@
  */
 import { useEffect, useRef } from "react";
 import { Plus } from "lucide-react";
-import { CARD_IDS, isCardColumn, type CardColumn, type CardId } from "./contract";
+import { CARD_IDS, isCardColumn, isCardImplemented, type CardColumn, type CardId } from "./contract";
 
 /** 七类组件的名字与一句话说明。**顺序即列表顺序**，与任务书对位表一致。 */
 export const CARD_CATALOG: ReadonlyArray<{ id: CardId; name: string; hint: string; column: CardColumn }> = [
   { id: "timer", name: "专注窗口", hint: "计时分布，可按事项 / 分类 / 应用展开", column: "left" },
+  /* `items` 原先漏在这张表里：`isCardKnown` 靠本表查 column，查不到就判成"未知卡"，
+   * 于是移除事项卡之后它在加卡列表里彻底消失，再也加不回来。 */
+  { id: "items", name: "事项排行", hint: "今天各事项的累计时长排行", column: "left" },
   { id: "apps", name: "应用排行", hint: "应用时长排行，可就地设分类、绑事项", column: "right" },
   { id: "timeline", name: "事项菜单", hint: "今日事项按时序排列，可编辑与加分类", column: "full" },
   { id: "todos", name: "待办窗口", hint: "未完成待办，可就地编辑", column: "right" },
@@ -39,7 +42,11 @@ export default function AddCardDialog({ present, onAdd, onClose }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const available = CARD_CATALOG.filter((item) => isCardKnown(item.id) && !present(item.id));
+  /* 只列**真能渲染**的卡：目录里留着 trend / reminder 但渲染返回 null 的话，
+     用户点了「添加」只会得到一个看不见的空槽（上一版的实际故障）。 */
+  const available = CARD_CATALOG.filter(
+    (item) => isCardKnown(item.id) && isCardImplemented(item.id) && !present(item.id),
+  );
 
   return (
     <div className="qp-add-card" role="dialog" aria-modal="true" aria-labelledby="qp-add-card-title">

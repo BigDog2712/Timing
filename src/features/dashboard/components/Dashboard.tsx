@@ -8,18 +8,13 @@ import { useTodayTodos } from "../hooks/useTodayTodos.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import type { DashboardReadModel } from "../services/dashboardReadModel.ts";
 import type { DashboardReadState } from "../hooks/useDashboardStats.ts";
-import AppsModule from "./AppsModule.tsx";
-import ItemsModule from "./ItemsModule.tsx";
-import NotesStrip from "./NotesStrip.tsx";
-import TimerModule from "./TimerModule.tsx";
-import TodosModule from "./TodosModule.tsx";
-import TimelineCard from "./TimelineCard.tsx";
 import AddCardDialog from "../layout/AddCardDialog";
 import CardControls from "../layout/CardControls";
 import { columnRowTokens, type LayoutCard } from "../layout/contract";
 import { buildFocusDistribution, isFocusDimension, type FocusDimension } from "../services/focusDimension.ts";
 import { useDashboardLayout } from "../layout/useDashboardLayout";
 import { useCardResize } from "../layout/useCardResize.ts";
+import { buildColumnCards, buildFullCard } from "./DashboardCards.tsx";
 
 /**
  * 今日视图（设计五模块）—— 只做**数据装配 + 五模块组合**，布局全在
@@ -130,77 +125,19 @@ export default function Dashboard({
     items: todayItems.rows,
   });
 
-  const renderCards = (cards: LayoutCard[]) => cards.map((card) => {
-    switch (card.id) {
-      case "timer":
-        return (
-          <TimerModule
-            key={card.id}
-            controls={controlsFor(card, labelOf(card.id), cards)}
-            categoryDist={focus.slices.map((slice) => ({
-              category: slice.category ?? "other",
-              name: slice.name,
-              value: slice.value,
-              color: slice.color,
-            }))}
-            dimension={focusDimension}
-            onDimensionChange={(next) => layout.setCardOption("timer", "dimension", next)}
-            totalTrackedTime={totalTrackedTime}
-            dayDeltaTrackedTime={dayDeltaTrackedTime}
-            {...snapshotProps}
-          />
-        );
-      case "items":
-        return (
-          <ItemsModule
-            key={card.id}
-            items={topItems}
-            total={topItemTotal}
-            controls={controlsFor(card, labelOf(card.id), cards)}
-            {...snapshotProps}
-          />
-        );
-      case "apps":
-        return (
-          <AppsModule
-            key={card.id}
-            controls={controlsFor(card, labelOf(card.id), cards)}
-            applications={topApplications}
-            icons={icons}
-            onOpenMapping={onOpenMapping}
-            {...snapshotProps}
-          />
-        );
-      case "todos":
-        return (
-          <TodosModule
-            key={card.id}
-            model={todosModel}
-            controls={controlsFor(card, labelOf(card.id), cards)}
-          />
-        );
-      default:
-        /* 列内卡只认这四张；通栏卡由 renderFullCard 处理（trend / reminder / timeline 排 P3）。 */
-        return null;
-    }
-  });
-  const renderFullCard = (card: LayoutCard) => {
-    if (card.id === "notes") return <NotesStrip model={notesModel} />;
-    /* [P3] 事项菜单卡：只读按时序（数据来自同一份 compiledSessions，不新增宿主命令）。 */
-    if (card.id === "timeline") {
-      return (
-        <TimelineCard
-          controls={controlsFor(card, labelOf(card.id), layout.full)}
-          items={todayItems.rows}
-          tier={card.tier}
-          status={snapshotStatus}
-          refreshError={refreshError}
-          onRetry={readState.retry}
-        />
-      );
-    }
-    return null;
+  /* [体积] 卡片装配搬到 `DashboardCards.tsx`：本文件已顶到 300 行冻结线，
+     加占位卡与手柄时连 4 行都塞不进去。这里只留状态、派生与两端调用。 */
+  const cardProps = {
+    layout, controlsFor, labelOf, copy,
+    focus, focusDimension,
+    onDimensionChange: (next: FocusDimension) => layout.setCardOption("timer", "dimension", next),
+    topItems, topItemTotal, topApplications, icons, onOpenMapping,
+    todosModel, notesModel, todayItems, snapshotProps,
+    totalTrackedTime, dayDeltaTrackedTime,
+    snapshotStatus, refreshError, onRetry: readState.retry,
   };
+  const renderCards = (cards: LayoutCard[]) => buildColumnCards(cards, cardProps);
+  const renderFullCard = (card: LayoutCard) => buildFullCard(card, cardProps);
 
   return (
     <div
@@ -235,6 +172,10 @@ export default function Dashboard({
       <div className="qp-dashboard-toolbar">
         <button type="button" className="qp-link-btn" onClick={() => setAddOpen(true)}>
           {copy.addCard}
+        </button>
+        {/* `reset()` 一直存在但没有任何 UI 入口：卡片移除乱了之后用户无处可退。 */}
+        <button type="button" className="qp-link-btn" onClick={layout.reset}>
+          {copy.resetLayout}
         </button>
       </div>
 

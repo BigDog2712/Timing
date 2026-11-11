@@ -45,7 +45,7 @@ export default function NotesStrip({ model }: Props) {
 
   return (
     <>
-      <section className="qp-notes" aria-labelledby="t-notes" aria-busy={loading || undefined}>
+      <section className="qp-notes" aria-labelledby="t-notes" aria-busy={loading || undefined} data-card="notes">
         <div className="qp-notes-head">
           <h2 id="t-notes" className="qp-notes-title">{copy.notesTitle}</h2>
           {/* 张数写在这里而不是 more 格里：more 格只表达"还有几张没排下"，两个数不重复 */}
@@ -96,6 +96,14 @@ export default function NotesStrip({ model }: Props) {
             </span>
           ) : total > notes.length ? copy.notesMore(total - notes.length) : null}
         </span>
+        {/* [拖拽调整大小] 与其它卡同一个手柄（本卡不是 ModuleShell，手柄单独给一次） */}
+        <span
+          className="qp-card-resize"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="调整便利贴高度"
+          tabIndex={0}
+        />
       </section>
 
       <QuietDialog

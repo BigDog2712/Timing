@@ -21,6 +21,22 @@ export const CARD_IDS = [
 ] as const;
 
 export type CardId = (typeof CARD_IDS)[number];
+
+/**
+ * **真的能渲染出来**的卡。加卡弹层只列这些，别的加了也是一个占位框。
+ *
+ * 为什么要这张表：上一版把 `trend` / `reminder` 也列进目录，但 `renderFullCard` 对它们
+ * 返回 `null` —— 用户点了「添加」，板上多出一个**看不见的空槽**（还占着高度），
+ * 表现就是「新增的图窗未显示」。现在两头都堵：目录不列没做的卡；已存布局里若出现，
+ * 渲染成一张写着「未实现」的占位卡，至少看得见、能移除。
+ */
+export const IMPLEMENTED_CARDS: readonly CardId[] = [
+  "timer", "items", "apps", "todos", "notes", "timeline",
+];
+
+export function isCardImplemented(id: CardId): boolean {
+  return IMPLEMENTED_CARDS.includes(id);
+}
 /** 档位：S/M/L。默认档必须等于今天的行高，见 `defaultLayout.ts`。 */
 export type CardTier = "S" | "M" | "L";
 /** 列：左列 / 右列 / 通栏（通栏卡排在双列之后，如便利贴）。 */
@@ -58,6 +74,16 @@ export function clampCardHeight(value: number): number {
 export interface DashboardLayout {
   version: typeof LAYOUT_VERSION;
   cards: LayoutCard[];
+  /**
+   * [列宽比可拖 · 0.12.1] 左列的 fr 权重，右列 = `SPLIT_TOTAL - split`。
+   *
+   * 为什么是 fr 权重而不是百分比：两列本来就是 `44fr / 54fr` 分配的，直接沿用同一套
+   * 加权（44 + 54 = 98）才能保证默认值下与今天的 465.14 / 570.86 逐像素相等；
+   * 换成百分比会引入一次取整，那个像素锁当场失效。
+   *
+   * 放在顶层而不是卡上：它是**板子**的属性，不是某张卡的属性（与 `options` 相反）。
+   */
+  split?: number;
 }
 
 export const LAYOUT_VERSION = 1;
@@ -65,6 +91,20 @@ export const LAYOUT_VERSION = 1;
 export const LAYOUT_STORAGE_KEY = "patina:dashboard-layout:v1";
 
 export const DEFAULT_TIER: CardTier = "M";
+
+/**
+ * 列宽比。`DEFAULT_SPLIT = 44` 且 `SPLIT_TOTAL = 98` → 44:54，等于今天的双列。
+ * 夹在 30..68 是因为再往外拖，左列会被 `minmax(320px, …)` 顶住、右列塌到放不下数字列。
+ */
+export const DEFAULT_SPLIT = 44;
+export const SPLIT_TOTAL = 98;
+export const MIN_SPLIT = 30;
+export const MAX_SPLIT = 68;
+
+export function clampSplit(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_SPLIT;
+  return Math.round(Math.min(MAX_SPLIT, Math.max(MIN_SPLIT, value)));
+}
 
 /**
  * 行高令牌：只有这四张卡是「列内的一行」，其余（notes/trend/reminder/timeline）是通栏卡，

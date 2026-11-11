@@ -438,6 +438,12 @@
       "change": "added",
       "reason": "[拖拽调整大小 · 0.12.1] 卡下边缘 8px 拖高：事件委托（认 .qp-card + 卡头 [data-card-controls] 取卡 id），模块侧零改动。拖动中 save=false 不落盘（每像素写 localStorage 会把手感拖成「拉不动」），松手才写一次；window 上挂 move/up，指针移出卡也继续拖。",
       "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/DashboardCards.tsx",
+      "change": "added",
+      "reason": "[体积 + 修复 · 0.12.1] 卡片装配从 Dashboard 搬出（Dashboard 顶到 300 行冻结线）。硬纪律：任何卡都不许返回 null —— 上一版对 trend/reminder 返回 null，用户点「添加」只多出看不见的空槽（症状「新增的图窗未显示」「大小也调不了」）。未实现的卡一律渲染 CardPlaceholder（有标题、能移除、能拖高）。",
+      "owner": "ForG"
     }
   ]
 }

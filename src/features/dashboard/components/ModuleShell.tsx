@@ -148,6 +148,16 @@ export default function ModuleShell({
       ) : state === "empty" ? (
         <p className="qp-empty">{emptyText}</p>
       ) : children}
+      {/* [拖拽调整大小] 显式手柄：卡底一条 8px，按下即拖；可 Tab 聚焦、↑/↓ 步进 8px。
+          用真元素而不是 ::after —— 靠坐标猜「是不是在边缘」在滚动容器/DPR 下会差几像素，
+          用户看到的就是「怎么拖都没反应」。 */}
+      <span
+        className="qp-card-resize"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label={`调整「${title}」高度`}
+        tabIndex={0}
+      />
     </section>
   );
 }
