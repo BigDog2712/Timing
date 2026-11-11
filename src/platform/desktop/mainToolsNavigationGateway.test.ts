@@ -173,6 +173,9 @@ function readSource(rel: string): string {
 
 const HISTORY_SRC = readSource('../../features/history/components/History.tsx');
 const APP_SHELL_SRC = readSource('../../app/AppShell.tsx');
+/* [0.12.1 P0] views 装配搬到 AppShellViews.tsx：断言跟着落点走，
+   同时对 AppShell 补一条「整份请求交出去」的正向检查，链条不许断。 */
+const APP_SHELL_VIEWS_SRC = readSource('../../app/components/AppShellViews.tsx');
 
 describe('focusApp 从落点到日期请求（P0-03 ③）', () => {
   let container: HTMLDivElement;
@@ -280,7 +283,8 @@ describe('History 的高亮键是纯派生（源码级）', () => {
   it('p003_highlight_is_handed_to_both_tracks_and_the_whole_request_is_passed_down', () => {
     const handed = HISTORY_SRC.match(/highlightSourceKey=\{highlightedApp\}/g) ?? [];
     expect(handed, '总览轨与 Timing 泳道必须都拿到 highlightedApp').toHaveLength(2);
-    expect(APP_SHELL_SRC, '挑字段传会把 focusApp 静默丢掉').toContain('selectedDateRequest={historyDateRequest}');
-    expect(APP_SHELL_SRC).not.toMatch(/selectedDateRequest=\{\{\s*dateKey/);
+    expect(APP_SHELL_VIEWS_SRC, '挑字段传会把 focusApp 静默丢掉').toContain('selectedDateRequest={historyDateRequest}');
+    expect(APP_SHELL_SRC, '装配搬走后 AppShell 必须把整份请求交给 views').toContain('historyDateRequest,');
+    expect(APP_SHELL_VIEWS_SRC).not.toMatch(/selectedDateRequest=\{\{\s*dateKey/);
   });
 });

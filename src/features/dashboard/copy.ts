@@ -27,6 +27,8 @@ export interface DashboardCopy {
   todoComposeLabel: string;
   /** 设计模块名是「计时分布」；既有 `dashboard.focusShare` 是「专注分布」，语义不同 */
   timerTitle: string;
+  addCard: string;
+  cardLabels: Record<string, string>;
   itemsTitle: string;
   /** 卡头第一段：今日**全部**事项数（不是列表里那 6 行） */
   itemsCount: (count: number) => string;
@@ -64,6 +66,8 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     todosEmpty: "今天还没有待办",
     todoComposeLabel: "添加待办",
     timerTitle: "计时分布",
+    addCard: "添加卡片",
+    cardLabels: { timer: "专注窗口", apps: "应用排行", timeline: "事项菜单", todos: "待办窗口", notes: "便利贴窗口", trend: "应用趋势", reminder: "提醒窗口" },
     itemsTitle: "事项分布",
     itemsCount: (count) => `今日 ${count} 项`,
     itemsMore: (count) => `更多 ${count} 项 ▸`,
@@ -92,6 +96,8 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     todosEmpty: "No to-dos today",
     todoComposeLabel: "Add a to-do",
     timerTitle: "Time distribution",
+    addCard: "Add card",
+    cardLabels: { timer: "Focus", apps: "Applications", timeline: "Timeline", todos: "Todos", notes: "Notes", trend: "App trend", reminder: "Reminders" },
     itemsTitle: "Items",
     itemsCount: (count) => `${count} today`,
     itemsMore: (count) => `${count} more ▸`,
@@ -120,6 +126,8 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     todosEmpty: "Сегодня задач нет",
     todoComposeLabel: "Добавить задачу",
     timerTitle: "Распределение времени",
+    addCard: "Добавить карточку",
+    cardLabels: { timer: "Фокус", apps: "Приложения", timeline: "Хронология", todos: "Задачи", notes: "Заметки", trend: "Тренд", reminder: "Напоминания" },
     itemsTitle: "Занятия",
     itemsCount: (count) => `Сегодня ${count}`,
     itemsMore: (count) => `Ещё ${count} ▸`,
@@ -148,6 +156,8 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     todosEmpty: "Hoy no hay tareas",
     todoComposeLabel: "Añadir tarea",
     timerTitle: "Distribución del tiempo",
+    addCard: "Añadir tarjeta",
+    cardLabels: { timer: "Enfoque", apps: "Aplicaciones", timeline: "Cronología", todos: "Pendientes", notes: "Notas", trend: "Tendencia", reminder: "Recordatorios" },
     itemsTitle: "Actividades",
     itemsCount: (count) => `${count} hoy`,
     itemsMore: (count) => `${count} más ▸`,

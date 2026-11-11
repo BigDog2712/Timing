@@ -8,6 +8,7 @@ import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { formatDashboardDuration, type CategoryDistItem } from "../services/dashboardFormatting.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import ModuleShell, { moduleState } from "./ModuleShell.tsx";
+import type { ReactNode } from "react";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
 
 /**
@@ -31,6 +32,7 @@ const DONUT_GAP_DEGREES = 4;
 const READOUT_LIMIT = 4;
 
 interface Props {
+  controls?: ReactNode;
   categoryDist: CategoryDistItem[];
   totalTrackedTime: number;
   dayDeltaTrackedTime: number;
@@ -62,6 +64,7 @@ function buildReadouts(
 }
 
 export default function TimerModule({
+  controls,
   categoryDist,
   totalTrackedTime,
   dayDeltaTrackedTime,
@@ -93,6 +96,7 @@ export default function TimerModule({
 
   return (
     <ModuleShell
+      controls={controls}
       id="t-timer"
       title={copy.timerTitle}
       state={state}

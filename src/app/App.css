@@ -29,6 +29,9 @@
 @import "./styles/features/host/settings-bits.css";
 @import "./styles/features/settings-groups.css";
 @import "./styles/features/dashboard.css";
+/* [P1 · 0.12.1] 组件化仪表盘的壳外版式（工具条 / 加卡入口 / 加卡弹层）。
+   卡自身几何仍在 dashboard.css 与 tiers.css，本文件不改一个像素。 */
+@import "./styles/features/dashboard-layout.css";
 @import "./styles/features/dashboard-modules.css";
 @import "./styles/features/dashboard-todos.css";
 @import "./styles/features/dashboard-notes.css";

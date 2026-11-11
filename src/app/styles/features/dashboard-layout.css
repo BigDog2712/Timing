@@ -1,0 +1,150 @@
+/* ============================================================================
+ * dashboard-layout.css — 组件化仪表盘的**壳外**版式（P1 · 0.12.1）
+ * -----------------------------------------------------------------------------
+ * 只管三样东西：卡头工具条、加卡入口、加卡弹层。
+ * 卡本身的几何（高度/内距/边）仍在 `dashboard.css` 与 `tiers.css`，本文件一个像素都不改
+ * —— 零像素回归的判据（B1/B2）靠这条成立。
+ *
+ * 红线同全仓：零字面量色值，只用 `var(--qp-*)`；不加阴影渐变，不动 `--qp-card-*`。
+ * ========================================================================== */
+
+/* ── 卡头工具条：常态隐藏，悬停/键盘聚焦时出现 ──
+ * 为什么不做常显：五张卡各挂五个按钮 = 一屏 25 个按钮，比数据还吵。
+ * 用 `:focus-within` 而不是只 `:hover`：键盘用户 Tab 进来必须能看见（B6 的键盘等价）。 */
+.qp-card-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--qp-motion-fast, 120ms) ease;
+}
+
+.qp-card:hover .qp-card-controls,
+.qp-card:focus-within .qp-card-controls {
+  opacity: 1;
+}
+
+/* 触屏与无 hover 环境：常显（否则永远点不到） */
+@media (hover: none) {
+  .qp-card-controls { opacity: 1; }
+}
+
+.qp-card-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--qp-control-h-sm, 20px);
+  height: var(--qp-control-h-sm, 20px);
+  padding: 0;
+  border: 0;
+  border-radius: var(--qp-radius-control);
+  background: transparent;
+  color: var(--qp-text-tertiary);
+  cursor: pointer;
+}
+
+.qp-card-control:hover {
+  background: var(--qp-bg-elevated);
+  color: var(--qp-text-primary);
+}
+
+.qp-card-control[aria-disabled="true"] {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.qp-card-control:focus-visible {
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: 1px;
+}
+
+/* ── 加卡入口：靠右的小按钮，与卡头同一行视觉重量 ── */
+.qp-dashboard-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  min-height: var(--qp-card-head-h);
+}
+
+/* ── 加卡弹层：居中面板 + 半透明遮罩 ── */
+.qp-add-card {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: var(--qp-scrim, rgb(0 0 0 / 45%));
+}
+
+.qp-add-card__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-card-head-gap);
+  width: min(420px, 80vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: var(--qp-card-pad);
+  border-radius: var(--qp-radius-card, 12px);
+  background: var(--qp-bg-panel);
+  color: var(--qp-text-primary);
+  outline: 1px solid var(--qp-border-subtle);
+  outline-offset: -1px;
+}
+
+.qp-add-card__title {
+  font-size: var(--qp-font-size-body);
+  font-weight: var(--qp-weight-strong, 600);
+}
+
+.qp-add-card__empty {
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-secondary);
+}
+
+.qp-add-card__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qp-add-card__item {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: var(--qp-card-head-gap);
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--qp-radius-control);
+  background: transparent;
+  color: var(--qp-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.qp-add-card__item:hover {
+  background: var(--qp-bg-elevated);
+}
+
+.qp-add-card__item:focus-visible {
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: 1px;
+}
+
+.qp-add-card__name {
+  font-size: var(--qp-font-size-body);
+  white-space: nowrap;
+}
+
+.qp-add-card__hint {
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

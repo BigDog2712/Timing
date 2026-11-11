@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
 
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
@@ -38,12 +38,13 @@ import ModuleShell, { moduleState } from "./ModuleShell.tsx";
  * 四条数字列右缘 443.14/548.86 的验收值立刻失效。
  */
 interface Props {
+  controls?: ReactNode;
   /** 待办是**独立源**：它自己的三态与数据都在这个 model 里（hook 由 `Dashboard` 提起，
    *  因为 E5 的 `hasAnyData()` 必须能看见它） */
   model: TodayTodosState;
 }
 
-export default function TodosModule({ model }: Props) {
+export default function TodosModule({ controls, model }: Props) {
   const UI_TEXT = useLocaleText();
   const copy = DASHBOARD_COPY[useLocale()];
   const { todos, status, pending, create, toggle, remove, undoPending, retry } = model;
@@ -101,6 +102,7 @@ export default function TodosModule({ model }: Props) {
 
   return (
     <ModuleShell
+      controls={controls}
       id="t-todos"
       title={copy.todosTitle}
       className="qp-card-todos"

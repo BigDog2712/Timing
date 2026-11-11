@@ -72,6 +72,120 @@
       "change": "modified",
       "reason": "[0.12.1 重锚] 新增：主题同步器 6 条用例（先订阅后读、旧值不盖事件、读不到不应用、订阅不可用仍读、取消后不再应用、取消早于订阅返回）。基线已含该文件，登记口径由 added 改 modified。",
       "owner": "ForG"
+    },
+    {
+      "path": "src/app/AppShell.tsx",
+      "change": "modified",
+      "reason": "[P0 · 0.12.1] 组件化仪表盘腾体积余量：views 映射与六个预加载入口搬到 AppShellViews.tsx，本文件 374 → 284 行。原来是 size-allowlist 里 374 的冻结条目，拆完已不超限，--freeze 已把该条移除。行为零变更（同一批 props、同一批回调），只改文件边界。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/components/AppShellViews.tsx",
+      "change": "added",
+      "reason": "[P0 · 0.12.1] 上一条的落点：装配 AppViewOutlet 的 views（dashboard/history/data/tools/settings/about/mapping）与六个 createPreloadableViewComponent chunk 入口。props 类型全部由各视图自己的 ComponentProps 派生，不手写第二份，避免与视图漂移。240 行。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/platform/desktop/mainToolsNavigationGateway.test.ts",
+      "change": "modified",
+      "reason": "[P0 · 0.12.1] views 装配从 AppShell.tsx 搬到 AppShellViews.tsx 后，源文本判据跟着落点走：`selectedDateRequest={historyDateRequest}` 的正向断言改读新文件，并对 AppShell 补一条 `historyDateRequest,` 的正向检查（装配搬走后整份请求仍须交出，链条不许断）。断言意图未变：挑字段传会把 focusApp 静默丢掉。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/contract.ts",
+      "change": "added",
+      "reason": "[P1 · 0.12.1] 布局契约：卡 id 八种（含 P3 的 trend/reminder/timeline，先占位不渲染）、列 left/right/full、档 S/M/L、单键持久化常量、columnRowTokens 纯函数。只描述「哪张卡在哪列什么档」，不描述像素。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/defaultLayout.ts",
+      "change": "added",
+      "reason": "[P1 · 0.12.1] 默认布局 = 今天的画面：left[timer,items] right[apps,todos] full[notes]，顺序本身是判据（改序即四个行高错位）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/normalizeLayout.ts",
+      "change": "added",
+      "reason": "[P1 · 0.12.1] 布局自愈纯函数（B4）：非对象/版本不符/卡表非数组→回默认；未知 id 与重复 id 丢弃并保留其余；行内卡不许通栏、通栏卡不许进列、非法档回 M（不删卡）；空表回默认。返回 repaired + 首个原因，供落盘层决定是否回写。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/layoutStore.ts",
+      "change": "added",
+      "reason": "[P1 · 0.12.1] 单键 localStorage 落盘（patina:dashboard-layout:v1）：读坏 JSON → 回默认 + 回写 + 一条 warn；首次运行不写盘（写盘等于替用户做决定）；localStorage 不可用时静默退默认，绝不抛）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/useDashboardLayout.ts",
+      "change": "added",
+      "reason": "[P1 · 0.12.1] 布局 hook：状态 + add/remove/move/setColumn/setTier/reset。两条纪律：改完立刻落盘不防抖（防抖会在「改完就关窗」时丢最后一次）；单实例（同卡已在板上则 add 返回 false，不摆第二张）。moveCard 只在同列内换序，跨列换序会顺手改列归属。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/layout.test.tsx",
+      "change": "added",
+      "reason": "[P1 · 0.12.1] B4 判据 10 条：非对象/版本不符/未知+重复 id/非法列与档/空表/合法透传；B1 一条钉默认布局的 grid-template-rows 与今天的硬编码逐字相同；落盘三条（往返不漂移、坏 JSON 自愈且只 warn 一次、首跑不写盘）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/App.css",
+      "change": "modified",
+      "reason": "[0.12.1 末 · 历史区间] 只加一行 `@import history-range.css`（history.css 冻结在 817 行，新样式必须另立文件）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/tiers.css",
+      "change": "modified",
+      "reason": "[P1 · 0.12.1] 补 S / L 两档卡高 token（长档与短档各一套，短档按自身行高重算，不沿用长档数）。M 档刻意不造副本 —— M 就是今天那五个 --qp-mod-*，多一份同值副本必然漂。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/ModuleShell.tsx",
+      "change": "modified",
+      "reason": "[P1 · 0.12.1] 卡头新增 controls 槽（布局工具条挂点）。B7 的判据是「qp-card-head 全仓只在 ModuleShell 出现」，所以工具条必须有壳提供的挂点，不许第二套壳。只加一个可选 ReactNode，渲染逻辑与既有四态分支一字未动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/TimerModule.tsx",
+      "change": "modified",
+      "reason": "[P1 · 0.12.1] 透传 controls 给 ModuleShell（布局工具条）。五个既有 props 与内部渲染未改。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/ItemsModule.tsx",
+      "change": "modified",
+      "reason": "[P1 · 0.12.1] 同上：透传 controls。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/AppsModule.tsx",
+      "change": "modified",
+      "reason": "[P1 · 0.12.1] 同上：透传 controls。应用行内的「设分类 / 绑事项」弹层是 P2，本轮只加壳挂点。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-layout.css",
+      "change": "added",
+      "reason": "[P1 · 0.12.1] 壳外版式：卡头工具条（悬停/聚焦显现、触屏常显）、加卡入口、加卡弹层。零字面量色值，全部 var(--qp-*)，不动卡自身几何 —— B1/B2 的零像素回归靠这条成立。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/CardControls.tsx",
+      "change": "added",
+      "reason": "[P1 · 0.12.1] 卡头工具条按钮：上移 / 下移 / 缩小 / 放大 / 移除。只出按钮不出容器（容器在 ModuleShell 的卡头里）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/AddCardDialog.tsx",
+      "change": "added",
+      "reason": "[P1 · 0.12.1] 加卡弹层：只列**不在板上**的卡（单实例口径），打开即聚焦第一项、Esc 关闭。七类组件的名字与一句话说明在此集中（CARD_CATALOG），顺序与任务书对位表一致。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/layout/AddCardDialog.test.tsx",
+      "change": "added",
+      "reason": "[P1 · 0.12.1] 行为判据两条：加卡后写进存储；弹层只列缺席卡且焦点落在第一项（B6 键盘等价的第一段）。仓库无 @testing-library，照 HostTimingStatusRow.test.tsx 用 react-dom/client + act。",
+      "owner": "ForG"
     }
   ]
 }

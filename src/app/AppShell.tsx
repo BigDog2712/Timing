@@ -1,22 +1,15 @@
 import { useMainToolsNavigation, type HistoryDateRequest } from "./hooks/useMainToolsNavigation.ts";
-import { type ComponentProps, useCallback, useState } from "react";
+import { useCallback, useState } from "react";
 import { useLocale, useLocaleText } from "../shared/i18n/index.ts";
 import AppTitleBar from "./components/AppTitleBar";
 import AppTopNav from "./components/AppTopNav.tsx";
 import TimingCapsule from "./components/TimingCapsule.tsx";
 import AppViewOutlet from "./components/AppViewOutlet.tsx";
 import type { View } from "./types/view";
-import Dashboard from "../features/dashboard/components/Dashboard.tsx";
-import type AboutView from "../features/about/components/About.tsx";
-import type AppMappingView from "../features/classification/components/AppMapping.tsx";
-import type DataView from "../features/data/components/Data.tsx";
-import type HistoryView from "../features/history/components/History.tsx";
-import type SettingsView from "../features/settings/components/Settings.tsx";
-import type ToolsView from "../features/tools/components/Tools.tsx";
+import { buildAppShellViews } from "./components/AppShellViews.tsx";
 import QuietToastStack from "../shared/components/QuietToastStack";
 import type {
   AppLanguage,
-  AppSettings,
   HourlyActivityChartMode,
   ThemeMode,
 } from "../shared/settings/appSettings.ts";
@@ -33,9 +26,6 @@ import {
   loadDataTrendRuntimeSnapshot,
   loadHistoryRuntimeSnapshot,
 } from "./services/readModelRuntimeService";
-import {
-  clearDataBootstrapCache,
-} from "../features/data/services/dataCacheLifecycle.ts";
 import { useQuietDialogs } from "../shared/hooks/useQuietDialogs";
 import { useAppShellNavigation } from "./hooks/useAppShellNavigation";
 import { useAppShellToasts } from "./hooks/useAppShellToasts";
@@ -51,7 +41,6 @@ import {
   preloadNavigationView,
   useAppShellRenderedView,
 } from "./hooks/useAppShellRenderedView.ts";
-import { createPreloadableViewComponent } from "./services/viewChunkPreloadService.ts";
 import { useAppWindowState } from "./hooks/useAppWindowState.ts";
 import { useAppShellRuntimeLifecycle } from "./hooks/useAppShellRuntimeLifecycle.ts";
 import ToolsStatusEntry from "../features/tools/components/ToolsStatusEntry.tsx";
@@ -62,14 +51,6 @@ import {
   startOfLocalDay,
 } from "../shared/lib/localDate.ts";
 import { useAppSidebarState } from "./hooks/useAppSidebarState.ts";
-
-const History = createPreloadableViewComponent<ComponentProps<typeof HistoryView>>("history");
-const Data = createPreloadableViewComponent<ComponentProps<typeof DataView>>("data");
-const Settings = createPreloadableViewComponent<ComponentProps<typeof SettingsView>>("settings");
-const About = createPreloadableViewComponent<ComponentProps<typeof AboutView>>("about");
-const AppMapping =
-  createPreloadableViewComponent<ComponentProps<typeof AppMappingView>>("mapping");
-const Tools = createPreloadableViewComponent<ComponentProps<typeof ToolsView>>("tools");
 
 type WindowTrackingState = ReturnType<typeof useWindowTracking>;
 type AppWindowState = ReturnType<typeof useAppWindowState>;
@@ -228,11 +209,6 @@ export default function AppShellContent({
     onNavigate: handleSidebarNavigate,
     onPreviewNavigate: handleSidebarPreviewNavigate,
   });
-  const quickClassificationCallbacks = {
-    onOverridesChanged: () => handleMappingOverridesChanged(uiText.common.saved),
-    onQuickActionError: handleQuickActionError,
-  };
-
   return (
     <div
       ref={appFrameRef}
@@ -257,116 +233,50 @@ export default function AppShellContent({
         <AppViewOutlet
           {...viewPresentation.outletProps}
           uiText={uiText}
-          views={{
-            dashboard: (
-              <Dashboard
-                dashboard={dashboard}
-                icons={icons}
-                readState={dashboardReadState}
-                refreshKey={refreshSignal}
-                onOpenMapping={() => { void handleSidebarNavigate("mapping"); }}
-              />
-            ),
-            history: (
-              <History
-                onInitialContentReady={viewPresentation.onHistoryContentReady}
-                icons={icons}
-                refreshKey={refreshSignal}
-                refreshIntervalSecs={appSettings.refreshIntervalSecs}
-                mergeThresholdSecs={appSettings.timelineMergeGapSecs}
-                minSessionSecs={appSettings.minSessionSecs}
-                onMinSessionSecsChange={handleMinSessionSecsChange}
-                trackerHealth={trackerHealth}
-                getHistorySeedSnapshot={getHistoryRuntimeSeedSnapshot}
-                loadHistorySnapshot={loadHistoryRuntimeSnapshot}
-                mappingVersion={mappingVersion}
-                selectedDateRequest={historyDateRequest}
-                hourlyActivityChartMode={appSettings.hourlyActivityChartMode}
-                onHourlyActivityChartModeChange={handleHourlyActivityChartModeChange}
-                refreshEnabled={isHistoryRefreshEnabled}
-                webActivityEnabled={appSettings.webActivityEnabled}
-                uiText={uiText}
-                locale={uiTextLanguage}
-                {...quickClassificationCallbacks}
-              />
-            ),
-            data: (
-              <Data
-                onInitialContentReady={viewPresentation.onDataContentReady}
-                icons={icons}
-                refreshKey={refreshSignal}
-                trackerHealth={trackerHealth}
-                loadDataTrendSnapshot={loadDataTrendRuntimeSnapshot}
-                mappingVersion={mappingVersion}
-                mergeThresholdSecs={appSettings.timelineMergeGapSecs}
-                onOpenHistoryDate={(dateKey) => {
-                  void openHistoryForDate(dateKey);
-                }}
-                onToast={pushToast}
-                {...quickClassificationCallbacks}
-                uiLanguage={uiTextLanguage}
-                webActivityEnabled={appSettings.webActivityEnabled}
-              />
-            ),
-            tools: (
-              <Tools
-                key="tools"
-                initialTarget={toolsInitialTarget}
-                onInitialTargetConsumed={handleToolsInitialTargetConsumed}
-                icons={icons}
-                showNavigationLabels={navigationMode === "labeled"}
-                onToast={pushToast}
-              />
-            ),
-            settings: (
-              <Settings
-                key="settings"
-                onSettingsChanged={(nextSettings: AppSettings) => {
-                  if (nextSettings.language !== appSettings.language) {
-                    void clearDataBootstrapCache();
-                  }
-                  setAppSettings(nextSettings);
-                  setSettingsThemeModePreview(null);
-                  setSettingsColorSchemePreview(null);
-                  setSettingsLanguagePreview(null);
-                }}
-                onColorSchemeSaved={(nextSettings: AppSettings) => {
-                  setAppSettings(nextSettings);
-                  setSettingsColorSchemePreview(null);
-                }}
-                onRegisterSaveHandler={registerSettingsSaveHandler}
-                onDirtyChange={setSettingsDirty}
-                onThemeModePreview={setSettingsThemeModePreview}
-                onColorSchemePreview={setSettingsColorSchemePreview}
-                onLanguagePreview={setSettingsLanguagePreview}
-                onToast={pushToast}
-                onPrepareImportCategories={prepareImportCategories}
-                onImportedDataChanged={handleImportedDataChanged}
-              />
-            ),
-            about: (
-              <About
-                key="about"
-                {...settingsUpdateEntry}
-                onToast={pushToast}
-              />
-            ),
-            mapping: (
-              <AppMapping
-                key="mapping"
-                icons={icons}
-                onRegisterSaveHandler={registerMappingSaveHandler}
-                titleRecordingEnabled={appSettings.titleRecordingEnabled}
-                onDirtyChange={setMappingDirty}
-                onOverridesChanged={handleMappingOverridesChanged}
-                onSessionsDeleted={() => {
-                  onMappingOverridesChanged();
-                  pushToast(uiText.mapping.objectDeleted, "success");
-                }}
-                webActivityEnabled={appSettings.webActivityEnabled}
-              />
-            ),
-          }}
+          /* [P0 · 0.12.1] 装配搬到 `components/AppShellViews.tsx`：这里只传状态与回调。
+             AppShell 已顶到 300 行冻结线，P1 要在这里接布局 store 与加卡入口。 */
+          views={buildAppShellViews({
+            aboutUpdateEntry: settingsUpdateEntry,
+            appSettings,
+            dashboard,
+            dashboardReadState,
+            getHistorySeedSnapshot: getHistoryRuntimeSeedSnapshot,
+            historyDateRequest,
+            historyRefreshEnabled: isHistoryRefreshEnabled,
+            icons,
+            loadDataTrendSnapshot: loadDataTrendRuntimeSnapshot,
+            loadHistorySnapshot: loadHistoryRuntimeSnapshot,
+            locale: uiTextLanguage,
+            mappingVersion,
+            onDataContentReady: viewPresentation.onDataContentReady,
+            onHistoryContentReady: viewPresentation.onHistoryContentReady,
+            onHourlyActivityChartModeChange: handleHourlyActivityChartModeChange,
+            onImportedDataChanged: handleImportedDataChanged,
+            onMappingOverridesChanged,
+            onMappingSaved: handleMappingOverridesChanged,
+            onMinSessionSecsChange: handleMinSessionSecsChange,
+            onOpenHistoryDate: openHistoryForDate,
+            onOpenMapping: () => {
+              void handleSidebarNavigate("mapping");
+            },
+            onPrepareImportCategories: prepareImportCategories,
+            onQuickActionError: handleQuickActionError,
+            onToast: pushToast,
+            onToolsInitialTargetConsumed: handleToolsInitialTargetConsumed,
+            refreshSignal,
+            registerMappingSaveHandler,
+            registerSettingsSaveHandler,
+            setAppSettings,
+            setColorSchemePreview: setSettingsColorSchemePreview,
+            setLanguagePreview: setSettingsLanguagePreview,
+            setMappingDirty,
+            setSettingsDirty,
+            showToolNavigationLabels: navigationMode === "labeled",
+            themeModePreviewSetter: setSettingsThemeModePreview,
+            toolsInitialTarget,
+            trackerHealth,
+            uiText,
+          })}
         />
       </div>
     </div>

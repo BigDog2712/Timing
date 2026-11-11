@@ -2,6 +2,7 @@ import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { formatDashboardDuration, type TopApplicationItem } from "../services/dashboardFormatting.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import ModuleShell, { moduleState } from "./ModuleShell.tsx";
+import type { ReactNode } from "react";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
 
 /**
@@ -21,6 +22,7 @@ import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
  * 且 footer 还多给了一条直达。行本身保持只读，因此也不需要 24×24 命中区的键盘化改造。
  */
 interface Props {
+  controls?: ReactNode;
   applications: TopApplicationItem[];
   icons: Record<string, string>;
   /** 快照源的同一个 `status`（E2/E3 都由它派生，不另算） */
@@ -32,7 +34,7 @@ interface Props {
   onOpenMapping: () => void;
 }
 
-export default function AppsModule({ applications, icons, status, refreshError, onRetry, onOpenMapping }: Props) {
+export default function AppsModule({ controls, applications, icons, status, refreshError, onRetry, onOpenMapping }: Props) {
   const UI_TEXT = useLocaleText();
   const copy = DASHBOARD_COPY[useLocale()];
   const visible = applications.slice(0, 5);
@@ -40,6 +42,7 @@ export default function AppsModule({ applications, icons, status, refreshError, 
 
   return (
     <ModuleShell
+      controls={controls}
       id="t-apps"
       title={UI_TEXT.dashboard.topApps}
       state={state}

@@ -38,6 +38,22 @@
   --qp-mod-todos: 294px;
   --qp-mod-note: 56px;
 
+  /* ── 卡片三档（P1 · 0.12.1 组件化仪表盘） ──
+   * `M` = 今天的行高，由上面那五个 `--qp-mod-*` 承担，**不再复制一份**（两个真相源更危险）。
+   * 这里只补 `S` / `L` 两档；`cardRowToken(id, tier)` 在 M 档返回不带后缀的基名。
+   * 选值口径：S/L 与 M 的差按「一行读数」的整数倍取，保证卡内行数变化是整行为单位
+   * （S 少 2 行、L 多 2 行，行高 24/30/32/36 见下），而不是拍一个好看的数。 */
+  --qp-mod-timer-s: 216px;
+  --qp-mod-timer-l: 360px;
+  --qp-mod-items-s: 224px;
+  --qp-mod-items-l: 404px;
+  --qp-mod-apps-s: 190px;
+  --qp-mod-apps-l: 382px;
+  --qp-mod-todos-s: 230px;
+  --qp-mod-todos-l: 406px;
+  --qp-mod-note-s: 44px;
+  --qp-mod-note-l: 88px;
+
   /* ── 行高（几何表：readout 24 / item 30 / app 32 / todo 36，gap 4 → pitch 40） ── */
   --qp-row-readout: 24px;
   --qp-row-items: 30px;
@@ -79,6 +95,19 @@
     --qp-donut: 120px;
     --qp-bar-max: 48px;
     --qp-note-card-h: 36px;
+
+    /* P1：短档的 S/L 同样按「少 2 行 / 多 2 行」重算，不许直接沿用长档数
+     * （短档行高更小，沿用会出现「切档后卡内反而更空」）。 */
+    --qp-mod-timer-s: 184px;
+    --qp-mod-timer-l: 312px;
+    --qp-mod-items-s: 192px;
+    --qp-mod-items-l: 344px;
+    --qp-mod-apps-s: 158px;
+    --qp-mod-apps-l: 318px;
+    --qp-mod-todos-s: 190px;
+    --qp-mod-todos-l: 350px;
+    --qp-mod-note-s: 40px;
+    --qp-mod-note-l: 76px;
   }
 }
 

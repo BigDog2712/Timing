@@ -63,6 +63,8 @@ interface Props {
   onRetry?: () => void;
   /** E3：有数据但刷新失败，卡头挂一个小图标 */
   refreshErrorText?: string;
+  /** [P1 · 0.12.1] 卡头右侧的布局工具条（上移/下移/切档/移除）。壳只提供位置，按钮在 layout/CardControls。 */
+  controls?: ReactNode;
   /** 需要额外定位上下文（待办卡的撤销条）时传进来 */
   className?: string;
   children: ReactNode;
@@ -82,6 +84,7 @@ export default function ModuleShell({
   retryBusy,
   onRetry,
   refreshErrorText,
+  controls,
   className,
   children,
 }: Props) {
@@ -100,6 +103,7 @@ export default function ModuleShell({
          *  各写一遍然后漏一张（ItemsModule 那次漏掉 empty 印出「今日 0 项」就是
          *  散写守卫的必然结果）。h2 标题保持恒在（M12/M13）。 */}
         <span className="qp-card-head-right">
+          {controls}
           {state === "ready" ? (
             <>
               {/* E3 只在这一层出现：条件渲染，不常驻空容器（常驻的 role=alert 挂载时就有内容，

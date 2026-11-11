@@ -3,6 +3,7 @@ import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { formatDashboardDuration, type TopItemEntry } from "../services/dashboardFormatting.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import ModuleShell, { moduleState } from "./ModuleShell.tsx";
+import type { ReactNode } from "react";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
 
 /**
@@ -20,6 +21,7 @@ import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
  * N 恒等于 6，是一句永远正确的假话。
  */
 interface Props {
+  controls?: ReactNode;
   items: TopItemEntry[];
   /** 截断前的总数（`buildTopItems(...).total`），卡头第一段用它 */
   total: number;
@@ -30,7 +32,7 @@ interface Props {
   onRetry: () => void;
 }
 
-export default function ItemsModule({ items, total, status, refreshError, onRetry }: Props) {
+export default function ItemsModule({ controls, items, total, status, refreshError, onRetry }: Props) {
   const displayColor = useActivityDisplayColor();
   const UI_TEXT = useLocaleText();
   const copy = DASHBOARD_COPY[useLocale()];
@@ -43,6 +45,7 @@ export default function ItemsModule({ items, total, status, refreshError, onRetr
 
   return (
     <ModuleShell
+      controls={controls}
       id="t-items"
       title={copy.itemsTitle}
       state={state}

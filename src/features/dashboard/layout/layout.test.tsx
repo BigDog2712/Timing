@@ -1,0 +1,120 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LAYOUT_STORAGE_KEY, columnRowTokens } from "./contract";
+import { DEFAULT_LAYOUT } from "./defaultLayout";
+import { normalizeLayout } from "./normalizeLayout";
+import { loadLayout, resetLayout, saveLayout } from "./layoutStore";
+
+/**
+ * [P1 · 0.12.1] B4 的判据：坏布局不许让主界面空着，也不许静默改用户排布。
+ * 每条都用**不同**的坏输入，避免「一条用例顺带覆盖五种」的假绿。
+ */
+describe("normalizeLayout", () => {
+  it("b04a_non_object_falls_back_to_default", () => {
+    const result = normalizeLayout("not-a-layout");
+    expect(result.repaired).toBe(true);
+    expect(result.reason).toBe("not-an-object");
+    expect(result.layout.cards).toEqual(DEFAULT_LAYOUT.cards);
+  });
+
+  it("b04b_version_mismatch_falls_back_to_default", () => {
+    const result = normalizeLayout({ version: 999, cards: DEFAULT_LAYOUT.cards });
+    expect(result.reason).toBe("version-mismatch");
+    expect(result.layout.cards).toEqual(DEFAULT_LAYOUT.cards);
+  });
+
+  it("b04c_unknown_id_and_duplicate_are_dropped_without_losing_the_rest", () => {
+    const result = normalizeLayout({
+      version: 1,
+      cards: [
+        { id: "timer", column: "left", tier: "M" },
+        { id: "not-a-card", column: "left", tier: "M" },
+        { id: "timer", column: "left", tier: "M" },
+        { id: "notes", column: "full", tier: "S" },
+      ],
+    });
+    expect(result.repaired).toBe(true);
+    expect(result.reason).toBe("unknown-card-id");
+    expect(result.layout.cards.map((card) => card.id)).toEqual(["timer", "notes"]);
+  });
+
+  it("b04d_illegal_tier_and_column_are_repaired_in_place", () => {
+    const result = normalizeLayout({
+      version: 1,
+      cards: [
+        { id: "timer", column: "full", tier: "XL" },
+        { id: "notes", column: "left", tier: "M" },
+      ],
+    });
+    expect(result.repaired).toBe(true);
+    expect(result.reason).toBe("illegal-column");
+    /* 行内卡不许通栏、通栏卡不许进列；非法档回 M，不删卡。 */
+    expect(result.layout.cards).toEqual([
+      { id: "timer", column: "left", tier: "M" },
+      { id: "notes", column: "full", tier: "M" },
+    ]);
+  });
+
+  it("b04e_empty_cards_falls_back_to_default", () => {
+    const result = normalizeLayout({ version: 1, cards: [] });
+    expect(result.reason).toBe("empty-cards");
+    expect(result.layout.cards).toEqual(DEFAULT_LAYOUT.cards);
+  });
+
+  it("b04f_valid_layout_is_passed_through_untouched", () => {
+    const input = {
+      version: 1 as const,
+      cards: [
+        { id: "apps", column: "left" as const, tier: "L" as const },
+        { id: "timer", column: "right" as const, tier: "S" as const },
+      ],
+    };
+    const result = normalizeLayout(input);
+    expect(result.repaired).toBe(false);
+    expect(result.reason).toBeNull();
+    expect(result.layout.cards).toEqual(input.cards);
+  });
+});
+
+describe("columnRowTokens", () => {
+  it("b01a_default_layout_reproduces_today_grid_rows_verbatim", () => {
+    const left = columnRowTokens(DEFAULT_LAYOUT.cards.filter((card) => card.column === "left"));
+    const right = columnRowTokens(DEFAULT_LAYOUT.cards.filter((card) => card.column === "right"));
+    /* 与 `.qp-col-left { grid-template-rows: var(--qp-mod-timer) var(--qp-mod-items) }` 逐字相同 */
+    expect(left).toEqual(["var(--qp-mod-timer)", "var(--qp-mod-items)"]);
+    expect(right).toEqual(["var(--qp-mod-apps)", "var(--qp-mod-todos)"]);
+  });
+});
+
+describe("layoutStore", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("b03a_save_then_load_round_trips_without_drift", () => {
+    const layout = { version: 1 as const, cards: [{ id: "todos" as const, column: "right" as const, tier: "L" as const }] };
+    saveLayout(layout);
+    const loaded = loadLayout();
+    expect(loaded.repaired).toBe(false);
+    expect(loaded.layout.cards).toEqual(layout.cards);
+  });
+
+  it("b04g_invalid_json_is_repaired_and_written_back_once", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, "{");
+    const loaded = loadLayout();
+    expect(loaded.reason).toBe("invalid-json");
+    expect(loaded.layout.cards).toEqual(DEFAULT_LAYOUT.cards);
+    /* 回写过：下一次读不该再自愈，否则每次启动都 warn 一条。 */
+    const again = loadLayout();
+    expect(again.repaired).toBe(false);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("b04h_first_run_does_not_write_storage", () => {
+    resetLayout();
+    const loaded = loadLayout();
+    expect(loaded.repaired).toBe(false);
+    expect(window.localStorage.getItem(LAYOUT_STORAGE_KEY)).toBeNull();
+  });
+});

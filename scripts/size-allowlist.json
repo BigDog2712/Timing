@@ -93,7 +93,6 @@
     "src-tauri/src/services/insight/engine/tracking/transition.rs": 527,
     "src-tauri/src/services/insight/engine/updater.rs": 875,
     "src-tauri/src/services/insight/engine/web_activity/mod.rs": 498,
-    "src/app/AppShell.tsx": 374,
     "src/app/services/startupWarmupService.ts": 561,
     "src/app/styles/app-shell.css": 321,
     "src/app/styles/features/about.css": 482,

@@ -1,0 +1,84 @@
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { LAYOUT_STORAGE_KEY, type CardId } from "./contract";
+import { DEFAULT_LAYOUT } from "./defaultLayout";
+import AddCardDialog from "./AddCardDialog";
+import { loadLayout, saveLayout } from "./layoutStore";
+import { normalizeLayout } from "./normalizeLayout";
+
+/**
+ * [P1 · 0.12.1] B3 / B6 的**行为**侧判据（纯函数判据在 `layout.test.tsx`）。
+ *
+ * 仓库没有 `@testing-library`，所以照 `HostTimingStatusRow.test.tsx` 的既有做法用
+ * `react-dom/client` + `act` 直接挂载 —— 不为一个弹层引入新的依赖树。
+ */
+let container: HTMLDivElement | null = null;
+let root: Root | null = null;
+
+beforeEach(() => {
+  window.localStorage.clear();
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+});
+
+afterEach(() => {
+  act(() => root?.unmount());
+  container?.remove();
+  container = null;
+  root = null;
+});
+
+function mount(element: Parameters<Root["render"]>[0]) {
+  act(() => root?.render(element));
+}
+
+function buttons(): HTMLButtonElement[] {
+  return Array.from(container?.querySelectorAll<HTMLButtonElement>("button") ?? []);
+}
+
+describe("AddCardDialog", () => {
+  it("b03b_adding_a_card_persists_it", () => {
+    saveLayout(DEFAULT_LAYOUT);
+    const added: string[] = [];
+    mount(
+      createElement(AddCardDialog, {
+        present: () => false,
+        onAdd: (id: CardId) => {
+          added.push(id);
+          const current = loadLayout().layout;
+          saveLayout({ ...current, cards: [...current.cards, { id, column: "full", tier: "M" }] });
+        },
+        onClose: () => {},
+      }),
+    );
+
+    const target = buttons().find((button) => button.textContent?.includes("应用趋势"));
+    expect(target).toBeTruthy();
+    act(() => target?.click());
+
+    expect(added).toEqual(["trend"]);
+    const stored = normalizeLayout(JSON.parse(window.localStorage.getItem(LAYOUT_STORAGE_KEY) ?? "null"));
+    expect(stored.layout.cards.map((card) => card.id)).toContain("trend");
+  });
+
+  it("b06a_dialog_lists_only_absent_cards_and_focuses_the_first", () => {
+    mount(
+      createElement(AddCardDialog, {
+        present: (id: CardId) => id === "timer" || id === "notes",
+        onAdd: () => {},
+        onClose: () => {},
+      }),
+    );
+
+    /* 已在板上的两张不出现；其余五张在。 */
+    expect(buttons().some((button) => button.textContent?.includes("专注窗口"))).toBe(false);
+    expect(buttons().some((button) => button.textContent?.includes("便利贴窗口"))).toBe(false);
+    const items = buttons().filter((button) => button.className.includes("qp-add-card__item"));
+    expect(items).toHaveLength(5);
+    /* 焦点落在第一项：打开就能 Tab/Enter，不必先点一下。 */
+    expect(document.activeElement).toBe(items[0]);
+  });
+});
