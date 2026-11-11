@@ -8,66 +8,10 @@
  * 红线同全仓：零字面量色值，只用 `var(--qp-*)`；不加阴影渐变，不动 `--qp-card-*`。
  * ========================================================================== */
 
-/* ── 卡头工具条：常态隐藏，悬停/键盘聚焦时出现 ──
- * 为什么不做常显：五张卡各挂五个按钮 = 一屏 25 个按钮，比数据还吵。
- * 用 `:focus-within` 而不是只 `:hover`：键盘用户 Tab 进来必须能看见（B6 的键盘等价）。 */
-.qp-card-controls {
-  /* [P1 修复] **绝对定位**：五个按钮 ≈ 110px 宽，塞进 20px 高的卡头右槽会把「前 5 项」
-     「比昨天增加」这类 meta 挤到卡外，表现为文字压在数据行上。位置贴着卡头右上角，
-     不参与排版，也不再影响卡头高度。 */
-  position: absolute;
-  top: 50%;
-  right: 0;
-  z-index: 2;
-  transform: translateY(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 2px;
-  border-radius: var(--qp-radius-control);
-  background: var(--qp-bg-panel);
-  opacity: 0;
-  transition: opacity var(--qp-motion-fast, 120ms) ease;
-}
-
-.qp-card:hover .qp-card-controls,
-.qp-card:focus-within .qp-card-controls {
-  opacity: 1;
-}
-
-/* 触屏与无 hover 环境：常显（否则永远点不到） */
-@media (hover: none) {
-  .qp-card-controls { opacity: 1; }
-}
-
-.qp-card-control {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--qp-control-h-sm, 20px);
-  height: var(--qp-control-h-sm, 20px);
-  padding: 0;
-  border: 0;
-  border-radius: var(--qp-radius-control);
-  background: transparent;
-  color: var(--qp-text-tertiary);
-  cursor: pointer;
-}
-
-.qp-card-control:hover {
-  background: var(--qp-bg-elevated);
-  color: var(--qp-text-primary);
-}
-
-.qp-card-control[aria-disabled="true"] {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.qp-card-control:focus-visible {
-  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
-  outline-offset: 1px;
-}
+/* ── 卡头工具条已迁走（A 批 · 0.12.x）──
+ * 旧的 `.qp-card-controls` / `.qp-card-control`（6 颗 12px 图标）整块删除，
+ * 接替者是 ⋯ + 弹出菜单，样式在新文件 `dashboard-dnd.css`（本文件 300 行贴死，
+ * 只能减不能加）。CardControls.tsx 现在只渲染一颗 `.qp-card-more`。 */
 
 /* ── 加卡入口：靠右的小按钮，与卡头同一行视觉重量 ── */
 /* [自由调大小 · 0.12.1] 工具条**不占文档流**。
@@ -274,21 +218,32 @@
   z-index: 3;
 }
 
+/* [A 批显形统一] 线常驻 2px 圆头、色 --qp-border-strong（3.4:1），**只加长不改色**：
+ * 静息透明 → 卡 hover 显 60% 长 → 手柄自身 hover/聚焦拉满 100%。禁换 border-subtle
+ * （1.9:1 静默跌破 3:1）、禁加粗到 3px。宽度手柄（dashboard-split.css）同一套语言。 */
 .qp-card-resize::before {
   content: "";
   position: absolute;
-  inset: 2px 0 auto 0;
-  height: 1px;
-  background: transparent;
+  inset: 3px 20% auto 20%;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--qp-border-strong);
+  opacity: 0;
+  transition: opacity 120ms ease, inset 120ms ease;
 }
 
-/* hover 时把线加粗到 2px 并补上通栏卡（便利贴的卡是 `.qp-notes`，不是 `.qp-card`，
+/* hover 时显形（通栏卡也要补：便利贴的卡是 `.qp-notes`，不是 `.qp-card`，
  * 少了第二行它永远不显形 —— 手柄明明在那儿，用户却找不到可以拖的地方）。 */
 .qp-card:hover .qp-card-resize::before,
 .qp-full-slot:hover .qp-card-resize::before,
 .qp-card-resize:focus-visible::before {
-  height: 2px;
-  background: var(--qp-border-strong);
+  opacity: 1;
+}
+
+/* 手柄自身 hover / 键盘聚焦：拉满整条宽（"只加长"的 100% 档） */
+.qp-card-resize:hover::before,
+.qp-card-resize:focus-visible::before {
+  inset: 3px 0 auto 0;
 }
 
 .qp-card-resize:focus-visible {

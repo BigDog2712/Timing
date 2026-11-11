@@ -142,7 +142,7 @@
     {
       "path": "src/app/App.css",
       "change": "modified",
-      "reason": "[0.12.1 末 · 历史区间] 只加一行 `@import history-range.css`（history.css 冻结在 817 行，新样式必须另立文件）。",
+      "reason": "[0.12.1 末 · 历史区间] 只加一行 `@import history-range.css`（history.css 冻结在 817 行，新样式必须另立文件）。[视觉层 0.12.x] 再加一行 `@import dashboard-surface.css`（卡片表面层：阴影 / 悬停 / 板面底色，dashboard.css 已 282 行）。",
       "owner": "ForG"
     },
     {
@@ -280,7 +280,7 @@
     {
       "path": "src/app/styles/tiers.css",
       "change": "modified",
-      "reason": "[P1 · 0.12.1] 补 S / L 两档卡高 token（长档与短档各一套，短档按自身行高重算，不沿用长档数）。M 档刻意不造副本 —— M 就是今天那五个 --qp-mod-*，多一份同值副本必然漂。",
+      "reason": "[P1 · 0.12.1] 补 S / L 两档卡高 token（长档与短档各一套，短档按自身行高重算，不沿用长档数）。M 档刻意不造副本 —— M 就是今天那五个 --qp-mod-*，多一份同值副本必然漂。[视觉层 0.12.x] 环径 144/120 → 132/112、bar-max 60 → 64、**row-app 32 → 28**（本批唯一改动的行高令牌）、note-card-h 40/36 → 38/34；新增字阶 readout 26/30 与 row 13/18（`--qp-font-size-metric` / body / caption 三个基准一个都没动）。",
       "owner": "ForG"
     },
     {
@@ -292,7 +292,7 @@
     {
       "path": "src/features/dashboard/components/TimerModule.tsx",
       "change": "modified",
-      "reason": "[P1 · 0.12.1] 透传 controls 给 ModuleShell（布局工具条）。五个既有 props 与内部渲染未改。",
+      "reason": "[P1 · 0.12.1] 透传 controls 给 ModuleShell（布局工具条）。五个既有 props 与内部渲染未改。[视觉层 0.12.x] 环心主读数拆成「数值 + 单位」两段（本地新增 `TotalReadout`，只把非数字片段包进 `.qp-donut-unit`）：单位降级到 13px/secondary。数据与文案仍由 `formatDashboardDuration` 一处产出，未改 SVG 常量。",
       "owner": "ForG"
     },
     {
@@ -304,7 +304,7 @@
     {
       "path": "src/features/dashboard/components/AppsModule.tsx",
       "change": "modified",
-      "reason": "[P1 · 0.12.1] 同上：透传 controls。应用行内的「设分类 / 绑事项」弹层是 P2，本轮只加壳挂点。",
+      "reason": "[P1 · 0.12.1] 同上：透传 controls。应用行内的「设分类 / 绑事项」弹层是 P2，本轮只加壳挂点。[视觉层 0.12.x] 删掉行内 `<span className=\"hair\" />`（全仓唯一一处，已 grep 确认）与顶部文档里对应的 2px 发丝口径；CSS 里那条 `.hair` 规则同步删除。行不再有任何分隔线。",
       "owner": "ForG"
     },
     {
@@ -418,7 +418,7 @@
     {
       "path": "src/app/styles/features/dashboard.css",
       "change": "modified",
-      "reason": "[P1 修复 · 0.12.1] 板式从「两行固定网格」改为 flex 列（`grid-template-rows: minmax(0,1fr) var(--qp-mod-note)` 预设了正好两行，组件化后多一张通栏卡或一条工具条就把 1fr 行吃掉，双列区被压到 56px、卡片重叠）。双列区 `flex:1` 吃掉剩余高度；通栏卡按 token 定高（notes=--qp-mod-note，timeline=--qp-mod-items），`flex: 0 1 auto` 保证空间不足时收缩而不是溢出。卡头右槽加 position: relative，作为工具条绝对定位的锚点。",
+      "reason": "[P1 修复 · 0.12.1] 板式从「两行固定网格」改为 flex 列（`grid-template-rows: minmax(0,1fr) var(--qp-mod-note)` 预设了正好两行，组件化后多一张通栏卡或一条工具条就把 1fr 行吃掉，双列区被压到 56px、卡片重叠）。双列区 `flex:1` 吃掉剩余高度；通栏卡按 token 定高（notes=--qp-mod-note，timeline=--qp-mod-items），`flex: 0 1 auto` 保证空间不足时收缩而不是溢出。卡头右槽加 position: relative，作为工具条绝对定位的锚点。[视觉层 0.12.x] `.qp-card` 的半径/底色/边色换成卡片层令牌（`--qp-radius-card` 18 / `--qp-surface-card` / `--qp-card-edge`），**outline 1px + offset -1 原样保留**（不占布局才有 443.14/548.86）；`.qp-card-meta` 由 tertiary 升 secondary（12px 正文在 #2d2d2d 上 3.79:1 → 5.10:1）。",
       "owner": "ForG"
     },
     {
@@ -539,6 +539,42 @@
       "path": "src/features/dashboard/layout/useCardWidthResize.test.tsx",
       "change": "added",
       "reason": "卡宽手柄的接线判据：手柄→closest(槽)→pointerdown 起点→move 吸附预览→up 落盘；另含越界钳到整列、指针移出仍可拖、按卡身不启动、键盘一档 25%。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/tokens.css",
+      "change": "modified",
+      "reason": "[视觉层 0.12.x] 新增卡片表面四层令牌（board / card / inset / raise）+ 边与影（`--qp-card-edge` / `--qp-card-inner` / `--qp-card-shadow-rest|hover`）+ `--qp-radius-card` 18 与 `--qp-radius-card-drag` 22。写法照既有 `--qp-focus-ring` 那块：浅色在 `:root`、暗色在 `:root[data-theme=\"dark\"]`，**两处同名成对**。不进 deriveTheme —— 那套管随宿主取色/预设漂移的颜色，表面层次是固定灰阶。既有令牌的值一个都没改。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-surface.css",
+      "change": "added",
+      "reason": "[视觉层 0.12.x] 卡片表面层（新文件，~80 行）：`.qp-card` 静息/悬停阴影 + 120ms 过渡、`.qp-notes` 静息阴影、`.qp-main-view` 板面底色；另含动效降级一条。半径/底色/1px 边**不在**本文件（与像素判据写在一起，留在 dashboard.css / dashboard-notes.css 原地换令牌），本文件只放新增量。多出 `--qp-card-box-rest|hover` 两条合成令牌是因为亮色的 `--qp-card-inner` 是 `none`，而 `box-shadow` 不接受 `none` 进列表（`none, <shadow>` 是无效值 → 整条声明被丢弃）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-modules.css",
+      "change": "modified",
+      "reason": "[视觉层 0.12.x] 环心主读数 26/30 + letter-spacing，新增 `.qp-donut-unit`（单位 13px/secondary）；图例行高 24 → 26（裸值，不动 `--qp-row-readout`）、dot 6 → 8、hover 底换 raise 层 + 8 圆角；事项行首列 6 → 8（跟 dot 同宽）、裸条 4 → 6、行 hover 加 raise 底；应用行图标 20 → 22 / radius 6 / raise 底、行主文 13/18、删 `.hair` 规则、列表滚动条自绘（**轨道仍 6px**，thumb 用 1px 透明边做成 4px，否则数字列右缘 443.14/548.86 会右移 2px）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-todos.css",
+      "change": "modified",
+      "reason": "[视觉层 0.12.x] `.qp-todo-compose` 去掉 1px 实边改 inset 底色 + 12 圆角；**连带两处必须一起改**：padding-left 5 → 6（原来 5+1 边才等于内容起点，边没了要补到 padding 上，否则输入起点比行标题偏左 1px）、`:focus-within` 从改 border-color 改成 1px 内描边（否则焦点环整个消失）。勾选框 16 → 18、圆角 5 → 6，命中区 24×36 不动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-notes.css",
+      "change": "modified",
+      "reason": "[视觉层 0.12.x] 便利贴条标签列 88 → 72，条体半径/底色/边色换卡片层令牌；贴纸 border → outline（+offset -1）、半径 12、底色 raise 层、内距 10 → 12、`line-height` 从 `calc(h − 2px)` 改 `h`（原来减的 2px 就是那两条边，不改会偏 1px）、新增左侧 3px `::before` 色条（button 的 padding-left 21 让位）、占位虚线从 border-style 换 outline-style 且不画色条；`.qp-notes-count` 与卡头 meta 同口径升 secondary。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard-dnd.css",
+      "change": "added",
+      "reason": "[A批 0.12.x] 卡头控件收敛的接替文件：旧的 6 颗 12px 图标控件（.qp-card-controls/.qp-card-control，原在 dashboard-layout.css）整块删除，新建本文件承载 ⋯ 入口 + 弹出菜单内容层 + grip 六点装饰层。dashboard-layout.css 297 行贴死 300 上限只能减不能加，故拆新文件（删后 297→252）。",
       "owner": "ForG"
     }
   ]

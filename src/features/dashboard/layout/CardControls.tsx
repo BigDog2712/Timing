@@ -1,14 +1,18 @@
 /**
- * [P1 · 0.12.1] 卡片工具条：上移 / 下移 / 换档 / 移除。
+ * [A 批 · 0.12.x] 卡片工具条：一颗 ⋯ + 弹出菜单。
  *
- * 为什么塞进 `ModuleShell` 的卡头而不自己画壳：B7 的判据是「`qp-card-head` 全仓只在
- * `ModuleShell.tsx` 出现一次」——第二套壳一出现，四张卡的卡头就会各自漂。
- * 本文件只出**按钮**，容器由壳提供。
+ * 为什么从 6 颗图标收成 1 颗：20px 高的卡头里挤 6 个 12px 图标，hover 才显形 ——
+ * 常隐只是把噪音藏起来，不是消除（读屏用户仍要全部 Tab 穿过去）。收敛后卡头右槽
+ * = meta(读数在前) + ⋯(操作在后)，「看」与「动」各占一个位置。
  *
- * 交互取舍：P1 只做到「按钮 + 同列拖动」，不做跨列拖拽手柄。理由是换列已经有显式按钮，
- * 而拖拽的落点判定在双列轨道下要先定「插到第几位」，那是 P2 的事。
+ * 菜单容器复用共享的 `QuietAnchoredPopover`（portal + 定位 + Esc/outside/scroll
+ * 关闭），菜单项全部接既有回调（onMove/onTier/onToggleSpan/onRemove）——零新增
+ * 业务 API。「移除卡片」**不用 danger 色**：它可逆（能从加卡目录加回），danger
+ * 只留给不可逆动作。
  */
-import { ChevronDown, ChevronUp, Maximize2, Minimize2, MoveHorizontal, X } from "lucide-react";
+import { useId, useRef, useState, type KeyboardEvent } from "react";
+import { MoreHorizontal } from "lucide-react";
+import QuietAnchoredPopover from "../../../shared/components/QuietAnchoredPopover.tsx";
 import type { CardId, CardTier } from "./contract";
 
 interface Props {
@@ -27,9 +31,9 @@ interface Props {
   onRemove: () => void;
 }
 
-/** 档位循环：S → M → L → S。两个按钮只表达「更小 / 更大」，不并列三个按钮。 */
-const SMALLER: Record<CardTier, CardTier> = { S: "S", M: "S", L: "M" };
-const LARGER: Record<CardTier, CardTier> = { S: "M", M: "L", L: "L" };
+/** 档位三段 radio 直接选 S/M/L（旧版「更小/更大」两颗按钮的语义被菜单吸收）。 */
+const TIERS: readonly CardTier[] = ["S", "M", "L"];
+const TIER_LABEL: Record<CardTier, string> = { S: "小", M: "中", L: "大" };
 
 export default function CardControls({
   id,
@@ -44,63 +48,116 @@ export default function CardControls({
   onTier,
   onRemove,
 }: Props) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuId = useId();
+
+  const run = (action: () => void) => () => {
+    setOpen(false);
+    action();
+  };
+
+  /* Esc 关闭后焦点必须回 ⋯：菜单 portal 到 body，不回去的话焦点掉到 body。 */
+  const handleClose = (reason: "outside" | "escape" | "scroll") => {
+    setOpen(false);
+    if (reason === "escape") triggerRef.current?.focus();
+  };
+
+  /* QuietAnchoredPopover 只管 Tab 循环与 Esc；menu 语义要求的 ↑/↓ 在这里补。 */
+  const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const items = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>(
+        '[role="menuitem"]:not([aria-disabled="true"]), [role="menuitemradio"], [role="menuitemcheckbox"]',
+      ),
+    );
+    if (items.length === 0) return;
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const step = event.key === "ArrowDown" ? 1 : items.length - 1;
+    items[(at + step) % items.length]?.focus();
+  };
+
   return (
     <span className="qp-card-controls" data-card-controls={id}>
       <button
+        ref={triggerRef}
         type="button"
-        className="qp-card-control"
-        aria-label={`${label} 上移`}
-        aria-disabled={!canMoveUp || undefined}
-        onClick={canMoveUp ? () => onMove(-1) : undefined}
+        className="qp-card-more"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-label={`${label} 布局菜单`}
+        onClick={() => setOpen((value) => !value)}
       >
-        <ChevronUp size={12} strokeWidth={2} aria-hidden="true" />
+        <MoreHorizontal size={14} strokeWidth={2} aria-hidden="true" />
       </button>
-      <button
-        type="button"
-        className="qp-card-control"
-        aria-label={`${label} 下移`}
-        aria-disabled={!canMoveDown || undefined}
-        onClick={canMoveDown ? () => onMove(1) : undefined}
+      <QuietAnchoredPopover
+        open={open}
+        anchor={triggerRef.current}
+        id={menuId}
+        ariaLabel={`${label} 布局菜单`}
+        onClose={handleClose}
+        /* 右缘对齐：ratio=1 让面板右缘贴 ⋯ 右缘（否则出窗） */
+        horizontalAlign="center"
+        horizontalAnchorRatio={1}
       >
-        <ChevronDown size={12} strokeWidth={2} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className="qp-card-control"
-        aria-label={`${label} 缩小`}
-        aria-disabled={tier === "S" || undefined}
-        onClick={tier === "S" ? undefined : () => onTier(SMALLER[tier])}
-      >
-        <Minimize2 size={12} strokeWidth={2} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className="qp-card-control"
-        aria-label={`${label} 放大`}
-        aria-disabled={tier === "L" || undefined}
-        onClick={tier === "L" ? undefined : () => onTier(LARGER[tier])}
-      >
-        <Maximize2 size={12} strokeWidth={2} aria-hidden="true" />
-      </button>
-      {canToggleSpan ? (
-        <button
-          type="button"
-          className="qp-card-control"
-          aria-pressed={spanning}
-          aria-label={spanning ? `${label} 收回单列` : `${label} 跨满两列`}
-          onClick={onToggleSpan}
-        >
-          <MoveHorizontal size={12} strokeWidth={2} aria-hidden="true" />
-        </button>
-      ) : null}
-      <button
-        type="button"
-        className="qp-card-control"
-        aria-label={`移除 ${label}`}
-        onClick={onRemove}
-      >
-        <X size={12} strokeWidth={2} aria-hidden="true" />
-      </button>
+        <div role="menu" aria-label={`${label} 布局`} className="qp-card-menu" onKeyDown={onMenuKeyDown}>
+          <button
+            type="button"
+            role="menuitem"
+            className="qp-card-menu-item"
+            aria-disabled={!canMoveUp || undefined}
+            onClick={canMoveUp ? run(() => onMove(-1)) : undefined}
+          >
+            上移
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="qp-card-menu-item"
+            aria-disabled={!canMoveDown || undefined}
+            onClick={canMoveDown ? run(() => onMove(1)) : undefined}
+          >
+            下移
+          </button>
+          <hr className="qp-card-menu-sep" />
+          <div role="group" aria-label="卡片档位" className="qp-card-menu-tiers">
+            {TIERS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={value === tier}
+                className="qp-card-menu-item qp-card-menu-tier"
+                onClick={run(() => onTier(value))}
+              >
+                {TIER_LABEL[value]}
+              </button>
+            ))}
+          </div>
+          {canToggleSpan ? (
+            <button
+              type="button"
+              role="menuitemcheckbox"
+              aria-checked={spanning}
+              className="qp-card-menu-item"
+              onClick={run(onToggleSpan)}
+            >
+              {spanning ? "收回单列" : "跨满两列"}
+            </button>
+          ) : null}
+          <hr className="qp-card-menu-sep" />
+          <button
+            type="button"
+            role="menuitem"
+            className="qp-card-menu-item"
+            onClick={run(onRemove)}
+          >
+            移除卡片
+          </button>
+        </div>
+      </QuietAnchoredPopover>
     </span>
   );
 }

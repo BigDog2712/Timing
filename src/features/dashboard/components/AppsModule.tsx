@@ -8,8 +8,9 @@ import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
 /**
  * 模块 3 · 应用排行（01 §4.2：数据复用 `topApplications` + `icons`，UI 重写）
  *
- * 旧形态是"卡中卡"（每行一张 `.qp-panel` + 100×6 进度条），新形态是**裸排行 + 2px 发丝**：
- * 行 = `grid 20px / 1fr / 44px`，发丝 `bottom:0; height:2px; border-radius:0`（几何表）。
+ * 旧形态是"卡中卡"（每行一张 `.qp-panel` + 100×6 进度条），新形态是**裸排行**：
+ * 行 = `grid 22px / 1fr / 44px`，行高走 `--qp-row-app`（视觉层 32 → 28）。
+ * [视觉层 0.12.x] 行间那 2px 发丝已删，图标 20 → 22、圆角 5 → 6、底色升到 raise 层。
  *
  * ## 行不再可点（这是设计的选择，不是偷懒）
  *
@@ -67,10 +68,9 @@ export default function AppsModule({ controls, applications, icons, status, refr
             <span className="qp-app-value" title={`${app.percentage}%`}>
               {formatDashboardDuration(app.duration)}
             </span>
-            {/* 发丝是**分割线**，不是数据通道：几何表只给了 2px/radius 0，没给颜色，
-                所以保持 --qp-border-subtle，不在这里编码类别色（类别色的位置在环与
-                事项裸条上；本卡的文字通道只有图标/名字/时长三格）。 */}
-            <span className="hair" aria-hidden="true" />
+            {/* [视觉层 0.12.x] 2px 发丝（`<span className="hair" />`）已删：行高 32 → 28 之后
+                5 行只占 140，再加 4 条线会把"行"读成"表格"。行间分隔交给行高差与图标底块。
+                发丝从来不是数据通道（几何表只给了 2px/radius 0，没给颜色），删掉不丢信息。 */}
           </li>
         ))}
       </ul>

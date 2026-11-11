@@ -35,14 +35,28 @@
   pointer-events: none;
 }
 
+/* 环心主读数（[P1 视觉层] 24 → 26：`--qp-font-size-metric` 不动，另立 readout 一条，
+ * 那个 24 在别处还有消费者）。`letter-spacing` 收紧 1% 是数值字（tabular-nums）在大字号下的
+ * 常规补偿，不改宽度判据 —— 环心是居中块，`min-width: 76px` 兜住三/四位数。 */
 .qp-donut-total {
   min-width: 76px;
   text-align: center;
-  font-size: var(--qp-font-size-metric);
+  font-size: var(--qp-font-size-readout);
   font-variant-numeric: tabular-nums;
   font-weight: var(--qp-font-weight-emphasis);
-  line-height: var(--qp-line-height-metric);
+  line-height: var(--qp-line-height-readout);
+  letter-spacing: -0.01em;
   color: var(--qp-text-primary);
+}
+
+/* 单位降级（h / m）：主读数里的字母不该跟数字一样响。26px 的数字配 13px 的单位，
+ * 单位走 secondary —— 它仍然要读得清（12/13px 非占位文本不许用 tertiary）。
+ * 数值与单位是同一行里的两段：`display: inline` + 继承 tabular-nums 保证不跳宽。 */
+.qp-donut-unit {
+  font-size: var(--qp-font-size-row);
+  font-weight: var(--qp-font-weight-regular);
+  line-height: inherit;
+  color: var(--qp-text-secondary);
 }
 
 .qp-donut-cap {
@@ -72,34 +86,43 @@
   min-width: 0;
 }
 
+/* [P1 视觉层] 图例行高 24 → 26（裸字面值，**不动 `--qp-row-readout`**：那是骨架条高与
+ * 别处行高的共用令牌，本批唯一许改的行高令牌是 `--qp-row-app`）。
+ * 5×26 + 4×4 = 146 ⊂ 计时卡环区可用高 178；短档 232−32−28−26 = 146，恰好占满（不溢出）。 */
 .qp-readout {
   display: grid;
-  grid-template-columns: 6px minmax(0, 1fr) var(--qp-col-num);
+  grid-template-columns: 8px minmax(0, 1fr) var(--qp-col-num);
   align-items: center;
   gap: 8px;
-  height: var(--qp-row-readout);
-  border-radius: 4px;
+  height: 26px;
+  border-radius: 8px;
   color: var(--qp-text-secondary);
 }
 
-/* hover 弧段 ↔ 读数行 双向联动（01 §4.2）。只改底色，不动几何（否则 5 行会跳） */
-.qp-readout[data-hover="true"] { background: var(--qp-bg-elevated); }
+/* hover 弧段 ↔ 读数行 双向联动（01 §4.2）。只改底色，不动几何（否则 5 行会跳）。
+ * [P1 视觉层] 底从 `--qp-bg-elevated` 换成 raise 层（比 card 高一层），并给 8 圆角 ——
+ * 悬停块要有"贴上来"的形状，方角在 18 圆角的卡里很硬。 */
+.qp-readout[data-hover="true"] { background: var(--qp-surface-raise); }
 
+/* 图例 dot 6 → 8：行高加到 26 之后 6px 的点偏小，与 13px 行主文不成比例 */
 .qp-readout-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
 }
 
+/* 行主文 12/18 → 13/18（`--qp-font-size-row`）：读数是"名字 + 时长"两栏，
+ * 名字是主文，不该和 12px 的时长同档；行高锁 18 让 26 的行内上下各留 4。 */
 .qp-readout-name {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+  font-size: var(--qp-font-size-row);
+  line-height: var(--qp-line-height-row);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* 数值统一 12px + tabular-nums（`--qp-font-size-caption` 就是 12，不另立令牌） */
 .qp-readout-value {
   text-align: right;
   font-size: var(--qp-font-size-caption);
@@ -109,7 +132,7 @@
   white-space: nowrap;
 }
 
-/* ── 事项分布：6 行裸条（dot / 名字 / 60 裸条 / 数字） ── */
+/* ── 事项分布：6 行裸条（dot / 名字 / `--qp-bar-max` 裸条 / 数字） ── */
 /* 列表的"重置"只留事项 / 应用两条：待办列表的那一份搬进 `dashboard-todos.css`，
  * 与 `.qp-todo-row` / `.qp-todo-list` 的其余规则放在一起 —— 一张卡的样式不跨两个文件，
  * 否则改列宽/间距时要来回翻。 */
@@ -129,27 +152,33 @@
   gap: var(--qp-row-gap);
 }
 
+/* [P1 视觉层] 首列保持与 dot 同宽；行 hover 用 raise 层 + 8 圆角（与图例同一口径）。
+ * 行高**没动**（`--qp-row-items` 30 是档位令牌，本批不许改）。 */
 .qp-item-row {
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: 6px minmax(0, 1fr) var(--qp-bar-max) var(--qp-col-num);
+  grid-template-columns: 8px minmax(0, 1fr) var(--qp-bar-max) var(--qp-col-num);
   align-items: center;
   gap: 8px;
   height: var(--qp-row-items);
+  border-radius: 8px;
 }
+
+.qp-item-row:hover { background: var(--qp-surface-raise); }
 
 .qp-item-name {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+  font-size: var(--qp-font-size-row);
+  line-height: var(--qp-line-height-row);
   color: var(--qp-text-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* 裸条 4 → 6：行高 30 里 4px 的条太细，6px 才在 13px 名字旁边立得住 */
 .qp-item-bar {
-  height: 4px;
+  height: 6px;
   border-radius: 999px;
   background: var(--qp-chart-track);
   overflow: hidden;
@@ -162,39 +191,50 @@
   background: currentColor;
 }
 
-/* ── 应用排行：5 行 + 2px 发丝 + 图标 ── */
+/* ── 应用排行：5 行 + 图标（[P1 视觉层] 发丝已删，见下） ── */
 .qp-app-list { display: flex; flex: 1 1 auto; flex-direction: column; }
+
+/* 自绘滚动条（**轨道仍是 6px**：数字列右缘 443.14/548.86 靠 `qp-scroll-region-stable`
+ * 常驻的那 6px 槽，宽度改 4 会让四条列一起右移 2px = 像素验收红）。
+ * 所以视觉上的"细"靠 thumb 的 1px 透明边 + content-box 裁切做出来（6 − 2 = 4px），
+ * 槽宽一个像素不动。`scrollbar-width: thin` 只对不支持 `::-webkit-scrollbar` 的引擎生效。 */
+.qp-app-list {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--qp-text-tertiary) 55%, transparent) transparent;
+}
+
+.qp-app-list::-webkit-scrollbar { width: var(--qp-scrollbar-size); }
+
+.qp-app-list::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--qp-text-tertiary) 55%, transparent);
+  background-clip: content-box;
+}
 
 .qp-app-row {
   position: relative;
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: 20px minmax(0, 1fr) var(--qp-col-num);
+  grid-template-columns: 22px minmax(0, 1fr) var(--qp-col-num);
   align-items: center;
   gap: 10px;
   height: var(--qp-row-app);
 }
 
-/* 2px 发丝：几何按 01 §4.3「bottom:0; height:2px; border-radius:0」 */
-.hair {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  border-radius: 0;
-  background: var(--qp-border-subtle);
-}
+/* [P1 视觉层] 发丝（`.hair` 那 2px 绝对定位分隔线）连同 DOM 里的 `<span class="hair" />`
+ * 一起删了：行高从 32 降到 28 之后，5 行只占 140，再加 4 条 2px 线会把"行"读成"表格"。
+ * 分隔交给行高差与图标底块，不加回任何分隔线。 */
 
 .qp-app-icon {
   display: flex;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  border-radius: 5px;
-  background: var(--qp-bg-elevated);
+  border-radius: 6px;
+  background: var(--qp-surface-raise);
   font-size: var(--qp-font-size-compact);
   font-weight: var(--qp-font-weight-emphasis);
   line-height: var(--qp-line-height-compact);
@@ -203,11 +243,13 @@
 
 .qp-app-icon > img { width: 100%; height: 100%; object-fit: contain; }
 
+/* [P1 视觉层] 行主文 14/20 → 13/18（`--qp-font-size-row`）：与事项分布、读数行同一档，
+ * 一行里三张卡的"名字"看起来才是同一层 */
 .qp-app-name {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--qp-font-size-body);
-  line-height: var(--qp-line-height-body);
+  font-size: var(--qp-font-size-row);
+  line-height: var(--qp-line-height-row);
   color: var(--qp-text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;

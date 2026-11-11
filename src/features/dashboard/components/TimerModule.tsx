@@ -67,6 +67,24 @@ function buildReadouts(
   }];
 }
 
+/**
+ * 环心主读数的**排版拆分**（只为视觉层）：`4h 45m` → 数字直接继承 26px，`h` / `m`
+ * 包进 `.qp-donut-unit` 降到 13px + secondary。数字仍是同一段文本、同一个 tabular-nums，
+ * 所以宽度判据（环心 `min-width: 76px`）不受影响。
+ *
+ * 只做"数字 / 非数字"切分，**不重写格式化逻辑**：文案仍由 `formatDashboardDuration`
+ * 一处产出（切成两段不会改变文案本身，四种语言都适用 —— 该函数只输出 `Nh Nm` / `Nm`）。
+ */
+function TotalReadout({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\d+)/).filter(Boolean).map((part, index) => (
+        /^\d+$/.test(part) ? part : <span key={index} className="qp-donut-unit">{part}</span>
+      ))}
+    </>
+  );
+}
+
 export default function TimerModule({
   controls,
   categoryDist,
@@ -179,7 +197,9 @@ export default function TimerModule({
             }) : null}
           </svg>
           <div className="qp-donut-center">
-            <span className="qp-donut-total">{formatDashboardDuration(totalTrackedTime)}</span>
+            <span className="qp-donut-total">
+              <TotalReadout text={formatDashboardDuration(totalTrackedTime)} />
+            </span>
             <span className="qp-donut-cap">{UI_TEXT.dashboard.total}</span>
           </div>
         </div>

@@ -1,0 +1,149 @@
+/* ============================================================================
+ * dashboard-dnd.css — 卡头控件收敛（⋯ 菜单 + grip）与两根手柄的显形（A 批 · 0.12.x）
+ * -----------------------------------------------------------------------------
+ * 从 `dashboard-layout.css` 搬出：那个文件 297 行、贴死 300 上限，而旧的
+ * `.qp-card-controls` / `.qp-card-control` 两块（6 颗 12px 图标时代）已整块删除，
+ * 本文件是它们唯一的接替者。删除与重建同批完成，不存在两套控件样式并存的窗口。
+ *
+ * 菜单面板本体（底/边/影/圆角 14）来自共享的 `quiet-anchored-popover.css`，
+ * 这里只写 `.qp-card-menu-*` 的内容层 —— portal 到 body，不依赖 .qp-card 祖先。
+ *
+ * 红线同全仓：零字面量色值，只用 var(--qp-*)；不动 --qp-card-* 影令牌（tokens.css
+ * 只剩 1 行余量，任何新令牌进不了那里）。
+ * ========================================================================== */
+
+/* ── grip（装饰层）：「这张卡能拖」的唯一静息线索 ──
+ * 三档透明度（静息 0 / 卡 hover 0.6 / 拖动 0.85+，后两档留给拖拽批次）。
+ * 0.6 对应 secondary 在卡面上的 3.33:1，过 WCAG 1.4.11 的 3:1 线；
+ * 再亮（0.8+）会让五张卡静息就各挂一个亮把手，破坏卡头的降噪口径。
+ * pointer-events:none：卡头的抓取热区是「整条卡头」一个，不允许出现第二个。 */
+.qp-card-grip {
+  position: absolute;
+  /* 落在卡内距留白里（卡内距 16）：left = 16−14 = 2，不推挤标题、不改 20px 卡头 */
+  left: calc(var(--qp-card-pad) - 14px);
+  top: calc(var(--qp-card-pad) + 5px);
+  width: 6px;
+  height: 10px;
+  pointer-events: none;
+  opacity: 0;
+  color: var(--qp-text-secondary);
+  transition: opacity 120ms ease;
+}
+/* 六点阵：本体 1 点 + box-shadow 补 5 点（2 列 × 3 行，点距 4px） */
+.qp-card-grip::before {
+  content: "";
+  display: block;
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow:
+    4px 0 currentColor,
+    0 4px currentColor, 4px 4px currentColor,
+    0 8px currentColor, 4px 8px currentColor;
+}
+.qp-card:hover .qp-card-grip,
+.qp-card:focus-within .qp-card-grip {
+  opacity: 0.6;
+}
+
+/* ── ⋯ 入口：20×20 视觉 / 24×24 命中（::after 外扩 2px，不撑 20px 卡头） ── */
+.qp-card-more {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--qp-radius-chip);
+  background: none;
+  color: var(--qp-text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+.qp-card-more::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+}
+.qp-card:hover .qp-card-more,
+.qp-card:focus-within .qp-card-more,
+.qp-card-more[aria-expanded="true"],
+.qp-card-more:focus-visible {
+  opacity: 1;
+}
+.qp-card-more:hover,
+.qp-card-more[aria-expanded="true"] {
+  background: var(--qp-surface-raise);
+  color: var(--qp-text-primary);
+}
+/* 展开态多一道内描边（面板开着时入口要"压得住"面板） */
+.qp-card-more[aria-expanded="true"] {
+  outline: 1px solid var(--qp-border-subtle);
+  outline-offset: -1px;
+}
+.qp-card-more:focus-visible {
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: 1px;
+}
+/* 触屏与无 hover 环境：常显（与旧控件同口径，否则永远点不到） */
+@media (hover: none) {
+  .qp-card-more { opacity: 1; }
+}
+
+/* ── 菜单内容层（面板壳在 quiet-anchored-popover.css） ── */
+.qp-card-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 168px;
+  padding: 4px;
+}
+.qp-card-menu-item {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--qp-radius-chip);
+  background: none;
+  font-size: var(--qp-font-size-row);
+  line-height: var(--qp-line-height-row);
+  color: var(--qp-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.qp-card-menu-item:hover { background: var(--qp-surface-raise); }
+.qp-card-menu-item:focus-visible {
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: -2px;
+}
+/* 禁用项保留占位（读屏仍可到达），灰字 + 不可点；hover 不给底色 —— 它不是可选项 */
+.qp-card-menu-item[aria-disabled="true"] {
+  color: var(--qp-text-tertiary);
+  cursor: default;
+}
+.qp-card-menu-item[aria-disabled="true"]:hover { background: none; }
+
+.qp-card-menu-sep {
+  margin: 4px 6px;
+  border: 0;
+  border-top: 1px solid var(--qp-border-subtle);
+}
+
+/* 档位三段：一行三格等宽，选中段给底色 */
+.qp-card-menu-tiers {
+  display: flex;
+  gap: 4px;
+  padding: 0;
+}
+.qp-card-menu-tier {
+  flex: 1 1 0;
+  justify-content: center;
+}
+.qp-card-menu-tier[aria-checked="true"] {
+  background: var(--qp-surface-raise);
+  font-weight: var(--qp-font-weight-emphasis);
+}

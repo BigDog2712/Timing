@@ -13,11 +13,13 @@
 .qp-card-todos { position: relative; }
 
 /* ── 输入行：与行网格共用同一条左侧轨（22 = 卡内 16 + 6） ──
- * `padding-left: 5` 而不是 6：本行有 1px 实边（行没有），5+1 才让**内容**起点落在 22，
- * 与 `.qp-todo-row` 的 grid 起点同一竖线。按 padding 数字对齐会差 1px，
- * 按内容边对齐才对（勾选框中心 34 / 输入起点 52 就是这么来的）。
- * 加号外面那层 24px 轨是必需的：svg 只有 14，轨道 24 才让图标中心落在 34，
- * 和行里那个 24×24 勾选按钮同宽 —— 两个"行首标记"必须同轴。 */
+ * [P1 视觉层] 1px 实边 → 无边框 + inset 底色。两处必须一起改：
+ *   ① `padding-left` 5 → **6**：原来 5+1(边) = 6 才是内容起点，边没了就补在 padding 上，
+ *      否则输入起点比行里的标题偏左 1px（勾选中心 34 / 输入起点 52 那条对齐会断）；
+ *   ② `:focus-within` 原来只改 `border-color`，现在没有边可改 → 换成 1px 内描边
+ *      （`outline` + offset −1），焦点环不能丢：输入本身 `outline: none`，视觉焦点全靠这一条。
+ * 高度 32 与圆角 12 是"输入框"这一层的形状：12 比 `--qp-radius-control`(10) 更方，
+ * 那个 10 全仓在用，不许为了这一条改令牌。 */
 .qp-todo-compose {
   display: flex;
   flex: 0 0 var(--qp-todo-compose-h);
@@ -25,13 +27,15 @@
   align-items: center;
   gap: 6px;
   margin-bottom: var(--qp-row-gap);
-  padding: 0 10px 0 5px;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-control);
-  background: var(--qp-bg-elevated);
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--qp-surface-inset);
   color: var(--qp-text-tertiary);
 }
 
+/* 加号外面那层 24px 轨是必需的：svg 只有 14，轨道 24 才让图标中心落在 34，
+ * 和行里那个 24×24 勾选按钮同宽 —— 两个"行首标记"必须同轴。 */
 .qp-compose-icon {
   display: flex;
   flex: 0 0 24px;
@@ -41,7 +45,12 @@
   justify-content: center;
 }
 
-.qp-todo-compose:focus-within { border-color: var(--qp-focus-ring); }
+/* 没有边可改之后焦点靠 1px 内描边表达（见上面 ②）。`outline` 跟着 12 圆角走，
+ * offset −1 让这条线画在输入框**里面**，与原来的 1px 边同一个视觉重量。 */
+.qp-todo-compose:focus-within {
+  outline: 1px solid var(--qp-focus-ring);
+  outline-offset: -1px;
+}
 
 .qp-todo-compose input {
   flex: 1 1 auto;
@@ -133,13 +142,15 @@
   cursor: default;
 }
 
-/* 视觉方框 16×16 画在按钮里面（按钮 24×24 只是命中区） */
+/* 视觉方框 18×18 画在按钮里面（按钮 24×24 只是命中区）。
+ * [P1 视觉层] 16 → 18、圆角 5 → 6：行高 36 里 16px 的框偏小，18 与 13px 行主文同重量。
+ * 命中区仍是 24 宽 × 36 高（WCAG 2.5.8 AA 的 24 下限不动，见上一条注释）。 */
 .qp-todo-box {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border: 1px solid var(--qp-border-strong);
-  border-radius: 5px;
+  border-radius: 6px;
   background: none;
   color: var(--qp-bg-panel);
 }

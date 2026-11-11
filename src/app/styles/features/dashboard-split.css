@@ -89,17 +89,26 @@
   cursor: col-resize;
   touch-action: none;
 }
+/* [A 批显形统一] 与下缘手柄同一套语言：2px 圆头、--qp-border-strong、只加长不改色。
+ * 静息透明 → 卡 hover 显 60% 长 → 自身 hover/聚焦拉满。禁换 border-subtle、禁加粗。 */
 .qp-card-width::before {
   content: "";
   position: absolute;
-  inset: 10% 2px 10% auto;
+  inset: 20% 2px 20% auto;
   width: 2px;
-  border-radius: 1px;
-  background: transparent;
-}
-.qp-card-slot:hover .qp-card-width::before,
-.qp-card-width:focus-visible::before {
+  border-radius: 999px;
   background: var(--qp-border-strong);
+  opacity: 0;
+  transition: opacity 120ms ease, inset 120ms ease;
+}
+.qp-card-slot:hover .qp-card-width::before {
+  opacity: 1;
+  inset: 8% 2px 8% auto;
+}
+.qp-card-width:hover::before,
+.qp-card-width:focus-visible::before {
+  opacity: 1;
+  inset: 0 2px 0 auto;
 }
 .qp-card-width:focus-visible {
   outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);

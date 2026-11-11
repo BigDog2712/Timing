@@ -1,0 +1,54 @@
+/* ============================================================================
+ * dashboard-surface.css — 卡片表面层（P1 视觉层 · 0.12.x）
+ * -----------------------------------------------------------------------------
+ * 本文件只放**新增量**：卡片阴影（静息 / 悬停 + 过渡）、便利贴条的阴影、板面底色。
+ * 半径 / 底色 / 那 1px 边**不在这里** —— 它们和「1px 边必须是 outline + outline-offset:-1
+ * 而不是 border（否则 443.14/548.86 两条数字列右缘全错）」那条判据写在同一处才安全，
+ * 所以在 `dashboard.css`（`.qp-card`）与 `dashboard-notes.css`（`.qp-notes`）里**原地换成
+ * 令牌**。同一个属性绝不写两遍：后加载覆盖前者是这仓最贵的一类静默 bug。
+ *
+ * ## 为什么这里没有 `--qp-card-box-*` 合成令牌（曾经有过，已删）
+ * 直觉写法 `box-shadow: var(--qp-card-inner), var(--qp-card-shadow-rest)` 有坑：
+ * `box-shadow` 的语法是 `none | <shadow>#`，**`none` 不能出现在列表里** —— 若亮色的
+ * `--qp-card-inner` 是 `none`，展开成 `none, 0 1px 2px …` 是**无效值，整条声明被丢弃**，
+ * 亮色一条影子都没有，而 CSS 不报错、测试也不红。
+ * 解法不是加一层合成，而是**每个主题在 `tokens.css` 里各给一条完整多层值**：列表里
+ * 不会再出现 `none`，合成层就没有存在意义（少一层间接 = 少一处以后没人看得懂的跳转）。
+ * 另一条硬约束：**rest 与 hover 的影子层数必须相等**，层数不等时 `transition: box-shadow`
+ * 不插值，悬停会变成硬切而不是抬起（暗色现为 3 层对 3 层）。
+ *
+ * ## 加载顺序
+ * `App.css` 里紧跟 `dashboard.css` 之后。当前四条规则都不与既有声明同属性，顺序本来无关；
+ * 放这里是为了让「表面层在卡体之后」一眼可见。
+ *
+ * `--qp-radius-card-drag`（22）是给**下一批**拖拽态用的，本批没有消费者 —— 故意留着，
+ * 免得下一个人再从 18 猜一个值出来。
+ * ========================================================================== */
+
+.qp-card {
+  box-shadow: var(--qp-card-shadow-rest);
+  transition: box-shadow var(--qp-motion-fast) var(--qp-motion-ease);
+}
+
+/* 悬停只加阴影，不动 padding / outline：几何一个像素不挪（五张卡的 264/284/254/294/56 与
+ * 卡间距 16 都在别处锁死，这里只允许"面"变，"体"不许变）。 */
+.qp-card:hover {
+  box-shadow: var(--qp-card-shadow-hover);
+}
+
+/* 动效降级：阴影过渡也是动效，reduced 下直接跳变 */
+:root[data-qp-motion="reduced"] .qp-card {
+  transition: none;
+}
+
+/* 便利贴条与卡同一层表面（无悬停：通栏条不是可点区域） */
+.qp-notes {
+  box-shadow: var(--qp-card-shadow-rest);
+}
+
+/* 板面：**只加 background**。width / min-height / margin 一个不动 —— 板宽 1052、
+ * 两列 465.14/570.86、五张卡高全靠那几个值。外层 `.qp-dashboard` 只滚不铺色，
+ * 于是留白区仍是窗口底色、板子是一块"桌面"，层次从这里来（board < card）。 */
+.qp-main-view {
+  background: var(--qp-surface-board);
+}

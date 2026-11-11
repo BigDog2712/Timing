@@ -99,6 +99,11 @@
 }
 
 /* ── 卡片（outline 版，见文件头 ①） ── */
+/* [P1 视觉层] 半径 / 底色 / 边色**原地换成卡片层令牌**（阴影与悬停在同批新增的
+ * `dashboard-surface.css`，本文件不放阴影：同一个属性两处写 = 后加载覆盖前者）。
+ * `--qp-radius-card` 18 是新令牌，**不是** `--qp-radius-panel` 14 —— 那个 14 全仓 18 处在用。
+ * `--qp-card-edge` 亮色 #e2e4e7 / 暗色 transparent（暗色靠 9% 内高光当上缘）。
+ * outline 仍是 1px + offset -1：不占布局，才有 465.14−16−6 = 443.14 的列右缘。 */
 .qp-card {
   display: flex;
   flex-direction: column;
@@ -107,10 +112,10 @@
   min-height: 0;
   padding: var(--qp-card-pad);
   border: 0;
-  border-radius: var(--qp-radius-panel);
-  outline: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-card);
+  outline: 1px solid var(--qp-card-edge);
   outline-offset: -1px;
-  background: var(--qp-bg-panel);
+  background: var(--qp-surface-card);
   overflow: hidden;
 }
 
@@ -142,7 +147,9 @@
   font-size: var(--qp-font-size-caption);
   font-variant-numeric: tabular-nums;
   line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-tertiary);
+  /* [P1 视觉层] tertiary → secondary。卡头 meta 是 12px 正文，tertiary 在 #2d2d2d 上只有
+   * 3.79:1（不达 4.5:1），secondary 是 5.10:1。**tertiary 从本批起只给占位符 / 骨架 / 空态**。 */
+  color: var(--qp-text-secondary);
   white-space: nowrap;
 }
 

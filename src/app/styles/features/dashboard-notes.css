@@ -6,20 +6,22 @@
  * 这里只有只读展示的样式，写路径一律不在这条通栏上（便利贴窗属主窗）。
  * ========================================================================== */
 
-/* ── 便利贴条（56 通栏：head 88 + 卡片流 + more 24） ──
+/* ── 便利贴条（56 通栏：head 72 + 卡片流 + more 24） ──
+ * [P1 视觉层] 标签列 88 → 72：`便利贴` 三字 15px 加"3 张"12px 在 72 里正好一行放得下，
+ * 88 那 16px 是全空的。**通栏高 56 / 内距 6 不动**（56 是像素验收项）。
  * 纵向内距 6：卡的 1px outline 用 `outline-offset: -1` 画在里面，靠的就是这 6；
  * 内距 0 时卡会贴着通栏上下边，看起来像两条 1px 线粘在一起。 */
 .qp-notes {
   display: grid;
-  grid-template-columns: 88px minmax(0, 1fr) 24px;
+  grid-template-columns: 72px minmax(0, 1fr) 24px;
   align-items: center;
   gap: 12px;
   min-height: 0;
   padding: 6px var(--qp-card-pad);
-  border-radius: var(--qp-radius-panel);
-  outline: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-card);
+  outline: 1px solid var(--qp-card-edge);
   outline-offset: -1px;
-  background: var(--qp-bg-panel);
+  background: var(--qp-surface-card);
   overflow: hidden;
 }
 
@@ -46,7 +48,8 @@
   font-size: var(--qp-font-size-caption);
   font-variant-numeric: tabular-nums;
   line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-tertiary);
+  /* 与 `.qp-card-meta` 同一条口径：12px 正文不用 tertiary（暗色 #7f8791 on #2d2d2d 只有 3.79:1） */
+  color: var(--qp-text-secondary);
 }
 
 .qp-notes-track {
@@ -58,40 +61,71 @@
   overflow-y: hidden;
 }
 
-/* 卡高 40 / 36（两档）由 token 给：卡高不是"内容撑出来的"，而是通栏高 − 2×6 再让 4，
+/* 卡高 38 / 34（两档）由 token 给：卡高不是"内容撑出来的"，而是通栏高 − 2×6 再让，
  * 所以必须写死高度，否则空态与 3 张卡之间通栏会跳。
  * 单行截断靠 `text-overflow` —— 它只在行内/块容器上生效，所以**不能**改成 flex；
- * 垂直居中就用 line-height 顶满内容盒（−2px 是上下各 1px 的边）。 */
+ * 垂直居中就用 line-height 顶满内容盒。
+ *
+ * [P1 视觉层] 三处联动，少一处就歪 1px：
+ *   ① `border: 1px` → `outline: 1px + offset -1`：outline 不占内容盒，宽度 2px 回到文字上，
+ *      所以 `flex: 0 1 280px` 的卡**外宽不变**（贴纸条是固定宽，不是内容撑的）；
+ *   ② `line-height` 相应从 `calc(h − 2px)` 改成 `h`：原来减的 2px 就是上下两条边，
+ *      边没了还减就会让文字比垂直中线高 1px；
+ *   ③ 内距 10 → 12，底色 `--qp-bg-elevated` → raise 层（比卡片高一档，贴纸才"浮"在条上）。 */
 .qp-note-card {
+  position: relative;
   flex: 0 1 280px;
   min-width: 0;
   max-width: 280px;
   height: var(--qp-note-card-h);
-  padding: 0 10px;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-control);
-  background: var(--qp-bg-elevated);
+  padding: 0 12px;
+  border: 0;
+  outline: 1px solid var(--qp-card-edge);
+  outline-offset: -1px;
+  border-radius: 12px;
+  background: var(--qp-surface-raise);
   font-size: var(--qp-font-size-caption);
-  line-height: calc(var(--qp-note-card-h) - 2px);
+  line-height: var(--qp-note-card-h);
   color: var(--qp-text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* 空态 / 骨架占位：与真卡片同尺寸，避免通栏在 0 张 ↔ 3 张之间跳高度 */
+/* 左侧 3px 色条：贴纸这一层唯一的"形状记号"（便利贴没有分类色，用当前文字色即可）。
+ * 上下各让 9px，38 高的卡里是 20 高的条；`left: 6` 落在 12px 内距的留白里，
+ * 所以文字的 padding-left 要在下面那条 `button.qp-note-card` 里让出 9px。 */
+.qp-note-card::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 6px;
+  width: 3px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* 空态 / 骨架占位：与真卡片同尺寸，避免通栏在 0 张 ↔ 3 张之间跳高度。
+ * 虚线从 `border-style` 换到 `outline-style`（边已经改成 outline 了），
+ * 占位也不画色条 —— 它没有"这是一张便利贴"的语义。 */
 .qp-note-placeholder {
-  border-style: dashed;
+  outline-style: dashed;
   background: none;
   color: var(--qp-text-tertiary);
 }
 
+.qp-note-placeholder::before { content: none; }
+
 /* 卡片是 `<button>`（点开看全文）：只改按钮自带的两样东西 —— 字族与水平对齐。
  * **不要**写 `font: inherit` 简写：它会把上面那行 `font-size/line-height` 一起清成继承值，
- * 卡片文字会从 caption 变成 body、40 高的卡按 body 行高重排。 */
+ * 卡片文字会从 caption 变成 body、38 高的卡按 body 行高重排。
+ * [P1 视觉层] padding-left 12 → 21：给左侧那条 3px 色条让位（条占 6–9，文字从 21 起，
+ * 条到字 12 = 与右内距对齐）。占位是 `<span>`，没这条规则，也就没有那个 9px。 */
 button.qp-note-card {
   font-family: inherit;
   text-align: left;
+  padding-left: 21px;
   cursor: default;
 }
 

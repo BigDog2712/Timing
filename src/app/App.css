@@ -29,6 +29,9 @@
 @import "./styles/features/host/settings-bits.css";
 @import "./styles/features/settings-groups.css";
 @import "./styles/features/dashboard.css";
+/* [P1 视觉层] 卡片表面层：阴影 / 悬停 / 板面底色。必须排在 dashboard.css 之后
+   （它只管"面"，几何与 1px 边仍在 dashboard.css 与 tiers.css）。 */
+@import "./styles/features/dashboard-surface.css";
 /* [P1 · 0.12.1] 组件化仪表盘的壳外版式（工具条 / 加卡入口 / 加卡弹层）。
    卡自身几何仍在 dashboard.css 与 tiers.css，本文件不改一个像素。 */
 @import "./styles/features/dashboard-layout.css";
@@ -36,6 +39,10 @@
 @import "./styles/features/dashboard-todos.css";
 @import "./styles/features/dashboard-notes.css";
 @import "./styles/features/dashboard-split.css";
+/* [A 批 · 0.12.x] 卡头控件（⋯ 菜单 + grip）与手柄显形。排在 split 之后：
+ * dnd.css 只新增 .qp-card-more / .qp-card-menu-* / .qp-card-grip，不覆盖既有规则，
+ * 顺序无实际依赖，放这里是为了让「控件层最后加载」一眼可见。 */
+@import "./styles/features/dashboard-dnd.css";
 @import "./styles/features/dashboard-trend-reminder.css";
 @import "./styles/features/classification.css";
 @import "./styles/features/history.css";

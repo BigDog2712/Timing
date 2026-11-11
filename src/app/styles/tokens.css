@@ -72,6 +72,11 @@
   --qp-scrollbar-thumb-inset: 0px;
 
   --qp-radius-panel: 14px;
+  /* 卡片面。**不要用 `--qp-radius-panel` 顶替**：那个 14 全仓 18 处在用（`.qp-panel`
+   * 系的数据管理/设置两视图），改它等于改那些视图的排版；卡片层单独一条。
+   * `-drag` 留给下一批的拖拽态（本批无消费者，见 dashboard-surface.css 顶部）。 */
+  --qp-radius-card: 18px;
+  --qp-radius-card-drag: 22px;
   --qp-radius-control: 10px;
   --qp-radius-button: 8px;
   --qp-radius-chip: 8px;
@@ -151,6 +156,35 @@
    * 可行区间只有 40%–41.4%：再淡看不出选中，再深选中区的字跌破 4.5:1 —— 不许顺手调圆整。 */
   --qp-selection-bg: color-mix(in srgb, var(--qp-accent-default) 40%, var(--qp-bg-panel));
   --qp-focus-ring: color-mix(in srgb, var(--qp-accent-default) 74%, var(--qp-bg-panel));
+}
+
+/* ── 卡片表面层次（P1 视觉层）：board / card / inset / raise 四层 + 边与影 ──
+ * 写法与上面 `--qp-focus-ring` 那块一致：浅色 `:root`、暗色 `:root[data-theme="dark"]`，
+ * **两处同名 token 必须成对**（漏一个 = 暗色静默沿用浅色值）。不进 `deriveTheme`：
+ * 那套管"随宿主取色 / 主题预设漂移"的颜色，表面层次是固定的中性灰阶，不跟预设。
+ * 消费点：`features/dashboard-surface.css` 与六张卡各自的版式文件。 */
+:root {
+  --qp-surface-board: #f7f7f7;
+  --qp-surface-card: #ffffff;
+  --qp-surface-inset: #f1f1f1;
+  --qp-surface-raise: #f8f8f8;
+  --qp-card-edge: #e2e4e7;
+  /* 亮色立边靠 outline；不再叠 0 0 0 1px 黑边（同位置两层会读成 2px 深边） */
+  --qp-card-shadow-rest: 0 1px 2px rgb(20 24 30 / 8%);
+  --qp-card-shadow-hover: 0 2px 8px rgb(20 24 30 / 12%);
+}
+
+:root[data-theme="dark"] {
+  --qp-surface-board: #1d1d1d;
+  --qp-surface-card: #2d2d2d;
+  --qp-surface-inset: #2a2a2a;
+  --qp-surface-raise: #393a3c;
+  /* 暗色不画 outline（卡面 : 画布仅 1.14:1），边界靠三层影：inset 上缘反光(厚度) +
+   * inset 内环(轮廓，外扩会胖 1px、缝 16→14) + 投影(离地)。降级只降内环 34%→24%→18% 永不删；
+   * rest/hover **层数必须相等**，否则 transition:box-shadow 不插值、悬停是硬切。 */
+  --qp-card-edge: transparent;
+  --qp-card-shadow-rest: inset 0 1px 0 rgb(209 213 220 / 9%), inset 0 0 0 1px rgb(0 0 0 / 34%), 0 1px 2px rgb(0 0 0 / 34%);
+  --qp-card-shadow-hover: inset 0 1px 0 rgb(209 213 220 / 12%), inset 0 0 0 1px rgb(0 0 0 / 34%), 0 2px 8px rgb(0 0 0 / 30%);
 }
 
 * {

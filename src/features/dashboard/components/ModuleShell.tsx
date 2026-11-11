@@ -97,13 +97,17 @@ export default function ModuleShell({
       data-state={state}
     >
       <div className="qp-card-head">
+        {/* [A 批] grip 是装饰层：pointer-events:none，不参与排版也不可点。
+            本批不接 tabIndex/role=button —— 键盘锚点等拖拽批次一起做，
+            现在给了就是一颗「能聚焦但按了没反应」的键。 */}
+        <span className="qp-card-grip" aria-hidden="true" />
         <h2 id={id} className="qp-card-title">{title}</h2>
         {/* 右槽只在 ready 渲染（R9 收口）：empty 的数是废话（空态文案已经说了）、
          *  error 的数不可信、loading 的数还没有。门控收在这里，四张卡就不可能再
          *  各写一遍然后漏一张（ItemsModule 那次漏掉 empty 印出「今日 0 项」就是
          *  散写守卫的必然结果）。h2 标题保持恒在（M12/M13）。 */}
+        {/* [A 批] 右槽顺序 = meta 在前、⋯ 在后：读数贴左、操作贴右，「看」与「动」各占一端 */}
         <span className="qp-card-head-right">
-          {controls}
           {state === "ready" ? (
             <>
               {/* E3 只在这一层出现：条件渲染，不常驻空容器（常驻的 role=alert 挂载时就有内容，
@@ -118,6 +122,7 @@ export default function ModuleShell({
               {action ?? (meta ? <span className="qp-card-meta">{meta}</span> : null)}
             </>
           ) : null}
+          {controls}
         </span>
       </div>
       {state === "loading" ? (

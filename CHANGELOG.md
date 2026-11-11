@@ -4,6 +4,25 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 0.12.1（桌面）— 2026-11-11（末）
+
+### 主界面视觉与交互重构（暗色面差体系 · 未出包并入同号）
+
+**视觉层（surface）**：卡片从「1px 描边」改为「面差 + 内环 + 内高光」三层体系。
+
+- 新令牌 `--qp-surface-board/card/inset/raise`、`--qp-card-edge`、`--qp-card-shadow-rest/hover`（tokens.css 299 行，余 1 行 —— 新令牌一律进不了那里）。暗色板面 #1d1d1d、卡面 #2d2d2d（1.22:1）；暗色卡边界由三层影撑（上缘反光 9% + inset 内环 34% + 投影 34%），**rest 与 hover 层数必须相等**（暗 3/3、亮 1/1），层数不等时 transition 不插值、悬停硬切。外扩 `0 0 0 1px` 禁用（会让卡缝 16→14），只用 `inset 0 0 0 1px`。
+- 字阶：主读数 26/700（新 `--qp-font-size-readout`）、行主文 13/18（新 `--qp-font-size-row`）、meta 升 secondary（tertiary 3.79:1 不达 4.5:1）。
+- 几何：环形 144→132（短档 112）、应用行高 32→28（**唯一动的行高令牌**，5×28+footer 32=172 ≤ 194 余 22）、裸条 4→6、`--qp-bar-max` 60→64、便利贴标签列 88→72 / 条高 40→38。像素验收项（443.14/548.86/465.14/570.86/264/284/254/294/56）零改动。
+- 删 `<span class="hair" />` 发丝线（3 处）；应用/事项列表滚动条 4px 自绘。
+
+**交互层（A 批）**：卡头 6 颗 12px 图标收敛成 1 颗 ⋯ + 弹出菜单。
+
+- `CardControls` 6→1：菜单复用共享 `QuietAnchoredPopover`，项 = 上移/下移（禁用保留占位）+ 档位三段 radio + 跨列 checkbox（FULL_ONLY_CARDS 不渲染）+ 移除卡片（可逆，不用 danger 色）。菜单项全部接既有回调，零新 API；Esc 关闭焦点回 ⋯，↑↓ 在项间移动。
+- `ModuleShell` 卡头加 grip 六点装饰层（pointer-events:none，落在卡内距留白不推挤标题）；右槽顺序改 meta 在前、⋯ 在后。
+- 旧 `.qp-card-controls`/`.qp-card-control` 样式整块删除（dashboard-layout.css 297→252），接替文件 `dashboard-dnd.css`。
+- 两根手柄显形统一：2px 圆头、`--qp-border-strong`（3.4:1），只加长不改色（静息隐 → 卡 hover 60% 长 → 自身拉满），禁 border-subtle（1.9:1 静默跌破 3:1）。
+- `--qp-card-inner` 幽灵令牌删除（tokens 有定义、全仓零消费 —— 内高光并入 shadow-rest 第一层）。
+
 ## 0.12.1（桌面）— 2026-11-11
 
 ### 主界面：卡片能真的调大了，两张占位卡换成真卡
