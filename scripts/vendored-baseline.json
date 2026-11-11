@@ -32,7 +32,7 @@
     "src-tauri/src/app/insight/classification.rs": "3802c588df29648b",
     "src-tauri/src/app/insight/desktop_behavior.rs": "27975bdf726613cb",
     "src-tauri/src/app/insight/import.rs": "cf48d202572144c4",
-    "src-tauri/src/app/insight/main_window.rs": "8e118d1a5e827915",
+    "src-tauri/src/app/insight/main_window.rs": "524ddb49343ac276",
     "src-tauri/src/app/insight/main_window/recovery.rs": "22c4f18643168c48",
     "src-tauri/src/app/insight/main_window/tools_navigation.rs": "71c0acdbed352b45",
     "src-tauri/src/app/insight/mini_window.rs": "cf5aa6cb445b0c3e",
