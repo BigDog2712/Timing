@@ -36,6 +36,13 @@
   box-shadow: var(--qp-card-shadow-hover);
 }
 
+/* [拖拽排序 0.12.1末] 拖动态：radius 换 22、阴影抬升。只动「面」不动「体」——
+ * 卡仍占原网格槽（让位由 grid 重排负责），不做 transform 平移，避免与 grid 定位打架。 */
+.qp-card-slot[data-dragging="true"] .qp-card {
+  box-shadow: var(--qp-card-shadow-hover);
+  border-radius: var(--qp-radius-card-drag);
+}
+
 /* 动效降级：阴影过渡也是动效，reduced 下直接跳变 */
 :root[data-qp-motion="reduced"] .qp-card {
   transition: none;

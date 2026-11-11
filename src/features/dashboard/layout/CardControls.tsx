@@ -13,39 +13,39 @@
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { MoreHorizontal } from "lucide-react";
 import QuietAnchoredPopover from "../../../shared/components/QuietAnchoredPopover.tsx";
-import type { CardId, CardTier } from "./contract";
+import { COLS, type CardId, type CardTier } from "./contract";
 
 interface Props {
   id: CardId;
   tier: CardTier;
+  /** 当前占宽（格） */
+  w: number;
   canMoveUp: boolean;
   canMoveDown: boolean;
   label: string;
-  /** 当前是否跨满两列 */
-  spanning: boolean;
-  /** 天生通栏的卡（便利贴 / 事项菜单 / 趋势 / 提醒）不给这颗键 —— 那是假选择 */
-  canToggleSpan: boolean;
-  onToggleSpan: () => void;
   onMove: (direction: -1 | 1) => void;
   onTier: (tier: CardTier) => void;
+  /** 设占宽（1..COLS），吸附整数格 */
+  onWidth: (w: number) => void;
   onRemove: () => void;
 }
 
-/** 档位三段 radio 直接选 S/M/L（旧版「更小/更大」两颗按钮的语义被菜单吸收）。 */
+/** 档位三段 radio 直接选 S/M/L。 */
 const TIERS: readonly CardTier[] = ["S", "M", "L"];
 const TIER_LABEL: Record<CardTier, string> = { S: "小", M: "中", L: "大" };
+/** 占宽档位：1..COLS 格。 */
+const WIDTHS: readonly number[] = Array.from({ length: COLS }, (_, i) => i + 1);
 
 export default function CardControls({
   id,
   tier,
+  w,
   canMoveUp,
   canMoveDown,
   label,
-  spanning,
-  canToggleSpan,
-  onToggleSpan,
   onMove,
   onTier,
+  onWidth,
   onRemove,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -136,17 +136,21 @@ export default function CardControls({
               </button>
             ))}
           </div>
-          {canToggleSpan ? (
-            <button
-              type="button"
-              role="menuitemcheckbox"
-              aria-checked={spanning}
-              className="qp-card-menu-item"
-              onClick={run(onToggleSpan)}
-            >
-              {spanning ? "收回单列" : "跨满两列"}
-            </button>
-          ) : null}
+          <hr className="qp-card-menu-sep" />
+          <div role="group" aria-label="卡片占宽" className="qp-card-menu-tiers">
+            {WIDTHS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={value === w}
+                className="qp-card-menu-item qp-card-menu-tier"
+                onClick={run(() => onWidth(value))}
+              >
+                {value} 格
+              </button>
+            ))}
+          </div>
           <hr className="qp-card-menu-sep" />
           <button
             type="button"

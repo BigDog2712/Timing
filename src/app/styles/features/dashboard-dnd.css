@@ -12,11 +12,11 @@
  * 只剩 1 行余量，任何新令牌进不了那里）。
  * ========================================================================== */
 
-/* ── grip（装饰层）：「这张卡能拖」的唯一静息线索 ──
- * 三档透明度（静息 0 / 卡 hover 0.6 / 拖动 0.85+，后两档留给拖拽批次）。
- * 0.6 对应 secondary 在卡面上的 3.33:1，过 WCAG 1.4.11 的 3:1 线；
- * 再亮（0.8+）会让五张卡静息就各挂一个亮把手，破坏卡头的降噪口径。
- * pointer-events:none：卡头的抓取热区是「整条卡头」一个，不允许出现第二个。 */
+/* ── grip（拖拽手柄）：「这张卡能拖」的唯一静息线索 + 抓取热区 ──
+ * [拖拽排序 0.12.1末] 从装饰层升级成真手柄：pointer-events 改 auto、命中区用
+ * ::after 外扩到 24×20（与 ⋯ 入口同口径，不撑 20px 卡头），视觉仍是 6×10 六点阵。
+ * 三档透明度（静息 0 / 卡 hover 0.6 / 拖动 0.85+）。0.6 对应 secondary 在卡面上的
+ * 3.33:1，过 WCAG 1.4.11 的 3:1 线。 */
 .qp-card-grip {
   position: absolute;
   /* 落在卡内距留白里（卡内距 16）：left = 16−14 = 2，不推挤标题、不改 20px 卡头 */
@@ -24,10 +24,16 @@
   top: calc(var(--qp-card-pad) + 5px);
   width: 6px;
   height: 10px;
-  pointer-events: none;
+  cursor: grab;
   opacity: 0;
   color: var(--qp-text-secondary);
   transition: opacity 120ms ease;
+}
+/* 命中区外扩到 24×20：视觉不变，抓取不再抠那 6px 缝。 */
+.qp-card-grip::after {
+  content: "";
+  position: absolute;
+  inset: -7px -9px;
 }
 /* 六点阵：本体 1 点 + box-shadow 补 5 点（2 列 × 3 行，点距 4px） */
 .qp-card-grip::before {
@@ -45,6 +51,11 @@
 .qp-card:hover .qp-card-grip,
 .qp-card:focus-within .qp-card-grip {
   opacity: 0.6;
+}
+/* 拖动中拉满：这是「正在拖」的唯一即时反馈。 */
+.qp-card[data-dragging="true"] .qp-card-grip {
+  opacity: 0.85;
+  cursor: grabbing;
 }
 
 /* ── ⋯ 入口：20×20 视觉 / 24×24 命中（::after 外扩 2px，不撑 20px 卡头） ── */

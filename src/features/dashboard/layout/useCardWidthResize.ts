@@ -1,43 +1,38 @@
 /**
- * [单独宽度 · 0.12.1] 卡右边缘那条手柄：拖动改**这张卡在自己列里占几格**。
+ * [v2 网格 · 0.12.1末] 卡右边缘手柄：拖动改这张卡的**占宽格数 w（1..COLS）**。
  *
- * 为什么不并进 `useSplitResize`：那根改的是「两列的比例」（一个全局数，换算基准 = 板宽），
- * 这根改的是「一张卡的列内占比」（每卡一个数，换算基准 = **列宽**）。两者都读 `clientX`，
- * 但基准不同 —— 混在一个 hook 里，窄列里拖一下会跳三档，宽列里又纹丝不动。
- *
- * 也不并进 `useCardResize`：那条读 `clientY`、写像素高度，判据盯的是另一件事。
- *
- * 三条手感口径与另两条一致：
- * 1. **拖动中不落盘**（`save = false`），每像素写一次 localStorage 会拖成"拉不动"；
- * 2. move/up 挂 window，指针移出那 12px 缝也能继续拖；
- * 3. 键盘 ←/→ 每次一档（25%），与拖到同一个吸附点走同一条落盘路径。
+ * 换算基准 = 网格总宽（`.qp-grid`），一格 = 总宽 / COLS。拖多少像素 → 多少格，
+ * 吸附到整数。拖动中不落盘（save=false），move/up 挂 window，键盘 ←/→ 每次一格。
  */
 import { useCallback, useEffect, useRef } from "react";
-import { clampCardWidth, MIN_CARD_WIDTH, type CardId } from "./contract";
+import { COLS, type CardId } from "./contract";
 
 interface Options {
-  onPreview: (id: CardId, width: number) => void;
-  onCommit: (id: CardId, width: number) => void;
+  onPreview: (id: CardId, w: number) => void;
+  onCommit: (id: CardId, w: number) => void;
 }
 
-const KEYBOARD_STEP = MIN_CARD_WIDTH;
 const HANDLE = ".qp-card-width";
 const SLOT = ".qp-card-slot";
+const GRID = ".qp-grid";
 
 interface Drag {
   id: CardId;
   startX: number;
-  startWidth: number;
-  /** 列的实宽：px → 百分比的换算基准。写死系数会在两个列宽下给出两个手感。 */
-  columnWidth: number;
+  startW: number;
+  /** 网格总宽：px → 格数的换算基准。 */
+  gridWidth: number;
+}
+
+function clampWInt(value: number): number {
+  if (!Number.isFinite(value)) return 1;
+  return Math.round(Math.min(COLS, Math.max(1, value)));
 }
 
 export function useCardWidthResize({ onPreview, onCommit }: Options) {
   const dragRef = useRef<Drag | null>(null);
-  /** 上一次预览值：吸附到 25 的倍数后，一次拖动里同一档会被算中几十次，不必每像素抬一次 state。 */
   const lastRef = useRef<number | null>(null);
 
-  /** 收尾只清状态：落盘由 `onUp` / 键盘各走各的（同一个 `finish` 里再提交一次会写两遍）。 */
   const finish = useCallback(() => {
     dragRef.current = null;
     lastRef.current = null;
@@ -48,8 +43,9 @@ export function useCardWidthResize({ onPreview, onCommit }: Options) {
     const widthAt = (clientX: number) => {
       const drag = dragRef.current;
       if (!drag) return null;
-      const delta = ((clientX - drag.startX) / Math.max(1, drag.columnWidth)) * 100;
-      return clampCardWidth(drag.startWidth + delta);
+      const cell = drag.gridWidth / COLS;
+      const delta = (clientX - drag.startX) / Math.max(1, cell);
+      return clampWInt(drag.startW + delta);
     };
     const onMove = (event: PointerEvent) => {
       const drag = dragRef.current;
@@ -76,10 +72,8 @@ export function useCardWidthResize({ onPreview, onCommit }: Options) {
       const id = slot?.dataset.card as CardId | undefined;
       if (!slot || !id) return;
       event.preventDefault();
-      /* 焦点在手上时以**界面上的值**为起点：它是上一档落盘后的结果，
-       * 比从 layout 里再查一遍更不容易和拖动中途的状态打架。 */
-      const current = Number(handle.getAttribute("aria-valuenow") ?? MIN_CARD_WIDTH);
-      onCommit(id, clampCardWidth(current + (event.key === "ArrowRight" ? KEYBOARD_STEP : -KEYBOARD_STEP)));
+      const current = Number(handle.getAttribute("aria-valuenow") ?? 1);
+      onCommit(id, clampWInt(current + (event.key === "ArrowRight" ? 1 : -1)));
     };
 
     window.addEventListener("pointermove", onMove, { passive: false });
@@ -94,25 +88,21 @@ export function useCardWidthResize({ onPreview, onCommit }: Options) {
     };
   }, [finish, onPreview, onCommit]);
 
-  /** 挂在 `.qp-dashboard` 的 onPointerDown 上：只认手柄，不猜坐标。 */
   const onPointerDown = useCallback((event: React.PointerEvent<HTMLElement>) => {
     if (event.button !== 0) return;
     const target = event.target as HTMLElement | null;
     const handle = target?.closest<HTMLElement>(HANDLE);
     if (!handle) return;
     const slot = handle.closest<HTMLElement>(SLOT);
-    const column = slot?.parentElement;
+    const grid = slot?.closest<HTMLElement>(GRID);
     const id = slot?.dataset.card as CardId | undefined;
-    if (!slot || !column || !id) return;
+    if (!slot || !grid || !id) return;
 
-    const columnWidth = column.getBoundingClientRect().width;
-    /* jsdom / 未布局时宽度为 0：退回 aria 上的设定值，别让一次除零把起点算成 NaN。 */
-    const startWidth = columnWidth > 0
-      ? clampCardWidth((slot.getBoundingClientRect().width / columnWidth) * 100)
-      : clampCardWidth(Number(handle.getAttribute("aria-valuenow") ?? MIN_CARD_WIDTH));
+    const gridWidth = grid.getBoundingClientRect().width;
+    const startW = clampWInt(Number(handle.getAttribute("aria-valuenow") ?? 1));
 
-    dragRef.current = { id, startX: event.clientX, startWidth, columnWidth };
-    lastRef.current = startWidth;
+    dragRef.current = { id, startX: event.clientX, startW, gridWidth };
+    lastRef.current = startW;
     document.body.style.cursor = "col-resize";
     event.preventDefault();
     handle.focus();

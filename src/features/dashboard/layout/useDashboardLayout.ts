@@ -1,55 +1,45 @@
 /**
- * [P1 · 0.12.1] 布局 hook：状态 + 四类动作 + 落盘。
+ * [v2 · 0.12.1末] 布局 hook：网格状态 + 动作 + 落盘。
  *
  * 纪律两条：
- * 1. **改完立刻落盘**（同一 tick 内写，不做防抖）——布局是用户手动动作，频率极低；
- *    防抖只会在「改完就关窗」时丢掉最后一次，而那次恰恰是他唯一一次调整。
- * 2. **单实例**（任务书口径 ⑥）：加卡时若该卡已在板上，什么都不做（返回 false），
- *    不做「再摆一张」——同一份数据在一屏里摆两张，读的人会以为是两份。
+ * 1. **改完立刻落盘**（同一 tick 内写，不做防抖）——布局是用户手动动作，频率极低。
+ * 2. **单实例**：加卡时若该卡已在板上，什么都不做（返回 false）。
+ *
+ * v2 起网格模型：卡用 `x`（起始列）+ `w`（占宽）+ `h`（占行）定位，**没有列归属**。
+ * 顺序 = `cards` 数组顺序（流式排布用 `order`），拖拽落点 = 改顺序 + 改 x/w。
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
-  clampCardHeight,
-  clampCardWidth,
-  clampSplit,
-  DEFAULT_CARD_WIDTH,
+  clampH,
+  clampW,
+  clampX,
   DEFAULT_TIER,
-  type CardColumn,
   type CardId,
   type CardTier,
   type DashboardLayout,
   type LayoutCard,
 } from "./contract";
 import { loadLayout, resetLayout, saveLayout } from "./layoutStore";
+import { computeDrop } from "./gridFlow";
 
 export interface DashboardLayoutController {
   layout: DashboardLayout;
-  left: LayoutCard[];
-  right: LayoutCard[];
-  full: LayoutCard[];
   has: (id: CardId) => boolean;
-  addCard: (id: CardId, column?: CardColumn) => boolean;
+  /** 加卡：默认落到网格尾部（x=0、w=2、h=1）。已在板上返回 false。 */
+  addCard: (id: CardId) => boolean;
   removeCard: (id: CardId) => void;
+  /** 网格内换序（顺序数组里前后挪一格），供菜单「上移/下移」。 */
   moveCard: (id: CardId, direction: -1 | 1) => void;
-  setCardColumn: (id: CardId, column: CardColumn) => void;
+  /** 拖拽落位：把卡放到指定顺序位置，并写 x/w。 */
+  moveCardTo: (id: CardId, index: number) => void;
+  /** [拖拽排序] 把卡拖到目标格（列 col、行 row）：dense 让位 + 吸附 x，落盘。 */
+  repositionCard: (id: CardId, col: number, row: number, save?: boolean) => void;
+  setCardX: (id: CardId, x: number, save?: boolean) => void;
+  setCardW: (id: CardId, w: number, save?: boolean) => void;
+  setCardH: (id: CardId, h: number, save?: boolean) => void;
   setCardTier: (id: CardId, tier: CardTier) => void;
-  /**
-   * 拖拽调整大小：写 height（压过 tier）。
-   *
-   * `save` 默认 true；拖动过程中传 `false` —— 每移动一像素写一次 localStorage，
-   * 一秒钟几十次序列化会把主线程拖住，手感直接变成"拉不动"。
-   */
-  setCardHeight: (id: CardId, height: number, save?: boolean) => void;
-  /**
-   * [单独宽度] 列内占几格（25/50/75/100）。存 100 时**删键** ——
-   * 缺省就是 100，多存一个 "width": 100 只会让「恢复默认」判不出来。
-   */
-  setCardWidth: (id: CardId, width: number, save?: boolean) => void;
-  /** 组件参数（P2）：一个键一个字，传 `null` 即删键。 */
   setCardOption: (id: CardId, key: string, value: string | null) => void;
   cardOption: (id: CardId, key: string) => string | null;
-  /** 列宽比（拖中间分隔条）：左列 fr 权重，`save=false` 用于拖动过程。 */
-  setSplit: (split: number, save?: boolean) => void;
   reset: () => void;
 }
 
@@ -63,8 +53,7 @@ export function useDashboardLayout(): DashboardLayoutController {
 
   const has = useCallback((id: CardId) => layout.cards.some((card) => card.id === id), [layout]);
 
-  const addCard = useCallback((id: CardId, column: CardColumn = "right") => {
-    const added = { id, column, tier: DEFAULT_TIER } satisfies LayoutCard;
+  const addCard = useCallback((id: CardId) => {
     let accepted = false;
     setLayout((current) => {
       if (current.cards.some((card) => card.id === id)) {
@@ -72,6 +61,7 @@ export function useDashboardLayout(): DashboardLayoutController {
         return current;
       }
       accepted = true;
+      const added: LayoutCard = { id, x: 0, w: 2, h: 1, tier: DEFAULT_TIER };
       return commit({ ...current, cards: [...current.cards, added] });
     });
     return accepted;
@@ -88,73 +78,84 @@ export function useDashboardLayout(): DashboardLayoutController {
     setLayout((current) => {
       const index = current.cards.findIndex((card) => card.id === id);
       if (index < 0) return current;
-      /* 只在**同列内**换序：跨列换序会顺手改变列归属，用户点的是「上移一格」。 */
-      const column = current.cards[index].column;
-      const siblings = current.cards
-        .map((card, at) => ({ card, at }))
-        .filter((entry) => entry.card.column === column);
-      const position = siblings.findIndex((entry) => entry.at === index);
-      const target = position + direction;
-      if (target < 0 || target >= siblings.length) return current;
+      const target = index + direction;
+      if (target < 0 || target >= current.cards.length) return current;
       const cards = [...current.cards];
       const [moved] = cards.splice(index, 1);
-      cards.splice(siblings[target].at, 0, moved);
+      cards.splice(target, 0, moved);
       return commit({ ...current, cards });
     });
   }, []);
 
-  const setCardColumn = useCallback((id: CardId, column: CardColumn) => {
-    setLayout((current) => commit({
-      ...current,
-      cards: current.cards.map((card) => (card.id === id ? { ...card, column } : card)),
-    }));
-  }, []);
-
-  const setCardTier = useCallback((id: CardId, tier: CardTier) => {
-    setLayout((current) => commit({
-      ...current,
-      cards: current.cards.map((card) => {
-        if (card.id !== id) return card;
-        /* 切档必须清 height：两个真相源同时生效时，用户点档位会"没反应"。 */
-        const { height: _dropped, ...rest } = card;
-        return { ...rest, tier };
-      }),
-    }));
-  }, []);
-
-  const setCardHeight = useCallback((id: CardId, height: number, save = true) => {
-    const next = clampCardHeight(height);
+  const moveCardTo = useCallback((id: CardId, index: number) => {
     setLayout((current) => {
-      const cards = current.cards.map((card) => (card.id === id ? { ...card, height: next } : card));
+      const from = current.cards.findIndex((card) => card.id === id);
+      if (from < 0) return current;
+      const cards = [...current.cards];
+      const [moved] = cards.splice(from, 1);
+      const at = Math.max(0, Math.min(index, cards.length));
+      cards.splice(at, 0, moved);
+      return commit({ ...current, cards });
+    });
+  }, []);
+
+  const repositionCard = useCallback((id: CardId, col: number, row: number, save = true) => {
+    setLayout((current) => {
+      if (!current.cards.some((card) => card.id === id)) return current;
+      const { cards } = computeDrop(current.cards, id, col, row);
       const layout = { ...current, cards };
       return save ? commit(layout) : layout;
     });
   }, []);
 
-  const setCardWidth = useCallback((id: CardId, width: number, save = true) => {
-    const next = clampCardWidth(width);
+  const setCardX = useCallback((id: CardId, x: number, save = true) => {
+    const next = clampX(x);
     setLayout((current) => {
       const cards = current.cards.map((card) => {
         if (card.id !== id) return card;
-        if (next === DEFAULT_CARD_WIDTH) {
-          const { width: _dropped, ...rest } = card;
-          return rest;
-        }
-        return { ...card, width: next };
+        /* x 变了 w 要重夹（x + w <= COLS） */
+        const w = clampW(card.w, next);
+        return { ...card, x: next, w };
       });
       const layout = { ...current, cards };
       return save ? commit(layout) : layout;
     });
   }, []);
 
-  const setCardOption = useCallback((id: CardId, key: string, value: string | null) => {    setLayout((current) => commit({
+  const setCardW = useCallback((id: CardId, w: number, save = true) => {
+    setLayout((current) => {
+      const cards = current.cards.map((card) => (card.id === id ? { ...card, w: clampW(w, card.x) } : card));
+      const layout = { ...current, cards };
+      return save ? commit(layout) : layout;
+    });
+  }, []);
+
+  const setCardH = useCallback((id: CardId, h: number, save = true) => {
+    setLayout((current) => {
+      const cards = current.cards.map((card) => (card.id === id ? { ...card, h: clampH(h) } : card));
+      const layout = { ...current, cards };
+      return save ? commit(layout) : layout;
+    });
+  }, []);
+
+  const setCardTier = useCallback((id: CardId, tier: CardTier) => {
+    setLayout((current) => commit({
+      ...current,
+      cards: current.cards.map((card) => (card.id === id ? { ...card, tier } : card)),
+    }));
+  }, []);
+
+  const setCardOption = useCallback((id: CardId, key: string, value: string | null) => {
+    setLayout((current) => commit({
       ...current,
       cards: current.cards.map((card) => {
         if (card.id !== id) return card;
         const options = { ...(card.options ?? {}) };
         if (value === null) delete options[key];
         else options[key] = value;
-        return Object.keys(options).length > 0 ? { ...card, options } : { id: card.id, column: card.column, tier: card.tier };
+        return Object.keys(options).length > 0
+          ? { ...card, options }
+          : { id: card.id, x: card.x, w: card.w, h: card.h, tier: card.tier };
       }),
     }));
   }, []);
@@ -164,26 +165,13 @@ export function useDashboardLayout(): DashboardLayoutController {
     [layout],
   );
 
-  const setSplit = useCallback((split: number, save = true) => {
-    const next = clampSplit(split);
-    setLayout((current) => {
-      const layout = { ...current, split: next };
-      return save ? commit(layout) : layout;
-    });
-  }, []);
-
   const reset = useCallback(() => {
     resetLayout();
-    /* 清键后再读：`loadLayout` 的「首次运行」分支给的是出厂布局，不写盘。 */
     setLayout(loadLayout().layout);
   }, []);
 
-  const left = useMemo(() => layout.cards.filter((card) => card.column === "left"), [layout]);
-  const right = useMemo(() => layout.cards.filter((card) => card.column === "right"), [layout]);
-  const full = useMemo(() => layout.cards.filter((card) => card.column === "full"), [layout]);
-
   return {
-    layout, left, right, full, has, addCard, removeCard, moveCard,
-    setCardColumn, setCardTier, setCardHeight, setCardWidth, setCardOption, cardOption, setSplit, reset,
+    layout, has, addCard, removeCard, moveCard, moveCardTo, repositionCard,
+    setCardX, setCardW, setCardH, setCardTier, setCardOption, cardOption, reset,
   };
 }

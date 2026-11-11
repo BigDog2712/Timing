@@ -24,11 +24,10 @@ const KEYBOARD_STEP = 8;
 /**
  * 拖拽目标的**唯一**选择器。
  *
- * 为什么是两条：四张列内卡是 `.qp-card`（`ModuleShell` 渲染），便利贴不是 ——
- * 它是 `.qp-notes`，外壳在槽 `.qp-full-slot` 上。上一版只认 `.qp-card`，
- * 便利贴既没有手柄、就算补了手柄 `closest` 也会返回 null，表现是「这张怎么拖都不动」。
+ * [v2] 所有卡都套 `.qp-card-slot`（网格槽），没有 `.qp-full-slot` 之分。
+ * 便利贴的卡体是 `.qp-notes`，但它的槽也是 `.qp-card-slot`，`closest` 能命中。
  */
-const DRAG_TARGET = ".qp-card, .qp-full-slot";
+const DRAG_TARGET = ".qp-card, .qp-card-slot";
 
 function cardIdOf(card: HTMLElement | null): CardId | null {
   if (!card) return null;

@@ -12,15 +12,13 @@ import type { DashboardReadModel } from "../services/dashboardReadModel.ts";
 import type { DashboardReadState } from "../hooks/useDashboardStats.ts";
 import AddCardDialog from "../layout/AddCardDialog";
 import CardControls from "../layout/CardControls";
-import CardSlot from "../layout/CardSlot.tsx";
 import type { LayoutCard } from "../layout/contract";
 import { buildFocusDistribution, isFocusDimension, type FocusDimension } from "../services/focusDimension.ts";
 import { useDashboardLayout } from "../layout/useDashboardLayout";
 import { useCardResize } from "../layout/useCardResize.ts";
 import { useCardWidthResize } from "../layout/useCardWidthResize.ts";
-import { useSplitResize } from "../layout/useSplitResize.ts";
-import { DEFAULT_SPLIT, FULL_ONLY_CARDS, MAX_SPLIT, MIN_SPLIT, SPLIT_TOTAL } from "../layout/contract";
-import { buildColumnCards, buildFullCard } from "./DashboardCards.tsx";
+import { useCardDrag } from "../layout/useCardDrag.ts";
+import { buildGridCards } from "./DashboardCards.tsx";
 
 /**
  * 今日视图（设计五模块）—— 只做**数据装配 + 五模块组合**，布局全在
@@ -99,61 +97,40 @@ export default function Dashboard({
      `grid-template-rows` 与 `.qp-col-left/right` 里那两条硬编码逐字相同 —— B1 靠这条成立。 */
   const layout = useDashboardLayout();
   const [addOpen, setAddOpen] = useState(false);
-  /* [拖拽调整大小] 卡下边缘 8px 拖高：拖动中只改界面，松手才落盘。 */
+  /* [拖拽调整占行] 卡下边缘拖高：改 h（1 或 2 行），拖动中只改界面，松手才落盘。 */
   const cardResize = useCardResize({
-    onPreview: (id, height) => layout.setCardHeight(id, height, false),
-    onCommit: (id, height) => layout.setCardHeight(id, height, true),
+    onPreview: (id, height) => layout.setCardH(id, height <= 400 ? 1 : 2, false),
+    onCommit: (id, height) => layout.setCardH(id, height <= 400 ? 1 : 2, true),
   });
-  /* [单独宽度] 卡右边缘 12px 拖宽：同上，只改这张卡在自己列里占几格。 */
+  /* [拖拽调整占宽] 卡右边缘拖宽：改 w（1..4 格），吸附整数格。 */
   const cardWidthResize = useCardWidthResize({
-    onPreview: (id, width) => layout.setCardWidth(id, width, false),
-    onCommit: (id, width) => layout.setCardWidth(id, width, true),
+    onPreview: (id, width) => layout.setCardW(id, width, false),
+    onCommit: (id, width) => layout.setCardW(id, width, true),
   });
-  /* [列宽比可拖] 左列 fr 权重；右列 = SPLIT_TOTAL − split。默认值不写内联样式 ——
-   * CSS 里那一行才是像素验收的正本（465.14 / 570.86），内联再重复一份必然漂。 */
-  const split = layout.layout.split ?? DEFAULT_SPLIT;
-  const splitResize = useSplitResize({
-    split,
-    onPreview: (next) => layout.setSplit(next, false),
-    onCommit: (next) => layout.setSplit(next, true),
+  /* [拖拽排序] 卡头 grip 拖动重排：dense 让位，松手落盘。 */
+  const cardDrag = useCardDrag({
+    onPreview: (id, col, row) => layout.repositionCard(id, col, row, false),
+    onCommit: (id, col, row) => layout.repositionCard(id, col, row, true),
   });
-  const wsStyle = split === DEFAULT_SPLIT
-    ? undefined
-    : {
-      gridTemplateColumns:
-        `minmax(320px, ${split}fr) var(--qp-card-gap) minmax(0, ${SPLIT_TOTAL - split}fr)`,
-    };
-  /* [单独宽度] 行高不再由这一层算：卡槽按 `data-card`/`data-tier` 自己定高，
-   * 两张半宽的卡落进同一行时也各按自己的档位算，不会互相压（见 `CardSlot.tsx` 文件头）。 */
-  /* [卡片跨列] 记一张卡跨列之前在哪一列：收回时回原位，而不是一律甩到左列。 */
-  const spanFromRef = useRef(new Map<LayoutCard["id"], "left" | "right">());
-  const toggleSpan = useCallback((card: LayoutCard) => {
-    if (card.column === "full") {
-      layout.setCardColumn(card.id, spanFromRef.current.get(card.id) ?? "left");
-      return;
-    }
-    spanFromRef.current.set(card.id, card.column);
-    layout.setCardColumn(card.id, "full");
-  }, [layout]);
-  const controlsFor = useCallback((card: LayoutCard, label: string, siblings: LayoutCard[]) => {
-    const at = siblings.findIndex((item) => item.id === card.id);
+
+  const controlsFor = useCallback((card: LayoutCard, label: string) => {
+    const cards = layout.layout.cards;
+    const at = cards.findIndex((item) => item.id === card.id);
     return (
       <CardControls
         id={card.id}
         tier={card.tier}
+        w={card.w}
         label={label}
-        spanning={card.column === "full"}
-        /* notes / timeline / trend / reminder 天生通栏，给它们一个「收回单列」的键是假选择 */
-        canToggleSpan={!FULL_ONLY_CARDS.includes(card.id)}
-        onToggleSpan={() => toggleSpan(card)}
         canMoveUp={at > 0}
-        canMoveDown={at >= 0 && at < siblings.length - 1}
+        canMoveDown={at >= 0 && at < cards.length - 1}
         onMove={(direction) => layout.moveCard(card.id, direction)}
         onTier={(tier) => layout.setCardTier(card.id, tier)}
+        onWidth={(w) => layout.setCardW(card.id, w)}
         onRemove={() => layout.removeCard(card.id)}
       />
     );
-  }, [layout, toggleSpan]);
+  }, [layout]);
   const labelOf = (id: LayoutCard["id"]) => copy.cardLabels[id] ?? id;
 
   /* [P2] 专注卡的三维度：参数存在卡自己的 `options.dimension` 里（C2：该字典只有这一个键）。 */
@@ -170,6 +147,7 @@ export default function Dashboard({
   const cardProps = {
     layout, controlsFor, labelOf, copy,
     onWidthDown: cardWidthResize.onPointerDown,
+    draggingId: cardDrag.draggingId,
     focus, focusDimension,
     onDimensionChange: (next: FocusDimension) => layout.setCardOption("timer", "dimension", next),
     topItems, topItemTotal, topApplications, icons, onOpenMapping,
@@ -178,15 +156,23 @@ export default function Dashboard({
     snapshotStatus, refreshError, onRetry: readState.retry,
     trend: trendModel, reminders: reminderModel,
   };
-  const renderCards = (cards: LayoutCard[]) => buildColumnCards(cards, cardProps);
-  const renderFullCard = (card: LayoutCard) => buildFullCard(card, cardProps);
+  const renderCards = (cards: LayoutCard[]) => buildGridCards(cards, cardProps);
+
+  /* 三种抓取（拖高 / 拖宽 / 拖排）共用板子这一处 onPointerDown，各认各的手柄：
+   * 手柄选择器互斥（`.qp-card-resize` / `.qp-card-width` / `.qp-card-grip`），
+   * 一次 pointerdown 只可能命中一个，谁先 `closest` 到谁接管。 */
+  const handleBoardPointerDown = useCallback((event: React.PointerEvent<HTMLElement>) => {
+    cardResize.onPointerDown(event);
+    cardWidthResize.onPointerDown(event);
+    cardDrag.onPointerDown(event);
+  }, [cardResize, cardWidthResize, cardDrag]);
 
   return (
     <div
       ref={panelRef}
       tabIndex={-1}
       className="qp-dashboard"
-      onPointerDown={cardResize.onPointerDown}
+      onPointerDown={handleBoardPointerDown}
       data-view="dashboard"
       data-dashboard-read-state={readState.status}
     >
@@ -209,8 +195,7 @@ export default function Dashboard({
         </div>
       ) : null}
 
-      {/* [P1 修复] 工具条是板子的兄弟节点，不许进 `.qp-main-view`：
-          放进去会占掉网格的首行，把双列区压扁。 */}
+      {/* [v2] 工具条是板子的兄弟节点，不许进 `.qp-main-view`。 */}
       <div className="qp-dashboard-toolbar">
         <button type="button" className="qp-link-btn" onClick={() => setAddOpen(true)}>
           {copy.addCard}
@@ -222,34 +207,9 @@ export default function Dashboard({
       </div>
 
       <div className="qp-main-view" aria-busy={snapshotStatus === "loading" || undefined}>
-        <div className="qp-ws" style={wsStyle}>
-          <div className="qp-col qp-col-left">
-            {renderCards(layout.left)}
-          </div>
-          {/* [列宽比可拖] 分隔条是网格的第二格，宽 = `--qp-card-gap`（与原来的列间距等宽，
-              所以默认比例下两列位置不动）。整条都能抓，不是 2px 细线。 */}
-          <div
-            className="qp-split"
-            role="separator"
-            aria-orientation="vertical"
-            aria-label={copy.resizeColumns}
-            aria-valuenow={split}
-            aria-valuemin={MIN_SPLIT}
-            aria-valuemax={MAX_SPLIT}
-            tabIndex={0}
-            onPointerDown={splitResize.onPointerDown}
-          />
-          <div className="qp-col qp-col-right">
-            {renderCards(layout.right)}
-          </div>
+        <div className="qp-grid">
+          {renderCards(layout.layout.cards)}
         </div>
-        {/* 通栏卡也套一层槽：拖出来的 height 直接写在这里（inline 压过令牌），
-            没有 height 时由 CSS 的 `data-card` 规则给令牌高度。 */}
-        {layout.full.map((card) => (
-          <CardSlot key={card.id} card={card} mode="full">
-            {renderFullCard(card)}
-          </CardSlot>
-        ))}
       </div>
       {addOpen ? (
         <AddCardDialog

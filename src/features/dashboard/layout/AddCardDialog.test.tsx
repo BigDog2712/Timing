@@ -49,7 +49,7 @@ describe("AddCardDialog", () => {
         onAdd: (id: CardId) => {
           added.push(id);
           const current = loadLayout().layout;
-          saveLayout({ ...current, cards: [...current.cards, { id, column: "full", tier: "M" }] });
+          saveLayout({ ...current, cards: [...current.cards, { id, x: 0, w: 2, h: 1, tier: "M" }] });
         },
         onClose: () => {},
       }),

@@ -1,31 +1,25 @@
 /**
- * [P1 · 0.12.1] 布局自愈：**坏数据不许让界面空着**，也不许静默改用户的排布。
+ * [v2 · 0.12.1末] 布局自愈：**坏数据不许让界面空着**，也不许静默改用户的排布。
  *
- * 判据（任务书 B4）：坏 JSON / `version: 999` / 未知 id / 重复 id / 非法 tier 五种输入，
- * 各自给出「回默认或就地修正 + 是否repair过」的确定结论，且只 warn 一条。
- * 这里全是纯函数 —— 不读 localStorage、不写日志，落盘那层才有副作用（`layoutStore.ts`）。
+ * v2 起模型是网格定位（x/w/h），不再有「列」的归属修正。判据：
+ *   坏 JSON / `version !== 2` / 未知 id / 重复 id / 非法 tier / 非法 x/w/h
+ * 各自给出「回默认或就地修正 + 是否 repair」的确定结论，且只 warn 一条。
+ * 纯函数 —— 不读 localStorage、不写日志，落盘在 `layoutStore.ts`。
  */
 import {
-  clampCardHeight,
-  clampCardWidth,
-  clampSplit,
-  DEFAULT_CARD_WIDTH,
+  clampH,
+  clampW,
+  clampX,
   DEFAULT_TIER,
-  FULL_ONLY_CARDS,
-  ROW_CARDS,
+  LAYOUT_VERSION,
   sanitizeOptions,
-  isCardColumn,
   isCardId,
   isCardTier,
-  LAYOUT_VERSION,
   type CardId,
   type DashboardLayout,
   type LayoutCard,
 } from "./contract";
 import { DEFAULT_LAYOUT } from "./defaultLayout";
-
-/* 两张名单的唯一出处在 `contract`（`Dashboard` 的跨列按钮也要查它）：
- * 这里再抄一份的话，加一张新卡必然只改一处 —— 症状是「点了跨列，刷新又弹回去」。 */
 
 export interface NormalizeResult {
   layout: DashboardLayout;
@@ -39,44 +33,19 @@ function cloneDefault(): DashboardLayout {
   return { version: LAYOUT_VERSION, cards: DEFAULT_LAYOUT.cards.map((card) => ({ ...card })) };
 }
 
-/**
- * 按卡的本性把列纠正回来：通栏卡不许进列。
- *
- * 行内卡**允许** `full`（0.12.1 起支持跨满两列）：它的定高仍在 `--qp-mod-*` 令牌上，
- * 只是从「列内一行」变成「板子上一行」，`.qp-full-slot[data-card=…]` 已给出同一个值。
- * 上一版把行内卡一律压回 `left`，用户点「跨列」后刷新就弹回去了。
- */
-function normalizeColumn(id: CardId, column: unknown): { column: LayoutCard["column"]; repaired: boolean } {
-  if (FULL_ONLY_CARDS.includes(id)) {
-    return isCardColumn(column) && column === "full"
-      ? { column, repaired: false }
-      : { column: "full", repaired: true };
-  }
-  if (!ROW_CARDS.includes(id)) {
-    return { column: "full", repaired: true };
-  }
-  if (isCardColumn(column)) return { column, repaired: false };
-  return { column: "left", repaired: true };
-}
-
 export function normalizeLayout(raw: unknown): NormalizeResult {
   if (!raw || typeof raw !== "object") {
     return { layout: cloneDefault(), repaired: true, reason: "not-an-object" };
   }
 
-  const candidate = raw as { version?: unknown; cards?: unknown; split?: unknown };
+  const candidate = raw as { version?: unknown; cards?: unknown };
+  /* v1（version 1）或任何其它版本：直接回默认。旧布局的 `column`/`split` 语义与新网格
+   * 不对齐，迁移成本高于收益（主人认可「旧数据丢弃重来」）。 */
   if (candidate.version !== LAYOUT_VERSION) {
     return { layout: cloneDefault(), repaired: true, reason: "version-mismatch" };
   }
   if (!Array.isArray(candidate.cards)) {
     return { layout: cloneDefault(), repaired: true, reason: "cards-not-array" };
-  }
-
-  /* 列宽比：缺省 = 今天的 44:54（老布局没有这个键，不能因此判"需自愈"）；
-   * 坏值夹住并记一次 repair，不丢卡。 */
-  let split: number | undefined;
-  if (typeof candidate.split === "number" && Number.isFinite(candidate.split)) {
-    split = clampSplit(candidate.split);
   }
 
   const seen = new Set<CardId>();
@@ -94,8 +63,7 @@ export function normalizeLayout(raw: unknown): NormalizeResult {
       continue;
     }
     const record = entry as {
-      id?: unknown; column?: unknown; tier?: unknown; options?: unknown;
-      height?: unknown; width?: unknown;
+      id?: unknown; x?: unknown; w?: unknown; h?: unknown; tier?: unknown; options?: unknown;
     };
     if (!isCardId(record.id)) {
       note("unknown-card-id");
@@ -107,8 +75,29 @@ export function normalizeLayout(raw: unknown): NormalizeResult {
     }
     seen.add(record.id);
 
-    const column = normalizeColumn(record.id, record.column);
-    if (column.repaired) note("illegal-column");
+    let x = 0;
+    if (typeof record.x === "number" && Number.isFinite(record.x)) {
+      x = clampX(record.x);
+      if (x !== record.x) note("illegal-x");
+    } else if (record.x !== undefined) {
+      note("illegal-x");
+    }
+
+    let w = 1;
+    if (typeof record.w === "number" && Number.isFinite(record.w)) {
+      w = clampW(record.w, x);
+      if (w !== record.w) note("illegal-w");
+    } else if (record.w !== undefined) {
+      note("illegal-w");
+    }
+
+    let h = 1;
+    if (typeof record.h === "number" && Number.isFinite(record.h)) {
+      h = clampH(record.h);
+      if (h !== record.h) note("illegal-h");
+    } else if (record.h !== undefined) {
+      note("illegal-h");
+    }
 
     let tier = record.tier;
     if (!isCardTier(tier)) {
@@ -117,30 +106,14 @@ export function normalizeLayout(raw: unknown): NormalizeResult {
     }
 
     const options = sanitizeOptions(record.options);
-    /* 拖出来的高度：只收有限数值，越界就地夹住；坏值当没有（回档位令牌），不删卡。 */
-    let height: number | undefined;
-    if (typeof record.height === "number" && Number.isFinite(record.height)) {
-      height = clampCardHeight(record.height);
-    } else if (record.height !== undefined) {
-      note("illegal-height");
-    }
-    /* [单独宽度] 四等分吸附：37 这种值吸到 25 的倍数并记一次 repair；
-     * 吸成 100 = 缺省，**不写进布局**（写了会让「恢复默认」永远判为"已自定义"）。 */
-    let width: number | undefined;
-    if (typeof record.width === "number" && Number.isFinite(record.width)) {
-      const snapped = clampCardWidth(record.width);
-      if (snapped !== record.width) note("illegal-width");
-      if (snapped !== DEFAULT_CARD_WIDTH) width = snapped;
-    } else if (record.width !== undefined) {
-      note("illegal-width");
-    }
+
     cards.push({
       id: record.id,
-      column: column.column,
+      x,
+      w,
+      h,
       tier: tier as LayoutCard["tier"],
       ...(options ? { options } : {}),
-      ...(height === undefined ? {} : { height }),
-      ...(width === undefined ? {} : { width }),
     });
   }
 
@@ -149,7 +122,7 @@ export function normalizeLayout(raw: unknown): NormalizeResult {
   }
 
   return {
-    layout: { version: LAYOUT_VERSION, cards, ...(split === undefined ? {} : { split }) },
+    layout: { version: LAYOUT_VERSION, cards },
     repaired,
     reason,
   };

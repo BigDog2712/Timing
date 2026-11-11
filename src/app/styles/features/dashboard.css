@@ -62,38 +62,16 @@
   outline: none;
 }
 
-/* ── 两列 44fr:54fr（1fr 基准 1036 = 1052−16 → 465.14 / 570.86） ── */
-/* [列宽比可拖] 中间夹一格 `--qp-card-gap` 宽的**分隔条**，`column-gap` 归零：
- * 原来两列之间的间距由 column-gap 提供，现在改由那一格占位，可用宽度不变
- * （1036 − gap 分给 44fr/54fr），所以默认比例下两列仍是 465.14 / 570.86。
- * 拖那根条就改这里的 fr 权重（inline 覆盖），见 `useSplitResize`。 */
-.qp-ws {
+/* ── [v2] 单网格：4 列，卡用 grid-column/grid-row 定位，自动流式补位 ──
+ * 取代 v1 的双列 `.qp-ws` + `.qp-col` + `.qp-split`。`grid-auto-flow: dense` 让卡片
+ * 自动向上补空（小组件桌面的行为）；行高 = 基准行高令牌（计时分布卡 264），卡占 2 行时
+ * 由 `grid-row: span 2` 撑高。 */
+.qp-grid {
   display: grid;
-  grid-template-columns: minmax(320px, 44fr) var(--qp-card-gap) minmax(0, 54fr);
-  column-gap: 0;
-  row-gap: var(--qp-card-gap);
-  min-height: 0;
-  /* [P1 修复] 双列区吃剩余高度；通栏卡按 token 定高，不再靠网格行模板分配 */
-  /* [可调大小 · 0.12.1 二次修复] `1 1 auto` → `1 0 auto`：**不许缩**。
-   * 高度不足时它会把 grid 行一起压扁（shrink 到 min-height:0），卡片拖大后行高仍被算回
-   * 容器高，视觉上就是「怎么拖都不变大」。让它只许长、超出由 `.qp-dashboard` 滚。 */
-  flex: 1 0 auto;
-}
-
-
-/* 通栏槽 `.qp-full-slot` 与列宽分隔条 `.qp-split` 在 `dashboard-split.css`：
- * 定高必须落在槽上（写在 `.qp-main-view > .qp-notes` 会因多一层槽而失效）。 */
-
-
-.qp-col {
-  display: grid;
-  /* [单独宽度 · 0.12.1] 每列再切成 4 格：卡按 `grid-column: span N` 占 1~4 格，
-   * 两张 2 格的卡自动并排。默认全是 span 4（占满整列）→ 与今天的像素完全一致。
-   * 改了这里要同步 `contract.ts` 的 `CARD_WIDTH_TRACKS`，否则 span 会溢出成隐式列。 */
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: var(--qp-grid-row);
+  grid-auto-flow: dense;
   gap: var(--qp-card-gap);
-  /* 行高由**卡槽**决定（`.qp-card-slot` 的 `--qp-slot-h`），不再是一卡一行的网格轨道：
-   * 并排之后一行里有两张卡，共用轨道会让 264 的卡压着 284 的卡。 */
   align-content: start;
   min-height: 0;
 }
