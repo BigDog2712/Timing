@@ -11,6 +11,21 @@
 - 修正分析窗关于图标、扩展商店徽标的资源相对路径，生产构建不再丢失这些资源。
 - 新增失败恢复回归测试；手机版号保持不变，本轮未生成 APK。
 
+### 0.12.1 同日修复：设置页的偏好送不到悬浮条
+
+- **根因**：主界面（label `patina`）与悬浮条（label `main`）**不在同一个 WebView2 数据目录**——
+  `main_window.rs` 建 patina 窗时设了 `.data_directory(webview_root)`，而 `tauri.conf.json`
+  静态创建的 main 用 Tauri 默认目录。localStorage 按数据目录分区，两个窗口各读各的一份，
+  所以设置页写的手柄绑定与药丸外观**永远到不了悬浮条**：症状是「设置里怎么调都没反应」，
+  零报错、零日志。上一轮「靠 focus / pointerenter 重读就够」的判断是错的——重读读的仍是本窗那份。
+- **修法**：设置页写完广播 `timing:pill-prefs`（`platform/desktop/hostPillPrefsGateway.ts`），
+  悬浮条收到后**写进自己那份**再生效（`lib/appearanceSync.ts::applyRemotePrefs`）。走既有的
+  `core:event` allow-emit / allow-listen 授权，不新增命令与事件，契约四个数（81/17/11/18）不变。
+- **旧值不用重配**：两张面板挂载时各推一次当前值，用户本轮调过、但当时没送达的绑定与形态
+  在进一次设置页后自动对齐到悬浮条。
+- **顶栏只留图标**：三个 tab 去掉文字标签（名字进 `aria-label` 与 `title`），
+  `--qp-nav-item-w` 改为跟高度档走（44 / 36 正方形），不再按窗宽 84→72 降级。
+
 ### 0.12.1 同日追加：悬浮条手柄三形态 + 两窗收口
 
 > 版本号**不另起**：0.12.1 尚未出包，本轮并入同号（「号归先出包的」，不预占）。
