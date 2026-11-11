@@ -354,7 +354,7 @@
     "src/app/AppShellLocaleRoot.tsx": "2c374aad119d782c",
     "src/app/components/AppSidebar.tsx": "e35d0feadaed8ce3",
     "src/app/components/AppTitleBar.tsx": "06a19d9b18b739c9",
-    "src/app/components/AppTopNav.tsx": "bb38231233f30a3b",
+    "src/app/components/AppTopNav.tsx": "d7c5c76aebf5d3b1",
     "src/app/components/AppViewOutlet.tsx": "69a83fefb561f58e",
     "src/app/components/TimingCapsule.tsx": "6acb180e1bd6ddc9",
     "src/app/hooks/trackingDataChangedPolicy.ts": "eb2ed093b41dc59d",
@@ -443,7 +443,7 @@
     "src/app/styles/tiers.css": "ec8a19fcd82c2d28",
     "src/app/styles/tokens.css": "68b2324e69e93fba",
     "src/app/styles/topbar-keys.css": "ecccadc0502b8a33",
-    "src/app/styles/topbar.css": "ff1e42d86c5666d6",
+    "src/app/styles/topbar.css": "b96900a801d231fb",
     "src/app/tool-notification/ToolNotificationShell.tsx": "8251055119e73956",
     "src/app/types/view.ts": "c7473bb28d2c0b46",
     "src/features/about/assets/github-issues-button-black.svg": "937c006e8cb63719",
@@ -609,7 +609,7 @@
     "src/features/settings/components/SettingsGroupNav.tsx": "8675f4e9bf51c41c",
     "src/features/settings/components/SettingsHandleCard.test.tsx": "16cbf2032e2960cf",
     "src/features/settings/components/SettingsHandleCard.tsx": "5a36531d6cc53cdb",
-    "src/features/settings/components/SettingsHandlesPanel.tsx": "fb911660574b7173",
+    "src/features/settings/components/SettingsHandlesPanel.tsx": "673395478f8700ca",
     "src/features/settings/components/SettingsHeaderActions.tsx": "3df89e101ba91b7d",
     "src/features/settings/components/SettingsInterfacePanel.tsx": "f9ad9bb129ce2340",
     "src/features/settings/components/SettingsPanelHeader.tsx": "cfa791df9eaa6fb1",
@@ -623,7 +623,7 @@
     "src/features/settings/components/host/HostGeneralPanel.test.tsx": "f6322bfd3a6641a5",
     "src/features/settings/components/host/HostGeneralPanel.tsx": "524778d109deaea7",
     "src/features/settings/components/host/HostHighlightCard.tsx": "48658a7ccd25ad71",
-    "src/features/settings/components/host/HostPillLookCard.tsx": "9753ddb425de3e0a",
+    "src/features/settings/components/host/HostPillLookCard.tsx": "af1a9d7d1f9f9243",
     "src/features/settings/components/host/HostPluginsPanel.test.tsx": "81040c6ded3c3206",
     "src/features/settings/components/host/HostPluginsPanel.tsx": "db00d05efd0de43f",
     "src/features/settings/components/host/HostSyncPanel.test.tsx": "e7b604e2789b1cf4",
@@ -642,6 +642,7 @@
     "src/features/settings/components/host/MdSyncRootRow.tsx": "e6602e0d5d1ec898",
     "src/features/settings/components/host/MdSyncTierPanel.tsx": "bdc397715b4da2a0",
     "src/features/settings/components/host/MdSyncWebdavCard.tsx": "8c60430c39b12e63",
+    "src/features/settings/components/host/PillPrefsBroadcast.test.tsx": "26b2d70dd41f1d70",
     "src/features/settings/hooks/settingsPageStateInteractions.ts": "b39608437f6d2d8f",
     "src/features/settings/hooks/useRemoteBackupState.ts": "764c217e1b38a048",
     "src/features/settings/hooks/useSettingsImportState.ts": "9ee5c0ec674c9eda",
@@ -749,6 +750,7 @@
     "src/platform/desktop/clipboardGateway.ts": "79f72ae03cff31c4",
     "src/platform/desktop/desktopBehaviorRuntimeGateway.ts": "e7aae155d814fda7",
     "src/platform/desktop/externalUrlGateway.ts": "29459916e3393810",
+    "src/platform/desktop/hostPillPrefsGateway.ts": "dadae4c942ef661a",
     "src/platform/desktop/hostPluginsGateway.ts": "1dc7b0d5b5a570eb",
     "src/platform/desktop/hostSettingsGateway.ts": "e774dc7c9d0fbed3",
     "src/platform/desktop/hostSyncGateway.ts": "d1da5b5a4eccf4ef",
@@ -908,11 +910,11 @@
   },
   "_reanchor": [
     {
-      "step": "0.12.1 手柄三形态 + 两窗收口",
-      "scope": "FE src/{app,features,platform,shared}（新增手柄注册表、设置页搬迁、主题写面、测试）+ BE 仅 insight 命名空间内的测试与命令别名",
-      "changed": "改 69 / 删 1（相对上一锚 7bc7bd7 + 9a7772f）",
-      "why": "本轮是真实功能改动，不是机械路径改写：按脚本第 44 行口径重锚，把已评审的改动固化进基线；随后白名单只保留与基线仍不同的 11 条",
-      "sha": "0770193"
+      "step": "0.12.1 修复（设置页偏好送达悬浮条 + 顶栏只留图标）",
+      "scope": "FE src/{app,lib,platform,features}（新增偏好搬运网关与接收侧、顶栏去文字）",
+      "changed": "改 4 / 增 2（相对 0770193）",
+      "why": "修复用户实测缺陷：patina 与 main 分属两个 WebView 数据目录，localStorage 不共享，设置页写的偏好到不了悬浮条。按脚本口径重锚固化",
+      "sha": "0407ab1"
     }
   ]
 }
