@@ -13,6 +13,7 @@
  * 前提，不是巧合，已在任务书里留证。
  */
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
+import { emitHostIntent } from "../../../platform/runtime/hostIntentGateway.ts";
 import type { CompiledSession } from "../../../shared/lib/sessionReadCompiler.ts";
 import { formatDashboardDuration } from "../services/dashboardFormatting.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
@@ -91,7 +92,26 @@ export default function TimelineCard({ controls, sessions, tier, status, refresh
       onRetry={onRetry}
       refreshErrorText={refreshError ? UI_TEXT.common.refreshFailed : undefined}
       emptyText={copy.itemsEmpty}
-      meta={copy.itemsCount(rows.length)}
+      /* 卡头的两颗按钮走既有事件桥（P3 的四条唤起动作），不新增命令：
+         编辑事项 / 唤起常用事项都在药丸侧完成，这张卡只管「看」。 */
+      action={(
+        <span className="qp-timeline-actions">
+          <button
+            type="button"
+            className="qp-link-btn"
+            onClick={() => { void emitHostIntent({ action: "open_items_menu" }); }}
+          >
+            {copy.cardLabels.timeline}
+          </button>
+          <button
+            type="button"
+            className="qp-link-btn"
+            onClick={() => { void emitHostIntent({ action: "open_common_items" }); }}
+          >
+            {copy.focusDimensions.category}
+          </button>
+        </span>
+      )}
     >
       <ul className="qp-timeline-rows">
         {rows.map((row) => (

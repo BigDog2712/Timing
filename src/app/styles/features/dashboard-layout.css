@@ -223,3 +223,10 @@
   color: var(--qp-text-secondary);
   font-variant-numeric: tabular-nums;
 }
+
+/* ── 事项卡的两颗唤起按钮（P3）：与卡头 meta 同排 ── */
+.qp-timeline-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--qp-card-head-gap);
+}

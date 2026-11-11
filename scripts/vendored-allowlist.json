@@ -74,6 +74,18 @@
       "owner": "ForG"
     },
     {
+      "path": "src/features/dashboard/hooks/useDashboardStats.ts",
+      "change": "modified",
+      "reason": "用户口径「主界面数据闪烁」：`loadSnapshot` 原来无条件把状态打回 loading，而 `moduleState()` 把 loading 映射成骨架 —— 于是每次 tracking-data-changed（每次切前台应用 / 每落一批会话）四张卡整块换成骨架条。改成「当天已有快照就不退回 loading」，与同目录 useTodayTodos / useTodayNotes 的 reload 同一条纪律；首屏、跨日、错误态无数据重试仍落 loading。只动 setState 那一处，取数管线未动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/hooks/useDashboardStats.test.tsx",
+      "change": "added",
+      "reason": "上一条的判据（D-01）：首屏必须 loading（无快照），第二次刷新期间 status 必须仍是 ready、hasSnapshot 仍 true。把 keep 分支删掉即红。文件是新加的，故记 added。",
+      "owner": "ForG"
+    },
+    {
       "path": "src/app/AppShell.tsx",
       "change": "modified",
       "reason": "[P0 · 0.12.1] 组件化仪表盘腾体积余量：views 映射与六个预加载入口搬到 AppShellViews.tsx，本文件 374 → 284 行。原来是 size-allowlist 里 374 的冻结条目，拆完已不超限，--freeze 已把该条移除。行为零变更（同一批 props、同一批回调），只改文件边界。",
@@ -134,6 +146,138 @@
       "owner": "ForG"
     },
     {
+      "path": "src/features/history/components/History.tsx",
+      "change": "modified",
+      "reason": "[0.12.1 末 · 历史区间] 拆成「外壳 + 单日主体」两个组件：外壳持档位状态并在区间模式下不挂载单日那 60+ 个 hook。同时把时间轴动作、时段分布、日摘要三块搬到独立文件，行数 1147→1136（棘轮只许减）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/components/HistoryDateHeader.tsx",
+      "change": "modified",
+      "reason": "[0.12.1 末 · 历史区间] 加 `rangeBar` 插槽：档位条放在日期导航左侧（决定「看哪一段」的层级高于「这段里哪一天」）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/settings/settingsConvergence.source.test.ts",
+      "change": "modified",
+      "reason": "[0.12.1 末 · 历史区间] 仅改一行注释：只读桥由 3 条扩到 5 条（新增 note_list / todo_list），断言本身未动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/history-range.css",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 区间视图样式（296 行）。只挂 .history-range-* 前缀，不覆盖既有 history 类；只用令牌，深浅主题各一份。三处「次要小字」与三处「卡头标题」合并成共用规则，避免各自漂移。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/components/HistoryRangeHeader.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 区间模式页头：标题 + 档位条 + 范围标签。不复用 HistoryDateHeader（那套状态全围着「某一天」转，塞 dummy handler 更易出 bug）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/components/HistoryRangeModeBar.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 六档 chip + 自定义框选。「自定义」三段行为：首次弹框 / 已有范围直接切回 / 当前就在自定义档再点则改日期。日期框复用 QuietDateRangePicker，与数据页逐字同行为。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/components/HistoryRangeRanking.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 应用/事项共用排行卡。条形用 share（占比）而非「相对第一名」，否则第一名永远满格看不出占比。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/components/HistoryRangeRecords.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 便利贴与已完成待办两块。只读展示，不提供编辑入口（写面回宿主）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/components/HistoryRangeSummary.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 四格摘要 + 逐日柱。柱是入口：点任一天回该日单日时间轴，空日也可点。柱高按区间峰值归一，最小 2px。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/components/HistoryRangeView.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 区间总览容器，替换单日主体。三态：首载 loading / 有数刷新不清空 / 四源全失败才报错。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/components/HistoryTimelineActions.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 时间轴三个图标动作 + 最短活动时长步进器。为 History.tsx 腾行数而抽取，className 一个字未改。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/historyRangeBridge.source.test.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 桥接哨兵 4 条：ACL 五条只读命令齐、ACL 零写面、gateway 真的 invoke 三条命令、hook 真的把四源接进聚合。针对「漏登记 ACL = 静默拒绝、两端零日志」这条反复踩过的形态。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/hooks/useHistoryRangeData.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 区间取数编排。nowMs 冻在 state（否则每次 render 换 cacheKey = 每帧全库查询）；换区间清空、同区间刷新不清空；单源失败降级成空，四源全失败才报错。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/rangeCopy.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 四语言文案表（Record<Locale,…>）。不进 shared/i18n：那是按索引对齐的位置数组，且 contract.ts 冻结在 1131 行。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/services/historyDayDistributionView.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 单日「时段分布」模式解析，从 History.tsx 等量搬出（逻辑一字未改）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/services/historyDaySummaryView.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 单日摘要三行数字，从 History.tsx 等量搬出（逻辑一字未改，含「高峰并列时比相邻小时」与「1 分钟阈值回退」两条口径）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/services/historyRange.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 档位→时间窗：昨日/本周/近7天/近30天/自定义。日界一律本地 00:00；昨日右端是今日 00:00（其余档是此刻）；自定义反选自动对调、未来裁到今天。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/services/historyRange.test.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 档位判据 12 条（显式 nowMs=2026-11-11 周三）：昨日右端、本周跨月、7/30 天数、逐日切片首尾相接、自定义反选与未来裁剪、cacheKey 互异、分桶边界首尾闭合。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/services/historyRangeAggregate.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 四类聚合口径：应用按墙钟跨日分摊、事项按 startedAt+累计秒、便利贴按 createdAt、待办按 doneAt。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/services/historyRangeAggregate.test.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 聚合判据 11 条：跨日各半、区间外剔除、同 exe 合并与占比、无名字事项降级、待办只算区间内完成、空输入仍留日骨架。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/platform/runtime/historyRangeGateway.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 反向桥区间版：list_records 翻页（100/页，上限 20 页）+ note_list + todo_list。便利贴/待办全量取回后按时刻归区间（宿主 note_list 无时间参数，todo_list 的 from/to 作用于 plannedAt）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/components/HistoryRangeView.test.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史区间] 视图判据 9 条：三态（首载/有数/全失败）、点逐日柱回单日并带日期、逐日柱条数与顺序、摘要四格与纪录明细。",
+      "owner": "ForG"
+    },
+    {
       "path": "src/app/styles/tiers.css",
       "change": "modified",
       "reason": "[P1 · 0.12.1] 补 S / L 两档卡高 token（长档与短档各一套，短档按自身行高重算，不沿用长档数）。M 档刻意不造副本 —— M 就是今天那五个 --qp-mod-*，多一份同值副本必然漂。",
@@ -188,6 +332,18 @@
       "owner": "ForG"
     },
     {
+      "path": "src/app/components/DataHistoryFaces.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史数据合并] 数据/历史两副面孔的容器：非活动面不挂载（两个页面各拉全套快照，同挂=同一批库查两遍），面签点选走导航、不持内部状态，高亮只跟 currentView。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/components/DataHistoryFaces.test.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 历史数据合并] 接线判据 4 条：只挂活动面（两个方向）、点面签调 onSelect、aria-selected 跟 active、tablist 读屏名含两面。",
+      "owner": "ForG"
+    },
+    {
       "path": "src/features/dashboard/services/focusDimension.ts",
       "change": "added",
       "reason": "[P2 · 0.12.1] 专注卡三维度（分类 / 应用 / 窗口标题）的唯一聚合口：三个维度从同一批 stats/sessions 派生，分类 Σ = 应用 Σ = 测量总量，标题 Σ ≤ 之。第三维刻意叫「窗口标题」而不是「事项」—— items 表是另一个数据源，混叫会让用户看到一个名字对、数字不对的卡。",
@@ -209,6 +365,24 @@
       "path": "src/features/dashboard/components/TimelineCard.test.ts",
       "change": "added",
       "reason": "[P3 · 0.12.1] D4 判据 4 条：升序、零时长与全无名会话丢弃（仅无标题时回落应用名）、档位截断、同一标题下 key 仍唯一。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/platform/runtime/hostIntentGateway.ts",
+      "change": "modified",
+      "reason": "[P3 · 0.12.1] HostIntent 增加四条唤起动作（open_items_menu / open_common_items / open_moyu_menu / open_note{noteId}），全部走既有事件桥 patina:host-intent，命令/事件/错误码一个不动。锚点口径：分析窗拿不到药丸屏幕坐标，三条菜单意图固定落药丸左上角 {x:12,y:12}。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/services/hostIntentBridge.ts",
+      "change": "modified",
+      "reason": "[P3 · 0.12.1] 药丸侧镜像四条动作与 handler：先 revealPill（不闪高亮）再开菜单；open_note 走既有 openNoteWindowFor（单例窗，已开则前置），id 不存在只 warn。类型与 gateway 侧逐字一致，由 source test 钉住。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/services/hostIntentMirror.test.ts",
+      "change": "added",
+      "reason": "[P3 · 0.12.1] D2 判据：抠两侧源码的 action 字面量与字段名归一后必须完全相等，并单独断言四条新动作都在。漂一个字段名的症状是静默的（default 分支吞掉）。",
       "owner": "ForG"
     }
   ]

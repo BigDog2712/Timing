@@ -41,7 +41,17 @@ export type HostIntent =
   | { action: "show_pill" }
   /** 打开独立待办窗（今日概览待办卡点行体，02 P0-8）。走事件桥而不是新 IPC 命令：
    *  契约 81 个数字不动、L9 不破；待办窗本来就是药丸侧（宿主）的单例窗 */
-  | { action: "open_todos" };
+  | { action: "open_todos" }
+  /* ── [P3 · 0.12.1] 组件化仪表盘的四条唤起动作 ──
+   * 全部走同一座事件桥（`patina:host-intent`），命令/事件/错误码一个不动。
+   * **锚点口径**：分析窗拿不到药丸的屏幕坐标（跨窗坐标换算要读窗口几何，还得处理 DPI），
+   * 所以这三条菜单意图一律落到药丸内容区左上角 `{x:12,y:12}`。观感是「菜单从条上弹出来」，
+   * 与用户自己右键弹出的位置不同，但落点确定、不闪烁、不需要新命令。 */
+  | { action: "open_items_menu" }
+  | { action: "open_common_items" }
+  | { action: "open_moyu_menu" }
+  /** 打开某张便利贴（`note-{id}` 单例窗）；id 不存在时宿主侧静默忽略 */
+  | { action: "open_note"; noteId: number };
 
 /**
  * 发一条意图。返回「有没有发出去」——**不是**「宿主做成了没有」。

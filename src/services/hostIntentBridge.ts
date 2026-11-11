@@ -25,6 +25,7 @@ import { openSettings } from './settingsActions';
 import { openTodosWindow } from './todosActions';
 import { useItemStore } from '../stores/itemStore';
 import { useUiStore } from '../stores/uiStore';
+import { openNoteWindowFor } from './noteActions';
 
 /**
  * 与 `src/platform/runtime/insightEvents.ts` 的 `HOST_INTENT` **逐字一致**。
@@ -44,7 +45,23 @@ type HostIntent =
   | { action: 'open_host_settings' }
   | { action: 'show_pill' }
   /** 打开独立待办窗（今日概览待办卡点行体）。字段名与 `hostIntentGateway.ts` 逐字一致 */
-  | { action: 'open_todos' };
+  | { action: 'open_todos' }
+  /* [P3 · 0.12.1] 与 `hostIntentGateway.ts` 逐字一致（L9：两侧各写一份，靠 source test 钉相等） */
+  | { action: 'open_items_menu' }
+  | { action: 'open_common_items' }
+  | { action: 'open_moyu_menu' }
+  | { action: 'open_note'; noteId: number };
+
+/** 菜单在药丸内容区里的固定锚点（见 gateway 侧「锚点口径」注释）。 */
+const PILL_ANCHOR = { x: 12, y: 12 } as const;
+
+/** 唤起药丸（不闪高亮）：菜单要开在看得见的窗上，否则用户以为「点了没反应」。 */
+function revealPill(): void {
+  useUiStore.getState().setCollapsed(false);
+  void ipc.showWindow().catch((error) => {
+    console.warn('reveal pill failed', error);
+  });
+}
 
 /** 按名精确匹配（trim 后全等，不分大小写）：不做模糊匹配，「Code」不该命中「VS Code」。 */
 function findItemByName(items: { id: number; name: string }[], name: string) {
@@ -137,6 +154,28 @@ export function useHostIntentBridge(): void {
           console.warn('show pill failed', error);
         });
         void highlightPill();
+        return;
+      case 'open_items_menu':
+        /* [P3] 锚点固定药丸左上角：分析窗拿不到药丸屏幕坐标，换算要读窗口几何还得处理 DPI，
+           不如给一个确定的落点（见 gateway 侧注释）。先唤起药丸再开菜单，否则菜单开在看不见的窗上。 */
+        revealPill();
+        useUiStore.getState().openItemMenu({ pos: PILL_ANCHOR, itemId: null });
+        return;
+      case 'open_common_items':
+        revealPill();
+        useUiStore.getState().openCommonItems(PILL_ANCHOR);
+        return;
+      case 'open_moyu_menu':
+        revealPill();
+        useUiStore.getState().openMoyuMenu({ pos: PILL_ANCHOR });
+        return;
+      case 'open_note':
+        /* 与便利贴清单、事项菜单同一条路（services/noteActions）：单例窗，已开则前置。
+           noteId 不存在时 openNoteWindowFor 自己抛，这里只 warn 不弹错 —— 分析窗比药丸旧时
+           可能出现「那张便利贴已经删了」。 */
+        void openNoteWindowFor(intent.noteId).catch((error) => {
+          console.warn('open note window failed', error);
+        });
         return;
       case 'open_todos':
         /* 与药丸菜单/胶囊同一条路（services/todosActions.ts）：单例窗，已开则前置 */
