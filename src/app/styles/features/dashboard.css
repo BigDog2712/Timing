@@ -65,8 +65,7 @@
   /* [P2 修正] 全量便利贴：一张不少，横向滚动而不是割掉 */
   overflow-x: auto; flex: 0 1 auto; height: var(--qp-mod-note); }
 .qp-main-view > .qp-card-timeline { flex: 0 1 auto; height: var(--qp-mod-items); }
-.qp-main-view > .qp-card-timeline[data-tier="S"] { flex-basis: var(--qp-mod-items-s); }
-.qp-main-view > .qp-card-timeline[data-tier="L"] { flex-basis: var(--qp-mod-items-l); }
+
 
 .qp-col {
   display: grid;
@@ -81,6 +80,8 @@
 .qp-card {
   display: flex;
   flex-direction: column;
+  /* [拖拽调整大小] 下边缘拖拽区的定位锚点 */
+  position: relative;
   min-height: 0;
   padding: var(--qp-card-pad);
   border: 0;

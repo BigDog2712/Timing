@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LAYOUT_STORAGE_KEY, columnRowTokens } from "./contract";
+import { clampCardHeight, columnRowTokens, LAYOUT_STORAGE_KEY, MAX_CARD_HEIGHT, MIN_CARD_HEIGHT } from "./contract";
 import { DEFAULT_LAYOUT } from "./defaultLayout";
 import { normalizeLayout } from "./normalizeLayout";
 import { loadLayout, resetLayout, saveLayout } from "./layoutStore";
@@ -82,6 +82,39 @@ describe("columnRowTokens", () => {
     /* 与 `.qp-col-left/right` 的令牌序列逐字相同；外面那层 minmax(0, …) 是防溢出用的，见 contract.ts */
     expect(left).toEqual(["minmax(0, var(--qp-mod-timer))", "minmax(0, var(--qp-mod-items))"]);
     expect(right).toEqual(["minmax(0, var(--qp-mod-apps))", "minmax(0, var(--qp-mod-todos))"]);
+  });
+});
+
+describe("拖拽调整大小（0.12.1）", () => {
+  it("r01a_dragged_height_wins_over_the_tier_token", () => {
+    const rows = columnRowTokens([
+      { id: "timer", column: "left", tier: "M", height: 300 },
+      { id: "items", column: "left", tier: "M" },
+    ]);
+    expect(rows).toEqual(["minmax(0, 300px)", "minmax(0, var(--qp-mod-items))"]);
+  });
+
+  it("r01b_out_of_range_heights_are_clamped_not_dropped", () => {
+    expect(clampCardHeight(20)).toBe(MIN_CARD_HEIGHT);
+    expect(clampCardHeight(9_999)).toBe(MAX_CARD_HEIGHT);
+    expect(clampCardHeight(Number.NaN)).toBe(MIN_CARD_HEIGHT);
+    /* 越界值在自愈时被夹住，卡还在 */
+    const result = normalizeLayout({
+      version: 1,
+      cards: [{ id: "timer", column: "left", tier: "M", height: 12 }],
+    });
+    expect(result.layout.cards[0].height).toBe(MIN_CARD_HEIGHT);
+  });
+
+  it("r01c_broken_height_falls_back_to_the_tier_token_without_dropping_the_card", () => {
+    const result = normalizeLayout({
+      version: 1,
+      cards: [{ id: "timer", column: "left", tier: "M", height: "300" }],
+    });
+    expect(result.repaired).toBe(true);
+    expect(result.reason).toBe("illegal-height");
+    expect(result.layout.cards).toHaveLength(1);
+    expect(result.layout.cards[0].height).toBeUndefined();
   });
 });
 

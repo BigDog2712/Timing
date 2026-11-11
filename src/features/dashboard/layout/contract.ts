@@ -36,6 +36,23 @@ export interface LayoutCard {
    * 刻意不放进顶层：参数是卡的属性，摊平到 layout 上必然出现 `timerDimension` 这类前缀键。
    */
   options?: Record<string, string>;
+  /**
+   * [拖拽调整大小 · 0.12.1] 用户拖出来的高度（css px）。
+   *
+   * 优先级：`height` 存在就压过 `tier`；切档（`setCardTier`）会**清掉** height，
+   * 否则会出现「拖过之后点 S/M/L 没反应」——两个真相源同时生效，用户判断不了哪个算数。
+   */
+  height?: number;
+}
+
+/** 拖动下限：再矮卡头 + 一行数据都放不下，拖到 120 以下没有意义。 */
+export const MIN_CARD_HEIGHT = 120;
+/** 上限：单卡超过这个高度，另一张会被压没（列内共享列高）。 */
+export const MAX_CARD_HEIGHT = 560;
+
+export function clampCardHeight(value: number): number {
+  if (!Number.isFinite(value)) return MIN_CARD_HEIGHT;
+  return Math.round(Math.min(MAX_CARD_HEIGHT, Math.max(MIN_CARD_HEIGHT, value)));
 }
 
 export interface DashboardLayout {
@@ -99,10 +116,11 @@ export function cardRowToken(id: CardId, tier: CardTier): string | null {
 export function columnRowTokens(cards: readonly LayoutCard[]): string[] {
   return cards
     .filter((card) => card.column !== "full")
-    .map((card) => cardRowToken(card.id, card.tier))
-    .filter((token): token is string => Boolean(token))
-    /* `minmax(0, …)` 而不是裸 `var(…)`：行高是固定像素，窗口比板子矮时（加卡工具条占位、
-       多张通栏卡挤压）裸值会**溢出列**，卡片就压到下一张身上。minmax 让它按需收缩，
-       空间够时与裸值逐像素相同 —— 零像素回归（B1/B2）不受影响。 */
-    .map((token) => `minmax(0, var(${token}))`);
+    .map((card) => {
+      /* 拖过的高度优先：用户亲眼看着拖出来的值，比三档令牌更"真"。 */
+      if (typeof card.height === "number") return `minmax(0, ${clampCardHeight(card.height)}px)`;
+      const token = cardRowToken(card.id, card.tier);
+      return token ? `minmax(0, var(${token}))` : null;
+    })
+    .filter((row): row is string => Boolean(row));
 }

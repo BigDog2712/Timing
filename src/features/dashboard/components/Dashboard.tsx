@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { buildTopItems } from "../services/dashboardFormatting.ts";
@@ -19,6 +19,7 @@ import CardControls from "../layout/CardControls";
 import { columnRowTokens, type LayoutCard } from "../layout/contract";
 import { buildFocusDistribution, isFocusDimension, type FocusDimension } from "../services/focusDimension.ts";
 import { useDashboardLayout } from "../layout/useDashboardLayout";
+import { useCardResize } from "../layout/useCardResize.ts";
 
 /**
  * 今日视图（设计五模块）—— 只做**数据装配 + 五模块组合**，布局全在
@@ -94,6 +95,11 @@ export default function Dashboard({
      `grid-template-rows` 与 `.qp-col-left/right` 里那两条硬编码逐字相同 —— B1 靠这条成立。 */
   const layout = useDashboardLayout();
   const [addOpen, setAddOpen] = useState(false);
+  /* [拖拽调整大小] 卡下边缘 8px 拖高：拖动中只改界面，松手才落盘。 */
+  const cardResize = useCardResize({
+    onPreview: (id, height) => layout.setCardHeight(id, height, false),
+    onCommit: (id, height) => layout.setCardHeight(id, height, true),
+  });
   const rowStyle = (cards: LayoutCard[]) => {
     const rows = columnRowTokens(cards);
     return rows.length > 0 ? { gridTemplateRows: rows.join(" ") } : undefined;
@@ -201,6 +207,7 @@ export default function Dashboard({
       ref={panelRef}
       tabIndex={-1}
       className="qp-dashboard"
+      onPointerDown={cardResize.onPointerDown}
       data-view="dashboard"
       data-dashboard-read-state={readState.status}
     >
@@ -240,8 +247,17 @@ export default function Dashboard({
             {renderCards(layout.right)}
           </div>
         </div>
+        {/* 通栏卡也套一层定高槽：拖出来的 height 直接写在这里（inline 压过令牌），
+            没有 height 时由 CSS 的 `data-card` 规则给令牌高度。 */}
         {layout.full.map((card) => (
-          <Fragment key={card.id}>{renderFullCard(card)}</Fragment>
+          <div
+            key={card.id}
+            className="qp-full-slot"
+            data-card={card.id}
+            style={card.height === undefined ? undefined : { height: `${card.height}px` }}
+          >
+            {renderFullCard(card)}
+          </div>
         ))}
       </div>
       {addOpen ? (

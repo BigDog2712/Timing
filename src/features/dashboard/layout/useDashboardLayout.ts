@@ -9,6 +9,7 @@
  */
 import { useCallback, useMemo, useState } from "react";
 import {
+  clampCardHeight,
   DEFAULT_TIER,
   type CardColumn,
   type CardId,
@@ -29,6 +30,13 @@ export interface DashboardLayoutController {
   moveCard: (id: CardId, direction: -1 | 1) => void;
   setCardColumn: (id: CardId, column: CardColumn) => void;
   setCardTier: (id: CardId, tier: CardTier) => void;
+  /**
+   * 拖拽调整大小：写 height（压过 tier）。
+   *
+   * `save` 默认 true；拖动过程中传 `false` —— 每移动一像素写一次 localStorage，
+   * 一秒钟几十次序列化会把主线程拖住，手感直接变成"拉不动"。
+   */
+  setCardHeight: (id: CardId, height: number, save?: boolean) => void;
   /** 组件参数（P2）：一个键一个字，传 `null` 即删键。 */
   setCardOption: (id: CardId, key: string, value: string | null) => void;
   cardOption: (id: CardId, key: string) => string | null;
@@ -95,8 +103,22 @@ export function useDashboardLayout(): DashboardLayoutController {
   const setCardTier = useCallback((id: CardId, tier: CardTier) => {
     setLayout((current) => commit({
       ...current,
-      cards: current.cards.map((card) => (card.id === id ? { ...card, tier } : card)),
+      cards: current.cards.map((card) => {
+        if (card.id !== id) return card;
+        /* 切档必须清 height：两个真相源同时生效时，用户点档位会"没反应"。 */
+        const { height: _dropped, ...rest } = card;
+        return { ...rest, tier };
+      }),
     }));
+  }, []);
+
+  const setCardHeight = useCallback((id: CardId, height: number, save = true) => {
+    const next = clampCardHeight(height);
+    setLayout((current) => {
+      const cards = current.cards.map((card) => (card.id === id ? { ...card, height: next } : card));
+      const layout = { ...current, cards };
+      return save ? commit(layout) : layout;
+    });
   }, []);
 
   const setCardOption = useCallback((id: CardId, key: string, value: string | null) => {
@@ -129,6 +151,6 @@ export function useDashboardLayout(): DashboardLayoutController {
 
   return {
     layout, left, right, full, has, addCard, removeCard, moveCard,
-    setCardColumn, setCardTier, setCardOption, cardOption, reset,
+    setCardColumn, setCardTier, setCardHeight, setCardOption, cardOption, reset,
   };
 }
