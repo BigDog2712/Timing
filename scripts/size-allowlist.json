@@ -3,7 +3,7 @@
   "limit": 300,
   "files": {
     "src-tauri/src/app/insight/bootstrap.rs": 305,
-    "src-tauri/src/app/insight/main_window.rs": 779,
+    "src-tauri/src/app/insight/main_window.rs": 778,
     "src-tauri/src/app/insight/mini_window.rs": 468,
     "src-tauri/src/app/insight/state.rs": 1220,
     "src-tauri/src/app/insight/tool_notifications.rs": 546,
