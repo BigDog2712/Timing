@@ -11,7 +11,7 @@
 //! 代价是约束写法，所以每条断言只钉「不许回到哪条路」，不钉具体怎么写。
 //!
 //! ⚠️ 注释里刻意不出现那个调用的完整字样（本项目的门禁/哨兵会扫到注释，`brand-gate` 扫
-//! `TickBar` 就踩过）：改注释时别把带前导点的写法补回去，否则这条哨兵会红在自己身上。
+//! 旧品牌名就踩过）：改注释时别把带前导点的写法补回去，否则这条哨兵会红在自己身上。
 
 const MAIN_WINDOW_RS: &str = include_str!("../app/insight/main_window.rs");
 const MINI_WINDOW_RS: &str = include_str!("../app/insight/mini_window/native.rs");
