@@ -211,7 +211,11 @@ pub use crate::infra::window_note::{
 /// - `RendererCodeIntegrity`：中文环境常见因输入法/安全软件向渲染进程注入 DLL，触发 Chromium 的
 ///   渲染器代码完整性校验而判死渲染器 → 崩溃；禁用该项可避免。
 /// - `--disable-gpu`：透明窗口在 GPU 合成下也可能致渲染进程崩溃，一并规避（软渲染）。
-pub(super) const WEBVIEW_ADDITIONAL_ARGS: &str =
+///
+/// **消费方不止面板**：`ensure_main_window_once`（patina 主界面）也传这份——它与 conf 静态
+/// 创建的 main 共用 Tauri 默认数据目录，而 WebView2 规定同一数据目录下各次建环境的
+/// 浏览器参数必须**逐字一致**，任何差异都以 0x8007139F「没有注册类」失败（0.12.1 实测）。
+pub(crate) const WEBVIEW_ADDITIONAL_ARGS: &str =
     "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,RendererCodeIntegrity --disable-gpu";
 
 fn open_panel_window(

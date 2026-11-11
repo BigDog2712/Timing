@@ -16,6 +16,15 @@
 const MAIN_WINDOW_RS: &str = include_str!("../app/insight/main_window.rs");
 const MINI_WINDOW_RS: &str = include_str!("../app/insight/mini_window/native.rs");
 const TOOL_NOTIFICATION_RS: &str = include_str!("../app/insight/tool_notifications/native.rs");
+const WINDOW_RS: &str = include_str!("../infra/window.rs");
+const TAURI_CONF: &str = include_str!("../../tauri.conf.json");
+
+/* conf main 的 additionalBrowserArgs 与 infra::window 常量的共同真值。
+   三处（conf / infra::window / main_window 的建窗链）任何一处漂移都会以
+   WebView2 0x8007139F「没有注册类」启动即崩（0.12.1 实测：同一默认数据目录
+   下两次建环境的浏览器参数必须逐字一致）。 */
+const CONF_BROWSER_ARGS: &str =
+    "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,RendererCodeIntegrity --disable-gpu";
 
 #[test]
 fn main_window_never_pins_its_own_webview_profile() {
@@ -44,4 +53,26 @@ fn patina_windows_keep_their_own_profile() {
              真要合并进 main 的目录，先去读 lib/pillAppearance.ts 的 PILL_PREFS_EVENT 注释再动。"
         );
     }
+}
+
+#[test]
+fn main_window_browser_args_match_conf() {
+    /* patina 与 conf main 共用 Tauri 默认数据目录，故建环境参数必须逐字一致。 */
+    assert!(
+        MAIN_WINDOW_RS
+            .contains(".additional_browser_args(crate::infra::window::WEBVIEW_ADDITIONAL_ARGS)"),
+        "ensure_main_window_once 的建窗链必须传 infra::window::WEBVIEW_ADDITIONAL_ARGS ——\n\
+         patina 与 conf 静态 main 共用默认数据目录，参数不同（哪怕只差一项）时\n\
+         WebView2 以 0x8007139F「没有注册类」拒建环境，启动即 panic（0.12.1 实测）。"
+    );
+    assert!(
+        WINDOW_RS.contains(CONF_BROWSER_ARGS),
+        "infra::window::WEBVIEW_ADDITIONAL_ARGS 漂移了，必须与 tauri.conf.json 的\n\
+         additionalBrowserArgs 保持逐字一致（同一数据目录的参数契约）。"
+    );
+    assert!(
+        TAURI_CONF.contains(CONF_BROWSER_ARGS),
+        "tauri.conf.json 的 additionalBrowserArgs 漂移了，必须与 infra::window 常量\n\
+         保持逐字一致（同一数据目录的参数契约）。"
+    );
 }

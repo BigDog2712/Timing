@@ -422,8 +422,7 @@ fn ensure_main_window_once<R: Runtime + 'static>(
         return Ok(MainWindowEnsureResult::Creating);
     }
 
-    /* [0.12.1 修复] 别在这里钉 data_directory：conf 建的 main 用 Tauri 默认目录，目录不同
-       → localStorage 分两份 → 窗口重建后手柄/外观整份换掉（零日志）。见 tests/main_window_profile.rs */
+    /* [0.12.1 修复] 不钉自己的 webview 目录：与 conf main 同用 Tauri 默认目录（localStorage 按目录分区；见 tests/main_window_profile.rs） */
     let lifecycle = app.state::<MainWindowLifecycleState>();
     let Some(generation) = lifecycle.begin_window_creation() else {
         return Ok(MainWindowEnsureResult::Creating);
@@ -445,9 +444,10 @@ fn ensure_main_window_once<R: Runtime + 'static>(
         .decorations(false)
         .transparent(true)
         .center()
-        /* 建窗时不可见：窗口由前端 `cmd_mark_main_window_ready` 握手后才揭示，
-        避免「白底闪一下再变透明」。 */
+        /* 建窗时不可见：由前端 `cmd_mark_main_window_ready` 握手后才揭示，避免「白底闪一下再变透明」 */
         .visible(false)
+        /* 参数与 conf main 逐字一致：同一默认数据目录下浏览器参数不同 = WebView2 拒建环境（0x8007139F） */
+        .additional_browser_args(crate::infra::window::WEBVIEW_ADDITIONAL_ARGS)
         .initialization_script(initialization_script)
         .on_page_load(move |window, payload| {
             match payload.event() {
