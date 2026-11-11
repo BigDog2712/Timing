@@ -609,7 +609,7 @@
     "src/features/settings/components/SettingsGroupNav.tsx": "8675f4e9bf51c41c",
     "src/features/settings/components/SettingsHandleCard.test.tsx": "16cbf2032e2960cf",
     "src/features/settings/components/SettingsHandleCard.tsx": "5a36531d6cc53cdb",
-    "src/features/settings/components/SettingsHandlesPanel.tsx": "673395478f8700ca",
+    "src/features/settings/components/SettingsHandlesPanel.tsx": "0957fdc55923d8b5",
     "src/features/settings/components/SettingsHeaderActions.tsx": "3df89e101ba91b7d",
     "src/features/settings/components/SettingsInterfacePanel.tsx": "f9ad9bb129ce2340",
     "src/features/settings/components/SettingsPanelHeader.tsx": "cfa791df9eaa6fb1",
@@ -623,7 +623,7 @@
     "src/features/settings/components/host/HostGeneralPanel.test.tsx": "f6322bfd3a6641a5",
     "src/features/settings/components/host/HostGeneralPanel.tsx": "524778d109deaea7",
     "src/features/settings/components/host/HostHighlightCard.tsx": "48658a7ccd25ad71",
-    "src/features/settings/components/host/HostPillLookCard.tsx": "af1a9d7d1f9f9243",
+    "src/features/settings/components/host/HostPillLookCard.tsx": "27207cf611bf1b2a",
     "src/features/settings/components/host/HostPluginsPanel.test.tsx": "81040c6ded3c3206",
     "src/features/settings/components/host/HostPluginsPanel.tsx": "db00d05efd0de43f",
     "src/features/settings/components/host/HostSyncPanel.test.tsx": "e7b604e2789b1cf4",
@@ -642,7 +642,7 @@
     "src/features/settings/components/host/MdSyncRootRow.tsx": "e6602e0d5d1ec898",
     "src/features/settings/components/host/MdSyncTierPanel.tsx": "bdc397715b4da2a0",
     "src/features/settings/components/host/MdSyncWebdavCard.tsx": "8c60430c39b12e63",
-    "src/features/settings/components/host/PillPrefsBroadcast.test.tsx": "26b2d70dd41f1d70",
+    "src/features/settings/components/host/PillPrefsBroadcast.test.tsx": "378db6fc5a0b7082",
     "src/features/settings/hooks/settingsPageStateInteractions.ts": "b39608437f6d2d8f",
     "src/features/settings/hooks/useRemoteBackupState.ts": "764c217e1b38a048",
     "src/features/settings/hooks/useSettingsImportState.ts": "9ee5c0ec674c9eda",
@@ -750,7 +750,6 @@
     "src/platform/desktop/clipboardGateway.ts": "79f72ae03cff31c4",
     "src/platform/desktop/desktopBehaviorRuntimeGateway.ts": "e7aae155d814fda7",
     "src/platform/desktop/externalUrlGateway.ts": "29459916e3393810",
-    "src/platform/desktop/hostPillPrefsGateway.ts": "dadae4c942ef661a",
     "src/platform/desktop/hostPluginsGateway.ts": "1dc7b0d5b5a570eb",
     "src/platform/desktop/hostSettingsGateway.ts": "e774dc7c9d0fbed3",
     "src/platform/desktop/hostSyncGateway.ts": "d1da5b5a4eccf4ef",
@@ -761,6 +760,8 @@
     "src/platform/desktop/miniActivityRuntimeGateway.ts": "438dd6225d33a36f",
     "src/platform/desktop/miniContentRuntimeGateway.ts": "f63d1cfcc3bd31c3",
     "src/platform/desktop/miniWindowRuntimeGateway.ts": "630ee4f00c987c81",
+    "src/platform/desktop/pillPrefsGateway.test.ts": "b8f8e0dcabd108b9",
+    "src/platform/desktop/pillPrefsGateway.ts": "5751b081dd81ede1",
     "src/platform/desktop/resourceDiagnosticsRuntimeGateway.ts": "851244e3120772e2",
     "src/platform/desktop/windowControlGateway.ts": "5c62e11322fb5462",
     "src/platform/persistence/activityDisplaySettingsStore.ts": "da8ec97fea8ab062",
@@ -907,5 +908,14 @@
     "src/shared/types/tracking.ts": "5bb1b043ec337457",
     "src/shared/types/update.ts": "f2cb5244802b9fd3",
     "src/shared/types/webActivity.ts": "dba354520591d565"
-  }
+  },
+  "_reanchor": [
+    {
+      "step": "0.12.1 归一：悬浮条偏好真源搬进宿主设置表",
+      "scope": "FE lib/platform/features/mocks + BE models/services（新增 pill_prefs，零命令零事件）",
+      "changed": "改 16 / 增 7 / 删 1（相对 62d0371）",
+      "why": "设置页偏好与悬浮条读值统一走宿主设置表，localStorage 降为首帧缓存；按脚本口径重锚固化",
+      "sha": "4705038"
+    }
+  ]
 }
