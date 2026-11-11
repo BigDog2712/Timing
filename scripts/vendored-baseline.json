@@ -907,14 +907,5 @@
     "src/shared/types/tracking.ts": "5bb1b043ec337457",
     "src/shared/types/update.ts": "f2cb5244802b9fd3",
     "src/shared/types/webActivity.ts": "dba354520591d565"
-  },
-  "_reanchor": [
-    {
-      "step": "0.12.1 修复（主窗建窗目录与 conf 一致）",
-      "scope": "BE insight/main_window 建窗路径 + tests 哨兵",
-      "changed": "改 2 / 增 1（相对 0407ab1）",
-      "why": "收敛「重建后 localStorage 换一份」的隐患，与前端偏好搬运同批",
-      "sha": "8bda60e"
-    }
-  ]
+  }
 }

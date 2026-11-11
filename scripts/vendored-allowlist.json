@@ -2,15 +2,9 @@
   "_doc": "vendored 改动登记表。前端 src/app/** src/features/** src/platform/** src/shared/** 与后端 src-tauri/src/app/insight/** src-tauri/src/commands/insight/** src-tauri/src/infra/insight/** src-tauri/src/models/insight/** src-tauri/src/services/insight/** 是 MIT 第三方源码（Patina），改动必须在这里留一条：path + change(modified|added|deleted) + reason + owner。验收口径是 node scripts/check-vendored-diff.mjs —— 未登记的改动让 npm run check 直接红。融合期（commit 7bc7bd7）那批路径改写与测试拆分不算改动，已固化进基线，见 THIRD-PARTY-NOTICES.md 第 1-7 条。",
   "entries": [
     {
-      "path": "src/app/hooks/useMainWindowReady.ts",
+      "path": "src-tauri/src/app/insight/main_window.rs",
       "change": "modified",
-      "reason": "D3：就绪判据与 effect 依赖改用 useAppThemeMode 返回的实际模式（3 处），不再比对本地 themeMode。",
-      "owner": "ForG"
-    },
-    {
-      "path": "src/platform/runtime/hostThemeGateway.test.ts",
-      "change": "modified",
-      "reason": "[0.12.1 重锚] 新增：主题同步器 6 条用例（先订阅后读、旧值不盖事件、读不到不应用、订阅不可用仍读、取消后不再应用、取消早于订阅返回）。基线已含该文件，登记口径由 added 改 modified。",
+      "reason": "0.12.1 修复：建窗路径不再钉 webview_root —— tauri.conf 静态创建的 main 用 Tauri 默认 WebView 数据目录，而重建路径曾用 <数据根>/webview，localStorage 按目录分区，窗口闲置销毁重建一次悬浮条的 timing.handles.v1 / timing.appearance.v1 就整份换掉（用户看到「设置自己变了」，零日志）。改成与 conf 完全一致；patina/mini/tool-notification 仍各自钉自己的 profile（哨兵 src-tauri/src/tests/main_window_profile.rs 两条钉住双向）。替换了一行 let webview_root，保留 resolve_storage_paths 调用用于自定义数据根校验。",
       "owner": "ForG"
     },
     {
@@ -32,10 +26,10 @@
       "owner": "寇豆码"
     },
     {
-      "path": "src/platform/desktop/mainToolsNavigationGateway.ts",
+      "path": "src/app/hooks/useMainWindowReady.ts",
       "change": "modified",
-      "reason": "P0-03（TB1-1）：`takeMainToolsTarget()` 返回类型从 `\"pomodoro\"|\"reminders\"|null` 改成带标签的 `MainWindowTarget` 联合（tools / history），并加运行时形状校验（非法载荷抛错，不静默吞）。事件常量 `MAIN_TOOLS_TARGET_CHANGED` 未变。",
-      "owner": "寇豆码"
+      "reason": "D3：就绪判据与 effect 依赖改用 useAppThemeMode 返回的实际模式（3 处），不再比对本地 themeMode。",
+      "owner": "ForG"
     },
     {
       "path": "src/features/dashboard/components/Dashboard.tsx",
@@ -44,15 +38,15 @@
       "owner": "ForG"
     },
     {
-      "path": "src/features/dashboard/components/TodosModule.tsx",
-      "change": "modified",
-      "reason": "[0.12.1 重锚] 第二批新增：待办卡（compose / 行 / 乐观删除 + 3s 撤销条 / 渐隐 / 可见行数用 ResizeObserver 量）。（基线已含该文件，登记口径由 added 改 modified）",
-      "owner": "ForG"
-    },
-    {
       "path": "src/features/dashboard/components/NotesStrip.tsx",
       "change": "modified",
       "reason": "[0.12.1 重锚] 第二批新增：便利贴条（56px 通栏，只读，按 updatedAt 筛今日，最多 3 张 + 「+N」）。（基线已含该文件，登记口径由 added 改 modified）",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/TodosModule.tsx",
+      "change": "modified",
+      "reason": "[0.12.1 重锚] 第二批新增：待办卡（compose / 行 / 乐观删除 + 3s 撤销条 / 渐隐 / 可见行数用 ResizeObserver 量）。（基线已含该文件，登记口径由 added 改 modified）",
       "owner": "ForG"
     },
     {
@@ -65,6 +59,18 @@
       "path": "src/features/dashboard/hooks/useTodayNotes.ts",
       "change": "modified",
       "reason": "[0.12.1 重锚] 第二批新增：便利贴取数 + 按 updatedAt 落今日本地日筛选（不按 createdAt，否则老用户这条永远空）+ 降序截 3。基线已含该文件，登记口径由 added 改 modified。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/platform/desktop/mainToolsNavigationGateway.ts",
+      "change": "modified",
+      "reason": "P0-03（TB1-1）：`takeMainToolsTarget()` 返回类型从 `\"pomodoro\"|\"reminders\"|null` 改成带标签的 `MainWindowTarget` 联合（tools / history），并加运行时形状校验（非法载荷抛错，不静默吞）。事件常量 `MAIN_TOOLS_TARGET_CHANGED` 未变。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/platform/runtime/hostThemeGateway.test.ts",
+      "change": "modified",
+      "reason": "[0.12.1 重锚] 新增：主题同步器 6 条用例（先订阅后读、旧值不盖事件、读不到不应用、订阅不可用仍读、取消后不再应用、取消早于订阅返回）。基线已含该文件，登记口径由 added 改 modified。",
       "owner": "ForG"
     }
   ]
