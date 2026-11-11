@@ -32,7 +32,7 @@
     "src-tauri/src/app/insight/classification.rs": "3802c588df29648b",
     "src-tauri/src/app/insight/desktop_behavior.rs": "27975bdf726613cb",
     "src-tauri/src/app/insight/import.rs": "cf48d202572144c4",
-    "src-tauri/src/app/insight/main_window.rs": "4032edb00665a0bd",
+    "src-tauri/src/app/insight/main_window.rs": "8e118d1a5e827915",
     "src-tauri/src/app/insight/main_window/recovery.rs": "22c4f18643168c48",
     "src-tauri/src/app/insight/main_window/tools_navigation.rs": "71c0acdbed352b45",
     "src-tauri/src/app/insight/mini_window.rs": "cf5aa6cb445b0c3e",
@@ -910,11 +910,11 @@
   },
   "_reanchor": [
     {
-      "step": "0.12.1 修复（设置页偏好送达悬浮条 + 顶栏只留图标）",
-      "scope": "FE src/{app,lib,platform,features}（新增偏好搬运网关与接收侧、顶栏去文字）",
-      "changed": "改 4 / 增 2（相对 0770193）",
-      "why": "修复用户实测缺陷：patina 与 main 分属两个 WebView 数据目录，localStorage 不共享，设置页写的偏好到不了悬浮条。按脚本口径重锚固化",
-      "sha": "0407ab1"
+      "step": "0.12.1 修复（主窗建窗目录与 conf 一致）",
+      "scope": "BE insight/main_window 建窗路径 + tests 哨兵",
+      "changed": "改 2 / 增 1（相对 0407ab1）",
+      "why": "收敛「重建后 localStorage 换一份」的隐患，与前端偏好搬运同批",
+      "sha": "8bda60e"
     }
   ]
 }
