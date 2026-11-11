@@ -30,6 +30,9 @@ pub mod timer_stop;
 pub mod timer_time;
 pub mod todo;
 pub mod todo_nudge;
+
+/* 应用使用统计（0.13.0，安卓）：只碰 app_usage 一张表。 */
+pub mod usage;
 pub mod todo_start;
 
 /* 分析窗的服务层（原 patina/data + patina/engine：自带 sqlx 池的完整持久化栈 + 调度器）。

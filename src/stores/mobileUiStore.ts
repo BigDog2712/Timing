@@ -15,7 +15,7 @@
 import { create } from 'zustand';
 import type { TimeRecord } from '../types/domain';
 
-export type MobileTab = 'timer' | 'items' | 'records' | 'notes' | 'settings';
+export type MobileTab = 'timer' | 'items' | 'records' | 'usage' | 'notes' | 'settings';
 
 /** 底部 Sheet 的载荷（每种 Sheet 自带它需要的那一条数据，避免二次拉取） */
 export type MobileSheet =

@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 应用使用时间统计（0.13.0）：特殊权限，运行时弹窗给不了，必须用户在系统「使用情况访问」里手动打开。
+         带 tools:ignore 是必须的 —— 这是受保护权限，lint 会报 ProtectedPermissions。 -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
     <!-- V1-Android：倒计时到点 / 待办提醒走系统通知。API 33+ 属于「运行时权限」，
          需先声明再由前端（@tauri-apps/plugin-notification）发起申请；用户拒绝时
          前端降级为应用内提示条（PRD D7），不静默失败。 -->

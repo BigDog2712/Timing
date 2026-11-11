@@ -91,6 +91,14 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
     if schema_version(pool).await? < 7 {
         run_raw(pool, include_str!("../migrations/0007_v01127.sql")).await?;
     }
+    // ⑫ v8（0.13.0）：新增 `app_usage`（安卓应用使用统计）。
+    //
+    // 本文件全是 `CREATE TABLE IF NOT EXISTS`，天然幂等，不需要版本门；但仍要显式执行一次，
+    // 且**必须**在建表后推进 `schema.version`，否则下次启动的 `< 8` 判断永远为真。
+    // 老库升级的判据（任务书 U6）：五张老表行数与升级前逐表相等 —— 本文件不碰任何老表。
+    if schema_version(pool).await? < 8 {
+        run_raw(pool, include_str!("../migrations/0008_v01300.sql")).await?;
+    }
     Ok(())
 }
 

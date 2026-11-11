@@ -36,6 +36,8 @@ macro_rules! define_invoke_handler {
             crate::commands::timer_cmd::discard_timer,
             crate::commands::daily_status_cmd::daily_status_get,
             crate::commands::daily_status_cmd::daily_status_set,
+            crate::commands::usage_cmd::usage_stats_get,
+            crate::commands::usage_cmd::usage_stats_settings,
             crate::commands::timer_cmd::undo_stop,
             crate::commands::timer_cmd::get_timer_state,
             crate::commands::timer_cmd::switch_item,

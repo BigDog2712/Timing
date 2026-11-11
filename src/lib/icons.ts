@@ -24,6 +24,7 @@ import {
   Settings2,
   Keyboard,
   CircleAlert,
+  ChartColumn,
   Clock,
   ChevronRight,
   ChevronLeft,
@@ -74,6 +75,8 @@ export const SettingsIcon = Settings2;
 export const KeyboardIcon = Keyboard;
 export const AlertIcon = CircleAlert;
 export const ClockIcon = Clock;
+/* [0.13.0] 应用使用统计（手机页签）：lucide 的柱状图，与「记录」的时钟区分开 */
+export const ChartIcon = ChartColumn;
 /* [V0.2.0] 设置 / 主题 / 配色（settings-panel.md §5 / theme-picker.md §5） */
 export const XIcon = X;
 export const SunIcon = Sun;

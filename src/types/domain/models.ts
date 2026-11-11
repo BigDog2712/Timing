@@ -57,7 +57,9 @@ export type ErrorCode =
   /* [V0.4.0] */
   | 'MD_SYNC_CONFIG_INVALID'
   /* [V0.11.13] 云端通道走不通（网络 / 远端 / 系统凭据），见 ADR-061 */
-  | 'MD_SYNC_REMOTE_ERROR';
+  | 'MD_SYNC_REMOTE_ERROR'
+  /* [0.13.0] 安卓「使用情况访问」未授权（不是故障，是需要引导的状态） */
+  | 'USAGE_PERMISSION_DENIED';
 
 /* ===========================================================================
  * 核心领域实体

@@ -37,6 +37,9 @@ pub mod theme;
 pub mod timer;
 pub mod todo;
 
+/* 应用使用统计（0.13.0，安卓）。桌面也编译：DTO 与纯逻辑两端共用。 */
+pub mod usage;
+
 /* 分析窗的领域类型（原 patina/domain，出边 0 的纯叶子）。 */
 #[cfg(desktop)]
 #[allow(dead_code)]

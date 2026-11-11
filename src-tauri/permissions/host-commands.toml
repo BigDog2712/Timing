@@ -22,6 +22,9 @@ commands.allow = [
   "create_record",
   "daily_status_get",
   "daily_status_set",
+  # [0.13.0] 安卓应用使用统计（两条）
+  "usage_stats_get",
+  "usage_stats_settings",
   "data_root_change",
   "data_root_get",
   "data_root_open",

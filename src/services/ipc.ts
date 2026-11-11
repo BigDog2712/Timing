@@ -1,8 +1,7 @@
 /**
  * Timing — IPC 唯一出口（K-11）
  * 契约：docs/phase2/IPC-CONTRACT-v2.md §3；类型：src/types/domain.ts（IpcApi）；规则（硬）：
- *   1. 组件内**禁止**直接 `invoke`；一切经本文件的 `ipc.*`。2. 集中 try/catch：后端 `Err` 序列化为
- *   `{ code, message }`，此处规范化为 IpcError。
+ *   1. 组件内**禁止**直接 `invoke`；一切经 `ipc.*`。2. 后端 `Err` 序列化为 `{ code, message }`，此处规范化为 IpcError。
  *   3. 事件订阅统一经 `onIpcEvent`，返回的 unlisten 须由调用方在 cleanup 调用（K-8）；非 Tauri 环境（纯浏览器 dev）自动降级到 src/mocks/browserMock，便于 UI 走查。
  */
 import { invoke } from '@tauri-apps/api/core';
@@ -139,6 +138,10 @@ export function errorText(err: unknown): string {
       return err instanceof Error && err.message ? err.message : '同步设置不合法';
     case 'MD_SYNC_REMOTE_ERROR':
       return err instanceof Error && err.message ? err.message : '云端同步失败，请检查网络与账号';
+    /* 这条要**保留原文**吗？不 —— 原文是「还没有『使用情况访问』权限」，就是给用户看的，
+       所以直接回它；没带 message 时给一句能照着做的。 */
+    case 'USAGE_PERMISSION_DENIED':
+      return err instanceof Error && err.message ? err.message : '去系统设置里打开「使用情况访问」后才能统计';
     default:
       return err instanceof Error && err.message ? err.message : '操作失败，请稍后重试';
   }
@@ -148,6 +151,8 @@ export function errorText(err: unknown): string {
 export const ipc: IpcApi = {
   dailyStatusGet: (date: string) => call<Record<number, 'pending' | 'done'>>('daily_status_get', { date }),
   dailyStatusSet: (date: string, itemId: number, status: 'pending' | 'done') => call<void>('daily_status_set', { date, itemId, status }),
+  usageStatsGet: (d: string) => call<import('../types/domain/usage').UsageDayDto>('usage_stats_get', { date: d }),
+  usageStatsSettings: () => call<void>('usage_stats_settings', {}),
   /* ---- 事项域 ---- */
   listItems: (params: ListItemsParams) => call<Item[]>('list_items', { includeArchived: params.includeArchived ?? false }),
   createItem: (params: CreateItemParams) => call<Item>('create_item', { name: params.name, color: params.color }),

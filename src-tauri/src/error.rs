@@ -47,6 +47,8 @@ pub enum ErrorCode {
     MdSyncConfigInvalid,
     /* [V0.11.13] */
     MdSyncRemoteError,
+    /* [0.13.0] 安卓「使用情况访问」未授权。见 ADR-063：这是**状态性**错误，不是故障。 */
+    UsagePermissionDenied,
 }
 
 impl ErrorCode {
@@ -70,6 +72,7 @@ impl ErrorCode {
             ErrorCode::ItemNameTooLong => "ITEM_NAME_TOO_LONG",
             ErrorCode::MdSyncConfigInvalid => "MD_SYNC_CONFIG_INVALID",
             ErrorCode::MdSyncRemoteError => "MD_SYNC_REMOTE_ERROR",
+            ErrorCode::UsagePermissionDenied => "USAGE_PERMISSION_DENIED",
         }
     }
 }

@@ -46,6 +46,7 @@ pub mod mobile_cmd;
 
 #[cfg(desktop)]
 pub mod system_cmd;
+pub mod usage_cmd;
 #[cfg(mobile)]
 #[path = "system_cmd_mobile.rs"]
 pub mod system_cmd;

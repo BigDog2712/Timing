@@ -24,6 +24,15 @@ export function createMockApiDaily(s: MockState): Record<string, (args?: any) =>
       const date = String(a?.date ?? todayText());
       return { ...(s.dailyStatus[date] ?? {}) };
     },
+    /* [0.13.0] 应用使用统计：浏览器里没有系统数据源，如实回「不支持」。
+       给假数据比不给更坏 —— 走查时会以为功能好了。 */
+    usage_stats_get: (a) => ({
+      supported: false,
+      date: String(a?.date ?? todayText()),
+      totalSec: 0,
+      rows: [],
+    }),
+    usage_stats_settings: () => undefined,
     daily_status_set: (a) => {
       const date = String(a?.date ?? todayText());
       const itemId = Number(a?.itemId);

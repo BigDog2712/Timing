@@ -16,6 +16,7 @@ import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
 import com.timing.app.native.Prefs
 import com.timing.app.native.SafVault
+import com.timing.app.native.UsageStats
 import com.timing.app.native.SecretStore
 import com.timing.app.overlay.PillService
 import java.io.File
@@ -316,6 +317,53 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
             android.util.Log.w("TimingExport", "导出失败 uri=$uri: ${err.message}", err)
             invoke.reject("写入失败：${err.message ?: err.javaClass.simpleName}")
         }
+    }
+
+    // ------------------------------------------------------------ 应用使用统计
+
+    /**
+     * 特殊权限状态（`PACKAGE_USAGE_STATS`）。
+     *
+     * 与悬浮条同一条纪律：**偏好与系统状态分开报**。这里有 `granted` 一项就够，
+     * 因为「用户想不想要统计」是宿主 settings 的事，不是安卓权限的事。
+     */
+    @Command
+    fun usagePermission(invoke: Invoke) {
+        val payload = JSObject()
+        payload.put("granted", UsageStats.hasPermission(activity))
+        invoke.resolve(payload)
+    }
+
+    /** 跳系统「使用情况访问」页。能不能授上是用户的事，这里只负责把他送到门口。 */
+    @Command
+    fun usageOpenSettings(invoke: Invoke) {
+        UsageStats.openSettings(activity)
+        invoke.resolve()
+    }
+
+    /**
+     * 取 [fromMs, toMs) 的前台时长（按包聚合），Rust → Kotlin。
+     *
+     * 参数用 `invoke.getArgs()` 的 `org.json` 取值，不用 `@InvokeArg` + `parseArgs(Class)`：
+     * 后者走 Jackson 反射，release 包开 R8 时反射链被优化掉会把异常折成一句
+     * 「系统调用失败」，症状与业务失败无法区分（ADR-055）。
+     */
+    @Command
+    fun usageDay(invoke: Invoke) {
+        val args = invoke.getArgs()
+        val from = args.optLong("from", 0L)
+        val to = args.optLong("to", 0L)
+        val payload = JSObject()
+        if (from <= 0L || to <= from) {
+            payload.put("rows", JSArray())
+            payload.put("granted", UsageStats.hasPermission(activity))
+            invoke.resolve(payload)
+            return
+        }
+        /* ADR-056：跨桥的列表只许 JSArray（org.json.JSONArray 直接 put 会被序列化成字符串） */
+        payload.put("rows", JSArray(UsageStats.queryDay(activity, from, to)))
+        payload.put("granted", true)
+        invoke.resolve(payload)
     }
 
     // ------------------------------------------------------------ 悬浮条

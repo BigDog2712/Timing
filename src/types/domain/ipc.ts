@@ -7,6 +7,7 @@
  *   3. `src-tauri/src/lib.rs` 的 `generate_handler!`
  * `npm run check:contract` 机械校验，不一致即非零退出。
  */
+import type { UsageDayDto } from './usage';
 import type {
   AccentColors,
   AccentSetParams,
@@ -129,6 +130,9 @@ export interface PatinaOpenWindowParams {
 export interface IpcApi {
   dailyStatusGet(date: string): Promise<Record<number, 'pending' | 'done'>>;
   dailyStatusSet(date: string, itemId: number, status: 'pending' | 'done'): Promise<void>;
+  /** [0.13.0] 安卓应用使用统计（桌面 supported:false；未授权抛 USAGE_PERMISSION_DENIED） */
+  usageStatsGet(date: string): Promise<UsageDayDto>;
+  usageStatsSettings(): Promise<void>;
 
   /* 事项域 */
   listItems(params: ListItemsParams): Promise<Item[]>;

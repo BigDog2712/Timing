@@ -16,6 +16,7 @@ import { useMobileBackSheet } from '../../hooks/useMobileBackSheet';
 import { usePillAction } from '../../hooks/usePillAction';
 import {
   AlertIcon,
+  ChartIcon,
   ClockIcon,
   ListIcon,
   SettingsIcon,
@@ -42,6 +43,7 @@ import { TodoSwitchSheet } from './SwitchModeSheet';
 import { TodoPlanSheet } from './TodoPlanSheet';
 import { TimerPage } from './TimerPage';
 import { UndoToast } from './UndoToast';
+import { UsagePage } from './UsagePage';
 
 interface TabDef {
   id: MobileTab;
@@ -54,6 +56,8 @@ const TABS: readonly TabDef[] = [
   { id: 'timer', label: '计时', sub: '点一下就开始', Icon: TimerIcon },
   { id: 'items', label: '事项', sub: '待办与今日记录', Icon: ListIcon },
   { id: 'records', label: '记录', sub: '今天 / 本周', Icon: ClockIcon },
+  /* [0.13.0] 应用使用统计：安卓专属（桌面 supported:false，页面自己说明去向） */
+  { id: 'usage', label: '统计', sub: '应用用了多久', Icon: ChartIcon },
   /* [V0.11.0] 便利贴：数据与桌面同一张 notes 表，见 services/mobileNoteActions */
   { id: 'notes', label: '便利贴', sub: '随手记，挂到事项上', Icon: StickyNoteIcon },
   { id: 'settings', label: '设置', sub: '外观 · 插件 · 通用', Icon: SettingsIcon },
@@ -141,6 +145,7 @@ export function MobileShell() {
         {tab === 'timer' && <TimerPage />}
         {tab === 'items' && <ItemsPage />}
         {tab === 'records' && <RecordsPage />}
+        {tab === 'usage' && <UsagePage />}
         {tab === 'notes' && <NotesPage />}
         {tab === 'settings' && <SettingsPage />}
       </main>
