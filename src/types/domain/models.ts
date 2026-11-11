@@ -6,6 +6,9 @@
  */
 import type { EpochMs, Seconds } from './constants';
 import type { AccentColors, ThemeMode, ThemeSettings } from '../domain-v020';
+/* [0.12.1 归一] 悬浮条外观 + 手柄绑定的快照形状只在 `lib/pillAppearance` 定义一次
+   （设置页与药丸都要用，而两窗唯一合法的共享载体就是 `src/lib/**`）。此处只借类型。 */
+import type { PillPrefs } from '../../lib/pillAppearance';
 
 /* ===========================================================================
  * 枚举（字符串联合）
@@ -181,6 +184,13 @@ export interface Settings {
   itemsRecentCount: number;
   /** [V0.3.9] 常用事项默认倒计时（itemId → 分钟）：有值 = 点它起倒计时，无值 = 正计时 */
   itemsTimers: Record<string, number>;
+  /**
+   * [0.12.1 归一] 悬浮条外观 + 手柄绑定快照（Rust `Settings::pill`）。
+   *
+   * `null` = 宿主库里**从未写过**这份数据 —— 这不是「没有值」的同义词，而是前端的
+   * **迁移信号**：主窗启动时读到 `null` 且本窗缓存非默认，就把缓存写进库一次。
+   */
+  pill?: PillPrefs | null;
 }
 
 /** 单事项聚合统计项 */

@@ -14,6 +14,9 @@ import type {
   UpdateSettingsParams,
   UndoStopParams,
 } from '../types/domain';
+/* [0.12.1 归一] `pill` 的半份合并需要出厂值兜底；两者都属主窗（mocks 与 lib 同侧，L9 允许） */
+import { DEFAULT_HANDLE_BINDINGS } from '../lib/handleCatalog';
+import { DEFAULT_APPEARANCE } from '../lib/pillAppearance';
 import { createMockApiV020 } from './browserMockV020';
 import { createMockApiDaily } from './browserMockDaily';
 import { createMockApiItems } from './browserMockItems';
@@ -225,7 +228,17 @@ export function createMockApi(): Record<string, (args?: any) => unknown> {
     get_settings: () => s.settings,
     update_settings: (a) => {
       const patch = (a as UpdateSettingsParams).patch;
-      s.settings = { ...s.settings, ...patch };
+      const next = { ...s.settings, ...patch };
+      /* [0.12.1 归一] `pill` 是**半份合并**：设置页的外观卡只发 `appearance`、手柄面板只发
+         `handles`，浅合并会把另半份抹成 `undefined`（预览里表现为「调了不透明度，手柄
+         绑定全没了」）。口径与 Rust `merge_pill_prefs` 一致：缺的那一半保持旧值。 */
+      if (patch.pill) {
+        next.pill = {
+          appearance: patch.pill.appearance ?? s.settings.pill?.appearance ?? DEFAULT_APPEARANCE,
+          handles: patch.pill.handles ?? s.settings.pill?.handles ?? DEFAULT_HANDLE_BINDINGS,
+        };
+      }
+      s.settings = next;
       return s.settings;
     },
     set_autostart: (a) => {

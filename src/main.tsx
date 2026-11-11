@@ -79,6 +79,9 @@ import App from './App';
 import { AppErrorBoundary, installGlobalErrorHooks } from './components/ui/AppErrorBoundary';
 import { markWindowKind } from './lib/window';
 import { installAppearanceSync } from './lib/appearanceSync';
+import { loadHandleBindings } from './lib/handleBindings';
+import { readPillAppearance } from './lib/pillAppearance';
+import { loadPillPrefs, seedPillPrefsIfAbsent } from './platform/desktop/pillPrefsGateway';
 import { initAppearance } from './stores/appearanceStore';
 import { useUiStore } from './stores/uiStore';
 
@@ -88,13 +91,20 @@ markWindowKind();
 /* [V0.4.1] 渲染之外的异常（事件回调 / 未处理的 Promise）也要可见，不能静默 */
 installGlobalErrorHooks();
 
-/* [V0.2.2] 文字 / 背景不透明度：首帧即套用，避免先闪一帧全不透明 */
+/* [V0.2.2] 文字 / 背景不透明度：首帧即套用，避免先闪一帧全不透明。
+   这一步读的是**本窗 localStorage**（首帧缓存）—— 同步、不依赖 IPC，所以第一帧就是对的。 */
 initAppearance();
 
-/* [0.12.1] 跨窗同步：focus / pointerenter / visibilitychange 上幂等重读外观与手柄绑定。
-   必须排在 initAppearance 之后（先有首帧外观，再谈"别窗改了要跟随"）。
-   `storage` 事件在 WebView2 里跨顶层 WebView 不保证投递，所以主通道是"人回来就重读"。 */
-installAppearanceSync();
+/* [0.12.1 归一] 顺序是有讲究的，三步各有分工：
+   ① `initAppearance()`：同步套用首帧缓存（防闪）。它不知道宿主设置表的存在。
+   ② `installAppearanceSync({ load: loadPillPrefs })`：把**去真源读**的通道装上，并在内部
+      立刻对齐一次。这是「悬浮条跟随设置页」的唯一机制（localStorage 不再参与判定）。
+   ③ `seedPillPrefsIfAbsent(...)`：迁移的**唯一入口** —— 库里 `pill` 还是 null 时，把本窗
+      缓存（用户 0.12.1 里调过、当时只落在 localStorage 的值）写进库一次。写完以库为准。
+   为什么 ③ 排在 ② 之后：②的首次对齐读到 null 会保留现值（什么都不做），不会把待迁移的
+   缓存擦掉；反过来（先 seed）会让 ③ 覆盖掉比它更新的库值 —— 顺序反了就是数据回退。 */
+installAppearanceSync({ load: loadPillPrefs });
+void seedPillPrefsIfAbsent({ appearance: readPillAppearance(), handles: loadHandleBindings() });
 
 /* 屏蔽 WebView2 的原生右键菜单：桌面版里它会弹出「重新加载 / 检查」一类浏览器菜单，
    与自绘的右键菜单（小条 / 便利贴手柄）冲突。捕获阶段只 preventDefault、不 stopPropagation，

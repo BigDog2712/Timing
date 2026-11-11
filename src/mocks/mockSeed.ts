@@ -81,6 +81,9 @@ const DEFAULT_SETTINGS: Settings = {
   itemsShowRecent: true,
   itemsRecentCount: RECENT_ITEMS_DEFAULT,
   itemsTimers: {},
+  /* [0.12.1 归一] 浏览器预览里没有宿主设置表：保持 `null`（= 从未写过），
+     与 Rust 侧 `Settings::default().pill` 同值，前端据此走「迁移 / 回落缓存」那条路。 */
+  pill: null,
 };
 
 export interface MockState {

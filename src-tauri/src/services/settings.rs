@@ -13,6 +13,9 @@ use crate::models::settings::{ReferenceSettings, ReferenceSettingsPatch, Setting
 use crate::platform::clock::now_ms;
 use crate::repositories::settings as repo;
 use crate::services::theme;
+/* [0.12.1 归一] 悬浮条外观 / 手柄绑定的读写整体放同层新文件：本文件只剩 2 行门禁余量，
+   而那段「读旧 → 覆盖 → 归一 → 写全量」塞进来会把它顶到 300。 */
+use crate::services::pill_prefs;
 
 /// 首次读取时写入默认值（schema.sql 尾部登记的键）。
 ///
@@ -152,6 +155,9 @@ pub async fn get(pool: &SqlitePool) -> AppResult<Settings> {
                 .unwrap_or(RECENT_ITEMS_DEFAULT),
         ),
         items_timers: items_timers(pool).await?,
+        /* [0.12.1 归一] 外观 / 手柄快照：`None` = 库里没写过（这是前端的**迁移信号**），
+           坏 JSON 也落到 `None`（药丸启动不能因为坏配置崩掉，回落默认比报错好）。 */
+        pill: pill_prefs::read(pool).await?,
     })
 }
 
@@ -215,6 +221,12 @@ pub async fn update(pool: &SqlitePool, patch: &SettingsPatch) -> AppResult<Setti
     if let Some(map) = patch.items_timers.as_ref() {
         let normalized = normalize_item_timers(map.clone());
         repo::set_value(pool, KEY_ITEMS_TIMERS, &encode_json(&normalized)?, now).await?;
+    }
+    /* [0.12.1 归一] 外观 / 手柄：写全量快照（内部是「读旧 → 覆盖 → 归一」）。
+       不能只写 patch 里给的字段：外观卡只发 `appearance`、手柄面板只发 `handles`，
+       只写一半会让另半份回默认。 */
+    if let Some(pill_patch) = patch.pill.as_ref() {
+        pill_prefs::write(pool, pill_patch, now).await?;
     }
     get(pool).await
 }

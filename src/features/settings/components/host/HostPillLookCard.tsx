@@ -1,28 +1,35 @@
 /**
- * 主界面设置 · 药丸外观卡（[0.12.1] T04：`timing.appearance.v1` 的新写入点）
+ * 主界面设置 · 药丸外观卡（[0.12.1] T04 · [0.12.1 归一] 真源搬到设置表）
  * -----------------------------------------------------------------------------
  * 三项：文字不透明度 / 背景不透明度 / 常驻形态。口径照宿主 `components/settings/AppearanceCard.tsx`
  * （同一套文案与同一套下限），但读写**只走** `src/lib/pillAppearance.ts`：
  *  - 不 import `stores/appearanceStore`（zustand + 副作用，L9 双窗隔离）；
- *  - 也不在本地重写 clamp —— 两处写同一个键必须只有一条写路径（归一化在库里）。
+ *  - 也不在本地重写 clamp —— 归一化只有一处（`normalizeAppearance`）。
  *
- * 写完立刻「看得见」的方式：本窗只落 localStorage；药丸窗口在 `focus` / `pointerenter` /
- * `visibilitychange` 上幂等重读（`lib/appearanceSync.ts`），最长延迟 = 一次焦点切换。
- * 不做轮询、不加事件 —— 这是本轮验收口径（X-01）。
+ * **写路径（0.12.1 归一后）**：`savePillPrefs({ appearance })` → 宿主设置表落库 → 成功后才改界面
+ * 与本窗缓存 → `nudgePillPrefs()` 发一个无载荷信号。顺序不能反：先改界面后落库，写失败时
+ * 界面会撒谎（关掉设置页再回来就变回去了，用户还以为是自己的错觉）。
+ *
+ * 本窗那份 localStorage 只剩「首帧缓存 + 同窗重渲染」，**不参与任何判定**。
  */
 import { Droplet, Type } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import QuietStepperSlider from "../../../../shared/components/QuietStepperSlider";
 import {
   FLOAT_FORM_OPTIONS,
   TEXT_OPACITY_MIN,
+  normalizeAppearance,
   readPillAppearance,
   writePillAppearance,
   type Appearance,
 } from "../../../../lib/pillAppearance";
 import SettingsPanelHeader from "../SettingsPanelHeader";
 import { SettingsPreferenceGroup, SettingsPreferenceRow } from "../SettingsPreferenceLayout";
-import { broadcastPillAppearance } from "../../../../platform/desktop/hostPillPrefsGateway";
+import {
+  loadPillPrefs,
+  nudgePillPrefs,
+  savePillPrefs,
+} from "../../../../platform/desktop/pillPrefsGateway";
 
 const STROKE = 1.6;
 const MIN_PERCENT = Math.round(TEXT_OPACITY_MIN * 100);
@@ -34,31 +41,55 @@ interface HostPillLookCardProps {
 
 export default function HostPillLookCard({ id }: HostPillLookCardProps) {
   const [appearance, setAppearance] = useState<Appearance>(() => readPillAppearance());
+  const [error, setError] = useState<string | null>(null);
+  /** 用户已经动过控件 → 进门那次读库的结果不许再盖回去。 */
+  const touched = useRef(false);
 
   /**
-   * 挂载时把本窗这份**当前值**推一次（幂等）。
+   * 挂载时去**真源**读一次。
    *
-   * 为什么需要：本页是这三项偏好的唯一编辑入口，而它读的是本窗那份存储。
-   * 用户 0.12.1 里调过、但当时没有任何通道送达悬浮条 —— 那些值现在只存在这里。
-   * 进一次设置页就把它们对齐过去，用户不必重新调一遍。
-   * 反过来也成立：悬浮条侧没有桌面写入点（药丸内联设置面板已下线），
-   * 所以本窗这份永远是"用户最后一次设置的值"，推过去不会覆盖更新的东西。
+   * 为什么要读：本卡显示本窗缓存，而本窗（分析窗）与悬浮条不是同一个 WebView 数据目录，
+   * 缓存可能是旧的；而 `patch` 发的是**整份外观**，用过期缓存打底就会把别的窗口改过的
+   * 另两项覆盖回去。读失败 / 库里没有 → 什么都不做（迁移由主窗 `main.tsx` 负责）。
    */
   useEffect(() => {
-    broadcastPillAppearance(readPillAppearance());
+    let alive = true;
+    void loadPillPrefs()
+      .then((prefs) => {
+        if (!alive || !prefs || touched.current) return;
+        writePillAppearance(prefs.appearance);
+        setAppearance(readPillAppearance());
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
   }, []);
 
   /**
-   * 唯一的写入口：库里归一化 → 落盘 → 把结果回填到本地状态 → **广播给悬浮条**。
+   * 唯一写入口：**先算完整值 → 落库 → 成功后才改界面**。
    *
-   * 最后一步不是可选的：设置页（主界面）与悬浮条是两份独立的 WebView 数据目录，
-   * 各读各的 localStorage，写完不广播的话用户回到悬浮条看到的还是旧外观
-   * （见 `platform/desktop/hostPillPrefsGateway.ts` 的文件头）。
+   * `normalizeAppearance` 是纯函数（在 `base` 上叠 patch），所以「算」与「写」可以分开：
+   * 算出的完整三项既是发给 Rust 的载荷，也是落库返回后本地要显示的值 —— 两边同源。
    */
+  const apply = async (merged: Appearance) => {
+    try {
+      await savePillPrefs({ appearance: merged });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存失败，请稍后重试");
+      return;
+    }
+    setError(null);
+    /* 本窗缓存：同窗立即跟随，也是下次冷启动首帧的来源（不是真源） */
+    writePillAppearance(merged);
+    setAppearance(merged);
+    /* 无载荷信号：悬浮条收到后自己去 `get_settings` 读，不靠这条通道传值 */
+    nudgePillPrefs();
+  };
+
   const patch = (next: Partial<Appearance>) => {
-    const saved = writePillAppearance(next);
-    setAppearance(saved);
-    broadcastPillAppearance(saved);
+    touched.current = true;
+    void apply(normalizeAppearance(next, appearance));
   };
 
   const opacitySlider = (
@@ -119,6 +150,11 @@ export default function HostPillLookCard({ id }: HostPillLookCardProps) {
           {opacitySlider("textOpacity", "文字不透明度")}
           {opacitySlider("bgOpacity", "背景不透明度")}
         </SettingsPreferenceGroup>
+        {error && (
+          <p className="inline-error mt-3" role="alert">
+            {error}
+          </p>
+        )}
         <p className="mt-3 flex items-center gap-1.5 qp-text-caption text-[var(--qp-text-tertiary)]">
           <Type size={12} strokeWidth={STROKE} aria-hidden />
           改完回到悬浮条即时生效（最长延迟 = 一次焦点切换）。

@@ -52,6 +52,8 @@ mod note;
 mod note_pin;
 /* [V0.11.27] 悬浮条显示源改成「状态机快照」后的三条易错口径（暂停/待机/原样透传）。 */
 mod overlay_snapshot;
+/* [0.12.1 归一] 悬浮条外观 / 手柄绑定的单一真源：半份 patch 的合并口径 + KV 往返。 */
+mod pill_prefs;
 mod plugin_v3_matrix;
 mod plugin_v3_wording;
 /* [QA V0.11.18] 「老用户云端配置一个字节都不许丢」的后端半场（PRD A3 / A4 / C2）：

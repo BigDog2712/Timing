@@ -1,18 +1,20 @@
 /**
- * 主界面设置 · G1「悬浮条与手柄」面板（[0.12.1] T04）
+ * 主界面设置 · G1「悬浮条与手柄」面板（[0.12.1] T04 · [0.12.1 归一] 真源搬到设置表）
  * -----------------------------------------------------------------------------
  * 三张卡（圆点 / 半手柄 / 手柄）由 `HANDLE_FORMS` 的顺序生成 —— 顺序即药丸上的顺序，
  * 不要在 JSX 里手写三遍。
  *
- * 读写全走 `src/lib/handleBindings.ts`：
- *  · `loadHandleBindings()` 读坏**永不 throw**、也**不写盘**（用户手改坏的原值不被覆盖）；
- *  · `saveHandleBindings()` 先归一化再落盘，所以这里可以放心传「用户刚点出来的对象」。
+ * **写路径（0.12.1 归一后）**：`savePillPrefs({ handles })` → 宿主设置表落库 → 成功后才动界面与
+ * 本窗缓存 → `nudgePillPrefs()` 发一个无载荷信号让悬浮条自己去读库。
+ * 顺序不能反：先改界面后落库的话，写失败时界面会撒谎（用户以为存上了，重启就没了）。
  *
- * 没有「保存」按钮：手柄绑定是一次性动作配置，不是表单草稿。改完即落盘，药丸在
- * `focus` / `pointerenter` / `visibilitychange` 上重读（`lib/appearanceSync.ts`）。
- * 这也避开了「点保存才生效」与「关掉设置页丢配置」两种相反预期。
+ * 为什么不再「写完广播载荷」：真源已经是宿主设置表，两窗各读各的 localStorage 的时代结束了
+ * （见 `platform/desktop/pillPrefsGateway.ts` 的文件头）。本窗那份 localStorage 只剩
+ * 「首帧缓存 + 同窗重渲染」两个用途，**不参与任何判定**。
+ *
+ * 没有「保存」按钮：手柄绑定是一次性动作配置，不是表单草稿。改完即落库。
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DEFAULT_HANDLE_BINDINGS,
   HANDLE_FORMS,
@@ -21,7 +23,11 @@ import {
   type HandleFormBinding,
 } from "../../../lib/handleCatalog";
 import { loadHandleBindings, saveHandleBindings } from "../../../lib/handleBindings";
-import { broadcastHandleBindings } from "../../../platform/desktop/hostPillPrefsGateway";
+import {
+  loadPillPrefs,
+  nudgePillPrefs,
+  savePillPrefs,
+} from "../../../platform/desktop/pillPrefsGateway";
 import SettingsPanelHeader from "./SettingsPanelHeader";
 import SettingsHandleCard from "./SettingsHandleCard";
 import { MousePointerClick } from "lucide-react";
@@ -35,36 +41,57 @@ interface SettingsHandlesPanelProps {
 
 export default function SettingsHandlesPanel({ id }: SettingsHandlesPanelProps) {
   const [bindings, setBindings] = useState<HandleBindings>(() => loadHandleBindings());
+  const [error, setError] = useState<string | null>(null);
+  /** 用户已经动过控件 → 进门那次读库的结果不许再盖回去（见下面的挂载效应）。 */
+  const touched = useRef(false);
 
   /**
-   * 挂载时把本窗这份**当前绑定**推一次（幂等）。
+   * 挂载时去**真源**读一次。
    *
-   * 与 `HostPillLookCard` 同一理由：本页是手柄绑定的唯一编辑入口，用户 0.12.1 里调过
-   * 的那些绑定只存在本窗这份存储里，进一次设置页就把它们对齐到悬浮条，
-   * 免得用户以为"又要重新配一遍"。
+   * 为什么要读：本卡显示的是本窗缓存，而本窗（分析窗）与悬浮条不是同一个 WebView 数据目录，
+   * 缓存可能是旧的。更要紧的是写：`commit` 发的是「整份 handles」，若首帧是过期缓存，
+   * 用户点一次开关就会把另外两个形态写成旧值（= 把别的窗口改过的配置抹掉）。
+   * 读失败 / 库里没有 → 什么都不做，继续用本窗缓存（迁移由主窗 `main.tsx` 负责）。
    */
   useEffect(() => {
-    broadcastHandleBindings(loadHandleBindings());
+    let alive = true;
+    void loadPillPrefs()
+      .then((prefs) => {
+        if (!alive || !prefs || touched.current) return;
+        saveHandleBindings(prefs.handles);
+        setBindings(loadHandleBindings());
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
   }, []);
 
   /**
-   * 唯一写入口：先落盘（归一化在库里）再把结果回填，界面与磁盘永远一致，
-   * 最后**广播给悬浮条**。
+   * 唯一写入口：**先落库，成功后再改界面**。
    *
-   * 广播不能省：设置页（主界面）与悬浮条是两份独立的 WebView 数据目录，各读各的
-   * localStorage，写完不广播的话用户回到悬浮条看到的还是旧绑定
-   * （见 `platform/desktop/hostPillPrefsGateway.ts` 的文件头）。
+   * 失败只在本卡内显示一行红字：不 throw 到 React 边界（那会让整个设置页消失），
+   * 也不用 toast（设置页有既定的红字口径）。
    */
-  const commit = (form: HandleForm, next: HandleFormBinding) => {
+  const commit = async (form: HandleForm, next: HandleFormBinding) => {
+    touched.current = true;
     const merged: HandleBindings = { ...bindings, [form]: next };
+    try {
+      await savePillPrefs({ handles: merged });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存失败，请稍后重试");
+      return;
+    }
+    setError(null);
+    /* 本窗缓存：同窗立即重渲染，也是下次冷启动首帧的来源（不是真源） */
     saveHandleBindings(merged);
-    const saved = loadHandleBindings();
-    setBindings(saved);
-    broadcastHandleBindings(saved);
+    /* 无载荷信号：悬浮条收到后自己去 `get_settings` 读，不靠这条通道传值 */
+    nudgePillPrefs();
+    setBindings(loadHandleBindings());
   };
 
   const resetForm = (form: HandleForm) => {
-    commit(form, DEFAULT_HANDLE_BINDINGS[form]);
+    void commit(form, DEFAULT_HANDLE_BINDINGS[form]);
   };
 
   return (
@@ -83,11 +110,16 @@ export default function SettingsHandlesPanel({ id }: SettingsHandlesPanelProps) 
             key={form}
             form={form}
             binding={bindings[form]}
-            onChange={(next) => commit(form, next)}
+            onChange={(next) => void commit(form, next)}
             onReset={() => resetForm(form)}
           />
         ))}
       </div>
+      {error && (
+        <p className="inline-error mt-3" role="alert">
+          {error}
+        </p>
+      )}
     </section>
   );
 }

@@ -16,6 +16,8 @@ pub mod note;
 pub mod overlay_push;
 pub mod plugin;
 pub mod plugin_merge;
+/* [0.12.1 归一] 悬浮条外观 / 手柄绑定的 KV 读写（`services/settings.rs` 只剩 2 行门禁余量）。 */
+pub mod pill_prefs;
 pub mod record;
 pub mod reminder;
 pub mod settings;

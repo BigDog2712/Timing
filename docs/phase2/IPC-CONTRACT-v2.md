@@ -1105,6 +1105,31 @@ Kotlin 自己读那个文件、写进用户选中的 `content://`。过桥要 ba
 
 ---
 
+### 12.15 V0.12.1 归一：悬浮条偏好真源搬进宿主设置表
+
+0.12.1 的两窗 localStorage 分区问题（§12.14 之后、同一批实测）最初用「设置页写完广播、
+悬浮条抄一份」对齐——那是权宜之计，真源仍是两份。本节收口为**单一真源**。
+
+| 项 | 内容 |
+|---|---|
+| 真源 | `settings` 表 KV 键 `timing.pill_prefs`（一个 JSON 快照：`appearance{textOpacity,bgOpacity,floatForm}` + `handles{dot,half,full}`） |
+| 命令变化 | **无**。读走既有 `get_settings`（新增返回字段 `pill: PillPrefs \| null`，`null` = 从未写过）；写走既有 `update_settings`（`patch.pill` 半份合并：读旧 → 覆盖 → 归一 → 写全量）。命令数仍 81(+117) |
+| 事件变化 | **无**。`timing:pill-prefs` 仍是前端自用常量（不进 Rust 事件表），从「携带载荷的搬运通道」降级为**无载荷信号**（收到 = 该去 `get_settings` 重读）。事件 11 / emit 18 不变 |
+| ACL 变化 | **无**。`get_settings` / `update_settings` 本就在 `host-commands`（悬浮条窗 `default` 已授权）；主界面写侧在 `patina-host-settings` |
+| 写路径 | 设置页（分析窗）→ `savePillPrefs(patch)` → 落库 → `nudgePillPrefs()`（无载荷 emit）→ 悬浮条收到信号后自己 `get_settings` |
+| 读路径 | 悬浮条（主窗）启动：localStorage 缓存**同步**套首帧（防闪）→ 异步 `get_settings` 对齐 → 把结果回写缓存。`pill == null`（读不到 / 坏形状）时**保留现值不覆盖** |
+| 迁移 | 悬浮条启动时 `pill == null` 且本窗缓存非默认 → 把缓存写库一次（`seedPillPrefsIfAbsent`），此后一律以库为准。0.12.1 里调过但只落在 localStorage 的值由此自动搬入 |
+| 归一化 | Rust `models/pill_prefs.rs::normalize`：不透明度 clamp（文字 ≥0.2、背景 0–1）、`floatForm` 只认 `bar/dot`、slot 空串/超 64 字符 → `None`。**动作 id 不在 Rust 校验**（权威目录在前端 `lib/handleCatalog.ts`） |
+| localStorage 的新地位 | **只做首帧缓存**：仅允许「启动时同步读一次」与「从库读到值后回写」两个用途，不参与任何判定。新增「设置页写 localStorage」的项不再需要接搬运通道 |
+| 手机端 | 不适用（`pill` 字段手机端恒 `null`；手机壳不读它） |
+
+判据：`src/lib/appearanceSync.test.ts`（安装即读 / null 不覆盖 / 信号重读）、
+`src/platform/desktop/pillPrefsGateway.test.ts`（`update_settings` 入参形状逐字）、
+`src/features/settings/components/host/PillPrefsBroadcast.test.tsx`（先落库成功才动界面）、
+`src-tauri/src/tests/pill_prefs.rs`（归一 / 半份合并不抹另一半 / KV 往返）。
+
+---
+
 ## 附录 A：capabilities 最小权限白名单（MVP，锁定）
 
 > 依据 Spec §10「安全：`capabilities` 最小权限白名单」与坑 K-4（插件命令运行时被拒）。Phase 3 实现 `src-tauri/capabilities/default.json` 时按本表逐项放行；**本表之外不放行**。

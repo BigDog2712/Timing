@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 use crate::models::constants::RECENT_ITEMS_DEFAULT;
 use crate::models::moyu::{default_presets as default_moyu_presets, MoyuPreset};
+use crate::models::pill_prefs::{PillPrefs, PillPrefsPatch};
 use crate::models::theme::{default_presets, AccentColors, AccentPatch, ThemeMode};
 
 /// Timing v1.7.3 参考设置（独立于现有 Settings，便于渐进接线）。
@@ -79,6 +80,13 @@ pub struct Settings {
     /// [V0.3.9] 常用事项的默认倒计时时长（itemId → 分钟）。
     /// 有值 = 点它起倒计时；无值 = 正计时。
     pub items_timers: HashMap<i64, i64>,
+    /// [0.12.1 归一] 悬浮条外观 + 手柄绑定快照。
+    ///
+    /// `None` = **库里从来没写过这份数据**，这本身是一个迁移信号：前端启动时若读到 `None`
+    /// 且本窗缓存不是出厂值，就把缓存写进来一次（用户 0.12.1 里调过的值只落在 localStorage）。
+    /// 一旦写过就永远是 `Some`，之后以库为准 —— 所以这个字段不能有默认快照，否则迁移永不触发。
+    #[serde(default)]
+    pub pill: Option<PillPrefs>,
 }
 
 impl Default for ReferenceSettings {
@@ -119,6 +127,8 @@ impl Default for Settings {
             items_show_recent: true,
             items_recent_count: RECENT_ITEMS_DEFAULT,
             items_timers: HashMap::new(),
+            /* 出厂 = 没写过：迁移判据就是它，别填默认快照 */
+            pill: None,
         }
     }
 }
@@ -145,6 +155,9 @@ pub struct SettingsPatch {
     pub items_recent_count: Option<i64>,
     #[serde(default)]
     pub items_timers: Option<HashMap<i64, i64>>,
+    /// [0.12.1 归一] 悬浮条外观 / 手柄绑定的部分更新（两个字段各自可选，缺的那个保持库里的值）。
+    #[serde(default)]
+    pub pill: Option<PillPrefsPatch>,
 }
 
 impl SettingsPatch {
