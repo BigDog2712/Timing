@@ -39,8 +39,10 @@
   --qp-nav-label-lh: 18px;
   --qp-shell-pad: 24px;
 
-  /* 横向档位 */
-  --qp-nav-item-w: 84px;
+  /* 横向档位：tab 只放图标后是**正方形**，宽度与高度同档（44 / 36）。
+   * 不再按窗宽 84→72 降级 —— 没有文字要容纳，图标 tab 的宽度与窗宽无关，
+   * 跟着高度轴走才不会在「900 宽 × 736 高」这一档留下一个 84 宽的空格子。 */
+  --qp-nav-item-w: 44px;
 }
 
 /* ── 纵向轴：只被**窗高**决定 ──
@@ -55,6 +57,7 @@
   :root {
     --qp-titlebar-height: 44px;
     --qp-nav-item-h: 36px;
+    --qp-nav-item-w: 36px;
     --qp-nav-icon: 16px;
     --qp-nav-stroke: 2.4;
     --qp-nav-label-lh: 14px;
@@ -63,15 +66,11 @@
 }
 
 /* ── 横向轴：只被**窗宽**决定 ──
- * 驱动三样宽度派生量：① tab 项宽 84→72 ② status 段两处降级（更新入口 58.6→28、
- * 胶囊隐藏今日列 省 75.3）③ 灯簇 38→24。
- * 不许并进高度断点：否则「900 宽 × 800 高」取 84×3 会把状态区挤到 286
+ * 驱动两样宽度派生量：① status 段两处降级（更新入口 58.6→28、胶囊隐藏今日列 省 75.3）
+ * ② 灯簇 38→24。（tab 项宽已不在这一轴：只放图标后它是正方形，跟高度档走。）
+ * 不许并进高度断点：否则「900 宽 × 800 高」的状态区会按窄档算，与实际宽度不符
  * （01 §1.1 附 B）。阈值 1000 而非 1024：只区分"接近最小宽"与"正常宽"，与高度轴正交。 */
 @media (max-width: 999.98px) {
-  :root {
-    --qp-nav-item-w: 72px;
-  }
-
   /* status 宽 = 900 − 114 − 96 − 216 − 152 = 322（宽度派生量，归这一轴）。
    * 胶囊自然需求 291.8、实得 250 → 名字列只剩 36.22（实测），而「设计评审会议」
    * 6 字 × 14 = 84 → 被 ellipsis 剪。判据一律按 6 字（84）判，**不按"四个汉字"判**：
@@ -201,13 +200,9 @@
   outline-offset: -2px;
 }
 
-/* 标签 12/400（M1 之后 --qp-font-weight-medium = 400）。**不许写裸 550**（46 坑 #4） */
-.qp-topbar-tab-label {
-  font-size: var(--qp-font-size-caption);
-  font-weight: var(--qp-font-weight-medium);
-  line-height: var(--qp-nav-label-lh);
-  white-space: nowrap;
-}
+/* [0.12.1] 文字标签已下线：tab 只留图标（名字进 `aria-label` / `title`）。
+   原 `.qp-topbar-tab-label` 规则随之删除；`--qp-nav-label-lh` 保留在 `:root`，
+   它是短档纵向节奏的一部分，删了会让 `--qp-nav-item-h` 两侧的派生失去参照。 */
 
 /* ── 指标条：全站唯一的动效；也是唯一允许"压线"的元素 ──
  * bottom: -1px 让 2px 条盖住顶栏那 1px 底边（.qp-topbar-nav 高 = 内容盒 51 →

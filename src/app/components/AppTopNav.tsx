@@ -97,9 +97,12 @@ export default function AppTopNav({
             aria-current={isActive ? "page" : undefined}
             data-topbar-tab={tab.id}
             className="qp-topbar-tab"
+            /* 文字标签已下线（只留图标）：名字必须留在可访问名里，否则读屏只剩
+               "按钮"三个字；`title` 给鼠标用户一条悬停提示，两者都不能省。 */
+            aria-label={tab.label}
+            title={tab.label}
           >
             <Icon aria-hidden="true" />
-            <span className="qp-topbar-tab-label">{tab.label}</span>
           </button>
         );
       })}

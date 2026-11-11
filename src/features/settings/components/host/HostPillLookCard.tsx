@@ -11,7 +11,7 @@
  * 不做轮询、不加事件 —— 这是本轮验收口径（X-01）。
  */
 import { Droplet, Type } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import QuietStepperSlider from "../../../../shared/components/QuietStepperSlider";
 import {
   FLOAT_FORM_OPTIONS,
@@ -22,6 +22,7 @@ import {
 } from "../../../../lib/pillAppearance";
 import SettingsPanelHeader from "../SettingsPanelHeader";
 import { SettingsPreferenceGroup, SettingsPreferenceRow } from "../SettingsPreferenceLayout";
+import { broadcastPillAppearance } from "../../../../platform/desktop/hostPillPrefsGateway";
 
 const STROKE = 1.6;
 const MIN_PERCENT = Math.round(TEXT_OPACITY_MIN * 100);
@@ -34,8 +35,31 @@ interface HostPillLookCardProps {
 export default function HostPillLookCard({ id }: HostPillLookCardProps) {
   const [appearance, setAppearance] = useState<Appearance>(() => readPillAppearance());
 
-  /** 唯一的写入口：库里归一化 → 落盘 → 把结果回填到本地状态。 */
-  const patch = (next: Partial<Appearance>) => setAppearance(writePillAppearance(next));
+  /**
+   * 挂载时把本窗这份**当前值**推一次（幂等）。
+   *
+   * 为什么需要：本页是这三项偏好的唯一编辑入口，而它读的是本窗那份存储。
+   * 用户 0.12.1 里调过、但当时没有任何通道送达悬浮条 —— 那些值现在只存在这里。
+   * 进一次设置页就把它们对齐过去，用户不必重新调一遍。
+   * 反过来也成立：悬浮条侧没有桌面写入点（药丸内联设置面板已下线），
+   * 所以本窗这份永远是"用户最后一次设置的值"，推过去不会覆盖更新的东西。
+   */
+  useEffect(() => {
+    broadcastPillAppearance(readPillAppearance());
+  }, []);
+
+  /**
+   * 唯一的写入口：库里归一化 → 落盘 → 把结果回填到本地状态 → **广播给悬浮条**。
+   *
+   * 最后一步不是可选的：设置页（主界面）与悬浮条是两份独立的 WebView 数据目录，
+   * 各读各的 localStorage，写完不广播的话用户回到悬浮条看到的还是旧外观
+   * （见 `platform/desktop/hostPillPrefsGateway.ts` 的文件头）。
+   */
+  const patch = (next: Partial<Appearance>) => {
+    const saved = writePillAppearance(next);
+    setAppearance(saved);
+    broadcastPillAppearance(saved);
+  };
 
   const opacitySlider = (
     which: "textOpacity" | "bgOpacity",
