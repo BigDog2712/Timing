@@ -12,9 +12,11 @@ import ItemsModule from "./ItemsModule.tsx";
 import NotesStrip from "./NotesStrip.tsx";
 import TimerModule from "./TimerModule.tsx";
 import TodosModule from "./TodosModule.tsx";
+import TimelineCard from "./TimelineCard.tsx";
 import AddCardDialog from "../layout/AddCardDialog";
 import CardControls from "../layout/CardControls";
 import { columnRowTokens, type LayoutCard } from "../layout/contract";
+import { buildFocusDistribution, isFocusDimension, type FocusDimension } from "../services/focusDimension.ts";
 import { useDashboardLayout } from "../layout/useDashboardLayout";
 
 /**
@@ -107,6 +109,15 @@ export default function Dashboard({
   }, [layout]);
   const labelOf = (id: LayoutCard["id"]) => copy.cardLabels[id] ?? id;
 
+  /* [P2] 专注卡的三维度：参数存在卡自己的 `options.dimension` 里（C2：该字典只有这一个键）。 */
+  const storedDimension = layout.cardOption("timer", "dimension");
+  const focusDimension: FocusDimension = isFocusDimension(storedDimension) ? storedDimension : "category";
+  const focus = buildFocusDistribution(focusDimension, {
+    categories: categoryDist,
+    applications: topApplications,
+    sessions: compiledSessions,
+  });
+
   const renderCards = (cards: LayoutCard[]) => cards.map((card) => {
     switch (card.id) {
       case "timer":
@@ -114,7 +125,14 @@ export default function Dashboard({
           <TimerModule
             key={card.id}
             controls={controlsFor(card, labelOf(card.id), cards)}
-            categoryDist={categoryDist}
+            categoryDist={focus.slices.map((slice) => ({
+              category: slice.category ?? "other",
+              name: slice.name,
+              value: slice.value,
+              color: slice.color,
+            }))}
+            dimension={focusDimension}
+            onDimensionChange={(next) => layout.setCardOption("timer", "dimension", next)}
             totalTrackedTime={totalTrackedTime}
             dayDeltaTrackedTime={dayDeltaTrackedTime}
             {...snapshotProps}
@@ -154,8 +172,23 @@ export default function Dashboard({
         return null;
     }
   });
-  const renderFullCard = (id: LayoutCard["id"]) =>
-    id === "notes" ? <NotesStrip model={notesModel} /> : null;
+  const renderFullCard = (card: LayoutCard) => {
+    if (card.id === "notes") return <NotesStrip model={notesModel} />;
+    /* [P3] 事项菜单卡：只读按时序（数据来自同一份 compiledSessions，不新增宿主命令）。 */
+    if (card.id === "timeline") {
+      return (
+        <TimelineCard
+          controls={controlsFor(card, labelOf(card.id), layout.full)}
+          sessions={compiledSessions}
+          tier={card.tier}
+          status={snapshotStatus}
+          refreshError={refreshError}
+          onRetry={readState.retry}
+        />
+      );
+    }
+    return null;
+  };
 
   return (
     <div
@@ -199,7 +232,7 @@ export default function Dashboard({
           </div>
         </div>
         {layout.full.map((card) => (
-          <Fragment key={card.id}>{renderFullCard(card.id)}</Fragment>
+          <Fragment key={card.id}>{renderFullCard(card)}</Fragment>
         ))}
       </div>
       {addOpen ? (

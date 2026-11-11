@@ -186,6 +186,30 @@
       "change": "added",
       "reason": "[P1 · 0.12.1] 行为判据两条：加卡后写进存储；弹层只列缺席卡且焦点落在第一项（B6 键盘等价的第一段）。仓库无 @testing-library，照 HostTimingStatusRow.test.tsx 用 react-dom/client + act。",
       "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/services/focusDimension.ts",
+      "change": "added",
+      "reason": "[P2 · 0.12.1] 专注卡三维度（分类 / 应用 / 窗口标题）的唯一聚合口：三个维度从同一批 stats/sessions 派生，分类 Σ = 应用 Σ = 测量总量，标题 Σ ≤ 之。第三维刻意叫「窗口标题」而不是「事项」—— items 表是另一个数据源，混叫会让用户看到一个名字对、数字不对的卡。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/services/focusDimension.test.ts",
+      "change": "added",
+      "reason": "[P2 · 0.12.1] C1 判据 6 条：分类与应用同额、标题回落到应用名、无名字节丢弃、切片按值降序且键唯一、只有分类维度带 category、isFocusDimension 只认三值。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/TimelineCard.tsx",
+      "change": "added",
+      "reason": "[P3 · 0.12.1] 事项菜单卡（只读）：今日会话按 startedAt 升序渲染，行数按档位 4/6/8。不新增宿主命令（复用 compiledSessions），不做就地编辑（写面排 P4，宁可只读也不给假的可编辑）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/TimelineCard.test.ts",
+      "change": "added",
+      "reason": "[P3 · 0.12.1] D4 判据 4 条：升序、零时长与全无名会话丢弃（仅无标题时回落应用名）、档位截断、同一标题下 key 仍唯一。",
+      "owner": "ForG"
     }
   ]
 }

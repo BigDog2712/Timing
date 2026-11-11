@@ -29,6 +29,9 @@ export interface DashboardCopy {
   timerTitle: string;
   addCard: string;
   cardLabels: Record<string, string>;
+  focusDimensionLabel: string;
+  focusDimensions: Record<"category" | "app" | "title", string>;
+
   itemsTitle: string;
   /** 卡头第一段：今日**全部**事项数（不是列表里那 6 行） */
   itemsCount: (count: number) => string;
@@ -67,6 +70,8 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     todoComposeLabel: "添加待办",
     timerTitle: "计时分布",
     addCard: "添加卡片",
+    focusDimensionLabel: "专注窗口维度",
+    focusDimensions: { category: "分类", app: "应用", title: "窗口标题" },
     cardLabels: { timer: "专注窗口", apps: "应用排行", timeline: "事项菜单", todos: "待办窗口", notes: "便利贴窗口", trend: "应用趋势", reminder: "提醒窗口" },
     itemsTitle: "事项分布",
     itemsCount: (count) => `今日 ${count} 项`,
@@ -97,6 +102,8 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     todoComposeLabel: "Add a to-do",
     timerTitle: "Time distribution",
     addCard: "Add card",
+    focusDimensionLabel: "Focus dimension",
+    focusDimensions: { category: "Category", app: "App", title: "Window title" },
     cardLabels: { timer: "Focus", apps: "Applications", timeline: "Timeline", todos: "Todos", notes: "Notes", trend: "App trend", reminder: "Reminders" },
     itemsTitle: "Items",
     itemsCount: (count) => `${count} today`,
@@ -127,6 +134,8 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     todoComposeLabel: "Добавить задачу",
     timerTitle: "Распределение времени",
     addCard: "Добавить карточку",
+    focusDimensionLabel: "Разрез фокуса",
+    focusDimensions: { category: "Категория", app: "Приложение", title: "Заголовок окна" },
     cardLabels: { timer: "Фокус", apps: "Приложения", timeline: "Хронология", todos: "Задачи", notes: "Заметки", trend: "Тренд", reminder: "Напоминания" },
     itemsTitle: "Занятия",
     itemsCount: (count) => `Сегодня ${count}`,
@@ -157,6 +166,8 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     todoComposeLabel: "Añadir tarea",
     timerTitle: "Distribución del tiempo",
     addCard: "Añadir tarjeta",
+    focusDimensionLabel: "Dimensión de enfoque",
+    focusDimensions: { category: "Categoría", app: "Aplicación", title: "Título de ventana" },
     cardLabels: { timer: "Enfoque", apps: "Aplicaciones", timeline: "Cronología", todos: "Pendientes", notes: "Notas", trend: "Tendencia", reminder: "Recordatorios" },
     itemsTitle: "Actividades",
     itemsCount: (count) => `${count} hoy`,

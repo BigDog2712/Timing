@@ -30,6 +30,12 @@ export interface LayoutCard {
   id: CardId;
   column: CardColumn;
   tier: CardTier;
+  /**
+   * 组件参数（P2）。**一个卡一个字典**，键由各卡自己解释 —— 布局层不校验业务值。
+   * 到 P2 只有专注卡用：`{ dimension: "category" | "app" | "title" }`。
+   * 刻意不放进顶层：参数是卡的属性，摊平到 layout 上必然出现 `timerDimension` 这类前缀键。
+   */
+  options?: Record<string, string>;
 }
 
 export interface DashboardLayout {
@@ -65,6 +71,16 @@ export function isCardColumn(value: unknown): value is CardColumn {
 
 export function isCardTier(value: unknown): value is CardTier {
   return value === "S" || value === "M" || value === "L";
+}
+
+/** 组件参数只收「字符串 → 字符串」；别的形状一律视为没有（宁可回默认，也不吞一个坏对象）。 */
+export function sanitizeOptions(value: unknown): Record<string, string> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof raw === "string" && raw.length > 0) out[key] = raw;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /**

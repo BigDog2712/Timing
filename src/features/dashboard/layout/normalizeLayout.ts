@@ -7,6 +7,7 @@
  */
 import {
   DEFAULT_TIER,
+  sanitizeOptions,
   isCardColumn,
   isCardId,
   isCardTier,
@@ -75,7 +76,7 @@ export function normalizeLayout(raw: unknown): NormalizeResult {
       note("card-not-object");
       continue;
     }
-    const record = entry as { id?: unknown; column?: unknown; tier?: unknown };
+    const record = entry as { id?: unknown; column?: unknown; tier?: unknown; options?: unknown };
     if (!isCardId(record.id)) {
       note("unknown-card-id");
       continue;
@@ -95,7 +96,13 @@ export function normalizeLayout(raw: unknown): NormalizeResult {
       tier = DEFAULT_TIER;
     }
 
-    cards.push({ id: record.id, column: column.column, tier: tier as LayoutCard["tier"] });
+    const options = sanitizeOptions(record.options);
+    cards.push({
+      id: record.id,
+      column: column.column,
+      tier: tier as LayoutCard["tier"],
+      ...(options ? { options } : {}),
+    });
   }
 
   if (cards.length === 0) {

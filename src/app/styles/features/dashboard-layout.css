@@ -148,3 +148,78 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ── 专注卡的三维度切换（P2）──
+ * 三个小标签，不占行高：放在环上方一行，与读数行同宽。
+ * 用 `aria-selected` 而不是自定义类表达选中，样式从属性来（键盘与读屏同一口径）。 */
+.qp-focus-dims {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.qp-focus-dim {
+  padding: 1px 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  cursor: pointer;
+}
+
+.qp-focus-dim[data-active] {
+  background: var(--qp-bg-elevated);
+  color: var(--qp-text-primary);
+}
+
+.qp-focus-dim:hover {
+  color: var(--qp-text-primary);
+}
+
+.qp-focus-dim:focus-visible {
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: 1px;
+}
+
+/* ── 事项菜单卡（P3）：时序行 ──
+ * 三列固定（时间 / 名称 / 时长），时间用 tabular-nums 防跳宽；名称占满并省略。 */
+.qp-card-timeline .qp-timeline-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-row-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.qp-timeline-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--qp-card-head-gap);
+  height: var(--qp-row-items);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+}
+
+.qp-timeline-time {
+  color: var(--qp-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.qp-timeline-label {
+  color: var(--qp-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-timeline-duration {
+  color: var(--qp-text-secondary);
+  font-variant-numeric: tabular-nums;
+}

@@ -6,6 +6,7 @@ import { getCategoryToken } from "../../../shared/classification/categoryTokens.
 import { useActivityDisplayColor } from "../../../shared/hooks/useActivityDisplayColor.ts";
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { formatDashboardDuration, type CategoryDistItem } from "../services/dashboardFormatting.ts";
+import { FOCUS_DIMENSIONS, type FocusDimension } from "../services/focusDimension.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import ModuleShell, { moduleState } from "./ModuleShell.tsx";
 import type { ReactNode } from "react";
@@ -34,6 +35,9 @@ const READOUT_LIMIT = 4;
 interface Props {
   controls?: ReactNode;
   categoryDist: CategoryDistItem[];
+  /** [P2] 当前维度：分类 / 应用 / 窗口标题（数据由 `buildFocusDistribution` 给好）。 */
+  dimension: FocusDimension;
+  onDimensionChange: (dimension: FocusDimension) => void;
   totalTrackedTime: number;
   dayDeltaTrackedTime: number;
   /** 快照源的同一个 `status`（E2/E3 都由它派生，不另算） */
@@ -66,6 +70,8 @@ function buildReadouts(
 export default function TimerModule({
   controls,
   categoryDist,
+  dimension,
+  onDimensionChange,
   totalTrackedTime,
   dayDeltaTrackedTime,
   status,
@@ -116,6 +122,23 @@ export default function TimerModule({
         </>
       )}
     >
+      {/* [P2] 三个维度：同一份总量换分组，不是三份数据。切维度只改 `options.dimension`，
+          环与读数行仍是同一份数组（段数 = 行数这条不变）。 */}
+      <div className="qp-focus-dims" role="tablist" aria-label={copy.focusDimensionLabel}>
+        {FOCUS_DIMENSIONS.map((dim) => (
+          <button
+            key={dim}
+            type="button"
+            role="tab"
+            aria-selected={dim === dimension}
+            className="qp-focus-dim"
+            data-active={dim === dimension || undefined}
+            onClick={() => onDimensionChange(dim)}
+          >
+            {copy.focusDimensions[dim]}
+          </button>
+        ))}
+      </div>
       <div className="qp-donut-body">
         {/* 环只是同一份数据的第二表达，读数行才是可读内容 → 环对读屏隐藏，
             否则同一组占比会被读两遍（01 §4.3 骨架里环无 role） */}

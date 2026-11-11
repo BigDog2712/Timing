@@ -29,6 +29,9 @@ export interface DashboardLayoutController {
   moveCard: (id: CardId, direction: -1 | 1) => void;
   setCardColumn: (id: CardId, column: CardColumn) => void;
   setCardTier: (id: CardId, tier: CardTier) => void;
+  /** 组件参数（P2）：一个键一个字，传 `null` 即删键。 */
+  setCardOption: (id: CardId, key: string, value: string | null) => void;
+  cardOption: (id: CardId, key: string) => string | null;
   reset: () => void;
 }
 
@@ -96,6 +99,24 @@ export function useDashboardLayout(): DashboardLayoutController {
     }));
   }, []);
 
+  const setCardOption = useCallback((id: CardId, key: string, value: string | null) => {
+    setLayout((current) => commit({
+      ...current,
+      cards: current.cards.map((card) => {
+        if (card.id !== id) return card;
+        const options = { ...(card.options ?? {}) };
+        if (value === null) delete options[key];
+        else options[key] = value;
+        return Object.keys(options).length > 0 ? { ...card, options } : { id: card.id, column: card.column, tier: card.tier };
+      }),
+    }));
+  }, []);
+
+  const cardOption = useCallback(
+    (id: CardId, key: string) => layout.cards.find((card) => card.id === id)?.options?.[key] ?? null,
+    [layout],
+  );
+
   const reset = useCallback(() => {
     resetLayout();
     /* 清键后再读：`loadLayout` 的「首次运行」分支给的是出厂布局，不写盘。 */
@@ -106,5 +127,8 @@ export function useDashboardLayout(): DashboardLayoutController {
   const right = useMemo(() => layout.cards.filter((card) => card.column === "right"), [layout]);
   const full = useMemo(() => layout.cards.filter((card) => card.column === "full"), [layout]);
 
-  return { layout, left, right, full, has, addCard, removeCard, moveCard, setCardColumn, setCardTier, reset };
+  return {
+    layout, left, right, full, has, addCard, removeCard, moveCard,
+    setCardColumn, setCardTier, setCardOption, cardOption, reset,
+  };
 }
