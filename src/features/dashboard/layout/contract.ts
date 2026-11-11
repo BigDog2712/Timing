@@ -101,5 +101,8 @@ export function columnRowTokens(cards: readonly LayoutCard[]): string[] {
     .filter((card) => card.column !== "full")
     .map((card) => cardRowToken(card.id, card.tier))
     .filter((token): token is string => Boolean(token))
-    .map((token) => `var(${token})`);
+    /* `minmax(0, …)` 而不是裸 `var(…)`：行高是固定像素，窗口比板子矮时（加卡工具条占位、
+       多张通栏卡挤压）裸值会**溢出列**，卡片就压到下一张身上。minmax 让它按需收缩，
+       空间够时与裸值逐像素相同 —— 零像素回归（B1/B2）不受影响。 */
+    .map((token) => `minmax(0, var(${token}))`);
 }

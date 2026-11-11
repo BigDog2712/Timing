@@ -217,12 +217,15 @@ export default function Dashboard({
         </div>
       ) : null}
 
+      {/* [P1 修复] 工具条是板子的兄弟节点，不许进 `.qp-main-view`：
+          放进去会占掉网格的首行，把双列区压扁。 */}
+      <div className="qp-dashboard-toolbar">
+        <button type="button" className="qp-link-btn" onClick={() => setAddOpen(true)}>
+          {copy.addCard}
+        </button>
+      </div>
+
       <div className="qp-main-view" aria-busy={snapshotStatus === "loading" || undefined}>
-        <div className="qp-dashboard-toolbar">
-          <button type="button" className="qp-link-btn" onClick={() => setAddOpen(true)}>
-            {copy.addCard}
-          </button>
-        </div>
         <div className="qp-ws">
           <div className="qp-col qp-col-left" style={rowStyle(layout.left)}>
             {renderCards(layout.left)}

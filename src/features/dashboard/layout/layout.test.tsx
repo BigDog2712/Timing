@@ -79,9 +79,9 @@ describe("columnRowTokens", () => {
   it("b01a_default_layout_reproduces_today_grid_rows_verbatim", () => {
     const left = columnRowTokens(DEFAULT_LAYOUT.cards.filter((card) => card.column === "left"));
     const right = columnRowTokens(DEFAULT_LAYOUT.cards.filter((card) => card.column === "right"));
-    /* 与 `.qp-col-left { grid-template-rows: var(--qp-mod-timer) var(--qp-mod-items) }` 逐字相同 */
-    expect(left).toEqual(["var(--qp-mod-timer)", "var(--qp-mod-items)"]);
-    expect(right).toEqual(["var(--qp-mod-apps)", "var(--qp-mod-todos)"]);
+    /* 与 `.qp-col-left/right` 的令牌序列逐字相同；外面那层 minmax(0, …) 是防溢出用的，见 contract.ts */
+    expect(left).toEqual(["minmax(0, var(--qp-mod-timer))", "minmax(0, var(--qp-mod-items))"]);
+    expect(right).toEqual(["minmax(0, var(--qp-mod-apps))", "minmax(0, var(--qp-mod-todos))"]);
   });
 });
 

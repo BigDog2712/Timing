@@ -12,9 +12,20 @@
  * 为什么不做常显：五张卡各挂五个按钮 = 一屏 25 个按钮，比数据还吵。
  * 用 `:focus-within` 而不是只 `:hover`：键盘用户 Tab 进来必须能看见（B6 的键盘等价）。 */
 .qp-card-controls {
+  /* [P1 修复] **绝对定位**：五个按钮 ≈ 110px 宽，塞进 20px 高的卡头右槽会把「前 5 项」
+     「比昨天增加」这类 meta 挤到卡外，表现为文字压在数据行上。位置贴着卡头右上角，
+     不参与排版，也不再影响卡头高度。 */
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: 2;
+  transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  padding: 0 2px;
+  border-radius: var(--qp-radius-control);
+  background: var(--qp-bg-panel);
   opacity: 0;
   transition: opacity var(--qp-motion-fast, 120ms) ease;
 }

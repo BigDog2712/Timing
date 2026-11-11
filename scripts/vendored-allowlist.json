@@ -384,6 +384,42 @@
       "change": "added",
       "reason": "[P3 · 0.12.1] D2 判据：抠两侧源码的 action 字面量与字段名归一后必须完全相等，并单独断言四条新动作都在。漂一个字段名的症状是静默的（default 分支吞掉）。",
       "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/services/historyRangeTimeline.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 区间时间轴] 每天一条 0–24h 活动带的纯函数：分格取主导（格宽随跨度 5/10/15 分钟）再合并相邻同应用。分格是为了把 DOM 从「上万条会话」压到每天 ≤288 块；分母用完整一天，今天的带子才不会被此刻裁短后横向拉满。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/services/historyRangeTimeline.test.ts",
+      "change": "added",
+      "reason": "[0.12.1 末 · 区间时间轴] 几何判据 10 条：格宽三档、格窗取整、相邻格合并、同格主导、跨日按墙钟切、今天裁到此刻且分母不变、左边界裁剪、空日仍出行、同长按键定序。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/history/components/HistoryRangeTimeline.tsx",
+      "change": "added",
+      "reason": "[0.12.1 末 · 区间时间轴] 区间视图的逐日时间轴：一行一天、行首点开单日、颜色按应用键解析一次。不用 QuietTimelineSegment 是因为它每段挂一个浮层实例，30 天几千段会卡。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/history-range-timeline.css",
+      "change": "added",
+      "reason": "[0.12.1 末 · 区间时间轴] history-range.css 已 296 行，撞 size 棘轮（≤300），故另立一份；选择器一律挂 .history-range-timeline-*，只用令牌。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/features/dashboard/components/dashboardBoardLayout.test.ts",
+      "change": "added",
+      "reason": "[P1 修复回填 · 0.12.1] 「板子塌了」的两条结构判据：加卡工具条必须是 .qp-main-view 的兄弟（不许进板子）、/layout/contract.ts 的行高必须被 minmax(0, …) 夹住。板子退化成两行固定网格那条没有自动判据（Vite 对 .css?raw 也走 CSS 管线，拿不到原文），只能靠人看，文件头写明。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/app/styles/features/dashboard.css",
+      "change": "modified",
+      "reason": "[P1 修复 · 0.12.1] 板式从「两行固定网格」改为 flex 列（`grid-template-rows: minmax(0,1fr) var(--qp-mod-note)` 预设了正好两行，组件化后多一张通栏卡或一条工具条就把 1fr 行吃掉，双列区被压到 56px、卡片重叠）。双列区 `flex:1` 吃掉剩余高度；通栏卡按 token 定高（notes=--qp-mod-note，timeline=--qp-mod-items），`flex: 0 1 auto` 保证空间不足时收缩而不是溢出。卡头右槽加 position: relative，作为工具条绝对定位的锚点。",
+      "owner": "ForG"
     }
   ]
 }

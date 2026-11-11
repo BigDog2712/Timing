@@ -34,13 +34,19 @@
 }
 
 /* ── 板式：>1052×636 时居中留白，绝不拉伸（01 §4.5 方案 A） ── */
+/* [P1 修复] 板式从「两行固定网格」改为 flex 列：
+ * 原 `grid-template-rows: minmax(0,1fr) var(--qp-mod-note)` 预设了「正好两行」（双列区 + 便利贴）。
+ * 组件化之后通栏卡可以有多张（便利贴 / 事项菜单 / 趋势…），第三张起只能落到隐式行上，
+ * 而任何**多出来的子元素**（例如加卡工具条）都会先吃掉那个 1fr 行 —— 于是双列区被压到 56px、
+ * 卡片互相重叠。改成 flex 后：双列区 `flex:1` 吃剩余空间，通栏卡按 token 各占一行，加多少张都不打架。 */
 .qp-main-view {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) var(--qp-mod-note);
+  display: flex;
+  flex-direction: column;
   gap: var(--qp-card-gap);
   width: min(var(--qp-board-w), 100%);
   height: min(var(--qp-board-h), 100%);
   margin: auto;
+  min-height: 0;
   outline: none;
 }
 
@@ -50,7 +56,15 @@
   grid-template-columns: minmax(320px, 44fr) minmax(0, 54fr);
   gap: var(--qp-card-gap);
   min-height: 0;
+  /* [P1 修复] 双列区吃剩余高度；通栏卡按 token 定高，不再靠网格行模板分配 */
+  flex: 1 1 auto;
 }
+
+/* 通栏卡的定高：S/M/L 三档沿用模块 token，避免第三张卡起抢空间 */
+.qp-main-view > .qp-notes { flex: 0 1 auto; height: var(--qp-mod-note); }
+.qp-main-view > .qp-card-timeline { flex: 0 1 auto; height: var(--qp-mod-items); }
+.qp-main-view > .qp-card-timeline[data-tier="S"] { flex-basis: var(--qp-mod-items-s); }
+.qp-main-view > .qp-card-timeline[data-tier="L"] { flex-basis: var(--qp-mod-items-l); }
 
 .qp-col {
   display: grid;
@@ -135,6 +149,8 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 4px;
+  /* [P1 修复] 布局工具条绝对定位的锚点：它跟着卡头右槽走，但不参与卡头排版 */
+  position: relative;
 }
 
 /* E3：有数据但刷新失败，只给一个 12px 图标（不占版面、不动卡高）。
