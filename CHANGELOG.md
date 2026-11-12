@@ -6,6 +6,39 @@
 
 ## 0.12.1（桌面）— 2026-11-12（末）
 
+### 工程 · 启动失败不再 abort；clippy 实测 136 处，审计的「42」不准确
+
+审计两轮都说「42 处生产可达 `unwrap/expect`」，但一直没有机器输出背书。本版把 `cargo clippy --lib`
+真跑出来了，结论是**方向对、数字不对**：
+
+- **实测 136 条**（`cargo clean -p timing` 后重编 20.6 s，清包前后同值）：`unwrap_used` 96
+  （`unwrap()` on `Option` 50 / `Result` 42 / `unwrap_err()` 4）+ `expect_used` 34
+  （`Option` 24 / `Result` 10）+ 其它 6（`needless_return` / `question_mark` /
+  `chunks_exact_to_as_chunks` / `unnecessary_sort_by` / `type_complexity` / `explicit_counter_loop`）。
+  注意 clippy 的 `unwrap_used` **覆盖 `unwrap_err()`**，所以「92 + 4」与「96」是同一组数的两种分组。
+- **95 处（70%）在验收支撑代码**，不是产品路径：`native_probe/acceptance.rs` 39、
+  `acceptance/shell.rs` 32、`acceptance/diagnostics.rs` 15、`native_icon_acceptance.rs` 9
+  （4 处 `unwrap_err()` 全在这里）。
+- **4 处在 `#[cfg(debug_assertions)]` 内**（`app/insight/main_window.rs:488/488/600/626`，全是
+  `PATINA_E2E_*` 环境变量解析）—— release 构建里那段**根本不编译**，审计把它们算进了「生产可达」。
+- **真能进 release 的启动 panic 点只有 `lib.rs:211` 一处**：`builder.build(ctx).expect("Timing 启动失败")`。
+  `panic = "abort"` 下这句是直接 abort，既没有栈也没有日志，用户只看到闪退。改为
+  `match` + `log_error!` + `exit(1)`（`183043a`）。**修后重跑该文件 0 条**，136 与修复前 137 的差就是它。
+- 剩余 **37 处**散在 31 个产品文件（`native_probe/process.rs` 4、`export_schedule` 3、
+  `storage_migration` 3、`native_probe/fault` 2、`process_filters` 2、`platform/clock` 2、
+  `export_scheduler` 2，另 19 个文件各 1 处）。**本轮不收敛**——这 37 处里哪些真的不可继续、
+  哪些该返回 `Result`，要逐条看失败分支，不是批量替换能解决的。
+- **为什么以后不信人肉估算**：我按三种静态口径分别得到 1,890 / 131 / 76 处，clippy 给 136。
+  131 最接近（「排除 `#[cfg(test)]` 块 + 测试专用文件 + `/tests/` 目录」是对的），但还得再排除
+  acceptance 支撑才对得上。四种口径差一个数量级，说明按 `mod` 图数数不可靠——要么用 clippy，要么别给数字。
+- **clippy 进 CI 的坑**：首次在 Windows 上跑了 47 分钟后**卡死**（`rustc` 子进程 CPU 0 秒、
+  内存 15 MB，僵在 `Checking tauri-plugin-single-instance` 之后）；杀掉重试走增量编译只花 **6.4 秒**，
+  清包重编 **20.6 秒**。冷启动不可靠、热启动极快 —— CI 必须缓存 `target/`，否则这条门禁每次都在赌
+  47 分钟会不会回来。另外 **缓存命中时 clippy 不重放 lint**，Fresh 单元甚至会重放上一轮的旧诊断，
+  所以取数前必须 `cargo clean -p timing`（本仓 0.11.19 记过这条）。
+- 命令：`cargo clippy --lib --message-format=json`，按 `reason=compiler-message` + `level=warning` 计数；
+  **不看 exit code**（clippy 对 warn 级 lint 恒返 0，历史上还出现过恒 0 的假绿）。
+
 ### 工程 · 跨窗共享层：L9 例外表清空，settings 三份副本合一
 
 上一版把「双窗共享」靠 L9 白名单放行 5 条例外（分析窗可以去引主窗模块）。那 5 个模块既不属于
@@ -43,8 +76,9 @@
   也把它列在退役清单）、`miniStatusViewModel`、`reminderReadRepository`、主窗 `folderPicker` / `mdSyncStore`。
   孤儿集按**迭代**收敛：单轮检测出 11 个，删完才暴露下层 2 个，三轮归零——「删 11 个」会留下 310 行新死代码。
 - **clippy 可见性**：`[lints.clippy] unwrap_used / expect_used = "warn"`。`panic = "abort"` 下生产可达的
-  42 处此前无任何门禁看着。**当前未跑 clippy 全量**（`target/debug` 已清，重建约 20 G），只验证了
-  manifest 可解析；warn 不阻断构建。
+  `unwrap/expect` 此前无任何门禁看着。这笔提交时只验证了 manifest 可解析（`target/debug` 已清），
+  **同一版内随后补跑了全量**：实测 136 处、70% 在验收支撑、真启动点仅 `lib.rs:211` 一处——
+  见本节上方「启动失败不再 abort」。warn 不阻断构建。
 - 数字：源码 1,673 → **1,662** 文件；总行 288,153 → **287,201**；超 300 行豁免仍 150 条。注意分母缩小后
   占比 32.7% → **32.8%**：占比度量的是「豁免代码占全仓比例」，对「删死代码」方向是反的，棘轮口径必须用条数。
 - 验证：tsc 0 错；八步门禁全绿（layers **10 条**）；1,196 用例全绿；build 2.18 s；4 处故意破坏

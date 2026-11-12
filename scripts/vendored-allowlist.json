@@ -104,18 +104,6 @@
       "owner": "寇豆码"
     },
     {
-      "path": "src/windows/patina/shell/hooks/useMainToolsNavigation.ts",
-      "change": "modified",
-      "reason": "P0-03（TB1-1）：消费新的落点联合类型（tools / history）；把原先内联在 `AppShell` 的 `handleToolsStatusChipOpen` 收成本 hook 的返回值（`AppShell.tsx` 是冻结行数，净预算必须 ≤0）；「先订阅、后 take」的冷启动写法保持不变。",
-      "owner": "寇豆码"
-    },
-    {
-      "path": "src/windows/patina/shell/hooks/useMainWindowReady.ts",
-      "change": "modified",
-      "reason": "D3：就绪判据与 effect 依赖改用 useAppThemeMode 返回的实际模式（3 处），不再比对本地 themeMode。",
-      "owner": "ForG"
-    },
-    {
       "path": "src/windows/patina/features/dashboard/components/Dashboard.tsx",
       "change": "modified",
       "reason": "第二批重写：513 行 → 113 行，只留数据装配 + 五模块组合。删 QuietPageHeader、HourlyActivityChart 与旧环形函数（设计五模块里没有今日节律）。",
@@ -143,18 +131,6 @@
       "path": "src/windows/patina/features/dashboard/hooks/useTodayNotes.ts",
       "change": "modified",
       "reason": "[0.12.1 重锚] 第二批新增：便利贴取数 + 按 updatedAt 落今日本地日筛选（不按 createdAt，否则老用户这条永远空）+ 降序截 3。基线已含该文件，登记口径由 added 改 modified。 ｜ [便利贴可删除] 主人口径：正文上移（上内距 11→7、色条 top/bottom 10→8，只动垂直留白）+ 展开后支持删除：弹层 actions 里加「删除」→ 同层内联二次确认 → `patina:host-intent` 的 `delete_note`（分析窗无写命令）→ 药丸侧 `services/noteActions.removeNote(id)`；`useTodayNotes.removeLocal(id)` 立刻摘掉并记入「待消失」集合，避免下一次刷新「删了又蹦回来」。",
-      "owner": "ForG"
-    },
-    {
-      "path": "src/windows/patina/platform/desktop/mainToolsNavigationGateway.ts",
-      "change": "modified",
-      "reason": "P0-03（TB1-1）：`takeMainToolsTarget()` 返回类型从 `\"pomodoro\"|\"reminders\"|null` 改成带标签的 `MainWindowTarget` 联合（tools / history），并加运行时形状校验（非法载荷抛错，不静默吞）。事件常量 `MAIN_TOOLS_TARGET_CHANGED` 未变。",
-      "owner": "寇豆码"
-    },
-    {
-      "path": "src/windows/patina/platform/runtime/hostThemeGateway.test.ts",
-      "change": "modified",
-      "reason": "[0.12.1 重锚] 新增：主题同步器 6 条用例（先订阅后读、旧值不盖事件、读不到不应用、订阅不可用仍读、取消后不再应用、取消早于订阅返回）。基线已含该文件，登记口径由 added 改 modified。",
       "owner": "ForG"
     },
     {
