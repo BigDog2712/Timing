@@ -185,6 +185,7 @@ for (const [oldRel, newRel] of newOf) {
     mkdirSync(path.join(ROOT, dir), { recursive: true });
     dirs.add(dir);
   }
+  if (oldRel === newRel) continue; // 留在原地（vite-env.d.ts）：git mv 同路径会报错
   execSync(`git mv "${oldRel}" "${newRel}"`, { cwd: ROOT });
 }
 for (const [, newRel, content] of changed) writeFileSync(path.join(ROOT, newRel), content, 'utf8');
