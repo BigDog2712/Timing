@@ -208,7 +208,18 @@ pub fn run() {
 
     /* `run(ctx)` 是「`build` + 空回调 `run`」的简写；桌面需要 `RunEvent`
     （Patina 的托盘驻留判定 / 退出时停观察者），所以展开成 build + run。 */
-    let application = builder.build(ctx).expect("Timing 启动失败");
+    /* 原来这里是 `.expect("Timing 启动失败")`。`panic = "abort"`（见 Cargo.toml）下，
+       `build` 失败等于**直接 abort**：没有窗口、没有日志、用户只看到进程消失，
+       连 panic.log 都可能来不及落盘。改成记录后 `exit(1)`：
+       `log_error!` 会走 platform/log 的落盘路径（`<数据根>/logs/`），
+       `exit(1)` 让安装器/外部守护进程能识别「启动失败」而不是「用户主动退出」。 */
+    let application = match builder.build(ctx) {
+        Ok(application) => application,
+        Err(error) => {
+            crate::log_error!("启动失败：无法创建应用实例（{error}）");
+            std::process::exit(1);
+        }
+    };
 
     #[cfg(desktop)]
     application.run(crate::app::insight::bootstrap::handle_run_event);
