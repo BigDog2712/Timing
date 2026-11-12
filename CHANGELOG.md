@@ -6,6 +6,28 @@
 
 ## 0.12.1（桌面）— 2026-11-12（末）
 
+### 工程 · 双窗门禁补洞：L9 扫入口 + 新增 L10，删 988 行死代码
+
+外审发现两个门禁「绿着空转」，本版补齐，每条都带故意破坏自证：
+
+- **L9 补入口洞**：`main.tsx` / `App.tsx` 此前不在扫描表里，而 `main.tsx:84` 早已把分析窗的
+  `pillPrefsGateway` 引进主窗，门禁仍报绿——入口不扫等于「绕到入口就没人管」。现在 `entry/` 入表；
+  `pillPrefsGateway`（药丸偏好真源唯一出入口）进例外表，破例理由与兜底写在 `L9_ALLOWED_TARGETS` 注释。
+- **L10 新增**：`patina/platform/**` 不得 import `features|shell`，`patina/shared/**` 不得 import
+  `features|shell|platform`（方向只能朝下）。两处既有反向依赖真的下沉了，不是加豁免：`hostTypes` →
+  `shared/dto`（原位置留 `export *` 转发壳，14 处引用零改动）、`useWindowDragGesture` → `platform/desktop`
+  （它依赖 invoke，留在 shared 就是 shared→platform 反向依赖）。
+- **删 12 个零引用模块 / 988 行**：history 旧版式整簇 8 个（单日已统一走 `HistoryRangeView`，h05 哨兵
+  也把它列在退役清单）、`miniStatusViewModel`、`reminderReadRepository`、主窗 `folderPicker` / `mdSyncStore`。
+  孤儿集按**迭代**收敛：单轮检测出 11 个，删完才暴露下层 2 个，三轮归零——「删 11 个」会留下 310 行新死代码。
+- **clippy 可见性**：`[lints.clippy] unwrap_used / expect_used = "warn"`。`panic = "abort"` 下生产可达的
+  42 处此前无任何门禁看着。**当前未跑 clippy 全量**（`target/debug` 已清，重建约 20 G），只验证了
+  manifest 可解析；warn 不阻断构建。
+- 数字：源码 1,673 → **1,662** 文件；总行 288,153 → **287,201**；超 300 行豁免仍 150 条。注意分母缩小后
+  占比 32.7% → **32.8%**：占比度量的是「豁免代码占全仓比例」，对「删死代码」方向是反的，棘轮口径必须用条数。
+- 验证：tsc 0 错；八步门禁全绿（layers **10 条**）；1,196 用例全绿；build 2.18 s；4 处故意破坏
+  （入口越窗 / platform→features / shared→platform / L10 路径前缀写错）全部先红后绿。
+
 ### 主界面 · 今日时间线：事项管理对齐悬浮窗事项菜单（0.12.1 末）
 
 卡底「编辑事项」（摊开全表逐条改名）整体替换为「事项管理」，与「＋ 新建事项」并排：
