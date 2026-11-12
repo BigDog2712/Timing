@@ -4,8 +4,8 @@
  * -----------------------------------------------------------------------------
  * 命令侧（原有）：
  *   1. src-tauri/src/lib.rs        generate_handler![...] 注册的命令（snake_case）
- *   2. src/types/**                IpcApi 接口声明的方法（camelCase）
- *   3. src/services/ipc.ts         实际 invoke 的字符串 + 对象上的方法名
+ *   2. src/windows/timing/types/**                IpcApi 接口声明的方法（camelCase）
+ *   3. src/windows/timing/services/ipc.ts         实际 invoke 的字符串 + 对象上的方法名
  *   4. src-tauri/src/error.rs      错误码字面值 ↔ 前端 ErrorCode 联合类型
  *
  * 事件与 mock（V0.3 扩充，见 ADR-015）：
@@ -13,7 +13,7 @@
  *      · 后端常量必须在前端声明（否则前端无从 listen）
  *      · 前端声明必须有 emit 来源（否则是死常量，只会在「监听永不触发」时浪费排查时间）
  *      · 禁止任何 `.emit("字面量")`：事件名只能来自 events.rs 常量
- *   6. src/mocks/** 的处理器键集合必须与 Rust 命令集合相等（浏览器 dev 不得缺口）
+ *   6. src/windows/timing/mocks/** 的处理器键集合必须与 Rust 命令集合相等（浏览器 dev 不得缺口）
  *
  * 任何一处新增/删除而其余没跟上，`npm run check:contract` 都会非零退出。
  * 本脚本只认代码，不解析 Markdown（文档由人负责，机器保证代码自身闭合）。
@@ -41,7 +41,7 @@ function walk(dir, ext, out = []) {
 
 /** 前端类型声明可能被拆到多个文件（types/domain/**），统一拼接后解析 */
 function typesSource() {
-  const files = ['src/types/domain.ts', ...walk('src/types/domain', '.ts')];
+  const files = ['src/windows/timing/types/domain.ts', ...walk('src/windows/timing/types/domain', '.ts')];
   return files.filter((f) => existsSync(join(root, f))).map(read).join('\n');
 }
 
@@ -50,7 +50,7 @@ function typesSource() {
  * 命令表在 `src-tauri/src/ipc_commands.rs`（V0.12.0 融合 Patina 时从 `lib.rs` 拆出：
  * 宿主 80 条 + insight 117 条，一张 `generate_handler!` 内）。这里只取**宿主**那一段
  * （`crate::commands::…`，且模块名不得是 `insight`）——insight 的命令由
- * `src/app/**` `src/features/**` 等前端自己调用，不进 `ipc.ts` / `IpcApi` /
+ * `src/windows/patina/shell/**` `src/windows/patina/features/**` 等前端自己调用，不进 `ipc.ts` / `IpcApi` /
  * `browserMock` 这套宿主契约。
  *
  * 负向断言 `(?!insight::)` 是必需的：insight 归一后路径变成
@@ -84,7 +84,7 @@ function apiMethods(types) {
 
 /** 3. ipc.ts 实际调用与对象方法 */
 function ipcCalls() {
-  const src = read('src/services/ipc.ts');
+  const src = read('src/windows/timing/services/ipc.ts');
   const commands = new Set(
     [...src.matchAll(/call<[\s\S]{0,160}?>\(\s*'([a-z0-9_]+)'/g)].map((m) => m[1]),
   );
@@ -187,7 +187,7 @@ function emitSites(byName) {
 
 /** 6. mock 覆盖 */
 function mockCommands() {
-  const files = ['src/mocks/browserMock.ts', ...walk('src/mocks', '.ts').filter((f) => f.includes('browserMock'))];
+  const files = ['src/windows/timing/mocks/browserMock.ts', ...walk('src/windows/timing/mocks', '.ts').filter((f) => f.includes('browserMock'))];
   const keys = new Set();
   for (const rel of [...new Set(files)]) {
     if (!existsSync(join(root, rel))) continue;
@@ -231,7 +231,7 @@ check('错误码两侧不一致', diff(rustCodes, feCodes), diff(feCodes, rustCo
    「操作失败，请稍后重试」。新加一个码却忘了给文案时，用户看到的就是这句万能兜底。
    这里要求每个 code 都有显式 case（文案内容不校验，那是产品文案的事）。 */
 function errorTextCases() {
-  const src = read('src/services/ipc.ts');
+  const src = read('src/windows/timing/services/ipc.ts');
   const start = src.indexOf('export function errorText');
   if (start < 0) throw new Error('ipc.ts 里找不到 errorText()');
   const end = src.indexOf('\n}', start);
@@ -243,7 +243,7 @@ check(
   '错误码没有对应文案（会静默落到通用兜底）',
   diff(feCodes, textCodes),
   diff(textCodes, feCodes),
-  'src/services/ipc.ts 的 errorText() 必须为每个 ErrorCode 提供一个 case',
+  'src/windows/timing/services/ipc.ts 的 errorText() 必须为每个 ErrorCode 提供一个 case',
 );
 
 /* ---- 事件 ---- */

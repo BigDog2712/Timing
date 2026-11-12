@@ -7,19 +7,19 @@
  *
  *   L1 组件不得触碰传输层：`ipc.` / `invoke(` 在 src/components、src/app|features|shared
  *      下的 components/ 子目录中 0 命中
- *   L2 状态容器不得触碰传输层：src/stores、src/**\/*Store.ts、src/features/**\/stores 下 0 命中
- *   L3 窗口 API 只能经 `src/lib/windowApi.ts`：全仓只有它 import
+ *   L2 状态容器不得触碰传输层：src/stores、src/**\/*Store.ts、src/windows/patina/features/**\/stores 下 0 命中
+ *   L3 窗口 API 只能经 `src/windows/timing/lib/windowApi.ts`：全仓只有它 import
  *      `@tauri-apps/api/window` 或 `@tauri-apps/api/webviewWindow`
  *   L4 Rust `infra` 不得依赖 `services`（解环，见 ADR-016）
  *   L5 Rust `commands` 不得直接依赖 `repositories`（必须经 service）
  *   L6 Rust 全域不得出现 `eprintln!`（结构化日志，见 platform/log.rs）
- *   L7 编译期平台常量 `__TIMING_MOBILE__` 只允许出现在 `src/lib/platform.ts`
+ *   L7 编译期平台常量 `__TIMING_MOBILE__` 只允许出现在 `src/windows/timing/lib/platform.ts`
  *   L8 业务写入信号 `dirty::mark(` 只允许出现在 `src-tauri/src/commands/`
  *      （`jobs/` 与 `services/` 下 0 命中；见下方 L8 哨兵）
  *   L9 双窗隔离：主窗（components/hooks/lib/mocks/services/stores/styles/types）与分析窗
  *      （app/features/platform/shared）不得互相 import；例外只有三类：零业务依赖的
- *      `src/lib/windowApi.ts`（窗口 API 薄壳）、`src-tauri/icons/**` 静态资源，
- *      以及 `src/lib/handle*` 两个纯数据 / 纯 IO 模块（手柄目录与绑定读写，见下方
+ *      `src/windows/timing/lib/windowApi.ts`（窗口 API 薄壳）、`src-tauri/icons/**` 静态资源，
+ *      以及 `src/windows/timing/lib/handle*` 两个纯数据 / 纯 IO 模块（手柄目录与绑定读写，见下方
  *      `L9_ALLOWED_TARGETS` 的说明 —— 它们是**两窗唯一合法的共享载体**）。
  *
  * 每一条都是「改坏了 CI 就红」的判据，而不是「建议」。
@@ -40,7 +40,7 @@ import { fileURLToPath } from 'node:url';
 
 /**
  * L7 扫描的编译期平台常量（**唯一口径**）。
- * 改名时必须同时改：`src/lib/platform.ts` 的 `declare const`、`vite.config.ts` 与
+ * 改名时必须同时改：`src/windows/timing/lib/platform.ts` 的 `declare const`、`vite.config.ts` 与
  * `vitest.config.ts` 的 `define` 键、本常量。哨兵会校验三处一致。
  */
 const PLATFORM_SYMBOL = '__TIMING_MOBILE__';
@@ -71,27 +71,27 @@ const inDirNamed = (rel, segment) => rel.split('/').slice(0, -1).includes(segmen
 
 /* [0.12.0 T04] 路径豁免已全部撤销：
  * Patina 已归一（T01–T03），没有「门禁不管」的代码。规则回到全仓统一口径。 */
-const L1_ROOTS = ['src/components/'];
-const L1_COMPONENT_ROOTS = ['src/app/', 'src/features/', 'src/shared/'];
-const L2_ROOTS = ['src/stores/'];
-const L2_FEATURE_STORES = 'src/features/';
+const L1_ROOTS = ['src/windows/timing/components/'];
+const L1_COMPONENT_ROOTS = ['src/windows/patina/shell/', 'src/windows/patina/features/', 'src/windows/patina/shared/'];
+const L2_ROOTS = ['src/windows/timing/stores/'];
+const L2_FEATURE_STORES = 'src/windows/patina/features/';
 const L2_SUFFIX = /(^|\/)[^/]*Store\.ts$/;
 
-const L3_ALLOWED = new Set(['src/lib/windowApi.ts']);
+const L3_ALLOWED = new Set(['src/windows/timing/lib/windowApi.ts']);
 const L3_PATTERN = /@tauri-apps\/api\/(?:webviewWindow|window)/;
 
 /* L9 双窗：主窗 = 宿主 UI 与传输/状态层；分析窗 = 归一的 Patina 四域。 */
 const L9_MAIN_ROOTS = [
-  'src/components/',
-  'src/hooks/',
-  'src/lib/',
-  'src/mocks/',
-  'src/services/',
-  'src/stores/',
-  'src/styles/',
-  'src/types/',
+  'src/windows/timing/components/',
+  'src/windows/timing/hooks/',
+  'src/windows/timing/lib/',
+  'src/windows/timing/mocks/',
+  'src/windows/timing/services/',
+  'src/windows/timing/stores/',
+  'src/windows/timing/styles/',
+  'src/windows/timing/types/',
 ];
-const L9_ANALYSIS_ROOTS = ['src/app/', 'src/features/', 'src/platform/', 'src/shared/'];
+const L9_ANALYSIS_ROOTS = ['src/windows/patina/shell/', 'src/windows/patina/features/', 'src/windows/patina/platform/', 'src/windows/patina/shared/'];
 /* 允许被分析窗 import 的**主窗**模块（白名单只增不减，且每一条都必须真实存在，
  * 由下方 L9 哨兵校验）：
  *  - `windowApi`：窗口 API 薄壳，只 re-export `@tauri-apps/api/*`，零业务依赖。
@@ -100,16 +100,16 @@ const L9_ANALYSIS_ROOTS = ['src/app/', 'src/features/', 'src/platform/', 'src/sh
  *  - `pillAppearance`：药丸外观（文字/背景不透明度、常驻形态）的**纯数据 + 纯 IO**，
  *    只 import `lib/storageKeys`（同属 `src/lib`，不越界）；[0.12.1 T04] 设置搬进主界面后，
  *    主界面的外观卡与宿主药丸必须写同一个键，而写路径只能有一条。
- * 前三条存在的理由：设置页（分析窗 `src/features/settings/**`）必须能读写手柄绑定，
- * 而分析窗读不到宿主 `src/services/**`（runner）与 `src/stores/**`（appearanceStore 带
+ * 前三条存在的理由：设置页（分析窗 `src/windows/patina/features/settings/**`）必须能读写手柄绑定，
+ * 而分析窗读不到宿主 `src/windows/timing/services/**`（runner）与 `src/windows/timing/stores/**`（appearanceStore 带
  * zustand 与副作用，加进来等于双窗隔离作废）。所以「能被两窗共享的东西」只能是
  * 无状态、无传输层依赖的纯模块 —— 这不是洁癖，是门禁的硬约束。
  * 反例（别照着抄）：任何带 `useState` / `zustand` / `invoke` 的模块都不许进这张表。 */
 const L9_ALLOWED_TARGETS = new Set([
-  'src/lib/windowApi',
-  'src/lib/handleCatalog',
-  'src/lib/handleBindings',
-  'src/lib/pillAppearance',
+  'src/windows/timing/lib/windowApi',
+  'src/windows/timing/lib/handleCatalog',
+  'src/windows/timing/lib/handleBindings',
+  'src/windows/timing/lib/pillAppearance',
 ]);
 
 const violations = [];
@@ -117,11 +117,11 @@ const rule = (id, desc) => ({ id, desc, hits: [] });
 const R = {
   L1: rule('L1', '组件（src/components 与 app|features|shared 下的 components/）不得出现 ipc. / invoke('),
   L2: rule('L2', '状态容器（src/stores、*Store.ts、features/**/stores）不得出现 ipc. / invoke('),
-  L3: rule('L3', '@tauri-apps/api/window 与 webviewWindow 只允许被 src/lib/windowApi.ts 引用'),
+  L3: rule('L3', '@tauri-apps/api/window 与 webviewWindow 只允许被 src/windows/timing/lib/windowApi.ts 引用'),
   L4: rule('L4', 'Rust infra 不得 use crate::services'),
   L5: rule('L5', 'Rust commands 不得 use crate::repositories'),
   L6: rule('L6', 'Rust 不得使用 eprintln!（用 crate::log_*!）'),
-  L7: rule('L7', `编译期平台常量 ${PLATFORM_SYMBOL} 只允许出现在 src/lib/platform.ts`),
+  L7: rule('L7', `编译期平台常量 ${PLATFORM_SYMBOL} 只允许出现在 src/windows/timing/lib/platform.ts`),
   L8: rule('L8', '业务写入信号 dirty::mark( 只允许出现在 src-tauri/src/commands/'),
   L9: rule(
     'L9',
@@ -178,7 +178,7 @@ scan(rsFiles, /\beprintln!\(/, R.L6);
 
 /* L7：平台常量是「编译期一次性替换」的全局，散落读取会让分支不可枚举、
    也让「桌面产物里不该有移动代码」这条摇树前提失效。唯一读取点是 platform.ts。 */
-scan(feFiles, new RegExp(PLATFORM_SYMBOL), R.L7, (rel) => rel === 'src/lib/platform.ts');
+scan(feFiles, new RegExp(PLATFORM_SYMBOL), R.L7, (rel) => rel === 'src/windows/timing/lib/platform.ts');
 
 /* L8：脏标记是白名单（设计 §4.6），唯一合法信号源是命令层的 25 处业务写入。
    批 1 的自检清单只有一条人工 `grep -rn "dirty::mark" src-tauri/src/jobs/`，
@@ -240,7 +240,7 @@ scanWindowCross(L9_ANALYSIS_FILES, L9_MAIN_ROOTS, R.L9);
 
 /* L7 哨兵：被扫描的符号必须真的存在（否则规则「绿着空转」）。 */
 const SENTINEL_SITES = [
-  ['src/lib/platform.ts', `declare const ${PLATFORM_SYMBOL}`],
+  ['src/windows/timing/lib/platform.ts', `declare const ${PLATFORM_SYMBOL}`],
   ['vite.config.ts', `${PLATFORM_SYMBOL}:`],
   ['vitest.config.ts', `${PLATFORM_SYMBOL}:`],
 ];
@@ -288,7 +288,7 @@ const l9SentinelFailures = [];
 if (L9_MAIN_FILES.length === 0) l9SentinelFailures.push('主窗路径集合为空（L9_MAIN_ROOTS 是否写错？）');
 if (L9_ANALYSIS_FILES.length === 0) l9SentinelFailures.push('分析窗路径集合为空（L9_ANALYSIS_ROOTS 是否写错？）');
 if (l9SpecifierCount === 0) l9SentinelFailures.push('两窗内没有解析出任何相对 import（说明符正则坏了？）');
-/* 例外清单必须指向真实存在的文件：`src/lib/windowApi` 被改名/搬走后，L9_ALLOWED_TARGETS
+/* 例外清单必须指向真实存在的文件：`src/windows/timing/lib/windowApi` 被改名/搬走后，L9_ALLOWED_TARGETS
  * 会静默变成一张空头支票；后来的人只会看到「例外还有空位」，顺势再塞几条。 */
 for (const target of L9_ALLOWED_TARGETS) {
   if (!['.ts', '.tsx'].some((ext) => existsSync(join(root, `${target}${ext}`)))) {

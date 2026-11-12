@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config';
  * 组件渲染测试暂不引入（要 RTL + 交互模拟，收益低于先把公式/派生逻辑钉死）。
  */
 export default defineConfig({
-  /* `src/lib/platform.ts` 直接读编译期常量（Vite define 替换）。测试进程不经过
+  /* `src/windows/timing/lib/platform.ts` 直接读编译期常量（Vite define 替换）。测试进程不经过
      vite.config.ts 的 Tauri 构建链路，这里补同一份 define 的桌面取值，
      否则引用 platform.ts 的模块会在模块求值时就抛 ReferenceError。 */
   define: {

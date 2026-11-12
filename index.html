@@ -15,8 +15,8 @@
           var mode = 'dark';
           try {
             /* [V0.5.0] 新键 timing.theme 优先，回落老键 tickbar.theme（0.5.0 兼容，一版后删）。
-               这处是内联 JS，**逃过类型检查**，也不经过 src/lib/storageKeys.ts：
-               改动必须与 src/types/domain/constants.ts / src/lib/theme.ts 同批。
+               这处是内联 JS，**逃过类型检查**，也不经过 src/windows/timing/lib/storageKeys.ts：
+               改动必须与 src/windows/timing/types/domain/constants.ts / src/windows/timing/lib/theme.ts 同批。
                这里只读不写——本脚本必须同步执行，搬运（回写新键）由首帧后的
                readCachedTheme() 完成（ARCHITECTURE §6.2）。 */
             var cached = localStorage.getItem('timing.theme');
@@ -44,6 +44,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/windows/timing/entry/main.tsx"></script>
   </body>
 </html>

@@ -71,19 +71,19 @@ src-tauri/src/platform/log.rs
 # 换成常量或新名字就搬不到它。行级豁免，只放这一串，不放行任何别的旧名。
 src-tauri/src/models/data_root.rs :: migrated-from-tickbar-app.json
 src-tauri/src/tests/data_root_transfer.rs :: migrated-from-tickbar-app.json
-src/types/domain/dataRoot.ts :: migrated-from-tickbar-app.json
-src/mocks/browserMockPlugins.ts :: migrated-from-tickbar-app.json
-src/components/settings/MdDataRootBlock.test.tsx :: migrated-from-tickbar-app.json
+src/windows/timing/types/domain/dataRoot.ts :: migrated-from-tickbar-app.json
+src/windows/timing/mocks/browserMockPlugins.ts :: migrated-from-tickbar-app.json
+src/windows/timing/components/settings/MdDataRootBlock.test.tsx :: migrated-from-tickbar-app.json
 # 5 个 localStorage 键的只读回落（新键优先，老键兜底一个版本）。
-src/lib/storageKeys.ts
-src/lib/storageKeys.test.ts
-src/lib/theme.ts
-src/stores/appearanceStore.ts
-src/stores/countdownArm.ts
-src/types/domain/constants.ts
-src/types/domain/migration.ts
-src/hooks/useWindowAutoFit.ts
-src/styles/tokens/01-primitives.css
+src/windows/timing/lib/storageKeys.ts
+src/windows/timing/lib/storageKeys.test.ts
+src/windows/timing/lib/theme.ts
+src/windows/timing/stores/appearanceStore.ts
+src/windows/timing/stores/countdownArm.ts
+src/windows/timing/types/domain/constants.ts
+src/windows/timing/types/domain/migration.ts
+src/windows/timing/hooks/useWindowAutoFit.ts
+src/windows/timing/styles/tokens/01-primitives.css
 index.html
 
 # ── 7. 行级豁免：整文件是新的，只有个别句子在讲「当年叫什么」──────────────
@@ -109,7 +109,7 @@ release/RELEASE-NOTES.md
 # 仓库名，改了就 404，用户点「打开发布页」就装不上扩展。显示名已按拍板全部改成
 # `Timing Web Sync`（明知商店里搜不到，视觉统一优先），但 href 必须留真实地址：
 # **文案是品牌，链接是坐标。** 行级豁免，只放这一串，不放行任何别的旧名。
-src/shared/i18n/generated/locales/*.ts :: patina-web-sync
+src/windows/patina/shared/i18n/generated/locales/*.ts :: patina-web-sync
 #
 # 另：src-tauri/src/models/insight/localization/generated.rs **故意不登记**。
 # 它曾经是文案表里的残留大户（15 处 × 4 语言），已全部改成 Timing。正因为如此，

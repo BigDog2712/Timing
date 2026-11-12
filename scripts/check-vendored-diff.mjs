@@ -81,10 +81,10 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 /* [0.12.0 T02] 前端 4 个根由 T01 定下；后端 `src-tauri/src/patina/` 已按层归一，
  * 换成 5 个 `insight/` 新根（docs/refactor/patina-structural-merge.md §2.2）。 */
 const ROOTS = [
-  'src/app/',
-  'src/features/',
-  'src/platform/',
-  'src/shared/',
+  'src/windows/patina/shell/',
+  'src/windows/patina/features/',
+  'src/windows/patina/platform/',
+  'src/windows/patina/shared/',
   'src-tauri/src/app/insight/',
   'src-tauri/src/commands/insight/',
   'src-tauri/src/infra/insight/',
@@ -103,17 +103,17 @@ const UPSTREAM_MAP = [
   // 前端：4 个域目录是纯前缀剥离
   {
     up: 'src/app',
-    loc: 'src/app',
+    loc: 'src/windows/patina/shell',
     extra: [
-      { up: 'src/App.tsx', loc: 'src/app/App.tsx' },
-      { up: 'src/main.tsx', loc: 'src/app/main.tsx' },
-      { up: 'src/App.css', loc: 'src/app/App.css' },
-      { up: 'src/styles', loc: 'src/app/styles' },
+      { up: 'src/App.tsx', loc: 'src/windows/patina/shell/App.tsx' },
+      { up: 'src/main.tsx', loc: 'src/windows/patina/shell/main.tsx' },
+      { up: 'src/App.css', loc: 'src/windows/patina/shell/App.css' },
+      { up: 'src/styles', loc: 'src/windows/patina/shell/styles' },
     ],
   },
-  { up: 'src/features', loc: 'src/features' },
-  { up: 'src/platform', loc: 'src/platform' },
-  { up: 'src/shared', loc: 'src/shared' },
+  { up: 'src/features', loc: 'src/windows/patina/features' },
+  { up: 'src/platform', loc: 'src/windows/patina/platform' },
+  { up: 'src/shared', loc: 'src/windows/patina/shared' },
   // 后端：6 条前缀映射（上游单层目录 → 本地 `<层>/insight/...`）
   { up: 'src-tauri/src/domain', loc: 'src-tauri/src/models/insight' },
   { up: 'src-tauri/src/platform', loc: 'src-tauri/src/infra/insight' },

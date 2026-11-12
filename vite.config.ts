@@ -9,13 +9,13 @@ const entry = (file: string): string => fileURLToPath(new URL(file, import.meta.
 /** 编译期平台标记：`tauri android dev/build` 注入 TAURI_ENV_FAMILY=mobile */
 const IS_MOBILE_BUILD = process.env.TAURI_ENV_FAMILY === 'mobile';
 
-/** `main.tsx` 里的移动端样式导入（整行） */
-const MOBILE_CSS_IMPORT = /^[ \t]*import[ \t]+['"]\.\/styles\/mobile\/[^'"]+['"];?[ \t]*$/gm;
+/** `entry/main.tsx` 里的移动端样式导入（整行；重排后从 `../styles/mobile/` 取） */
+const MOBILE_CSS_IMPORT = /^[ \t]*import[ \t]+['"]\.\.\/styles\/mobile\/[^'"]+['"];?[ \t]*$/gm;
 
 /**
  * 桌面构建剔除移动端样式表
  * -----------------------------------------------------------------------------
- * `src/styles/mobile/*.css` 是 7 个只服务于移动壳的样式表（约 1200 行）。JS 侧的
+ * `src/windows/timing/styles/mobile/*.css` 是 7 个只服务于移动壳的样式表（约 1200 行）。JS 侧的
  * `if (IS_MOBILE) return <MobileShell/>` 会被摇树整块删掉，但 CSS 是**副作用导入**：
  * 只要 `main.tsx` 里有那几行 `import`，样式就会进桌面产物（实测桌面 CSS 里能搜到
  * `.m-tabbar`）。CSS 不能像 JS 那样靠死代码消除，只能在模块进入打包器之前把导入摘掉
@@ -28,7 +28,7 @@ function platformCss(): Plugin {
     name: 'timing:platform-css',
     enforce: 'pre',
     transform(code, id) {
-      if (IS_MOBILE_BUILD || !/src[\\/]main\.tsx$/.test(id)) return;
+      if (IS_MOBILE_BUILD || !/src[\\/]windows[\\/]timing[\\/]entry[\\/]main\.tsx$/.test(id)) return;
       const stripped = code.replace(MOBILE_CSS_IMPORT, '');
       if (stripped === code) return;
       return { code: stripped, map: null };
@@ -42,7 +42,7 @@ function platformCss(): Plugin {
 // - strictPort 1420：与 src-tauri/tauri.conf.json 的 devUrl 对齐
 // - target=chrome105：WebView2（Chromium 105+）
 export default defineConfig({
-  /* tailwindcss 只服务 patina 入口：`src/app/App.css` 里 `@import "tailwindcss" source("../")`
+  /* tailwindcss 只服务 patina 入口：`src/windows/patina/shell/App.css` 里 `@import "tailwindcss" source("../")`
      限定扫描范围，主窗口 index.html 不引用该样式表 → 两边样式零交叉。 */
   plugins: [platformCss(), tailwindcss(), react()],
   /* 编译期平台标记（DESIGN-ANDROID-V1 §1.2）：`tauri android dev/build` 会注入

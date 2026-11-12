@@ -83,7 +83,7 @@ export default tseslint.config(
      另外两条（`no-control-regex` / `prefer-const`）T03 已改代码，不再需要豁免；
      任何**新增**的 `files:` 范围都视为回退，脚本层由 `npm run lint` 直接挡住。 */
   {
-    files: ['src/shared/i18n/generated/**'],
+    files: ['src/windows/patina/shared/i18n/generated/**'],
     rules: {
       'no-sparse-arrays': 'off',
     },
