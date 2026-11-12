@@ -93,7 +93,19 @@ const stale = Object.keys(frozen).filter((rel) => {
 });
 
 const entries = Object.keys(frozen).length;
-const summary = `扫描 ${files.length} 个文件，上限 ${LIMIT} 行；冻结基线 ${entries} 条（棘轮：只许减不许增）`;
+/* [审计 2026-11-12] 只报「条数」会把问题藏起来：150 条豁免听着不多，实际吃掉 94,115 行
+   = 扫描总量 288,153 行的 32.7%（Rust 侧 42.5%、前端 20.9%）。把「豁免行数 / 总行数」一起
+   打出来，棘轮才有可收敛的目标。目标（主理人 2026-11-12 拍板）：**每版至少 −10 条**，
+   0.15.0 前压到 100 条以内；未达标不得出包。 */
+const totalLines = measured.reduce((n, m) => n + m.lines, 0);
+const exemptLines = measured.reduce((n, m) => n + (m.lines > LIMIT ? m.lines : 0), 0);
+const exemptPct = totalLines === 0 ? '0.0' : ((exemptLines / totalLines) * 100).toFixed(1);
+const SIZE_TARGET = 100;
+const targetNote =
+  entries <= SIZE_TARGET ? `已达 0.15.0 目标（≤${SIZE_TARGET} 条）` : `距 0.15.0 目标还差 ${entries - SIZE_TARGET} 条`;
+const summary =
+  `扫描 ${files.length} 个文件，上限 ${LIMIT} 行；冻结基线 ${entries} 条（棘轮：只许减不许增）；` +
+  `超限文件占 ${exemptLines}/${totalLines} 行 = ${exemptPct}%；${targetNote}`;
 
 if (newOversized.length === 0 && grown.length === 0) {
   console.log(`[size] OK — ${summary}`);
