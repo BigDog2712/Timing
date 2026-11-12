@@ -19,9 +19,11 @@
  * 3.33:1，过 WCAG 1.4.11 的 3:1 线。 */
 .qp-card-grip {
   position: absolute;
-  /* 落在卡内距留白里（卡内距 16）：left = 16−14 = 2，不推挤标题、不改 20px 卡头 */
+  /* 落在卡内距留白里（卡内距 20）：left = 20−14 = 6，不推挤标题。
+   * 纵向按 46 高的卡头居中（46/2 − 5 = 18）—— 卡头从 28 变 46 之后，
+   * 原来那个 pad+5 会把它顶到标题上沿。 */
   left: calc(var(--qp-card-pad) - 14px);
-  top: calc(var(--qp-card-pad) + 5px);
+  top: calc(var(--qp-card-head-h) / 2 - 5px);
   width: 6px;
   height: 10px;
   cursor: grab;
@@ -58,16 +60,18 @@
   cursor: grabbing;
 }
 
-/* ── ⋯ 入口：20×20 视觉 / 24×24 命中（::after 外扩 2px，不撑 20px 卡头） ── */
+/* ── ⋯ 入口：24×24（Rust `app.rs:492` 的 `v2(24, 24)`，位置 right−40 / top+11） ──
+ * 46 高的卡头里垂直居中即 top 11；`::after` 外扩 2px 给 28×28 的命中区，
+ * 不撑排版（卡头是 flex，按钮本身 24 已经够 WCAG 的 24×24）。 */
 .qp-card-more {
   position: relative;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
-  border-radius: var(--qp-radius-chip);
+  border-radius: 7px;
   background: none;
   color: var(--qp-text-tertiary);
   cursor: pointer;

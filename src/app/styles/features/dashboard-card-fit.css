@@ -1,0 +1,54 @@
+/* ============================================================================
+ * dashboard-card-fit.css — 卡内尺寸自适应（容器查询）
+ * -----------------------------------------------------------------------------
+ * 为什么单开一个文件：v3 的卡片能被拖到任意尺寸，于是「内容按卡片多大来排版」成了
+ * 一个新的横切关注点 —— 它既不属于某张卡的版式（`dashboard-modules.css`），也不属于
+ * 画布布局（`dashboard-board.css`），而且 `dashboard-modules.css` 已经贴着 300 行硬限
+ * （AGENTS.md）。放这里，加第三张、第四张卡要自适应时有地方加。
+ *
+ * 容器锚点必须是**卡内的 section**：`.qp-board-card` 只负责定位，真正有确定尺寸、
+ * 又包住卡内所有内容的是那个 section（`height: 100%` 由 dashboard-board.css 给）。
+ * 只给需要的两张卡开 `container-type: size` —— 它是 `contain: size`，
+ * 开着就意味着内容不再影响元素尺寸，没必要给所有卡付这个约束。
+ * ========================================================================== */
+
+.qp-board-card[data-kind="timer"] > section,
+.qp-board-card[data-kind="heatmap"] > section {
+  container-type: size;
+}
+
+/* ── 计时卡：环径 = min(可用高, 0.46×可用宽) clamp 86–158（`focus.rs:80-82`） ──
+ * 容器锚点放在 `.qp-donut-body` 上而不是整张卡：Rust 那两行算的是**正文矩形**
+ * （已扣掉卡头、卡身内距与维度条），拿整卡尺寸算会大一圈。
+ *
+ * `container-type: size` 让这个 grid 的高度不再由内容撑开 —— 它是 `flex: 1`，
+ * 高度本来就从卡高来，正好。cq 单位按**内容盒**算，`100cqh` 就是"环区可用高"，
+ * 与 Rust 的 `content.height()` 同义，不必再猜 62/76 那种系数。 */
+.qp-board-card[data-kind="timer"] .qp-donut-body {
+  container-type: size;
+  --qp-donut-fit: clamp(86px, min(46cqw, 100cqh), 158px);
+  grid-template-columns: var(--qp-donut-fit) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.qp-board-card[data-kind="timer"] .qp-donut {
+  width: var(--qp-donut-fit);
+  height: var(--qp-donut-fit);
+}
+
+/* 5 行图例（5×30 = 150）放不下时溢出即滚，不裁行 ——
+ * 裁掉的恰好是「其他」，那一行代表剩下所有分类的合计，不能在无提示的情况下消失。
+ * `flex: 0 0 auto` 不能省：列向 flex 的子项默认 `flex-shrink: 1`，高度会被压缩，
+ * 结果是「5 行各挤到 26px」而不是出现滚动条 —— 看起来没坏，行高却已经不是 30。 */
+.qp-board-card[data-kind="timer"] .qp-readouts {
+  max-height: 100%;
+  align-self: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--qp-border-strong) transparent;
+}
+
+.qp-board-card[data-kind="timer"] .qp-readout {
+  flex: 0 0 auto;
+}

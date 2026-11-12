@@ -15,6 +15,12 @@ use crate::error::AppResult;
 use crate::models::usage::{UsageAggregate, UsageRowDto};
 
 /// 写一天的聚合。`rows` 为空是合法输入（那天一个应用都没用），此时不写任何行。
+///
+/// 桌面目标上唯一的调用方（`commands::usage_cmd::usage_stats_get`）在 `#[cfg(mobile)]`
+/// 分支里，桌面那条分支直接回 `supported: false`。**不整段 `cfg` 掉**：一旦 `cfg` 掉，
+/// 这个函数就永远只在手机包里有，桌面 `cargo test` 编不到它，下一个人重构时编译器
+/// 也不提醒他调用点已经断了（`services::overlay_push` 同款口径）。
+#[cfg_attr(desktop, allow(dead_code))]
 pub async fn rollup(pool: &SqlitePool, date: &str, rows: &[UsageRowDto]) -> AppResult<()> {
     let now = crate::platform::clock::now_ms();
     for row in rows {
@@ -50,6 +56,11 @@ pub async fn rollup(pool: &SqlitePool, date: &str, rows: &[UsageRowDto]) -> AppR
 }
 
 /// 读某一天的排行（按时长降序）。
+///
+/// 与 `rollup` 同一处境：唯一调用点在 `usage_stats_get` 的 `#[cfg(mobile)]` 分支，
+/// 桌面不读这张表。**不 `cfg` 掉**，理由同上：桌面 `cargo test` 要能编到它，
+/// 纯 SQL 逻辑才不会只在手机包上被验证。
+#[cfg_attr(desktop, allow(dead_code))]
 pub async fn read(pool: &SqlitePool, date: &str) -> AppResult<Vec<UsageAggregate>> {
     let rows: Vec<(String, i64, i64, i64)> = sqlx::query_as(
         r#"

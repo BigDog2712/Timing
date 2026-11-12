@@ -24,11 +24,15 @@
   --qp-board-w: 1052px;
   --qp-board-h: 636px;
 
-  /* ── 卡间距 / 卡内距（几何表：卡内 padding 16、卡头 20 高 + 8 距，两档同值） ── */
+  /* ── 卡间距 / 卡内距（**对照 timing-board.exe**：`kit.rs` PAD/GAP 16 + `app.rs` 的卡壳） ──
+   * 卡头 46 高、标题 13.5 粗、右侧读数 11；卡身左右内距 20、底 16（顶部由卡头吃掉）。
+   * 这三个数是 Rust 版卡壳的**原值**，不再走「两档几何表」——v3 画布整体等比缩放，
+   * 卡内不再是"窗高变了就换一套行高"，而是"窗变小了整张卡一起缩"。 */
   --qp-card-gap: 16px;
-  --qp-card-pad: 16px;
-  --qp-card-head-h: 20px;
-  --qp-card-head-gap: 8px;
+  --qp-card-pad: 20px;
+  --qp-card-pad-b: 16px;
+  --qp-card-head-h: 46px;
+  --qp-card-head-gap: 0px;
   --qp-card-foot-h: 32px;
 
   /* ── 五模块高（左列 264+16+284 = 564 = 636−56−16；右列 254+16+294 = 564） ── */
@@ -66,29 +70,31 @@
   --qp-mod-trend: 184px;
   --qp-mod-reminder: 200px;
 
-  /* ── 行高（几何表：readout 24 / item 30 / app 28 / todo 36，gap 4 → pitch 32） ── */
-  --qp-row-readout: 24px;
+  /* ── 行高（**逐条照抄 Rust 组件**，两档同值） ──
+   *   readout 30 = `focus.rs` 图例 row_h
+   *   items   30 = `items.rs` row_h（时间线卡沿用）
+   *   app     38 = `apps.rs` row_h（里头还含 4px 细条）
+   *   todo    32 = `todos.rs` row_h
+   * 两个数都**不再是档位量**：窗高变化由画布 zoom 承担，卡内行高必须稳在 Rust 的值上，
+   * 否则同一张卡在 900 高与 1100 高的窗里行距不同，和 timing-board.exe 对不上。 */
+  --qp-row-readout: 30px;
   --qp-row-items: 30px;
-  /* [视觉层 0.12.x] app 行 32 → 28。**本批唯一改动的行高令牌**（其它行高一个数不动）。
-   * 应用卡可用内容高 = 254 − 2×16 − (20+8) = 194；5 行 = 5×28 = 140（应用列表**没有** gap，
-   * 行间靠发丝，本轮发丝已删），加 footer 32 → 172，**余量 22px**。
-   * 下一批要往这张卡里加东西的，先看这 22px，别再往 194 里塞第 6 行。 */
-  --qp-row-app: 28px;
-  --qp-row-todo: 36px;
+  --qp-row-app: 38px;
+  --qp-row-todo: 32px;
   --qp-row-gap: 4px;
   /* 四条数字列的列宽（读数 / 事项 / 应用 / 待办同宽）。四列右缘对齐是验收项
    * （443.14 / 548.86），列宽散在四个文件里改一处漏三处，所以提成一个 token。 */
   --qp-col-num: 44px;
 
-  /* ── 环 / 裸条 / 待办输入 / 便利贴卡（⌀132；短档 ⌀112 —— 见下方注释） ── */
-  --qp-donut: 132px;
+  /* ── 环 / 裸条 / 便利贴卡 ──
+   * `--qp-donut` 是**上限**而不是定值：Rust `focus.rs` 的环径 = min(内容高, 0.46×内容宽)
+   * 再 clamp 到 86–158，所以真正的尺寸在 `dashboard-card-fit.css` 里由容器查询算，
+   * 这里只留那个 158 的上限。 */
+  --qp-donut: 158px;
   --qp-bar-max: 64px;
-  /* 32 而不是 34：32 + 4(row-gap) = 36，待办列表起点落在卡内 80、可容高 L = 198
-   * = 5×36 + 4×4 + **2 余量**。34 时 L = 196 = 5×36+4×4 恰好占满，"余 2" 没了，
-   * 视觉上最后一行贴着底边。 */
-  --qp-todo-compose-h: 32px;
-  /* 便利贴卡高 = 通栏高 − 2×6（内距）。56/52 两档不是一个卡高，所以必须两套。 */
-  --qp-note-card-h: 38px;
+  /* 便利贴纸片高 = Rust `notes.rs` 的双列档 88。单列档 78 不在这里：它取决于**这张卡多宽**，
+   * 由 `dashboard-notes.css` 的容器查询就地覆盖（卡宽 < 470 → 78）。 */
+  --qp-note-card-h: 88px;
 
   /* ── 字阶（视觉层 0.12.x）：主读数 / 行主文 ──
    * `--qp-font-size-metric`（1.5rem = 24）**不动**：它在别处还有消费者，本批只给环心
@@ -107,19 +113,16 @@
      *  时它会把板压成 860、左右各空 100px。删掉后 1100×636 = 1052（与长档一致）。 */
     --qp-board-h: 552px;
 
-    --qp-card-gap: 12px;
-
     --qp-mod-timer: 232px;
     --qp-mod-items: 244px;
     --qp-mod-apps: 222px;
     --qp-mod-todos: 254px;
     --qp-mod-note: 52px;
 
-    --qp-row-items: 26px;
-
-    --qp-donut: 112px;
+    /* 行高 / 卡间距 / 环径**不在短档改写**：v3 画布整体缩放，卡内版式必须与
+     * timing-board.exe 逐值一致（16 / 30 / 38 / 32）。这里再压一套短档值，
+     * 同一张卡就会在矮窗里换一套行距，正是"和 Rust 版对不上"的来源。 */
     --qp-bar-max: 48px;
-    --qp-note-card-h: 34px;
 
     /* P1：短档的 S/L 同样按「少 2 行 / 多 2 行」重算，不许直接沿用长档数
      * （短档行高更小，沿用会出现「切档后卡内反而更空」）。 */

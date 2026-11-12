@@ -80,6 +80,11 @@ impl OverlaySnapshot {
     }
 
     /// 日志用的一行摘要（用户报障时要能一眼看出推的是哪一版状态）。
+    ///
+    /// 桌面目标上唯一的调用方（`app::overlay_push::push`）是空实现，所以这里会报
+    /// `dead_code`。**不整段 `cfg` 掉**：一旦 `cfg` 掉，这个方法就永远只在手机包里有，
+    /// 桌面 `cargo test` 编不到它，下一个人重构时编译器也不提醒他调用点已经断了。
+    #[cfg_attr(desktop, allow(dead_code))]
     pub fn summary(&self) -> String {
         format!(
             "{} item={:?} acc={} since={:?} mode={} target={}",

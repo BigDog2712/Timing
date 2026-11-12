@@ -1,0 +1,45 @@
+/* =============================================================================
+ * classification-category-menu.css — 快捷分类子菜单的「删除分类 / ＋ 新建分类」（[本轮]）
+ *
+ * 为什么不写进 `classification.css`：那条文件 404 行，已经在
+ * `scripts/size-allowlist.json` 里**冻结在 404**（棘轮：只许减不许增），加一行就红。
+ * 这一族是"分类定义管理"的语义（删的是分类本身，不是某个应用的分到哪一类），
+ * 独立成文件反而让边界更清楚。`App.css` 里紧跟 `classification.css` 导入 ——
+ * 它只新增 `.quick-classification-category-manage*` / `-delete` / `-create`，
+ * 不覆盖任何既有规则。
+ *
+ * 两级菜单的宽度是锁死的（根 148 / 子 184），所以这几行都按"一行放不下就省略号"写。
+ * ========================================================================== */
+
+/* 删除区：与上面的分类列表用一条发丝分开，读屏那边是 `role="group"` */
+.quick-classification-category-manage {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--qp-border-subtle);
+}
+
+/* 删除是破坏性动作：用 danger 色，且与"选一个分类"的正常色区分开 */
+.quick-classification-category-manage .quick-classification-category-delete {
+  color: var(--qp-danger);
+}
+
+.quick-classification-category-manage .quick-classification-category-delete:hover:not(:disabled),
+.quick-classification-category-manage .quick-classification-category-delete:focus-visible {
+  color: var(--qp-danger);
+}
+
+/* 「＋ 新建分类」是**建设性**动作：贴在菜单最底、与列表同层但不带勾选占位 */
+.quick-classification-category-create {
+  margin-top: 4px;
+  color: var(--qp-text-secondary);
+}
+
+/* 「删除分类：{名字}」在 184px 里放不下时省略，别把菜单撑宽（宽了会盖住根菜单） */
+.quick-classification-category-delete,
+.quick-classification-category-create {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

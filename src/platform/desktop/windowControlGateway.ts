@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 /* 窗口 API 走宿主薄壳（纯 re-export）：直接引窗口 API 包会与 src/lib/window.ts 一起
    把宿主 IPC 全表拖进分析窗 bundle。见 src/lib/windowApi.ts。 */
-import { getCurrentWebviewWindow, getCurrentWindow } from "../../lib/windowApi";
+import { getCurrentWebviewWindow, getCurrentWindow, LogicalSize } from "../../lib/windowApi";
 
 interface CurrentWindowForegroundState {
   visible: boolean;
@@ -143,6 +143,57 @@ export async function closeCurrentWindow(): Promise<void> {
 
 export async function startCurrentWindowDrag(): Promise<void> {
   await getCurrentWindow().startDragging();
+}
+
+/* ── [v3.1] 主界面窗口大小记忆 ──
+ * 两件事：**读逻辑尺寸**（存的是逻辑像素，换显示器/改缩放比都不会漂）与**按逻辑尺寸改窗**。
+ * 不用 `innerSize()` 原样存取的理由：它返回物理像素，125% 屏上存 1240×826、换到 100% 屏
+ * 回填就变成一块比预期大 25% 的板（这正是 `window_spec.rs` 那条 K-15 注释在躲的坑）。 */
+
+export interface LogicalWindowSize {
+  width: number;
+  height: number;
+}
+
+export async function readCurrentWindowLogicalSize(): Promise<LogicalWindowSize | null> {
+  try {
+    const currentWindow = getCurrentWindow();
+    const [size, scale] = await Promise.all([currentWindow.innerSize(), currentWindow.scaleFactor()]);
+    if (!Number.isFinite(scale) || scale <= 0) return null;
+    const width = size.width / scale;
+    const height = size.height / scale;
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+    return { width: Math.round(width), height: Math.round(height) };
+  } catch (error) {
+    console.warn("read current window size failed", error);
+    return null;
+  }
+}
+
+export async function resizeCurrentWindowTo(size: LogicalWindowSize): Promise<boolean> {
+  try {
+    await getCurrentWindow().setSize(
+      new LogicalSize(Math.round(size.width), Math.round(size.height)),
+    );
+    return true;
+  } catch (error) {
+    console.warn("resize current window failed", error);
+    return false;
+  }
+}
+
+/** 只回调，不读状态：读尺寸要两条 IPC，节流放在调用方（`useMainWindowSizeMemory`）。 */
+export async function watchCurrentWindowResized(handler: () => void): Promise<() => void> {
+  return getCurrentWindow().onResized(() => handler());
+}
+
+export async function readCurrentWindowMaximized(): Promise<boolean> {
+  try {
+    return await getCurrentWindow().isMaximized();
+  } catch (error) {
+    console.warn("read current window maximized state failed", error);
+    return false;
+  }
 }
 
 export async function watchCurrentWindowMaximized(

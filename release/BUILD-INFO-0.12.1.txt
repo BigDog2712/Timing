@@ -1,0 +1,6 @@
+product: Timing
+version: 0.12.1
+git_commit: 66497624548d7b96f68459cf1258abdaf77b98f1
+git_dirty: dirty
+built_at_utc: 2026-11-12T11:37:12.694Z
+build_profile: release

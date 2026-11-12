@@ -1,70 +1,18 @@
 /* ============================================================================
  * dashboard-todos.css — 待办卡（01 §4.3 骨架：head / compose / list / fade / undo）
  * -----------------------------------------------------------------------------
- * 这一张卡的**全部**样式都在本文件：卡体、输入行、行网格、勾选命中区、渐隐、撤销条。
+ * 这张卡的样式分两个文件：**本文件**管卡体 + 行网格（勾选命中区、四种时刻状态、渐隐、撤销条），
+ * `dashboard-todos-compose.css` 管「新建待办」弹层的表单（[本轮] 行内输入行下线后，那里
+ * 换成了弹层样式；表单控件与行网格互不影响，拆开后两边都有余量）。
  * 之所以单独成文件而不是接着 dashboard.css 写，是因为 dashboard.css 同时承担
  * 板式 + 卡壳 + 空态骨架（那是五卡共用的），再塞一张卡的内部版式会让"改一行要不要
- * 先读 200 行"变成常态；判据是单文件 ≤300 行（AGENTS.md）+ 一张卡的样式不跨文件。
+ * 先读 200 行"变成常态；判据是单文件 ≤300 行（AGENTS.md）+ 一张卡的版式尽量不跨文件。
  * 便利贴条曾经也在这里，后来搬去 `dashboard-notes.css`（同一条判据：它们是两张不同的卡）。
  * 档位数值照旧只引用 tiers.css，本文件不出现 294 / 36 这类裸数。
  * ========================================================================== */
 
-/* ── 待办卡（DOM 见 01 §4.3：head / compose / list / fade / undo） ── */
+/* ── 待办卡（DOM 见 01 §4.3：head / list / fade / undo / footer） ── */
 .qp-card-todos { position: relative; }
-
-/* ── 输入行：与行网格共用同一条左侧轨（22 = 卡内 16 + 6） ──
- * [P1 视觉层] 1px 实边 → 无边框 + inset 底色。两处必须一起改：
- *   ① `padding-left` 5 → **6**：原来 5+1(边) = 6 才是内容起点，边没了就补在 padding 上，
- *      否则输入起点比行里的标题偏左 1px（勾选中心 34 / 输入起点 52 那条对齐会断）；
- *   ② `:focus-within` 原来只改 `border-color`，现在没有边可改 → 换成 1px 内描边
- *      （`outline` + offset −1），焦点环不能丢：输入本身 `outline: none`，视觉焦点全靠这一条。
- * 高度 32 与圆角 12 是"输入框"这一层的形状：12 比 `--qp-radius-control`(10) 更方，
- * 那个 10 全仓在用，不许为了这一条改令牌。 */
-.qp-todo-compose {
-  display: flex;
-  flex: 0 0 var(--qp-todo-compose-h);
-  height: var(--qp-todo-compose-h);
-  align-items: center;
-  gap: 6px;
-  margin-bottom: var(--qp-row-gap);
-  padding: 0 10px 0 6px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--qp-surface-inset);
-  color: var(--qp-text-tertiary);
-}
-
-/* 加号外面那层 24px 轨是必需的：svg 只有 14，轨道 24 才让图标中心落在 34，
- * 和行里那个 24×24 勾选按钮同宽 —— 两个"行首标记"必须同轴。 */
-.qp-compose-icon {
-  display: flex;
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 没有边可改之后焦点靠 1px 内描边表达（见上面 ②）。`outline` 跟着 12 圆角走，
- * offset −1 让这条线画在输入框**里面**，与原来的 1px 边同一个视觉重量。 */
-.qp-todo-compose:focus-within {
-  outline: 1px solid var(--qp-focus-ring);
-  outline-offset: -1px;
-}
-
-.qp-todo-compose input {
-  flex: 1 1 auto;
-  min-width: 0;
-  border: 0;
-  background: none;
-  padding: 0;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-primary);
-  outline: none;
-}
-
-.qp-todo-compose input::placeholder { color: var(--qp-text-placeholder); }
 
 .qp-todo-list {
   display: flex;
@@ -80,18 +28,40 @@
   /* 撤销条 / 渐隐都是 absolute/sticky，不占行位 → 可见整行数才是几何表那 5 行 */
 }
 
-/* 行网格的左轨 = 6 padding + 24 勾选列 + 6 gap：勾选框中心 34、标题起点 52 */
+/* 行网格 = Rust `todos.rs:29-59`：行高 32、圆点中心在行内 x=8、名称从 x=22 起、
+ * 右侧时间胶囊 54×18。所以三列是 22 / 1fr / auto，勾选按钮自己往左探 3px 把
+ * 24 的命中区中心对到 9（视觉圆点仍落在 8）。
+ * [本轮] 第三列 54 → auto：`qp-todo-when` 里只有胶囊时 = 54，带提醒铃铛时 = 68。
+ * 两种情况下该列的**右缘**都在卡内右缘（auto 轨贴着容器右缘、内容右对齐）——
+ * 行内删除键与时间胶囊的右缘对齐不因铃铛出现而动；代价只是有铃铛的行标题窄 14px。 */
 .qp-todo-row {
   position: relative;
   display: grid;
   flex: 0 0 auto;
-  /* 勾选列 24 而不是 16：命中区 ≥24×24 是 WCAG 2.5.8 AA 的硬下限（02 §5.3 A9），
-   * 16px 的勾选框只是**画出来**那么大，按钮必须有 24 的可点范围。 */
-  grid-template-columns: 24px minmax(0, 1fr) var(--qp-col-num);
+  /* 勾选列 22 只是版式列；按钮本身仍是 24×24 命中区（WCAG 2.5.8 AA 的下限），
+   * 用负 margin 探进卡身内距，不推挤标题。 */
+  grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 6px;
+  gap: 0;
   height: var(--qp-row-todo);
-  padding-left: 6px;
+}
+
+/* 时间列容器（胶囊 + 可选的提醒铃铛）：右对齐，保证胶囊右缘与删除键同轴 */
+.qp-todo-when {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+/* 提醒铃铛（12px，`role="img"` + aria-label，不是按钮 —— 本轮不做编辑提醒）。
+ * 灰字而不是 accent：提醒是"已设"的事实陈述，不是需要抢注意力的主操作
+ * （FW-6 的"每屏一个强调色元素"留给今天的时刻胶囊）。 */
+.qp-todo-bell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--qp-text-tertiary);
 }
 
 /* 行内删除键：**绝对定位盖在时间列上**，不进 grid 列宽（否则 44px 数字列被挤窄，
@@ -134,6 +104,7 @@
   display: flex;
   align-self: stretch;
   width: 24px;
+  margin-left: -3px;
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -142,22 +113,39 @@
   cursor: default;
 }
 
-/* 视觉方框 18×18 画在按钮里面（按钮 24×24 只是命中区）。
- * [P1 视觉层] 16 → 18、圆角 5 → 6：行高 36 里 16px 的框偏小，18 与 13px 行主文同重量。
- * 命中区仍是 24 宽 × 36 高（WCAG 2.5.8 AA 的 24 下限不动，见上一条注释）。 */
+/* 状态标记画成**圆**（Rust `todos.rs:43-55`）：未完成 = 6.5 半径细描边，
+ * 完成 = 7 半径实心 + 白勾。方框是宿主自己的形状语言，与 Rust 版并排一眼就分得出。 */
 .qp-todo-box {
-  display: block;
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--qp-border-strong);
-  border-radius: 6px;
+  display: flex;
+  width: 13px;
+  height: 13px;
+  align-items: center;
+  justify-content: center;
+  border: 1.3px solid var(--qp-border-strong);
+  border-radius: 999px;
   background: none;
   color: var(--qp-bg-panel);
 }
 
+.qp-todo-box::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 3px;
+  margin-top: -2px;
+  border-bottom: 1.4px solid currentColor;
+  border-left: 1.4px solid currentColor;
+  transform: rotate(-45deg);
+  opacity: 0;
+}
+
 .qp-todo-check[aria-checked="true"] .qp-todo-box {
-  border-color: var(--qp-accent-default);
-  background: var(--qp-accent-default);
+  border-color: var(--qp-success);
+  background: var(--qp-success);
+}
+
+.qp-todo-check[aria-checked="true"] .qp-todo-box::after {
+  opacity: 1;
 }
 
 .qp-todo-check:focus-visible {
@@ -165,11 +153,12 @@
   outline-offset: 2px;
 }
 
+/* 名称 12.5 / 19（Rust `todos.rs:63` 的 `galley(..., 12.5, ...)`） */
 .qp-todo-title {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--qp-font-size-body);
-  line-height: var(--qp-line-height-body);
+  font-size: 12.5px;
+  line-height: 19px;
   color: var(--qp-text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -180,13 +169,34 @@
   text-decoration: line-through;
 }
 
+/* 时间胶囊 54×18 / 字 10.5（`todos.rs:77-99`）：底是 accent 9%（= `with_alpha(accent, 22)`）。 */
 .qp-todo-time {
-  text-align: right;
-  font-size: var(--qp-font-size-caption);
+  display: inline-flex;
+  width: 54px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--qp-accent-default) 9%, transparent);
+  text-align: center;
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-tertiary);
+  line-height: 18px;
+  color: var(--qp-text-secondary);
   white-space: nowrap;
+}
+
+/* 已完成 / 更远的日期：不铺底、只留灰字（时刻在这是记录，不是"要去做"的信号）；
+ * 逾期：danger 字 + danger 10% 底（Rust `with_alpha(th.danger, 26)`）。 */
+.qp-todo-time[data-state="done"],
+.qp-todo-time[data-state="later"] {
+  background: transparent;
+  color: var(--qp-text-tertiary);
+}
+
+.qp-todo-time[data-state="overdue"] {
+  background: color-mix(in srgb, var(--qp-danger) 10%, transparent);
+  color: var(--qp-danger);
 }
 
 /* 底部渐隐（01 §4.3 的 .qp-fade-bottom）：只在"还能往下滚"时出现，
@@ -210,11 +220,18 @@
   pointer-events: none;
 }
 
-/* 撤销条：乐观删除 + 窗内撤销（语义照抄主窗 todoStore.remove/undoRemove，AC-32） */
+/* 撤销条：乐观删除 + 窗内撤销（语义照抄主窗 todoStore.remove/undoRemove，AC-32）
+ *
+ * [本轮] `bottom` 必须让开卡底新加的「＋ 新建待办」footer 条（`.qp-todo-foot`，
+ * 几何与 `.qp-card-footer` 同一套：32 高 + 底部负边距贴到卡片下缘）。原来的
+ * `bottom: var(--qp-card-pad)` 会直接把撤销条压在按钮上。让位量 =
+ * `--qp-card-foot-h`（footer 自身 32）+ 8px 间隙 —— **不含** `--qp-card-pad-b`：
+ * footer 的负底边距已经把那 16px 吃掉了，再算一遍就会多飘 16px 盖住列表最后一行。
+ * 两处几何必须一起改：见 `dashboard-todos-compose.css` 的 `.qp-todo-foot` 注释。 */
 .qp-undo-bar {
   position: absolute;
   right: var(--qp-card-pad);
-  bottom: var(--qp-card-pad);
+  bottom: calc(var(--qp-card-foot-h) + 8px);
   left: var(--qp-card-pad);
   display: flex;
   align-items: center;

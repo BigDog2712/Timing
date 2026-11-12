@@ -1,0 +1,246 @@
+/* ============================================================================
+ * dashboard-board.css — 自由摆位画布（v3）
+ * -----------------------------------------------------------------------------
+ * 只管**几何**：滚动容器、缩放舞台、卡框、三根手柄、加卡弹层的两处补丁。
+ * 卡片表面（底/边/圆角/阴影）仍由 `dashboard.css` 的 `.qp-card` 与
+ * `dashboard-notes.css` 的 `.qp-notes` 提供 —— 卡框是**透明**的，只管定位。
+ * 两处都画底/边会得到「卡片套卡片」的双层描边，界面上看是一条 2px 粗边。
+ *
+ * 零字面量色值（与全仓同一条红线）；数值只有两类：8px 吸附网格与手柄热区。
+ * ========================================================================== */
+
+/* ── 外层不再钉 1052 ──
+ * `dashboard.css` 的 `.qp-main-view` 是 `width: min(var(--qp-board-w), 100%)`——那是 v2
+ * 「网格版式居中留白」的约束。v3 的画布是 1250 宽的设计点坐标，被钉死在 1052 的话
+ * 右侧那列永远出不来（倍率再大也只是把 1052 放大）。
+ * 这里只放开宽度，高度与 flex 约束见 `dashboard-board-zoom.css`。 */
+.qp-main-view {
+  width: 100%;
+}
+
+/* ── 滚动容器（滚动规则在 `dashboard-board-zoom.css`） ──
+ * `padding-top: 26px` 是给工具条让位：工具条仍然绝对定位贴在视图右上角
+ * （`dashboard-layout.css` 那套不改），而 v3 的卡片从 y=0 开始摆，不留这条就会被
+ * 「添加组件 / 整理 / 恢复默认」压住第一行的卡头。
+ * [v3.1] 两个方向的 overflow 搬去了 zoom 那份：倍率归用户之后画布可能比容器宽，
+ * 横向也要能滚 —— 写在这里会被那边覆盖，两边各写一份只会让人分不清谁说了算。 */
+.qp-board-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 26px;
+  overscroll-behavior: contain;
+}
+
+/* 舞台负责「缩放后的占地」：宽高由 JS 按 zoom 写 inline，滚动条才算得对。
+ * 不写 height: 100% —— 板子内容比首屏高是常态（今天也滚）。 */
+.qp-board-stage {
+  position: relative;
+  margin: 0 auto;
+}
+
+/* 画布本体：设计点坐标系，整体 `scale(zoom)`。`transform-origin` 必须是左上角，
+ * 否则缩放会以中心为原点，卡片越缩越往右下漂。 */
+.qp-board-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: top left;
+  /* 字体与 `timing-board.exe` 同源：exe 在 `install_fonts`（`app.rs:889`）里把
+   * `C:/Windows/Fonts/msyh.ttc` 插到 Proportional 族第一位，加粗用 `msyhbd.ttc`
+   * —— 也就是**微软雅黑**，不是 Segoe UI。全仓 `--font-sans` 是 Segoe UI 打头，
+   * 所以拉丁字母与数字的形状和 exe 一直不是一套；这里在板上把字族纠正过来。
+   * 只在板上覆盖，不动宿主窗口其余界面（那些不属于这次移植范围）。 */
+  font-family: "Microsoft YaHei", "微软雅黑", "PingFang SC", "Noto Sans SC", "Segoe UI", system-ui, sans-serif;
+  font-feature-settings: "kern" 1;
+}
+
+/* ── 一张卡：只是定位框 ── */
+.qp-board-card {
+  position: absolute;
+  /* 让卡内的 outline 不被外框裁掉（.qp-card 自己 overflow:hidden，这里不能裁） */
+  overflow: visible;
+}
+/* 卡内元素吃满整框：`.qp-card` 是 flex 列，`.qp-notes` 是 grid 条，两者都要 100% 高。
+ * 改造前它们是 `.qp-card-slot > *` 的 flex 子项，也是被拉满的 —— 这里换成绝对定位，
+ * 不补这行的话高度会塌回内容高，表现为「拖高了但卡里还是原来那么矮」。 */
+.qp-board-card > section {
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 拖动中的卡抬起来：阴影 + 轻微透明，别的卡不跟着动（自由摆位不挤开别人）。 */
+.qp-board-card[data-dragging="true"] {
+  z-index: 30;
+  filter: drop-shadow(0 6px 18px var(--qp-card-shadow, rgb(0 0 0 / 18%)));
+}
+.qp-board-card[data-dragging="true"] > section {
+  cursor: grabbing;
+}
+/* 拖拽期间禁掉卡内的文本选中：否则从卡头拖到正文会选中一片字，松手后残留在页面上。 */
+.qp-board-card[data-dragging="true"] * {
+  user-select: none;
+}
+
+/* 卡头是抓取热区（判据在 BoardCardFrame.tsx）：给个抓手光标，静息不改变任何像素。 */
+.qp-board-card .qp-card-head,
+.qp-notes-head {
+  cursor: grab;
+}
+
+/* ── 三根手柄 ──
+ * 热区 10px，画一条 2px 的静息线；hover / focus / 拖动时才显形。
+ * 手柄整体**贴在卡内侧**，不往卡缝里伸：卡片可以重叠，往外伸的那半会落进邻居的
+ * 命中区，谁抢到谁生效，表现是「拖这张，动的是另一张」。 */
+.qp-board-handle {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  z-index: 4;
+  transition: opacity 120ms ease;
+}
+.qp-board-handle::after {
+  content: "";
+  position: absolute;
+  border-radius: 999px;
+  background: var(--qp-border-strong, rgb(0 0 0 / 18%));
+}
+.qp-board-handle-e {
+  top: 12px;
+  right: 0;
+  bottom: 12px;
+  width: 10px;
+  cursor: ew-resize;
+}
+.qp-board-handle-e::after {
+  top: 50%;
+  right: 3px;
+  width: 2px;
+  height: 20px;
+  transform: translateY(-50%);
+}
+.qp-board-handle-s {
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 10px;
+  cursor: ns-resize;
+}
+.qp-board-handle-s::after {
+  left: 50%;
+  bottom: 3px;
+  width: 20px;
+  height: 2px;
+  transform: translateX(-50%);
+}
+.qp-board-handle-se {
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+}
+.qp-board-handle-se::after {
+  right: 2px;
+  bottom: 2px;
+  width: 5px;
+  height: 5px;
+  border-radius: 2px;
+}
+.qp-board-card:hover .qp-board-handle,
+.qp-board-card:focus-within .qp-board-handle {
+  opacity: 1;
+}
+.qp-board-handle:focus-visible {
+  opacity: 1;
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: -2px;
+}
+@media (hover: none) {
+  .qp-board-handle { opacity: 1; }
+}
+
+/* `.qp-card-more` 的显形规则挂在 `.qp-card:hover` 上，便利贴不是 `.qp-card` —— 补一条。
+ * 卡头栅格与右槽尺寸在 `dashboard-notes.css`（那是这张卡自己的文件），这里只管"悬停显形"。 */
+.qp-notes:hover .qp-card-more,
+.qp-notes:focus-within .qp-card-more {
+  opacity: 1;
+}
+
+/* ── 空板 / 提示 / 轻提示 ── */
+.qp-board-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+}
+.qp-board-hint {
+  margin: 8px 0 4px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--qp-text-tertiary);
+}
+/* 提示条：贴视图底部居中，不挡卡。`pointer-events: none` —— 它只是一句话，不该抢点击。 */
+.qp-board-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 45;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--qp-bg-elevated);
+  outline: 1px solid var(--qp-border-subtle);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-primary);
+  pointer-events: none;
+}
+
+/* ── 加卡弹层补丁 ── */
+/* 每行右侧的「板上 N 张」：不要跟着 hint 一起换行。 */
+.qp-add-card__count {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--qp-text-tertiary);
+  white-space: nowrap;
+}
+/* 加卡列表现在永远列满 8 项，面板要能滚（原来最多 7 项，靠 max-height 就够）。 */
+.qp-add-card__panel { max-height: min(70vh, 520px); overflow-y: auto; }
+
+/* ── 卡菜单里的标题输入（v3 新增：改名）── */
+.qp-card-menu-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px 2px;
+}
+.qp-card-menu-label {
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--qp-text-tertiary);
+}
+.qp-card-menu-input {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--qp-radius-chip);
+  outline: 1px solid var(--qp-border-subtle);
+  outline-offset: -1px;
+  background: var(--qp-surface-raise);
+  font-size: var(--qp-font-size-row);
+  color: var(--qp-text-primary);
+}
+.qp-card-menu-input::placeholder { color: var(--qp-text-tertiary); }
+.qp-card-menu-input:focus-visible {
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: -1px;
+}

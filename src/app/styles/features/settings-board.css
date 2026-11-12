@@ -1,0 +1,115 @@
+/* ============================================================================
+ * settings-board.css — 设置页「主界面组件」清单（v3）
+ * -----------------------------------------------------------------------------
+ * 一行 = 一张卡：名字 / 类型 / 尺寸三档 / 移除。四列用 `grid` 定宽，不靠 flex 挤——
+ * 名字长度差很大（「计时分布」vs 用户改成的「上午的会议收尾」），flex 会让尺寸按钮左右跳。
+ *
+ * 配色只用 `--qp-*` 令牌；尺寸档是**三段互斥按钮**（`aria-pressed`），选中态给底色而
+ * 不是给边框：边框会和这一行自己的发丝线撞在一起，看起来像两条线。
+ * ========================================================================== */
+
+.settings-board-hint {
+  margin: 0;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-secondary);
+}
+
+.settings-board-hint strong {
+  color: var(--qp-text-primary);
+  font-weight: var(--qp-font-weight-emphasis);
+}
+
+.settings-board-empty {
+  margin: 0;
+  padding: 8px 0;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-tertiary);
+}
+
+.settings-board-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-board-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px solid var(--qp-border-subtle);
+}
+
+.settings-board-row:first-child {
+  border-top: 0;
+}
+
+.settings-board-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--qp-font-size-row);
+  line-height: var(--qp-line-height-row);
+  color: var(--qp-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-board-kind {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--qp-text-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-board-size {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--qp-radius-chip);
+  /* 与 `.qp-segmented-filter-compact` 同口径：容器只做「这是一组」的暗示，
+     不给实底 —— 深色下 `--qp-surface-raise` 比面板亮一档，三段实底会抢走整行的注意力。 */
+  background: color-mix(in srgb, var(--qp-bg-elevated) 58%, transparent);
+}
+
+.settings-board-tier {
+  min-width: 28px;
+  height: 22px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--qp-radius-chip);
+  background: none;
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--qp-text-tertiary);
+  cursor: pointer;
+}
+
+.settings-board-tier:hover {
+  color: var(--qp-text-primary);
+}
+
+/* 选中态用 accent 而不是「深一档的底」：深色面板上 `--qp-bg-elevated` 比面板更暗，
+  选中的那格会看着像被抠掉的洞（实测如此）。accent-muted 是本页既有的「已选中」语言。 */
+.settings-board-tier[aria-pressed="true"] {
+  background: var(--qp-accent-muted);
+  color: var(--qp-accent-default);
+  font-weight: var(--qp-font-weight-emphasis);
+}
+
+.settings-board-tier:focus-visible {
+  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+  outline-offset: -1px;
+}
+
+.settings-board-actions {
+  display: inline-flex;
+  gap: 8px;
+}

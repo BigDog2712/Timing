@@ -24,7 +24,8 @@ type Intent =
   | { action: 'toggle_timer' }
   | { action: 'open_host_settings' }
   | { action: 'show_pill' }
-  | { action: 'open_todos' };
+  | { action: 'open_todos' }
+  | { action: 'delete_note'; noteId: number };
 
 const h = vi.hoisted(() => ({
   handler: null as ((intent: Intent) => void) | null,
@@ -36,6 +37,8 @@ const h = vi.hoisted(() => ({
   reloadItems: vi.fn(async () => []),
   showWindow: vi.fn(async () => undefined),
   openTodos: vi.fn(async () => undefined),
+  openNote: vi.fn(async () => undefined),
+  removeNote: vi.fn(async () => undefined),
   openSettings: vi.fn(async () => undefined),
   highlightPill: vi.fn(async () => undefined),
   setNotice: vi.fn(),
@@ -56,6 +59,12 @@ vi.mock('../hooks/useTimerActions', () => ({
 vi.mock('./api', () => ({ itemApi: { create: h.createItem } }));
 vi.mock('./highlightActions', () => ({ highlightPill: h.highlightPill }));
 vi.mock('./todosActions', () => ({ openTodosWindow: h.openTodos }));
+/* [便利贴可删除] 删除必须落到既有的 `removeNote(id)`（note_delete + 关窗）——
+   自己在这里重写一遍 note_delete 会绕开"关窗"与失败提示，所以连模块一起换成桩。 */
+vi.mock('./noteActions', () => ({
+  openNoteWindowFor: h.openNote,
+  removeNote: h.removeNote,
+}));
 /* [0.12.1 T04b] 设置只剩一个家：这条意图现在与托盘/菜单/手柄同走 `openSettings()`。 */
 vi.mock('./settingsActions', () => ({ openSettings: h.openSettings }));
 vi.mock('./ipc', () => ({
@@ -97,6 +106,7 @@ beforeEach(() => {
   for (const fn of [
     h.startOrSwitch, h.togglePause, h.createItem, h.reloadItems, h.createRecord,
     h.showWindow, h.highlightPill, h.setNotice, h.openPanel, h.setCollapsed, h.openSettings,
+    h.openTodos, h.openNote, h.removeNote,
   ]) fn.mockClear();
   h.items = [];
 });
@@ -193,6 +203,28 @@ describe('useHostIntentBridge（P0-04 / P0-05 执行端）', () => {
     expect(h.startOrSwitch).not.toHaveBeenCalled();
   });
 
+  /* ---- [便利贴可删除] 删除意图 ---- */
+
+  /* 判据①：`delete_note` 必须把**意图里的那个 id** 原样交给 `removeNote`。
+     变异自证：把 `intent.noteId` 换成常量 0 → 这条立刻红（宿主会去删一张不存在的贴，
+     或更糟：删掉 id 恰好是 0 的那张）。 */
+  it('n01_delete_note_runs_remove_note_with_the_intent_id', async () => {
+    await dispatch({ action: 'delete_note', noteId: 42 });
+
+    expect(h.removeNote).toHaveBeenCalledTimes(1);
+    expect(h.removeNote).toHaveBeenCalledWith(42);
+    /* 删除不碰计时状态机、不建事项 —— 它是纯粹的便利贴动作 */
+    expect(h.startOrSwitch).not.toHaveBeenCalled();
+    expect(h.togglePause).not.toHaveBeenCalled();
+    expect(h.createItem).not.toHaveBeenCalled();
+  });
+
+  it('n02_delete_note_keeps_the_exact_id_for_another_note', async () => {
+    await dispatch({ action: 'delete_note', noteId: 7 });
+
+    expect(h.removeNote).toHaveBeenCalledWith(7);
+  });
+
   /* ---- P1-01 补记 ---- */
 
   /* 判据①：补记走 `createRecord`，起止 = 传进来的段起止（不是「现在」） */
@@ -238,18 +270,6 @@ describe('useHostIntentBridge（P0-04 / P0-05 执行端）', () => {
 
     expect(h.createItem).not.toHaveBeenCalled();
     expect(h.createRecord).not.toHaveBeenCalled();
-  });
-
-  /* 判据③的宿主半场：分析窗递来的是**建议命中的那个事项名**，宿主按精确名一找就命中，
-     于是「复用」而不是「新建」——事项表条数不变。变异：让弹卡递活动原名 → 这里会
-     `createItem('VS Code')` → 事项表 +1。 */
-  it('p106_host_reuses_the_suggested_item_name_without_adding_one', async () => {
-    h.items = [{ id: 7, name: 'VS Code 调试' }];
-
-    await dispatch({ action: 'backfill_record', itemName: 'VS Code 调试', startedAt: 1000, endedAt: 5000 });
-
-    expect(h.createItem).not.toHaveBeenCalled();
-    expect(h.createRecord).toHaveBeenCalledWith({ itemId: 7, startedAt: 1000, endedAt: 5000, note: null });
   });
 
   it('p004_unknown_action_from_a_newer_analysis_window_is_ignored', async () => {

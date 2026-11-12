@@ -1,14 +1,14 @@
 use crate::models::insight::localization::{self, Locale};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
-
 pub const APP_OVERRIDE_KEY_PREFIX: &str = "__app_override::";
+/// 「应用 → 指定事项」的绑定（0.12.1）：值 `{"itemId":123}`，只存配置，不进快照。
+pub const APP_ITEM_BINDING_KEY_PREFIX: &str = "__app_item_binding::";
 pub const WEB_DOMAIN_OVERRIDE_KEY_PREFIX: &str = "__web_domain_override::";
 pub const CATEGORY_LABEL_OVERRIDE_KEY_PREFIX: &str = "__category_label_override::";
 pub const CATEGORY_COLOR_OVERRIDE_KEY_PREFIX: &str = "__category_color_override::";
 pub const CATEGORY_DEFINITION_KEY_PREFIX: &str = "__custom_category::";
 pub const DELETED_CATEGORY_KEY_PREFIX: &str = "__deleted_category::";
-
 const SYSTEM_EXECUTABLES: &[&str] = &[
     "taskmgr.exe",
     "regedit.exe",

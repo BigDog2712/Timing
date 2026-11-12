@@ -12,6 +12,8 @@ src-tauri/gen/android/.kotlin/
 src-tauri/gen/android/app/build/
 src-tauri/gen/android/build/
 src-tauri/gen/android/.gradle/
+# buildSrc 有独立的 Kotlin 构建缓存（实测 908 KB），上面四条只覆盖 app/build 级
+src-tauri/gen/android/buildSrc/.kotlin/
 
 # --- 构建产物（构建期复制生成，不入库） ---
 release/*.exe
@@ -38,6 +40,9 @@ Desktop.ini
 
 # --- 本地工作数据（协作工具产物：调试脚本 / 截图 / 笔记，不入库） ---
 .workbuddy/
+# Agent 技能包：本地安装、38 MB / 1631 文件，与本仓源码无关（配套锁文件同理）
+.agents/
+skills-lock.json
 
 # 归档的旧安装包（构建产物，挪出来只为让打包脚本第 4 步只看到 1 个 setup）
 release/archive/

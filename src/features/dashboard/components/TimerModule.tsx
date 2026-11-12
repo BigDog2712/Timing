@@ -13,23 +13,27 @@ import type { ReactNode } from "react";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
 
 /**
- * 模块 1 · 计时分布（01 §4.2：环复用旧 `DashboardFocusDonut` 的 SVG 数学，几何换档）
+ * 模块 1 · 计时分布（**几何逐值照抄 `widgets/focus.rs`**）
  *
- * 几何（01 §4.3，长档）：⌀144 / 描边 14 / 内径 116 → **viewBox 144，center 72，r 65**。
- * 旧常量是 viewBox 112 / center 56 / r 47 / stroke 16（47+8=55≈56），换算关系是
- * "center = r + stroke/2"，所以新值 65 + 7 = 72 仍然自洽。
+ * Rust 的环不是固定 ⌀132：`d = min(内容高, 0.46×内容宽)` 再 clamp 到 86–158，
+ * 描边 `0.135d`（不小于 9），片间缝隙按弧长 1.6px 折算角度。这里保留一套 viewBox
+ * （d = 144），把**比例**写死，实际直径交给 CSS 的 `--qp-donut-fit`：
+ *   · 描边 19.44 / 144 = 0.135   → 与 Rust 同粗
+ *   · 中径 62.28 = 72 − 19.44/2  → 内外缘比例与 Rust 一致
+ *   · 缝隙 1.47° ≈ 1.6px 弧长（r=62.28）
  *
- * 短档（⌀120 / 12）**不换常量**：设计的两档环是同一张图按 120/144 缩放的，
- * 尺寸交给 CSS 的 `--qp-donut`，见 `tiers.css:78-82` 的推算与取舍。
+ * 环心读数与 Rust 一样是**一整串同号字**（`19.5` 粗 + `今日合计` 10）：
+ * 原来把 `h` / `m` 降成 0.62em，放大到 158 的环里会多出一处"层级"，
+ * 而 Rust 那张卡上没有这一层。
  */
 
 const DONUT_VIEWBOX = 144;
 const DONUT_CENTER = 72;
-const DONUT_RADIUS = 65;
-const DONUT_STROKE_WIDTH = 14;
+const DONUT_RADIUS = 62.28;
+const DONUT_STROKE_WIDTH = 19.44;
 const DONUT_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
-const DONUT_GAP_DEGREES = 4;
-/** 5 行读数 = 前 4 类 + 「其他」（几何表 readout 24 × 5 + gap 4 × 4 = 136 ≤ 环 144） */
+const DONUT_GAP_DEGREES = 1.47;
+/** 5 行图例 = 前 4 类 + 「其他」（Rust 前 5 名单独成条，第 6 名起并入「其他」） */
 const READOUT_LIMIT = 4;
 
 interface Props {
@@ -65,24 +69,6 @@ function buildReadouts(
     value: restValue,
     color: "var(--qp-text-tertiary)",
   }];
-}
-
-/**
- * 环心主读数的**排版拆分**（只为视觉层）：`4h 45m` → 数字直接继承 26px，`h` / `m`
- * 包进 `.qp-donut-unit` 降到 13px + secondary。数字仍是同一段文本、同一个 tabular-nums，
- * 所以宽度判据（环心 `min-width: 76px`）不受影响。
- *
- * 只做"数字 / 非数字"切分，**不重写格式化逻辑**：文案仍由 `formatDashboardDuration`
- * 一处产出（切成两段不会改变文案本身，四种语言都适用 —— 该函数只输出 `Nh Nm` / `Nm`）。
- */
-function TotalReadout({ text }: { text: string }) {
-  return (
-    <>
-      {text.split(/(\d+)/).filter(Boolean).map((part, index) => (
-        /^\d+$/.test(part) ? part : <span key={index} className="qp-donut-unit">{part}</span>
-      ))}
-    </>
-  );
 }
 
 export default function TimerModule({
@@ -130,32 +116,38 @@ export default function TimerModule({
       refreshErrorText={refreshError ? UI_TEXT.common.refreshFailed : undefined}
       skeletonRows={5}
       emptyText={copy.timerEmpty}
-      meta={(
-        <>
-          <DeltaIcon size={12} strokeWidth={2} aria-hidden="true" />
+      /* 卡头读数就是 exe 的 `meta(Timer)`：「今日 14m」（`widgets/mod.rs:141`）。
+         昨日对比不在卡头 —— 它在维度那一行的右端（见下）。 */
+      meta={copy.timerToday(formatDashboardDuration(totalTrackedTime))}
+    >
+      {/* [P2] 三个维度：同一份总量换分组，不是三份数据。切维度只换这一个 state
+          （v3 起提到 `Dashboard` 视图层，板上多个计时卡共用一个口径），
+          环与读数行仍是同一份数组（段数 = 行数这条不变）。 */}
+      <div className="qp-focus-bar">
+        <div className="qp-focus-dims" role="tablist" aria-label={copy.focusDimensionLabel}>
+          {FOCUS_DIMENSIONS.map((dim) => (
+            <button
+              key={dim}
+              type="button"
+              role="tab"
+              aria-selected={dim === dimension}
+              className="qp-focus-dim"
+              data-active={dim === dimension || undefined}
+              onClick={() => onDimensionChange(dim)}
+            >
+              {copy.focusDimensions[dim]}
+            </button>
+          ))}
+        </div>
+        {/* 较昨日读数与维度共用一行（`focus.rs:54-69`：读数右对齐在 `tabs` 那条 24 高的
+            横带里，10.5px）。放进卡头会把这一行挤成两行，卡头高度是几何表锁死的。 */}
+        <span className="qp-focus-delta" data-dir={direction}>
+          <DeltaIcon size={11} strokeWidth={2} aria-hidden="true" />
           {UI_TEXT.dashboard.comparedWithYesterday(
             formatDashboardDuration(Math.abs(dayDeltaTrackedTime)),
             direction,
           )}
-        </>
-      )}
-    >
-      {/* [P2] 三个维度：同一份总量换分组，不是三份数据。切维度只改 `options.dimension`，
-          环与读数行仍是同一份数组（段数 = 行数这条不变）。 */}
-      <div className="qp-focus-dims" role="tablist" aria-label={copy.focusDimensionLabel}>
-        {FOCUS_DIMENSIONS.map((dim) => (
-          <button
-            key={dim}
-            type="button"
-            role="tab"
-            aria-selected={dim === dimension}
-            className="qp-focus-dim"
-            data-active={dim === dimension || undefined}
-            onClick={() => onDimensionChange(dim)}
-          >
-            {copy.focusDimensions[dim]}
-          </button>
-        ))}
+        </span>
       </div>
       <div className="qp-donut-body">
         {/* 环只是同一份数据的第二表达，读数行才是可读内容 → 环对读屏隐藏，
@@ -197,34 +189,39 @@ export default function TimerModule({
             }) : null}
           </svg>
           <div className="qp-donut-center">
-            <span className="qp-donut-total">
-              <TotalReadout text={formatDashboardDuration(totalTrackedTime)} />
-            </span>
-            <span className="qp-donut-cap">{UI_TEXT.dashboard.total}</span>
+            <span className="qp-donut-total">{formatDashboardDuration(totalTrackedTime)}</span>
+            <span className="qp-donut-cap">{copy.timerDonutCap}</span>
           </div>
         </div>
 
         <ul className="qp-readouts">
-          {readouts.map((item, index) => (
-            <li
-              key={`${item.category}:${index}`}
-              className="qp-readout"
-              data-hover={hovered === index || undefined}
-              onPointerEnter={() => setHovered(index)}
-              onPointerLeave={() => setHovered(null)}
-            >
-              <span
-                className="qp-readout-dot"
-                aria-hidden="true"
-                style={{
-                  backgroundColor: displayColor(item.color) || "var(--qp-accent-default)",
-                  ...(item.category === "anonymous" ? ANONYMOUS_ACTIVITY_STYLE : {}),
-                }}
-              />
-              <span className="qp-readout-name" title={item.name}>{item.name}</span>
-              <span className="qp-readout-value">{formatDashboardDuration(item.value)}</span>
-            </li>
-          ))}
+          {readouts.map((item, index) => {
+            /* Rust 的图例每行两段：名称（12）与「百分比 · 时长」（10）。百分比在这层算，
+             * 用**同一份** readouts 的总量 —— 环、名称、占比三者永远自洽。 */
+            const percent = total > 0 ? Math.round((Math.max(0, item.value) / total) * 100) : 0;
+            return (
+              <li
+                key={`${item.category}:${index}`}
+                className="qp-readout"
+                data-hover={hovered === index || undefined}
+                onPointerEnter={() => setHovered(index)}
+                onPointerLeave={() => setHovered(null)}
+              >
+                <span
+                  className="qp-readout-dot"
+                  aria-hidden="true"
+                  style={{
+                    backgroundColor: displayColor(item.color) || "var(--qp-accent-default)",
+                    ...(item.category === "anonymous" ? ANONYMOUS_ACTIVITY_STYLE : {}),
+                  }}
+                />
+                <span className="qp-readout-name" title={item.name}>{item.name}</span>
+                <span className="qp-readout-sub">
+                  {`${percent}%  ·  ${formatDashboardDuration(item.value)}`}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </div>
     </ModuleShell>

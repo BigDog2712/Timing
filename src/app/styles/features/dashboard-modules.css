@@ -6,13 +6,14 @@
  * 档位数值照旧只引用 tiers.css。
  * ========================================================================== */
 
-/* ── 计时分布：环 + 5 行读数 ── */
+/* ── 计时分布：环 + 图例（**逐条对照 `widgets/focus.rs`**） ── */
+/* 环与图例之间 14（`focus.rs:128` 的 `ring.right() + 14.0`） */
 .qp-donut-body {
   display: grid;
   flex: 1 1 auto;
   grid-template-columns: var(--qp-donut) minmax(0, 1fr);
   align-items: center;
-  gap: var(--qp-card-gap);
+  gap: 14px;
   min-height: 0;
 }
 
@@ -35,100 +36,90 @@
   pointer-events: none;
 }
 
-/* 环心主读数（[P1 视觉层] 24 → 26：`--qp-font-size-metric` 不动，另立 readout 一条，
- * 那个 24 在别处还有消费者）。`letter-spacing` 收紧 1% 是数值字（tabular-nums）在大字号下的
- * 常规补偿，不改宽度判据 —— 环心是居中块，`min-width: 76px` 兜住三/四位数。 */
+/* 环心主读数：Rust 按环径分三档 14.5 / 17 / 19.5（`focus.rs:108`）。
+ * 三档其实是同一条线性关系（19.5/144 ≈ 0.135），所以用环径乘系数一次算完：
+ * 158 → 20.9（Rust 上限 158 时取 19.5，差 1.4px）、132 → 17.4（Rust 17）、
+ * 110 → 14.5（Rust 14.5）。取 0.128 让三档同时贴合：158→20.2、132→16.9、110→14.1。 */
 .qp-donut-total {
-  min-width: 76px;
+  min-width: 0;
   text-align: center;
-  font-size: var(--qp-font-size-readout);
+  /* 环心读数：Rust 是**按环径分三档**（`focus.rs:105`，d<118 → 14.5 / d<140 → 17 / 否则 19.5），
+   * 用 clamp 连续逼近：两端钉死在 14.5 与 19.5，中段偏差 < 1px。 */
+  font-size: clamp(14.5px, var(--qp-donut-fit, 158px) * 0.128, 19.5px);
   font-variant-numeric: tabular-nums;
   font-weight: var(--qp-font-weight-emphasis);
-  line-height: var(--qp-line-height-readout);
+  line-height: 1.05;
   letter-spacing: -0.01em;
   color: var(--qp-text-primary);
 }
 
-/* 单位降级（h / m）：主读数里的字母不该跟数字一样响。26px 的数字配 13px 的单位，
- * 单位走 secondary —— 它仍然要读得清（12/13px 非占位文本不许用 tertiary）。
- * 数值与单位是同一行里的两段：`display: inline` + 继承 tabular-nums 保证不跳宽。 */
-.qp-donut-unit {
-  font-size: var(--qp-font-size-row);
-  font-weight: var(--qp-font-weight-regular);
-  line-height: inherit;
-  color: var(--qp-text-secondary);
-}
-
+/* 「今日合计」10（`focus.rs:121`） */
 .qp-donut-cap {
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+  font-size: 10px;
+  line-height: 13px;
   color: var(--qp-text-tertiary);
 }
 
-/* 数字列右缘 = 卡内右缘 − 6（01 §4.3 几何表，列内相对坐标）
- * 左列：465.14−16 = 449.14 → −6 = **443.14**；右列：570.86−16 = 554.86 → −6 = **548.86**
- * （表里 555 / 549 是同一对值的四舍五入）。
- * 这 6px 就是 §4.2 说的「右轨」。实现分两种容器，但**结果一致**：
- *   · 不滚动的读数表 → 容器上一句 padding-right（下面这条）；
- *   · 会滚动的三个列表 → 用 `qp-scroll-region-stable` 的 `scrollbar-gutter: stable`，
- *     滚不滚都常驻 6px（`--qp-scrollbar-size: 6px`）。
- * 为什么不能用"行上 padding-right"：列表一旦溢出就多出滚动条槽，数字列会再左移 6px
- * —— 实测（1100 档探针）右列数字右缘 439.25 而不是 445.25，四条列的竖线直接断开。 */
+/* 图例区：Rust 的行是**连续**的 30px（`row_h = 30.0`，行内不再留 gap），
+ * 10 / 12 两行文字都排在行内，所以这里不能有 gap —— 有 gap 时 5 行会多出 16px，
+ * 最小卡里就会莫名其妙地滚起来。 */
 .qp-readouts {
   display: flex;
   flex-direction: column;
-  gap: var(--qp-row-gap);
+  gap: 0;
   margin: 0;
-  /* padding-right 必须写在 padding 简写**之后**（简写会把前面那行清成 0 —— 第一版就是这么
-   * 被吃掉的，实测右缘 449.14 而不是 443.14） */
-  padding: 0 var(--qp-rail-inset) 0 0;
+  padding: 0;
   list-style: none;
   min-width: 0;
 }
 
-/* [P1 视觉层] 图例行高 24 → 26（裸字面值，**不动 `--qp-row-readout`**：那是骨架条高与
- * 别处行高的共用令牌，本批唯一许改的行高令牌是 `--qp-row-app`）。
- * 5×26 + 4×4 = 146 ⊂ 计时卡环区可用高 178；短档 232−32−28−26 = 146，恰好占满（不溢出）。 */
+/* 一行图例 = Rust `focus.rs:134-177`：
+ *   点 3.5 半径，圆心在行内 x=9 / y=8；名称 12 从 x=19 起，副行 10 紧跟其下。
+ * 行高 30、两行文字 15 + 13 在 30 里上下各留 1。 */
 .qp-readout {
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) var(--qp-col-num);
-  align-items: center;
-  gap: 8px;
-  height: 26px;
-  border-radius: 8px;
+  grid-template-columns: 19px minmax(0, 1fr);
+  grid-template-rows: 15px 13px;
+  align-content: center;
+  height: 30px;
+  border-radius: 6px;
   color: var(--qp-text-secondary);
 }
 
 /* hover 弧段 ↔ 读数行 双向联动（01 §4.2）。只改底色，不动几何（否则 5 行会跳）。
- * [P1 视觉层] 底从 `--qp-bg-elevated` 换成 raise 层（比 card 高一层），并给 8 圆角 ——
- * 悬停块要有"贴上来"的形状，方角在 18 圆角的卡里很硬。 */
+ * Rust 的悬停块是 `row.expand2(6, 0)` + 8 圆角；这里用内侧 6 圆角贴住 30 高，
+ * 外扩交给负 margin 会撞到环 —— 6 圆角已经足够"贴上来"。 */
 .qp-readout[data-hover="true"] { background: var(--qp-surface-raise); }
 
-/* 图例 dot 6 → 8：行高加到 26 之后 6px 的点偏小，与 13px 行主文不成比例 */
+/* 点 7px（Rust 半径 3.5），圆心落在行内 x=9：左缘 5.5 = 9 − 3.5 */
 .qp-readout-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
+  margin-left: 5.5px;
   border-radius: 999px;
 }
 
-/* 行主文 12/18 → 13/18（`--qp-font-size-row`）：读数是"名字 + 时长"两栏，
- * 名字是主文，不该和 12px 的时长同档；行高锁 18 让 26 的行内上下各留 4。 */
+/* 名称 12 / 15（Rust `focus.rs:161` 的 `label(..., 12.0, th.text, ...)`） */
 .qp-readout-name {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--qp-font-size-row);
-  line-height: var(--qp-line-height-row);
+  font-size: 12px;
+  line-height: 15px;
+  color: var(--qp-text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* 数值统一 12px + tabular-nums（`--qp-font-size-caption` 就是 12，不另立令牌） */
-.qp-readout-value {
-  text-align: right;
-  font-size: var(--qp-font-size-caption);
+/* 副行「62% · 3h 20m」10 / 13（Rust `focus.rs:174` 的 `10.0 / th.text3`） */
+.qp-readout-sub {
+  grid-column: 2;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-primary);
+  line-height: 13px;
+  color: var(--qp-text-tertiary);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -189,77 +180,4 @@
   height: 100%;
   border-radius: 999px;
   background: currentColor;
-}
-
-/* ── 应用排行：5 行 + 图标（[P1 视觉层] 发丝已删，见下） ── */
-.qp-app-list { display: flex; flex: 1 1 auto; flex-direction: column; }
-
-/* 自绘滚动条（**轨道仍是 6px**：数字列右缘 443.14/548.86 靠 `qp-scroll-region-stable`
- * 常驻的那 6px 槽，宽度改 4 会让四条列一起右移 2px = 像素验收红）。
- * 所以视觉上的"细"靠 thumb 的 1px 透明边 + content-box 裁切做出来（6 − 2 = 4px），
- * 槽宽一个像素不动。`scrollbar-width: thin` 只对不支持 `::-webkit-scrollbar` 的引擎生效。 */
-.qp-app-list {
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--qp-text-tertiary) 55%, transparent) transparent;
-}
-
-.qp-app-list::-webkit-scrollbar { width: var(--qp-scrollbar-size); }
-
-.qp-app-list::-webkit-scrollbar-thumb {
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--qp-text-tertiary) 55%, transparent);
-  background-clip: content-box;
-}
-
-.qp-app-row {
-  position: relative;
-  display: grid;
-  flex: 0 0 auto;
-  grid-template-columns: 22px minmax(0, 1fr) var(--qp-col-num);
-  align-items: center;
-  gap: 10px;
-  height: var(--qp-row-app);
-}
-
-/* [P1 视觉层] 发丝（`.hair` 那 2px 绝对定位分隔线）连同 DOM 里的 `<span class="hair" />`
- * 一起删了：行高从 32 降到 28 之后，5 行只占 140，再加 4 条 2px 线会把"行"读成"表格"。
- * 分隔交给行高差与图标底块，不加回任何分隔线。 */
-
-.qp-app-icon {
-  display: flex;
-  width: 22px;
-  height: 22px;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-radius: 6px;
-  background: var(--qp-surface-raise);
-  font-size: var(--qp-font-size-compact);
-  font-weight: var(--qp-font-weight-emphasis);
-  line-height: var(--qp-line-height-compact);
-  color: var(--qp-text-tertiary);
-}
-
-.qp-app-icon > img { width: 100%; height: 100%; object-fit: contain; }
-
-/* [P1 视觉层] 行主文 14/20 → 13/18（`--qp-font-size-row`）：与事项分布、读数行同一档，
- * 一行里三张卡的"名字"看起来才是同一层 */
-.qp-app-name {
-  min-width: 0;
-  overflow: hidden;
-  font-size: var(--qp-font-size-row);
-  line-height: var(--qp-line-height-row);
-  color: var(--qp-text-primary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.qp-app-value {
-  text-align: right;
-  font-size: var(--qp-font-size-caption);
-  font-variant-numeric: tabular-nums;
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-secondary);
-  white-space: nowrap;
 }

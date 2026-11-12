@@ -1,13 +1,17 @@
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent, } from "react";
-import { Check } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, } from "react";
 import { createPortal } from "react-dom";
-import QuietButton from "../../../shared/components/QuietButton.tsx";
-import QuietDialog from "../../../shared/components/QuietDialog.tsx";
 import type {
+  QuickClassificationItemBinding,
   QuickClassificationOpenRequest,
   QuickClassificationTarget,
 } from "../types.ts";
+import type { AppCategory } from "../../../shared/classification/categoryTokens.ts";
+import { useQuietDialogs } from "../../../shared/hooks/useQuietDialogs.tsx";
+import QuickClassificationCategoryMenu, { focusMenuItem } from "./QuickClassificationCategoryMenu.tsx";
+import QuickClassificationItemBindingMenu from "./QuickClassificationItemBindingMenu.tsx";
+import QuickClassificationRenameDialog from "./QuickClassificationRenameDialog.tsx";
+import { useQuickClassificationCategoryAdmin } from "../hooks/useQuickClassificationCategoryAdmin.ts";
 import {
   ClassificationService,
   type ClassificationBootstrapData,
@@ -30,16 +34,15 @@ interface Props {
     override: QuickClassificationOverride | null,
   ) => void;
   onError: (message: string) => void;
+  /**
+   * [0.12.1] 可选的第二栏「绑定事项」。**不传时本组件逐字等于现状**
+   * （数据页 / 历史页两处调用方都不传）。传了也只是多一个菜单项：
+   * 选中写一条 KV（或清除），不开始计时、不改追踪。
+   */
+  itemBinding?: QuickClassificationItemBinding;
 }
 
 const MENU_MARGIN = 12;
-const SUBMENU_GAP = 2;
-
-function focusMenuItem(container: HTMLElement | null, index: number) {
-  const items = container?.querySelectorAll<HTMLElement>("[role^='menuitem']:not([disabled])");
-  if (!items?.length) return;
-  items[(index + items.length) % items.length]?.focus();
-}
 
 function resolveAdjacentPageFocusTarget(trigger: HTMLElement, backwards: boolean) {
   const focusable = Array.from(document.querySelectorAll<HTMLElement>([
@@ -64,6 +67,7 @@ export default function QuickClassificationSurface({
   onClose,
   onSaved,
   onError,
+  itemBinding,
 }: Props) {
   const UI_TEXT = useLocaleText();
   const locale = useLocale();
@@ -71,12 +75,10 @@ export default function QuickClassificationSurface({
   const menuRef = useRef<HTMLDivElement>(null);
   const categoryTriggerRef = useRef<HTMLButtonElement>(null);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
-  const renameInputRef = useRef<HTMLInputElement>(null);
   const savingRef = useRef(false);
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
   const [position, setPosition] = useState({ left: anchor.clientX, top: anchor.clientY });
-  const [categoryPosition, setCategoryPosition] = useState({ left: anchor.clientX, top: anchor.clientY });
   const [categoryOptions, setCategoryOptions] = useState<QuickClassificationCategoryOption[]>([]);
   const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -86,7 +88,11 @@ export default function QuickClassificationSurface({
   const [loading, setLoading] = useState(true);
   const [categoryLoadFailed, setCategoryLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
-  const currentCategory = target.category;
+  /* [本轮] 分类是要能变的：删掉用户当前所属的自定义分类之后，勾选必须落到「其他」。
+     原先这里是 `const currentCategory = target.category`（常量）—— 那只够读，不够改。 */
+  const [currentCategory, setCurrentCategory] = useState<AppCategory>(target.category);
+  /* 分类增删的提示框 / 确认框：复用仓里的 `useQuietDialogs`（映射页同一套） */
+  const dialogs = useQuietDialogs();
 
   useLayoutEffect(() => {
     const menu = menuRef.current;
@@ -148,39 +154,7 @@ export default function QuickClassificationSurface({
       window.removeEventListener("blur", closeFromViewportChange);
     };
   }, [onClose, renameOpen]);
-
-  useEffect(() => {
-    if (!categoryMenuOpen) return;
-    const frame = window.requestAnimationFrame(() => {
-      const selectedIndex = categoryOptions.findIndex((option) => option.value === currentCategory);
-      focusMenuItem(categoryMenuRef.current, selectedIndex >= 0 ? selectedIndex : 0);
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [categoryMenuOpen, categoryOptions, currentCategory]);
-
-  useEffect(() => {
-    if (!renameOpen) return;
-    const frame = window.requestAnimationFrame(() => renameInputRef.current?.select());
-    return () => window.cancelAnimationFrame(frame);
-  }, [renameOpen]);
-
-  useLayoutEffect(() => {
-    const rootMenu = menuRef.current;
-    const categoryMenu = categoryMenuRef.current;
-    if (!categoryMenuOpen || !rootMenu || !categoryMenu) return;
-    const rootBounds = rootMenu.getBoundingClientRect();
-    const categoryBounds = categoryMenu.getBoundingClientRect();
-    const opensLeft = rootBounds.right + SUBMENU_GAP + categoryBounds.width + MENU_MARGIN > window.innerWidth;
-    setCategoryPosition({
-      left: opensLeft
-        ? Math.max(MENU_MARGIN, rootBounds.left - SUBMENU_GAP - categoryBounds.width)
-        : Math.min(window.innerWidth - categoryBounds.width - MENU_MARGIN, rootBounds.right + SUBMENU_GAP),
-      top: Math.max(
-        MENU_MARGIN,
-        Math.min(rootBounds.top, window.innerHeight - categoryBounds.height - MENU_MARGIN),
-      ),
-    });
-  }, [categoryMenuOpen, categoryOptions, position]);
+  /* [本轮] 子菜单的摆位/焦点已随它搬进 `QuickClassificationCategoryMenu`；根菜单仍在这里定位。 */
 
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Tab") {
@@ -250,13 +224,12 @@ export default function QuickClassificationSurface({
     ));
   };
 
-  const submitRename = (event: FormEvent) => {
-    event.preventDefault();
-    if (savingRef.current || !renameHasChanges) return;
+  const submitRename = (displayName: string) => {
+    if (savingRef.current) return;
     void saveOverride(buildQuickClassificationOverride(
       target,
       currentOverride,
-      { displayName: renameValue },
+      { displayName },
     ));
   };
 
@@ -265,10 +238,21 @@ export default function QuickClassificationSurface({
     currentCategory,
     deletedCategories,
   );
-  const normalizedRenameValue = renameValue.trim();
-  const renameHasChanges = currentDisplayName
-    ? normalizedRenameValue !== currentDisplayName
-    : normalizedRenameValue !== target.displayName.trim() && normalizedRenameValue !== "";
+
+  /* [本轮] 分类增删的编排全在这个 hook 里（本文件只能减不能加）；这里只收回状态。 */
+  const categoryAdmin = useQuickClassificationCategoryAdmin({
+    target,
+    currentOverride,
+    options: categoryOptions,
+    dialogs,
+    onOptionsChange: setCategoryOptions,
+    onAssigned: (override, category) => {
+      setCurrentOverride(override);
+      setCurrentCategory(category);
+      onSaved(target, override);
+    },
+    onError: (message) => onErrorRef.current(message),
+  });
 
   const menu = (
     <>
@@ -315,69 +299,40 @@ export default function QuickClassificationSurface({
             </span>
           </button>
           {categoryMenuOpen && !loading ? (
-            <div
-              ref={categoryMenuRef}
-              className="quick-classification-menu quick-classification-category-menu qp-scroll-region"
-              role="menu"
-              aria-label={UI_TEXT.mapping.quickCategoryMenuLabel}
-              style={{ left: categoryPosition.left, top: categoryPosition.top }}
-            >
-              {categoryOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className="quick-classification-menu-item quick-classification-category-item"
-                  role="menuitemradio"
-                  aria-checked={option.value === currentCategory}
-                  disabled={saving}
-                  onClick={() => saveCategory(option)}
-                >
-                  <span className="quick-classification-menu-check" aria-hidden="true">
-                    {option.value === currentCategory ? <Check size={14} /> : null}
-                  </span>
-                  <span>{option.label}</span>
-                </button>
-              ))}
-            </div>
+            <QuickClassificationCategoryMenu
+              menuRef={categoryMenuRef}
+              rootMenuRef={menuRef}
+              options={categoryOptions}
+              currentCategory={currentCategory}
+              disabled={saving || categoryAdmin.busy}
+              onPick={saveCategory}
+              onCreate={() => { void categoryAdmin.createCategory(); }}
+              onDelete={(category) => { void categoryAdmin.deleteCategory(category); }}
+            />
+          ) : null}
+          {/* [0.12.1] 可选的第三项：只在调用方传了 `itemBinding` 时出现。
+              不传 → 这里渲染 null，根菜单与键盘序完全等于旧形态。 */}
+          {itemBinding ? (
+            <QuickClassificationItemBindingMenu
+              binding={itemBinding}
+              disabled={saving}
+              onError={(message) => onErrorRef.current(message)}
+            />
           ) : null}
         </div>
       ) : null}
-      <QuietDialog
+      <QuickClassificationRenameDialog
         open={renameOpen}
-        title={UI_TEXT.mapping.quickRenameTitle}
-        surfaceClassName="quick-classification-rename-dialog"
-        initialFocusRef={renameInputRef}
-        onClose={() => {
-          if (!saving) onClose();
-        }}
-        actions={(
-          <>
-            <QuietButton tone="secondary" onClick={() => onClose()} disabled={saving}>
-              {UI_TEXT.dialog.cancel}
-            </QuietButton>
-            <QuietButton
-              tone="primary"
-              type="submit"
-              form="quick-classification-rename-form"
-              disabled={saving || !renameHasChanges}
-            >
-              {saving ? UI_TEXT.mapping.quickSaving : UI_TEXT.mapping.quickSave}
-            </QuietButton>
-          </>
-        )}
-      >
-        <form id="quick-classification-rename-form" className="quick-classification-rename-form" onSubmit={submitRename}>
-          <input
-            ref={renameInputRef}
-            className="qp-control qp-dialog-input quick-classification-rename-input"
-            value={renameValue}
-            placeholder={UI_TEXT.mapping.quickRenamePlaceholder}
-            disabled={saving}
-            maxLength={80}
-            onChange={(event) => setRenameValue(event.target.value)}
-          />
-        </form>
-      </QuietDialog>
+        saving={saving}
+        value={renameValue}
+        currentDisplayName={currentDisplayName}
+        fallbackName={target.displayName}
+        onChange={setRenameValue}
+        onSubmit={() => submitRename(renameValue)}
+        onClose={() => onClose()}
+      />
+      {/* [本轮] 新建分类的输入框 / 删除分类的确认框（`useQuietDialogs` 自己 portal 到 body） */}
+      {dialogs.dialogs}
     </>
   );
 

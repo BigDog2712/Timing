@@ -48,6 +48,12 @@ pub enum ErrorCode {
     /* [V0.11.13] */
     MdSyncRemoteError,
     /* [0.13.0] 安卓「使用情况访问」未授权。见 ADR-063：这是**状态性**错误，不是故障。 */
+    /* 唯一的构造点在 `commands::usage_cmd::usage_stats_get` 的 `#[cfg(mobile)]` 分支里，
+       桌面那条 `#[cfg(not(mobile))]` 分支直接回 `supported: false`，不构造它。
+       不 `cfg` 掉：`ErrorCode` 是**契约闭集**（与 domain.ts 一一对应），桌面也要能序列化出
+       `USAGE_PERMISSION_DENIED`；留一个只在手机包里的码，等于让错误码表两端不一致。
+       只豁免这一条死码告警，见 `services::overlay_push` 的同款口径。 */
+    #[cfg_attr(desktop, allow(dead_code))]
     UsagePermissionDenied,
 }
 

@@ -1,0 +1,217 @@
+/* =============================================================================
+ * dashboard-timeline-manage.css — 今日时间线卡的**两个写入口**与它们的两个弹层（[本轮]）
+ *
+ * 为什么单独一个文件：`.qp-timeline-*` 一族住在 `dashboard-layout.css`，那条文件
+ * 已经 259 行、贴着 300 行硬限；这两个入口是**新一轮的语义**（可写面），不是版式微调，
+ * 混进去以后拆不出来。`App.css` 里紧跟 `dashboard-layout.css` 导入 —— 它只**新增**
+ * `.qp-timeline-manage*` / `.qp-timeline-prefs*` / `.qp-timeline-item*` 这三族类名，
+ * 不覆盖既有规则，顺序不影响谁。
+ *
+ * 卡底条放 `ModuleShell` 的 `footer`（四态之外常驻）：empty / error 时也要在场，
+ * 否则"今天还没有计时"这一天恰恰没有入口可以新建事项。
+ *
+ * 只用既有 `--qp-*` 变量：深浅两套主题都靠变量切换，这里不写死任何颜色。
+ * 窄卡口径：弹层宽度 `min(380px, 100vw - 2*page)`，行内的动作组允许换行，
+ * 名称列 `min-width: 0` + 省略号 —— 三处合起来保证极窄时也**不横向溢出**。
+ * ========================================================================== */
+
+.qp-timeline-manage {
+  display: flex;
+  align-items: center;
+  gap: var(--qp-space-group);
+  margin-top: var(--qp-space-group);
+  padding-top: var(--qp-space-group);
+  border-top: 1px solid var(--qp-border-subtle);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+}
+
+/* 弹层：窄一点，一行一个名字不需要整屏 */
+.qp-timeline-manage-dialog {
+  width: min(380px, calc(100vw - 2 * var(--qp-space-page)));
+}
+
+.qp-timeline-manage-input {
+  width: 100%;
+}
+
+/* ── 新建事项的弹层：名称 / 默认时长 / 设为常用 ───────────────────────────── */
+
+.qp-timeline-manage-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-space-group);
+}
+
+.qp-timeline-manage-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qp-timeline-manage-label {
+  flex: 0 0 auto;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+}
+
+.qp-timeline-manage-timer {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.qp-timeline-manage-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+}
+
+/* 行内提示（空名 / 超长 / 时长非法 / 没发出去）：排在表单或行下方，跨满一行 */
+.qp-timeline-manage-issue {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--qp-danger);
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+}
+
+/* ── 事项管理：常用事项 / 近期事项 两组 ──────────────────────────────────── */
+
+.qp-timeline-prefs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-space-group);
+}
+
+.qp-timeline-prefs-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-space-group);
+}
+
+.qp-timeline-group-title {
+  margin: 0;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  font-weight: var(--qp-font-weight-emphasis);
+}
+
+.qp-timeline-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-space-group);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 一行：名称弹性撑满、时长徽标定宽、动作组贴右；太窄时动作组整体换行，不挤压名称 */
+.qp-timeline-item-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  border-radius: var(--qp-radius-control);
+}
+
+.qp-timeline-item-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--qp-text-primary);
+  font-size: var(--qp-font-size-body);
+  line-height: var(--qp-line-height-body);
+}
+
+/* 默认时长徽标：「25 分钟」/「正计时」。三级底色 + 二级文字，深浅主题都够对比 */
+.qp-timeline-item-timer {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: var(--qp-radius-chip);
+  background: var(--qp-badge-subtle);
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+  white-space: nowrap;
+}
+
+.qp-timeline-item-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.qp-timeline-item-action {
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+}
+
+.qp-timeline-item-action:disabled {
+  color: var(--qp-text-disabled);
+}
+
+/* 上移 / 下移：图标按钮。用边框而不是填充色，避免和行内的文字按钮抢注意力 */
+.qp-timeline-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-button);
+  background: transparent;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-compact);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.qp-timeline-icon-btn:hover:not(:disabled) {
+  color: var(--qp-text-primary);
+  border-color: var(--qp-border-strong);
+}
+
+.qp-timeline-icon-btn:disabled {
+  color: var(--qp-text-disabled);
+  cursor: default;
+}
+
+/* ── 行内编辑（就地展开：名称 + 默认时长 + 保存/取消）────────────────────── */
+
+.qp-timeline-item-row--editing {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.qp-timeline-item-editor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.qp-timeline-item-editor > .qp-timeline-manage-input {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.qp-timeline-item-editor > .qp-timeline-manage-timer {
+  flex: 0 1 110px;
+  min-width: 0;
+}
+
+.qp-timeline-item-editor-actions {
+  display: inline-flex;
+  gap: 8px;
+  margin-left: auto;
+}

@@ -51,7 +51,33 @@ export type HostIntent =
   | { action: "open_common_items" }
   | { action: "open_moyu_menu" }
   /** 打开某张便利贴（`note-{id}` 单例窗）；id 不存在时宿主侧静默忽略 */
-  | { action: "open_note"; noteId: number };
+  | { action: "open_note"; noteId: number }
+  /** [本轮] 删除某张便利贴：宿主侧 `services/noteActions.removeNote(id)`（note_delete + 关窗）。
+   *  分析窗自己**没有**写命令，所以"删除"也只能是一条意图 —— 由药丸用它自己的 typed IPC 落库。
+   *  字段名与 `src/services/hostIntentBridge.ts` 的同名类型**逐字一致**（L9 两侧各写一份，
+   *  靠 `services/hostIntentMirror.test.ts` 的 source test 钉相等）。 */
+  | { action: "delete_note"; noteId: number }
+  /* ── [本轮] 「今日时间线」卡上的写动作（新建事项 / 事项管理）──
+   * 分析窗**没有写命令**（`permissions/patina-host-bridge.toml` 只放行三条只读），
+   * 所以这些事也只能是一条意图，由药丸用 `itemApi.create` / `itemApi.update` /
+   * `settingsApi.update` 落库。字段名与 `src/services/hostIntentBridge.ts` 的同名类型
+   * **逐字一致**（L9 两侧各写一份，靠 `features/dashboard/services/hostIntentMirror.test.ts`
+   * 的 source test 钉集合与字段）。
+   *
+   * `name` 已经是**trim 过**的名字：两侧都做一次 trim 不是为了防谁，而是这条通道没有回执，
+   * 前端把「纯空格」发出去之后药丸只会静默丢进 default —— 用户看到的是"点了没反应"。
+   *
+   * `timerMinutes` 是**三态**（与 `settings.itemsTimers` 的“有键/无键”一一对应）：
+   *   · 缺省 = 不改（`update_item` 只想改个名字时不能顺手把时长清了）；
+   *   · `null` = 清除（回到正计时）；
+   *   · 数字 = 设为该分钟数（宿主侧再按 1..1440 归一一次）。
+   *
+   * `sortOrder` 只在上移/下移与「设为常用」时给：分析窗按当前常用组的
+   * `max(sortOrder)+1` 算出落点，宿主照写，不自己再猜一遍顺序。
+   */
+  | { action: "create_item"; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number }
+  /** 改某一件事项。只提交**给了的字段**：改色 / 删除 / 提醒时刻各自牵连历史与语义，属独立改造。 */
+  | { action: "update_item"; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null };
 
 /**
  * 发一条意图。返回「有没有发出去」——**不是**「宿主做成了没有」。

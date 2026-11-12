@@ -6,10 +6,9 @@ use crate::models::insight::classification::{
     ClassificationSnapshot, CATEGORY_COLOR_OVERRIDE_KEY_PREFIX, CATEGORY_DEFINITION_KEY_PREFIX,
     CATEGORY_LABEL_OVERRIDE_KEY_PREFIX, DELETED_CATEGORY_KEY_PREFIX,
 };
-pub use crate::models::insight::classification::{APP_OVERRIDE_KEY_PREFIX, WEB_DOMAIN_OVERRIDE_KEY_PREFIX};
+pub use crate::models::insight::classification::{APP_ITEM_BINDING_KEY_PREFIX, APP_OVERRIDE_KEY_PREFIX, WEB_DOMAIN_OVERRIDE_KEY_PREFIX};
 use sqlx::{Pool, Row, Sqlite, Transaction};
 use std::collections::HashMap;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LegacyClassificationApp {
     pub exe_name: String,
@@ -305,6 +304,7 @@ fn is_allowed_classification_setting_key(key: &str) -> bool {
         super::app_links::APP_LINK_PREFIX,
         crate::models::insight::web_links::SETTING_PREFIX,
         APP_OVERRIDE_KEY_PREFIX,
+        APP_ITEM_BINDING_KEY_PREFIX,
         WEB_DOMAIN_OVERRIDE_KEY_PREFIX,
         CATEGORY_COLOR_OVERRIDE_KEY_PREFIX,
         CATEGORY_LABEL_OVERRIDE_KEY_PREFIX,

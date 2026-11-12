@@ -14,6 +14,7 @@ import SettingsHandlesPanel from "./SettingsHandlesPanel";
 import SettingsInterfacePanel from "./SettingsInterfacePanel";
 import SettingsResidentPanel from "./SettingsResidentPanel";
 import SettingsTrackingPanel from "./SettingsTrackingPanel";
+import SettingsBoardPanel from "./SettingsBoardPanel";
 import { HostGeneralPanel } from "./host/HostGeneralPanel";
 import HostHighlightCard from "./host/HostHighlightCard";
 import HostPillLookCard from "./host/HostPillLookCard";
@@ -232,7 +233,8 @@ export default function Settings({
             />
           </div>
 
-          {/* 第 3 组「计时与记录」：`timelineMergeGapSecs` 全应用只有这一处可编辑。 */}
+          <SettingsBoardPanel id="s-board-widgets" />
+          {/* 第 4 组「计时与记录」：`timelineMergeGapSecs` 全应用只有这一处可编辑。 */}
           <div id="s-tracking">
             <SettingsTrackingPanel
               timelineMergeGapControl={{
@@ -257,7 +259,6 @@ export default function Settings({
               onTitleRecordingEnabledChange={(nextChecked) => handleChange("titleRecordingEnabled", nextChecked)}
             />
           </div>
-
           {/* 第 4 组「数据与同步」：宿主的 md_sync（计时记录）在前，活动库备份在后。 */}
           <div id="s-sync"><HostSyncPanel /></div>
           <div id="s-backup">
@@ -290,7 +291,6 @@ export default function Settings({
               onOpenStorageDirectory={handleOpenStorageDirectory}
             />
           </div>
-
           {/* 第 5 组「通用与启动」：三张卡都直接写宿主设置，不走草稿/保存。 */}
           <div id="s-general"><HostGeneralPanel /></div>
           <div id="s-resident">

@@ -1,0 +1,103 @@
+/* ============================================================================
+ * dashboard-todos-compose.css — 待办卡的**新建弹层表单**（`dashboard-todos.css` 的姊妹文件）
+ * -----------------------------------------------------------------------------
+ * [本轮] 顶部的行内输入行下线了（用户口径：「新增代办应与新增事项一致，可以填写
+ * 时间，选择是否提醒」—— 一个时间 + 一个勾选装不进 32px 的行内输入），本文件从
+ * "输入行样式"整体换成 `TodoComposeDialog` 的表单样式。文件名**保留**：`App.css`
+ * 的 `@import` 与 vendored 登记都锚着它，改名是纯连锁、零收益。
+ *
+ * 为什么单拆：`dashboard-todos.css` 管"卡体 + 行网格"，本文件管"弹层表单"——
+ * 两块互不影响，拆开之后各自都有余量（行数棘轮）。
+ *
+ * 全部只用既有 `--qp-*` 变量；深浅两套主题都靠变量切换，这里不写死任何颜色。
+ * 窄卡口径：弹层宽 `min(380px, 100vw − 2*page)`（照 `.qp-timeline-manage-dialog`），
+ * 时间行允许收缩（`min-width: 0`），极窄时也不横向溢出。
+ * ========================================================================== */
+
+/* ── 卡底入口条（`ModuleShell` 的 footer：empty / error 态也在场） ──
+ * 几何与 `.qp-card-footer`（应用卡那颗通栏「全部分类…」）同一套：32 高 + 两侧负边距
+ * 贴到卡片下缘（吃掉 16px 的 `--qp-card-pad-b`）。`.qp-undo-bar` 的让位数值就按
+ * 这套几何算 —— 两处必须一起看，见 `dashboard-todos.css` 的撤销条注释。 */
+.qp-todo-foot {
+  display: flex;
+  flex: 0 0 var(--qp-card-foot-h);
+  height: var(--qp-card-foot-h);
+  align-items: center;
+  margin: 0 calc(-1 * var(--qp-card-pad)) calc(-1 * var(--qp-card-pad-b));
+  padding: 0 var(--qp-card-pad);
+  border-top: 1px solid var(--qp-border-subtle);
+}
+
+/* ── 弹层：窄一点，一行一个字段不需要整屏 ── */
+.qp-todo-dialog {
+  width: min(380px, calc(100vw - 2 * var(--qp-space-page)));
+}
+
+.qp-todo-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-space-group);
+}
+
+.qp-todo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qp-todo-field-label {
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+}
+
+.qp-todo-name-input {
+  width: 100%;
+}
+
+/* ── 计划时间：datetime-local 原生控件 + 清除键同行 ── */
+.qp-todo-time-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qp-todo-time-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 深色主题下原生 datetime-local 的日历图标/弹出面板是系统绘制的：不声明
+ * `color-scheme` 时 WebView 按 light 渲染，深色面板上一个"看不见的黑色图标"。
+ * 跟随 `tokens.css` 的主题选择器（`:root[data-theme="dark"]`）走。 */
+.qp-todo-form input { color-scheme: light; }
+
+:root[data-theme="dark"] .qp-todo-form input { color-scheme: dark; }
+
+/* ── 「提醒我」勾选行：时间为空时 disabled + 一句解释，不是灰着不解释 ── */
+.qp-todo-remind {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+}
+
+.qp-todo-remind input:disabled { cursor: not-allowed; }
+
+/* 提示行（勾选解释）： tertiary 灰字，与"错误"长得不一样 */
+.qp-todo-hint {
+  margin: 0;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+}
+
+/* 错误行（校验不过 / 落库失败，role=status）：danger，照 `.qp-timeline-manage-issue` */
+.qp-todo-issue {
+  margin: 0;
+  color: var(--qp-danger);
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+}

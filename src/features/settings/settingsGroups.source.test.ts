@@ -23,12 +23,13 @@ const APPEARANCE = code('src/features/settings/components/SettingsAppearancePane
  * 锚点在页面源码里的**真实出现顺序**。
  * 它与 `SETTINGS_ANCHOR_IDS` 差一处，而且是**故意的**：`s-interface` 长在「显示」卡内部
  * （P0-06 把「接口」内嵌进「显示」，见判据 E），所以它出现在 `s-display` 之后、`s-tracking`
- * 之前，而表里它挂在「计时与记录」那一组（语义归属）。这张表就是把「物理顺序」与
+ * 之前，而表里它挂在「计时与记录」那一组（语义归属）。`s-board-widgets`（v3 组件板）
+ * 是同一个形状的反面例子：它是**独立那张卡**，物理位置就在 `s-interface` 之后。这张表就是把「物理顺序」与
  * 「语义归属」两件事分开钉住——挪卡片的人必须同时改这两处，改一半就红。
  */
 const DOM_ORDER = [
   's-pill-handles', 's-pill-look',
-  's-theme', 's-highlight', 's-display', 's-interface',
+  's-theme', 's-highlight', 's-display', 's-interface', 's-board-widgets',
   's-tracking',
   's-sync', 's-backup',
   's-general', 's-resident', 's-plugins',
@@ -44,13 +45,15 @@ function anchorsInSourceOrder(): string[] {
 }
 
 describe('② 五组锚点（P0-06 判据 2 的替代口径）', () => {
-  it('p006_five_groups_and_no_standalone_appearance', () => {
+  it('p006_six_groups_and_no_standalone_appearance', () => {
+    /* [v3] 第五组之后插入「主界面」（组件板）：分组从 5 变 6 是**功能变化**，
+       所以这条断言同批改；下表仍是「表 = 页面 = 导航」三者的唯一口径。 */
     expect(SETTINGS_GROUPS.map((group) => group.id))
-      .toEqual(['pill', 'appearance', 'tracking', 'data', 'general']);
+      .toEqual(['pill', 'appearance', 'board', 'tracking', 'data', 'general']);
     /* 标题是中文常量、不进 i18n（`contract.ts` 本轮零行余量）：所以文案本身要钉住，
        不然「改一个字」这种改动会静默溜过去。 */
     expect(SETTINGS_GROUPS.map((group) => group.title))
-      .toEqual(['悬浮条与手柄', '外观与配色', '计时与记录', '数据与同步', '通用与启动']);
+      .toEqual(['悬浮条与手柄', '外观与配色', '主界面', '计时与记录', '数据与同步', '通用与启动']);
     for (const group of SETTINGS_GROUPS) {
       expect(group.anchors.length, `${group.id} 组没有锚点`).toBeGreaterThan(0);
       for (const anchor of group.anchors) {

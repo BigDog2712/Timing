@@ -4,7 +4,50 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
-## 0.12.1（桌面）— 2026-11-11（末）
+## 0.12.1（桌面）— 2026-11-12（末）
+
+### 主界面 · 今日时间线：事项管理对齐悬浮窗事项菜单（0.12.1 末）
+
+卡底「编辑事项」（摊开全表逐条改名）整体替换为「事项管理」，与「＋ 新建事项」并排：
+
+- **＋ 新建事项**：名称 + 默认时长（分钟，留空 = 正计时）+「设为常用」勾选（**默认不勾**——
+  宿主侧「常用」是用户自己设的，快捷添加建的是普通事项；勾上才带
+  `isPinned:true + sortOrder = 常用组 max+1`）。
+- **事项管理**弹层只两组：**常用事项**（`isPinned && !isSystem`，`sortOrder` 升序；↑↓ / 取消常用 /
+  就地改名 + 时长）与**近期事项**（非置顶非系统按 `updatedAt` 倒序前 N，N 跟宿主 `itemsRecentCount`）。
+  系统事项两组都不列；**不做**删除事项（牵连 `time_records` 归属）与列表内 HTML5 拖拽（与卡片
+  拖拽抢事件，改 ↑↓ 按钮）。
+- 时长落 `settings.itemsTimers`，与悬浮条共用同一份——分析窗设 25 分钟，悬浮条点该事项就是
+  25 分钟倒计时。三态：留空 = 清键回正计时 / 数字 = 设值 / 缺省 = 不改。
+- **修掉一个会丢数据的隐患**：宿主 `update_settings` 对 `itemsTimers` 是**整键替换**（还会
+  `normalize_item_timers` 静默丢弃脏值），两次快速设时长并发时后写覆盖前写；启动设置加载失败后
+  第一次设时长会把所有事项的时长清空。新增 `src/services/itemTimerWrite.ts`（54 行）：模块级
+  串行队列 + **基底在队列任务内部读** + `!loaded` 先 `reload()`（fail-closed，reload 失败不落库）。
+  已知未收口：`ItemsPrefsMenu.tsx:117,123` 仍直写（独立改造）。
+- L9 落地：「直接调用原功能」= 分析窗镜像纯函数 `features/dashboard/services/itemPrefs.ts`
+  + `itemPrefs.mirror.test.ts` 读两侧源码钉常量（1/1440、1..10、默认 5），不是复制粘贴任其漂移。
+
+### 主界面 · 待办卡：新建待办对齐新建事项（时间 + 提醒）（0.12.1 末）
+
+行内「回车即存」输入框下线，换卡底「＋ 新建待办」→ `QuietDialog` 弹层（名称 + 计划时间 + 提醒勾选）：
+
+- **时间口径（主人拍板：一个时间 = 计划时刻）**：填的时间写 `planned_at`（行上时间胶囊 + 逾期
+  红字）；勾「提醒」时**同一时刻**也写 `remind_at`（宿主两级提醒以此为基准：T-15 轻提醒、
+  T-5 问自动开始），不勾则不设提醒。不做双时间字段、不做「提前 N 分钟」可选。
+- 校验在纯函数 `todoDraft.validateTodoDraft`：名称 trim 空 / 超 200 拦（200 = 镜像
+  `TODO_TITLE_MAX_CHARS`，mirror test 钉两侧同值）；时间串非法拦（手解 `YYYY-MM-DDTHH:mm`，
+  禁 `new Date(string)` 宽松解析）；**勾了提醒且时间 ≤ 现在 → 拦**（nudge grace 过点不补弹）；
+  不勾提醒允许过去时间（补记合法）。勾选在时间为空时禁用并说明。
+- 失败路径：`create` 返回 false / 抛错 → 弹层不关、草稿一字不清、显示失败提示（待办走直接 IPC
+  `patina-todo-notes`，非 host-intent，无 `sent` 布尔）。
+- 行上：`remindAt` 非空显示 12px 铃铛（`role="img"` + 四语言「已设提醒 HH:mm」）。
+- 布局：footer 贴卡下缘后撤销条让位 `calc(--qp-card-foot-h + 8px)`（负底边距吃掉 pad_b，
+  不是 `pad_b + foot_h`）；`.qp-todo-list` 加 `min-height: 0`。两条都进了
+  `dashboardBoardLayout.test.ts` 的 CSS 守卫（p07a / p07b）。
+- 文案整块搬家：待办文案从 `copy.ts`（299 行顶限）抽出 `copyTodos.ts`（四语言 24 键），
+  `copy.ts` 299 → 237。
+- 已知后果（宿主既有行为，本轮 UI 放行过去时间后显形）：跨零点 `expire` 会软删
+  `planned_at < today_start` 且未完成的待办——补记「昨天」的待办次日消失。
 
 ### 主界面视觉与交互重构（暗色面差体系 · 未出包并入同号）
 
@@ -30,6 +73,90 @@
 - 渲染 `grid-auto-flow: dense` 自动向上补空（小组件桌面行为）；卡定位由 `CardSlot` 写 inline `grid-column: x+1 / span w` + `grid-row: span h`，槽 CSS 兜底 span 1。
 - **拖拽排序**：卡头 grip 六点从装饰层升级成真手柄（命中区 ::after 外扩到 24×20），按住拖动让其它卡让位。新增 `gridFlow.ts`（纯函数复现 dense 落点 + computeDrop 抽出插回吸附 x）、`useCardDrag.ts`（floor 反推目标格、拖动中不落盘、draggingId 驱动 `data-dragging` 视觉）。
 - 三种抓取（拖高 `.qp-card-resize` / 拖宽 `.qp-card-width` / 拖排 `.qp-card-grip`）共用板子一处 onPointerDown，各认各的手柄选择器，互斥不打架。
+
+### 主界面 · 应用排行：双击应用可编辑分类与绑定事项（0.12.1 末）
+
+**交互**：应用排行卡的每一行重新可编辑（上一轮「收口」时被判为只读，本轮只把**编辑**加回来，
+不恢复「双击进目标详情」—— 那条仍在历史区/数据区）。入口三条，全部落在同一行上：
+双击 / 右键 / `Enter`·`空格`·`Shift+F10`（行是 `role=button` + `tabIndex=0`，有 `:focus-visible` 内嵌描边）。
+编辑器**复用**数据页/历史页那套 `QuickClassificationSurface`（`useQuickClassificationLauncher` + 懒加载 `QuickClassificationEntry`），
+不新写一套，只在根菜单末尾多一栏「绑定事项」；卡底「全部分类…」仍是分类映射视图的入口，两条路径不互相取代。
+
+**绑定 = 仅存配置**（本轮不做自动归因、不接追踪写入）：`settings` 表 KV `__app_item_binding::<exeName>` → `{"itemId":123}`，
+清除走**删行**（`value: null`），不写 `{"itemId":null}` —— 否则「未绑定」有两种表示法。
+写在现有 `cmd_commit_classification_settings` 通道上（Rust 前缀白名单新增 `APP_ITEM_BINDING_KEY_PREFIX`，
+**不新增 IPC 命令**，命令表计数不动）；读是一次前缀扫描，失败降级为空、主界面不变红。
+有绑定的行显示 5px 色点 + 事项名（≤46% 宽，与名称各自 ellipsis），`title`/`aria-label` 带「已绑定：X」。
+
+**踩到的坑（值得记）**：`TopApplicationItem.exeName` 来自 `AppStat.exeName`，`resolveStatsExeName`
+在「记录时的原始大小写 == 归一键」时**保留原始大小写**（`Code.exe`），而 KV 键是写侧归一后的 `code.exe`。
+行渲染直接拿原始 exe 查表 → 「绑定存上了、行上没有标记、重开弹层选中态又是对的」三种表现同时出现，
+且 `chrome.exe` 恰好全小写才没暴露。修法：读侧 `parseAppItemBindingRows`、行侧查表、写侧建键**三处同一个**
+`resolveStatisticalApp`；归一后撞键取后者（不删库，只是先到那条不再生效）。
+回归用 `apps06b`（`Code.exe` 大写）钉住，另加 M5 变异（去掉行侧归一）必须变红。
+
+**顺带**：`serializeAppItemBindingValue` 对「非 null 但非法」的 itemId 由「返回 null」改为**抛错** ——
+原实现把 `0` 当成清除，将来任何一处误传就会静默删掉用户绑定。解析侧仍静默降级（脏数据不清库）。
+样板块 `dashboard-modules.css` 在加标记后顶穿 300 行，`.qp-app-*` 一族整体搬到 `dashboard-apps.css`
+（在 `App.css` 紧跟 modules 之后 @import，不新增 `size-allowlist` 条目）。
+
+### 构建洁净：桌面目标 6 条 `dead_code` 告警清零（0.12.1 末补）
+
+`cargo check` 在桌面目标上报 6 条 `dead_code`，全部来自 0.13.0 安卓「应用使用统计」那批
+「只在手机端接线」的符号：`ErrorCode::UsagePermissionDenied`、`OverlaySnapshot::summary`、
+`UsageRowDto`、`UsageDayReply`、`services::usage::rollup` / `read`。
+根因是它们的唯一消费者都包在 `#[cfg(mobile)]` 分支里，桌面 `#[cfg(not(mobile))]` 直接回
+`supported: false` / 空实现。
+
+**修法照 `services::overlay_push` 的既有口径**：逐项加 `#[cfg_attr(desktop, allow(dead_code))]`，
+**不整段 `cfg` 掉** —— 一旦 `cfg` 掉，这些符号就永远只在手机包里，桌面 `cargo test` 编不到，
+下一个人改字段或挪调用点时编译器不再提醒（`ErrorCode` 更是契约闭集，桌面也要能序列化出
+`USAGE_PERMISSION_DENIED`）。没有用 crate 级 `#![allow]`，没有碰 `lib.rs` 的平台豁免。
+
+顺带把 `models/usage.rs` 里一句不实注释改掉：原文声称「桌面编进 `cargo test` 才能被字段名
+两边一致的测试覆盖」，实际仓里**没有**这条测试；现在如实写明「当前没有自动化判据，
+`first`/`last`/`granted`/`rows` 都带 `serde(default)`，字段名改错只静默读成 0/空数组，
+对齐全靠人比对 `UsageStats.kt`」——否则下一个改 DTO 的人会以为有护栏。
+
+### 主界面四张卡的可交互升级（0.12.1 末）
+
+**① 活动趋势 → 今日活动趋势**：原来画近 14 天每日柱，现在**只看今天**——每根柱一小时，
+从本地 00:00 到当前这一小时（末窗右端裁到此刻），顶部读数从「峰值 / 日均」换成
+「今日总时长 / 峰值时刻」。「日均」对一天之内没有意义，那条日均虚线一并下线。
+柱高仍按峰值归一（不是按 1 小时），有量至少 3px、0 量留 2px 底桩。
+
+**② 今日时间线可以新建与编辑事项**：卡底常驻一条操作行（＋新建事项 / 编辑事项），
+参照手机端事项菜单底部那两颗。分析窗**没有写命令**，两条都走 `patina:host-intent`
+（`create_item` / `update_item`），由药丸用 `itemApi` 落库后 `reload()`。
+系统事项（`isSystem`，如「未命名计时」）不可改名；删除与改色本轮不做（会牵连历史记录）。
+
+**③ 应用排行可增删分类**：弹层「改分类」子菜单底部加「＋ 新建分类」，每个自定义分类
+多一条删除。新建写 `__custom_category::<id>`（`Date.now()`）+ `__category_label_override::<id>`；
+删除是**整批一次提交**：成员应用/网页域名的 override 重算成「不带 category」的形态
+（**保留别名/颜色/不追踪标题**，照 `deleteCategoryFromDraftState` 的既有语义），
+再清四条定义键。内置 11 个分类不可删——`other` 是所有回落的目标。
+
+**④ 便利贴**：纸片正文上移（`padding-top` 11 → 7px，行高与元信息不动）；点开全文后
+可删除，二次确认内联在同一个弹窗里。删除走 `delete_note` 意图 → 药丸侧
+`noteActions.removeNote`（`note_delete` + 关窗）。
+
+**本轮最值钱的一条（夏令时）**：`buildTodayHourPlan` 原先在循环**之后**扫零长窗口，
+只能从数组末尾弹；而 DST「春季前跳」日 `02:00` 被 JS 归一化成 `03:00`，那颗零长窗口落在
+数组**中间**，弹不掉 → `boundaries` 出现两个相同值 → 后端 `windows(2).any(|p| p[1] <= p[0])`
+直接拒，整条聚合读取失败，趋势卡从本地 02:00 起全天没有数据。修法是把判据收进循环体
+（算完 `endMs` 就判 `endMs <= hourStart`），让下一个 hour 顶上来补住那一格——
+不能靠"跳过"把 03:00–04:00 也扔掉。**`en-US` / `ru-RU` / `es` 这些夏季时区每年都会命中**，
+不是理论问题；原来那句注释写着"已处理"，只做了尾部一半，属于最危险的那种注释。
+
+**两条同款纪律**：「意图发出去了」不等于「宿主做成了」。改名与删便利贴都采用
+「本地乐观更新 + 待确认集合」（后续刷新继续用本地值覆盖，直到返回值与本地一致才摘掉），
+避免"改完又变回去 / 删了又蹦回来"。`emitHostIntent` 返回 `false` 时**一步都不往前走**——
+便利贴删除第一版丢了返回值，会导致"界面删了、重启后回来"。
+
+**护栏**：时间线卡多了常驻操作条后，S 档（卡高 200）扣掉卡头 62 与操作条 47 只剩 91px，
+而 4 行 × 30 需要 120；行容器改为 `overflow-y: auto`（行项 `flex: 0 0 auto` 防压缩）。
+这条已经写进断言（`p06a_timeline_rows_scroll_instead_of_clipping`）——它此前只是注释，
+改回 `overflow: hidden` 测试照样全绿，属于"眼睛看得见、测试看不见"的回归。
 
 ## 0.12.1（桌面）— 2026-11-11
 

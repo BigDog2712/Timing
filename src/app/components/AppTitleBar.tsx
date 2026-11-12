@@ -1,10 +1,11 @@
 import { useLocaleText } from "../../shared/i18n/index.ts";
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { AppWindow, ArrowUpCircle, Maximize2, Minimize2, Minus, X } from "lucide-react";
 import { openMiniWindow } from "../../platform/desktop/miniWindowRuntimeGateway.ts";
 import appIconUrl from "../../../src-tauri/icons/128x128@2x.png";
 import {
-  closeCurrentWindow, minimizeCurrentWindow, startCurrentWindowDrag, toggleCurrentWindowMaximized, } from "../../platform/desktop/windowControlGateway";
+  closeCurrentWindow, minimizeCurrentWindow, toggleCurrentWindowMaximized, } from "../../platform/desktop/windowControlGateway";
+import { useWindowDragGesture } from "../../shared/hooks/useWindowDragGesture.ts";
 
 
 const APP_TITLE = "Timing";
@@ -56,20 +57,37 @@ export default function AppTitleBar({
     catch (error) { setMiniFailed(true); console.warn("mini:open", error); }
     finally { openingMini.current = false; setMiniBusy(false); }
   };
-  const handleDragMouseDown = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || event.detail > 1) {
-      return;
-    }
+  /* [v3.1 拖窗] 原来只有 brand 右边那条 96px 的 `.app-titlebar-drag-region` 挂着
+   * mousedown → startDragging，表现就是「窗口只有左上能拖」。现在整条标题栏都能拖：
+   * 判据是「按下的是不是控件」——按钮 / 输入框 / 链接 / 标了 data-no-drag 的子树
+   * 一律不拖（否则点最小化键会被当成拖窗口）。
+   * 用 `useWindowDragGesture`（分析窗自己的版本，见该文件头）而不是
+   * `data-tauri-drag-region`：后者只认命中自己的那个元素，子元素上的点击一律不生效，
+   * 等于没修。 */
+  const windowDrag = useWindowDragGesture();
+  const isInteractive = (target: EventTarget | null) => (
+    target instanceof Element
+    && target.closest("button, a, input, textarea, select, [data-no-drag]") !== null
+  );
 
-    runWindowAction(startCurrentWindowDrag, "start window drag");
+  const handleBarPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if (isInteractive(event.target)) return;
+    windowDrag.onPointerDown(event);
   };
 
-  const handleDragDoubleClick = () => {
+  const handleBarDoubleClick = (event: ReactMouseEvent<HTMLElement>) => {
+    if (isInteractive(event.target)) return;
     runWindowAction(toggleCurrentWindowMaximized, "toggle window maximize");
   };
 
   return (
-    <header className="app-titlebar" aria-label={APP_TITLE}>
+    <header
+      className="app-titlebar"
+      aria-label={APP_TITLE}
+      onPointerDown={handleBarPointerDown}
+      onClickCapture={windowDrag.onClickCapture}
+      onDoubleClick={handleBarDoubleClick}
+    >
       <div className="app-titlebar-brand">
         <span className="app-titlebar-mark" aria-hidden>
           <img className="app-titlebar-icon" src={appIconUrl} alt="" draggable={false} />
@@ -77,11 +95,8 @@ export default function AppTitleBar({
         <span className="app-titlebar-name">{APP_TITLE}</span>
       </div>
 
-      <div
-        className="app-titlebar-drag-region"
-        onMouseDown={handleDragMouseDown}
-        onDoubleClick={handleDragDoubleClick}
-      />
+      {/* 96px 的留白段：拖窗热区已经覆盖整条标题栏，这里只负责品牌段与 tab 段之间的呼吸 */}
+      <div className="app-titlebar-drag-region" aria-hidden />
 
       {navigationSlot}
 

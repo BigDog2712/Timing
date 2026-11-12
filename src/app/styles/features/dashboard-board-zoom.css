@@ -1,0 +1,50 @@
+/* ============================================================================
+ * dashboard-board-zoom.css — 画布滚动归属 + 缩放反馈徽标
+ * -----------------------------------------------------------------------------
+ * [v3.1] 倍率归用户之后（`useBoardZoom`），画布尺寸不再被窗口"拟合"，可能出现
+ * 1250×820 撑不进窗口的情况。于是滚动必须由**一个**容器独占，否则会出现两条滚动条
+ * 抢滚轮：外层的 `.qp-dashboard`（原来自己 `overflow-y: auto`）与内层的
+ * `.qp-board-scroll`（原来也是 auto，但高度是内容高，永远滚不动）。
+ *
+ * 这里的口径：`.qp-dashboard` 只裁不滚 → `.qp-main-view` 吃掉剩余高度（必须
+ * `min-height: 0`，否则 flex 子项撑回内容高）→ `.qp-board-scroll` 两个方向都滚。
+ * 于是滚轮的归属、滚动条的位置、Ctrl + 滚轮的锚点换算三者都只有一个答案。
+ * ========================================================================== */
+
+.qp-dashboard {
+  /* 只裁不滚：主界面滚的是画布，不是整页（工具条要留在原地） */
+  overflow: hidden;
+}
+
+.qp-main-view {
+  /* 撑满剩余高度。`min-height: 0` 是这条链的关键：dashboard.css 里写的是
+   * `min-height: min(--qp-board-h, 100%)`，那会让它无论如何都不低于 636，
+   * 窗口更矮时画布被裁掉且滚不到。 */
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0 auto;
+}
+
+.qp-board-scroll {
+  /* 两个方向都滚：倍率 > 容器时横向也要能看右边那列 */
+  overflow: auto;
+}
+
+/* ── 缩放百分比徽标 ──
+ * 只在动手那 900ms 内出现（`adjusting`）。`pointer-events: none` —— 它只是一句
+ * 反馈，不该挡住右下角那张卡。定位锚在 `.qp-dashboard`（它是 relative）。 */
+.qp-board-zoom {
+  position: absolute;
+  right: 18px;
+  bottom: 14px;
+  z-index: 44;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--qp-bg-elevated);
+  outline: 1px solid var(--qp-border-subtle);
+  font-size: 11px;
+  line-height: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--qp-text-secondary);
+  pointer-events: none;
+}

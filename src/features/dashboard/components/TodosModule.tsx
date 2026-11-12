@@ -1,14 +1,24 @@
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Plus, X } from "lucide-react";
+import { Bell, X } from "lucide-react";
 
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { emitHostIntent } from "../../../platform/runtime/hostIntentGateway.ts";
+import { reminderClock } from "../services/todoDraft.ts";
 import type { TodayTodosState } from "../hooks/useTodayTodos.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import ModuleShell, { moduleState } from "./ModuleShell.tsx";
+import TodoComposeDialog from "./TodoComposeDialog.tsx";
 
 /**
- * 模块 4 · 待办事项（01 §4.3 骨架：head / compose / list / fade / undo）
+ * 模块 4 · 待办事项（01 §4.3 骨架：head / list / fade / undo / footer）
+ *
+ * ## 新建入口 = 卡底「＋ 新建待办」弹层（[本轮]，与「新建事项」完全对齐）
+ *
+ * 顶部的行内输入行下线了：用户口径「新增代办应与新增事项一致，可以填写时间，
+ * 选择是否提醒」。一个时间（`plannedAt`）+ 一个勾选（勾了才有 `remindAt`）装不进
+ * 32px 的行内输入，所以挪进 `TodoComposeDialog`（挂在 `ModuleShell` 的 `footer` 里 ——
+ * footer 在 empty / error 态也在场，「今天还没有待办」恰恰是最需要新建入口的时刻）。
+ * 时间口径的唯一实现在 `services/todoDraft.ts` 的 `planTodoWrite`，这里不写三元。
  *
  * ## 「还有 N 项」的 N 是**量出来的**，不是写死的
  *
@@ -16,6 +26,9 @@ import ModuleShell, { moduleState } from "./ModuleShell.tsx";
  * 一旦有人改 `--qp-row-todo` 或卡高，写死的 4 会立刻错。这里用一个 `ResizeObserver`
  * 挂在列表上，pitch 从第 1、2 行的 `offsetTop` 差里读，**不读 CSS 变量、不算魔法数**：
  *   visible = floor((clientHeight − rowH) / pitch) + 1     // 末行不需要 trailing gap
+ *
+ * 卡底加了 footer 之后这套测量**照常工作**：可见行数从量出来的 clientHeight 推，
+ * 「还有 K 项」自动适配，不需要跟着改任何数字。
  *
  * 两个推导量（可见行数、底部渐隐）由**同一个** `syncTodoDerived()` 算，它是一个可同步
  * 调用的普通函数：`useLayoutEffect`（列表变了）、RO 回调（容器变了）、`scroll`（滚动位置
@@ -46,9 +59,10 @@ interface Props {
 
 export default function TodosModule({ controls, model }: Props) {
   const UI_TEXT = useLocaleText();
-  const copy = DASHBOARD_COPY[useLocale()];
-  const { todos, status, pending, create, toggle, remove, undoPending, retry } = model;
-  const [draft, setDraft] = useState("");
+  const locale = useLocale();
+  const copy = DASHBOARD_COPY[locale];
+  const { todos, status, pending, toggle, remove, undoPending, retry } = model;
+  const [composeOpen, setComposeOpen] = useState(false);
   const [hiddenCount, setHiddenCount] = useState(0);
   const [fadeVisible, setFadeVisible] = useState(false);
   const listRef = useRef<HTMLUListElement | null>(null);
@@ -117,42 +131,30 @@ export default function TodosModule({ controls, model }: Props) {
       /* 三段式：① 无（加载 / 空） ② `全部 N 项 ▸` 常驻 ③ 溢出时再加 `还有 K 项 ▸`。
       两个 N 是**两个数**（总数 / 没排下的条数），谁也不许拿另一个推。
       （ready 态必然 todos.length > 0：0 条会被 moduleState 判成 empty。） */
+      /* 卡头读数 = exe 的 `meta(Todos)`：「N 条待办」（`widgets/mod.rs:156`）。
+         溢出条数仍要说，但只在真的溢出时追加一段，不再是常驻的「全部 N 项 ▸」。 */
       meta={(
         <>
-          <span>{copy.todosAll(todos.length)}</span>
+          <span>{copy.todosMeta(todos.filter((todo) => todo.doneAt === null).length)}</span>
           {hiddenCount > 0 ? <span>{copy.todosRest(hiddenCount)}</span> : null}
         </>
       )}
+      /* [本轮] 卡底写入口放 **footer** 而不是 children：children 只在 ready 渲染，
+         而「今天还没有待办」正是最想新建一条的时刻（`ModuleShell` 的 footer 注释）。
+         弹层也挂在 footer 里（照 `TimelineCard.tsx` 的 `qp-timeline-manage`）。 */
+      footer={(
+        <div className="qp-todo-foot">
+          <button type="button" className="qp-link-btn" onClick={() => setComposeOpen(true)}>
+            {copy.todoNewTodo}
+          </button>
+          <TodoComposeDialog
+            open={composeOpen}
+            onClose={() => setComposeOpen(false)}
+            create={model.create}
+          />
+        </div>
+      )}
     >
-      <form
-        className="qp-todo-compose"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void create(draft).then((accepted) => { if (accepted) setDraft(""); });
-        }}
-      >
-        <span className="qp-compose-icon" aria-hidden="true">
-          <Plus size={14} strokeWidth={2} />
-        </span>
-        <input
-          value={draft}
-          placeholder={copy.todoCompose}
-          /* label 与 placeholder 必须两串：placeholder 里的「…」会被读屏读出来（06 T6） */
-          aria-label={copy.todoComposeLabel}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            /* Esc（06 T4/T5）：有字→清空；无字→焦点去列表首行。
-             * 不 preventDefault：Esc 在输入框没有默认行为要拦。 */
-            if (event.key !== "Escape") return;
-            if (draft.trim() !== "") {
-              setDraft("");
-            } else {
-              listRef.current?.querySelector<HTMLElement>(".qp-todo-check")?.focus();
-            }
-          }}
-        />
-      </form>
-
       <ul className="qp-todo-list qp-scroll-region qp-scroll-region-stable" ref={listRef}>
         {todos.map((todo) => {
           const done = todo.doneAt !== null;
@@ -181,7 +183,21 @@ export default function TodosModule({ controls, model }: Props) {
                 <span className="qp-todo-box" aria-hidden="true" />
               </button>
               <span className="qp-todo-title" title={todo.title}>{todo.title}</span>
-              <span className="qp-todo-time">{formatPlannedLabel(todo.plannedAt)}</span>
+              {/* [本轮] 提醒标记：`remindAt` 非 null 才画（宿主两级提醒以它为基准）。
+                  不做成按钮 —— 本轮不做编辑提醒，一个"能聚焦但按了没反应"的控件比没有更糟；
+                  用 role="img" + aria-label（"已设提醒 21:00"），读屏用户听得见、点上无副作用。 */}
+              <span className="qp-todo-when">
+                {todo.remindAt !== null ? (
+                  <span
+                    className="qp-todo-bell"
+                    role="img"
+                    aria-label={copy.todoRemindAt(reminderClock(todo.remindAt))}
+                  >
+                    <Bell size={12} strokeWidth={2.5} aria-hidden="true" />
+                  </span>
+                ) : null}
+                <PlannedChip plannedAt={todo.plannedAt} done={done} locale={locale} />
+              </span>
               <button
                 type="button"
                 className="qp-todo-del"
@@ -215,8 +231,40 @@ export default function TodosModule({ controls, model }: Props) {
 }
 
 /** 排期时间只画时分（24 小时制，本地时区）；没排期就空着，不写「未排期」占位 */
-function formatPlannedLabel(plannedAt: number | null): string {
-  if (plannedAt === null) return "";
-  const date = new Date(plannedAt);
+const DAY_MS = 86_400_000;
+
+function clockOf(ms: number): string {
+  const date = new Date(ms);
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+/**
+ * 计划时刻胶囊：**没排期就不画**，四种状态各自一套色（逐条照 `todos.rs:76-100`）。
+ *
+ * 原来无条件渲染一个 54×18 的胶囊，`plannedAt` 为 null 时就是一个空框 ——
+ * 看着像"加载失败的占位"，比不显示更让人分心。
+ *
+ * 状态口径：
+ *   · 已完成 → 灰字、无底（事情已经了了，时刻只是记录）；
+ *   · 逾期（早于今天 0 点）→ danger 色 + danger 淡底；
+ *   · 今天 → 时刻 + accent 淡底（Rust 的 `with_alpha(accent, 22)`）；
+ *   · 更远的日期 → 换成日期（"11/13"），不带底 —— 那时还不需要"几点"这个精度。
+ */
+function PlannedChip({ plannedAt, done, locale }: { plannedAt: number | null; done: boolean; locale: string }) {
+  if (plannedAt === null) return null;
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const start = dayStart.getTime();
+
+  if (done) {
+    return <span className="qp-todo-time" data-state="done">{clockOf(plannedAt)}</span>;
+  }
+  if (plannedAt < start) {
+    return <span className="qp-todo-time" data-state="overdue">{clockOf(plannedAt)}</span>;
+  }
+  if (plannedAt < start + DAY_MS) {
+    return <span className="qp-todo-time">{clockOf(plannedAt)}</span>;
+  }
+  const text = new Date(plannedAt).toLocaleDateString(locale, { month: "numeric", day: "numeric" });
+  return <span className="qp-todo-time" data-state="later">{text}</span>;
 }

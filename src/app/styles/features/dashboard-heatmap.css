@@ -1,0 +1,181 @@
+/* ============================================================================
+ * dashboard-heatmap.css — 活动热力图卡（近 4 周平均：周一→周日 7 行 × 24 列）
+ * -----------------------------------------------------------------------------
+ * 版式逐值照 `widgets/heatmap.rs`：
+ *   星期列 16（`label_w`）· 格距 3（`GAP`）· 单格 `min(cell_w, cell_h).clamp(4, 18)`
+ *   · 底部刻度带 15 + 图例带 15（`bottom_h` / `legend_h`）· 刻度与星期 9px
+ *   · 图例小格 10×10、贴右下。
+ *
+ * 两条不能省的取法：
+ *   · **格子必须是正方形**：整块尺寸由外层的 `--qp-heatmap-cell` 算一次、行列共用，
+ *     不能用 `1fr` 让列宽撑满 —— 卡一宽格子就成了扁条，24 小时的"形状"就没了
+ *     （Rust 那句 `.min(cell_h)` 就是防这个）；
+ *   · **行、列、刻度三者共用同一个格宽**，否则 0/6/12/18 会与格子错列。
+ *
+ * 配色只用 `--qp-*` 令牌：深浅是 `--qp-accent-default` 的 `color-mix` 五档，
+ * 不写死任何一个色值（`brand-gate` 会拦）。
+ * ========================================================================== */
+
+/* 容器锚点放在这张卡自己身上（不是卡壳）：`100cqw`/`100cqh` 就是"格阵可用区"，
+ * 与 Rust 的 `avail_w`/`avail_h` 同义。注意 `cqw` 在容器**自身**上不生效（元素不能
+ * 给自己当容器），所以格宽令牌定义在子元素上。 */
+.qp-heatmap {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  /* 整块上限 520 = 星期列 16 + 间距 3 + 格阵 501（24×18 + 23×3）。卡更宽时居中留白，
+   * Rust 也是居中，不是把格子拉开。 */
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  container-type: size;
+}
+
+/* 格宽 = `clamp(4, min((可用宽-23GAP)/24, (可用高-6GAP)/7), 18)`。
+ * 85 = 星期列 16 + 它后面的 3 + 23 个格距 69；48 = 底部两条带 30 + 6 个格距 18。 */
+.qp-heatmap__rows,
+.qp-heatmap__foot {
+  --qp-heatmap-label: 16px;
+  --qp-heatmap-gap: 3px;
+  --qp-heatmap-cell: clamp(
+    4px,
+    min(calc((100cqw - 85px) / 24), calc((100cqh - 48px) / 7)),
+    18px
+  );
+}
+
+/* 两列：星期列 + 格阵。`justify-content` / `align-content` 都居中 ——
+ * Rust 把格阵摆在可用区正中（`(avail - grid) * 0.5`），不是贴左上。 */
+.qp-heatmap__rows {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: var(--qp-heatmap-label) max-content;
+  grid-auto-rows: var(--qp-heatmap-cell);
+  justify-content: center;
+  align-content: center;
+  gap: var(--qp-heatmap-gap);
+  min-height: 0;
+}
+
+.qp-heatmap__day {
+  min-width: 0;
+  overflow: hidden;
+  align-self: center;
+  text-align: right;
+  padding-right: var(--qp-heatmap-gap);
+  font-size: 9px;
+  line-height: 12px;
+  color: var(--qp-text-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-heatmap__cells {
+  display: grid;
+  grid-template-columns: repeat(24, var(--qp-heatmap-cell));
+  grid-auto-rows: var(--qp-heatmap-cell);
+  gap: var(--qp-heatmap-gap);
+  min-width: 0;
+  min-height: 0;
+}
+
+.qp-heatmap__cell {
+  min-width: 0;
+  min-height: 0;
+  border-radius: 2px;
+  /* 零活动 = 一个浅浅的底，与"还没发生"（`data-future` 的虚线）分开。
+   * 用 `--qp-surface-raise` 而不是 border-subtle 的透明混色：它在两套主题里都比卡面
+   * **亮一档**（深色 #2d2d2d → #393a3c，浅色 #ffffff → #f8f8f8），零活动格因此
+   * 「看得见但不出声」。实测 34% 的 border-subtle 在深色卡上直接看不见，24 格的网格
+   * 只剩有量的那几格 —— 读起来像"这一天只有这几个小时"。（GitHub 那套也是这么做的。） */
+  background: var(--qp-surface-raise);
+}
+
+/* 五档强度：**开方后分 5 档**（照 Rust 的 `sqrt` 压长尾），alpha 沿用它的阶梯
+ * `38 + t*200`：t = 0.12/0.32/0.52/0.72/0.92 → 62/102/142/182/222 ≈ 24/40/56/71/87%。
+ * 不用"15/30/45 分钟"这种绝对门槛：4 周平均之后一小时里有 20 分钟就算很满了，
+ * 写死门槛会让整张图永远停在第 1 档。 */
+.qp-heatmap__cell[data-level="1"],
+.qp-heatmap__legend i[data-level="1"] {
+  background: color-mix(in srgb, var(--qp-accent-default) 24%, transparent);
+}
+
+.qp-heatmap__cell[data-level="2"],
+.qp-heatmap__legend i[data-level="2"] {
+  background: color-mix(in srgb, var(--qp-accent-default) 40%, transparent);
+}
+
+.qp-heatmap__cell[data-level="3"],
+.qp-heatmap__legend i[data-level="3"] {
+  background: color-mix(in srgb, var(--qp-accent-default) 56%, transparent);
+}
+
+.qp-heatmap__cell[data-level="4"],
+.qp-heatmap__legend i[data-level="4"] {
+  background: color-mix(in srgb, var(--qp-accent-default) 71%, transparent);
+}
+
+.qp-heatmap__cell[data-level="5"],
+.qp-heatmap__legend i[data-level="5"] {
+  background: color-mix(in srgb, var(--qp-accent-default) 87%, transparent);
+}
+
+/* 底部两条带：小时刻度一条、图例一条贴右下（Rust 里是两条独立的带）。
+ * 与 `__rows` 用同一套列骨架，格宽和居中方式都一样 —— 否则 0/6/12/18 与格子错列。 */
+.qp-heatmap__foot {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: var(--qp-heatmap-label) max-content;
+  grid-auto-rows: 12px;
+  justify-content: center;
+  align-content: end;
+  gap: 2px var(--qp-heatmap-gap);
+  min-width: 0;
+}
+
+.qp-heatmap__axis {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(24, var(--qp-heatmap-cell));
+  gap: var(--qp-heatmap-gap);
+  min-width: 0;
+  font-size: 9px;
+  line-height: 12px;
+  color: var(--qp-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.qp-heatmap__axis > span {
+  /* 刻度压在列的**中间**（Rust 是 `x - 12` 起 24 宽居中），不是压在列左缘 */
+  text-align: center;
+}
+
+.qp-heatmap__legend {
+  grid-column: 2;
+  display: none;
+  justify-self: end;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  line-height: 12px;
+  color: var(--qp-text-tertiary);
+}
+
+/* 图例小格 10×10（Rust `heatmap.rs:130`） */
+.qp-heatmap__legend i {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+/* 够高才给图例：Rust 的门槛就是正文高 > 150（`legend_h = if body.height() > 150`）。
+ * 现在容器是 `.qp-heatmap` 本身，`100cqh` 就是正文高 —— 阈值可以直接写 150，
+ * 不必再折算出卡高（原来写 180 是因为量的是卡壳内容盒）。 */
+@container (min-height: 150px) {
+  .qp-heatmap__legend {
+    display: inline-flex;
+  }
+}

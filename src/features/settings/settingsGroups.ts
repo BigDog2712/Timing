@@ -42,6 +42,16 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     ],
   },
   {
+    /* [v3] 主界面组件板：摆位在主界面上做，这里管「有哪些组件」与全局手感
+       （吸附、整理、恢复默认）。放在外观之后、计时之前——它属于「界面长什么样」，
+       不属于「怎么记时」。 */
+    id: "board",
+    title: "主界面",
+    anchors: [
+      { id: "s-board-widgets", title: "组件与排布" },
+    ],
+  },
+  {
     id: "tracking",
     title: "计时与记录",
     anchors: [

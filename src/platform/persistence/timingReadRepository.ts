@@ -20,6 +20,15 @@ export interface TimingItem {
   name: string;
   color: string;
   isSystem: boolean;
+  /**
+   * [本轮] 常用事项（宿主 `items.is_pinned`）——「事项管理」弹层的**常用事项**分组判据。
+   * Rust 的 `Item` 已带这个 camelCase 字段，`list_items` 原样透传，不新增命令。
+   */
+  isPinned: boolean;
+  /** 手动排序权重（升序）；同值时按 `id` 升序兜底。脏值回落 0。 */
+  sortOrder: number;
+  /** 最后修改时刻（epoch 毫秒）——「近期事项」按它倒序取前 N。脏值回落 0。 */
+  updatedAt: number;
 }
 
 export interface TimingRecord {
@@ -42,11 +51,19 @@ export async function listTimingItems(): Promise<TimingItem[]> {
     const id = Number(record.id);
     const name = typeof record.name === "string" ? record.name.trim() : "";
     if (!Number.isSafeInteger(id) || name.length === 0) return [];
+    /* 三个新字段一律**容错读**：`sortOrder` / `updatedAt` 只用于排序，非有限数当 0 处理
+       （当成缺失排序，而不是把整条事项丢掉——丢一条比排错一次严重得多）；
+       `isPinned` 只认真正的 `true`，`"true"` / `1` 一律当 false（宿主序列化的是布尔）。 */
+    const sortOrder = Number(record.sortOrder);
+    const updatedAt = Number(record.updatedAt);
     return [{
       id,
       name,
       color: typeof record.color === "string" ? record.color : "",
       isSystem: record.isSystem === true,
+      isPinned: record.isPinned === true,
+      sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
+      updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0,
     }];
   });
 }

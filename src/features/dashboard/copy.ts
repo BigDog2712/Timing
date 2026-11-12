@@ -1,4 +1,8 @@
 import type { Locale } from "../../shared/i18n/index.ts";
+import { APP_BINDING_COPY, type AppBindingCopy } from "./copyAppBinding.ts";
+import { NOTE_COPY, type NoteCopy } from "./copyNotes.ts";
+import { TIMELINE_MANAGE_COPY, type TimelineManageCopy } from "./copyTimeline.ts";
+import { TODO_COPY, type TodoCopy } from "./copyTodos.ts";
 
 /**
  * 今日五模块 + 便利贴条的**新文案表**（四语言齐备）。
@@ -12,21 +16,21 @@ import type { Locale } from "../../shared/i18n/index.ts";
  * 已有的键照旧走 `useLocaleText()`（`dashboard.emptyState` / `dashboard.topApps` /
  * `dashboard.comparedWithYesterday` / `common.*`），本表只放**仓里还没有的**标题与动词。
  */
-export interface DashboardCopy {
+export interface DashboardCoreCopy {
   /** 页面级 `sr-only h1`：屏幕阅读器的第一句"这是哪一页"，视觉上没有页头（01 §4.1） */
   pageTitle: string;
   /** 四卡空态（02 §14.4 / M5）：**四句必须不同**。共用一句的话，用户分不清
    *  "今天没有计时"和"今天没有待办"——空态是每张卡自己的陈述，不是页面的。
-   *  句式照 `notesEmpty`（§12.3 定稿的陈述句式）：时间 + "还没有" + 东西。 */
+   *  句式照 `notesEmpty`（§12.3 定稿的陈述句式）：时间 + "还没有" + 东西。
+   *  待办卡那句（`todosEmpty`）随整块待办文案搬去了 `copyTodos.ts`。 */
   timerEmpty: string;
-  itemsEmpty: string;
   appsEmpty: string;
-  todosEmpty: string;
-  /** 输入框 `aria-label`：**不带省略号**。placeholder 里的"…"会被读屏读出来，
-   *  所以 label 与 placeholder 必须是两串（06 T6） */
-  todoComposeLabel: string;
   /** 设计模块名是「计时分布」；既有 `dashboard.focusShare` 是「专注分布」，语义不同 */
   timerTitle: string;
+  /** 卡头读数：exe 的 `meta(Timer)` 就是「今日 14m」（`widgets/mod.rs:141`） */
+  timerToday: (text: string) => string;
+  /** 环心第二行（`focus.rs:120` 的「今日合计」，10px） */
+  timerDonutCap: string;
   addCard: string;
   /** 工具条第二颗键：把布局恢复成出厂（`useDashboardLayout().reset` 一直没有 UI 入口，
    *  用户把卡移除乱了就只能删 localStorage —— 这条是补那个缺口，不是新功能。 */
@@ -39,26 +43,16 @@ export interface DashboardCopy {
   focusDimensionLabel: string;
   focusDimensions: Record<"category" | "app" | "item", string>;
 
-  itemsTitle: string;
-  /** 卡头第一段：今日**全部**事项数（不是列表里那 6 行） */
-  itemsCount: (count: number) => string;
-  /** 卡头第二段：只有总数 > 6（= 列表被截断）时才出现 */
-  itemsMore: (count: number) => string;
-  todosTitle: string;
-  /** 卡头第一段：待办总数，常驻（与事项卡的「今日 N 项」同口径） */
-  todosAll: (count: number) => string;
-  /** 卡头第二段：溢出没排下的条数（量出来的，不是写死的） */
-  todosRest: (count: number) => string;
-  todoCompose: string;
-  todoToggle: (title: string) => string;
-  /** 已勾选行的 checkbox `aria-label`：必须随 `aria-checked` 换词，
-   *  否则读屏对已完成的事还在说"完成"（06 A9 第 5 条） */
-  todoUntoggle: (title: string) => string;
-  todoDelete: (title: string) => string;
-  undoDeleted: (title: string) => string;
-  /** 勾选的撤销条文案：勾选是**立即落库**的，撤销 = 反向再调一次，语义不同于删除 */
-  undoToggled: (title: string) => string;
-  undoAction: string;
+  /** 时间线卡头第一颗按钮：发的是「打开事项菜单」意图，文案不能跟着卡名走 */
+  itemsMenu: string;
+  /** 同卡第二颗：打开「常用事项」（exe 的事项卡里那一列「常用」） */
+  commonItems: string;
+  /** 应用卡头读数：exe 的 `meta(Apps)` 只有总时长，没有「前 N 项」 */
+  appsMeta: (text: string) => string;
+  /** 应用卡底注：exe 「共 5 个应用 · 合计 14m」（`apps.rs:86`） */
+  appsSummary: (count: number, text: string) => string;
+  /** 热力图卡头读数：exe 「近 4 周」（`widgets/mod.rs:159`） */
+  heatmapMeta: (weeks: number) => string;
   notesTitle: string;
   notesCount: (count: number) => string;
   notesMore: (count: number) => string;
@@ -66,195 +60,178 @@ export interface DashboardCopy {
   appsTop: (count: number) => string;
   appsFooter: string;
   /* ── [0.12.1] 新增的两张真卡：应用趋势 / 提醒窗口 ── */
+  /** [今日分时] 卡标题「今日活动趋势」——主人要的口径是只看今天 */
   trendTitle: string;
   trendEmpty: string;
-  /** 卡头读数：近 7 天合计 */
+  /** 图表顶部左读数：今日总时长 */
   trendTotal: (text: string) => string;
-  /** 柱的 aria/title：必须同时说出“哪天”与“多久”，只有高度的柱对读屏是空白 */
-  trendBar: (day: string, text: string) => string;
-  reminderTitle: string;
-  reminderEmpty: string;
-  reminderCount: (count: number) => string;
-  /** 提醒目标类型：`ReminderTarget` 的两个值 */
-  reminderKinds: Record<"item" | "todo", string>;
-  reminderDue: string;
+  /** 柱的 aria/title：必须同时说出「几点到几点」与「多久」，只有高度的柱对读屏是空白 */
+  trendBar: (slot: string, text: string) => string;
+  /** 最后一根柱（＝当前这一小时）的轴文字：「现在」 */
+  trendToday: string;
+  /** 图表顶部右读数：峰值时刻 + 该小时时长（`14:00 · 1h 20m`） */
+  trendPeak: (text: string) => string;
+  /** 轴文字里的小时（只出现三处：首 / 中）：zh「8点」、其余「8:00」 */
+  trendHourTick: (hour: number) => string;
 }
+
+/** 整页文案 = 本表 + 应用行/绑定弹层的那批（`copyAppBinding.ts`）+ 便利贴删除那两颗
+ *  （`copyNotes.ts`）+ 时间线卡「新建/管理事项」（`copyTimeline.ts`）+ 待办卡整块
+ *  （`copyTodos.ts`，含本轮新建弹层）。
+ *  拆文件是为了守住单文件 300 行上限；口径完全相同、"四键齐全"这条也一样。 */
+export type DashboardCopy = DashboardCoreCopy
+  & AppBindingCopy
+  & NoteCopy
+  & TimelineManageCopy
+  & TodoCopy;
 
 export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
   "zh-CN": {
+    ...APP_BINDING_COPY["zh-CN"],
+    ...NOTE_COPY["zh-CN"],
+    ...TIMELINE_MANAGE_COPY["zh-CN"],
+    ...TODO_COPY["zh-CN"],
     pageTitle: "今日概览",
     timerEmpty: "今天还没有计时",
-    itemsEmpty: "今天还没有事项",
     appsEmpty: "今天还没有用到应用",
-    todosEmpty: "今天还没有待办",
-    todoComposeLabel: "添加待办",
     timerTitle: "计时分布",
+    timerToday: (text) => `今日 ${text}`,
+    timerDonutCap: "今日合计",
     addCard: "添加卡片",
     resetLayout: "恢复默认布局",
     resizeColumns: "调整两栏宽度",
     resizeWidth: (label) => `调整「${label}」宽度`,
     focusDimensionLabel: "专注窗口维度",
     focusDimensions: { category: "分类", app: "应用", item: "事项" },
-    cardLabels: { timer: "专注窗口", items: "事项排行", apps: "应用排行", timeline: "事项菜单", todos: "待办窗口", notes: "便利贴窗口", trend: "应用趋势", reminder: "提醒窗口" },
-    itemsTitle: "事项分布",
-    itemsCount: (count) => `今日 ${count} 项`,
-    itemsMore: (count) => `更多 ${count} 项 ▸`,
-    todosTitle: "待办事项",
-    todosAll: (count) => `全部 ${count} 项 ▸`,
-    todosRest: (count) => `还有 ${count} 项 ▸`,
-    todoCompose: "添加待办…",
-    todoToggle: (title) => `完成「${title}」`,
-    todoUntoggle: (title) => `取消完成「${title}」`,
-    todoDelete: (title) => `删除「${title}」`,
-    undoDeleted: (title) => `已删除「${title}」`,
-    undoToggled: (title) => `已完成「${title}」`,
-    undoAction: "撤销",
+    cardLabels: { timer: "计时分布", apps: "应用排行", timeline: "今日时间线", todos: "待办事项", notes: "便利贴", trend: "今日活动趋势", heatmap: "活动热力图" },
+    itemsMenu: "事项菜单",
+    commonItems: "常用",
+    appsMeta: (text) => text,
+    appsSummary: (count, text) => `共 ${count} 个应用 · 合计 ${text}`,
+    heatmapMeta: (weeks) => `近 ${weeks} 周`,
     notesTitle: "便利贴",
     notesCount: (count) => `${count} 张`,
     notesMore: (count) => `+${count}`,
     notesEmpty: "今天还没有便利贴",
     appsTop: (count) => `前 ${count} 项`,
     appsFooter: "全部分类…",
-    trendTitle: "应用趋势",
-    trendEmpty: "近 7 天还没有活动记录",
-    trendTotal: (text) => `近 7 天 ${text}`,
-    trendBar: (day, text) => `${day} ${text}`,
-    reminderTitle: "提醒窗口",
-    reminderEmpty: "没有待提醒的到点事项",
-    reminderCount: (count) => `${count} 条待提醒`,
-    reminderKinds: { item: "事项", todo: "待办" },
-    reminderDue: "已到点",
+    trendTitle: "今日活动趋势",
+    trendEmpty: "今天还没有活动记录",
+    trendTotal: (text) => `今日 ${text}`,
+    trendBar: (slot, text) => `${slot} · ${text}`,
+    trendToday: "现在",
+    trendPeak: (text) => `峰值 ${text}`,
+    trendHourTick: (hour) => `${hour}点`,
   },
   "en-US": {
+    ...APP_BINDING_COPY["en-US"],
+    ...NOTE_COPY["en-US"],
+    ...TIMELINE_MANAGE_COPY["en-US"],
+    ...TODO_COPY["en-US"],
     pageTitle: "Today overview",
     timerEmpty: "No time tracked today",
-    itemsEmpty: "No items today",
     appsEmpty: "No apps used today",
-    todosEmpty: "No to-dos today",
-    todoComposeLabel: "Add a to-do",
     timerTitle: "Time distribution",
+    timerToday: (text) => `Today ${text}`,
+    timerDonutCap: "Total today",
     addCard: "Add card",
     resetLayout: "Reset layout",
     resizeColumns: "Resize columns",
     resizeWidth: (label) => `Resize ${label}`,
     focusDimensionLabel: "Focus dimension",
     focusDimensions: { category: "Category", app: "App", item: "Item" },
-    cardLabels: { timer: "Focus", items: "Items", apps: "Applications", timeline: "Timeline", todos: "Todos", notes: "Notes", trend: "App trend", reminder: "Reminders" },
-    itemsTitle: "Items",
-    itemsCount: (count) => `${count} today`,
-    itemsMore: (count) => `${count} more ▸`,
-    todosTitle: "To-dos",
-    todosAll: (count) => `All ${count} ▸`,
-    todosRest: (count) => `${count} more ▸`,
-    todoCompose: "Add a to-do…",
-    todoToggle: (title) => `Complete “${title}”`,
-    todoUntoggle: (title) => `Mark “${title}” as not done`,
-    todoDelete: (title) => `Delete “${title}”`,
-    undoDeleted: (title) => `Deleted “${title}”`,
-    undoToggled: (title) => `Completed “${title}”`,
-    undoAction: "Undo",
+    cardLabels: { timer: "Time split", apps: "Applications", timeline: "Timeline", todos: "To-dos", notes: "Notes", trend: "Today's activity", heatmap: "Activity heatmap" },
+    itemsMenu: "Items menu",
+    commonItems: "Frequent",
+    appsMeta: (text) => text,
+    appsSummary: (count, text) => `${count} apps · ${text} total`,
+    heatmapMeta: (weeks) => `Last ${weeks} weeks`,
     notesTitle: "Notes",
     notesCount: (count) => `${count}`,
     notesMore: (count) => `+${count}`,
     notesEmpty: "No notes today",
     appsTop: (count) => `Top ${count}`,
     appsFooter: "All categories…",
-    trendTitle: "App trend",
-    trendEmpty: "No activity in the last 7 days",
-    trendTotal: (text) => `Last 7 days ${text}`,
-    trendBar: (day, text) => `${day} ${text}`,
-    reminderTitle: "Reminders",
-    reminderEmpty: "No pending reminders",
-    reminderCount: (count) => `${count} pending`,
-    reminderKinds: { item: "Item", todo: "To-do" },
-    reminderDue: "Due",
+    trendTitle: "Today's activity",
+    trendEmpty: "No activity today",
+    trendTotal: (text) => `Today ${text}`,
+    trendBar: (slot, text) => `${slot} · ${text}`,
+    trendToday: "Now",
+    trendPeak: (text) => `Peak ${text}`,
+    trendHourTick: (hour) => `${hour}:00`,
   },
   "ru-RU": {
+    ...APP_BINDING_COPY["ru-RU"],
+    ...NOTE_COPY["ru-RU"],
+    ...TIMELINE_MANAGE_COPY["ru-RU"],
+    ...TODO_COPY["ru-RU"],
     pageTitle: "Обзор дня",
     timerEmpty: "Сегодня времени нет",
-    itemsEmpty: "Сегодня занятий нет",
     appsEmpty: "Сегодня приложения не использовались",
-    todosEmpty: "Сегодня задач нет",
-    todoComposeLabel: "Добавить задачу",
     timerTitle: "Распределение времени",
+    timerToday: (text) => `Сегодня ${text}`,
+    timerDonutCap: "Итого за день",
     addCard: "Добавить карточку",
     resetLayout: "Сбросить макет",
     resizeColumns: "Ширина колонок",
     resizeWidth: (label) => `Ширина «${label}»`,
     focusDimensionLabel: "Разрез фокуса",
     focusDimensions: { category: "Категория", app: "Приложение", item: "Дело" },
-    cardLabels: { timer: "Фокус", items: "События", apps: "Приложения", timeline: "Хронология", todos: "Задачи", notes: "Заметки", trend: "Тренд", reminder: "Напоминания" },
-    itemsTitle: "Занятия",
-    itemsCount: (count) => `Сегодня ${count}`,
-    itemsMore: (count) => `Ещё ${count} ▸`,
-    todosTitle: "Задачи",
-    todosAll: (count) => `Все ${count} ▸`,
-    todosRest: (count) => `Ещё ${count} ▸`,
-    todoCompose: "Добавить задачу…",
-    todoToggle: (title) => `Завершить «${title}»`,
-    todoUntoggle: (title) => `Снять отметку «${title}»`,
-    todoDelete: (title) => `Удалить «${title}»`,
-    undoDeleted: (title) => `Удалено «${title}»`,
-    undoToggled: (title) => `Выполнено «${title}»`,
-    undoAction: "Отменить",
+    cardLabels: { timer: "Распределение времени", apps: "Приложения", timeline: "Хронология", todos: "Задачи", notes: "Заметки", trend: "Активность сегодня", heatmap: "Тепловая карта" },
+    itemsMenu: "Меню дел",
+    commonItems: "Частые",
+    appsMeta: (text) => text,
+    appsSummary: (count, text) => `${count} прил. · ${text}`,
+    heatmapMeta: (weeks) => `Последние ${weeks} нед.`,
     notesTitle: "Заметки",
     notesCount: (count) => `${count}`,
     notesMore: (count) => `+${count}`,
     notesEmpty: "Сегодня заметок нет",
     appsTop: (count) => `Топ ${count}`,
     appsFooter: "Все категории…",
-    trendTitle: "Тренд приложений",
-    trendEmpty: "За последние 7 дней активности нет",
-    trendTotal: (text) => `За 7 дней ${text}`,
-    trendBar: (day, text) => `${day} ${text}`,
-    reminderTitle: "Напоминания",
-    reminderEmpty: "Нет ожидающих напоминаний",
-    reminderCount: (count) => `Ожидает: ${count}`,
-    reminderKinds: { item: "Дело", todo: "Задача" },
-    reminderDue: "Просрочено",
+    trendTitle: "Активность сегодня",
+    trendEmpty: "Сегодня активности нет",
+    trendTotal: (text) => `Сегодня ${text}`,
+    trendBar: (slot, text) => `${slot} · ${text}`,
+    trendToday: "Сейчас",
+    trendPeak: (text) => `Пик ${text}`,
+    trendHourTick: (hour) => `${hour}:00`,
   },
   es: {
+    ...APP_BINDING_COPY.es,
+    ...NOTE_COPY.es,
+    ...TIMELINE_MANAGE_COPY.es,
+    ...TODO_COPY.es,
     pageTitle: "Resumen de hoy",
     timerEmpty: "Hoy no hay registros de tiempo",
-    itemsEmpty: "Hoy no hay actividades",
     appsEmpty: "Hoy no se han usado aplicaciones",
-    todosEmpty: "Hoy no hay tareas",
-    todoComposeLabel: "Añadir tarea",
     timerTitle: "Distribución del tiempo",
+    timerToday: (text) => `Hoy ${text}`,
+    timerDonutCap: "Total de hoy",
     addCard: "Añadir tarjeta",
     resetLayout: "Restablecer diseño",
     resizeColumns: "Ajustar columnas",
     resizeWidth: (label) => `Ancho de ${label}`,
     focusDimensionLabel: "Dimensión de enfoque",
     focusDimensions: { category: "Categoría", app: "Aplicación", item: "Asunto" },
-    cardLabels: { timer: "Enfoque", items: "Elementos", apps: "Aplicaciones", timeline: "Cronología", todos: "Pendientes", notes: "Notas", trend: "Tendencia", reminder: "Recordatorios" },
-    itemsTitle: "Actividades",
-    itemsCount: (count) => `${count} hoy`,
-    itemsMore: (count) => `${count} más ▸`,
-    todosTitle: "Tareas",
-    todosAll: (count) => `Todas ${count} ▸`,
-    todosRest: (count) => `${count} más ▸`,
-    todoCompose: "Añadir tarea…",
-    todoToggle: (title) => `Completar «${title}»`,
-    todoUntoggle: (title) => `Desmarcar «${title}»`,
-    todoDelete: (title) => `Eliminar «${title}»`,
-    undoDeleted: (title) => `Eliminado «${title}»`,
-    undoToggled: (title) => `Completado «${title}»`,
-    undoAction: "Deshacer",
+    cardLabels: { timer: "Reparto del tiempo", apps: "Aplicaciones", timeline: "Cronología", todos: "Pendientes", notes: "Notas", trend: "Actividad de hoy", heatmap: "Mapa de calor" },
+    itemsMenu: "Menú de asuntos",
+    commonItems: "Frecuentes",
+    appsMeta: (text) => text,
+    appsSummary: (count, text) => `${count} apps · ${text}`,
+    heatmapMeta: (weeks) => `Últimas ${weeks} sem.`,
     notesTitle: "Notas",
     notesCount: (count) => `${count}`,
     notesMore: (count) => `+${count}`,
     notesEmpty: "Hoy no hay notas",
     appsTop: (count) => `Top ${count}`,
     appsFooter: "Todas las categorías…",
-    trendTitle: "Tendencia de apps",
-    trendEmpty: "Sin actividad en los últimos 7 días",
-    trendTotal: (text) => `Últimos 7 días ${text}`,
-    trendBar: (day, text) => `${day} ${text}`,
-    reminderTitle: "Recordatorios",
-    reminderEmpty: "No hay recordatorios pendientes",
-    reminderCount: (count) => `${count} pendientes`,
-    reminderKinds: { item: "Elemento", todo: "Pendiente" },
-    reminderDue: "Vencido",
+    trendTitle: "Actividad de hoy",
+    trendEmpty: "Hoy no hay actividad",
+    trendTotal: (text) => `Hoy ${text}`,
+    trendBar: (slot, text) => `${slot} · ${text}`,
+    trendToday: "Ahora",
+    trendPeak: (text) => `Pico ${text}`,
+    trendHourTick: (hour) => `${hour}:00`,
   },
 };

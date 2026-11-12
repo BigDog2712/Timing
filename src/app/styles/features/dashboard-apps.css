@@ -1,0 +1,177 @@
+/*
+ * dashboard-apps.css — 应用排行卡（`.qp-app-*`）的版式
+ * -----------------------------------------------------------------------------
+ * [0.12.1] 从 `dashboard-modules.css` 拆出来的：那张表在加「行内绑定标记」之后
+ * 顶穿了单文件 300 行硬限（`npm run check:size` 是逐文件棘轮，不许新增豁免）。
+ * 拆分口径与 `dashboard-card-fit.css` 同一条：**一张卡的样式不跨两个文件**，
+ * 所以应用排行这一族（列表 / 行 / 图标砖 / 名称 / 时长 / 占比条 / 绑定标记）
+ * 整块搬过来，一行不落；顺序与优先级和原来逐行一致（本文件在原位置被 @import）。
+ *
+ * 逐值对照 `widgets/apps.rs`：行 38 高、图标砖 24、名称 12.5/19、时长 11.5/19、
+ * 占比条 4 高 2 圆角。窄卡约束：卡片可拖到 w=1（约 300px），任何新增元素
+ * 都必须 `minmax(0,1fr)` + `text-overflow: ellipsis`，不得产生横向滚动。
+ */
+
+/* ── 应用排行：一行 = 图标砖 / 名称 / 时长 / 细条（逐值对照 `widgets/apps.rs`） ── */
+.qp-app-list { display: flex; flex: 1 1 auto; flex-direction: column; }
+
+/* 自绘滚动条（轨道 6px 不动：右缘对齐靠 `qp-scroll-region-stable` 常驻的那 6px 槽，
+ * 宽度改 4 会让数字列整体右移 2px）。视觉上的"细"靠 thumb 的 1px 透明边 +
+ * content-box 裁切做出来（6 − 2 = 4px）。 */
+.qp-app-list {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--qp-text-tertiary) 55%, transparent) transparent;
+}
+
+.qp-app-list::-webkit-scrollbar { width: var(--qp-scrollbar-size); }
+
+.qp-app-list::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--qp-text-tertiary) 55%, transparent);
+  background-clip: content-box;
+}
+
+/* 行 38 高（`apps.rs:28`）：第一行放图标/名称/时长，第二行放那根 4px 的占比条。
+ * 行盒 34（`row_h - 4`），条落在 row.bottom()−6 → 行内 y 28..32。
+ * 用 `19 + 9` 凑出 28：名称行 19（行高就是 19），条贴 28 起 —— 与 Rust 逐像素同位。
+ * 不写 `padding-top` 也是这个原因：Rust 的图标砖在 row.top()+3，多 1px 内距就会变成 4。 */
+.qp-app-row {
+  position: relative;
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: 24px minmax(0, 1fr) 52px;
+  grid-template-rows: 19px 4px;
+  align-content: start;
+  column-gap: 10px;
+  row-gap: 9px;
+  height: var(--qp-row-app);
+  box-sizing: border-box;
+}
+
+/* [P1 视觉层] 发丝（`.hair` 那 2px 绝对定位分隔线）连同 DOM 里的 `<span class="hair" />`
+ * 一起删了：行高从 32 降到 28 之后，5 行只占 140，再加 4 条 2px 线会把"行"读成"表格"。
+ * 分隔交给行高差与图标底块，不加回任何分隔线。 */
+
+/* 图标砖 24×24 / 圆角 7（`apps.rs:40-41`），首字 11.5 粗（`apps.rs:42`） */
+.qp-app-icon {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  margin-top: 3px;
+  align-self: start;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--qp-surface-raise);
+  font-size: 11.5px;
+  font-weight: var(--qp-font-weight-emphasis);
+  line-height: 15px;
+  color: var(--qp-text-tertiary);
+}
+
+.qp-app-icon > img { width: 100%; height: 100%; object-fit: contain; }
+
+/* 名称 12.5 / 19（`apps.rs:47`） */
+.qp-app-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 19px;
+  color: var(--qp-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 时长 11.5 / 19（`apps.rs:48-55`） */
+.qp-app-value {
+  text-align: right;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 19px;
+  color: var(--qp-text-secondary);
+  white-space: nowrap;
+}
+
+/* 占比条：4 高 / 圆角 2，从图标砖右侧一直拉到行尾（`apps.rs:57`）。
+ * 填充是 accent 的 59%（Rust `with_alpha(th.accent, 150)` = 150/255）。 */
+.qp-app-bar {
+  grid-column: 2 / 4;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--qp-chart-track);
+  overflow: hidden;
+}
+
+.qp-app-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--qp-accent-default) 59%, transparent);
+}
+
+/* ── [0.12.1] 行内「已绑定事项」标记 ──
+ * 名称列改成 flex 容器（名字 + 可选标记），两者各自省略号：
+ *   · 容器的 `min-width: 0` + `overflow: hidden` 是硬约束 —— 卡宽可拖到 w=1（约 300px），
+ *     少了它 flex 子项会按内容宽度撑开，横向滚动条就会出现；
+ *   · 标记最多吃掉 46% 宽度，剩下的全留给名字（名字是主信息，标记是补充）；
+ *   · 标记自身 `align-items: center` + 固定 5px 的点，行高仍由名字的 19px 决定，
+ *     不会因为「有绑定 / 没绑定」跳动。 */
+.qp-app-label {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.qp-app-binding {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 46%;
+  align-items: center;
+  gap: 4px;
+  color: var(--qp-text-tertiary);
+  white-space: nowrap;
+}
+
+.qp-app-binding-dot {
+  flex: none;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--qp-accent-default);
+}
+
+.qp-app-binding-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 19px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 行是键盘可达的编辑入口（`role="button"` + `tabIndex=0`），焦点必须看得见。
+ * 用内嵌描边（负 offset）而不是外扩：行与行之间只有 9px，外扩会压到上一行的占比条。 */
+.qp-app-row:focus-visible {
+  outline: 2px solid var(--qp-focus-ring);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+/* 编辑失败的内联提示（主界面没有全局 toast 通道，见 `AppsModule` 注释）：
+ * 单行省略号，不参与排行布局，出现/消失不改变列表高度之外的东西。 */
+.qp-app-notice {
+  margin: 0;
+  padding: 2px 0;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 14px;
+  color: var(--qp-warning);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+

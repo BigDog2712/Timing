@@ -98,7 +98,13 @@ export function permissionGrants(): Map<string, Set<string>> {
     for (const block of raw.split('[[permission]]').slice(1)) {
       const id = block.match(/identifier\s*=\s*"([^"]+)"/)?.[1];
       if (!id) continue;
-      const allow = block.match(/commands\.allow\s*=\s*\[([\s\S]*?)\]/)?.[1] ?? '';
+      /* [G1] 先去掉 TOML 行注释再抓数组：`host-commands.toml` 的 `commands.allow` 中间夹着
+         `# [0.13.0] 安卓应用使用统计（两条）` 这类注释，里面的 `]` 会让非贪婪的
+         `[\s\S]*?` 在**第 8 个命令**处就收尾 —— 于是 `theme_set`（第 79 个）根本没被读到，
+         判据变成「只校验前 8 条」，红的是探针而不是源码。注释里也不可能出现命令名，
+         所以去注释不会把「注释里提过」当成「真的授予了」（那正是本函数要防的假绿）。 */
+      const withoutComments = block.replace(/^\s*#.*$/gm, '');
+      const allow = withoutComments.match(/commands\.allow\s*=\s*\[([\s\S]*?)\]/)?.[1] ?? '';
       map.set(id, new Set([...allow.matchAll(/"([^"]+)"/g)].map((match) => match[1])));
     }
   }

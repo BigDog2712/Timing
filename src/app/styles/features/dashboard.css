@@ -88,7 +88,10 @@
   /* [拖拽调整大小] 下边缘拖拽区的定位锚点 */
   position: relative;
   min-height: 0;
-  padding: var(--qp-card-pad);
+  /* [Rust 对照 · `app.rs:439`] 卡身内距 = 左右 20、底 16，顶部由 46 高的卡头吃掉。
+   * 原来四边 16 + 卡头 20/8 是宿主自己的口径，与 timing-board.exe 差一截：
+   * 标题离左边只有 16、卡头只有 28 高，两版并排一眼就能看出"不是同一个壳"。 */
+  padding: 0 var(--qp-card-pad) var(--qp-card-pad-b);
   border: 0;
   border-radius: var(--qp-radius-card);
   outline: 1px solid var(--qp-card-edge);
@@ -97,7 +100,9 @@
   overflow: hidden;
 }
 
-/* 卡头 20 高 + 8 距（几何表，两档同值） */
+/* 卡头 = Rust 的 `HEADER_H = 46`（`app.rs:19`）。标题在 46 高的带子里垂直居中、
+ * 离左缘 20（卡身内距），不再有 8px 的"头与正文之间"的额外留白 —— 那 8px 在 Rust 里
+ * 属于卡头内部，正文从 y=46 直接开始。 */
 .qp-card-head {
   display: flex;
   flex: 0 0 var(--qp-card-head-h);
@@ -108,25 +113,31 @@
   margin-bottom: var(--qp-card-head-gap);
 }
 
+/* 标题 13.5（Rust `app.rs:422` 的 `text_b(..., 13.5, th.text)`） */
 .qp-card-title {
   margin: 0;
-  font-size: var(--qp-font-size-group-title);
+  font-size: 13.5px;
   font-weight: var(--qp-font-weight-emphasis);
-  line-height: var(--qp-line-height-group-title);
+  line-height: 18px;
   color: var(--qp-text-primary);
   white-space: nowrap;
 }
 
+/* 卡头右侧读数 11（Rust `app.rs:433` 的 `elide_right(..., 11.0, th.text3)`）。
+ * 颜色仍留在 secondary 而不是 Rust 的 text3：11px 的 text3 在深色卡上只有 3.6:1，
+ * 这一仓的对比度门槛是 4.5（02 §14），尺寸对齐、颜色不降级。 */
 .qp-card-meta {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-  font-size: var(--qp-font-size-caption);
+  /* 右缘落点照 exe：卡头读数框是 `[left+90, right−74]`（`app.rs:433`），
+   * 也就是读数右端离卡右缘 74 —— 中间那 34 是给 `⋯` 让的位（`⋯` 占 right−40..−16）。
+   * 不写这条，读数会紧贴 `⋯`，卡头看着就"挤"。 */
+  margin-right: 30px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
-  line-height: var(--qp-line-height-caption);
-  /* [P1 视觉层] tertiary → secondary。卡头 meta 是 12px 正文，tertiary 在 #2d2d2d 上只有
-   * 3.79:1（不达 4.5:1），secondary 是 5.10:1。**tertiary 从本批起只给占位符 / 骨架 / 空态**。 */
+  line-height: 15px;
   color: var(--qp-text-secondary);
   white-space: nowrap;
 }
@@ -177,12 +188,14 @@
 .qp-card-footer {
   flex: 0 0 var(--qp-card-foot-h);
   height: var(--qp-card-foot-h);
-  margin: 0 calc(-1 * var(--qp-card-pad)) calc(-1 * var(--qp-card-pad));
+  /* 底部内距现在是 16（`--qp-card-pad-b`），左右仍是 20：负边距要分两轴写，
+   * 否则 footer 的底边会比卡底低 4px、被 `overflow:hidden` 切掉一行字。 */
+  margin: 0 calc(-1 * var(--qp-card-pad)) calc(-1 * var(--qp-card-pad-b));
   padding: 0 var(--qp-card-pad);
   border: 0;
   background: none;
   text-align: left;
-  font-size: var(--qp-font-size-caption);
+  font-size: 10.5px;
   font-weight: var(--qp-font-weight-medium);
   line-height: var(--qp-card-foot-h);
   color: var(--qp-text-secondary);
@@ -220,14 +233,16 @@
 }
 
 /* ── 空态 / 骨架（五卡共用，只有这一份） ── */
+/* 12.5 = Rust `empty_with_hint` 的标题档（`mod.rs:166`）。空态是卡内唯一的"正文"，
+ * 12 与 12.5 差半像素，但它是**整套字阶的锚**：卡头 13.5 / 空态 12.5 / 元信息 11。 */
 .qp-empty {
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
   align-items: center;
   justify-content: center;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+  font-size: 12.5px;
+  line-height: 18px;
   color: var(--qp-text-tertiary);
   text-align: center;
 }

@@ -1,0 +1,6273 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark" data-window="main" style="--ui-text-opacity: 1.00; --ui-bg-opacity: 1.00;"><head>
+    <script type="module">import { injectIntoGlobalHook } from "/@react-refresh";
+injectIntoGlobalHook(window);
+window.$RefreshReg$ = () => {};
+window.$RefreshSig$ = () => (type) => type;</script>
+
+    <script type="module" src="/@vite/client"></script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0E0F12">
+    <title>Timing · 悬浮时间记录</title>
+    <script>
+      /* 防白闪引导脚本（K-1 / ADR-012）：样式加载前同步解析并写入 <html data-theme>。
+         只设 data-theme —— 令牌文件 :root 内已给 --bg 默认值 + html{background:var(--bg)}，
+         故即使 CSS 未全量就绪也不会白闪。system 模式用系统偏好解析。 */
+      (function () {
+        try {
+          var mode = 'dark';
+          try {
+            /* [V0.5.0] 新键 timing.theme 优先，回落老键 tickbar.theme（0.5.0 兼容，一版后删）。
+               这处是内联 JS，**逃过类型检查**，也不经过 src/lib/storageKeys.ts：
+               改动必须与 src/types/domain/constants.ts / src/lib/theme.ts 同批。
+               这里只读不写——本脚本必须同步执行，搬运（回写新键）由首帧后的
+               readCachedTheme() 完成（ARCHITECTURE §6.2）。 */
+            var cached = localStorage.getItem('timing.theme');
+            if (cached !== 'dark' && cached !== 'light' && cached !== 'system') {
+              cached = localStorage.getItem('tickbar.theme');
+            }
+            if (cached === 'dark' || cached === 'light' || cached === 'system') mode = cached;
+          } catch (e) {}
+          var resolved = mode;
+          if (mode === 'system') {
+            var dark = true;
+            try {
+              dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            } catch (e) {}
+            resolved = dark ? 'dark' : 'light';
+          }
+          document.documentElement.setAttribute('data-theme', resolved);
+          var meta = document.querySelector('meta[name="color-scheme"]');
+          if (meta) meta.setAttribute('content', resolved);
+        } catch (e) {
+          /* 任何异常都回落到默认深色（html 已带 data-theme="dark"） */
+        }
+      })();
+    </script>
+  <style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/design-tokens.css">/* =============================================================================
+ * Timing — design-tokens.css（索引入口，符号入口不变）
+ * -----------------------------------------------------------------------------
+ * 原 486 行单文件按「层」拆为 tokens/ 下 5 个文件（ADR-017 单文件 ≤300 行）：
+ *   01-primitives        §0 不透明度 + 主题无关令牌（字体/字阶/尺寸/间距/圆角/动效/层级）
+ *                       + §0b 首屏兜底与 V0.1.0 过渡别名 + html/body 基础
+ *   02-theme-dark        §1 深色主题（默认）
+ *   03-theme-light       §2 浅色主题
+ *   04-aliases           §3 四色可配 + §4 B-slot 组件别名
+ *   05-typography-rules  §5 计时数字规则 + §6 focus-visible / reduced-motion
+ *
+ * 消费规则（P0，全文仍适用于 tokens/*）：
+ *   1. 组件 CSS 只允许引用 var(--*)，禁止出现任何裸 hex / rgb。
+ *      唯一例外：box-shadow 内的 rgba 阴影色，且必须经 --shadow-* / --inset-* 引用。
+ *   2. 主题切换：<html data-theme="dark|light">，两套变量同在 tokens 内，无 JS 重排。
+ *   3. 语义色作『文字』须 >=4.5:1；作『非文本』（描边/进度/色点）须 >=3:1。
+ *   4. 一屏强调色可见用量：小条 <=1 处，面板 <=2 处。
+ *   5. 计时数字规则不可协商（见 05-typography-rules.css .timer-digits）。
+ *   6. 禁止弹跳/弹性缓动；禁止动画 width/height/font-size/filter/backdrop-filter。
+ *
+ * 【不要调换下面 5 行的顺序】：层叠依赖它。例如 --input-placeholder 在 02 里由
+ * `:root[data-theme="dark"]`（特异性 0,2,0）给出 rgba 白，在 04 里由 `:root`
+ * 给出 var(--ink-4)；两者顺序一动，深色主题的占位符就会跟着变暗。
+ * ========================================================================== *//* =============================================================================
+ * Timing V0.2.0 — design-tokens.css（三层 Token：primitive → semantic → component）
+ * V0.2.0-2 设计系统整体重做（对标 Timing v1.7.0）| 设计师：颜好看
+ * -----------------------------------------------------------------------------
+ * 消费规则（P0）：
+ *   1. 组件 CSS 只允许引用 var(--*)，禁止出现任何裸 hex / rgb。
+ *      唯一例外：box-shadow 内的 rgba 阴影色，且必须经 --shadow-* / --inset-* 引用。
+ *   2. 主题切换：<html data-theme="dark|light">，两套变量在同一文件内，无 JS 重排。
+ *   3. 语义色作『文字』须 >=4.5:1；作『非文本』（描边/进度/色点）须 >=3:1。
+ *   4. 一屏强调色可见用量：小条 <=1 处，面板 <=2 处。
+ *   5. 计时数字规则不可协商（见 §5 .timer-digits）。
+ *   6. 禁止弹跳/弹性缓动；禁止动画 width/height/font-size/filter/backdrop-filter。
+ * 源：docs/design/design-tokens-V0.2.0.css（移植）+ §7 为 V0.1.0 过渡别名桥。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 0. 外观不透明度（[V0.2.2] 设置面板可调；1 = 原色值）
+ * -----------------------------------------------------------------------------
+ * 由调用方写入 <html> 内联变量（appearanceStore），组件不要读写这两个值。
+ * --ui-bg-opacity 只乘在玻璃板的 alpha 上（见 §1/§2 的 --glass-panel-bg、
+ * §3 的 --pill-hover-plate、§4 的 --note-body-bg），设置面板与托盘菜单不参与。
+ * ========================================================================== */
+:root {
+  --ui-text-opacity: 1;
+  --ui-bg-opacity: 1;
+}
+
+/* =============================================================================
+ * 0. 主题无关令牌（字体 / 字阶 / 尺寸 / 间距 / 圆角 / 阴影 / 动效 / 层级 / 图标）
+ * ========================================================================== */
+:root {
+  /* ---- 字体 ---- */
+  --font-ui:      "Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-ui);
+  --font-mono:    "Cascadia Mono", "Consolas", "SFMono-Regular", "Segoe UI Mono", ui-monospace, monospace;
+
+  /* ---- 字阶（对齐 Timing §2.5）---- */
+  --text-title: 15px;    --leading-title: 1.3;
+  --text-num:   14px;    --leading-num:   1.0;
+  --text-body:  13px;    --leading-body:  1.6;
+  --text-sm:    12.5px;  --leading-sm:    1.45;
+  --text-xs:    11.5px;  --leading-xs:    1.5;
+  --text-cap:   11px;    --leading-cap:   1.4;
+  --text-mono:  11.5px;  --leading-mono:  1.4;
+
+  /* ---- 字重三级 + 强档（YaHei UI 落地映射见 DESIGN-V0.2.0.md §3.3）---- */
+  --weight-read:     400;   /* 正文 / 说明 */
+  --weight-medium:   500;   /* 控件文本 / 任务名 */
+  --weight-semibold: 600;   /* 分组标题 / 已完成行名 */
+  --weight-strong:   650;   /* 标题 / 时间数字 */
+
+  /* ---- 字距 ---- */
+  --tracking-caps:  0.08em;
+  --tracking-xs:    0.02em;
+  --tracking-base:  0;
+  --tracking-tight: -0.01em;
+
+  /* ---- 间距（4px 网格）---- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --row-pad-y:   9px;
+  --card-pad-x:  14px;
+  --panel-pad:   16px;
+  --menu-pad:    6px;
+
+  /* ---- 圆角 ---- */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   12px;
+  --radius-xl:   14px;
+  --radius-full: 9999px;
+
+  /* ---- 尺寸：小条几何（对齐 Timing §4.1）---- */
+  /* [ADR-020] 固定 384×360 画布已删除。布局上界改由 `lib/fitBounds.ts` 写成
+     --fit-w / --fit-h：主窗 = 胶囊所在显示器的工作区（DIP），非主窗 = 真实视口。
+     这里只给兜底值（100vw/100vh），IPC 拿到工作区后会被覆盖。 */
+  --fit-w:           100vw;
+  --fit-h:           100vh;
+  --pill-h:          32px;   /* Timing BarH 32（MainForm.cs:175） */
+  --pill-h-compact:  30px;
+  --radius-pill:     calc(var(--pill-h) / 2);   /* 真胶囊 = 16px */
+  --pill-w-min:      116px;
+  --pill-w-max:      288px;
+  --task-w-max:      164px;
+  --pill-pad-l:      8px;
+  --pill-pad-r:      7px;
+  /* [UI 统一 2026-10-16] 环几何对齐 Timing 实测（MainForm.cs: RingD=14 / RingLW=2.4）：
+     视觉 ⌀16（Timing 14 + 命中余量），描边 2.4；命中区经 .ring::before 扩到 24。 */
+  --ring-size:       16px;
+  --ring-stroke:     2.4px;
+  --ring-hit-extra:  4px;
+  /* [V0.3.7] 圆角方形的**视觉等效半径**（idle / ended 仍走 CSS border，见 surfaces.css）。
+     [V0.3.3] 从圆形改圆角方形时取 5px，那是「圆角矩形」的口径——直线接四分之一圆弧，
+     切点处曲率突变，放大看有一道生硬的接缝。V0.3.7 把握把形状换成超椭圆 n=3
+     （曲率连续，见 lib/ringGeometry.ts 的 ARC_PATH），SVG 那条不用这个值；
+     这里的 5.6px 只是让**走 border 的 idle / ended** 在角部内缩量上与超椭圆对齐：
+     超椭圆外沿（半边长 8）角部内缩 = 8·(1 − 2^(−1/3))·√2 ≈ 2.334px，
+     圆角矩形的内缩 = r·(√2−1)，反解 r ≈ 5.64px。两者相差 0.01px 量级，肉眼不可分。
+     收起态圆点仍走 --radius-full。 */
+  --ring-radius:     5.6px;
+  /* 小条计时数字：对齐 Timing 有效字号（TimeEm 28 自动收缩到 53px 盒 → 实测 ≈19-20）。
+     字体 Segoe UI Semibold 观感 + tabular-nums 保 AC-24 不抖动（替代 mono，见 pill-bar.md §1 注）。
+     [V0.2.1] 20 → 18：大字号下数字的视觉重量压过 16px 圆环，用户要求「时间组件的大小与位置」与
+     圆环对齐（行高锁 --ring-size 共用中心线，见 surfaces.css .pill .timer-digits）。 */
+  --text-timer-pill: 18px;
+  --text-task-pill:  14px;   /* Timing TaskEm=14（YaHei UI Bold） */
+  --font-timer:      "Segoe UI", "Segoe UI Semibold", "Microsoft YaHei UI", sans-serif;
+  --grip-w:          10px;
+  --grip-hit-w:      10px;
+  --grip-svg-w:      12px;
+  --grip-svg-h:      22px;
+
+  /* ---- 尺寸：窗口 ---- */
+  --settings-w: 392px;  --settings-h: 660px;
+  --settings-title-h: 50px;  --settings-tab-h: 48px;  --settings-foot-h: 58px;
+  --todos-w: 336px;  --todos-head-h: 32px;  --todos-row-h: 26px;  --todos-mark-size: 15px;
+  --todos-pending-row-h: 24px;  --todos-foot-h: 40px;  --todos-pending-max: 8;
+  --note-w: 320px;  --note-h: 232px;  --note-head-h: 36px;  --note-foot-h: 34px;
+  /* [V0.2.4] 便利贴正文框相对窗口的内缩：圆点与缩放手柄都浮在这条留白里 */
+  --note-pad: 6px;
+  --note-w-min: 160px;  --note-h-min: 120px;  --note-w-max: 900px;  --note-h-max: 900px;
+  --note-w-comfort-max: 640px;  --note-h-comfort-max: 480px;
+  --note-max-count: 20;
+  --note-geom-persist-debounce-ms: 300;
+  --note-confirm-stack-below-w: 200px;
+
+  /* ---- 尺寸：菜单 / 控件 ---- */
+  --menu-w: 136px;  --menu-item-h: 30px;  --menu-item-pad-x: 9px;
+  --menu-w-max: 208px;   /* 上限：长标签（「开始计时 · 很长的名字」）到此为止，超出省略号 */
+  --menu-icon-gap: 10px;  --menu-status-h: 46px;   /* Timing StatusH 46（GlassMenu.cs:27）。预留：.menu__status 为内容驱动高度（padding 9 + 多行），强接定高有 3 行变体裁切风险，待运行态验证后接线 */
+  --btn-md-h: 28px;  --btn-sm-h: 24px;  --icon-btn-size: 26px;
+  --input-h: 28px;  --field-num-w: 54px;
+  --slider-track-h: 4px;  --slider-thumb: 14px;
+  --switch-w: 38px;  --switch-h: 22px;
+
+  /* ---- 尺寸：命中 ---- */
+  --hit-target: 44px;
+  --hit-target-small: 26px;
+  /* [V0.11.0] --hit-target-dot 已删：圆点自身 76px 就够命中，不需要再套一层外扩 */
+  --snap-margin: 16px;
+  /* [V0.2.3 · 2] 小条靠左：整条离窗口左沿的内缩从 16px 收到 6px（事项名+手柄这组随之左移） */
+  --pill-inset: 6px;
+  --drag-threshold: 4px;
+
+  /* ---- 图标 ---- */
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --icon-stroke-sm: 2.5;   /* 16px */
+  --icon-stroke-lg: 2;     /* 20px / 24px */
+
+  /* ---- 动效（仅 3 条缓动；禁止任何弹跳/弹性）---- */
+  --dur-instant: 100ms;
+  --dur-quick:   150ms;
+  --dur-exit:    180ms;
+  --dur-base:    200ms;
+  --dur-morph:   280ms;
+  --dur-confirm: 900ms;
+  --dur-undo:    3000ms;
+  --dur-tick:    1000ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit:     cubic-bezier(0.4, 0, 1, 1);
+  --ease-morph:    cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* ---- 层级 ---- */
+  --z-base: 0;  --z-pill: 10;  --z-panel: 20;  --z-note: 20;
+  --z-settings: 30;  --z-undo: 40;  --z-tooltip: 50;  --z-menu: 60;  --z-dialog: 70;
+
+  /* ---- 玻璃（有明确功能目的，见 DESIGN-V0.2.0.md §6.4）---- */
+  --glass-blur: 18px;
+  --glass-blur-sm: 14px;
+  --glass-saturate: 150%;
+}
+
+/* =============================================================================
+ * 0b. 首屏兜底 + V0.1.0 颜色过渡别名
+ *   index.html 内联引导脚本只需设 data-theme（读 localStorage `tickbar.theme`）
+ *   即可让 --bg 立即生效 —— 无需等 CSS 全量就绪，消除首帧白闪（坑 K-1）。
+ * ========================================================================== */
+:root {
+  --bg:          var(--bg-plate);
+  --surface:     var(--bg-panel);
+  --surface-2:   var(--bg-card);
+  --surface-3:   var(--bg-field);
+  --surface-4:   var(--bg-field-hi);
+  --fg:          var(--ink);
+  --fg-2:        var(--ink-2);
+  --muted:       var(--ink-3);
+  --meta:        var(--ink-4);
+  --border:      var(--line-2);
+  --border-soft: var(--line);
+}
+html { background: var(--bg); font-synthesis-weight: none; }   /* 首屏兜底 + 禁伪粗体 */
+body { background: transparent; }
+/* =============================================================================
+ * Timing — 02-theme-dark.css（语义层 · 深色主题，默认）
+ * 拆自 design-tokens.css §1（ADR-017 单文件 ≤300 行）。
+ * 载入顺序固定为 01 → 02 → 03 → 04 → 05，顺序改变会改变层叠结果（尤其 --input-placeholder）。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 1. 深色主题（默认）
+ * ========================================================================== */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg-plate:    #0E0F12;
+  --bg-inset:    #1B1E25;
+  --bg-panel:    #0E1015;
+  --bg-card:     #14161C;
+  --bg-field:    #1B1E25;
+  --bg-field-hi: #232833;
+  --bg-seg:      #171A21;
+  --bg-seg-on:   #262B36;
+
+  --line:    rgba(255, 255, 255, 0.06);
+  --line-2:  rgba(255, 255, 255, 0.10);
+  --line-3:  rgba(255, 255, 255, 0.16);
+
+  /* [V0.2.10] 文字一律纯白、零透明度（用户口径「所有文字都按照纯白，不要半透，看不清」）。
+     层级感改由字号/字重/留白承担，不再靠灰阶：--ink-2/3/4 只作为语义别名保留，
+     色值全部对齐 #FFFFFF，避免「看着像禁用」的灰字。 */
+  --ink:    #FFFFFF;
+  --ink-2:  #FFFFFF;
+  --ink-3:  #FFFFFF;
+  --ink-4:  #FFFFFF;
+
+  /* 输入占位符是「还没写的提示」，纯白会和已输入内容混同，故单独留一档：仍是白色，只是提亮程度低。
+     写在这里（而不是共享映射块）是因为 `:root[data-theme=…]` 的特异性高于 `:root`，能盖住共享值。 */
+  --input-placeholder: rgba(255, 255, 255, 0.62);
+
+  /* [V0.2.10] 随「去除整体阴影」一并去掉：任何状态的文字都不再挂暗影/描边，
+     文字就是纯色平面。深色壁纸上更干净，浅色壁纸上的可读性交回给用户调 --ui-bg-opacity。 */
+  --text-halo: none;
+
+  --accent:      #4DA3E8;
+
+  /* [V0.3.1] 高亮定位色（托盘双击时小条闪三下）。默认值 = 后端
+     `timing.highlight_color` 的出厂值；用户可在设置里改，主窗收到双击事件时
+     用行内样式覆盖本变量。 */
+  --highlight-color: #4DA3E8;
+  --accent-ink:  #8FC6F5;
+  --accent-wash: color-mix(in srgb, #4DA3E8 14%, transparent);
+  --accent-line: color-mix(in srgb, #4DA3E8 32%, transparent);
+
+  --warn:        #E8A33D;
+  --warn-wash:   color-mix(in srgb, #E8A33D 12%, transparent);
+  --danger:      #E5484D;
+  --danger-wash: color-mix(in srgb, #E5484D 12%, transparent);
+  --ok:          #4CC38A;
+  --ok-ink:      #06251A;
+
+  --solid-bg:  #EDEFF3;
+  --solid-ink: #0B0C10;
+  --danger-solid: #E1292F;   /* dark: danger 实心底（白字 4.61:1；原 #E5484D 白字仅 3.91）*/
+
+  --track:      rgba(255, 255, 255, 0.09);
+  --scrim:      rgba(14, 15, 18, 0.56);
+  /* [Timing 对齐 D6] --ring-track 已删：倒计时 SVG 轨道改用 currentColor 37%（batch2.css） */
+
+  --glass-panel-bg: color-mix(in srgb, #0E0F12 calc(94% * var(--ui-bg-opacity)), transparent);
+  --glass-hover-bg: color-mix(in srgb, #0E0F12 calc(74% * var(--ui-bg-opacity)), transparent);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+
+  --shadow-flat:    none;
+  --shadow-ring:    0 0 0 1px var(--line-2);
+  /* [V0.2.10] 用户要求「去除整体阴影」：投影一律 none，界面回到纯平面。
+     `--shadow-ring` 保留：0 模糊的 1px 细线是当描边用的，视觉上不算投影。 */
+  --shadow-pop:     none;
+  --shadow-plate:   none;
+  --shadow-float:   none;
+  --shadow-panel:   none;
+  --shadow-balloon: none;
+  /* 透明态文字/环投埃（对齐 Timing TextShadow）——同样是投影，随整体一并去掉 */
+  --shadow-ink: none;
+  --inset-top:      var(--inset-highlight);
+
+  --grip-ink:   rgba(255, 255, 255, 0.55);   /* Timing 实绘 GlassInkDim 139/255（MainForm.cs:2238） */
+  --focus-ring: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
+  --focus-ring-danger: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--danger);
+}
+/* =============================================================================
+ * Timing — 03-theme-light.css（语义层 · 浅色主题）
+ * 拆自 design-tokens.css §2（ADR-017 单文件 ≤300 行）。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 2. 浅色主题
+ * ========================================================================== */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-plate:    #F2F3F5;
+  --bg-inset:    #FFFFFF;
+  --bg-panel:    #FFFFFF;
+  --bg-card:     #F7F8FA;
+  --bg-field:    #F1F3F7;
+  --bg-field-hi: #E6E9EF;
+  --bg-seg:      #EDEFF4;
+  --bg-seg-on:   #FFFFFF;
+
+  --line:    rgba(16, 20, 28, 0.07);
+  --line-2:  rgba(16, 20, 28, 0.12);
+  --line-3:  rgba(16, 20, 28, 0.18);
+
+  /* 前景层（AC-53：四级文本对最浅底 --bg-plate 亦须 >=4.5:1，可作正文小字）*/
+  --ink:    #16181D;
+  --ink-2:  #41485A;
+  --ink-3:  #5C6577;
+  --ink-4:  #656E7D;   /* 对 plate 4.64:1 / 卡 4.84 / 白 5.15（原 #707A8A 仅 3.91）*/
+
+  /* 浅色主题底色浅、字色深，不需要暗影 */
+  --text-halo: none;
+
+  --accent:      #1669AD;
+
+  /* [V0.3.1] 高亮定位色（默认同后端出厂值；设置可改） */
+  --highlight-color: #4DA3E8;
+  --accent-ink:  #1F63AA;
+  --accent-wash: color-mix(in srgb, #1669AD 14%, transparent);
+  --accent-line: color-mix(in srgb, #1669AD 32%, transparent);
+
+  /* 语义层（AC-53：作『文字』对最浅底 --bg-plate 须 >=4.5:1；亦满足非文本 >=3:1）
+     保色相、仅降亮度：H 分别 35 / 358 / 151，与原色同相 */
+  --warn:        #A05E00;   /* 对 plate 4.62:1 / 卡 4.82（原 #A76200 仅 4.31）*/
+  --warn-wash:   color-mix(in srgb, #A05E00 12%, transparent);
+  --danger:      #D02C33;   /* 对 plate 4.62:1 / 卡 4.83（原 #D4353B 仅 4.33）*/
+  --danger-wash: color-mix(in srgb, #D02C33 12%, transparent);
+  --ok:          #0C7E47;   /* 对 plate 4.62:1 / 卡 4.83（原 #0C834A 仅 4.34）*/
+  --ok-ink:      #FFFFFF;
+
+  --solid-bg:  #1A1D24;
+  --solid-ink: #FFFFFF;
+  --danger-solid: #D02C33;   /* light: danger 实心底 = 浅色 --danger（白字 5.13:1）*/
+
+  --track:      rgba(16, 20, 28, 0.11);
+  --scrim:      rgba(16, 20, 28, 0.32);
+
+  --glass-panel-bg: color-mix(in srgb, #F2F3F5 calc(97% * var(--ui-bg-opacity)), transparent);
+  --glass-hover-bg: color-mix(in srgb, #F2F3F5 calc(86% * var(--ui-bg-opacity)), transparent);
+  --inset-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.90);
+
+  --shadow-flat:    none;
+  --shadow-ring:    0 0 0 1px var(--line-2);
+  /* [V0.2.10] 与深色主题一致：整体去投影 */
+  --shadow-pop:     none;
+  --shadow-plate:   none;
+  --shadow-float:   none;
+  --shadow-panel:   none;
+  --shadow-balloon: none;
+  --shadow-ink: none;
+  --inset-top:      var(--inset-highlight);
+
+  --grip-ink:   rgba(16, 20, 28, 0.36);   /* Timing 浅档 GlassInkDim = Ink3.A 92/255（Design.cs:258） */
+  --focus-ring: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
+  --focus-ring-danger: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--danger);
+}
+/* =============================================================================
+ * Timing — 04-aliases.css（§3 四色可配 + §4 B-slot 组件别名）
+ * 拆自 design-tokens.css §3/§4（ADR-017 单文件 ≤300 行）。
+ * 这里全是 `var(--*)` 引用，不出现裸色值；组件只引用本文件的别名。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 3. 四色可配（settings 写入；默认 = 语义色）
+ * ========================================================================== */
+:root {
+  --color-running: var(--accent);
+  --color-danger:  var(--danger);   /* [Timing 对齐 D3] 急迫态 = RingUrgent，与 running/warn/done 同构 */
+  --color-warn:  var(--warn);
+  --color-done:    var(--ok);
+  --color-bar:     var(--bg-plate);
+}
+
+/* =============================================================================
+ * 4. B-slot 组件别名（组件引用这些，不直接引用原始值）
+ * ========================================================================== */
+:root {
+  /* 小条 */
+  /* [Timing 对齐 D2] --pill-bg 死别名已删（悬停板改接 --pill-hover-plate，无消费方） */
+  --pill-border-in:     var(--line-2);
+  --pill-hover-plate:   color-mix(in srgb, var(--color-bar) calc(74% * var(--ui-bg-opacity)), transparent);   /* 裁决二：74%（= --glass-hover-bg 档） */
+  --pill-grip-ink:      var(--grip-ink);
+  --pill-divider:       var(--line);
+
+  /* 菜单 */
+  --menu-bg:            var(--glass-panel-bg);
+  --menu-border:        var(--line-2);
+  --menu-item-hover:    var(--bg-field-hi);
+  --menu-text:          var(--ink-2);
+  --menu-text-on:       var(--ink);
+  --menu-danger:        var(--danger);
+  --menu-group-label:   var(--ink-4);
+  --menu-badge-bg:      var(--accent-wash);
+  --menu-badge-ink:     var(--accent-ink);
+
+  /* 输入 / 分段 */
+  --input-bg:           var(--bg-field);
+  --input-bg-focus:     var(--bg-field-hi);
+  --input-border:       var(--line);
+  --input-placeholder:  var(--ink-4);
+  --input-text:         var(--ink);
+  --seg-track:          var(--bg-seg);
+  --seg-track-line:     var(--line);
+  --seg-on-bg:          var(--bg-seg-on);
+  --seg-on-ink:         var(--ink);
+  --seg-off-ink:        var(--ink-3);
+
+  /* 按钮（六档：solid / accent / neutral / ghost / danger / icon）*/
+  --btn-accent-bg:      var(--accent-wash);
+  --btn-accent-ink:     var(--accent-ink);
+  --btn-accent-line:    var(--accent-line);
+  --btn-neutral-bg:     var(--bg-field-hi);
+  --btn-neutral-ink:    var(--ink);
+  --btn-ghost-ink:      var(--ink-3);
+  --btn-danger-bg:      var(--danger-solid);   /* 实心底专用（深 #E1292F / 浅 #D02C33），白字均 >=4.5 */
+  --btn-danger-ink:     #FFFFFF;
+  --btn-solid-bg:       var(--solid-bg);
+  --btn-solid-ink:      var(--solid-ink);
+  --btn-icon-ink:       var(--ink-3);
+  --btn-icon-hover-bg:  var(--bg-field-hi);
+  --btn-icon-danger-bg: var(--danger-wash);
+
+  /* 卡片 / 行 */
+  --card-bg:            var(--bg-card);
+  --card-line:          var(--line);
+
+  /* 事项窗口 / 待办（todos-panel.md §3.1 四状态分层；DESIGN §2.4 B-slot） */
+  --todo-row-hover:      var(--bg-field-hi);
+  --todo-row-current:    var(--accent-wash);
+  --todo-bar-current:    var(--accent);
+  --todo-time-current:   var(--accent-ink);
+  --todo-name-done:      var(--ink-4);
+  --todo-mark-ring:      var(--line-3);
+  --todo-mark-done:      var(--ok);
+  --todo-mark-done-ink:  var(--ok-ink);
+  --todo-overdue:        var(--color-warn);   /* 走可配色（AC-54），默认回落 --warn */
+  --todo-no-time:        var(--ink-4);
+  --todo-summary-ink:    var(--ink-4);
+
+  /* 便利贴（sticky-note.md §4；源 docs/design/design-tokens-V0.2.0.css §4 B-slot） */
+  --note-body-bg:       color-mix(in srgb, var(--bg-inset) calc(100% * var(--ui-bg-opacity)), transparent);
+  --note-foot-ink:      var(--ink-3);
+  --note-confirm-bg:    var(--danger-wash);
+  --note-confirm-line:  var(--danger);
+
+  /* 文本语义别名 */
+  --text-primary:       var(--ink);
+  --text-secondary:     var(--ink-2);
+  --text-tertiary:      var(--ink-3);
+  --text-disabled:      var(--ink-4);
+
+  /* 提示气泡 kbd */
+  --kbd-bg:             var(--bg-panel);
+  --kbd-border:         var(--line-2);
+}
+/* =============================================================================
+ * Timing — 05-typography-rules.css（§5 计时数字规则 + §6 focus-visible / reduced-motion）
+ * 拆自 design-tokens.css §5/§6（ADR-017 单文件 ≤300 行）。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 5. 计时数字规则（全项目最重要的一条排版规则，不可协商）
+ * ========================================================================== */
+.timer-digits {
+  font-family: var(--font-mono);
+  font-size: var(--text-num);
+  line-height: var(--leading-num);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-base);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 1;
+  font-variant-ligatures: none;
+  min-width: 53px;                            /* MM:SS 定宽（对齐 Timing TimeW 53）*/
+  text-align: right;
+  white-space: nowrap;
+  color: var(--ink);
+  display: inline-block;
+}
+.timer-digits[data-hours="true"] { min-width: 72px; }
+.timer-digits[data-size="lg"] {
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: var(--tracking-tight);
+}
+
+/* =============================================================================
+ * 6. focus-visible（永不被清除）与 reduced-motion
+ * ========================================================================== */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: inherit;
+}
+/* 危险项的焦点环：必须按值匹配——`data-danger` 在菜单项上恒存在（值为 "true"/"false"），
+   写成 `[data-danger]` 会让所有菜单项都套上红环。 */
+.btn-danger:focus-visible,
+[data-danger="true"]:focus-visible {
+  box-shadow: var(--focus-ring-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-instant: 0.01ms;
+    --dur-quick:   0.01ms;
+    --dur-exit:    0.01ms;
+    --dur-base:    0.01ms;
+    --dur-morph:   0.01ms;
+  }
+  .halo-breath,
+  .ring-tick { animation: none !important; }
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  /* [V0.3.6] 删除两条死代码：`.ring[data-state="running"]{stroke-width:3px}` 与
+     `.ring[data-state="paused"]{stroke-dasharray:4 3}`。`.ring` 是 <button>，stroke-*
+     对 HTML 元素无效；它们描述的是 V0.3.3 改 SVG 之前「环 = CSS 描边」的形态，
+     只剩误导作用（真正管描边的是 .ring__arc-track / .ring__arc-bar）。 */
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/design-tokens-compat.css">/* =============================================================================
+ * Timing V0.2.0 — design-tokens-compat.css（V0.1.0 过渡别名 + 主题卡预览色）
+ * -----------------------------------------------------------------------------
+ * 拆自 design-tokens.css（单文件 <=300 行纪律）。**仅此文件与 design-tokens.css
+ * 允许出现字面量色值**；其余组件 CSS 一律 var(--*)。
+ * 载入顺序须在 design-tokens.css 之后。
+ * ========================================================================== */
+
+/* =============================================================================
+ * 7. V0.1.0 过渡别名桥（仅此文件可含字面量）
+ *   目的：V0.1.0 既有组件 CSS 引用旧名，仍需解析。全部映射到 V0.2.0 令牌，
+ *   颜色/阴影经 var 间接层，自动随 data-theme 切换；新代码一律用 V0.2.0 规范名。
+ * ========================================================================== */
+:root {
+  /* 状态色（旧三态色 → V0.2.0） */
+  /* [Timing 对齐 D1] RingIdle = InkOnGlass：深 #F2F3F5 / 浅 #16181D → var(--ink) */
+  --state-idle:    var(--ink);
+  --state-running: var(--color-running);
+  --state-paused:  var(--color-warn);   /* [Timing 对齐裁决三] 暂停=暖橙；别名零消费方，纯一致性 */
+  --success:       var(--ok);
+  --info:          var(--ink-3);
+  --warn-on:       var(--solid-ink);
+  --danger-on:     var(--solid-bg);
+  --accent-on:     var(--solid-ink);
+  --accent-hover:  var(--accent-ink);
+  --accent-active: var(--accent);
+  --accent-halo:   transparent;   /* V0.2.0 删除运行光晕 */
+  --accent-halo-success: transparent;
+
+  /* 描边 / 内高光 */
+  --border-strong: var(--line-3);
+  --edge-inner:    var(--inset-highlight);
+
+  /* 字阶（旧名 → 新名） */
+  --text-2xs:      var(--text-cap);
+  --text-base:     var(--text-body);
+  --text-md:       var(--text-num);
+  --text-lg:       var(--text-title);
+  --text-timer:    var(--text-num);
+  --text-timer-lg: 28px;
+  --leading-timer: var(--leading-num);
+  --leading-timer-lg: 1.15;
+  --tracking-sm:   var(--tracking-base);
+  --tracking-tighter: var(--tracking-tight);
+  --weight-emphasize: var(--weight-medium);
+  --weight-announce:  var(--weight-strong);
+
+  /* 圆角 / 阴影（旧名 → 新名） */
+  --radius-chip:    var(--radius-full);
+  --elev-flat:      var(--shadow-flat);
+  --elev-ring:      var(--shadow-ring);
+  --elev-raised:    var(--shadow-pop);
+  --elev-raised-hover: var(--shadow-pop);
+  --elev-float:     var(--shadow-float);
+  --elev-panel:     var(--shadow-panel);
+  --elev-drag:      var(--shadow-plate);
+
+  /* 间距补充档（V0.2.0 仅定义 1..7） */
+  --space-8:  24px;
+  --space-9:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* 尺寸补充（V0.2.0 未定义） */
+  --panel-w:   300px;
+  --toast-h:   32px;
+  --chip-h:    28px;
+  --chip-pad-x: 12px;
+  /* [V0.11.5] 圆点是纯图形（表盘 + 增长弧 + 分针），不放字；22 → 33，放大 1.5 倍 */
+  --dot-size:  33px;
+  --dur-breath: 2400ms;
+
+  /* 药丸旧别名 → V0.2.0 */
+  /* [Timing 对齐 D2] --pill-bg-hover 已删：无任何消费方，--pill-hover-plate 直接接线 */
+  --pill-bg-active:     var(--bg-field-hi);
+  --pill-bg-drag:       var(--bg-field-hi);
+  --pill-border:        var(--line-2);
+  --pill-shadow:        var(--shadow-balloon);
+  --pill-shadow-hover:  var(--shadow-pop);
+  --pill-shadow-drag:   var(--shadow-plate);
+  --divider:            var(--line);
+
+  /* chips 旧别名 */
+  --chip-bg:        var(--bg-field);
+  --chip-bg-hover:  var(--bg-field-hi);
+  --chip-text:      var(--ink-2);
+
+  /* 菜单旧别名 */
+  --menu-item-pressed: var(--bg-field-hi);
+
+  /* 撤销条旧别名（V0.2.0 未定义，映射到通用浮层） */
+  --undo-bg:     var(--bg-panel);
+  --undo-border: var(--line-2);
+  --undo-text:   var(--ink-2);
+  --undo-action: var(--accent);
+
+  --ring-color:  var(--state-idle);
+  --pill-opacity: 0.96;
+  --pill-scale:   1;
+}
+
+/* =============================================================================
+ * 8. 主题卡迷你预览色（ThemePicker 用「真实色」缩略，非 UI 语义色）
+ *    仅为让「深色 / 浅色」卡在任意当前主题下都显示各自真实外观；字面量集中于此。
+ * ========================================================================== */
+:root {
+  --preview-dark-plate:  #0E0F12;
+  --preview-dark-ink:    #F2F3F5;
+  --preview-dark-line:   rgba(255, 255, 255, 0.14);
+  --preview-light-plate: #F2F3F5;
+  --preview-light-ink:   #16181D;
+  --preview-light-line:  rgba(16, 20, 28, 0.14);
+  --preview-accent:      #4DA3E8;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/app.css">/* =============================================================================
+ * Timing — app.css（基础层与共享原语）
+ * -----------------------------------------------------------------------------
+ * P0：本文件**只允许**引用 var(--*) CSS 变量，禁止出现任何字面量色值
+ *     （十六进制色值、色彩函数一律禁止，白色与黑色也不例外）。
+ *     原始色值唯一合法出现处是 styles/design-tokens.css。
+ * 结构：reset -> 透明置顶层 -> 按钮/开关/提示/错误 -> 焦点环（置于末尾以赢得同优先）
+ * ========================================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  /* [ADR-020] 不再有 384×360 画布：根元素就是视口，浮层靠绝对定位向外长，
+     真实窗口由 useWindowAutoFit 撑到「内容包围盒」。 */
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent; /* 透明置顶层：无背景、无 Mica/Acrylic */
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  color: var(--text-primary);
+  text-shadow: var(--text-halo);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  user-select: none;
+  cursor: default;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* 透明置层：空白区 click-through，仅可见元素接管指针 */
+.layer {
+  /* 必须是 fixed 而不是 relative：主窗真实窗口会被 useWindowAutoFit 撑到内容大小，
+     流内元素一旦被 focus()/scrollIntoView 触发根滚动，布局坐标整体平移，
+     浮层（尤其菜单）会跟着被推出窗口。
+     固定在视口原点后，程序化滚动再也搬不动它，布局坐标 == 视口坐标恒成立。
+
+     尺寸用 --fit-w / --fit-h（主窗 = 显示器工作区，非主窗 = 100vw/100vh）而**不是** 100%：
+     100% 会让置层跟着真实窗口一起缩放，于是 absolute 子元素（尤其 .layer__stack 的
+     shrink-to-fit）按「当前窗口宽度」排版 —— 窗口一缩、胶囊文字就换行、测量值更小、
+     窗口继续缩，形成自我坍缩的正反馈（实测 174px 的胶囊塌到 128px，"新建事项"竖排）。
+     用工作区做布局空间，坐标稳定、容量也 = 屏幕真实容量，浮层可以长到视口外，
+     fixed 置层不被裁剪，getBoundingClientRect() 仍量得到真实矩形。 */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--fit-w);
+  height: var(--fit-h);
+  pointer-events: none;
+}
+
+.layer__stack {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /* [V0.2.3 · 2] 左内缩单独用 --pill-inset（6px），让小条与事项名+手柄整体更靠左 */
+  padding: var(--snap-margin) var(--snap-margin) var(--snap-margin) var(--pill-inset);
+  pointer-events: none;
+}
+
+.layer__stack > * {
+  pointer-events: auto;
+}
+
+/* [V0.3.1] 拖动期统一「抓取」光标的规则已删除：
+   便利贴不再因拖动改变指针形状（用户口径「鼠标状态应为默认状态」）。 */
+
+/* ---- 基础控件 reset ---- */
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+kbd {
+  font: inherit;
+}
+
+/* ---- 通用按钮 ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--toast-h);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-chip);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-emphasize);
+  color: var(--text-primary);
+  background: var(--surface-3);
+  border: 1px solid transparent;
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard),
+    border-color var(--dur-quick) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard);
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--surface-4);
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+/* accent tint 档（V0.2.0 §4.1：品牌蓝不做实心主按钮——白字压强调蓝仅 2.45:1） */
+.btn--primary {
+  background: var(--btn-accent-bg);
+  color: var(--btn-accent-ink);
+  border-color: var(--btn-accent-line);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-line);
+}
+
+.btn--secondary {
+  background: transparent;
+  border-color: var(--btn-accent-line);
+  color: var(--btn-accent-ink);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: var(--accent-wash);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.btn--danger {
+  color: var(--danger);
+}
+
+.btn--danger:hover:not(:disabled) {
+  color: var(--danger);
+  background: var(--surface-2);
+}
+
+/* ---- 提示条 ---- */
+.notice {
+  position: absolute;
+  left: var(--snap-margin);
+  right: var(--snap-margin);
+  bottom: var(--snap-margin);
+  z-index: var(--z-tooltip);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--toast-h);
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-float);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  pointer-events: auto;
+}
+
+.notice[data-tone="danger"] {
+  color: var(--danger);
+}
+
+/* ---- 内联错误 ---- */
+.inline-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+
+.inline-error svg {
+  flex: 0 0 auto;
+}
+
+/* ---- 开关（V0.2.0 §4.3：38×22 / 槽 --track / 开 --accent / 钮 18px） ---- */
+.switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--switch-w);
+  height: var(--switch-h);
+  border-radius: var(--radius-full);
+  background: var(--track);
+  border: 1px solid transparent;
+  transition: background-color var(--dur-base) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
+}
+
+.switch[data-on="true"] {
+  background: var(--accent);
+}
+
+.switch:hover:not(:disabled) {
+  border-color: var(--line-3);
+}
+
+.switch:disabled {
+  background: var(--bg-field);
+}
+
+.switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--solid-bg);
+  transition: transform var(--dur-exit) var(--ease-standard), background-color var(--dur-base) var(--ease-standard);
+}
+
+.switch[data-on="true"] .switch__thumb {
+  background: var(--solid-bg);
+  transform: translateX(16px);
+}
+
+.switch:disabled .switch__thumb {
+  background: var(--ink-3);
+}
+
+.switch:active:not(:disabled) .switch__thumb {
+  transform: scale(0.94);
+}
+
+.switch[data-on="true"]:active:not(:disabled) .switch__thumb {
+  transform: translateX(16px) scale(0.94);
+}
+
+/* ---- 焦点环（置于文件末尾，保证在相同优先级下胜出；禁止 outline:none 清除） ---- */
+:where(button, [role="switch"], input, select, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/utilities.css">/* =============================================================================
+ * Timing — utilities.css（跨组件的少量通用类）
+ * -----------------------------------------------------------------------------
+ * 从 app.css 拆出（ADR-017：单文件 ≤300 行）。只放「与具体组件无关、被多处复用」
+ * 的极小工具类；组件私有样式一律回各自文件，不要把这里当垃圾桶。
+ * P0：只允许引用 var(--*)，禁止字面量色值。
+ * ========================================================================== */
+
+/* ---- 无障碍：仅视觉隐藏 ---- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- 键盘键名（ALL CAPS：必须带字距） ---- */
+.kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/surfaces.css">/* =============================================================================
+ * Timing V0.2.0 — surfaces.css（药丸形态：Pill / Ring / Grip / CollapsedDot）
+ * -----------------------------------------------------------------------------
+ * 几何对齐 Timing v1.7.0 实测（MainForm.cs 常量 + 2026-10-16 截图比对）：
+ *   高 --pill-h 32 / 圆角 --radius-pill(h/2)=16 / 色环 ⌀16 stroke 2.4（Timing RingD 14 + 命中余量）/
+ *   计时数字 20px Segoe UI Semibold 观感（tabular-nums 保不抖）/ 事项名 14px Bold /
+ *   状态墨度 idle .75 / paused .88 / running 1 / 透明态文字投埃 --shadow-ink /
+ *   运行态 = Timing 式「沿轨道行进」的 90° 弧（3.2s/圈），暂停 = 270° 静弧（--color-warm 系）。
+ * P0：仅允许 var(--*)；零字面量色值；零毛玻璃；禁止运行光晕（V0.2.0 删除）。
+ * ========================================================================== */
+
+/* ------------------------------ 药丸 Pill ------------------------------ */
+.pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* [V0.2.2 · 3] 内容左移贴齐：由居中对齐改回左对齐，环 / 计时数字 / 事项名 / 手柄
+     从左侧内边距起排，不再被整条居中留出左空档 */
+  justify-content: flex-start;
+  gap: var(--space-2);
+  height: var(--pill-h);
+  min-width: var(--pill-w-min);
+  max-width: var(--pill-w-max);
+  padding: 0 var(--pill-pad-r) 0 var(--pill-pad-l);
+  border-radius: var(--radius-pill);
+  /* 未悬停：背景全透（没有任何底板 / 描边 / 投影）——仅保留内容（状态环 + 计时数字 + 事项名）。
+     鼠标移入 / 键盘聚焦 / 菜单·面板展开时显影为完整药丸（悬停显隐）。 */
+  background: transparent;
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    border-color var(--dur-quick) var(--ease-standard),
+    border-radius var(--dur-quick) var(--ease-standard),
+    box-shadow var(--dur-quick) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard);
+}
+
+/* 显影：悬停 / 焦点 / 菜单或面板展开时恢复板式（Timing GlassPlate：半透板 + 无描边，D2；
+   圆角 GlassRadius 11 → 标度档 --radius-lg 12，裁决二） */
+.pill:hover,
+.pill:focus-within,
+.pill[data-reveal="true"] {
+  background: var(--pill-hover-plate);
+  border-color: transparent;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-balloon);
+}
+
+.pill:active {
+  background: var(--bg-field-hi);
+  transform: scale(0.985);
+}
+
+/* [V0.2.2 · 4] 文字不透明度改由设置驱动（--ui-text-opacity）：取消 idle .75 /
+   paused .88 的自动淡出，悬停与否不再改变文字浓淡（原状态墨度块已删）。 */
+.pill > * {
+  opacity: var(--ui-text-opacity, 1);
+  transition: opacity var(--dur-base) var(--ease-standard);
+}
+
+/* [V0.2.10+] 时间与事项之间再收 4px：用户反馈「事项与时间之间的空隙太大，事项名和括号手柄继续左移」。
+   .timer-digits 是 53px 定宽 + 右对齐，数字右缘到其后元素之间只有 .pill 的 --space-2（8px）；
+   全局 gap 继续服务「环 ↔ 数字」，只在数字之后的三个入口与手柄上各抵掉 --space-1，
+   净间距 8 → 4px：事项名 / 新建入口 / 内联输入框与括号手柄整体左移，环与数字位置不动。 */
+.pill__name,
+.pill__empty,
+.pill__input,
+.pill__handle {
+  margin-left: calc(-1 * var(--space-1));
+}
+
+/* 事项名：Timing TaskEm 14 / YaHei Bold / 全墨（InkOnGlass ×0.94）+ 透明态投埃 */
+.pill__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: var(--task-w-max);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-task-pill);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
+  text-shadow: var(--shadow-ink);
+  transition:
+    color var(--dur-quick) var(--ease-standard),
+    text-shadow var(--dur-base) var(--ease-standard);
+}
+
+.pill__name[data-muted="true"] {
+  color: var(--ink-3);
+}
+
+/* [V0.2.3 · 3] 条上内联命名输入框：与事项名同字号同基线，宽度吃掉事项名原本的位置 */
+.pill__input {
+  flex: 0 1 auto;
+  min-width: 0;
+  width: var(--task-w-max);
+  max-width: var(--task-w-max);
+  height: calc(var(--pill-h) - 8px);
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  outline: none;
+  background: var(--bg-field);
+  color: var(--ink);
+  font-size: var(--text-task-pill);
+  font-weight: var(--weight-strong);
+  font-family: var(--font-ui);
+  caret-color: var(--accent);
+}
+
+.pill__input::placeholder {
+  color: var(--ink-4);
+  font-weight: var(--weight-medium);
+}
+
+.pill__empty {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--pill-h);
+  /* [V0.2.1 · 2] 事项组件左右空白缩短：原 8px 内边距在窄形态里显得松，收到 2px，
+     文字与圆环/手柄之间的间隔交给 .pill 的 gap 统一控制 */
+  padding: 0 2px;
+  border-radius: var(--radius-pill);
+  /* [V0.11.7] 字号 / 字重与 `.pill__name`（14px / strong）对齐：这格文字点一下就变成
+     事项名，原先 13px / medium → 14px / strong 会「变大变粗」跳一下；中途点开输入框
+     （`.pill__input` 本来就是 14px / strong）又跳回来，一共跳两次。只改字号字重，
+     **颜色仍是 --ink-3 的提示态**（它是占位入口，不是已有数据），hover 保持 --ink。 */
+  font-size: var(--text-task-pill);
+  font-weight: var(--weight-strong);
+  color: var(--ink-3);
+  transition: color var(--dur-quick) var(--ease-standard);
+}
+
+.pill__empty:hover {
+  color: var(--ink);
+}
+
+/* 小条计时数字：对齐 Timing 观感（Segoe UI Semibold）；
+   行高锁成与圆环同高（--ring-size），使数字与圆环共用同一条中心线（V0.2.1 · 1.1 对齐）；
+   tabular-nums 保 AC-24 不抖动（替代 .timer-digits 基础 mono，仅小条作用域） */
+.pill .timer-digits {
+  display: inline-flex;
+  align-items: center;
+  height: var(--ring-size);
+  font-family: var(--font-timer);
+  font-size: var(--text-timer-pill);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  /* [V0.2.1 · 1'] 光学微调：Segoe UI 的数字墨迹在行盒里偏下，几何盒虽已与圆环同心，
+     看上去仍低一档。整体上移 1px，让数字的视觉重心与圆环对齐。 */
+  transform: translateY(-1px);
+  text-shadow: var(--shadow-ink);
+  transition: text-shadow var(--dur-base) var(--ease-standard);
+}
+
+/* 悬停 / 显影：投埃淡出（Timing shadow × (1 - 0.82·hoverFade)），由板式承接对比度 */
+.pill:hover .pill__name,
+.pill:focus-within .pill__name,
+.pill:hover .timer-digits,
+.pill:focus-within .timer-digits {
+  text-shadow: none;
+}
+
+/* 抓取柄：圆角括号 ）（非 lucide，自绘 SVG 12×22）；仅 hover 显示 */
+.pill__handle {
+  flex: 0 0 auto;
+  width: var(--grip-w);
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--pill-grip-ink);
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.pill__handle svg {
+  opacity: 0;
+  transition: opacity var(--dur-exit) var(--ease-standard);
+}
+
+.pill:hover .pill__handle svg,
+.pill__handle:focus-visible svg {
+  opacity: 1;
+}
+
+/* [P0-03] 药丸「今天」入口：**只新增一个图标位**（16px 图标 + 20px 命中宽），
+   不与既有 7 个点击区（圆环 / 数字左右 / 事项名左右 / 手柄左右）抢任何一块。
+   颜色走 --ink-3 → hover --ink，与「新建事项」占位格同一档，保持提示态观感；
+   显影时跟着 `.pill > *` 的 --ui-text-opacity 一起淡入，不单独处理。 */
+.pill__today {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: calc(var(--pill-h) - 10px);
+  margin-left: calc(-1 * var(--space-1));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: color var(--dur-quick) var(--ease-standard);
+}
+
+.pill__today:hover,
+.pill__today:focus-visible {
+  color: var(--ink);
+}
+
+/* ------------------------------ 状态环 Ring ------------------------------ */
+.ring {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  display: grid;
+  place-items: center;
+  /* [V0.3.7] 形状由 `lib/ringGeometry.ts` 的 ARC_PATH **独占**（超椭圆，曲率连续）。
+     这里保留 border-radius 只为 `::before` 命中区的同心外扩取形，真正的环是 SVG 那一条。
+     border 归零：idle / ended 也从 border 环改成 SVG 弧（见 batch2.css 顶部说明），
+     否则空环（最常看到的状态）仍是圆角矩形，与计时态的超椭圆「变脸」。 */
+  border-radius: var(--ring-radius);
+  border: 0;
+  background: transparent;
+  color: var(--state-idle);
+  box-shadow: var(--shadow-ink);
+  transition:
+    color var(--dur-base) var(--ease-standard),
+    box-shadow var(--dur-base) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard);
+}
+
+/* 命中区外扩 4px（视觉 16 + 2×4 = 24×24；a11y）。
+   形状按「外扩同心圆角」推：半径相加 5.6 + 4 = 9.6px，与 16px 盒上的 5.6px 是同一条曲线
+   （直接用原半径套在更大的盒子上，四角会比主环方一截）。
+   [V0.3.7] `inset` 相对 **padding box** 定位，而 `.ring` 现在 `border: 0`，padding box = 16，
+   所以命中区**真的**是 24×24 —— 这条注释以前写的是 ⌀24、实际只有 19.2×19.2
+   （border 吃掉了 4.8）。V0.3.6 审计记录、V0.3.7 随 border 归零一并修正。 */
+.ring::before {
+  content: "";
+  position: absolute;
+  inset: calc(-1 * var(--ring-hit-extra));
+  border-radius: calc(var(--ring-radius) + var(--ring-hit-extra));
+}
+
+.pill:hover .ring,
+.pill:focus-within .ring {
+  box-shadow: none;
+}
+
+.ring[data-state="running"] {
+  /* [V0.3.6] 只定色：底环由 SVG track（37%）承载，有弧时 border 由 data-arc 置透明；原 35% 已删 */
+  color: var(--color-running);
+}
+
+.ring[data-state="paused"] {
+  /* Timing RingPause = 暖橙（Design.cs: 232,163,61）→ --color-warn；[V0.3.6] 两模式统一 270° 静弧 */
+  color: var(--color-warn);
+}
+
+/* 待命（idle + 时长已选、尚未开始）：环走 running 系表达「就绪」，仍未开始 → 不行进（D4） */
+.ring[data-state="idle"][data-countdown="true"] {
+  color: var(--color-running);
+}
+
+.ring[data-state="ended"] {
+  /* [V0.3.7] 加粗改由 SVG 描边表达（.ring[data-thick="true"] .ring__arc-bar { stroke-width: 3px }） */
+  color: var(--color-done);
+}
+
+.ring:hover {
+  transform: scale(1.04);
+}
+
+.ring:active {
+  transform: scale(0.92);
+}
+
+/* ------------------------------ 状态环 Ring ------------------------------ */
+/* [V0.11.0] 收起圆点已迁到 styles/dot.css（环 + 时间重制，本文件让出 38 行守住 300 行上限） */
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/dot.css">/* =============================================================================
+ * Timing — 收起圆点（V0.11.1 秒表形态，V0.11.5 放大 + 增长弧 + 高亮）
+ * -----------------------------------------------------------------------------
+ * 用户口径：「环是图形语言，不应放时间」。三层：表盘细框 / 进度弧 / 分针，
+ * 全部走图形，圆点里没有文字。与手机端 `.m-ring` 同一套语言，量纲另算。
+ *
+ * [V0.11.5] 尺寸 22px → 33px（`--dot-size`，用户口径「太小」→ 放大 1.5 倍）；
+ * 几何量在 CollapsedDot.tsx 里按 1.5 倍放大。外环的弧长由 `stroke-dashoffset`
+ * 从 12 点**增长**，60 秒长满一圈后重来：本文件不含任何旋转 / 自转动画。
+ *
+ * 颜色分层：
+ *   - 表盘（.dot__rim）恒灰，不随状态变——它是「表壳」，不是信息；
+ *   - 弧与指针用 currentColor，状态色只挂在 .dot 上，一处改全跟着改；
+ *   - 高亮（data-highlight）只动 box-shadow 与底色，不碰 color，避免顶掉状态色。
+ * ========================================================================== */
+
+.dot {
+  position: relative;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  color: var(--state-idle);
+  /* [V0.11.2] 圆点可拖（收起后主窗唯一的抓手）：给一个「能抓」的光标 */
+  cursor: grab;
+  transition: transform var(--dur-quick) var(--ease-standard), color var(--dur-base) var(--ease-standard);
+}
+
+.dot:hover {
+  transform: scale(1.04);
+}
+
+.dot:active {
+  /* [V0.11.2] 圆点可拖（收起后主窗唯一的抓手） */
+  cursor: grabbing;
+  transform: scale(0.94);
+}
+
+.dot__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* 表盘：恒定的细灰圈，给「秒表」一个外轮廓，不表达任何状态 */
+.dot__rim {
+  fill: none;
+  stroke: var(--line-3);
+}
+
+.dot__arc {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+
+.dot__needle {
+  stroke: currentColor;
+}
+
+.dot__pin {
+  fill: currentColor;
+}
+
+.dot[data-state="running"],
+.dot[data-countdown="true"] {
+  color: var(--color-running);
+}
+
+/* 暂停在小条 / 圆点 / 手机三形态必须同色 */
+.dot[data-state="paused"] {
+  color: var(--color-warn);
+}
+
+.dot[data-state="ended"] {
+  color: var(--color-done);
+}
+
+/* 倒计时剩 ≤60s：环切红并随小条一起闪 */
+.dot[data-warn="true"] {
+  color: var(--color-danger);
+  animation: dot-warn 1s steps(1, end) infinite;
+}
+
+@keyframes dot-warn {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* =============================================================================
+ * 托盘双击高亮（[V0.11.5] 圆点形态也要闪）
+ * -----------------------------------------------------------------------------
+ * 与 `.pill[data-highlight]` 同一节奏：0.8s × 3 次。两点差异：
+ *  1. 窗口严丝合缝贴内容（autoFit pad=0），外发光会被窗口边界裁掉 → 环画在**内侧**
+ *     （inset box-shadow）；
+ *  2. `dot-warn` 动画只改 opacity，所以高亮**只用 box-shadow / background**，
+ *     不抢 opacity，两者可同时成立（倒计时尾声双击托盘也不会丢高亮）。
+ * 高亮不碰 `color`：running / paused / ended 的状态色仍由 `data-state` 决定。
+ * ========================================================================== */
+.dot[data-highlight="true"] {
+  background: color-mix(in srgb, var(--highlight-color) 22%, transparent);
+  animation: dot-highlight 0.8s var(--ease-standard) 3;
+}
+
+@keyframes dot-highlight {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 2px var(--highlight-color);
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px transparent;
+  }
+}
+
+/* 闪烁 + 预警同时成立：两条动画并存（改的属性互不重叠，0-3-0 压过上面两条 0-2-0） */
+.dot[data-warn="true"][data-highlight="true"] {
+  animation:
+    dot-warn 1s steps(1, end) infinite,
+    dot-highlight 0.8s var(--ease-standard) 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot[data-warn="true"],
+  .dot[data-highlight="true"] {
+    animation: none;
+  }
+
+  /* 动画关掉后 box-shadow 不再由 keyframes 提供：静态画一圈，仍能看出「被定位」 */
+  .dot[data-highlight="true"] {
+    box-shadow: inset 0 0 0 2px var(--highlight-color);
+  }
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/overlays.css">/* =============================================================================
+ * Timing — overlays.css（浮层：展开面板 Panel / 撤销条 UndoBar）
+ * -----------------------------------------------------------------------------
+ * P0：仅允许 var(--*)；零字面量色值；零毛玻璃；缓动仅 standard / exit / morph。
+ * 自绘玻璃菜单已拆至 styles/menu.css（单文件 ≤300 行纪律）。
+ * ========================================================================== */
+
+/* ------------------------------ 展开面板 Panel ------------------------------ */
+.panel {
+  width: var(--panel-w);
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-5) var(--space-5);
+  border-radius: var(--radius-lg);
+  /* [V0.2.2] 浮层底板乘 --ui-bg-opacity */
+  background: color-mix(in srgb, var(--surface-2) calc(100% * var(--ui-bg-opacity)), transparent);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-panel);
+  animation: panel-in var(--dur-morph) var(--ease-morph);
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.panel__input-wrap {
+  position: relative;
+}
+
+.panel__input {
+  width: 100%;
+  height: var(--input-h);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-emphasize);
+  border: 1px solid transparent;
+  transition: background-color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard);
+}
+
+.panel__input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.panel__input:focus {
+  background: var(--input-bg-focus);
+}
+
+.panel__input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.panel__spinner {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  width: 16px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: var(--radius-chip);
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  animation: arc-pulse var(--dur-morph) var(--ease-standard) infinite;
+}
+
+@keyframes arc-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.panel__chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  height: var(--chip-h);
+  padding: 0 var(--chip-pad-x);
+  border-radius: var(--radius-chip);
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  border: 1px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-emphasize);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background-color var(--dur-quick) var(--ease-standard), border-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.chip:hover {
+  background: var(--chip-bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.chip--add {
+  color: var(--muted);
+}
+
+.panel__hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  color: var(--meta);
+  font-size: var(--text-xs);
+}
+
+.panel__hint svg {
+  flex: 0 0 auto;
+  color: var(--meta);
+}
+
+.panel__hint-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.panel__hint-item:last-child {
+  margin-left: auto;
+}
+
+/* ------------------------------ 撤销条 UndoBar ------------------------------ */
+.undo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-height: var(--toast-h);
+  max-width: var(--pill-w-max);
+  margin-top: var(--space-3);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--undo-bg) calc(100% * var(--ui-bg-opacity)), transparent);
+  border: 1px solid var(--undo-border);
+  box-shadow: var(--elev-float);
+  color: var(--undo-text);
+  font-size: var(--text-sm);
+  animation: undo-in var(--dur-morph) var(--ease-morph);
+}
+
+@keyframes undo-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.undo__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo__time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+/* [V0.3.4] 原 `.undo__actions`（短记录二选一的按钮组容器）随弹条删除；撤销条现在只有
+   一个按钮，不需要额外容器。 */
+
+.undo__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 24px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-chip);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-emphasize);
+  color: var(--muted);
+  transition: color var(--dur-quick) var(--ease-standard), background-color var(--dur-quick) var(--ease-standard);
+}
+
+.undo__btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.undo__btn--primary {
+  color: var(--undo-action);
+}
+
+.undo__btn--primary:hover:not(:disabled) {
+  color: var(--accent-hover);
+  background: var(--surface-2);
+}
+
+.undo__btn:disabled {
+  color: var(--text-disabled);
+  cursor: not-allowed;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/menu.css">/* =============================================================================
+ * Timing V0.2.0 — menu.css（自绘玻璃菜单 GlassMenu / context-menu.md）
+ * -----------------------------------------------------------------------------
+ * 拆自 overlays.css（单文件 ≤300 行纪律）。P0：仅 var(--*)，零字面量色值。
+ * 板式拟玻璃：高不透明度板（--menu-bg 94%）+ 文字全不透明 ink（DESIGN §6.4）；
+ * backdrop-filter 仅作用于菜单浮层 —— 主小条本体（pill）不挂任何模糊。
+ * 行高 30 / 键盘可达（↑↓ Home End Enter Esc Tab）/ 禁用项 hover 不变色。
+ * ========================================================================== */
+
+.menu-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-tooltip);
+  background: transparent;
+  pointer-events: auto;
+}
+
+.menu {
+  position: absolute;
+  z-index: var(--z-menu);
+  min-width: var(--menu-w);
+  max-width: var(--menu-w-max);
+  padding: var(--menu-pad);
+  border-radius: var(--radius-lg);
+  background: var(--menu-bg);
+  /* [V0.2.1 · 1.2] 浮层不再画 1px 描边：靠板 + 投影分层（与主条悬停态同口径，无边框） */
+  border: 0;
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  pointer-events: auto;
+  /* [V0.2.4 · 4] 长菜单（倒计时 8 档预设 + 分隔 + 自定义）在小条窗口里放不下：
+     限高 + 内部滚动，而不是让它顶出窗口被裁掉。非主窗（设置窗等）沿用 100vh。 */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  animation: menu-in var(--dur-base) var(--ease-standard);
+}
+
+/* [ADR-020] 主窗没有画布了：100vh 是「当前窗口高」，而窗口本身由内容决定，
+   用它限高会自我压扁。改用 --fit-h（胶囊所在显示器工作区高，DIP），
+   长菜单也只在屏幕内滚动，不再被窗口边缘裁掉。 */
+html[data-window="main"] .menu {
+  max-height: calc(var(--fit-h) - 16px);
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 顶部状态块（计时中 / 暂停时显示） */
+.menu__status {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 2px var(--space-2);
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+  border: 1px solid var(--line);
+}
+
+.menu__status-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.menu__status-dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+
+.menu__status[data-tone="danger"] .menu__status-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-wash);
+}
+
+.menu__status-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+.menu__status-meta {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.menu__status-detail {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.menu__status[data-tone="danger"] .menu__status-detail {
+  color: var(--danger);
+}
+
+/* 分组标题 */
+.menu__group {
+  padding: var(--space-1) var(--menu-item-pad-x);
+  font-size: var(--text-cap);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--menu-group-label);
+}
+
+.menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--menu-icon-gap);
+  width: 100%;
+  height: var(--menu-item-h);
+  padding: 0 var(--menu-item-pad-x);
+  border-radius: var(--radius-sm);
+  color: var(--menu-text);
+  font-size: var(--text-body);
+  font-weight: var(--weight-read);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard);
+}
+
+.menu__item svg {
+  flex: 0 0 auto;
+  color: var(--ink-4);
+  transition: color var(--dur-quick) var(--ease-standard);
+}
+
+.menu__item:hover:not(:disabled),
+.menu__item:focus-visible {
+  background: var(--menu-item-hover);
+  color: var(--menu-text-on);
+}
+
+.menu__item:hover:not(:disabled) svg,
+.menu__item:focus-visible svg {
+  color: var(--ink-3);
+}
+
+.menu__item:active:not(:disabled) {
+  background: var(--menu-item-hover);
+  transform: scale(0.99);
+}
+
+.menu__item[data-current="true"] {
+  color: var(--menu-text-on);
+}
+
+/* 禁用项：字仍是纯白（V0.2.10 起文字不再走灰阶），靠 .72 的透明度表示「点不了」——
+   太低会和「没字」混同，太高又看不出不可点。 */
+.menu__item:disabled {
+  color: var(--ink-4);
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.menu__item:disabled svg {
+  color: var(--ink-4);
+}
+
+.menu__item[data-danger="true"],
+.menu__item[data-danger="true"] svg {
+  color: var(--menu-danger);
+}
+
+/* 危险项 hover/focus：底保留淡化红 tint（危险语义不变），**文字回退 --ink**。
+   原「--menu-danger 压 --danger-wash」实测 light 3.87–4.27 / dark 4.38（<4.5，文字 AA 不达标）；
+   改 --ink 后 light 13.4+ / dark 15.4+。图标仍用 --menu-danger（非文本，≥3:1 达标）。 */
+.menu__item[data-danger="true"]:hover:not(:disabled),
+.menu__item[data-danger="true"]:focus-visible {
+  background: var(--danger-wash);
+  color: var(--ink);
+}
+
+.menu__item[data-danger="true"]:hover:not(:disabled) svg,
+.menu__item[data-danger="true"]:focus-visible svg {
+  color: var(--menu-danger);
+}
+
+.menu__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.menu__accel {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.menu__item:hover:not(:disabled) .menu__accel,
+.menu__item:focus-visible .menu__accel {
+  color: var(--ink-3);
+}
+
+.menu__check {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.menu__sep {
+  height: 1px;
+  margin: 5px 6px;
+  background: var(--line);
+}
+
+/* 菜单底部附加区（V0.3.9：常用事项框的「事项管理」小圆点） */
+.menu__footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-1) var(--menu-item-pad-x) 2px;
+}
+
+/* ------------------------------ 滚动条 ------------------------------ */
+/* [V0.2.6] 菜单行数超过窗口高度后内部滚动（见上方 max-height），
+   默认滚动条会在玻璃板上画一条亮灰色实心条，这里收敛成细的 --line-3。 */
+.menu {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-3) transparent;
+}
+.menu::-webkit-scrollbar {
+  width: 8px;
+}
+.menu::-webkit-scrollbar-track {
+  background: transparent;
+}
+.menu::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+.menu::-webkit-scrollbar-thumb:hover {
+  background: var(--line-2);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/panels.css">/* =============================================================================
+ * Timing — panels.css（记录汇总面板 Records Panel）
+ * -----------------------------------------------------------------------------
+ * P0：仅允许 var(--*)；零字面量色值；分组用 1px 线不用卡片盒；中文不加字距。
+ * ========================================================================== */
+
+.records {
+  display: flex;
+  flex-direction: column;
+  width: var(--panel-w);
+  max-height: calc(var(--fit-h) - var(--snap-margin) * 2 - var(--pill-h) - var(--space-3));
+  margin-top: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  /* [V0.2.2] 面板底板乘 --ui-bg-opacity（设置面板另有自己的底，不受影响） */
+  background: color-mix(in srgb, var(--surface-2) calc(100% * var(--ui-bg-opacity)), transparent);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-panel);
+}
+
+.records__tabs {
+  display: flex;
+  gap: var(--space-6);
+}
+
+.tab {
+  position: relative;
+  height: 28px;
+  padding-bottom: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-emphasize);
+  transition: color var(--dur-quick) var(--ease-standard);
+}
+
+.tab[data-active="true"] {
+  color: var(--fg);
+}
+
+.tab__underline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--accent);
+}
+
+.records__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.records__total-label {
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.records__body {
+  flex: 1 1 auto;
+  margin-top: var(--space-3);
+  overflow-y: auto;
+}
+
+.records__body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.records__body::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-chip);
+}
+
+.records__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.skeleton-row {
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--meta);
+}
+
+.records__hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  color: var(--meta);
+  font-size: var(--text-xs);
+}
+
+/* 分组 */
+.group {
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.group__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  height: 36px;
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  font-weight: var(--weight-emphasize);
+}
+
+.group__head svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.group__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.group__total {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-emphasize);
+  color: var(--text-secondary);
+}
+
+.group__chev {
+  color: var(--muted);
+  transition: transform var(--dur-base) var(--ease-standard);
+}
+
+.group__chev[data-open="true"] {
+  transform: rotate(90deg);
+}
+
+.group__rows {
+  padding-left: var(--space-6);
+}
+
+.group__empty {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+/* 明细行 */
+.row {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 32px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.row__range {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+.row__dur {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-emphasize);
+  color: var(--text-secondary);
+}
+
+.row__actions {
+  display: inline-flex;
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity var(--dur-quick) var(--ease-standard);
+}
+
+.row:hover .row__actions,
+.row[data-editing="true"] .row__actions {
+  opacity: 1;
+}
+
+.row__btn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.row__btn:hover {
+  background: var(--surface-3);
+  color: var(--fg);
+}
+
+.row__btn--danger:hover {
+  color: var(--danger);
+}
+
+.row__edit {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-3);
+}
+
+.row__edit-label {
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.row__select {
+  flex: 1 1 auto;
+  height: 28px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  border: 1px solid var(--border);
+  font-size: var(--text-sm);
+}
+
+/* 状态块（Empty / Error） */
+.state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-5);
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.state-block svg {
+  color: var(--muted);
+}
+
+.state-block p {
+  margin: 0;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/activity-strip.css">/**
+ * Timing — 同期电脑活动条（Patina 融合：记录面板顶部的旁证行）
+ * -----------------------------------------------------------------------------
+ * 单开一个文件而不是塞进 panels.css：那个文件已经 258 行、贴着 300 行门禁，
+ * 而这条窄条属于「Patina 融合」这条线，将来反向入口、跳转都长在这里。
+ *
+ * 一条横向可滚动的窄条，不进 records__body 的纵向滚动区，避免和记录明细抢高度。
+ */
+
+.activity-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.activity-strip__label {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.activity-strip__list {
+  display: flex;
+  flex: 1 1 auto;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.activity-strip__list::-webkit-scrollbar {
+  display: none;
+}
+
+.activity-strip__chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-chip);
+  font-size: var(--text-xs);
+  color: var(--fg);
+  white-space: nowrap;
+  /* [P0-03] chip 从 span 改成 button（点它 = 去分析窗看这个应用这一天）：
+     `button` 自带 UA 的底色 / 字体 / 居中，这里逐项归零，保持原观感不变。 */
+  background: none;
+  font-family: inherit;
+  line-height: inherit;
+  cursor: pointer;
+  transition: border-color var(--dur-quick) var(--ease-standard);
+}
+
+.activity-strip__chip[data-interactive="true"]:hover {
+  border-color: var(--accent);
+}
+
+.activity-strip__chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.activity-strip__sec {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* [P0-03] 记录面板头的「在分析窗看这一天」：面板是窄浮层，做成一行轻量文字按钮，
+   不与「总计」抢视觉重量（它是出口，不是数据）。 */
+.records__analysis-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--text-xs);
+  font-family: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color var(--dur-quick) var(--ease-standard);
+}
+
+.records__analysis-entry:hover,
+.records__analysis-entry:focus-visible {
+  color: var(--accent);
+  text-decoration: underline;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/settings-dialog.css">/* =============================================================================
+ * Timing — settings-dialog.css（设置面板 / 崩溃恢复对话框）
+ * -----------------------------------------------------------------------------
+ * P0：仅允许 var(--*)；零字面量色值；分组用 1px 线不用卡片盒；中文不加字距。
+ * ========================================================================== */
+
+/* ------------------------------ 设置面板 ------------------------------ */
+.settings {
+  width: var(--panel-w);
+  margin-top: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-panel);
+}
+
+.settings__title {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-announce);
+  color: var(--fg);
+}
+
+.setting-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  height: 40px;
+}
+
+.setting-row__label {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+/* [V0.3.5] 最短记录时长：数字输入框 + 单位。
+ * 外壳承担边框 / 底色 / 焦点环，内部 input 去壳——这样「数字 + S」是一个整体控件，
+ * 与右侧的开关视觉重量对齐。原生数字输入的上下箭头由 UA 绘制，拿不到令牌，直接隐藏；
+ * 键盘上下键仍可增减（不带箭头也照常工作）。 */
+.num-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  border: 1px solid var(--line);
+}
+
+/* [V0.3.9] 用户口径：「调整最短记录时长时的高亮效果取消」——
+   聚焦不再给外壳描边染色，控件保持常态底色，调数时不闪一块高亮。 */
+.num-field:focus-within {
+  border-color: var(--line);
+}
+
+.num-field__input {
+  width: 40px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  color: var(--ink);
+  text-align: right;
+  -webkit-appearance: none;
+  appearance: textfield;
+}
+
+.num-field__input:focus {
+  outline: none;
+}
+
+/* [V0.3.9] 用户口径：「调整最短记录时长时的高亮效果取消」。
+   全局焦点环是 `box-shadow: var(--focus-ring)`（app.css 末尾），`outline: none` 盖不掉它，
+   这里按控件单独关掉——外壳描边也不染色，调数时整行保持常态。 */
+.num-field__input:focus-visible {
+  box-shadow: none;
+}
+
+.num-field__input::-webkit-inner-spin-button,
+.num-field__input::-webkit-outer-spin-button {
+  appearance: none;
+  margin: 0;
+}
+
+.num-field__unit {
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+.settings__divider {
+  height: 1px;
+  margin: var(--space-4) 0;
+  background: var(--border-soft);
+}
+
+.setting-group__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-emphasize);
+  color: var(--muted);
+}
+
+.pill-tag {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-chip);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-caps);
+  color: var(--meta);
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 36px;
+}
+
+.shortcut-row__label {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.shortcut-row__accel {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--muted);
+}
+
+.shortcut-row .btn {
+  height: 24px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.settings__hint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  color: var(--meta);
+  font-size: var(--text-xs);
+}
+
+/* ------------------------------ 恢复对话框 ------------------------------ */
+.dialog-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-dialog);
+  display: grid;
+  place-items: center;
+  background: var(--scrim); /* 纯色半透明，禁用模糊 */
+  pointer-events: auto;
+}
+
+/* 主窗不是整屏画布（ADR-020 后窗口按内容自适应）。遮罩若铺满布局空间会出两件事：
+   ①place-items:center 把对话框摆到「工作区中央」，而真实窗口只有胶囊那么大
+     → 对话框落在窗口之外，用户完全看不见；
+   ②pointer-events:auto 让这层看不见的遮罩吞掉胶囊上的全部点击（左键/右键都失灵）。
+   所以主窗里改成贴着胶囊下方就地渲染：遮罩只做视觉底衬、不拦指针，对话框自己可点。 */
+html[data-window="main"] .dialog-scrim {
+  inset: auto;
+  left: 0;
+  top: calc(var(--snap-margin) + var(--pill-h) + var(--space-2));
+  display: block;
+  width: max-content;
+  background: transparent;
+  pointer-events: none;
+}
+
+html[data-window="main"] .dialog {
+  pointer-events: auto;
+}
+
+.dialog {
+  width: var(--panel-w);
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--elev-panel);
+  animation: dialog-in var(--dur-base) var(--ease-standard);
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dialog__title {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-announce);
+  color: var(--fg);
+}
+
+.dialog__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.dialog__summary svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.dialog__meta {
+  margin: 0 0 var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+
+/* [V0.4.2] 恢复对话框：「把退出期间（xx）也计入」 */
+.dialog__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.dialog__check input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* 勾上后「已计时 → 计入后」的增量，只是提示，不是主信息 */
+.dialog__plus {
+  color: var(--accent-ink);
+}
+
+.dialog__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/settings-panel.css">/* =============================================================================
+ * Timing V0.2.0 — settings-panel.css（设置面板外壳 / 页签 / 底栏 / 按钮）
+ * -----------------------------------------------------------------------------
+ * 依据 settings-panel.md。P0：仅 var(--*)，零字面量色值，零毛玻璃，无弹跳缓动。
+ * 主题/配色卡片样式见 theme-picker.css；插件页签见 settings-plugins.css
+ * （同一面板内分文件，控制单文件行数）。
+ * ========================================================================== */
+
+/* ------------------------------ 面板外壳 ------------------------------ */
+.settings {
+  display: flex;
+  flex-direction: column;
+  width: 340px;
+  max-height: calc(var(--fit-h) - var(--snap-margin) * 2 - var(--pill-h) - var(--space-3));
+  margin-top: var(--space-3);
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--bg-panel);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-panel);
+}
+
+.settings__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--settings-title-h);
+  padding: 0 var(--panel-pad);
+  border-bottom: 1px solid var(--line);
+}
+
+.settings__title {
+  margin: 0;
+  font-size: var(--text-title);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+/* [V0.3.9] 标题栏右侧的关闭 × 已按用户口径移除，`.settings__close` 规则随之删除 */
+
+.settings__tabs {
+  padding: var(--space-3) var(--panel-pad) 0;
+}
+
+.settings__content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--panel-pad);
+}
+
+.settings__content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings__content::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+
+.settings__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: var(--settings-foot-h);
+  padding: 0 var(--panel-pad);
+  border-top: 1px solid var(--line);
+}
+
+.settings__foot-hint {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+/* ------------------------------ 分段控件 ------------------------------ */
+.seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--bg-seg);
+  border: 1px solid var(--line);
+}
+
+.seg__item {
+  flex: 1 1 0;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.seg__item:hover {
+  color: var(--ink);
+}
+
+.seg__item:active {
+  transform: scale(0.99);
+}
+
+.seg__item[data-on="true"] {
+  background: var(--bg-seg-on);
+  color: var(--ink);
+  box-shadow: var(--inset-top);
+}
+
+/* [V0.11.0] 悬浮形态二选一：复用分段控件的视觉，但不吃满整行（只两项，撑开像两个按钮） */
+.seg--compact {
+  flex: 0 0 auto;
+}
+
+.seg--compact .seg__item {
+  flex: 0 0 auto;
+  min-width: 64px;
+  padding: 0 var(--space-4);
+}
+
+/* ------------------------------ 按钮补充档 ------------------------------ */
+.btn--sm {
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.btn--neutral {
+  height: var(--btn-md-h);
+  padding: 0 var(--space-3);
+  background: var(--btn-neutral-bg);
+  color: var(--btn-neutral-ink);
+  border-color: transparent;
+}
+
+.btn--neutral:hover:not(:disabled) {
+  background: var(--bg-field-hi);
+}
+
+/* =============================================================================
+ * 独立设置窗（label=settings，decorations:false / transparent:true）
+ *   app.css 的根按 100% 铺满视口；此窗口再按 data-window 显式钉一遍 100vw/vh（独立窗口无画布）。
+ *   圆角外壳外的四角保持透明（html 背景置透明，不铺 --bg），避免露出方形透明区。
+ * ========================================================================== */
+.win {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+html[data-window="settings"] {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+html[data-window="settings"] body,
+html[data-window="settings"] #root {
+  width: 100vw;
+  height: 100vh;
+}
+
+.settings--window {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+}
+
+/* 自绘标题栏为拖动区（K-2：capabilities 已放行 core:window:allow-start-dragging） */
+.settings__bar[data-tauri-drag-region] {
+  cursor: default;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/settings-plugins.css">/* =============================================================================
+ * Timing — settings-plugins.css（设置 · 插件页签，V0.3.4 由「扩展」改名）
+ * -----------------------------------------------------------------------------
+ * 从 settings-panel.css 拆出（单文件 ≤300 行纪律，同 theme-picker.css 的做法）。
+ * 消费规则：只引用 var(--*)，无裸色值。组件的类名/结构见 PluginsTab.tsx。
+ * ========================================================================== */
+
+/* ------------------------------ 插件（V0.3.4 由「扩展」改名） ------------------------------ */
+/* 原「暂无扩展」空态在 V0.3.2 被删过（当时认为内置包恒在、不存在空列表）；
+   V0.3.4 不再展示任何内置功能，没有插件时列表**真的**会空，故补回 `.plg__empty`。 */
+.plg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.plg__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.plg__path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plg__btn {
+  flex: none;
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+}
+
+.plg__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plg__item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+}
+
+/* 载入失败的行用 danger 描边：一眼能挑出来，不必逐行读原因 */
+.plg__item[data-broken="true"] {
+  border-color: var(--danger);
+}
+
+.plg__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.plg__name {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.plg__tag {
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-seg-on);
+  font-size: var(--text-cap);
+  color: var(--ink-3);
+}
+
+.plg__ver {
+  font-size: var(--text-cap);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+}
+
+.plg__desc,
+.plg__meta,
+.plg__hint,
+.plg__error,
+.plg__warn {
+  margin: 0;
+  font-size: var(--text-cap);
+}
+
+.plg__desc {
+  color: var(--ink-3);
+}
+
+.plg__meta,
+.plg__hint {
+  color: var(--ink-4);
+}
+
+.plg__hint {
+  line-height: 1.5;
+}
+
+/* 空列表说明：没有插件时不留白屏，直接告诉用户下一步做什么 */
+.plg__empty {
+  margin: 0;
+  padding: var(--space-3) 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+
+.plg__error {
+  color: var(--danger);
+}
+
+/* [v3] 黄字 = 插件仍生效，但清单里有东西被忽略了（如已下架的 mdSync）；
+   红字 .plg__error 才是「没生效」，两个层级不合并。 */
+.plg__warn {
+  color: var(--warn);
+  line-height: 1.5;
+}
+
+/* 插件来源目录：同 id 放两处时，一眼看出这份是从哪读来的 */
+.plg__dir {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/settings-sync.css">/* =============================================================================
+ * Timing — settings-sync.css（设置 · 同步页签，V0.4.0）
+ * -----------------------------------------------------------------------------
+ * 消费规则：只引用 var(--*)，无裸色值。结构见 MdSyncTab / MdSyncBindingCard。
+ * 视觉语言与插件页签一致：1px 线 + 弱底，不堆卡片阴影。
+ * ========================================================================== */
+
+.sync {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sync__bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.sync__intro {
+  min-width: 0;
+}
+
+.sync__title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sync__hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.sync__enable {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: 2px;
+}
+
+.sync__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+}
+
+/* 以下四条只声明一个属性，按「单属性规则写一行」压缩（≤300 行硬约束，见 AGENTS.md）。 */
+.sync__card[data-disabled="true"] { opacity: 0.62; }
+
+.sync__card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sync__card-title { min-width: 0; }
+
+.sync__kind {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.sync__desc {
+  margin: 2px 0 0;
+  font-size: var(--text-cap);
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+.sync__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sync__body[hidden],
+.sync__fields[hidden] {
+  display: none;
+}
+
+.sync__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.sync__folded {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px dashed var(--line-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  text-align: left;
+}
+
+.sync__folded:hover {
+  background: var(--bg-panel);
+  color: var(--ink);
+}
+
+.sync__folded-meta {
+  margin-left: auto;
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+}
+
+.sync__card-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sync__fold-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+}
+
+.sync__fold-btn:hover {
+  background: var(--bg-seg);
+  color: var(--ink);
+}
+
+.sync__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+}
+
+@media (max-width: 420px) {
+  .sync__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.sync__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sync__label {
+  font-size: var(--text-cap);
+  color: var(--ink-3);
+}
+
+.sync__row {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.sync__input {
+  flex: 1;
+  min-width: 0;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  color: var(--ink);
+}
+
+.sync__input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.sync__input:disabled { color: var(--ink-4); }
+
+.sync__pick,
+.sync__open {
+  flex: none;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-cap);
+}
+
+.sync__path {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  line-height: 1.5;
+  color: var(--ink-4);
+}
+
+.sync__card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.sync__status {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-cap);
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync__status[data-error="true"] { color: var(--danger); }
+
+.sync__error {
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--danger-wash);
+  font-size: var(--text-cap);
+  line-height: 1.5;
+  color: var(--danger);
+}
+
+.sync__ok {
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+}
+
+.sync__empty {
+  margin: 0;
+  padding: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.sync__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+
+.sync__foot {
+  margin: 0;
+  font-size: var(--text-cap);
+  line-height: 1.6;
+  color: var(--ink-4);
+}
+
+.sync__foot code {
+  font-family: var(--font-mono);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/settings-sync-interval.css">/**
+ * Timing — 同步间隔行（V0.11.3）
+ * -----------------------------------------------------------------------------
+ * 从 `settings-sync.css` 单独拆出来：那个文件已 299 行，`.settings` 相关的样式
+ * 又都归它管，门禁上限 300 行，塞不下一行了。
+ *
+ * 只放「一行标签 + 数字输入 + 说明」的排布，控件本身复用 `.num-field`（最短记录
+ * 时长用的同一套），所以不必再造一份输入框样式。
+ */
+.sync__interval {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+}
+
+.sync__interval-hint {
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+}
+
+/* 关掉总开关时间隔无意义，输入跟着变灰 */
+.sync__interval .num-field__input:disabled {
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/settings-sync-cloud.css">/* =============================================================================
+ * Timing — settings-sync-cloud.css（同步页签 · 云端通道卡 + 备份卡，V0.11.13）
+ * -----------------------------------------------------------------------------
+ * 为什么不追加到 settings-sync.css：那个文件 281 行，且是本轮「一个字节不许动」的红线。
+ * 这两张卡又是全新结构，混进去既超限也说不清谁改了谁。
+ *
+ * 规则与 settings-sync.css 一致：只引用 var(--*)，无裸色值。输入框**故意另起类名**
+ * （`sync-cloud__input`）：若复用 `.sync__input`，`input.sync__input` 会先命中云端卡的
+ * 输入框，落点卡的选择器就错了。
+ * 单属性 / 短规则写一行，是多文件共用 300 行门禁下的既有写法（见 settings-sync.css）。
+ * ========================================================================== */
+
+.sync-cloud,
+.sync-backup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+}
+
+.sync-cloud__head,
+.sync-backup__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.sync-cloud__input {
+  flex: 1; min-width: 0; height: 26px; padding: 0 var(--space-2);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--bg-panel); font-family: var(--font-mono); font-size: var(--text-cap);
+  color: var(--ink);
+}
+
+.sync-cloud__input:focus { outline: none; border-color: var(--accent); }
+.sync-cloud__input:disabled { color: var(--ink-4); }
+
+.sync-cloud__hint { margin: 0; font-size: var(--text-cap); line-height: 1.5; color: var(--ink-4); }
+.sync-cloud__test { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
+
+.sync-cloud__result {
+  overflow-wrap: anywhere;
+  font-size: var(--text-cap); line-height: 1.5; color: var(--ok);
+}
+
+.sync-cloud__result[data-ok="false"] { color: var(--danger); }
+
+.sync-cloud__status {
+  display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3);
+  padding-top: var(--space-2); border-top: 1px solid var(--line);
+  font-size: var(--text-cap); color: var(--ink-3);
+}
+
+/* 上一轮的失败原文可能很长，独占一行才读得顺 */
+.sync-cloud__status .sync__error { flex-basis: 100%; }
+
+.sync-backup__group { display: flex; flex-direction: column; gap: var(--space-2); }
+.sync-backup__date { margin: var(--space-1) 0 0; font-family: var(--font-mono); font-size: var(--text-cap); color: var(--ink-3); }
+
+.sync-backup__row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  padding: var(--space-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--bg-panel);
+}
+
+.sync-backup__target {
+  flex: none; padding: 1px 6px; border: 1px solid var(--line-3);
+  border-radius: var(--radius-sm); font-size: var(--text-cap); color: var(--ink-2);
+}
+
+/* 老备份归属未知：用警示色，别让用户误以为它默认落到 Obsidian */
+.sync-backup__target[data-target="unknown"] { border-color: var(--warn); color: var(--warn); }
+
+.sync-backup__source {
+  min-width: 0; overflow: hidden;
+  font-family: var(--font-mono); font-size: var(--text-cap); color: var(--ink-2);
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sync-backup__facts { margin-left: auto; font-size: var(--text-cap); color: var(--ink-4); }
+
+.sync-backup__confirm {
+  flex-basis: 100%; display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-2); border: 1px solid var(--danger);
+  border-radius: var(--radius-sm); background: var(--danger-wash);
+}
+
+.sync-backup__confirm-text { margin: 0; font-size: var(--text-cap); line-height: 1.6; color: var(--ink); }
+.sync-backup__confirm-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/settings-data.css">/* =============================================================================
+ * Timing — settings-data.css（设置 · 数据管理页签，V0.11.15）
+ * -----------------------------------------------------------------------------
+ * 消费规则与 settings-sync*.css 一致：只引用 var(--*)，无裸色值。
+ *
+ * 为什么另起一份：settings-sync.css 已是 281 行（本轮不动它），而且这一轮新增的是
+ * **壳**（页签标题、五块容器、底部 sticky 条、黄条、徽标）——与 ③④⑤ 的 `sync__*`
+ * 是两套结构，混在一起既超行数也说不清谁改了谁。
+ * ③④⑤ 继续用 `sync__*` / `sync-cloud__*` / `sync-backup__*`（设计 §8-6）。
+ * 单属性 / 短规则写一行，是多文件共用 300 行门禁下的既有写法。
+ * ========================================================================== */
+
+.data {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.data__head { padding-bottom: var(--space-3); border-bottom: 1px solid var(--line); }
+
+.data__title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.data__hint { margin: var(--space-1) 0 0; font-size: var(--text-xs); line-height: 1.5; color: var(--ink-3); }
+
+/* ---- 折叠块（FoldBlock） ---- */
+.data__block {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+}
+
+.data__block-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.data__block-main { min-width: 0; }
+.data__block-title-row { display: flex; align-items: center; gap: var(--space-2); }
+
+.data__block-title {
+  margin: 0;
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* 「未保存」标记：被改过的块自己在标题旁说清楚，不靠用户去猜底部条指的是哪一块 */
+.data__dirty {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--warn);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-cap);
+  line-height: 1.5;
+  color: var(--warn);
+}
+
+.data__block-hint { margin: 2px 0 0; font-size: var(--text-cap); line-height: 1.5; color: var(--ink-3); }
+
+.data__block-actions { display: flex; flex: none; align-items: center; gap: var(--space-2); }
+
+.data__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.data__body[hidden] { display: none; }
+
+/* ---- 块内通用零件 ---- */
+.data__row { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.data__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.data__label { font-size: var(--text-cap); color: var(--ink-3); }
+
+.data__input {
+  flex: 1; min-width: 0; height: 26px; padding: 0 var(--space-2);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--bg-panel); font-family: var(--font-mono); font-size: var(--text-cap);
+  color: var(--ink);
+}
+
+.data__input:focus { outline: none; border-color: var(--accent); }
+.data__input:disabled { color: var(--ink-4); }
+
+/* 当前数据根：只读可选中复制。用户要能把路径复制到资源管理器里核对（验收 C1） */
+.data__path {
+  margin: 0; overflow-wrap: anywhere;
+  font-family: var(--font-mono); font-size: var(--text-cap); line-height: 1.5; color: var(--ink-2);
+  user-select: text;
+}
+
+.data__badge {
+  flex: none; padding: 0 6px; border: 1px solid var(--line-3);
+  border-radius: var(--radius-sm); font-size: var(--text-cap); color: var(--ink-3);
+}
+
+.data__badge[data-ok="false"] { border-color: var(--danger); color: var(--danger); }
+.data__note { margin: 0; font-size: var(--text-cap); line-height: 1.5; color: var(--ink-4); }
+
+/* 待生效黄条：切换成功不等于生效（重启才生效），所以它是提示不是错误 */
+.data__warn {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
+  margin: 0; padding: var(--space-2); border: 1px solid var(--warn);
+  border-radius: var(--radius-sm); background: var(--bg-panel);
+  font-size: var(--text-cap); line-height: 1.5; color: var(--ink-2);
+}
+
+.data__warn-text { flex: 1; min-width: 0; margin: 0; }
+
+/* 五项清单：确认对话框逐行列出来，体积右对齐才扫得动 */
+.data__entries { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; }
+
+.data__entry {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  font-family: var(--font-mono); font-size: var(--text-cap); color: var(--ink-2);
+}
+
+.data__entry-name { min-width: 0; overflow-wrap: anywhere; }
+.data__entry-size { flex: none; color: var(--ink-3); }
+
+/* 页面内确认条（不用 window.confirm：桌面 WebView 里它可能被拦成「什么都没发生」） */
+.data__confirm {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-2); border: 1px solid var(--accent);
+  border-radius: var(--radius-sm); background: var(--bg-panel);
+}
+
+.data__confirm-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+
+/* ---- 底部 sticky 操作条：五块共用的**唯一**保存入口（PRD A6） ---- */
+.data__bar {
+  position: sticky; bottom: 0;
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) 0; border-top: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+
+.data__bar-hint { margin-right: auto; font-size: var(--text-cap); color: var(--warn); }
+
+/* ⑤ 每行「打开」的失败原文：独占整行，否则挤在 flex 行里只剩半句（PRD D2） */
+.sync-backup__row .sync__error { flex-basis: 100%; }
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/settings-data-slim.css">/* =============================================================================
+ * Timing — settings-data-slim.css（数据管理 · 做减法之后的那几个新位置，V0.11.16）
+ * -----------------------------------------------------------------------------
+ * 为什么不追加到 settings-sync.css：那个文件 281 行，本轮是「一个字节不许动」的红线；
+ * settings-data.css（折叠壳）也不该被塞进「某个块的内部行」。
+ *
+ * 规则与其余样式文件一致：只引用 var(--*)，无裸色值；单属性 / 短规则写一行
+ * （多文件共用 300 行门禁下的既有写法，见 settings-sync.css）。
+ *
+ * 五个类各管一处：
+ *   .sync__today       ① 文件名框右侧那行只读「今天：…」
+ *   .sync__heading-row ① 三个标题行各一段（没有种类说明、没有指路行）
+ *   .sync__tier-hint   ③ 异常时那一行提示 + 「逐个设置」
+ *   .sync__agg         ③ 聚合状态 + 「打开今日文件」
+ *   .sync-cloud__steps ④ 三关结论（账号 ✓ 目录 ✓ 写入 ✓）
+ *   .sync__latest      ⑤ 折叠标题下的当条记录
+ * ========================================================================== */
+
+.sync__today {
+  flex: none; max-width: 18ch; overflow: hidden;
+  font-family: var(--font-mono); font-size: var(--text-cap); color: var(--ink-4);
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sync__heading-row {
+  display: flex; flex-direction: column; gap: var(--space-1);
+}
+
+.sync__tier-hint {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-2); padding: var(--space-2); border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--bg-field);
+}
+
+.sync__tier-text {
+  min-width: 0; overflow: hidden;
+  font-size: var(--text-cap); color: var(--ink-3);
+  text-overflow: ellipsis; white-space: nowrap;
+}
+
+.sync__tier-close { align-self: flex-start; height: 26px; padding: 0 var(--space-2); }
+
+.sync__agg {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--line);
+}
+
+.sync-cloud__steps {
+  display: inline-flex; flex-wrap: wrap; gap: var(--space-2);
+  font-size: var(--text-cap); color: var(--ink-3);
+}
+
+.sync-cloud__step[data-ok="false"] { color: var(--danger); }
+
+.sync__latest {
+  margin: var(--space-1) 0 0; overflow: hidden;
+  font-family: var(--font-mono); font-size: var(--text-cap); color: var(--ink-4);
+  text-overflow: ellipsis; white-space: nowrap;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/error-boundary.css">/**
+ * Timing — 渲染异常兜底样式（V0.4.1）
+ * -----------------------------------------------------------------------------
+ * 只给 `AppErrorBoundary` 用。出现在主窗时窗口会被 auto-fit 收缩到这块内容，
+ * 所以它必须**自带宽高下限**：否则透明窗 + 空内容 = 仍然看不见。
+ * 零字面量色值，全部走令牌（AGENTS.md 硬约束）。
+ */
+
+.fatal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  min-width: 220px;
+  max-width: 340px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  box-shadow: var(--elev-float);
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  pointer-events: auto;
+}
+
+.fatal__title {
+  color: var(--danger);
+  font-weight: var(--weight-semibold);
+}
+
+.fatal__detail {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.fatal__action {
+  align-self: flex-start;
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.fatal__action:hover {
+  background: var(--surface-3);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/theme-picker.css">/* =============================================================================
+ * Timing V0.2.0 — theme-picker.css（主题卡 + 四色取色行）
+ * -----------------------------------------------------------------------------
+ * 依据 theme-picker.md / DESIGN-V0.2.0.md §4.5 §4.6。P0：仅 var(--*)，零字面量色值。
+ * 面板外壳 / 页签 / 底栏见 settings-panel.css。
+ * ========================================================================== */
+
+/* ------------------------------ 卡片 ------------------------------ */
+.card {
+  padding: var(--card-pad-x);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+.card + .card {
+  margin-top: var(--space-3);
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.card__title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-cap);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.card__head .card__title {
+  margin: 0;
+}
+
+/* ------------------------------ 主题卡 ------------------------------ */
+.theme-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.theme-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+  border: 1px solid var(--line);
+  transition: border-color var(--dur-quick) var(--ease-standard), background-color var(--dur-quick) var(--ease-standard);
+}
+
+.theme-card:hover {
+  border-color: var(--line-3);
+}
+
+.theme-card:active {
+  transform: scale(0.99);
+}
+
+.theme-card[data-on="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+}
+
+/* 迷你预览：用该主题的「真实色」缩略（令牌 --preview-*，非当前主题变量） */
+.theme-card__preview {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+}
+
+.theme-card__preview[data-preview="dark"] {
+  background: var(--preview-dark-plate);
+  border: 1px solid var(--preview-dark-line);
+}
+
+.theme-card__preview[data-preview="light"] {
+  background: var(--preview-light-plate);
+  border: 1px solid var(--preview-light-line);
+}
+
+.theme-card__ring {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  /* [V0.3.3] 预览跟着主环改形状：12px 按 16px 的比例缩放（5 × 12/16 = 3.75px），
+     仍保持 ~31% 圆角观感，不至于缩成圆形（直接用 --ring-radius 会变成 42%）。 */
+  border-radius: calc(var(--ring-radius) * 0.75);
+  border: 2px solid var(--preview-accent);
+}
+
+.theme-card__bar {
+  flex: 1 1 auto;
+  height: 5px;
+  border-radius: var(--radius-full);
+}
+
+.theme-card__preview[data-preview="dark"] .theme-card__bar {
+  background: var(--preview-dark-ink);
+}
+
+.theme-card__preview[data-preview="light"] .theme-card__bar {
+  background: var(--preview-light-ink);
+}
+
+.theme-card__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: var(--text-sm);   /* [Timing 对齐 D13] ThemeCard 标签 12.5（ThemeCard.cs:170） */
+  color: var(--ink-2);
+}
+
+.theme-card__check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  color: var(--accent-ink);
+}
+
+/* ------------------------------ 取色行 ------------------------------ */
+.swatches {
+  display: flex;
+  flex-direction: column;
+}
+
+.swatch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding: var(--row-pad-y) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.swatch:last-child {
+  border-bottom: 0;
+}
+
+.swatch__dot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 0 0 1px var(--line-3);
+}
+
+.swatch__native {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.swatch__name {
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+
+.swatch__spacer {
+  flex: 1 1 auto;
+}
+
+.swatch__hex {
+  /* 7 位 hex（#RRGGBB）在 11.5px 等宽下约 48px，加上左右各 10px 内边距需要 68px。
+     原先套用 --field-num-w（54px，那是给倒计时分钟数用的），hex 会被截成「#4DA3」，
+     看起来像色值没显示出来。 */
+  width: 68px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  border: 1px solid var(--line);
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  color: var(--ink-2);
+  text-align: center;
+}
+
+.swatch[data-invalid="true"] .swatch__hex {
+  border-color: var(--danger);
+}
+
+.swatch__follow {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.swatch__follow:hover {
+  color: var(--ink);
+  background: var(--bg-field-hi);
+}
+
+.swatch__chev {
+  flex: 0 0 auto;
+  color: var(--ink-4);
+}
+
+.swatch__error {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+
+.picker__error {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/slider.css">/* =============================================================================
+ * Timing V0.2.2 — slider.css（设置面板的「文字 / 背景不透明度」滑杆）
+ * -----------------------------------------------------------------------------
+ * P0：仅 var(--*)，零字面量色值。
+ * 不重绘轨道的伪元素：Chrome 的 range 轨道伪元素在 appearance:none 下仍会退回 UA 画法
+ * （实测 track 规则不生效、滑块规则生效），因此改用 accent-color 让轨道/滑块跟主题走，
+ * 只保留尺寸与焦点环。
+ * ========================================================================== */
+
+.slider {
+  width: 118px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.slider:focus-visible {
+  outline: none;
+  border-radius: var(--radius-full);
+  box-shadow: var(--focus-ring);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/todos-panel.css">/* =============================================================================
+ * Timing V0.2.0 — todos-panel.css（事项窗口外壳 / 表头 / 记录行 / 底栏）
+ * -----------------------------------------------------------------------------
+ * 依据 docs/design/pages-V0.2.0/todos-panel.md。
+ * P0：仅 var(--*)，零字面量色值；清单用 1px 线分组（不用卡片盒）；
+ *     进行中行 = --accent-wash 底 + 3px 竖条（非「彩色左边框」单打独斗）。
+ * 窗口壳：html[data-window="todos"] 铺满自身视口（独立窗口，按 ADR-020 没有画布）。
+ * 待办分组 / 内联编辑 / 空态见同目录 todos-pending.css（单文件 ≤300 行纪律）。
+ * ========================================================================== */
+
+/* ------------------------------ 窗口根 ------------------------------ */
+html[data-window="todos"] {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+html[data-window="todos"] body,
+html[data-window="todos"] #root {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* [V0.3.9] 窗口宽 = 面板 252 + 左侧便利贴预览区 240（`window_spec::TODOS`）。
+   面板靠右贴住主条原位，左边 240 透明——预览卡（portal 到 body）就画在那一段里。 */
+html[data-window="todos"] .win {
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.todos {
+  position: relative; /* [V0.3.9] 「新增待办」表单卡按绝对定位贴在底栏上方 */
+  display: flex;
+  flex-direction: column;
+  /* 面板只占右侧 252（= Rust `TODOS_PANEL_W`），不铺满窗口 */
+  width: 252px;
+  height: 100vh;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--menu-bg); /* 玻璃板 94%（todos-panel.md §1 底） */
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-plate);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  color: var(--ink-2);
+}
+
+/* ------------------------------ 表头 ------------------------------ */
+.todos__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  height: var(--todos-head-h);
+  padding: 0 var(--card-pad-x);
+  border-bottom: 1px solid var(--line);
+}
+
+.todos__head-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--text-xs);   /* [Timing 对齐 D10] HeadEm 11.5（TodoListPanel.cs:64） */
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.todos__head-count {
+  font-weight: var(--weight-read);
+  color: var(--ink-3);
+}
+
+.todos__head-total {
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+/* ------------------------------ 主体 ------------------------------ */
+.todos__body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--space-1) var(--space-2);
+}
+
+.todos__body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.todos__body::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+
+.todos__records {
+  padding-bottom: var(--space-1);
+}
+
+/* ------------------------------ 记录行 ------------------------------ */
+/* 三列网格：名字（左）/ 时间（整行正中）/ 时长（右）。
+   左右两列等分 1fr，中间 auto 列才会落在行的正中央 —— 用 flex 做不到
+   「时间居中且时长仍贴右」。 */
+.todo-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--todos-row-h);
+  padding: 0 6px 0 10px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-row:hover {
+  background: var(--todo-row-hover);
+}
+
+/* [V0.4.2] 记录行可点 = 直接开始这一条事项的计时；编辑模式不可点（那里的点击是改名 / 输时间） */
+.todo-row[data-clickable='true'] {
+  cursor: pointer;
+}
+
+.todo-row[data-status="running"] {
+  background: var(--todo-row-current);
+  box-shadow: inset 3px 0 0 0 var(--todo-bar-current);
+}
+
+.todo-row--editing,
+.todo-row--confirming {
+  padding: 0 6px;
+}
+
+/* 内联条独占整行（网格下只有一个孩子，不指定会挤在左列） */
+.todo-row--editing > *,
+.todo-row--confirming > * {
+  grid-column: 1 / -1;
+}
+
+.todo-row__name {
+  width: 100%;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.todo-row__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);   /* [Timing 对齐 D10] RowEm 12.5（TodoListPanel.cs:66） */
+  color: var(--ink-2);
+}
+
+.todo-row[data-status="running"] .todo-row__title {
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+.todo-row[data-status="done"] .todo-row__title {
+  color: var(--todo-name-done);
+}
+
+/* 提醒铃（AC-54）：跟随**可配提醒色** --color-warn（未自定义时经别名回落到分主题 --warn）。
+   只有「今日计时」记录行还挂铃铛；待办行 V0.3.11 起按用户口径与计时同格式，不再挂图标。 */
+.todo-row__bell {
+  flex: 0 0 auto;
+  color: var(--color-warn);
+}
+
+
+/* 时间列居中：位置由网格的等分左列决定（见 .todo-row），这里再让列内文字居中，
+   两列都不必凑宽度也能落到视觉中线上。 */
+.todo-row__time {
+  flex: 0 0 auto;
+  min-width: 34px;
+  text-align: center;
+  /* [P2] 时间列现在可能是「开始–结束」区间，不能折行 */
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);   /* [Timing 对齐 D10] NumEm 11.5（TodoListPanel.cs:68） */
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+}
+
+.todo-row__dur {
+  flex: 0 0 auto;
+  justify-self: end;
+  min-width: 50px;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);   /* [Timing 对齐 D10] NumEm 11.5（TodoListPanel.cs:68） */
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.todo-row[data-status="running"] .todo-row__dur {
+  color: var(--todo-time-current);
+}
+
+.todo-row[data-status="done"] .todo-row__dur {
+  color: var(--todo-name-done);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-3);
+}
+
+
+/* ------------------------------ 状态圆标记（已移除） ------------------------------ */
+/* [V0.3.9] 待办行不再画左侧圆点（用户口径：与计时行一致）；组件 TodoMark 一并删除，
+   `--todos-mark-*` 令牌仍由主窗「今日摘要」的 .today-digest__mark 使用，故令牌保留。 */
+
+/* ------------------------------ 底栏 ------------------------------ */
+.todos__foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--todos-foot-h);
+  padding: 0 var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.todos__foot-add {
+  flex: 1.3 1 0;
+  justify-content: center;
+}
+
+.todos__foot-edit {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+/* [V0.3.9] 窗口从 336 缩到 252 后，底栏两按钮的内宽不够，「编辑事项」会折成两行；
+   按钮标签一律不换行（实在放不下就压缩图标与内边距，不折行）。 */
+.todos__foot-add,
+.todos__foot-edit {
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.todos__foot-edit[data-on="true"] {
+  color: var(--ink);
+  background: var(--bg-field-hi);
+}
+
+/* ------------------------------ 撤销条（AC-32：删除待办） ------------------------------ */
+/* 复用 overlays.css 的 .undo 视觉（同底 / 同描边 / 同圆角 / 同入场动效），仅按面板宽度自适应。 */
+.todos__undo {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-3) 0;
+}
+
+.todos__undo .undo {
+  margin-top: 0;
+  max-width: none;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/todos-pending.css">/* =============================================================================
+ * Timing V0.2.0 — todos-pending.css（事项窗口：待办分组 + 待办行）
+ * -----------------------------------------------------------------------------
+ * 拆自 todos-panel.css（单文件 ≤300 行纪律）。仅 var(--*)，零字面量色值。
+ * 依据 docs/design/pages-V0.2.0/todos-panel.md §1 待办区 + §3.1 三级语气。
+ * 内联编辑 / 空态 / Loading-Error 见 todos-inline.css。
+ * ========================================================================== */
+
+/* ------------------------------ 待办分组 ------------------------------ */
+.todo-sec {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+
+.todo-sec__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 22px;
+}
+
+.todo-sec__head--done {
+  margin-top: var(--space-2);
+}
+
+.todo-sec__label {
+  font-size: var(--text-cap);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  color: var(--todo-summary-ink);
+}
+
+.todo-sec__none {
+  margin: var(--space-2) 0;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+.todo-sec__more {
+  width: 100%;
+  height: var(--todos-pending-row-h);
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-sec__more:hover {
+  background: var(--todo-row-hover);
+  color: var(--ink);
+}
+
+/* ------------------------------ 待办行 ------------------------------ */
+/* [V0.3.9] 与「今日计时」记录行同构：名字（左）/ 时刻（右）/ 编辑态动作（行尾），
+   左侧不再有圆点；整行可点 = 勾选切换，故给 pointer 光标。
+   [V0.3.10] 编辑模式下名字与两枚时间胶囊**各自可点开改**（点哪改哪）；只读时胶囊只是读数。 */
+.todo-pend {
+  display: grid;
+  /* [V0.3.11] 与「今日计时」行**同一套三列**（用户口径「时间应显示在对应的开始时间列」）：
+     名字（1fr）/ 时间（auto，行内水平居中）/ 右侧（1fr，圆圈贴右沿 —— 正好落在表头「总时间」那一列下）。
+     两节用同一份模板与同一份 gap，时间列才会上下对齐。 */
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--todos-pending-row-h);
+  padding: 0 6px 0 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+/* 编辑态：多出「时间位 ×2」与「删除」两列，名字仍占 1fr 以便改名时看得清 */
+.todo-pend[data-edit="true"] {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+.todo-pend:hover {
+  background: var(--todo-row-hover);
+}
+
+.todo-pend--editing {
+  display: block;
+  cursor: default;
+}
+
+.todo-pend__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* [V0.3.10] 名字里不再挂铃铛（铃铛已挪进开启胶囊），所以用**块级**盒子而不是 inline-flex ——
+     text-overflow: ellipsis 只对块级容器的行内内容生效，挂在 flex 容器上只会被硬裁掉半个字。 */
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);   /* [Timing 对齐 D10] RowEm 12.5 */
+  color: var(--ink-2);
+}
+
+/* 编辑态：名字本身是改名按钮（行尾铅笔已删，改名面就是名字） */
+.todo-pend__title--editable {
+  margin: 0 -2px;
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: text;
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-pend__title--editable:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.todo-pend[data-tone="none"] .todo-pend__title {
+  color: var(--todo-no-time);
+}
+
+/* [V0.3.14] 过期：整行降透明度 + 名字一道横线（用户口径「透明度降低且有一条横线表示过期」）。
+   颜色仍走 `--todo-overdue`，但压低 opacity 后不再抢眼 —— 过期是「已经过去」的语气，
+   而不是「更醒目」。编辑态（`data-edit="true"`）不降透明度、不划线：正在改的名字要看得清。 */
+.todo-pend[data-tone="overdue"]:not([data-edit="true"]) {
+  opacity: 0.62;
+}
+
+.todo-pend[data-tone="overdue"]:not([data-edit="true"]) .todo-pend__title {
+  color: var(--todo-overdue);
+  text-decoration: line-through;
+  text-decoration-color: var(--todo-overdue);
+  text-decoration-thickness: 1px;
+}
+
+.todo-pend[data-done="true"] .todo-pend__title {
+  color: var(--todo-name-done);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-3);
+}
+
+/* ------------------------------ 时间胶囊 ------------------------------ */
+/* [V0.3.10] 开启 / 截止各自可点编辑；[V0.3.11] 只读态改回**和「今日计时」行同一套读数**
+   （等宽 11.5 / --ink-4 / 右对齐）：用户口径「显示格式应该和计时一样，没指定时间就右侧空白」。
+   胶囊、铃铛、「未设时间」字样全部取消 —— 有时间就显示：有开始时间按开始显示，否则显示截止。 */
+.todo-pend__time {
+  flex: 0 0 auto;
+  /* [ADR-034] 这一格现在也会写日期（`10-22`）与「逾期」，34px 装不下 `MM-DD`（5 位等宽 ≈ 35–38px），
+     会把字挤成两行。加宽到 40px 兜住常态；跨年 `YY-MM-DD`（8 位）仍允许按内容自然撑开
+     （grid 中列是 auto，两侧 1fr 等分吸收，不破坏行内对齐）。 */
+  min-width: 40px;
+  /* 居中对齐 = 与「今日计时」的时间列同一条视觉中线（两节列模板一致） */
+  text-align: center;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);   /* [Timing 对齐 D10] NumEm 11.5 */
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+}
+
+/* [V0.3.11] 行尾圆圈：**只表达「有没有提醒」**（黄 = 有时间提醒，空心 = 无）。
+   用户口径「提醒放在显示总时间的部分」—— 它贴右沿，正落在表头「X 小时 Y 分」那一列下面。
+   点击它是「完成 / 未完成」（见 TodosPendingRow），行的其余部分才是开关提醒。 */
+.todo-pend__mark {
+  justify-self: end;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--line-3);
+  background: transparent;
+  transition: background-color var(--dur-quick) var(--ease-standard),
+    border-color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-pend__mark[data-on="true"] {
+  border-color: var(--color-warn);
+  background: var(--color-warn);
+}
+
+.todo-pend__mark:hover {
+  border-color: var(--ink-3);
+}
+
+.todo-pend__mark[data-on="true"]:hover {
+  border-color: var(--color-warn);
+}
+
+/* 已完成的待办：圆圈淡下去（完成态本身由名字删除线表达） */
+.todo-pend[data-done="true"] .todo-pend__mark {
+  opacity: 0.5;
+}
+
+.todo-pend__times {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 编辑态的时间位：纯文字（不是胶囊），hover 才起底；未设时是淡淡的「+」 */
+.todo-pend__chip {
+  min-width: 30px;
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-pend__chip:hover,
+.todo-pend__chip[aria-expanded="true"] {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+/* 未设值：虚线「+」——空也能点开去设（用户口径「待办时间应可空置」） */
+.todo-pend__chip[data-empty="true"] {
+  font-family: inherit;
+  text-decoration: underline dotted var(--line-3);
+  text-underline-offset: 2px;
+}
+
+.todo-pend__chip[data-empty="true"]:hover {
+  color: var(--ink-3);
+  text-decoration-color: var(--accent-line);
+}
+
+/* 截止项跟着行语气走（逾期看的是 planned_at，开始时间不参与） */
+.todo-pend[data-tone="overdue"] .todo-pend__time,
+.todo-pend[data-tone="overdue"] .todo-pend__chip[data-field="planned"] {
+  color: var(--todo-overdue);
+}
+
+.todo-pend__actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.todo-pend__act {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-pend__act:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+/* 图标非文本，门槛 3:1（WCAG 1.4.11）；勿按文字 4.5 抬高 */
+.todo-pend__act--danger:hover {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/todos-inline.css">/* =============================================================================
+ * Timing V0.2.0 — todos-inline.css（事项窗口：内联编辑/确认 + 空态 + Loading/Error）
+ * -----------------------------------------------------------------------------
+ * 拆自 todos-pending.css（单文件 ≤300 行纪律）。仅 var(--*)，零字面量色值。
+ * 依据 docs/design/pages-V0.2.0/todos-panel.md §3.2 交互态 / §3.3 空态 / §3.4 键盘路径。
+ * ========================================================================== */
+
+/* ------------------------------ 内联编辑 / 确认 ------------------------------ */
+/* [V0.3.13] 改名 / 改时间不再是「编辑条 + 确定 / 取消」，而是**就地打字**（`.inline-text`）；
+   删除确认条（`.inline-confirm`）保持原样。 */
+.inline-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+/* 就地文本框：吃掉所在格子，观感尽量贴近原来的纯文本（同字号、无内边距跳动） */
+.inline-text {
+  min-width: 0;
+  width: 100%;
+  height: var(--todos-pending-row-h);
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  background: var(--input-bg-focus);
+  color: var(--ink);
+  border: 1px solid var(--input-border);
+  font: inherit;
+  font-size: var(--text-sm);
+  outline: none;
+}
+
+.inline-text:focus {
+  border-color: var(--accent-line);
+}
+
+.inline-text[data-invalid="true"] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* 时间位是定宽的等宽格：输入时不能把左右两列挤走 */
+.inline-text--time {
+  width: 62px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.inline-confirm__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+.inline-confirm__ok {
+  flex: 0 0 auto;
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  background: var(--btn-danger-bg);
+  color: var(--btn-danger-ink);
+}
+
+.inline-confirm__cancel {
+  flex: 0 0 auto;
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+.inline-confirm__cancel:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+/* ------------------------------ 空态 ------------------------------ */
+.todos__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.todos__empty-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-md);
+  background: var(--bg-field);
+  color: var(--ink-4);
+}
+
+.todos__empty-title {
+  margin: 0;
+  font-size: var(--text-body);
+  color: var(--ink-2);
+}
+
+.todos__empty-hint {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+/* ------------------------------ Loading / Error ------------------------------ */
+.todos__skel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.todos__skel-row {
+  height: var(--todos-row-h);
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+}
+
+.todos__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+.todos__state svg {
+  color: var(--ink-3);
+}
+
+.todos__state p {
+  margin: 0;
+}
+
+.todos__err {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-xs);
+  color: var(--danger);
+}
+
+/* --------------------- 记录行编辑态（V0.3.11） --------------------- */
+/* 用户口径「编辑事项功能应也能修改计时的事项」：打开底栏「编辑事项」后，
+   记录行的名字变成改名按钮、行尾多一枚删除（走同一条内联确认条 ——
+   记录挂在**事项**上，删的是事项本身，所以不像待办那样即时删除）。 */
+/* 编辑态：名字 / 时间 / 删除 三列，**隐藏时长列** —— 四列时「时长」把名字挤到只剩 25px
+   （实测），改名的输入面根本看不到字。编辑时段里名字优先于时长。 */
+.todo-row[data-edit="true"] {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.todo-row[data-edit="true"] .todo-row__dur {
+  display: none;
+}
+
+.todo-row__name--btn {
+  margin: 0 -2px;
+  padding: 0 2px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+  cursor: text;
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-row__name--btn:hover {
+  background: var(--bg-field-hi);
+}
+
+.todo-row__actions {
+  flex: 0 0 auto;
+  display: inline-flex;
+  justify-self: end;
+}
+
+.todo-row__act {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+/* 图标非文本，门槛 3:1（WCAG 1.4.11） */
+.todo-row__act:hover {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+/* 记录行编辑态的「开始 / 结束」两枚时间位（[V0.3.12] ADR-030）：
+   与待办行的 `.todo-pend__chip` 同一套观感（等宽数字、悬停底、未设虚线），
+   但落在 `.todo-row` 里，所以单独一组类名，避免和待办行的 grid 打架。 */
+.todo-row__times {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.todo-row__chip {
+  display: inline-block;
+  padding: 0 3px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todo-row__chip:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.todo-row__chip[data-empty="true"] {
+  color: var(--ink-4);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/todos-compose.css">/* =============================================================================
+ * Timing V0.3.9 — todos-compose.css（事项窗「新增待办」卡）
+ * -----------------------------------------------------------------------------
+ * 用户口径：新增待办要与「新增常用摸鱼 / 常用事项」一样走**表单卡**，可填开启 / 截止时间
+ * （都可不填）。卡片贴在底栏上方，占满面板宽度，玻璃底与菜单同源。
+ * P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+.todos-compose {
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: calc(var(--todos-foot-h) + var(--space-2));
+  z-index: 5;
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--menu-bg);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-plate);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+}
+
+.todos-compose__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.todos-compose__title {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  color: var(--ink-2);
+}
+
+.todos-compose__close {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.todos-compose__close:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.todos-compose__input {
+  width: 100%;
+  height: var(--input-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  border: 1px solid var(--input-border);
+  /* [V0.11.7] 与它生成的那一行（待办行 `.todo-pend__title` = --text-sm 12.5px）对齐：
+     原先是 --text-xs 11.5px，打完字按 Enter 立刻「变大一号」。也顺手回到全站
+     表单输入的常用档（--text-sm / --text-body），不再单独做一个更小的一档。
+     注：这张卡生成的是**待办行**，不是「今日计时」的记录行（`.todo-row__title`）。 */
+  font-size: var(--text-sm);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.todos-compose__input::placeholder {
+  color: var(--input-placeholder);
+}
+
+.todos-compose__input:focus {
+  outline: none;
+  background: var(--input-bg-focus);
+}
+
+/* 时间行：左标签 + 右按钮（窄窗里仍是一行，控件吃掉剩余宽度）。
+   控件本体在 todos-datetime.css（.dt-field / .dt-pop） */
+.todos-compose__row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-cap);
+  color: var(--ink-3);
+}
+
+.todos-compose__err {
+  margin: 0;
+  font-size: var(--text-cap);
+  color: var(--danger);
+}
+
+.todos-compose__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/todos-datetime.css">/* =============================================================================
+ * Timing V0.3.9 — todos-datetime.css（待办「开启 / 截止」时间字段 + 自绘选择浮层）
+ * -----------------------------------------------------------------------------
+ * 为什么自绘：原生 datetime-local 是 Chromium 面板，加不了「x 天后」、也不能切上午/下午。
+ * 见 components/todos/DateTimePicker.tsx 顶部说明。
+ * P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+/* ------------------------------ 字段按钮 ------------------------------ */
+.dt-field {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: var(--input-h);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  transition: background-color var(--dur-quick) var(--ease-standard),
+    border-color var(--dur-quick) var(--ease-standard);
+}
+
+.dt-field:hover {
+  background: var(--input-bg-focus);
+}
+
+/* 未设值：灰字 + 正文字体（「今天（未设）」是提示，不是读数） */
+.dt-field[data-empty="true"] {
+  font-family: inherit;
+  color: var(--input-placeholder);
+}
+
+/* 展开中：只加描边，不加阴影（避免与全局 --focus-ring 的双环打架） */
+.dt-field[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--input-bg-focus);
+}
+
+/* ------------------------------ 选择浮层 ------------------------------ */
+.dt-pop {
+  z-index: var(--z-menu);
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-md);
+  background: var(--menu-bg);
+  box-shadow: var(--shadow-plate);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  overflow: auto;
+  color: var(--ink-2);
+  font-size: var(--text-cap);
+}
+
+.dt-pop__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  min-height: 22px;
+}
+
+.dt-pop__month {
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.dt-pop__nav {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.dt-pop__nav:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.dt-pop__week,
+.dt-pop__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.dt-pop__week {
+  color: var(--ink-4);
+  font-size: var(--text-cap);
+  text-align: center;
+}
+
+/* 日期格：22 高（7 列 × 22 + 间距 ≈ 178，正好落在 232 宽内） */
+.dt-pop__day {
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.dt-pop__day:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+/* 上下月补位：降一档亮度，仍可点（省一次翻月） */
+.dt-pop__day[data-out="true"] {
+  color: var(--ink-4);
+}
+
+/* 今天：加一圈细描边，不与选中态抢色 */
+.dt-pop__day[data-today="true"] {
+  box-shadow: inset 0 0 0 1px var(--line-3);
+}
+
+/* 选中：accent 淡底 + accent 描边 + accent 字（跟 --btn-accent-bg 同一套：
+   品牌蓝实心底上压白字只有 2.45:1，设计系统明令不做实心蓝块） */
+.dt-pop__day[data-sel="true"] {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+  font-weight: var(--weight-semibold);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+/* 相对天数（用户口径：「下边额外显示 x 天后」）+ 清除 */
+.dt-pop__rel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 18px;
+  padding: 0 var(--space-1);
+}
+
+.dt-pop__rel-day {
+  font-size: var(--text-cap);
+  color: var(--ink-3);
+  letter-spacing: var(--tracking-xs);
+}
+
+.dt-pop__clear {
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+}
+
+.dt-pop__clear:hover {
+  color: var(--danger);
+}
+
+/* ------------------------------ 时间行 ------------------------------ */
+.dt-pop__time {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--line);
+}
+
+/* 上午 / 下午分段 */
+.dt-pop__mer {
+  display: flex;
+  flex: 0 0 auto;
+  padding: 1px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+}
+
+.dt-pop__mer button {
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  font-size: var(--text-cap);
+  transition: background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.dt-pop__mer button[data-on="true"] {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+
+.dt-pop__sel {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 24px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.dt-pop__colon {
+  flex: 0 0 auto;
+  color: var(--ink-4);
+  font-family: var(--font-mono);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/todos-preview.css">/* =============================================================================
+ * Timing V0.3.9 — todos-preview.css（事项窗左侧「便利贴预览」卡）
+ * -----------------------------------------------------------------------------
+ * 用户口径：事项窗里悬停事项行时，在该事项左侧预览它的便利贴。
+ * 事项窗为此整体加宽 240px，面板靠右、左侧留透明区；卡片用 portal 挂到 body，
+ * 这里只负责长相（玻璃底 / 小标题 / 可滚正文）。P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+.note-preview {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--menu-bg);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-plate);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  cursor: pointer;
+  animation: note-preview-in var(--dur-quick) var(--ease-standard) both;
+}
+
+.note-preview:hover {
+  border-color: var(--accent-line);
+}
+
+@keyframes note-preview-in {
+  from {
+    opacity: 0;
+    transform: translateX(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.note-preview__head {
+  flex: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-cap);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--tracking-caps);
+  color: var(--ink-4);
+}
+
+.note-preview__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+.note-preview__body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.note-preview__body::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/timer-window.css">.timer-window { color: var(--text-primary); background: var(--surface-panel); }
+.timer-window__clock { display: block; font-size: 2.4rem; letter-spacing: .04em; }
+.timer-window__item { color: var(--text-secondary); }
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/note.css">/* =============================================================================
+ * Timing V0.2.0 — note.css（便利贴窗口 label = note-{id}）
+ * -----------------------------------------------------------------------------
+ * 依据 docs/design/pages-V0.2.0/sticky-note.md §1/§3/§6。
+ * P0：仅 var(--*)，零字面量色值（尺寸断点除外）。
+ * 关键：正文文字**始终 100% 不透明**（--ink），未悬停仅让**背景板**更透 + 头/页脚/按钮淡出
+ *       （sticky-note.md §3.1 可读性红线：Timing §1-11 双重透明硬伤的修复）。
+ * 窗口壳：html[data-window="note"] 铺满自身视口（独立窗口，按 ADR-020 没有画布）。
+ * ========================================================================== */
+
+/* ------------------------------ 窗口根 ------------------------------ */
+html[data-window="note"] {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+html[data-window="note"] body,
+html[data-window="note"] #root {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* [V0.3.1] 指针形状恒为**默认箭头**（用户口径「不要在便利贴改变鼠标状态」）：
+   正文的 I-beam、圆点/手柄的 pointer、拖动期的 grabbing 全部压回 default。
+   cursor 只影响形状，不影响输入、选区与拖动本身；要选字用 Shift+拖动照旧。
+   放在 note.css（在 app.css 之后加载）并用 !important，才能盖住控件级规则。 */
+html[data-window="note"],
+html[data-window="note"] * {
+  cursor: default !important;
+}
+
+/* ------------------------------ 便利贴本体 ------------------------------ */
+.note {
+  container-type: inline-size; /* 供确认条窄宽断点查询（noteConfirmStackBelowW 200） */
+  position: relative; /* [V0.2.4 · 1/2] 圆点与缩放手柄都绝对定位在正文框内侧 */
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  /* 未悬停（sticky 态）：**背景消失**，只剩正文浮在桌面上——与主小条同一口径（V0.2.1 · 1.2） */
+  /* [V0.2.1 · 5] 整窗零描边：连 1px 透明占位边也去掉，避免任何缩放/子像素下透出细线 */
+  border: 0;
+  box-shadow: none;
+  color: var(--ink);
+  transition:
+    background-color var(--dur-exit) var(--ease-standard),
+    box-shadow var(--dur-exit) var(--ease-standard);
+}
+
+/* [V0.2.3 · 1] 恒定无底板：悬停/聚焦也不再显影（只留文字 + 右上角圆点） */
+.note:hover,
+.note:focus-within {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ------------------------------ 头（两枚圆点，浮在正文框右上角内侧） ------------------------------ */
+/* [V0.2.4 · 1] 圆点从「独立一行」改为**浮在文字框内**的右上角：不再占正文高度，
+   文字背景亮起时它们就在这块底色里（用户口径：按钮放在文字背景内）。 */
+.note__head {
+  position: absolute;
+  top: var(--note-pad);
+  right: var(--note-pad);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 4px 6px;
+  /* [V0.2.1 · 5] 两枚圆点随背景一起隐藏：允许先藏（找不到落点）是用户明确口径 */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-exit) var(--ease-standard);
+}
+
+.note:hover .note__head,
+.note:focus-within .note__head,
+.note__body:hover .note__head {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* [V0.2.4 · 2] 右下角缩放手柄：悬停才现形，按住交给系统做 nwse 缩放 */
+.note__resize {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  z-index: 2;
+  width: 14px;
+  height: 14px;
+  /* [V0.3.1] 不再改指针（原 nwse-resize）：整块便利贴统一默认箭头 */
+  opacity: 0;
+  transition: opacity var(--dur-exit) var(--ease-standard);
+  /* 两道斜纹示意可拖拽角（零字面量色值：全部走令牌） */
+  background:
+    linear-gradient(135deg, transparent 45%, var(--ink-4) 45%, var(--ink-4) 55%, transparent 55%) right 3px bottom 3px /
+      6px 6px no-repeat,
+    linear-gradient(135deg, transparent 45%, var(--ink-4) 45%, var(--ink-4) 55%, transparent 55%) right 0 bottom 0 /
+      4px 4px no-repeat;
+}
+
+.note:hover .note__resize {
+  opacity: 0.85;
+}
+
+.note__dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 红点 = 删除（两步确认：armed 时外扩一圈环）/ 黄点 = 隐藏 */
+.note__dot {
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+  box-shadow: 0 0 0 0 transparent;
+  transition:
+    box-shadow var(--dur-quick) var(--ease-standard),
+    transform var(--dur-instant) var(--ease-standard),
+    filter var(--dur-quick) var(--ease-standard);
+}
+
+.note__dot[data-tone="warn"] {
+  background: var(--warn);
+}
+
+/* [V0.3.1] 白色「置顶」点已删除（用户口径）；便利贴恒为置顶，无切换入口。
+   原 data-tone="pin" 两条规则（实心 / 空心环）随之移除。 */
+
+.note__dot:hover {
+  transform: scale(1.15);
+  filter: brightness(1.12);
+}
+
+.note__dot:active {
+  transform: scale(0.92);
+}
+
+.note__dot[data-armed="true"] {
+  box-shadow: 0 0 0 3px var(--danger-wash);
+}
+
+.note[data-error="true"] .note__dot[data-tone="danger"] {
+  box-shadow: 0 0 0 3px var(--danger-wash);
+}
+
+/* ------------------------------ 正文（始终可读可输入） ------------------------------ */
+/* V0.2.1 · 4：未悬停时连正文底板也透明（整窗=只剩文字浮在桌面）；悬停/聚焦才浮出底板 */
+.note__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: var(--note-pad);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  /* [V0.2.1 · 5] 去掉外边框：原先 1px 透明描边会在聚焦时变成 accent 边（用户看到的「外框」），
+     现在整块零描边，只靠底板与投影表达焦点。 */
+  border: 0;
+  transition:
+    background-color var(--dur-exit) var(--ease-standard),
+    box-shadow var(--dur-quick) var(--ease-standard);
+}
+
+/* [V0.2.4 · 3] 触发面是**正文框本身**：鼠标进到文字框内就浮出底板（含聚焦态），
+   而不是整个窗口（窗口右下角有小块缩放手柄留白，悬停那里不该点亮）。 */
+.note__body:hover,
+.note__body:focus-within {
+  background: var(--note-body-bg);
+  box-shadow: none;
+}
+
+.note__input {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 9px 11px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--ink); /* 可读性红线：始终 100% 不透明 */
+  /* [V0.2.2 · 4] 文字浓淡只由设置里的「文字不透明度」决定，悬停与否不再变化 */
+  opacity: var(--ui-text-opacity, 1);
+  /* [Timing 对齐 D5] 正文 = 悬浮小条事项名同套字体参数：14px / 650（StickyNoteForm.cs:1289-1293）。
+     font 简写保行数红线（等价 font-family + font-size + line-height + font-weight 四行） */
+  font: var(--weight-strong) var(--text-task-pill) / var(--leading-body) var(--font-ui);
+  user-select: text;
+  /* [V0.3.1] 整块便利贴都是默认箭头（含聚焦后的正文），不再切 I-beam。 */
+  cursor: default;
+  overflow-y: auto;
+}
+
+.note__input::placeholder {
+  color: var(--ink-4);
+}
+
+/* 自绘 6px 滚动条（无箭头） */
+.note__input::-webkit-scrollbar {
+  width: 6px;
+}
+
+.note__input::-webkit-scrollbar-thumb {
+  background: var(--line-3);
+  border-radius: var(--radius-full);
+}
+
+/* V0.2.1 · 3：页脚（「随记 · 未关联事项」/ 关联按钮 / 删除确认条）已全部移除——
+   界面上不留任何文字，只剩正文输出框与右上角两枚圆点。 */
+
+/* ------------------------------ 焦点环（取消） ------------------------------ */
+/* [V0.2.6] 便利贴里不再画任何焦点环：app.css 的
+   `:where(button, input, select, [tabindex]):focus-visible { box-shadow: var(--focus-ring) }`
+   会给正文 textarea / 圆点按钮套一圈 accent 蓝环——用户在桌面上看到的就是「便利贴边框蓝色」。
+   便利贴是常驻可编辑面（正文永远可输入），焦点已由底板与光标表达，这里显式清零。 */
+.note :where(input, textarea, button, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/batch2.css">/* =============================================================================
+ * Timing V0.2.0 — batch2.css（批2 浮层：小条倒计时环 / 倒计时自定义 / 常用事项）
+ * -----------------------------------------------------------------------------
+ * 依据 docs/design/pages-V0.2.0/{countdown-menu,common-items}.md。
+ * P0：仅 var(--*)，零字面量色值。自绘玻璃复用于 menu.css 的 .menu 语言。
+ * 提醒浮出卡见同目录 reminder.css（单文件 ≤300 行纪律）。
+ * ========================================================================== */
+
+/* ------------------------------ 小条：倒计时剩余提示色 ------------------------------ */
+/* [Timing 对齐 D3] 裁决一：急迫态 = RingUrgent 红（非橙）；数字变红不闪（MainForm.cs:786-793） */
+.pill .timer-digits[data-tone="warn"] {
+  color: var(--color-danger);
+}
+
+/* [Timing 对齐 D4] 暂停即橙字（MainForm.cs:782-785，与暂停弧同源）；置于 warn 规则后，
+   同权重下暂停优先（MainForm 先判 paused） */
+.pill[data-state="paused"] .timer-digits {
+  color: var(--color-warn);
+}
+
+/* ------------------------- 状态环弧（V0.3.6 统一结构，ADR-024 / V0.3.7 全状态单载体） ------------------------- */
+/* 单一结构裁决：**每一种状态**都渲染同一个 `<svg>` + 同一条 ARC_PATH，`border` 彻底退场
+   （`.ring` 的 border 已归零，见 surfaces.css）。V0.3.7 之前 idle / ended 是例外——
+   它们走 CSS border-radius，也就是「圆角矩形」，与 SVG 的超椭圆是两种形状；
+   而空环恰恰是用户最常看到的状态，只改计时态等于没改。
+   去掉 border 后还顺带修掉两笔旧账：环的粗细只剩 SVG 一处（不再有 2.4 被吸附成 2.00px），
+   以及 `.ring::before` 的命中区终于真的等于 24×24（原 padding box 只有 11.2，实际 19.2）。 */
+
+.ring__arc {
+  position: absolute;
+  /* [V0.2.1 · 1.6] 绝对定位以 padding box 为基准：.ring 有 --ring-stroke 的边框，
+     原 inset:0 让 SVG 只剩 16 − 2×描边（≈11.2px），弧比 border 环小一圈（进行时看起来缩了一个号）。
+     改为「按 border box 尺寸居中摆放」：宽高直接取 --ring-size，用负外边距抵消一半，
+     viewBox 16 与环 16 一一对应，弧与静态环同径，且不随边框像素对齐而变化。 */
+  top: 50%;
+  left: 50%;
+  width: var(--ring-size);
+  height: var(--ring-size);
+  margin: calc(var(--ring-size) / -2) 0 0 calc(var(--ring-size) / -2);
+  /* 描边中线 inset 1.2 + stroke/2 1.2 = 8，外沿恰好触界；overflow 兜住半像素裁切 */
+  overflow: visible;
+  /* [V0.3.6 P0] 这里**不再有任何 transform**：行进取代 rotate()，见 ring-march 的注释。
+     留着 rotate 会让整个 SVG（含底轨）一起歪——那是 V0.3.3 改 squircle 时埋下的静默回归。 */
+  pointer-events: none;
+}
+
+.ring__arc-track {
+  fill: none;
+  /* [Timing 对齐 D6] 轨道 = 状态色 × RingTrackAlpha 95/255 ≈ 0.37（MainForm.cs:2369）。
+     [V0.3.6] 这是**唯一**一处底环实现：surfaces.css 里 35% 的 border-color 已删，
+     两套载体在分数 DPI 下抗锯齿不同（SVG 走 subpixel、border 走像素对齐），必须收成一套。
+     track 不加 transition：底轨是静态参照物，跟着 bar 一起动会显得整环在抖。 */
+  stroke: color-mix(in srgb, currentColor 37%, transparent);
+  stroke-width: var(--ring-stroke);
+}
+
+.ring__arc-bar {
+  fill: none;
+  /* [V0.3.6] 弧色 = currentColor，与 track 同源：环色只由 .ring 的 color 一处决定
+     （running / warn / danger / 待命-running），SVG 里不再写死 --color-running——
+     写死会让「待命态弧亮绿 + 轨道仍用 idle 的 ink」这类分叉永远修不掉。 */
+  stroke: currentColor;
+  /* 与 track 同源：一条粗一条细是 16px 盒上最显眼的失谐 */
+  stroke-width: var(--ring-stroke);
+  stroke-linecap: round;
+  transition:
+    stroke-dashoffset var(--dur-tick) linear,
+    stroke var(--dur-base) var(--ease-standard);
+}
+
+/* [V0.3.7] ended 的瞬时确认：描边加粗到 3px（原来是 `border-width: 3px`）。
+   方向差别要知道：border 从盒边向**内**长，SVG 描边从中线向**两侧**长，
+   所以外沿会超出 16×16 约 0.3px（`.ring__arc` 的 overflow: visible 兜得住）。
+   900ms 之后 ring 回到 idle，这 0.3px 不会停留。 */
+.ring[data-thick="true"] .ring__arc-bar {
+  stroke-width: 3px;
+}
+
+/* [V0.3.6] 暂停 = 瞬时定格：从 transition 里摘掉 dashoffset，只留颜色过渡。
+   CSS transition 取**变化后状态**的 declaration，所以 running→paused 命中这条 →
+   弧长在一个 rAF 内直接到位，不再用 1s 线性「长到 270°」。
+   为什么必须掐掉：暂停的语义是「停住」，渐变等于告诉用户「还在动」；而且倒计时剩 20% 时
+   弧会从 72° 缓缓长到 270°，看起来像进度回退了。正计时那边本来就是硬切，现在两边一致。
+   注意**不能**影响倒计时 running 的每秒 tick 平滑——那条仍在 .ring__arc-bar 基准规则里。 */
+.ring[data-state="paused"] .ring__arc-bar {
+  transition: stroke var(--dur-base) var(--ease-standard);
+}
+
+/* [Timing 对齐 D3] 急迫态：环色切 RingUrgent 红；轨道（color-mix 取 currentColor）与弧
+   （stroke: currentColor）随之一起变红，不需要再单独给 bar 写 stroke。
+   暂停优先（MainForm.cs:782 先判 paused）：paused 态不切红 */
+.ring[data-warn="true"]:not([data-state="paused"]) {
+  color: var(--color-danger);
+}
+
+/* Blink（MainForm.cs:2388-2395）：1s 周期，0-520ms 全亮、480ms 亮度 0.615，
+   作用于弧与轨道；数字不闪（裁决一实现要点） */
+@keyframes ring-blink {
+  0%, 52% {
+    opacity: 1;
+  }
+  52.01%, 100% {
+    opacity: 0.615;
+  }
+}
+
+.ring[data-warn="true"]:not([data-state="paused"]) .ring__arc-bar,
+.ring[data-warn="true"]:not([data-state="paused"]) .ring__arc-track {
+  animation: ring-blink 1s linear infinite;
+}
+
+/* 暂停态（270° 暖橙静弧）不需要单独规则：弧色 = currentColor，而 `.ring[data-state="paused"]`
+   的 color 已是 --color-warn（surfaces.css），track 的 color-mix 取同一个 currentColor，
+   一处改、弧与轨同步（V0.3.6）。 */
+
+/* [V0.3.3] 起点已在顶边中点（ARC_PATH），沿路径走一整圈仍是 360° */
+/* [V0.3.6 P0] 行进 = dashoffset 沿路径推进，**不是** transform: rotate()。
+   squircle（圆角方形）只有 90° 旋转对称：把 rotate() 加在 .ring__arc 上会让
+   ① 底轨一起歪掉（41° 时四边既不水平也不垂直）；② 90° 弧段只在 90° 整数倍上
+   与轨道曲率吻合，转到中途会浮出轨道。dashoffset 推进让弧永远贴着真实路径走，track 完全不动。 */
+@keyframes ring-march {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -100;   /* 沿路径正方向（顺时针）推进一整圈，pathLength 口径 100 */
+  }
+}
+
+/* [V0.3.6] 行进只认 data-spin（正计时 running 独占；一圈 3.2s，转速口径与 Timing 一致，
+   MainForm.cs:3062）。动画落在 **bar** 上，`.ring__arc` 不含任何 transform。
+   **不要**退回 `[data-state="running"]`：倒计时运行时 data-state 也是 running，
+   递减弧会被一起动起来，用户读不出剩余量（D1，本次核心 P0）。
+   transition 只留颜色：dashoffset 交给动画（动画驱动的变化不会触发 transition，
+   但把 dashoffset 从 transition 里摘掉可以省掉「切到 running 的第一帧」那次多余的插值）。 */
+.ring[data-spin="true"] .ring__arc-bar {
+  animation: ring-march 3.2s linear infinite;
+  transition: stroke var(--dur-base) var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* [V0.3.6-F1] 三条都**必须**与基准规则同特异性（spin 0,3,0 / warn 0,4,0）：
+     媒体查询本身不贡献特异性，若写成 `.ring[data-warn="true"] .ring__arc-bar`（0,3,0）
+     就会被基准规则的 `animation: ring-blink` 压掉，这条 `animation: none` 变成死规则
+     （CDP 实测：命中但被压，computed animationName 仍是 ring-blink）。
+     同特异性 + 后加载 → 本块胜出，减动效才真的生效。不要改用 `!important` 兜底。 */
+  .ring[data-spin="true"] .ring__arc-bar,
+  .ring[data-warn="true"]:not([data-state="paused"]) .ring__arc-bar,
+  .ring[data-warn="true"]:not([data-state="paused"]) .ring__arc-track {
+    animation: none;   /* blink 退化为静态红；行进弧退化为静止的「顶部起 90°」 */
+  }
+}
+
+/* 事项名可点（常用事项入口） */
+.pill__name[data-interactive="true"] {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-quick) var(--ease-standard);
+}
+
+.pill__name[data-interactive="true"]:hover {
+  color: var(--ink);
+}
+
+/* ------------------------------ 自定义时长（countdown-menu.md §3.2） ------------------------------ */
+.menu--countdown-custom {
+  width: 200px;
+  animation: menu-in var(--dur-base) var(--ease-standard);
+}
+
+.cd-custom__row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--menu-item-pad-x) 0;
+}
+
+.cd-custom__field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cd-custom__input {
+  width: var(--field-num-w);
+  height: var(--input-h);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--input-text);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  text-align: right;
+}
+
+.cd-custom__input:focus-visible {
+  outline: none;
+  background: var(--input-bg-focus);
+  box-shadow: var(--focus-ring);
+}
+
+.cd-custom__unit {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.cd-custom__hint,
+.cd-custom__error {
+  margin: var(--space-2) var(--menu-item-pad-x) 0;
+  font-size: var(--text-cap);
+}
+
+.cd-custom__hint {
+  color: var(--ink-4);
+}
+
+.cd-custom__error {
+  color: var(--danger);
+}
+
+.cd-custom__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--menu-item-pad-x) var(--space-1);
+}
+
+.cd-custom__btn {
+  height: var(--btn-sm-h);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+}
+
+/* ------------------------------ 常用事项（common-items.md §1） ------------------------------ */
+/* 当前项：左 3×16 --accent 竖条（与事项窗口当前行一致）；隐藏右侧勾以去重编码 */
+.menu--common .menu__item[data-current="true"] {
+  box-shadow: inset 3px 0 0 0 var(--accent);
+  color: var(--menu-text-on);
+}
+
+.menu--common .menu__check {
+  display: none;
+}
+
+/* ------------------------------ 设置 · 通用页：开关行内小字提示 ------------------------------ */
+.setting-row__hint {
+  margin-left: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/reminder.css">/* =============================================================================
+ * Timing V0.2.0 — reminder.css（批2 N-5 提醒浮出卡）
+ * -----------------------------------------------------------------------------
+ * 依据 docs/design/pages-V0.2.0/reminder-popover.md §1/§3.2。
+ * P0：仅 var(--*)，零字面量色值。层 --z-dialog (70)，宽 330（Timing BoxW，RemindBox.cs:12），玻璃 --menu-bg。
+ * ========================================================================== */
+
+.reminder {
+  position: absolute;
+  z-index: var(--z-dialog);
+  width: 330px;   /* [Timing 对齐 D12] BoxW 330（RemindBox.cs:12） */
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--menu-bg);
+  border: 1px solid var(--line-2);
+  box-shadow: var(--shadow-pop);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  pointer-events: auto;
+  animation: reminder-in var(--dur-base) var(--ease-standard);
+}
+
+@keyframes reminder-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.reminder__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.reminder__bell {
+  display: inline-flex;
+  color: var(--color-warn);
+}
+
+.reminder__title {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
+}
+
+.reminder__line {
+  margin: 0;
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+
+.reminder__sub {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.reminder__pending {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  max-height: 66px;
+  overflow-y: auto;
+}
+
+.reminder__pending-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--menu-item-h);
+}
+
+.reminder__pending-time {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+}
+
+.reminder__clear {
+  margin-left: auto;
+  height: var(--btn-md-h);   /* [Timing 对齐 D12] 主 CTA → --btn-md-h 28（裁决二，标度档） */
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+/* 聚合到点行的标题（弹性截断，清除按钮靠右） */
+.reminder__fired-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+}
+
+.reminder__clear:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.reminder__snooze {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.reminder__snooze-btn {
+  height: var(--btn-md-h);   /* [Timing 对齐 D12] 主 CTA → --btn-md-h 28 */
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--bg-field);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.reminder__snooze-btn:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.reminder__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.reminder__btn {
+  height: var(--btn-md-h);   /* [Timing 对齐 D12] 主 CTA → --btn-md-h 28 */
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+}
+
+.reminder__close {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: var(--icon-btn-size);
+  height: var(--icon-btn-size);
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  transition: background-color var(--dur-quick) var(--ease-standard), color var(--dur-quick) var(--ease-standard);
+}
+
+.reminder__close:hover {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.reminder__clear-all {
+  display: block;
+  margin: var(--space-2) 0 0 auto;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  text-underline-offset: 2px;
+}
+
+.reminder__clear-all:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/highlight.css">/* =============================================================================
+ * Timing V0.3.1 — highlight.css（托盘双击 → 高亮定位小条）
+ * -----------------------------------------------------------------------------
+ * 托盘图标双击时 Rust 广播 `tray:highlight`，主窗读到「高亮颜色」后给
+ * `.pill` 挂 `data-highlight="true"`，闪三下（0.8s × 3）自动摘掉。
+ *
+ * 两点约束：
+ *  1. 窗口是严丝合缝贴合内容的（autoFit pad=0），外发光会被窗口边界裁掉，
+ *     所以描边一律画**内侧**（inset）。
+ *  2. 本文件必须在 surfaces.css **之后**加载：`.pill[data-highlight]` 与
+ *     `.pill:hover` 同为 0-2-0 特异性，靠顺序压过悬停板——双击时鼠标往往就停在
+ *     小条上，否则高亮会被悬停样式顶掉。
+ * ========================================================================== */
+
+.pill[data-highlight="true"] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--highlight-color) 24%, transparent);
+  box-shadow: inset 0 0 0 2px var(--highlight-color);
+  animation: pill-highlight 0.8s var(--ease-standard) 3;
+}
+
+@keyframes pill-highlight {
+  0%,
+  100% {
+    box-shadow: inset 0 0 0 2px var(--highlight-color);
+  }
+  50% {
+    box-shadow: inset 0 0 0 2px transparent;
+  }
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/moyu.css">/* =============================================================================
+ * Timing V0.3.2 — moyu.css（摸鱼菜单 / 其他事项滚轮定长）
+ * -----------------------------------------------------------------------------
+ * 玻璃底、行高、键盘态、贴边定位全部沿用 menu.css 的 .menu 语言；
+ * 本文件只补两处差异：加速位数字等宽 + 「其他事项」卡片的表单/大数字。
+ * P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+/* 行右侧时长用等宽数字：5m / 25m / 1h 混排时不抖 */
+.menu--moyu .menu__accel {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------ 其他事项（名称 + 滚轮定长） ------------------------------ */
+.moyu-custom {
+  padding-bottom: var(--space-2);
+}
+
+.moyu-custom__field {
+  display: block;
+  padding: var(--space-1) var(--menu-item-pad-x) 0;
+}
+
+.moyu-custom__input {
+  width: 100%;
+  height: var(--input-h);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--input-border);
+  border-radius: var(--radius-sm);
+  background: var(--input-bg);
+  color: var(--input-text);
+  font-size: var(--text-sm);
+}
+
+.moyu-custom__input::placeholder {
+  color: var(--ink-4);
+}
+
+.moyu-custom__input:focus-visible {
+  outline: none;
+  background: var(--input-bg-focus);
+  box-shadow: var(--focus-ring);
+}
+
+.moyu-custom__value {
+  margin-top: var(--space-3);
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--text-timer-pill);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-num);
+  color: var(--ink);
+  /* 滚轮是这个数的唯一主交互：光标给「可上下拖动」的暗示 */
+  cursor: ns-resize;
+  user-select: none;
+}
+
+.moyu-custom__hint {
+  margin: var(--space-1) 0 var(--space-2);
+  text-align: center;
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+}
+
+.moyu-custom__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: 0 var(--menu-item-pad-x);
+}
+
+/* ------------------------------ 常用摸鱼管理（V0.3.9） ------------------------------ */
+.moyu-manage {
+  padding-bottom: var(--space-2);
+}
+
+.moyu-manage__list {
+  max-height: 168px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-3) transparent;
+}
+
+.moyu-manage__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--menu-item-h);
+  padding: 0 var(--menu-item-pad-x);
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.moyu-manage__row:hover,
+.moyu-manage__row[data-editing="true"] {
+  background: var(--menu-item-hover);
+}
+
+.moyu-manage__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  color: var(--menu-text);
+}
+
+.moyu-manage__meta {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  letter-spacing: var(--tracking-caps);
+  color: var(--ink-4);
+}
+
+.moyu-manage__act {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.moyu-manage__act:hover:not(:disabled) {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.moyu-manage__act:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.moyu-manage__act--danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.moyu-manage__empty {
+  margin: 0;
+  padding: var(--space-2) var(--menu-item-pad-x);
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+.moyu-manage__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--menu-item-pad-x);
+}
+
+.moyu-manage__form .menu__group {
+  padding: var(--space-1) 0 0;
+}
+
+.moyu-manage__mode {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.moyu-manage__mode button {
+  flex: 1 1 0;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.moyu-manage__mode button[data-on="true"] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.moyu-manage__minutes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.moyu-manage__minutes .moyu-custom__input {
+  width: 84px;
+}
+
+.moyu-manage__minutes span {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.moyu-manage__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/countdown-card.css">/* 独立倒计时卡：玻璃材质与应用菜单一致，仅使用设计令牌。 */
+.countdown-card {
+  position: absolute;
+  z-index: var(--z-menu);
+  display: flex;
+  width: max-content;
+  min-width: 168px;
+  min-height: 106px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+  background: var(--menu-bg);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  animation: menu-in var(--dur-base) var(--ease-standard);
+}
+
+.countdown-card:hover:not([data-locked="true"]),
+.countdown-card:focus-visible {
+  background: var(--glass-hover-bg);
+  outline: none;
+}
+
+.countdown-card:focus-visible {
+  box-shadow: var(--focus-ring), var(--shadow-float);
+}
+
+.countdown-card[data-locked="true"] {
+  cursor: not-allowed;
+}
+
+.countdown-card__mode {
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+
+.countdown-card__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-timer-pill);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--leading-num);
+  color: var(--ink);
+}
+
+.countdown-card__hint {
+  font-size: var(--text-cap);
+  color: var(--ink-4);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/common-items.css">/* =============================================================================
+ * Timing V0.3.9 — common-items.css（常用事项框 / 常用事项管理卡）
+ * -----------------------------------------------------------------------------
+ * 列表本体沿用 menu.css 的 .menu / .menu__item 语言，本文件补三块：
+ *   1. 框底的「事项管理」小圆点（新建不在这里做，见 CommonItems 注释）；
+ *   2. 管理卡里可拖动排序的常用事项行；
+ *   3. 「显示最近事项」开关（开=高亮色）与条数输入框。
+ * P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+/* ------------------------------ 右下角小圆点 ------------------------------ */
+.common-items__dot {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--line-3);
+  transition:
+    border-color var(--dur-quick) var(--ease-standard),
+    background-color var(--dur-quick) var(--ease-standard);
+}
+
+.common-items__dot::after {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--ink-4);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.common-items__dot:hover,
+.common-items__dot:focus-visible {
+  border-color: var(--line-2);
+  background: var(--bg-field-hi);
+}
+
+.common-items__dot:hover::after,
+.common-items__dot:focus-visible::after {
+  background: var(--ink);
+}
+
+.common-items__dot[aria-expanded="true"] {
+  border-color: var(--accent);
+}
+
+.common-items__dot[aria-expanded="true"]::after {
+  background: var(--accent);
+}
+
+/* --------------------------- 框底：管理小圆点 --------------------------- */
+/* [V0.3.9 修订] 框底的「最近事项胶囊 + 小圆点」外框与胶囊样式拆到
+   common-items-chips.css（本文件已接近 300 行上限）。 */
+
+/* 管理卡的表单输入框（框底已无新建输入框，这里只剩管理卡在用） */
+.common-items__input {
+  width: 100%;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  color: var(--menu-text);
+  font-size: var(--text-body);
+  transition: border-color var(--dur-quick) var(--ease-standard);
+}
+
+.common-items__input::placeholder {
+  color: var(--ink-4);
+}
+
+.common-items__input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* ------------------------------ 管理卡 ------------------------------ */
+.items-prefs {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-3) transparent;
+}
+
+.items-prefs__list {
+  max-height: 168px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-3) transparent;
+}
+
+.items-prefs__empty {
+  margin: 0;
+  padding: var(--space-2) var(--menu-item-pad-x);
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+.items-prefs__row {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  height: var(--menu-item-h);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.items-prefs__row:hover {
+  background: var(--menu-item-hover);
+}
+
+.items-prefs__row[data-editing="true"] {
+  background: var(--accent-wash);
+}
+
+/* 拖动落点：上沿一条 accent 线 */
+.items-prefs__row[data-over="true"] {
+  box-shadow: inset 0 1px 0 var(--accent);
+}
+
+.items-prefs__grip {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 22px;
+  color: var(--ink-4);
+  cursor: grab;
+}
+
+.items-prefs__grip:active {
+  cursor: grabbing;
+}
+
+.items-prefs__grip:focus-visible {
+  color: var(--accent);
+}
+
+.items-prefs__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  color: var(--menu-text);
+}
+
+.items-prefs__name:hover {
+  color: var(--ink);
+}
+
+.items-prefs__meta {
+  flex: 0 0 auto;
+  padding-right: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-cap);
+  letter-spacing: var(--tracking-caps);
+  color: var(--ink-4);
+}
+
+.items-prefs__act {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.items-prefs__act:hover:not(:disabled) {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.items-prefs__act:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.items-prefs__act--danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+/* ------------------------------ 新增 / 编辑表单 ------------------------------ */
+.items-prefs__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 var(--menu-item-pad-x);
+}
+
+.items-prefs__form .menu__group {
+  padding: var(--space-1) 0 0;
+}
+
+.items-prefs__minutes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.items-prefs__minutes .common-items__input {
+  width: 84px;
+}
+
+.items-prefs__minutes span {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.items-prefs__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-bottom: var(--space-1);
+}
+
+/* --------------------------- 最近事项开关 + 条数 --------------------------- */
+.items-prefs__recent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--menu-item-pad-x) var(--space-2);
+}
+
+.items-prefs__toggle {
+  flex: 1 1 auto;
+  height: 26px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  text-align: left;
+  font-size: var(--text-body);
+  color: var(--ink-3);
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.items-prefs__toggle:hover {
+  background: var(--bg-field);
+  color: var(--ink);
+}
+
+/* 开 = 高亮色，关 = 常规色（不再有图标与对勾） */
+.items-prefs__toggle[data-on="true"] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+
+.items-prefs__count {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 26px;
+  padding: 0 var(--space-1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--bg-field);
+  color: var(--ink-2);
+  font-size: var(--text-body);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.items-prefs__count:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.items-prefs__count:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/common-items-chips.css">/* =============================================================================
+ * Timing V0.3.9 — common-items-chips.css（常用事项框底：最近事项小胶囊）
+ * -----------------------------------------------------------------------------
+ * 用户口径：「最近事项形态改为最初版的小胶囊状，尽可能小巧显示」。
+ * 原来是整行（图标 + 名称 + 勾选），占的高度和置顶行一样；现在压成一排小胶囊：
+ *   - 18px 高、`--text-cap` 字号、左右 6px，自然宽度横排，放不下自动换行；
+ *   - 当前项用 accent 底色，其余 `--bg-field`，hover 提亮；
+ *   - 右侧仍留「事项管理」小圆点，与胶囊同一行底对齐（省一行高度）。
+ * P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+.menu__footer > .common-items__foot {
+  flex: 1 1 auto;
+}
+
+.common-items__foot {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.common-items__chips {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 3px;
+  min-width: 0;
+}
+
+.common-items__chip {
+  max-width: 100%;
+  height: 18px;
+  padding: 0 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--bg-field);
+  color: var(--ink-3);
+  font-size: var(--text-cap);
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.common-items__chip:hover,
+.common-items__chip:focus-visible {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.common-items__chip[data-current="true"] {
+  background: var(--accent-wash);
+  color: var(--accent);
+}
+</style><style type="text/css" data-vite-dev-id="D:/101-Workshop/261111-Timing/src/styles/today-digest.css">.today-digest {
+  display: flex;
+  flex-direction: column;
+  width: var(--todos-w);
+  max-height: min(80vh, 560px);
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+  background: var(--menu-bg);
+  box-shadow: var(--shadow-plate);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  color: var(--ink-2);
+}
+
+/* [ADR-020] 主窗没有画布了：80vh 是「当前窗口高」（由内容决定），用它限高会自我压扁。
+   改用 --fit-h（显示器工作区高），与收缩前的 80vh(360) 观感一致但不再写死。 */
+html[data-window="main"] .today-digest {
+  max-height: min(calc(var(--fit-h) * 0.8), 560px);
+}
+
+.today-digest__head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--todos-head-h);
+  gap: var(--space-2);
+  padding: 0 var(--card-pad-x);
+  border-bottom: 1px solid var(--line);
+}
+
+.today-digest__head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+}
+
+.today-digest__head h2 span,
+.today-digest__head time {
+  color: var(--ink-3);
+  font-weight: var(--weight-read);
+}
+
+.today-digest__head time,
+.today-digest__duration {
+  font-family: var(--font-mono);
+  font-size: var(--text-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.today-digest__body { flex: 1 1 auto; overflow-y: auto; padding: var(--space-1) var(--space-2); }
+.today-digest__row { display: flex; width: 100%; min-height: var(--todos-row-h); align-items: center; gap: var(--space-2); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-2); text-align: left; cursor: pointer; }
+.today-digest__row:hover, .today-digest__row:focus-visible { background: var(--bg-field-hi); outline: none; }
+.today-digest__row[data-active="true"] { background: var(--accent-wash); box-shadow: inset 3px 0 0 var(--accent); color: var(--ink); }
+.today-digest__mark { display: grid; flex: 0 0 auto; width: var(--todos-mark-size); height: var(--todos-mark-size); place-items: center; border: 1px solid var(--todo-mark-ring); border-radius: var(--radius-full); color: var(--todo-mark-done-ink); }
+.today-digest__mark[data-done="true"] { border-color: var(--todo-mark-done); background: var(--todo-mark-done); }
+.today-digest__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
+.today-digest__duration { flex: 0 0 auto; color: var(--ink-3); }
+.today-digest__empty { display: flex; min-height: 132px; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-2); color: var(--ink-4); text-align: center; }
+.today-digest__empty strong { color: var(--ink-2); font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.today-digest__empty span, .today-digest__state, .today-digest__error { margin: 0; font-size: var(--text-xs); }
+.today-digest__state { padding: var(--space-4); color: var(--ink-3); text-align: center; }
+.today-digest__error { padding: var(--space-2) var(--space-3); color: var(--danger); }
+.today-digest__footer { display: flex; flex: 0 0 auto; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-top: 1px solid var(--line); }
+.today-digest__footer .btn:first-child { flex: 1 1 auto; justify-content: center; }
+</style></head>
+  <body>
+    <div id="root"><div class="layer"><div class="layer__stack"><div class="pill" data-state="idle"><button type="button" class="ring" data-state="idle" data-countdown="false" data-warn="false" data-spin="false" data-thick="false" aria-label="开始计时"><svg class="ring__arc" viewBox="0 0 16 16" aria-hidden="true"><path class="ring__arc-bar" d="M 8 1.2 C 8.76 1.2 9.69 1.23 10.29 1.29 C 10.88 1.35 11.2 1.43 11.58 1.55 C 11.97 1.67 12.29 1.81 12.6 1.99 C 12.9 2.16 13.16 2.37 13.4 2.6 C 13.63 2.84 13.84 3.1 14.01 3.4 C 14.19 3.71 14.33 4.03 14.45 4.42 C 14.57 4.8 14.65 5.12 14.71 5.71 C 14.77 6.31 14.8 7.24 14.8 8 C 14.8 8.76 14.77 9.69 14.71 10.29 C 14.65 10.88 14.57 11.2 14.45 11.58 C 14.33 11.97 14.19 12.29 14.01 12.6 C 13.84 12.9 13.63 13.16 13.4 13.4 C 13.16 13.63 12.9 13.84 12.6 14.01 C 12.29 14.19 11.97 14.33 11.58 14.45 C 11.2 14.57 10.88 14.65 10.29 14.71 C 9.69 14.77 8.76 14.8 8 14.8 C 7.24 14.8 6.31 14.77 5.71 14.71 C 5.12 14.65 4.8 14.57 4.42 14.45 C 4.03 14.33 3.71 14.19 3.4 14.01 C 3.1 13.84 2.84 13.63 2.6 13.4 C 2.37 13.16 2.16 12.9 1.99 12.6 C 1.81 12.29 1.67 11.97 1.55 11.58 C 1.43 11.2 1.35 10.88 1.29 10.29 C 1.23 9.69 1.2 8.76 1.2 8 C 1.2 7.24 1.23 6.31 1.29 5.71 C 1.35 5.12 1.43 4.8 1.55 4.42 C 1.67 4.03 1.81 3.71 1.99 3.4 C 2.16 3.1 2.37 2.84 2.6 2.6 C 2.84 2.37 3.1 2.16 3.4 1.99 C 3.71 1.81 4.03 1.67 4.42 1.55 C 4.8 1.43 5.12 1.35 5.71 1.29 C 6.31 1.23 7.24 1.2 8 1.2 Z" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"></path></svg></button><span class="timer-digits" data-hours="false" data-tone="default" role="timer" aria-label="已计时 00:00（右键设置倒计时）">00:00</span><button type="button" class="pill__empty" aria-label="新建事项并开始计时（右键打开事项菜单）"><span>新建事项</span></button><button type="button" class="pill__today" aria-label="今天 · 左键记录面板，右键今日摘要" title="今天 · 记录面板 / 右键：今日摘要"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-calendar-clock" aria-hidden="true"><path d="M16 14v2.2l1.6 1"></path><path d="M16 2v3"></path><path d="M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338"></path><path d="M3 9h5.859"></path><path d="M8 2v3"></path><circle cx="16" cy="16" r="6"></circle></svg></button><button type="button" class="pill__handle" aria-label="打开当前事项便利贴" aria-haspopup="menu" title="当前事项便利贴 · 右键看清单"><svg width="12" height="22" viewBox="0 0 12 22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M5.6 3.6 C9 6.6, 9 15.4, 5.6 18.4"></path></svg></button></div></div></div></div>
+    <script type="module" src="/src/main.tsx"></script>
+  
+
+</body></html>

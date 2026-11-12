@@ -24,8 +24,10 @@ export interface TodayTodosState {
   status: LoadStatus;
   /** 正在等撤销的那一条；非空时 UI 显示撤销条 */
   pending: UndoPending | null;
-  /** 返回 false = 标题为空（UI 不清空输入框） */
-  create: (title: string) => Promise<boolean>;
+  /** 返回 false = 没建成（标题为空 / 落库失败），UI 不清空草稿、不关弹层。
+   *  [本轮] 两个时刻由 `services/todoDraft.ts` 的 `planTodoWrite` 算好后传进来
+   *  （`remindAt = null` 表示用户没勾「提醒我」）—— hook 不猜时间口径。 */
+  create: (title: string, plannedAt: number | null, remindAt: number | null) => Promise<boolean>;
   /** 按 **id** 勾选，`done` 是目标状态（列表里没有一处用下标） */
   toggle: (id: number, done: boolean) => void;
   /** 按 **id** 删除；撤销条需要那一行的快照，由 hook 自己从当前列表取 */
@@ -111,15 +113,22 @@ export function useTodayTodos(refreshKey: number): TodayTodosState {
   /* 卸载时把未决删除落库：否则"删了但没到 3s 就切视图"会让这一条永远删不掉 */
   useEffect(() => () => { void commitPending(); }, [commitPending]);
 
-  const create = useCallback(async (title: string) => {
+  const create = useCallback(async (
+    title: string,
+    plannedAt: number | null,
+    remindAt: number | null,
+  ) => {
     const trimmed = title.trim();
     if (!trimmed) return false;
+    /* 这条链路走**直接 IPC**（`patina-todo-notes` 已放行 `todo_create`），
+     * 不是 `patina:host-intent` 事件桥 —— 所以没有"意图有没有发出去"的 `sent` 布尔：
+     * 失败就是抛错，`catch` 返回 false。别照 `TimelineManage` 那样写 `if (!sent)`。 */
     try {
-      await createTodo(trimmed);
+      await createTodo(trimmed, plannedAt, remindAt);
       await reload();
       return true;
     } catch (error: unknown) {
-      /* 返回 false → UI 不清空输入框，用户写的字不丢 */
+      /* 返回 false → UI 弹层不关、草稿不清，用户写的字一个也不丢 */
       console.warn("Failed to create todo:", error);
       return false;
     }

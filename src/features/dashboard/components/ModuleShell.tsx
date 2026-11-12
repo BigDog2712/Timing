@@ -2,6 +2,7 @@ import { useId, type ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
 
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
+import { useBoardInstance, withInstance } from "../layout/instanceContext.ts";
 
 /**
  * 四张卡共用的外壳：卡头（20 高 + 8 距）/ 四态 / 滚动区。
@@ -67,6 +68,10 @@ interface Props {
   controls?: ReactNode;
   /** 需要额外定位上下文（待办卡的撤销条）时传进来 */
   className?: string;
+  /** [本轮] 四态之外的**常驻**底条：empty / error 时也要在场。
+   *  为什么不在 `children` 里：`children` 只在 `ready` 渲染，而"今天还没有计时"正是
+   *  最需要「＋ 新建事项」的时刻（时间线卡）。不传 → 逐字等于旧形态（其余五张卡）。 */
+  footer?: ReactNode;
   children: ReactNode;
 }
 
@@ -86,13 +91,18 @@ export default function ModuleShell({
   refreshErrorText,
   controls,
   className,
+  footer,
   children,
 }: Props) {
   const errorId = useId();
+  /* [v3] 同一组件可以放多张：卡内 id 加实例后缀，否则两份 `t-todos` 会让
+   * aria-labelledby 指到先出现的那张（改名后读屏就念错）。 */
+  const instance = useBoardInstance();
+  const domId = withInstance(id, instance);
   return (
     <section
       className={className ? `qp-card ${className}` : "qp-card"}
-      aria-labelledby={id}
+      aria-labelledby={domId}
       aria-busy={state === "loading" || undefined}
       data-state={state}
     >
@@ -101,7 +111,7 @@ export default function ModuleShell({
             本批不接 tabIndex/role=button —— 键盘锚点等拖拽批次一起做，
             现在给了就是一颗「能聚焦但按了没反应」的键。 */}
         <span className="qp-card-grip" aria-hidden="true" />
-        <h2 id={id} className="qp-card-title">{title}</h2>
+        <h2 id={domId} className="qp-card-title">{title}</h2>
         {/* 右槽只在 ready 渲染（R9 收口）：empty 的数是废话（空态文案已经说了）、
          *  error 的数不可信、loading 的数还没有。门控收在这里，四张卡就不可能再
          *  各写一遍然后漏一张（ItemsModule 那次漏掉 empty 印出「今日 0 项」就是
@@ -136,7 +146,7 @@ export default function ModuleShell({
           className="qp-module-error"
           role="alert"
           data-error-layer="module"
-          aria-labelledby={`${id} ${errorId}`}
+          aria-labelledby={`${domId} ${errorId}`}
         >
           <p id={errorId} className="qp-module-error-text">{errorText}</p>
           {onRetry ? (
@@ -153,16 +163,7 @@ export default function ModuleShell({
       ) : state === "empty" ? (
         <p className="qp-empty">{emptyText}</p>
       ) : children}
-      {/* [拖拽调整大小] 显式手柄：卡底一条 8px，按下即拖；可 Tab 聚焦、↑/↓ 步进 8px。
-          用真元素而不是 ::after —— 靠坐标猜「是不是在边缘」在滚动容器/DPR 下会差几像素，
-          用户看到的就是「怎么拖都没反应」。 */}
-      <span
-        className="qp-card-resize"
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label={`调整「${title}」高度`}
-        tabIndex={0}
-      />
+      {footer}
     </section>
   );
 }

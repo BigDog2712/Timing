@@ -34,6 +34,47 @@ export function getTotalTrackedTime(stats: AppStat[]) {
   return stats.reduce((total, item) => total + Math.max(0, item.totalDuration), 0);
 }
 
+/**
+ * 星期短名（趋势卡的柱下标 / 热力图的行标）。`Intl` 在个别语言包缺失时可能抛，
+ * 退回 `toLocaleDateString()` —— 宁可显示成日期，也不能让整张卡白屏。
+ */
+export function formatWeekdayShort(startMs: number, locale: string): string {
+  try {
+    return new Intl.DateTimeFormat(locale, { weekday: "short" }).format(new Date(startMs));
+  } catch {
+    return new Date(startMs).toLocaleDateString();
+  }
+}
+
+/**
+ * 「MM/DD」短日期（趋势卡的 x 轴，`format::short_date` 的同一口径）。
+ *
+ * 为什么不用 `formatWeekdayShort`：exe 那三处轴文字是日期而不是星期
+ * （`trend.rs:114`），14 根柱并排时星期名一天一个太啰嗦，日期还能读出"这是哪几天"。
+ */
+export function formatShortDate(startMs: number, locale: string): string {
+  try {
+    return new Intl.DateTimeFormat(locale, { month: "2-digit", day: "2-digit" }).format(new Date(startMs));
+  } catch {
+    return new Date(startMs).toLocaleDateString();
+  }
+}
+
+/**
+ * 星期**窄名**（热力图左侧那一列）：`narrow` 在中文里就是「一」而不是「周一」，
+ * 与 Rust `format::weekday_short` 逐字一致 —— 那一列只有 16px（`heatmap.rs:28`
+ * 的 `label_w`），「周一」放不进去会被省略成「周…」。
+ *
+ * 只给热力图用：趋势卡的下标有整格宽度，`short`（「周一」）读起来更清楚。
+ */
+export function formatWeekdayNarrow(startMs: number, locale: string): string {
+  try {
+    return new Intl.DateTimeFormat(locale, { weekday: "narrow" }).format(new Date(startMs));
+  } catch {
+    return formatWeekdayShort(startMs, locale);
+  }
+}
+
 export function buildTopApplications(stats: AppStat[]): TopApplicationItem[] {
   const totalTrackedTime = getTotalTrackedTime(stats);
 

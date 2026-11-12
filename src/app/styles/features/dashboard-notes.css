@@ -1,157 +1,202 @@
 /* ============================================================================
- * dashboard-notes.css — 便利贴条（01 §4.3 末行，56px 通栏）
+ * dashboard-notes.css — 便利贴卡（纸片墙）
  * -----------------------------------------------------------------------------
- * 从 dashboard-todos.css 拆出：那是**待办卡**的全部样式，便利贴是另一张卡，
- * 两张卡的类名与版式没有一行共用。判据是"一张卡的样式不跨文件" + 单文件 ≤300 行。
- * 这里只有只读展示的样式，写路径一律不在这条通栏上（便利贴窗属主窗）。
+ * 版式照 `widgets/notes.rs`：卡头 46 + 一墙纸片。双列时纸片 88 高、单列 78；
+ * 纸片左侧一条 2.5px 色条，正文 11.5 两行截断，底下 10px 一行相对时间。
+ *
+ * 这张卡**宽高都能拖**（下限 320×152，见 `contract.ts` 的 `KIND_SPECS.notes`）：
+ * 拖宽 → `auto-fill` 自动增减列数；拖窄到单列 → 纸片按 Rust 的单列档降到 78；
+ * 拖高 → 多露几行纸片，拖矮 → 纸片区自己滚，卡头永远完整。
+ * 「两张纸片的行高」与「至少一整张可见」是这两条下限的判据，不是随手取整。
+ *
+ * 为什么不再是一条横向胶囊条：胶囊读起来像"标签"，纸片读起来像"便签" ——
+ * 这张卡的语义就是"随手记的东西贴在这儿"，形状本身就是信息。
+ *
+ * 判据仍是"一张卡的样式不跨文件" + 单文件 ≤300 行。写路径一律不在这张卡上
+ * （编辑便利贴属主窗），这里只有只读展示与一个"看全文"的弹层。
  * ========================================================================== */
 
-/* ── 便利贴条（56 通栏：head 72 + 卡片流 + more 24） ──
- * [P1 视觉层] 标签列 88 → 72：`便利贴` 三字 15px 加"3 张"12px 在 72 里正好一行放得下，
- * 88 那 16px 是全空的。**通栏高 56 / 内距 6 不动**（56 是像素验收项）。
- * 纵向内距 6：卡的 1px outline 用 `outline-offset: -1` 画在里面，靠的就是这 6；
- * 内距 0 时卡会贴着通栏上下边，看起来像两条 1px 线粘在一起。 */
+/* ── 卡体：与 `.qp-card` 同一套卡壳（18 圆角 / 1px 边 / 左右 20、底 16 内距） ──
+ * `container-type: inline-size` 只为下面那条「单列 → 纸片 78 高」的查询服务：
+ * 便利贴现在宽高都能拖（下限 320×152），窄到单列时纸片要按 Rust 的单列档变矮。 */
 .qp-notes {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr) 24px;
-  align-items: center;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
-  padding: 6px var(--qp-card-pad);
+  padding: 0 var(--qp-card-pad) var(--qp-card-pad-b);
   border-radius: var(--qp-radius-card);
   outline: 1px solid var(--qp-card-edge);
   outline-offset: -1px;
   background: var(--qp-surface-card);
   overflow: hidden;
+  container-type: inline-size;
 }
 
-/* 标题与张数**同一行**（原来 column 排两行，卡头 36 高，比其余四张卡的 20 高一截，
- * 五卡卡头不在一条水平线上）。现在单行 20，与 `.qp-card-head` 等高。 */
+/* 卡头 46，标题左、读数与 ⋯ 右（与 `.qp-card-head` 同高，五张卡的标题在同一条水平线上） */
 .qp-notes-head {
   display: flex;
-  min-width: 0;
-  flex-direction: row;
+  flex: 0 0 var(--qp-card-head-h);
+  height: var(--qp-card-head-h);
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   overflow: hidden;
 }
 
+/* 标题 13.5（Rust `app.rs:422`） */
 .qp-notes-title {
   margin: 0;
-  font-size: var(--qp-font-size-group-title);
+  font-size: 13.5px;
   font-weight: var(--qp-font-weight-emphasis);
-  line-height: var(--qp-line-height-group-title);
+  line-height: 18px;
   color: var(--qp-text-primary);
+  white-space: nowrap;
 }
 
+/* 张数 11（Rust 卡头 meta 是 11） */
 .qp-notes-count {
-  font-size: var(--qp-font-size-caption);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
-  line-height: var(--qp-line-height-caption);
-  /* 与 `.qp-card-meta` 同一条口径：12px 正文不用 tertiary（暗色 #7f8791 on #2d2d2d 只有 3.79:1） */
+  line-height: 15px;
   color: var(--qp-text-secondary);
 }
 
-.qp-notes-track {
-  display: flex;
+/* 右槽：E3 图标 / 张数 / ⋯ 横排，不换行 */
+.qp-notes-more {
+  display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  color: var(--qp-text-tertiary);
 }
 
-/* 卡高 38 / 34（两档）由 token 给：卡高不是"内容撑出来的"，而是通栏高 − 2×6 再让，
- * 所以必须写死高度，否则空态与 3 张卡之间通栏会跳。
- * 单行截断靠 `text-overflow` —— 它只在行内/块容器上生效，所以**不能**改成 flex；
- * 垂直居中就用 line-height 顶满内容盒。
+/* ── 纸片墙 ──
+ * 列数**由纸片宽度反推**：`auto-fill` + 每列最小 193（Rust 436 宽卡两列时纸片就是 193：
+ * `(436 − 左右 40 − 列距 10) / 2`）。这样纸片在任何卡宽下都保持"便签"的比例 ——
+ * 早先写死 `1fr / 两列`，卡被拉通到 1052 时纸片变成 500 宽的一条横幅，形状就不再是便签了。
+ * 行高固定 88（Rust 双列档），`align-content: start` 让 3 张纸片时不被拉伸成三等分。
  *
- * [P1 视觉层] 三处联动，少一处就歪 1px：
- *   ① `border: 1px` → `outline: 1px + offset -1`：outline 不占内容盒，宽度 2px 回到文字上，
- *      所以 `flex: 0 1 280px` 的卡**外宽不变**（贴纸条是固定宽，不是内容撑的）；
- *   ② `line-height` 相应从 `calc(h − 2px)` 改成 `h`：原来减的 2px 就是上下两条边，
- *      边没了还减就会让文字比垂直中线高 1px；
- *   ③ 内距 10 → 12，底色 `--qp-bg-elevated` → raise 层（比卡片高一档，贴纸才"浮"在条上）。 */
+ * 卡被拖窄到单列时（Rust `notes.rs:22-23`：正文宽 < 430 → 单列，纸片 78），行高跟着降到
+ * 78 —— 280×88 的纸片看着像竖条，280×78 才还是"一张便签"。阈值 470 = 正文 430 + 左右内距 40。 */
+.qp-notes-track {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 193px), 1fr));
+  grid-auto-rows: var(--qp-note-card-h);
+  gap: 10px;
+  flex: 1 1 auto;
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+@container (max-width: 470px) {
+  .qp-notes-track {
+    --qp-note-card-h: 78px;
+  }
+}
+
+/* ── 一张纸片（Rust `notes.rs:44-84`）──
+ * 底 = 卡面混 5% accent（深色 10%），边框 accent 18%，左侧 2.5 色条，12 圆角。
+ * 正文 11.5 / 16 两行，元信息 10 / 14 贴底。
+ * 上内距 11 → **7**（主人：「文字再靠上一点」）：只动垂直留白，字号 / 行高 / 圆角 / 颜色
+ * 一像素不动。两行正文（7 + 32 = 39）与元信息（底内距 5 + 14 → 顶边在 59）之间仍空 20px，
+ * 78 / 88 两档都不重叠 —— 这条是改这个值的**唯一**约束。 */
 .qp-note-card {
   position: relative;
-  flex: 0 1 280px;
+  display: block;
   min-width: 0;
-  max-width: 280px;
   height: var(--qp-note-card-h);
-  padding: 0 12px;
+  padding: 7px 12px 5px 14px;
   border: 0;
-  outline: 1px solid var(--qp-card-edge);
-  outline-offset: -1px;
   border-radius: 12px;
-  background: var(--qp-surface-raise);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-note-card-h);
-  color: var(--qp-text-secondary);
+  outline: 1px solid color-mix(in srgb, var(--qp-accent-default) 18%, transparent);
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--qp-accent-default) 5%, var(--qp-surface-card));
+  color: var(--qp-text-primary);
   overflow: hidden;
+  text-align: left;
+  cursor: default;
+}
+
+/* 左侧色条：宽 2.5，圆角 2。上下各让 8 —— 与正文的上内距 7 同步（正文整体上移 4px，
+ * 色条不跟着走就会比第一行字低半格，像贴歪了）。 */
+.qp-note-card::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 1px;
+  width: 2.5px;
+  border-radius: 2px;
+  background: var(--qp-accent-default);
+}
+
+/* 正文两行截断：`-webkit-line-clamp` 是这里唯一能表达"两行 + 省略号"的手段
+ * （`text-overflow` 只对单行生效）。`overflow-wrap: anywhere` 兜住长英文串。 */
+.qp-note-body {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 11.5px;
+  line-height: 16px;
+  color: var(--qp-text-primary);
+  overflow-wrap: anywhere;
+}
+
+/* 元信息：相对时间，10 / 14 */
+.qp-note-meta {
+  position: absolute;
+  right: 12px;
+  bottom: 5px;
+  left: 14px;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 14px;
+  color: var(--qp-text-tertiary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* 左侧 3px 色条：贴纸这一层唯一的"形状记号"（便利贴没有分类色，用当前文字色即可）。
- * 上下各让 9px，38 高的卡里是 20 高的条；`left: 6` 落在 12px 内距的留白里，
- * 所以文字的 padding-left 要在下面那条 `button.qp-note-card` 里让出 9px。 */
-.qp-note-card::before {
-  content: "";
-  position: absolute;
-  top: 9px;
-  bottom: 9px;
-  left: 6px;
-  width: 3px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
-/* 空态 / 骨架占位：与真卡片同尺寸，避免通栏在 0 张 ↔ 3 张之间跳高度。
- * 虚线从 `border-style` 换到 `outline-style`（边已经改成 outline 了），
- * 占位也不画色条 —— 它没有"这是一张便利贴"的语义。 */
+/* 空态 / 骨架占位：同尺寸，避免 0 张 ↔ 3 张之间卡内高度跳。
+ * 虚线 + 无纸片底 + 不画色条 —— 它没有"这是一张便利贴"的语义。 */
 .qp-note-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   outline-style: dashed;
   background: none;
+  font-size: 12.5px;
   color: var(--qp-text-tertiary);
 }
 
 .qp-note-placeholder::before { content: none; }
 
-/* 卡片是 `<button>`（点开看全文）：只改按钮自带的两样东西 —— 字族与水平对齐。
- * **不要**写 `font: inherit` 简写：它会把上面那行 `font-size/line-height` 一起清成继承值，
- * 卡片文字会从 caption 变成 body、38 高的卡按 body 行高重排。
- * [P1 视觉层] padding-left 12 → 21：给左侧那条 3px 色条让位（条占 6–9，文字从 21 起，
- * 条到字 12 = 与右内距对齐）。占位是 `<span>`，没这条规则，也就没有那个 9px。 */
-button.qp-note-card {
-  font-family: inherit;
-  text-align: left;
-  padding-left: 21px;
-  cursor: default;
-}
-
-/* 便利贴条的错误块（E2）：通栏内容高只有 44，竖向居中的块放不下，
- * 所以横排一行（文字 + 重试），其余沿用 `.qp-module-error` 的口径。 */
+/* 便利贴卡的错误块（E2）：内容高 88 里放得下，沿用 `.qp-module-error` 的竖排口径 */
 .qp-notes-error {
-  flex-direction: row;
-  gap: 8px;
+  grid-column: 1 / -1;
+  align-self: center;
   min-width: 0;
 }
 
 /* 全文对话框：body 封顶 52vh 并**自己滚**（正文可能几十行，不能把对话框顶出窗口）。
- * `overflow-y` 必须自己写：`qp-dialog-body` 上那个 `qp-scroll-region` 只配滚动条外观
- * （`scrollbar-gutter` + `::-webkit-scrollbar`），**不含 `overflow` 声明** —— 实测
- * 只给 `max-height` 时 computed `overflow-y` 仍是 `visible`，873 字的正文会直接压出卡片外。
+ * `overflow-y` 必须自己写：`qp-dialog-body` 上那个 `qp-scroll-region` 只配滚动条外观，
+ * 不含 `overflow` 声明 —— 实测只给 `max-height` 时 computed `overflow-y` 仍是 `visible`。
  *
- * 归属说明：这条规则的**真正业主**是共享的 `.qp-dialog-body`，不是每个调用方。
- * 本轮只在便利贴这一处隔离，是因为给共享层加 `overflow-y` 会同时改 10+ 个对话框的滚动行为
- * （它们现在都是 `visible`，有的可能正依赖"不裁切"，比如带外溢阴影的 surface）——
- * 横切改动必须单项改、单项验。共享层修好后这条可以删。 */
+ * 归属说明：这条规则的**真正业主**是共享的 `.qp-dialog-body`。本轮只在这里隔离，
+ * 是因为给共享层加 `overflow-y` 会同时改 10+ 个对话框的滚动行为 —— 横切改动
+ * 必须单项改、单项验。共享层修好后这条可以删。 */
 .qp-note-dialog .qp-dialog-body {
   max-height: 52vh;
   overflow-y: auto;
 }
 
-/* `pre-wrap` 是这一条的**内容要求**：便利贴里换行是有意义的，折成一行等于改写了用户的话。
+/* `pre-wrap` 是**内容要求**：便利贴里换行有意义，折成一行等于改写了用户的话。
  * 也**不**加 `-webkit-line-clamp` —— 这里就是"看全文"的那一处。 */
 .qp-note-dialog-text {
   margin: 0;
@@ -162,10 +207,25 @@ button.qp-note-card {
   white-space: pre-wrap;
 }
 
-.qp-notes-more {
+/* ── 展开弹层底部的「删除」与内联二次确认 ──
+ * 确认条与两颗键**同排**（不开第二层弹窗：两层弹窗的 Escape 与焦点陷阱会互相打架）。
+ * `margin-right: auto` 是这条的全部技巧：`.qp-dialog-actions` 是 `justify-content: flex-end`，
+ * 不加它问句会被一起推到右边，读起来像按钮的标签而不是一个问题。 */
+.qp-note-dialog-confirm {
+  align-self: center;
+  min-width: 0;
+  margin-right: auto;
   font-size: var(--qp-font-size-caption);
-  font-variant-numeric: tabular-nums;
   line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-tertiary);
-  text-align: right;
+  color: var(--qp-text-secondary);
+}
+
+/* 「删除意图没发出去」的提示：排在正文下方、与正文同一条左边线。
+ * 用 danger 色是因为这一下**确实没成**（宿主没收到），不是中性信息；
+ * 但它不是表单校验错误，所以不加 `aria-invalid`、不抢焦点。 */
+.qp-note-dialog-issue {
+  margin: var(--qp-space-group) 0 0;
+  color: var(--qp-danger);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
 }

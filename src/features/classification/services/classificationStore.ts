@@ -41,9 +41,9 @@ const APP_OVERRIDE_KEY_PREFIX = "__app_override::";
 const WEB_DOMAIN_OVERRIDE_KEY_PREFIX = "__web_domain_override::";
 const LEGACY_AUTO_CLASSIFICATION_MIGRATION_KEY = "__classification_manual_confirmation_migration::v1";
 const CATEGORY_COLOR_OVERRIDE_KEY_PREFIX = "__category_color_override::";
-const CATEGORY_LABEL_OVERRIDE_KEY_PREFIX = "__category_label_override::";
+export const CATEGORY_LABEL_OVERRIDE_KEY_PREFIX = "__category_label_override::";
 const CATEGORY_DEFAULT_COLOR_ASSIGNMENT_KEY_PREFIX = "__category_default_color_assignment::";
-const CATEGORY_DEFINITION_KEY_PREFIX = "__custom_category::";
+export const CATEGORY_DEFINITION_KEY_PREFIX = "__custom_category::";
 const DELETED_CATEGORY_KEY_PREFIX = "__deleted_category::";
 const USER_ASSIGNABLE_CATEGORY_SET = new Set<string>(USER_ASSIGNABLE_CATEGORIES);
 
@@ -317,11 +317,10 @@ export async function saveAppOverride(exeName: string, override: AppOverride | n
   await upsertSettingValue(key, ProcessMapper.toOverrideStorageValue(override));
 }
 
-function buildSaveAppOverrideMutations(
+export function buildSaveAppOverrideMutations(
   exeName: string,
   override: AppOverride | null,
-): ClassificationSettingMutation[] {
-  const canonicalExe = resolveCanonicalExecutable(exeName);
+): ClassificationSettingMutation[] {  const canonicalExe = resolveCanonicalExecutable(exeName);
   if (!canonicalExe) {
     return [];
   }
@@ -521,7 +520,7 @@ function buildSaveCategoryDefinitionMutations(category: ExtendedAppCategory): Cl
   }];
 }
 
-function buildDeleteCategoryDefinitionMutations(category: ExtendedAppCategory): ClassificationSettingMutation[] {
+export function buildDeleteCategoryDefinitionMutations(category: ExtendedAppCategory): ClassificationSettingMutation[] {
   return [
     {
       key: `${CATEGORY_DEFINITION_KEY_PREFIX}${category}`,

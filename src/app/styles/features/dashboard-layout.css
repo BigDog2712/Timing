@@ -22,8 +22,10 @@
 .qp-dashboard-toolbar {
   position: absolute;
   top: 0;
-  /* 板子在视图中居中留白时，对齐**板**的右缘而不是视图右缘 */
-  right: max(0px, calc((100% - var(--qp-board-w)) / 2));
+  /* 板子在视图中居中留白时，对齐**板**的右缘而不是视图右缘。
+   * [v3.1] 下限 20px：倍率归用户后画布会出滚动条，工具条贴着 `right: 0` 时
+   * 「恢复默认」会被那条 15px 的滚动条压掉半个字（实测 1100 窗 + 100% 倍率）。 */
+  right: max(20px, calc((100% - var(--qp-board-w)) / 2));
   z-index: 5;
   display: flex;
   flex: 0 0 auto;
@@ -127,31 +129,71 @@
 /* ── 专注卡的三维度切换（P2）──
  * 三个小标签，不占行高：放在环上方一行，与读数行同宽。
  * 用 `aria-selected` 而不是自定义类表达选中，样式从属性来（键盘与读屏同一口径）。 */
+/* 维度切换 = Rust `focus.rs:24-42`：每颗 50×24、间距 4（`x += 54.0`）、圆角 7、
+ * 字 11.5；选中是 accent-soft 底 + accent 字 + 粗体，未选中 text3。
+ * 与正文之间 10（`tabs.bottom() + 10`）—— 原来 6 那 4px 是宿主自己的节奏。 */
+/* 维度行 = 左 tab + 右「较昨日」（`focus.rs:24-69`：两者共用同一条 24 高横带）。
+ * 早先「较昨日」挂在卡头，卡头因此被挤成两行；exe 里它在这一行右侧，10.5px。 */
+.qp-focus-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 24px;
+  margin-bottom: 10px;
+}
+
 .qp-focus-dims {
   display: flex;
   flex: 0 0 auto;
-  gap: 2px;
-  margin-bottom: 6px;
+  gap: 4px;
+}
+
+/* 较昨日：涨了用强调色，跌/平用三级字（`focus.rs:56` 的 `if sign >= 0 { accent } else { text3 }`） */
+.qp-focus-delta {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 14px;
+  color: var(--qp-text-tertiary);
+  white-space: nowrap;
+}
+
+.qp-focus-delta[data-dir="increase"] {
+  color: var(--qp-accent-default);
 }
 
 .qp-focus-dim {
-  padding: 1px 8px;
+  width: 50px;
+  height: 24px;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: 7px;
   background: transparent;
   color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+  font-size: 11.5px;
+  line-height: 24px;
+  text-align: center;
   cursor: pointer;
 }
 
 .qp-focus-dim[data-active] {
-  background: var(--qp-bg-elevated);
-  color: var(--qp-text-primary);
+  background: var(--qp-accent-muted);
+  color: var(--qp-accent-default);
+  font-weight: var(--qp-font-weight-emphasis);
 }
 
 .qp-focus-dim:hover {
   color: var(--qp-text-primary);
+}
+
+.qp-focus-dim[data-active]:hover {
+  color: var(--qp-accent-default);
 }
 
 .qp-focus-dim:focus-visible {
@@ -160,35 +202,54 @@
 }
 
 /* ── 事项菜单卡（P3）：时序行 ──
- * 三列固定（时间 / 名称 / 时长），时间用 tabular-nums 防跳宽；名称占满并省略。 */
+ * 三列固定（时间 / 名称 / 时长）。字号照 `items.rs`：名称 12.5、时长尾巴 11.5，
+ * 行高 30（`row_h = 30.0`）。`--qp-card-head-gap` 现在是 0（卡头 46 自带留白），
+ * 所以列间距必须显式给 8，否则三列会贴在一起。 */
 .qp-card-timeline .qp-timeline-rows {
   display: flex;
   flex-direction: column;
-  gap: var(--qp-row-gap);
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
   min-height: 0;
-  overflow: hidden;
+  /* 宁可出滚动条，也别裁半行。S 档卡高 200：扣掉卡头与内距 62、再扣掉卡底操作条
+   * `.qp-timeline-manage` 的 47，只剩 91 —— 而 4 行 × 30 需要 120。原来的
+   * `overflow: hidden` 会把第 4 行裁在中间（看着像"只有 3 行半"，也不报错）。
+   * 口径与 `.qp-notes-track` 逐字一致：纵向滚、横向裁。
+   * **别**去动 `layout/contract.ts` 的 `KIND_SPECS`：那是所有卡的档位换算与布局契约
+   * 测试的正本，改它换来的不是"这张卡不裁"，而是每张卡的高度都变。 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--qp-border-strong) transparent;
 }
 
 .qp-timeline-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--qp-card-head-gap);
+  gap: 8px;
   height: var(--qp-row-items);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+  /* `flex: 0 0 auto` 不能省：列向 flex 的子项默认 `flex-shrink: 1`，行容器一矮就会被
+   * 挤成 26 / 15 那种高度 —— 结果是"看起来没坏、行高却不是 30 了"，而不是出滚动条
+   * （`.qp-readout` 那次踩的就是这个）。放不下就由上面那条 `overflow-y: auto` 兜。 */
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  line-height: 15px;
 }
 
 .qp-timeline-time {
   color: var(--qp-text-tertiary);
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
 
 .qp-timeline-label {
   color: var(--qp-text-primary);
+  font-size: 12.5px;
+  line-height: 19px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -196,57 +257,17 @@
 
 .qp-timeline-duration {
   color: var(--qp-text-secondary);
+  font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
 
 /* ── 事项卡的两颗唤起按钮（P3）：与卡头 meta 同排 ── */
+/* 卡头两颗入口（事项菜单 / 常用）：字号 11，间距 8 —— 原来跟着 `--qp-card-head-gap`
+ * 走，那个令牌已经改成 0，两颗按钮会贴成一个词「事项菜单常用」。 */
 .qp-timeline-actions {
   display: inline-flex;
   align-items: center;
-  gap: var(--qp-card-head-gap);
-}
-
-/* ── 卡片下边缘的拖拽调整大小（0.12.1） ──
- * 只在最后 8px 内响应，鼠标在这里变成上下箭头；其余区域照常点击。
- * 用伪元素而不是真节点：真节点会参与卡内排版，还会吃掉行的点击。 */
-.qp-card-resize {
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 8px;
-  cursor: ns-resize;
-  /* 手柄要能收到指针：它是卡内绝对定位的最后一个元素，卡是 overflow:hidden 的 */
-  z-index: 3;
-}
-
-/* [A 批显形统一] 线常驻 2px 圆头、色 --qp-border-strong（3.4:1），**只加长不改色**：
- * 静息透明 → 卡 hover 显 60% 长 → 手柄自身 hover/聚焦拉满 100%。禁换 border-subtle
- * （1.9:1 静默跌破 3:1）、禁加粗到 3px。宽度手柄（dashboard-split.css）同一套语言。 */
-.qp-card-resize::before {
-  content: "";
-  position: absolute;
-  inset: 3px 20% auto 20%;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--qp-border-strong);
-  opacity: 0;
-  transition: opacity 120ms ease, inset 120ms ease;
-}
-
-/* hover 时显形（通栏卡也要补：便利贴的卡是 `.qp-notes`，不是 `.qp-card`，
- * 少了第二行它永远不显形 —— 手柄明明在那儿，用户却找不到可以拖的地方）。 */
-.qp-card:hover .qp-card-resize::before,
-.qp-full-slot:hover .qp-card-resize::before,
-.qp-card-resize:focus-visible::before {
-  opacity: 1;
-}
-
-/* 手柄自身 hover / 键盘聚焦：拉满整条宽（"只加长"的 100% 档） */
-.qp-card-resize:hover::before,
-.qp-card-resize:focus-visible::before {
-  inset: 3px 0 auto 0;
-}
-
-.qp-card-resize:focus-visible {
-  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
-  outline-offset: -2px;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 15px;
 }
