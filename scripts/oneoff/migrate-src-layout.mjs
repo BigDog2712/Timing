@@ -10,7 +10,7 @@
  *
  * 回滚：git reset --hard <迁移前的提交>
  */
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync, rmdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 
@@ -182,17 +182,28 @@ const dirs = new Set();
 for (const [oldRel, newRel] of newOf) {
   const dir = path.posix.dirname(newRel);
   if (!dirs.has(dir)) {
-    execSync(`mkdir -p "${dir}"`, { cwd: ROOT, shell: '/bin/bash' });
+    mkdirSync(path.join(ROOT, dir), { recursive: true });
     dirs.add(dir);
   }
   execSync(`git mv "${oldRel}" "${newRel}"`, { cwd: ROOT });
 }
 for (const [, newRel, content] of changed) writeFileSync(path.join(ROOT, newRel), content, 'utf8');
-try {
-  execSync('find src -type d -empty -delete', { cwd: ROOT, shell: '/bin/bash' });
-} catch {
-  /* 清不掉无妨 */
+
+/** 自底向上删空目录（不依赖 shell 的 find，Windows 下更稳） */
+function pruneEmptyDirs(dir) {
+  let entries;
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return;
+  }
+  for (const name of entries) {
+    const abs = path.join(dir, name);
+    if (statSync(abs).isDirectory()) pruneEmptyDirs(abs);
+  }
+  if (dir !== path.join(ROOT, 'src') && readdirSync(dir).length === 0) rmdirSync(dir);
 }
+pruneEmptyDirs(path.join(ROOT, 'src'));
 
 console.log('[迁移] 已执行。接着必须跑：npx tsc --noEmit && npx eslint src && node scripts/check-layers.mjs && node scripts/check-size.mjs && npx vitest run');
 console.log('[迁移] 再手工改配置：vite.config.ts / index.html / patina.html / scripts/*.mjs / scripts/*.json（前缀替换，勿碰 src-tauri/src/app）。');
