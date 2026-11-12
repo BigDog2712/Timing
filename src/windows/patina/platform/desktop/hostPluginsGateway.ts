@@ -8,10 +8,10 @@
  * `patina-host-settings` 授予）。返回形状见 `hostTypes.ts::PluginListResult`。
  */
 import { invoke } from "@tauri-apps/api/core";
-import type { PluginListResult } from "../../shared/dto/hostTypes";
+import type { PluginListResult } from "../../../shared/dto/hostTypes";
 
 export type { PluginInfo, PluginListResult, PluginSource, QuickTimer } from
-  "../../shared/dto/hostTypes";
+  "../../../shared/dto/hostTypes";
 
 const isTauriRuntime = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;

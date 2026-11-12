@@ -22,7 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
-vi.mock("../../../../platform/desktop/pillPrefsGateway", () => ({
+vi.mock("../../../../../shared/pillPrefsGateway", () => ({
   loadPillPrefs: vi.fn(async () => null),
   savePillPrefs: vi.fn(async () => undefined),
   nudgePillPrefs: vi.fn(),
@@ -32,9 +32,9 @@ import {
   loadPillPrefs,
   nudgePillPrefs,
   savePillPrefs,
-} from "../../../../platform/desktop/pillPrefsGateway";
-import { DEFAULT_HANDLE_BINDINGS } from "../../../../../timing/lib/handleCatalog";
-import type { PillPrefs } from "../../../../../timing/lib/pillAppearance";
+} from "../../../../../shared/pillPrefsGateway";
+import { DEFAULT_HANDLE_BINDINGS } from "../../../../../shared/handleCatalog";
+import type { PillPrefs } from "../../../../../shared/pillAppearance";
 import SettingsHandlesPanel from "../SettingsHandlesPanel";
 import HostPillLookCard from "./HostPillLookCard";
 

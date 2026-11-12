@@ -19,7 +19,7 @@ import {
   HANDLE_SLOTS,
   HANDLE_SLOT_LABELS,
   type HandleFormBinding,
-} from '../../../../timing/lib/handleCatalog';
+} from '../../../../shared/handleCatalog';
 import SettingsHandleCard from './SettingsHandleCard';
 
 let container: HTMLDivElement;

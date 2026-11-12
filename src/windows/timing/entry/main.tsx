@@ -81,7 +81,7 @@ import { markWindowKind } from '../lib/window';
 import { installAppearanceSync } from '../lib/appearanceSync';
 import { loadHandleBindings } from '../lib/handleBindings';
 import { readPillAppearance } from '../lib/pillAppearance';
-import { loadPillPrefs, seedPillPrefsIfAbsent } from '../../patina/platform/desktop/pillPrefsGateway';
+import { loadPillPrefs, seedPillPrefsIfAbsent } from '../../shared/pillPrefsGateway';
 import { initAppearance } from '../stores/appearanceStore';
 import { useUiStore } from '../stores/uiStore';
 

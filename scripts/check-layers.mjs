@@ -85,7 +85,7 @@ const L2_ROOTS = ['src/windows/timing/stores/'];
 const L2_FEATURE_STORES = 'src/windows/patina/features/';
 const L2_SUFFIX = /(^|\/)[^/]*Store\.ts$/;
 
-const L3_ALLOWED = new Set(['src/windows/timing/lib/windowApi.ts']);
+const L3_ALLOWED = new Set(['src/windows/shared/windowApi.ts']);
 const L3_PATTERN = /@tauri-apps\/api\/(?:webviewWindow|window)/;
 
 /* L9 双窗：主窗 = 宿主 UI 与传输/状态层；分析窗 = 归一的 Patina 四域。
@@ -105,32 +105,20 @@ const L9_MAIN_ROOTS = [
   'src/windows/timing/types/',
 ];
 const L9_ANALYSIS_ROOTS = ['src/windows/patina/shell/', 'src/windows/patina/features/', 'src/windows/patina/platform/', 'src/windows/patina/shared/'];
-/* 允许被分析窗 import 的**主窗**模块（白名单只增不减，且每一条都必须真实存在，
- * 由下方 L9 哨兵校验）：
- *  - `windowApi`：窗口 API 薄壳，只 re-export `@tauri-apps/api/*`，零业务依赖。
- *  - `handleCatalog`：手柄动作目录，**纯数据 + 零 import**；
- *  - `handleBindings`：手柄绑定读写，**纯函数 + localStorage**，只 import 前者；
- *  - `pillAppearance`：药丸外观（文字/背景不透明度、常驻形态）的**纯数据 + 纯 IO**，
- *    只 import `lib/storageKeys`（同属 `src/lib`，不越界）；[0.12.1 T04] 设置搬进主界面后，
- *    主界面的外观卡与宿主药丸必须写同一个键，而写路径只能有一条。
- * 前三条存在的理由：设置页（分析窗 `src/windows/patina/features/settings/**`）必须能读写手柄绑定，
- * 而分析窗读不到宿主 `src/windows/timing/services/**`（runner）与 `src/windows/timing/stores/**`（appearanceStore 带
- * zustand 与副作用，加进来等于双窗隔离作废）。所以「能被两窗共享的东西」只能是
- * 无状态、无传输层依赖的纯模块 —— 这不是洁癖，是门禁的硬约束。
- * 反例（别照着抄）：任何带 `useState` / `zustand` / `invoke` 的模块都不许进这张表。
+/* 允许被分析窗 import 的**主窗**模块。
  *
- * [0.12.1 L10] 唯一破例：`patina/platform/desktop/pillPrefsGateway`。它**带 invoke**，按上面
- * 那条规矩本该被拒，但它是「药丸偏好真源」的唯一出入口，两侧都必须用同一份（主窗启动读、
- * 分析窗设置页写；两窗 localStorage 分区，各写一份正是 0.12.0 的老 bug）。破例的代价由
- * L10 兜住：它属 platform 层，一旦它去 import 分析窗 `features/**` 或 `shell/**`，L10 立即
- * 变红 —— 也就是说它只能是「只依赖 timing/lib + shared」的一片薄网关，不能变成第二扇门。 */
-const L9_ALLOWED_TARGETS = new Set([
-  'src/windows/timing/lib/windowApi',
-  'src/windows/timing/lib/handleCatalog',
-  'src/windows/timing/lib/handleBindings',
-  'src/windows/timing/lib/pillAppearance',
-  'src/windows/patina/platform/desktop/pillPrefsGateway',
-]);
+ * [0.12.1 共享层] 本表**已清空**。原来这里有 5 条（windowApi / handleCatalog / handleBindings /
+ * pillAppearance / pillPrefsGateway），靠"例外"让分析窗去引主窗模块；现在这些模块整体下沉到
+ * `src/windows/shared/`（既不属于主窗也不属于分析窗），两侧都直接引它，跨窗引用在物理上消失，
+ * 例外表自然归零。
+ *
+ * 为什么清空比"留一份例外"好：例外表是"共享载体"的逃生门 —— 只要门还在，下一个人就能往
+ * 里塞第 6 条。共享层建好之后，任何"分析窗要读主窗的东西"都只有一条正路：把那东西搬进
+ * `windows/shared/`（并且它必须满足 L10 的约束：不得反向依赖任一窗口）。
+ *
+ * 仍然保留哨兵语义：表非空时，每条都必须指向真实存在的文件（防止薄壳改名后例外静默失效）。
+ * 空表时哨兵跳过该检查 —— 这是允许的状态，不是漏配。 */
+const L9_ALLOWED_TARGETS = new Set([]);
 
 const violations = [];
 const rule = (id, desc) => ({ id, desc, hits: [] });
@@ -145,7 +133,7 @@ const R = {
   L8: rule('L8', '业务写入信号 dirty::mark( 只允许出现在 src-tauri/src/commands/'),
   L9: rule(
     'L9',
-    '双窗隔离：主窗与分析窗不得互相 import（例外 windowApi.ts / lib/handleCatalog / lib/handleBindings / icons 资源）',
+    '双窗隔离：主窗与分析窗不得互相 import（例外表已清空，共享模块改为下沉到 src/windows/shared/）',
   ),
   L10: rule(
     'L10',
@@ -306,6 +294,15 @@ const L10_LAYERS = [
       'src/windows/patina/platform/',
     ],
     why: 'shared 是纯数据/纯工具层，不得依赖 features / shell / platform（带上 invoke 就不再共享）',
+  },
+  {
+    /* [0.12.1] 跨窗共享层：既不属于主窗也不属于分析窗，是 L9 例外表清空后的唯一合法交汇点。
+       它只能依赖 npm 包与自身 —— 一旦反向依赖任一窗口，就退化成"第三个窗"，
+       两侧引用它等于隔着一层偷偷耦合。 */
+    name: 'windows/shared',
+    roots: ['src/windows/shared/'],
+    forbidden: ['src/windows/timing/', 'src/windows/patina/'],
+    why: '跨窗共享层不得反向依赖主窗或分析窗（否则退化成第三个窗，L9 的隔离被绕过）',
   },
 ];
 

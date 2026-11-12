@@ -22,14 +22,14 @@ import {
   readPillAppearance,
   writePillAppearance,
   type Appearance,
-} from "../../../../../timing/lib/pillAppearance";
+} from "../../../../../shared/pillAppearance";
 import SettingsPanelHeader from "../SettingsPanelHeader";
 import { SettingsPreferenceGroup, SettingsPreferenceRow } from "../SettingsPreferenceLayout";
 import {
   loadPillPrefs,
   nudgePillPrefs,
   savePillPrefs,
-} from "../../../../platform/desktop/pillPrefsGateway";
+} from "../../../../../shared/pillPrefsGateway";
 
 const STROKE = 1.6;
 const MIN_PERCENT = Math.round(TEXT_OPACITY_MIN * 100);

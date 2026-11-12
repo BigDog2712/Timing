@@ -21,7 +21,7 @@ import type {
   MdSyncTestResult,
   MdSyncViewCloud,
   SafStatus,
-} from "../../shared/dto/hostTypes";
+} from "../../../shared/dto/hostTypes";
 
 const isTauriRuntime = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 /* 窗口 API 走宿主薄壳（纯 re-export）：直接引窗口 API 包会与 src/lib/window.ts 一起
    把宿主 IPC 全表拖进分析窗 bundle。见 src/lib/windowApi.ts。 */
-import { getCurrentWebviewWindow, getCurrentWindow, LogicalSize } from "../../../timing/lib/windowApi";
+import { getCurrentWebviewWindow, getCurrentWindow, LogicalSize } from "../../../shared/windowApi";
 
 interface CurrentWindowForegroundState {
   visible: boolean;

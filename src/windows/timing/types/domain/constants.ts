@@ -57,7 +57,6 @@ export const DEFAULT_COUNTDOWN_PRESETS: readonly number[] = [300, 900, 1500, 180
  * [V0.5.0] 改名 `tickbar.theme` → `timing.theme`；老键只读回落一个版本，
  * 见 `src/lib/storageKeys.ts`（唯一读取口径）与 `index.html` 内联脚本（同批改）。
  */
-export const THEME_CACHE_KEY = 'timing.theme';
-
-/** [V0.5.0] 老主题键：只读回落，**不删**（回滚 0.4.1 时它的偏好还在） */
-export const THEME_CACHE_KEY_LEGACY = 'tickbar.theme';
+/* [0.12.1 共享层] 定义搬到 `windows/shared/storageKeys.ts`（storageKeys 是跨窗共享层，
+   不能反向依赖本目录），这里只 re-export，引用方零改动。 */
+export { THEME_CACHE_KEY, THEME_CACHE_KEY_LEGACY } from '../../../shared/storageKeys';

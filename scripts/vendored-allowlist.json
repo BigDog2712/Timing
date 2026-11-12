@@ -1119,14 +1119,14 @@
     },
     {
       "path": "src/windows/patina/platform/desktop/pillPrefsGateway.test.ts",
-      "change": "modified",
-      "reason": "[目录重排 2026-11-12] 双窗结构重排（src/app|features|platform|shared → src/windows/patina/*）导致 import 相对路径变更，逻辑与行为零改动；只改了指向被搬文件的模块说明符。",
+      "change": "deleted",
+      "reason": "[0.12.1 共享层] 单测随模块迁到 `src/windows/shared/pillPrefsGateway.test.ts`（测试跟模块走，不留副本）。本路径已不存在。",
       "owner": "ForG"
     },
     {
       "path": "src/windows/patina/platform/desktop/pillPrefsGateway.ts",
-      "change": "modified",
-      "reason": "[目录重排 2026-11-12] 双窗结构重排（src/app|features|platform|shared → src/windows/patina/*）导致 import 相对路径变更，逻辑与行为零改动；只改了指向被搬文件的模块说明符。",
+      "change": "deleted",
+      "reason": "[0.12.1 共享层] 药丸偏好网关整体下沉到 `src/windows/shared/pillPrefsGateway.ts`（两侧都直接引共享层，L9 例外表因此清空）。本路径已不存在，登记随之为 deleted。",
       "owner": "ForG"
     },
     {

@@ -75,7 +75,7 @@ src/windows/timing/types/domain/dataRoot.ts :: migrated-from-tickbar-app.json
 src/windows/timing/mocks/browserMockPlugins.ts :: migrated-from-tickbar-app.json
 src/windows/timing/components/settings/MdDataRootBlock.test.tsx :: migrated-from-tickbar-app.json
 # 5 个 localStorage 键的只读回落（新键优先，老键兜底一个版本）。
-src/windows/timing/lib/storageKeys.ts
+src/windows/shared/storageKeys.ts
 src/windows/timing/lib/storageKeys.test.ts
 src/windows/timing/lib/theme.ts
 src/windows/timing/stores/appearanceStore.ts

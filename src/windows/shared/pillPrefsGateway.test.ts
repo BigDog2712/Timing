@@ -15,9 +15,9 @@ vi.mock('@tauri-apps/api/event', () => ({ emit: vi.fn(() => Promise.resolve()) }
 
 import { invoke } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
-import { DEFAULT_HANDLE_BINDINGS } from '../../../timing/lib/handleCatalog';
-import { PILL_PREFS_EVENT } from '../../../timing/lib/pillAppearance';
-import type { PillPrefs } from '../../../timing/lib/pillAppearance';
+import { DEFAULT_HANDLE_BINDINGS } from './handleCatalog';
+import { PILL_PREFS_EVENT } from './pillAppearance';
+import type { PillPrefs } from './pillAppearance';
 import {
   loadPillPrefs,
   nudgePillPrefs,

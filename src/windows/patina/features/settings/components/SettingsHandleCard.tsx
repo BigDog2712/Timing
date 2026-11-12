@@ -27,7 +27,7 @@ import {
   type HandleForm,
   type HandleFormBinding,
   type HandleSlot,
-} from "../../../../timing/lib/handleCatalog";
+} from "../../../../shared/handleCatalog";
 
 const STROKE = 1.6;
 

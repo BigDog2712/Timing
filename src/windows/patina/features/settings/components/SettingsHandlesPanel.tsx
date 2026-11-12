@@ -21,13 +21,13 @@ import {
   type HandleBindings,
   type HandleForm,
   type HandleFormBinding,
-} from "../../../../timing/lib/handleCatalog";
-import { loadHandleBindings, saveHandleBindings } from "../../../../timing/lib/handleBindings";
+} from "../../../../shared/handleCatalog";
+import { loadHandleBindings, saveHandleBindings } from "../../../../shared/handleBindings";
 import {
   loadPillPrefs,
   nudgePillPrefs,
   savePillPrefs,
-} from "../../../platform/desktop/pillPrefsGateway";
+} from "../../../../shared/pillPrefsGateway";
 import SettingsPanelHeader from "./SettingsPanelHeader";
 import SettingsHandleCard from "./SettingsHandleCard";
 import { MousePointerClick } from "lucide-react";

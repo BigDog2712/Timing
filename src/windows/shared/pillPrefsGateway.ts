@@ -20,8 +20,8 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
-import { PILL_PREFS_EVENT, parsePillPrefs } from "../../../timing/lib/pillAppearance";
-import type { PillPrefs, PillPrefsPatch } from "../../../timing/lib/pillAppearance";
+import { PILL_PREFS_EVENT, parsePillPrefs } from "./pillAppearance";
+import type { PillPrefs, PillPrefsPatch } from "./pillAppearance";
 
 const isTauriRuntime = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;

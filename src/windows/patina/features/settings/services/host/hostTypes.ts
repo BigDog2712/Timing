@@ -11,4 +11,4 @@
  * 新增类型请写进 `shared/dto/hostTypes.ts`，不要写回本文件 —— 否则 platform 侧又会引到
  * features 里的定义，L10 立即变红。
  */
-export * from '../../../../shared/dto/hostTypes';
+export * from '../../../../../shared/dto/hostTypes';
