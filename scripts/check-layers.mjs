@@ -16,15 +16,20 @@
  *   L7 编译期平台常量 `__TIMING_MOBILE__` 只允许出现在 `src/windows/timing/lib/platform.ts`
  *   L8 业务写入信号 `dirty::mark(` 只允许出现在 `src-tauri/src/commands/`
  *      （`jobs/` 与 `services/` 下 0 命中；见下方 L8 哨兵）
- *   L9 双窗隔离：主窗（components/hooks/lib/mocks/services/stores/styles/types）与分析窗
- *      （app/features/platform/shared）不得互相 import；例外只有三类：零业务依赖的
+ *   L9 双窗隔离：主窗（entry/components/hooks/lib/mocks/services/stores/styles/types）与分析窗
+ *      （shell/features/platform/shared）不得互相 import；例外只有三类：零业务依赖的
  *      `src/windows/timing/lib/windowApi.ts`（窗口 API 薄壳）、`src-tauri/icons/**` 静态资源，
  *      以及 `src/windows/timing/lib/handle*` 两个纯数据 / 纯 IO 模块（手柄目录与绑定读写，见下方
  *      `L9_ALLOWED_TARGETS` 的说明 —— 它们是**两窗唯一合法的共享载体**）。
+ *      [0.12.1 L10] 例外表新增 `windows/patina/platform/desktop/pillPrefsGateway`（药丸偏好真源
+ *      唯一出入口）—— 它带 invoke，属白名单破例，理由与兜底见 `L9_ALLOWED_TARGETS` 的注释。
+ *   L10 patina 内部分层（[0.12.1] 新增）：`platform/**` 不得 import `features/**` / `shell/**`；
+ *      `shared/**` 不得 import `features/**` / `shell/**` / `platform/**`。方向只能朝下
+ *      （shell → features → platform → shared）。测试文件与 CSS 说明符不参与（理由见下方常量注释）。
  *
  * 每一条都是「改坏了 CI 就红」的判据，而不是「建议」。
  *
- * ## L7 / L8 / L9 的哨兵（防「绿着空转」）
+ * ## L7 / L8 / L9 / L10 的哨兵（防「绿着空转」）
  *
  * L7 / L8 都是**按符号名 grep** 的规则：符号一改名而本脚本没跟着改，规则就会去扫
  * 一个根本不存在的符号，于是打印「N 条规则全部通过」，而保护已经消失（PRD R7 警告
@@ -33,6 +38,9 @@
  *
  * L9 是「按路径集合 + import 解析」的规则，最容易因为根目录写错而两个集合都为空、
  * 于是永远不命中。哨兵要求主窗/分析窗两条路径集合都非空，且真的解析出了相对 import。
+ *
+ * L10 同型：它按 `L10_LAYERS` 的路径前缀收文件，前缀一写错就扫空集合、永远不命中而
+ * 依旧打印「N 条规则全部通过」。哨兵要求每一层都非空，且全层合计解析出的相对 import > 0。
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
@@ -80,8 +88,13 @@ const L2_SUFFIX = /(^|\/)[^/]*Store\.ts$/;
 const L3_ALLOWED = new Set(['src/windows/timing/lib/windowApi.ts']);
 const L3_PATTERN = /@tauri-apps\/api\/(?:webviewWindow|window)/;
 
-/* L9 双窗：主窗 = 宿主 UI 与传输/状态层；分析窗 = 归一的 Patina 四域。 */
+/* L9 双窗：主窗 = 宿主 UI 与传输/状态层；分析窗 = 归一的 Patina 四域。
+ * [0.12.1 L10] `entry/` 必须在内：`main.tsx` / `App.tsx` 是**主窗入口**，也是越窗 import
+ * 最容易被漏掉的地方 —— 上一版这里没列 entry/，`main.tsx:84` 已经实际把分析窗的
+ * `pillPrefsGateway` 引进主窗，门禁却报绿（2026-11-12 审计发现）。入口不扫，等于
+ * 「只要绕到入口就没人管」。 */
 const L9_MAIN_ROOTS = [
+  'src/windows/timing/entry/',
   'src/windows/timing/components/',
   'src/windows/timing/hooks/',
   'src/windows/timing/lib/',
@@ -104,12 +117,19 @@ const L9_ANALYSIS_ROOTS = ['src/windows/patina/shell/', 'src/windows/patina/feat
  * 而分析窗读不到宿主 `src/windows/timing/services/**`（runner）与 `src/windows/timing/stores/**`（appearanceStore 带
  * zustand 与副作用，加进来等于双窗隔离作废）。所以「能被两窗共享的东西」只能是
  * 无状态、无传输层依赖的纯模块 —— 这不是洁癖，是门禁的硬约束。
- * 反例（别照着抄）：任何带 `useState` / `zustand` / `invoke` 的模块都不许进这张表。 */
+ * 反例（别照着抄）：任何带 `useState` / `zustand` / `invoke` 的模块都不许进这张表。
+ *
+ * [0.12.1 L10] 唯一破例：`patina/platform/desktop/pillPrefsGateway`。它**带 invoke**，按上面
+ * 那条规矩本该被拒，但它是「药丸偏好真源」的唯一出入口，两侧都必须用同一份（主窗启动读、
+ * 分析窗设置页写；两窗 localStorage 分区，各写一份正是 0.12.0 的老 bug）。破例的代价由
+ * L10 兜住：它属 platform 层，一旦它去 import 分析窗 `features/**` 或 `shell/**`，L10 立即
+ * 变红 —— 也就是说它只能是「只依赖 timing/lib + shared」的一片薄网关，不能变成第二扇门。 */
 const L9_ALLOWED_TARGETS = new Set([
   'src/windows/timing/lib/windowApi',
   'src/windows/timing/lib/handleCatalog',
   'src/windows/timing/lib/handleBindings',
   'src/windows/timing/lib/pillAppearance',
+  'src/windows/patina/platform/desktop/pillPrefsGateway',
 ]);
 
 const violations = [];
@@ -126,6 +146,10 @@ const R = {
   L9: rule(
     'L9',
     '双窗隔离：主窗与分析窗不得互相 import（例外 windowApi.ts / lib/handleCatalog / lib/handleBindings / icons 资源）',
+  ),
+  L10: rule(
+    'L10',
+    'patina 内部分层：platform 不得 import features|shell；shared 不得 import features|shell|platform',
   ),
 };
 
@@ -217,6 +241,23 @@ function relativeSpecifiers(src) {
   return out;
 }
 
+/* 资源类说明符不参与跨窗/分层判定。
+ *
+ * 理由：CSS（以及 scss/less）**没有模块语义** —— 它不导出符号、不产生调用边，跨窗引一份
+ * 样式表不会让两侧 bundle 互相拖进来；真正的耦合判据是 TS 模块 import。
+ * 现状：`timing/entry/main.tsx:28-41` 引了 8 份 `patina/shell/styles/features/host/*.css`
+ * （0.12.1「设置搬进主界面」的产物，主界面要渲染同一套设置面板）。把它算成越窗，
+ * 只会逼人放宽整条规则 —— 那是「绿着空转」的另一种写法。若将来真要隔离样式，
+ * 应按目录搬迁（样式进共享目录）并另立规则，不在这里悄悄开口子。 */
+const RESOURCE_SPECIFIER = /\.(css|scss|less)$/i;
+
+/* 测试文件不参与 L10（内部分层）。
+ * 测试是**站在最上层验收下层接缝**的：`platform` 层下的 `*.test.ts` 引 `shell/hooks` 是它
+ * 唯一能干这件事的方式，禁掉就等于禁止测接缝。产品代码仍被 L10 全覆盖 ——
+ * 已有的三处（`mainToolsNavigationGateway.{overview,settings,}.test.ts`）不会因为这条豁免
+ * 而放宽任何产品模块。 */
+const isTestFile = (rel) => /\.(test|spec)\.[tj]sx?$/.test(rel) || rel.includes('/__tests__/');
+
 const L9_MAIN_FILES = feFiles.filter((f) => L9_MAIN_ROOTS.some((p) => f.startsWith(p)));
 const L9_ANALYSIS_FILES = feFiles.filter((f) => L9_ANALYSIS_ROOTS.some((p) => f.startsWith(p)));
 const L9_ALLOWED_NORMALIZED = new Set([...L9_ALLOWED_TARGETS].map((p) => p.replace(/\.(tsx?|jsx?)$/, '')));
@@ -225,6 +266,7 @@ let l9SpecifierCount = 0;
 function scanWindowCross(files, targetRoots, target) {
   for (const rel of files) {
     for (const spec of relativeSpecifiers(read(rel))) {
+      if (RESOURCE_SPECIFIER.test(spec)) continue;
       l9SpecifierCount++;
       const targetRel = relPath(resolve(root, dirname(rel), spec));
       const normalized = targetRel.replace(/\.(tsx?|jsx?)$/, '');
@@ -237,6 +279,52 @@ function scanWindowCross(files, targetRoots, target) {
 }
 scanWindowCross(L9_MAIN_FILES, L9_ANALYSIS_ROOTS, R.L9);
 scanWindowCross(L9_ANALYSIS_FILES, L9_MAIN_ROOTS, R.L9);
+
+/* L10：分析窗**内部分层方向**（shell → features → platform → shared，只许朝下）。
+ *
+ * 与 L9 的分工：L9 管跨窗（timing ↔ patina），L10 管 patina 内部四域。上一版没有 L10，
+ * 于是出现两条「不影响运行、但让分层失去意义」的反向依赖：
+ *   · `platform/desktop/hostPluginsGateway.ts` → `features/settings/services/host/hostTypes`
+ *     （传输层反向依赖业务层：底层一引上层，打包就拆不开，单测也无法只测平台层）
+ *   · `shared/hooks/useWindowDragGesture.ts` → `platform/desktop/windowControlGateway`
+ *     （共享层反向依赖平台层：shared 一旦带上 invoke，就再也不能被任何一侧单独复用）
+ * 2026-11-12 已把两者下沉（hostTypes → `shared/dto/`，手势 → `platform/desktop/`）；
+ * L10 是防止它们慢慢爬回去的判据，而不是风格建议。 */
+const L10_LAYERS = [
+  {
+    name: 'platform',
+    roots: ['src/windows/patina/platform/'],
+    forbidden: ['src/windows/patina/features/', 'src/windows/patina/shell/'],
+    why: 'platform 是传输/平台能力层，只能依赖 shared 与主窗薄壳，不得反向依赖 features / shell',
+  },
+  {
+    name: 'shared',
+    roots: ['src/windows/patina/shared/'],
+    forbidden: [
+      'src/windows/patina/features/',
+      'src/windows/patina/shell/',
+      'src/windows/patina/platform/',
+    ],
+    why: 'shared 是纯数据/纯工具层，不得依赖 features / shell / platform（带上 invoke 就不再共享）',
+  },
+];
+
+let l10SpecifierCount = 0;
+for (const layer of L10_LAYERS) {
+  const files = feFiles.filter((f) => layer.roots.some((p) => f.startsWith(p)));
+  layer.files = files;
+  for (const rel of files) {
+    if (isTestFile(rel)) continue;
+    for (const spec of relativeSpecifiers(read(rel))) {
+      if (RESOURCE_SPECIFIER.test(spec)) continue;
+      l10SpecifierCount++;
+      const targetRel = relPath(resolve(root, dirname(rel), spec));
+      if (layer.forbidden.some((p) => targetRel.startsWith(p))) {
+        R.L10.hits.push(`${rel} → ${targetRel}  (${spec})  [${layer.name} 反向依赖]`);
+      }
+    }
+  }
+}
 
 /* L7 哨兵：被扫描的符号必须真的存在（否则规则「绿着空转」）。 */
 const SENTINEL_SITES = [
@@ -306,12 +394,30 @@ if (l9SentinelFailures.length) {
   process.exit(1);
 }
 
+/* L10 哨兵：每层都必须扫到文件，且真的解析出了相对 import。
+ * 与 L9 同型 —— 路径前缀写错会让规则扫空集合、永远不命中，而输出仍是「10 条规则全部通过」。 */
+const l10SentinelFailures = [];
+for (const layer of L10_LAYERS) {
+  if (!layer.files || layer.files.length === 0) {
+    l10SentinelFailures.push(`${layer.name} 层路径集合为空（L10_LAYERS.roots 是否写错？）`);
+  }
+}
+if (l10SpecifierCount === 0) l10SentinelFailures.push('L10 没有解析出任何相对 import（说明符正则坏了？）');
+if (l10SentinelFailures.length) {
+  console.error('[layers] FAILED — L10 哨兵未通过：内部分层规则会「绿着空转」\n');
+  for (const line of l10SentinelFailures) console.error(`  ✗ ${line}`);
+  console.error('\n规则：L10 依赖 L10_LAYERS 的路径前缀；集合为空时它永远不命中。');
+  console.error('patina 四域改名（shell/features/platform/shared）必须同批改 L10_LAYERS。');
+  process.exit(1);
+}
+
 for (const r of Object.values(R)) if (r.hits.length) violations.push(r);
 
 if (violations.length === 0) {
   console.log(
     `[layers] OK — ${Object.keys(R).length} 条分层规则全部通过（扫描 ${feFiles.length + rsFiles.length} 个文件；` +
-      `L9 主窗 ${L9_MAIN_FILES.length} / 分析窗 ${L9_ANALYSIS_FILES.length} 个文件）`,
+      `L9 主窗 ${L9_MAIN_FILES.length} / 分析窗 ${L9_ANALYSIS_FILES.length} 个文件；` +
+      `L10 解析 ${l10SpecifierCount} 条相对 import）`,
   );
   process.exit(0);
 }

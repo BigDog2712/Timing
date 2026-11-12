@@ -314,18 +314,6 @@
       "owner": "ForG"
     },
     {
-      "path": "src/windows/patina/features/history/services/historyDayDistributionView.ts",
-      "change": "added",
-      "reason": "[0.12.1 末 · 历史区间] 单日「时段分布」模式解析，从 History.tsx 等量搬出（逻辑一字未改）。",
-      "owner": "ForG"
-    },
-    {
-      "path": "src/windows/patina/features/history/services/historyDaySummaryView.ts",
-      "change": "added",
-      "reason": "[0.12.1 末 · 历史区间] 单日摘要三行数字，从 History.tsx 等量搬出（逻辑一字未改，含「高峰并列时比相邻小时」与「1 分钟阈值回退」两条口径）。",
-      "owner": "ForG"
-    },
-    {
       "path": "src/windows/patina/features/history/services/historyRange.ts",
       "change": "added",
       "reason": "[0.12.1 末 · 历史区间] 档位→时间窗：昨日/本周/近7天/近30天/自定义。日界一律本地 00:00；昨日右端是今日 00:00（其余档是此刻）；自定义反选自动对调、未来裁到今天。",
@@ -533,12 +521,6 @@
       "path": "src/windows/patina/features/dashboard/components/TrendModule.tsx",
       "change": "added",
       "reason": "应用趋势卡：7 根柱按峰值归一（按 24h 归一时每根都矮，看不出走势），今天用强调色。 [1:1 对齐 timing-board.exe] 把日均占峰值的百分比作为 `--qp-trend-avg` 传给 CSS 画虚线（不在 DOM 里塞非 `li` 元素）；柱高外包 `max(…, 3px)`、零活动给 2px + `data-empty`，照 `trend.rs:82/106`。 [照搬 exe · 文字排版] x 轴只标首/中/末三处（`trend.rs:110`），文字是 MM/DD、最后一根写「今天」；列数交给 `--qp-trend-n`；卡头读数改「近 N 天」；柱高下限 3px 照 `trend.rs:82`。早先每根柱下面都挂星期，14 根时挤成一片 —— 这是\"文字排版不像\"最明显的一处。 ｜ [今日活动趋势] 主人口径：「活动趋势」改成「今日活动趋势」，只看今天 —— 旧的「近 14 天每日」换成「今日每小时」（`buildTodayHourPlan`：本地 00:00 起每整点一窗口、末窗口裁到此刻、边界严格递增），卡头读数改成「今日总时长 + 峰值时刻」，轴文字仍是首/中/末三处，日均虚线与 `--qp-trend-avg` 一起下线。",
-      "owner": "ForG"
-    },
-    {
-      "path": "src/windows/patina/platform/persistence/reminderReadRepository.ts",
-      "change": "added",
-      "reason": "提醒窗口卡（0.12.1）的只读网关：照 noteReadRepository 的三条边界写 —— 不碰分析窗 api.ts 与 domain-v020.ts（L9 双窗隔离，type import 同样红），命令名 reminder_pending 无入参，脏行丢弃不抛错。",
       "owner": "ForG"
     },
     {
@@ -773,12 +755,6 @@
       "path": "src/windows/patina/features/dashboard/layout/boardZoomGesture.test.tsx",
       "change": "added",
       "reason": "[v3.1] 缩放行为判据：Ctrl + 滚轮真的改倍率与 transform、普通滚轮不被 preventDefault（拦了就是用户报的「滚轮无法翻动」）、连滚到底仍钳在范围内。",
-      "owner": "ForG"
-    },
-    {
-      "path": "src/windows/patina/shared/hooks/useWindowDragGesture.ts",
-      "change": "added",
-      "reason": "[v3.1 拖窗] 分析窗自己的「按住空白处拖窗」手势。不复用 src/windows/timing/hooks/useWindowDragAnywhere：那个经 src/windows/timing/lib/window 转出，会把宿主 IPC 全表拖进分析窗 bundle（L9 双窗隔离）。",
       "owner": "ForG"
     },
     {
@@ -1157,6 +1133,78 @@
       "path": "src/windows/patina/shared/theme/hostAccentBridge.test.ts",
       "change": "modified",
       "reason": "[目录重排 2026-11-12] 双窗结构重排（src/app|features|platform|shared → src/windows/patina/*）导致 import 相对路径变更，逻辑与行为零改动；只改了指向被搬文件的模块说明符。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/shell/mini/miniStatusViewModel.ts",
+      "change": "deleted",
+      "reason": "[0.12.1 死代码清理] mini 活动卡的旧状态视图模型；mini 侧已改用 miniViewModel + MiniToolStatus，本文件全仓 0 处 import（迭代 3 轮确认无二次孤儿）。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/features/history/components/HistoryDayDistributionPanel.tsx",
+      "change": "deleted",
+      "reason": "[0.12.1 死代码清理] 单日「时段分布」旧版式的容器；单日已统一走 HistoryRangeView（h05 哨兵明确要求不得挂回），随其子组件同批删除。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/features/history/components/HistoryDayDistributionQuickActions.tsx",
+      "change": "deleted",
+      "reason": "[0.12.1 死代码清理] 单日旧版式的快捷动作条；h05 哨兵把它列在「退役清单」里（not.toContain），文件本身已无引用。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/features/history/components/HistoryDaySummaryPanel.tsx",
+      "change": "deleted",
+      "reason": "[0.12.1 死代码清理] 单日旧版式三行摘要容器；单日统一走 HistoryRangeView 后无引用。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/features/history/components/HistoryTimingOverlap.tsx",
+      "change": "deleted",
+      "reason": "[0.12.1 死代码清理] 单日旧版式的「计时重叠」卡；同上，随旧版式整簇退役。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/features/history/hooks/useHistoryDistributionItems.ts",
+      "change": "deleted",
+      "reason": "[0.12.1 死代码清理] 旧版式时段分布的数据 hook；唯一消费者是上面的 Panel，一并退役。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/features/history/hooks/useTimingOverlap.ts",
+      "change": "deleted",
+      "reason": "[0.12.1 死代码清理] 旧版式计时重叠的 hook；唯一消费者是上面的 HistoryTimingOverlap。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/host/hostTypes.ts",
+      "change": "modified",
+      "reason": "[0.12.1 死代码清理] L10 分层整改：DTO 真源下沉到 shared/dto/hostTypes.ts（platform 与 features 双向都要引它，放任一侧都会形成反向依赖）。本文件保留一条 `export *` 转发壳，既有 14 处引用零改动。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/platform/desktop/hostPluginsGateway.ts",
+      "change": "modified",
+      "reason": "[0.12.1 死代码清理] L10 分层整改：类型来源由 `features/settings/services/host/hostTypes` 改为 `shared/dto/hostTypes`，消除 platform → features 反向依赖。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/platform/desktop/hostSyncGateway.ts",
+      "change": "modified",
+      "reason": "[0.12.1 死代码清理] L10 分层整改：同上，类型来源下沉到 shared/dto。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/shared/dto/hostTypes.ts",
+      "change": "added",
+      "reason": "[0.12.1 死代码清理] L10 分层整改：宿主 DTO 形状镜像从 features/settings/services/host/ 下沉到 shared/dto/。平台层与业务层都引它，只有 shared 是方向一致朝下的公共位置。内容与下沉前逐字一致。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/platform/desktop/useWindowDragGesture.ts",
+      "change": "added",
+      "reason": "[0.12.1 死代码清理] L10 分层整改：从 shared/hooks/ 下沉到 platform/desktop/（它依赖 windowControlGateway 的 invoke，放 shared 会让 shared 反向依赖 platform）。调用方 AppTitleBar / BoardCanvas 的 import 路径同批更新。",
       "owner": "ForG"
     }
   ]

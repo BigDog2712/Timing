@@ -15,7 +15,7 @@ import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "
 import { BOARD_H, BOARD_W, type BoardCard, type DashboardLayout } from "./contract";
 import { contentHeight } from "./geometry";
 import { useBoardZoom } from "./useBoardZoom";
-import { useWindowDragGesture } from "../../../shared/hooks/useWindowDragGesture.ts";
+import { useWindowDragGesture } from "../../../platform/desktop/useWindowDragGesture.ts";
 
 interface Props {
   layout: DashboardLayout;

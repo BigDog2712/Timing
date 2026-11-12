@@ -6,6 +6,20 @@ authors = ["Timing Team"]
 edition = "2021"
 rust-version = "1.90"
 
+[lints.clippy]
+# `panic = "abort"`（见下方 [profile.release]）：可达路径上的 unwrap/expect 直接杀进程，
+# 没有 unwind 兜底、也不会留下可恢复的错误。这两条是 restriction 级 lint（默认 allow），
+# 打开后让「生产可达的 panic 点」至少在 clippy 输出里可见 —— 2026-11-12 审计实测全量
+# 5,660 处、其中生产可达 42 处，而此前没有任何门禁看着它们。
+#
+# 为什么是 warn 而不是 deny：`cargo clippy` 默认不编 test target、`#[cfg(test)]` 模块也不
+# 参与，所以这两条只盯产品代码；但 42 处清完之前设 deny 会让 clippy 直接不可用。
+# 收敛路径：每版按清单清一批 → 42 处归零后另立版本改 `deny`（与 check-size 的棘轮同型）。
+# 注意：目前项目没有 CI clippy 步骤（npm run check 是 node 门禁），所以 warn 不会阻断构建；
+# 若将来加 clippy 到门禁，禁止使用 `-D warnings` 直到这两条收敛完毕。
+unwrap_used = "warn"
+expect_used = "warn"
+
 [lib]
 name = "timing_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]

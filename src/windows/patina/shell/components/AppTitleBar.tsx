@@ -5,7 +5,7 @@ import { openMiniWindow } from "../../platform/desktop/miniWindowRuntimeGateway.
 import appIconUrl from "../../../../../src-tauri/icons/128x128@2x.png";
 import {
   closeCurrentWindow, minimizeCurrentWindow, toggleCurrentWindowMaximized, } from "../../platform/desktop/windowControlGateway";
-import { useWindowDragGesture } from "../../shared/hooks/useWindowDragGesture.ts";
+import { useWindowDragGesture } from "../../platform/desktop/useWindowDragGesture.ts";
 
 
 const APP_TITLE = "Timing";

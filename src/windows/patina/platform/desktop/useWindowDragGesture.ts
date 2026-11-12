@@ -1,9 +1,13 @@
 /**
- * Timing — 「按住空白处拖窗」手势（分析窗自用）
+ * Timing — 「按住空白处拖窗」手势（分析窗自用，[L10] 从 shared/hooks 下沉到 platform/desktop）
  * -----------------------------------------------------------------------------
- * 为什么不是直接复用 `src/hooks/useWindowDragAnywhere`：那个是**主窗**（药丸/便利贴）
- * 的钩子，它经 `src/lib/window` 转出，会把宿主 IPC 全表拖进分析窗 bundle（L9 双窗隔离）。
+ * 为什么不是直接复用主窗的 `windows/timing/hooks/useWindowDragAnywhere`：那个经
+ * `timing/lib/window` 转出，会把宿主 IPC 全表拖进分析窗 bundle（L9 双窗隔离）。
  * 这里只依赖 `windowControlGateway` 的一条 `startDragging`，两窗零交叉。
+ *
+ * 为什么归 platform 而不是 shared：它依赖 `platform/desktop/windowControlGateway`（带 invoke），
+ * 而 shared 层的规则是「不依赖 platform / features / shell」（L10）。放在 shared 里会形成
+ * shared → platform 的反向依赖；放在 platform 里方向朝下，上层（shell / features）照常引。
  *
  * 语义与那个钩子一致，理由也一样：
  *   - 阈值 4px：单击（点按钮、点卡头）照常落到控件上，不被误判成拖动；
@@ -15,7 +19,7 @@
  */
 import { useEffect, useRef } from "react";
 import type { MouseEvent, PointerEvent as ReactPointerEvent } from "react";
-import { startCurrentWindowDrag } from "../../platform/desktop/windowControlGateway.ts";
+import { startCurrentWindowDrag } from "./windowControlGateway.ts";
 
 /** 与主窗 `src/lib/constants` 同值：4px 是按"手抖但没想拖"的实测下限定的 */
 const DRAG_THRESHOLD_PX = 4;
