@@ -55,14 +55,10 @@ Tauri 2 + React 19 + TypeScript + Rust。
 .
 ├── index.html              # 宿主入口（多窗口共用同一 bundle，按 label 分流）
 ├── patina.html             # Patina 入口（0.12.0 起同进程的第二扇窗，独立 bundle）
-├── src/                    # React 前端（宿主与第二窗共用一份源码，按 label 分流）
-│   ├── components/         # pill / panel / menu / todos / note / records / reminder / settings / ui / mobile
-│   ├── stores/             # zustand：timer / todo / note / item / plugin / theme / settings / ui
-│   ├── services/           # ipc 封装 + 各域 action + api.ts 领域门面
-│   ├── hooks/  lib/  types/
-│   ├── styles/             # 自写 CSS；tokens/ 是设计令牌实体（design-tokens.css 为索引，@import 顺序不可调换）
-│   ├── mocks/              # 浏览器降级 mock（无 Tauri 环境下 `npm run dev` 可跑）
-│   └── app/  features/  platform/  shared/   # 第二窗（Patina）前端，0.12.0 归一后与宿主同层并列
+├── src/                    # React 前端：两窗各一棵子树（2026-11-12 重排，按 label 分流）
+│   ├── windows/timing/     # 宿主窗：entry（main/App）/ components / stores / services / hooks / lib / types / styles / mocks
+│   └── windows/patina/     # 第二窗：shell（原 app）/ features / platform / shared
+│   └── vite-env.d.ts       # 两窗共用的全局类型声明
 ├── src-tauri/              # Rust 后端（依赖只能向下，见 ADR-016）
 │   ├── src/platform/       # 叶子层：clock（单调时钟）/ log / boot_timing
 │   ├── src/infra/          # 平台适配：窗口 / 托盘菜单 / 通知 / 几何 / 迁移
@@ -83,9 +79,9 @@ Tauri 2 + React 19 + TypeScript + Rust。
 └── release/                # 构建产物落点（不入库，见 .gitignore）
 ```
 
-**两套代码在一个仓里**：宿主（`src/` 的 components / stores / services… + `src-tauri/src/` 同名层）
+**两套代码在一个仓里**：宿主（`src/windows/timing/` 的 components / stores / services… + `src-tauri/src/` 同名层）
 与 0.12.0 并入的 Patina。Patina 是 vendored 第三方源码，**结构已归一**：前端
-`app / features / platform / shared` 四个根与宿主目录同层并列（目录名互不冲突），后端收进各层的
+`windows/patina/{shell,features,platform,shared}` 四根与宿主窗并列（目录名互不冲突），后端收进各层的
 `insight/` 命名空间（`src-tauri/src/{app,commands,infra,models,services}/insight/`）。
 `check:size` 的 300 行豁免**不再是整棵豁免**，改为逐文件基线棘轮（`scripts/size-allowlist.json`，
 只许减不许增）。改动清单见 `THIRD-PARTY-NOTICES.md`，与上游对账靠 `check:vendored`。
