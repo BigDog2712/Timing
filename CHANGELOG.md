@@ -6,6 +6,32 @@
 
 ## 0.12.1（桌面）— 2026-11-12（末）
 
+### 工程 · 后端测试首跑：8 条红，7 条是 0.13.0 迁移忘更新断言
+
+`cargo test --lib` 前两轮都卡在 540 s 超时，从没拿到过数字。本轮首次跑通（1 分 47 秒）：
+**1,711 passed / 8 failed**。
+
+- **7 条同因**：`6649762`（0.13.0 安卓应用使用统计）新增 `migrations/0008_v01300.sql`，把
+  `schema.version` 从 7 推到 8，但 `tests/migration_v2.rs:107,174,196`、`tests/migration.rs:64`、
+  `tests/todo_nudge.rs:39`、`tests/md/cloud_pending.rs:84` 的断言还钉在 `Some("7")`。
+  v8 迁移本身没问题（全 `CREATE TABLE IF NOT EXISTS` + `< 8` 版本门 + SQL 尾部 `UPDATE settings`
+  推进一次），是测试没跟上。顺带修 `migration.rs` 的注释（写着「推进到 6」却断言 7）。
+- **1 条是判据不抗污染**：`tests/md/sync_disabled_gate.rs` 原来断言今日 md 文件**必须不存在**
+  ——`!default_file.exists()`。但这台机器跑过 App，真实路径 `%APPDATA%\com.timing.app\md\<今天>.md`
+  本来就在，于是该判据**只在从没启动过 App 的干净机器上成立**，一用过就必红：把用户的真实数据
+  当成违规。改成前后指纹（`(len, modified)` 相等）比对，与同用例目录那条「存在性不变」口径一致，
+  仍能抓「同步偷偷建了 / 覆写了今天这份」。
+- **自证 2 处**：① 拆同步闸门（`if !config.enabled` → `if false && …`）→ 用例红；
+  ② 负对照把 before 侧改成读一个不存在的路径 → **精确红在指纹那条断言上**（第 190 行，
+  报「默认关却写/改了今日文件」），确认新断言真有接线而不是摆设。
+- **结果：1,718 passed / 1 failed**。剩下那条
+  `storage_control::tests::registry_access_denial_preserves_old_configuration_and_never_uses_defaults`
+  要 `Command::new("reg.exe")` 制造「权限拒绝」，被本机沙箱的程序黑名单拦下
+  （`output().unwrap()` 拿到 `Err` 才 panic）——**它没跑过，既不算通过也不算失败**，
+  需在放开 `reg.exe` 的环境里复跑。
+- 一句话教训：前一轮把 8 条红写成「历史红项未变」——数量没变就等于与我无关，于是红了一整天。
+  **红灯一旦被改名成「历史」，就再没人问它为什么红。**
+
 ### 工程 · 启动失败不再 abort；clippy 实测 136 处，审计的「42」不准确
 
 审计两轮都说「42 处生产可达 `unwrap/expect`」，但一直没有机器输出背书。本版把 `cargo clippy --lib`
@@ -26,8 +52,11 @@
   `match` + `log_error!` + `exit(1)`（`183043a`）。**修后重跑该文件 0 条**，136 与修复前 137 的差就是它。
 - 剩余 **37 处**散在 31 个产品文件（`native_probe/process.rs` 4、`export_schedule` 3、
   `storage_migration` 3、`native_probe/fault` 2、`process_filters` 2、`platform/clock` 2、
-  `export_scheduler` 2，另 19 个文件各 1 处）。**本轮不收敛**——这 37 处里哪些真的不可继续、
-  哪些该返回 `Result`，要逐条看失败分支，不是批量替换能解决的。
+  `export_scheduler` 2，另 19 个文件各 1 处）。其中**只有 31 处是 `unwrap/expect`，另 6 处是风格类
+  lint**（`needless_return` / `question_mark` / `chunks_exact_to_as_chunks` / `unnecessary_sort_by` /
+  `type_complexity` / `explicit_counter_loop`），后者不是 panic 风险，改它们属纯重构。
+  **本轮都不敢批量动**——这 31 处里哪些真的不可继续、哪些该返回 `Result`，要逐条看失败分支，
+  不是替换能解决的问题。
 - **为什么以后不信人肉估算**：我按三种静态口径分别得到 1,890 / 131 / 76 处，clippy 给 136。
   131 最接近（「排除 `#[cfg(test)]` 块 + 测试专用文件 + `/tests/` 目录」是对的），但还得再排除
   acceptance 支撑才对得上。四种口径差一个数量级，说明按 `mod` 图数数不可靠——要么用 clippy，要么别给数字。
