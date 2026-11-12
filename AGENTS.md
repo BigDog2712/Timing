@@ -19,10 +19,13 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 
 ## 项目速览
 
-- 一个前端 bundle 服务所有窗口：`index.html` → `src/main.tsx`，按 `window.location` / window label 分流（主条 `main`、设置、事项、便利贴 `note-{id}`）。
+- 一个前端 bundle 服务所有窗口：`index.html` → `src/windows/timing/entry/main.tsx`，按 `window.location` / window label 分流（主条 `main`、设置、事项、便利贴 `note-{id}`）。
 - 前端 `src/**`（React + zustand + 自写 CSS，无 UI 框架）。
-- **双窗边界**：主窗（`components` / `hooks` / `lib` / `mocks` / `services` / `stores` / `styles` / `types`）与分析窗（`app` / `features` / `platform` / `shared`）互不 import，只经 IPC 命令/事件交互；唯一例外是 `lib/windowApi.ts`（零业务依赖的窗口 API 薄壳）与 `src-tauri/icons/**` 静态资源。由 L9 机械执行。
-- `src/app/` 是**分析窗**根（原 Patina 的 `src/`），不是应用入口；应用入口是 `src/main.tsx`。没有改名 `src/shell/` 是为了保住搬迁时 446 个文件的相对引用不变。
+- **双窗边界（2026-11-12 重排后）**：`src/windows/` 下两个窗各占一棵子树，互不 import，只经 IPC 命令/事件交互；唯一例外是 `src/windows/timing/lib/windowApi.ts`（零业务依赖的窗口 API 薄壳）与 `src-tauri/icons/**` 静态资源。由 L9 机械执行。
+  - 主窗：`src/windows/timing/{entry,components,hooks,lib,mocks,services,stores,styles,types}`
+  - 分析窗：`src/windows/patina/{shell,features,platform,shared}`（`shell` = 原 `src/app`，即 Patina 的壳）
+- 入口两个：`index.html` → `windows/timing/entry/main.tsx`；`patina.html` → `windows/patina/shell/main.tsx`。**不要再把 `shell` 当应用入口。**
+- `src/vite-env.d.ts` 留在 `src/` 根，两窗共用。
 - 后端 `src-tauri/src/**` 六层，依赖**只能向下**（ADR-016）：
   `platform`（叶子：clock / log / boot_timing）→ `infra`（窗口 / 托盘菜单 / 通知 / 几何 / 迁移）→ `services`（业务）→ `app`（装配：events / tray / bootstrap / diagnostics）与 `jobs`（调度）→ `commands`（IPC 入口）。
   其中 `models` / `infra` / `services` / `app` / `commands` 五层各带一个 `insight/` 命名空间（Patina 归一，见 `docs/refactor/patina-structural-merge.md` §2.2）：`models/insight ← infra/insight ← services/insight ← app/insight ← commands/insight`，方向与宿主层序一致。`insight` 是命名空间，不是第 7 层。
@@ -56,16 +59,16 @@ cd src-tauri && cargo fmt --check
   超限文件登记在 `scripts/size-allowlist.json` 的**冻结基线**（150 条，由 `--freeze` 扫描生成，禁止手写）。它是**棘轮**：只许减不许增——行数超过冻结值、或出现不在基线里的新超限文件，一律红。拆分后跑 `node scripts/check-size.mjs --freeze` 收紧。
   **硬目标（2026-11-12 拍板）**：每版至少 **−10 条**，0.15.0 前压到 **100 条以内**；未达标不提交出包。门禁摘要会打印「超限行数 / 总行数」占比，当前 **94,115 / 288,153 = 32.7%**，别只看条数。
 - **分层只能向下** → `npm run check:layers`（9 条 grep 规则）
-  L1 `components`（含 `app|features|shared` 下的 `components/`）不 `invoke`；L2 `stores`（含 `*Store.ts`、`features/**/stores`）不碰 `ipc.`；L3 只有 `lib/windowApi.ts` 引窗口 API 包（`api/window` 与 `api/webviewWindow`）；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）；L9 双窗隔离——主窗与分析窗不得互相 import，例外只有 `lib/windowApi.ts` 与 `src-tauri/icons/**`（带哨兵：两条路径集合必须非空、例外文件必须真实存在，防路径写错或薄壳改名后绿着空转）。
+  L1 `components`（含 `patina/{shell,features,shared}` 下的 `components/`）不 `invoke`；L2 `stores`（含 `*Store.ts`、`features/**/stores`）不碰 `ipc.`；L3 只有 `windows/timing/lib/windowApi.ts` 引窗口 API 包（`api/window` 与 `api/webviewWindow`）；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `windows/timing/lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）；L9 双窗隔离——主窗与分析窗不得互相 import，例外只有 `windows/timing/lib/windowApi.ts` 与 `src-tauri/icons/**`（带哨兵：两条路径集合必须非空、例外文件必须真实存在，防路径写错或薄壳改名后绿着空转）。
 - **IPC 契约** → `npm run check:contract`
   命令 4 处一致（`generate_handler!` / `IpcApi` / `ipc.ts` / `browserMock`）、错误码 2 处一致、事件三方一致（后端常量 / `IPC_EVENTS` / emit 点）、禁止事件名字面量、**每个错误码必须在 `errorText()` 里有 case**（否则静默落到通用兜底）。
 - **Patina 改动必须登记** → `npm run check:vendored`
-  Patina 已按层并入（无独立子树）：前端 `src/app|features|platform|shared/**`，后端 `src-tauri/src/{app,commands,infra,models,services}/insight/**`。基线按前后端分锚（`7bc7bd7` / `9a7772f`，机械改写批次见 `_reanchor`），改一处就要在 `scripts/vendored-allowlist.json` 写一条 `path + change + reason + owner`（**owner 必填**），否则红。`node scripts/check-vendored-diff.mjs --upstream <patina-main>` 按 `UPSTREAM_MAP` + `TEXT_MAP` 反推回上游坐标系，报「同 / 实质差异 / 仅上游 / 仅本地」。**这是为了保住「能 diff 上游、按需同步」**——顺手的颜色调整攒上十轮，上游发版时全是逐行冲突。
+  Patina 已按层并入（无独立子树）：前端 `src/windows/patina/**`，后端 `src-tauri/src/{app,commands,infra,models,services}/insight/**`。基线按前后端分锚（`7bc7bd7` / `9a7772f`，机械改写批次见 `_reanchor`），改一处就要在 `scripts/vendored-allowlist.json` 写一条 `path + change + reason + owner`（**owner 必填**），否则红。`node scripts/check-vendored-diff.mjs --upstream <patina-main>` 按 `UPSTREAM_MAP` + `TEXT_MAP` 反推回上游坐标系，报「同 / 实质差异 / 仅上游 / 仅本地」。**这是为了保住「能 diff 上游、按需同步」**——顺手的颜色调整攒上十轮，上游发版时全是逐行冲突。
 - **双轨版号** → `npm run check:version`
   真源 `scripts/platform-versions.json`。桌面六处（`package.json` · `package-lock.json` 2 处 · `src-tauri/Cargo.toml` · `src-tauri/Cargo.lock` · `src-tauri/tauri.conf.json`）必须等于 `desktop`；手机 `versionCode` 必须与 `versionName` 同源（`major*1_000_000 + minor*1_000 + patch`）且**不低于 `release/` 已发出的最大号**。另含归档冻结表。**不再需要人工核对**；变更记录写 `CHANGELOG.md`。
   ⚠️ 安卓出包**只能走** `node scripts/android-apk.mjs`：`npm run tauri android build` 会读 `tauri.conf.json` 的桌面号，出来的包版号是错的。
-- CSS 只用 `var(--*)` 令牌，零字面量色值、零 emoji、零紫粉渐变；令牌定义在 `src/styles/design-tokens.css`（索引，实体在 `src/styles/tokens/*.css`，**@import 顺序不可调换**）。
-- 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/types/domain/models.ts::ErrorCode` 与文案 `src/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **18** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
+- CSS 只用 `var(--*)` 令牌，零字面量色值、零 emoji、零紫粉渐变；令牌定义在 `src/windows/timing/styles/design-tokens.css`（索引，实体在 `src/windows/timing/styles/tokens/*.css`，**@import 顺序不可调换**）。
+- 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/windows/timing/types/domain/models.ts::ErrorCode` 与文案 `src/windows/timing/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **18** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
 - 文档目录：现行文档在 `docs/`；`docs/archive/v1/` 只作历史，不作为实现依据。
 
 ## 权限面
