@@ -1206,6 +1206,24 @@
       "change": "added",
       "reason": "[0.12.1 死代码清理] L10 分层整改：从 shared/hooks/ 下沉到 platform/desktop/（它依赖 windowControlGateway 的 invoke，放 shared 会让 shared 反向依赖 platform）。调用方 AppTitleBar / BoardCanvas 的 import 路径同批更新。",
       "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/host/mdSyncAuto.ts",
+      "change": "modified",
+      "reason": "[0.12.1 共享层] md 同步纯函数的三份逐字副本合并为一份真源（`src/windows/shared/settings/`），本文件退化为 `export *` 转发壳（原 281/204/68 行实现已移走）。判据由「两份逻辑不许漂移」改为「壳里不许有逻辑 + 两侧指向同一真源」，见 mdSyncCopies.drift.test.ts。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/host/mdSyncConfig.ts",
+      "change": "modified",
+      "reason": "[0.12.1 共享层] md 同步纯函数的三份逐字副本合并为一份真源（`src/windows/shared/settings/`），本文件退化为 `export *` 转发壳（原 281/204/68 行实现已移走）。判据由「两份逻辑不许漂移」改为「壳里不许有逻辑 + 两侧指向同一真源」，见 mdSyncCopies.drift.test.ts。",
+      "owner": "ForG"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/host/mdSyncCopy.ts",
+      "change": "modified",
+      "reason": "[0.12.1 共享层] md 同步纯函数的三份逐字副本合并为一份真源（`src/windows/shared/settings/`），本文件退化为 `export *` 转发壳（原 281/204/68 行实现已移走）。判据由「两份逻辑不许漂移」改为「壳里不许有逻辑 + 两侧指向同一真源」，见 mdSyncCopies.drift.test.ts。",
+      "owner": "ForG"
     }
   ]
 }

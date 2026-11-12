@@ -1,100 +1,87 @@
 /**
- * 「同一份逻辑两份副本」的**漂移哨兵**（[0.12.1] T04b）
+ * md 同步纯函数的「唯一真源」哨兵（[0.12.1 共享层] 由原「两份副本不许漂移」改造）
  * -----------------------------------------------------------------------------
- * 背景：设置页搬进分析窗时，`mdSyncAuto` / `mdSyncCopy` / `mdSyncConfig` 被复制成两份 ——
+ * 背景：0.12.1 设置页搬进分析窗时，`mdSyncAuto` / `mdSyncCopy` / `mdSyncConfig` 被复制成两份
+ * （分析窗一份、主窗/手机端一份），靠本文件逐行比「逻辑正文」防止漂移。
+ * 那是**权宜之计**：副本永远在，漂移风险就永远在，只是被一条测试盯着 —— 改完一边忘了另一边，
+ * 这次红、下次照样可能忘。
  *
- *   · `src/features/settings/services/host/*`   ← 桌面（分析窗）实际运行的那份
- *   · `src/components/settings/*`               ← 手机端 `SyncPane` / `SyncCloudPane` 还在用
+ * 0.12.1 末建了 `src/windows/shared/`，三份逻辑合并为**一份**，两侧各留一条 `export *` 壳。
+ * 于是本文件的判据从「两份逻辑一致」换成两条更硬的：
  *
- * 为什么不能只留一份：L9 双窗隔离禁止分析窗 import 主窗模块（反过来也一样），而手机端是
- * 主窗入口。为什么不能各写一套用例：逻辑逐字相同，写两套只会让「改一处忘了另一处」变成
- * 两个都能过的绿灯 —— 那正是这次要防的东西。
+ *   1. **壳里不许有逻辑**。壳一旦写入实现，等于「副本又长出来了」，只是换了写法 ——
+ *      而这次连 diff 都不会提示（两份壳可以长得一模一样）。
+ *   2. **两侧壳必须指向同一真源**，且真源必须在 `src/windows/shared/settings/` 下。
+ *      指向不同文件等于分叉，且同样没有肉眼可见的症状。
  *
- * 所以做法是**漂移哨兵**：把两份文件去掉注释与 import 之后逐行比。等价就说明「只改了
- * 搬运方式，没改逻辑」；不等价就红，逼人要么同步两份、要么在注释里写明差异点。
- *
- * 已知且**允许**的差异只有 import 路径本身（`./hostTypes` vs `../../types/domain`），
- * 所以 `normalize` 会把整段 import（含跨行的 `import type {\n…\n} from '…';`）一起删掉。
+ * 为什么保留本文件而不是删掉：原测试自己写过「副本被删时应删掉本文件」，但那个假设是
+ * 「只剩分析窗一份、手机端复用分析窗组件」。实际做的是**下沉到共享层** —— 两侧仍是两个
+ * 入口各自 import，所以「两侧都接到同一份实现」依然是需要机器保证的事实。
  */
 import { describe, expect, it } from 'vitest';
 import { code, PROJECT_ROOT } from '../../settingsSourceProbe.test-utils';
 // @ts-expect-error 项目未安装 @types/node（tsconfig 无 node 类型）；vitest 跑在 Node 上。
 import { readFileSync } from 'node:fs';
 // @ts-expect-error 同上：仅测试进程用得到 node:path。
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 
-/** 去注释 → 去 import → 去空行与行尾空白。剩下的就是「逻辑正文」。 */
-function normalize(source: string): string {
-  const withoutComments = source
+const TIMING_DIR = 'src/windows/timing/components/settings';
+const PATINA_DIR = 'src/windows/patina/features/settings/services/host';
+const TRUE_SOURCE_DIR = 'src/windows/shared/settings';
+
+/** 三份纯函数 × 两侧壳（主窗/手机端 vs 分析窗）。 */
+const MODULES = ['mdSyncAuto', 'mdSyncCopy', 'mdSyncConfig'] as const;
+
+const SHELLS = MODULES.flatMap((name) => [
+  { name, side: '主窗/手机端', path: `${TIMING_DIR}/${name}.ts` },
+  { name, side: '分析窗', path: `${PATINA_DIR}/${name}.ts` },
+]);
+
+/** 读壳里的 `export * from '…'`，解析成仓库相对路径（去扩展名）。 */
+function targetOf(rel: string): string {
+  const body = code(rel);
+  const m = /export\s+\*\s+from\s+['"]([^'"]+)['"]/.exec(body);
+  expect(m, `${rel} 不是 \`export *\` 转发壳`).not.toBeNull();
+  const abs = resolve(PROJECT_ROOT, rel.replace(/[^/]+$/, ''), m![1]);
+  return relative(PROJECT_ROOT, abs).split('\\').join('/').replace(/\.tsx?$/, '');
+}
+
+/** 去掉转发语句与空白后，壳里还剩什么（应当什么都不剩）。 */
+function residual(rel: string): string {
+  const raw = readFileSync(resolve(PROJECT_ROOT, rel), 'utf8');
+  return raw
     .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
-  const withoutImports = withoutComments
-    .replace(/^\s*import[\s\S]*?["'][^"']*["'];?[ \t]*$/gm, '')
-    .replace(/^\s*import\s+["'][^"']+["'];?$/gm, '');
-  return withoutImports
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter((line) => line.trim().length > 0)
-    .join('\n');
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/export\s+\*\s+from\s+['"][^'"]+['"];?/g, '')
+    .replace(/\s+/g, '');
 }
 
-/** 两份副本的路径（桌面对手机）。 */
-const PAIRS: readonly { name: string; desktop: string; mobile: string }[] = [
-  {
-    name: 'mdSyncAuto.ts',
-    desktop: 'src/windows/patina/features/settings/services/host/mdSyncAuto.ts',
-    mobile: 'src/windows/timing/components/settings/mdSyncAuto.ts',
-  },
-  {
-    name: 'mdSyncCopy.ts',
-    desktop: 'src/windows/patina/features/settings/services/host/mdSyncCopy.ts',
-    mobile: 'src/windows/timing/components/settings/mdSyncCopy.ts',
-  },
-  {
-    name: 'mdSyncConfig.ts',
-    desktop: 'src/windows/patina/features/settings/services/host/mdSyncConfig.ts',
-    mobile: 'src/windows/timing/components/settings/mdSyncConfig.ts',
-  },
-];
-
-/** 读原文（**不去注释**——`normalize` 自己要去掉注释，两步不能叠）。 */
-function readRaw(rel: string): string {
-  return readFileSync(resolve(PROJECT_ROOT, rel), 'utf8');
-}
-
-describe('md 同步的「两份副本」必须逐字同源', () => {
-  it('mobile copy still exists (哨兵的哨兵：副本被删了，这个文件就不该再绿)', () => {
-    /* 如果哪天手机端也搬到分析窗、这 4 份副本被删掉，那么「漂移」就无从谈起：
-       届时应当**删掉本文件**并让 `mdSyncConfig.test.ts` / `mdSyncShared.test.ts`
-       成为唯一覆盖，而不是让这里的断言空转。 */
-    for (const pair of PAIRS) {
-      const mobile = readRaw(pair.mobile);
-      expect(mobile.trim().length, `${pair.mobile} 空了或已被删除`).toBeGreaterThan(0);
-      expect(
-        code(pair.mobile).includes('export'),
-        `${pair.mobile} 里没有 export —— 副本可能被清空了`,
-      ).toBe(true);
+describe('md 同步纯函数只有一份真源（0.12.1 共享层）', () => {
+  it('两侧壳指向的目标集合恰好是真源目录下的三份', () => {
+    const targets = new Set(SHELLS.map((s) => targetOf(s.path)));
+    expect(targets.size, '两侧壳指向了多个不同目标 —— 说明已经分叉').toBe(MODULES.length);
+    for (const name of MODULES) {
+      expect([...targets], `${name} 的真源不在 ${TRUE_SOURCE_DIR}/ 下`).toContain(
+        `${TRUE_SOURCE_DIR}/${name}`,
+      );
     }
   });
 
-  for (const pair of PAIRS) {
-    it(`${pair.name}: desktop 与 mobile 的逻辑正文逐字相同（改一处必须两处同改）`, () => {
-      const desktop = normalize(readRaw(pair.desktop));
-      const mobile = normalize(readRaw(pair.mobile));
-      expect(desktop.length, `${pair.desktop} 正文为空，检查 normalize 是否吃掉了整个文件`)
-        .toBeGreaterThan(200);
-      /* 断言用「首个差异行的上下文」而不是整份正文：红的时候要能一眼看出差在哪，
-         而不是被 100 行 diff 淹掉。 */
-      if (desktop !== mobile) {
-        const d = desktop.split('\n');
-        const m = mobile.split('\n');
-        const at = d.findIndex((line, index) => line !== m[index]);
-        expect(
-          { line: at + 1, desktop: d[at], mobile: m[at] },
-          `${pair.name} 漂移了：桌面副本与手机副本在这一行分叉（改一处必须两处同改）`,
-        ).toEqual({ line: -1, desktop: undefined, mobile: undefined });
-      }
-      expect(desktop).toBe(mobile);
+  for (const name of MODULES) {
+    it(`${name}: 两侧壳指向同一真源`, () => {
+      const mobile = targetOf(`${TIMING_DIR}/${name}.ts`);
+      const desktop = targetOf(`${PATINA_DIR}/${name}.ts`);
+      expect(desktop, `${name} 两侧壳指向不同文件（已分叉）`).toBe(mobile);
+      expect(mobile).toBe(`${TRUE_SOURCE_DIR}/${name}`);
+    });
+  }
+
+  for (const shell of SHELLS) {
+    it(`${shell.name}（${shell.side}）: 壳里没有任何逻辑`, () => {
+      expect(
+        residual(shell.path),
+        `${shell.path} 的转发壳里出现了实现代码 —— 副本又长出来了，改回 \`export *\` 或改真源`,
+      ).toBe('');
     });
   }
 });
