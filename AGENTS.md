@@ -21,9 +21,10 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 
 - 一个前端 bundle 服务所有窗口：`index.html` → `src/windows/timing/entry/main.tsx`，按 `window.location` / window label 分流（主条 `main`、设置、事项、便利贴 `note-{id}`）。
 - 前端 `src/**`（React + zustand + 自写 CSS，无 UI 框架）。
-- **双窗边界（2026-11-12 重排后）**：`src/windows/` 下两个窗各占一棵子树，互不 import，只经 IPC 命令/事件交互；唯一例外是 `src/windows/timing/lib/windowApi.ts`（零业务依赖的窗口 API 薄壳）与 `src-tauri/icons/**` 静态资源。由 L9 机械执行。
+- **双窗边界（2026-11-12 重排后）**：`src/windows/` 下两个窗各占一棵子树，互不 import，只经 IPC 命令/事件交互；两窗确实都要用的模块一律放 `src/windows/shared/`（既不属于主窗也不属于分析窗，由 L9 + L10 双向把守），静态资源例外只有 `src-tauri/icons/**`。由 L9 机械执行。
   - 主窗：`src/windows/timing/{entry,components,hooks,lib,mocks,services,stores,styles,types}`
   - 分析窗：`src/windows/patina/{shell,features,platform,shared}`（`shell` = 原 `src/app`，即 Patina 的壳）
+  - 跨窗共享：`src/windows/shared/`（`windowApi` / `handleCatalog` / `handleBindings` / `pillAppearance` / `storageKeys` / `pillPrefsGateway` / `dto/` / `settings/`）。**它不得 import `timing/**` 或 `patina/**`** —— 一旦反向依赖就退化成"第三个窗"。旧位置上留了 `export *` 转发壳，只为让同窗既有引用零改动；新代码直接引共享层。
 - 入口两个：`index.html` → `windows/timing/entry/main.tsx`；`patina.html` → `windows/patina/shell/main.tsx`。**不要再把 `shell` 当应用入口。**
 - `src/vite-env.d.ts` 留在 `src/` 根，两窗共用。
 - 后端 `src-tauri/src/**` 六层，依赖**只能向下**（ADR-016）：
@@ -59,7 +60,7 @@ cd src-tauri && cargo fmt --check
   超限文件登记在 `scripts/size-allowlist.json` 的**冻结基线**（150 条，由 `--freeze` 扫描生成，禁止手写）。它是**棘轮**：只许减不许增——行数超过冻结值、或出现不在基线里的新超限文件，一律红。拆分后跑 `node scripts/check-size.mjs --freeze` 收紧。
   **硬目标（2026-11-12 拍板）**：每版至少 **−10 条**，0.15.0 前压到 **100 条以内**；未达标不提交出包。门禁摘要会打印「超限行数 / 总行数」占比，当前 **94,115 / 288,153 = 32.7%**，别只看条数。
 - **分层只能向下** → `npm run check:layers`（9 条 grep 规则）
-  L1 `components`（含 `patina/{shell,features,shared}` 下的 `components/`）不 `invoke`；L2 `stores`（含 `*Store.ts`、`features/**/stores`）不碰 `ipc.`；L3 只有 `windows/timing/lib/windowApi.ts` 引窗口 API 包（`api/window` 与 `api/webviewWindow`）；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `windows/timing/lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）；L9 双窗隔离——主窗与分析窗不得互相 import，**例外表已清空**：原 5 条共享模块（windowApi / handleCatalog / handleBindings / pillAppearance / pillPrefsGateway）已整体下沉到 `src/windows/shared/`，两侧直接引它，跨窗引用在物理上消失（带哨兵：两条路径集合必须非空；例外表非空时每条必须真实存在，防薄壳改名后绿着空转）；**L10 分层方向**——`patina/platform/**` 不得 import `features/**` 或 `shell/**`，`patina/shared/**` 不得 import `features/**`、`shell/**`、`platform/**`，`windows/shared/**` 不得 import `timing/**` 或 `patina/**`（带哨兵：每层路径集合非空且至少解析出 1 条相对 import，防路径前缀写错后绿着空转；`*.test.*` 不参与——测试站在最上层验收接缝；CSS 等资源说明符不参与——它们没有模块语义）。
+  L1 `components`（含 `patina/{shell,features,shared}` 下的 `components/`）不 `invoke`；L2 `stores`（含 `*Store.ts`、`features/**/stores`）不碰 `ipc.`；L3 只有 `windows/shared/windowApi.ts` 引窗口 API 包（`api/window` 与 `api/webviewWindow`）；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `windows/timing/lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）；L9 双窗隔离——主窗与分析窗不得互相 import，**例外表已清空**：原 5 条共享模块（windowApi / handleCatalog / handleBindings / pillAppearance / pillPrefsGateway）已整体下沉到 `src/windows/shared/`，两侧直接引它，跨窗引用在物理上消失（带哨兵：两条路径集合必须非空；例外表非空时每条必须真实存在，防薄壳改名后绿着空转）；**L10 分层方向**——`patina/platform/**` 不得 import `features/**` 或 `shell/**`，`patina/shared/**` 不得 import `features/**`、`shell/**`、`platform/**`，`windows/shared/**` 不得 import `timing/**` 或 `patina/**`（带哨兵：每层路径集合非空且至少解析出 1 条相对 import，防路径前缀写错后绿着空转；`*.test.*` 不参与——测试站在最上层验收接缝；CSS 等资源说明符不参与——它们没有模块语义）。
 - **IPC 契约** → `npm run check:contract`
   命令 4 处一致（`generate_handler!` / `IpcApi` / `ipc.ts` / `browserMock`）、错误码 2 处一致、事件三方一致（后端常量 / `IPC_EVENTS` / emit 点）、禁止事件名字面量、**每个错误码必须在 `errorText()` 里有 case**（否则静默落到通用兜底）。
 - **Patina 改动必须登记** → `npm run check:vendored`
