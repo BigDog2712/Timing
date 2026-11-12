@@ -6,6 +6,28 @@
 
 ## 0.12.1（桌面）— 2026-11-12（末）
 
+### 工程 · 跨窗共享层：L9 例外表清空，settings 三份副本合一
+
+上一版把「双窗共享」靠 L9 白名单放行 5 条例外（分析窗可以去引主窗模块）。那 5 个模块既不属于
+主窗也不属于分析窗——白名单只是把错误的归属遮住了。本版建 `src/windows/shared/` 把它们真正归位：
+
+- **7 个模块下沉**：`windowApi`（L3 唯一入口）、`handleCatalog`、`handleBindings`、`pillAppearance`、
+  `storageKeys`、`pillPrefsGateway`（原 `patina/platform/desktop`）、`hostTypes`（原 `patina/shared/dto`）。
+  6 个转发壳留在旧位置，**主窗既有相对引用零改动**；分析窗 21 处 import 直连共享层。
+- **`L9_ALLOWED_TARGETS` 清空**。例外表是逃生门，门在就有人往里塞第 6 条；共享层建好后，
+  「分析窗要读主窗的东西」只有一条正路——搬进 `windows/shared/`。
+- **L10 新增第三层**：`windows/shared/**` 不得 import `timing/**` 或 `patina/**`（否则退化成"第三个窗"）。
+- **隐性反向依赖**：`storageKeys` 原本引 `timing/types/domain/constants`，下沉后就是 shared→timing。
+  把两个主题键的**定义**搬进共享层，`constants.ts` 改 re-export（正向），引用方零改动。
+- **settings 三份逐字副本合一**（审计 P1-1，约 1,130 行）：`mdSyncCopy`（204 行，两份 md5 完全相同）/
+  `mdSyncConfig`（281）/ `mdSyncAuto`（68，只差 import）合并到 `src/windows/shared/settings/`，两侧各留壳。
+- **哨兵改造**：`mdSyncCopies.drift.test.ts` 从「两份逻辑逐行一致」改为「**壳里不许有逻辑** + **两侧指向
+  同一真源**」，用例 4 → 10 条。原判据在合并后会空转（没有两份可比），新判据防"把实现写回壳里"。
+- 合并前逐字核过 7 个 DTO 形状（`MdSyncConfig` / `MdSyncCloud` / `CloudSchedule` 等）在 `types/domain`
+  与 `hostTypes` 的定义——全部同形，否则主窗行为会静默变化。
+- 自证 5 处：分析窗引主窗壳 / shared 反向引 timing / 例外目标失效 / 壳里塞实现 / 一侧壳指向别处 —— 全红后复绿。
+- 验证：tsc 0 错；八步门禁全绿（layers 10 条，L9 例外 **0**）；**1,202 用例全绿**；build 1.94 s。
+
 ### 工程 · 双窗门禁补洞：L9 扫入口 + 新增 L10，删 988 行死代码
 
 外审发现两个门禁「绿着空转」，本版补齐，每条都带故意破坏自证：
