@@ -51,9 +51,9 @@ async fn seed_system_item_uncategorized() {
             .as_deref(),
         Some("未归类")
     );
-    // schema 版本登记：全部迁移跑完推进到 6（K-7 / Spec §6 迁移铁律；v3 = 便利贴置顶列，ADR-019；
+    // schema 版本登记：全部迁移跑完推进到 8（K-7 / Spec §6 迁移铁律；v3 = 便利贴置顶列，ADR-019；
     // v4 = 待办提醒链路的 remind_stage / auto_start，ADR-030；v5 = 待办绑定事项 item_id，ADR-042；
-    // v6 = 云端待传队列 md_cloud_pending，ADR-061）
+    // v6 = 云端待传队列 md_cloud_pending，ADR-061；v7 = 该队列按通路隔离；v8 = app_usage 应用使用统计）
     assert_eq!(
         scalar_opt_str(
             &pool,
@@ -61,7 +61,7 @@ async fn seed_system_item_uncategorized() {
         )
         .await
         .as_deref(),
-        Some("7")
+        Some("8")
     );
 }
 

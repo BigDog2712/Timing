@@ -104,7 +104,7 @@ async fn v2_settings_seeded_and_version_bumped() {
     }
     assert_eq!(
         setting_value(&pool, "schema.version").await.as_deref(),
-        Some("7")
+        Some("8")
     );
 }
 
@@ -171,7 +171,7 @@ async fn v1_database_upgrades_in_place() {
     );
     assert_eq!(
         setting_value(&pool, "schema.version").await.as_deref(),
-        Some("7")
+        Some("8")
     );
 
     // ③ 再跑一次仍不报错（K-13 幂等），且种子不重复
@@ -184,7 +184,7 @@ async fn v1_database_upgrades_in_place() {
     );
 }
 
-/// 幂等：同一目录连跑两次 `init_pool` 不报错，版本稳定为 4。
+/// 幂等：同一目录连跑两次 `init_pool` 不报错，版本稳定为最新（当前 8）。
 #[tokio::test]
 async fn init_pool_is_idempotent_at_v2() {
     let dir = unique_dir("mig-v2-idem");
@@ -193,7 +193,7 @@ async fn init_pool_is_idempotent_at_v2() {
     let p2 = db::init_pool(&dir).await.expect("重复迁移应成功");
     assert_eq!(
         setting_value(&p2, "schema.version").await.as_deref(),
-        Some("7")
+        Some("8")
     );
     assert_eq!(
         scalar_i64(&p2, "SELECT COUNT(*) FROM items WHERE id = 1").await,

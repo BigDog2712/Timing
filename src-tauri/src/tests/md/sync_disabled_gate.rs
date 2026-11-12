@@ -159,6 +159,12 @@ async fn a_disabled_config_performs_no_file_io() {
 ///
 /// 用例名里的 `real_documents_dir` 是 V0.11.5 的措辞，保留是为了不动作例清单；
 /// 判据（存在性不变）与默认根改名无关，仍成立。
+///
+/// **为什么文件那条也要比前后指纹，而不是「必须不存在」**：本机跑过 App 之后，
+/// 这个真实路径下本来就有今天的 `<日期>.md`（App 正常同步写的）。绝对断言
+/// `!default_file.exists()` 于是只在「从没启动过 App 的干净机器」上成立，一用过就必红
+/// —— 那不是回归，是判据把用户的真实数据当成了违规。改成「存在性 + 长度 + 修改时刻」
+/// 前后不变：既有能力抓「同步偷偷建了 / 覆写了今天这份」，又不再依赖机器干净。
 #[tokio::test]
 async fn a_fresh_install_sync_writes_nothing_to_the_real_documents_dir() {
     let pool = fresh_pool("md-kernel-fresh-run").await;
@@ -167,6 +173,7 @@ async fn a_fresh_install_sync_writes_nothing_to_the_real_documents_dir() {
     let default_file = md_file::resolve_path(MD_SYNC_DEFAULT_ROOT, MD_SYNC_DEFAULT_FILE, today);
     let default_dir = default_file.parent().map(Path::to_path_buf);
     let existed_before = default_dir.as_deref().is_some_and(Path::exists);
+    let fingerprint_before = file_fingerprint(&default_file);
 
     let report = services::md_sync::run(&pool)
         .await
@@ -180,9 +187,19 @@ async fn a_fresh_install_sync_writes_nothing_to_the_real_documents_dir() {
         "默认关却动了用户文档目录：{}",
         default_dir.map_or_else(|| "?".into(), |dir| dir.display().to_string())
     );
-    assert!(
-        !default_file.exists(),
-        "默认关却生成了今日文件：{}",
+    assert_eq!(
+        fingerprint_before,
+        file_fingerprint(&default_file),
+        "默认关却写/改了今日文件：{}",
         default_file.display()
     );
+}
+
+/// 文件指纹：`None` = 不存在；`Some((长度, 修改时刻))` = 存在时的可观测状态。
+///
+/// 只比「长度 + 修改时刻」，不比内容：这条用例要抓的是「有没有写」，不是「写了什么」；
+/// 读全文会在文件很大时拖慢测试，且一旦文件被写到不同内容也会落在长度或时刻的差异上。
+fn file_fingerprint(path: &Path) -> Option<(u64, Option<std::time::SystemTime>)> {
+    let meta = std::fs::metadata(path).ok()?;
+    Some((meta.len(), meta.modified().ok()))
 }
