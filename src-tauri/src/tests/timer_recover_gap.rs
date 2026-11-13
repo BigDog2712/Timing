@@ -16,7 +16,7 @@
 use crate::models::enums::ResolveAction;
 use crate::platform::clock::now_ms;
 use crate::services::timer;
-use crate::tests::support::{exec, fresh_pool, scalar_i64};
+use crate::tests::support::{exec, fresh_pool, safe_rewind_ms, scalar_i64};
 
 /// 把会话推到「1 小时前开始、跑了 42 秒后崩溃」：`running_since` 就是最后落盘点。
 async fn crash_after(pool: &sqlx::SqlitePool, id: i64, ago_ms: i64, running: bool) {
@@ -38,9 +38,12 @@ async fn crash_after(pool: &sqlx::SqlitePool, id: i64, ago_ms: i64, running: boo
 
 #[tokio::test]
 async fn resume_without_gap_keeps_r2() {
+    let Some(back) = safe_rewind_ms(600_000) else {
+        return;
+    };
     let pool = fresh_pool("recover-gap-resume-off").await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
-    crash_after(&pool, rec.id, 600_000, true).await;
+    crash_after(&pool, rec.id, back, true).await;
 
     let out = timer::resolve_open(&pool, ResolveAction::Resume, None, false)
         .await
@@ -52,18 +55,23 @@ async fn resume_without_gap_keeps_r2() {
 
 #[tokio::test]
 async fn resume_with_gap_credits_the_whole_absence() {
+    let Some(back) = safe_rewind_ms(600_000) else {
+        return;
+    };
     let pool = fresh_pool("recover-gap-resume-on").await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
-    crash_after(&pool, rec.id, 600_000, true).await;
+    crash_after(&pool, rec.id, back, true).await;
 
     let out = timer::resolve_open(&pool, ResolveAction::Resume, None, true)
         .await
         .unwrap()
         .unwrap();
-    /* 42 + 600 = 642；留 2 秒余量给测试自身的耗时。 */
+    /* 42 + 空档；留 2 秒余量给测试自身的耗时。 */
+    let want = 42 + back / 1000;
     assert!(
-        (642..=644).contains(&out.accumulated_sec),
-        "勾了要补上 600 秒空档，实际 {}",
+        (want..=want + 2).contains(&out.accumulated_sec),
+        "勾了要补上 {} 秒空档，实际 {}",
+        back / 1000,
         out.accumulated_sec
     );
     assert_eq!(out.status, "active");
@@ -75,18 +83,23 @@ async fn resume_with_gap_credits_the_whole_absence() {
 
 #[tokio::test]
 async fn close_with_gap_counts_up_to_the_end_time() {
+    let Some(back) = safe_rewind_ms(3_600_000) else {
+        return;
+    };
     let pool = fresh_pool("recover-gap-close-on").await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
-    crash_after(&pool, rec.id, 3_600_000, true).await;
+    crash_after(&pool, rec.id, back, true).await;
 
     let out = timer::resolve_open(&pool, ResolveAction::Close, None, true)
         .await
         .unwrap()
         .unwrap();
     assert_eq!(out.status, "saved");
+    let want = 42 + back / 1000;
     assert!(
-        (3642..=3644).contains(&out.accumulated_sec),
-        "结束并保存也要补空档（42 + 3600），实际 {}",
+        (want..=want + 2).contains(&out.accumulated_sec),
+        "结束并保存也要补空档（42 + {}），实际 {}",
+        back / 1000,
         out.accumulated_sec
     );
     assert!(out.running_since.is_none());
@@ -95,29 +108,38 @@ async fn close_with_gap_counts_up_to_the_end_time() {
 
 #[tokio::test]
 async fn close_with_gap_honors_explicit_end_at() {
+    let Some(back) = safe_rewind_ms(600_000) else {
+        return;
+    };
     let pool = fresh_pool("recover-gap-close-endat").await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
-    crash_after(&pool, rec.id, 600_000, true).await;
-    /* 用户把结束时刻挪到「崩溃后 5 分钟」：空档只该补 300 秒，不该补到 now。 */
-    let end = now_ms() - 300_000;
+    crash_after(&pool, rec.id, back, true).await;
+    /* 用户把结束时刻往前挪：空档只该补到 end，不该补到 now。 */
+    let end_back = back.min(300_000);
+    let end = now_ms() - end_back;
 
     let out = timer::resolve_open(&pool, ResolveAction::Close, Some(end), true)
         .await
         .unwrap()
         .unwrap();
     assert_eq!(out.ended_at, Some(end));
+    let want = 42 + end_back / 1000;
     assert!(
-        (342..=344).contains(&out.accumulated_sec),
-        "空档以 end_at 为界（42 + 300），实际 {}",
+        (want..=want + 2).contains(&out.accumulated_sec),
+        "空档以 end_at 为界（42 + {}），实际 {}",
+        end_back / 1000,
         out.accumulated_sec
     );
 }
 
 #[tokio::test]
 async fn gap_is_never_credited_for_a_paused_session() {
+    let Some(back) = safe_rewind_ms(3_600_000) else {
+        return;
+    };
     let pool = fresh_pool("recover-gap-paused").await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
-    crash_after(&pool, rec.id, 3_600_000, false).await;
+    crash_after(&pool, rec.id, back, false).await;
 
     let closed = timer::resolve_open(&pool, ResolveAction::Close, None, true)
         .await
@@ -142,9 +164,12 @@ async fn gap_is_never_credited_for_a_paused_session() {
 
 #[tokio::test]
 async fn discard_ignores_gap_and_frees_the_slot() {
+    let Some(back) = safe_rewind_ms(3_600_000) else {
+        return;
+    };
     let pool = fresh_pool("recover-gap-discard").await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
-    crash_after(&pool, rec.id, 3_600_000, true).await;
+    crash_after(&pool, rec.id, back, true).await;
 
     let out = timer::resolve_open(&pool, ResolveAction::Discard, None, true)
         .await

@@ -203,14 +203,18 @@ async fn switch_writes_pointer_with_previous_root() {
         .await
         .expect("切换应成功");
     let pointer = root_pointer::read(&appdata).expect("指针要写出来");
+    /* 先 canonicalize 再比：Windows 上同一目录有长名与 8.3 短名两种写法
+       （CI 是 `C:\Users\runneradmin\…`，读回来可能是 `C:\Users\RUNNER~1\…`），
+       直接比字符串会在这种机器上假红。canonicalize 把两侧归一到同一写法。 */
+    let canonical = |p: &Path| std::fs::canonicalize(p).expect("目录应可解析");
     assert_eq!(
-        PathBuf::from(&pointer.data_dir),
-        target,
+        canonical(Path::new(&pointer.data_dir)),
+        canonical(&target),
         "指针指向用户选的那个目录"
     );
     assert_eq!(
-        pointer.previous.as_deref().map(Path::new),
-        Some(source.as_path()),
+        pointer.previous.as_deref().map(Path::new).map(canonical),
+        Some(canonical(&source)),
         "previous 必须是切换那一刻**正在生效**的根（撤销时用它回退）"
     );
     assert!(target.join("timing.db").is_file(), "库要真的搬过去");

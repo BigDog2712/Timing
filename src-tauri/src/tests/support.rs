@@ -82,6 +82,28 @@ pub async fn rewind(pool: &SqlitePool, id: i64, ms: i64) {
     .await;
 }
 
+/// 距离「本地今天 00:00」还能安全回拨多少毫秒（留 60 s 余量，封顶 `cap_ms`）。
+///
+/// **为什么需要它**：`timer_recover::resolve_open` 与 `timer::switch` 都会调
+/// `timer_split::finalize`，把跨零点的记录按天拆成多条（这是设计行为）；拆分后
+/// 当前那条的 `accumulated_sec` 只含「今天这一段」。于是「回拨 3600 s 然后断言补了
+/// 3600 s」这种做法**只在白天成立** —— 午夜前后回拨会跨到昨天，断言必然失败。
+///
+/// 实测：CI（UTC）在 00:46 跑时，四条计时用例全红（`now - 3600s` 落到前一天 23:46），
+/// 本地白天跑却一次没红过。
+///
+/// 返回 `None` 表示此刻距 00:00 不足 3 分钟、任何有意义回拨都会跨天，调用方跳过该用例。
+/// 其它时刻返回**实际可回拨量**（≤ `cap_ms`），调用方按它算期望值 —— 这样凌晨也能真正跑，
+/// 而不是靠「不安全就跳过」把用例变成摆设。
+pub fn safe_rewind_ms(cap_ms: i64) -> Option<i64> {
+    let since_midnight =
+        crate::platform::clock::now_ms() - crate::platform::clock::start_of_today_ms();
+    if since_midnight < 180_000 {
+        return None;
+    }
+    Some((since_midnight - 60_000).min(cap_ms))
+}
+
 /// 新建一个普通事项并返回其 id（新库仅有系统事项 id=1，用例按需建 2/3/…）。
 pub async fn new_item(pool: &SqlitePool, name: &str) -> i64 {
     crate::services::item::create(pool, name, None)

@@ -7,7 +7,8 @@ use crate::models::enums::{ResolveAction, SwitchMode};
 use crate::platform::clock::now_ms;
 use crate::services::timer;
 use crate::tests::support::{
-    allow_short_records, count_active, exec, expect_err, fresh_pool, new_item, scalar_i64,
+    allow_short_records, count_active, exec, expect_err, fresh_pool, new_item, safe_rewind_ms,
+    scalar_i64,
 };
 
 #[tokio::test]
@@ -163,9 +164,12 @@ async fn resolve_resume_resets_running_since_without_gap() {
 
 #[tokio::test]
 async fn resolve_close_uses_last_flushed_without_gap() {
+    let Some(back) = safe_rewind_ms(3_600_000) else {
+        return;
+    };
     let pool = fresh_pool("timer-close-gap").await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
-    let past = now_ms() - 3_600_000;
+    let past = now_ms() - back;
     exec(
         &pool,
         &format!(
