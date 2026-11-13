@@ -4,6 +4,42 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 主界面 / 分析窗第二轮改造（R2）— 2026-11-13（未出包）
+
+> 设计文档：`docs/design/DASHBOARD-R2-ARCH.md`（六项裁决 Q1–Q6 全部落档 §7）。
+> 本轮 161 文件（+9315/−5508），删除 39 个文件，孤儿闭合 3 轮归零；独立 QA 验收 PASS with notes。
+
+### 主界面（组件板）
+
+- **布局库 + 锁定**：工具条收成三入口「添加组件 / 布局管理 / 锁定布局」，删掉「出厂布局 / 恢复默认 / 保存布局」。布局库单键 `patina:dashboard-layout:library:v1`（查看 / 切换 / 删除 / 新建，删当前布局回落虚拟出厂条目）；锁定偏好独立键（塞进 `DashboardLayout` 会升 `LAYOUT_VERSION` 触发全量自愈去「修」用户排布）。锁定 = 几何锁 + 结构锁，但锁态工具栏仍可点（禁用 `pointer-events:none` 防死锁），允许改卡标题与卡内参数。
+- **趋势横轴铺满 24 桶**（00:00–24:00），查询 `endMs` 仍裁到此刻——放开会撞 `activity_read_model` 边界校验，卡片**静默变空**；DST 前跳日 23 格如实留空。
+- **今日时间线**：删右上角「常用事项 / 事项菜单」；底部三键（新建 / 编辑 / 管理）；行 =「事项名称 - 起止时间 - 总用时」；卡头总计取后端口径（`accumulatedSec`，判据用「暂停 10 分钟 vs 时间戳相减 20 分钟」的歧义数据钉死）。
+- **改起止时刻**：`patina:host-intent → update_record_time`（药丸侧 `update_record` 已有，Rust 零改动）。**跨零点在前端拦死**：`record.rs::update` 不按天拆分，造出跨零点行会让 `useTodayItems` 把整天时长算给起始日**且不报错**。前端不自算时长——`RecordPatch` 没有 duration 字段，serde 静默丢弃。
+- **待办**：显示所有未完成；多日期 × 多时刻点批量创建 = 新命令 `todo_create_batch`（单事务，原子回滚有测试；四处契约同步，`EXPECTED_EMIT_SITES=18` 未涨）。
+- **应用排行分类删除**：实现早已存在（快捷分类弹层删除区只给 `custom:` 前缀），本轮只补渲染回归判据——先设计后发现的「别重写」项。
+
+### 1.2「全黑」的根因
+
+分析窗是全仓唯一没有错误边界的窗：渲染一抛异常 → React 卸载整棵根树 → `#root` 空 → 露出 WebView 深色底（全黑），导航随树消失（无法返回）。修复 = `AppErrorBoundary` 下沉 `src/windows/shared/`（药丸窗零改动），分析窗壳级 + 视图级双层包裹（单页崩了还能换页，导航在 fallback 外），mini 窗同包。空数据仍画底圈。
+
+### 工具页下线（删 39 文件，孤儿闭合 3 轮归零）
+
+- 番茄/专注交互层全部移除，**表与历史保留**；提醒并入待办（复用 `jobs::nudge`），engine 的 fire 保留——已排定旧提醒照旧响一次，绝不静默丢。
+- 活动提醒迁成主界面组件卡（三件套搬迁；QA 验收发现旧路径副本没删，收口补删 3 个）。
+- **`tool-notification` 窗零字节未动**（裁决 Q4=A）：它是 `ToolAlert` 投递通道，删窗不改 `target()` = 「规则设了、到点什么都没发生」的静默失声。
+- `useMainToolsNavigation` 缩形保留（设计原列删除，QA 实测它承载托盘/药丸的 history/settings/overview 落点，整删会断托盘跳转）。
+
+**删除清单（39）**：`features/tools/components/` 下 Tools.tsx、ToolsSettingsDialog.tsx、ToolsStatusEntry/ToolStatusButtons/ToolsStatusChip、ReminderToolPanel、TimedReminderEditor、ReminderScheduleFields、PomodoroToolPanel/PomodoroTaskEditor/PomodoroTaskRow/PomodoroSettingsPicker、FocusAlertDialog、FocusSessionLedgerNote、FreeFocusContent/FreeFocusRestPicker/FreeFocusTaskEditor、FocusHistoryButton、HostTimingStatusRow(+test)、ToolDurationInput、ActivityReminderRuleEditor/DurationPicker/TargetPicker（QA 补删的旧副本）；`features/tools/hooks/useToolsPageState.ts`；`features/tools/services/` 下 toolStatusEntries、toolsViewModel、focusSessionCopy、timingSemantics.test、freeFocusViewModel、freeFocusPreferenceStorage、toolsLayoutPreferenceStorage、toolsNumberInput、reminderTimeInput；`shell/components/AppSidebar.tsx`、`shell/hooks/useAppSidebarState.ts`、`shell/mini/MiniToolStatus.tsx`、`shell/services/sidebarNavigationPreferenceStorage.ts`、`shell/styles/features/tools.css`。
+
+### 顶栏与页头
+
+- 标题栏导航居中（三栏 grid；`isInteractive` 拖窗判据一字未动，变异自证）。
+- 删数据页与设置页 `QuietPageHeader`（侧边栏已高亮当前页，标题条重复且占一整行）；设置保存/取消挪进 `QuietPageToolbar`（统一容器逻辑，不降级按钮皮）；五组锚点 `scroll-margin-top` 60→18px 失配修正。
+
+### 账本
+
+vendored 基线重锚至 `f5f3f29`（改 94 / 删 49 与门禁行逐一相等后才继续），`_reanchor` 手写 `DASHBOARD-R2` 一步；白名单 305 条失效清零——条目本来就是两次重锚之间的暂存账，留着一堆「已与基线一致」的条目等于挂着不拦东西的规则。
+
 ## 仓库 · 2026-11-13 — 合并两条历史，转 public，补 LICENSE
 
 ### 仓库落到一个地址：`BigDog2712/Timing`（public）
