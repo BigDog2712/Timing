@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20x64-0078D4)](docs/)
 [![Tauri](https://img.shields.io/badge/Tauri-2.12-24C8DB)](https://tauri.app)
-[![Rust](https://img.shields.io/badge/Rust-1.90+-DEA584)](src-tauri/)
+[![Rust](https://img.shields.io/badge/Rust-1.100.0-DEA584)](rust-toolchain.toml)
 
 Windows 10 / 11 · Tauri 2 · React 19 · Rust · SQLite
 
@@ -78,12 +78,24 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 
 ## 界面
 
-静态设计稿（浏览器直接打开，不参与构建）：
+<div align="center">
+  <img src="preview/timing-desktop-features.png" alt="Timing 桌面端：按一下开始，结束自动落档" width="760">
+</div>
 
-- [`preview/pill-preview.html`](preview/pill-preview.html) —— 药丸的悬停 / 计时 / 倒计时 / 提醒四态
+<p align="center"><em>一张贴在屏幕边上的计时小条 —— 点圆环开始，干完点一下存下来，记录落进当天的 Markdown。</em></p>
+
+<div align="center">
+  <img src="preview/pill-preview.png" alt="药丸四态：待机 / 计时中 / 暂停 / 已结束" width="760">
+</div>
+
+<p align="center"><em>药丸四态。等宽数字不抖动，暂停不换色，结束时按 绿 &gt; 红 &gt; 蓝 的优先级取色。</em></p>
+
+上面两张是**设计稿渲染图**（由 `preview/*.html` 截出），不是真机截图 —— 说清楚这点比放一张来路不明的图有用。可交互版本（下载后双击即开，零依赖）：
+
 - [`preview/timing-desktop-features.html`](preview/timing-desktop-features.html) —— 桌面各功能页对照
+- [`preview/pill-preview.html`](preview/pill-preview.html) —— 药丸四态 / 展开面板 / 右键菜单
 
-> 截图待补：目前没有可用的真机截图，`preview/` 里的 HTML 是唯一带样式的形态参照。
+> 真机截图仍缺：仓库里还没有跑起来的 App 截图。等出包时补，不拿设计稿冒充。
 
 ## 安装
 
@@ -104,8 +116,8 @@ npm install
 npm run tauri dev
 ```
 
-Windows 上需要：Rust（`stable-x86_64-pc-windows-msvc`）、VS Build Tools 的
-「使用 C++ 的桌面开发」、Windows SDK、WebView2 运行时。
+Windows 上需要：Rust（仓根 `rust-toolchain.toml` 已钉 `1.100.0`，`rustup` 会自动装；
+MSRV 1.90）、VS Build Tools 的「使用 C++ 的桌面开发」、Windows SDK、WebView2 运行时。
 
 VS Build Tools **不会**把 `link.exe` 写进系统 PATH，直接跑会报
 ``linker `link.exe` not found``。两种解法：
@@ -144,7 +156,7 @@ npm run tauri build                  # 出 nsis / msi 安装器
 |---|---|
 | 前端 | React 19 · TypeScript 5.9 · Zustand 5 · Vite 8（rolldown 内核）· lucide-react |
 | 桌面壳 | Tauri 2.12（无边框透明小窗，所有窗口恒定置顶） |
-| 后端 | Rust 1.90+ · sqlx 0.8（SQLite，WAL）· autostart / window-state / single-instance / notification / dialog |
+| 后端 | Rust（`rust-toolchain.toml` 钉 1.100.0；MSRV 1.90）· sqlx 0.8（SQLite，WAL）· autostart / window-state / single-instance / notification / dialog |
 | 数据 | 迁移脚本 `migrations/0001…0008`，`settings.schema.version` 记版本 |
 
 Tauri 插件只放行实际用到的能力：`plugin-sql` / `plugin-store` 在 v0.3 已移除
