@@ -39,7 +39,7 @@ export interface TodoCopy {
   undoAction: string;
 
   /* ── [本轮] 新建待办弹层（与「新建事项」完全对齐的入口） ── */
-  /** 卡底那颗入口（全角加号，与 `timelineNewItem` 同一标点风格） */
+  /** 卡头那颗入口（[本轮] 去掉「＋」前缀，与 `timelineNewItem` 同一口径） */
   todoNewTodo: string;
   /** 弹层标题 */
   todoCreateTitle: string;
@@ -104,7 +104,7 @@ export const TODO_COPY: Record<Locale, TodoCopy> = {
     undoDeleted: (title) => `已删除「${title}」`,
     undoToggled: (title) => `已完成「${title}」`,
     undoAction: "撤销",
-    todoNewTodo: "＋ 新建待办",
+    todoNewTodo: "新建待办",
     todoCreateTitle: "新建待办",
     todoNameLabel: "待办名称",
     todoTimeLabel: "计划时间",
@@ -141,7 +141,7 @@ export const TODO_COPY: Record<Locale, TodoCopy> = {
     undoDeleted: (title) => `Deleted “${title}”`,
     undoToggled: (title) => `Completed “${title}”`,
     undoAction: "Undo",
-    todoNewTodo: "＋ New to-do",
+    todoNewTodo: "New to-do",
     todoCreateTitle: "New to-do",
     todoNameLabel: "To-do name",
     todoTimeLabel: "Planned time",
@@ -178,7 +178,7 @@ export const TODO_COPY: Record<Locale, TodoCopy> = {
     undoDeleted: (title) => `Удалено «${title}»`,
     undoToggled: (title) => `Выполнено «${title}»`,
     undoAction: "Отменить",
-    todoNewTodo: "＋ Новая задача",
+    todoNewTodo: "Новая задача",
     todoCreateTitle: "Новая задача",
     todoNameLabel: "Название задачи",
     todoTimeLabel: "Плановое время",
@@ -215,7 +215,7 @@ export const TODO_COPY: Record<Locale, TodoCopy> = {
     undoDeleted: (title) => `Eliminado «${title}»`,
     undoToggled: (title) => `Completado «${title}»`,
     undoAction: "Deshacer",
-    todoNewTodo: "＋ Nueva tarea",
+    todoNewTodo: "Nueva tarea",
     todoCreateTitle: "Nueva tarea",
     todoNameLabel: "Nombre de la tarea",
     todoTimeLabel: "Hora prevista",

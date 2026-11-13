@@ -50,6 +50,15 @@ interface Props {
   title: string;
   meta?: ReactNode;
   action?: ReactNode;
+  /** [本轮] 卡头右侧的**常驻**操作槽：empty / error / loading 都在场。
+   *  为什么需要它（而不是复用 `action`）：`action` 是 `meta` 的替代品、而且和 meta 一样
+   *  只在 ready 渲染 —— 而「今天还没有待办」正是最想点「新建待办」的时刻。旧做法是把入口
+   *  挂在卡底 `footer`（四态常驻）里，本轮按用户要求把这个入口搬到卡头。
+   *  **排版**：渲染在 `.qp-card-head-right` 的**最左侧**（在 meta / E3 图标之前、`controls` 之前）。
+   *  理由：`.qp-card-meta` 自带 `margin-right: 30px`，那 30px 是给绝对定位的 `⋯` 工具条让的位；
+   *  把新槽放在 meta **之后**会正好落进那块让位区，和 `controls` 抢同一段横向空间。
+   *  放最左 → 右槽读数 `[headAction][meta][⋯]`，`controls` 一位不少、meta 的让位仍成立。 */
+  headAction?: ReactNode;
   state: ModuleState;
   emptyText: string;
   skeletonRows?: number;
@@ -84,6 +93,7 @@ export default function ModuleShell({
   title,
   meta,
   action,
+  headAction,
   state,
   emptyText,
   skeletonRows = 5,
@@ -123,6 +133,8 @@ export default function ModuleShell({
          *  散写守卫的必然结果）。h2 标题保持恒在（M12/M13）。 */}
         {/* [A 批] 右槽顺序 = meta 在前、⋯ 在后：读数贴左、操作贴右，「看」与「动」各占一端 */}
         <span className="qp-card-head-right">
+          {/* [本轮] `headAction` 是**唯一**不受四态门控的东西：放在最左，见 Props 注释里的排版理由 */}
+          {headAction}
           {state === "ready" ? (
             <>
               {/* E3 只在这一层出现：条件渲染，不常驻空容器（常驻的 role=alert 挂载时就有内容，

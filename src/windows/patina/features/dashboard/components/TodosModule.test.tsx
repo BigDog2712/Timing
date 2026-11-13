@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * 待办卡「增删改 + 批量新建」的判据（[0.13 · 1.7]）。
  *
  * 钉的是"错了也照样出货"的静默项：
- *   ① footer 按钮能开弹层；
+ *   ① 卡头那颗「新建待办」能开弹层（[本轮] 入口从卡底 footer 搬到卡头 `headAction`）；
  *   ② 批量创建 = **一条** `todo_create_batch`（不是前端循环 `todo_create`）——
  *      勾提醒 → 每条 plan 的 `remindAt === plannedAt`（同一时刻）；
  *   ③ 不勾提醒 → `remindAt: null`（每条都弹两次提醒是这个口径写错的症状）；
@@ -108,7 +108,7 @@ function typeInto(input: HTMLInputElement | null, value: string) {
 
 /** 打开新建弹层并填好一个（日期, 时刻）槽位 */
 async function openComposeWithSlot(date: string, time: string) {
-  act(() => { byText("＋ 新建待办")?.click(); });
+  act(() => { byText("新建待办")?.click(); });
   typeInto(nameInput(), "背单词");
   typeInto(dateInput(), date);
   act(() => { pickers()[0]?.querySelector<HTMLButtonElement>("button")?.click(); });
@@ -143,11 +143,11 @@ afterEach(() => {
   root = null;
 });
 
-describe("TodosModule · ＋ 新建待办（批量）", () => {
-  it("tq01_the_footer_button_opens_the_dialog", async () => {
+describe("TodosModule · 新建待办（批量）", () => {
+  it("tq01_the_card_head_action_opens_the_dialog", async () => {
     await mount();
     expect(dialog()).toBeNull();
-    act(() => { byText("＋ 新建待办")?.click(); });
+    act(() => { byText("新建待办")?.click(); });
     expect(dialog()).not.toBeNull();
     /* 焦点必须落在弹层表面内（QuietDialog 的 initialFocusRef 指向名称输入；jsdom 没有
        布局，精确断言"落在输入框"测不了，退而断言"没落在弹层外面" —— 焦点逃出弹层才是真回归）。 */
@@ -157,7 +157,7 @@ describe("TodosModule · ＋ 新建待办（批量）", () => {
 
   it("tq02_batch_submit_is_one_todo_create_batch_with_remindAt_equal_to_plannedAt", async () => {
     await mount();
-    act(() => { byText("＋ 新建待办")?.click(); });
+    act(() => { byText("新建待办")?.click(); });
     typeInto(nameInput(), "背单词");
     /* 多日期 × 多时刻：两个日期 × 一个时刻 = 2 条 plan */
     typeInto(dateInput(), "2030-01-02");
@@ -200,7 +200,7 @@ describe("TodosModule · ＋ 新建待办（批量）", () => {
 
   it("tq04_an_empty_name_keeps_the_confirm_button_disabled", async () => {
     await mount();
-    act(() => { byText("＋ 新建待办")?.click(); });
+    act(() => { byText("新建待办")?.click(); });
     expect((byText("确认") as HTMLButtonElement).disabled).toBe(true);
     typeInto(nameInput(), "   ");
     expect((byText("确认") as HTMLButtonElement).disabled).toBe(true);
@@ -237,7 +237,7 @@ describe("TodosModule · ＋ 新建待办（批量）", () => {
 
   it("tq06_escape_closes_the_dialog", async () => {
     await mount();
-    act(() => { byText("＋ 新建待办")?.click(); });
+    act(() => { byText("新建待办")?.click(); });
     expect(dialog()).not.toBeNull();
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
@@ -245,6 +245,32 @@ describe("TodosModule · ＋ 新建待办（批量）", () => {
     });
     await flush();
     expect(dialog()).toBeNull();
+  });
+});
+
+describe("TodosModule · 新建入口在卡头（[本轮]）", () => {
+  it("tq08_the_entry_lives_in_the_card_head_and_survives_the_empty_state", async () => {
+    /* 空态（今天一条待办都没有）必须**也有**入口：这正是「新建」最该出现的时刻，
+       也是 old 版把它放在 footer 的唯一理由。搬到卡头之后这条语义不许丢。 */
+    await mount();
+    const entry = byText("新建待办");
+    expect(entry, "空态没有「新建待办」= 入口被四态门控吃掉了").not.toBeUndefined();
+    expect(entry?.closest(".qp-card-head-right"), "入口必须在卡头右槽（ModuleShell 的 headAction）")
+      .not.toBeNull();
+    expect(container?.querySelector(".qp-card-foot, .qp-todo-foot"), "卡底那条入口条必须已经下线")
+      .toBeNull();
+  });
+
+  it("tq09_the_entry_does_not_displace_the_card_controls_slot", async () => {
+    /* 卡头右槽的排法：headAction 在最左，meta 与 `⋯` 控件各占原位。
+       若把 headAction 排到 meta 之后，它会落进 meta 给 `⋯` 让出的 30px 里。 */
+    await mount();
+    const right = container?.querySelector(".qp-card-head-right");
+    const children = Array.from(right?.children ?? []);
+    const actionIndex = children.findIndex((node) => node.className.includes("qp-card-head-link"));
+    const metaIndex = children.findIndex((node) => node.className.includes("qp-card-meta"));
+    expect(actionIndex).toBe(0);
+    if (metaIndex >= 0) expect(actionIndex).toBeLessThan(metaIndex);
   });
 });
 

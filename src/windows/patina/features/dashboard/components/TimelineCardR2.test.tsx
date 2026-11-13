@@ -151,7 +151,7 @@ describe("TimelineCard · 入口收敛与总计（V-1.6a）", () => {
     const buttons = footerButtons();
     expect(buttons).toHaveLength(3);
     expect(buttons.map((button) => button.textContent))
-      .toEqual(["＋ 新建事项", "编辑事项", "事项管理"]);
+      .toEqual(["新建事项", "编辑事项", "事项管理"]);
   });
 
   it("tc03_rows_show_name_range_and_total", async () => {

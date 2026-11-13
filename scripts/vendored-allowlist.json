@@ -1,4 +1,275 @@
 {
-  "_doc": "单文件/vendored 差异账本。由 check-vendored-diff.mjs 的提示驱动清理（提示「已与基线一致可删」时立刻删），条目在两次重锚之间是暂存的：重锚（--refresh <sha> + 手写 _reanchor）会把已登记的改动固化进基线，此后条目全部失效归零。2026-11-13 DASHBOARD-R2 重锚（f5f3f29）后清空，此前 305 条。",
-  "entries": []
+  "_doc": "单文件/vendored 差异账本。由 check-vendored-diff.mjs 的提示驱动清理（提示「已与基线一致可删」时立刻删），条目在两次重锚之间是暂存的：重锚（--refresh <sha> + 手写 _reanchor）会把已登记的改动固化进基线，此后条目全部失效归零。2026-11-13 DASHBOARD-R2 重锚（f5f3f29）后清空，此前 305 条；本轮（设置高亮 / 开关开启态 / 应用设置弹窗与分类管理 / 待办入口上移 / 文案去加号）共 36 条，均 < 10 批次粒度外的收口改动，故逐条登记而不重锚。",
+  "entries": [
+    {
+      "path": "src/windows/patina/features/classification/services/categoryDefinitionMutations.ts",
+      "change": "modified",
+      "reason": "[复核修复 D-4/D-9] 应用成员回落改走 buildQuickAppOverride（唯一重建入口，透传 categories/itemBindings），并把被删分类从集合里摘掉、主分类顺延；网页成员回落原样带上 builder 不产出的 siteRule/knownDomain，避免归一判空把整条记录写成 null（删掉用户的分组规则）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/services/categoryDeleteRegression.test.ts",
+      "change": "added",
+      "reason": "QA 独立复核补测：删除自定义分类时 app 与 web domain 两侧成员回落（原测试从未传第三个参数）、与新字段 categories/itemBindings 被清空的 D-4 缺陷固化",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/services/classificationStore.ts",
+      "change": "modified",
+      "reason": "导出 buildSaveCategoryColorOverrideMutations / buildSaveCategoryLabelOverrideMutations（只加 export，0 行增长）：应用设置弹窗改分类名/色复用映射页同一条写入路径，不另造一套",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/services/quickClassification.test.ts",
+      "change": "added",
+      "reason": "新增：只改分类时 itemBindings 原样保留 / 只改事项时 categories 原样保留 / 清空主分类连集合一起清 / 老数据零迁移",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/services/quickClassification.ts",
+      "change": "modified",
+      "reason": "buildQuickAppOverride 透传 categories / itemBindings（白名单重建漏了新字段就会静默抹掉另一组），并强制 category === categories[0]",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/dashboardBoardLayout.test.ts",
+      "change": "modified",
+      "reason": "撤销条让位量从 --qp-card-foot-h 重锚到 --qp-card-pad-b（卡底入口条下线），文案相关注释同步",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/ModuleShell.tsx",
+      "change": "modified",
+      "reason": "新增 headAction 槽：卡头右侧的常驻操作，不受四态门控（待办卡的新建入口从卡底 footer 搬上来）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineCardR2.test.tsx",
+      "change": "modified",
+      "reason": "卡底三颗入口文案去「＋ 新建事项」的加号前缀后同步断言（入口位置与数量不变）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TodosLayout.test.tsx",
+      "change": "added",
+      "reason": "QA 独立复核补测：入口上移后「还有 K 项」的量测回归（空态/1 条/超屏/高度变化/折叠）",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TodosModule.test.tsx",
+      "change": "modified",
+      "reason": "文案去「＋」前缀后同步断言；新增「入口在卡头且空态常驻」与「不挤占 controls 槽」两条回归",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TodosModule.tsx",
+      "change": "modified",
+      "reason": "新建待办入口从 footer 搬到 headAction；弹层移到 ModuleShell 兄弟位置（children 只在 ready 渲染）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/copyTimeline.ts",
+      "change": "modified",
+      "reason": "timelineNewItem 四语言去掉「＋ 」前缀（T06）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/copyTodos.ts",
+      "change": "modified",
+      "reason": "todoNewTodo 四语言去掉「＋ 」前缀（T06）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/dashboardCopyNoPlus.test.ts",
+      "change": "added",
+      "reason": "QA 独立复核补测：需求 6「去加号」此前零直接覆盖，补四语言断言（原只有 zh-CN 待办经 byText 间接用到）",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/appEditCopy.ts",
+      "change": "added",
+      "reason": "新增应用设置弹窗的四语言文案（照 copyTodos / categoryAdminCopy 的先例，不进 i18n 契约表）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataAppEditCategoryManager.tsx",
+      "change": "added",
+      "reason": "新增分类管理区（增删改查）：用量读数 + 只给自定义分类画删除键 + 复用 QuietColorField",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataAppEditCategoryPicker.tsx",
+      "change": "added",
+      "reason": "新增分类多选区：勾选多个分类 + 「主」角标 + 设为主分类（other 不列入，other = 未分类）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataAppEditColorReset.test.tsx",
+      "change": "added",
+      "reason": "QA 独立复核补测：分类管理区「恢复默认颜色」的接线（D-5：弹窗层 onApplyColor 用 if (color) 把 null 过滤掉，点了一点反应都没有）",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataAppEditDialog.test.tsx",
+      "change": "added",
+      "reason": "应用设置弹窗的集成用例（无 app 不渲染 / 三区渲染与主分类标记 / 保存把主分类与事项绑定一起写回 / 读取失败时保存按钮不可用并给出错误文案），锁住 categories 与 itemBindings 不会被白名单重建抹掉",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataAppEditDialog.tsx",
+      "change": "added",
+      "reason": "新增「应用设置」弹窗外壳：关闭即卸载（草稿随之丢弃），读写编排在 hooks 里",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataAppEditItemPicker.tsx",
+      "change": "added",
+      "reason": "新增事项多选区：勾选多个事项 + 每行一个归属分类下拉（候选 = 该应用已勾选的分类）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataAppTrendPanel.tsx",
+      "change": "modified",
+      "reason": "双击整行打开应用设置弹窗（单击选中改为短窗推迟，双击不换选中）；加载骨架外移到 DataAppTrendSkeleton（行数只减不增）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataAppTrendSkeleton.tsx",
+      "change": "added",
+      "reason": "从 DataAppTrendPanel 按语义拆出的加载骨架（类名与结构逐字保留）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/hooks/useAppEditCategoryAdmin.ts",
+      "change": "added",
+      "reason": "新增分类定义增删改编排（复用 categoryDefinitionMutations 与 classificationStore 的既有 builder，删除走整批成员回落）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/hooks/useAppEditDialog.ts",
+      "change": "added",
+      "reason": "新增应用设置弹窗的读取/保存/草稿编排（一次 bootstrap + 一次写入，不新增 IPC 命令）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/hooks/useAppTrendRowEdit.interaction.test.tsx",
+      "change": "added",
+      "reason": "QA 独立复核补测：双击/单击边界（跨行连点、换目标、Ctrl 组合、卸载清定时器）+ D-1/D-2 两条缺陷的 it.fails 绊线",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/hooks/useAppTrendRowEdit.test.tsx",
+      "change": "added",
+      "reason": "新增：双击后 onOptionSelect 零调用且弹窗打开 / 单击过了短窗仍选中 / 图标双击走详情 / 非应用模式单击立即生效",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/hooks/useAppTrendRowEdit.ts",
+      "change": "added",
+      "reason": "新增「单击选中 / 双击编辑」时序：短窗推迟选中，双击不改变已选集合；行首图标仍走既有详情链路",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/services/appEditDraft.test.ts",
+      "change": "added",
+      "reason": "新增 15 条：取消勾选分类后事项回落、主分类恒等集合首项、取消干净不会冒回来、用量只数 override 集合",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/services/appEditDraft.ts",
+      "change": "added",
+      "reason": "新增草稿模型（纯函数）：多选分类/事项的联动、写回 override、分类用量统计",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsGroupNav.test.tsx",
+      "change": "added",
+      "reason": "新增 5 条：复现 s-interface 嵌在 s-display 内且登记在后的错位、到底亮最后一组、中间组正常、一屏放得下不跳到末组、判定线取自 CSS",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsGroupNav.tsx",
+      "change": "modified",
+      "reason": "滚动高亮判定重写：取「已越线锚点里 DOM 最靠下的那个」所属组（免疫锚点嵌套与表顺序错位）+ 到底取最后一组",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/classification/appOverrideCodec.test.ts",
+      "change": "added",
+      "reason": "QA 独立复核补测：老数据零迁移（只有 category 的存量行）/ 已删与非法分类过滤 / itemBindings 脏 id 归一 / 写盘幂等 + D-3 缺陷固化",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/classification/appOverrideCodec.ts",
+      "change": "added",
+      "reason": "新增：AppOverride 形状与归一、resolveCategorySet（读侧唯一入口）、serialize/parse（新字段必须一起写）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/classification/processMapper.ts",
+      "change": "modified",
+      "reason": "override 的字段形状 / 归一 / storage 编解码按语义搬到 appOverrideCodec（本文件只减不增），AppOverride 加 categories/itemBindings",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/components/QuietSwitch.test.tsx",
+      "change": "added",
+      "reason": "新增 6 条：checked 类挂载 + aria-checked、开启态轨道/滑块引用 accent 且不再出现灰阶变量、尺寸与 motion 令牌未动、disabled 0.52",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/App.css",
+      "change": "modified",
+      "reason": "引入 data-app-edit.css（新弹窗的样式独立成文件，避让 data.css 与 quiet-pro.css 的行数棘轮）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/dashboard-todos-compose.css",
+      "change": "modified",
+      "reason": ".qp-todo-foot 下线（入口上移卡头），原位留一段说明",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/dashboard-todos.css",
+      "change": "modified",
+      "reason": "撤销条让位量回到 --qp-card-pad-b（卡底入口条下线）+ 卡头小号链路键 .qp-card-head-link",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/data-app-edit.css",
+      "change": "added",
+      "reason": "新增「应用设置」弹窗版式（只用 --qp-* 令牌，深浅两套主题自动跟随）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/quiet-pro.css",
+      "change": "modified",
+      "reason": "开关开启态：轨道改主色、滑块改 --qp-bg-elevated + 投影（两主题对比度 6.05/5.44）；合并两条选择器以保持 1936 行不变",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/Data.tsx",
+      "change": "modified",
+      "reason": "新增直写选中集入口 handleDestinationSelectionRestore（按 presentedDestinationMode 写三个 setter 之一，不走 replace/toggle、不弹 toast）；handleDestinationOptionSelect 改为复用该入口，抵消新增行数后仍是 1193 行",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/hooks/useAppTrendRowEdit.selectionRestore.test.tsx",
+      "change": "added",
+      "reason": "新增 ri10/ri11/ri12：多选（≥2）慢速双击后整份选中集还原、双击集外行也不留残留、还原不触发 toast",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/hooks/useAppTrendRowEdit.slowDoubleClick.test.tsx",
+      "change": "added",
+      "reason": "D-1/D-2 间隔分档回归（80/300/500/700ms 四档双击还原 + 多选还原两变体 + Ctrl 与非 Ctrl 跨行连点）；原 QA 最终回归临时件改名转正",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/services/categoryFallbackVariants.test.ts",
+      "change": "added",
+      "reason": "D-4 副分类变体（成员判定看整个集合）、D-9 siteRule 写侧不丢、D-3「其他」及其反向（遗留 other 行做别名编辑不许清集合）；原 QA 最终回归临时件改名转正",
+      "owner": "software-engineer"
+    }
+  ]
 }

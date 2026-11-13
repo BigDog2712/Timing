@@ -1826,15 +1826,14 @@
     border-color var(--qp-motion-fast) var(--qp-motion-ease);
 }
 
+/* [本轮] 开启态一眼可辨：轨道改用主色（旧值与关闭态几乎同一灰阶，用户看不出开没开）。
+ * 混 `--qp-bg-elevated` 而不是 transparent：宿主换色后仍是不透明定值。 */
 .qp-switch-checked::before {
-  border-color: var(--qp-border-strong);
-  background: color-mix(in srgb, var(--qp-bg-elevated) 82%, var(--qp-border-subtle));
+  border-color: var(--qp-accent-default);
+  background: color-mix(in srgb, var(--qp-accent-default) 88%, var(--qp-bg-elevated));
 }
 
-.qp-switch:disabled {
-  cursor: not-allowed;
-  opacity: 0.52;
-}
+.qp-switch:disabled { cursor: not-allowed; opacity: 0.52; }
 
 .qp-switch-thumb {
   position: relative;
@@ -1852,12 +1851,13 @@
     background-color var(--qp-motion-fast) var(--qp-motion-ease);
 }
 
-.qp-switch-checked .qp-switch-thumb {
-  border-color: color-mix(in srgb, var(--qp-text-tertiary) 84%, var(--qp-bg-elevated));
-  background: color-mix(in srgb, var(--qp-text-tertiary) 84%, var(--qp-bg-elevated));
-}
-
+/* [本轮] thumb 与轨道反向：`--qp-bg-elevated` 浅色近白、深色近黑，两个主题都在主色对面
+ * 那一端（对主色 6.05:1 / 5.44:1）。尺寸与位移不变（44×24、thumb 14、6 ↔ 24）。 */
+.qp-switch-checked .qp-switch-thumb,
 .qp-switch-thumb-checked {
+  border-color: var(--qp-accent-default);
+  background: var(--qp-bg-elevated);
+  box-shadow: 0 1px 3px rgba(18, 24, 35, 0.34);
   transform: translateX(24px);
 }
 

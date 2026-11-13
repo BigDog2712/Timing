@@ -1,30 +1,35 @@
 import {
   getCategoryToken,
   isAppCategory,
-  isExtendedCategory,
-  normalizeExtendedCategory,
   USER_ASSIGNABLE_CATEGORIES,
   type AppCategory,
-  type UserAssignableAppCategory,
 } from "./categoryTokens.ts";
 import { resolveCanonicalExecutable, shouldTrackProcess } from "./processNormalization.ts";
 import { CategoryColorRegistry } from "./categoryColorRegistry.ts";
 import { formatExecutableFallbackName } from "./executableDisplayName.ts";
+import {
+  normalizeAppOverride,
+  parseAppOverride,
+  resolveCategorySet,
+  serializeAppOverride,
+  type AppOverrideShape,
+} from "./appOverrideCodec.ts";
 import type { UiText } from "../i18n/index.ts";
 
 export interface MappingHints {
   appName?: string;
 }
 
-export interface AppOverride {
-  category?: UserAssignableAppCategory;
-  displayName?: string;
-  color?: string;
-  track?: boolean;
-  captureTitle?: boolean;
-  enabled?: boolean;
-  updatedAt?: number;
-}
+/**
+ * 应用 override 的全部字段（形状定义在 `appOverrideCodec.ts`）。
+ *
+ * 本轮新增两组字段，语义见 codec 顶部注释：
+ *   · `categories`   —— 该应用允许归属的分类集合，`[0]` 与 `category` 相同（主分类）；
+ *   · `itemBindings` —— 已绑定的事项，各自可指定归属分类。
+ * 之所以用 `type` 而不是再抄一遍 `interface`：字段形状只能有一个真相源，
+ * 抄第二份的下场是"写盘认得、读盘不认得"。
+ */
+export type AppOverride = AppOverrideShape;
 
 export interface AppInfo {
   name: string;
@@ -32,22 +37,8 @@ export interface AppInfo {
   color: string;
 }
 
-const USER_ASSIGNABLE_CATEGORY_SET = new Set<string>(USER_ASSIGNABLE_CATEGORIES);
-
 function normalizeDisplayName(name: string | undefined) {
   return (name ?? "").trim().replace(/\.exe$/i, "");
-}
-
-function normalizeHexColor(color: string | undefined): string | null {
-  const raw = (color ?? "").trim();
-  if (!raw) return null;
-
-  const normalized = raw.startsWith("#") ? raw : `#${raw}`;
-  if (!/^#[0-9A-Fa-f]{6}$/.test(normalized)) {
-    return null;
-  }
-
-  return normalized.toUpperCase();
 }
 
 function normalizeCategoryLabelOverrides(
@@ -69,62 +60,6 @@ function normalizeCategoryLabelOverrides(
     normalized[category] = trimmed;
   }
   return normalized;
-}
-
-function normalizeUserAssignableCategory(category: string | undefined): UserAssignableAppCategory | null {
-  const normalized = (category ?? "").trim();
-  if (!normalized) {
-    return null;
-  }
-
-  if (isExtendedCategory(normalized)) {
-    return normalizeExtendedCategory(normalized);
-  }
-
-  if (USER_ASSIGNABLE_CATEGORY_SET.has(normalized)) {
-    return normalized as UserAssignableAppCategory;
-  }
-
-  return null;
-}
-
-function normalizeOverride(override: AppOverride | null | undefined): AppOverride | null {
-  if (!override) return null;
-  if (override.enabled === false) return null;
-
-  const normalized: AppOverride = {};
-
-  const normalizedCategory = normalizeUserAssignableCategory(override.category);
-  if (normalizedCategory) {
-    normalized.category = normalizedCategory;
-  }
-  if (override.displayName?.trim()) {
-    normalized.displayName = override.displayName.trim();
-  }
-  const color = normalizeHexColor(override.color);
-  if (color) {
-    normalized.color = color;
-  }
-  if (override.track === false) {
-    normalized.track = false;
-  }
-  if (override.captureTitle === false) {
-    normalized.captureTitle = false;
-  }
-  if (typeof override.updatedAt === "number" && Number.isFinite(override.updatedAt)) {
-    normalized.updatedAt = override.updatedAt;
-  }
-  normalized.enabled = true;
-
-  const hasMeaningfulOverride = Boolean(
-    normalized.category
-    || normalized.displayName
-    || normalized.color
-    || normalized.track === false
-    || normalized.captureTitle === false,
-  );
-
-  return hasMeaningfulOverride ? normalized : null;
 }
 
 export class ProcessMapper {
@@ -218,7 +153,7 @@ export class ProcessMapper {
       const canonicalExe = resolveCanonicalExecutable(exeName);
       if (!canonicalExe) continue;
 
-      const safeOverride = normalizeOverride(override);
+      const safeOverride = normalizeAppOverride(override);
       if (!safeOverride) continue;
       normalized[canonicalExe] = safeOverride;
     }
@@ -229,7 +164,7 @@ export class ProcessMapper {
     const canonicalExe = resolveCanonicalExecutable(exeName);
     if (!canonicalExe) return;
 
-    const safeOverride = normalizeOverride(override);
+    const safeOverride = normalizeAppOverride(override);
     if (!safeOverride) {
       delete this.userOverrides[canonicalExe];
       return;
@@ -245,6 +180,15 @@ export class ProcessMapper {
   static getUserOverride(exeName: string): AppOverride | null {
     const canonicalExe = resolveCanonicalExecutable(exeName);
     return this.userOverrides[canonicalExe] ?? null;
+  }
+
+  /**
+   * 该应用**当前生效**的分类集合（多选；`[0]` = 主分类）。已删除的自定义分类会被过滤掉，
+   * 过滤后为空回落到 `category`。界面要"这个应用属于哪些分类"一律走这里，别自己写三元。
+   */
+  static getAppCategorySet(exeName: string): AppCategory[] {
+    const override = this.getUserOverride(exeName);
+    return resolveCategorySet(override, this.getDeletedCategories());
   }
 
   private static mapWithOverride(exeName: string, hints: MappingHints, override: AppOverride | null | undefined): AppInfo {
@@ -284,24 +228,10 @@ export class ProcessMapper {
   }
 
   static toOverrideStorageValue(override: AppOverride) {
-    return JSON.stringify({
-      category: override.category ?? null,
-      displayName: override.displayName ?? null,
-      color: normalizeHexColor(override.color) ?? null,
-      track: override.track !== false,
-      captureTitle: override.captureTitle !== false,
-      enabled: override.enabled !== false,
-      updatedAt: override.updatedAt ?? Date.now(),
-    });
+    return serializeAppOverride(override);
   }
 
   static fromOverrideStorageValue(rawValue: string): AppOverride | null {
-    if (!rawValue.trim()) return null;
-    try {
-      const parsed = JSON.parse(rawValue) as AppOverride;
-      return normalizeOverride(parsed);
-    } catch {
-      return null;
-    }
+    return parseAppOverride(rawValue);
   }
 }

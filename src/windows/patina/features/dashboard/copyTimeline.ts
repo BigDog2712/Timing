@@ -16,7 +16,7 @@ import type { Locale } from "../../shared/i18n/index.ts";
  * （确定）/ `common.close`（关闭）/ `common.loading` / `common.readFailed`。
  */
 export interface TimelineManageCopy {
-  /** 卡底第一颗「＋ 新建事项」（全角加号，与卡里既有文案同一标点风格） */
+  /** 卡底第一颗「新建事项」（[本轮] 去掉前缀的「＋」：入口靠位置与颜色区分，不靠加号） */
   timelineNewItem: string;
   /** 卡底第二颗「编辑事项」（0.13 · 1.6：选事项 → 改名称 + 默认时长，一条 update_item） */
   timelineEditItem: string;
@@ -90,7 +90,7 @@ export interface TimelineManageCopy {
 
 export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
   "zh-CN": {
-    timelineNewItem: "＋ 新建事项",
+    timelineNewItem: "新建事项",
     timelineEditItem: "编辑事项",
     timelineManageItems: "事项管理",
     timelineCreateTitle: "新建事项",
@@ -127,7 +127,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     recordSaveFailed: "没发出去，请重试",
   },
   "en-US": {
-    timelineNewItem: "＋ New item",
+    timelineNewItem: "New item",
     timelineEditItem: "Edit item",
     timelineManageItems: "Manage items",
     timelineCreateTitle: "New item",
@@ -164,7 +164,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     recordSaveFailed: "Not sent, please retry",
   },
   "ru-RU": {
-    timelineNewItem: "＋ Новое дело",
+    timelineNewItem: "Новое дело",
     timelineEditItem: "Изменить дело",
     timelineManageItems: "Управление делами",
     timelineCreateTitle: "Новое дело",
@@ -201,7 +201,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     recordSaveFailed: "Не отправлено, повторите",
   },
   es: {
-    timelineNewItem: "＋ Nuevo asunto",
+    timelineNewItem: "Nuevo asunto",
     timelineEditItem: "Editar asunto",
     timelineManageItems: "Gestionar asuntos",
     timelineCreateTitle: "Nuevo asunto",

@@ -11,13 +11,8 @@ import {
   upsertSettingValue,
   type RecordedAppCatalogQueryInput,
 } from "../../../platform/persistence/classificationPersistence.ts";
-import {
-  loadObservedWebDomainStats,
-} from "../../../platform/persistence/webActivityRepository.ts";
-import {
-  commitClassificationSettingMutations,
-  type ClassificationSettingMutation,
-} from "../../../platform/persistence/classificationSettingsGateway.ts";
+import { loadObservedWebDomainStats } from "../../../platform/persistence/webActivityRepository.ts";
+import { commitClassificationSettingMutations, type ClassificationSettingMutation } from "../../../platform/persistence/classificationSettingsGateway.ts";
 import { ProcessMapper, type AppOverride } from "../../../shared/classification/processMapper.ts";
 import {
   isAppCategory,
@@ -27,15 +22,10 @@ import {
   type AppCategory,
   type ExtendedAppCategory,
 } from "../../../shared/classification/categoryTokens.ts";
-import {
-  resolveCanonicalExecutable,
-} from "../../../shared/classification/processNormalization.ts";
+import { resolveCanonicalExecutable } from "../../../shared/classification/processNormalization.ts";
 import type { ClassificationDraftChangePlan } from "./classificationDraftState.ts";
 import { buildLegacyAutoClassificationOverrides } from "./legacyAutoClassificationMigration.ts";
-import type {
-  ObservedWebDomainCandidate,
-  WebDomainOverride,
-} from "../../../shared/types/webActivity.ts";
+import { type ObservedWebDomainCandidate, type WebDomainOverride } from "../../../shared/types/webActivity.ts";
 
 const APP_OVERRIDE_KEY_PREFIX = "__app_override::";
 const WEB_DOMAIN_OVERRIDE_KEY_PREFIX = "__web_domain_override::";
@@ -128,19 +118,24 @@ function normalizeWebDomainOverride(override: WebDomainOverride | null | undefin
   if (typeof override.updatedAt === "number" && Number.isFinite(override.updatedAt)) {
     normalized.updatedAt = override.updatedAt;
   }
+  /* [修复 D-9] `siteRule` 也要搬：它没有别的落库位（序列化会写它，读侧再从
+     `__web_site::` 合并回来），漏掉它会让下面那句判空把"唯一内容是分组规则"的域名
+     整条写成 `value: null` —— 等于删掉用户的分组规则。 */
+  if (override.siteRule) {
+    normalized.siteRule = override.siteRule;
+  }
 
   const hasMeaningfulValue = Boolean(
     normalized.category
     || normalized.displayName
     || normalized.color
     || normalized.enabled === false
-    || normalized.captureTitle === false,
+    || normalized.captureTitle === false
+    || normalized.siteRule,
   );
 
   return hasMeaningfulValue ? normalized : null;
 }
-
-
 
 function toWebDomainOverrideStorageValue(override: WebDomainOverride): string {
   return JSON.stringify({
@@ -150,6 +145,7 @@ function toWebDomainOverrideStorageValue(override: WebDomainOverride): string {
     enabled: override.enabled !== false,
     captureTitle: override.captureTitle !== false,
     updatedAt: override.updatedAt ?? Date.now(),
+    siteRule: override.siteRule ?? null,
   });
 }
 
@@ -402,7 +398,7 @@ export async function loadCategoryColorOverrides(): Promise<Record<string, strin
   return overrides;
 }
 
-function buildSaveCategoryColorOverrideMutations(
+export function buildSaveCategoryColorOverrideMutations(
   category: AppCategory,
   colorValue: string | null,
 ): ClassificationSettingMutation[] {
@@ -440,7 +436,7 @@ export async function loadCategoryLabelOverrides(): Promise<Record<string, strin
   return overrides;
 }
 
-function buildSaveCategoryLabelOverrideMutations(
+export function buildSaveCategoryLabelOverrideMutations(
   category: AppCategory,
   label: string | null,
 ): ClassificationSettingMutation[] {

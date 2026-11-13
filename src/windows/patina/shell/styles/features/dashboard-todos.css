@@ -11,8 +11,16 @@
  * 档位数值照旧只引用 tiers.css，本文件不出现 294 / 36 这类裸数。
  * ========================================================================== */
 
-/* ── 待办卡（DOM 见 01 §4.3：head / list / fade / undo / footer） ── */
+/* ── 待办卡（DOM 见 01 §4.3：head / list / fade / undo；[本轮] footer 下线，入口上卡头） ── */
 .qp-card-todos { position: relative; }
+
+/* 卡头右槽的「新建待办」（`ModuleShell` 的 `headAction`，四态常驻）。
+ * 用 compact 一档：卡头高只有 46，12px 的 caption 会跟 13.5 的标题抢视觉层级，
+ * 而它是个**次级**入口（主操作仍是「勾完一条」）。 */
+.qp-card-head-link {
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+}
 
 .qp-todo-list {
   display: flex;
@@ -222,16 +230,14 @@
 
 /* 撤销条：乐观删除 + 窗内撤销（语义照抄主窗 todoStore.remove/undoRemove，AC-32）
  *
- * [本轮] `bottom` 必须让开卡底新加的「＋ 新建待办」footer 条（`.qp-todo-foot`，
- * 几何与 `.qp-card-footer` 同一套：32 高 + 底部负边距贴到卡片下缘）。原来的
- * `bottom: var(--qp-card-pad)` 会直接把撤销条压在按钮上。让位量 =
- * `--qp-card-foot-h`（footer 自身 32）+ 8px 间隙 —— **不含** `--qp-card-pad-b`：
- * footer 的负底边距已经把那 16px 吃掉了，再算一遍就会多飘 16px 盖住列表最后一行。
- * 两处几何必须一起改：见 `dashboard-todos-compose.css` 的 `.qp-todo-foot` 注释。 */
+ * [本轮] 新建入口搬去卡头（`ModuleShell` 的 `headAction`），卡底那 32 高的 footer 条下线，
+ * 所以让位量回到卡片自己的底部内距：`--qp-card-pad-b`（16）+ 8px 间隙。原来为了不压住
+ * footer 按钮而写的 `--qp-card-foot-h` 已经没有对应的实体（`--qp-card-foot-h` 仍被应用卡
+ * 的 `.qp-card-footer` 使用，不能删）。两者差 16px：留着旧值撤销条会悬空。 */
 .qp-undo-bar {
   position: absolute;
   right: var(--qp-card-pad);
-  bottom: calc(var(--qp-card-foot-h) + 8px);
+  bottom: calc(var(--qp-card-pad-b) + 8px);
   left: var(--qp-card-pad);
   display: flex;
   align-items: center;

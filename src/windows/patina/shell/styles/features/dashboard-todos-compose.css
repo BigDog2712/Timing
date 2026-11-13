@@ -14,19 +14,11 @@
  * 时间行允许收缩（`min-width: 0`），极窄时也不横向溢出。
  * ========================================================================== */
 
-/* ── 卡底入口条（`ModuleShell` 的 footer：empty / error 态也在场） ──
- * 几何与 `.qp-card-footer`（应用卡那颗通栏「全部分类…」）同一套：32 高 + 两侧负边距
- * 贴到卡片下缘（吃掉 16px 的 `--qp-card-pad-b`）。`.qp-undo-bar` 的让位数值就按
- * 这套几何算 —— 两处必须一起看，见 `dashboard-todos.css` 的撤销条注释。 */
-.qp-todo-foot {
-  display: flex;
-  flex: 0 0 var(--qp-card-foot-h);
-  height: var(--qp-card-foot-h);
-  align-items: center;
-  margin: 0 calc(-1 * var(--qp-card-pad)) calc(-1 * var(--qp-card-pad-b));
-  padding: 0 var(--qp-card-pad);
-  border-top: 1px solid var(--qp-border-subtle);
-}
+/* ── 卡底入口条已下线（[本轮]） ──
+ * 「新建待办」搬去卡头右槽（`ModuleShell` 的 `headAction` + `.qp-card-head-link`，
+ * 见 `dashboard-todos.css`）。这里曾经是 `.qp-todo-foot`（32 高 + 两侧负边距贴卡片下缘），
+ * 撤销条的让位量就是按它算的 —— 现在撤销条回到 `calc(var(--qp-card-pad-b) + 8px)`。
+ * 那 32px 卡高回到了列表：待办卡本来就缺行。 */
 
 /* ── 弹层：窄一点，一行一个字段不需要整屏 ── */
 .qp-todo-dialog {

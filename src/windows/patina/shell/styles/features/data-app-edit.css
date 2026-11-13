@@ -1,0 +1,206 @@
+/* ============================================================================
+ * data-app-edit.css — 「应用设置」弹窗（双击应用趋势的一行打开）
+ * -----------------------------------------------------------------------------
+ * 只管这一个弹窗：分类多选区 / 事项多选区 / 分类管理区。分开成文件而不是塞进
+ * `data.css`（246 行）或 `quiet-pro.css`（1936 行、被 size 门禁冻死在 1936）——
+ * 那两个文件加不进任何一行，而这份版式与"数据页"的骨架没有共用点。
+ *
+ * 分层照旧：颜色一律 `var(--qp-*)` 令牌（深浅两套主题自动跟随），间距只引用
+ * `--qp-space-*` / `--qp-radius-*`，不写字面量色值、不写 emoji。
+ *
+ * 视觉口径（为什么这么排）：
+ *   · 三段用**细分割线**隔开而不是三个卡片：弹窗里再套卡片会让"哪一段可滚"变得模糊；
+ *   · 勾选行整行可点（`label` 包住 checkbox + 色块 + 名字），命中区 28 高；
+ *   · 主分类用一枚 `--qp-accent-muted` 底的小角标，颜色与"设为主分类"文字键同色系，
+ *     让"谁现在是主分类"和"怎么换"在同一处可见。
+ * ========================================================================== */
+
+.qp-app-edit-dialog {
+  width: min(560px, calc(100vw - 2 * var(--qp-space-page)));
+}
+
+/* ── 标题：应用图标 + 应用名 + 一句"应用设置" ── */
+.qp-app-edit-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.qp-app-edit-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--qp-radius-chip);
+  object-fit: contain;
+}
+
+.qp-app-edit-app-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-app-edit-kicker {
+  flex: 0 0 auto;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-compact);
+  font-weight: var(--qp-font-weight-regular);
+}
+
+/* ── 三段：分割线 + 段标题 ── */
+.qp-app-edit-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--qp-border-subtle);
+}
+
+.qp-app-edit-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.qp-app-edit-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.qp-app-edit-section-title {
+  margin: 0;
+  font-size: var(--qp-font-size-body);
+  font-weight: var(--qp-font-weight-emphasis);
+  line-height: var(--qp-line-height-body);
+  color: var(--qp-text-primary);
+}
+
+.qp-app-edit-hint {
+  margin: 0;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+}
+
+/* 错误行（读取失败 / 保存失败 / 重名）：与提示行区分开 */
+.qp-app-edit-issue {
+  margin: 0 0 8px;
+  color: var(--qp-danger);
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+}
+
+/* ── 勾选列表（分类 / 事项共用同一套行） ── */
+.qp-app-edit-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 168px;
+  overflow-y: auto;
+}
+
+.qp-app-edit-picker-items {
+  max-height: 196px;
+}
+
+.qp-app-edit-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+  padding: 0 6px;
+  border-radius: var(--qp-radius-chip);
+}
+
+.qp-app-edit-option[data-checked] {
+  background: var(--qp-accent-muted);
+}
+
+.qp-app-edit-option-label {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  cursor: default;
+}
+
+.qp-app-edit-check {
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  accent-color: var(--qp-accent-default);
+}
+
+/* 分类色块。没有自定义色时不画（`--qp-app-edit-swatch` 缺席 → transparent） */
+.qp-app-edit-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: 999px;
+  background: var(--qp-app-edit-swatch, transparent);
+}
+
+.qp-app-edit-option-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  color: var(--qp-text-secondary);
+}
+
+.qp-app-edit-option[data-checked] .qp-app-edit-option-name {
+  color: var(--qp-text-primary);
+}
+
+/* 主分类角标：与"设为主分类"同色系，两件事在同一处可见 */
+.qp-app-edit-badge {
+  flex: 0 0 auto;
+  padding: 0 6px;
+  border-radius: var(--qp-radius-chip);
+  background: var(--qp-accent-muted);
+  color: var(--qp-accent-default);
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+  font-weight: var(--qp-font-weight-medium);
+}
+
+.qp-app-edit-row-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  color: var(--qp-accent-default);
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+}
+
+.qp-app-edit-row-action:disabled {
+  color: var(--qp-text-disabled);
+  cursor: not-allowed;
+}
+
+/* ── 事项行：右端那颗分类下拉 ── */
+.qp-app-edit-item-category {
+  flex: 0 0 auto;
+  max-width: 148px;
+}
+
+/* ── 分类管理的用量读数（删除前的唯一判据） ── */
+.qp-app-edit-usage {
+  flex: 0 0 auto;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-compact);
+  line-height: var(--qp-line-height-compact);
+  white-space: nowrap;
+}

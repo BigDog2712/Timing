@@ -4,6 +4,78 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 0.12.2 · 应用多分类绑定 + 设置页导航修复（R3）— 2026-11-13（未出包）
+
+> 版号：`desktop` 0.12.1 → **0.12.2**（六处同步；R2 与本轮同号并入，桌面上一版出包是 0.12.1）。
+
+> 47 文件（新增 22 / 修改 25），**零 Rust 改动、零 schema 变更、零迁移**；独立 QA 两轮复核 PASS，
+> 变异自证 7 处全部咬住（关掉补偿 / 回退旧 builder / 删透传 / 挪回 footer 等都能让对应用例变红）。
+
+### 设置页分组导航：表顺序 ≠ DOM 顺序必然串组
+
+- 判定从「按 `SETTINGS_GROUPS` 顺序遍历、取最后一个越线锚点」改为「**已越线锚点里取 `top` 最大者**」。
+  原实现下 `s-interface` 嵌在 `s-display` 卡片内部（DOM 位置早于 `s-board-widgets`），但表里登记在 `tracking` 组，
+  于是滚到「主界面」时 current 被覆盖成「计时与记录」——**主界面永远不亮**。
+- 加触底规则（`scrollTop + clientHeight >= scrollHeight - 2` 取末组），否则滚到底时
+  「通用与启动」的最后几张卡无法越过判定线，也永远不亮。
+- 判定线仍读 CSS 的 `scroll-margin-top`（跳转落点与高亮判定线必须是同一个数），rAF 节流保留。
+
+### 开关开启态
+
+- `.qp-switch-checked` 轨道改 accent 混色 + accent 描边，thumb 改 elevated + 描边 + 投影。
+  原实现开与关共用同一支灰（`--qp-border-strong` / `--qp-text-tertiary`），深色下只靠 thumb 位移区分。
+- 几何（44×24 / thumb 14 / translate 6↔24）与 `disabled` 的 0.52 一字未动；`quiet-pro.css` **净增 0 行**（守住 1936 冻结值）。
+- 断言盯**行为**（checked 时 accent 生效、几何不变）而非「两个选择器必须合并」——后者是压行数的权宜，断言它会造成假红。
+
+### 应用 → 多分类 / 多事项：只改前端，不动后端
+
+- `AppOverride` 增 `categories?: UserAssignableAppCategory[]` 与 `itemBindings?: { itemId, category? }[]`，
+  **`category` 保留为唯一真相 = `categories[0]`**。后端 `tracker_settings.rs` 只读 `track` / `captureTitle`，
+  按分类的聚合也只看 `category` → 零 Rust 改动、零迁移，旧数据（只有 `category`）读出来自动归一成 `[category]`。
+- 三条不变式落在 `appOverrideCodec.ts` 纯函数：`category === categories[0]`、集合永不含 `other`、
+  读侧过滤已删除的自定义分类并回落 `category`。
+- **`buildQuickAppOverride` 是唯一写入口，白名单重建必须透传两组新字段**——漏一个就等于
+  「改一次分类顺手把事项绑定整段抹掉」。用 qc01/qc02 双向钉死（只改分类→绑定活、只改事项→集合活）。
+- 选「其他」（未分类）= **清空主分类**，不是写入 `category:'other'`：落盘后 `other` 被剔除，
+  读回 `category='other' ≠ categories[0]`，还留下一条僵尸 override。
+
+### 应用设置弹窗（双击行打开）
+
+- 数据页应用趋势行**双击整行**（此前仅行首图标可双击）打开：分类多选（勾选序即主分类，可设为主）、
+  事项多选 + 每事项指定归属分类、分类增删查改（删除仅限 `custom:`，内置 11 类不可删）。
+- 单击让位双击：单击 260ms 延迟落定；**超窗口的慢速双击（300/500/700ms）靠快照补偿还原**。
+  不能「逐项 toggle 回滚」：`Data.tsx` 的 `handleDestinationOptionSelect` 从闭包读 `currentKeys`
+  （同 tick 多次调用后写覆盖），且 toggle 有 last-item 守卫，而"双击前什么都没选"时被双击行往往正是唯一选中项。
+  正解是新增 `handleDestinationSelectionRestore(keys)` **直写 setter**：一条命令、不读闭包、不走守卫、不弹 toast。
+- 补偿判据用**集合差**而不是「被点行翻动次数」：单击是 replace 语义，选着 `a/b/c` 单击 `c` 时
+  `c` 的成员资格没变（翻动 0 次），但集合从 3 项塌成 1 项——奇偶判据会漏掉最该补的那一次。
+
+### 待办入口与文案
+
+- `ModuleShell` 新增 `headAction` 槽：卡头右槽**最左**、**不受 `state === "ready"` 门控**。
+  待办「新建待办」从卡底 footer 上移进该槽；footer 在 empty / error 面在场地的理由
+  （"今天还没有待办"正是最该新建的时刻）由 headAction 承接。时间线卡三个 footer 入口未动。
+- `timelineNewItem` / `todoNewTodo` 四语言去掉「＋ 」前缀（`QuickClassificationCategoryMenu` 的「＋ 新建分类」不在范围内，保留）。
+
+### 修复（QA 两轮挖出，全部附回归用例）
+
+- **删自定义分类抹掉多分类与事项绑定**（阻塞级数据丢失）：成员回落走的是旧 builder `buildAppMappingOverride`，
+  白名单无新字段 → 写回 `{category:null, categories:[], itemBindings:[]}`。改为
+  `resolveCategorySet(override)` 判成员（否则「被删分类只是副分类」的应用漏判，因仍有引用而**复活**）
+  + `buildQuickAppOverride` 重建，绑定指向被删分类时降级为「跟随主分类」而不是丢弃绑定。
+- **删分类连带删掉 web 域名的 `siteRule` 记录**：`normalizeWebDomainOverride` 判「无意义值」时未计入 `siteRule`，
+  唯一数据是 siteRule 的域名会写 `value: null` 被整条删。
+- **「恢复默认颜色」是死按钮**：`if (color)` 把 `null`（= 恢复默认）吃掉，点了无反应也无提示。
+- **保存后趋势列表不刷新**：`onSaved` 未接线，行上分类标记停旧值，用户以为没存上。
+- **跨行 Ctrl 连点丢选中**：`cancelPending` 无条件取消，改为同 key 才取消、跨行先 flush。
+
+### 遗留（下一轮）
+
+- **事项时间区间改写应用分类的统计聚合**：本轮只落「绑定关系」。`cmd_get_app_trend` 仍把整段时长归到 `category`（主分类），
+  用户把某事项绑到副分类后，那段时间**不会**挪过去。要让「Chrome 选娱乐/学习/工作、事项=学习SQL → 那段时间记学习」
+  真正生效，需后端读这张配置并按时间区间切分重算（Rust 聚合 + schema 口径）。
+- 弹窗关闭即弃稿（不存草稿、不提示未保存）。
+
 ## 主界面 / 分析窗第二轮改造（R2）— 2026-11-13（未出包）
 
 > 设计文档：`docs/design/DASHBOARD-R2-ARCH.md`（六项裁决 Q1–Q6 全部落档 §7）。

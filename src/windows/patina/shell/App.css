@@ -74,6 +74,9 @@
 @import "./styles/features/history-range.css";
 @import "./styles/features/history-range-timeline.css";
 @import "./styles/features/data.css";
+/* [本轮] 「应用设置」弹窗（双击应用趋势的一行打开）：独立文件，避让 data.css 与
+   quiet-pro.css 的行数棘轮（后者冻在 1936 行、加不进任何一行）。 */
+@import "./styles/features/data-app-edit.css";
 @import "./styles/features/destination.css";
 @import "./styles/features/about.css";
 @import "./styles/features/tools-alerts.css";

@@ -143,29 +143,28 @@ describe("时间线卡的行容器守卫", () => {
 });
 
 /**
- * 待办卡的卡底守卫（2026-11-12 · 卡底加了「＋ 新建待办」footer 之后）。
+ * 待办卡的卡底 / 收缩守卫（2026-11-12 建，[本轮] 入口从卡底 footer 搬到卡头后重锚）。
  *
- * 两类"改回去零报错、只会某天被报『按钮被盖住 / 卡片顶出滚动』"的接线：
- *  ① 撤销条是 absolute，`bottom` 若退回 `var(--qp-card-pad)` 会直接压在 footer 按钮上
- *     （footer 与 `.qp-card-footer` 同几何：32 高 + 底部负边距贴到卡片下缘，见
- *     `dashboard-todos-compose.css` 的 `.qp-todo-foot`）；
- *  ② 列表是 flex 子项，默认 `min-height: auto` —— 加了 footer 之后容器一矮，
- *     列表拒不收缩，整卡被顶出滚动区。
+ * 两类"改回去零报错、只会某天被报『撤销条悬空 / 卡片顶出滚动』"的接线：
+ *  ① 撤销条是 absolute；卡底那条 32 高的入口条（`.qp-todo-foot`）本轮随入口搬到卡头
+ *     一起下线，所以 `bottom` 回到卡片自己的底部内距 `--qp-card-pad-b` + 8px 间隙。
+ *     还留着 `--qp-card-foot-h` 就是照旧几何算的 —— 没有实体接住那 32px，撤销条会悬空。
+ *  ② 列表是 flex 子项，默认 `min-height: auto` —— 容器一矮，列表拒不收缩，整卡被顶出滚动区。
  */
-describe("待办卡的卡底 footer 守卫", () => {
-  it("p07a_todo_undo_bar_clears_the_footer", () => {
+describe("待办卡的卡底守卫", () => {
+  it("p07a_todo_undo_bar_sits_above_the_card_bottom_padding", () => {
     const css = readCss("../../../shell/styles/features/dashboard-todos.css");
     const bar = cssBlock(css, ".qp-undo-bar");
     const bottom = (/bottom: ([^;]+);/.exec(bar)?.[1] ?? "");
-    expect(bottom, "撤销条的 bottom 必须让开卡底 footer（不含 --qp-card-foot-h 就是贴回了卡底）")
-      .toContain("var(--qp-card-foot-h)");
-    expect(bottom, "不许退回旧的 var(--qp-card-pad)：那会盖住「＋ 新建待办」")
-      .not.toBe("var(--qp-card-pad)");
+    expect(bottom, "撤销条的 bottom 必须挂在卡片底部内距（--qp-card-pad-b）上")
+      .toContain("var(--qp-card-pad-b)");
+    expect(bottom, "卡底入口条已下线，再留 --qp-card-foot-h 会让撤销条悬空 16px")
+      .not.toContain("var(--qp-card-foot-h)");
   });
 
-  it("p07b_todo_list_can_shrink_below_footer", () => {
+  it("p07b_todo_list_still_shrinks_so_the_card_never_overflows", () => {
     const css = readCss("../../../shell/styles/features/dashboard-todos.css");
-    expect(cssBlock(css, ".qp-todo-list"), "列表必须 min-height: 0，否则加了 footer 会把卡片顶出滚动")
+    expect(cssBlock(css, ".qp-todo-list"), "列表必须 min-height: 0，否则行数一多就把卡片顶出滚动区")
       .toContain("min-height: 0");
   });
 });

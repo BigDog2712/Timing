@@ -25,6 +25,9 @@ import type {
 } from "../services/dataReadModel.ts";
 import type { DataTrendRangeSelection } from "../services/dataTrendRange.ts";
 import DataTrendRangeControl from "./DataTrendRangeControl.tsx";
+import DataAppTrendSkeleton from "./DataAppTrendSkeleton.tsx";
+import DataAppEditDialog from "./DataAppEditDialog.tsx";
+import { useAppTrendRowEdit } from "../hooks/useAppTrendRowEdit.ts";
 import QuickClassificationStatus from "../../classification/components/QuickClassificationStatus.tsx";
 import type { QuickClassificationAnchor } from "../../classification/types.ts";
 
@@ -75,6 +78,8 @@ interface DataAppTrendPanelProps {
   onSelectionChange: (selection: DataTrendRangeSelection) => void;
   onSearchQueryChange: (nextQuery: string) => void;
   onOptionSelect: (key: string, multi: boolean) => void;
+  /** 直写选中集（双击补偿把误翻转的选中还回去；不走 replace/toggle，也不弹 toast） */
+  onRestoreSelection?: (keys: readonly string[]) => void;
   onOptionIntentStart: (
     option: DataDestinationTrendOption,
     returnFocusTo?: HTMLElement | null,
@@ -87,8 +92,7 @@ interface DataAppTrendPanelProps {
     anchor: QuickClassificationAnchor,
     trigger: HTMLButtonElement,
   ) => void;
-  onMouseDownCapture: (event: MouseEvent<HTMLDivElement>) => void;
-  onDoubleClickCapture: (event: MouseEvent<HTMLDivElement>) => void;
+  onMouseDownCapture: (event: MouseEvent<HTMLDivElement>) => void; onDoubleClickCapture: (event: MouseEvent<HTMLDivElement>) => void;
   onMouseMove: (event: unknown) => void;
   onMouseLeave: () => void;
 }
@@ -103,11 +107,9 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
   const presentation = useDataPresentation(props, props.ready, props.refreshing && !props.errorMessage, props.destinationMode);
   const retainingPresentation = presentation !== props;
   const {
-  allTimeEndDateKey,
-  allTimeStartDateKey,
+  allTimeEndDateKey, allTimeStartDateKey,
   onContentCommitted,
-  destinationMode,
-  availableDestinationModes,
+  destinationMode, availableDestinationModes,
   title,
   rangeAriaLabel,
   selection,
@@ -142,6 +144,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
   onDestinationModeChange,
   onSearchQueryChange,
   onOptionSelect,
+  onRestoreSelection,
   onOptionIntentStart,
   onOptionOpenDetails,
   activeQuickClassificationTargetKey,
@@ -155,9 +158,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
   const UI_TEXT = useLocaleText();
   const canClassify = (option: DataDestinationTrendOption) => supportsQuickClassification && !isAnonymousActivity(option.key);
   const handleRetry = (event: MouseEvent<HTMLButtonElement>) => {
-    if (document.activeElement === event.currentTarget) {
-      event.currentTarget.closest(".data-app-panel")?.querySelector<HTMLElement>(".data-trend-range-trigger")?.focus();
-    }
+    if (document.activeElement === event.currentTarget) event.currentTarget.closest(".data-app-panel")?.querySelector<HTMLElement>(".data-trend-range-trigger")?.focus();
     onRetry();
   };
   const handleQuickClassificationKeyDown = (option: DataDestinationTrendOption, event: KeyboardEvent<HTMLButtonElement>) => {
@@ -189,6 +190,15 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
     event.stopPropagation();
     onOptionOpenDetails(option);
   };
+  /* [本轮] 单击选中 / 双击编辑的时序、"行首图标 = 详情"的分支、以及超窗双击的选中补偿都在这个 hook 里 */
+  const rowEdit = useAppTrendRowEdit({
+    editable: destinationMode === "app",
+    supportsDestinationDetails,
+    selectedKeys: selectedOptions.map((option) => option.key),
+    onOptionSelect,
+    onRestoreSelection,
+    onOptionOpenDetails,
+  });
   const detailCopy = UI_TEXT.destinationDetail;
   const modeLabels: Record<DataDestinationMode, string> = {
     app: UI_TEXT.data.destinationApp,
@@ -320,33 +330,11 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
           </button>
         </div>
       ) : !ready ? (
-        <div className="relative flex min-h-0 flex-1 flex-col" aria-busy>
-          <div role="status" className="absolute qp-text-caption text-[var(--qp-text-tertiary)]">{UI_TEXT.common.loading}</div>
-          <div
-            className="data-app-grid pointer-events-none invisible"
-            aria-hidden
-          >
-            <div className="data-app-sidebar" data-hint="">
-              <div className="data-app-search" />
-              <div className="data-app-list data-app-trend-list qp-scroll-region" />
-            </div>
-            <div className="data-app-chart-column">
-              <div className="data-app-metric-strip">
-                {Array.from({ length: 4 }, (_, index) => (
-                  <div className="data-app-metric" key={index}>
-                    <span>-</span>
-                    <strong>-</strong>
-                  </div>
-                ))}
-              </div>
-              <div
-                ref={chartRef}
-                className="data-app-chart data-chart-placeholder"
-              />
-              {heatmapContent}
-            </div>
-          </div>
-        </div>
+        <DataAppTrendSkeleton
+          chartRef={chartRef}
+          heatmapContent={heatmapContent}
+          loadingLabel={UI_TEXT.common.loading}
+        />
       ) : filteredOptions.length === 0 && !hasSearchQuery ? (
         <div className="data-app-loading text-[var(--qp-text-tertiary)] qp-text-caption" role="status">
           {emptyLabel}
@@ -405,8 +393,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
                       "--data-series-color": displayColor(series.color),
                     } as CSSProperties : undefined}
                     onMouseDown={(event) => handleDetailIntent(option, event)}
-                    onClick={(event) => onOptionSelect(option.key, event.ctrlKey)}
-                    onDoubleClick={(event) => handleDetailOpen(option, event)}
+                    {...rowEdit.handlers(option)}
                     onContextMenu={canClassify(option) ? (event) => handleClassificationContextMenu(option, event) : undefined}
                     onPointerEnter={canClassify(option) ? onQuickClassificationPreload : undefined}
                     onFocus={canClassify(option) ? onQuickClassificationPreload : undefined}
@@ -511,6 +498,8 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
           </div>
         </div>
       )}
+      {/* 双击整行开「应用设置」（关掉即卸载=弃稿）。[修复 D-7] `onSaved` 接 `onRetry`：只作废缓存的话这一行分类标记会停在旧值 */}
+      <DataAppEditDialog app={rowEdit.editing} onClose={rowEdit.closeEditor} onSaved={onRetry} />
     </div>
   );
 }

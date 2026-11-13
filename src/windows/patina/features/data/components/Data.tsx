@@ -728,26 +728,25 @@ export default function Data({
     ? selectedWebKeys
     : isCategoryDestination ? selectedCategoryKeys : selectedAppKeys;
   const destinationSupportsObjectActions = !isCategoryDestination;
+  /* 直写入口：把选中集**整体**写成给定的 key 列表。不走 replace / toggle ——
+     那两个是"用户操作"语义（单值替换 / 带 last-item 守卫），还会弹 limit-reached /
+     last-item 的 toast；而这条的调用方是"双击补偿把误翻转的选中还回去"，不是用户在选，
+     弹警告反而奇怪，也不能被守卫挡住（还原后的集合本来就合法）。 */
+  const handleDestinationSelectionRestore = useCallback((keys: readonly string[]) => {
+    if (presentedDestinationMode === "web") setSelectedWebKeys([...keys]);
+    else if (presentedDestinationMode === "category") setSelectedCategoryKeys([...keys]);
+    else setSelectedAppKeys([...keys]);
+  }, [presentedDestinationMode]);
   const handleDestinationOptionSelect = useCallback((key: string, multi: boolean) => {
     const currentKeys = presentedDestinationMode === "web"
       ? selectedWebKeys
       : presentedDestinationMode === "category" ? selectedCategoryKeys : selectedAppKeys;
-    const result = multi
-      ? toggleDataDestinationSelection(currentKeys, key)
-      : replaceDataDestinationSelection(key);
-    if (presentedDestinationMode === "web") {
-      setSelectedWebKeys(result.keys);
-    } else if (presentedDestinationMode === "category") {
-      setSelectedCategoryKeys(result.keys);
-    } else {
-      setSelectedAppKeys(result.keys);
-    }
-    if (result.outcome === "limit-reached") {
-      onToast?.(UI_TEXT.data.selectionLimitReached, "warning");
-    } else if (result.outcome === "last-item") {
-      onToast?.(UI_TEXT.data.selectionLastItem, "warning");
-    }
+    const result = multi ? toggleDataDestinationSelection(currentKeys, key) : replaceDataDestinationSelection(key);
+    handleDestinationSelectionRestore(result.keys);
+    if (result.outcome === "limit-reached") onToast?.(UI_TEXT.data.selectionLimitReached, "warning");
+    else if (result.outcome === "last-item") onToast?.(UI_TEXT.data.selectionLastItem, "warning");
   }, [
+    handleDestinationSelectionRestore,
     onToast,
     presentedDestinationMode,
     selectedAppKeys,
@@ -1156,6 +1155,7 @@ export default function Data({
                 ? handleCategorySearchQueryChange
                 : handleAppSearchQueryChange}
             onOptionSelect={handleDestinationOptionSelect}
+            onRestoreSelection={handleDestinationSelectionRestore}
             onOptionIntentStart={captureDestinationDetailIntent}
             onOptionOpenDetails={handleOpenDestinationDetail}
             activeQuickClassificationTargetKey={quickClassification.request

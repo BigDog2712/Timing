@@ -12,12 +12,16 @@ import TodoRow from "./TodoRow.tsx";
 /**
  * 模块 4 · 待办事项（01 §4.3 骨架：head / list / fade / undo / footer）
  *
- * ## 新建入口 = 卡底「＋ 新建待办」弹层（[本轮]，与「新建事项」完全对齐）
+ * ## 新建入口 = **卡头**那颗文字键（[本轮] 从卡底 footer 搬上来）
  *
- * 顶部的行内输入行下线了：用户口径「新增代办应与新增事项一致，可以填写时间，
- * 选择是否提醒」。一个时间（`plannedAt`）+ 一个勾选（勾了才有 `remindAt`）装不进
- * 32px 的行内输入，所以挪进 `TodoComposeDialog`（挂在 `ModuleShell` 的 `footer` 里 ——
- * footer 在 empty / error 态也在场，「今天还没有待办」恰恰是最需要新建入口的时刻）。
+ * 顶部行内输入行早已下线（用户口径「新增代办应与新增事项一致，可以填写时间，选择是否提醒」），
+ * 入口挪进 `TodoComposeDialog`。本轮再按用户要求把入口从卡底 footer 挪到**卡头右槽**
+ * （`ModuleShell` 的 `headAction`）：footer 会吃掉 32px 卡高，而待办卡最缺的就是行。
+ *
+ * `headAction` 是四态常驻的（`ModuleShell` 的 Props 注释）：empty / error / loading 时
+ * 那颗键也在 —— 「今天还没有待办」恰恰是最需要新建入口的时刻，这条语义不能因为搬家丢掉。
+ * 弹层本身挂在 `ModuleShell` **外面**（同一层 fragment 的兄弟）：`children` 只在 ready
+ * 渲染，挂在里面的话空态下点开弹层什么都不会出现。
  * 时间口径的唯一实现在 `services/todoDraft.ts` 的 `planTodoWrite`，这里不写三元。
  *
  * ## 「还有 N 项」的 N 是**量出来的**，不是写死的
@@ -27,8 +31,9 @@ import TodoRow from "./TodoRow.tsx";
  * 挂在列表上，pitch 从第 1、2 行的 `offsetTop` 差里读，**不读 CSS 变量、不算魔法数**：
  *   visible = floor((clientHeight − rowH) / pitch) + 1     // 末行不需要 trailing gap
  *
- * 卡底加了 footer 之后这套测量**照常工作**：可见行数从量出来的 clientHeight 推，
- * 「还有 K 项」自动适配，不需要跟着改任何数字。
+ * 入口搬到卡头之后这套测量**照常工作**：可见行数从量出来的 `clientHeight` 推，
+ * 「还有 K 项」自动适配。卡的可用高度确实变了（footer 那 32px 回到了列表），
+ * 但那是**量**出来的，不是常量 —— 所以这里一个数字都不用改。
  *
  * 两个推导量（可见行数、底部渐隐）由**同一个** `syncTodoDerived()` 算，它是一个可同步
  * 调用的普通函数：`useLayoutEffect`（列表变了）、RO 回调（容器变了）、`scroll`（滚动位置
@@ -117,79 +122,85 @@ export default function TodosModule({ controls, model }: Props) {
   const state = moduleState(status, refreshError, todos.length === 0 && pending === null);
 
   return (
-    <ModuleShell
-      controls={controls}
-      id="t-todos"
-      title={copy.todosTitle}
-      className="qp-card-todos"
-      state={state}
-      skeletonRows={5}
-      skeletonRow="todo"
-      errorText={UI_TEXT.common.readFailed}
-      retryLabel={UI_TEXT.common.retry}
-      onRetry={retry}
-      refreshErrorText={refreshError ? UI_TEXT.common.refreshFailed : undefined}
-      emptyText={copy.todosEmpty}
-      /* 三段式：① 无（加载 / 空） ② `全部 N 项 ▸` 常驻 ③ 溢出时再加 `还有 K 项 ▸`。
-      两个 N 是**两个数**（总数 / 没排下的条数），谁也不许拿另一个推。
-      （ready 态必然 todos.length > 0：0 条会被 moduleState 判成 empty。） */
-      /* 卡头读数 = exe 的 `meta(Todos)`：「N 条待办」（`widgets/mod.rs:156`）。
-         溢出条数仍要说，但只在真的溢出时追加一段，不再是常驻的「全部 N 项 ▸」。 */
-      meta={(
-        <>
-          <span>{copy.todosMeta(todos.filter((todo) => todo.doneAt === null).length)}</span>
-          {hiddenCount > 0 ? <span>{copy.todosRest(hiddenCount)}</span> : null}
-        </>
-      )}
-      /* [本轮] 卡底写入口放 **footer** 而不是 children：children 只在 ready 渲染，
-         而「今天还没有待办」正是最想新建一条的时刻（`ModuleShell` 的 footer 注释）。
-         弹层也挂在 footer 里（照 `TimelineCard.tsx` 的 `qp-timeline-manage`）。 */
-      footer={(
-        <div className="qp-todo-foot">
-          <button type="button" className="qp-link-btn" onClick={() => setComposeOpen(true)}>
+    <>
+      <ModuleShell
+        controls={controls}
+        id="t-todos"
+        title={copy.todosTitle}
+        className="qp-card-todos"
+        state={state}
+        skeletonRows={5}
+        skeletonRow="todo"
+        errorText={UI_TEXT.common.readFailed}
+        retryLabel={UI_TEXT.common.retry}
+        onRetry={retry}
+        refreshErrorText={refreshError ? UI_TEXT.common.refreshFailed : undefined}
+        emptyText={copy.todosEmpty}
+        /* [本轮] 新建入口搬到卡头右槽（原来是卡底 footer）。`headAction` 不受四态门控，
+           empty / error / loading 时这颗键都在 —— 「今天还没有待办」正是最该点它的时刻。 */
+        headAction={(
+          <button
+            type="button"
+            className="qp-link-btn qp-card-head-link"
+            onClick={() => setComposeOpen(true)}
+          >
             {copy.todoNewTodo}
           </button>
-          <TodoComposeDialog
-            open={composeOpen}
-            onClose={() => setComposeOpen(false)}
-            createBatch={model.createBatch}
-          />
-        </div>
-      )}
-    >
-      {/* [0.13 · 1.7] 行编辑弹层作为第一个 child：children 只在 ready 渲染，而编辑
-          必须有一条待办才开（ready 态必有行）—— 弹层自身 open 门控（`todo === null`
-          时不渲染表面），所以放 children 里不会把空态/骨架挡掉。 */}
-      <TodoEditDialog
-        todo={editingTodo}
-        onClose={() => setEditingTodo(null)}
-        update={model.update}
+        )}
+        /* 三段式：① 无（加载 / 空） ② `全部 N 项 ▸` 常驻 ③ 溢出时再加 `还有 K 项 ▸`。
+        两个 N 是**两个数**（总数 / 没排下的条数），谁也不许拿另一个推。
+        （ready 态必然 todos.length > 0：0 条会被 moduleState 判成 empty。） */
+        /* 卡头读数 = exe 的 `meta(Todos)`：「N 条待办」（`widgets/mod.rs:156`）。
+           溢出条数仍要说，但只在真的溢出时追加一段，不再是常驻的「全部 N 项 ▸」。 */
+        meta={(
+          <>
+            <span>{copy.todosMeta(todos.filter((todo) => todo.doneAt === null).length)}</span>
+            {hiddenCount > 0 ? <span>{copy.todosRest(hiddenCount)}</span> : null}
+          </>
+        )}
+      >
+        {/* [0.13 · 1.7] 行编辑弹层作为第一个 child：children 只在 ready 渲染，而编辑
+            必须有一条待办才开（ready 态必有行）—— 弹层自身 open 门控（`todo === null`
+            时不渲染表面），所以放 children 里不会把空态/骨架挡掉。 */}
+        <TodoEditDialog
+          todo={editingTodo}
+          onClose={() => setEditingTodo(null)}
+          update={model.update}
+        />
+        <ul className="qp-todo-list qp-scroll-region qp-scroll-region-stable" ref={listRef}>
+          {todos.map((todo) => (
+            <TodoRow
+              key={todo.id}
+              todo={todo}
+              onToggle={toggle}
+              onRemove={remove}
+              onEdit={setEditingTodo}
+            />
+          ))}
+        </ul>
+
+        {fadeVisible ? <div className="qp-fade-bottom" /> : null}
+
+        {pending ? (
+          <div className="qp-undo-bar" role="status">
+            <span className="qp-undo-text" title={pending.todo.title}>
+              {pending.kind === "delete" ? copy.undoDeleted(pending.todo.title) : copy.undoToggled(pending.todo.title)}
+            </span>
+            <button ref={undoRef} type="button" className="qp-undo-btn" onClick={undoPending}>
+              {copy.undoAction}
+            </button>
+          </div>
+        ) : null}
+      </ModuleShell>
+      {/* 新建弹层是 `ModuleShell` 的**兄弟**：挂进 children 就只有 ready 态才渲染，
+          空态点「新建待办」会什么都不出来（这正是 old 版把入口塞 footer 的原因）。
+          `QuietDialog` 自己 portal 到 body，放在这里不影响卡片排版。 */}
+      <TodoComposeDialog
+        open={composeOpen}
+        onClose={() => setComposeOpen(false)}
+        createBatch={model.createBatch}
       />
-      <ul className="qp-todo-list qp-scroll-region qp-scroll-region-stable" ref={listRef}>
-        {todos.map((todo) => (
-          <TodoRow
-            key={todo.id}
-            todo={todo}
-            onToggle={toggle}
-            onRemove={remove}
-            onEdit={setEditingTodo}
-          />
-        ))}
-      </ul>
-
-      {fadeVisible ? <div className="qp-fade-bottom" /> : null}
-
-      {pending ? (
-        <div className="qp-undo-bar" role="status">
-          <span className="qp-undo-text" title={pending.todo.title}>
-            {pending.kind === "delete" ? copy.undoDeleted(pending.todo.title) : copy.undoToggled(pending.todo.title)}
-          </span>
-          <button ref={undoRef} type="button" className="qp-undo-btn" onClick={undoPending}>
-            {copy.undoAction}
-          </button>
-        </div>
-      ) : null}
-    </ModuleShell>
+    </>
   );
 }
 
