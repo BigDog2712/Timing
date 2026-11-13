@@ -68,11 +68,65 @@ rustfmt 把这个调用拆成四行后，**正确代码也红；反之真换成�
 判据从「验接线」退化成「验排版」。改为按括号配平取整段调用再判。
 自证：把 `save_checked` 换成闭包（保持多行排版）→ 4 处同时开火；还原 → 复绿。
 
+### CI 首跑暴露的真问题：4 条断言默认「现在是白天」
+
+门禁和 lint 修完之后 CI 照样红，而且是本地一次没红过的 4 条 —— 这才是这次首跑最大的收获。
+
+- **3 条计时用例（`timer_recover_gap` ×2、`timer_switch` ×1）**：写法是「把开始时刻回拨
+  3600 s，断言补了 3600 s」。`timer_recover::resolve_open` / `timer::switch` 都会走
+  `timer_split::finalize`，按**本地日界**把跨零点记录拆成两条（设计行为）—— 当前那条的
+  `accumulated_sec` 就只剩「今天这一段」。CI 在 UTC 00:46 跑，`now - 3600s` 落到前一天 23:46，
+  断言必然失败（实测报「补空档 3600，实际 2813」）。本地白天回拨不跨天，所以从没红过。
+  **修法不是放宽断言**：新增 `tests::support::safe_rewind_ms(cap)`，按「距本地 00:00 还剩多少」
+  返回实际可回拨量（留 60 s 余量、封顶 cap；不足 3 分钟返回 `None` 让用例跳过），期望值随之
+  改成 `42 + back/1000`。这样凌晨也能**真跑**，而不是靠「不安全就跳过」把用例变成摆设。
+- **1 条路径比对（`data_root_transfer::switch_writes_pointer_with_previous_root`）**：Windows
+  同一目录有长名与 8.3 短名两种写法，CI 上指针里是 `C:\Users\runneradmin\…`、读回来是
+  `C:\Users\RUNNER~1\…`，字符串比对假红。两侧先 `canonicalize` 再比。
+- **自证**：把 `safe_rewind_ms` 改成故意返回跨天的量（`since_midnight + 60_000`），
+  `close_with_gap_counts_up_to_the_end_time` 立刻精确报「补空档 33630，实际 33613」（差 59 秒）
+  —— 证明判据没被弱化；还原后 6 条复绿。第一次负对照做错了（只改期望值、没真跨天，实测仍 3642），
+  等于啥也没证。
+
+### `npm ci` 直接 ERESOLVE：`@eslint/js` 版本越了 eslint 一级
+
+CI 的「安装依赖」两个 job 秒红：`@eslint/js@10.0.1` 要求 `eslint@^10` peer，而根是
+`eslint@9.39.5`。本地是 `npm install` 装出来的（会挑兼容解），`npm ci` 严格按 lock 校验就炸，
+于是后面所有步骤从来没执行过 —— 包括 `npm run build` 和 `check:*` 四步，全是本轮才第一次验。
+降 `@eslint/js` 到 `^9.39.5`（两处一致），并在本地补跑了此前从未跑过的：`typecheck` 干净、
+`build` 成功、四个 check 全绿。
+
+### 行数基线收紧 800 → 799
+
+上一轮压缩断言省下的一行让 `sqlite_pool_upgrade_tests.rs` 低于冻结值，门禁自己提示可收紧。
+走 `--freeze` 重新生成（不发手改）：150 条不变，1 条降值，另有 10 条是 `localeCompare` 的
+重排（`shared/` 与 `shell/` 次序），语义零变化。留着一个高于实测的冻结值，等于给下次
+偷偷加一行留了口子。
+
+### 工具链钉在 1.100.0：`stable` 是浮动的，会让「本地全绿」失效
+
+上一轮那 4 条修完，`单元/集成测试` 在 CI 终于绿了，红变成了 `Clippy` —— 而本地
+`cargo clippy --all-targets -D warnings` 是 0 诊断。查下来是工具链不同版：CI 的
+`dtolnay/rust-toolchain@stable` 已经跑到 **1.100.0**，本机是 **1.99.0**。1.100 的
+`needless_bool` 增强了形态，盯上 `infra/insight/windows/foreground.rs` 末尾那个
+`if … != 0 { return false } true`，化简成 `(extended_style & WS_EX_TOOLWINDOW.0) == 0`。
+
+但**根因不是这条 lint，是「浮动 stable」这个设定本身**：stable 每月可能带新 lint，
+红的原因与你改的东西无关，一次白烧 13 分钟。因此：
+
+- 新增仓根 `rust-toolchain.toml`（channel 1.100.0 / components 只有 clippy / profile minimal）。
+  不列 rustfmt —— 本仓不用 fmt 当门禁。
+- `ci.yml` 的 action 从 `@stable` 改成 `@1.100.0`，两处注释互相点名「必须同版」。
+- **验证不靠「看着对」**：本机装了 1.100.0，用 `cargo +1.100.0 clippy --all-targets`
+  （带同样的 `-D warnings -A …`）跑出 0 诊断，再用 1.100.0 跑 `cargo test --lib` 1,718 通过。
+  1.99.0 看不见这条 lint —— 这正是「本地绿」证明不了任何事的活例子。
+
 ### 验证
 
-`npm run check` 七条 OK（size 150 条不变 / vendored 214 条）·
-`cargo clippy --all-targets -- -D warnings -A clippy::unwrap_used -A clippy::expect_used` 0 error ·
-`cargo test --lib` 1,718 passed / 1 failed（唯一失败是本地沙箱拦 `reg.exe`）。
+`npm run check` 八步 OK（size 150 条 / vendored 215 条）·
+`npm run typecheck` 0 错 · `npm run build` 成功 · `npm test` 1,202 passed / 153 文件 ·
+`cargo +1.100.0 clippy --all-targets -- -D warnings -A clippy::unwrap_used -A clippy::expect_used` 0 诊断 ·
+`cargo +1.100.0 test --lib` 1,718 passed / 1 failed（唯一失败是本地沙箱拦 `reg.exe`，CI 上可跑）。
 
 ## 0.12.1（桌面）— 2026-11-12（末）
 
