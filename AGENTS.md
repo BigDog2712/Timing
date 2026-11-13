@@ -50,16 +50,28 @@ npm run lint         # ESLint（只查正确性，不查风格）
 npm test             # vitest（含双端时间公式黄金用例）
 npm run build        # tsc + vite build
 cd src-tauri && cargo test                 # 后端测试，必须全绿
-cd src-tauri && cargo clippy --all-targets -- -D warnings
-cd src-tauri && cargo fmt --check
+cd src-tauri && cargo clippy --all-targets -- -D warnings -A clippy::unwrap_used -A clippy::expect_used
 ```
+
+**没有 `cargo fmt`**（`cargo fmt --check` 也不是门禁，别加回来）：它与「单文件 ≤300 行」不可
+同时满足 —— 全仓 fmt 会把 14 个原本合规的文件换行推过 300 行，`size-allowlist.json` 从 150 条
+涨到 164 条，而基线是只许减的棘轮（实测记录见 `CHANGELOG.md` 的 2026-11-13 一节）。二选一，
+本项目选 300 行；改代码按现有风格手写。
+
+clippy 那两条 `-A` 是**存量豁免**，不是抄错命令：`unwrap_used` / `expect_used` 是 `Cargo.toml`
+里我们自己开的 restriction lint，`--all-targets` 下约 5,900 处（绝大多数在测试与验收支撑）。
+写在命令里是为了让豁免可见；收敛完删掉即可。
+
+工具链钉在仓根 `rust-toolchain.toml`（1.100.0），CI 用同一个号 —— **用别的版本跑 clippy 结论
+不作数**：1.99 看不见 1.100 才有的 lint（`needless_bool` 就因此把 CI 打红过一次）。升版本是
+显式动作：改 `rust-toolchain.toml` + 改 `.github/workflows/ci.yml` 的 action ref，两处必须同版。
 
 ## 硬约束（全部由 CI 机械执行，不靠记性）
 
 - **单文件 ≤300 行**（前后端一致）→ `npm run check:size`
   超限文件登记在 `scripts/size-allowlist.json` 的**冻结基线**（150 条，由 `--freeze` 扫描生成，禁止手写）。它是**棘轮**：只许减不许增——行数超过冻结值、或出现不在基线里的新超限文件，一律红。拆分后跑 `node scripts/check-size.mjs --freeze` 收紧。
-  **硬目标（2026-11-12 拍板）**：每版至少 **−10 条**，0.15.0 前压到 **100 条以内**；未达标不提交出包。门禁摘要会打印「超限行数 / 总行数」占比，当前 **94,115 / 288,153 = 32.7%**，别只看条数。
-- **分层只能向下** → `npm run check:layers`（9 条 grep 规则）
+  **硬目标（2026-11-12 拍板）**：每版至少 **−10 条**，0.15.0 前压到 **100 条以内**；未达标不提交出包。门禁摘要会打印「超限行数 / 总行数」占比，当前 **94,111 / 286,866 = 32.8%**，别只看条数。
+- **分层只能向下** → `npm run check:layers`（10 条 grep 规则）
   L1 `components`（含 `patina/{shell,features,shared}` 下的 `components/`）不 `invoke`；L2 `stores`（含 `*Store.ts`、`features/**/stores`）不碰 `ipc.`；L3 只有 `windows/shared/windowApi.ts` 引窗口 API 包（`api/window` 与 `api/webviewWindow`）；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `windows/timing/lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）；L9 双窗隔离——主窗与分析窗不得互相 import，**例外表已清空**：原 5 条共享模块（windowApi / handleCatalog / handleBindings / pillAppearance / pillPrefsGateway）已整体下沉到 `src/windows/shared/`，两侧直接引它，跨窗引用在物理上消失（带哨兵：两条路径集合必须非空；例外表非空时每条必须真实存在，防薄壳改名后绿着空转）；**L10 分层方向**——`patina/platform/**` 不得 import `features/**` 或 `shell/**`，`patina/shared/**` 不得 import `features/**`、`shell/**`、`platform/**`，`windows/shared/**` 不得 import `timing/**` 或 `patina/**`（带哨兵：每层路径集合非空且至少解析出 1 条相对 import，防路径前缀写错后绿着空转；`*.test.*` 不参与——测试站在最上层验收接缝；CSS 等资源说明符不参与——它们没有模块语义）。
 - **IPC 契约** → `npm run check:contract`
   命令 4 处一致（`generate_handler!` / `IpcApi` / `ipc.ts` / `browserMock`）、错误码 2 处一致、事件三方一致（后端常量 / `IPC_EVENTS` / emit 点）、禁止事件名字面量、**每个错误码必须在 `errorText()` 里有 case**（否则静默落到通用兜底）。

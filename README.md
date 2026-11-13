@@ -105,7 +105,7 @@ Releases 上有**两个早期版本**，都远早于当前主线 0.12.1（命令
 
 | 版本 | 产物 | 说明 |
 |---|---|---|
-| v0.5.0 | `Timing.exe` + `SHA256SUMS.txt` | 「品牌归位」版：TickBar → Timing，老数据自动复制迁移 |
+| v0.5.0 | `Timing.exe` + `SHA256SUMS.txt` | 「品牌归位」版：产品名统一为 Timing，老数据自动复制迁移 |
 | v0.1.1 | `Timing-0.1.1-portable.exe` | 绿色版，双击即用，不写注册表 |
 
 为什么有两个 0.x：`v0.5.0` 是私有仓时代的最后一个包，`v0.1.1` 是公开仓发布线的包 ——
@@ -234,10 +234,19 @@ npm run build        # tsc + vite build
 
 ```bash
 cd src-tauri
-cargo test                                   # 后端测试
-cargo clippy --all-targets -- -D warnings    # 0 warning
-cargo fmt --check                            # 格式检查
+cargo test                                   # 后端测试（1,700+ 用例）
+cargo clippy --all-targets -- -D warnings \
+  -A clippy::unwrap_used -A clippy::expect_used
 ```
+
+**没有 `cargo fmt`**，别把它加回来：本仓把「单文件 ≤300 行」当硬约束，而全仓 fmt 会把 14 个
+原本合规的文件换行推过 300 行（`size-allowlist.json` 从 150 条涨到 164，而该基线是只许减的
+棘轮）。两条规则不可同时满足，本项目选 300 行 —— 格式化因此不是门禁项，改代码按现有风格手写。
+
+`-A clippy::unwrap_used -A clippy::expect_used` 是**故意写出来的豁免**，不是命令抄错：这两条
+restriction lint 在 `Cargo.toml` 里开着（本地看得见），而 `--all-targets` 下有约 5,900 处，
+绝大多数在测试与验收支撑里。一次性改成 `?` 不现实，让 CI 长期红着只会训练人忽略整条流水线。
+豁免写在命令里，就是为了让它可见；收敛完删掉即可。
 
 只想看界面、不碰 Rust：`npm run dev` 后打开 <http://localhost:1420>，走 `src/mocks` 的 mock IPC
 （无托盘、无真实窗口）。
