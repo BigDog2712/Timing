@@ -204,6 +204,16 @@ pub async fn restore(
     })
 }
 
+/// 一个落点探测的三件套：显示名 · 「该落点是否可用」· 「怎么解析出目录」。
+///
+/// 三者必须绑在一起返回——只拿到名字去配另一份 `if`，就会出现「说了 WebDAV、
+/// 解析的却是 Obsidian 目录」这类错配。
+type ChannelProbe<'a> = (
+    &'a str,
+    Box<dyn Fn(&MdSyncCloudChannel) -> bool>,
+    Box<dyn Fn(&MdSyncCloudChannel) -> Result<std::path::PathBuf, String>>,
+);
+
 /// 某个落点的生效根。
 ///
 /// ## 解析不出来必须报错（[V0.11.14] 修 O4）
@@ -222,11 +232,7 @@ fn root_of(
 ) -> AppResult<String> {
     /* 落点名与它要求的通路绑在一起写：错误文案要说清「这份备份属于哪个落点」，
     用户才知道该去设置里开哪一块。[V0.11.26] 通路结构自带归属，mode 比对整段消失。 */
-    let (label, ready, resolve): (
-        &str,
-        Box<dyn Fn(&MdSyncCloudChannel) -> bool>,
-        Box<dyn Fn(&MdSyncCloudChannel) -> Result<std::path::PathBuf, String>>,
-    ) = match target {
+    let (label, ready, resolve): ChannelProbe<'_> = match target {
         Some("webdav") => (
             "WebDAV",
             Box::new(|c| c.is_usable_webdav()),

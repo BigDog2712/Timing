@@ -92,18 +92,6 @@
       "owner": "ForG"
     },
     {
-      "path": "src-tauri/src/app/insight/main_window/tools_navigation.rs",
-      "change": "modified",
-      "reason": "P0-03（TB1-1）：`ToolsNavigationState(Mutex<Option<ToolsSection>>)` 泛化为 `Mutex<Option<PendingView>>`，新增 `open_history(app, HistoryTarget)`；`open_tools` 路径行为逐字不变（先写 state 再 show、硬失败 take 回滚并返回 Err、emit 常量不变），`ToolsSection` 的 serde 形状未动（迷你窗反序列化依赖它）。单测扩一条 history 用例。",
-      "owner": "寇豆码"
-    },
-    {
-      "path": "src-tauri/src/commands/insight/window_cmd.rs",
-      "change": "modified",
-      "reason": "P0-03（TB1-1）：`cmd_take_main_tools_target` 的返回形状从裸枚举改成 `Option<MainWindowTargetDto>`（`{tools?}` 或 `{history?}`），**不新增命令**（insight 仍 117 条），守卫 `require_main_window_string` 不变。日期非法时由宿主命令侧拦下并退化为只 show，未新增错误码（仍 17）。",
-      "owner": "寇豆码"
-    },
-    {
       "path": "src/windows/patina/features/dashboard/components/Dashboard.tsx",
       "change": "modified",
       "reason": "第二批重写：513 行 → 113 行，只留数据装配 + 五模块组合。删 QuietPageHeader、HourlyActivityChart 与旧环形函数（设计五模块里没有今日节律）。",
@@ -1200,6 +1188,102 @@
       "change": "modified",
       "reason": "[0.12.1 共享层] md 同步纯函数的三份逐字副本合并为一份真源（`src/windows/shared/settings/`），本文件退化为 `export *` 转发壳（原 281/204/68 行实现已移走）。判据由「两份逻辑不许漂移」改为「壳里不许有逻辑 + 两侧指向同一真源」，见 mdSyncCopies.drift.test.ts。",
       "owner": "ForG"
+    },
+    {
+      "path": "src-tauri/src/app/insight/bootstrap.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`#[cfg(test)] mod tests` 移到文件末尾（clippy::items_after_test_module）。行数 305 不变。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/infra/insight/runtime_diagnostics_mod_tests.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`n % 2 == 0` → `n.is_multiple_of(2)`。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/infra/insight/windows/icon.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`chunks_exact_mut(4)` → `as_chunks_mut::<4>()`（同一切法，API 更明确）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/infra/insight/windows/notification_sound.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：两处 `chunks_exact(2)` → `as_chunks::<2>()`，顺带去掉一次 `try_into().unwrap()`。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/models/insight/mini_window/geometry.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`sort_by(|l,r| ...cmp)` → `sort_by_key`（稳定排序语义不变）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/hourly_benchmark.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：去掉 `load_range(&pool)` 的多余 `&`（同函数内其余调用均传 `pool`）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/import/destructure/csv_source.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：手写行号计数器 → `records().enumerate()`，物理行号仍为 `index + 2`（表头占第 1 行）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/repositories/app_links.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`&[x.clone()]` → `std::slice::from_ref(&x)`，省一次 clone。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/repositories/app_settings.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：两处 `&[x.clone()]` → `std::slice::from_ref(&x)`。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/repositories/web_links_mod_tests.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`&[first.clone()]` → `std::slice::from_ref(&first)`。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sqlite_pool_upgrade_tests.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：八元组 → `type ReminderRuleRow`；为守住 800 行冻结值，同时把一处 5 行 assert 压成 1 行。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/storage_migration.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`#[cfg(test)] mod tests` 移到文件末尾。行数 1732 不变。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/engine/tools/mod.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`Atomic::fetch_update` → `try_update`（Rust 1.89 起前者 deprecated，语义相同）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/engine/tracking/app_names_tests.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：五元组 → `type SessionFact`；`await_holding_lock` 加显式 `#[allow]` —— 本用例要验的就是「持锁跨 await 时记录链路仍通」，不跨 await 造不出现场。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/engine/tracking/runtime/loop_state.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`#[cfg(test)] mod tests` 移到文件末尾。行数 1328 不变。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/services/insight/engine/tracking/runtime/power_lifecycle.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`#[cfg(test)] mod tests` 移到文件末尾。行数 145 不变。",
+      "owner": "寇豆码"
     }
   ]
 }

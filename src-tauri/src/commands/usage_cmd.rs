@@ -62,12 +62,12 @@ pub async fn usage_stats_get(
     #[cfg(not(mobile))]
     {
         let _ = (&app, &date, &state);
-        return Ok(UsageDay {
+        Ok(UsageDay {
             supported: false,
             date,
             total_sec: 0,
             rows: Vec::new(),
-        });
+        })
     }
 
     #[cfg(mobile)]

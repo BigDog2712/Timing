@@ -20,7 +20,7 @@
 //!   它是纵深防御：`..` 已在第一道闸拦死，这条拦的是链接与大小写归一化。
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::services::md_backup_export::{export_name, resolve_in};
 
@@ -39,7 +39,7 @@ fn temp_dir(tag: &str) -> PathBuf {
 }
 
 /// 造一份真的备份文件，返回它的名字。
-fn put(dir: &PathBuf, name: &str) {
+fn put(dir: &Path, name: &str) {
     fs::write(dir.join(name), "# 2026-11-06\n\n#### 事项计时\n").expect("写备份");
 }
 

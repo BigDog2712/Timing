@@ -50,10 +50,10 @@ fn convert_tai_text(csv_text: &str) -> Result<TaiCsvConversion, String> {
     }
 
     let mut conversion = TaiCsvConversion::default();
-    let mut data_line = 1usize;
 
-    for result in reader.records() {
-        data_line += 1;
+    for (index, result) in reader.records().enumerate() {
+        /* 表格第 1 行是表头，所以第 index 条数据的物理行号是 index + 2。 */
+        let data_line = index + 2;
         let record = match result {
             Ok(record) => record,
             Err(_) => {

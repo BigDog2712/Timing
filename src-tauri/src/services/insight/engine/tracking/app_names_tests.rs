@@ -12,6 +12,9 @@ mod cases {
     use std::time::Duration;
     use tokio::time::timeout;
 
+    /// 一条会话事实：`app_name / exe_name / start_time / end_time / duration`。
+    type SessionFact = (String, String, i64, Option<i64>, Option<i64>);
+
     async fn fixture() -> (SqlitePool, TrackingRuntimeDataStore) {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
         pool.execute(schema::CURRENT_BASELINE_SCHEMA_SQL)
@@ -85,7 +88,7 @@ mod cases {
         })
         .await
         .unwrap();
-        let facts: Vec<(String, String, i64, Option<i64>, Option<i64>)> = sqlx::query_as(
+        let facts: Vec<SessionFact> = sqlx::query_as(
             "SELECT app_name, exe_name, start_time, end_time, duration FROM sessions ORDER BY id",
         )
         .fetch_all(&pool)
@@ -134,6 +137,9 @@ mod cases {
         pool.close().await;
     }
 
+    /// **刻意持锁跨 await**：本用例要验的正是「诊断锁被人按住时，记录链路还走得通」，
+    /// 不跨 await 就造不出争用现场。lint 在此处是对的、但结论相反 —— 显式豁免。
+    #[allow(clippy::await_holding_lock)]
     #[tokio::test]
     async fn diagnostic_contention_rejects_enrichment_without_delaying_records() {
         let (pool, store) = fixture().await;

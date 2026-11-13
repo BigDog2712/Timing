@@ -8,6 +8,9 @@ use super::sqlite_pool::{
 use sqlx::{Executor, Row, SqlitePool};
 use std::path::Path;
 
+/// 一条提醒规则连同它的状态位与扩展时长（列序同下方 SELECT）。
+type ReminderRuleRow = (i64, String, i64, String, i64, Option<i64>, i64, i64);
+
 const LEGACY_ACTIVITY_TARGET_INDEX: &str =
     "CREATE UNIQUE INDEX idx_tool_activity_reminder_rules_unique_target
     ON tool_activity_reminder_rules(target_kind, CASE target_kind
@@ -68,12 +71,8 @@ async fn legacy_activity_reminder_index_upgrade_preserves_data_and_is_repeatable
         prepare_pool_schema(&pool, Path::new("legacy-activity-targets.db"))
             .await
             .unwrap();
-        assert!(
-            super::schema_contracts::has_unique_activity_reminder_targets(&pool)
-                .await
-                .unwrap()
-        );
-        let rows: Vec<(i64, String, i64, String, i64, Option<i64>, i64, i64)> = sqlx::query_as(
+        assert!(super::schema_contracts::has_unique_activity_reminder_targets(&pool).await.unwrap());
+        let rows: Vec<ReminderRuleRow> = sqlx::query_as(
             "SELECT r.id,r.label_snapshot,r.limit_ms,r.message,r.updated_at,r.disabled_at,s.enabled,e.extension_limit_ms
              FROM tool_activity_reminder_rules r JOIN tool_activity_reminder_states s ON s.rule_id=r.id
              JOIN tool_activity_reminder_extensions e ON e.rule_id=r.id ORDER BY r.id",

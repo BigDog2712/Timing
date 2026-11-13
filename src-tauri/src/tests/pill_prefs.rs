@@ -33,12 +33,13 @@ fn slots(left: Option<&str>) -> HandleSlotBinding {
 
 /// 手柄绑定的完整形状（三形态都在），用于验「另半份原样保留」。
 fn handles_with_full_enabled() -> HandleBindings {
-    let mut handles = HandleBindings::default();
-    handles.full = HandleFormBinding {
-        enabled: true,
-        slots: slots(Some("note.current")),
-    };
-    handles
+    HandleBindings {
+        full: HandleFormBinding {
+            enabled: true,
+            slots: slots(Some("note.current")),
+        },
+        ..Default::default()
+    }
 }
 
 #[test]

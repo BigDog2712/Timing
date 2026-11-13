@@ -5,7 +5,6 @@
 //! folder 通路的「目录不能与落点重合」。
 
 use super::*;
-use super::*;
 use crate::models::md_sync::MdSyncKind;
 
 fn binding(root: &str) -> MdSyncBinding {

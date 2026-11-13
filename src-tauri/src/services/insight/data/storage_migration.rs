@@ -977,6 +977,48 @@ fn pre_migration_backup_file_name(migration_id: &str) -> String {
     format!("Patina-{PRE_MIGRATION_BACKUP_PREFIX}-{migration_id}.zip")
 }
 
+#[cfg(debug_assertions)]
+// Only isolated debug runtime tests can pause a migration. Release builds omit this hook.
+fn pause_migration_for_recovery_test(phase: &str) {
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{Duration, Instant},
+    };
+    if std::env::var("PATINA_E2E").as_deref() != Ok("1") {
+        return;
+    }
+    let Some(root) = std::env::var_os("PATINA_E2E_DATA_ROOT").map(PathBuf::from) else {
+        return;
+    };
+    if !root.is_absolute()
+        || !root.starts_with(std::env::temp_dir())
+        || !root
+            .file_name()
+            .is_some_and(|n| n.to_string_lossy().starts_with("patina-tauri-e2e-"))
+    {
+        return;
+    }
+    let request = root.join("storage-pause-request");
+    if fs::read_to_string(&request).ok().as_deref() != Some(phase) {
+        return;
+    }
+    fs::remove_file(request).expect("consume one-shot migration pause");
+    fs::write(
+        root.join("storage-paused"),
+        serde_json::to_vec(&serde_json::json!({
+            "pid":std::process::id(), "phase":phase
+        }))
+        .unwrap(),
+    )
+    .expect("report migration pause");
+    let start = Instant::now();
+    while start.elapsed() < Duration::from_secs(30) {
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    panic!("migration recovery test did not terminate paused process at {phase}");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1687,46 +1729,4 @@ mod tests {
         let normalized = normalize_selected_storage_root("D:\\Patina Data").unwrap();
         assert_eq!(normalized, PathBuf::from("D:\\Patina Data"));
     }
-}
-
-#[cfg(debug_assertions)]
-// Only isolated debug runtime tests can pause a migration. Release builds omit this hook.
-fn pause_migration_for_recovery_test(phase: &str) {
-    use std::{
-        fs,
-        path::PathBuf,
-        time::{Duration, Instant},
-    };
-    if std::env::var("PATINA_E2E").as_deref() != Ok("1") {
-        return;
-    }
-    let Some(root) = std::env::var_os("PATINA_E2E_DATA_ROOT").map(PathBuf::from) else {
-        return;
-    };
-    if !root.is_absolute()
-        || !root.starts_with(std::env::temp_dir())
-        || !root
-            .file_name()
-            .is_some_and(|n| n.to_string_lossy().starts_with("patina-tauri-e2e-"))
-    {
-        return;
-    }
-    let request = root.join("storage-pause-request");
-    if fs::read_to_string(&request).ok().as_deref() != Some(phase) {
-        return;
-    }
-    fs::remove_file(request).expect("consume one-shot migration pause");
-    fs::write(
-        root.join("storage-paused"),
-        serde_json::to_vec(&serde_json::json!({
-            "pid":std::process::id(), "phase":phase
-        }))
-        .unwrap(),
-    )
-    .expect("report migration pause");
-    let start = Instant::now();
-    while start.elapsed() < Duration::from_secs(30) {
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    panic!("migration recovery test did not terminate paused process at {phase}");
 }

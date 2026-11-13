@@ -102,7 +102,7 @@ async fn automatic_rules_replay_conflict_and_atomic_rejection() {
     let pool = database().await;
     let rule = json!({"version":2,"exceptions":["mail.example.com"]});
     let first = change(rule.clone(), json!(null));
-    commit_classification_setting_mutations(&pool, &[first.clone()])
+    commit_classification_setting_mutations(&pool, std::slice::from_ref(&first))
         .await
         .unwrap();
     commit_classification_setting_mutations(&pool, &[first])

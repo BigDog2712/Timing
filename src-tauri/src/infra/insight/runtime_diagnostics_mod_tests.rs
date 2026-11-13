@@ -143,7 +143,7 @@ fn full_diagnostic_queue_and_busy_executor_do_not_stop_observation() {
     let observer = RuntimeDiagnostics::start_with_writer(
         move || {
             let n = observed.fetch_add(1, Ordering::Relaxed);
-            (n % 2 == 0, serde_json::json!({"stage":"foreground"}))
+            (n.is_multiple_of(2), serde_json::json!({"stage":"foreground"}))
         },
         move |_| {
             if let Some(held) = held.take() {

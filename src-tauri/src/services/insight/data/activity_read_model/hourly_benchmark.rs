@@ -111,7 +111,7 @@ async fn measure_capacity(
     let mut fetched_projection_rows = 0;
     for _ in 0..sample_count {
         let started = Instant::now();
-        let mut result = load_range(&pool, start_ms, end_ms, &boundaries)
+        let mut result = load_range(pool, start_ms, end_ms, &boundaries)
             .await
             .unwrap();
         query_samples_ms.push(started.elapsed().as_secs_f64() * 1000.0);

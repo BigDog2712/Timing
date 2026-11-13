@@ -126,9 +126,7 @@ impl PatinaOpenTarget {
 
     /// 历史分支：空日期（前端不该发）→ `None`，调用方退化成「只 show」，绝不乱跳某一天。
     fn into_history_target(self) -> Option<HistoryTarget> {
-        let Some(history) = self.history else {
-            return None;
-        };
+        let history = self.history?;
         let date_key = history.date_key.trim().to_string();
         if date_key.is_empty() {
             crate::log_warn!("open_patina_window: empty history date; falling back to show only");

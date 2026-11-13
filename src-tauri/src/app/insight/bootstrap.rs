@@ -221,6 +221,21 @@ fn should_keep_app_running_without_windows(
     !explicit_exit && !exit_requested && (configured_tray_residency || safety_tray_forced)
 }
 
+fn storage_startup_error(error: String) -> std::io::Error {
+    use crate::models::insight::localization::{format_text, Locale};
+    let message = format_text(
+        Locale::default(),
+        "native.storage.startupFailure",
+        &[("details", error.clone())],
+    );
+    rfd::MessageDialog::new()
+        .set_title("Timing")
+        .set_description(message)
+        .set_level(rfd::MessageLevel::Error)
+        .show();
+    std::io::Error::other(error)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{resolve_startup_source, should_keep_app_running_without_windows};
@@ -287,19 +302,4 @@ mod tests {
             true, true, true, true
         ));
     }
-}
-
-fn storage_startup_error(error: String) -> std::io::Error {
-    use crate::models::insight::localization::{format_text, Locale};
-    let message = format_text(
-        Locale::default(),
-        "native.storage.startupFailure",
-        &[("details", error.clone())],
-    );
-    rfd::MessageDialog::new()
-        .set_title("Timing")
-        .set_description(message)
-        .set_level(rfd::MessageLevel::Error)
-        .show();
-    std::io::Error::other(error)
 }

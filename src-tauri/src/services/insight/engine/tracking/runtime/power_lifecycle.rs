@@ -39,6 +39,20 @@ pub(super) async fn apply_power_lifecycle_event(
     Ok(None)
 }
 
+pub(super) async fn flush_pending_power_stop_and_publish<R: Runtime>(
+    app: &AppHandle<R>,
+    data: &dyn TrackingDataStore,
+    state: &TrackingRuntimeSnapshotState,
+) -> Result<(), String> {
+    let ended = flush_pending_power_stop(data, state)
+        .await
+        .map_err(|error| format!("power lifecycle transition failed: {error}"))?;
+    if let Some((reason, ended_at)) = ended {
+        let _ = super::emit_tracking_data_changed(app, reason, ended_at as u64);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,18 +142,4 @@ mod tests {
             assert!(state.accepts_sample(state.lifecycle_generation()));
         });
     }
-}
-
-pub(super) async fn flush_pending_power_stop_and_publish<R: Runtime>(
-    app: &AppHandle<R>,
-    data: &dyn TrackingDataStore,
-    state: &TrackingRuntimeSnapshotState,
-) -> Result<(), String> {
-    let ended = flush_pending_power_stop(data, state)
-        .await
-        .map_err(|error| format!("power lifecycle transition failed: {error}"))?;
-    if let Some((reason, ended_at)) = ended {
-        let _ = super::emit_tracking_data_changed(app, reason, ended_at as u64);
-    }
-    Ok(())
 }

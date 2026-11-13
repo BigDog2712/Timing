@@ -626,7 +626,7 @@ mod tests {
                     key: key.into(),
                     value: value.into(),
                 };
-                assert!(commit_app_setting_mutations(&pool, &[mutation.clone()])
+                assert!(commit_app_setting_mutations(&pool, std::slice::from_ref(&mutation))
                     .await
                     .is_err());
                 let saved: String = sqlx::query_scalar("SELECT value FROM settings WHERE key=?")
@@ -689,7 +689,7 @@ mod tests {
                 key: "tracking_paused".into(),
                 value: "1".into(),
             };
-            assert!(commit_app_setting_mutations(&pool, &[pause.clone()])
+            assert!(commit_app_setting_mutations(&pool, std::slice::from_ref(&pause))
                 .await
                 .is_err());
             let setting: Option<String> =

@@ -129,7 +129,7 @@ mod tests {
                 .await
                 .unwrap();
             let initial = change("b.exe", Some("a.exe"), None);
-            commit_classification_setting_mutations(&pool, &[initial.clone()])
+            commit_classification_setting_mutations(&pool, std::slice::from_ref(&initial))
                 .await
                 .unwrap();
             commit_classification_setting_mutations(&pool, &[initial])

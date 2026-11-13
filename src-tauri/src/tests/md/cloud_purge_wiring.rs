@@ -74,6 +74,62 @@ fn code_lines(source: &str) -> impl Iterator<Item = &str> {
         .filter(|line| !line.starts_with("//"))
 }
 
+/// 取「含 `needle` 那行起、到括号配平为止」的整段源码，拼成一行返回。
+///
+/// **为什么不能只看一行**：`cargo fmt` 在参数超宽时会把一次调用拆成多行
+///
+/// ```text
+/// match folder::remove_one(
+///     &cand.path,
+///     &cand.bytes,
+///     crate::infra::md_backup::save_checked,
+/// ) {
+/// ```
+///
+/// 此时按「单行必须含 `save_checked`」判，判据就从「验接线」退化成「验排版」：
+/// 代码完全正确也会红，而真把参数换成闭包、只要写成一行反而蒙过去。
+/// 括号配平取整段，两种排版下判据都成立。
+fn call_snippets(source: &str, needle: &str) -> Vec<String> {
+    let lines: Vec<&str> = code_lines(source).collect();
+    let mut out: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        if !lines[i].contains(needle) {
+            i += 1;
+            continue;
+        }
+        let mut snippet = String::new();
+        let mut depth = 0i32;
+        let mut opened = false;
+        let mut j = i;
+        while j < lines.len() {
+            snippet.push_str(lines[j]);
+            snippet.push(' ');
+            for ch in lines[j].chars() {
+                match ch {
+                    '(' => {
+                        depth += 1;
+                        opened = true;
+                    }
+                    ')' => depth -= 1,
+                    _ => {}
+                }
+            }
+            j += 1;
+            /* 见过左括号且已配平 = 整个调用收完；40 行兜底防括号不配平时无限吞。 */
+            if opened && depth <= 0 {
+                break;
+            }
+            if j - i > 40 {
+                break;
+            }
+        }
+        out.push(snippet);
+        i = j.max(i + 1);
+    }
+    out
+}
+
 /// 「留底」这一格必须焊死在 `save_checked` 上。
 ///
 /// 变异自检（红→绿）：见模块头「自证能红」——把留底参数换成
@@ -82,14 +138,13 @@ fn code_lines(source: &str) -> impl Iterator<Item = &str> {
 fn folder_round_passes_save_checked_as_the_backup_argument() {
     let source = include_str!("../../services/md_cloud/purge/mod.rs");
     /* 问题收集起来最后一起报：任何一处 panic 都会挡住后面的判据，
-       而「红在错的地方 / 只红一处」正是本项目反复栽的坑。 */
+    而「红在错的地方 / 只红一处」正是本项目反复栽的坑。 */
     let mut problems: Vec<String> = Vec::new();
 
     /* ① 正向：全文件只许有一处 `remove_one(` 调用，且它的留底参数就是 `save_checked`。
-       多一处调用 = 多一条绕过闸⑥ 的路；参数不是一个常量函数 = 判据失效。 */
-    let calls: Vec<&str> = code_lines(source)
-        .filter(|line| line.contains("remove_one("))
-        .collect();
+    多一处调用 = 多一条绕过闸⑥ 的路；参数不是一个常量函数 = 判据失效。
+    取的是**括号配平的整段调用**而不是单行 —— 见 `call_snippets` 的说明。 */
+    let calls: Vec<String> = call_snippets(source, "remove_one(");
     if calls.len() != 1 {
         problems.push(format!(
             "remove_one 只许有一处调用（多一处就多一条绕过闸⑥ 的路），实际 {} 处：{calls:?}",
@@ -98,7 +153,9 @@ fn folder_round_passes_save_checked_as_the_backup_argument() {
     }
     if let Some(call) = calls.first() {
         if !call.contains("md_backup::save_checked") {
-            problems.push(format!("留底参数必须是 md_backup::save_checked 本身，实际是：{call}"));
+            problems.push(format!(
+                "留底参数必须是 md_backup::save_checked 本身，实际是：{call}"
+            ));
         }
         /* ③ 不看 needle 的那条：正确写法这一行没有任何 `|`。见模块头「换参数名绕不过去」。 */
         if call.contains('|') {
@@ -110,13 +167,13 @@ fn folder_round_passes_save_checked_as_the_backup_argument() {
     }
 
     /* ② 负向：不许把留底包成闭包。这五个 needle 是最小覆盖，每一个都对应一种「看着还行、
-       其实闸⑥ 没了」的写法，且都**不会**误伤正确写法（`save_checked` 里没有 `save(`）：
-       - `md_backup::save(`  ：直接调 `save` 再自己 return true —— 也就是 QA 报的那个变异；
-       - `|p, t|` / `|p,t|`  ：把留底写成双参闭包（「调完就 true」必然落在这个形状里，
-                               `remove_one` 的签名决定了闭包只能接两个参数）；
-       - `|_, _| true`       ：连参数都不看、恒真 —— 闸⑥ 退化成「什么都没做」；
-       - `|_,_| true`        ：同上，少一个空格的手滑写法。
-       增量改动若真需要一个本地闭包，请把 needle 与理由一起改，别默默删掉这一组。 */
+    其实闸⑥ 没了」的写法，且都**不会**误伤正确写法（`save_checked` 里没有 `save(`）：
+    - `md_backup::save(`  ：直接调 `save` 再自己 return true —— 也就是 QA 报的那个变异；
+    - `|p, t|` / `|p,t|`  ：把留底写成双参闭包（「调完就 true」必然落在这个形状里，
+                            `remove_one` 的签名决定了闭包只能接两个参数）；
+    - `|_, _| true`       ：连参数都不看、恒真 —— 闸⑥ 退化成「什么都没做」；
+    - `|_,_| true`        ：同上，少一个空格的手滑写法。
+    增量改动若真需要一个本地闭包，请把 needle 与理由一起改，别默默删掉这一组。 */
     for needle in [
         "md_backup::save(",
         "|p, t|",

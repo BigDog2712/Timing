@@ -103,8 +103,7 @@ pub fn match_monitor(saved: &MonitorAffinity, monitors: &[MonitorAffinity]) -> O
     let mut exact_geometry_matches = valid_monitors
         .filter(|(_, monitor)| monitor.work_area == saved.work_area)
         .collect::<Vec<_>>();
-    exact_geometry_matches
-        .sort_by(|(_, left), (_, right)| left.stable_key().cmp(&right.stable_key()));
+    exact_geometry_matches.sort_by_key(|(_, monitor)| monitor.stable_key());
     exact_geometry_matches.first().map(|(index, _)| *index)
 }
 

@@ -102,8 +102,10 @@ mod tests {
 
     #[test]
     fn blocked_notice_when_a_channel_is_on_but_not_filled() {
-        let mut config = MdSyncConfig::default();
-        config.enabled = true;
+        let mut config = MdSyncConfig {
+            enabled: true,
+            ..Default::default()
+        };
         assert_eq!(blocked_notice(&config), None, "两条都关着 = 只写 Obsidian 那份，放行");
         config.cloud_webdav = Some(crate::models::md_sync_channel::MdSyncCloudChannel {
             enabled: true,

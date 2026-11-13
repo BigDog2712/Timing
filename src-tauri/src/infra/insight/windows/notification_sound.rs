@@ -115,8 +115,10 @@ mod tests {
                 data.len()
             );
             let samples: Vec<i16> = data[44..]
-                .chunks_exact(2)
-                .map(|v| i16::from_le_bytes(v.try_into().unwrap()))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|v| i16::from_le_bytes(*v))
                 .collect();
             assert!(samples.iter().any(|v| v.abs() > 1000));
             assert!(samples.iter().all(|v| v.abs() < 12000));
@@ -138,8 +140,10 @@ mod tests {
     fn default_chime_has_a_second_strike_and_bell_has_a_longer_tail() {
         fn energy(data: &[u8], start: f64, end: f64) -> f64 {
             let samples: Vec<f64> = data[44..]
-                .chunks_exact(2)
-                .map(|v| f64::from(i16::from_le_bytes(v.try_into().unwrap())))
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|v| f64::from(i16::from_le_bytes(*v)))
                 .collect();
             let range = &samples[(start * 44100.0) as usize..(end * 44100.0) as usize];
             range.iter().map(|v| v * v).sum::<f64>() / range.len() as f64

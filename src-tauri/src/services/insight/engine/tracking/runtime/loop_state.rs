@@ -447,6 +447,123 @@ async fn load_tracking_paused(
     }
 }
 
+pub(super) async fn record_committed_sample(
+    data: &dyn TrackingDataStore,
+    health: &crate::services::insight::engine::tracking::watchdog::RuntimeHealthState,
+    now_ms: i64,
+    successful: bool,
+    persisted: &mut TrackerTimestampPersistState,
+) {
+    if successful {
+        health.note_successful_sample(now_ms);
+        health
+            .progress
+            .enter(super::super::watchdog::TrackingStage::Persisting);
+        if persist_tracker_runtime_timestamps(data, now_ms, true, persisted).await {
+            health.progress.committed();
+        }
+        health
+            .progress
+            .enter(super::super::watchdog::TrackingStage::Waiting);
+    }
+}
+
+pub(super) struct TrackingStop {
+    pub change_reason: Option<&'static str>,
+}
+
+impl TrackingLoopState {
+    pub(super) fn resolve_anonymous_cutoff(
+        &self,
+        previous_window: Option<&tracker::WindowInfo>,
+        previous_status: Option<&TrackingStatusSnapshot>,
+        cutoff: i64,
+        now_ms: i64,
+    ) -> i64 {
+        use super::super::session_timeout::*;
+        let native_cutoff = if self.tracking_paused {
+            now_ms
+        } else if should_seal_sustained_participation(
+            previous_window,
+            previous_status,
+            &self.tracked_window,
+            &self.tracking_status,
+        ) {
+            resolve_sustained_participation_end_time(
+                now_ms,
+                self.tracked_window.idle_time_ms,
+                self.sustained_participation_secs,
+            )
+        } else if should_suspend_active_tracking(
+            previous_window,
+            &self.tracked_window,
+            self.continuity_window_secs,
+            &self.tracking_status,
+        ) {
+            resolve_continuity_window_end_time(
+                now_ms,
+                self.tracked_window.idle_time_ms,
+                self.continuity_window_secs,
+            )
+        } else {
+            super::super::transition::plan_window_transition(
+                previous_window,
+                &self.tracked_window,
+                now_ms,
+            )
+            .resolved_end_time(now_ms)
+        };
+        cutoff.min(native_cutoff)
+    }
+
+    pub(super) async fn seal_stop(
+        &self,
+        data: &dyn TrackingDataStore,
+        previous_window: Option<&tracker::WindowInfo>,
+        previous_status: Option<&TrackingStatusSnapshot>,
+        now_ms: i64,
+        successful_sample: bool,
+    ) -> Result<Option<TrackingStop>, crate::services::insight::engine::tracking::ports::TrackingDataError> {
+        use super::super::session_timeout::*;
+        let reason = if self.tracking_paused {
+            seal_active_sessions_for_tracking_pause(data, now_ms).await?
+        } else if !successful_sample {
+            return Ok(None);
+        } else if should_seal_sustained_participation(
+            previous_window,
+            previous_status,
+            &self.tracked_window,
+            &self.tracking_status,
+        ) {
+            seal_active_sessions_for_passive_participation_timeout(
+                data,
+                &self.tracked_window,
+                now_ms,
+                self.sustained_participation_secs,
+            )
+            .await?
+        } else if should_suspend_active_tracking(
+            previous_window,
+            &self.tracked_window,
+            self.continuity_window_secs,
+            &self.tracking_status,
+        ) {
+            seal_active_sessions_for_continuity_timeout(
+                data,
+                &self.tracked_window,
+                now_ms,
+                self.continuity_window_secs,
+            )
+            .await?
+        } else {
+            return Ok(None);
+        };
+        Ok(Some(TrackingStop {
+            change_reason: reason,
+        }))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[tokio::test]
@@ -1207,122 +1324,5 @@ mod tests {
             assert!(state.tracking_status.is_tracking_active);
             assert_eq!(state.tracked_window.title, "Patina Mini");
         });
-    }
-}
-
-pub(super) async fn record_committed_sample(
-    data: &dyn TrackingDataStore,
-    health: &crate::services::insight::engine::tracking::watchdog::RuntimeHealthState,
-    now_ms: i64,
-    successful: bool,
-    persisted: &mut TrackerTimestampPersistState,
-) {
-    if successful {
-        health.note_successful_sample(now_ms);
-        health
-            .progress
-            .enter(super::super::watchdog::TrackingStage::Persisting);
-        if persist_tracker_runtime_timestamps(data, now_ms, true, persisted).await {
-            health.progress.committed();
-        }
-        health
-            .progress
-            .enter(super::super::watchdog::TrackingStage::Waiting);
-    }
-}
-
-pub(super) struct TrackingStop {
-    pub change_reason: Option<&'static str>,
-}
-
-impl TrackingLoopState {
-    pub(super) fn resolve_anonymous_cutoff(
-        &self,
-        previous_window: Option<&tracker::WindowInfo>,
-        previous_status: Option<&TrackingStatusSnapshot>,
-        cutoff: i64,
-        now_ms: i64,
-    ) -> i64 {
-        use super::super::session_timeout::*;
-        let native_cutoff = if self.tracking_paused {
-            now_ms
-        } else if should_seal_sustained_participation(
-            previous_window,
-            previous_status,
-            &self.tracked_window,
-            &self.tracking_status,
-        ) {
-            resolve_sustained_participation_end_time(
-                now_ms,
-                self.tracked_window.idle_time_ms,
-                self.sustained_participation_secs,
-            )
-        } else if should_suspend_active_tracking(
-            previous_window,
-            &self.tracked_window,
-            self.continuity_window_secs,
-            &self.tracking_status,
-        ) {
-            resolve_continuity_window_end_time(
-                now_ms,
-                self.tracked_window.idle_time_ms,
-                self.continuity_window_secs,
-            )
-        } else {
-            super::super::transition::plan_window_transition(
-                previous_window,
-                &self.tracked_window,
-                now_ms,
-            )
-            .resolved_end_time(now_ms)
-        };
-        cutoff.min(native_cutoff)
-    }
-
-    pub(super) async fn seal_stop(
-        &self,
-        data: &dyn TrackingDataStore,
-        previous_window: Option<&tracker::WindowInfo>,
-        previous_status: Option<&TrackingStatusSnapshot>,
-        now_ms: i64,
-        successful_sample: bool,
-    ) -> Result<Option<TrackingStop>, crate::services::insight::engine::tracking::ports::TrackingDataError> {
-        use super::super::session_timeout::*;
-        let reason = if self.tracking_paused {
-            seal_active_sessions_for_tracking_pause(data, now_ms).await?
-        } else if !successful_sample {
-            return Ok(None);
-        } else if should_seal_sustained_participation(
-            previous_window,
-            previous_status,
-            &self.tracked_window,
-            &self.tracking_status,
-        ) {
-            seal_active_sessions_for_passive_participation_timeout(
-                data,
-                &self.tracked_window,
-                now_ms,
-                self.sustained_participation_secs,
-            )
-            .await?
-        } else if should_suspend_active_tracking(
-            previous_window,
-            &self.tracked_window,
-            self.continuity_window_secs,
-            &self.tracking_status,
-        ) {
-            seal_active_sessions_for_continuity_timeout(
-                data,
-                &self.tracked_window,
-                now_ms,
-                self.continuity_window_secs,
-            )
-            .await?
-        } else {
-            return Ok(None);
-        };
-        Ok(Some(TrackingStop {
-            change_reason: reason,
-        }))
     }
 }
