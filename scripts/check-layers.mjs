@@ -8,7 +8,7 @@
  *   L1 组件不得触碰传输层：`ipc.` / `invoke(` 在 src/components、src/app|features|shared
  *      下的 components/ 子目录中 0 命中
  *   L2 状态容器不得触碰传输层：src/stores、src/**\/*Store.ts、src/windows/patina/features/**\/stores 下 0 命中
- *   L3 窗口 API 只能经 `src/windows/timing/lib/windowApi.ts`：全仓只有它 import
+ *   L3 窗口 API 只能经 `src/windows/shared/windowApi.ts`：全仓只有它 import
  *      `@tauri-apps/api/window` 或 `@tauri-apps/api/webviewWindow`
  *   L4 Rust `infra` 不得依赖 `services`（解环，见 ADR-016）
  *   L5 Rust `commands` 不得直接依赖 `repositories`（必须经 service）
@@ -16,15 +16,16 @@
  *   L7 编译期平台常量 `__TIMING_MOBILE__` 只允许出现在 `src/windows/timing/lib/platform.ts`
  *   L8 业务写入信号 `dirty::mark(` 只允许出现在 `src-tauri/src/commands/`
  *      （`jobs/` 与 `services/` 下 0 命中；见下方 L8 哨兵）
- *   L9 双窗隔离：主窗（entry/components/hooks/lib/mocks/services/stores/styles/types）与分析窗
- *      （shell/features/platform/shared）不得互相 import；例外只有三类：零业务依赖的
- *      `src/windows/timing/lib/windowApi.ts`（窗口 API 薄壳）、`src-tauri/icons/**` 静态资源，
- *      以及 `src/windows/timing/lib/handle*` 两个纯数据 / 纯 IO 模块（手柄目录与绑定读写，见下方
- *      `L9_ALLOWED_TARGETS` 的说明 —— 它们是**两窗唯一合法的共享载体**）。
- *      [0.12.1 L10] 例外表新增 `windows/patina/platform/desktop/pillPrefsGateway`（药丸偏好真源
- *      唯一出入口）—— 它带 invoke，属白名单破例，理由与兜底见 `L9_ALLOWED_TARGETS` 的注释。
- *   L10 patina 内部分层（[0.12.1] 新增）：`platform/**` 不得 import `features/**` / `shell/**`；
- *      `shared/**` 不得 import `features/**` / `shell/**` / `platform/**`。方向只能朝下
+ *   L9 双窗隔离：主窗
+ *      （entry / components / hooks / lib / mocks / services / stores / styles / types）与
+ *      分析窗（shell / features / platform / shared）不得互相 import。
+ *      **例外表当前为空**（`L9_ALLOWED_TARGETS = new Set([])`）：0.12.1 起两窗真正共用的
+ *      载体全部下沉到 `src/windows/shared/`（第三棵子树，不属任一窗），因此不再需要
+ *      「主窗模块被分析窗引用」这类破例。静态资源（`src-tauri/icons/**`）本来就不参与
+ *      本规则；`.css/.scss/.less` 说明符无模块语义，同样不参与（理由见 RESOURCE_SPECIFIER）。
+ *   L10 分层方向（[0.12.1] 新增）：`platform/**` 不得 import `features/**` / `shell/**`；
+ *      `shared/**` 不得 import `features/**` / `shell/**` / `platform/**`；
+ *      `windows/shared/**` 不得 import `windows/timing|patina`。方向只能朝下
  *      （shell → features → platform → shared）。测试文件与 CSS 说明符不参与（理由见下方常量注释）。
  *
  * 每一条都是「改坏了 CI 就红」的判据，而不是「建议」。

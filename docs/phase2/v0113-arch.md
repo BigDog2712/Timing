@@ -333,7 +333,7 @@ pub fn redact(url: &str) -> String;
 
 ## 2.9 参考实现取舍（remotely-save，只读参考，未复制代码）
 
-**许可边界**：参考源在 `C:\Users\49801\Downloads\Compressed\remotely-save-master\remotely-save-master`，其中 `src/` / `tests/` / `docs/` / `assets/` 为 **Apache-2.0**，可供阅读；**`pro/` 是 PolyForm Strict（Source Available），未打开、未引用、未派生**。本项目遵守任务书 §五「抄协议用法可以，抄代码不行」：**Rust 侧全部自行实现，未复制其任何源文件、无衍生片段**；下表只记录「它踩过的坑 → 我们的对应做法」。
+**许可边界**：参考源为本地解压的 `remotely-save` 源码副本，其中 `src/` / `tests/` / `docs/` / `assets/` 为 **Apache-2.0**，可供阅读；**`pro/` 是 PolyForm Strict（Source Available），未打开、未引用、未派生**。本项目遵守任务书 §五「抄协议用法可以，抄代码不行」：**Rust 侧全部自行实现，未复制其任何源文件、无衍生片段**；下表只记录「它踩过的坑 → 我们的对应做法」。
 
 | # | 参考实现的事实 | 我们的取舍 | 落点（本轮设计中的位置） |
 |---|---|---|---|

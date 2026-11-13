@@ -15,8 +15,8 @@ import io
 import os
 import re
 
-LIST = r"C:/Users/49801/AppData/Roaming/WorkDaddy/client-tmp/workbuddy-cn/split_ok.txt"
-ROOT = r"D:/101-Workshop/261109-Timing/src-tauri"
+LIST = os.environ.get("SPLIT_LIST", "split_ok.txt")
+ROOT = os.environ.get("SPLIT_ROOT", "src-tauri")
 
 files = [line.strip() for line in io.open(LIST, encoding="utf-8") if line.strip()]
 os.chdir(ROOT)

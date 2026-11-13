@@ -38,6 +38,10 @@ use crate::tests::support::fresh_pool;
 
 /// 主人活库 `settings.plugin.md-sync.config` 的**逐字**内容（V0.11.18 验收当天读取）。
 ///
+/// **已脱敏**：用户名与账号邮箱换成了占位符（`user` / `someone@example.com`），其余
+/// （中文目录名、`%USERPROFILE%`、JSON 转义层级）一字未动 —— 夹具验的是「这些字符能不能
+/// 原样往返」，不验它是谁的账号。
+///
 /// 三个坑都在这串里，缺一个夹具就少验一个：
 /// - `root` 里 `%USERPROFILE%` + **中文目录名**（`应用/remotely-save/Elio/1-MemeX/Diary`）；
 /// - `localRoot` 是**中文**路径（`我的坚果云`）；
@@ -45,7 +49,7 @@ use crate::tests::support::fresh_pool;
 ///
 /// 三档落点**不同**（前两档 OneDrive 日记，待办走 `%APP_DIR%\md`）—— 这正是
 /// 「一次误扇出就毁两档」的形状。
-const LIVE_JSON: &str = r#####"{"enabled":true,"pollSecs":900,"bindings":[{"kind":"timers","enabled":true,"root":"%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary","file":"{date}.md","heading":"#### 事项计时"},{"kind":"notes","enabled":true,"root":"%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary","file":"{date}.md","heading":"#### 便利贴"},{"kind":"todos","enabled":true,"root":"%APP_DIR%\\md","file":"{date}.md","heading":"#### 待办事项"}],"cloud":{"enabled":true,"mode":"localfolder","localRoot":"C:\\Users\\49801\\Nutstore\\1\\我的坚果云\\Timing","baseUrl":"https://dav.jianguoyun.com/dav/","basePath":"/Timing","user":"498019678@qq.com"}}"#####;
+const LIVE_JSON: &str = r#####"{"enabled":true,"pollSecs":900,"bindings":[{"kind":"timers","enabled":true,"root":"%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary","file":"{date}.md","heading":"#### 事项计时"},{"kind":"notes","enabled":true,"root":"%USERPROFILE%\\OneDrive\\应用\\remotely-save\\Elio\\1-MemeX\\Diary","file":"{date}.md","heading":"#### 便利贴"},{"kind":"todos","enabled":true,"root":"%APP_DIR%\\md","file":"{date}.md","heading":"#### 待办事项"}],"cloud":{"enabled":true,"mode":"localfolder","localRoot":"C:\\Users\\user\\Nutstore\\1\\我的坚果云\\Timing","baseUrl":"https://dav.jianguoyun.com/dav/","basePath":"/Timing","user":"someone@example.com"}}"#####;
 
 /// 一条通路里「一个字节都不许变」的字段（`enabled` 是开关位，允许变）。
 const CHANNEL_FIELDS: [&str; 4] = ["localRoot", "baseUrl", "basePath", "user"];
@@ -83,7 +87,7 @@ async fn load_then_save_keeps_the_live_config_byte_identical() {
     );
     assert!(once.contains("cloudFolder"), "folder 通路必须物化出来：{once}");
     assert!(once.contains("我的坚果云"), "迁移把用户填的中文目录弄丢了：{once}");
-    assert!(once.contains("498019678@qq.com"), "迁移把账号弄丢了：{once}");
+    assert!(once.contains("someone@example.com"), "迁移把账号弄丢了：{once}");
 
     /* 幂等：第二次什么都没改的保存必须逐字节相同。 */
     let again = config::load(&pool).await.expect("load 应成功");
@@ -175,7 +179,7 @@ async fn null_cloud_is_never_fattened_into_a_default_shell() {
     /* 形状 A：键存在、值是 null（老前端「切一下再切回来」会发出这一形状） */
     let pool = fresh_pool("qa-null-cloud").await;
     let nulled = LIVE_JSON.replace(
-        r#""cloud":{"enabled":true,"mode":"localfolder","localRoot":"C:\\Users\\49801\\Nutstore\\1\\我的坚果云\\Timing","baseUrl":"https://dav.jianguoyun.com/dav/","basePath":"/Timing","user":"498019678@qq.com"}"#,
+        r#""cloud":{"enabled":true,"mode":"localfolder","localRoot":"C:\\Users\\user\\Nutstore\\1\\我的坚果云\\Timing","baseUrl":"https://dav.jianguoyun.com/dav/","basePath":"/Timing","user":"someone@example.com"}"#,
         r#""cloud":null"#,
     );
     assert!(nulled.contains(r#""cloud":null"#), "夹具替换失败，用例会假绿");
@@ -234,7 +238,7 @@ async fn poll_secs_survives_a_save_that_only_touches_the_channel() {
     let folder = after.cloud_folder.expect("folder 通路不许被删掉（CH4）");
     assert_eq!(
         folder.local_root,
-        r"C:\Users\49801\Nutstore\1\我的坚果云\Timing",
+        r"C:\Users\user\Nutstore\1\我的坚果云\Timing",
         "本地落点被改了"
     );
 }

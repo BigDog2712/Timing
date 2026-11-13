@@ -7,7 +7,7 @@
 
 | 组件 | 版本 | 路径 |
 |------|------|------|
-| JDK | Zulu 17.0.21+`LTS`（`17.70.113`） | `C:\Users\49801\.wb-toolchain\jdk-17` |
+| JDK | Zulu 17.0.21+`LTS`（`17.70.113`） | `%USERPROFILE%\.wb-toolchain\jdk-17` |
 | Android cmdline-tools | 19.0 | `%LOCALAPPDATA%\Android\Sdk\cmdline-tools\latest` |
 | platform-tools | 37.0.1（adb 1.0.41） | `%LOCALAPPDATA%\Android\Sdk\platform-tools` |
 | platforms | android-35、android-36 | `%LOCALAPPDATA%\Android\Sdk\platforms` |
@@ -23,10 +23,10 @@ Rust 侧（rustc 1.99.0）已装 4 个 Android target：
 ## 2. 环境变量（已写入「用户」作用域，无需管理员）
 
 ```
-JAVA_HOME        = C:\Users\49801\.wb-toolchain\jdk-17
-ANDROID_HOME     = C:\Users\49801\AppData\Local\Android\Sdk
-ANDROID_SDK_ROOT = C:\Users\49801\AppData\Local\Android\Sdk
-NDK_HOME         = C:\Users\49801\AppData\Local\Android\Sdk\ndk\27.2.12479018
+JAVA_HOME        = %USERPROFILE%\.wb-toolchain\jdk-17
+ANDROID_HOME     = %USERPROFILE%\AppData\Local\Android\Sdk
+ANDROID_SDK_ROOT = %USERPROFILE%\AppData\Local\Android\Sdk
+NDK_HOME         = %USERPROFILE%\AppData\Local\Android\Sdk\ndk\27.2.12479018
 PATH            += ...\Android\Sdk\platform-tools;...\Android\Sdk\cmdline-tools\latest\bin
 ```
 
