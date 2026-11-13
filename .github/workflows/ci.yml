@@ -47,7 +47,11 @@ jobs:
     name: 前端 · 类型 / Lint / 测试 / 构建
     runs-on: windows-latest
     steps:
+      # vitest 里有 source test 用 `git show/diff` 对照 T04 基线提交（fcbbab5），
+      # 浅克隆取不到祖先对象 → 必须全量历史（2026-11-13 CI 实测 4 条红即此因）。
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
