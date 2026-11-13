@@ -92,13 +92,24 @@
     display: none;
   }
 
-  /* 灯簇降到 24 宽（只降宽不降高）。硬约束：不许给状态段加 `overflow: hidden`，
-   * 也不许做 `max-width` + "+1" 折叠 —— 两者都让"第 3 盏灯存在但看不见"变静默。 */
-  .qp-topbar-status .tools-status-entry-titlebar-item {
-    width: 24px;
-    min-width: 24px;
-    max-width: 24px;
-  }
+  /* [本轮 T04] 灯簇整簇下线，原来给 `.tools-status-entry-titlebar-item` 的 24 宽降级
+   * 规则随之删除；窄档只保留胶囊今日列隐藏与更新入口收缩两条。 */
+}
+
+/* ── [本轮 T05] 顶栏居中：三栏 grid ──
+ * 灯簇下线前 status 段 `flex: 1 1 auto` 吸收全部剩余宽度，tab 段只能"顺序排布"。
+ * 现在 status 段挪进右栏，左右两栏 `minmax(0, 1fr)` **等宽**吃掉剩余空间，
+ * tab 段（auto）落在窗口正中（判据 V-3b：|centerX − W/2| ≤ 2）。
+ * 段宽变量一个没动：brand 仍 114（下两条）、controls 仍 152（下面 ⑤）。 */
+.app-titlebar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.app-titlebar-side {
+  display: flex;
+  min-width: 0;
+  align-items: center;
 }
 
 /* ── ① brand（锁死 114，两档同值） ── */

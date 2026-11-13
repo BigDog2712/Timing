@@ -64,6 +64,30 @@ export interface TodoCopy {
   todoCreateFailed: string;
   /** 行上铃铛的 `aria-label`：`{clock}` = `HH:mm` */
   todoRemindAt: (clock: string) => string;
+
+  /* ── [0.13 · 1.7] 行编辑 + 批量创建（多日期 × 多时刻，`services/todoBatch.ts`） ── */
+  /** 行上的「编辑」键：打开单条编辑弹层（标题 + 计划时间 + 提醒） */
+  todoEdit: string;
+  /** 编辑弹层标题（与新建共用一张表单的语义） */
+  todoEditTitle: string;
+  /** 批量区「日期」字段的标签（可多选，`type="date"` + chip） */
+  todoBatchDates: string;
+  /** 批量区「时刻」字段的标签（可多选，`type="time"` + chip） */
+  todoBatchTimes: string;
+  /** 添加一颗日期 / 时刻的按钮（aria-label 也复用） */
+  todoBatchAddTime: string;
+  /** 已选项的移除键 aria-label：`{value}` = 日期或时刻 */
+  todoBatchRemove: (value: string) => string;
+  /** 日期、时刻至少各选一个（`noSlot`） */
+  todoBatchNeedBoth: string;
+  /** 日期/时刻字符串解析失败（`timeInvalid`） */
+  todoBatchTimeInvalid: string;
+  /** 展开超过 60 条（`tooMany`，`TODO_BATCH_MAX`） */
+  todoBatchTooMany: (max: number) => string;
+  /** 日期早于今天 0 点（`datePast`）：`purge_overdue` 会在 15 s 内把刚建的软删 */
+  todoBatchDatePast: string;
+  /** 勾了提醒但存在早于现在的时刻（`remindPast`）：宿主 `nudge_due` 有 grace 窗口不补弹 */
+  todoBatchRemindPast: string;
 }
 
 export const TODO_COPY: Record<Locale, TodoCopy> = {
@@ -92,6 +116,17 @@ export const TODO_COPY: Record<Locale, TodoCopy> = {
     todoTimeInvalid: "时间格式不对",
     todoCreateFailed: "没能创建这条待办，请重试",
     todoRemindAt: (clock) => `已设提醒 ${clock}`,
+    todoEdit: "编辑",
+    todoEditTitle: "编辑待办",
+    todoBatchDates: "日期（可多选）",
+    todoBatchTimes: "时刻（可多选）",
+    todoBatchAddTime: "添加",
+    todoBatchRemove: (value) => `移除 ${value}`,
+    todoBatchNeedBoth: "日期和时刻至少各选一个",
+    todoBatchTimeInvalid: "日期或时刻格式不对",
+    todoBatchTooMany: (max) => `一次最多创建 ${max} 条`,
+    todoBatchDatePast: "日期不能早于今天",
+    todoBatchRemindPast: "有时刻已经过了现在，提醒不会补弹；请去掉该时刻或取消提醒",
   },
   "en-US": {
     todosTitle: "To-dos",
@@ -118,6 +153,17 @@ export const TODO_COPY: Record<Locale, TodoCopy> = {
     todoTimeInvalid: "Invalid time format",
     todoCreateFailed: "Could not create this to-do, please retry",
     todoRemindAt: (clock) => `Reminder set for ${clock}`,
+    todoEdit: "Edit",
+    todoEditTitle: "Edit to-do",
+    todoBatchDates: "Dates (multiple)",
+    todoBatchTimes: "Times (multiple)",
+    todoBatchAddTime: "Add",
+    todoBatchRemove: (value) => `Remove ${value}`,
+    todoBatchNeedBoth: "Pick at least one date and one time",
+    todoBatchTimeInvalid: "Invalid date or time format",
+    todoBatchTooMany: (max) => `At most ${max} to-dos at once`,
+    todoBatchDatePast: "Dates cannot be before today",
+    todoBatchRemindPast: "Some times are already past; reminders will not fire. Remove them or uncheck Remind me",
   },
   "ru-RU": {
     todosTitle: "Задачи",
@@ -144,6 +190,17 @@ export const TODO_COPY: Record<Locale, TodoCopy> = {
     todoTimeInvalid: "Неверный формат времени",
     todoCreateFailed: "Не удалось создать задачу, повторите",
     todoRemindAt: (clock) => `Напоминание в ${clock}`,
+    todoEdit: "Изменить",
+    todoEditTitle: "Изменить задачу",
+    todoBatchDates: "Даты (несколько)",
+    todoBatchTimes: "Время (несколько)",
+    todoBatchAddTime: "Добавить",
+    todoBatchRemove: (value) => `Убрать ${value}`,
+    todoBatchNeedBoth: "Выберите хотя бы одну дату и одно время",
+    todoBatchTimeInvalid: "Неверный формат даты или времени",
+    todoBatchTooMany: (max) => `Не более ${max} задач за раз`,
+    todoBatchDatePast: "Даты не могут быть раньше сегодня",
+    todoBatchRemindPast: "Часть времён уже прошла; напоминания не сработают. Уберите их или снимите галочку",
   },
   es: {
     todosTitle: "Tareas",
@@ -170,5 +227,16 @@ export const TODO_COPY: Record<Locale, TodoCopy> = {
     todoTimeInvalid: "Formato de hora incorrecto",
     todoCreateFailed: "No se pudo crear la tarea, inténtalo de nuevo",
     todoRemindAt: (clock) => `Recordatorio a las ${clock}`,
+    todoEdit: "Editar",
+    todoEditTitle: "Editar tarea",
+    todoBatchDates: "Fechas (varias)",
+    todoBatchTimes: "Horas (varias)",
+    todoBatchAddTime: "Añadir",
+    todoBatchRemove: (value) => `Quitar ${value}`,
+    todoBatchNeedBoth: "Elige al menos una fecha y una hora",
+    todoBatchTimeInvalid: "Formato de fecha u hora incorrecto",
+    todoBatchTooMany: (max) => `Como máximo ${max} tareas a la vez`,
+    todoBatchDatePast: "Las fechas no pueden ser anteriores a hoy",
+    todoBatchRemindPast: "Algunas horas ya pasaron; los recordatorios no se emitirán. Quítalas o desmarca Recordármelo",
   },
 };

@@ -28,7 +28,7 @@ vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
   listTimingRecords: g.listTimingRecords,
 }));
 
-import { useTodayItems, type TodayItemsState } from "./useTodayItems.ts";
+import { buildTodayItemRows, useTodayItems, type TodayItemsState } from "./useTodayItems.ts";
 import type { TimingItem, TimingRecord } from "../../../platform/persistence/timingReadRepository.ts";
 
 function item(id: number, name: string, isSystem = false): TimingItem {
@@ -161,5 +161,46 @@ describe("useTodayItems · 改名后的本地收敛", () => {
     act(() => { latest?.applyLocalRename(3, "开会（周会）"); });
 
     expect(names()).toEqual(["写代码", "开会（周会）", "看论文"]);
+  });
+});
+
+/* ── [0.13 · 1.6] 行的「止」列与总计口径（纯函数直测） ──
+ * 变异靶子 ④：「时间线总计不来自后端口径 → 判据红」。后端口径 = `accumulated_sec`
+ * 之和（Rust 已按 ADR-030 重算），**不是** `(ended - started)` 的前端减法 ——
+ * 暂停过的记录两者不相等，减法会把暂停时间也计入。 */
+describe("buildTodayItemRows · lastEnd 与总计的后端口径", () => {
+  const from = new Date(2026, 10, 11, 0, 0, 0).getTime();
+  const to = from + 24 * 60 * 60 * 1000;
+
+  it("i06_last_end_is_the_max_ended_at_and_null_while_running", () => {
+    const dayStart = from;
+    const rows = buildTodayItemRows([item(2, "写代码")], [
+      { id: 1, itemId: 2, startedAt: dayStart + 9 * 3600_000, endedAt: dayStart + 10 * 3600_000, accumulatedSec: 3600, status: "saved" },
+      { id: 2, itemId: 2, startedAt: dayStart + 11 * 3600_000, endedAt: dayStart + 12 * 3600_000, accumulatedSec: 3600, status: "saved" },
+    ], from, to, from + 12 * 3600_000);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].lastEnd).toBe(dayStart + 12 * 3600_000);
+  });
+
+  it("i07_a_running_record_makes_last_end_null_even_after_saved_ones", () => {
+    const dayStart = from;
+    const rows = buildTodayItemRows([item(2, "写代码")], [
+      { id: 1, itemId: 2, startedAt: dayStart + 9 * 3600_000, endedAt: dayStart + 10 * 3600_000, accumulatedSec: 3600, status: "saved" },
+      { id: 2, itemId: 2, startedAt: dayStart + 14 * 3600_000, endedAt: null, accumulatedSec: 600, status: "active" },
+    ], from, to, dayStart + 14 * 3600_000 + 5 * 60_000);
+    expect(rows[0].lastEnd).toBeNull();
+  });
+
+  it("i08_total_follows_accumulated_sec_not_the_timestamp_subtraction", () => {
+    const dayStart = from;
+    /* 暂停过的记录：accumulated_sec = 10 分钟，但 end - start = 20 分钟。
+       前端口径（错误实现）会得 20 分钟；后端口径（accumulated_sec）得 10 分钟。 */
+    const rows = buildTodayItemRows([item(2, "写代码")], [
+      { id: 1, itemId: 2, startedAt: dayStart + 9 * 3600_000, endedAt: dayStart + 11 * 3600_000, accumulatedSec: 600, status: "saved" },
+    ], from, to, dayStart + 11 * 3600_000);
+    expect(rows[0].value).toBe(600_000);
+    /* useTodayItems 的 total = Σ row.value（useMemo），同一口径的镜像断言 */
+    const sum = rows.reduce((acc, row) => acc + row.value, 0);
+    expect(sum).toBe(600_000);
   });
 });

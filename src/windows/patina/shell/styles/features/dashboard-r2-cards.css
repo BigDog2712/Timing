@@ -1,0 +1,226 @@
+/* ============================================================================
+ * dashboard-r2-cards.css — 主界面第二轮改造（0.13）卡面侧**新增**的选择器
+ * -----------------------------------------------------------------------------
+ * 从 `dashboard-r2.css` 拆出（300 行棘轮）：那一份只留布局层（工具条 / 兜底面板 /
+ * 锁定态 / 布局管理弹层），卡面内容（时间线行、改起止弹层、待办批量表单）住这里，
+ * 一段对应一个任务号。红线同全仓：零字面量色值，只用 `var(--qp-*)`；不加阴影渐变。
+ *
+ *   T03a · 时间线行三列（名称 - 起止 - 总用时）+ 行上「改起止」入口 + 编辑事项弹层
+ *   T03b · 改起止弹层
+ *   T03a · 待办批量表单（多日期 × 多时刻 chip 流）+ 行编辑键
+ * ========================================================================== */
+
+/* ── T03a · 时间线行三列（名称 - 起止 - 总用时）+ 行上「改起止」入口 ──
+ * 行是 grid：名称可省略（title 兜底全名），起止列贴中、总用时贴右。
+ * 进行中的行（data-running）不加删除线类效果 —— 它的"止"就是此刻，实时变。 */
+.qp-timeline-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.qp-timeline-range {
+  overflow: hidden;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.qp-timeline-record-edit {
+  flex: 0 0 auto;
+  visibility: hidden;
+}
+
+.qp-timeline-row:hover .qp-timeline-record-edit,
+.qp-timeline-row:focus-within .qp-timeline-record-edit {
+  visibility: visible;
+}
+
+/* 「编辑事项」弹层：左侧选择列表 + 底部编辑表单（复用 `.qp-timeline-item-editor`） */
+.qp-timeline-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-space-group);
+  min-height: 0;
+}
+
+.qp-timeline-edit-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.qp-timeline-edit-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-control);
+  background: none;
+  color: var(--qp-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.qp-timeline-edit-choice[data-selected] {
+  border-color: var(--qp-border-strong);
+  background: var(--qp-surface-inset);
+}
+
+.qp-timeline-edit-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── T03b · 改起止弹层 ── */
+.qp-record-time {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-space-group);
+  min-height: 0;
+}
+
+.qp-record-time-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  max-height: 44vh;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.qp-record-time-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-control);
+}
+
+.qp-record-time-range {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--qp-text-primary);
+  font-size: var(--qp-font-size-body);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.qp-record-time-duration {
+  flex: 0 0 auto;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-caption);
+}
+
+.qp-record-time-note {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-caption);
+}
+
+.qp-record-time-editor {
+  display: flex;
+  flex-wrap: wrap;
+  flex-basis: 100%;
+  align-items: end;
+  gap: 10px;
+}
+
+.qp-record-time-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── T03a · 待办批量表单（多日期 × 多时刻 chip 流）── */
+.qp-todo-batch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-space-group);
+}
+
+.qp-todo-batch-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qp-todo-batch-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qp-todo-batch-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-button);
+  background: var(--qp-surface-inset);
+  color: var(--qp-text-primary);
+  font-size: var(--qp-font-size-caption);
+}
+
+.qp-todo-batch-chip-remove {
+  border: 0;
+  padding: 0 2px;
+  background: none;
+  color: var(--qp-text-tertiary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.qp-todo-batch-chip-remove:hover {
+  color: var(--qp-text-primary);
+}
+
+/* [0.13 · 1.7] 行上的「编辑」键与删除键同区：绝对定位盖在时间列上，
+   不参与 grid 列宽（与 `.qp-todo-del` 同一条几何纪律）。 */
+.qp-todo-edit {
+  position: absolute;
+  right: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--qp-text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.qp-todo-row:hover .qp-todo-edit,
+.qp-todo-row:focus-within .qp-todo-edit {
+  opacity: 1;
+}
+
+.qp-todo-edit:hover {
+  color: var(--qp-text-primary);
+}

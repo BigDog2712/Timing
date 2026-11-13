@@ -17,6 +17,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   listPendingTodos: vi.fn(async (): Promise<unknown[]> => []),
   createTodo: vi.fn(async (): Promise<unknown> => ({})),
+  createTodoBatch: vi.fn(async (_plans?: unknown): Promise<void> => undefined),
+  updateTodo: vi.fn(async (_id?: unknown, _patch?: unknown): Promise<void> => undefined),
   toggleTodo: vi.fn(async () => undefined),
   deleteTodo: vi.fn(async () => undefined),
 }));
@@ -24,6 +26,8 @@ const h = vi.hoisted(() => ({
 vi.mock("../../../platform/persistence/todoRepository.ts", () => ({
   listPendingTodos: h.listPendingTodos,
   createTodo: h.createTodo,
+  createTodoBatch: h.createTodoBatch,
+  updateTodo: h.updateTodo,
   toggleTodo: h.toggleTodo,
   deleteTodo: h.deleteTodo,
 }));
@@ -60,6 +64,10 @@ beforeEach(() => {
   h.listPendingTodos.mockResolvedValue([]);
   h.createTodo.mockReset();
   h.createTodo.mockResolvedValue({});
+  h.createTodoBatch.mockReset();
+  h.createTodoBatch.mockResolvedValue(undefined);
+  h.updateTodo.mockReset();
+  h.updateTodo.mockResolvedValue(undefined);
   h.toggleTodo.mockReset();
   h.deleteTodo.mockReset();
   latest = null;
@@ -146,5 +154,99 @@ describe("useTodayTodos · create 的三参链路", () => {
     });
     expect(accepted).toBe(false);
     expect(h.createTodo).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * [0.13 · 1.7] 批量创建与单条编辑的判据。
+ *
+ * `createBatch` 是本轮唯一的**新命令** `todo_create_batch` 的前端唯一入口：
+ *   · plans 必须逐字转发（hook 不展开、不去重、不改 remind 语义 —— 口径在
+ *     `expandTodoBatch` 一处）；
+ *   · 失败（IPC 抛错）→ false，列表不动 —— 失败"演成成功"会让弹层关掉、草稿清掉，
+ *     用户以为建好了，实际库里一条都没有；
+ *   · 空 plans 直接 false 且**不发 IPC**（后端 1..=60 拒空批，没必要过网络）。
+ *
+ * `update` 走既有 `todo_update`：patch 三态逐字转发（显式 `null` = 清空，
+ * Rust `TodoPatch` 的 double_option 靠它区分"没给"和"清空"）。
+ */
+describe("useTodayTodos · createBatch 与 update", () => {
+  it("tb01_forwards_plans_verbatim_to_createTodoBatch_and_reloads", async () => {
+    await mount();
+    expect(h.listPendingTodos).toHaveBeenCalledTimes(1);
+
+    const plans = [
+      { title: "背单词", plannedAt: new Date(2030, 0, 2, 9, 0).getTime(), remindAt: null },
+      { title: "背单词", plannedAt: new Date(2030, 0, 2, 21, 0).getTime(),
+        remindAt: new Date(2030, 0, 2, 21, 0).getTime() },
+    ];
+    h.listPendingTodos.mockResolvedValue([todo(1), todo(2)]);
+    let accepted = false;
+    await act(async () => {
+      accepted = await latest!.createBatch(plans);
+    });
+    await flush();
+
+    expect(accepted).toBe(true);
+    expect(h.createTodoBatch).toHaveBeenCalledTimes(1);
+    expect(h.createTodoBatch.mock.calls[0][0]).toEqual(plans);
+    /* 成功后 reload：批量行要等真实 sort_order / id，不做本地乐观插入 */
+    expect(h.listPendingTodos).toHaveBeenCalledTimes(2);
+    expect(latest!.todos.map((row) => row.id)).toEqual([1, 2]);
+    expect(latest!.status).toBe("ready");
+  });
+
+  it("tb02_a_rejected_batch_returns_false_and_leaves_the_list_untouched", async () => {
+    h.listPendingTodos.mockResolvedValue([todo(1)]);
+    await mount();
+    h.createTodoBatch.mockRejectedValue(new Error("boom"));
+
+    let accepted = true;
+    await act(async () => {
+      accepted = await latest!.createBatch([{ title: "背单词", plannedAt: 1, remindAt: null }]);
+    });
+    await flush();
+
+    expect(accepted).toBe(false);
+    expect(latest!.todos.map((row) => row.id)).toEqual([1]);
+    expect(latest!.status).toBe("ready");
+  });
+
+  it("tb03_an_empty_plan_list_returns_false_without_touching_the_ipc", async () => {
+    await mount();
+    let accepted = true;
+    await act(async () => {
+      accepted = await latest!.createBatch([]);
+    });
+    expect(accepted).toBe(false);
+    expect(h.createTodoBatch).not.toHaveBeenCalled();
+  });
+
+  it("tu01_update_forwards_the_patch_verbatim_including_explicit_nulls", async () => {
+    h.listPendingTodos.mockResolvedValue([todo(1)]);
+    await mount();
+
+    let accepted = false;
+    await act(async () => {
+      accepted = await latest!.update(1, { title: "改了名", plannedAt: null, remindAt: null });
+    });
+    await flush();
+
+    expect(accepted).toBe(true);
+    expect(h.updateTodo).toHaveBeenCalledTimes(1);
+    expect(h.updateTodo).toHaveBeenCalledWith(1, { title: "改了名", plannedAt: null, remindAt: null });
+    /* 成功后 reload 收敛 */
+    expect(h.listPendingTodos).toHaveBeenCalledTimes(2);
+  });
+
+  it("tu02_a_rejected_update_returns_false", async () => {
+    await mount();
+    h.updateTodo.mockRejectedValue(new Error("boom"));
+    let accepted = true;
+    await act(async () => {
+      accepted = await latest!.update(1, { title: "x" });
+    });
+    await flush();
+    expect(accepted).toBe(false);
   });
 });

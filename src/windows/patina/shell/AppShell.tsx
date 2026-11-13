@@ -43,14 +43,11 @@ import {
 } from "./hooks/useAppShellRenderedView.ts";
 import { useAppWindowState } from "./hooks/useAppWindowState.ts";
 import { useAppShellRuntimeLifecycle } from "./hooks/useAppShellRuntimeLifecycle.ts";
-import ToolsStatusEntry from "../features/tools/components/ToolsStatusEntry.tsx";
 import ToolAlertDialog from "../features/tools/components/ToolAlertDialog.tsx";
-import type { ToolsOpenTarget } from "../features/tools/types.ts";
 import {
   parseLocalDateKey,
   startOfLocalDay,
 } from "../shared/lib/localDate.ts";
-import { useAppSidebarState } from "./hooks/useAppSidebarState.ts";
 
 type WindowTrackingState = ReturnType<typeof useWindowTracking>;
 type AppWindowState = ReturnType<typeof useAppWindowState>;
@@ -88,7 +85,6 @@ export default function AppShellContent({
   const [settingsColorSchemePreview, setSettingsColorSchemePreview] =
     useState<ColorSchemePreview | null>(null);
   const [historyDateRequest, setHistoryDateRequest] = useState<HistoryDateRequest | null>(null);
-  const [toolsInitialTarget, setToolsInitialTarget] = useState<ToolsOpenTarget | null>(null);
   const viewPresentation = useAppShellRenderedView(currentView, appWindowState.isForegroundReady);
   const { presentedView } = viewPresentation;
   const {
@@ -142,12 +138,8 @@ export default function AppShellContent({
     uiTextLanguage,
   });
 
-  /* [P0-03] 工具分区跳转（原内联的 handleToolsStatusChipOpen）+ 药丸递来的历史落点，一并收进 hook */
-  const openToolsTarget = useMainToolsNavigation({ navigate: handleNavigate, setHistoryDateRequest, setToolsInitialTarget });
-
-  const handleToolsInitialTargetConsumed = useCallback(() => {
-    setToolsInitialTarget(null);
-  }, []);
+  /* 宿主药丸递来的落点（历史 / 设置 / 总览；工具落点已并入主界面） */
+  useMainToolsNavigation({ navigate: handleNavigate, setHistoryDateRequest });
 
   const handleMinSessionSecsChange = useCallback((nextValue: number) => {
     setAppSettings((current) => ({
@@ -191,9 +183,6 @@ export default function AppShellContent({
 
   const handleSidebarNavigate = useCallback(async (nextView: View) => {
     setHistoryDateRequest(null);
-    if (nextView === "tools") {
-      setToolsInitialTarget(null);
-    }
     preloadNavigationView(nextView, "intent");
     const result = await handleNavigate(nextView);
     return result.navigated;
@@ -202,13 +191,6 @@ export default function AppShellContent({
   const handleSidebarPreviewNavigate = useCallback((nextView: View) => {
     preloadNavigationView(nextView, "preview");
   }, []);
-  /* 侧栏已下线（01 §3.1）：三区导航搬进顶栏 ③ 段。只留 navigationMode —— 工具区段轨的标签开关还在读它。 */
-  const { navigationMode } = useAppSidebarState({
-    currentView: viewPresentation.presentedView,
-    onPrepareNavigate: prepareNavigate,
-    onNavigate: handleSidebarNavigate,
-    onPreviewNavigate: handleSidebarPreviewNavigate,
-  });
   return (
     <div
       ref={appFrameRef}
@@ -217,7 +199,6 @@ export default function AppShellContent({
     >
       <AppTitleBar
         isMaximized={isWindowMaximized}
-        toolsStatusEntry={<ToolsStatusEntry toolsOpen={presentedView === "tools"} onOpenSection={target => { void openToolsTarget(target); }} />}
         timingStatusEntry={<TimingCapsule />}
         navigationSlot={<AppTopNav currentView={presentedView} onPrepareNavigate={prepareNavigate}
           onNavigate={handleSidebarNavigate} onPreviewNavigate={handleSidebarPreviewNavigate} />}
@@ -227,14 +208,16 @@ export default function AppShellContent({
       {/* 无 gap：本容器只有 AppViewOutlet 的 <main> 一个在流子元素，其余三个图层都是 fixed */}
       <div className="qp-shell flex-1 min-h-0 flex overflow-hidden">
         <QuietToastStack toasts={toasts} />
+        {/* 活动提醒 / 旧定时提醒到点弹窗（工具页下线后这条投递链保留，Q4） */}
         <ToolAlertDialog />
         {dialogs}
 
         <AppViewOutlet
           {...viewPresentation.outletProps}
           uiText={uiText}
-          /* [P0 · 0.12.1] 装配搬到 `components/AppShellViews.tsx`：这里只传状态与回调。
-             AppShell 已顶到 300 行冻结线，P1 要在这里接布局 store 与加卡入口。 */
+          /* [0.13 · 1.2] 视图级错误边界的出口：单页崩了还能一键回到主界面 */
+          onBackHome={() => { void handleSidebarNavigate("dashboard"); }}
+          /* [P0 · 0.12.1] 装配搬到 `components/AppShellViews.tsx`：这里只传状态与回调。 */
           views={buildAppShellViews({
             aboutUpdateEntry: settingsUpdateEntry,
             appSettings,
@@ -265,7 +248,6 @@ export default function AppShellContent({
             onPrepareImportCategories: prepareImportCategories,
             onQuickActionError: handleQuickActionError,
             onToast: pushToast,
-            onToolsInitialTargetConsumed: handleToolsInitialTargetConsumed,
             refreshSignal,
             registerMappingSaveHandler,
             registerSettingsSaveHandler,
@@ -274,9 +256,7 @@ export default function AppShellContent({
             setLanguagePreview: setSettingsLanguagePreview,
             setMappingDirty,
             setSettingsDirty,
-            showToolNavigationLabels: navigationMode === "labeled",
             themeModePreviewSetter: setSettingsThemeModePreview,
-            toolsInitialTarget,
             trackerHealth,
             uiText,
           })}

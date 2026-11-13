@@ -24,6 +24,7 @@ import type {
   ThemeSetParams,
   ThemeSettings,
   Todo,
+  TodoCreateBatchParams,
   TodoCreateParams,
   TodoListParams,
   TodoRefParams,
@@ -188,6 +189,8 @@ export interface IpcApi {
   todoDelete(params: TodoRefParams): Promise<void>;
   todoList(params: TodoListParams): Promise<Todo[]>;
   todoToggle(params: TodoToggleParams): Promise<Todo>;
+  /** [0.13 · 1.7] 批量创建（多日期 × 多时刻）：单事务 1..=60，任一失败整批回滚 */
+  todoCreateBatch(params: TodoCreateBatchParams): Promise<Todo[]>;
   /** [V0.3.12] 待办 → 计时：开始计时并立刻把这条待办移出待办区（ADR-030） */
   todoStart(params: TodoRefParams): Promise<TimeRecord>;
 

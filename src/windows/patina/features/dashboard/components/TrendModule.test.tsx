@@ -12,10 +12,11 @@ import type { TrendState } from "../hooks/useTrendDays.ts";
 /**
  * 今日活动趋势卡的**行为**判据（纯函数判据在 `services/trendDays.test.ts`）。
  *
- * 为什么这些必须测：全部是"错了也照样渲染"的静默项 ——
- *   · 按 1 小时归一 → 每根柱都矮，看不出起伏，但没有任何报错；
- *   · 当前这一小时不高亮 → 用户分不清最后一根是"现在"还是"今天某个历史小时"；
- *   · 24 根柱每根都挂轴文字 → 窄卡里糊成一片，没有报错；
+ * [0.13 · 1.5 重做] 钉的是这些"错了也照样渲染"的静默项：
+ *   · 横轴不铺满 24 桶 → 柱子随时刻伸缩，上午看像"一天快过完了"；
+ *   · 轴字不收敛到 5 处 → 24 根柱每根挂字，窄卡里糊成一片；
+ *   · "当前这一桶"标错（标最后一桶）→ 23:00 那格永远高亮，与"现在"无关；
+ *   · 按 1 小时归一 → 每根柱都矮，看不出起伏；
  *   · 全 0 不判空态 → 一墙 2px 桩子 + 一句"没有记录"的空白卡。
  */
 let container: HTMLDivElement | null = null;
@@ -43,22 +44,21 @@ async function mount(element: Parameters<Root["render"]>[0]) {
   act(() => root?.render(createElement(LocaleProvider, { locale: "zh-CN", children: element })));
 }
 
-const HOUR = 3600_000;
+const HOUR = 3_600_000;
+const DAY_START = new Date(2026, 10, 11, 0, 0, 0).getTime();
 
-/** 今日逐时桶：从本地 00:00 起，每格一小时，最后一个窗口右端裁到 18:24（与真实 hook 同形） */
-function hourModel(durations: number[]): TrendState {
-  const dayStart = new Date(2026, 10, 11, 0, 0, 0).getTime();
+/** 今日逐时桶模型：n 个整点桶（恒一小时一格）。`nowMs` 缺省落在**最后一桶**正中。 */
+function hourModel(durations: number[], nowMs?: number): TrendState {
   const days: TrendDay[] = durations.map((durationMs, index) => {
-    const startMs = dayStart + index * HOUR;
-    const isLast = index === durations.length - 1;
-    return {
-      key: `h${index}`,
-      startMs,
-      endMs: isLast ? startMs + 24 * 60_000 : startMs + HOUR,
-      durationMs,
-    };
+    const startMs = DAY_START + index * HOUR;
+    return { key: `h${index}`, startMs, endMs: startMs + HOUR, durationMs };
   });
-  return { days, status: "ready", retry: () => undefined };
+  return {
+    days,
+    status: "ready",
+    nowMs: nowMs ?? DAY_START + (durations.length - 1) * HOUR + 30 * 60_000,
+    retry: () => undefined,
+  };
 }
 
 function bars() {
@@ -66,7 +66,7 @@ function bars() {
 }
 
 describe("今日活动趋势卡", async () => {
-  it("tr01_tallest_hour_fills_the_track_and_the_current_hour_is_marked", async () => {
+  it("tr01_tallest_hour_fills_the_track_and_the_bucket_covering_now_is_marked", async () => {
     await mount(createElement(TrendModule, { model: hourModel([HOUR, 2 * HOUR, 30 * 60_000]) }));
     const list = bars();
     expect(list).toHaveLength(3);
@@ -77,8 +77,20 @@ describe("今日活动趋势卡", async () => {
     expect(list[0].style.height).toBe("max(50%, 3px)");
     const nowLanes = container?.querySelectorAll(".qp-trend__day.is-today") ?? [];
     expect(nowLanes).toHaveLength(1);
-    /* 当前这一小时必须是**最后一根**：标错位置比不标更糟 */
+    /* 「当前这一桶」= 覆盖 now 的那一桶（`model.nowMs` 缺省落在最后一桶正中），
+       不再是"最后一桶"—— 轴铺满 24 桶之后"最后一桶"恒是 23:00，那是明天的事。 */
     expect(Array.from(container?.querySelectorAll(".qp-trend__day") ?? []).at(-1)?.className).toContain("is-today");
+  });
+
+  it("tr01b_the_now_bucket_is_the_one_covering_now_not_the_last", async () => {
+    /* nowMs = 09:30：09:00 那桶高亮，23:00（最后一桶）不许亮 */
+    await mount(createElement(TrendModule, {
+      model: hourModel(Array.from({ length: 24 }, () => HOUR), DAY_START + 9.5 * HOUR),
+    }));
+    const lanes = Array.from(container?.querySelectorAll(".qp-trend__day") ?? []);
+    expect(lanes[9]?.className).toContain("is-today");
+    expect(lanes[23]?.className).not.toContain("is-today");
+    expect(lanes.filter((lane) => lane.className.includes("is-today"))).toHaveLength(1);
   });
 
   it("tr02_zero_hour_gets_a_stub_but_a_tiny_hour_stays_visible", async () => {
@@ -112,22 +124,26 @@ describe("今日活动趋势卡", async () => {
     expect(text).not.toContain("日均");
   });
 
-  it("tr05_only_three_axis_labels_and_the_last_one_says_now", async () => {
-    /* 24 根柱：0…23，最后一格是当前小时 */
+  it("tr05_axis_spans_24_buckets_with_exactly_five_labels_00_to_24", async () => {
+    /* V-1.5 判据：轴字数量 = 5 且首字为 00:00 —— 00/06/12/18 四个整点 + 末桶 24:00 */
     const durations = Array.from({ length: 24 }, () => HOUR);
-    await mount(createElement(TrendModule, { model: hourModel(durations) }));
+    await mount(createElement(TrendModule, {
+      model: hourModel(durations, DAY_START + 9.5 * HOUR),
+    }));
     const labels = Array.from(container?.querySelectorAll<HTMLElement>(".qp-trend__label") ?? [])
       .map((node) => node.textContent ?? "");
-    /* 每根柱都有一个 span，但只有三处写字（首 / 中 / 末） */
+    /* 每根柱都有一个 span，但只写 5 处轴字 */
     expect(labels).toHaveLength(24);
-    expect(labels.filter((text) => text.length > 0)).toHaveLength(3);
-    expect(labels[0]).toBe("0点");
-    expect(labels[labels.length - 1]).toBe("现在");
-    /* 中间那处是小时（zh 用「N点」） */
-    expect(labels[12]).toBe("12点");
+    expect(labels.filter((text) => text.length > 0)).toHaveLength(5);
+    expect(labels[0]).toBe("00:00");
+    expect(labels[6]).toBe("06:00");
+    expect(labels[12]).toBe("12:00");
+    expect(labels[18]).toBe("18:00");
+    /* 末桶写 24:00（轴的右端点），不是重复一次"23:00" */
+    expect(labels[23]).toBe("24:00");
     /* 窗口数进 DOM 与 CSS 变量：24 根柱靠 `--qp-trend-n` 平分容器宽度（不横向滚动） */
     expect(container?.querySelector(".qp-trend")?.getAttribute("data-trend-days")).toBe("24");
-    expect((container?.querySelector<HTMLElement>(".qp-trend")?.style.getPropertyValue("--qp-trend-n"))).toBe("24");
+    expect(container?.querySelector<HTMLElement>(".qp-trend")?.style.getPropertyValue("--qp-trend-n")).toBe("24");
   });
 
   it("tr06_bar_tooltip_says_the_hour_range_and_the_duration", async () => {

@@ -1,13 +1,13 @@
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { Bell, X } from "lucide-react";
 
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
-import { emitHostIntent } from "../../../platform/runtime/hostIntentGateway.ts";
-import { reminderClock } from "../services/todoDraft.ts";
+import type { TodoSummary } from "../../../shared/types/todos.ts";
 import type { TodayTodosState } from "../hooks/useTodayTodos.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import ModuleShell, { moduleState } from "./ModuleShell.tsx";
 import TodoComposeDialog from "./TodoComposeDialog.tsx";
+import TodoEditDialog from "./TodoEditDialog.tsx";
+import TodoRow from "./TodoRow.tsx";
 
 /**
  * 模块 4 · 待办事项（01 §4.3 骨架：head / list / fade / undo / footer）
@@ -63,6 +63,8 @@ export default function TodosModule({ controls, model }: Props) {
   const copy = DASHBOARD_COPY[locale];
   const { todos, status, pending, toggle, remove, undoPending, retry } = model;
   const [composeOpen, setComposeOpen] = useState(false);
+  /** 正在编辑的那条；`null` = 编辑弹层关着（[0.13 · 1.7] 行上的「编辑」键） */
+  const [editingTodo, setEditingTodo] = useState<TodoSummary | null>(null);
   const [hiddenCount, setHiddenCount] = useState(0);
   const [fadeVisible, setFadeVisible] = useState(false);
   const listRef = useRef<HTMLUListElement | null>(null);
@@ -150,68 +152,29 @@ export default function TodosModule({ controls, model }: Props) {
           <TodoComposeDialog
             open={composeOpen}
             onClose={() => setComposeOpen(false)}
-            create={model.create}
+            createBatch={model.createBatch}
           />
         </div>
       )}
     >
+      {/* [0.13 · 1.7] 行编辑弹层作为第一个 child：children 只在 ready 渲染，而编辑
+          必须有一条待办才开（ready 态必有行）—— 弹层自身 open 门控（`todo === null`
+          时不渲染表面），所以放 children 里不会把空态/骨架挡掉。 */}
+      <TodoEditDialog
+        todo={editingTodo}
+        onClose={() => setEditingTodo(null)}
+        update={model.update}
+      />
       <ul className="qp-todo-list qp-scroll-region qp-scroll-region-stable" ref={listRef}>
-        {todos.map((todo) => {
-          const done = todo.doneAt !== null;
-          return (
-            <li
-              key={todo.id}
-              className="qp-todo-row"
-              data-done={done || undefined}
-              /* 行体单击开独立待办窗（06 T12）。走 patina:host-intent 事件桥
-               * （{action:'open_todos'}），不是新 IPC 命令 —— 契约不动、L9 不破。
-               * 行内两个键各自 stopPropagation，否则点勾选/删除会顺带开窗。 */
-              onClick={() => { void emitHostIntent({ action: "open_todos" }); }}
-            >
-              <button
-                type="button"
-                className="qp-todo-check"
-                role="checkbox"
-                aria-checked={done}
-                /* label 必须随状态换词：已完成的事再读「完成」会让读屏用户重做一遍（06 A9⑤） */
-                aria-label={done ? copy.todoUntoggle(todo.title) : copy.todoToggle(todo.title)}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  toggle(todo.id, !done);
-                }}
-              >
-                <span className="qp-todo-box" aria-hidden="true" />
-              </button>
-              <span className="qp-todo-title" title={todo.title}>{todo.title}</span>
-              {/* [本轮] 提醒标记：`remindAt` 非 null 才画（宿主两级提醒以它为基准）。
-                  不做成按钮 —— 本轮不做编辑提醒，一个"能聚焦但按了没反应"的控件比没有更糟；
-                  用 role="img" + aria-label（"已设提醒 21:00"），读屏用户听得见、点上无副作用。 */}
-              <span className="qp-todo-when">
-                {todo.remindAt !== null ? (
-                  <span
-                    className="qp-todo-bell"
-                    role="img"
-                    aria-label={copy.todoRemindAt(reminderClock(todo.remindAt))}
-                  >
-                    <Bell size={12} strokeWidth={2.5} aria-hidden="true" />
-                  </span>
-                ) : null}
-                <PlannedChip plannedAt={todo.plannedAt} done={done} locale={locale} />
-              </span>
-              <button
-                type="button"
-                className="qp-todo-del"
-                aria-label={copy.todoDelete(todo.title)}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  remove(todo.id);
-                }}
-              >
-                <X size={12} strokeWidth={2} aria-hidden="true" />
-              </button>
-            </li>
-          );
-        })}
+        {todos.map((todo) => (
+          <TodoRow
+            key={todo.id}
+            todo={todo}
+            onToggle={toggle}
+            onRemove={remove}
+            onEdit={setEditingTodo}
+          />
+        ))}
       </ul>
 
       {fadeVisible ? <div className="qp-fade-bottom" /> : null}
@@ -230,41 +193,3 @@ export default function TodosModule({ controls, model }: Props) {
   );
 }
 
-/** 排期时间只画时分（24 小时制，本地时区）；没排期就空着，不写「未排期」占位 */
-const DAY_MS = 86_400_000;
-
-function clockOf(ms: number): string {
-  const date = new Date(ms);
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-}
-
-/**
- * 计划时刻胶囊：**没排期就不画**，四种状态各自一套色（逐条照 `todos.rs:76-100`）。
- *
- * 原来无条件渲染一个 54×18 的胶囊，`plannedAt` 为 null 时就是一个空框 ——
- * 看着像"加载失败的占位"，比不显示更让人分心。
- *
- * 状态口径：
- *   · 已完成 → 灰字、无底（事情已经了了，时刻只是记录）；
- *   · 逾期（早于今天 0 点）→ danger 色 + danger 淡底；
- *   · 今天 → 时刻 + accent 淡底（Rust 的 `with_alpha(accent, 22)`）；
- *   · 更远的日期 → 换成日期（"11/13"），不带底 —— 那时还不需要"几点"这个精度。
- */
-function PlannedChip({ plannedAt, done, locale }: { plannedAt: number | null; done: boolean; locale: string }) {
-  if (plannedAt === null) return null;
-  const dayStart = new Date();
-  dayStart.setHours(0, 0, 0, 0);
-  const start = dayStart.getTime();
-
-  if (done) {
-    return <span className="qp-todo-time" data-state="done">{clockOf(plannedAt)}</span>;
-  }
-  if (plannedAt < start) {
-    return <span className="qp-todo-time" data-state="overdue">{clockOf(plannedAt)}</span>;
-  }
-  if (plannedAt < start + DAY_MS) {
-    return <span className="qp-todo-time">{clockOf(plannedAt)}</span>;
-  }
-  const text = new Date(plannedAt).toLocaleDateString(locale, { month: "numeric", day: "numeric" });
-  return <span className="qp-todo-time" data-state="later">{text}</span>;
-}

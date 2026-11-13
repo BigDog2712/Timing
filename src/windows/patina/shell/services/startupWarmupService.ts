@@ -139,7 +139,6 @@ const STARTUP_WARMUP_TASKS: StartupWarmupTaskId[] = [
 const DEFAULT_STARTUP_WARMUP_VIEWS: PreloadableView[] = [
   "history",
   "data",
-  "tools",
   "mapping",
   "settings",
   "about",

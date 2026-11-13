@@ -39,11 +39,17 @@ export default function BoardCanvas({
   const windowDrag = useWindowDragGesture();
   const height = Math.max(BOARD_H, contentHeight(layout.cards));
 
+  /* [0.13 · 1.2「无法返回」] 空板**不挂**拖窗：一块空板上处处是空白，用户点一下再拖
+   * 就把窗推出屏幕，而窗被推走之后标题栏也不在了 —— 表现和「回不来」一模一样。
+   * 只要板上有卡，卡本身就不是拖窗热区（判据在 `BoardCardFrame` 的 ①②③），
+   * 空白处拖窗反而是无边框窗的必要手感。 */
+  const windowDragEnabled = dragWindowOnBackdrop && layout.cards.length > 0;
+
   /* 只有"点在自己身上"才算空白：卡片、工具条、提示句都不算。
    * 判据用 currentTarget + 两个容器类名，不靠 `closest`：画布是绝对定位的
    * 定尺寸盒子，命中的元素只可能是这三者之一。 */
   const handleBackdropPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (!dragWindowOnBackdrop) return;
+    if (!windowDragEnabled) return;
     const target = event.target as Element | null;
     const onBackdrop = target === event.currentTarget
       || target?.classList.contains("qp-board-stage")
@@ -59,7 +65,7 @@ export default function BoardCanvas({
         ref={hostRef}
         data-board-zoom={zoom}
         onPointerDown={handleBackdropPointerDown}
-        onClickCapture={dragWindowOnBackdrop ? windowDrag.onClickCapture : undefined}
+        onClickCapture={windowDragEnabled ? windowDrag.onClickCapture : undefined}
       >
         <div className="qp-board-stage" style={{ width: BOARD_W * zoom, height: height * zoom }}>
           <div

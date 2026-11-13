@@ -1,13 +1,14 @@
 /**
  * 模块 · 今日活动趋势（今天每小时总时长）。
  *
- * 主人口径（本轮）：「活动趋势」→「今日活动趋势」，只看今天。四条结构照旧、内容换代：
- *   · **每根柱一小时**，从 0 点到当前这一小时（窗口由 `services/trendDays` 算好）；
- *   · **只标三处 x 轴文字**：首、中、末。24 根柱每根都挂字，窄卡里那行字会糊成一片 ——
- *     早先 14 根时就踩过这条，24 根只会更糟；
- *   · 柱高仍按**峰值归一**（不是按 1 小时）：一天里最忙那小时占满，其余按比例。
- *     按 1 小时归一的话，只在某个小时忙 20 分钟的人，每根柱都不到三分之一高；
- *   · 顶部两行读数换成「今日总时长 + 峰值时刻」——"日均"对一天之内没有意义。
+ * 主人口径（本轮 0.13 · 1.5）：**横轴铺满 24 个整点桶（00:00–24:00）**，不再随时刻伸缩：
+ *   · 桶由 `services/trendDays.buildTodayTrendPlan` 给好（未来桶时长恒 0）；
+ *   · **轴字只落 5 处**：`00:00 / 06:00 / 12:00 / 18:00 / 24:00`（判据：轴字数量 = 5
+ *     且首字为 00:00）。24 根柱每根都挂字，窄卡里那行字会糊成一片；
+ *   · **"当前这一桶" = 覆盖 now 的那一桶**（`model.nowMs` 落在哪格就标哪格），
+ *     不再是"最后一桶"—— 最后一桶永远是 23:00，那是明天的事；
+ *   · 柱高仍按**峰值归一**（不是按 1 小时）：一天里最忙那小时占满，其余按比例；
+ *   · 顶部两行读数仍是「今日总时长 + 峰值时刻」。
  */
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { formatDashboardDuration } from "../services/dashboardFormatting.ts";
@@ -18,6 +19,7 @@ import ModuleShell, { moduleState } from "./ModuleShell.tsx";
 import type { CSSProperties, ReactNode } from "react";
 
 interface Props {
+  /** 卡头 `⋯`（布局层的 controls 注入，`DashboardCards` 统一给） */
   controls?: ReactNode;
   model: TrendState;
 }
@@ -58,28 +60,33 @@ export default function TrendModule({ controls, model }: Props) {
       </div>
 
       {/* 基线（`trend.rs:52-55`）用 `::after` 画在 `.qp-trend` 上 —— `ul` 里塞别的元素是
-          非法结构，而这条线本来也没有语义。日均虚线随"日均"读数一起下线：一条没有基准的
-          虚线比不画它更让人费解。 */}
+          非法结构，而这条线本来也没有语义。 */}
       <ul
         className="qp-trend"
-        /* 属性名沿用 `data-trend-days`（QA 脚本/截图契约里就是它），**语义已换成「窗口数」**：
-           现在一个窗口是一小时，不再是一天。 */
+        /* 属性名沿用 `data-trend-days`（QA 脚本/截图契约里就是它），**语义是「展示桶数」**：
+           正常日恒 24（DST 前跳日少一格 —— 那一小时本地不存在）。 */
         data-trend-days={windows.length}
         style={{ "--qp-trend-n": windows.length } as CSSProperties}
       >
         {windows.map((window, index) => {
-          /* 最后一根就是"当前这一小时"：它是唯一还在长的柱，用强调色标出来 */
-          const isNow = index === windows.length - 1;
-          /* 只在首 / 中 / 末三处写字（`trend.rs:110` 的同一判据）。 */
-          const showLabel = index === 0 || index === windows.length >> 1 || index === windows.length - 1;
-          const hour = new Date(window.startMs).getHours();
-          const label = isNow
-            ? copy.trendToday
-            : copy.trendHourTick(hour);
+          /* 覆盖 now 的那一桶 = 唯一还在长的柱，用强调色标出来（不是"最后一桶"） */
+          const isNow = model.nowMs >= window.startMs && model.nowMs < window.endMs;
+          /* 轴字 5 处：起点落在 0/6/12/18 的桶写整点，末桶写 24:00（轴的右端点）。
+             isLast 必须按下标判 —— `window.endMs > 最后桶.endMs` 对最后桶自己是
+             false，末桶会永远拿不到轴字（tr05 判据钉着这个坑）。 */
+          const startHour = new Date(window.startMs).getHours();
+          const isLast = index === windows.length - 1;
+          const showLabel = startHour % 6 === 0 || isLast;
+          const label = isLast
+            ? "24:00"
+            : formatClockHour(window.startMs, locale);
           const height = peak > 0 ? Math.round((window.durationMs / peak) * 100) : 0;
-          /* tooltip 一律给「几点到几点」：轴文字只能放三个，把范围说清是 tooltip 的职责。
-             末窗口的右端是"此刻"而不是整点 —— 所以它写的是 `14:00–14:37`，这是真的。 */
-          const slot = `${formatClockHour(window.startMs, locale)}–${formatClockHour(window.endMs, locale)}`;
+          /* tooltip 一律给「几点到几点」：轴文字只能放五处，把范围说清是 tooltip 的职责。
+             末桶的右端是次日 0 点，写 "00:00" 会和首桶混淆 —— 轴上它叫 24:00。
+             未来桶的 tooltip 也是真话 —— "还没有发生"。 */
+          const slot = isLast
+            ? `${formatClockHour(window.startMs, locale)}–24:00`
+            : `${formatClockHour(window.startMs, locale)}–${formatClockHour(window.endMs, locale)}`;
           return (
             <li
               key={window.key}
@@ -106,7 +113,7 @@ export default function TrendModule({ controls, model }: Props) {
 }
 
 /**
- * 本地整点的 24 小时制文字（tooltip 与峰值时刻用）：`09:00`。
+ * 本地整点的 24 小时制文字（轴字与峰值时刻用）：`09:00`。
  *
  * 用 `hourCycle: "h23"` 而不是 `hour12: false`：后者在部分 ICU 版本里把零点写成 `24:00`，
  * 于是"23:00–24:00"和"24:00–01:00"会同时出现在轴上。

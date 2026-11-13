@@ -78,6 +78,41 @@ export function createMockApiV020(
       todo.updatedAt = now();
       return todo;
     },
+    /* [0.13 · 1.7] 批量创建：单事务 1..=60（与 Rust `todo_create_batch` 同语义）。
+       mock 是内存数组，天然原子；校验逐条做，任一失败整批拒绝 —— 不许"加了一半"。 */
+    todo_create_batch: (a) => {
+      const rows = Array.isArray(a?.todos) ? (a.todos as any[]) : [];
+      if (rows.length < 1 || rows.length > 60) fail('INVALID_ARGUMENT', '批量条数须在 1–60 之间');
+      const prepared: Todo[] = [];
+      for (const row of rows) {
+        const title = String(row?.title ?? '').trim();
+        if (!title) fail('ITEM_NAME_EMPTY', '待办标题不能为空');
+        if (title.length > TODO_TITLE_MAX_CHARS) {
+          fail('ITEM_NAME_TOO_LONG', `待办标题长度不能超过 ${TODO_TITLE_MAX_CHARS} 字`);
+        }
+        const t = now();
+        prepared.push({
+          id: 0,
+          title,
+          /* 按名精确匹配（与 Rust `find_by_name` 同语义；mock 侧直接查 s.items，
+             `findItem` 只认 id，别拿名字去调它） */
+          itemId: s.items.find((i) => i.name === title && i.status === 'active')?.id ?? null,
+          plannedAt: (row?.plannedAt as number | null) ?? null,
+          remindAt: (row?.remindAt as number | null) ?? null,
+          remindedAt: null,
+          doneAt: null,
+          sortOrder: 0,
+          createdAt: t,
+          updatedAt: t,
+        });
+      }
+      const base = s.todos.reduce((max, x) => Math.max(max, x.sortOrder + 1), 0);
+      return prepared.map((todo, index) => {
+        const stored: Todo = { ...todo, id: ++s.seq, sortOrder: base + index };
+        s.todos.push(stored);
+        return stored;
+      });
+    },
     /* [V0.3.12] 待办 → 计时：开始即移出待办区（ADR-030）。mock 只做数据侧等价。 */
     todo_start: (a) => {
       const todo = s.todos.find((x) => x.id === a?.id);

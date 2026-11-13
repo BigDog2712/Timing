@@ -86,6 +86,7 @@ commands.allow = [
   "theme_get",
   "theme_set",
   "todo_create",
+  "todo_create_batch",
   "todo_delete",
   "todo_list",
   "todo_start",

@@ -76,7 +76,17 @@
 @import "./styles/features/data.css";
 @import "./styles/features/destination.css";
 @import "./styles/features/about.css";
-@import "./styles/features/tools.css";
+@import "./styles/features/tools-alerts.css";
+@import "./styles/features/dashboard-reminder.css";
 @import "./styles/motion.css";
 @import "./styles/topbar.css";
 @import "./styles/topbar-keys.css";
+/* [0.13 · 主界面第二轮改造] 本轮**新增**的选择器（页级工具条容器 / 错误兜底面板 /
+   锁定态 / 布局管理弹层）。排在最后：它含 `.qp-page-toolbar` 一族，而这一族是从
+   `dashboard-layout.css` 搬出来的（原文件那块已删），需要盖住任何残留的同名规则。 */
+@import "./styles/features/dashboard-r2.css";
+/* [0.13 · T03a/T03b] 卡面侧的新选择器（时间线行三列 / 改起止弹层 / 待办批量表单），
+   从 dashboard-r2.css 拆出（300 行棘轮）。排在其后：同样要盖住可能的同名残留。 */
+@import "./styles/features/dashboard-r2-cards.css";
+/* [0.13 · T04] 工具页整页下线后，`tools.css` 里仍被到点弹窗 / tool-notification 窗 /
+   活动提醒卡复用的选择器搬到 tools-alerts.css（上面已引入）；工具页自己的布局类随页删。 */

@@ -282,11 +282,12 @@ migrate(pool):
 | `note_update` | `{ id: number, patch: NotePatch }` | `Note` | 部分更新（`content`/`itemId`/`posX`/`posY`/`width`/`height`） |
 | `note_delete` | `{ id: number }` | `void` | 软删除 + **关闭该窗口（若开）** + emit `note-window-closed` |
 
-#### 待办 todo（5）
+#### 待办 todo（6）
 
 | 命令 | 入参 | 出参 | 说明 |
 |---|---|---|---|
 | `todo_create` | `{ title: string, plannedAt?: number, remindAt?: number }` | `Todo` | 新建；`title` trim 空 → `ITEM_NAME_EMPTY` |
+| `todo_create_batch` | `{ todos: TodoCreateBatchInput[] }`（每条 `{ title, plannedAt?, remindAt? }`） | `Todo[]` | **批量新建**（[0.13 · 1.7] 多日期 × 多时刻）：**单事务**插入 1..=60 行；任一条校验失败（空标题 / 超长）整批回滚并返回 `ITEM_NAME_EMPTY` / `ITEM_NAME_TOO_LONG`，库里 0 行新增。事项按标题自动匹配（与 `todo_create` 不传 `itemId` 同规则） |
 | `todo_update` | `{ id: number, patch: TodoPatch }` | `Todo` | 部分更新（`title`/`plannedAt`/`remindAt`/`sortOrder`） |
 | `todo_delete` | `{ id: number }` | `void` | 软删除（幂等：不存在静默成功） |
 | `todo_list` | `{ includeDone?: boolean, from?: EpochMs, to?: EpochMs }` | `Todo[]` | 默认排除已完成；`from <= planned_at < to`；排序 `sort_order ASC, planned_at ASC` |

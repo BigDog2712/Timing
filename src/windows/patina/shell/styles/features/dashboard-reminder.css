@@ -1,0 +1,277 @@
+/* ============================================================================
+ * dashboard-reminder.css — 活动提醒卡（[本轮 T04]）复用的表单/行/选择器族
+ * -----------------------------------------------------------------------------
+ * 三件套（RuleEditor / DurationPicker / TargetPicker）按附录第 4 条从
+ * `features/tools/` 搬迁而来，类名不变 → 它们的样式从 tools.css 原样搬到这里
+ * （工具页整页下线，tools.css 删除；这段皮现在是主界面卡片的）。
+ * 卡级布局差异（列表滚动上限等）在 `dashboard-r2.css` 的 T04 段。
+ * 红线同全仓：零字面量色值，只用 `var(--qp-*)`。
+ * ========================================================================== */
+
+/* ── 表单族 ── */
+.tools-form-field {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.tools-form-field > span {
+  display: block;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-body);
+  font-weight: var(--qp-font-weight-medium);
+  line-height: var(--qp-line-height-body);
+  text-transform: uppercase;
+}
+
+.tools-form-field input {
+  width: 100%;
+}
+
+.tools-reminder-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.tools-reminder-form .tools-form-actions {
+  align-self: end;
+}
+
+.tools-candidate-load-error {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+}
+
+.tools-activity-target-search-field {
+  position: relative;
+}
+
+.tools-activity-target-search {
+  width: 100%;
+}
+
+.tools-activity-target-candidate-list {
+  position: fixed;
+  z-index: 80;
+  max-width: calc(100vw - 24px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-panel);
+  background: var(--qp-bg-panel);
+  box-shadow: var(--qp-shadow-overlay);
+  padding: 6px;
+}
+
+.tools-activity-target-option-active {
+  border-color: color-mix(in srgb, var(--qp-accent-default) 34%, var(--qp-border-subtle));
+  background: var(--qp-accent-muted);
+  color: var(--qp-accent-default);
+}
+
+.data-app-option-icon[data-activity-category-marker] {
+  padding: 0;
+}
+
+.tools-activity-category-dot {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  margin-top: 0;
+  border-radius: 50%;
+  background: var(--activity-category-color, var(--qp-text-tertiary));
+}
+
+.tools-validation-message {
+  margin: 0;
+  color: var(--qp-danger);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  font-weight: var(--qp-font-weight-regular);
+}
+
+.tools-form-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tools-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ── 规则行族 ── */
+.tools-reminder-list {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.tools-reminder-list-frame {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px dashed var(--qp-border-subtle);
+  border-radius: var(--qp-radius-panel);
+  padding: 10px;
+  padding-inline-end: 4px;
+}
+
+.tools-reminder-list-frame > .tools-reminder-list {
+  flex: 1 1 0;
+  min-height: 0;
+  align-content: start;
+  grid-auto-rows: min-content;
+  overflow-y: auto;
+  padding-inline-end: 4px;
+}
+
+.tools-empty-state {
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--qp-border-subtle);
+  border-radius: var(--qp-radius-panel);
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  font-weight: var(--qp-font-weight-regular);
+}
+
+.tools-reminder-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-control);
+  background: var(--qp-bg-elevated);
+  padding: 9px 10px;
+}
+
+.tools-reminder-row-main {
+  min-width: 0;
+}
+
+.tools-software-rule-main {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.tools-software-rule-copy {
+  min-width: 0;
+}
+
+.tools-reminder-row-main strong {
+  display: block;
+  overflow: hidden;
+  color: var(--qp-text-primary);
+  font-size: var(--qp-font-size-body);
+  line-height: var(--qp-line-height-body);
+  font-weight: var(--qp-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tools-reminder-row-main span:where(:not(.qp-badge)) {
+  display: block;
+  margin-top: 3px;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--qp-font-weight-regular);
+}
+
+.tools-software-rule-main .data-app-option-icon {
+  display: inline-flex;
+  margin-top: 0;
+  border: 0;
+  background: transparent;
+  padding: 4px;
+  color: var(--qp-text-secondary);
+}
+
+.tools-software-rule-main img {
+  width: 100%;
+  height: 100%;
+}
+
+.tools-software-rule-main .tools-activity-category-dot {
+  width: 16px;
+  height: 16px;
+  margin-top: 0;
+}
+
+.tools-software-rule-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tools-software-rule-heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.tools-reminder-row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0;
+}
+
+.tools-reminder-row-actions .qp-icon-action {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+}
+
+.tools-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 时长选择浮层 ── */
+.tools-usage-duration-popover {
+  width: 176px;
+  padding: 8px;
+}
+
+.tools-usage-duration-popover .qp-time-picker-list {
+  height: 170px;
+  grid-auto-rows: 24px;
+  align-content: start;
+}
+
+/* ── 阈值编辑弹层（RuleEditor）宽度 ── */
+.qp-dialog-surface:has(.tools-reminder-editor) {
+  max-width: 400px;
+}
+
+.tools-reminder-editor .tools-reminder-editor-target strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.tools-reminder-editor {
+  display: grid;
+  gap: 14px;
+}

@@ -1,25 +1,20 @@
 /**
  * Timing — 分析窗意图的**执行端**（P0-04 / P0-05，FUSION-ARCH-v1 §6.4）
  * -----------------------------------------------------------------------------
- * 分析窗（label = `patina`）没有任何写命令，它只 `emitTo("main", …)` 喊一句「我想干什么」。
- * 本模块挂在**药丸**（label = `main`）上，收到之后用**宿主的既有 typed IPC** 去执行并落库。
- * Rust 侧对这条通道完全不知情：没有新命令、没有新事件常量、契约十个数不变。
- *
- * ## 窗口 label 反着写，别记错
- * 药丸的 label 是 `main`；分析窗的 label 是 `patina`（Rust insight 侧 `MAIN_WINDOW_LABEL`
- * 指的是分析窗）。本文件运行在药丸里，所以「对面」是分析窗。
- *
- * ## 为什么错误只在这里提示
- * 分析窗只表达意图、不承诺结果（§6.4）。建事项/开始计时被拒时用既有的
- * `setNotice({tone:'danger'})` 在**药丸**上出现；分析窗靠随后的 `timer:state-changed`
- * 广播自然收敛，拿不到也不需要错误文案（§6.5「跨窗只传意图，不传错误」）。
+ * 分析窗（label = `patina`）没有任何写命令，只 `emitTo("main", …)` 喊一句「我想干什么」；
+ * 本模块挂在**药丸**（label = `main`）上，用**宿主的既有 typed IPC** 执行并落库。
+ * Rust 对这条通道完全不知情：没有新命令、没有新事件常量。
+ * 窗口 label 反着写：Rust insight 的 `MAIN_WINDOW_LABEL` 指的是分析窗，本文件在药丸里。
+ * 错误只在这里提示：分析窗只表达意图、不承诺结果（§6.4），被拒时
+ * `setNotice({tone:'danger'})` 出在**药丸**上；分析窗靠 `timer:state-changed`
+ * 广播自然收敛（§6.5「跨窗只传意图，不传错误」）。
  */
 import { useCallback } from 'react';
 
 import { useTauriEvent } from '../hooks/useTauriEvent';
 import { useTimerActions } from '../hooks/useTimerActions';
 import { errorText, ipc } from './ipc';
-import { itemApi } from './api';
+import { itemApi, recordApi } from './api';
 import { highlightPill } from './highlightActions';
 import { openSettings } from './settingsActions';
 import { openTodosWindow } from './todosActions';
@@ -29,11 +24,9 @@ import { useUiStore } from '../stores/uiStore';
 import { openNoteWindowFor, removeNote } from './noteActions';
 
 /**
- * 与 `src/platform/runtime/insightEvents.ts` 的 `HOST_INTENT` **逐字一致**。
- * L9 禁止跨窗 import，所以两侧各写一份；改一处必须改两处，否则意图「静默不达」。
- *
- * ⚠️ **不进** 宿主 `IPC_EVENTS`（`src/types/domain/ipc.ts:83`）：Rust 从不 emit 它，
- * 写进去会被 `scripts/check-contract.mjs:282-287` 判成死常量。契约事件数保持 11。
+ * 与 `src/platform/runtime/insightEvents.ts` 的 `HOST_INTENT` **逐字一致**
+ * （L9 禁止跨窗 import，两侧各写一份；改一处必须改两处，否则意图「静默不达」）。
+ * ⚠️ **不进** 宿主 `IPC_EVENTS`：Rust 从不 emit 它，写进去会被契约门禁判成死常量。
  */
 const HOST_INTENT = 'patina:host-intent';
 
@@ -57,7 +50,11 @@ type HostIntent =
   /** [本轮] 时间线卡的写动作：字段名与 `hostIntentGateway.ts` 逐字一致（L9：两侧各写一份）。
    *  `timerMinutes` 三态：缺省 = 不改；`null` = 清除（回正计时）；数字 = 设为该分钟数。 */
   | { action: 'create_item'; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number }
-  | { action: 'update_item'; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null };
+  | { action: 'update_item'; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null }
+  /** [0.13 · T03b] 改计时记录起止：字段名与 `hostIntentGateway.ts` 逐字一致（L9：两侧各写一份）。
+   *  执行端复用既有 `recordApi.update`（→ `update_record`，命令面零改动）。payload **没有**
+   *  时长字段 —— `accumulated_sec` 由 Rust 按新区间重算（ADR-030 / §3.8 B4）。 */
+  | { action: 'update_record_time'; recordId: number; startedAt: number; endedAt: number };
 
 /** 菜单在药丸内容区里的固定锚点（见 gateway 侧「锚点口径」注释）。 */
 const PILL_ANCHOR = { x: 12, y: 12 } as const;
@@ -202,6 +199,21 @@ export function useHostIntentBridge(): void {
     }
   }, []);
 
+  /**
+   * [0.13 · T03b] 改一条计时记录的起止时刻（Q1 裁决 (b)，区间**整体替换** §3.8）：
+   * patch 只带 `startedAt` / `endedAt`（不带 item/note，少一个字段少一处
+   * 「改个时刻顺手把事项改没了」）。B4：不自己算时长 —— `RecordPatch` 没有
+   * duration 字段，`accumulated_sec` 由 `services/record.rs:75-79` 按新区间重算。
+   * B2 等边界规则由分析窗 `recordTimeEdit.ts` 先拦，执行端不二次校验（语义一处）。
+   */
+  const handleUpdateRecordTime = useCallback(async (recordId: number, startedAt: number, endedAt: number) => {
+    try {
+      await recordApi.update(recordId, { startedAt, endedAt });
+    } catch (err) {
+      useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
+    }
+  }, []);
+
   const handleIntent = useCallback((intent: HostIntent) => {
     switch (intent.action) {
       case 'start_timer_for_activity':
@@ -274,11 +286,14 @@ export function useHostIntentBridge(): void {
       case 'update_item':
         void handleUpdateItem(intent);
         return;
+      case 'update_record_time':
+        void handleUpdateRecordTime(intent.recordId, intent.startedAt, intent.endedAt);
+        return;
       default:
         /* 分析窗版本比药丸新时可能发来不认识的动作：忽略，不抛、不提示 */
         return;
     }
-  }, [handleStartForActivity, handleBackfill, togglePause, handleCreateItem, handleUpdateItem]);
+  }, [handleStartForActivity, handleBackfill, togglePause, handleCreateItem, handleUpdateItem, handleUpdateRecordTime]);
 
   useTauriEvent<HostIntent>(HOST_INTENT, handleIntent);
 }

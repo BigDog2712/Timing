@@ -43,6 +43,22 @@ pub struct TodoListParams {
     pub to: Option<i64>,
 }
 
+/// `todo_create_batch` 的单条输入（[0.13 · 1.7] 多日期 × 多时刻展开后的行）。
+///
+/// 字段与前端 `TodoCreateBatchInput` 一一对应（`camelCase`）。**没有** `item_id`：
+/// 批量行按标题自动匹配事项（与 `todo_create` 不传 `item_id` 的路径同一条规则）。
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TodoCreateInput {
+    pub title: String,
+    /// 计划执行时刻；缺省 / null = 未排期。
+    #[serde(default)]
+    pub planned_at: Option<i64>,
+    /// 提醒时刻；缺省 / null = 无提醒。
+    #[serde(default)]
+    pub remind_at: Option<i64>,
+}
+
 /// `todo_update` 的部分更新字段。
 ///
 /// `planned_at` / `remind_at` 可显式置 null（清空），故用 `Option<Option<i64>>` +

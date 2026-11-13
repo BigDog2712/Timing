@@ -44,6 +44,7 @@ import type {
   TimeRecord,
   TimerState,
   Todo,
+  TodoCreateBatchParams,
   TodoCreateParams,
   TodoListParams,
   TodoRefParams,
@@ -162,8 +163,7 @@ export const ipc: IpcApi = {
   deleteItem: (params: ItemIdParams) => call<void>('delete_item', { id: params.id }),
 
   /* ---- 计时域 ---- */
-  startTimer: (params: StartTimerParams) =>
-    call<TimeRecord>('start_timer', params.itemId != null ? { itemId: params.itemId } : {}),
+  startTimer: (params: StartTimerParams) => call<TimeRecord>('start_timer', params.itemId != null ? { itemId: params.itemId } : {}),
   pauseTimer: () => call<TimeRecord>('pause_timer'),
   resumeTimer: () => call<TimeRecord>('resume_timer'),
   stopTimer: () => call<StopResult>('stop_timer'),
@@ -173,11 +173,9 @@ export const ipc: IpcApi = {
   switchItem: (params: SwitchItemParams) => call<TimerState>('switch_item', { itemId: params.itemId, mode: params.mode }),
 
   /* ---- 记录域 ---- */
-  listRecords: (params: ListRecordsParams) =>
-    call<Paginated<TimeRecord>>('list_records', { itemId: params.itemId, from: params.from, to: params.to, page: params.page ?? 1, limit: params.limit ?? 20 }),
+  listRecords: (params: ListRecordsParams) => call<Paginated<TimeRecord>>('list_records', { itemId: params.itemId, from: params.from, to: params.to, page: params.page ?? 1, limit: params.limit ?? 20 }),
   createRecord: (params) => call<TimeRecord[]>('create_record', { itemId: params.itemId, startedAt: params.startedAt, endedAt: params.endedAt, note: params.note ?? null }),
-  statsSummary: (params: StatsSummaryParams) =>
-    call<StatsSummary>('stats_summary', { itemId: params.itemId, from: params.from, to: params.to }),
+  statsSummary: (params: StatsSummaryParams) => call<StatsSummary>('stats_summary', { itemId: params.itemId, from: params.from, to: params.to }),
   updateRecord: (params: UpdateRecordParams) => call<TimeRecord>('update_record', { id: params.id, patch: params.patch }),
   deleteRecord: (params: ItemIdParams) => call<void>('delete_record', { id: params.id }),
 
@@ -208,8 +206,7 @@ export const ipc: IpcApi = {
   quitApp: () => call<void>('quit_app'),
 
   /* ---- [V0.2.0] 待办域 ---- */
-  todoCreate: (params: TodoCreateParams) =>
-    call<Todo>('todo_create', {
+  todoCreate: (params: TodoCreateParams) => call<Todo>('todo_create', {
       title: params.title,
       itemId: params.itemId ?? null,
       plannedAt: params.plannedAt,
@@ -220,6 +217,9 @@ export const ipc: IpcApi = {
   todoList: (params: TodoListParams) =>
     call<Todo[]>('todo_list', { includeDone: params.includeDone ?? false, from: params.from, to: params.to }),
   todoToggle: (params: TodoToggleParams) => call<Todo>('todo_toggle', { id: params.id, done: params.done }),
+  /** [0.13 · 1.7] 批量创建：后端单事务（`commands/todo_cmd.rs::todo_create_batch`） */
+  todoCreateBatch: (params: TodoCreateBatchParams) =>
+    call<Todo[]>('todo_create_batch', { todos: params.todos.map((todo) => ({ title: todo.title, plannedAt: todo.plannedAt ?? null, remindAt: todo.remindAt ?? null })) }),
   todoStart: (params: TodoRefParams) => call<TimeRecord>('todo_start', { id: params.id }),
 
   /* ---- [V0.2.0] 便利贴域 ---- */

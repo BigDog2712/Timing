@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { AppWindow, Pin, SquareArrowOutUpRight, X } from "lucide-react";
 import { LocaleProvider, useLocaleText } from "../../shared/i18n/index.ts";
+import { AppErrorBoundary } from "../../../shared/AppErrorBoundary.tsx";
+import { APP_BOUNDARY_COPY } from "../components/appBoundaryCopy.ts";
 import { showMainWindow } from "../../platform/desktop/windowControlGateway.ts";
 import { useAppThemeMode } from "../hooks/useAppThemeMode.ts";
 import { useMiniTracking } from "./useMiniTracking.ts";
 import { useMiniWindow } from "./useMiniWindow.ts";
 import MiniContent from "./MiniContent.tsx";
-import MiniToolStatus from "./MiniToolStatus.tsx";
 import { useMiniTransition } from "./useMiniTransition.ts";
 import { buildMiniViewModel } from "./miniViewModel.ts";
 
@@ -16,7 +17,10 @@ export default function MiniShell() {
   const tracking = useMiniTracking(contentActive);
   useAppThemeMode(tracking.appSettings.themeMode, tracking.appSettings.colorSchemeLight, tracking.appSettings.colorSchemeDark);
   return <LocaleProvider locale={tracking.appSettings.language}>
-    <MiniView runtime={runtime} tracking={tracking} />
+    {/* [0.13 · 1.2] 窗内这层用 locale 取文案（`App.tsx` 的上一层拿不到 locale）。 */}
+    <AppErrorBoundary copy={APP_BOUNDARY_COPY[tracking.appSettings.language]}>
+      <MiniView runtime={runtime} tracking={tracking} />
+    </AppErrorBoundary>
   </LocaleProvider>;
 }
 
@@ -103,8 +107,6 @@ function MiniView({ runtime, tracking }: {
       <div className="mini-main">
       <header className="mini-header">
         <div className="mini-status-icon" {...dragProps}><AppWindow size={14} aria-hidden="true" /></div>
-        {(snapshot.expanded || snapshot.transitioning) && !snapshot.suppressed && <MiniToolStatus tracking={tracking}
-          onOpenSection={({ section }) => { if (section) void act({ kind: "open_tools", section }); }} />}
         <div className="mini-drag-region" {...dragProps} />
         <div className="mini-window-actions">
         <button type="button" className="qp-icon-action qp-icon-action-neutral" aria-label={text.miniWindow.hold} aria-pressed={snapshot?.held ?? false}

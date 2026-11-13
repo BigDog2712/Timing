@@ -11,12 +11,13 @@
  * 写路径全部即时生效、没有保存按钮：这是观感配置，不是表单草稿（与本页其它卡同口径）。
  */
 import { useState } from "react";
-import { LayoutGrid, Plus, RotateCcw } from "lucide-react";
+import { LayoutGrid, Plus } from "lucide-react";
 import { useLocale } from "../../../shared/i18n/index.ts";
 import QuietButton from "../../../shared/components/QuietButton";
 import QuietSwitch from "../../../shared/components/QuietSwitch";
 import { BOARD_COPY } from "../../dashboard/layout/boardCopy.ts";
 import AddCardDialog from "../../dashboard/layout/AddCardDialog.tsx";
+import { FACTORY_LAYOUT_ID } from "../../dashboard/layout/library.ts";
 import {
   displayTitle,
   KIND_SPECS,
@@ -40,23 +41,20 @@ export default function SettingsBoardPanel({ id }: { id?: string }) {
 
   return (
     <section className="qp-panel p-5 md:p-6 settings-board" id={id}>
-      <SettingsPanelHeader icon={<LayoutGrid size={16} aria-hidden="true" />} title="主界面组件" />
+      <SettingsPanelHeader icon={<LayoutGrid size={16} aria-hidden="true" />} title={copy.boardPanelTitle} />
 
       {/* 与同页其它面板同构：`qp-panel` 不带内边距，组间距靠 `mt-5 space-y-5`。 */}
       <div className="mt-5 space-y-5">
-        <p className="settings-board-hint">
-          组件板是自由摆位：在主界面拖卡头挪位置、拖右缘下缘改尺寸，位置会记住。这里管的是
-          <strong>有哪些组件</strong>与<strong>全局手感</strong>。
-        </p>
+        <p className="settings-board-hint">{copy.boardPanelHint}</p>
 
-        <SettingsPreferenceGroup title={`板上组件 · ${cards.length} 张`} headerAside={(
+        <SettingsPreferenceGroup title={`${copy.onBoard(cards.length)}`} headerAside={(
           <QuietButton size="compact" onClick={() => setAddOpen(true)}>
             <Plus size={14} aria-hidden="true" />
-            添加组件
+            {copy.addTitle}
           </QuietButton>
         )}>
           {cards.length === 0 ? (
-            <p className="settings-board-empty">板子是空的。点右上「添加组件」放一张，主界面才有内容。</p>
+            <p className="settings-board-empty">{copy.boardPanelEmpty}</p>
           ) : (
             <ul className="settings-board-list">
               {cards.map((card) => {
@@ -65,13 +63,14 @@ export default function SettingsBoardPanel({ id }: { id?: string }) {
                   <li key={card.uid} className="settings-board-row">
                     <span className="settings-board-name">{name}</span>
                     <span className="settings-board-kind">{KIND_SPECS[card.kind].label}</span>
-                    <span className="settings-board-size" role="group" aria-label={`${name} 尺寸`}>
+                    <span className="settings-board-size" role="group" aria-label={copy.sizeNamed(name)}>
                       {TIERS.map((tier) => (
                         <button
                           key={tier}
                           type="button"
                           className="settings-board-tier"
                           aria-pressed={card.tier === tier}
+                          disabled={layout.locked}
                           onClick={() => layout.setTier(card.uid, tier)}
                         >
                           {copy.sizes[tier]}
@@ -81,10 +80,11 @@ export default function SettingsBoardPanel({ id }: { id?: string }) {
                     <QuietButton
                       size="compact"
                       tone="secondary"
-                      aria-label={`移除「${name}」`}
+                      aria-label={copy.removeNamed(name)}
+                      disabled={layout.locked}
                       onClick={() => layout.remove(card.uid)}
                     >
-                      移除
+                      {copy.remove}
                     </QuietButton>
                   </li>
                 );
@@ -93,46 +93,51 @@ export default function SettingsBoardPanel({ id }: { id?: string }) {
           )}
         </SettingsPreferenceGroup>
 
-        <SettingsPreferenceGroup title="布局与手感">
+        <SettingsPreferenceGroup title={copy.manageLayout}>
           <SettingsPreferenceRow
-            title="8px 对齐"
-            hint="拖动与缩放时吸附到 8px 网格。关掉后按 1px 精度移动，适合卡着像素对齐。"
+            title={copy.snapTitle}
+            hint={copy.snapHint}
           >
             <QuietSwitch
               checked={layout.layout.snap}
-              ariaLabel="8px 对齐"
+              ariaLabel={copy.snapTitle}
               onChange={layout.setSnap}
             />
           </SettingsPreferenceRow>
           <SettingsPreferenceRow
-            title="整理"
-            hint="把现有组件按三列重新排紧凑（exe 的装箱算法）。"
+            title={copy.tidy}
+            hint={copy.tidyHint}
           >
             <span className="settings-board-actions">
-              <QuietButton size="compact" onClick={layout.tidy}>整理</QuietButton>
+              <QuietButton size="compact" disabled={layout.locked} onClick={layout.tidy}>{copy.tidy}</QuietButton>
             </span>
           </SettingsPreferenceRow>
           <SettingsPreferenceRow
-            title="默认布局"
-            hint="「保存布局」把当前排布存为默认，此后「恢复默认」回到这一版；没存过时回出厂排布。「出厂布局」不动已存的默认版。"
+            title={copy.layoutLibTitle}
+            hint={copy.layoutLibHint}
           >
             <span className="settings-board-actions">
               <QuietButton
                 size="compact"
-                onClick={() => layout.saveAsDefault()}
-                disabled={cards.length === 0}
+                disabled={cards.length === 0 || layout.locked}
+                onClick={() => layout.createLayout(copy.layoutName(layout.library.items.length + 1))}
               >
-                保存布局
+                {copy.newLayout}
               </QuietButton>
-              <QuietButton size="compact" onClick={layout.reset}>
-                <RotateCcw size={14} aria-hidden="true" />
-                恢复默认
+              <QuietButton
+                size="compact"
+                disabled={layout.locked}
+                onClick={() => layout.switchToLayout(layout.library.activeId)}
+              >
+                {copy.restoreSaved}
               </QuietButton>
-              {layout.customDefault ? (
-                <QuietButton size="compact" onClick={layout.resetToFactory}>
-                  出厂布局
-                </QuietButton>
-              ) : null}
+              <QuietButton
+                size="compact"
+                disabled={layout.locked}
+                onClick={() => layout.switchToLayout(FACTORY_LAYOUT_ID)}
+              >
+                {copy.factoryLayoutName}
+              </QuietButton>
             </span>
           </SettingsPreferenceRow>
         </SettingsPreferenceGroup>
@@ -142,6 +147,7 @@ export default function SettingsBoardPanel({ id }: { id?: string }) {
         <AddCardDialog
           copy={copy}
           countOf={layout.countOf}
+          locked={layout.locked}
           onAdd={layout.add}
           onClose={() => setAddOpen(false)}
         />

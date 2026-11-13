@@ -9,7 +9,8 @@ import type { TodoSummary } from "../../shared/types/todos.ts";
  *
  * 命令来源：`src-tauri/src/commands/todo_cmd.rs:41`（`todo_list`，入参 `include_done`
  * / `from` / `to`，`from <= planned_at < to`）、`:19`（`todo_create`）、`:52`
- * （`todo_toggle`）、`:33`（`todo_delete`）。
+ * （`todo_toggle`）、`:33`（`todo_delete`）、`todo_update`（[0.13] 行编辑）、
+ * `todo_create_batch`（[0.13] 批量创建，单事务 1..=60）。
  *
  * ## 为什么读用 `includeDone: false`
  *
@@ -72,6 +73,33 @@ export async function createTodo(
    * 后端 `todo_create` 的签名就是 `(title, item_id, planned_at, remind_at)`，
    * 省略键等于让 Rust 侧落到默认值，两处口径就分家了。 */
   await invokeWithCommandError("todo_create", { title, itemId: null, plannedAt, remindAt });
+}
+
+/**
+ * 批量创建（[0.13 · 1.7]，多日期 × 多时刻）：**一条命令、后端单事务**。
+ *
+ * 为什么不是前端循环调 `todo_create`：第 3 条失败会出现"只加了一半"的部分成功，
+ * 而且没有回滚手段；"统一添加"的语义就是原子（设计 §3.2）。Rust 侧
+ * `todo_create_batch`（`commands/todo_cmd.rs`）1..=60 条、任一校验失败整批回滚。
+ * 上限由 `expandTodoBatch`（`TODO_BATCH_MAX = 60`）先拦，这里不重复校验。
+ */
+export async function createTodoBatch(plans: readonly { title: string; plannedAt: number | null; remindAt: number | null }[]): Promise<void> {
+  await invokeWithCommandError("todo_create_batch", {
+    todos: plans.map((plan) => ({ title: plan.title, plannedAt: plan.plannedAt, remindAt: plan.remindAt })),
+  });
+}
+
+/**
+ * 编辑一条待办（[0.13 · 1.7]：`todo_update` 命令本就四处齐全，本轮补权限与入口）。
+ *
+ * patch 语义与 Rust `TodoPatch` 的三态一一对应：`null` = 清空（`remind_at` 清空会
+ * 连带复位 `reminded_at` / `remind_stage`，两级提醒按新时刻重来）；不给键 = 不改。
+ */
+export async function updateTodo(
+  id: number,
+  patch: { title?: string; plannedAt?: number | null; remindAt?: number | null },
+): Promise<void> {
+  await invokeWithCommandError("todo_update", { id, patch });
 }
 
 export async function toggleTodo(id: number, done: boolean): Promise<void> {

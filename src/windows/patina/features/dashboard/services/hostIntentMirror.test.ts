@@ -70,4 +70,14 @@ describe("HostIntent 两侧镜像", () => {
     expect(gateway).toContain("update_item{id,isPinned?,name?,sortOrder?,timerMinutes?}");
     expect(bridge).toContain("update_item{id,isPinned?,name?,sortOrder?,timerMinutes?}");
   });
+
+  /* [0.13 · T03b] 本轮唯一的**新语义**意图：改计时记录起止。三条静默失败路径：
+     ① 两侧字段名漂一个（recordId 写成 id / startedAt 写成 start）→ 药丸 switch 落进
+        default，"点了保存没反应"零日志；② payload 里多塞一个 duration 字段 ——
+        Rust `RecordPatch` 没有 duration，serde 静默丢弃（B4：时长必须由 Rust 重算）；
+     ③ 两侧只改一边（L9 各写一份）。集合相等（d02a）抓不住 ①②，逐字钉。 */
+  it("d02e_update_record_time_carries_the_same_camel_case_fields_on_both_sides", () => {
+    expect(gateway).toContain("update_record_time{endedAt,recordId,startedAt}");
+    expect(bridge).toContain("update_record_time{endedAt,recordId,startedAt}");
+  });
 });

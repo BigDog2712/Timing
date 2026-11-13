@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { useTodayNotes } from "../hooks/useTodayNotes.ts";
@@ -86,6 +86,14 @@ export default function Dashboard({
   const snapshotProps = { status: snapshotStatus, refreshError, onRetry: readState.retry };
 
   const layout = useDashboardLayout();
+  /* [0.13 · 1.4] 老「默认布局」键 → 布局库的迁移只做一次（幂等，见 `boardStore`）。
+   * 放在这里而不是 store 模块顶层：迁移要给一条**默认名**，而默认名是语言相关的
+   * （`copy.layoutName`）—— store 在模块求值时还不知道界面语言。迁移生成的名字
+   * 会存成字符串（名字是用户数据，之后不随切语言变）。 */
+  const hydrateLibrary = layout.hydrateLibrary;
+  useEffect(() => {
+    hydrateLibrary(boardCopy.layoutName(1));
+  }, [hydrateLibrary, boardCopy]);
   /* 维度是**视图级**的（同一块板上多个计时卡共用一个口径）：分到每张卡上会出现
    * 「两张环一个按分类、一个按应用」，读数无法互相解释。 */
   const [focusDimension, setFocusDimension] = useState<FocusDimension>("category");
@@ -106,6 +114,8 @@ export default function Dashboard({
       title={card.title ?? ""}
       tier={card.tier}
       copy={boardCopy}
+      /* 锁定态只禁「尺寸 / 复制 / 移除」三项，改标题仍可用（锁几何，不锁内容） */
+      locked={layout.locked}
       onTier={(tier) => layout.setTier(card.uid, tier)}
       onRename={(title) => layout.setTitle(card.uid, title)}
       onDuplicate={() => layout.duplicate(card.uid)}

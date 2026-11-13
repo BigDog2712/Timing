@@ -104,6 +104,52 @@ export default function TimerModule({
 
   let consumed = 0;
 
+  /* 环抽成变量（[0.13 · F2]）：empty 态也要画底圈 —— 只给一句 `qp-empty` 的话，
+     "卡是空的还是坏了"分不出来。底环 + 环心读数（0m）说的是"今天真的什么都没记"。 */
+  const donut = (
+    <div className="qp-donut">
+      <svg viewBox={`0 0 ${DONUT_VIEWBOX} ${DONUT_VIEWBOX}`} aria-hidden="true" focusable="false">
+        <AnonymousActivityPattern id={anonymousPatternId} />
+        <circle
+          cx={DONUT_CENTER}
+          cy={DONUT_CENTER}
+          fill="none"
+          r={DONUT_RADIUS}
+          stroke="var(--qp-track-muted)"
+          strokeWidth={DONUT_STROKE_WIDTH}
+        />
+        {total > 0 ? readouts.map((item, index) => {
+          const segmentLength = (Math.max(0, item.value) / total) * DONUT_CIRCUMFERENCE;
+          const gapLength = Math.min(segmentLength, DONUT_CIRCUMFERENCE * DONUT_GAP_DEGREES / 360);
+          const dashLength = Math.max(0, segmentLength - gapLength);
+          const dashOffset = -consumed;
+          consumed += segmentLength;
+          return (
+            <circle
+              key={`${item.category}:${index}`}
+              cx={DONUT_CENTER}
+              cy={DONUT_CENTER}
+              fill="none"
+              r={DONUT_RADIUS}
+              stroke={item.category === "anonymous"
+                ? `url(#${anonymousPatternId})`
+                : displayColor(item.color) || "var(--qp-accent-default)"}
+              strokeDasharray={`${dashLength} ${DONUT_CIRCUMFERENCE - dashLength}`}
+              strokeDashoffset={dashOffset}
+              strokeOpacity={hovered === null || hovered === index ? 1 : 0.35}
+              strokeWidth={DONUT_STROKE_WIDTH}
+              transform={`rotate(-90 ${DONUT_CENTER} ${DONUT_CENTER})`}
+            />
+          );
+        }) : null}
+      </svg>
+      <div className="qp-donut-center">
+        <span className="qp-donut-total">{formatDashboardDuration(totalTrackedTime)}</span>
+        <span className="qp-donut-cap">{copy.timerDonutCap}</span>
+      </div>
+    </div>
+  );
+
   return (
     <ModuleShell
       controls={controls}
@@ -119,6 +165,8 @@ export default function TimerModule({
       /* 卡头读数就是 exe 的 `meta(Timer)`：「今日 14m」（`widgets/mod.rs:141`）。
          昨日对比不在卡头 —— 它在维度那一行的右端（见下）。 */
       meta={copy.timerToday(formatDashboardDuration(totalTrackedTime))}
+      /* [0.13 · F2 / V-1.2b] 空态仍画底圈 + 「今日 0m」 */
+      emptyVisual={state === "empty" ? donut : undefined}
     >
       {/* [P2] 三个维度：同一份总量换分组，不是三份数据。切维度只换这一个 state
           （v3 起提到 `Dashboard` 视图层，板上多个计时卡共用一个口径），
@@ -152,47 +200,7 @@ export default function TimerModule({
       <div className="qp-donut-body">
         {/* 环只是同一份数据的第二表达，读数行才是可读内容 → 环对读屏隐藏，
             否则同一组占比会被读两遍（01 §4.3 骨架里环无 role） */}
-        <div className="qp-donut">
-          <svg viewBox={`0 0 ${DONUT_VIEWBOX} ${DONUT_VIEWBOX}`} aria-hidden="true" focusable="false">
-            <AnonymousActivityPattern id={anonymousPatternId} />
-            <circle
-              cx={DONUT_CENTER}
-              cy={DONUT_CENTER}
-              fill="none"
-              r={DONUT_RADIUS}
-              stroke="var(--qp-track-muted)"
-              strokeWidth={DONUT_STROKE_WIDTH}
-            />
-            {total > 0 ? readouts.map((item, index) => {
-              const segmentLength = (Math.max(0, item.value) / total) * DONUT_CIRCUMFERENCE;
-              const gapLength = Math.min(segmentLength, DONUT_CIRCUMFERENCE * DONUT_GAP_DEGREES / 360);
-              const dashLength = Math.max(0, segmentLength - gapLength);
-              const dashOffset = -consumed;
-              consumed += segmentLength;
-              return (
-                <circle
-                  key={`${item.category}:${index}`}
-                  cx={DONUT_CENTER}
-                  cy={DONUT_CENTER}
-                  fill="none"
-                  r={DONUT_RADIUS}
-                  stroke={item.category === "anonymous"
-                    ? `url(#${anonymousPatternId})`
-                    : displayColor(item.color) || "var(--qp-accent-default)"}
-                  strokeDasharray={`${dashLength} ${DONUT_CIRCUMFERENCE - dashLength}`}
-                  strokeDashoffset={dashOffset}
-                  strokeOpacity={hovered === null || hovered === index ? 1 : 0.35}
-                  strokeWidth={DONUT_STROKE_WIDTH}
-                  transform={`rotate(-90 ${DONUT_CENTER} ${DONUT_CENTER})`}
-                />
-              );
-            }) : null}
-          </svg>
-          <div className="qp-donut-center">
-            <span className="qp-donut-total">{formatDashboardDuration(totalTrackedTime)}</span>
-            <span className="qp-donut-cap">{copy.timerDonutCap}</span>
-          </div>
-        </div>
+        {donut}
 
         <ul className="qp-readouts">
           {readouts.map((item, index) => {

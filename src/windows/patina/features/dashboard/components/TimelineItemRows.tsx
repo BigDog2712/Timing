@@ -6,11 +6,13 @@
  * 单文件 300 行的棘轮。这里**不发意图、不碰本地数据**：一切写动作都通过 `onUpdate` /
  * `onMove` 交回容器 —— 因为“发出去没有”只有容器知道（事件桥没有回执）。
  *
+ * [0.13 · 1.6] 行内编辑态抽成了 `ItemEditForm`（与卡底「编辑事项」弹层共用同一张表单，
+ * 校验口径只写一遍）；本文件只剩列表结构、行读数与 ↑/↓/常用 按钮。
+ *
  * 三条实现口径（都是踩过的坑）：
  *   1. **不用 HTML5 拖拽**：主界面卡片本身已有拖拽排序，行上再挂 `draggable` 会抢事件
  *      （拖卡片变成拖事项）。所以排序只有 ↑/↓ 两颗真按钮，且**只在常用组内**可用。
- *   2. 行内编辑用**真表单**（名称 + 默认时长）、Enter 保存、Escape 取消；
- *      Escape 必须 `preventDefault()`，否则 `QuietDialog` 的 window 级 Escape 会把整个弹层关掉。
+ *   2. 行内编辑用**真表单**（名称 + 默认时长）、Enter 保存、Escape 取消（在 `ItemEditForm` 里）。
  *   3. `aria-label` 写成「动作 事项名」（`上移 开会`，**空格不用冒号**）：一行里有四颗按钮，
  *      只念“上移”读屏用户分不清是哪一条；而全角冒号在 en/ru/es 里混排成 `Move up：Code`，
  *      所以分隔符用与语言无关的空格。
@@ -31,6 +33,7 @@ import {
   ITEM_NAME_MAX_LEN,
   type ItemNameIssue,
 } from "../services/timelineItemName.ts";
+import ItemEditForm from "./ItemEditForm.tsx";
 
 /** 一次写意图的载荷（容器按它拼 `update_item`）。`timerMinutes` 三态见 `withItemTimer`。 */
 export interface ItemPatchIntent {
@@ -122,70 +125,23 @@ export default function TimelineItemRows({
     if (editingId === item.id) {
       return (
         <li key={item.id} className="qp-timeline-item-row qp-timeline-item-row--editing">
-          <div className="qp-timeline-item-editor">
-            <input
-              className="qp-input qp-timeline-manage-input"
-              value={draftName}
-              maxLength={ITEM_NAME_MAX_LEN}
-              autoFocus
-              aria-label={copy.timelineEditAction}
-              aria-invalid={rowIssue ? true : undefined}
-              onChange={(event) => {
-                setDraftName(event.target.value);
-                setRowIssue(null);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  saveEdit(item);
-                } else if (event.key === "Escape") {
-                  event.preventDefault();
-                  cancelEdit();
-                }
-              }}
-            />
-            <input
-              className="qp-input qp-timeline-manage-timer"
-              value={draftMinutes}
-              inputMode="numeric"
-              aria-label={copy.timelineTimerLabel}
-              placeholder={copy.timelineTimerPlaceholder}
-              onChange={(event) => {
-                setDraftMinutes(event.target.value);
-                setRowIssue(null);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  saveEdit(item);
-                } else if (event.key === "Escape") {
-                  event.preventDefault();
-                  cancelEdit();
-                }
-              }}
-            />
-            <span className="qp-timeline-item-editor-actions">
-              <button
-                type="button"
-                className="qp-button qp-button-compact qp-button-primary"
-                disabled={busy}
-                onClick={() => saveEdit(item)}
-              >
-                {copy.timelineSaveAction}
-              </button>
-              <button
-                type="button"
-                className="qp-button qp-button-compact qp-button-secondary"
-                disabled={busy}
-                onClick={cancelEdit}
-              >
-                {UI_TEXT.dialog.cancel}
-              </button>
-            </span>
-            {rowIssue ? (
-              <p className="qp-timeline-manage-issue" role="status">{rowIssue}</p>
-            ) : null}
-          </div>
+          <ItemEditForm
+            draftName={draftName}
+            draftMinutes={draftMinutes}
+            busy={busy}
+            issue={rowIssue}
+            copy={copy}
+            onNameChange={(value) => {
+              setDraftName(value);
+              setRowIssue(null);
+            }}
+            onMinutesChange={(value) => {
+              setDraftMinutes(value);
+              setRowIssue(null);
+            }}
+            onSave={() => saveEdit(item)}
+            onCancel={cancelEdit}
+          />
         </li>
       );
     }

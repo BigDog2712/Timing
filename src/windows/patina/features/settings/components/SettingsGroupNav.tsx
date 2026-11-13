@@ -6,7 +6,7 @@
  *
  * `aria-current` 由**滚动位置派生**，不引第三方：监听滚动容器（`#settings-scroll`）的
  * `scroll`，用 `requestAnimationFrame` 节流（一次滚动最多一次 setState），取「顶端已越过
- * 视口上沿 -56px」的最后一个锚点作为当前组。不用 `IntersectionObserver` 的理由：五组高度
+ * 判定线（读自 CSS 的 `scroll-margin-top`）」的最后一个锚点作为当前组。不用 `IntersectionObserver` 的理由：五组高度
  * 差很大（G1 三张卡 vs G3 一张卡），交叉比在「谁算当前」上比位置比较更容易跳。
  *
  * 没有「滚动中不许点击」的状态锁：点了就跳，滚动过程中高亮会跟着变，这正是用户想看的反馈。
@@ -15,8 +15,20 @@ import { useEffect, useRef, useState } from "react";
 import { SETTINGS_GROUPS } from "../settingsGroups";
 
 const SCROLL_CONTAINER_ID = "settings-scroll";
-/** 判定线：视口顶端往下 56px（页头高度的经验值，与 `scroll-margin-top: 60px` 配套）。 */
-const ACTIVE_OFFSET = 56;
+/** CSS 读不到时的兜底（如无头环境）；正常路径永远走 `scroll-margin-top`。 */
+const FALLBACK_ACTIVE_OFFSET = 18;
+
+/**
+ * [本轮 T05] 判定线从 CSS 读，不再手抄第二个常量：锚点的 `scroll-margin-top`
+ * 定义在 `settings-handles.css`（页头删除后 60 → 18），跳转的落点与高亮的判定线
+ * 必须是**同一个数**。读不到（NaN）时回落到旧经验值。
+ */
+function readActiveOffset(): number {
+  const anchor = document.querySelector<HTMLElement>("#settings-scroll [id^='s-']");
+  if (!anchor) return FALLBACK_ACTIVE_OFFSET;
+  const margin = Number.parseFloat(getComputedStyle(anchor).scrollMarginTop);
+  return Number.isFinite(margin) ? margin : FALLBACK_ACTIVE_OFFSET;
+}
 
 export default function SettingsGroupNav() {
   const [activeGroup, setActiveGroup] = useState(SETTINGS_GROUPS[0]?.id ?? "");
@@ -28,7 +40,7 @@ export default function SettingsGroupNav() {
 
     const compute = () => {
       frame.current = null;
-      const top = container.getBoundingClientRect().top + ACTIVE_OFFSET;
+      const top = container.getBoundingClientRect().top + readActiveOffset();
       let current = SETTINGS_GROUPS[0]?.id ?? "";
       for (const group of SETTINGS_GROUPS) {
         for (const anchor of group.anchors) {

@@ -1,0 +1,146 @@
+/* ============================================================================
+ * tools-alerts.css — 工具页下线后**仍然存活**的工具样式（[本轮 T04] 从 tools.css 提出）
+ * -----------------------------------------------------------------------------
+ * tools.css（1195 行）随工具页整页删除，但它里面混着两类不能死的东西：
+ *   ① 到点弹窗族：`ToolAlertDialog` / `ActivityReminderAlertDialog` /
+ *      `TimedReminderAlertDialog`（保留，见设计 §4.4）—— 弹窗本体与
+ *      `tool-notification` 窗（本轮一个字节不动，Q4）的透明壳全靠这些类；
+ *      唯一的新增是把 `:has(.tools-reminder-editor, .tools-pomodoro-editor)` 里
+ *      随番茄编辑器下线的那半删掉。
+ * 活动提醒卡复用的表单/行/选择器族搬去了 `dashboard-reminder.css`（300 行棘轮，
+ * 且它们现在是主界面卡片的皮，文件归属跟着组件走）。
+ * ========================================================================== */
+
+/* ── ① 到点弹窗族 + tool-notification 窗壳（原 tools.css:998-1191 原样保留） ── */
+.qp-dialog-surface:has(.tools-reminder-editor) {
+  max-width: 400px;
+}
+
+.tools-reminder-editor .tools-reminder-editor-target strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.tools-reminder-editor {
+  display: grid;
+  gap: 14px;
+}
+
+.tools-usage-alert-surface {
+  --tools-alert-width: 420px;
+  width: min(var(--tools-alert-width), calc(100vw - 32px));
+}
+
+.tools-timed-alert-surface .qp-dialog-title {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.tools-usage-alert-limit .qp-dialog-header,
+.tools-usage-alert-limit .tools-usage-alert-summary {
+  text-align: center;
+}
+
+.tools-usage-alert-limit .qp-dialog-heading {
+  width: 100%;
+}
+
+.tools-usage-steps-dialog > .qp-dialog-body { margin-top: 0; }
+.tools-usage-steps { position: relative; display: grid; overflow: clip; }
+.tools-usage-steps > div { grid-area: 1 / 1; min-width: 0; overflow-wrap: anywhere; }
+.tools-usage-steps > [inert] { position: absolute; inset: 0 0 auto; visibility: hidden; opacity: 0; }
+.tools-usage-steps > .tools-usage-step-limit { align-self: center; text-align: center; }
+.tools-usage-steps .qp-dialog-title + :is(.tools-usage-alert-options, .tools-usage-alert-summary) { margin-top: 12px; }
+
+.tools-usage-alert-identity {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  margin: 4px 0 19px;
+}
+
+.tools-usage-alert-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  color: var(--qp-text-primary);
+}
+
+.tools-usage-alert-icon img {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.tools-usage-alert-name {
+  font-size: var(--qp-font-size-section-title);
+  line-height: var(--qp-line-height-section-title);
+  font-weight: var(--qp-font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.tools-usage-alert-summary {
+  margin: 0;
+  color: var(--qp-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.tools-usage-alert-surface .qp-dialog-actions { display: flex; gap: 12px; }
+.tools-usage-alert-surface .qp-dialog-actions > button { flex: 1 1 0; min-width: 0; }
+
+.tools-usage-alert-options {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-control);
+  background: var(--qp-bg-panel);
+  overflow: hidden;
+}
+
+.tools-usage-alert-option {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 16px;
+  cursor: pointer;
+}
+
+.tools-usage-alert-option + .tools-usage-alert-option::before { content: ""; position: absolute; inset: 0 12px auto; border-top: 1px solid var(--qp-border-subtle); }
+.tools-usage-alert-option:has(input:checked) { color: var(--qp-accent-default); }
+.tools-usage-alert-option:has(input:focus-visible) { outline: 2px solid color-mix(in srgb, var(--qp-accent-default) 42%, transparent); outline-offset: -2px; }
+.tools-usage-alert-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+.tools-usage-alert-option-check { flex: 0 0 auto; visibility: hidden; }
+.tools-usage-alert-option:has(input:checked) .tools-usage-alert-option-check { visibility: visible; }
+.tools-usage-alert-options:disabled .tools-usage-alert-option { cursor: default; opacity: 0.6; }
+
+.tools-usage-alert-error { color: var(--qp-danger); margin: 12px 0 0; }
+
+/* tool-notification 窗：透明壳，弹窗浮在系统层（本轮一个字节不动，Q4） */
+html[data-window-label="tool-notification"], body[data-window-label="tool-notification"], #root[data-window-label="tool-notification"] { background: transparent; min-width: 0; overflow: hidden; }
+body[data-window-label="tool-notification"] .qp-dialog-backdrop {
+  background: transparent;
+  padding: 2px;
+  align-items: flex-start;
+  animation: none;
+  overflow: auto;
+  scrollbar-width: none;
+}
+body[data-window-label="tool-notification"] .qp-dialog-surface {
+  width: min(var(--tools-alert-width), calc(100vw - 4px));
+  margin: 0;
+  max-height: none;
+  animation: none;
+}
+body[data-window-label="tool-notification"] .qp-dialog-backdrop:has(> .tools-usage-steps-dialog) {
+  flex-direction: column-reverse;
+  align-items: center;
+  justify-content: flex-start;
+}
+body[data-window-label="tool-notification"] .tools-usage-steps-dialog { flex: none; }

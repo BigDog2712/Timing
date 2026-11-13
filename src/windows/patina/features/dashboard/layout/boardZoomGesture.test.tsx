@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import DashboardBoard from "./DashboardBoard";
 import { BOARD_COPY } from "./boardCopy";
 import { displayTitle } from "./contract";
+import { cloneLayout, DEFAULT_LAYOUT } from "./defaultLayout";
 import { useBoardStore } from "./boardStore";
 import { useDashboardLayout } from "./useDashboardLayout";
 import { DASHBOARD_COPY } from "../copy";
@@ -21,7 +22,7 @@ let root: Root | null = null;
 
 beforeEach(() => {
   window.localStorage.clear();
-  useBoardStore.getState().reset();
+  useBoardStore.setState({ layout: cloneLayout(DEFAULT_LAYOUT) });
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);

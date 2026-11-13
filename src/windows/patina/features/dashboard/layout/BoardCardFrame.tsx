@@ -25,18 +25,29 @@ interface Props {
   label: string;
   copy: BoardCopy;
   dragging: boolean;
+  /**
+   * 布局锁定（几何锁）：`onPointerDown` 首行早退，且**三根手柄不渲染**。
+   * 两处都要堵 —— 只堵其中一处是两种不同的漏：
+   *   · 只堵 `onPointerDown`：手柄自己的 `onPointerDown` 会把事件停在手柄上（`stopPropagation`），
+   *     根本走不到卡框那一层判断，拖右缘照样能改宽；
+   *   · 只堵手柄：拖卡头仍能挪位。
+   */
+  locked: boolean;
   onBegin: (event: ReactPointerEvent<HTMLElement>, rect: Rect, mode: DragMode) => void;
   onNudge: (rect: Rect) => void;
   children: ReactNode;
 }
 
 export default function BoardCardFrame({
-  card, label, copy, dragging, onBegin, onNudge, children,
+  card, label, copy, dragging, locked, onBegin, onNudge, children,
 }: Props) {
   const rect: Rect = { x: card.x, y: card.y, w: card.w, h: card.h };
 
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.button !== 0) return;
+    /* ⓪ 锁定态：整张卡不接受任何抓取（几何锁）。放在最前面 —— 后面三条判据都只是
+     * 「这次点的是不是抓取热区」，锁定要连热区本身一起否掉。 */
+    if (locked) return;
     const target = event.target as HTMLElement;
     /* ① 手柄自己接管（三根手柄的 onPointerDown 已经把事件停在这里） */
     if (target.closest("[data-resize]")) return;
@@ -95,15 +106,22 @@ export default function BoardCardFrame({
       data-board-card={card.uid}
       data-kind={card.kind}
       data-dragging={dragging || undefined}
+      data-locked={locked || undefined}
       role="group"
       aria-label={label}
       style={{ left: card.x, top: card.y, width: card.w, height: card.h }}
       onPointerDown={onPointerDown}
     >
       <BoardInstanceContext.Provider value={card.uid}>{children}</BoardInstanceContext.Provider>
-      {handle("e", "qp-board-handle-e", copy.resizeWidth(label), "vertical")}
-      {handle("s", "qp-board-handle-s", copy.resizeHeight(label), "horizontal")}
-      {handle("se", "qp-board-handle-se", copy.resizeBoth(label), "horizontal")}
+      {/* 锁定态不渲染手柄：它们 `tabIndex={0}`，留着会让键盘用户 Tab 进一根按了没用的
+          「分隔条」—— 那是一句谎话（读屏会念「调整宽度」）。 */}
+      {locked ? null : (
+        <>
+          {handle("e", "qp-board-handle-e", copy.resizeWidth(label), "vertical")}
+          {handle("s", "qp-board-handle-s", copy.resizeHeight(label), "horizontal")}
+          {handle("se", "qp-board-handle-se", copy.resizeBoth(label), "horizontal")}
+        </>
+      )}
     </div>
   );
 }

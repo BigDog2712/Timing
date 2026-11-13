@@ -1,6 +1,5 @@
 import { useLocaleText, type UiText } from "../../../shared/i18n/index.ts";
 import { type MouseEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, } from "react";
-import { BarChart3 } from "lucide-react";
 import { objectColor } from "../../../shared/classification/objectColor.ts";
 
 import {
@@ -54,7 +53,6 @@ import {
   type DataBootstrapSnapshot,
 } from "../services/dataBootstrapSnapshot.ts";
 import { prewarmDataFirstScreen } from "../services/dataFirstScreenPrewarm.ts";
-import QuietPageHeader from "../../../shared/components/QuietPageHeader";
 import type { TrackerHealthSnapshot } from "../../../shared/types/tracking";
 import type { QuietToastTone } from "../../../shared/types/toast.ts";
 import { formatLocalDateKey } from "../../../shared/lib/localDate.ts";
@@ -1041,10 +1039,8 @@ export default function Data({
       }
       className="flex h-full min-h-0 flex-col gap-4 md:gap-5"
     >
-      <QuietPageHeader
-        icon={<BarChart3 size={18} />}
-        title={UI_TEXT.data.title}
-      />
+      {/* [本轮 T05] 视觉页头下线（顶栏 tab 已声明位置），读屏的名字不丢 */}
+      <h1 className="sr-only">{UI_TEXT.data.title}</h1>
 
       <div className="data-page-scroll min-h-0 flex-1 overflow-y-auto pr-1 qp-scroll-region qp-scroll-region-stable">
         <div className="data-dashboard-grid">

@@ -13,35 +13,12 @@
  * 接替者是 ⋯ + 弹出菜单，样式在新文件 `dashboard-dnd.css`（本文件 300 行贴死，
  * 只能减不能加）。CardControls.tsx 现在只渲染一颗 `.qp-card-more`。 */
 
-/* ── 加卡入口：靠右的小按钮，与卡头同一行视觉重量 ── */
-/* [自由调大小 · 0.12.1] 工具条**不占文档流**。
- * 它本来是板子的兄弟节点，占 20 + gap 8 = 28px，而板高仍按 636 算
- * → 底部便利贴被裁掉一半（症状：「卡片显示不完全」）。
- * 现在贴板子右上角漂浮、平时透明，指针进入视图区才完全显形：
- * 既不抢几何，也不会在没人操作时压住卡头。 */
-.qp-dashboard-toolbar {
-  position: absolute;
-  top: 0;
-  /* 板子在视图中居中留白时，对齐**板**的右缘而不是视图右缘。
-   * [v3.1] 下限 20px：倍率归用户后画布会出滚动条，工具条贴着 `right: 0` 时
-   * 「恢复默认」会被那条 15px 的滚动条压掉半个字（实测 1100 窗 + 100% 倍率）。 */
-  right: max(20px, calc((100% - var(--qp-board-w)) / 2));
-  z-index: 5;
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 16px;
-  height: var(--qp-card-head-h);
-  /* 常驻淡显而不是全隐形：全透明等于"这两个按钮没了"，
-   * 而"添加卡片"正是用户加回被移除窗口的唯一入口。 */
-  opacity: 0.45;
-  transition: opacity 120ms ease;
-}
-
-.qp-dashboard:hover > .qp-dashboard-toolbar,
-.qp-dashboard:focus-within > .qp-dashboard-toolbar {
-  opacity: 1;
-}
+/* ── 加卡入口：与卡头同一行视觉重量 ── */
+/* [0.13 · 需求 1.3/1.4] 工具条那一块（`.qp-dashboard-toolbar` 几何 + 悬停显形）
+ * **已搬走**到 `dashboard-r2.css` 的 `.qp-page-toolbar` 一族：设置页要复用同一套
+ * 几何与淡显（需求 4 的「工具条统一」落在容器这一维），而本文件 273 行贴 300 行硬顶，
+ * 就地加只能先减。搬走之后**位置也变了**：从板子右上角改成左上角（锁定入口按需求在左）。
+ * 本文件因此净减 28 行。 */
 
 /* ── 加卡弹层：居中面板 + 半透明遮罩 ── */
 .qp-add-card {

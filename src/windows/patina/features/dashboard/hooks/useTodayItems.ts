@@ -27,6 +27,11 @@ export interface TodayItemRow {
   value: number;
   /** 今天第一段的开始时刻（毫秒时间戳） */
   firstStart: number;
+  /**
+   * 今天最后一段的结束时刻（毫秒时间戳）；`null` = 该事项还有一段进行中
+   * （[0.13 · 1.6] 时间线行的「止」列用它；进行中显示此刻的钟点）。
+   */
+  lastEnd: number | null;
   /** 段数 */
   segments: number;
 }
@@ -80,10 +85,17 @@ export function buildTodayItemRows(
 
     const item = byId.get(record.itemId);
     const name = item?.name ?? "未归类";
+    /* 段的「止」：进行中 → null（行上显示此刻）；已结束 → 取各段的 max（乱序返回也稳） */
+    const recordEnd = running ? null : record.endedAt;
     const existing = buckets.get(record.itemId);
     if (existing) {
       existing.value += value;
       existing.firstStart = Math.min(existing.firstStart, record.startedAt);
+      existing.lastEnd = recordEnd === null
+        ? null
+        : existing.lastEnd === null
+          ? null
+          : Math.max(existing.lastEnd, recordEnd);
       existing.segments += 1;
     } else {
       buckets.set(record.itemId, {
@@ -92,6 +104,7 @@ export function buildTodayItemRows(
         color: item?.color ?? "",
         value,
         firstStart: record.startedAt,
+        lastEnd: recordEnd,
         segments: 1,
       });
     }

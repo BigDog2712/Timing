@@ -72,6 +72,10 @@ interface Props {
    *  为什么不在 `children` 里：`children` 只在 `ready` 渲染，而"今天还没有计时"正是
    *  最需要「＋ 新建事项」的时刻（时间线卡）。不传 → 逐字等于旧形态（其余五张卡）。 */
   footer?: ReactNode;
+  /** [0.13 · F2] 空态里**额外**渲染的视觉锚点（如计时分布卡的环底圈）。
+   *  为什么要有：只渲染一句 `qp-empty` 的话，"卡片是空的还是坏了"分不出来 ——
+   *  一圈底环 + 「今日 0m」说的是"今天真的什么都没记"，而不是"卡挂了"。 */
+  emptyVisual?: ReactNode;
   children: ReactNode;
 }
 
@@ -92,6 +96,7 @@ export default function ModuleShell({
   controls,
   className,
   footer,
+  emptyVisual,
   children,
 }: Props) {
   const errorId = useId();
@@ -161,7 +166,10 @@ export default function ModuleShell({
           ) : null}
         </div>
       ) : state === "empty" ? (
-        <p className="qp-empty">{emptyText}</p>
+        <>
+          <p className="qp-empty">{emptyText}</p>
+          {emptyVisual}
+        </>
       ) : children}
       {footer}
     </section>

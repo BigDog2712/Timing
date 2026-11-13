@@ -8,12 +8,15 @@ use crate::models::todo::{Todo, TodoListParams};
 const COLS: &str = "id, title, item_id, planned_at, remind_at, reminded_at, done_at, sort_order, \
                     created_at, updated_at";
 
-/// 按 id 查询（排除已软删除）。
-pub async fn find_by_id(pool: &SqlitePool, id: i64) -> AppResult<Option<Todo>> {
+/// 按 id 查询（排除已软删除）。[0.13] 泛化到连接池或事务（批量创建在事务内回读）。
+pub async fn find_by_id<'a, E>(executor: E, id: i64) -> AppResult<Option<Todo>>
+where
+    E: sqlx::Executor<'a, Database = Sqlite>,
+{
     let sql = format!("SELECT {COLS} FROM todos WHERE id = ? AND deleted_at IS NULL");
     let todo = sqlx::query_as::<_, Todo>(&sql)
         .bind(id)
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await?;
     Ok(todo)
 }
@@ -41,26 +44,34 @@ pub async fn list(pool: &SqlitePool, params: &TodoListParams) -> AppResult<Vec<T
 }
 
 /// 当前最大 sort_order（仅未软删行；无记录返回 0）。
-pub async fn max_sort_order(pool: &SqlitePool) -> AppResult<i64> {
+/// [0.13] 泛化到连接池或事务：批量创建只查一次，然后在事务内本地递增。
+pub async fn max_sort_order<'a, E>(executor: E) -> AppResult<i64>
+where
+    E: sqlx::Executor<'a, Database = Sqlite>,
+{
     let value: i64 = sqlx::query_scalar(
         "SELECT COALESCE(MAX(sort_order), 0) FROM todos WHERE deleted_at IS NULL",
     )
-    .fetch_one(pool)
+    .fetch_one(executor)
     .await?;
     Ok(value)
 }
 
 /// 插入并返回新 id（`updated_at` = 创建时刻，与 items 同法）。
+/// [0.13] 泛化到连接池或事务：单条路径传 pool、批量路径传 `&mut tx`（drop 即回滚）。
 #[allow(clippy::too_many_arguments)]
-pub async fn insert(
-    pool: &SqlitePool,
+pub async fn insert<'a, E>(
+    executor: E,
     title: &str,
     item_id: Option<i64>,
     planned_at: Option<i64>,
     remind_at: Option<i64>,
     sort_order: i64,
     now: i64,
-) -> AppResult<i64> {
+) -> AppResult<i64>
+where
+    E: sqlx::Executor<'a, Database = Sqlite>,
+{
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO todos \
          (title, item_id, planned_at, remind_at, reminded_at, done_at, sort_order, created_at, updated_at) \
@@ -73,7 +84,7 @@ pub async fn insert(
     .bind(sort_order)
     .bind(now)
     .bind(now)
-    .fetch_one(pool)
+    .fetch_one(executor)
     .await?;
     Ok(id)
 }

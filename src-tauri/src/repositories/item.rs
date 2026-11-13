@@ -21,14 +21,19 @@ pub async fn find_by_id(pool: &SqlitePool, id: i64) -> AppResult<Option<Item>> {
 /// 按名称精确查询（排除已软删除；同名多条取最小 id —— V0.3.12 待办→计时映射用）。
 ///
 /// 与 `todos.title` 的匹配口径一致（`COLLATE BINARY`，见 `soft_delete_for_saved_record`）。
-pub async fn find_by_name(pool: &SqlitePool, name: &str) -> AppResult<Option<Item>> {
+/// [0.13] 泛化到任意执行器（连接池或事务）：`todo_create_batch` 要在**事务内**
+/// 按标题匹配事项（单条 `todo_create` 路径传 pool 不受影响，泛型两吃）。
+pub async fn find_by_name<'a, E>(executor: E, name: &str) -> AppResult<Option<Item>>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Sqlite>,
+{
     let sql = format!(
         "SELECT {COLS} FROM items WHERE name = ? COLLATE BINARY AND deleted_at IS NULL \
          ORDER BY id ASC LIMIT 1"
     );
     let item = sqlx::query_as::<_, Item>(&sql)
         .bind(name)
-        .fetch_optional(pool)
+        .fetch_optional(executor)
         .await?;
     Ok(item)
 }

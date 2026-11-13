@@ -9,11 +9,12 @@ const LAST_ACTIVE_VIEW_KEY = "patina:last-active-view";
 const PENDING_UPDATE_RELAUNCH_VIEW_KEY = "patina:pending-update-relaunch-view";
 
 function isView(value: string | null): value is View {
+  /* [T04] "tools" 已从 View 联合移除：旧会话存的 "tools" 在这里自然判非法，
+     回落到 dashboard —— 不需要专门的迁移键。 */
   return value === "dashboard"
     || value === "history"
     || value === "data"
     || value === "mapping"
-    || value === "tools"
     || value === "settings"
     || value === "about";
 }

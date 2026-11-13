@@ -30,11 +30,9 @@ type TabStyle = CSSProperties & { "--qp-tab-i": number };
  * 本轮只做**高亮映射**，视图归属的真正归并（数据管理三面 / 设置五组）在下一批。
  * 先把它写全，是为了避免"恢复了上次视图却没有 tab 点亮"这种看起来像 bug 的状态：
  * 启动时 last-active-view 可能是 history / mapping / about（另一个窗口递来的落点也可能是）。
- * tools 归主界面：工具是主界面的第二面，主界面 tab 保持点亮（01 §5.2）。
  */
 const TAB_BY_VIEW: Record<View, View> = {
   dashboard: "dashboard",
-  tools: "dashboard",
   history: "data",
   data: "data",
   mapping: "data",

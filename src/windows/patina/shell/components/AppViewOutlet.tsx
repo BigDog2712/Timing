@@ -5,8 +5,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { UiText } from "../../shared/i18n/index.ts";
+import { useLocale, type UiText } from "../../shared/i18n/index.ts";
 import type { View } from "../types/view.ts";
+import { AppErrorBoundary } from "../../../shared/AppErrorBoundary.tsx";
+import { APP_BOUNDARY_COPY } from "./appBoundaryCopy.ts";
 
 interface AppViewOutletProps {
   onPresentedViewChange?: (view: View) => void;
@@ -15,6 +17,8 @@ interface AppViewOutletProps {
   foregroundReady: boolean;
   uiText: UiText;
   views: Record<View, ReactNode>;
+  /** 兜底面板的「回到主界面」：切回 dashboard。不传则那颗键不渲染。 */
+  onBackHome?: () => void;
 }
 
 export default function AppViewOutlet({
@@ -24,7 +28,10 @@ export default function AppViewOutlet({
   foregroundReady,
   uiText,
   views,
+  onBackHome,
 }: AppViewOutletProps) {
+  const locale = useLocale();
+  const boundaryCopy = APP_BOUNDARY_COPY[locale];
   const [displayedView, setDisplayedView] = useState<View>(renderedView);
   const [outgoingView, setOutgoingView] = useState<View | null>(null);
   const transitionRequestRef = useRef(0);
@@ -96,7 +103,13 @@ export default function AppViewOutlet({
           aria-hidden={transitionActive || undefined}
           className="qp-view-container flex-1 min-h-0 flex flex-col h-full overflow-hidden"
         >
-          {views[displayedView]}
+          {/* [0.13 · 1.2「无数据时全黑 + 无法返回」] 边界只包**视图内容**：
+              标题栏与顶栏在 `AppShell` 层（本组件之上），因此单页崩了还能换页 ——
+              这就是「无法返回」的结构性修法。`key` 绑在视图上：
+              换页即重挂边界，错误态不会粘着上一个页面。 */}
+          <AppErrorBoundary key={displayedView} copy={boundaryCopy} onBackHome={onBackHome}>
+            {views[displayedView]}
+          </AppErrorBoundary>
         </div>
         {outgoingView !== null ? (
           <div

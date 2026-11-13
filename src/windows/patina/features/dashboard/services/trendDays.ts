@@ -114,6 +114,55 @@ export function buildTodayHourPlan(nowMs: number, stampHour: LocalHourStamp = lo
   };
 }
 
+/**
+ * 本轮（0.13 · 1.5）的**展示轴**：横轴铺满 24 个整点桶（00:00–24:00），
+ * 而查询计划（`query`）**仍然裁到此刻**。
+ *
+ * 为什么必须拆成两半：把 `query.endMs` 放开到明日 0 点会让
+ * `activity_read_model/mod.rs:189-203` 的边界校验拒绝整条读取（卡片**静默变空**）；
+ * 而"只画到当前小时"又让横轴随时刻伸缩，早上一根柱、晚上 24 根，视觉上没有"一天"的锚。
+ * 所以：
+ *   · `query`   —— 沿用 `buildTodayHourPlan` 的全部语义（末桶裁到 now、DST 去重），
+ *     只用来发 `loadActivityAggregateRange`；
+ *   · `windows` —— 恒 24 个整点桶（DST 前跳日会少一个，见下），交给
+ *     `accumulateTrendDays` 与渲染。未来桶与记录的交集恒为空 → **时长恒 0**，
+ *     这一条是几何事实，不需要额外置零代码。
+ */
+export interface TodayTrendPlan {
+  /** 发给后端的查询计划：`endMs` 恒 <= 此刻，绝不推到未来 */
+  query: TrendQueryPlan;
+  /** 展示轴：00:00–24:00 的整点桶（正常日恒 24 个） */
+  windows: TrendWindow[];
+}
+
+export function buildTodayTrendPlan(nowMs: number, stampHour: LocalHourStamp = localHourStart): TodayTrendPlan {
+  const query = buildTodayHourPlan(nowMs, stampHour);
+  const now = new Date(nowMs);
+  const dayStart = startOfLocalDay(now);
+  const dayKey = formatLocalDateKey(dayStart);
+
+  const windows: TrendWindow[] = [];
+  for (let hour = 0; hour < 24; hour += 1) {
+    const startMs = stampHour(dayStart, hour);
+    const endMs = stampHour(dayStart, hour + 1);
+    const previous = windows[windows.length - 1];
+    /* DST 前跳日有**两种**坏桶，都要跳（t13 判据钉着）：
+       ① 重复起点：被抹掉的整点与后一个算出同一瞬间（hour3 与 hour2 同瞬间）；
+       ② 零长窗：02:00 被归一化成 03:00 时，hour2 的 start 与 end 落成同一瞬间 ——
+          这颗不在循环末尾、`startMs` 也没重复，只判 ① 根本拦不住。
+       展示轴因此可能少于 24 格 —— 那一小时本地根本不存在，"画一个空位"才是假的；
+       跳过之后下一个 hour 顶上来补住这段（03:00–04:00 照常在轴上）。 */
+    if (previous && startMs <= previous.startMs) continue;
+    if (endMs <= startMs) continue;
+    windows.push({
+      key: `${dayKey}T${pad2(hour)}`,
+      startMs,
+      endMs,
+    });
+  }
+  return { query, windows };
+}
+
 interface RangeRecord {
   startTime: number;
   endTime: number;

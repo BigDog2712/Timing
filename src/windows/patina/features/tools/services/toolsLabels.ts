@@ -1,19 +1,9 @@
-import type { Locale, UiText } from "../../../shared/i18n/index.ts";
-import type { ToolsViewModelLabels } from "../types.ts";
+import type { Locale } from "../../../shared/i18n/index.ts";
 
-export function buildToolsViewModelLabels(uiText: UiText): ToolsViewModelLabels {
-  return {
-    pomodoroFocus: uiText.tools.pomodoroPhase.focus,
-    pomodoroShortBreak: uiText.tools.pomodoroPhase.shortBreak,
-    pomodoroLongBreak: uiText.tools.pomodoroPhase.longBreak,
-    chipFocus: uiText.tools.statusChip.focus,
-    chipBreak: uiText.tools.statusChip.break,
-    chipReminder: uiText.tools.statusChip.reminder,
-    completedToday: uiText.tools.completedToday,
-    cycle: uiText.tools.pomodoroCycle,
-  };
-}
-
+/**
+ * [本轮 T04] `buildToolsViewModelLabels` 随番茄 / 灯簇下线删除；
+ * 只留 `formatUsageDuration`（活动提醒卡三件套 + 到点弹窗在用）。
+ */
 export function formatUsageDuration(totalMinutes: number, locale: Locale): string {
   const total = Math.max(0, Math.floor(totalMinutes));
   const hours = Math.floor(total / 60);

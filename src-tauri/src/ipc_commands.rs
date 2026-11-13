@@ -70,6 +70,8 @@ macro_rules! define_invoke_handler {
             crate::commands::window_cmd::open_note_window,
             crate::commands::window_cmd::close_note_window,
             crate::commands::todo_cmd::todo_create,
+            // [0.13 · 1.7] 批量创建（单事务 1..=60）；本轮唯一新增命令
+            crate::commands::todo_cmd::todo_create_batch,
             crate::commands::todo_cmd::todo_update,
             crate::commands::todo_cmd::todo_delete,
             crate::commands::todo_cmd::todo_list,

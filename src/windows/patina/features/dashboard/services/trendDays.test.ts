@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { accumulateTrendDays, buildTodayHourPlan, type LocalHourStamp } from "./trendDays";
+import { accumulateTrendDays, buildTodayHourPlan, buildTodayTrendPlan, type LocalHourStamp } from "./trendDays";
 
 /**
  * 今日分时计划的几何判据。这几条钉的都是**算错了也照样出货**的地方：
@@ -173,6 +173,73 @@ describe("今日活动趋势 · 夏令时前跳日", () => {
       { startTime: midnight + 2 * 3_600_000, endTime: midnight + 2 * 3_600_000 + 30 * 60_000 },
     ]);
     expect(windows.reduce((sum, item) => sum + item.durationMs, 0)).toBe(30 * 60_000);
+  });
+});
+
+/**
+ * [0.13 · 1.5] `buildTodayTrendPlan`：**查询**与**展示**拆成两半的判据。
+ *
+ * 为什么这两个口径必须分开钉：
+ *   · `query`（发给后端）的 `endMs` **裁到此刻** —— `activity_read_model/mod.rs:189-203`
+ *     的边界校验会拒绝"末边界在未来"的读取，整条 `aggregate_range` 失败、卡片静默变空。
+ *     放宽这一行（endMs 推到 24:00）是本判据的变异靶点；
+ *   · `windows`（展示轴）恒 **24 个整点桶**（00:00–24:00），不随时刻伸缩 ——
+ *     未来桶时长恒 0（accumulate 的交集自然裁掉，不需要置零代码）。
+ */
+describe("今日活动趋势 · 查询与展示拆分（buildTodayTrendPlan）", () => {
+  const now = new Date(2026, 10, 11, 9, 30, 0).getTime();
+  const dayStart = new Date(2026, 10, 11, 0, 0, 0).getTime();
+
+  it("t10_display_axis_covers_24_full_hour_buckets_from_00_to_24", () => {
+    const plan = buildTodayTrendPlan(now);
+    /* 24 个桶：00:00–24:00 铺满，不随"现在几点"伸缩 */
+    expect(plan.windows).toHaveLength(24);
+    expect(plan.windows[0].startMs).toBe(dayStart);
+    expect(plan.windows[0].endMs).toBe(dayStart + 3_600_000);
+    /* 末桶是 23:00–24:00：右端就是 24:00（次日 0 点），不裁 */
+    expect(plan.windows[23].startMs).toBe(dayStart + 23 * 3_600_000);
+    expect(plan.windows[23].endMs).toBe(dayStart + 24 * 3_600_000);
+    /* key 全局唯一（React key 撞了会复用错行），且桶首尾相接无空洞 */
+    expect(new Set(plan.windows.map((window) => window.key)).size).toBe(24);
+    expect(plan.windows.slice(1).every((window, index) => window.startMs === plan.windows[index].endMs)).toBe(true);
+  });
+
+  it("t11_query_endMs_is_clipped_to_now_never_to_the_future", () => {
+    const plan = buildTodayTrendPlan(now);
+    /* 展示轴铺到 24:00 ≠ 查询跟着铺到 24:00：末边界在未来会被后端校验整条拒掉 */
+    expect(plan.query.endMs).toBe(now);
+    expect(plan.query.startMs).toBe(dayStart);
+    expect(plan.query.endMs).toBeLessThan(plan.windows[23].endMs);
+    /* 查询边界与查询窗口自洽（`validate_aggregate_boundaries`：首 == startMs、末 == endMs） */
+    expect(plan.query.boundaries[0]).toBe(plan.query.startMs);
+    expect(plan.query.boundaries[plan.query.boundaries.length - 1]).toBe(plan.query.endMs);
+  });
+
+  it("t12_future_buckets_accumulate_zero_but_stay_on_the_axis", () => {
+    const plan = buildTodayTrendPlan(now);
+    const days = accumulateTrendDays(plan.windows, [
+      { startTime: new Date(2026, 10, 11, 9, 0, 0).getTime(), endTime: new Date(2026, 10, 11, 9, 10, 0).getTime() },
+    ]);
+    /* 09:00–09:10 落在 09:00 那桶；09:30 之后的桶在轴上、时长 0 */
+    expect(days[9].durationMs).toBe(10 * 60_000);
+    expect(days[20].durationMs).toBe(0);
+    expect(days[23].durationMs).toBe(0);
+    expect(days.reduce((sum, item) => sum + item.durationMs, 0)).toBe(10 * 60_000);
+  });
+
+  it("t13_spring_forward_day_yields_23_buckets_and_still_keeps_the_axis_gapless", () => {
+    /* 前跳日 02:00 不存在 → 展示桶少一格（23 个），但轴仍首尾相接、无重复起点；
+       查询照常裁到此刻。展示"一个本地不存在的小时的空位"才是假话。 */
+    const midnight = new Date(2026, 2, 8, 0, 0, 0).getTime();
+    const stamp: LocalHourStamp = (day, hour) => {
+      const base = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0).getTime();
+      return base + (hour <= 2 ? hour : hour - 1) * 3_600_000;
+    };
+    const plan = buildTodayTrendPlan(midnight + 17 * 3_600_000, stamp);
+    expect(plan.windows).toHaveLength(23);
+    expect(new Set(plan.windows.map((window) => window.key)).size).toBe(23);
+    expect(plan.windows.slice(1).every((window, index) => window.startMs === plan.windows[index].endMs)).toBe(true);
+    expect(plan.query.endMs).toBe(midnight + 17 * 3_600_000);
   });
 });
 

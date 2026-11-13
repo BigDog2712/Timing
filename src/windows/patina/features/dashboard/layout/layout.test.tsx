@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { LAYOUT_STORAGE_KEY, type DashboardLayout } from "./contract";
-import { DEFAULT_LAYOUT } from "./defaultLayout";
+import { cloneLayout, DEFAULT_LAYOUT } from "./defaultLayout";
 import { normalizeLayout } from "./normalizeLayout";
 import { LEGACY_STORAGE_KEY, loadLayout, resetLayout, saveLayout } from "./layoutStore";
 import { useBoardStore } from "./boardStore";
@@ -69,7 +69,8 @@ describe("normalizeLayout（自由摆位 v3）", () => {
         /* 这两张是真的被主人摘掉的组件：老布局文件里还留着，读进来必须安静地清掉，
          * 不能因为「有个不认识的 kind」就整份回默认（那会把用户其余排布一起抹了） */
         { uid: 5, kind: "items", x: 0, y: 280, w: 518, h: 264, tier: "M" },
-        { uid: 6, kind: "reminder", x: 534, y: 280, w: 518, h: 264, tier: "M" },
+        /* [本轮 T04] `reminder` 回归为合法 kind（活动提醒新卡），这里换一个真不存在的 kind */
+        { uid: 6, kind: "gauge", x: 534, y: 280, w: 518, h: 264, tier: "M" },
         { uid: 4, kind: "notes", x: 0, y: 600, w: 1052, h: 264, tier: "M" },
       ],
     });
@@ -148,7 +149,7 @@ describe("layoutStore（v3 键 + v2 迁移）", () => {
 describe("boardStore（多实例 / 增删 / 尺寸 / 标题）", () => {
   beforeEach(() => {
     window.localStorage.clear();
-    useBoardStore.getState().reset();
+    useBoardStore.setState({ layout: cloneLayout(DEFAULT_LAYOUT) });
   });
 
   it("同一种组件可以加多张，落点互不重叠", () => {
@@ -187,7 +188,7 @@ describe("boardStore（多实例 / 增删 / 尺寸 / 标题）", () => {
     useBoardStore.getState().remove(target.uid);
     expect(useBoardStore.getState().layout.cards.some((card) => card.uid === target.uid)).toBe(false);
 
-    useBoardStore.getState().reset();
+    useBoardStore.setState({ layout: cloneLayout(DEFAULT_LAYOUT) });
     expect(useBoardStore.getState().layout.cards).toEqual(DEFAULT_LAYOUT.cards);
   });
 

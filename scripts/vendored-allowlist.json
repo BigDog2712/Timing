@@ -2,6 +2,84 @@
   "_doc": "vendored 改动登记表。前端 src/windows/patina/shell/** src/windows/patina/features/** src/windows/patina/platform/** src/windows/patina/shared/** 与后端 src-tauri/src/app/insight/** src-tauri/src/commands/insight/** src-tauri/src/infra/insight/** src-tauri/src/models/insight/** src-tauri/src/services/insight/** 是 MIT 第三方源码（Patina），改动必须在这里留一条：path + change(modified|added|deleted) + reason + owner。验收口径是 node scripts/check-vendored-diff.mjs —— 未登记的改动让 npm run check 直接红。融合期（commit 7bc7bd7）那批路径改写与测试拆分不算改动，已固化进基线，见 THIRD-PARTY-NOTICES.md 第 1-7 条。",
   "entries": [
     {
+      "path": "src/windows/patina/features/dashboard/layout/library.ts",
+      "change": "added",
+      "reason": "[0.13 T01/T02 需求1.4] 多布局库：单键 patina:dashboard-layout:library:v1（activeId+items），factory 为内置虚拟条目。loadLibrary（坏 JSON/坏形状自愈、老「默认布局」键迁移一次并落盘保 id 稳定）/saveLibrary/createLayout（深拷贝快照，改当前排布不影响库）/removeLayout（删当前回落 factory）/resolveLayout/libraryEntries。纯函数+存储，无 React 无 store，响应式在 boardStore。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/layout/lockPreference.ts",
+      "change": "added",
+      "reason": "[0.13 T01/T02 需求1.3] 布局锁定偏好：独立键 patina:dashboard-layout:locked:v1（\"1\"/\"0\"）。不进 DashboardLayout——放进去要升 LAYOUT_VERSION，会触发 normalizeLayout 全量自愈去「修」用户排布；也不跟布局库——锁是操作模式不是布局属性，切布局不该改锁。坏值按未锁定处理（宁可不锁，不许锁死）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/layout/LayoutManagerDialog.tsx",
+      "change": "added",
+      "reason": "[0.13 T02 需求1.4] 布局管理弹层：查看/切换/删除(同键两次点击确认)/新建(默认名「布局 N」可重名)+整理。锁定态新建/删除/整理/切换全禁并给 lockedHint 解释。刻意不做重命名与导入导出（需求未列）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/components/QuietPageToolbar.tsx",
+      "change": "added",
+      "reason": "[0.13 T01] 页级工具条容器：把原 .qp-dashboard-toolbar 的几何/淡显提成 .qp-page-toolbar 一族给设置页复用（需求4「工具条统一」落在容器维）。约束：锁定态绝不许 pointer-events:none（死锁防线）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/components/appBoundaryCopy.ts",
+      "change": "added",
+      "reason": "[0.13 T01 需求1.2] 分析窗错误边界的四语言文案（title/reload/backHome）。不进 shared/i18n/**（位置数组插行整体错位），四键齐全，ru/es 不降级英文。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/dashboard-r2.css",
+      "change": "added",
+      "reason": "[0.13 T01/T02] 本轮新增选择器集中地：.qp-page-toolbar 一族（从 dashboard-layout.css 搬出，原文件净减 28 行；主界面修饰类从 right: 改 left: 贴左上角）、.fatal 兜底面板（分析窗此前没有这套样式）、锁定态视觉、.qp-layout-manager 弹层。零字面量色值。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/App.tsx",
+      "change": "modified",
+      "reason": "[0.13 T01 需求1.2] mini 分支包一层 AppErrorBoundary（MiniShell 的 LocaleProvider 之外的最后防线，文案走缺省中文）；tool-notification 窗本轮不动（T04 下线）。主窗分支结构不变。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/components/AppViewOutlet.tsx",
+      "change": "modified",
+      "reason": "[0.13 T01 需求1.2] 视图级错误边界：AppErrorBoundary 包 views[displayedView]，key 绑视图（换页即重挂，错误态不粘页）；新增 onBackHome prop 由 AppShell 传 handleSidebarNavigate('dashboard')。结构性修法=导航在边界外，单页崩了还能换页。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/mini/MiniShell.tsx",
+      "change": "modified",
+      "reason": "[0.13 T01 需求1.2] LocaleProvider 之内再包一层按 locale 取文案的 AppErrorBoundary（App.tsx 那层在 Provider 外拿不到 locale）。MiniView 一行不动。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/layout/library.test.ts",
+      "change": "added",
+      "reason": "[0.13 T01] V-1.4a 判据 12 条：迁移(id 跨会话稳定/老键不删/无源回落空库)、坏数据自愈(坏 JSON/坏形状/版本不符/activeId 悬空)、删当前回落 factory 且不猜「最近一条」、深拷贝隔离、列表 factory 恒在、重名允许 id 唯一、存读回环。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/layout/boardLock.test.tsx",
+      "change": "added",
+      "reason": "[0.13 T02] V-1.3a/b/c/d+V-3a+V-1.4d 判据 14 条：锁定后六动作不改 layout 引用(引用相等断言)、改标题/参数仍可用、切删建布局禁用、卡头菜单只禁结构三项且标题可编辑、工具条锁定态 disabled=false 且 CSS 不许 pointer-events:none(死锁)、卡框不渲染手柄不吃抓取、卡内输入框不触发拖卡、弹层整理/出厂条目。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/layout/boardCopy.test.ts",
+      "change": "added",
+      "reason": "[0.13 T02] V-1.4b 判据：四 locale 键集相等、函数键数量相等、每句非空、ru/es 逐句不等于英文(sizes 例外——S/M/L 是代号不是词)。防手写表「少补一键」与「静默降级英文」两种不报错的坏法。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/components/AppErrorBoundary.test.tsx",
+      "change": "added",
+      "reason": "[0.13 T01] V-1.2a 判据 7 条：必抛子组件→兜底面板出现且 role=alert、两颗出口键、错误原文可见、导航(标题栏/顶栏)在边界外不随树消失、backHome 回调触发、接线源码判据(AppViewOutlet 包视图且 key 绑视图/AppShellLocaleRoot 按 locale 包壳/App.tsx 包 mini)、四语言文案齐全。",
+      "owner": "寇豆码"
+    },
+    {
       "path": "src/windows/patina/features/dashboard/services/timelineItemName.ts",
       "change": "added",
       "reason": "[本轮 时间线卡可写] 从 TimelineManage 拆出的事项名校验（ITEM_NAME_MAX_LEN=60 与 Rust models::item 同值、按码点计长、create 不查重 —— ADR-021 允许同名；改名才由弹层挡一次同名）与弹层行类型 TimelineManageRow。拆出来的唯一理由：TimelineManage.tsx 贴 300 行硬限，而校验口径的注释本身就是判据。",
@@ -981,8 +1059,8 @@
     },
     {
       "path": "src/windows/patina/shell/components/AppSidebar.tsx",
-      "change": "modified",
-      "reason": "[目录重排 2026-11-12] 双窗结构重排（src/app|features|platform|shared → src/windows/patina/*）导致 import 相对路径变更，逻辑与行为零改动；只改了指向被搬文件的模块说明符。",
+      "change": "deleted",
+      "reason": "死代码（AppShell:205-211 注明侧栏已下线）；[0.13 T04] 由寇豆码删除",
       "owner": "ForG"
     },
     {
@@ -1053,20 +1131,20 @@
     },
     {
       "path": "src/windows/patina/features/tools/components/HostTimingStatusRow.test.tsx",
-      "change": "modified",
-      "reason": "[目录重排 2026-11-12] 双窗结构重排（src/app|features|platform|shared → src/windows/patina/*）导致 import 相对路径变更，逻辑与行为零改动；只改了指向被搬文件的模块说明符。",
+      "change": "deleted",
+      "reason": "判据对象整批不存在；[0.13 T04] 由寇豆码删除",
       "owner": "ForG"
     },
     {
       "path": "src/windows/patina/features/tools/components/HostTimingStatusRow.tsx",
-      "change": "modified",
-      "reason": "[目录重排 2026-11-12] 双窗结构重排（src/app|features|platform|shared → src/windows/patina/*）导致 import 相对路径变更，逻辑与行为零改动；只改了指向被搬文件的模块说明符。",
+      "change": "deleted",
+      "reason": "孤儿闭合：Tools.tsx/focusSessionCopy 删除；[0.13 T04] 由寇豆码删除",
       "owner": "ForG"
     },
     {
       "path": "src/windows/patina/features/tools/services/timingSemantics.test.ts",
-      "change": "modified",
-      "reason": "[目录重排 2026-11-12] 双窗结构重排（src/app|features|platform|shared → src/windows/patina/*）导致 import 相对路径变更，逻辑与行为零改动；只改了指向被搬文件的模块说明符。",
+      "change": "deleted",
+      "reason": "判据对象整批删除；换成 shell/components/toolsRetirement.source.test.ts 的 V-2g（换，不是删）。[0.13 T04] 由寇豆码删除",
       "owner": "ForG"
     },
     {
@@ -1289,6 +1367,468 @@
       "path": "src-tauri/src/infra/insight/windows/foreground.rs",
       "change": "modified",
       "reason": "[0.12.1 CI 对齐] clippy 1.100 的 needless_bool：`if (extended_style & WS_EX_TOOLWINDOW.0) != 0 { return false; } true` 化简为 `(extended_style & WS_EX_TOOLWINDOW.0) == 0`。同一函数里前面几处「false 提前返回」不在这个 lint 范围内（后面不是 bool 字面量），只有末尾这处被点名。语义等价：只看 TOOLWINDOW 位是否存在。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/recordTimeEdit.ts",
+      "change": "added",
+      "reason": "[0.13 T03b 需求2] 改起止的六条边界规则（B1 严格小于 / B2 同一本地日 / B3 只改 saved / B4 前端不算时长 / B5 逐段改 / B6 跨零点拒绝+指引）收进一个纯函数。判定顺序即判据（notSaved 赢过 crossDay）。B2 必须前端拦：Rust update 不按天拆分，跨零点行会让整天算给起始日且零报错。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/recordTimeEdit.test.ts",
+      "change": "added",
+      "reason": "[0.13 T03b 需求2] V-1.6d 判据：六条 issue 各一条 + 顺序钉死（notSaved>endMissing>sameInstant>endBeforeStart>crossDay）。变异靶点②：摘掉 crossDay 检查 → r05 红。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/todoBatch.ts",
+      "change": "added",
+      "reason": "[0.13 T03a 需求3] 批量新建的笛卡尔展开（多日期 × 多时刻），TodoBatchIssue 七态按优先级，TODO_BATCH_MAX=60 与 Rust 同值，datePast 硬校验（purge_overdue 15s 会软删过去的待办），remind 语义与单条同一条规则（Q2 裁决：不加 planned_end_at）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/todoBatch.test.ts",
+      "change": "added",
+      "reason": "[0.13 T03a 需求3] 批量展开判据：2×2=4 升序、remind→remindAt===plannedAt、去重、七态 issue、>60 整批拒绝不截断、datePast、remindPast、issue 时 plans 恒空。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/itemMenuMirror.test.ts",
+      "change": "added",
+      "reason": "[0.13 T03a §3.1 C] 默认时长「留空=null」语义两窗镜像的 source test：药丸侧 ItemsPrefsMenu.readMinutes 的空串分支逐字钉住（变异靶点：改成 return 0 立即红），分析窗侧 clampItemMinutes 用运行时判据钉。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/ItemEditForm.tsx",
+      "change": "added",
+      "reason": "[0.13 T03a 需求2] 事项编辑表单（名称+默认时长+Enter 保存/Escape 取消且 preventDefault）从 TimelineItemRows 行内编辑抽出，TimelineEditDialog 与行内编辑共用同一把校验尺。TimelineItemRows 291 行贴限的拆法。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineEditDialog.tsx",
+      "change": "added",
+      "reason": "[0.13 T03a 需求2] 卡底「编辑事项」弹层：先选事项（updatedAt 倒序）再改名称+默认时长，保存恰一条 update_item 意图（timerMinutes 三态显式发：留空=null 清默认时长），成功走 applyLocalItem/applyLocalTimer/onLocalRename。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineRecordTimeDialog.tsx",
+      "change": "added",
+      "reason": "[0.13 T03b 需求2] 「改起止」弹层：useItemRecords 按需拉当天段，逐段 datetime-local 编辑，保存恰一条 update_record_time 意图（camelCase，payload 无时长字段——B4），B3 进行中的段保存键 disabled + onlySavedEditable 文案，B2 跨零点就地 crossDayHint 不发意图。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TodoBatchFields.tsx",
+      "change": "added",
+      "reason": "[0.13 T03a 需求3] 多日期×多时刻的 chip 流控件（type=date/type=time 各一 + 已选 chip 可移除，添加去重）。从 TodoComposeDialog 拆出防破 300 行棘轮；笛卡尔展开与校验在 todoBatch.ts 一处。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TodoEditDialog.tsx",
+      "change": "added",
+      "reason": "[0.13 T03a 需求3] 单条待办编辑弹层（标题+计划时间+提醒）：patch 三态显式发（null=清空，Rust double_option 靠它与缺键区分），remind 语义与新建同一条规则，勾提醒且 plannedAt 空时勾选 disabled。TodosModule 270 行贴限的拆法。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TodoRow.tsx",
+      "change": "added",
+      "reason": "[0.13 T03a 需求3] 待办卡一行从 TodosModule 抽出（勾选/标题/铃铛/时间胶囊/编辑键/删除键，行体单击 open_todos 意图），顺带补「编辑」入口。TodosModule 270→194 行。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/useItemRecords.ts",
+      "change": "added",
+      "reason": "[0.13 T03b] 某事项当天原始记录段的按需拉取 hook：弹层关着不拉（每 30s 轮询背 200 行原始段是浪费），listTimingRecords 后本地按 itemId 过滤排序。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimerModuleEmpty.test.tsx",
+      "change": "added",
+      "reason": "[0.13 T03a 需求5 · V-1.2b] 计时分布空数据仍画底圈判据：categoryDist=[] 时 data-state=empty 且 .qp-donut（含轨道色 circle）与「今日 0m」在场，渲染零 console.error。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineCardR2.test.tsx",
+      "change": "added",
+      "reason": "[0.13 T03a/T03b] 时间线卡行为判据：V-1.6a 卡头无菜单按钮+footer 恰三键+总计读数、V-1.6c 编辑事项恰一条 update_item、V-1.6e 改起止恰一条 camelCase update_record_time（变异靶点④邻近）、B2 跨零点不发意图、B3 进行中段 disabled。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TodoEditDialog.test.tsx",
+      "change": "added",
+      "reason": "[0.13 T03a 需求3] 行编辑弹层判据（从 TodosModule.test 拆出防破棘轮）：td01 打开初值、td02 清时间=两个显式 null、td03 remindAt===plannedAt、td04 失败弹层留着、td05 关态不渲染。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/dashboard-r2-cards.css",
+      "change": "added",
+      "reason": "[0.13 T03a/T03b] 从 dashboard-r2.css 拆出的卡面侧选择器（时间线行三列 grid、改起止弹层 .qp-record-time*、待办批量 chip 流 .qp-todo-batch*、行编辑 hover 键）——原文件 427 行破 300 棘轮。零字面量色值。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/useActivityReminders.ts",
+      "change": "added",
+      "reason": "[0.13 T04/T05]",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/activityReminderRows.ts",
+      "change": "added",
+      "reason": "[0.13 T04/T05]",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/settingsR2.source.test.ts",
+      "change": "added",
+      "reason": "[0.13 T04/T05]",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/components/appTitleBarR2.test.tsx",
+      "change": "added",
+      "reason": "[0.13 T04/T05]",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/components/toolsRetirement.source.test.ts",
+      "change": "added",
+      "reason": "[0.13 T04/T05]",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/dashboard-reminder.css",
+      "change": "added",
+      "reason": "[0.13 T04/T05]",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/tools-alerts.css",
+      "change": "added",
+      "reason": "[0.13 T04/T05]",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/Data.tsx",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsGroupNav.tsx",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsHeaderActions.tsx",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ToolAlertDialog.tsx",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/services/toolsLabels.ts",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/types.ts",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/components/AppTopNav.tsx",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/hooks/useAppShellRenderedView.ts",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/hooks/useMainToolsNavigation.ts",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/services/startupWarmupService.ts",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/services/updateRelaunchViewStorage.ts",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/services/viewChunkPreloadService.ts",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/settings-handles.css",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/topbar.css",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/types/view.ts",
+      "change": "modified",
+      "reason": "[0.13 T04/T05] 上一工程师批次的既有登记外改动",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/FocusAlertDialog.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/FocusHistoryButton.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/FocusSessionLedgerNote.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/FreeFocusContent.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/FreeFocusRestPicker.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/FreeFocusTaskEditor.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/PomodoroSettingsPicker.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/PomodoroTaskEditor.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/PomodoroTaskRow.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/PomodoroToolPanel.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ReminderScheduleFields.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ReminderToolPanel.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/TimedReminderEditor.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ToolDurationInput.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ToolStatusButtons.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/Tools.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ToolsSettingsDialog.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ToolsStatusChip.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ToolsStatusEntry.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/hooks/useToolsPageState.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/services/focusSessionCopy.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/services/freeFocusPreferenceStorage.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/services/freeFocusViewModel.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/services/reminderTimeInput.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/services/toolStatusEntries.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/services/toolsLayoutPreferenceStorage.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/services/toolsNumberInput.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/services/toolsViewModel.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/hooks/useAppSidebarState.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/mini/MiniToolStatus.tsx",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/services/sidebarNavigationPreferenceStorage.ts",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/tools.css",
+      "change": "deleted",
+      "reason": "[0.13 T04/T05] 孤儿闭合",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/reminder/ReminderModule.tsx",
+      "change": "added",
+      "reason": "[0.13 T04] 活动提醒新卡：目标候选 + 阈值 + 规则开关/编辑/删除，写动作全走 useActivityReminders（组件目录零传输层调用，V-2c）。工具页「活动提醒」分区的卡内形态。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/reminder/ActivityReminderRuleEditor.tsx",
+      "change": "added",
+      "reason": "[0.13 T04] 活动提醒三件套搬迁（附录第 4 条）：原 features/tools/components/ 同名文件原样迁入，仅改相对 import。改阈值弹层。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/reminder/ActivityReminderDurationPicker.tsx",
+      "change": "added",
+      "reason": "[0.13 T04] 三件套搬迁：时长选择浮层触发钮，formatUsageDuration 仍从保留的 toolsLabels.ts 取。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/reminder/ActivityReminderTargetPicker.tsx",
+      "change": "added",
+      "reason": "[0.13 T04] 三件套搬迁：目标搜索 combobox（app/category/web 候选）。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ActivityReminderRuleEditor.tsx",
+      "change": "deleted",
+      "reason": "[T04 收口·QA 建议修①] 活动提醒三件套迁到 dashboard/components/reminder/ 后，旧路径副本零引用（引用方全部改用新路径），按 §4.3「搬迁=删除旧路径」红线补删。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ActivityReminderDurationPicker.tsx",
+      "change": "deleted",
+      "reason": "[T04 收口·QA 建议修①] 同上：旧副本零引用（唯一引用者是被删的旧 RuleEditor），补删。",
+      "owner": "寇豆码"
+    },
+    {
+      "path": "src/windows/patina/features/tools/components/ActivityReminderTargetPicker.tsx",
+      "change": "deleted",
+      "reason": "[T04 收口·QA 建议修①] 同上：旧副本零引用，补删。",
       "owner": "寇豆码"
     }
   ]

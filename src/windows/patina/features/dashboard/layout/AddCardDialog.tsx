@@ -16,11 +16,18 @@ import { CARD_IDS, KIND_SPECS, type CardKind } from "./contract";
 interface Props {
   copy: BoardCopy;
   countOf: (kind: CardKind) => number;
+  /**
+   * 布局锁定：加卡属于**结构**，锁定时一律不可加。
+   * 为什么锁在弹层里而不是把工具条那颗键 `disabled` 掉：工具条三颗键在锁定态必须
+   * 仍然可点（`pointer-events: none` / `disabled` 会制造"永久锁死"的死锁），
+   * 所以「添加组件」照常打开弹层，只是里面的每一项都加不了。
+   */
+  locked?: boolean;
   onAdd: (kind: CardKind) => void;
   onClose: () => void;
 }
 
-export default function AddCardDialog({ copy, countOf, onAdd, onClose }: Props) {
+export default function AddCardDialog({ copy, countOf, locked = false, onAdd, onClose }: Props) {
   const firstRef = useRef<HTMLButtonElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
 
@@ -50,7 +57,7 @@ export default function AddCardDialog({ copy, countOf, onAdd, onClose }: Props) 
     >
       <div className="qp-add-card__panel" ref={panelRef}>
         <h2 id="qp-add-card-title" className="qp-add-card__title">{copy.addTitle}</h2>
-        <p className="qp-add-card__empty">{copy.addNote}</p>
+        <p className="qp-add-card__empty">{locked ? copy.lockedNotice : copy.addNote}</p>
         <ul className="qp-add-card__list">
           {CARD_IDS.map((kind, index) => {
             const spec = KIND_SPECS[kind];
@@ -61,6 +68,7 @@ export default function AddCardDialog({ copy, countOf, onAdd, onClose }: Props) 
                   ref={index === 0 ? firstRef : undefined}
                   type="button"
                   className="qp-add-card__item"
+                  disabled={locked}
                   onClick={() => onAdd(kind)}
                 >
                   <Plus size={14} strokeWidth={2} aria-hidden="true" />

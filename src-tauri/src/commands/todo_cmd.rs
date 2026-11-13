@@ -6,7 +6,7 @@ use tauri::State;
 
 use crate::error::AppResult;
 use crate::models::record::TimeRecord;
-use crate::models::todo::{Todo, TodoListParams, TodoPatch};
+use crate::models::todo::{Todo, TodoCreateInput, TodoListParams, TodoPatch};
 use crate::services;
 use crate::state::AppState;
 
@@ -21,6 +21,22 @@ pub async fn todo_create(
     let todo = services::todo::create(&state.pool, &title, item_id, planned_at, remind_at).await?;
     services::md_sync::dirty::mark("todo");
     Ok(todo)
+}
+
+/// 批量创建（[0.13 · 1.7] 多日期 × 多时刻）：**单事务**插入 1..=60 行。
+///
+/// 原子性是这条命令存在的唯一理由：前端循环调 N 次 `todo_create` 会出现部分成功
+/// （第 3 条失败 → 用户看到"只加了一半"，且没有回滚手段）。任一条校验失败
+/// （空标题 / 超长）整批回滚并返回 `ITEM_NAME_EMPTY` / `ITEM_NAME_TOO_LONG`，
+/// 库里 0 行新增（判据 V-1.7c）。
+#[tauri::command]
+pub async fn todo_create_batch(
+    state: State<'_, AppState>,
+    todos: Vec<TodoCreateInput>,
+) -> AppResult<Vec<Todo>> {
+    let created = services::todo::create_batch(&state.pool, todos).await?;
+    services::md_sync::dirty::mark("todo");
+    Ok(created)
 }
 
 #[tauri::command]

@@ -21,6 +21,12 @@ interface Props {
   title: string;
   tier: CardTier;
   copy: BoardCopy;
+  /**
+   * 布局锁定：**只禁几何/结构三项**（尺寸档 / 复制 / 移除），
+   * `标题` 仍可用 —— 锁定锁的是几何与结构，不是内容（改卡标题与卡内参数必须还能改，
+   * 否则「锁一下防误拖」会顺手把「改个卡名」也锁掉，用户只能去解锁）。
+   */
+  locked: boolean;
   onTier: (tier: CardTier) => void;
   onRename: (title: string | null) => void;
   onDuplicate: () => void;
@@ -28,7 +34,7 @@ interface Props {
 }
 
 export default function CardMenu({
-  label, title, tier, copy, onTier, onRename, onDuplicate, onRemove,
+  label, title, tier, copy, locked, onTier, onRename, onDuplicate, onRemove,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(title);
@@ -124,6 +130,7 @@ export default function CardMenu({
                 role="menuitemradio"
                 aria-checked={item === tier}
                 className="qp-card-menu-item qp-card-menu-tier"
+                disabled={locked}
                 onClick={run(() => onTier(item))}
               >
                 {copy.sizes[item]}
@@ -133,10 +140,22 @@ export default function CardMenu({
 
           <hr className="qp-card-menu-sep" />
 
-          <button type="button" role="menuitem" className="qp-card-menu-item" onClick={run(onDuplicate)}>
+          <button
+            type="button"
+            role="menuitem"
+            className="qp-card-menu-item"
+            disabled={locked}
+            onClick={run(onDuplicate)}
+          >
             {copy.duplicate}
           </button>
-          <button type="button" role="menuitem" className="qp-card-menu-item" onClick={run(onRemove)}>
+          <button
+            type="button"
+            role="menuitem"
+            className="qp-card-menu-item"
+            disabled={locked}
+            onClick={run(onRemove)}
+          >
             {copy.remove}
           </button>
         </div>

@@ -1,10 +1,9 @@
 import { useLocaleText } from "../../../shared/i18n/index.ts";
-import { Settings2 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import type { SettingsPageProps } from "../types";
 import type { AppLanguage } from "../../../shared/settings/appSettings.ts";
-import QuietPageHeader from "../../../shared/components/QuietPageHeader";
+import QuietPageToolbar from "../../../shell/components/QuietPageToolbar.tsx";
 import QuietButton from "../../../shared/components/QuietButton";
 import SettingsAppearancePanel from "./SettingsAppearancePanel";
 import SettingsDataSafetyPanel from "./SettingsDataSafetyPanel";
@@ -147,10 +146,8 @@ export default function Settings({
   if (loading || !savedSettings || !draftSettings) {
     return (
       <div className="flex h-full min-w-0 flex-col gap-4 md:gap-5">
-        <QuietPageHeader
-          icon={<Settings2 size={18} />}
-          title={UI_TEXT.settings.title}
-        />
+        {/* [本轮 T05] 视觉页头下线，读屏的名字不丢 */}
+        <h1 className="sr-only">{UI_TEXT.settings.title}</h1>
         <div className="qp-panel flex flex-1 items-center justify-center gap-3 text-[var(--qp-text-tertiary)]">
           <span className="qp-text-body qp-weight-medium">
             {loadError ? UI_TEXT.settings.loadFailed : UI_TEXT.settings.loading}
@@ -166,21 +163,22 @@ export default function Settings({
   }
 
   return (
-    <div className="settings-button-preview flex h-full w-full min-w-0 flex-col gap-4 md:gap-5">
+    /* `relative`：保存/取消搬进页级工具条后，工具条是绝对定位（`dashboard-r2.css` 的
+     * `.qp-page-toolbar` 几何），锚点必须是本页根。 */
+    <div className="settings-button-preview relative flex h-full w-full min-w-0 flex-col gap-4 md:gap-5">
       {dialogs}
-      <QuietPageHeader
-        icon={<Settings2 size={18} />}
-        title={UI_TEXT.settings.title}
-        rightSlot={(
-          <SettingsHeaderActions
-            saveStatus={saveStatus}
-            hasUnsavedChanges={hasUnsavedChanges}
-            blocked={languageSelectionPending}
-            onCancel={handleCancel}
-            onSave={() => void handleSave()}
-          />
-        )}
-      />
+      {/* [本轮 T05] 页头删了，保存/取消不能丢：搬进与主界面统一的 `QuietPageToolbar`
+       * 容器（V-4b：仍是 QuietButton，只是 size compact；按钮不降级成 qp-link-btn）。 */}
+      <QuietPageToolbar ariaLabel={UI_TEXT.settings.title} modifier="qp-settings-toolbar">
+        <SettingsHeaderActions
+          saveStatus={saveStatus}
+          hasUnsavedChanges={hasUnsavedChanges}
+          blocked={languageSelectionPending}
+          onCancel={handleCancel}
+          onSave={() => void handleSave()}
+        />
+      </QuietPageToolbar>
+      <h1 className="sr-only">{UI_TEXT.settings.title}</h1>
 
       <SettingsGroupNav />
 

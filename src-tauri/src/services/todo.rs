@@ -7,9 +7,12 @@ use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::models::constants::TODO_TITLE_MAX_LEN;
-use crate::models::todo::{Todo, TodoListParams, TodoPatch};
+use crate::models::todo::{Todo, TodoCreateInput, TodoListParams, TodoPatch};
 use crate::platform::clock::now_ms;
 use crate::repositories::todo as repo;
+
+/// 批量上限（设计 §3.2 `MAX_BATCH = 60`；前端 `TODO_BATCH_MAX` 同值先拦）
+const TODO_BATCH_MAX: usize = 60;
 
 pub async fn list(pool: &SqlitePool, params: TodoListParams) -> AppResult<Vec<Todo>> {
     repo::list(pool, &params).await
@@ -41,6 +44,49 @@ pub async fn create(
     let sort_order = repo::max_sort_order(pool).await? + 1;
     let id = repo::insert(pool, &title, bound, planned_at, remind_at, sort_order, now).await?;
     fetch_or_not_found(pool, id).await
+}
+
+/// 批量新建（[0.13 · 1.7]，`todo_create_batch`）：**单事务**插入 1..=60 行。
+///
+/// 原子语义（设计 §3.2）：任一条校验失败（空标题 → `ITEM_NAME_EMPTY`、超长 →
+/// `ITEM_NAME_TOO_LONG`）整批回滚，库里 0 行新增 —— 前端循环调 `todo_create`
+/// 会出现"只加了一半"的部分成功，而"统一添加"的动作语义就是原子。
+///
+/// 实现口径：
+///   · **先全部校验，再开事务**：非法输入连库都不碰（失败路径零副作用）；
+///   · `sort_order` 取一次 `max+1` 后在事务内本地递增（N 条查询 max 会互相踩）；
+///   · 事项绑定与 `create` 同一条规则：按标题匹配一次，匹配不到留空；
+///   · 事务体沿用 sqlx 的 drop-rollback：`tx` 在错误路径上被丢弃即回滚。
+pub async fn create_batch(pool: &SqlitePool, inputs: Vec<TodoCreateInput>) -> AppResult<Vec<Todo>> {
+    /* 1..=60（设计 §3.2 `MAX_BATCH`；前端 `TODO_BATCH_MAX` 同值先拦）。
+       这里是防御分支：走不到，走到了说明契约被改坏 —— 用 `DB_ERROR` 报内部不变式。 */
+    if inputs.is_empty() || inputs.len() > TODO_BATCH_MAX {
+        return Err(AppError::db("批量条数须在 1–60 之间"));
+    }
+    let normalized: Vec<(String, Option<i64>, Option<i64>)> = inputs
+        .iter()
+        .map(|input| {
+            Ok::<_, AppError>((normalize_title(&input.title)?, input.planned_at, input.remind_at))
+        })
+        .collect::<AppResult<_>>()?;
+
+    let mut tx = pool.begin().await?;
+    let mut sort_order = repo::max_sort_order(&mut *tx).await?;
+    let mut created: Vec<Todo> = Vec::with_capacity(normalized.len());
+    for (title, planned_at, remind_at) in &normalized {
+        let bound = crate::repositories::item::find_by_name(&mut *tx, title)
+            .await?
+            .map(|item| item.id);
+        sort_order += 1;
+        let id = repo::insert(&mut *tx, title, bound, *planned_at, *remind_at, sort_order, now_ms()).await?;
+        created.push(
+            repo::find_by_id(&mut *tx, id)
+                .await?
+                .ok_or_else(|| AppError::db("待办批量写入后读取失败"))?,
+        );
+    }
+    tx.commit().await?;
+    Ok(created)
 }
 
 pub async fn update(pool: &SqlitePool, id: i64, patch: TodoPatch) -> AppResult<Todo> {

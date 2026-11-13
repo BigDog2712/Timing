@@ -15,10 +15,8 @@ import DataView from "../../features/data/components/Data.tsx";
 import Dashboard from "../../features/dashboard/components/Dashboard.tsx";
 import HistoryView from "../../features/history/components/History.tsx";
 import SettingsView from "../../features/settings/components/Settings.tsx";
-import ToolsView from "../../features/tools/components/Tools.tsx";
 import { clearDataBootstrapCache } from "../../features/data/services/dataCacheLifecycle.ts";
 import type { ColorSchemePreview } from "../../features/settings/types.ts";
-import type { ToolsOpenTarget } from "../../features/tools/types.ts";
 import type {
   AppLanguage,
   AppSettings,
@@ -37,7 +35,6 @@ const Settings = createPreloadableViewComponent<ComponentProps<typeof SettingsVi
 const About = createPreloadableViewComponent<ComponentProps<typeof AboutView>>("about");
 const AppMapping =
   createPreloadableViewComponent<ComponentProps<typeof AppMappingView>>("mapping");
-const Tools = createPreloadableViewComponent<ComponentProps<typeof ToolsView>>("tools");
 
 export interface AppShellViewsProps {
   appSettings: AppSettings;
@@ -66,7 +63,6 @@ export interface AppShellViewsProps {
   onPrepareImportCategories: ComponentProps<typeof SettingsView>["onPrepareImportCategories"];
   onQuickActionError: (message: string) => void;
   onToast: (message: string, tone?: QuietToastTone) => void;
-  onToolsInitialTargetConsumed: () => void;
   refreshSignal: number;
   registerMappingSaveHandler: ComponentProps<typeof AppMappingView>["onRegisterSaveHandler"];
   registerSettingsSaveHandler: ComponentProps<typeof SettingsView>["onRegisterSaveHandler"];
@@ -75,9 +71,7 @@ export interface AppShellViewsProps {
   setLanguagePreview: (language: AppLanguage | null) => void;
   setMappingDirty: (dirty: boolean) => void;
   setSettingsDirty: (dirty: boolean) => void;
-  showToolNavigationLabels: boolean;
   themeModePreviewSetter: (mode: ThemeMode | null) => void;
-  toolsInitialTarget: ToolsOpenTarget | null;
   trackerHealth: TrackerHealthSnapshot;
   uiText: UiText;
 }
@@ -109,7 +103,6 @@ export function buildAppShellViews(props: AppShellViewsProps): Record<View, Reac
     onPrepareImportCategories,
     onQuickActionError,
     onToast,
-    onToolsInitialTargetConsumed,
     refreshSignal,
     registerMappingSaveHandler,
     registerSettingsSaveHandler,
@@ -118,9 +111,7 @@ export function buildAppShellViews(props: AppShellViewsProps): Record<View, Reac
     setLanguagePreview,
     setMappingDirty,
     setSettingsDirty,
-    showToolNavigationLabels,
     themeModePreviewSetter,
-    toolsInitialTarget,
     trackerHealth,
     uiText,
   } = props;
@@ -206,16 +197,6 @@ export function buildAppShellViews(props: AppShellViewsProps): Record<View, Reac
         onSelect={onNavigateView}
         dataNode={dataNode}
         historyNode={historyNode}
-      />
-    ),
-    tools: (
-      <Tools
-        key="tools"
-        initialTarget={toolsInitialTarget}
-        onInitialTargetConsumed={onToolsInitialTargetConsumed}
-        icons={icons}
-        showNavigationLabels={showToolNavigationLabels}
-        onToast={onToast}
       />
     ),
     settings: (

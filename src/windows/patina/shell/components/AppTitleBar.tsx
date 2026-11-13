@@ -14,7 +14,6 @@ type AppTitleBarProps = {
   isMaximized: boolean;
   showUpdateEntry?: boolean;
   onOpenUpdateDialog?: () => void;
-  toolsStatusEntry?: ReactNode;
   /** [P0-04] 「Timing 计时胶囊」槽位。药丸在计时时由 `TimingCapsule` 填，其它时候为 null */
   timingStatusEntry?: ReactNode;
   /** ③ tab 段槽位（01 §3.1）。由 `AppTopNav` 填；本组件只负责给它一个 flex 槽，
@@ -32,7 +31,6 @@ export default function AppTitleBar({
   isMaximized,
   showUpdateEntry = false,
   onOpenUpdateDialog,
-  toolsStatusEntry,
   timingStatusEntry,
   navigationSlot,
 }: AppTitleBarProps) {
@@ -88,38 +86,42 @@ export default function AppTitleBar({
       onClickCapture={windowDrag.onClickCapture}
       onDoubleClick={handleBarDoubleClick}
     >
-      <div className="app-titlebar-brand">
-        <span className="app-titlebar-mark" aria-hidden>
-          <img className="app-titlebar-icon" src={appIconUrl} alt="" draggable={false} />
-        </span>
-        <span className="app-titlebar-name">{APP_TITLE}</span>
-      </div>
+      {/* [本轮 T05 · 顶栏居中] 三栏 grid：左右两栏 `minmax(0,1fr)` 等宽，tab 段 `auto`
+          落在正中 —— 灯簇下线后 status 段不再"吸收全部剩余宽度"，居中的唯一做法是
+          让左右两栏对称吃掉剩余空间。brand 仍锁 114、controls 仍锁 152（topbar.css
+          的段宽变量一个没动，判据 V-3b）。拖窗判据 isInteractive 一字未动。 */}
+      <div className="app-titlebar-side app-titlebar-side-left">
+        <div className="app-titlebar-brand">
+          <span className="app-titlebar-mark" aria-hidden>
+            <img className="app-titlebar-icon" src={appIconUrl} alt="" draggable={false} />
+          </span>
+          <span className="app-titlebar-name">{APP_TITLE}</span>
+        </div>
 
-      {/* 96px 的留白段：拖窗热区已经覆盖整条标题栏，这里只负责品牌段与 tab 段之间的呼吸 */}
-      <div className="app-titlebar-drag-region" aria-hidden />
+        {/* 96px 的留白段：拖窗热区已经覆盖整条标题栏，这里只负责品牌段与 tab 段之间的呼吸 */}
+        <div className="app-titlebar-drag-region" aria-hidden />
+      </div>
 
       {navigationSlot}
 
-      {/* ④ status 段：吸收五段配平剩下的全部宽度（1100 档 486 / 900 档 322）。
-          更新入口从"brand 之后、drag 之前"挪到这里 —— ① brand 必须锁死 114、
-          ② drag 锁死 96，更新入口留在原处会把 brand 段撑宽（01 §3.1）。 */}
-      <div className="qp-topbar-status" data-titlebar-status="">
-        {timingStatusEntry}
-        {showUpdateEntry ? (
-          <button
-            type="button"
-            className="app-titlebar-update-entry"
-            data-titlebar-update-entry=""
-            onClick={onOpenUpdateDialog}
-          >
-            <ArrowUpCircle size={12} strokeWidth={1.9} aria-hidden="true" />
-            <span>{UI_TEXT.update.sidebarEntry}</span>
-          </button>
-        ) : null}
-        {toolsStatusEntry}
-      </div>
+      <div className="app-titlebar-side app-titlebar-side-right">
+        {/* ④ status 段：在自己的栏内吸收剩余宽度；更新入口留在胶囊旁（01 §3.1） */}
+        <div className="qp-topbar-status" data-titlebar-status="">
+          {timingStatusEntry}
+          {showUpdateEntry ? (
+            <button
+              type="button"
+              className="app-titlebar-update-entry"
+              data-titlebar-update-entry=""
+              onClick={onOpenUpdateDialog}
+            >
+              <ArrowUpCircle size={12} strokeWidth={1.9} aria-hidden="true" />
+              <span>{UI_TEXT.update.sidebarEntry}</span>
+            </button>
+          ) : null}
+        </div>
 
-      <div className="app-titlebar-controls">
+        <div className="app-titlebar-controls">
         <button ref={miniEntry} type="button" className="app-titlebar-button" data-titlebar-mini-entry=""
           aria-label={UI_TEXT.miniWindow.open} aria-busy={miniBusy} disabled={miniBusy}
           onClick={() => { void handleOpenMini(); }}><AppWindow size={14} strokeWidth={1.8} /></button>
@@ -152,6 +154,7 @@ export default function AppTitleBar({
         >
           <X size={14} strokeWidth={2.1} />
         </button>
+        </div>
       </div>
     </header>
   );

@@ -59,7 +59,7 @@ export default function SettingsHeaderActions({
         )}
       </div>
       <QuietButton
-        size="large"
+        size="compact"
         onClick={onCancel}
         disabled={locked}
         className="settings-header-button rounded-[8px]"
@@ -68,7 +68,7 @@ export default function SettingsHeaderActions({
       </QuietButton>
       <QuietButton
         tone="primary"
-        size="large"
+        size="compact"
         onClick={onSave}
         disabled={locked}
         busy={busy}

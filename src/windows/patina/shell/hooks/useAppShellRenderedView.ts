@@ -17,15 +17,10 @@ import {
   getSettingsPageBootstrapCache,
   prewarmSettingsBootstrapCache,
 } from "../../features/settings/services/settingsBootstrapService.ts";
-import {
-  prewarmToolsRuntimeSnapshot,
-  toolsRuntimeSnapshotStore,
-} from "../../features/tools/services/toolsRuntimeSnapshotStore.ts";
 
 function prepareViewData(view: View): Promise<unknown> {
   if (view === "mapping") return prewarmClassificationBootstrapCache();
   if (view === "settings") return prewarmSettingsBootstrapCache();
-  if (view === "tools") return prewarmToolsRuntimeSnapshot();
   return Promise.resolve();
 }
 
@@ -36,7 +31,6 @@ function getPreloadableNavigationView(view: View): PreloadableView | null {
     case "history":
     case "mapping":
     case "settings":
-    case "tools":
       return view;
     case "dashboard":
       return null;
@@ -64,9 +58,6 @@ function isNavigationViewReady(view: View) {
   if (getPreloadableViewChunkStatus(preloadableView) !== "resolved") return false;
   if (view === "settings") {
     return getSettingsPageBootstrapCache() !== null;
-  }
-  if (view === "tools") {
-    return toolsRuntimeSnapshotStore.getCurrentSnapshot() !== null;
   }
   if (view !== "mapping") return true;
 

@@ -13,10 +13,12 @@
    ============================================================================= */
 
 /* 锚点滚动偏移：分组导航 scrollIntoView 时，卡片标题不该贴着滚动区顶边。
-   60px = 页头（标题 + 保存按钮）的视觉高度留白，纯经验值，改页头时一起看。 */
+   [本轮 T05] 页头已删（保存/取消搬进页级工具条，不占文档流），60px 的页头留白
+   不复存在 → 18px = 一句呼吸留白。SettingsGroupNav 的 ACTIVE_OFFSET 从这里读
+   （getComputedStyle().scrollMarginTop），不抄第二个常量 —— 改这里高亮判定跟着变。 */
 .settings-anchor,
 [id^="s-"] {
-  scroll-margin-top: 60px;
+  scroll-margin-top: 18px;
 }
 
 .settings-handle-card {

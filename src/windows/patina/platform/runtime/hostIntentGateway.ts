@@ -77,7 +77,15 @@ export type HostIntent =
    */
   | { action: "create_item"; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number }
   /** 改某一件事项。只提交**给了的字段**：改色 / 删除 / 提醒时刻各自牵连历史与语义，属独立改造。 */
-  | { action: "update_item"; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null };
+  | { action: "update_item"; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null }
+  /* ── [0.13 · T03b] 改一条计时记录的起止时刻（Q1 裁决 (b)，设计 §3.8）──
+   * 复用药丸既有的 `update_record`（`RecordPatch { item_id, started_at, ended_at, note }`
+   * 四处齐全），Rust **零改动**：不新增命令、不动四处命令表、不动 host-commands.toml
+   * （分析窗仍不开任何宿主写命令 —— §1 的纪律）。payload 无时长字段：
+   * `accumulated_sec` 由 Rust 按新区间重算（B4，前端**不许**自己算 —— `RecordPatch`
+   * 没有 duration 字段，塞了也会被 serde 静默丢弃）。边界规则 B1–B6 的校验
+   * 在 `features/dashboard/services/recordTimeEdit.ts`，弹层先拦再发。 */
+  | { action: "update_record_time"; recordId: number; startedAt: number; endedAt: number };
 
 /**
  * 发一条意图。返回「有没有发出去」——**不是**「宿主做成了没有」。

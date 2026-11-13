@@ -1,0 +1,241 @@
+/* ============================================================================
+ * dashboard-r2.css — 主界面第二轮改造（0.13）**新增**的选择器
+ * -----------------------------------------------------------------------------
+ * 为什么单独一份：`.qp-dashboard-toolbar` 原来住 `dashboard-layout.css`（273 行，逼近
+ * 300 行硬顶），本轮要把那套几何「提成 `.qp-page-toolbar` 一族」给设置页复用，
+ * 就地改会把它顶穿。所以规则**搬到这里**（原文件里的那一块被删掉，净减），
+ * 本文件只放本轮新增 / 搬入的东西，一段对应一个任务号：
+ *
+ *   T01 · 页级工具条容器（几何 / 淡显 / 悬停全显）
+ *   T01 · 渲染异常兜底面板（分析窗此前完全没有 `.fatal` 样式）
+ *   T02 · 锁定态（几何锁 + 结构锁的视觉反馈）
+ *   T02 · 布局管理弹层
+ *   T04 · 活动提醒卡（表单/行样式族在 `tools-alerts.css`，这里只放卡级布局）
+ *
+ * 卡面侧（T03a/T03b：时间线行三列、改起止弹层、待办批量表单）在
+ * `dashboard-r2-cards.css` —— 300 行棘轮，拆两份。
+ *
+ * 红线同全仓：零字面量色值，只用 `var(--qp-*)`；不加阴影渐变。
+ * ========================================================================== */
+
+/* ── T01 · 页级工具条容器 ──
+ * 规则从 `dashboard-layout.css` 的 `.qp-dashboard-toolbar` 提出（几何逐值不变）：
+ * 工具条**不占文档流**，贴页面上沿漂浮，平时透明、指针进入视图区才完全显形 ——
+ * 既不抢几何，也不会在没人操作时压住卡头。原先它占 20 + gap 8 = 28px，板高仍按
+ * 636 算，结果是底部便利贴被裁掉一半。 */
+.qp-page-toolbar {
+  position: absolute;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 16px;
+  height: var(--qp-card-head-h);
+  /* 常驻淡显而不是全隐形：全透明等于"这几个按钮没了"，而「添加组件」正是用户
+   * 加回被移除窗口的唯一入口。 */
+  opacity: 0.45;
+  transition: opacity var(--qp-motion-fast) var(--qp-motion-ease);
+}
+
+/* 自己悬停 / 焦点落进来就全显（settings 用它）；
+ * 主界面另外保留了「指针进视图区就全显」（下面那条），因为板子太大，
+ * 让用户精确悬停到一行 30px 高的字上才知道有按钮是反人类。 */
+.qp-page-toolbar:hover,
+.qp-page-toolbar:focus-within,
+.qp-dashboard:hover > .qp-page-toolbar,
+.qp-dashboard:focus-within > .qp-page-toolbar {
+  opacity: 1;
+}
+
+/* 主界面修饰类：贴**板**的左上角（不是视图左上角）。
+ * [0.13 · 需求 1.3] 原实现在右上（`right:`），锁定入口按需求搬到左上角，
+ * 三颗键一起搬 —— 拆开摆会让「锁定」看着像一个独立功能而不是工具条的一颗。
+ * 下限 20px：倍率归用户后画布会出滚动条，贴死 `left: 0` 时第一颗键会被压掉半个字。 */
+.qp-page-toolbar.qp-dashboard-toolbar {
+  left: max(20px, calc((100% - var(--qp-board-w)) / 2));
+}
+
+/* 设置页修饰类：贴**页**右上角（页头删掉后保存/取消的唯一位子）。 */
+.qp-page-toolbar.qp-settings-toolbar {
+  right: 0;
+}
+
+/* ── T01 · 渲染异常兜底面板 ──
+ * 分析窗此前**没有任何**错误边界，也没有 `.fatal` 样式（那份只在药丸窗
+ * `timing/styles/error-boundary.css`）。兜底面板必须看得见、且两颗键都能点，
+ * 所以这里给最小可用的一套：一个带边框的面板 + 竖排的两颗键。 */
+.fatal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-space-group);
+  box-sizing: border-box;
+  max-width: 420px;
+  margin: auto;
+  padding: var(--qp-space-section);
+  border: 1px solid var(--qp-danger);
+  border-radius: var(--qp-radius-panel);
+  background: var(--qp-surface-card);
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-body);
+  line-height: var(--qp-line-height-body);
+}
+
+.fatal__title {
+  color: var(--qp-danger);
+  font-weight: var(--qp-font-weight-emphasis);
+}
+
+.fatal__detail {
+  overflow-wrap: anywhere;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+}
+
+.fatal__action {
+  align-self: flex-start;
+  padding: 6px 14px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-button);
+  background: var(--qp-surface-inset);
+  color: var(--qp-text-primary);
+  font: inherit;
+  font-size: var(--qp-font-size-caption);
+  cursor: pointer;
+}
+
+.fatal__action:hover {
+  background: var(--qp-surface-raise);
+}
+
+/* ── T02 · 锁定态 ──
+ * 锁定 = 几何锁 + 结构锁。视觉上只表达两件事：
+ *   ① 卡不再有「可以抓」的暗示（手柄不渲染 + 光标不是 move）；
+ *   ② 工具条那颗「解锁」键仍在（**绝不许** `pointer-events: none`，否则永久锁死）。 */
+.qp-board-card[data-locked] {
+  cursor: default;
+}
+
+.qp-board-card[data-locked] .qp-card-head,
+.qp-board-card[data-locked] .qp-notes-head,
+.qp-board-card[data-locked] .qp-board-grab {
+  cursor: default;
+}
+
+/* 锁定态的工具条：仍然是 0.45 淡显，但「锁定中」这件事要一眼可见 ——
+ * 用一次常驻的实色（不是动画、不是阴影），免得用户以为自己没点成功。 */
+.qp-page-toolbar.qp-dashboard-toolbar[data-locked] {
+  opacity: 0.85;
+}
+
+/* ── T02 · 布局管理弹层 ── */
+.qp-layout-manager {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: var(--qp-scrim, rgb(0 0 0 / 45%));
+}
+
+.qp-layout-manager__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--qp-space-group);
+  width: min(460px, 84vw);
+  max-height: 80vh;
+  padding: var(--qp-space-section);
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-panel);
+  background: var(--qp-bg-panel);
+  box-shadow: var(--qp-shadow-overlay);
+  color: var(--qp-text-primary);
+}
+
+.qp-layout-manager__title {
+  margin: 0;
+  font-size: var(--qp-font-size-section-title);
+  line-height: var(--qp-line-height-section-title);
+  font-weight: var(--qp-font-weight-emphasis);
+}
+
+.qp-layout-manager__hint {
+  margin: 0;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-caption);
+}
+
+.qp-layout-manager__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.qp-layout-manager__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-control);
+}
+
+/* 当前这一条：一条实心中性底，不加阴影（阴影会让它看起来像浮在别的东西上） */
+.qp-layout-manager__row[data-active="true"] {
+  border-color: var(--qp-border-strong);
+  background: var(--qp-surface-inset);
+}
+
+.qp-layout-manager__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--qp-font-size-body);
+}
+
+.qp-layout-manager__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.qp-layout-manager__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+  border-top: 1px solid var(--qp-border-subtle);
+}
+
+/* ── T04 · 活动提醒卡 ──
+ * 表单 / 目标候选 / 规则行的皮都在 `tools-alerts.css`（三件套搬迁时类名不变）。
+ * 这里只放**卡级**差异：卡是流式高度，规则列表不能再 `flex: 1 1 0` 撑满
+ * （旧面板是整页高度），给一个可滚的相对上限，随卡档位自然伸缩。 */
+.qp-card .qp-reminder-form {
+  margin-top: 0;
+}
+
+.qp-card .tools-reminder-list-frame {
+  flex: 0 1 auto;
+  margin-top: 10px;
+}
+
+.qp-card .tools-reminder-list {
+  max-height: 260px;
+}
+
+.qp-card .tools-empty-state {
+  margin-top: 10px;
+  min-height: 56px;
+}

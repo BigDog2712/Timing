@@ -172,6 +172,20 @@ export interface TodoToggleParams {
   done: boolean;
 }
 
+/** todo_create_batch 的单条输入（[0.13 · 1.7] 多日期 × 多时刻展开后的行） */
+export interface TodoCreateBatchInput {
+  title: string;
+  /** 计划执行时刻；null = 未排期 */
+  plannedAt?: EpochMs | null;
+  /** 提醒时刻；null = 无提醒 */
+  remindAt?: EpochMs | null;
+}
+
+/** todo_create_batch 入参（单事务 1..=60 条；任一校验失败整批回滚） */
+export interface TodoCreateBatchParams {
+  todos: TodoCreateBatchInput[];
+}
+
 /* ===========================================================================
  * 主题 Theme（双主题 + 四色可配）
  * ========================================================================= */

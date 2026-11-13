@@ -25,6 +25,7 @@ export const CARD_IDS = [
   "trend",
   "timeline",
   "heatmap",
+  "reminder",
 ] as const;
 
 export type CardId = (typeof CARD_IDS)[number];
@@ -133,6 +134,13 @@ export const KIND_SPECS: Record<CardKind, KindSpec> = {
     hint: "今天每一段计时的时间轴",
     minW: 280, minH: 200,
     sizes: { S: [280, 200], M: [340, 424], L: [500, 424] },
+  },
+  reminder: {
+    /* [本轮 T04] 工具页「活动提醒」分区的卡内形态；窄卡，与 todos 同列宽便于并排 */
+    label: "活动提醒",
+    hint: "应用 / 分类 / 网站用到一定时长就提醒，到点弹窗",
+    minW: 296, minH: 216,
+    sizes: { S: [296, 216], M: [330, 304], L: [500, 304] },
   },
 };
 

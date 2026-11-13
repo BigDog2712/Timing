@@ -43,10 +43,6 @@ export interface DashboardCoreCopy {
   focusDimensionLabel: string;
   focusDimensions: Record<"category" | "app" | "item", string>;
 
-  /** 时间线卡头第一颗按钮：发的是「打开事项菜单」意图，文案不能跟着卡名走 */
-  itemsMenu: string;
-  /** 同卡第二颗：打开「常用事项」（exe 的事项卡里那一列「常用」） */
-  commonItems: string;
   /** 应用卡头读数：exe 的 `meta(Apps)` 只有总时长，没有「前 N 项」 */
   appsMeta: (text: string) => string;
   /** 应用卡底注：exe 「共 5 个应用 · 合计 14m」（`apps.rs:86`） */
@@ -67,12 +63,12 @@ export interface DashboardCoreCopy {
   trendTotal: (text: string) => string;
   /** 柱的 aria/title：必须同时说出「几点到几点」与「多久」，只有高度的柱对读屏是空白 */
   trendBar: (slot: string, text: string) => string;
-  /** 最后一根柱（＝当前这一小时）的轴文字：「现在」 */
-  trendToday: string;
   /** 图表顶部右读数：峰值时刻 + 该小时时长（`14:00 · 1h 20m`） */
   trendPeak: (text: string) => string;
-  /** 轴文字里的小时（只出现三处：首 / 中）：zh「8点」、其余「8:00」 */
-  trendHourTick: (hour: number) => string;
+
+  /* ── [本轮 T04] 活动提醒卡 ── */
+  /** 规则列表为空时的一句陈述（卡内还有创建表单，空态只描述"规则"这一半） */
+  reminderEmpty: string;
 }
 
 /** 整页文案 = 本表 + 应用行/绑定弹层的那批（`copyAppBinding.ts`）+ 便利贴删除那两颗
@@ -103,9 +99,7 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     resizeWidth: (label) => `调整「${label}」宽度`,
     focusDimensionLabel: "专注窗口维度",
     focusDimensions: { category: "分类", app: "应用", item: "事项" },
-    cardLabels: { timer: "计时分布", apps: "应用排行", timeline: "今日时间线", todos: "待办事项", notes: "便利贴", trend: "今日活动趋势", heatmap: "活动热力图" },
-    itemsMenu: "事项菜单",
-    commonItems: "常用",
+    cardLabels: { timer: "计时分布", apps: "应用排行", timeline: "今日时间线", todos: "待办事项", notes: "便利贴", trend: "今日活动趋势", heatmap: "活动热力图", reminder: "活动提醒" },
     appsMeta: (text) => text,
     appsSummary: (count, text) => `共 ${count} 个应用 · 合计 ${text}`,
     heatmapMeta: (weeks) => `近 ${weeks} 周`,
@@ -119,10 +113,9 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     trendEmpty: "今天还没有活动记录",
     trendTotal: (text) => `今日 ${text}`,
     trendBar: (slot, text) => `${slot} · ${text}`,
-    trendToday: "现在",
-    trendPeak: (text) => `峰值 ${text}`,
-    trendHourTick: (hour) => `${hour}点`,
-  },
+      trendPeak: (text) => `峰值 ${text}`,
+    reminderEmpty: "还没有活动提醒规则 · 在上面选一个目标建一条",
+    },
   "en-US": {
     ...APP_BINDING_COPY["en-US"],
     ...NOTE_COPY["en-US"],
@@ -140,9 +133,7 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     resizeWidth: (label) => `Resize ${label}`,
     focusDimensionLabel: "Focus dimension",
     focusDimensions: { category: "Category", app: "App", item: "Item" },
-    cardLabels: { timer: "Time split", apps: "Applications", timeline: "Timeline", todos: "To-dos", notes: "Notes", trend: "Today's activity", heatmap: "Activity heatmap" },
-    itemsMenu: "Items menu",
-    commonItems: "Frequent",
+    cardLabels: { timer: "Time split", apps: "Applications", timeline: "Timeline", todos: "To-dos", notes: "Notes", trend: "Today's activity", heatmap: "Activity heatmap", reminder: "Reminders" },
     appsMeta: (text) => text,
     appsSummary: (count, text) => `${count} apps · ${text} total`,
     heatmapMeta: (weeks) => `Last ${weeks} weeks`,
@@ -156,10 +147,9 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     trendEmpty: "No activity today",
     trendTotal: (text) => `Today ${text}`,
     trendBar: (slot, text) => `${slot} · ${text}`,
-    trendToday: "Now",
-    trendPeak: (text) => `Peak ${text}`,
-    trendHourTick: (hour) => `${hour}:00`,
-  },
+      trendPeak: (text) => `Peak ${text}`,
+    reminderEmpty: "No reminder rules yet · pick a target above to create one",
+    },
   "ru-RU": {
     ...APP_BINDING_COPY["ru-RU"],
     ...NOTE_COPY["ru-RU"],
@@ -177,9 +167,7 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     resizeWidth: (label) => `Ширина «${label}»`,
     focusDimensionLabel: "Разрез фокуса",
     focusDimensions: { category: "Категория", app: "Приложение", item: "Дело" },
-    cardLabels: { timer: "Распределение времени", apps: "Приложения", timeline: "Хронология", todos: "Задачи", notes: "Заметки", trend: "Активность сегодня", heatmap: "Тепловая карта" },
-    itemsMenu: "Меню дел",
-    commonItems: "Частые",
+    cardLabels: { timer: "Распределение времени", apps: "Приложения", timeline: "Хронология", todos: "Задачи", notes: "Заметки", trend: "Активность сегодня", heatmap: "Тепловая карта", reminder: "Напоминания" },
     appsMeta: (text) => text,
     appsSummary: (count, text) => `${count} прил. · ${text}`,
     heatmapMeta: (weeks) => `Последние ${weeks} нед.`,
@@ -193,9 +181,8 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     trendEmpty: "Сегодня активности нет",
     trendTotal: (text) => `Сегодня ${text}`,
     trendBar: (slot, text) => `${slot} · ${text}`,
-    trendToday: "Сейчас",
     trendPeak: (text) => `Пик ${text}`,
-    trendHourTick: (hour) => `${hour}:00`,
+    reminderEmpty: "Правил напоминаний пока нет · выберите цель выше",
   },
   es: {
     ...APP_BINDING_COPY.es,
@@ -214,9 +201,7 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     resizeWidth: (label) => `Ancho de ${label}`,
     focusDimensionLabel: "Dimensión de enfoque",
     focusDimensions: { category: "Categoría", app: "Aplicación", item: "Asunto" },
-    cardLabels: { timer: "Reparto del tiempo", apps: "Aplicaciones", timeline: "Cronología", todos: "Pendientes", notes: "Notas", trend: "Actividad de hoy", heatmap: "Mapa de calor" },
-    itemsMenu: "Menú de asuntos",
-    commonItems: "Frecuentes",
+    cardLabels: { timer: "Reparto del tiempo", apps: "Aplicaciones", timeline: "Cronología", todos: "Pendientes", notes: "Notas", trend: "Actividad de hoy", heatmap: "Mapa de calor", reminder: "Recordatorios" },
     appsMeta: (text) => text,
     appsSummary: (count, text) => `${count} apps · ${text}`,
     heatmapMeta: (weeks) => `Últimas ${weeks} sem.`,
@@ -230,8 +215,7 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     trendEmpty: "Hoy no hay actividad",
     trendTotal: (text) => `Hoy ${text}`,
     trendBar: (slot, text) => `${slot} · ${text}`,
-    trendToday: "Ahora",
     trendPeak: (text) => `Pico ${text}`,
-    trendHourTick: (hour) => `${hour}:00`,
+    reminderEmpty: "Aún no hay reglas · elige un objetivo arriba para crear una",
   },
 };

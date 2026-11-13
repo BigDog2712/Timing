@@ -83,6 +83,8 @@ mod record;
 /* [P1-01 补记] `services::record::backfill` 的 8 条可变异判据 + 命令层接线（`record.rs` 已 271 行，
    再塞 10 条用例必破 300 行硬上限，故单独成文件）。 */
 mod record_backfill;
+/* [0.13 T03b] `update_record` 的时长重算（V-1.6f）：把「前端别自己算」钉成事实。 */
+mod record_update_time;
 mod reminder;
 #[cfg(target_os = "windows")]
 mod secret_dpapi;
@@ -98,6 +100,8 @@ mod timer_switch;
 mod timer_threshold;
 mod timer_todo_link;
 mod todo;
+/* [0.13 T03a] `todo_create_batch` 的原子性（V-1.7c）：失败批 0 行新增。 */
+mod todo_batch;
 mod todo_list;
 mod todo_nudge;
 mod todo_purge;

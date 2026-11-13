@@ -111,11 +111,12 @@ describe("三种抓取（移动 / 改宽 / 改高）", () => {
 describe("组件分发", () => {
   it("p05a_all_kinds_dispatch_to_real_components", async () => {
     const cards = (await import("./DashboardCards.tsx?raw")).default as string;
-    for (const tag of ["TimerModule", "AppsModule", "TodosModule", "NotesStrip", "TimelineCard", "TrendModule", "HeatmapModule"]) {
+    /* [本轮 T04] 活动提醒回归为新卡（原工具页分区迁入） */
+    for (const tag of ["TimerModule", "AppsModule", "TodosModule", "NotesStrip", "TimelineCard", "TrendModule", "HeatmapModule", "ReminderModule"]) {
       expect(cards, `分发里少了 ${tag}`).toContain(`<${tag}`);
     }
-    /* 下线的那两张不许留在分发里：留着就是「能加成空框」 */
-    for (const gone of ["ItemsModule", "ReminderModule"]) {
+    /* 下线的组件不许留在分发里：留着就是「能加成空框」（[本轮 T04] ReminderModule 回归，摘出名单） */
+    for (const gone of ["ItemsModule"]) {
       expect(cards, `${gone} 已下线`).not.toContain(gone);
     }
   });

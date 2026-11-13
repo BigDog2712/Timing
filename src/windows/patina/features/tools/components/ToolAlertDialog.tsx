@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
 import { useToolPresentation } from "../hooks/useToolPresentation.ts";
 import { toolPresentationStore } from "../services/toolPresentationStore.ts";
-import FocusAlertDialog from "./FocusAlertDialog.tsx";
 
 const ActivityReminderAlertDialog = lazy(() => import("./ActivityReminderAlertDialog.tsx"));
 const TimedReminderAlertDialog = lazy(() => import("./TimedReminderAlertDialog.tsx"));
@@ -58,5 +57,7 @@ export default function ToolAlertDialog({ notification = false }: { notification
   if (alert.kind === "reminder") {
     return <Suspense fallback={null}><TimedReminderAlertDialog key={alert.id} alert={alert} onAction={onAction} notification={notification} /></Suspense>;
   }
-  return <FocusAlertDialog key={alert.id} alert={alert} onAction={onAction} notification={notification} />;
+  /* 番茄 / 自由专注的到点弹窗随工具页下线（§3.4）：不再有新建会话，旧的 Focus 分支
+   * 连同 `FocusAlertDialog.tsx` 一并删除 —— 走到这里只剩未知的 alert 种类，不画。 */
+  return null;
 }

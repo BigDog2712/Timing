@@ -21,6 +21,7 @@ import TimerModule from "./TimerModule.tsx";
 import TimelineCard from "./TimelineCard.tsx";
 import TodosModule from "./TodosModule.tsx";
 import TrendModule from "./TrendModule.tsx";
+import ReminderModule from "./reminder/ReminderModule.tsx";
 import type { TrendState } from "../hooks/useTrendDays.ts";
 import type { HeatmapState } from "../hooks/useHeatmapModel.ts";
 import type { DashboardReadModel } from "../services/dashboardReadModel.ts";
@@ -39,7 +40,7 @@ interface CardProps {
   onOpenMapping: () => void;
   todosModel: TodayTodosState;
   notesModel: TodayNotesState;
-  todayItems: Pick<TodayItemsState, "rows" | "applyLocalRename" | "applyLocalCreate">;
+  todayItems: Pick<TodayItemsState, "rows" | "total" | "applyLocalRename" | "applyLocalCreate">;
   snapshotProps: { status: DashboardReadState["status"]; refreshError: boolean; onRetry: () => void };
   totalTrackedTime: number;
   dayDeltaTrackedTime: number;
@@ -92,6 +93,7 @@ export function buildCardBody(card: BoardCard, label: string, props: CardProps):
         <TimelineCard
           controls={controls}
           items={props.todayItems.rows}
+          total={props.todayItems.total}
           tier={card.tier}
           status={props.snapshotStatus}
           refreshError={props.refreshError}
@@ -104,6 +106,8 @@ export function buildCardBody(card: BoardCard, label: string, props: CardProps):
       return <TrendModule controls={controls} model={props.trend} />;
     case "heatmap":
       return <HeatmapModule controls={controls} state={props.heatmap} />;
+    case "reminder":
+      return <ReminderModule controls={controls} icons={props.icons} />;
     default:
       return <CardPlaceholder card={card} controls={controls} />;
   }

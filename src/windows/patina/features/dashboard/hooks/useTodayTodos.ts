@@ -2,10 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   createTodo,
+  createTodoBatch,
   deleteTodo,
   listPendingTodos,
   toggleTodo,
+  updateTodo,
 } from "../../../platform/persistence/todoRepository.ts";
+import type { TodoWritePlan } from "../services/todoDraft.ts";
 import type { TodoSummary } from "../../../shared/types/todos.ts";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
 
@@ -32,6 +35,17 @@ export interface TodayTodosState {
   toggle: (id: number, done: boolean) => void;
   /** 按 **id** 删除；撤销条需要那一行的快照，由 hook 自己从当前列表取 */
   remove: (id: number) => void;
+  /**
+   * 批量创建（[0.13 · 1.7] 多日期 × 多时刻）：plans 由 `expandTodoBatch` 展开好
+   * （含提醒语义），hook 只负责「一条命令 → 成功重拉 / 失败返回 false」。
+   * 返回 false = 没建成（IPC 抛错），UI 不清草稿、不关弹层。
+   */
+  createBatch: (plans: readonly TodoWritePlan[]) => Promise<boolean>;
+  /** 编辑一条（[0.13 · 1.7] 行编辑）：标题 + 排期 + 提醒，`null` = 清空对应字段 */
+  update: (
+    id: number,
+    patch: { title?: string; plannedAt?: number | null; remindAt?: number | null },
+  ) => Promise<boolean>;
   undoPending: () => void;
   retry: () => void;
 }
@@ -134,6 +148,38 @@ export function useTodayTodos(refreshKey: number): TodayTodosState {
     }
   }, [reload]);
 
+  /**
+   * 批量创建：**一条** `todo_create_batch`（后端单事务，1..=60 条）。
+   * 失败就是抛错（直接 IPC 没有 `sent` 布尔），catch → false；成功后 reload。
+   * 不做本地乐观插入：新建的行要等真实 `sort_order` / `id`，而 reload 很快。
+   */
+  const createBatch = useCallback(async (plans: readonly TodoWritePlan[]) => {
+    if (plans.length === 0) return false;
+    try {
+      await createTodoBatch(plans);
+      await reload();
+      return true;
+    } catch (error: unknown) {
+      console.warn("Failed to create todo batch:", error);
+      return false;
+    }
+  }, [reload]);
+
+  /** 行编辑：乐观改标题/时刻，失败回滚靠 reload（与 toggle 同一条收敛路径）。 */
+  const update = useCallback(async (
+    id: number,
+    patch: { title?: string; plannedAt?: number | null; remindAt?: number | null },
+  ) => {
+    try {
+      await updateTodo(id, patch);
+      await reload();
+      return true;
+    } catch (error: unknown) {
+      console.warn("Failed to update todo:", error);
+      return false;
+    }
+  }, [reload]);
+
   const armUndo = useCallback((next: UndoPending) => {
     pendingRef.current = next;
     setPending(next);
@@ -188,5 +234,5 @@ export function useTodayTodos(refreshKey: number): TodayTodosState {
 
   const retry = useCallback(() => { setAttempt((current) => current + 1); }, []);
 
-  return { todos, status, pending, create, toggle, remove, undoPending, retry };
+  return { todos, status, pending, create, createBatch, update, toggle, remove, undoPending, retry };
 }

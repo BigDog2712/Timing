@@ -18,7 +18,7 @@ const stats: AppStat[] = [
 ];
 
 function itemRow(itemId: number, name: string, value: number, firstStart = 0): TodayItemRow {
-  return { itemId, name, color: "", value, firstStart, segments: 1 };
+  return { itemId, name, color: "", value, firstStart, lastEnd: firstStart + value, segments: 1 };
 }
 
 const items: TodayItemRow[] = [

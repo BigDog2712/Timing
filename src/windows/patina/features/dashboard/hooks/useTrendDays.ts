@@ -5,6 +5,11 @@
  * 后端一条 `cmd_get_activity_aggregate_range` 带上桶边界就返回逐桶聚合，
  * 与历史页的区间视图走的是同一条路（口径因此天然一致）。
  *
+ * [0.13 · 1.5] 查询与展示拆开：`buildTodayTrendPlan` 给出两半 ——
+ *   · `plan.query`   发给后端（边界**裁到此刻**，绝不放宽，否则
+ *     `activity_read_model/mod.rs:189-203` 会拒绝整条读取、卡片静默变空）；
+ *   · `plan.windows` 交给 `accumulateTrendDays`（恒 24 个整点桶，未来桶时长恒 0）。
+ *
  * 刷新纪律（与 `useTodayTodos` / `useTodayNotes` 同一条）：**已有数据时不许退回 `loading`**。
  * 退回的话 `ModuleShell.moduleState()` 会把卡片换成骨架 —— 每次切前台整块闪一次。
  */
@@ -12,17 +17,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { loadActivityAggregateRange } from "../../../platform/persistence/activityReadModelGateway.ts";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
-import { accumulateTrendDays, buildTodayHourPlan, type TrendDay } from "../services/trendDays.ts";
+import { accumulateTrendDays, buildTodayTrendPlan, type TrendDay } from "../services/trendDays.ts";
 
 export interface TrendState {
-  /** 今日逐时桶（按时间升序，最后一桶 = 当前这一小时） */
+  /** 今日逐时桶（恒 24 个整点桶，按时间升序；时长为 0 的桶照常占位） */
   days: TrendDay[];
   status: LoadStatus;
+  /** 计划这次加载时的「此刻」：渲染层用它判"覆盖 now 的那一桶"（不是最后一桶） */
+  nowMs: number;
   retry: () => void;
 }
 
 export function useTrendDays(refreshKey: number): TrendState {
   const [days, setDays] = useState<TrendDay[]>([]);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [status, setStatus] = useState<LoadStatus>("loading");
   const hasDataRef = useRef(false);
   const aliveRef = useRef(true);
@@ -30,12 +38,14 @@ export function useTrendDays(refreshKey: number): TrendState {
   const load = useCallback(async () => {
     try {
       /* `nowMs` 在这里只取一次：跨过整点时重算一次是正常的，每帧变则会每帧重查 */
-      const plan = buildTodayHourPlan(Date.now());
-      const result = await loadActivityAggregateRange(plan.startMs, plan.endMs, plan.boundaries);
+      const at = Date.now();
+      const plan = buildTodayTrendPlan(at);
+      const result = await loadActivityAggregateRange(plan.query.startMs, plan.query.endMs, plan.query.boundaries);
       if (!aliveRef.current) return;
       const next = accumulateTrendDays(plan.windows, result.records);
       hasDataRef.current = true;
       setDays(next);
+      setNowMs(at);
       setStatus("ready");
     } catch {
       if (!aliveRef.current) return;
@@ -57,5 +67,5 @@ export function useTrendDays(refreshKey: number): TrendState {
     void load();
   }, [load]);
 
-  return { days, status, retry };
+  return { days, status, nowMs, retry };
 }
