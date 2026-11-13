@@ -1284,6 +1284,12 @@
       "change": "modified",
       "reason": "[0.12.1 CI 对齐] clippy -D warnings 修复，语义零变化：`#[cfg(test)] mod tests` 移到文件末尾。行数 145 不变。",
       "owner": "寇豆码"
+    },
+    {
+      "path": "src-tauri/src/infra/insight/windows/foreground.rs",
+      "change": "modified",
+      "reason": "[0.12.1 CI 对齐] clippy 1.100 的 needless_bool：`if (extended_style & WS_EX_TOOLWINDOW.0) != 0 { return false; } true` 化简为 `(extended_style & WS_EX_TOOLWINDOW.0) == 0`。同一函数里前面几处「false 提前返回」不在这个 lint 范围内（后面不是 bool 字面量），只有末尾这处被点名。语义等价：只看 TOOLWINDOW 位是否存在。",
+      "owner": "寇豆码"
     }
   ]
 }

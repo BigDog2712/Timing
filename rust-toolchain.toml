@@ -1,0 +1,18 @@
+# 固定 Rust 工具链 —— CI 与本地必须是**同一版**。
+#
+# 为什么钉：`dtolnay/rust-toolchain@stable` 是浮动的，stable 一升级，新 clippy lint 就
+# 会让「本地全绿、CI 突然红」，而红的原因和你改的东西毫无关系（本仓实测两次：
+# 2026-11-13 CI 已跑到 1.100.0，本地还是 1.99.0，`needless_bool` 增强了形态，
+# 一条 6 行的小函数把整条流水线打红 13 分钟）。钉死之后，升级编译器是一个**显式动作**：
+# 改本文件 + 改 `.github/workflows/ci.yml` 里 action 的 ref，两处必须同版。
+#
+# 没有 rustfmt：本仓不用 `cargo fmt --check` 当门禁（它与「单文件 ≤300 行」硬约束不可
+# 同时满足，理由写在 ci.yml 的注释里），列进来只会让 shell 补全多一个不认识的东西。
+#
+# 为什么是 1.100.0 而不是 MSRV 1.90：钉的是「CI 实际用的那一版」，不是最低能编的那一版。
+# 本版在 1.100.0 上实测过 clippy `--all-targets -D warnings` 零诊断、`cargo test --lib`
+# 通过；换版前请先在两边都跑一遍，别只改数字。
+[toolchain]
+channel = "1.100.0"
+components = ["clippy"]
+profile = "minimal"

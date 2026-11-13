@@ -17,7 +17,7 @@
     "src-tauri/src/infra/insight/webview_cache.rs": 580,
     "src-tauri/src/infra/insight/windows/app_metadata.rs": 590,
     "src-tauri/src/infra/insight/windows/audio/native.rs": 315,
-    "src-tauri/src/infra/insight/windows/foreground.rs": 785,
+    "src-tauri/src/infra/insight/windows/foreground.rs": 782,
     "src-tauri/src/infra/insight/windows/icon.rs": 345,
     "src-tauri/src/infra/insight/windows/media.rs": 349,
     "src-tauri/src/infra/insight/windows/native_probe.rs": 529,

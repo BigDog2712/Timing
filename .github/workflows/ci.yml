@@ -75,9 +75,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@stable
+      # 工具链钉版本，不用 `@stable`：stable 一升级就会带来新的 clippy lint，把「本地全绿」
+      # 变成「CI 红 13 分钟」，而红的原因与本次改动无关（本仓实测：CI 已到 1.100.0，本地
+      # 还是 1.99.0，`needless_bool` 增强了形态，一条 6 行的小函数打红整条流水线）。
+      # 升级编译器是显式动作：改这里 + 改仓根 `rust-toolchain.toml` 的 channel，两处必须同版。
+      - uses: dtolnay/rust-toolchain@1.100.0
         with:
-          components: clippy, rustfmt
+          components: clippy
 
       - uses: swatinem/rust-cache@v2
         with:
