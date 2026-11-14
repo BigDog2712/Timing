@@ -31,6 +31,9 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
   `platform`（叶子：clock / log / boot_timing）→ `infra`（窗口 / 托盘菜单 / 通知 / 几何 / 迁移）→ `services`（业务）→ `app`（装配：events / tray / bootstrap / diagnostics）与 `jobs`（调度）→ `commands`（IPC 入口）。
   其中 `models` / `infra` / `services` / `app` / `commands` 五层各带一个 `insight/` 命名空间（Patina 归一，见 `docs/refactor/patina-structural-merge.md` §2.2）：`models/insight ← infra/insight ← services/insight ← app/insight ← commands/insight`，方向与宿主层序一致。`insight` 是命名空间，不是第 7 层。
 - 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql` … `0007_v01127.sql` 共七支，当前 **schema v7**，`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。**0007 是重建表，不吃重跑**，必须由版本门 `< 7` 只放行一次（见 `infra/migrate.rs` 注释）。
+- **活动库（`patina.db`）走 sqlx `Migrator`**：正文在 `services/insight/data/sql/00NN_*.sql`，登记在 `data/schema_registry.rs`，账本 `_sqlx_migrations.checksum` 存的是 **sha384(文件字节)**，逐字节比对。
+  所以**凡是在任何库上跑过的 `.sql` 一个字都不能再改**（改注释、调缩进都算）——改了老库开机即 `数据库里的迁移 N 的校验和与当前版本不一致`（`schema_core/ensure.rs::describe_migration_failure`），而且这条**不自动修账本**（对用户是对的，对开发者是拦路）。
+  未出包的迁移确实需要改正文时，本机库必须一起回到「未应用」状态：`DROP` 该迁移建的对象 + `DELETE FROM _sqlx_migrations WHERE version=N`，让 sqlx 自己重跑重算（表为空时最省事；有数据就先 `cp` 一份库）。
 - **数据目录迁移（V0.5.0）**：`infra/appdata_migrate/`（`paths` / `decide` / `copy` / `verify` / `marker` / `mod`）是 **headless** 的——不依赖 services、不依赖 tauri，所以能用两个临时目录直接跑测试（`run_at(&Paths, skip)`）。编排在 `app/preboot.rs`（桌面独占，跑在 `Builder::run` 之前、`log::init` 之前，故模块内不写日志），两条 IPC 命令在 `commands/migration_cmd.rs`。老库名 `tickbar.db` 与新库名 `timing.db` 的映射只认三种后缀（`""` / `-wal` / `-shm`），定义在 `paths.rs`。
 - IPC 契约：宿主命令 **83** 条 + Patina **117** 条（仅桌面，`#[cfg(desktop)]`），一张表写在 `src-tauri/src/ipc_commands.rs`（`docs/phase2/IPC-CONTRACT-v2.md`）；事件 11 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
 - 插件：`plugins/<id>/plugin.json` 是**启动头**，宿主只读不执行（声明式）。目录三处合并扫描
