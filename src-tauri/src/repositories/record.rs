@@ -191,8 +191,8 @@ pub async fn insert_saved(
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO time_records \
          (item_id, status, started_at, ended_at, accumulated_sec, running_since, \
-          mode, target_sec, note, created_at, updated_at) \
-         VALUES (?, 'saved', ?, ?, ?, NULL, 'countup', NULL, ?, ?, ?) RETURNING id",
+          mode, target_sec, note, created_at, updated_at, device_id) \
+         VALUES (?, 'saved', ?, ?, ?, NULL, 'countup', NULL, ?, ?, ?, ?) RETURNING id",
     )
     .bind(item_id)
     .bind(started_at)
@@ -201,6 +201,8 @@ pub async fn insert_saved(
     .bind(note)
     .bind(now)
     .bind(now)
+    /* 手工补记归本机：uid 靠触发器按 device_id 发，漏写就永不同步。 */
+    .bind(crate::services::identity::install_id().unwrap_or_default())
     .fetch_one(&mut *conn)
     .await?;
     Ok(id)

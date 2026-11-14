@@ -9,7 +9,7 @@ use sqlx::SqlitePool;
 use crate::error::{AppError, AppResult};
 use crate::models::constants::ITEM_NAME_MAX_LEN;
 use crate::models::enums::item_status;
-use crate::models::item::{Item, ItemPatch};
+use crate::models::item::{Item, ItemCreate, ItemPatch};
 use crate::platform::clock::now_ms;
 use crate::repositories::item as repo;
 
@@ -34,12 +34,67 @@ fn normalize_name(raw: &str) -> AppResult<String> {
 }
 
 pub async fn create(pool: &SqlitePool, name: &str, color: Option<String>) -> AppResult<Item> {
-    let trimmed = normalize_name(name)?;
+    create_in(
+        pool,
+        &ItemCreate {
+            name: name.to_string(),
+            color,
+            parent_id: None,
+            category_key: None,
+        },
+    )
+    .await
+}
+
+/// 事项树的**唯一**分层入口（2 层硬限）。
+///
+/// ## 为什么限 2 层
+///
+/// 允许无限深会立刻产生三个无解歧义：块挂在树的哪一层、父事项能不能自己计时、
+/// rollup 到哪一层出报表。限 2 层 + 「有子事项的事项不可计时」（见
+/// `services::timer::start`）这三个问题一起消失。
+///
+/// ## 为什么 `depth` 由这里算而不接受前端传
+///
+/// 它是 `parent_id` 的派生值。让前端传就有两个真源：改父子关系时忘了同步 depth
+/// 会得到「depth=0 但挂着父」的行，而所有「取顶层」的查询都按 depth 过滤 ——
+/// 这些行会从界面上消失，且没有任何报错。
+pub async fn create_in(pool: &SqlitePool, input: &ItemCreate) -> AppResult<Item> {
+    let trimmed = normalize_name(&input.name)?;
+    let depth = resolve_depth(pool, input.parent_id).await?;
     let now = now_ms();
     let sort_order = repo::max_sort_order(pool).await? + 1;
-    let normalized = normalize_color(color);
-    let id = repo::insert(pool, &trimmed, normalized.as_deref(), sort_order, now).await?;
+    let normalized = normalize_color(input.color.clone());
+    let category = normalize_category(input.category_key.as_deref());
+    let id = repo::insert(
+        pool,
+        repo::NewItem {
+            name: &trimmed,
+            color: normalized.as_deref(),
+            sort_order,
+            now,
+            parent_id: input.parent_id,
+            depth,
+            category_key: category.as_deref(),
+        },
+    )
+    .await?;
     fetch_or_not_found(pool, id).await
+}
+
+/// 新事项该落在第几层；同时把「父必须存在且是顶层」这条规则钉在这里。
+async fn resolve_depth(pool: &SqlitePool, parent_id: Option<i64>) -> AppResult<i64> {
+    let Some(parent_id) = parent_id else {
+        return Ok(0);
+    };
+    let parent = repo::find_by_id(pool, parent_id)
+        .await?
+        .ok_or_else(AppError::item_not_found)?;
+    if parent.depth != 0 {
+        // 子事项不能再挂子：拦在写入前，而不是让它长成第 3 层再回头清理。
+        return Err(AppError::invalid_duration());
+    }
+    Ok(1)
 }
 
 pub async fn update(pool: &SqlitePool, id: i64, patch: ItemPatch) -> AppResult<Item> {
@@ -58,6 +113,30 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: ItemPatch) -> AppResult<I
         .filter(|c| !c.is_empty())
         .map(str::to_string);
 
+    /* 改父子关系要连带改 depth，而 depth 一变，它已有的子就会变成第 3 层。
+       所以在**允许挂到别人下面之前**先确认它自己没有子。 */
+    let mut depth_to_set: Option<i64> = None;
+    if let Some(parent) = patch.parent_id {
+        if parent == Some(id) {
+            return Err(AppError::invalid_duration());
+        }
+        if parent.is_none() {
+            depth_to_set = Some(0);
+        } else {
+            if repo::count_children(pool, id).await? > 0 {
+                return Err(AppError::invalid_duration());
+            }
+            depth_to_set = Some(resolve_depth(pool, parent).await?);
+        }
+    }
+
+    /* 借用检查：`ItemFields` 里的分类是 `Option<Option<&str>>`（避免每列都克隆），
+       所以归一后的 `String` 要先落成局部变量活到 `repo::update` 调用结束。 */
+    let category_to_set: Option<Option<String>> = patch
+        .category_key
+        .as_ref()
+        .map(|value| normalize_category(value.as_deref()));
+
     repo::update(
         pool,
         id,
@@ -67,6 +146,11 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: ItemPatch) -> AppResult<I
             sort_order: patch.sort_order,
             remind_at: patch.remind_at,
             is_pinned: patch.is_pinned,
+            parent_id: patch.parent_id,
+            /* 只有「父子关系真的改了」才写 depth：没改就传 None，别把 existing 再写一遍
+               （那会多一次 `updated_at_ms` 盖戳，同步端看到一条没变化的变更）。 */
+            depth: depth_to_set,
+            category_key: category_to_set.as_ref().map(|value| value.as_deref()),
         },
         now_ms(),
     )
@@ -107,4 +191,16 @@ fn normalize_color(color: Option<String>) -> Option<String> {
     color
         .map(|c| c.trim().to_string())
         .filter(|c| !c.is_empty())
+}
+
+/// 分类键归一：留 trim 后的非空值，其余一律 `None`。
+///
+/// 不校验「分类是否存在」：分类集属于活动库（`classification_settings`），
+/// 业务库这一层够不着；而写进来的键即使当前不存在，也只是「暂时解析到兜底」，
+/// 用户之后建同名分类就会自动生效 —— 比直接拒绝写入更不挡人。
+fn normalize_category(category: Option<&str>) -> Option<String> {
+    category
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }

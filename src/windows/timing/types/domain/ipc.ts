@@ -33,6 +33,9 @@ import type {
 } from '../domain-v020';
 import type {
   CreateItemParams,
+  ItemAppBindParams,
+  ItemAppBinding,
+  ItemAppKeyParams,
   ItemIdParams,
   ListItemsParams,
   ListRecordsParams,
@@ -142,6 +145,11 @@ export interface IpcApi {
   archiveItem(params: ItemIdParams): Promise<Item>;
   unarchiveItem(params: ItemIdParams): Promise<Item>;
   deleteItem(params: ItemIdParams): Promise<void>;
+  /* [0.13.x] 事项 ↔ 应用绑定 */
+  listItemApps(params: ItemIdParams): Promise<ItemAppBinding[]>;
+  listItemsForApp(params: { appKey: string }): Promise<ItemAppBinding[]>;
+  bindItemApp(params: ItemAppBindParams): Promise<ItemAppBinding>;
+  unbindItemApp(params: ItemAppKeyParams): Promise<boolean>;
 
   /* 计时域 */
   startTimer(params: StartTimerParams): Promise<TimeRecord>;

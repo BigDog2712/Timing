@@ -120,14 +120,18 @@ pub async fn append(
     device_id: &str,
 ) -> AppResult<TimerOp> {
     let mut tx = pool.begin().await?;
-    let item_uid: Option<String> =
-        sqlx::query_scalar("SELECT item_uid FROM timer_ops WHERE session_uid = ?1 LIMIT 1")
-            .bind(session_uid)
-            .fetch_optional(&mut *tx)
-            .await?;
+    /* `item_uid` 从**会话当前的**事项取，不从「第一条事件」复制：第一条事件（`start`）
+       没有前驱可抄（按前驱取会让起点永远写不进去，实测报错 `... has no start event`），
+       而事项还可以被 `switch` 改判。冗余存一份是为了按事项查事件时不必回连会话表。 */
+    let item_uid: Option<String> = sqlx::query_scalar(
+        "SELECT i.uid FROM time_records r JOIN items i ON i.id = r.item_id WHERE r.uid = ?1",
+    )
+    .bind(session_uid)
+    .fetch_optional(&mut *tx)
+    .await?;
     let item_uid = item_uid.ok_or_else(|| {
         crate::error::AppError::db(format!(
-            "timer session `{session_uid}` has no start event"
+            "timer session `{session_uid}` has no item uid; device identity was not adopted"
         ))
     })?;
 
@@ -234,7 +238,51 @@ pub async fn materialize(pool: &SqlitePool, block: &FoldedBlock, now: i64) -> Ap
     Ok(())
 }
 
-fn payload_for_start(mode: &str, target_sec: Option<i64>) -> String {
+/// 给一条**已存在的会话**追加事件（按 `time_records.id` 定位）。
+///
+/// 反查 uid 的原因：计时服务手里只有 `TimeRecord`，而 uid 是库按 `device_id` 发的
+/// （`t:<device>:<id>`）。让调用方自己拼会写出 `t::12` 这种半截身份，落库后不再重算。
+///
+/// `day_key` 取**会话 start 的本地日**而不是事件时刻的日：23:40 开始、次日 00:20 结束的
+/// 会话，`start` 与 `stop` 必须落在同一个 `day-*.jsonl`，否则对端 fold 要跨文件拼事件。
+///
+/// 返回 `None`（而不是报错）的两种情况：本机身份读不出来、会话还没有 uid。
+/// 两者都不该让「暂停 / 结束」失败 —— 用户必须能停下计时。
+pub async fn append_for_record(
+    pool: &SqlitePool,
+    record_id: i64,
+    kind: TimerOpKind,
+    at_ms: i64,
+    payload: Option<&str>,
+) -> AppResult<Option<TimerOp>> {
+    let Some(device_id) = crate::services::identity::install_id() else {
+        crate::log_warn!("timer event `{}` skipped: no install id", kind.as_str());
+        return Ok(None);
+    };
+    let row: Option<(Option<String>, i64)> =
+        sqlx::query_as("SELECT uid, started_at FROM time_records WHERE id = ?1")
+            .bind(record_id)
+            .fetch_optional(pool)
+            .await?;
+    let Some((Some(session_uid), started_at)) = row else {
+        crate::log_warn!(
+            "timer event `{}` skipped: record {record_id} has no uid",
+            kind.as_str()
+        );
+        return Ok(None);
+    };
+    let day_key = crate::services::identity::local_day_key(started_at)
+        .map_err(crate::error::AppError::db)?;
+    Ok(Some(
+        append(pool, &session_uid, kind, at_ms, &day_key, payload, device_id).await?,
+    ))
+}
+
+/// `start` 事件的 payload：`{"mode":"countup"}` / `{"mode":"countdown","target_sec":1500}`。
+///
+/// 公开给 `services::timer_events::record_start`：这两样是 `start` 事件**自带的参数**，
+/// 不是需要另存的状态，所以只能跟着事件走。
+pub fn payload_for_start(mode: &str, target_sec: Option<i64>) -> String {
     let mut payload = format!("{{\"mode\":\"{mode}\"");
     if let Some(target) = target_sec {
         payload.push_str(&format!(",\"target_sec\":{target}"));

@@ -121,7 +121,11 @@ fn appending_to_an_unknown_session_fails_loudly() {
         )
         .await
         .unwrap_err();
-        assert!(error.message.contains("no start event"), "{}", error.message);
+        assert!(
+            error.message.contains("no item uid"),
+            "未知会话必须报错而不是写出一条孤儿事件：{}",
+            error.message
+        );
     });
 }
 

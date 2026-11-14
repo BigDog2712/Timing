@@ -50,9 +50,30 @@ pub async fn stop(pool: &SqlitePool) -> AppResult<StopResult> {
         return Err(AppError::invalid_duration());
     }
     let accumulated = live_duration(&active, now);
+    /* 语义时刻与 `accumulated` 同源（都是「段起点 + 单调流逝」）。落库的 `ended_at`
+       也用它，而不是 `now`：两个值一旦分叉（有单调锚点时必然分叉几毫秒，NTP 校时后
+       可能差几秒），事件流 fold 出来的终点与 `time_records.ended_at` 就对不上 ——
+       而「时长」按 `ended_at - started_at` 反算的地方会给出另一套数。 */
+    let at_ms = crate::services::timer_events::end_at(active.running_since, now);
     // 与切换分段同一口径，判定逻辑只在 `should_ignore` 里写一遍（ADR-023）。
     if should_ignore(pool, accumulated).await {
-        session::discard(pool, active.id, accumulated, now, now).await?;
+        session::discard(pool, active.id, accumulated, at_ms, now).await?;
+        crate::services::timer_events::record(
+            pool,
+            active.id,
+            crate::services::timer_ops::TimerOpKind::Stop,
+            at_ms,
+            None,
+        )
+        .await;
+        crate::services::timer_events::record(
+            pool,
+            active.id,
+            crate::services::timer_ops::TimerOpKind::Drop,
+            at_ms,
+            None,
+        )
+        .await;
         if let Some(rs) = active.running_since {
             clock::clear_anchor(rs);
         }
@@ -78,7 +99,18 @@ pub async fn stop(pool: &SqlitePool) -> AppResult<StopResult> {
     }
     /* [V0.11.3] 跨零点按天拆开落库：一条 23:40→00:20 的会话变成两天各一段，
     日记里各归各的日期。不跨天时与 `session::finalize` 等价（内部走同一条路径）。 */
-    crate::services::timer_split::finalize(pool, &active, accumulated, now, now).await?;
+    crate::services::timer_split::finalize(pool, &active, accumulated, at_ms, now).await?;
+    /* `stop` 用**原会话**的 uid 记，即使上面把它按天拆成了多行：事件流描述的是
+    「用户按了结束」这一件事，拆天是本地展示口径（`timer_split` 的取舍见该文件头）。
+    对端 fold 出的是未拆分的单条块，范围与拆开的两段完全一致。 */
+    crate::services::timer_events::record(
+        pool,
+        active.id,
+        crate::services::timer_ops::TimerOpKind::Stop,
+        at_ms,
+        None,
+    )
+    .await;
     if let Some(rs) = active.running_since {
         clock::clear_anchor(rs);
     }

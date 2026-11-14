@@ -167,7 +167,7 @@ async fn adopt_rows(
     prefix: &str,
     device_id: &str,
 ) -> Result<u64, String> {
-    if !super::device::is_valid(device_id) {
+    if !crate::services::identity::is_valid(device_id) {
         return Err(format!(
             "refusing to adopt local rows with an invalid device id `{device_id}`"
         ));

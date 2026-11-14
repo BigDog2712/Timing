@@ -1,8 +1,12 @@
 //! 业务层：计时状态机、事项规则、记录编排、设置读写。所有业务逻辑归属此处。
 pub mod countdown;
-/* [0.12.2] 设备维度：本机 install_id 与设备花名册的启动接线。桌面独占 —— 它依赖
-   `services::insight::schema_core`，而 `insight` 整体是 `#[cfg(desktop)]`（P3 让手机端
-   建库时会把这条依赖翻过来，届时再放开 cfg）。 */
+/* [0.13.x] 本机身份（install_id）的落盘读写 + 进程级缓存 + 本地日键。
+   跨平台：计时事件流（`repositories::timer_ops`）在两端都要写 `device_id`，
+   而原先的实现藏在 `insight`（`#[cfg(desktop)]`）里，手机端够不着。
+   `insight::schema_core::device` 留了转发壳，老调用点不变。 */
+pub mod identity;
+/* [0.12.2] 设备维度的**启动接线**（认领哨兵行 / 标记本机）。桌面独占 —— 它依赖
+   `services::insight::schema_core`，而 `insight` 整体是 `#[cfg(desktop)]`。 */
 #[cfg(desktop)]
 pub mod device;
 /* [V0.11.15] 数据根（`%APP_DIR%`）的落点信息与切换。桌面独占：`appdata_dir` 与原生
@@ -11,6 +15,12 @@ pub mod device;
 pub mod data_root;
 pub mod daily_status;
 pub mod item;
+/* [0.13.x] 事项 ↔ 应用绑定（校验后委托仓储）。 */
+pub mod item_app;
+/* [0.13.x] 事项树（2 层硬限）与绑定的判据：断言落库后的 `parent_id`/`depth`，
+   而不是只断言调用返回 Ok（两者不同步时全链路零报错）。 */
+#[cfg(test)]
+mod item_tests;
 pub mod md_backup;
 /* [V0.11.23] 备份导出：名字校验 / 路径闸 / 导出名。放 services 才够得着桌面用例。 */
 pub mod md_backup_export;
@@ -29,13 +39,12 @@ pub mod settings;
 pub mod theme;
 pub mod timer;
 /* [0.13.x] 计时操作日志：事件真源与折叠（`fold_session`）。跨端同步只传这里的事件，
-   状态由两端各自折叠得出 —— 详见 `docs/design/PLAN-20261114-事项为中心的计时模型.md` §7。
-
-   `allow(dead_code)` 是**临时**的：接线（`timer::start/pause/resume/stop` 末尾追加事件）
-   要先把本机 `device_id` 送到这条链路，而它现在只有 `services::device`（desktop-only）
-   持有。摘除条件写在 `repositories::timer_ops` 的模块头，接线那一轮一起删。 */
-#[allow(dead_code)]
+   状态由两端各自折叠得出 —— 详见 `docs/design/PLAN-20261114-事项为中心的计时模型.md` §7。 */
 pub mod timer_ops;
+/* [0.13.x] 事件接线：`timer` 的 start/pause/resume/stop/discard 落成 `timer_ops` 事件。
+   单独一层是因为它同时依赖 `repositories::timer_ops`（写库）与 `timer_time`（口径），
+   塞进 `timer.rs` 会把它顶过 300 行硬限。 */
+pub mod timer_events;
 pub mod timer_flush;
 pub mod timer_recover;
 pub mod timer_split;

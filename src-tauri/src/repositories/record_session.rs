@@ -36,17 +36,23 @@ pub async fn find_all_active(pool: &SqlitePool) -> AppResult<Vec<TimeRecord>> {
 }
 
 /// 新建 active 会话并返回新 id。
+///
+/// ⚠️ `device_id` 必须显式写：`uid` 由 AFTER INSERT 触发器按它拼（`t:<device>:<id>`）。
+/// 漏了 → uid 恒 NULL → 这行永不被同步导出，且零报错（早前这个 INSERT 就没写）。
+/// 取不到身份时退化成哨兵 `''` 而不是报错：按下开始必须能开始，交给下次启动认领。
 pub async fn insert_active(pool: &SqlitePool, item_id: i64, now: i64) -> AppResult<i64> {
+    let device_id = crate::services::identity::install_id().unwrap_or_default();
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO time_records \
-         (item_id, status, started_at, ended_at, accumulated_sec, running_since, created_at, updated_at) \
-         VALUES (?, 'active', ?, NULL, 0, ?, ?, ?) RETURNING id",
+         (item_id, status, started_at, ended_at, accumulated_sec, running_since, created_at, updated_at, device_id) \
+         VALUES (?, 'active', ?, NULL, 0, ?, ?, ?, ?) RETURNING id",
     )
     .bind(item_id)
     .bind(now)
     .bind(now)
     .bind(now)
     .bind(now)
+    .bind(device_id)
     .fetch_one(pool)
     .await
     .map_err(active_conflict)?;
@@ -54,16 +60,19 @@ pub async fn insert_active(pool: &SqlitePool, item_id: i64, now: i64) -> AppResu
 }
 
 /// [V0.2.0] 新建 active **倒计时**会话并返回新 id（`mode='countdown'`，`target_sec` 非空）。
+///
+/// `device_id` 的理由同 [`insert_active`]：uid 靠触发器按它发，漏写就永不同步。
 pub async fn insert_active_countdown(
     pool: &SqlitePool,
     item_id: i64,
     target_sec: i64,
     now: i64,
 ) -> AppResult<i64> {
+    let device_id = crate::services::identity::install_id().unwrap_or_default();
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO time_records \
-         (item_id, status, started_at, ended_at, accumulated_sec, running_since, mode, target_sec, created_at, updated_at) \
-         VALUES (?, 'active', ?, NULL, 0, ?, 'countdown', ?, ?, ?) RETURNING id",
+         (item_id, status, started_at, ended_at, accumulated_sec, running_since, mode, target_sec, created_at, updated_at, device_id) \
+         VALUES (?, 'active', ?, NULL, 0, ?, 'countdown', ?, ?, ?, ?) RETURNING id",
     )
     .bind(item_id)
     .bind(now)
@@ -71,6 +80,7 @@ pub async fn insert_active_countdown(
     .bind(target_sec)
     .bind(now)
     .bind(now)
+    .bind(device_id)
     .fetch_one(pool)
     .await
     .map_err(active_conflict)?;
@@ -98,94 +108,10 @@ pub async fn set_accum_and_running(
     Ok(())
 }
 
-/// 结束会话：置 saved、冻结累计、ended_at 落盘。
-pub async fn finalize(
-    pool: &SqlitePool,
-    id: i64,
-    accumulated_sec: i64,
-    ended_at: i64,
-    now: i64,
-) -> AppResult<()> {
-    let mut tx = pool.begin().await?;
-    let saved = sqlx::query(
-        "UPDATE time_records \
-         SET status = 'saved', ended_at = ?, accumulated_sec = ?, running_since = NULL, updated_at = ? \
-         WHERE id = ? AND status = 'active' AND deleted_at IS NULL",
-    )
-    .bind(ended_at)
-    .bind(accumulated_sec)
-    .bind(now)
-    .bind(id)
-    .execute(&mut *tx)
-    .await?;
-    if saved.rows_affected() != 1 {
-        // 事务未 commit 即返回：tx 被 drop 时自动回滚。
-        // 0 行说明会话已被别处结束（双击结束、并发 stop），不能让调用方以为保存成功。
-        return Err(AppError::timer_not_running());
-    }
-    super::todo::soft_delete_for_saved_record(&mut tx, id, now).await?;
-    tx.commit().await?;
-    Ok(())
-}
-
-/// 跨零点分段落库（V0.11.3）：把一条 active 会话按给定分段切成多条 saved。
-///
-/// `segments` 是升序的 `(started_at, ended_at, accumulated_sec)`，由
-/// `services::timer_split::split_by_day` 算好——这里不再判断日界，只负责原子落库。
-///
-/// **原记录 id 保留给最后一段**：撤销条、「刚结束的那条」、md 导入的对位都还指着它。
-/// 前面各段作为新行插入，`target_sec` 置 NULL——倒计时的目标只属于真正结束的那一段，
-/// 否则两段各自显示一个完整目标，统计看着像跑了两次。`mode` 则整段复制：
-/// 它描述的是「这次会话的性质」，拆开也还是同一种。
-pub async fn finalize_split(
-    pool: &SqlitePool,
-    active: &TimeRecord,
-    segments: &[(i64, i64, i64)],
-    now: i64,
-) -> AppResult<()> {
-    let Some(&(last_start, last_end, last_accum)) = segments.last() else {
-        return Err(AppError::invalid_duration());
-    };
-
-    let mut tx = pool.begin().await?;
-    for (start, end, accum) in &segments[..segments.len() - 1] {
-        sqlx::query(
-            "INSERT INTO time_records \
-             (item_id, status, started_at, ended_at, accumulated_sec, running_since, \
-              mode, target_sec, created_at, updated_at) \
-             VALUES (?, 'saved', ?, ?, ?, NULL, ?, NULL, ?, ?)",
-        )
-        .bind(active.item_id)
-        .bind(start)
-        .bind(end)
-        .bind(accum)
-        .bind(&active.mode)
-        .bind(now)
-        .bind(now)
-        .execute(&mut *tx)
-        .await?;
-    }
-    let saved = sqlx::query(
-        "UPDATE time_records \
-         SET status = 'saved', started_at = ?, ended_at = ?, accumulated_sec = ?, \
-             running_since = NULL, updated_at = ? \
-         WHERE id = ? AND status = 'active' AND deleted_at IS NULL",
-    )
-    .bind(last_start)
-    .bind(last_end)
-    .bind(last_accum)
-    .bind(now)
-    .bind(active.id)
-    .execute(&mut *tx)
-    .await?;
-    if saved.rows_affected() != 1 {
-        /* 与 `finalize` 同一口径：会话已被别处结束时不假装成功（tx 丢弃即回滚）。 */
-        return Err(AppError::timer_not_running());
-    }
-    super::todo::soft_delete_for_saved_record(&mut tx, active.id, now).await?;
-    tx.commit().await?;
-    Ok(())
-}
+/* 结束 / 跨天拆分段落库移到 `record_session_split.rs`（本文件压在 300 行硬限上，
+   而那一对函数自带 20 行口径说明）。在此 re-export：`record_session::finalize*`
+   的调用点写法不变。 */
+pub use crate::repositories::record_session_split::{finalize, finalize_split};
 
 /// 撤销结束：saved 回滚为 active（ended_at=NULL，running_since=now）。
 pub async fn reactivate(pool: &SqlitePool, id: i64, running_since: i64, now: i64) -> AppResult<()> {
@@ -284,14 +210,15 @@ pub async fn end_and_start(
     }
     let new_id: i64 = sqlx::query_scalar(
         "INSERT INTO time_records \
-         (item_id, status, started_at, ended_at, accumulated_sec, running_since, created_at, updated_at) \
-         VALUES (?, 'active', ?, NULL, 0, ?, ?, ?) RETURNING id",
+         (item_id, status, started_at, ended_at, accumulated_sec, running_since, created_at, updated_at, device_id) \
+         VALUES (?, 'active', ?, NULL, 0, ?, ?, ?, ?) RETURNING id",
     )
     .bind(new_item_id)
     .bind(now)
     .bind(now)
     .bind(now)
     .bind(now)
+    .bind(crate::services::identity::install_id().unwrap_or_default())
     .fetch_one(&mut *tx)
     .await?;
     tx.commit().await?;

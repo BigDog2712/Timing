@@ -1,4 +1,12 @@
-//! 本机设备身份（`install_id`）的落盘读取。**零 `AppHandle`**：入参是目录。
+//! 本机设备身份（`install_id`）的落盘读取 + 进程级缓存 + 本地日键。**零 `AppHandle`**。
+//!
+//! ## 为什么这一层在 `services/` 顶层而不是 `insight/schema_core/`
+//!
+//! 它原本是 `services/insight/schema_core/device.rs`（`insight` 整体 `#[cfg(desktop)]`）。
+//! 但**计时事件流**（`services/timer_ops` + `repositories/timer_ops`）在两端都要写
+//! `device_id`，而手机端编不进 `insight`。身份是「这台机器是谁」，与 patina 分析窗
+//! 毫无关系，放这里才是它该在的层；`schema_core::device` 留了一个转发壳，
+//! `adopt_local_rows` 那套老调用点一个字都不用改。
 //!
 //! ## 落盘位置（唯一权威，别在别处再存一份）
 //!
@@ -22,15 +30,106 @@
 //! 写文件失败时**不能**「本次运行用一个临时 id」：那会让这一批行带着一个下次启动
 //! 再也不存在的 device_id 落库，成为永久脏数据（release 是 `panic = "abort"`，
 //! 也不许 `expect`）。调用方按 `IO_ERROR` 处理。
+//!
+//! 唯一的例外是 [`install_id`]：它服务「用户按下开始按钮」这条路径，失败时退化为
+//! `None`（该会话不同步），而不是让计时用不了。区别写在那里的注释里。
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 /// 身份文件名。名字是文档口径（用户能看到），**不许变**。
 pub const INSTALL_ID_FILE: &str = "install_id.txt";
 
 /// 身份的字符数（12 位小写 hex）。
 const INSTALL_ID_LEN: usize = 12;
+
+/// 本机配置目录：`%APPDATA%\com.timing.app`（Windows）/ 等价的 per-user 目录。
+///
+/// **测试隔离**：`cargo test --lib` 会有几十处经 `prepare_pool_schema` 走到这里。
+/// 那些用例的库全是 `:memory:` 或临时文件，绝不能让它们去读写开发机上**真实的**
+/// `%APPDATA%\com.timing.app\install_id.txt`——那会在从没跑过 App 的机器上凭空造出一个
+/// 身份文件，而且并行用例会互相看见同一个身份。测试二进制改用进程级临时目录。
+pub fn config_dir() -> Result<PathBuf, String> {
+    #[cfg(test)]
+    let dir = std::env::temp_dir().join(format!("timing-test-config-{}", std::process::id()));
+    #[cfg(not(test))]
+    let dir = crate::platform::app_dir::fallback_appdata();
+
+    std::fs::create_dir_all(&dir)
+        .map_err(|error| format!("failed to create config dir `{}`: {error}", dir.display()))?;
+    Ok(dir)
+}
+
+/// 用默认配置目录读/生成本机身份（`install_id` 的落盘版本，无缓存）。
+pub fn load_install_id() -> Result<String, String> {
+    ensure_install_id(&config_dir()?)
+}
+
+/// 进程级缓存的 `install_id`。
+///
+/// ## 为什么缓存
+///
+/// 计时接线（`services::timer` 的 start / pause / resume / stop）每次都要拿它来写
+/// `timer_ops.device_id`，而读它是**同步文件 IO**。放在点按路径上等于每按一次按钮
+/// 做一次系统调用，而那条路径是 async 的 —— 阻塞的是 runtime 线程。
+///
+/// ## 为什么是 `Option` 而不是 `Result`
+///
+/// 身份读不出来（权限被拒 / 磁盘满 / 配置目录不可写）时**不能阻塞计时**：
+/// 用户按下「开始」必须能开始，哪怕这条会话最终无法同步。代价是诚实记在日志里
+/// （下面的 WARN），而不是让它静默消失。
+///
+/// ## 谁会填它
+///
+/// 启动流程的两条身份接线（`services::device::startup_identity` /
+/// `startup_business_identity`）都会调 [`remember_install_id`]，所以正常运行期这里
+/// 恒为 `Some`。`None` 只出现在「启动接线失败但用户仍点了开始」这种降级路径上。
+static INSTALL_ID: OnceLock<Option<String>> = OnceLock::new();
+
+/// 本机身份（12 位小写 hex），首次调用时读/生成并缓存。
+///
+/// 失败返回 `None` 并打一行 WARN：调用方据此跳过事件写入，但**业务操作照常完成**。
+pub fn install_id() -> Option<&'static str> {
+    INSTALL_ID
+        .get_or_init(|| match load_install_id() {
+            Ok(id) => Some(id),
+            Err(error) => {
+                crate::log_warn!(
+                    "install id unavailable, timer events will not be exported: {error}"
+                );
+                None
+            }
+        })
+        .as_deref()
+}
+
+/// 启动流程已知身份时直接登记，省掉第一次读文件。
+///
+/// 只写一次（`OnceLock::set` 后续失败被忽略）：同一个进程里身份不该变，
+/// 变了就意味着两次启动读到了不同的文件内容 —— 那是数据目录被换掉的信号，
+/// 让它保持首次的值比静默切换更安全。
+pub fn remember_install_id(install_id: &str) {
+    let _ = INSTALL_ID.set(Some(install_id.to_string()));
+}
+
+/// 本地日键（`YYYY-MM-DD`，本地时区）。
+///
+/// 与 `activity_daily_totals.day_key` 和远端分片名 `day-YYYY-MM-DD.jsonl` 同一个口径：
+/// 10 位、连字符位置固定。放这里是因为**两端都要**（桌面算分片名、手机算上报日），
+/// 而原先的实现藏在 `insight`（`#[cfg(desktop)]`）里，手机端够不着。
+///
+/// 禁 `toISOString().slice(0,10)`：那是 UTC 日界，东八区每天 00:00–08:00 的记录
+/// 会被算进前一天。
+pub fn local_day_key(at_ms: i64) -> Result<String, String> {
+    use chrono::TimeZone;
+
+    chrono::Local
+        .timestamp_millis_opt(at_ms)
+        .single()
+        .map(|moment| moment.format("%Y-%m-%d").to_string())
+        .ok_or_else(|| format!("timestamp {at_ms} ms is out of the representable range"))
+}
 
 /// 完整路径。
 pub fn path_of(config_dir: &Path) -> PathBuf {

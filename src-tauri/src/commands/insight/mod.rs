@@ -1,8 +1,10 @@
 pub mod activity_read_model_cmd;
+pub mod attribution_cmd;
 pub mod backup_cmd;
 pub mod diagnostics_cmd;
 pub mod error;
 pub mod export_cmd;
+pub mod focus_block_cmd;
 pub mod import_cmd;
 pub mod mini_window_cmd;
 pub mod persistence_cmd;

@@ -35,24 +35,17 @@ pub const INCLUDE_TIME_RECORDS: bool = false;
 
 /// 把毫秒时间戳折成**本地**日键 `YYYY-MM-DD`。
 ///
+/// 实现已搬到 `services::identity::local_day_key`（跨平台：业务库侧写 `timer_ops.day_key`
+/// 也要它，而 `insight` 整块是 `#[cfg(desktop)]`）。这里转发，调用点写法不变。
+///
 /// 三条口径必须与既有实现一致，否则分片会与 md 同步、`app_usage.local_date` 错开一天：
 /// 1. **本地时区**，不是 UTC（UTC 切会整档偏一天，坑速览 §9.8 的同一个形状）；
 /// 2. 日界是本地 00:00，由 `infra::insight::clock::local_day_range_at` 给出；
 /// 3. 返回 `Result` 而不是 `unwrap_or_default()`：越界的毫秒值宁可报错，
 ///    也不要折成 `1970-01-01` —— 那会把「一条坏行」变成「一整天的历史」。
-pub fn local_day_key(at_ms: i64) -> Result<String, String> {
-    use chrono::TimeZone;
-
-    chrono::Local
-        .timestamp_millis_opt(at_ms)
-        .single()
-        .map(|moment| moment.format("%Y-%m-%d").to_string())
-        .ok_or_else(|| format!("timestamp {at_ms} ms is out of the representable range"))
-}
-
 #[cfg(test)]
 mod local_day_key_tests {
-    use super::local_day_key;
+    use crate::services::identity::local_day_key;
 
     /// 日键必须是 10 位、连字符位置固定 —— 它是 `activity_daily_totals.day_key`
     /// 的 `CHECK(length(day_key) = 10)` 与远端文件名 `day-YYYY-MM-DD.jsonl` 的共同前提。

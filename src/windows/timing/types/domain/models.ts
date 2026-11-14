@@ -85,6 +85,19 @@ export interface Item {
   isPinned: boolean;
   createdAt: EpochMs;
   updatedAt: EpochMs;
+  /**
+   * [0.13.x] 父事项；null = 顶层。深度硬限 2 层（见 services/item 的 create_in）。
+   *
+   * 三个树/分类字段是**可选**的：后端 `Item` DTO 一定返回它们（Rust 侧
+   * `item_tree_fields_are_always_serialized` 钉住），但仓里有 30 多处测试夹具在造
+   * `Item` 字面量，把它们设成必填等于强制每个夹具写三个 `null` —— 那不会让代码更安全，
+   * 只会让「加一个纯展示字段」变成一次全仓改动。
+   */
+  parentId?: number | null;
+  /** [0.13.x] 0 = 顶层事项，1 = 子事项（parent_id 的派生值，由后端算） */
+  depth?: number;
+  /** [0.13.x] 事项分类键（学习 / 游戏 …）；子记录分类解析的第一条规则要用它 */
+  categoryKey?: string | null;
 }
 
 /** 时间记录（一次计时会话） */

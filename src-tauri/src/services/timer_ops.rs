@@ -100,13 +100,21 @@ impl FoldedBlock {
         self.accumulated_ms / 1000
     }
 
+    /// 这条块还在跑（没有 `stop`）。
+    ///
+    /// `#[cfg(test)]`：生产代码判「进行中」一律看 `ended_at_ms.is_none()`（同一个表达式），
+    /// 多一个 public 方法就多一处「两处口径各自演化」的机会；而用例里 `!folded.is_running()`
+    /// 比 `assert!(folded.ended_at_ms.is_none())` 更直白，值得留。
+    #[cfg(test)]
     pub fn is_running(&self) -> bool {
         self.running_since_ms.is_some()
     }
 
-    /// 整段的墙钟跨度（含暂停）。`None` 表示进行中。
+    /// 整段的墙钟跨度（含暂停）。`None` 表示进行中。理由同 [`Self::is_running`]。
+    #[cfg(test)]
     pub fn wall_clock_ms(&self) -> Option<i64> {
-        self.ended_at_ms.map(|ended| (ended - self.started_at_ms).max(0))
+        self.ended_at_ms
+            .map(|ended| (ended - self.started_at_ms).max(0))
     }
 }
 

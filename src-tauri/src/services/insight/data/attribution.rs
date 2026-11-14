@@ -77,5 +77,10 @@ pub fn resolve_child_category(
     }
 }
 
+/* [0.13.x] 子记录切片：块 ∩ 事实 → 按应用分段并解析分类。
+   与  分开文件：那一个是「一条规则」，这一层是「怎么把
+   时间轴切出来」，两者的判据完全不相干。 */
+pub mod slice;
+
 #[cfg(test)]
 mod tests;

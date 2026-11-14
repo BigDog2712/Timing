@@ -27,6 +27,12 @@ macro_rules! define_invoke_handler {
             crate::commands::item_cmd::archive_item,
             crate::commands::item_cmd::unarchive_item,
             crate::commands::item_cmd::delete_item,
+            /* [0.13.x] 事项 ↔ 应用绑定（宿主段：业务库 item_app 表）。
+               四条都是两端可用的普通命令，不进 Patina 段。 */
+            crate::commands::item_app_cmd::list_item_apps,
+            crate::commands::item_app_cmd::list_items_for_app,
+            crate::commands::item_app_cmd::bind_item_app,
+            crate::commands::item_app_cmd::unbind_item_app,
             /* [V0.3.4] 日记域四条命令（diary_get_config / diary_set_config / diary_today /
             diary_open_today）随日记模块整体下架删除，见 ADR-023。 */
             crate::commands::timer_cmd::start_timer,
@@ -126,6 +132,14 @@ macro_rules! define_invoke_handler {
 define_invoke_handler![
     // [设备维度 P1] 日级双口径：Patina 段命令，不计入宿主 79 条契约（但文档总数要 +1）。
     crate::commands::insight::activity_read_model_cmd::cmd_get_activity_daily_totals,
+    /* [0.13.x] 应用分类绑定（活动库 app_category 表）：列表 / 设 / 删。 */
+    crate::commands::insight::attribution_cmd::cmd_list_app_categories,
+    crate::commands::insight::attribution_cmd::cmd_set_app_category,
+    crate::commands::insight::attribution_cmd::cmd_remove_app_category,
+    /* [0.13.x] 事项块投影 + 子记录切片（时间轴点开一个块）。 */
+    crate::commands::insight::focus_block_cmd::cmd_project_focus_blocks,
+    crate::commands::insight::focus_block_cmd::cmd_list_focus_blocks,
+    crate::commands::insight::focus_block_cmd::cmd_get_block_detail,
     crate::commands::insight::tool_notifications_cmd::cmd_get_tool_presentation,
     crate::commands::insight::tool_notifications_cmd::cmd_save_tool_notification_preferences,
     crate::commands::insight::tool_notifications_cmd::cmd_tool_presentation_action,

@@ -1,10 +1,11 @@
 //! 设备身份与设备维度的**启动接线**（桌面侧）。
 //!
-//! 这一层只做三件事，真正的逻辑在 `services::insight::schema_core`（可移植内核）：
+//! 身份本身的落盘读写与进程级缓存在 `services::identity`（跨平台，因为计时事件流两端
+//! 都要写 `device_id`）。这一层只做桌面启动时才需要的事：
 //!
-//! 1. [`config_dir`]：本机配置目录（`%APPDATA%\com.timing.app\`），`install_id.txt` 住这；
-//! 2. [`ensure_install_id`]：读/生成 12 位身份；
-//! 3. [`ensure_self`]：在 `devices` 表里把本机标成 `is_self = 1` 并刷新 `last_seen_ms`。
+//! 1. [`ensure_self`]：在活动库 `devices` 表里把本机标成 `is_self = 1` 并刷新 `last_seen_ms`；
+//! 2. [`startup_identity`] / [`startup_business_identity`]：两条启动路径的接线
+//!    （活动库在 `sqlite_pool::prepare_pool_schema`，业务库在 `app::bootstrap`）。
 //!
 //! ## 为什么 install_id 不放数据根里
 //!
@@ -18,7 +19,6 @@
 //! 文件、另一个 install_id。同一个人两台设备 = 两个 device_id，这正是同步要的语义。
 
 use sqlx::{Pool, Sqlite};
-use std::path::PathBuf;
 
 /// 本机平台标识。取值必须落在 `devices.platform` 的 `CHECK` 列表里。
 pub const fn host_platform() -> &'static str {
@@ -33,28 +33,6 @@ pub const fn host_platform() -> &'static str {
     }
 }
 
-/// 本机配置目录：`%APPDATA%\com.timing.app`（Windows）/ 等价的 per-user 目录。
-///
-/// **测试隔离**：`cargo test --lib` 会有几十处经 `prepare_pool_schema` 走到这里。
-/// 那些用例的库全是 `:memory:` 或临时文件，绝不能让它们去读写开发机上**真实的**
-/// `%APPDATA%\com.timing.app\install_id.txt`——那会在从没跑过 App 的机器上凭空造出一个
-/// 身份文件，而且并行用例会互相看见同一个身份。测试二进制改用进程级临时目录。
-pub fn config_dir() -> Result<PathBuf, String> {
-    #[cfg(test)]
-    let dir = std::env::temp_dir().join(format!("timing-test-config-{}", std::process::id()));
-    #[cfg(not(test))]
-    let dir = crate::platform::app_dir::fallback_appdata();
-
-    std::fs::create_dir_all(&dir)
-        .map_err(|error| format!("failed to create config dir `{}`: {error}", dir.display()))?;
-    Ok(dir)
-}
-
-/// 读/生成本机 `install_id`（12 位小写 hex）。
-pub fn ensure_install_id() -> Result<String, String> {
-    crate::services::insight::schema_core::ensure_install_id(&config_dir()?)
-}
-
 /// 在 `devices` 里保证「本机」这一行存在且唯一。
 ///
 /// `uq_devices_self` 是 `(is_self) WHERE is_self = 1` 的唯一索引，所以先把别的行降级
@@ -62,7 +40,7 @@ pub fn ensure_install_id() -> Result<String, String> {
 /// `label` 留空由前端按需填：空 label 显示成 `install_id` 前 6 位，比强行写
 /// 一个「Windows PC」更不容易误导（一个人可能有三台 Windows）。
 pub async fn ensure_self(pool: &Pool<Sqlite>, install_id: &str) -> Result<(), String> {
-    if !crate::services::insight::schema_core::device::is_valid(install_id) {
+    if !crate::services::identity::is_valid(install_id) {
         return Err(format!("invalid install id `{install_id}`"));
     }
     let now_ms = crate::infra::insight::clock::unix_timestamp_millis_i64();
@@ -85,11 +63,13 @@ pub async fn ensure_self(pool: &Pool<Sqlite>, install_id: &str) -> Result<(), St
     Ok(())
 }
 
-/// 启动身份接线（`prepare_pool_schema` 在迁移之后调它）：取身份 → 认领哨兵行 → 标记本机。
+/// 启动身份接线（`prepare_pool_schema` 在迁移之后调它）：取身份 → 登记缓存 → 认领哨兵行 → 标记本机。
 ///
-/// 返回本机 `install_id`，调用方（目前没人用）可以拿它做日志或后续投影。
+/// 「登记缓存」这一步不能省：`identity::install_id()` 是计时事件流唯一的取值来源，
+/// 它填不上就等于所有事件都没有 `device_id`（→ uid 恒 NULL → 永不同步，且零报错）。
 pub async fn startup_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
-    let install_id = ensure_install_id()?;
+    let install_id = crate::services::identity::load_install_id()?;
+    crate::services::identity::remember_install_id(&install_id);
     let adopted = crate::services::insight::schema_core::adopt_local_rows(pool, &install_id).await?;
     if adopted > 0 {
         crate::log_info!("adopted {adopted} local activity row(s) into device {install_id}");
@@ -108,7 +88,8 @@ pub async fn startup_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
 /// ⚠️ 必须在 `infra::db::init_pool`（迁移）之后调：列是迁移加的。调用点放在
 /// `app::bootstrap` 而不是 `infra` 层，因为 `check-layers` 的 L4 不许 `infra` 依赖 `services`。
 pub async fn startup_business_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
-    let install_id = ensure_install_id()?;
+    let install_id = crate::services::identity::load_install_id()?;
+    crate::services::identity::remember_install_id(&install_id);
     let adopted = crate::services::insight::schema_core::adopt_business_rows(pool, &install_id).await?;
     if adopted > 0 {
         crate::log_info!("adopted {adopted} local time record(s) into device {install_id}");
@@ -151,6 +132,22 @@ mod tests {
                     .await
                     .unwrap();
             assert_eq!((again.0, again.1), (device_id, uid));
+        });
+    }
+
+    /// 启动接线必须把身份登记进缓存 —— 这是计时事件流唯一的取值来源。
+    ///
+    /// 没有这条断言，「缓存没填」的表现是「所有计时事件 `device_id` 为空、uid 恒 NULL、
+    /// 永远不同步」，而且零报错。用例必须跑在**没有别的用例填过缓存**的前提下才有意义，
+    /// 所以它断言的是「登记后能读到同一个值」而不是「首次调用能生成」。
+    #[test]
+    fn startup_registers_the_identity_for_the_timer_event_stream() {
+        tauri::async_runtime::block_on(async {
+            let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+            crate::infra::migrate::migrate(&pool).await.unwrap();
+            let install_id = startup_business_identity(&pool).await.unwrap();
+            assert_eq!(crate::services::identity::install_id(), Some(install_id.as_str()));
+            assert!(crate::services::identity::is_valid(install_id.as_str()));
         });
     }
 }

@@ -8,7 +8,15 @@
  * 超过 `ITEM_NAME_MAX_CHARS` → `ITEM_NAME_TOO_LONG`（ADR-018）；**同名放行**（ADR-021）。
  * 这里若比后端宽松，浏览器里试出来的行为就不可信。
  */
-import type { CreateItemParams, Item, ItemIdParams, UpdateItemParams } from '../types/domain';
+import type {
+  CreateItemParams,
+  Item,
+  ItemAppBindParams,
+  ItemAppBinding,
+  ItemAppKeyParams,
+  ItemIdParams,
+  UpdateItemParams,
+} from '../types/domain';
 import { ITEM_NAME_MAX_CHARS } from '../lib/constants';
 import { fail, now, type MockState } from './mockSeed';
 
@@ -33,6 +41,12 @@ export function createMockApiItems(s: MockState): Record<string, (args?: any) =>
     create_item: (a) => {
       const p = a as CreateItemParams;
       const name = checkName(p?.name ?? '');
+      /* 2 层硬限与后端同口径：父必须是顶层事项，否则 `INVALID_DURATION`。
+         mock 比后端宽松的话，浏览器里点出来的树会在真机上建不出来。 */
+      const parent = p?.parentId != null ? s.items.find((i) => i.id === p.parentId) : undefined;
+      if (p?.parentId != null && (!parent || parent.depth !== 0)) {
+        fail('INVALID_DURATION', '子事项不能再挂子事项（深度上限 2 层）');
+      }
       const id = ++s.seq;
       const t = now();
       const item: Item = {
@@ -48,6 +62,9 @@ export function createMockApiItems(s: MockState): Record<string, (args?: any) =>
         isPinned: false,
         createdAt: t,
         updatedAt: t,
+        parentId: p?.parentId ?? null,
+        depth: p?.parentId != null ? 1 : 0,
+        categoryKey: p?.categoryKey?.trim() || null,
       };
       s.items.push(item);
       return item;
@@ -58,6 +75,20 @@ export function createMockApiItems(s: MockState): Record<string, (args?: any) =>
       if (!item) fail('ITEM_NOT_FOUND', '事项不存在');
       if (p.patch.name !== undefined) item.name = checkName(p.patch.name);
       if (p.patch.color !== undefined) item.color = p.patch.color;
+      if (p.patch.categoryKey !== undefined) item.categoryKey = p.patch.categoryKey;
+      if (p.patch.parentId !== undefined) {
+        if (p.patch.parentId != null) {
+          const parent = s.items.find((i) => i.id === p.patch.parentId);
+          if (!parent || parent.depth !== 0) {
+            fail('INVALID_DURATION', '子事项不能再挂子事项（深度上限 2 层）');
+          }
+          if (s.items.some((i) => i.parentId === item.id)) {
+            fail('INVALID_DURATION', '有子事项的事项不能挂到别人下面');
+          }
+        }
+        item.parentId = p.patch.parentId;
+        item.depth = p.patch.parentId == null ? 0 : 1;
+      }
       if (p.patch.sortOrder !== undefined) item.sortOrder = p.patch.sortOrder;
       /* [V0.2.0] */
       if (p.patch.remindAt !== undefined) {
@@ -90,6 +121,39 @@ export function createMockApiItems(s: MockState): Record<string, (args?: any) =>
       item.status = 'archived';
       item.updatedAt = now();
       return undefined;
+    },
+
+    /* ---- [0.13.x] 事项 ↔ 应用绑定 ---- */
+    list_item_apps: (a) => {
+      const itemId = (a as ItemIdParams).id;
+      return s.itemApps.filter((b) => b.itemId === itemId).sort((x, y) => x.appKey.localeCompare(y.appKey));
+    },
+    list_items_for_app: (a) => {
+      const appKey = String(a?.appKey ?? '').trim();
+      return s.itemApps.filter((b) => b.appKey === appKey).sort((x, y) => x.itemId - y.itemId);
+    },
+    bind_item_app: (a) => {
+      const input = (a as { input: ItemAppBindParams }).input;
+      if (!s.items.some((i) => i.id === input.itemId)) fail('ITEM_NOT_FOUND', '事项不存在');
+      const appKey = input.appKey.trim();
+      if (!appKey) fail('ITEM_NAME_EMPTY', '应用键不能为空');
+      const track = input.track ?? 1;
+      if (track !== 0 && track !== 1) fail('INVALID_DURATION', 'track 只能是 0 或 1');
+      const existing = s.itemApps.find((b) => b.itemId === input.itemId && b.appKey === appKey);
+      if (existing) {
+        existing.track = track;
+        return existing;
+      }
+      const binding: ItemAppBinding = { itemId: input.itemId, appKey, track };
+      s.itemApps.push(binding);
+      return binding;
+    },
+    unbind_item_app: (a) => {
+      const p = a as ItemAppKeyParams;
+      const index = s.itemApps.findIndex((b) => b.itemId === p.itemId && b.appKey === p.appKey);
+      if (index < 0) return false;
+      s.itemApps.splice(index, 1);
+      return true;
     },
   };
 }

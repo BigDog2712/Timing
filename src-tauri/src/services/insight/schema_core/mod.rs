@@ -9,7 +9,8 @@
 //!
 //! - [`ensure_schema`]：把**任何**状态的库带到 head 28（Migrator + 幂等补列守卫）；
 //! - [`adopt_local_rows`]：迁移期哨兵 `device_id = ''` → 真实 `install_id`，并补 `uid`；
-//! - [`ensure_install_id`]：读/生成本机 12 位身份（入参是目录，不是 `AppHandle`）。
+//! - 身份（`install_id`）**不在这里**了：它搬到了 `services::identity`（跨平台），
+//!   因为计时事件流两端都要写 `device_id`，而 `insight` 整块是 `#[cfg(desktop)]`。
 //!
 //! ## 谁调它
 //!
@@ -20,10 +21,8 @@
 //! `ensure_schema` 幂等，先跑一遍不会让后跑的一遍出错。
 
 pub mod ddl;
-pub mod device;
 pub mod ensure;
 
-pub use device::ensure_install_id;
 pub use ensure::{adopt_business_rows, adopt_local_rows, ensure_schema_at};
 #[cfg(test)]
 mod version_guard_tests;

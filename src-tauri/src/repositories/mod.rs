@@ -1,12 +1,16 @@
 //! 数据访问层：仅 SQL + 行映射，不含业务规则。
 
 pub mod item;
+/* [0.13.x] 事项 ↔ 应用绑定：幂等绑定 / 解绑 / 正反两向查询。 */
+pub mod item_app;
 pub mod md_cloud_pending;
 pub mod md_sync;
 pub mod md_sync_todo;
 pub mod note;
 pub mod record;
 pub mod record_session;
+/* [0.13.x] 结束 / 跨天拆分段落库： 在此 re-export。 */
+pub mod record_session_split;
 pub mod reminder;
 pub mod settings;
 pub mod todo;

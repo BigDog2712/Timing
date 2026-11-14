@@ -1,4 +1,5 @@
 pub mod anonymous_activity;
+pub mod app_category;
 pub mod app_links;
 pub mod app_settings;
 pub mod classification_settings;

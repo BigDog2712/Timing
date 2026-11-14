@@ -6,6 +6,8 @@ pub mod data_root;
 pub mod constants;
 pub mod enums;
 pub mod item;
+/* [0.13.x] 事项 ↔ 应用绑定（`item_app`）。 */
+pub mod item_app;
 /* [V0.11.23] 备份导出的返回形状（`md_sync_cloud.rs` 已顶到 300 行门禁）。 */
 pub mod md_backup_export;
 pub mod md_sync;

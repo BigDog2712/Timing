@@ -50,6 +50,41 @@
 - 本轮**不同步** `time_records`（`items` 未过桥 ⇒ `itemId` 跨设备悬空）。列与触发器已建好，
   切开只差 `sync::INCLUDE_TIME_RECORDS`（用例钉着它是 `false`）。
 
+### T15–T19 · 事项为中心的计时模型（同一版号并入）
+
+设计文档：`docs/design/PLAN-20261114-事项为中心的计时模型.md`（含 §12 落地状态与四项变异自证）。
+
+- **事项树**：`items` 加 `parent_id` / `depth` / `category_key`（业务库迁移 0011）。2 层硬限
+  在 `services::item::resolve_depth` 一处判定，深度由后端算、不接受前端传——让前端传就有
+  两个真源，`depth` 与 `parent_id` 一旦不同步，那些行会从**所有**「取顶层」的查询里消失且零报错。
+  `update` 的 `parent_id` 走三态：自引用拒 / 有子事项不能再挂别人下面 / 改挂时重算 depth。
+- **块只挂叶子**：`timer::start` 拦「有子事项的事项」—— 放过去，父的时长会和**全部**子事项
+  并行重复计时，而「父块含不含子块」在任何读路径上都没有答案。
+- **事项 ↔ 应用**（`item_app`，纯绑定不存分类）+ **应用 ↔ 分类**（活动库 `app_category`，
+  `priority` 最小者即「分类首位」）。4 条宿主命令 + 3 条 Patina 命令，四面契约全通。
+- **身份内核搬家**：`insight/schema_core/device.rs` → `services/identity.rs`（`git mv`）。
+  新增 `install_id() -> Option<&'static str>`（`OnceLock` 缓存，失败只 WARN 不阻断计时）。
+  这是 T19 的唯一阻塞点：`timer.rs` 跨平台，而原实现藏在 `#[cfg(desktop)]` 的 `insight` 里。
+- **计时事件接线（T19）**：`timer_events::record_start` / `record`，start/pause/resume/stop/discard
+  五条全部落事件（discard 分支 `Stop`+`Drop` 双发）。`elapsed_at` / `end_at` 让**事件时刻与
+  `live_duration` 同源**——`timer_stop::stop` 把同一个 `at_ms` 既传给 `discard` 也传给
+  `finalize`，否则事件按单调时刻、落库按裸墙钟，两者差几毫秒，fold 与 `time_records` 永远不一致。
+- **补齐两处既存缺口**：`insert_active` / `insert_active_countdown` / `finalize_split` /
+  `end_and_start` / 手工补记这五处 INSERT **从没写过 `device_id`** ⇒ uid 触发器不触发 ⇒
+  老计时行的 uid 一直是 NULL（永不被导出、零报错）。`timer_ops::append` 取 `item_uid` 也从
+  「首条事件」改成 `time_records JOIN items`（原写法下 start 自己写不进去）。
+- **块投影（T17）**：`focus_blocks::project(business, activity, since_ms)`，`None` 全量 /
+  `Some` 增量，`ON CONFLICT(uid) DO UPDATE` 幂等。判据是「清空本表能否从 `time_records`
+  完整重造」——能，所以是投影不是双写。哨兵 `device_id` 的行跳过（未认领，投过去只会多一个空设备）。
+- **子记录切片（T18 后端）**：`slice_block` / `summarize_by_category` 纯函数，7 条用例，
+  需求原文的五段子记录逐段覆盖（chrome 学习 90 分 / bilibili 摸鱼 20 分 / pycharm 学习 20 分）。
+- **前端接口**：`ipc.ts` + `IpcApi` + `browserMockItems`（含 2 层硬限校验）+ `mockSeed`
+  五面齐；新增 `platform/persistence/attributionGateway.ts` 包 7 条 Patina 命令。
+  `Item.parentId` / `depth` / `categoryKey` 在 TS 侧声明为**可选**（仓里 30+ 处 `Item` 字面量），
+  补偿放在 Rust 侧：`item_tree_fields_are_always_serialized` 断言三个键一定出现在序列化 JSON 里。
+- **新增 10 条用例** `services::item_tests`：断言**落库后**的 `parent_id`/`depth`，不只断言
+  返回 Ok（「先插再报错」的实现也要能抓出来）。四项变异自证各自咬住唯一一条（见设计文档 §12）。
+
 ### 顺手修掉的两个真 bug
 
 - `ensure_install_id` 的临时文件名是固定的 `install_id.txt.tmp`：两个写者同时进来时，
@@ -62,9 +97,13 @@
 
 ### 账本
 
-- `size` 145 条（`schema.rs` 1887→1751、`hourly.rs` 852→629、`sqlite_pool.rs` 748→747 等向下收紧）。
-- `vendored` 158 条（改 61 / 增 97）；`contract` 84（+Patina 118）/ 错误码 18 / 事件 11-11。
-- `cargo test --lib` **1763 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 204 文件 / 1566 用例。
+- `size` 145 条（`schema.rs` 1887→1751、`hourly.rs` 852→629、`sqlite_pool.rs` 748→747 等向下收紧）；
+  扫描 1791 文件 / 超限占比 29.4%。为压回 300 行硬限，本轮把 `record_session.rs` 拆出
+  `record_session_split.rs`、`focus_blocks.rs` 拆成 `mod.rs` + `read.rs`、`ipc.ts` 压行。
+- `vendored` 171 条（改 63 / 增 108）；`contract` 88（+Patina 124）/ 错误码 18 / 事件 11-11。
+- `cargo test --lib` **1813 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 204 文件 / 1566 用例。
+- `clippy --all-targets -D warnings` 0 诊断（`--lib` 看不到新用例的 lint：`too_many_arguments`
+  与 `doc_lazy_continuation` 都是只在 `--all-targets` 下才现形的）。
 
 ## 0.12.2 · 应用多分类绑定 + 设置页导航修复（R3）— 2026-11-13（未出包）
 

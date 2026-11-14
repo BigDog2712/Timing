@@ -12,6 +12,7 @@ import type {
   CreateItemParams,
   Item,
   ItemIdParams,
+  ItemAppBindParams, ItemAppBinding, ItemAppKeyParams,
   ListItemsParams,
   ListRecordsParams,
   Note,
@@ -154,13 +155,17 @@ export const ipc: IpcApi = {
   dailyStatusSet: (date: string, itemId: number, status: 'pending' | 'done') => call<void>('daily_status_set', { date, itemId, status }),
   usageStatsGet: (d: string) => call<import('../types/domain/usage').UsageDayDto>('usage_stats_get', { date: d }),
   usageStatsSettings: () => call<void>('usage_stats_settings', {}),
-  /* ---- 事项域 ---- */
   listItems: (params: ListItemsParams) => call<Item[]>('list_items', { includeArchived: params.includeArchived ?? false }),
-  createItem: (params: CreateItemParams) => call<Item>('create_item', { name: params.name, color: params.color }),
+  createItem: (params: CreateItemParams) => call<Item>('create_item', { name: params.name, color: params.color, parentId: params.parentId ?? null, categoryKey: params.categoryKey ?? null }),
   updateItem: (params: UpdateItemParams) => call<Item>('update_item', { id: params.id, patch: params.patch }),
   archiveItem: (params: ItemIdParams) => call<Item>('archive_item', { id: params.id }),
   unarchiveItem: (params: ItemIdParams) => call<Item>('unarchive_item', { id: params.id }),
   deleteItem: (params: ItemIdParams) => call<void>('delete_item', { id: params.id }),
+
+  listItemApps: (p: ItemIdParams) => call<ItemAppBinding[]>('list_item_apps', { itemId: p.id }),
+  listItemsForApp: (p: { appKey: string }) => call<ItemAppBinding[]>('list_items_for_app', { appKey: p.appKey }),
+  bindItemApp: (p: ItemAppBindParams) => call<ItemAppBinding>('bind_item_app', { input: { itemId: p.itemId, appKey: p.appKey, track: p.track ?? 1 } }),
+  unbindItemApp: (p: ItemAppKeyParams) => call<boolean>('unbind_item_app', { itemId: p.itemId, appKey: p.appKey }),
 
   /* ---- 计时域 ---- */
   startTimer: (params: StartTimerParams) => call<TimeRecord>('start_timer', params.itemId != null ? { itemId: params.itemId } : {}),
@@ -172,14 +177,12 @@ export const ipc: IpcApi = {
   getTimerState: () => call<TimerState>('get_timer_state'),
   switchItem: (params: SwitchItemParams) => call<TimerState>('switch_item', { itemId: params.itemId, mode: params.mode }),
 
-  /* ---- 记录域 ---- */
   listRecords: (params: ListRecordsParams) => call<Paginated<TimeRecord>>('list_records', { itemId: params.itemId, from: params.from, to: params.to, page: params.page ?? 1, limit: params.limit ?? 20 }),
   createRecord: (params) => call<TimeRecord[]>('create_record', { itemId: params.itemId, startedAt: params.startedAt, endedAt: params.endedAt, note: params.note ?? null }),
   statsSummary: (params: StatsSummaryParams) => call<StatsSummary>('stats_summary', { itemId: params.itemId, from: params.from, to: params.to }),
   updateRecord: (params: UpdateRecordParams) => call<TimeRecord>('update_record', { id: params.id, patch: params.patch }),
   deleteRecord: (params: ItemIdParams) => call<void>('delete_record', { id: params.id }),
 
-  /* ---- 崩溃恢复 ---- */
   resolveOpenRecord: (params: ResolveOpenRecordParams) =>
     call<TimeRecord | null>('resolve_open_record', {
       action: params.action,
@@ -273,10 +276,9 @@ export const ipc: IpcApi = {
 
   /* ---- [V0.4.0] Markdown 同步（插件 API v2）/ [V0.11.13] 云端 + 备份（ADR-061） ---- */
   mdSyncGet: () => call<MdSyncViewCloud>('md_sync_get'),
-  mdSyncSave: (params: { config: MdSyncConfig; secret?: string | null }) =>
-    call<MdSyncViewCloud>('md_sync_save', { config: params.config, secret: params.secret ?? null }),
+  mdSyncSave: (p: { config: MdSyncConfig; secret?: string | null }) => call<MdSyncViewCloud>('md_sync_save', { config: p.config, secret: p.secret ?? null }),
   mdSyncRun: () => call<MdSyncReport>('md_sync_run'),
-  mdSyncOpen: (params: { kind: MdSyncKind }) => call<void>('md_sync_open', { kind: params.kind }),
+  mdSyncOpen: (p: { kind: MdSyncKind }) => call<void>('md_sync_open', { kind: p.kind }),
   mdSyncTest: (params: { config: MdSyncConfig; secret?: string | null }) => call<MdSyncTestResult>('md_sync_test', { config: params.config, secret: params.secret ?? null }),
   mdBackupList: () => call<MdBackupItem[]>('md_backup_list'),
   mdBackupRestore: (params: { name: string; target?: string | null }) => call<MdBackupRestoreResult>('md_backup_restore', { name: params.name, target: params.target ?? null }),
@@ -287,13 +289,11 @@ export const ipc: IpcApi = {
   mdBackupOpen: (params: { name: string }) => call<void>('md_backup_open', { name: params.name }),
   /* [V0.11.23] 导出备份（手机专属）：取消 → `saved:false`，不算失败 */
   mdBackupExport: (params: { name: string }) => call<MdBackupExport>('md_backup_export', { name: params.name }),
-
   /* ---- 手机端原生能力 [V0.12.0]：SAF 目录 / 悬浮条 ---- */
   mdSafPick: () => call<SafStatus>('md_saf_pick'),
   mdSafStatus: () => call<SafStatus>('md_saf_status'),
   overlaySet: (params: { enabled: boolean; style?: OverlayStyle }) => call<OverlayStatus>('overlay_set', { enabled: params.enabled, style: params.style }),
   overlayStatus: () => call<OverlayStatus>('overlay_status'),
-
   /* ---- 迁移可见性 [V0.5.0]（命令 65 → 67，ADR-037） ---- */
   getMigrationInfo: () => call<MigrationInfo>('get_migration_info'),
   openLegacyDir: () => call<void>('open_legacy_dir'),

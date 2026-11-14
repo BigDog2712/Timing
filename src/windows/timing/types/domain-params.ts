@@ -19,6 +19,36 @@ export interface CreateItemParams {
   name: string;
   /** 标签色 hex；省略 = 主题默认 */
   color?: string;
+  /**
+   * [0.13.x] 父事项 id；省略 = 顶层事项。
+   * 父必须是顶层事项（`depth = 0`），否则后端回 `INVALID_DURATION`——2 层硬限。
+   */
+  parentId?: number;
+  /** [0.13.x] 事项分类键；子记录分类与应用分类集取交集（规则 1） */
+  categoryKey?: string;
+}
+
+/* ---- [0.13.x] 事项 ↔ 应用绑定 ---- */
+
+/** 一条绑定：事项 + 应用 + 是否计入子记录 */
+export interface ItemAppBinding {
+  itemId: number;
+  /** 归一后的键（桌面 = 小写 exe，安卓 = 包名），与 sessions.appKey 同源 */
+  appKey: string;
+  /** 1 = 计入该事项的子记录；0 = 仅记录绑定 */
+  track: number;
+}
+
+export interface ItemAppBindParams {
+  itemId: number;
+  appKey: string;
+  /** 缺省 1 */
+  track?: number;
+}
+
+export interface ItemAppKeyParams {
+  itemId: number;
+  appKey: string;
 }
 
 /** update_item 的部分更新字段 */
@@ -30,6 +60,10 @@ export interface ItemPatch {
   remindAt?: EpochMs | null;
   /** [V0.2.0] 固定任务开关 */
   isPinned?: boolean;
+  /** [0.13.x] 父事项；三态：省略 = 不改，null = 移到顶层，值 = 挂到该顶层事项下 */
+  parentId?: number | null;
+  /** [0.13.x] 事项分类；三态：省略 = 不改，null = 清空，值 = 设置 */
+  categoryKey?: string | null;
 }
 
 export interface UpdateItemParams {

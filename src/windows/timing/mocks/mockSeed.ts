@@ -6,6 +6,7 @@
  */
 import type {
   Item,
+  ItemAppBinding,
   Note,
   ReferenceSettings,
   Reminder,
@@ -101,6 +102,8 @@ export interface MockState {
   dailyStatus: Record<string, Record<number, 'pending' | 'done'>>;
   /* [V0.3.4] 参考设置（`get_reference_settings` / `update_reference_settings` 的内存态） */
   reference: ReferenceSettings;
+  /* [0.13.x] 事项 ↔ 应用绑定（`item_app` 的内存态） */
+  itemApps: ItemAppBinding[];
 }
 
 /** 构造初始状态（含「未归类」系统事项与示例记录） */
@@ -108,10 +111,10 @@ export function seed(): MockState {
   const t = now();
   return {
     items: [
-      { id: 1, name: '未归类', color: null, status: 'active', isSystem: true, sortOrder: 0, remindAt: null, remindedAt: null, isPinned: false, createdAt: t, updatedAt: t },
-      { id: 2, name: '品牌视觉改版', color: null, status: 'active', isSystem: false, sortOrder: 1, remindAt: null, remindedAt: null, isPinned: true, createdAt: t, updatedAt: t },
-      { id: 3, name: '客户方案评审', color: null, status: 'active', isSystem: false, sortOrder: 2, remindAt: null, remindedAt: null, isPinned: false, createdAt: t, updatedAt: t },
-      { id: 4, name: '接口联调', color: null, status: 'active', isSystem: false, sortOrder: 3, remindAt: null, remindedAt: null, isPinned: false, createdAt: t, updatedAt: t },
+      { id: 1, name: '未归类', color: null, status: 'active', isSystem: true, sortOrder: 0, remindAt: null, remindedAt: null, isPinned: false, createdAt: t, updatedAt: t, parentId: null, depth: 0, categoryKey: null },
+      { id: 2, name: '品牌视觉改版', color: null, status: 'active', isSystem: false, sortOrder: 1, remindAt: null, remindedAt: null, isPinned: true, createdAt: t, updatedAt: t, parentId: null, depth: 0, categoryKey: null },
+      { id: 3, name: '客户方案评审', color: null, status: 'active', isSystem: false, sortOrder: 2, remindAt: null, remindedAt: null, isPinned: false, createdAt: t, updatedAt: t, parentId: null, depth: 0, categoryKey: null },
+      { id: 4, name: '接口联调', color: null, status: 'active', isSystem: false, sortOrder: 3, remindAt: null, remindedAt: null, isPinned: false, createdAt: t, updatedAt: t, parentId: null, depth: 0, categoryKey: null },
     ],
     records: sampleRecords(),
     active: null,
@@ -125,6 +128,7 @@ export function seed(): MockState {
     notes: [],
     reminders: [],
     dailyStatus: {},
+    itemApps: [],
     reference: { ...REFERENCE_DEFAULTS },
   };
 }

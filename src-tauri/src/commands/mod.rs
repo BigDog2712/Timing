@@ -8,6 +8,8 @@
 pub mod countdown_cmd;
 pub mod daily_status_cmd;
 pub mod item_cmd;
+/* [0.13.x] 事项 ↔ 应用绑定域。 */
+pub mod item_app_cmd;
 pub mod migration_cmd;
 pub mod note_cmd;
 pub mod plugin_cmd;

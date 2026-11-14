@@ -6,7 +6,7 @@ use crate::error::AppResult;
 use crate::models::item::Item;
 
 const COLS: &str = "id, name, color, status, is_system, sort_order, remind_at, reminded_at, \
-                    is_pinned, created_at, updated_at";
+                    is_pinned, created_at, updated_at, parent_id, depth, category_key";
 
 /// 按 id 查询（排除已软删除）。
 pub async fn find_by_id(pool: &SqlitePool, id: i64) -> AppResult<Option<Item>> {
@@ -50,6 +50,17 @@ pub async fn list(pool: &SqlitePool, include_archived: bool) -> AppResult<Vec<It
     Ok(items)
 }
 
+/// 直接子事项数量（排除已软删除）—— 「有子的事项不能再挂到别人下面」的判据。
+pub async fn count_children(pool: &SqlitePool, parent_id: i64) -> AppResult<i64> {
+    let value: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM items WHERE parent_id = ? AND deleted_at IS NULL",
+    )
+    .bind(parent_id)
+    .fetch_one(pool)
+    .await?;
+    Ok(value)
+}
+
 /// 当前最大 sort_order（无记录返回 0）。
 pub async fn max_sort_order(pool: &SqlitePool) -> AppResult<i64> {
     let value: i64 = sqlx::query_scalar(
@@ -60,23 +71,39 @@ pub async fn max_sort_order(pool: &SqlitePool) -> AppResult<i64> {
     Ok(value)
 }
 
+/// 新行（仓库层入参）。
+///
+/// 与 `ItemFields` 同型：聚成结构体，因为 `parent_id`/`depth`/`category_key` 加进来后
+/// 参数已经是 8 个（`clippy::too_many_arguments`），且按位置传的三个 `Option` 很容易传反
+/// —— 它们都是 `Option<&str>` 或 `Option<i64>`，编译器不会替人分辨。
+pub struct NewItem<'a> {
+    pub name: &'a str,
+    pub color: Option<&'a str>,
+    pub sort_order: i64,
+    pub now: i64,
+    pub parent_id: Option<i64>,
+    pub depth: i64,
+    pub category_key: Option<&'a str>,
+}
+
 /// 插入并返回新 id。
-pub async fn insert(
-    pool: &SqlitePool,
-    name: &str,
-    color: Option<&str>,
-    sort_order: i64,
-    now: i64,
-) -> AppResult<i64> {
+///
+/// `depth` 由调用方算好传进来（`services::item` 是分层规则的唯一入口）：
+/// 仓储层不该知道「2 层硬限」这条业务规则，否则规则会有第二个实现。
+pub async fn insert(pool: &SqlitePool, new: NewItem<'_>) -> AppResult<i64> {
     let id: i64 = sqlx::query_scalar(
-        "INSERT INTO items (name, color, status, is_system, sort_order, created_at, updated_at) \
-         VALUES (?, ?, 'active', 0, ?, ?, ?) RETURNING id",
+        "INSERT INTO items (name, color, status, is_system, sort_order, created_at, updated_at, \
+                            parent_id, depth, category_key) \
+         VALUES (?, ?, 'active', 0, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
-    .bind(name)
-    .bind(color)
-    .bind(sort_order)
-    .bind(now)
-    .bind(now)
+    .bind(new.name)
+    .bind(new.color)
+    .bind(new.sort_order)
+    .bind(new.now)
+    .bind(new.now)
+    .bind(new.parent_id)
+    .bind(new.depth)
+    .bind(new.category_key)
     .fetch_one(pool)
     .await?;
     Ok(id)
@@ -93,6 +120,10 @@ pub struct ItemFields<'a> {
     pub sort_order: Option<i64>,
     pub remind_at: Option<Option<i64>>,
     pub is_pinned: Option<bool>,
+    /// 三态同 `remind_at`：`None` 不动、`Some(None)` 置空、`Some(Some(v))` 改值。
+    pub parent_id: Option<Option<i64>>,
+    pub depth: Option<i64>,
+    pub category_key: Option<Option<&'a str>>,
 }
 
 /// 部分更新（仅传非 None 字段）。
@@ -123,6 +154,27 @@ pub async fn update(pool: &SqlitePool, id: i64, fields: ItemFields<'_>, now: i64
     }
     if let Some(v) = fields.is_pinned {
         qb.push(", is_pinned = ").push_bind(v);
+    }
+    match fields.parent_id {
+        Some(Some(v)) => {
+            qb.push(", parent_id = ").push_bind(v);
+        }
+        Some(None) => {
+            qb.push(", parent_id = NULL");
+        }
+        None => {}
+    }
+    if let Some(v) = fields.depth {
+        qb.push(", depth = ").push_bind(v);
+    }
+    match fields.category_key {
+        Some(Some(v)) => {
+            qb.push(", category_key = ").push_bind(v.to_string());
+        }
+        Some(None) => {
+            qb.push(", category_key = NULL");
+        }
+        None => {}
     }
     qb.push(" WHERE id = ")
         .push_bind(id)
