@@ -4,6 +4,80 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 修复 · 小圆点形态看不见高亮 / 分针太具象 — 2026-11-14（未出包）
+
+> 纯前端改动，全部落在 `src/windows/timing/**`：**零 Rust 改动、零 schema 变更、零迁移、零契约变更**。
+> 版号本轮不动（赋号是单独一轮）。
+
+### 小圆点：分针 + 圆心轴心 → 单个黄点
+
+- 用户口径：「内部分针过于具象化，优化为单个黄色圆点（参考默认设置颜色），圆点在圆指针顶部位置」。
+  删掉 `line.dot__needle`（分针）与 `circle.dot__pin`（圆心轴心），换成一枚 `circle.dot__mark`：
+  **轨道半径 = 原针长 7**（就是原针尖端所在的那个圆周），半径 2.4（取进度弧的描边宽，同一档视觉重量；
+  原针 1.5 是「画一条线」的量纲，直径 3px 的点在 33px 里几乎看不见）。
+- 黄点取 `var(--color-warn)` —— 即设置四色里的 `accents.warn`，出厂 `#E8A33D`
+  （`stores/settingsStore.ts` 的 `DEFAULT_SETTINGS.accents.warn` 与 `lib/theme.ts` 的 `DEFAULT_ACCENTS.warn` 同源）。
+  **不新增令牌**：`ReferenceSettings` 里唯一的颜色是 `highlightColor`（出厂 `#4DA3E8`，是蓝的），
+  全仓也没有别的黄系定义，所以复用它而不是发明一个色值。走令牌而非写死 hex，一是组件 CSS 禁裸 hex
+  （design-tokens 消费规则 P0），二是用户改自己的 warn 色时圆点跟着走、与设置永远同源。
+- 角度口径**一字未改**：正计时 `displaySec % 3600 × 0.1°`（一小时一圈）/ 倒计时「已用比例 × 360°」/
+  空闲与结束回 12 点；几何仍吃 `useSmoothTimerTick()` 的小数秒（逐帧推进，不是一秒一跳，文本仍取整）。
+- 外环（表盘细框 + 进度弧）、`data-highlight` / `data-state` / `data-countdown` / `data-warn` / `title`、
+  拖拽、单击展开、右键吞事件全部原样——用户明确认可的是弧那套图形语言。
+- 黄点**不跟状态变色**：它标的是「针尖在哪儿」这个几何位置，跟着状态走会和环同色、丢掉位置感。
+- **已知代价**：`--color-warn` 在**浅色主题**解析成 `#A05E00`（同色相加深，为达标文字 4.5:1），
+  深色主题才是 `#E8A33D`。决定**接受**：这个点贴在应用自己的表面上，对比度优先于「看着像黄」；
+  而且单独给圆点开一个令牌，等于让它在浅色主题下成为全应用唯一不跟随语义色的元素。
+
+### 小圆点形态下点托盘图标：临时展开成悬浮条、闪完收回
+
+- 先纠正事实：圆点形态**本来**就接了高亮（订阅 `highlightSeq` 挂 `data-highlight`，`dot.css` 有
+  `.dot[data-highlight="true"]` 规则）。问题不是「没接」，是 **33px 的圆点上闪一圈内侧描边太弱、看不见**。
+  所以本轮补的是**形态临时切换**：收起态触发高亮 → 临时放出悬浮条（它自带 3 × 0.8s 高亮）→
+  闪完自动收回圆点。悬浮条形态下行为不变（它本来就在，闪就完了）。
+- 收回**只有一个入口**：既有的 `scheduleCollapse()`（300ms 延迟 + 刚展开 400ms 内不动 + `hasOpenSurface()`）。
+  高亮侧只负责在 `HIGHLIGHT_MS` 之后叫它一声，判定一行都不重写、也不另起定时器——
+  两套收回逻辑迟早会打架。`hasOpenSurface()` 那条护栏因此自动生效：闪的过程中用户点了面板，
+  到点不收（用例钉着）。
+- 四条边界：① 指针压在条上时**连叫都不叫**，留给既有 `onMouseLeave → scheduleCollapse`
+  （用户正在看，不替他把条收掉）；② 从不调 `setFloatForm` —— `floatForm === 'dot'` 是用户的**常驻**
+  形态设定，临时看一眼不能顺手改掉设定；③ `isDragActive()` 时不展开 —— 拖动窗口期间改窗口尺寸
+  会打断这次拖动；④ 收回定时器只有一个 ref，连点两次先 clear 再重排，不叠定时器。
+- 用户**自己**展开的条（或面板开着的条）不接管收回：那不是高亮放出来的，是他的界面。
+- 实现细节：高亮 effect 只依赖 `[highlightSeq, floatForm, clearFlashTimer]`，`scheduleCollapse` 走
+  `scheduleRef` 取最新引用——若把 `collapsed` / `scheduleCollapse` 写进依赖，`setCollapsed(false)`
+  那一刻 effect 重建、cleanup 会把刚排上的定时器清掉。
+
+### 拖拽态：`lib/dragState.ts`（进程级单例）
+
+- 原来**拿不到**「此刻是否在拖」：`origin` / `swallow` 是 `usePillDrag` 的内部 ref，而圆点与药丸
+  **各有一份 hook 实例**，`entry/App.tsx` 既看不到、也没有回传通道。「拖动中不展开」这条判定
+  只能在 App 层做（展开动作就是 App 改 `collapsed` → autoFit 改窗口尺寸），故新增模块级布尔 +
+  `isDragActive()` 探针。
+- **不进 zustand 是刻意的**：拖动期间每次 `pointermove` 都 `setState` 会让主窗整体重渲染，
+  为一个布尔值不值得。代价写进头注：它是**进程级单例，不触发渲染、不参与组件生命周期**
+  （跨实例共享、不随组件卸载重置，靠下面两条复位保证不脏）；**别在渲染里读它**。
+- 置位 / 复位点与既有 `swallow` 完全一致（同一个 4px 阈值、同一次松手），所以「算不算拖」
+  与「拖完吞 click」两个口径天然一致；另有 `DRAG_FLAG_MAX_MS = 2000` 超时兜底 —— 原生窗口拖动
+  期间 WebView 收不到 `pointerup`，没有兜底会「一次拖动就把标志永久卡死、之后高亮再也不展开」。
+- `usePillDrag` 只多两行调用（置位 / 复位），**没有重构既有逻辑**。既有拖拽口径新增 11 条用例钉住：
+  4px 阈值 / 拖完紧跟的那一次 click 只吞一次 / 单击仍是单击 / 只认可信左键 / 吞窗 240ms 过期。
+
+### 用例与门禁
+
+- 新增 4 个测试文件：`components/ui/CollapsedDotMark.test.tsx`（黄点位置 + 「分针/轴心已删」的结构断言）、
+  `entry/App.test.tsx`（形态临时切换；渲染的是**真** PillBar / CollapsedDot，`data-highlight` 由组件自己算）、
+  `hooks/usePillDrag.test.tsx`（拖拽口径）、`components/ui/dotHarness.test-utils.tsx`（共用夹具）。
+- `CollapsedDot.test.tsx` 按语义拆成两族（383 → **163** + **110**），夹具抽出后零重复逻辑：
+  外环一族留增长弧 / 归零空窗 / 不整体旋转 / 暂停冻结 / 高亮 / 「外环与弧仍在渲染」，
+  黄点一族留结构断言 + 正计时与倒计时两种角度口径。单文件 ≤300 的硬约束没有靠豁免绕过。
+- 判据写法：结构断言只看 **DOM**（找不到 `.dot__needle` / `.dot__pin`、SVG 里没有 `<line>`、
+  图形元素恰好 3 个），不去 grep 源码里的 `NEEDLE` 字样——那种哨兵会被一句注释误伤。
+- 变异自证 8 处全部咬住：塞回 `needle`/`pin`、把黄点角度冻死、删掉进度弧、删掉临时展开、
+  把收回改成绕过 `scheduleCollapse`、去掉拖拽 guard、去掉定时器重排前的 clear、去掉 `tempExpanded` 判定。
+- `npx tsc --noEmit` / `npx eslint src --max-warnings=0` / `node scripts/check-size.mjs` /
+  `node scripts/check-layers.mjs` 全绿；契约四方（Rust 90 / IpcApi 90 / ipc.ts 90 / mock 90）未触碰。
+
 ## 0.12.2 · 设备维度（P1–P2）+ 同步簿记（P4·T11）— 2026-11-14（未出包）
 
 > 版号沿用 **0.12.2**（已赋号未出包，本轮并入同号；桌面上一版出包是 0.12.1）。

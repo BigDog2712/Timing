@@ -60,6 +60,15 @@ export const DRAG_THRESHOLD_PX = 4;
 export const DRAG_CLICK_SWALLOW_MS = 240;
 
 /**
+ * [0.13.x] 拖拽标志的超时兜底（`lib/dragState.ts`）。
+ *
+ * 原生窗口拖动期间 WebView 收不到 `pointerup`，所以「在拖」这个标志必须自带超时，
+ * 否则一次拖动就能把它永久卡住、之后所有高亮都不再临时展开。取 2s：正常的一次
+ * 拖动早就结束了，卡死最多 2s 自愈。
+ */
+export const DRAG_FLAG_MAX_MS = 2000;
+
+/**
  * [V0.12.1] 手柄双击判定窗。
  *
  * 手柄要区分「左键」与「左双击」，但原生 `dblclick` 只对主键触发（右键双击拿不到），

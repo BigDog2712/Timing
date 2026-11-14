@@ -34,6 +34,8 @@ import { useHostIntentBridge } from '../services/hostIntentBridge';
 import { useItemsRefreshOnFocus } from '../hooks/useItemsRefreshOnFocus';
 import { useAppBindingAutoTimer } from '../hooks/useAppBindingAutoTimer';
 import { useWindowAutoFit } from '../hooks/useWindowAutoFit';
+import { HIGHLIGHT_MS } from '../lib/constants';
+import { isDragActive } from '../lib/dragState';
 import { IS_MOBILE } from '../lib/platform';
 import { currentWindowKind } from '../lib/window';
 import { useUiStore, hasOpenSurface } from '../stores/uiStore';
@@ -70,6 +72,7 @@ function MainWindow() {
   useAppBindingAutoTimer();
 
   const collapsed = useUiStore((s) => s.collapsed);
+  const highlightSeq = useUiStore((s) => s.highlightSeq);
   const panel = useUiStore((s) => s.panel);
   const itemMenu = useUiStore((s) => s.itemMenu);
   const notesListPos = useUiStore((s) => s.notesListPos);
@@ -83,9 +86,13 @@ function MainWindow() {
          指针可能正好落在新窗口外面，会立刻被收回，看起来像「点不动」；
        · 面板 / 菜单 / 提醒卡 / 恢复框 / 撤销条开着时不收（见 hasOpenSurface）——
          那些是用户主动打开的，收起来等于替他把东西关掉。
-     悬浮条形态整段短路：条本来就常驻，没有「收回」这回事。 */
+     悬浮条形态整段短路：条本来就常驻，没有「收回」这回事。
+     [0.13.x] 高亮的「临时展开」也走这一套（见下方「点托盘图标 → 圆点临时变条」段），
+     所以这里仍是**唯一**的收回入口。 */
   const leaveTimer = useRef<number | null>(null);
   const lastExpandAt = useRef(0);
+  /** 指针此刻是否压在本层上（临时展开到点要不要收回，靠它判断，见下方段注释） */
+  const hovered = useRef(false);
 
   useEffect(() => {
     if (!collapsed) lastExpandAt.current = Date.now();
@@ -112,9 +119,89 @@ function MainWindow() {
 
   useEffect(() => cancelCollapse, [cancelCollapse]);
 
+  /* 收回入口要保持「最新的一份」但又不能进 effect 依赖：高亮那个 effect 只许吃
+     `highlightSeq`（它自己在回调里改 `collapsed`，若把 collapsed 写进依赖，
+     临时展开的瞬间 effect 就会被重建、顺手清掉刚排上的定时器）。 */
+  const scheduleRef = useRef(scheduleCollapse);
+  useEffect(() => {
+    scheduleRef.current = scheduleCollapse;
+  }, [scheduleCollapse]);
+
+  /* 指针进 / 出本层：除了原先的「取消 / 排一次收回」，还要维护 `hovered`——
+     它只被高亮的收回判定读一次（见下），语义是「用户此刻正在看条」。 */
+  const handleEnter = useCallback(() => {
+    hovered.current = true;
+    cancelCollapse();
+  }, [cancelCollapse]);
+
+  const handleLeave = useCallback(() => {
+    hovered.current = false;
+    scheduleCollapse();
+  }, [scheduleCollapse]);
+
+  /* =============================================================================
+   * [0.13.x] 点托盘图标 → 圆点临时变条、闪完再收回（用户口径 3）
+   * -----------------------------------------------------------------------------
+   * 用户原话：「点击任务栏图标的高亮提醒在小圆点形态失效。应小圆点变为悬浮条形态高亮，
+   * 结束后恢复小圆点形态」。事实校正：圆点形态**已经**接了高亮（CollapsedDot 订阅
+   * `highlightSeq` 挂 `data-highlight`，`styles/dot.css` 有 `.dot[data-highlight="true"]`），
+   * 只是 33px 的圆点上闪一圈内侧描边太弱看不见。所以这里补的不是闪烁，是**形态临时切换**。
+   *
+   * 四条边界，逐条对应实现：
+   *   1. 收回复用 `scheduleCollapse`（同一个定时器 + 300ms 延迟 + 刚展开 400ms 内不动 +
+   *      `hasOpenSurface()` 护栏）——本段**只负责在 HIGHLIGHT_MS 之后叫它一声**，
+   *      一行判定都不重写；指针若还压在条上，则连叫都不叫，留给既有的
+   *      `onMouseLeave → scheduleCollapse`，那正是同一套护栏的常规路径。
+   *   2. 不碰 `setFloatForm`：临时展开只改 `uiStore.collapsed`。`floatForm === 'dot'`
+   *      是用户的**常驻形态设定**，替他把条放出来看一眼不能顺手改掉设定。
+   *   3. 拖动中不展开：`isDragActive()`。圆点本身是窗口抓手，拖动期间改窗口尺寸
+   *      会把这次拖动打断（用户正在移动窗口，不是要看条）。
+   *   4. 连点两次不叠收回定时器：收回定时器只有 `flashTimer` 一个 ref，重排前先 clear。
+   * ========================================================================== */
+  const flashTimer = useRef<number | null>(null);
+  /** 当前这次展开是不是「高亮临时放出来的」——用户自己展开的条不归本段收 */
+  const tempExpanded = useRef(false);
+
+  const clearFlashTimer = useCallback(() => {
+    if (flashTimer.current != null) {
+      window.clearTimeout(flashTimer.current);
+      flashTimer.current = null;
+    }
+  }, []);
+  /* 卸载（切窗 / 退出）时不留孤儿定时器 */
+  useEffect(() => clearFlashTimer, [clearFlashTimer]);
+
+  useEffect(() => {
+    if (highlightSeq <= 0) return;
+    if (floatForm !== 'dot') {
+      /* 常驻悬浮条：条本来就在，闪就完了。这里仍要清一次——用户可能在高亮这 2.5s 内
+         把常驻形态从 dot 改成 bar，残着的定时器到点会把他的条收起来（越权）。 */
+      clearFlashTimer();
+      tempExpanded.current = false;
+      return;
+    }
+    const ui = useUiStore.getState();
+    if (ui.collapsed) {
+      if (isDragActive()) return; /* 边界 3：拖动中不打断 */
+      ui.setCollapsed(false); /* 边界 2：只动 collapsed，不动 floatForm */
+      tempExpanded.current = true;
+    } else if (!tempExpanded.current) {
+      /* 条是用户自己展开的（点圆点 / 分析窗意图）：不接管收回，到点也不收 */
+      return;
+    }
+    clearFlashTimer(); /* 边界 4：连点只留一个收回定时器 */
+    flashTimer.current = window.setTimeout(() => {
+      flashTimer.current = null;
+      tempExpanded.current = false;
+      /* 边界 1：指针在条上 → 用户正在看，不替他收；离开时那条 mouseleave 会接管 */
+      if (hovered.current) return;
+      scheduleRef.current();
+    }, HIGHLIGHT_MS);
+  }, [highlightSeq, floatForm, clearFlashTimer]);
+
   return (
     <div className="layer">
-      <div className="layer__stack" onMouseEnter={cancelCollapse} onMouseLeave={scheduleCollapse}>
+      <div className="layer__stack" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
         {collapsed ? <CollapsedDot /> : <PillBar />}
         {!collapsed && <UndoBar />}
         {!collapsed && panel === 'create' && <ItemPicker />}

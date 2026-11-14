@@ -1,19 +1,33 @@
 /**
- * Timing — 收起圆点 CollapsedDot（V0.11.5）
+ * Timing — 收起圆点 CollapsedDot（V0.11.5 / [0.13.x] 黄点版）
  * -----------------------------------------------------------------------------
  * 用户口径：「环是图形语言，不应放时间，参考安卓端的图形化语言」。
- * 所以这一版仍是**纯图形**：一枚秒表（外环 + 分针 + 轴心），圈内不写字。
+ * 所以这一版仍是**纯图形**：不许在圈内写字。
  *
- * 三层结构（对齐手机端 `.m-ring` 的语言，只换量纲）：
- *   1. 外环   —— 表盘细框 + 进度弧：
+ * [0.13.x] 用户口径 2：「小圆点形态 UI 进行优化，内部分针过于具象化，优化为单个黄色
+ * 圆点，圆点在圆指针顶部位置」。于是本轮**删掉分针与轴心**，只留一枚实心黄点：
+ *   1. 外环   —— 表盘细框 + 进度弧（**原样保留**：弧是用户认可的图形语言）：
  *      · 正计时（running / paused）：弧**从 12 点起点随时间增长**，60 秒长满一圈后
  *        从头再来；暂停时弧冻在当前长度上，靠颜色区分暂停（[V0.11.5] 用户口径）；
  *      · 倒计时 / 待命 / 结束 / 空闲：复用 `MainButton.arcSpec`（ADR-024 四条规则：
  *        倒计时按剩余比例收缩 / 待命与结束整周 / 空闲整周细弧）；
- *   2. 分针   —— 从圆心指向外缘的针，**一小时转一圈**（像钟表的分针）；
- *   3. 轴心   —— 圆心一个小点收口，让两根针的交点有个落点。
+ *   2. 黄点   —— **一枚**实心圆点，位置 = 原分针的**针尖端**（轨道半径仍是原针长 7），
+ *      角度沿用原分针口径。原来那条「从圆心伸到外缘的针 + 圆心轴心」就是用户说的
+ *      「过于具象」，本轮只留针尖那一点：既保住了「转速」这个信息，又不再画钟表指针。
  *
- * 尺寸：33px（V0.11.4 定到 22px 后用户反馈「太小」，本轮放大 1.5 倍）。
+ * 黄点取色：复用 `--color-warn`（= 设置里四色中的 `accents.warn`，出厂默认 `#E8A33D`；
+ * 语义令牌 `--warn` 在深色主题即 #E8A33D、浅色主题为达标的 #A05E00）。
+ * 为什么是它：用户要的是「黄色，参考默认设置颜色」——`ReferenceSettings` 里唯一的颜色是
+ * `highlightColor`，出厂 `#4DA3E8` 是**蓝**，不是黄；全仓唯一的黄系既有定义就是
+ * `DEFAULT_SETTINGS.accents.warn = '#E8A33D'`（`lib/theme.ts` 的 `DEFAULT_ACCENTS.warn`
+ * 与之同源）。所以这里**不新造色值**，直接吃这个已有令牌：用户改了自己的 warn 色，圆点
+ * 跟着走，与「设置里的默认黄」永远同源。走 `--color-warn` 而不是写死 `#E8A33D`，
+ * 也让浅色主题自动换到达标的那一档（组件 CSS 禁止裸 hex，见 design-tokens 消费规则 P0）。
+ *
+ * 黄点**不跟状态变色**：状态色已经由外环的 `currentColor` 表达（running / paused / ended /
+ * 倒计时尾声），黄点是「针尖」这个几何标记本身，跟状态走会和环同色、丢掉「点在哪儿」。
+ *
+ * 尺寸：33px（V0.11.4 定到 22px 后用户反馈「太小」，V0.11.5 放大 1.5 倍）。
  * 几何量按 22 → 33 等比放大；描边**不**严格等比 —— 33px 下照 0.5 倍描边会糊成一团，
  * 按 1x 屏可辨识微调过（见下方常量注释）。
  *
@@ -21,16 +35,18 @@
  * 于是弧**从起点生长**，而不是固定长度地沿着轨道绕圈；圆点里没有任何 `transform`
  * 动画，整组 `<g>` 也不旋转。
  *
- * 转速口径：
+ * 转速口径（黄点沿用原分针，一字未改）：
  *   - 外环：正计时 `displaySec % 60`，一秒 1/60 圈（= 6°），60 秒长满；
- *   - 分针：正计时 `displaySec % 3600`，一秒走 0.1°（分针本来就这么慢）；
+ *   - 黄点：正计时 `displaySec % 3600`，一秒 0.1°（分针本来就这么慢）；
  *     倒计时仍按「已用比例 × 360°」整圈走完——倒计时的「一圈」就是它的总时长，
  *     换成 3600s 口径反而读不出还剩多少；空闲 / 结束回 12 点。
  *
  * 读数去哪了：`title` 里仍是「时长 · 事项名」，悬停可看；圆点本身不再写字。
  * 交互不变：单击展开回悬浮条，右键只吞事件。
  * [V0.11.5] 托盘双击 → 高亮：圆点形态下 PillBar 已卸载，所以这里自己订阅
- *   `highlightSeq` 并挂 `data-highlight`（样式见 `styles/highlight.css` 同源的 dot.css）。
+ *   `highlightSeq` 并挂 `data-highlight`（样式见 `styles/dot.css`）。
+ * [0.13.x] 形态临时展开（点托盘图标 → 圆点临时变条再收回）由 `entry/App.tsx` 的
+ *   `useTempExpandOnHighlight` 统一处理，本组件不参与——它只负责「闪」。
  */
 import { useEffect, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
@@ -57,15 +73,23 @@ const RIM_STROKE = 1.1;
 /** 环（进度弧）半径：比表盘内收 4.05px，两层之间留出呼吸的空隙 */
 const ARC_RADIUS = 11.4;
 const ARC_STROKE = 2.4;
-/** 分针：从圆心出发，长度约为环半径的 61%，根部一个小圆点收口 */
-const NEEDLE_LEN = 7;
-const NEEDLE_STROKE = 1.5;
-/** 轴心（圆心小点）半径 */
-const PIN_RADIUS = 1.2;
+/** 黄点轨道半径 = 原分针长度（7）：「圆点在原分针顶端位置」，位置口径原样接过 */
+const MARK_ORBIT = 7;
+/**
+ * 黄点半径 2.4：取进度弧的描边宽（同一档视觉重量）。
+ * 原针描边 1.5 是「画一条线」的量纲，直径 3px 的点在 33px 里几乎看不见；2.4 直径 4.8px，
+ * 与环的粗细对齐、又不至于把环内的空白吃掉（点在 4.6..9.4，弧在 10.2..12.6，留 0.8px 空隙）。
+ */
+const MARK_RADIUS = 2.4;
+
+/** 坐标保留 3 位小数：DOM 上不出现 16.500000000000004，逐帧位移 0.012px 也仍然可见 */
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
 
 export function CollapsedDot() {
-  /* [V0.11.10] 弧与分针改吃「带小数的秒」，逐帧推进。
-     原来一秒一跳：弧每次跳 6°（33px 下约 1.2px），看着是顿的；分针更狠，一分钟才挪一格。
+  /* [V0.11.10] 弧与黄点改吃「带小数的秒」，逐帧推进。
+     原来一秒一跳：弧每次跳 6°（33px 下约 1.2px），看着是顿的；点更狠，一分钟才挪一格。
      文本仍用取整后的秒，读数不会出现 04:59.7 这种中间态。 */
   const smoothSec = useSmoothTimerTick();
   const seconds = Math.floor(smoothSec);
@@ -105,7 +129,7 @@ export function CollapsedDot() {
   const armedIdle = status === 'idle' && armedSec != null;
   const displaySec = isCountdown ? remaining : armedIdle ? (armedSec ?? 0) : seconds;
 
-  /* 同一口径的小数版：只给弧和分针用 */
+  /* 同一口径的小数版：只给弧和黄点用 */
   const smoothRemaining = isCountdown ? Math.max(0, (session?.targetSec ?? 0) - smoothSec) : 0;
   const smoothDisplay = isCountdown ? smoothRemaining : armedIdle ? (armedSec ?? 0) : smoothSec;
 
@@ -126,13 +150,19 @@ export function CollapsedDot() {
   const showBar = isArcVisible(frac);
   const text = formatDuration(displaySec);
 
-  /* 分针角度：正计时一小时一圈（一秒 0.1°）；倒计时按已用比例整圈；
-     空闲 / 结束回 12 点。v0.11.10 起吃小数秒，针是匀速扫过去的，不是每分钟挪一格。 */
-  const needleAngle = isCountdown
+  /* 黄点角度（= 原分针角度，一字未改）：正计时一小时一圈（一秒 0.1°）；倒计时按已用比例
+     整圈；空闲 / 结束回 12 点。v0.11.10 起吃小数秒，点是匀速扫过去的，不是每分钟挪一格。 */
+  const markAngle = isCountdown
     ? (1 - progress) * 360
     : visual === 'idle' || visual === 'ended'
       ? 0
       : (smoothDisplay % 3600) * 0.1;
+
+  /* 角度 → 圆周坐标：0° 在 12 点、顺时针。直接用 cx/cy 而不是给 `transform=rotate(...)`，
+     一是少一层变换、二是「点在圆周的哪儿」在 DOM 上就能读到（测试也钉在这里）。 */
+  const markRad = ((markAngle - 90) * Math.PI) / 180;
+  const markCx = round3(CENTER + MARK_ORBIT * Math.cos(markRad));
+  const markCy = round3(CENTER + MARK_ORBIT * Math.sin(markRad));
 
   /* [V0.3.1] 右键主菜单已删除：圆点右键只吞事件，不再弹菜单 */
   const handleContextMenu = (e: ReactMouseEvent<HTMLButtonElement>) => {
@@ -158,7 +188,7 @@ export function CollapsedDot() {
       onContextMenu={handleContextMenu}
     >
       <svg className="dot__svg" viewBox={`0 0 ${SIZE} ${SIZE}`} aria-hidden>
-        {/* 外环：表盘细框 + 进度弧（弧长随秒数增长，不做整体旋转） */}
+        {/* 外环：表盘细框 + 进度弧（弧长随秒数增长，不做整体旋转）。用户认可这段图形语言，本轮不动 */}
         <g>
           <circle className="dot__rim" cx={CENTER} cy={CENTER} r={RIM_RADIUS} strokeWidth={RIM_STROKE} />
           {showBar && (
@@ -177,18 +207,8 @@ export function CollapsedDot() {
             />
           )}
         </g>
-        {/* 分针：一小时一圈，从 12 点起顺时针，角度由 needleAngle 给 */}
-        <line
-          className="dot__needle"
-          x1={CENTER}
-          y1={CENTER}
-          x2={CENTER}
-          y2={CENTER - NEEDLE_LEN}
-          strokeWidth={NEEDLE_STROKE}
-          strokeLinecap="round"
-          transform={`rotate(${needleAngle} ${CENTER} ${CENTER})`}
-        />
-        <circle className="dot__pin" cx={CENTER} cy={CENTER} r={PIN_RADIUS} />
+        {/* 黄点：原分针的针尖端，角度由 markAngle 给（0° = 12 点，顺时针） */}
+        <circle className="dot__mark" cx={markCx} cy={markCy} r={MARK_RADIUS} />
       </svg>
     </button>
   );
