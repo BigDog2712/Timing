@@ -24,6 +24,9 @@ export interface DashboardCoreCopy {
    *  句式照 `notesEmpty`（§12.3 定稿的陈述句式）：时间 + "还没有" + 东西。
    *  待办卡那句（`todosEmpty`）随整块待办文案搬去了 `copyTodos.ts`。 */
   timerEmpty: string;
+  /** 事项维度的空态：这里"空"是"今天还没在事项上计时"（计时器没记过），
+   *  与"电脑上什么都没发生"不是一回事 —— 两个维度各有各的总量，空态也就得分句说。 */
+  timerEmptyItems: string;
   appsEmpty: string;
   /** 设计模块名是「计时分布」；既有 `dashboard.focusShare` 是「专注分布」，语义不同 */
   timerTitle: string;
@@ -31,6 +34,8 @@ export interface DashboardCoreCopy {
   timerToday: (text: string) => string;
   /** 环心第二行（`focus.rs:120` 的「今日合计」，10px） */
   timerDonutCap: string;
+  /** 事项维度的环心第二行：换维度就换了数据源，读数说明也得跟着换 */
+  timerDonutCapItems: string;
   addCard: string;
   /** 工具条第二颗键：把布局恢复成出厂（`useDashboardLayout().reset` 一直没有 UI 入口，
    *  用户把卡移除乱了就只能删 localStorage —— 这条是补那个缺口，不是新功能。 */
@@ -89,10 +94,12 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     ...TODO_COPY["zh-CN"],
     pageTitle: "今日概览",
     timerEmpty: "今天还没有计时",
+    timerEmptyItems: "今天还没有计时事项",
     appsEmpty: "今天还没有用到应用",
     timerTitle: "计时分布",
     timerToday: (text) => `今日 ${text}`,
     timerDonutCap: "今日合计",
+    timerDonutCapItems: "今日事项合计",
     addCard: "添加卡片",
     resetLayout: "恢复默认布局",
     resizeColumns: "调整两栏宽度",
@@ -123,10 +130,12 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     ...TODO_COPY["en-US"],
     pageTitle: "Today overview",
     timerEmpty: "No time tracked today",
+    timerEmptyItems: "No items timed today",
     appsEmpty: "No apps used today",
     timerTitle: "Time distribution",
     timerToday: (text) => `Today ${text}`,
     timerDonutCap: "Total today",
+    timerDonutCapItems: "Total items today",
     addCard: "Add card",
     resetLayout: "Reset layout",
     resizeColumns: "Resize columns",
@@ -157,10 +166,12 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     ...TODO_COPY["ru-RU"],
     pageTitle: "Обзор дня",
     timerEmpty: "Сегодня времени нет",
+    timerEmptyItems: "Сегодня нет отсчётов по делам",
     appsEmpty: "Сегодня приложения не использовались",
     timerTitle: "Распределение времени",
     timerToday: (text) => `Сегодня ${text}`,
     timerDonutCap: "Итого за день",
+    timerDonutCapItems: "Итого по делам",
     addCard: "Добавить карточку",
     resetLayout: "Сбросить макет",
     resizeColumns: "Ширина колонок",
@@ -191,10 +202,12 @@ export const DASHBOARD_COPY: Record<Locale, DashboardCopy> = {
     ...TODO_COPY.es,
     pageTitle: "Resumen de hoy",
     timerEmpty: "Hoy no hay registros de tiempo",
+    timerEmptyItems: "Hoy no hay asuntos cronometrados",
     appsEmpty: "Hoy no se han usado aplicaciones",
     timerTitle: "Distribución del tiempo",
     timerToday: (text) => `Hoy ${text}`,
     timerDonutCap: "Total de hoy",
+    timerDonutCapItems: "Total de asuntos hoy",
     addCard: "Añadir tarjeta",
     resetLayout: "Restablecer diseño",
     resizeColumns: "Ajustar columnas",

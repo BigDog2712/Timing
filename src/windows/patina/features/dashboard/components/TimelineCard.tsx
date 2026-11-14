@@ -63,6 +63,16 @@ function clockOf(ms: number): string {
   return `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
 }
 
+/**
+ * 时间线上「算一回事」的判据：真的计过时（`value > 0`）、有可用的第一段开始时刻、
+ * 名字非空。`buildTimelineRows`（画几行）与 `todayTimedItemIds`（能编辑哪些）
+ * **共用这一份** —— 两处各写一遍条件，某天只改了一处，就会变成
+ * 「卡上看得见、编辑弹层里找不到」。
+ */
+function isTimelineItem(item: TodayItemRow): boolean {
+  return item.value > 0 && Number.isFinite(item.firstStart) && item.name.trim().length > 0;
+}
+
 /** 纯函数：事项行 → 时序行（导出是为了能单测，渲染层不该是判据唯一证人）。 */
 export function buildTimelineRows(
   items: readonly TodayItemRow[],
@@ -70,7 +80,7 @@ export function buildTimelineRows(
   nowMs: number = Date.now(),
 ): TimelineRow[] {
   return items
-    .filter((item) => item.value > 0 && Number.isFinite(item.firstStart) && item.name.trim().length > 0)
+    .filter(isTimelineItem)
     .slice()
     .sort((a, b) => a.firstStart - b.firstStart)
     .slice(0, limit)
@@ -84,6 +94,24 @@ export function buildTimelineRows(
       duration: formatDashboardDuration(item.value),
       value: item.value,
     }));
+}
+
+/**
+ * 「编辑事项」的候选 = **今日时间线上的事项**（按第一段开始时刻升序），
+ * **不受档位行数限制**。
+ *
+ * 主人口径（2026-11-14）：「编辑事项指对今日时间线上的事项进行编辑」。
+ * 上一版候选取的是**全部** `items`（按 `updatedAt` 倒序），于是那个列表里混着
+ * 半年前建的「测试」「测试2」「阿萨德」—— 用户要改的是今天做过的那几件，
+ * 不是库里建过的一切。卡上只画得下 4~8 行，但第 9 件今天也计时过，它同样该能编辑，
+ * 所以这里按"今天计过时"筛，而不是按"卡上画出来的行"筛。
+ */
+export function todayTimedItemIds(items: readonly TodayItemRow[]): number[] {
+  return items
+    .filter(isTimelineItem)
+    .slice()
+    .sort((a, b) => a.firstStart - b.firstStart)
+    .map((item) => item.itemId);
 }
 
 interface Props {
@@ -133,6 +161,8 @@ export default function TimelineCard({
     });
   };
   const recordEditItemName = items.find((item) => item.itemId === recordEditItemId)?.name ?? "";
+  /* 「编辑事项」的候选 = 今日计时过的事项（不受档位行数限制，理由见 `todayTimedItemIds`） */
+  const editableItemIds = todayTimedItemIds(items);
 
   return (
     <>
@@ -227,6 +257,7 @@ export default function TimelineCard({
       <TimelineEditDialog
         open={dialog === "edit"}
         onClose={() => setDialog(null)}
+        todayItemIds={editableItemIds}
         onLocalRename={onLocalRename}
       />
       <TimelineRecordTimeDialog

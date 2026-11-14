@@ -42,7 +42,6 @@ interface CardProps {
   notesModel: TodayNotesState;
   todayItems: Pick<TodayItemsState, "rows" | "total" | "applyLocalRename" | "applyLocalCreate">;
   snapshotProps: { status: DashboardReadState["status"]; refreshError: boolean; onRetry: () => void };
-  totalTrackedTime: number;
   dayDeltaTrackedTime: number;
   snapshotStatus: DashboardReadState["status"];
   refreshError: boolean;
@@ -69,7 +68,6 @@ export function buildCardBody(card: BoardCard, label: string, props: CardProps):
           }))}
           dimension={props.focusDimension}
           onDimensionChange={props.onDimensionChange}
-          totalTrackedTime={props.totalTrackedTime}
           dayDeltaTrackedTime={props.dayDeltaTrackedTime}
           {...props.snapshotProps}
         />

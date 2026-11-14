@@ -1170,6 +1170,66 @@
       "change": "added",
       "reason": "卡底三颗入口在 empty/error 态的判据：三颗按钮挂在 footer（四态常驻），弹层原先写在 children 里（只在 ready 渲染）⇒ 空态点击零反应、零报错；用例钉住「点一次，弹层真的在 DOM 里」",
       "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimerModule.tsx",
+      "change": "modified",
+      "reason": "计时卡三处读数同源：环心/卡头改吃当前维度合计（原吃应用活动总量 ⇒ 事项维度下同时出现「今天还没有计时」与「40m」）；维度条挪进 subhead（empty 态不许丢失切换入口）；事项维度不显示应用活动的「较昨日」",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/DashboardCards.tsx",
+      "change": "modified",
+      "reason": "删掉 totalTrackedTime 透传：计时卡不再有第二个总量来源，环心与空态判定都只看当前维度",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/Dashboard.tsx",
+      "change": "modified",
+      "reason": "同上，不再解构 totalTrackedTime",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineEditDialog.tsx",
+      "change": "modified",
+      "reason": "候选改为「今日时间线上的事项」（宿主给 todayItemIds，时间线顺序）：原先是全量 items 按 updatedAt 倒序，混着半年前建的空事项",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/copy.ts",
+      "change": "modified",
+      "reason": "计时卡新增两个键（事项维度空态 / 环心说明）：换维度就换了数据源，读数说明得跟着换",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/dashboard-modules.css",
+      "change": "modified",
+      "reason": "空态环的新容器 .qp-empty-figure：环径吃 62cqh 自适应，矮卡里不再溢出被裁；环与文案纵排不再互相压",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimerModuleEmpty.test.tsx",
+      "change": "modified",
+      "reason": "跟接口（totalTrackedTime 已删）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimerModuleSource.test.tsx",
+      "change": "added",
+      "reason": "计时卡读数同源的判据：事项维度空 + 应用活动 40m 时环心必须是 0m；空态环与文案同容器；维度条在 empty 态仍可点（原先是死路）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineEditToday.test.tsx",
+      "change": "added",
+      "reason": "编辑事项候选范围的判据：只列今日时间线事项、顺序按时间线、系统事项不出现、空态文案指向新建",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineCard.test.ts",
+      "change": "modified",
+      "reason": "补 todayTimedItemIds 的两条（时序 + 不吃档位行数），与画行共用同一判据",
+      "owner": "software-engineer"
     }
   ]
 }

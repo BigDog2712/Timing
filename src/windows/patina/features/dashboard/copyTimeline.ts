@@ -49,6 +49,8 @@ export interface TimelineManageCopy {
   timelineSaveAction: string;
   /** 常用组为空 */
   timelineManageEmpty: string;
+  /** 「编辑事项」的候选为空：今天时间线上还没有事项（候选 = 今日计时过的事项） */
+  timelineEditEmpty: string;
   /** 近期组为空 */
   timelineRecentEmpty: string;
   /** 时长输入非法（非数字 / 超出 1–1440） */
@@ -113,6 +115,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineEditAction: "编辑",
     timelineSaveAction: "保存",
     timelineManageEmpty: "还没有常用事项",
+    timelineEditEmpty: "今天的时间线上还没有事项，先用卡底的「新建事项」记一笔。",
     timelineRecentEmpty: "还没有近期事项",
     timelineTimerInvalid: "时长需在 1–1440 分钟",
     timelineNameEmpty: "名字不能为空",
@@ -153,6 +156,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineEditAction: "Edit",
     timelineSaveAction: "Save",
     timelineManageEmpty: "No frequent items yet",
+    timelineEditEmpty: "Nothing on today’s timeline yet — add one with “New item” first.",
     timelineRecentEmpty: "No recent items yet",
     timelineTimerInvalid: "Length must be 1–1440 minutes",
     timelineNameEmpty: "Name cannot be empty",
@@ -193,6 +197,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineEditAction: "Изменить",
     timelineSaveAction: "Сохранить",
     timelineManageEmpty: "Частых дел пока нет",
+    timelineEditEmpty: "В сегодняшней ленте пока пусто — сначала добавьте дело кнопкой «Новое дело».",
     timelineRecentEmpty: "Недавних дел пока нет",
     timelineTimerInvalid: "Длительность от 1 до 1440 минут",
     timelineNameEmpty: "Название не может быть пустым",
@@ -233,6 +238,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineEditAction: "Editar",
     timelineSaveAction: "Guardar",
     timelineManageEmpty: "Aún no hay asuntos frecuentes",
+    timelineEditEmpty: "La línea de hoy está vacía: crea un asunto con «Nuevo asunto».",
     timelineRecentEmpty: "Aún no hay asuntos recientes",
     timelineTimerInvalid: "La duración debe ser 1–1440 minutos",
     timelineNameEmpty: "El nombre no puede estar vacío",

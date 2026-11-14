@@ -1,10 +1,17 @@
 /**
  * 「编辑事项」弹层（0.13 · 1.6）：**先选事项，再改名称 + 默认时长**。
  *
- * 为什么不直接摊开全表：「事项管理」弹层已经是"常用 / 近期两组 + 行内编辑"（T03 前一轮
- * 的口径），这一颗卡底入口补的是**另一条**路 —— 用户心里已经有那个事项的名字，
- * 想直接搜出来改。选择区是全部事项（含近期/常用，按 `updatedAt` 倒序），选中后
- * 展开的编辑表单与 `TimelineItemRows` 的行内编辑是**同一个** `ItemEditForm`。
+ * ## 候选 = 今日时间线上的事项（主人口径 2026-11-14）
+ *
+ * 「编辑事项指对今日时间线上的事项进行编辑」。所以候选清单由宿主的
+ * `todayTimedItemIds(items)` 给（今天真的计过时的事项，时间线顺序），**不是**全量
+ * `items`：库里可能建过二十几个事项（半年前的「测试」「测试2」），那是「事项管理」
+ * 的分组列表该干的事；这一颗入口的语境是"我刚在卡上看到的那几行"。
+ * `todayItemIds` 的顺序就是时间线顺序 —— 不用再按 `updatedAt` 排（那会让同一份清单
+ * 在卡上和弹层里两种顺序）。
+ *
+ * 为什么不合并进「事项管理」：那一层是"常用 / 近期两组 + 行内编辑"（T03 的口径），
+ * 这一颗补的是**另一条路** —— 用户心里已经有那个事项，点开就直接改。
  *
  * ## 意图恰一条（V-1.6c）
  *
@@ -16,8 +23,9 @@
  *
  * ## 为什么用 useItemPrefs（而不是 useTodayItems）
  *
- * 编辑的是**事项本身**（全量列表 + `settings.itemsTimers`），不是"今天有记录的事项"；
+ * 编辑的是**事项本身**（名字 + `settings.itemsTimers` 的默认时长），不是"今天那几段记录"；
  * `useItemPrefs(true)` 的读法、pending 表（改名不被刷新覆盖）都与「事项管理」同一条路。
+ * 候选的**范围**由宿主给 `todayItemIds`，这一层只负责"在这批里挑一个"。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -33,11 +41,13 @@ import ItemEditForm from "./ItemEditForm.tsx";
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** 今日时间线上的事项 id（**时间线顺序**；不含今天没计过时的事项，理由见头注释） */
+  todayItemIds: readonly number[];
   /** 交给 `useTodayItems.applyLocalRename`：本地先改，别让下一次刷新覆盖回去 */
   onLocalRename: (itemId: number, name: string) => void;
 }
 
-export default function TimelineEditDialog({ open, onClose, onLocalRename }: Props) {
+export default function TimelineEditDialog({ open, onClose, todayItemIds, onLocalRename }: Props) {
   const copy = DASHBOARD_COPY[useLocale()];
   const UI_TEXT = useLocaleText();
   const { items, timers, status, applyLocalItem, applyLocalTimer } = useItemPrefs(open);
@@ -49,10 +59,18 @@ export default function TimelineEditDialog({ open, onClose, onLocalRename }: Pro
   const [issue, setIssue] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  /* 按最近动过的排前面（选择列表的口径：用户刚在药丸里动过的事项排最前） */
+  /* 候选 = 今日时间线上那几件，**按时间线顺序**（`todayItemIds` 已经是升序）。
+     用 Map 记位次而不是每次 `indexOf`：列表最多几十条，但 `indexOf` 在 sort 里
+     是 O(n²logn)，而且读者会误以为"顺序是排序算出来的"。 */
+  const orderOf = useMemo(
+    () => new Map(todayItemIds.map((id, index) => [id, index] as const)),
+    [todayItemIds],
+  );
   const candidates = useMemo(
-    () => [...items].filter((item) => !item.isSystem).sort((a, b) => b.updatedAt - a.updatedAt || a.id - b.id),
-    [items],
+    () => items
+      .filter((item) => !item.isSystem && orderOf.has(item.id))
+      .sort((a, b) => (orderOf.get(a.id) ?? 0) - (orderOf.get(b.id) ?? 0)),
+    [items, orderOf],
   );
 
   const selected = candidates.find((item) => item.id === selectedId) ?? null;
@@ -164,7 +182,7 @@ export default function TimelineEditDialog({ open, onClose, onLocalRename }: Pro
                   </button>
                 </li>
               ))}
-              {candidates.length === 0 ? <li className="qp-empty">{copy.timelineManageEmpty}</li> : null}
+              {candidates.length === 0 ? <li className="qp-empty">{copy.timelineEditEmpty}</li> : null}
             </ul>
             {selected ? (
               <ItemEditForm

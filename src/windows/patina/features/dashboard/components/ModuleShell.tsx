@@ -190,10 +190,18 @@ export default function ModuleShell({
           ) : null}
         </div>
       ) : state === "empty" ? (
-        <>
+        emptyVisual ? (
+          /* 有视觉锚点时环与文案**纵排在同一块**里。
+             不能写成「一句 `qp-empty` + 环」两个并列子项：`.qp-empty` 是
+             `flex: 1 1 auto`（它要独占整卡的剩余高度来居中），环跟在后面就只能溢出卡外
+             被裁 —— 实际观感是"文字压在环上、环只剩上半截"（0.13 的计时卡）。 */
+          <div className="qp-empty-figure">
+            {emptyVisual}
+            <p className="qp-empty">{emptyText}</p>
+          </div>
+        ) : (
           <p className="qp-empty">{emptyText}</p>
-          {emptyVisual}
-        </>
+        )
       ) : children}
       {footer}
     </section>

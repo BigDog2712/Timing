@@ -74,7 +74,7 @@ export default function Dashboard({
   const trendModel = useTrendDays(refreshKey);
   const heatmapModel = useHeatmapModel(refreshKey);
 
-  const { categoryDist, topApplications, totalTrackedTime, dayDeltaTrackedTime } = dashboard;
+  const { categoryDist, topApplications, dayDeltaTrackedTime } = dashboard;
 
   /* E3 = 快照失败但仍有数据（卡头小图标）；E2 = 失败且无数据（卡内一块）。同一处分派，不另算 */
   const snapshotStatus = readState.status;
@@ -129,7 +129,7 @@ export default function Dashboard({
     onDimensionChange: setFocusDimension,
     topApplications, icons, onOpenMapping,
     todosModel, notesModel, todayItems, snapshotProps,
-    totalTrackedTime, dayDeltaTrackedTime,
+    dayDeltaTrackedTime,
     snapshotStatus, refreshError, onRetry: readState.retry,
     trend: trendModel, heatmap: heatmapModel,
   };

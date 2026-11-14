@@ -39,7 +39,6 @@ async function mount() {
         categoryDist: [],
         dimension: "category",
         onDimensionChange: () => undefined,
-        totalTrackedTime: 0,
         dayDeltaTrackedTime: 0,
         status: "ready",
         refreshError: false,

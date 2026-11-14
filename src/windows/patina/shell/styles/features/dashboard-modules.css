@@ -181,3 +181,27 @@
   border-radius: 999px;
   background: currentColor;
 }
+
+/* ── 空态里的环（0.13 · F2）：环 + 一句空文案纵排 ──
+ * 环径跟着这块可用空间走（62cqh 给下面那行字留位置），矮卡里不会溢出被裁。
+ * 宽高的全局值是 `var(--qp-donut)`（档位上限 158），空态没有 `.qp-donut-body`
+ * 那层容器尺寸，所以这里自己定义 `--qp-donut-fit`（环心字号也吃这个变量）。 */
+.qp-empty-figure {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 0;
+  container-type: size;
+  --qp-donut-fit: clamp(72px, min(46cqw, 62cqh), 158px);
+}
+
+/* 文案在环下面，不参与抢高度 */
+.qp-empty-figure .qp-empty { flex: 0 0 auto; }
+
+.qp-empty-figure .qp-donut {
+  width: var(--qp-donut-fit);
+  height: var(--qp-donut-fit);
+}

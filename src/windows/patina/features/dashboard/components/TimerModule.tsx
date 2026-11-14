@@ -39,10 +39,10 @@ const READOUT_LIMIT = 4;
 interface Props {
   controls?: ReactNode;
   categoryDist: CategoryDistItem[];
-  /** [P2] 当前维度：分类 / 应用 / 窗口标题（数据由 `buildFocusDistribution` 给好）。 */
+  /** [P2] 当前维度：分类 / 应用 / 事项（数据由 `buildFocusDistribution` 给好）。 */
   dimension: FocusDimension;
   onDimensionChange: (dimension: FocusDimension) => void;
-  totalTrackedTime: number;
+  /** 较昨日的**应用活动**总量差。只在分类 / 应用维度成立 —— 事项维度昨天没有对应读数 */
   dayDeltaTrackedTime: number;
   /** 快照源的同一个 `status`（E2/E3 都由它派生，不另算） */
   status: LoadStatus;
@@ -76,7 +76,6 @@ export default function TimerModule({
   categoryDist,
   dimension,
   onDimensionChange,
-  totalTrackedTime,
   dayDeltaTrackedTime,
   status,
   refreshError,
@@ -97,10 +96,20 @@ export default function TimerModule({
     return buildReadouts(localized, UI_TEXT.categories.other);
   }, [categoryDist, UI_TEXT]);
 
+  /* 环心读数 / 卡头读数 / 空态判定**必须是同一份数**：`total` 是当前维度的合计
+     （分类 / 应用 / 事项），`readouts` 是它的分段。
+     上一版环心与卡头印的是 `totalTrackedTime`（**应用活动**总量），而环和空态看的是
+     当前维度 —— 切到「事项」维度、今天还没有任何计时记录时，卡里会同时出现
+     「今天还没有计时」和「40m 今日合计」，环里却一个弧都没有：三个数字来自两个源，
+     用户只能读成"卡坏了"。三个维度本来就度量不同的东西（电脑上发生过什么 vs 用户在
+     计时器上记了什么），各自的合计各说各话，但不能混着说。 */
   const total = readouts.reduce((sum, item) => sum + Math.max(0, item.value), 0);
+  const isItemDimension = dimension === "item";
   const direction = dayDeltaTrackedTime > 0 ? "increase" : dayDeltaTrackedTime < 0 ? "decrease" : "same";
   const DeltaIcon = direction === "increase" ? TrendingUp : direction === "decrease" ? TrendingDown : Minus;
   const state = moduleState(status, refreshError, readouts.length === 0);
+  /* 空态文案按维度分开：事项维度的"空"是"今天还没在事项上计时"，与"今天没记录"不同 */
+  const emptyText = isItemDimension ? copy.timerEmptyItems : copy.timerEmpty;
 
   let consumed = 0;
 
@@ -144,9 +153,47 @@ export default function TimerModule({
         }) : null}
       </svg>
       <div className="qp-donut-center">
-        <span className="qp-donut-total">{formatDashboardDuration(totalTrackedTime)}</span>
-        <span className="qp-donut-cap">{copy.timerDonutCap}</span>
+        <span className="qp-donut-total">{formatDashboardDuration(total)}</span>
+        <span className="qp-donut-cap">{isItemDimension ? copy.timerDonutCapItems : copy.timerDonutCap}</span>
       </div>
+    </div>
+  );
+
+  /* 维度行挂在 `subhead`（卡头之下的常驻行），**不能**留在 children 里：
+     children 只在 ready 态渲染，于是"切到事项维度 → 今天还没计时 → 空态 →
+     维度切换条消失"就成了一条死路：用户回不到分类维度，卡永远停在空环上。
+     这一条是被真实使用撞出来的（0.13 的卡就是这么哑的）。
+     较昨日读数只在 ready 出现：空态/骨架里那两个数没有意义。 */
+  const dimensionBar = (
+    <div className="qp-focus-bar">
+      <div className="qp-focus-dims" role="tablist" aria-label={copy.focusDimensionLabel}>
+        {FOCUS_DIMENSIONS.map((dim) => (
+          <button
+            key={dim}
+            type="button"
+            role="tab"
+            aria-selected={dim === dimension}
+            className="qp-focus-dim"
+            data-active={dim === dimension || undefined}
+            onClick={() => onDimensionChange(dim)}
+          >
+            {copy.focusDimensions[dim]}
+          </button>
+        ))}
+      </div>
+      {/* 较昨日读数与维度共用一行（`focus.rs:54-69`：读数右对齐在 `tabs` 那条 24 高的
+          横带里，10.5px）。放进卡头会把这一行挤成两行，卡头高度是几何表锁死的。
+          **事项维度不显示**：`dayDeltaTrackedTime` 是应用活动的今日−昨日，昨天没有
+          按事项的读数可比 —— 拿应用活动的差值挂在事项维度上，就是一句看起来像真的假话。 */}
+      {isItemDimension || state !== "ready" ? null : (
+        <span className="qp-focus-delta" data-dir={direction}>
+          <DeltaIcon size={11} strokeWidth={2} aria-hidden="true" />
+          {UI_TEXT.dashboard.comparedWithYesterday(
+            formatDashboardDuration(Math.abs(dayDeltaTrackedTime)),
+            direction,
+          )}
+        </span>
+      )}
     </div>
   );
 
@@ -161,42 +208,14 @@ export default function TimerModule({
       onRetry={onRetry}
       refreshErrorText={refreshError ? UI_TEXT.common.refreshFailed : undefined}
       skeletonRows={5}
-      emptyText={copy.timerEmpty}
-      /* 卡头读数就是 exe 的 `meta(Timer)`：「今日 14m」（`widgets/mod.rs:141`）。
-         昨日对比不在卡头 —— 它在维度那一行的右端（见下）。 */
-      meta={copy.timerToday(formatDashboardDuration(totalTrackedTime))}
+      emptyText={emptyText}
+      /* 卡头读数与环心同一份数（`total`）：卡头印 A、环心印 B 的话，用户会拿两个数
+         互相对，然后得出"这张卡算错了"。 */
+      meta={copy.timerToday(formatDashboardDuration(total))}
+      subhead={dimensionBar}
       /* [0.13 · F2 / V-1.2b] 空态仍画底圈 + 「今日 0m」 */
       emptyVisual={state === "empty" ? donut : undefined}
     >
-      {/* [P2] 三个维度：同一份总量换分组，不是三份数据。切维度只换这一个 state
-          （v3 起提到 `Dashboard` 视图层，板上多个计时卡共用一个口径），
-          环与读数行仍是同一份数组（段数 = 行数这条不变）。 */}
-      <div className="qp-focus-bar">
-        <div className="qp-focus-dims" role="tablist" aria-label={copy.focusDimensionLabel}>
-          {FOCUS_DIMENSIONS.map((dim) => (
-            <button
-              key={dim}
-              type="button"
-              role="tab"
-              aria-selected={dim === dimension}
-              className="qp-focus-dim"
-              data-active={dim === dimension || undefined}
-              onClick={() => onDimensionChange(dim)}
-            >
-              {copy.focusDimensions[dim]}
-            </button>
-          ))}
-        </div>
-        {/* 较昨日读数与维度共用一行（`focus.rs:54-69`：读数右对齐在 `tabs` 那条 24 高的
-            横带里，10.5px）。放进卡头会把这一行挤成两行，卡头高度是几何表锁死的。 */}
-        <span className="qp-focus-delta" data-dir={direction}>
-          <DeltaIcon size={11} strokeWidth={2} aria-hidden="true" />
-          {UI_TEXT.dashboard.comparedWithYesterday(
-            formatDashboardDuration(Math.abs(dayDeltaTrackedTime)),
-            direction,
-          )}
-        </span>
-      </div>
       <div className="qp-donut-body">
         {/* 环只是同一份数据的第二表达，读数行才是可读内容 → 环对读屏隐藏，
             否则同一组占比会被读两遍（01 §4.3 骨架里环无 role） */}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTimelineRows } from "./TimelineCard";
+import { buildTimelineRows, todayTimedItemIds } from "./TimelineCard";
 import type { TodayItemRow } from "../hooks/useTodayItems";
 
 /**
@@ -92,5 +92,30 @@ describe("buildTimelineRows", () => {
     ], 6, NOW);
     expect(rows[0].running).toBe(false);
     expect(rows[0].endLabel).toBe("09:45");
+  });
+});
+
+/**
+ * 「编辑事项」的候选（`todayTimedItemIds`，主人口径 2026-11-14：对**今日时间线上的事项**
+ * 编辑）。它和 `buildTimelineRows` 共用同一个「算一回事」的判据，但**不吃档位行数**：
+ * 卡上只画得下 4~8 行，第 9 件今天也计时过，它同样该能编辑。
+ */
+describe("todayTimedItemIds", () => {
+  it("d04h_candidates_are_todays_timed_items_in_timeline_order", () => {
+    const items = [
+      row(21, "下午的活", 600_000, 5_000, 6_000),
+      row(3, "早上的活", 600_000, 1_000, 2_000),
+      row(9, "零时长", 0, 3_000, 4_000),
+      row(11, "", 600_000, 2_000, 3_000),
+    ];
+    /* 零时长与空名不是「时间线上的一件事」，与画行时的过滤一字不差 */
+    expect(todayTimedItemIds(items)).toEqual([3, 21]);
+  });
+
+  it("d04i_candidates_are_not_truncated_by_the_tier_row_limit", () => {
+    const items = Array.from({ length: 10 }, (_, index) =>
+      row(index + 1, `事项 ${index + 1}`, 60_000, index, index + 1_000));
+    expect(buildTimelineRows(items, 4, NOW)).toHaveLength(4);
+    expect(todayTimedItemIds(items)).toHaveLength(10);
   });
 });
