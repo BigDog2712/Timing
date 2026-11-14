@@ -61,6 +61,13 @@ const MIGRATE_COLUMNS_V9: &[(&str, &str, &str)] = &[
     ("time_records", "merged_into_uid", "TEXT"),
 ];
 
+/// 0.12.2 加列清单（同步簿记）。
+///
+/// 只负责「列在不在」：盖戳由 `0010_v0141_sync_bookkeeping_guard.sql` 里的触发器做
+/// （不能依赖调用点记得写——写入口有四个，漏一个就是「那批行永远不会被导出且零报错」）。
+const MIGRATE_COLUMNS_V10: &[(&str, &str, &str)] =
+    &[("time_records", "updated_at_ms", "INTEGER NOT NULL DEFAULT 0")];
+
 /// 执行全部迁移（幂等）。由 `infra::db::init_pool` 调用。
 pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
     // ① 3 张基表（IF NOT EXISTS，幂等）
@@ -134,6 +141,25 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
         run_raw(
             pool,
             include_str!("../migrations/0009_v0140_device_dimension.sql"),
+        )
+        .await?;
+    }
+    // ⑭ v10（0.12.2）：同步簿记。
+    //
+    // 结构与 0009 完全同型，理由也同型：补列（幂等守卫）→ 幂等段每次启动跑 →
+    // 版本推进关在版本门里（否则会把更高的版本号改回 10）。
+    for (table, column, def) in MIGRATE_COLUMNS_V10 {
+        ensure_column(pool, table, column, def).await?;
+    }
+    run_raw(
+        pool,
+        include_str!("../migrations/0010_v0141_sync_bookkeeping_guard.sql"),
+    )
+    .await?;
+    if schema_version(pool).await? < 10 {
+        run_raw(
+            pool,
+            include_str!("../migrations/0010_v0141_sync_bookkeeping.sql"),
         )
         .await?;
     }

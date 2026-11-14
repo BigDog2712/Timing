@@ -168,20 +168,19 @@ pub(in crate::services::insight::data) async fn has_current_schema(pool: &Pool<S
 
 /// 28 起的「基线布局」判据（启动验收用）。
 ///
-/// = 旧基线的全部要求 **去掉** `idx_sessions_single_active`，**加上**设备维度的几样：
-/// `sessions.device_id / uid / app_key / updated_at_ms`、`uq_sessions_open_per_device`、
-/// `devices` 与 `activity_daily_totals` 两张新表。
+/// = 旧基线的全部要求 **去掉** `idx_sessions_single_active`，**加上**设备维度与
+/// 同步簿记的几样：`sessions.device_id / uid / app_key / updated_at_ms`、
+/// `uq_sessions_open_per_device`、`devices` / `activity_daily_totals` / `sync_tombstone` 三张新表。
 ///
 /// 只检查「列存在」，**不**检查 `device_id <> ''`：哨兵值由 `adopt_local_rows` 清理，
 /// 万一它失败，宁可让用户看到一次明确的 `schema validation failed`，也不要把
 /// 「库里有空 device_id」当成 schema 问题掩盖掉。
 async fn has_current_baseline_layout(pool: &Pool<Sqlite>) -> Result<bool, String> {
+    /* `sync_tombstone` 也进必需项：墓碑表只被同步路径读，缺了它 App 照样能跑，
+       但「删过的行」会在下一次推送里**复活**（对端仍持有那条状态行）。宁可在启动
+       验收时明确失败，也不要让数据在无声中回来。 */
     for table in [
-        "sessions",
-        "settings",
-        "icon_cache",
-        "devices",
-        "activity_daily_totals",
+        "sessions", "settings", "icon_cache", "devices", "activity_daily_totals", "sync_tombstone",
     ] {
         if !table_exists(pool, table).await? {
             return Ok(false);

@@ -23,6 +23,7 @@ pub mod storage_migration;
 mod storage_migration_cleanup;
 mod storage_path_safety;
 pub mod storage_restart;
+pub mod sync;
 pub mod tools_store;
 pub mod tracking_pause_service;
 pub mod tracking_runtime;
@@ -36,6 +37,12 @@ mod sqlite_pool_upgrade_tests;
 pub mod tool_notification_store;
 #[cfg(test)]
 mod device_schema_upgrade_tests;
+#[cfg(test)]
+mod sync_bookkeeping_business_tests;
+#[cfg(test)]
+mod sync_bookkeeping_fixture;
+#[cfg(test)]
+mod sync_bookkeeping_tests;
 #[cfg(test)]
 mod hourly_fixture;
 #[cfg(test)]

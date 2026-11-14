@@ -71,7 +71,7 @@
     "src-tauri/src/services/insight/data/schema.rs": 1751,
     "src-tauri/src/services/insight/data/sqlite_pool_mod_tests.rs": 992,
     "src-tauri/src/services/insight/data/sqlite_pool_upgrade_tests.rs": 799,
-    "src-tauri/src/services/insight/data/sqlite_pool.rs": 748,
+    "src-tauri/src/services/insight/data/sqlite_pool.rs": 747,
     "src-tauri/src/services/insight/data/sqlite_pool/restore.rs": 593,
     "src-tauri/src/services/insight/data/storage_migration.rs": 1732,
     "src-tauri/src/services/insight/data/tracking_runtime.rs": 490,

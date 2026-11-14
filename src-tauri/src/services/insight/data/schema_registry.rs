@@ -26,9 +26,30 @@ use super::schema::*;
 /// schema 巡检（`VALIDATED_SCHEMA_MIGRATION_HEAD`）要拿它对齐，两者必须同源。
 pub const DEVICE_DIMENSION_MIGRATION_VERSION: i64 = 28;
 
+/// 同步簿记迁移的版本号（当前 head）。
+///
+/// ⚠️ 与 28 一样：**不要**去 `schema_contracts::schema_revision_limit()` 里加它的探测项
+/// （见该函数与本文件头注释）。
+pub const SYNC_BOOKKEEPING_MIGRATION_VERSION: i64 = 29;
+
 /// 设备维度迁移的正文。放 `.sql` 文件：`check:size` 不扫 `.sql`，而且 DDL 用 SQL 写
 /// 比挤在 Rust 字符串里可读（多语句、注释、反引号都不用转义）。
 pub const DEVICE_DIMENSION_SQL: &str = include_str!("sql/0028_device_dimension.sql");
+
+/// 同步簿记（P4 · T11）的正文：`updated_at_ms` 盖戳、墓碑、四张同步表。
+pub const SYNC_BOOKKEEPING_SQL: &str = include_str!("sql/0029_sync_bookkeeping.sql");
+
+/// 登记表里的最大版本（= 当前 head）。
+///
+/// 给巡检与用例用。用例里写死数字会让每加一条迁移都要改好几处断言，而「改断言」正是
+/// 最容易改错的地方（把 29 写成 28 照样绿）；真正该钉成常量的只有「这一轮是几」那一处。
+pub fn head_version() -> i64 {
+    tracker_migrations()
+        .iter()
+        .map(|migration| migration.version)
+        .max()
+        .unwrap_or_default()
+}
 
 /// 全部迁移（升序）。
 pub fn tracker_migrations() -> Vec<Migration> {
@@ -172,6 +193,11 @@ pub fn tracker_migrations() -> Vec<Migration> {
             version: DEVICE_DIMENSION_MIGRATION_VERSION,
             description: "device_dimension",
             sql: DEVICE_DIMENSION_SQL,
+        },
+        Migration {
+            version: SYNC_BOOKKEEPING_MIGRATION_VERSION,
+            description: "sync_bookkeeping",
+            sql: SYNC_BOOKKEEPING_SQL,
         },
     ]
 }

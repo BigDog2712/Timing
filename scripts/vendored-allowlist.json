@@ -918,6 +918,36 @@
       "change": "added",
       "reason": "P2 T06：钉「8 个令牌在浅/深两套里各定义一次、且没有 0..7 之外的槽位」。缺令牌不报错、jsdom 不做样式计算也测不出（圆点静默变透明），只能读源文件断言；顺带钉住 FNV-1a 的已知值，换算法必须改这里",
       "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sql/0029_sync_bookkeeping.sql",
+      "change": "added",
+      "reason": "P4 T11：同步簿记迁移（head 29）。盖戳触发器、墓碑表、抑制表、四张同步表。只改这一份 DDL，不往 schema.rs 的 Rust 字符串常量里加（那里冻在 300 行棘轮上，且 .sql 不受 check:size 约束）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sync/mod.rs",
+      "change": "added",
+      "reason": "P4 T11：同步代码落点骨架（先只落 local_day_key 纯函数 + INCLUDE_TIME_RECORDS 裁决常量）。放 data/ 而不是 infra/：L4 规定 infra 不得依赖 services，而同步要读业务表",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sync_bookkeeping_tests.rs",
+      "change": "added",
+      "reason": "P4 T11 验收：时钟回拨后 updated_at_ms 仍严格递增（MAX(now, OLD+1)）、删行只留一条墓碑、抑制表生效且清掉后能再记、删行不弄丢读模型脏区间、业务库那套同型生效。单开文件是因为 sqlite_pool_mod_tests.rs 已冻在 992 行",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sync_bookkeeping_fixture.rs",
+      "change": "added",
+      "reason": "P4 T11 验收夹具：活动库/业务库两组用例共用的 helper（建行、盖戳、墓碑计数、sqlite_master 探测）。单独一个文件是因为 300 行是单文件硬约束——抄两遍既撞限又会在两处漂移",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sync_bookkeeping_business_tests.rs",
+      "change": "added",
+      "reason": "P4 T11 验收（业务库侧）：timing.db 与 patina.db 是两套迁移机制，只改一边不会有任何报错、只是那侧 updated_at_ms 永远 0。另钉「第二次启动不重盖已盖过戳的行」（守卫段回填条件是 WHERE updated_at_ms = 0）",
+      "owner": "software-engineer"
     }
   ]
 }

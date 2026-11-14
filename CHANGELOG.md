@@ -4,6 +4,68 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 0.12.2 · 设备维度（P1–P2）+ 同步簿记（P4·T11）— 2026-11-14（未出包）
+
+> 版号沿用 **0.12.2**（已赋号未出包，本轮并入同号；桌面上一版出包是 0.12.1）。
+> 三批一起落地：**P1 后端设备维度**（T01–T04）、**P2 展示层**（T05–T07）、**P4 簿记层**（T11）。
+
+> 设计文档：`docs/design/PLAN-20261114-数据结构与设备维度.md`（P1–P4 落地设计与偏差表）、
+> `docs/design/PLAN-20261114-P4-同步协议.md`（P4 施工协议）。
+
+### P1 · 设备维度：一台设备时数字逐位不变
+
+- `patina.db` 迁移 **28**：`devices` 花名册、`sessions.device_id/uid`、三张源表的 `app_key`
+  **生成列**（12 处内联 `CASE` 收敛成 3 个 DDL 表达式）、9 个读模型触发器改读 `NEW.app_key`、
+  「全库单活跃」索引拆成「每设备单活跃」、小时投影按设备重建、日级双口径表。
+- 业务库迁移 **0009**：`time_records.device_id/uid/merged_into_uid` + `uq_records_open_per_device`。
+  **0002 每次启动都会重建 `uq_records_open`**，0009 的 `DROP` 是唯一抵消点——删掉它，
+  多设备计时会在**第二次启动**才退化（第一次自测永远绿）。
+- `schema_revision_limit` **不**加 28/29 的探测项：它一旦认到新版本，`_sqlx_migrations`
+  会被整表重写成「已应用」而迁移从不执行，老用户开机即 `schema validation failed`。
+- 日级双口径 `daily::compute_day` 是**纯函数**（排序 + running max 求并集），
+  不写在 SQL 里：写成 `LAG` 会在「两设备完全嵌套」时少算且没有任何东西会报错。
+- 逐位相等基线 `daily_parity_tests`（`capture` / `verify` 两段式，`#[ignore]`，跑真实库）。
+
+### P2 · 展示层：单设备时界面零设备元素
+
+- 聚合 DTO 带 `deviceId`；读路径永不产出空串（事实 SQL 用 `COALESCE(NULLIF(TRIM(device_id),''), 本机 id)` 折回）。
+- 时间轴按设备分行 + chip / 图例：`deviceLanes` 为空即单设备，**不渲染节点**（不是 CSS 隐藏）。
+- 设备色改令牌 `var(--qp-device-0..7)`：运行时拼 `hsl()` 等于把字面量换个写法，主题切换调不到；
+  8 色相邻至少差 20°，暗色不是搬运而是提亮度；令牌单开 `device-lanes.css`（`tokens.css` 冻在 298 行）。
+- 热力 / 趋势主指标改服务侧**逐桶并集**（跨设备重叠不能在前端按桶求和，会重复计时）；
+  旧实现留在用例里当 oracle 逐格比对。`device_sum_ms`（可 >24h）本轮前端不消费，
+  网关**故意不导出**日级读方法——留一个没人调的接口只会让人以为 UI 已经接了。
+
+### P4 · T11 簿记层：谁在什么时候盖 `updated_at_ms`
+
+- `patina.db` 迁移 **29**：`sync_peer` / `sync_pull_state` / `sync_push_state` / `sync_channel` /
+  `sync_tombstone` / `sync_suppress` + 盖戳触发器 + 删除墓碑触发器；业务库 **0010** 同型。
+- 盖戳写成触发器而不是让调用点赋值：写入口有四个（tracker / Kotlin / 导入 / 恢复），
+ 漏一个 ⇒ 那批行永远 `updated_at_ms = 0` ⇒ **永远不会被导出，且零报错**。
+- `MAX(now, OLD+1)` 而不是纯 `now`：用户时钟会被 NTP 回拨、也会被手工改；纯 `now` 会让
+  「刚写的一行」比旧行更旧 ⇒ 对端 LWW 判错 ⇒ 新数据被旧数据覆盖。
+- 墓碑走独立表 + 抑制表，`sessions` 保持硬删除：软删除会让几十条 `FROM sessions` 查询与
+  9 个读模型触发器全部失效。应用对端墓碑时**原样灌入、不重发**（朴素做法每跳刷新时间戳 ⇒
+  分片永不稳定 ⇒ 无限重推）。
+- 本轮**不同步** `time_records`（`items` 未过桥 ⇒ `itemId` 跨设备悬空）。列与触发器已建好，
+  切开只差 `sync::INCLUDE_TIME_RECORDS`（用例钉着它是 `false`）。
+
+### 顺手修掉的两个真 bug
+
+- `ensure_install_id` 的临时文件名是固定的 `install_id.txt.tmp`：两个写者同时进来时，
+  A 建好 tmp、B 已经把它 rename 走，A 的 rename 直接 `os error 2`。并行用例下必现（随机某条红）。
+  改为 `<pid>.<seq>.tmp` + **以落盘值为准返回**（并发时各写者生成的值可能不同，
+  但目录里最终只有一份，所有调用者必须读到同一份）。
+- `deviceColor.tokens.test.ts` 用了 `new URL("字面量", import.meta.url)`：Vite 会把它静态改写成
+  `http://localhost:3000/…` 资源地址，`fs` 直接报 "URL must be of scheme file"。
+  路径**必须经变量**传进 `new URL`（仓里 `readCss(rel)` 那层包装就是为这个）。
+
+### 账本
+
+- `size` 145 条（`schema.rs` 1887→1751、`hourly.rs` 852→629、`sqlite_pool.rs` 748→747 等向下收紧）。
+- `vendored` 158 条（改 61 / 增 97）；`contract` 84（+Patina 118）/ 错误码 18 / 事件 11-11。
+- `cargo test --lib` **1763 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 204 文件 / 1566 用例。
+
 ## 0.12.2 · 应用多分类绑定 + 设置页导航修复（R3）— 2026-11-13（未出包）
 
 > 版号：`desktop` 0.12.1 → **0.12.2**（六处同步；R2 与本轮同号并入，桌面上一版出包是 0.12.1）。

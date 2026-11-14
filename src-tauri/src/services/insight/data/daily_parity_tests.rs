@@ -176,10 +176,7 @@ async fn measure(pool: &Pool<Sqlite>) -> Baseline {
 }
 
 /// 取（或建）某个时刻所属本地日的条目，并顺手把「今天以前 = 已关闭」判定算好。
-fn day_entry<'a>(
-    days: &'a mut BTreeMap<String, DayBaseline>,
-    at_ms: i64,
-) -> &'a mut DayBaseline {
+fn day_entry(days: &mut BTreeMap<String, DayBaseline>, at_ms: i64) -> &mut DayBaseline {
     let (day_start_ms, day_end_ms) = local_day_range_at(at_ms).unwrap();
     let day_key = day_key_of(day_start_ms).unwrap();
     days.entry(day_key.clone())

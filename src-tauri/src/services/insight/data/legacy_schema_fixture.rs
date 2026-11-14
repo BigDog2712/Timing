@@ -33,6 +33,19 @@ pub(crate) async fn rewind_to_pre_device_dimension(pool: &SqlitePool) -> Result<
     let statements = [
         "DELETE FROM _sqlx_migrations WHERE version >= 28".to_string(),
         "DROP TRIGGER IF EXISTS trg_sessions_uid".to_string(),
+        // 29（同步簿记）加的三样同样要拆：触发器引用的列在下面会被 DROP 掉，
+        // 索引不先删就会让 `ALTER TABLE … DROP COLUMN` 直接报
+        // 「error in index idx_sessions_updated after drop column」。
+        "DROP TRIGGER IF EXISTS trg_sessions_touch_insert".to_string(),
+        "DROP TRIGGER IF EXISTS trg_sessions_touch_update".to_string(),
+        "DROP TRIGGER IF EXISTS trg_sessions_tombstone".to_string(),
+        "DROP INDEX IF EXISTS idx_sessions_updated".to_string(),
+        "DROP TABLE IF EXISTS sync_tombstone".to_string(),
+        "DROP TABLE IF EXISTS sync_suppress".to_string(),
+        "DROP TABLE IF EXISTS sync_peer".to_string(),
+        "DROP TABLE IF EXISTS sync_pull_state".to_string(),
+        "DROP TABLE IF EXISTS sync_push_state".to_string(),
+        "DROP TABLE IF EXISTS sync_channel".to_string(),
         "DROP INDEX IF EXISTS uq_sessions_open_per_device".to_string(),
         "DROP INDEX IF EXISTS uq_sessions_uid".to_string(),
         "DROP INDEX IF EXISTS idx_sessions_device_date".to_string(),

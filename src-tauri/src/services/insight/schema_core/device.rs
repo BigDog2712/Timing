@@ -37,11 +37,22 @@ pub fn path_of(config_dir: &Path) -> PathBuf {
     config_dir.join(INSTALL_ID_FILE)
 }
 
+/// 原子落盘用的临时文件序号（同进程内并发调用时区分，见 `ensure_install_id`）。
+static TEMP_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// 读出本机 `install_id`；文件不存在则生成一个并**原子落盘**。
 ///
-/// 原子性：先写 `install_id.txt.tmp` 再 `rename`（同目录 rename 是原子的）。
+/// 原子性：先写 `install_id.txt.<pid>.<seq>.tmp` 再 `rename`（同目录 rename 是原子的）。
 /// 直接覆写会让「写到一半崩了」留下半截 id —— 那比没有文件更糟，因为下一次读会
 /// 把它当成合法 id（校验只查长度与字符集）。
+///
+/// ## 临时文件名必须唯一（不是洁癖，是真踩过）
+///
+/// 早前用的固定名 `install_id.txt.tmp`：两个写者同时进来时，A 建好 tmp、B 已经把它
+/// rename 走了，A 的 rename 直接 `os error 2`（系统找不到指定的文件）——
+/// 在 `cargo test` 的并行线程下必现，表现为**随机某条**用例红。
+/// 现在每个写者用自己的临时名，且**以落盘值为准**返回：并发时各写者生成的值可能不同，
+/// 但目录里最终只有一份，所有调用者必须读到同一份，否则同一台机器会出现两个身份。
 pub fn ensure_install_id(config_dir: &Path) -> Result<String, String> {
     let path = path_of(config_dir);
     if let Some(existing) = read_valid(&path)? {
@@ -50,7 +61,8 @@ pub fn ensure_install_id(config_dir: &Path) -> Result<String, String> {
     let generated = generate()?;
     std::fs::create_dir_all(config_dir)
         .map_err(|error| format!("failed to create config dir `{}`: {error}", config_dir.display()))?;
-    let temp = config_dir.join(format!("{INSTALL_ID_FILE}.tmp"));
+    let seq = TEMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let temp = config_dir.join(format!("{INSTALL_ID_FILE}.{}.{seq}.tmp", std::process::id()));
     {
         let mut file = std::fs::File::create(&temp)
             .map_err(|error| format!("failed to create install id file: {error}"))?;
@@ -64,7 +76,8 @@ pub fn ensure_install_id(config_dir: &Path) -> Result<String, String> {
         let _ = std::fs::remove_file(&temp);
         format!("failed to commit install id file: {error}")
     })?;
-    Ok(generated)
+    /* 并发写者可能都 rename 成功（后写者覆盖前者）：以落盘的那一份为准。 */
+    Ok(read_valid(&path)?.unwrap_or(generated))
 }
 
 /// 读一个**已存在且合法**的 id；不存在返回 `None`；存在但内容非法 → Err。

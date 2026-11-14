@@ -18,14 +18,14 @@ use std::path::Path;
 
 /// 迁移头必须与登记表最后一条一致（`schema_registry` + `sqlite_pool` 两处同源）。
 #[test]
-fn registered_head_matches_the_device_dimension_version() {
+fn registered_head_matches_the_sync_bookkeeping_version() {
     let head = schema_registry::tracker_migrations()
         .iter()
         .map(|migration| migration.version)
         .max()
         .unwrap_or_default();
-    assert_eq!(head, schema_registry::DEVICE_DIMENSION_MIGRATION_VERSION);
-    assert_eq!(head, 28);
+    assert_eq!(head, schema_registry::SYNC_BOOKKEEPING_MIGRATION_VERSION);
+    assert_eq!(head, 29);
 }
 
 /// 生成列的 DDL 依赖 SQLite ≥ 3.31；sqlx 带的是 bundled 版本，这里钉一次实际值。
@@ -67,7 +67,7 @@ fn fresh_database_reaches_device_dimension_head() {
         assert!(has_index(&pool, "idx_sessions_pending").await);
         assert!(table_exists(&pool, "devices").await);
         assert!(table_exists(&pool, "activity_daily_totals").await);
-        assert_eq!(applied_head(&pool).await, 28);
+        assert_eq!(applied_head(&pool).await, 29);
         // 本机身份写进 devices 且恰好一行 is_self=1。
         let self_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM devices WHERE is_self = 1")
             .fetch_one(&pool)
@@ -145,7 +145,7 @@ fn prepare_pool_schema_twice_preserves_migration_28_and_open_sessions() {
             .unwrap();
         prepare_pool_schema(&second, &db_path).await.unwrap();
 
-        assert_eq!(applied_head(&second).await, 28);
+        assert_eq!(applied_head(&second).await, 29);
         let open_rows: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM sessions WHERE end_time IS NULL")
                 .fetch_one(&second)
@@ -213,7 +213,7 @@ fn device_schema_upgrade() {
         println!("sessions before={before} after={after} sentinel={sentinel} null_uid={null_uid}");
         assert_eq!(sentinel, 0, "every row must be adopted into a real device id");
         assert_eq!(after, before, "migration must not add or drop rows");
-        assert_eq!(applied_head(&pool).await, 28);
+        assert_eq!(applied_head(&pool).await, 29);
         pool.close().await;
     });
 }
