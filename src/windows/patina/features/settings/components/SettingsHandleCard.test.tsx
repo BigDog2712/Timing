@@ -9,7 +9,7 @@
  * 渲染方式沿用本仓既有口径（没装 `@testing-library/react`）：`createRoot` + `act` 手搓宿主，
  * 断言直接读 DOM。`QuietSelect` 的菜单是 portal 到 `body` 的，所以数选项要在 `document.body` 上数。
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import {
@@ -21,6 +21,10 @@ import {
   type HandleFormBinding,
 } from '../../../../shared/handleCatalog';
 import SettingsHandleCard from './SettingsHandleCard';
+
+/* 原生文件选择器：判据只关心「选中之后写了什么 / 取消之后有没有写」，不需要真对话框 */
+const { dialogOpen } = vi.hoisted(() => ({ dialogOpen: vi.fn() }));
+vi.mock('@tauri-apps/plugin-dialog', () => ({ open: dialogOpen }));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -62,6 +66,26 @@ function openSelectOptions(index: number): string[] {
     .map((node) => (node.textContent ?? '').trim());
 }
 
+/**
+ * 打开第 `index` 个下拉并点掉文本为 `label` 的那一项。
+ *
+ * 开菜单与点选项**分成两个 act**：菜单是 portal + `useLayoutEffect` 挂上去的，
+ * 把整段塞进一个 `await act(async () => …)` 里时，`role="option"` 在查询那一刻还不在 DOM 上
+ * （内层同步 act 的 flush 被外层 async act 推迟了）—— 断言会得到「选项不存在」。
+ */
+async function pickOption(index: number, label: string): Promise<void> {
+  act(() => { openSelectOptions(index); });
+  const option = Array.from(document.body.querySelectorAll<HTMLElement>('[role="option"]'))
+    .find((node) => (node.textContent ?? '').trim() === label);
+  expect(option, `选项「${label}」不存在`).toBeTruthy();
+  await act(async () => { option?.click(); });
+}
+
+/** 按一下组合键（录制框挂在 window 的捕获阶段） */
+function pressCombo(init: KeyboardEventInit): void {
+  act(() => { window.dispatchEvent(new KeyboardEvent('keydown', init)); });
+}
+
 describe('G1 手柄卡', () => {
   it('a01_each_form_has_exactly_five_slots', () => {
     /* 槽位恒定 5 个，**顺序必须是字面量**：`left / right / middle / leftDouble / rightDouble`。
@@ -85,15 +109,18 @@ describe('G1 手柄卡', () => {
       .toMatch(new RegExp(`^${HANDLE_FORM_LABELS.full} · ${HANDLE_SLOT_LABELS[HANDLE_SLOTS[0]]}`));
   });
 
-  it('a02_option_count_equals_registry_size_plus_none', () => {
-    /* 选项 = 目录 13 条 + 「无」。多一个 = 有第二份清单在漂移；少一个 = 某个动作选不到。 */
+  it('a02_option_count_equals_registry_size_plus_none_plus_two_collectors', () => {
+    /* 选项 = 目录 13 条 + 「无」+ 两个采集入口（启动应用 / 发送快捷键）。
+       多一个 = 有第二份清单在漂移；少一个 = 某个动作选不到。 */
     mount();
     const options = openSelectOptions(0);
-    expect(options).toHaveLength(HANDLE_ACTIONS.length + 1);
+    expect(options).toHaveLength(HANDLE_ACTIONS.length + 3);
     expect(options[0]).toBe('无');
-    expect(options.slice(1)).toEqual(HANDLE_ACTIONS.map((action) => (
+    expect(options.slice(1, HANDLE_ACTIONS.length + 1)).toEqual(HANDLE_ACTIONS.map((action) => (
       action.irreversible ? `${action.label} · 不可逆` : action.label
     )));
+    /* [0.13] 两个采集入口固定在最后：它们不是动作，是「去配一个动作」 */
+    expect(options.slice(-2)).toEqual(['启动应用…', '发送快捷键…']);
   });
 
   it('a02_injected_fake_action_appears_in_the_selector', () => {
@@ -149,5 +176,74 @@ describe('G1 手柄卡', () => {
     expect(changes).toHaveLength(1);
     expect(changes[0].enabled).toBe(true);
     expect(changes[0].slots).toEqual(form.slots);
+  });
+});
+
+describe('G1 手柄卡 · [0.13] 自定义绑定', () => {
+  beforeEach(() => {
+    dialogOpen.mockReset();
+  });
+
+  it('a08_已配的自定义绑定必须出现在下拉里', () => {
+    /* 只从目录建选项的话，配了「启动 Photoshop」的那一槽会显示成「无」——
+       按键有反应、下拉说没绑，用户会以为自己配错了。 */
+    mount({
+      ...DEFAULT_HANDLE_BINDINGS.full,
+      slots: {
+        ...DEFAULT_HANDLE_BINDINGS.full.slots,
+        left: 'launch:C:////Apps////Photoshop.exe',
+        right: 'hotkey:Ctrl+Shift+M',
+      },
+    });
+    const options = openSelectOptions(0);
+    expect(options).toContain('启动 Photoshop.exe');
+    expect(options).toContain('发送 Ctrl+Shift+M');
+  });
+
+  it('a09_选中文件后写入_launch_绑定', async () => {
+    dialogOpen.mockResolvedValue('C:////Apps////WeChat.exe');
+    const { changes } = mount();
+    await pickOption(0, '启动应用…');
+
+    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    expect(changes).toHaveLength(1);
+    expect(changes[0].slots.left).toBe('launch:C:////Apps////WeChat.exe');
+    /* 其它槽位一字不动 */
+    expect(changes[0].slots.right).toBe(DEFAULT_HANDLE_BINDINGS.full.slots.right);
+  });
+
+  it('a10_取消选择时一个字都不写', async () => {
+    /* 受控 `value` 一直来自 binding，所以「不写」就是「下拉弹回原值」——不需要额外状态 */
+    dialogOpen.mockResolvedValue(null);
+    const { changes } = mount();
+    await pickOption(0, '启动应用…');
+    expect(changes).toHaveLength(0);
+  });
+
+  it('a11_录制组合键后写入_hotkey_绑定', async () => {
+    const { changes } = mount();
+    await pickOption(0, '发送快捷键…');
+    /* 录制框必须已经出现（它在 body 上的 portal 里） */
+    expect(document.body.textContent).toContain('录制快捷键');
+
+    pressCombo({ code: 'KeyM', ctrlKey: true, shiftKey: true });
+    const confirm = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button'))
+      .find((node) => (node.textContent ?? '').trim() === '使用');
+    expect(confirm, '「使用」键不存在').toBeTruthy();
+    act(() => { confirm?.click(); });
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0].slots.left).toBe('hotkey:Ctrl+Shift+M');
+  });
+
+  it('a12_只有主键的组合键不会被确认', async () => {
+    /* 单键 = 往用户当前前台应用注入一个字符。录制框必须拒绝确认。 */
+    const { changes } = mount();
+    await pickOption(0, '发送快捷键…');
+    pressCombo({ code: 'KeyM' });
+    const confirm = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button'))
+      .find((node) => (node.textContent ?? '').trim() === '使用');
+    expect(confirm?.disabled).toBe(true);
+    expect(changes).toHaveLength(0);
   });
 });

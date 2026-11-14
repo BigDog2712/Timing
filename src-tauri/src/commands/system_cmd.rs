@@ -6,7 +6,7 @@
 
 use tauri::{AppHandle, State};
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::infra::window;
 use crate::models::common::{WindowRectDip, WorkAreaDip};
 use crate::platform::boot_timing;
@@ -58,4 +58,33 @@ pub async fn save_window_position(state: State<'_, AppState>, x: f64, y: f64) ->
 pub async fn quit_app(app: AppHandle) -> AppResult<()> {
     app.exit(0);
     Ok(())
+}
+
+/* ── [0.13] 手柄自定义动作：启动应用 / 发送快捷键 ───────────────────────────────
+ *
+ * 一条命令两个分支，而不是两条命令：两者都只做「执行一次系统动作」，
+ * 拆成两条会让契约面 +1 却没有换来任何独立性（前端永远只会二选一调用）。
+ *
+ * `deny_unknown_fields` 不是洁癖：这个载荷直接决定「跑哪个程序」，多出来的字段
+ * 意味着前端与本文件对形状的理解已经分叉 —— 宁可拒绝执行，也不要猜着执行。
+ */
+#[derive(serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub enum HandleCustomAction {
+    /// 启动一个用户亲手选中的文件（`.exe` / `.lnk` / 文档，语义 = 双击）
+    Launch { path: String },
+    /// 向当前前台窗口发送组合键；`vks` 是**已排好序**的 VK 序列（修饰键在前）
+    Hotkey { vks: Vec<u16> },
+}
+
+#[tauri::command]
+pub async fn run_handle_custom_action(action: HandleCustomAction) -> AppResult<()> {
+    match action {
+        HandleCustomAction::Launch { path } => {
+            crate::infra::shell_open::launch(std::path::Path::new(&path)).map_err(AppError::io)
+        }
+        HandleCustomAction::Hotkey { vks } => {
+            crate::infra::hotkey_send::send(&vks).map_err(AppError::io)
+        }
+    }
 }

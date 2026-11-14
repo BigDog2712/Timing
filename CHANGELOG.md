@@ -190,6 +190,43 @@
 - 用例：改判 3 条（d03 / cm04 / cm11）+ 新增 2 条（cm13 内置删除整批、cm14 恢复写 null），
   `DataAppEditColorReset.test.tsx` → `DataCategoryManageColorReset.test.tsx`（宿主换了）。
 
+### 手柄可绑「启动应用 / 发送快捷键」（0.12.2 并入）
+
+槽位原来只能装 `HANDLE_ACTIONS` 目录里的 13 条内置动作。现在多两类用户自定义：
+
+- `launch:<路径>`：启动一个用原生文件选择器挑中的程序 / 文档（语义 = 双击）
+- `hotkey:<组合键>`：向**当前前台窗口**发送该组合键（`Ctrl+Shift+M` 这类）
+
+**为什么编码在同一根字符串里**（而不是给 `HandleFormBinding` 加个 `custom` 字段）：
+槽位值的所有消费方都只回答一个问题「这个槽有没有绑定」。拆成两字段之后，
+`useHandleGesture` 的「要不要等 250ms 判双击」、`HandleButton` 的 title、`parseSlots` 的归一、
+设置卡的下拉，每处都要变成「A 非空 **或** B 非空」—— 漏一处的症状都是静默的
+（双击不再生效 / 下拉显示「无」但按键有反应）。单根字符串保住了 `!= null` 这一处判据。
+目录 id 全部形如 `note.current`（不含冒号），两个前缀都以冒号结尾，所以前缀就是判据。
+
+- **后端一条命令两个分支**：`run_handle_custom_action`（`#[serde(tag = "kind", deny_unknown_fields)]`）。
+  `launch` 走 `infra::shell_open::launch`：先 `Command::new(path).spawn()`（对 `.exe` 是精确语义），
+  失败才回落 explorer / open / xdg-open（`.lnk` / `.bat` / 文档）。`hotkey` 走
+  `infra::hotkey_send::send`：`SendInput` 按下再逆序抬起。
+- **键名表只有一份**（`src/windows/shared/hotkey.ts`）：前端把 `Ctrl+Shift+M` 解析成 VK 序列，
+  后端纯机械执行。后端也认键名的话就会出现两份表，漂移的症状是「录制成功、按下不发」，两端日志干净。
+  该文件放 `shared`（不在 `timing/lib`）：录制框在**分析窗**的设置页、派发在**主窗**，L9 不允许跨窗引用。
+- **必须带修饰键**（录制、解析、发送三处各挡一次）：这条链最终往用户当前前台应用注入按键，
+  允许单键就等于允许「点一下手柄，在别人的输入框里打一个字母」。
+- **发按键前要抢回前台**：手柄点下去会激活我们自己的窗口，`SendInput` 的目标就变成 Timing 自己
+  （症状是「点了没反应」）。`get_active_window_native` 每次观测顺手记下「最近一个**外部**前台窗口」
+  （排除本进程，`AtomicIsize` + relaxed store），发送前若发现前台是自己就 `SetForegroundWindow` 抢回来。
+  抢不到照发（`SetForegroundWindow` 受前台锁定策略限制）——猜错最多是这次没生效，不发一定是没生效。
+- **槽位长度上限 64 → 512**：`models/pill_prefs.rs::ACTION_ID_MAX_LEN` 原按「目录里最长 14」定的，
+  `launch:C://Program Files\…\x.exe` 轻松超过 → 后端**静默截成 None** → 用户选好程序、保存成功、
+  那颗键回到「无」，库里干净得像什么都没发生。`tests/pill_prefs.rs` 补了 `p3b` 钉住这条。
+- 契约面 +1（宿主 **89**），`permissions/host-commands.toml` 同步登记；分析窗 capability 加
+  `dialog:allow-open`（设置页要调原生文件选择器）。手机不注册该命令（没有「发给前台应用」这件事），
+  前端在手机上不给这两个选项。
+
+**已知边界**（写进代码注释）：目标窗口比 Timing 权限更高（以管理员运行）时，`SendInput` 会被 UIPI
+静默丢弃，此时返回一条「快捷键没能发出去（目标窗口权限更高？）」。
+
 ### 交互收口：调色盘出口、未分类沉底、事项分类、应用绑定自动计时（0.12.2 并入）
 
 - **调色盘没有出口**：head 只有「恢复默认色 / 取色器」，挑完色只能点空白或按 Esc。

@@ -172,6 +172,17 @@ export const dataRootApi = {
   open: (): Promise<void> => ipc.dataRootOpen(),
 };
 
+/* ---- [0.13] 手柄自定义动作（启动应用 / 发送快捷键）----
+   两个方法只做「把载荷形状拼对」，判定一律在调用方（`handleActions/dispatch.ts`）：
+   那里才知道失败该怎么告诉用户（手柄有一块 notice 区域，别处没有）。 */
+export const handleCustomApi = {
+  launch: (path: string): Promise<void> =>
+    ipc.runHandleCustomAction({ action: { kind: 'launch', path } }),
+  /** `vks` 必须是已排好序的 VK 序列（`lib/hotkey.ts::hotkeyToVirtualKeys`） */
+  hotkey: (vks: number[]): Promise<void> =>
+    ipc.runHandleCustomAction({ action: { kind: 'hotkey', vks } }),
+};
+
 export { isTauri };
 /* 错误文案也走门面：视图层要的是「给用户看的一句话」，不是传输层对象。
    从本文件再导出，组件就不必为了一个文案函数直接 import services/ipc。 */

@@ -20,6 +20,7 @@ import {
   HANDLE_FORMS,
   HANDLE_SLOTS,
 } from './handleCatalog';
+import { parseCustomBinding } from './handleCustomBinding';
 import type {
   HandleBindings,
   HandleForm,
@@ -37,6 +38,19 @@ type SlotValues = Record<HandleSlot, string | null>;
 export function isKnownActionId(id: string): boolean {
   for (const action of HANDLE_ACTIONS) if (action.id === id) return true;
   return false;
+}
+
+/**
+ * 槽位值合法吗：内置动作 id **或** 自定义绑定（`launch:` / `hotkey:`）。
+ *
+ * 自定义绑定要不要在这里「验得更细」（路径存不存在、组合键合不合法）？**不要**：
+ *  - 路径存在性是执行那一刻的事（用户可能刚把程序挪了位置，那不该让整个配置回默认）；
+ *  - 组合键的语法由 `lib/hotkey.ts` 在**发送前**判，判不过就是一条提示，
+ *    而这里判不过是「槽位归零」—— 用户会看到自己配的东西凭空消失。
+ * 这一层只回答一个问题：这个字符串是不是我们认识**格式**的绑定。
+ */
+function isBindableSlotValue(value: string): boolean {
+  return isKnownActionId(value) || parseCustomBinding(value) !== null;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -62,7 +76,7 @@ function parseSlots(raw: unknown): SlotValues {
     const value = source[slot];
     /* 规则 5 / 6：缺 key、非字符串、字符串但不在目录里 —— 一律 `null`。
        未知 id 不抛也不 console.error：那是用户手改配置的正常后果，不是程序缺陷。 */
-    out[slot] = typeof value === 'string' && isKnownActionId(value) ? value : null;
+    out[slot] = typeof value === 'string' && isBindableSlotValue(value) ? value : null;
   }
   return out;
 }

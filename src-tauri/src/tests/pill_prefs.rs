@@ -81,9 +81,30 @@ fn p2_normalize_clamps_and_falls_back_unknown_float_form() {
     assert_eq!(nan.bg_opacity, 1.0);
 }
 
+/// [0.13] 槽位值不再只装动作 id：`launch:` + Windows 路径轻松超过 64 字符。
+/// 上限仍是 64 时，用户选好程序、保存成功、那颗键回到「无」—— 库里干净得像什么都没发生。
+#[test]
+fn p3b_launch_binding_with_a_real_windows_path_survives() {
+    let path = r"launch:C://Program Files\Some Vendor\Some Application\bin\app.exe";
+    assert!(path.chars().count() > 64, "这条夹具必须比旧上限长，否则它证明不了什么");
+    let mut binding = HandleSlotBinding {
+        left: Some(path.to_string()),
+        right: Some("hotkey:Ctrl+Alt+Shift+F12".to_string()),
+        ..Default::default()
+    };
+    binding.normalize();
+
+    assert_eq!(binding.left, Some(path.to_string()), "带路径的 launch 绑定不许被截断");
+    assert_eq!(
+        binding.right,
+        Some("hotkey:Ctrl+Alt+Shift+F12".to_string()),
+        "组合键绑定原样保留"
+    );
+}
+
 #[test]
 fn p3_slot_blank_and_overlong_become_none() {
-    let overlong = "a".repeat(65);
+    let overlong = "a".repeat(513);
     let mut binding = HandleSlotBinding {
         left: Some("  ".to_string()),
         right: Some(overlong),
@@ -93,7 +114,7 @@ fn p3_slot_blank_and_overlong_become_none() {
     binding.normalize();
 
     assert_eq!(binding.left, None, "全空白槽必须变成「无」");
-    assert_eq!(binding.right, None, "超过 64 字符的 id 必须变成「无」");
+    assert_eq!(binding.right, None, "超过 512 字符必须是坏数据（上限要为路径留出空间）");
     assert_eq!(
         binding.middle,
         Some("timer.start".to_string()),

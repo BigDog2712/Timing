@@ -22,6 +22,7 @@ import { createMockApiDaily } from './browserMockDaily';
 import { createMockApiItems } from './browserMockItems';
 import { createMockApiPlugins } from './browserMockPlugins';
 import { createMockApiMigration } from './browserMockMigration';
+import { createMockApiHandleCustom } from './browserMockHandleCustom';
 import { buildState, fail, now, seed, type MockState } from './mockSeed';
 
 /**
@@ -281,5 +282,6 @@ export function createMockApi(): Record<string, (args?: any) => unknown> {
     ...createMockApiDaily(s),
     ...createMockApiPlugins(),
     ...createMockApiMigration(),
+    ...createMockApiHandleCustom(),
   };
 }

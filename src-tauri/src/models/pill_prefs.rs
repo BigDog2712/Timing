@@ -19,8 +19,13 @@ use serde::{Deserialize, Serialize};
 /// 文字不透明度下限。**必须等于**前端 `src/lib/pillAppearance.ts` 的同名常量（改一处两处同改）。
 pub const TEXT_OPACITY_MIN: f64 = 0.2;
 
-/// 槽位里动作 id 的最大长度（字符）。目录里最长的是 `menu.countdown`（14），64 只可能是坏数据。
-const ACTION_ID_MAX_LEN: usize = 64;
+/// 槽位值的最大长度（字符）。
+///
+/// [0.13] 槽位不再只装动作 id：自定义绑定形如 `launch:C:\Program Files\Some App\app.exe`
+/// （Windows `MAX_PATH` 是 260）与 `hotkey:Ctrl+Alt+Shift+F12`。原来按「目录里最长 14」定的
+/// 64 会把带路径的绑定**静默截成空**——用户选好一个程序、保存后那颗键回到「无」，库里干净。
+/// 512 覆盖 `MAX_PATH` 与超长路径前缀（`\\?\`），再长的只可能是坏数据。
+const ACTION_ID_MAX_LEN: usize = 512;
 
 /// 药丸外观三项。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

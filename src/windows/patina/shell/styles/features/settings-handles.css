@@ -127,3 +127,41 @@
     max-width: 100%;
   }
 }
+
+/* ── [0.13] 快捷键录制框 ─────────────────────────────────────────────────── */
+
+/* 预览区用等宽 + 大字号：`Ctrl+Alt+Shift+F12` 这类长组合要一眼看清有没有多按一个键。
+   `data-empty="true"` 时降墨，提示"还没按"而不是显示一个空框。 */
+.settings-handle-hotkey {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  padding: 12px;
+  border: 1px dashed var(--qp-border-strong);
+  border-radius: var(--qp-radius-control);
+  color: var(--qp-text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--qp-font-size-section-title);
+  font-weight: var(--qp-font-weight-medium);
+  letter-spacing: 0.02em;
+  word-break: break-all;
+}
+
+.settings-handle-hotkey[data-empty="true"] {
+  color: var(--qp-text-tertiary);
+  font-family: inherit;
+  font-size: var(--qp-font-size-caption);
+}
+
+.settings-handle-hotkey__hint {
+  margin: 8px 0 0;
+  color: var(--qp-text-tertiary);
+  font-size: var(--qp-font-size-caption);
+}
+
+/* 错误与「双击会延迟 250ms」共用 `.settings-handle-card__hint`（warning 色），
+   但红字要能区分开：一句是"提醒"，一句是"刚才那步没成"。 */
+.settings-handle-card__hint[data-tone="error"] {
+  color: var(--qp-danger);
+}

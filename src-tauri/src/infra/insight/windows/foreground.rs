@@ -85,9 +85,7 @@ pub fn cmd_set_afk_threshold(threshold_secs: u64) {
     AFK_THRESHOLD_SECS.store(threshold_secs, Ordering::Relaxed);
 }
 
-pub fn get_active_window() -> Result<WindowInfo, String> {
-    super::native_probe::foreground(AFK_THRESHOLD_SECS.load(Ordering::Relaxed))
-}
+pub fn get_active_window() -> Result<WindowInfo, String> { super::native_probe::foreground(AFK_THRESHOLD_SECS.load(Ordering::Relaxed)) }
 
 pub(super) fn get_active_window_native() -> WindowInfo {
     unsafe {
@@ -133,6 +131,8 @@ pub(super) fn get_active_window_native() -> WindowInfo {
         if should_treat_shell_surface_as_inactive(root_owner_hwnd, &exe_name, &window_class) {
             return build_inactive_window(idle_time, is_afk);
         }
+
+        if process_id != std::process::id() { crate::infra::hotkey_send::remember_foreign_foreground(root_owner_hwnd.0 as isize); }
 
         WindowInfo {
             hwnd: format_hwnd(hwnd),

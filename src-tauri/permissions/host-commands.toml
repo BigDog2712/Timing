@@ -78,6 +78,7 @@ commands.allow = [
   "reminder_set",
   "resolve_open_record",
   "resume_timer",
+  "run_handle_custom_action",
   "save_window_position",
   "set_autostart",
   "set_countdown_preset",

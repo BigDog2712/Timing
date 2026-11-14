@@ -22,6 +22,7 @@ import {
   findHandleAction,
 } from '../../lib/handleCatalog';
 import type { HandleForm, HandleSlot } from '../../lib/handleCatalog';
+import { describeCustomBinding, parseCustomBinding } from '../../../shared/handleCustomBinding';
 import { dispatchHandleAction } from '../../services/handleActions/dispatch';
 import type { HandleActionCtx } from '../../services/handleActions/guards';
 
@@ -42,13 +43,20 @@ const GLYPH_PATH: Record<Exclude<HandleForm, 'dot'>, string> = {
   full: 'M5.6 3.6 C9 6.6, 9 15.4, 5.6 18.4',
 };
 
-/** 把当前绑定说成人话（H-05：`title` 必须随绑定重算，不能写死旧文案） */
+/**
+ * 把当前绑定说成人话（H-05：`title` 必须随绑定重算，不能写死旧文案）。
+ *
+ * [0.13] 自定义绑定（`launch:` / `hotkey:`）也要在这里出现：只查目录的话，配了
+ * 「启动某程序」的那一槽会显示成「无」—— 按键有反应、提示说没绑，用户会去翻设置。
+ */
 function boundSummary(slots: Record<HandleSlot, string | null>): string {
   const parts: string[] = [];
   for (const slot of HANDLE_SLOTS) {
     const id = slots[slot];
     if (id == null) continue;
-    parts.push(`${HANDLE_SLOT_LABELS[slot]}：${findHandleAction(id)?.label ?? '无'}`);
+    const custom = parseCustomBinding(id);
+    const label = custom ? describeCustomBinding(custom) : (findHandleAction(id)?.label ?? '无');
+    parts.push(`${HANDLE_SLOT_LABELS[slot]}：${label}`);
   }
   return parts.length > 0 ? parts.join(' · ') : '未绑定';
 }

@@ -32,6 +32,25 @@ pub fn open_file(path: &Path) -> Result<(), String> {
     spawn(opener(), path, "打开文件失败")
 }
 
+/// [0.13] 手柄「启动应用」：把用户亲手选中的路径**跑起来**。
+///
+/// 与 `open_file` 的区别只在「谁来解释这个文件」：`open_file` 一律交给资源管理器
+/// （等于双击），而 `.exe` 经 explorer 绕一圈会多一个前台闪烁，个别带 UAC 清单的程序
+/// 还会被降权转发。所以先尝试**直接执行**（对可执行文件是精确语义），失败才回落
+/// 系统默认程序（`.lnk` / `.bat` / 文档 / 脚本都走这条）。
+///
+/// `Command::new` 不吃 shell（不经 `cmd /C`），路径里的 `&`、`|`、`^` 没有意义；
+/// 失败回落时也只把路径作为**单个参数**交给 explorer / open / xdg-open。
+pub fn launch(path: &Path) -> Result<(), String> {
+    if !path.is_file() {
+        return Err(format!("文件不存在：{}", path.display()));
+    }
+    if Command::new(path).spawn().is_ok() {
+        return Ok(());
+    }
+    spawn(opener(), path, "启动失败")
+}
+
 /// 用系统默认浏览器打开一个 URL（[V0.11.6] 便携版缺 WebView2 时给下载页出口）。
 ///
 /// 判据与 `open_dir` 同一套：只 `spawn` 不 `wait`，不经 shell 解析。

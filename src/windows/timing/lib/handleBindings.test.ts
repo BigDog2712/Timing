@@ -116,6 +116,45 @@ describe('parseHandleBindings —— 非法输入一律回落默认，永不抛'
     expect(error).not.toHaveBeenCalled();
   });
 
+  it('r8_custom_bindings_survive_normalization', () => {
+    /* [0.13] 槽位不再只装目录 id。归一化把自定义绑定当未知 id 清掉的话，症状是
+       「配好的启动应用，重启后变回『无』」，设置页也跟着说没绑 —— 用户看不出发生过什么。 */
+    const doc = validDoc();
+    const out = parseHandleBindings({
+      version: 1,
+      forms: {
+        ...doc.forms,
+        full: {
+          enabled: true,
+          slots: {
+            ...doc.forms.full.slots,
+            left: 'launch:C:////Apps////Photoshop.exe',
+            right: 'hotkey:Ctrl+Shift+M',
+          },
+        },
+      },
+    });
+    expect(out.full.slots.left).toBe('launch:C:////Apps////Photoshop.exe');
+    expect(out.full.slots.right).toBe('hotkey:Ctrl+Shift+M');
+  });
+
+  it('r9_half_baked_custom_binding_falls_back_to_null', () => {
+    /* 只有前缀没有载荷（采集到一半的坏数据）必须当成「无」：留着会在下拉里显示「启动 」 */
+    const doc = validDoc();
+    const out = parseHandleBindings({
+      version: 1,
+      forms: {
+        ...doc.forms,
+        full: {
+          enabled: true,
+          slots: { ...doc.forms.full.slots, left: 'launch:', right: 'hotkey:  ' },
+        },
+      },
+    });
+    expect(out.full.slots.left).toBeNull();
+    expect(out.full.slots.right).toBeNull();
+  });
+
   it('r7_unknown_forms_are_ignored', () => {
     /* 规则 7：未来版本加了 `bubble`，老版本读到它必须静默忽略（不报错、不崩） */
     const doc = validDoc();

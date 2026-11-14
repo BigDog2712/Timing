@@ -32,6 +32,7 @@
     "patina-host-bridge",
     "patina-host-settings",
     "host-theme-read",
-    "patina-host-data"
+    "patina-host-data",
+    "dialog:allow-open"
   ]
 }

@@ -13,6 +13,9 @@ pub mod appdata_migrate;
 pub mod db;
 /* [V0.11.15] 数据根可配：指针文件（`data-root.json`）与剩余空间预检。 */
 pub mod disk_space;
+/* [0.13] 手柄「发送快捷键」：VK 序列 → SendInput。桌面独占（手机没有可发的全局按键）。 */
+#[cfg(desktop)]
+pub mod hotkey_send;
 pub mod md_backup;
 /* 备份目录的读侧（列表 / 读取 / 名字解析）：从 `md_backup` 拆出来的，只为行数。 */
 pub mod md_backup_store;

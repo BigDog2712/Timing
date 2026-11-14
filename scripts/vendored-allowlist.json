@@ -1332,6 +1332,36 @@
       "change": "modified",
       "reason": "[0.13] 调色盘 head 加「完成」确认键（esc 与它共用 closePopover 收尾）",
       "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsHandleCard.tsx",
+      "change": "modified",
+      "reason": "[0.13] 手柄卡支持自定义绑定：下拉新增「启动应用…」（原生选文件）与「发送快捷键…」（录制框），已配的自定义绑定也列进选项",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsHotkeyRecorder.tsx",
+      "change": "added",
+      "reason": "[0.13] 快捷键录制框：捕获阶段吞掉按键、组合键预览、单键不许确认（安全护栏）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsHandleCard.test.tsx",
+      "change": "modified",
+      "reason": "[0.13] 自定义绑定判据：已配绑定出现在下拉 / 选文件写入 launch / 取消不写 / 录制写入 hotkey / 单键不许确认",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/settings-handles.css",
+      "change": "modified",
+      "reason": "[0.13] 录制框预览区与卡内红字（data-tone=error）样式",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/infra/insight/windows/foreground.rs",
+      "change": "modified",
+      "reason": "[0.13] 前台观测顺手记下「最近的外部前台窗口」（排除本进程），供手柄发快捷键时抢回焦点",
+      "owner": "software-engineer"
     }
   ]
 }

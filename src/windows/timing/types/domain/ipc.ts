@@ -286,4 +286,15 @@ export interface IpcApi {
   getMigrationInfo(): Promise<MigrationInfo>;
   /** 资源管理器打开旧数据目录；目录不存在返回 `IO_ERROR`，**不创建**目录 */
   openLegacyDir(): Promise<void>;
+
+  /* [0.13] 手柄自定义动作。`vks` 必须是已排好序的 VK 序列（`shared/hotkey.ts::hotkeyToVirtualKeys`） */
+  runHandleCustomAction(params: HandleCustomActionParams): Promise<void>;
 }
+
+/**
+ * 手柄自定义动作的载荷（[0.13]，与 Rust `HandleCustomAction` 逐字对齐）。
+ * 判别键 `kind`：`launch` 带 `path`，`hotkey` 带 `vks`（Win32 VK 序列，1..=8 个）。
+ * 嵌一层 `action` 是必需的：Rust 侧是 `tag = "kind"` 的枚举，摊平会被 `deny_unknown_fields` 拒掉。
+ */
+export type HandleCustomActionParams =
+  | { action: { kind: 'launch'; path: string } } | { action: { kind: 'hotkey'; vks: number[] } };

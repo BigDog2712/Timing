@@ -9,7 +9,7 @@ import type {
   AccentColors,
   AccentSetParams,
   CloseNoteWindowParams,
-  CreateItemParams,
+  CreateItemParams, HandleCustomActionParams,
   Item,
   ItemIdParams,
   ItemAppBindParams, ItemAppBinding, ItemAppKeyParams,
@@ -207,7 +207,6 @@ export const ipc: IpcApi = {
   toggleWindow: () => call<void>('toggle_window'),
   saveWindowPosition: (params: SaveWindowPositionParams) => call<void>('save_window_position', { x: params.x, y: params.y }),
   quitApp: () => call<void>('quit_app'),
-
   /* ---- [V0.2.0] 待办域 ---- */
   todoCreate: (params: TodoCreateParams) => call<Todo>('todo_create', {
       title: params.title,
@@ -297,4 +296,5 @@ export const ipc: IpcApi = {
   /* ---- 迁移可见性 [V0.5.0]（命令 65 → 67，ADR-037） ---- */
   getMigrationInfo: () => call<MigrationInfo>('get_migration_info'),
   openLegacyDir: () => call<void>('open_legacy_dir'),
+  runHandleCustomAction: (params: HandleCustomActionParams) => call<void>('run_handle_custom_action', params),
 };
