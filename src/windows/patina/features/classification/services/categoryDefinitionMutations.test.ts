@@ -93,10 +93,17 @@ describe("buildDeleteCategoryBatchMutations", () => {
     expect(mutations.filter((row) => row.key.startsWith("__app_override::")).length).toBe(3);
   });
 
-  it("d03_builtin_categories_produce_no_mutations_at_all", () => {
-    /* 内置 11 个分类不可删（`other` 尤其不能：它是所有回落的目标） */
-    for (const builtin of ["other", "browser", "ai"] as const) {
-      expect(buildDeleteCategoryBatchMutations(builtin, overrides)).toEqual([]);
+  it("d03_uncategorised_is_the_only_builtin_that_cannot_be_deleted", () => {
+    /* `other` 是所有回落的目标：删了它，"回到未分类"就无处可去 */
+    expect(buildDeleteCategoryBatchMutations("other", overrides)).toEqual([]);
+    /* 其余内置分类可删：成员回落 + 只登记 `__deleted_category::`（它没有定义可删） */
+    for (const builtin of ["browser", "ai"] as const) {
+      const mutations = buildDeleteCategoryBatchMutations(builtin, overrides);
+      const byKey = new Map(mutations.map((row) => [row.key, row.value]));
+      expect(byKey.get(`__deleted_category::${builtin}`), "内置分类没登记已删除").not.toBeNull();
+      expect(byKey.has(`__custom_category::${builtin}`), "内置分类没有定义可删").toBe(false);
+      expect(byKey.get(`__category_label_override::${builtin}`)).toBeNull();
+      expect(byKey.get(`__category_color_override::${builtin}`)).toBeNull();
     }
   });
 });

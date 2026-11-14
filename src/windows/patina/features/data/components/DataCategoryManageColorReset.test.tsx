@@ -9,23 +9,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * `DataAppEditCategoryManager` 把「恢复默认颜色」（`RotateCcw`）接到
  * `onApplyColor(category, null)`，写盘侧 `buildSaveCategoryColorOverrideMutations(category, null)`
  * 也确实支持"把覆盖删掉"（写 `value: null`）。断在中间：
- * `DataAppEditDialog` 的回调写成了
+ * 宿主把回调写成了
  *
  *     onApplyColor={(category, color) => { if (color) void state.recolorCategory(category, color); }}
  *
  * `if (color)` 把 `null` 过滤掉了 —— 于是用户点「恢复默认颜色」**什么都不发生**，也没有任何提示。
- * 这是本轮唯一一处"新做的按钮是死的"，所以单独钉一个文件。
  *
- * 期望行为原先写成 `it.fails`（那时实现不满足）。**[已修复 D-5]**：`onApplyColor` 不再
- * 用 `if (color)` 过滤，`null` 会一路走到 `buildSaveCategoryColorOverrideMutations`，
- * 所以 cr02 / cr03 现在是正常用例。
+ * ## [本轮] 宿主换成「管理分类」弹窗
+ *
+ * 这条接线原来挂在 `DataAppEditDialog`（分类管理曾长在它里面）。现在那段搬到了
+ * `DataCategoryManageDialog`，所以判据也跟着搬 —— 留在旧宿主上会变成"测一个不存在的
+ * 区域"，`querySelector` 返回 null，用例红得莫名其妙（或者更糟：被改成 `if` 判空而永远绿）。
  */
 const h = vi.hoisted(() => ({
   loadBootstrap: vi.fn(),
   invalidateBootstrapCache: vi.fn(),
   saveAppOverride: vi.fn(async (_exe: string, _override: unknown): Promise<void> => undefined),
   saveWebDomainOverride: vi.fn(async (): Promise<void> => undefined),
-  listItems: vi.fn(),
   commitMutations: vi.fn(async (_mutations: unknown): Promise<void> => undefined),
 }));
 
@@ -37,17 +37,12 @@ vi.mock("../../classification/services/classificationService.ts", () => ({
     saveWebDomainOverride: h.saveWebDomainOverride,
   },
 }));
-vi.mock("../../dashboard/services/appItemBinding.ts", () => ({
-  listAppItemBindingOptions: h.listItems,
-}));
 vi.mock("../../../platform/persistence/classificationSettingsGateway.ts", () => ({
   commitClassificationSettingMutations: h.commitMutations,
 }));
 
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
-import DataAppEditDialog from "./DataAppEditDialog.tsx";
-
-const APP = { exeName: "code.exe", displayName: "Code", category: "development" as const, iconUrl: undefined };
+import DataCategoryManageDialog from "./DataCategoryManageDialog.tsx";
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -62,23 +57,16 @@ async function mount() {
   await act(async () => {
     root?.render(createElement(LocaleProvider, {
       locale: "zh-CN",
-      children: createElement(DataAppEditDialog, { app: APP, onClose: () => {} }),
+      children: createElement(DataCategoryManageDialog, { open: true, onClose: () => {} }),
     }));
   });
   await flush();
 }
 
-/**
- * 分类行上的第一个色块触发器。
- *
- * [本轮] 必须限定在 `.qp-category-management-grid`（= 分类行那一栏）里找：新建表单
- * 也带一颗色块（新建时选颜色），它排在行**前面**且没有「恢复默认颜色」—— 在整段里取
- * 第一颗会取到它，于是点击什么都不会发生（用例变成永假的假红）。
- */
+/** 分类行上的第一个色块触发器（限定在分类格栅里：新建行那颗色块没有「恢复默认颜色」） */
 function firstColorTrigger(): HTMLButtonElement | null {
-  const sections = Array.from(document.body.querySelectorAll<HTMLElement>(".qp-app-edit-section"));
-  const manage = sections[sections.length - 1];
-  return manage?.querySelector<HTMLButtonElement>(".qp-category-management-grid .qp-color-trigger") ?? null;
+  const surface = document.body.querySelector<HTMLElement>(".qp-category-manage-dialog");
+  return surface?.querySelector<HTMLButtonElement>(".qp-category-management-grid .qp-color-trigger") ?? null;
 }
 
 /** 打开色块弹层后点「恢复默认颜色」（弹层 actions 区的第一颗图标键） */
@@ -106,8 +94,6 @@ beforeEach(() => {
     loadedPersistedCategoryIds: [],
     loadedDeletedCategories: [],
   });
-  h.listItems.mockReset();
-  h.listItems.mockResolvedValue([{ id: 7, name: "写代码", color: "" }]);
   h.commitMutations.mockReset();
   h.commitMutations.mockResolvedValue(undefined);
   container = document.createElement("div");

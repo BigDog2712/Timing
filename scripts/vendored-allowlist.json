@@ -110,12 +110,6 @@
       "owner": "software-engineer"
     },
     {
-      "path": "src/windows/patina/features/data/components/DataAppEditColorReset.test.tsx",
-      "change": "added",
-      "reason": "QA 独立复核补测：分类管理区「恢复默认颜色」的接线（D-5：弹窗层 onApplyColor 用 if (color) 把 null 过滤掉，点了一点反应都没有）",
-      "owner": "software-qa-engineer"
-    },
-    {
       "path": "src/windows/patina/features/data/components/DataAppEditDialog.test.tsx",
       "change": "added",
       "reason": "应用设置弹窗的集成用例（无 app 不渲染 / 三区渲染与主分类标记 / 保存把主分类与事项绑定一起写回 / 读取失败时保存按钮不可用并给出错误文案），锁住 categories 与 itemBindings 不会被白名单重建抹掉",
@@ -1145,6 +1139,30 @@
       "path": "src-tauri/src/services/insight/data/attribution/slice_device_tests.rs",
       "change": "added",
       "reason": "设备维度判据 2 条：双端并行两段各带 device_id、覆盖分支改分类不改设备。从 slice_tests.rs 拆出（300 行硬限）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/classification/categoryTokens.ts",
+      "change": "modified",
+      "reason": "新增 isDeletableCategory：面板删除键与写库 builder 共用同一判据，边界是「未分类」不可删（它是所有回落的目标）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/categoryAdminCopy.ts",
+      "change": "modified",
+      "reason": "回落文案统一成界面上的分类名「未分类」（原文写「其他」，与列表里那一行不同名）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/services/categoryDefinitionMutations.test.ts",
+      "change": "modified",
+      "reason": "d03 由「内置一律不可删」改判为「只有 other 不可删」，并钉住内置删除写的是 __deleted_category:: 而非定义",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataCategoryManageColorReset.test.tsx",
+      "change": "added",
+      "reason": "「恢复默认颜色」的接线判据随宿主一起搬到 DataCategoryManageDialog（原文件按旧宿主命名）",
       "owner": "software-engineer"
     }
   ]

@@ -33,6 +33,8 @@ export interface AppEditCopy {
   manageAction: string;
   /** 独立弹窗顶部那句话：这个弹窗能做什么、删了会怎样 */
   manageHint: string;
+  /** 「已删除」那一行前面的说明（这些分类只能从这里恢复） */
+  deletedHint: string;
   /** 分类管理里每行的用量：多少个应用/域名正指着它（判断删除影响面） */
   usageCount: (count: number) => string;
   /**
@@ -48,7 +50,7 @@ export const APP_EDIT_COPY: Record<Locale, AppEditCopy> = {
   "zh-CN": {
     title: "应用设置",
     categories: "分类",
-    categoriesHint: "可勾选多个分类，第一个为主分类。",
+    categoriesHint: "可勾选多个分类，第一个为主分类。分类的增删改在「分类」页的「管理分类」里。",
     primaryBadge: "主",
     setPrimary: "设为主分类",
     items: "绑定事项",
@@ -58,7 +60,8 @@ export const APP_EDIT_COPY: Record<Locale, AppEditCopy> = {
     followPrimary: "跟随主分类",
     manage: "分类管理",
     manageAction: "管理分类",
-    manageHint: "新建、改名、换色、删除都在这里。删除只对自定义分类开放：内置分类不能删，该分类下的应用会回到「其他」。",
+    manageHint: "新建、改名、换色、删除都在这里。内置分类也能删，只有「未分类」不行；删掉的分类在最下面可以恢复，其下的应用会回到「未分类」。",
+    deletedHint: "已删除，点一下恢复：",
     usageCount: (count) => `${count} 个在用`,
     createColorHint: "不选色则按调色板自动取色（色块里现在是预览色，不会被记成你的选择）",
     loadFailed: "读取这个应用的设置失败",
@@ -67,7 +70,7 @@ export const APP_EDIT_COPY: Record<Locale, AppEditCopy> = {
   "en-US": {
     title: "App settings",
     categories: "Categories",
-    categoriesHint: "Pick any number of categories; the first one is primary.",
+    categoriesHint: "Pick any number of categories; the first one is primary. Create, rename and delete them under Manage categories on the Categories page.",
     primaryBadge: "Primary",
     setPrimary: "Make primary",
     items: "Bound items",
@@ -77,7 +80,8 @@ export const APP_EDIT_COPY: Record<Locale, AppEditCopy> = {
     followPrimary: "Follow primary",
     manage: "Manage categories",
     manageAction: "Manage categories",
-    manageHint: "Create, rename, recolor and delete here. Only custom categories can be deleted; apps in a deleted category fall back to “Other”.",
+    manageHint: "Create, rename, recolor and delete here. Built-in categories can be deleted too — only “Other” cannot; deleted ones can be restored at the bottom, and their apps fall back to “Other”.",
+    deletedHint: "Deleted — click to restore:",
     usageCount: (count) => `${count} in use`,
     createColorHint: "Leave the swatch alone and the palette picks the colour (what you see is a preview, not your choice)",
     loadFailed: "Could not read the settings for this app",
@@ -86,7 +90,7 @@ export const APP_EDIT_COPY: Record<Locale, AppEditCopy> = {
   "ru-RU": {
     title: "Настройки приложения",
     categories: "Категории",
-    categoriesHint: "Можно выбрать несколько категорий; первая — основная.",
+    categoriesHint: "Можно выбрать несколько категорий; первая — основная. Создание, переименование и удаление — в «Управлении категориями» на странице категорий.",
     primaryBadge: "Осн.",
     setPrimary: "Сделать основной",
     items: "Связанные дела",
@@ -96,7 +100,8 @@ export const APP_EDIT_COPY: Record<Locale, AppEditCopy> = {
     followPrimary: "Как основная",
     manage: "Управление категориями",
     manageAction: "Управление категориями",
-    manageHint: "Создавайте, переименовывайте, перекрашивайте и удаляйте здесь. Удалять можно только свои категории; приложения из удалённой перейдут в «Прочее».",
+    manageHint: "Создавайте, переименовывайте, перекрашивайте и удаляйте здесь. Встроенные категории тоже можно удалить — кроме «Прочее»; удалённые восстанавливаются внизу, их приложения переходят в «Прочее».",
+    deletedHint: "Удалены — нажмите, чтобы вернуть:",
     usageCount: (count) => `используется: ${count}`,
     createColorHint: "Не трогайте образец — цвет возьмётся из палитры (сейчас это предпросмотр, а не ваш выбор)",
     loadFailed: "Не удалось прочитать настройки приложения",
@@ -105,7 +110,7 @@ export const APP_EDIT_COPY: Record<Locale, AppEditCopy> = {
   es: {
     title: "Ajustes de la aplicación",
     categories: "Categorías",
-    categoriesHint: "Puedes marcar varias categorías; la primera es la principal.",
+    categoriesHint: "Puedes marcar varias categorías; la primera es la principal. Crear, renombrar y eliminar se hace en Gestionar categorías, en la página de categorías.",
     primaryBadge: "Princ.",
     setPrimary: "Marcar como principal",
     items: "Asuntos vinculados",
@@ -115,7 +120,8 @@ export const APP_EDIT_COPY: Record<Locale, AppEditCopy> = {
     followPrimary: "Seguir la principal",
     manage: "Gestionar categorías",
     manageAction: "Gestionar categorías",
-    manageHint: "Crea, renombra, recolorea y elimina aquí. Solo se pueden eliminar las categorías propias; las aplicaciones de una categoría eliminada pasan a «Otros».",
+    manageHint: "Crea, renombra, recolorea y elimina aquí. Las categorías integradas también se pueden eliminar — salvo «Otros»; las eliminadas se restauran abajo, y sus aplicaciones pasan a «Otros».",
+    deletedHint: "Eliminadas: pulsa para restaurar:",
     usageCount: (count) => `${count} en uso`,
     createColorHint: "Si no eliges color, la paleta lo asigna sola (lo que ves es una vista previa, no tu elección)",
     loadFailed: "No se pudo leer la configuración de esta aplicación",

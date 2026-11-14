@@ -190,6 +190,22 @@ export function isAppCategory(category: string): category is AppCategory {
   return isSeededCategory(category) || isExtendedCategory(category);
 }
 
+/**
+ * 这个分类能不能从分类列表里删掉（唯一入口：面板的删除键与写库的 builder 都读它）。
+ *
+ * 三条边界，各自都有代价：
+ *   · 自定义分类（`custom:`）—— 删的是**定义**，成员回落；
+ *   · 内置分类 —— 删的只是它的"可选项"身份（`__deleted_category::`），名字/颜色覆盖一起清，
+ *     成员同样回落；**不删定义**，因为定义根本不存在（它是代码里的 token）；
+ *   · `other`（未分类）**永远不可删** —— 它是所有回落的目标，删了之后"回落"无处可去，
+ *     那些应用会变成"分类指向一个不存在的键"，比不删更糟。
+ * `system` / `anonymous` 不在 `USER_ASSIGNABLE_CATEGORIES` 里，界面见不到，这里一并挡掉。
+ */
+export function isDeletableCategory(category: string): boolean {
+  if (isExtendedCategory(category)) return true;
+  return isSeededCategory(category) && category !== "other" && category !== "system";
+}
+
 export function getCategoryToken(category: AppCategory, uiText: UiText): CategoryToken {
   if (category === "anonymous") return { label: uiText.common.anonymousActivity, color: OTHER_CATEGORY_FIXED_COLOR };
   if (category === "system") {

@@ -31,11 +31,11 @@ import { type ObservedWebDomainCandidate, type WebDomainOverride } from "../../.
 const APP_OVERRIDE_KEY_PREFIX = "__app_override::";
 const WEB_DOMAIN_OVERRIDE_KEY_PREFIX = "__web_domain_override::";
 const LEGACY_AUTO_CLASSIFICATION_MIGRATION_KEY = "__classification_manual_confirmation_migration::v1";
-const CATEGORY_COLOR_OVERRIDE_KEY_PREFIX = "__category_color_override::";
+export const CATEGORY_COLOR_OVERRIDE_KEY_PREFIX = "__category_color_override::";
 export const CATEGORY_LABEL_OVERRIDE_KEY_PREFIX = "__category_label_override::";
-const CATEGORY_DEFAULT_COLOR_ASSIGNMENT_KEY_PREFIX = "__category_default_color_assignment::";
+export const CATEGORY_DEFAULT_COLOR_ASSIGNMENT_KEY_PREFIX = "__category_default_color_assignment::";
 export const CATEGORY_DEFINITION_KEY_PREFIX = "__custom_category::";
-const DELETED_CATEGORY_KEY_PREFIX = "__deleted_category::";
+export const DELETED_CATEGORY_KEY_PREFIX = "__deleted_category::";
 const USER_ASSIGNABLE_CATEGORY_SET = new Set<string>(USER_ASSIGNABLE_CATEGORIES);
 
 export interface ObservedAppCandidate {
@@ -555,7 +555,7 @@ export function parsePersistedDeletedCategories(
   return Array.from(categories);
 }
 
-function buildSaveDeletedCategoryMutations(
+export function buildSaveDeletedCategoryMutations(
   category: AppCategory,
   deleted: boolean,
 ): ClassificationSettingMutation[] {

@@ -8,23 +8,16 @@ import DataCategoryManagePanel from "./DataCategoryManagePanel.tsx";
 /**
  * 独立打开的「分类管理」弹窗（数据页 → 分类 tab →「管理分类」/ 双击分类行）。
  *
- * ## 为什么这件事原来没有门
+ * ## [本轮] 全站唯一的分类管理入口
  *
- * 分类的增删改查早就实现了，但只长在「应用设置」弹窗（双击应用趋势的一行）里：
- * 想删一个自己建错的分类，得先去应用 tab 找一个"恰好属于它"的应用、双击它、再往下滚。
- * 分类 tab 上明明列着全部分类，却对它们什么都做不了 —— 这就是用户提的那条。
- *
- * ## 复用而不是复制
- *
- * 内容整段是 `DataCategoryManagePanel`（和应用设置弹窗里的第三段是**同一个组件**），
- * 所以两处永远长得一样、走同一套写路径（`useAppEditCategoryAdmin` →
- * `commitClassificationSettingMutations`），不存在"这里能删、那里删不掉"的分叉。
+ * 它原来只是「应用设置」弹窗第三段的第二扇门；现在应用设置里那段摘掉了，分类的增删改
+ * **只有这一个地方**能做。理由：那是"一处配置"，不该塞进"给某个应用挑分类"的弹层里。
  *
  * ## 删除的影响面
  *
- * 每行右侧的「N 个在用」就是影响面；删除确认框里还会再写一遍「该分类下的应用会回到「其他」」
- * 和同一份用量读数。内置 11 类**没有删除键**（`isExtendedCategory` 为假），`other` 尤其不能删
- * ——它是所有回落的目标。
+ * 每行右侧的「N 个在用」就是影响面；删除确认框里还会再写一遍「该分类下的应用会回到「未分类」」
+ * 和同一份用量读数。**内置分类也能删**（只是从可选项里移除，历史记录一条不动），
+ * 唯一不能删的是 `other` ——它是所有回落的目标。删掉的内置分类在最下面一行可以恢复。
  */
 export default function DataCategoryManageDialog({
   open,
@@ -77,12 +70,19 @@ function DataCategoryManageDialogSurface({
           <DataCategoryManagePanel
             options={state.options}
             usage={state.usage}
+            deletedOptions={state.deletedOptions}
             disabled={state.managing}
             managing={state.managing}
-            labels={{ title: copy.manage, usage: copy.usageCount, createColorHint: copy.createColorHint }}
+            labels={{
+              title: copy.manage,
+              usage: copy.usageCount,
+              createColorHint: copy.createColorHint,
+              deletedHint: copy.deletedHint,
+            }}
             onCreate={(label, color) => { void state.createCategory(label, color); }}
             onRename={state.renameCategory}
             onDelete={(category) => { void state.deleteCategory(category); }}
+            onRestore={(category) => { void state.restoreCategory(category); }}
             /* `null` = 恢复默认色（写 `value: null` = 删掉覆盖），不能当"没选色"过滤掉 */
             onApplyColor={(category, color) => { void state.recolorCategory(category, color); }}
             dialogsElement={state.dialogsElement}

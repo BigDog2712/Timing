@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { AppCategory, UserAssignableAppCategory } from "../../../shared/classification/categoryTokens.ts";
 import type { AppOverride } from "../../../shared/classification/processMapper.ts";
@@ -25,16 +25,18 @@ import {
   type AppEditDraft,
 } from "../services/appEditDraft.ts";
 import { buildAppEditCategoryOptions, collectAppEditCategoryUsage } from "../services/categoryCatalog.ts";
-import {
-  useAppEditCategoryAdmin,
-  type AppEditCategoryOption,
-} from "./useAppEditCategoryAdmin.ts";
+import type { AppEditCategoryOption } from "./useAppEditCategoryAdmin.ts";
 
 export type { AppEditCategoryOption };
 
 /**
- * 「应用设置」弹窗的**读取 + 保存 + 草稿**编排（分类定义的增删改在
- * `useAppEditCategoryAdmin`，组件只画）。
+ * 「应用设置」弹窗的**读取 + 保存 + 草稿**编排（组件只画）。
+ *
+ * ## [本轮] 分类定义的增删改不在这里了
+ *
+ * 弹窗里那段「分类管理」搬去了分类趋势页的「管理分类」（`DataCategoryManageDialog`），
+ * 对应的 `useAppEditCategoryAdmin` 也一并摘掉：一个没有消费方的写入口，就是一条随时
+ * 能把用户分类删掉、却没有任何界面在用的暗路。现在本 hook 只碰**这一个应用**的 override。
  *
  * ## 关闭即丢弃，不弹"未保存"确认
  *
@@ -92,7 +94,6 @@ export interface AppEditDialogState {
   loading: boolean;
   loadFailed: boolean;
   saving: boolean;
-  managing: boolean;
   error: string | null;
   draft: AppEditDraft;
   dirty: boolean;
@@ -106,13 +107,6 @@ export interface AppEditDialogState {
   toggleItem: (itemId: number) => void;
   assignItemCategory: (itemId: number, category: UserAssignableAppCategory | undefined) => void;
   save: () => void;
-  createCategory: (label: string, color: string | null) => Promise<void>;
-  renameCategory: (category: AppCategory, label: string) => Promise<void>;
-  /** `null` = 恢复默认色（写 `value: null`），不是"什么都不做" */
-  recolorCategory: (category: AppCategory, color: string | null) => Promise<void>;
-  deleteCategory: (category: AppCategory) => Promise<void>;
-  /** `useQuietDialogs` 的提示框 / 确认框节点（新建分类、删除确认） */
-  dialogsElement: ReactNode;
 }
 
 export function useAppEditDialog({
@@ -136,7 +130,6 @@ export function useAppEditDialog({
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [managing, setManaging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState<AppOverride | null>(null);
   const [draft, setDraft] = useState<AppEditDraft>({ categories: [], itemBindings: [] });
@@ -188,29 +181,6 @@ export function useAppEditDialog({
     };
   }, [applyBootstrap, copy.loadFailed, target]);
 
-  const refreshBootstrap = useCallback(async () => {
-    /* 必须作废缓存：`classificationBootstrapCache` 会把"没有新分类"的那一份还回来 */
-    ClassificationService.invalidateBootstrapCache();
-    applyBootstrap(await ClassificationService.loadClassificationBootstrap());
-  }, [applyBootstrap]);
-
-  const admin = useAppEditCategoryAdmin({
-    categoryOptions,
-    categoryUsage,
-    refreshBootstrap,
-    onCreated: (category) => {
-      /* 新建完直接勾上：用户点"新建分类"的意图就是"把这件事归到一个新分类" */
-      setDraft((prev) => toggleDraftCategory(prev, category));
-    },
-    onDeleted: (category) => setDraft((prev) => (
-      prev.categories.includes(category as UserAssignableAppCategory)
-        ? toggleDraftCategory(prev, category as UserAssignableAppCategory)
-        : prev
-    )),
-    onError: setError,
-    onManagingChange: setManaging,
-  });
-
   const save = useCallback(() => {
     if (busyRef.current || saving || loadFailed) return;
     busyRef.current = true;
@@ -238,7 +208,6 @@ export function useAppEditDialog({
     loading,
     loadFailed,
     saving,
-    managing,
     error,
     draft,
     dirty,
@@ -253,10 +222,5 @@ export function useAppEditDialog({
     toggleItem: (itemId) => setDraft((prev) => toggleDraftItem(prev, itemId)),
     assignItemCategory: (itemId, category) => setDraft((prev) => assignDraftItemCategory(prev, itemId, category)),
     save,
-    createCategory: admin.createCategory,
-    renameCategory: admin.renameCategory,
-    recolorCategory: admin.recolorCategory,
-    deleteCategory: admin.deleteCategory,
-    dialogsElement: admin.dialogsElement,
   };
 }

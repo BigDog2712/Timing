@@ -43,10 +43,12 @@ vi.mock("../../classification/services/classificationStore.ts", async (importOri
 import DataCategoryManageDialog from "./DataCategoryManageDialog.tsx";
 import {
   bootstrapFixture,
+  categoryRow,
   committedRows,
   confirmButton,
   createTestContainer,
   deleteButton,
+  flush,
   manageDialog,
   mount,
   renameButton,
@@ -125,12 +127,14 @@ describe("③ 改名 / 改色 / 删除", () => {
     expect(row?.value).toBeNull();
   });
 
-  it("cm11_delete_is_offered_only_for_custom_categories", async () => {
+  it("cm11_delete_is_offered_for_every_category_except_uncategorised", async () => {
     await mount(root!, createElement(DataCategoryManageDialog, { open: true, onClose: () => undefined }));
     expect(deleteButton(CUSTOM), "自定义分类没有删除键").not.toBeNull();
-    /* 内置 11 类的定义不能删（`other` 更是所有回落的目标） */
-    expect(deleteButton("development"), "内置分类不许有删除键").toBeNull();
-    expect(deleteButton("design"), "内置分类不许有删除键").toBeNull();
+    /* [本轮] 内置分类也能删（从可选项里移除，历史不动）—— 用户要的就是这个 */
+    expect(deleteButton("development"), "内置分类应该能删了").not.toBeNull();
+    expect(deleteButton("design"), "内置分类应该能删了").not.toBeNull();
+    /* 唯一例外：「未分类」是所有回落的目标，删了之后回落无处可去 */
+    expect(deleteButton("other"), "「未分类」绝不能删").toBeNull();
     /* 查：每行的用量读数就是删除影响面 */
     expect(manageDialog()?.querySelector(`[data-category="${CUSTOM}"]`)?.textContent).toContain("1 个在用");
   });
@@ -139,10 +143,10 @@ describe("③ 改名 / 改色 / 删除", () => {
     await mount(root!, createElement(DataCategoryManageDialog, { open: true, onClose: () => undefined }));
     await act(async () => { deleteButton(CUSTOM)?.click(); });
     await act(async () => { await Promise.resolve(); });
-    /* 确认框里必须先说清影响面：用量 + "应用会回到「其他」" */
+    /* 确认框里必须先说清影响面：用量 + "应用会回到「未分类」"（界面上的分类名就是这个） */
     const surfaces = Array.from(document.body.querySelectorAll<HTMLElement>(".qp-dialog-surface"));
     const confirmSurface = surfaces[surfaces.length - 1];
-    expect(confirmSurface?.textContent, "删除确认里没有影响面").toContain("回到「其他」");
+    expect(confirmSurface?.textContent, "删除确认里没有影响面").toContain("回到「未分类」");
     expect(confirmSurface?.textContent).toContain("1 个在用");
     /* 没确认之前一条都不许写 */
     expect(h.commitMutations).not.toHaveBeenCalled();
@@ -161,6 +165,60 @@ describe("③ 改名 / 改色 / 删除", () => {
     expect(fallback, `成员没有回落：${written}`).toBeDefined();
     expect(String(fallback?.value)).not.toContain(CUSTOM);
     expect(String(fallback?.value)).toContain("development");
+    expect(h.invalidateBootstrapCache).toHaveBeenCalled();
+  });
+
+  it("cm13_deleting_a_builtin_hides_it_and_falls_back_its_members", async () => {
+    /* 内置分类的"删除"= 从可选项里移除（`__deleted_category::`），**不是**删定义：
+       定义在代码里（`categoryTokens`），删不掉也不该删。成员回落与自定义分类同一套。 */
+    h.loadAppOverrides.mockResolvedValue({
+      "figma.exe": { category: "design", displayName: "Figma", enabled: true, updatedAt: 1 },
+    });
+    await mount(root!, createElement(DataCategoryManageDialog, { open: true, onClose: () => undefined }));
+    await act(async () => { deleteButton("design")?.click(); });
+    await act(async () => { await Promise.resolve(); });
+    const surfaces = Array.from(document.body.querySelectorAll<HTMLElement>(".qp-dialog-surface"));
+    expect(surfaces[surfaces.length - 1]?.textContent, "删除确认里没有影响面").toContain("回到「未分类」");
+
+    await act(async () => { confirmButton()?.click(); });
+    await act(async () => { await Promise.resolve(); });
+
+    expect(h.commitMutations, "一次整批提交").toHaveBeenCalledTimes(1);
+    const rows = committedRows(h.commitMutations);
+    const keys = rows.map((row) => row.key);
+    expect(keys, `写了：${typedValue(h.commitMutations)}`).toContain("__deleted_category::design");
+    expect(keys, "内置分类没有定义可删").not.toContain("__custom_category::design");
+    /* 登记值是时间戳：`null` 在那条键上=「没删」，写成 null 就等于什么都没做 */
+    expect(rows.find((row) => row.key === "__deleted_category::design")?.value).not.toBeNull();
+    /* 名字 / 颜色覆盖一起清：日后恢复出来的是原厂分类，不是半套残留 */
+    expect(rows.find((row) => row.key === "__category_label_override::design")?.value).toBeNull();
+    expect(rows.find((row) => row.key === "__category_color_override::design")?.value).toBeNull();
+    /* 成员回落：figma.exe 只有这一条分类信息，重算之后不能再提到 design */
+    const fallback = rows.find((row) => row.key.includes("figma.exe"));
+    expect(fallback, `成员没有回落：${typedValue(h.commitMutations)}`).toBeDefined();
+    expect(String(fallback?.value)).not.toContain("design");
+    expect(h.invalidateBootstrapCache).toHaveBeenCalled();
+  });
+
+  it("cm14_a_deleted_builtin_shows_a_restore_chip_that_writes_null", async () => {
+    /* 删除是从列表里移除，所以「恢复」必须有个入口 —— 否则误点一次就只剩改库一条路 */
+    h.loadBootstrap.mockResolvedValue({ ...bootstrapFixture(), loadedDeletedCategories: ["design"] });
+    await mount(root!, createElement(DataCategoryManageDialog, { open: true, onClose: () => undefined }));
+    /* 前置自证：它确实已经从可编辑行里消失了（不是"两边都在"） */
+    expect(categoryRow("design"), "已删除的分类还留在可编辑列表里").toBeNull();
+    const restore = document.body.querySelector<HTMLButtonElement>('[data-restore-category="design"]');
+    expect(restore, "已删除的分类没有恢复入口").not.toBeNull();
+    expect(restore?.textContent?.trim().length, "恢复键上没写分类名").toBeGreaterThan(0);
+
+    await act(async () => { restore?.click(); });
+    await flush();
+
+    expect(h.commitMutations).toHaveBeenCalledTimes(1);
+    const row = committedRows(h.commitMutations).find((item) => item.key === "__deleted_category::design");
+    /* 恢复 = 把那条登记写成 null（不是空串、也不是不管） */
+    expect(row, `恢复没写对：${typedValue(h.commitMutations)}`).toBeDefined();
+    expect(row?.value).toBeNull();
+    expect(committedRows(h.commitMutations), "恢复不需要写别的东西").toHaveLength(1);
     expect(h.invalidateBootstrapCache).toHaveBeenCalled();
   });
 });

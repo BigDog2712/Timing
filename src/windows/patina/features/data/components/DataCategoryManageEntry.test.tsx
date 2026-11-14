@@ -97,11 +97,13 @@ describe("① 入口：只有分类 tab 有，点了就开弹窗", () => {
   });
 
   it("cm04_the_dialog_hint_explains_what_happens_to_deleted_categories", async () => {
-    /* 删之前必须说得清"会怎样"：内置分类不能删、被删分类下的应用回到「其他」 */
+    /* 删之前必须说得清"会怎样"：内置也能删、只有「未分类」不行、被删分类下的应用去哪 */
     await mount(root!, createElement(DataCategoryManageDialog, { open: true, onClose: () => undefined }));
     const text = manageDialog()?.textContent ?? "";
-    expect(text).toContain("内置分类不能删");
-    expect(text).toContain("回到「其他」");
+    expect(text).toContain("内置分类也能删");
+    expect(text).toContain("只有「未分类」不行");
+    expect(text, "没说清楚删掉之后还能不能找回来").toContain("可以恢复");
+    expect(text).toContain("回到「未分类」");
     expect(text).toContain("我的项目");
   });
 });

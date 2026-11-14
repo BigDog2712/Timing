@@ -4,7 +4,6 @@ import {
   createCategoryId,
   normalizeCategoryLabelInput,
   type AppCategory,
-  type UserAssignableAppCategory,
 } from "../../../shared/classification/categoryTokens.ts";
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { useQuietDialogs } from "../../../shared/hooks/useQuietDialogs.tsx";
@@ -13,6 +12,7 @@ import { CATEGORY_ADMIN_COPY } from "../../classification/categoryAdminCopy.ts";
 import {
   buildCreateCategoryDefinitionMutations,
   buildDeleteCategoryBatchMutations,
+  buildUnhideCategoryMutations,
 } from "../../classification/services/categoryDefinitionMutations.ts";
 import {
   buildSaveCategoryColorOverrideMutations,
@@ -24,8 +24,8 @@ import type { QuickClassificationCategoryOption } from "../../classification/ser
 import { APP_EDIT_COPY } from "../appEditCopy.ts";
 
 /**
- * 「应用设置」弹窗里的**分类增删改查**（从 `useAppEditDialog` 拆出来，为的是守住单文件
- * 300 行：那一半管"读一次、存一次"，这一半管"分类定义本身怎么变"）。
+ * 分类定义本身的**增删改**（[本轮] 只服务「管理分类」弹窗；应用设置弹窗里那段已摘除）。
+ * 从 `useAppEditDialog` 拆出来，为的是守住单文件 300 行。
  *
  * ## 为什么全部走既有写入路径
  *
@@ -33,8 +33,10 @@ import { APP_EDIT_COPY } from "../appEditCopy.ts";
  * 改：`buildSaveCategoryLabelOverrideMutations` / `buildSaveCategoryColorOverrideMutations`
  *     （映射页写分类色/名用的就是这两个，本轮只把它们从 `classificationStore` 导出）。
  * 删：`buildDeleteCategoryBatchMutations` —— **一定要用整批**：成员回落（含 web 域回落）
- *     与四条定义清理必须在同一个事务里。只清定义不清成员的下场，是本仓踩过的坑：
- *     被删的自定义分类会因为"某个域名还指着它"在下一次 bootstrap 里**原地复活**。
+ *     与定义清理必须在同一个事务里。只清定义不清成员的下场，是本仓踩过的坑：
+ *     被删的分类会因为"某个域名还指着它"在下一次 bootstrap 里**原地复活**。
+ *     自定义分类删的是**定义**（`__custom_category::`），内置分类只是"从可选项里移除"
+ *     （`__deleted_category::`），历史记录一条都不动。
  *
  * ## 权限
  *
@@ -51,10 +53,6 @@ interface Params {
   categoryUsage: Readonly<Record<string, number>>;
   /** 重新读一份 bootstrap 并刷新候选 / 用量（由父 hook 提供，含缓存作废） */
   refreshBootstrap: () => Promise<void>;
-  /** 新建成功的分类：父 hook 负责顺手勾进草稿 */
-  onCreated: (category: UserAssignableAppCategory) => void;
-  /** 删除成功的分类：父 hook 负责从草稿里摘掉 */
-  onDeleted: (category: AppCategory) => void;
   onError: (message: string | null) => void;
   onManagingChange: (busy: boolean) => void;
 }
@@ -66,6 +64,8 @@ export interface AppEditCategoryAdminState {
   /** [修复 D-5] `null` = 恢复默认色（写 `value: null`），不是"什么也不做" */
   recolorCategory: (category: AppCategory, color: string | null) => Promise<void>;
   deleteCategory: (category: AppCategory) => Promise<void>;
+  /** 把「已删除」的内置分类放回可选项（写 `__deleted_category::` = null） */
+  restoreCategory: (category: AppCategory) => Promise<void>;
   /** `useQuietDialogs` 的提示框 / 确认框节点（由弹窗层渲染） */
   dialogsElement: ReturnType<typeof useQuietDialogs>["dialogs"];
 }
@@ -74,8 +74,6 @@ export function useAppEditCategoryAdmin({
   categoryOptions,
   categoryUsage,
   refreshBootstrap,
-  onCreated,
-  onDeleted,
   onError,
   onManagingChange,
 }: Params): AppEditCategoryAdminState {
@@ -124,9 +122,8 @@ export function useAppEditCategoryAdmin({
       ...(color ? buildSaveCategoryColorOverrideMutations(category, color) : []),
     ]);
     await refreshBootstrap();
-    onCreated(category);
   }), [
-    adminCopy.duplicateName, categoryOptions, onCreated, onError,
+    adminCopy.duplicateName, categoryOptions, onError,
     refreshBootstrap, withManaging,
   ]);
 
@@ -160,17 +157,24 @@ export function useAppEditCategoryAdmin({
       buildDeleteCategoryBatchMutations(category, appOverrides, webDomainOverrides),
     );
     await refreshBootstrap();
-    onDeleted(category);
   }), [
     adminCopy.deleteFallback, categoryOptions, categoryUsage, copy, dialogs,
-    onDeleted, refreshBootstrap, UI_TEXT, withManaging,
+    refreshBootstrap, UI_TEXT, withManaging,
   ]);
+
+  /* 恢复只清 `__deleted_category::`（标签 / 颜色在删除时已清）：分类回到默认名字与调色板色。
+     **没有**"撤销删除"能带回用户改过的名字，界面文案里如实说一句。 */
+  const restoreCategory = useCallback((category: AppCategory) => withManaging(async () => {
+    await commitClassificationSettingMutations(buildUnhideCategoryMutations(category));
+    await refreshBootstrap();
+  }), [refreshBootstrap, withManaging]);
 
   return {
     createCategory,
     renameCategory,
     recolorCategory,
     deleteCategory,
+    restoreCategory,
     dialogsElement: dialogs.dialogs,
   };
 }

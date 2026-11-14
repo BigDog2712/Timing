@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { AppCategory } from "../../../shared/classification/categoryTokens.ts";
+import {
+  getCategoryToken,
+  isDeletableCategory,
+  type AppCategory,
+} from "../../../shared/classification/categoryTokens.ts";
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import {
   ClassificationService,
@@ -40,10 +44,13 @@ export interface CategoryAdminSessionState {
   managing: boolean;
   options: AppEditCategoryOption[];
   usage: Record<string, number>;
+  /** 已删除的内置分类（列表里看不到它们了，这是唯一的恢复入口） */
+  deletedOptions: { value: AppCategory; label: string }[];
   createCategory: (label: string, color: string | null) => Promise<void>;
   renameCategory: (category: AppCategory, label: string) => Promise<void>;
   recolorCategory: (category: AppCategory, color: string | null) => Promise<void>;
   deleteCategory: (category: AppCategory) => Promise<void>;
+  restoreCategory: (category: AppCategory) => Promise<void>;
   dialogsElement: ReturnType<typeof useAppEditCategoryAdmin>["dialogsElement"];
 }
 
@@ -61,6 +68,7 @@ export function useCategoryAdminSession({
   const [managing, setManaging] = useState(false);
   const [options, setOptions] = useState<AppEditCategoryOption[]>([]);
   const [usage, setUsage] = useState<Record<string, number>>({});
+  const [deletedOptions, setDeletedOptions] = useState<{ value: AppCategory; label: string }[]>([]);
   /* 回调可能在下次渲染时变（页面没 memo）：异步写完之后必须调**最新**的那一个 */
   const changedRef = useRef(onChanged);
   changedRef.current = onChanged;
@@ -68,6 +76,16 @@ export function useCategoryAdminSession({
   const applyBootstrap = useCallback((bootstrap: ClassificationBootstrapData) => {
     setOptions(buildAppEditCategoryOptions(bootstrap, UI_TEXT, locale));
     setUsage(collectAppEditCategoryUsage(bootstrap));
+    /* 「已删除」清单只收内置分类：自定义分类删的是定义（id 一起没了），没有可恢复的东西。
+       `isDeletableCategory` 再挡一次 `other` —— 理论上它不该出现在这份清单里，但若历史上
+       被写进过（老版本没有这道门），这里不能把它画成可恢复项。 */
+    setDeletedOptions(bootstrap.loadedDeletedCategories
+      .filter((category) => isDeletableCategory(category))
+      .map((category) => ({
+        value: category,
+        label: bootstrap.loadedCategoryLabelOverrides[category]
+          ?? getCategoryToken(category, UI_TEXT).label,
+      })));
   }, [UI_TEXT, locale]);
 
   const refreshBootstrap = useCallback(async () => {
@@ -120,9 +138,6 @@ export function useCategoryAdminSession({
     categoryOptions: options,
     categoryUsage: usage,
     refreshBootstrap,
-    /* 独立会话没有"草稿"要顺手勾上 / 摘掉：新建完它就是列表里的一行 */
-    onCreated: () => undefined,
-    onDeleted: () => undefined,
     onError: setError,
     onManagingChange: setManaging,
   });
@@ -134,6 +149,7 @@ export function useCategoryAdminSession({
     renameCategory: adminRename,
     recolorCategory: adminRecolor,
     deleteCategory: adminDelete,
+    restoreCategory: adminRestore,
     dialogsElement,
   } = admin;
 
@@ -162,16 +178,23 @@ export function useCategoryAdminSession({
     changedRef.current?.();
   }, [adminDelete]);
 
+  const restoreCategory = useCallback(async (category: AppCategory) => {
+    await adminRestore(category);
+    changedRef.current?.();
+  }, [adminRestore]);
+
   return {
     loading,
     error,
     managing,
     options,
     usage,
+    deletedOptions,
     createCategory,
     renameCategory,
     recolorCategory,
     deleteCategory,
+    restoreCategory,
     dialogsElement,
   };
 }

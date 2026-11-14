@@ -245,3 +245,25 @@
 .qp-category-manage-dialog {
   width: min(560px, 92vw);
 }
+
+/* 「已删除」那一行：恢复入口。单独成行、小一号，不能和上面的分类格栅混成一片 ——
+   它列的是"已经不在列表里"的分类，视觉上必须与可编辑行区分开。 */
+.qp-category-restore-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--qp-border-subtle);
+}
+
+.qp-category-restore-row .qp-app-edit-hint {
+  margin: 0;
+}
+
+.qp-category-restore-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}

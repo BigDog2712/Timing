@@ -6,7 +6,7 @@ import type { Locale } from "../../shared/i18n/index.ts";
  * 为什么不进 `src/shared/i18n/**`：那四个 locale 文件是按索引对齐的**位置数组**，
  * 手插一行会让其后全部文案错位（`generated/contract.ts` 还被 size 门禁冻着）。
  * 为什么不复用 `UI_TEXT.mapping.deleteCategoryDetail`：那句只说"将删除 X 分类"，
- * 没说清**分类里的应用去哪了** —— 而「应用会回到「其他」」正是用户点确认前必须知道的事
+ * 没说清**分类里的应用去哪了** —— 而「应用会回到「未分类」」正是用户点确认前必须知道的事
  * （`other` 是回落目标，内置分类不可删）。其余文案（新建分类 / 删除分类标题 / 取消 / 确认）
  * 都有现成键，直接复用，不在这里重写。
  */
@@ -21,7 +21,7 @@ export interface CategoryAdminCopy {
 export const CATEGORY_ADMIN_COPY: Record<Locale, CategoryAdminCopy> = {
   "zh-CN": {
     duplicateName: "已经有同名分类了",
-    deleteFallback: "该分类下的应用会回到「其他」。",
+    deleteFallback: "该分类下的应用会回到「未分类」。",
   },
   "en-US": {
     duplicateName: "A category with that name already exists",

@@ -1,5 +1,6 @@
 import type { ClassificationSettingMutation } from "../../../platform/persistence/classificationSettingsGateway.ts";
 import {
+  isDeletableCategory,
   isExtendedCategory,
   type AppCategory,
   type ExtendedAppCategory,
@@ -13,7 +14,9 @@ import { buildQuickAppOverride } from "./quickClassification.ts";
 import {
   buildDeleteCategoryDefinitionMutations,
   buildSaveAppOverrideMutations,
+  buildSaveDeletedCategoryMutations,
   buildSaveWebDomainOverrideMutations,
+  CATEGORY_COLOR_OVERRIDE_KEY_PREFIX,
   CATEGORY_DEFINITION_KEY_PREFIX,
   CATEGORY_LABEL_OVERRIDE_KEY_PREFIX,
 } from "./classificationStore.ts";
@@ -61,11 +64,12 @@ export function buildCreateCategoryDefinitionMutations(
  * 集合与全部事项绑定一起静默抹掉。网页一侧仍用 `buildWebDomainMappingOverride`
  * （那里没有这两组字段）。
  *
- * ## 内置分类不来这里
+ * ## 内置分类也来
  *
- * 调用方必须先判 `isExtendedCategory`：内置 11 个分类可能被"隐藏"（`deletedCategories`），
- * 但**定义不能删** —— `other` 尤其不能，它是所有回落的目标。这里再挡一次，
- * 免得将来有人从别的入口把 `other` 传进来。
+ * [本轮] 内置分类可以删（从可选项里移除），成员同样要回落 —— 否则"删了「游戏」，那几个
+ * 游戏应用还指着它"，下一次 bootstrap 又把它画回选项里（自定义分类踩过的同一个坑）。
+ * 唯一不同的是**删的东西**：内置清 `__deleted_category::`，自定义清 `__custom_category::`。
+ * `other` 仍由 `isDeletableCategory` 挡住 —— 它是所有回落的目标。
  */
 export function buildCategoryMemberFallbackMutations(
   category: AppCategory,
@@ -123,22 +127,64 @@ export function buildCategoryMemberFallbackMutations(
 }
 
 /**
- * 删除一个**自定义**分类的完整批次 = 成员回落 + 四条定义清理。
+ * 删除一个分类的完整批次 = 成员回落 + 定义/可选项清理。
  *
  * 一次 `commitClassificationSettingMutations` 提交整批（Rust 侧是同一个事务）：
  * 分两批提交的话，中间那一瞬会出现"分类没了、应用还指着它"的状态，
  * 读侧（`buildQuickClassificationCategoryOptions`）会把一个不存在的分类画成选项。
+ *
+ * ## [本轮] 内置分类也走这里了
+ *
+ * 两种分类删的东西**不一样**，但成员回落一模一样：
+ *   · 自定义 → 清 `__custom_category::` 定义（连同标签 / 默认色分配）；
+ *   · 内置   → 只登记 `__deleted_category::`（从可选项里移除），名字与颜色覆盖一起清空，
+ *     这样日后「恢复」得到的是干净的原厂分类，而不是半套残留。
+ * 判据统一走 `isDeletableCategory`（`other` 不可删：它是所有回落的目标）。
  */
 export function buildDeleteCategoryBatchMutations(
   category: AppCategory,
   appOverrides: Readonly<Record<string, AppOverride>>,
   webDomainOverrides: Readonly<Record<string, WebDomainOverride>> = {},
 ): ClassificationSettingMutation[] {
-  if (!isExtendedCategory(category)) {
+  if (!isDeletableCategory(category)) {
     return [];
   }
   return [
     ...buildCategoryMemberFallbackMutations(category, appOverrides, webDomainOverrides),
-    ...buildDeleteCategoryDefinitionMutations(category),
+    ...(isExtendedCategory(category)
+      ? buildDeleteCategoryDefinitionMutations(category)
+      : buildHideBuiltinCategoryMutations(category)),
   ];
+}
+
+/**
+ * 内置分类的"删除" = 从可选项里移除。定义（代码里的 token）不删，也删不掉。
+ *
+ * 为什么连标签 / 颜色覆盖一起清：它们描述的是"用户对这个分类的改动"，分类都不在列表里了，
+ * 留着只会让日后恢复出来的分类名字还是旧的、颜色还是旧的，而用户没有任何地方能看到
+ * 那两条残留 —— 属于"看不见的配置"。
+ */
+function buildHideBuiltinCategoryMutations(
+  category: AppCategory,
+): ClassificationSettingMutation[] {
+  return [
+    ...buildSaveDeletedCategoryMutations(category, true),
+    { key: `${CATEGORY_LABEL_OVERRIDE_KEY_PREFIX}${category}`, value: null },
+    { key: `${CATEGORY_COLOR_OVERRIDE_KEY_PREFIX}${category}`, value: null },
+  ];
+}
+
+/**
+ * 把已删除的内置分类放回可选项：只删 `__deleted_category::` 这条登记。
+ *
+ * 自定义分类不适用（它的"删除"是真的删定义，恢复等于用新 id 重建 —— 会换掉 id，
+ * 历史与成员全部对不上），所以这里只对内置分类返回非空结果。
+ */
+export function buildUnhideCategoryMutations(
+  category: AppCategory,
+): ClassificationSettingMutation[] {
+  if (isExtendedCategory(category) || !isDeletableCategory(category)) {
+    return [];
+  }
+  return buildSaveDeletedCategoryMutations(category, false);
 }

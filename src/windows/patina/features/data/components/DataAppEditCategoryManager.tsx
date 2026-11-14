@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { PencilLine, Plus, Trash2 } from "lucide-react";
 
-import { isExtendedCategory, type AppCategory } from "../../../shared/classification/categoryTokens.ts";
+import { isDeletableCategory, type AppCategory } from "../../../shared/classification/categoryTokens.ts";
 import { useLocaleText } from "../../../shared/i18n/index.ts";
 import QuietColorField from "../../../shared/components/QuietColorField.tsx";
 import QuietIconAction from "../../../shared/components/QuietIconAction.tsx";
@@ -14,10 +14,11 @@ import type { AppEditCategoryOption } from "../hooks/useAppEditDialog.ts";
  * ## 为什么不用现成的 `CategoryColorControls`
  *
  * 那个组件画的是"色块 + 名字 + 改名 + 删除"，正合适——但它**没有地方放用量**，
- * 而且对内置分类也画删除键。本区要的两件事恰好是它没有的：
+ * 而且对内置分类也画删除键（本轮之前那是不许的，所以自己排了一版）。本区要的两件事
+ * 恰好是它没有的：
  *   · **查**：每行显示"多少个应用/域名正指着它"（删除影响面）；
- *   · **删只给自定义分类**：内置 11 类可以隐藏（`deletedCategories`）但**定义不能删**，
- *     `other` 更是所有回落的目标（`buildCategoryMemberFallbackMutations` 的注释）。
+ *   · **删的边界**：内置与自定义都能删，唯独「未分类」不能（`other` 是所有回落的目标，
+ *     判据 `isDeletableCategory` 与写库 builder 同源）。
  * 所以这里自己排行，但**复用同一批原子件**（`QuietColorField` 取色、
  * `QuietIconAction` 图标键、`qp-category-management-grid` 那套版式类），
  * 外观与映射页的分类面板一致，不新造一套视觉。
@@ -181,8 +182,9 @@ export default function DataAppEditCategoryManager({
                 <div className="flex shrink-0 items-center gap-1.5">
                   {/* 查：用量读数是删除前的唯一判据，所以放在删除键旁边 */}
                   <span className="qp-app-edit-usage">{labels.usage(usage[option.value] ?? 0)}</span>
-                  {/* 删：只有自定义分类（`custom:` 前缀）才有这颗键 */}
-                  {isExtendedCategory(option.value) ? (
+                  {/* 删：内置分类与自定义分类都能删，唯一例外是「未分类」（`other` 是所有
+                      回落的目标，判据在 `isDeletableCategory`，与写库 builder 同一入口） */}
+                  {isDeletableCategory(option.value) ? (
                     <QuietIconAction
                       icon={<Trash2 size={12} />}
                       tone="danger"

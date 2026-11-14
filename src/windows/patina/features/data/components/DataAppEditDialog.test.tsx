@@ -9,7 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * 「应用设置」弹窗的**接线**判据（[本轮]）。
  *
  * 这个弹窗是本轮唯一一处"新开工的写路径"，所以这里不打样式、只打**接线**：
- *   ① 三段（分类 / 事项 / 分类管理）都真的画出来了 —— 少一段就是某次拆文件拆丢了；
+ *   ① 只有两段（分类 / 事项）—— [本轮] 「分类管理」已搬去分类趋势页，弹窗里再出现它
+ *      就是分离没做完（把"给这个应用挑分类"和"全局增删改分类"又混回一个弹层）；
  *   ② 打开时读到的 override 会落到勾选上（分类多选 + 事项绑定），主分类带「主」角标；
  *   ③ 只勾一个分类 → 保存键由灭变亮（`canSave` 依赖 dirty），保存写回的 override 里
  *      **`category` = 集合首项**、`itemBindings` **原样保留**（那正是本轮最容易踩的坑）；
@@ -141,10 +142,13 @@ describe("DataAppEditDialog", () => {
     expect(surface()).toBeNull();
   });
 
-  it("ae02_draws_the_three_sections_and_marks_the_primary_category", async () => {
+  it("ae02_draws_only_the_two_sections_and_marks_the_primary_category", async () => {
     await mount(APP);
     expect(surface()).not.toBeNull();
-    expect(sections()).toHaveLength(3);
+    /* [本轮] 只有「分类」「绑定事项」两段：分类管理整段搬去了分类趋势页的「管理分类」 */
+    expect(sections()).toHaveLength(2);
+    expect(surface()?.textContent, "分类管理又被塞回应用设置弹窗了").not.toContain("分类管理");
+    expect(surface()?.querySelector(".qp-category-management-grid"), "弹窗里不该再有分类管理的行").toBeNull();
     /* 落库态落到勾选上：development 是主分类（带「主」角标），design 也勾着 */
     expect(categoryRow("development")?.hasAttribute("data-primary")).toBe(true);
     expect(categoryRow("development")?.textContent).toContain("主");
