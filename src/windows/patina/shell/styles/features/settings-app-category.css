@@ -1,0 +1,124 @@
+/**
+ * 「应用分类候选」面板的样式。
+ *
+ * 单独一个文件而不是追加进 `settings.css`：那边有 1667 行的冻结基线（棘轮只许减），
+ * 一次性 +118 会让「这张卡」变成「整页超限」。新卡新文件，代价是 `App.css` 多一行。
+ */
+
+/* ── [0.13.x] 应用分类候选（一个应用多个分类，首位即兜底答案） ─────────────── */
+.settings-app-category-error {
+  margin-top: 10px;
+  color: var(--qp-danger-default, #c0392b);
+  font-size: var(--qp-font-size-caption);
+}
+
+.settings-app-category-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-app-category-input {
+  flex: 1 1 160px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-sm, 6px);
+  background: var(--qp-surface-sunken, transparent);
+  color: var(--qp-text-primary);
+  font: inherit;
+  font-size: var(--qp-font-size-caption);
+}
+
+.settings-app-category-input:focus-visible {
+  outline: 2px solid var(--qp-accent-default);
+  outline-offset: 1px;
+}
+
+.settings-app-category-list {
+  display: flex;
+  flex-direction: column;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-app-category-row {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 0;
+}
+
+.settings-app-category-row + .settings-app-category-row {
+  border-top: 1px solid var(--qp-border-subtle);
+}
+
+.settings-app-category-app {
+  overflow: hidden;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-app-category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-app-category-chip {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+  padding: 2px 4px 2px 8px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: 999px;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+}
+
+/* 首位 = 兜底答案。用强调色描边 + 徽章，不能只靠「排在第一」这个位置信息：
+   读屏与色觉差异下，位置本身不传达「这是我算不出时用的那个」。 */
+.settings-app-category-chip[data-first] {
+  border-color: var(--qp-accent-default);
+  color: var(--qp-text-primary);
+}
+
+.settings-app-category-chip-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-app-category-chip-badge {
+  margin-left: 2px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--qp-accent-default);
+  color: var(--qp-accent-on-default, #fff);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+.settings-app-category-chip-action {
+  padding: 0 3px;
+  border: 0;
+  background: none;
+  color: var(--qp-text-tertiary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-app-category-chip-action:hover:not(:disabled) {
+  color: var(--qp-text-primary);
+}
+
+.settings-app-category-chip-action:disabled {
+  opacity: 0.35;
+  cursor: default;
+}

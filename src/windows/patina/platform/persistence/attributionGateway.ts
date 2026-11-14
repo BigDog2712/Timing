@@ -19,9 +19,11 @@
  *
  * ## 旧 KV 的迁移
  *
- * `backfillLegacyBindings` 是设计文档 §13 的那条路：把 `__app_override::` /
- * `__app_item_binding::` 灌进新表，守卫键保证只真跑一次。CRUD 面板上线后
- * 旧 KV 写入点会被删掉，这个命令随之退役。
+ * `backfillLegacyBindings` 把 `__app_override::` / `__app_item_binding::` 灌进新表，
+ * 守卫键保证只真跑一次。之后旧页保存仍会写 KV（它的 displayName / color / track 等
+ * 字段还在用，新表没有这些列），但**分类归属**由 `appCategoryCandidateSync` 在同一刻
+ * 同步成新表的单条候选 —— 切片只读新表，所以「旧页改了分类、切片没变」这个零报错
+ * 失效被堵在保存那一刻。
  */
 import { invokeWithCommandError } from "./commandError.ts";
 

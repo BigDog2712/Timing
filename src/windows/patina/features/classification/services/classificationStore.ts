@@ -25,6 +25,7 @@ import {
 import { resolveCanonicalExecutable } from "../../../shared/classification/processNormalization.ts";
 import type { ClassificationDraftChangePlan } from "./classificationDraftState.ts";
 import { buildLegacyAutoClassificationOverrides } from "./legacyAutoClassificationMigration.ts";
+import { syncCandidatesFromOverride, syncCandidatesFromOverrideUpserts } from "./appCategoryCandidateSync.ts";
 import { type ObservedWebDomainCandidate, type WebDomainOverride } from "../../../shared/types/webActivity.ts";
 
 const APP_OVERRIDE_KEY_PREFIX = "__app_override::";
@@ -299,20 +300,16 @@ export function buildAppOverrideTransition(
 
 export async function saveAppOverride(exeName: string, override: AppOverride | null): Promise<void> {
   const canonicalExe = resolveCanonicalExecutable(exeName);
-  if (!canonicalExe) {
-    return;
-  }
-
+  if (!canonicalExe) return;
   const key = `${APP_OVERRIDE_KEY_PREFIX}${canonicalExe}`;
-
   if (!override || override.enabled === false) {
     await deleteSettingValue(key);
-    return;
+  } else {
+    await upsertSettingValue(key, ProcessMapper.toOverrideStorageValue(override));
   }
-
-  await upsertSettingValue(key, ProcessMapper.toOverrideStorageValue(override));
+  /* 切片只读新表（`app_category`），候选集必须跟着变 —— 否则旧页改了分类不生效，且零报错。 */
+  await syncCandidatesFromOverride(canonicalExe, override);
 }
-
 export function buildSaveAppOverrideMutations(
   exeName: string,
   override: AppOverride | null,
@@ -633,6 +630,8 @@ export async function commitDraftChangePlan(changePlan: ClassificationDraftChang
       key: `${APP_LINK_KEY_PREFIX}${member}`, value: JSON.stringify({ parent, previous }),
     })),
   ]);
+  /* 分类归属的权威表是 `app_category`（切片只读它）：KV 写完把候选集压成单值。 */
+  await syncCandidatesFromOverrideUpserts(changePlan.overrideUpserts);
 }
 
 export async function loadAppCatalogPage(input: RecordedAppCatalogQueryInput) {

@@ -13,6 +13,7 @@ import SettingsHandlesPanel from "./SettingsHandlesPanel";
 import SettingsInterfacePanel from "./SettingsInterfacePanel";
 import SettingsResidentPanel from "./SettingsResidentPanel";
 import SettingsTrackingPanel from "./SettingsTrackingPanel";
+import SettingsAppCategoryPanel from "./SettingsAppCategoryPanel.tsx";
 import SettingsBoardPanel from "./SettingsBoardPanel";
 import { HostGeneralPanel } from "./host/HostGeneralPanel";
 import HostHighlightCard from "./host/HostHighlightCard";
@@ -163,12 +164,10 @@ export default function Settings({
   }
 
   return (
-    /* `relative`：保存/取消搬进页级工具条后，工具条是绝对定位（`dashboard-r2.css` 的
-     * `.qp-page-toolbar` 几何），锚点必须是本页根。 */
+    /* `relative`：工具条是绝对定位（`dashboard-r2.css` 的 `.qp-page-toolbar`），锚点必须是本页根。 */
     <div className="settings-button-preview relative flex h-full w-full min-w-0 flex-col gap-4 md:gap-5">
       {dialogs}
-      {/* [本轮 T05] 页头删了，保存/取消不能丢：搬进与主界面统一的 `QuietPageToolbar`
-       * 容器（V-4b：仍是 QuietButton，只是 size compact；按钮不降级成 qp-link-btn）。 */}
+      {/* [T05] 页头删了但保存/取消不能丢：搬进 `QuietPageToolbar`（仍是 QuietButton，size compact）。 */}
       <QuietPageToolbar ariaLabel={UI_TEXT.settings.title} modifier="qp-settings-toolbar">
         <SettingsHeaderActions
           saveStatus={saveStatus}
@@ -257,6 +256,7 @@ export default function Settings({
               onTitleRecordingEnabledChange={(nextChecked) => handleChange("titleRecordingEnabled", nextChecked)}
             />
           </div>
+          <SettingsAppCategoryPanel id="s-app-categories" />
           {/* 第 4 组「数据与同步」：宿主的 md_sync（计时记录）在前，活动库备份在后。 */}
           <div id="s-sync"><HostSyncPanel /></div>
           <div id="s-backup">

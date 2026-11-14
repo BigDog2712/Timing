@@ -101,7 +101,7 @@
     "src/windows/patina/features/classification/services/classificationAppCatalog.ts": 457,
     "src/windows/patina/features/classification/services/classificationDraftState.ts": 305,
     "src/windows/patina/features/classification/services/classificationService.ts": 438,
-    "src/windows/patina/features/classification/services/classificationStore.ts": 647,
+    "src/windows/patina/features/classification/services/classificationStore.ts": 646,
     "src/windows/patina/features/data/components/Data.tsx": 1193,
     "src/windows/patina/features/data/components/DataAppTrendPanel.tsx": 505,
     "src/windows/patina/features/data/components/DataHeatmapPanel.tsx": 455,

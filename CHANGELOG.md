@@ -85,6 +85,30 @@
 - **新增 10 条用例** `services::item_tests`：断言**落库后**的 `parent_id`/`depth`，不只断言
   返回 Ok（「先插再报错」的实现也要能抓出来）。四项变异自证各自咬住唯一一条（见设计文档 §12）。
 
+### 应用分类候选：一个应用多个分类（0.12.2 并入）
+
+- **设置页新增「应用分类候选」**（`SettingsAppCategoryPanel`）：一个应用可绑多个分类并
+  调顺序，**首位 = 规则 2 的兜底答案**（事项分类不在候选集里时用它）。旧界面只能绑一个，
+  而需求里 chrome 同时是学习工具和娱乐工具 —— 这条一直缺一个入口。
+- **排序比较器与后端一字不差**（`compareAppCategory` vs `resolve_child_category` 的
+  `min_by`）：priority 升序 + 同 priority 按 key 字典序。界面若只按 priority 排，
+  「同 priority 两组谁在前」变成插入顺序的函数 —— 界面上标「首位：社交」、实际切出「娱乐」，
+  两边各自都对，零报错。
+- **前移/后移写整组重排后的 priority**：只写被移动那条会与邻居撞号（两条同 priority
+  时规则退化成字典序，用户点一次上移、下次读出来又跳回去）。已一致的条目不多写一次。
+- **旧页保存同步到新表**（`appCategoryCandidateSync`）：`saveAppOverride` 与
+  `commitDraftChangePlan` 末尾把候选集压成单条。切片只读 `app_category`，不接这一步
+  就是「界面改了分类、数据没变、零报错」。方向单向（旧 → 新），因为旧语义（单值 = 强制）
+  在候选集模型下恰好等于「候选集只有一条」，不需要再加一条「强制覆盖」规则。
+- **§13 结论改判**：上一版写「新面板上线时把两个 KV 写入点删掉」。实际删不掉 ——
+  `__app_override::` 还装 displayName / color / track，删了等于删功能。改为分层：
+  **分类归属只认 `app_category`**，KV 是旧界面的读缓存，在同一动作里同步。
+  判据也跟着改成「删光 `__app_override::*` 后切片结果不变」。
+- **样式单独成文件**（`settings-app-category.css`）：`settings.css` 是 1667 行冻结基线，
+  一次性 +118 会让整页超限。
+- **新增用例 25 条**：纯函数 13（排序/重排/追加/分组）、面板 4（首位徽章唯一、整组重排写入、
+  只写真变了的、首位禁用前移）、同步 8（压单条、删光、幂等、键归一、失败只 warn）。
+
 ### T18 · 双层时间轴 + 旧 KV 回填（同一版号并入）
 
 - **读模型** `focus_blocks/timeline.rs`：`item_timeline` 按 `item_uid` 聚块 →
@@ -119,10 +143,10 @@
 ### 账本
 
 - `size` 145 条（`schema.rs` 1887→1751、`hourly.rs` 852→629、`sqlite_pool.rs` 748→747 等向下收紧）；
-  扫描 1797 文件 / 超限占比 29.3%。为压回 300 行硬限，本轮把 `record_session.rs` 拆出
+  扫描 1805 文件 / 超限占比 29.2%。为压回 300 行硬限，本轮把 `record_session.rs` 拆出
   `record_session_split.rs`、`focus_blocks.rs` 拆成 `mod.rs` + `read.rs`、`ipc.ts` 压行。
-- `vendored` 179 条（改 65 / 增 114）；`contract` 88（+Patina 126）/ 错误码 18 / 事件 11-11。
-- `cargo test --lib` **1826 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 205 文件 / 1571 用例。
+- `vendored` 190 条（改 68 / 增 122）；`contract` 88（+Patina 126）/ 错误码 18 / 事件 11-11。
+- `cargo test --lib` **1826 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 208 文件 / 1596 用例。
 - `clippy --all-targets -D warnings` 0 诊断（`--lib` 看不到新用例的 lint：`too_many_arguments`
   与 `doc_lazy_continuation` 都是只在 `--all-targets` 下才现形的）。
 
