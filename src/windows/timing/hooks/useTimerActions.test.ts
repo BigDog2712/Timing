@@ -125,3 +125,54 @@ describe('useTimerActions.stop —— 短会话被忽略时不产生任何「已
     expect(ui.endedAt).toBeNull();
   });
 });
+
+/**
+ * [0.13 fix · 高-1] `startOrSwitch` 的回值与 `silent` 口径。
+ *
+ * 以前三处 `try/catch` 只 `notify` 就正常返回（**从不 reject**），于是自动链路
+ * （切到绑定应用就接管）既弹了红条、又把"已接管"记成成功 —— 一次失败就把那个应用
+ * 永久排除在外。回值 + `silent` 就是为这条链补的两件事：
+ *   · `silent: true` 时失败**不弹** notice（用户没点任何东西）；
+ *   · 失败返回 `false`（自动链路据此**不**记账，下一次前台变化会重试）。
+ *
+ * 变异自证：把 `if (!silent) notify(err)` 改回无条件 `notify(err)` → ta02 红；
+ * 把 `return false` 改成 `return true`（或删掉回值走 `Promise<void>`）→ ta01/ta02 红。
+ */
+describe('useTimerActions.startOrSwitch —— 自动链路（silent）与失败回值', () => {
+  beforeEach(resetState);
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('ta01_手动链路失败：弹 danger 提示并返回 false', async () => {
+    vi.spyOn(ipc, 'startTimer').mockRejectedValue(
+      new IpcError('TIMER_ALREADY_RUNNING', '已在计时中'),
+    );
+
+    const started = await grabActions().startOrSwitch(7);
+
+    expect(started).toBe(false);
+    expect(useUiStore.getState().notice).toMatchObject({ tone: 'danger' });
+  });
+
+  it('ta02_自动链路（silent）失败：不弹 notice，仍返回 false', async () => {
+    vi.spyOn(ipc, 'startTimer').mockRejectedValue(
+      new IpcError('ITEM_NOT_FOUND', '事项不存在'),
+    );
+
+    const started = await grabActions().startOrSwitch(7, { silent: true });
+
+    expect(started, '失败必须回 false，否则自动链路会记成"已接管"').toBe(false);
+    expect(useUiStore.getState().notice, '用户没点任何东西，不许弹错误').toBeNull();
+  });
+
+  it('ta03_接上了才回 true', async () => {
+    vi.spyOn(ipc, 'startTimer').mockResolvedValue({ ...RECORD, status: 'active' });
+    vi.spyOn(ipc, 'getTimerState').mockResolvedValue(IDLE_TIMER_STATE);
+
+    const started = await grabActions().startOrSwitch(7, { silent: true });
+
+    expect(started).toBe(true);
+    expect(useUiStore.getState().notice).toBeNull();
+  });
+});

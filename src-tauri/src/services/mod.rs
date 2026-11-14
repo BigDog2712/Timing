@@ -17,6 +17,17 @@ pub mod daily_status;
 pub mod item;
 /* [0.13.x] 事项 ↔ 应用绑定（校验后委托仓储）。 */
 pub mod item_app;
+/* [0.13 fix] 存量绑定的**启动补镜像**（分析窗配置表 → `item_app`）：药丸的自动接管只读
+   后面这张表，而本轮之前没有任何代码往它写过行，老用户的绑定因此完全不生效。
+   桌面独占 —— `app_key` 的归一实现与分析窗配置表都只在桌面存在。 */
+#[cfg(desktop)]
+pub mod item_app_mirror;
+#[cfg(all(test, desktop))]
+mod item_app_mirror_tests;
+/* [R1] 「解绑」的端到端边界（两处真源都清干净才不复活）：从上面那个文件分出来，
+   因为它正好 300 行（`check:size` 硬限，棘轮只许减不许增）。 */
+#[cfg(all(test, desktop))]
+mod item_app_mirror_unbind_tests;
 /* [0.13.x] 事项树（2 层硬限）与绑定的判据：断言落库后的 `parent_id`/`depth`，
    而不是只断言调用返回 Ok（两者不同步时全链路零报错）。 */
 #[cfg(test)]

@@ -3,6 +3,19 @@
  * -----------------------------------------------------------------------------
  * 组件只调用本 Hook 的动作，不直接拼装 ipc 时序；错误统一转成 uiStore.notice。
  * 撤销失败（TIMER_NO_UNDO / TIMER_ALREADY_RUNNING）必须**友好提示不崩溃**。
+ *
+ * ## 两条错误口径（[0.13 fix] · 高-1）
+ *
+ * 每个动作内部都有一对实现：`runXxx(silent)` 返回**成功与否**，对外的 `xxx()` 只是
+ * `await runXxx(false)`。差别只有一处 —— `silent` 时**不弹 notice**：
+ *
+ *   · **手动链路**（用户点了某个东西）：失败必须看得见，所以 `silent = false`；
+ *   · **自动链路**（切到绑定应用就接管，`useAppBindingAutoTimer`）：用户没点任何东西，
+ *     弹一句"开始计时失败"只会让人困惑，所以传 `silent: true`。
+ *
+ * 以前三处 `try/catch` 都只 `notify` 然后正常返回（**从不 reject**），于是自动链路
+ * 既弹了红条、又把"已接管"记成了成功 —— 一次失败就把那个应用永久排除在外，
+ * 而且没有任何提示能让人想到是绑定出了问题。回值就是为此存在的：**只有 `true` 才算接上了**。
  */
 import { useCallback, useMemo } from 'react';
 import { errorText, ipc } from '../services/ipc';
@@ -16,8 +29,8 @@ import { useUiStore } from '../stores/uiStore';
 /** 「最短记录时长」兜底：与后端 `ReferenceSettings::default().min_record_seconds` 同值 */
 const FALLBACK_MIN_RECORD_SEC = 30;
 
-/** 在途的 `start` 请求（模块级：跨组件实例共用同一个锁，见 `start` 注释） */
-let startInFlight: Promise<void> | null = null;
+/** 在途的 `runStart` 请求（模块级：跨组件实例共用同一个锁，见 `runStart` 注释） */
+let startInFlight: Promise<boolean> | null = null;
 
 export interface TimerActions {
   /** 开始计时（缺省用 lastItemId / 首个事项 / 未归类） */
@@ -37,8 +50,12 @@ export interface TimerActions {
    * 存在的理由：后端 `switch(end_and_start)` 只接受**非运行中**会话（`timer::switch` 的守卫），
    * 所以「边跑边换」必须先暂停冻结累计再分段。之前几个入口直接调 `switchTo`，运行中点击
    * 只会收到 `TIMER_ALREADY_RUNNING`，「点了没反应」的观感就是这么来的。
+   *
+   * 回值 = **这一次真的接上了吗**（`true` 才代表"当前计时已在这个事项上"）。自动链路
+   * （`useAppBindingAutoTimer`）只认它 —— 拿不到 `true` 就**不许**记"已接管"，
+   * 否则一次失败会把那个应用永久排除。`silent: true` = 失败不弹 notice（用户没点任何东西）。
    */
-  startOrSwitch: (itemId: number) => Promise<void>;
+  startOrSwitch: (itemId: number, options?: { silent?: boolean }) => Promise<boolean>;
   /** 丢弃当前会话：结束并软删除该记录（上下文菜单「丢弃本次记录」） */
   discardCurrent: () => Promise<void>;
   /**
@@ -53,13 +70,18 @@ export function useTimerActions(): TimerActions {
     useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
   }, []);
 
-  const start = useCallback(
-    async (itemId?: number) => {
-      /* [V0.11.2] 防重入：手机端双击大按钮（间隔约 120ms，IPC 往返 30~200ms）会连发两次
-         `start_timer`，第二次必然收到 TIMER_ALREADY_RUNNING —— 用户看到一条「已在计时」
-         的假报错，而界面其实已经开好了。桌面药丸有 200ms 去抖，其它入口没有。 */
+  /**
+   * `start` 的**带回值**实现。`silent` 见文件头「两条错误口径」。
+   *
+   * [V0.11.2] 防重入：手机端双击大按钮（间隔约 120ms，IPC 往返 30~200ms）会连发两次
+   * `start_timer`，第二次必然收到 TIMER_ALREADY_RUNNING —— 用户看到一条「已在计时」
+   * 的假报错，而界面其实已经开好了。桌面药丸有 200ms 去抖，其它入口没有。
+   * 并发时第二个调用方共享**第一个**的结果与提示口径（谁先到谁决定弹不弹）。
+   */
+  const runStart = useCallback(
+    async (itemId: number | undefined, silent: boolean): Promise<boolean> => {
       if (startInFlight) return startInFlight;
-      const run = (async () => {
+      const run = (async (): Promise<boolean> => {
         const items = useItemStore.getState().items;
         const lastItemId = useTimerStore.getState().state.lastItemId;
         const target = itemId ?? findItem(items, lastItemId)?.id ?? items[0]?.id ?? SYSTEM_ITEM_ID;
@@ -67,8 +89,10 @@ export function useTimerActions(): TimerActions {
           await ipc.startTimer({ itemId: target });
           await useTimerStore.getState().refresh();
           useUiStore.getState().closePanel();
+          return true;
         } catch (err) {
-          notify(err);
+          if (!silent) notify(err);
+          return false;
         }
       })();
       startInFlight = run;
@@ -80,24 +104,37 @@ export function useTimerActions(): TimerActions {
     [notify],
   );
 
-  const togglePause = useCallback(async () => {
-    const status = useTimerStore.getState().state.status;
-    try {
-      if (status === 'idle') {
-        await start();
-        return;
+  const start = useCallback(
+    async (itemId?: number) => {
+      await runStart(itemId, false);
+    },
+    [runStart],
+  );
+
+  const runTogglePause = useCallback(
+    async (silent: boolean): Promise<boolean> => {
+      const status = useTimerStore.getState().state.status;
+      if (status === 'idle') return runStart(undefined, silent);
+      try {
+        /* 先本地翻：IPC 往返那 ~30ms 里若用户立刻右键数字，`status` 还是旧值，
+           摸鱼菜单会整个吞掉（实测「暂停后 0ms 右键」约 1/8 次丢失）。 */
+        useTimerStore.getState().setStatus(status === 'running' ? 'paused' : 'running');
+        if (status === 'running') await ipc.pauseTimer();
+        else await ipc.resumeTimer();
+        await useTimerStore.getState().refresh();
+        return true;
+      } catch (err) {
+        if (!silent) notify(err);
+        await useTimerStore.getState().refresh().catch(() => undefined);
+        return false;
       }
-      /* 先本地翻：IPC 往返那 ~30ms 里若用户立刻右键数字，`status` 还是旧值，
-         摸鱼菜单会整个吞掉（实测「暂停后 0ms 右键」约 1/8 次丢失）。 */
-      useTimerStore.getState().setStatus(status === 'running' ? 'paused' : 'running');
-      if (status === 'running') await ipc.pauseTimer();
-      else await ipc.resumeTimer();
-      await useTimerStore.getState().refresh();
-    } catch (err) {
-      notify(err);
-      await useTimerStore.getState().refresh().catch(() => undefined);
-    }
-  }, [start, notify]);
+    },
+    [runStart, notify],
+  );
+
+  const togglePause = useCallback(async () => {
+    await runTogglePause(false);
+  }, [runTogglePause]);
 
   /**
    * 结束并保存。
@@ -145,42 +182,51 @@ export function useTimerActions(): TimerActions {
     [notify],
   );
 
-  const switchTo = useCallback(
-    async (itemId: number, mode: SwitchMode = 'end_and_start') => {
+  const runSwitch = useCallback(
+    async (itemId: number, mode: SwitchMode, silent: boolean): Promise<boolean> => {
       try {
         await ipc.switchItem({ itemId, mode });
         await useTimerStore.getState().refresh();
+        return true;
       } catch (err) {
-        notify(err);
+        if (!silent) notify(err);
         /* 失败也要回读：失败的可能是「暂停后分段」的第二跳，本地状态已经过期 */
         await useTimerStore.getState().refresh().catch(() => undefined);
+        return false;
       }
     },
     [notify],
   );
 
-  const startOrSwitch = useCallback(
-    async (itemId: number) => {
-      const current = useTimerStore.getState().state;
-      if (current.status === 'idle') {
-        await start(itemId);
-        return;
-      }
-      if (current.session?.itemId === itemId) {
-        /* 点的是当前这一条：跑着就什么都不做，暂停着就当「继续」 */
-        if (current.status === 'paused') await togglePause();
-        return;
-      }
-      try {
-        if (current.status === 'running') await ipc.pauseTimer();
-      } catch (err) {
-        notify(err);
-        await useTimerStore.getState().refresh().catch(() => undefined);
-        return;
-      }
-      await switchTo(itemId, 'end_and_start');
+  const switchTo = useCallback(
+    async (itemId: number, mode: SwitchMode = 'end_and_start') => {
+      await runSwitch(itemId, mode, false);
     },
-    [start, togglePause, switchTo, notify],
+    [runSwitch],
+  );
+
+  const startOrSwitch = useCallback(
+    async (itemId: number, options?: { silent?: boolean }): Promise<boolean> => {
+      const silent = options?.silent === true;
+      const current = useTimerStore.getState().state;
+      if (current.status === 'idle') return runStart(itemId, silent);
+      if (current.session?.itemId === itemId) {
+        /* 点的是当前这一条：跑着就什么都不做（本来就在计它），暂停着就当「继续」 */
+        if (current.status === 'paused') return runTogglePause(silent);
+        return true;
+      }
+      if (current.status === 'running') {
+        try {
+          await ipc.pauseTimer();
+        } catch (err) {
+          if (!silent) notify(err);
+          await useTimerStore.getState().refresh().catch(() => undefined);
+          return false;
+        }
+      }
+      return runSwitch(itemId, 'end_and_start', silent);
+    },
+    [runStart, runTogglePause, runSwitch, notify],
   );
 
   const discardCurrent = useCallback(async () => {

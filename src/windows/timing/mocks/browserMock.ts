@@ -249,6 +249,9 @@ export function createMockApi(): Record<string, (args?: any) => unknown> {
     },
     get_autostart: () => s.settings.autostartEnabled,
     show_window: () => undefined,
+    /* [0.13] 浏览器 mock 读不到真实前台窗口 → 固定 `null`（`null` 是契约里的合法值：
+       调用方按"不知道"处理，绝不当成"前台是空应用"去接管计时） */
+    get_foreground_window: () => null,
     /* 浏览器 mock：无权读真实工作区，退化成屏幕可用区（DIP 口径不严格，仅供布局不崩） */
     main_work_area: () => ({
       x: 0,

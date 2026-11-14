@@ -1,6 +1,6 @@
 //! 命令层：仅反序列化 -> 调 service -> 序列化，无业务、无 SQL。
 //!
-//! 命令名就是契约面（`lib.rs` 的 74 条注册 + `check:contract` 静态比对），所以
+//! 命令名就是契约面（`ipc_commands.rs` 的命令注册 + `check:contract` 静态比对），所以
 //! **不能**用 `#[cfg]` 把命令整条剔除。三组「桌面有实现、移动端只能给桩」的命令
 //! 改用 `#[path]` 换文件：模块名与函数名一字不变，`lib.rs` 因此零改动。
 //! 桩只回 `IO_ERROR`（见 `platform::host::desktop_only`），不新增错误码。
@@ -59,7 +59,7 @@ pub mod window_cmd;
 #[path = "window_cmd_mobile.rs"]
 pub mod window_cmd;
 
-/* 分析窗的命令面（117 条，桌面独占；与宿主 80 条共用 `ipc_commands.rs` 的一张表）。 */
+/* 分析窗的命令面（126 条，桌面独占；与宿主 90 条共用 `ipc_commands.rs` 的一张表）。 */
 #[cfg(desktop)]
 #[allow(dead_code)]
 pub mod insight;

@@ -27,6 +27,9 @@ const h = vi.hoisted(() => ({
   saveAppOverride: vi.fn(async (_exe: string, _override: unknown): Promise<void> => undefined),
   saveWebDomainOverride: vi.fn(async (): Promise<void> => undefined),
   listItems: vi.fn(),
+  loadSingleBinding: vi.fn(async () => null as number | null),
+  clearBinding: vi.fn(async (): Promise<void> => undefined),
+  syncBindings: vi.fn(async (): Promise<void> => undefined),
   commitMutations: vi.fn(async (_mutations: unknown): Promise<void> => undefined),
 }));
 
@@ -38,11 +41,20 @@ vi.mock("../../classification/services/classificationService.ts", () => ({
     saveWebDomainOverride: h.saveWebDomainOverride,
   },
 }));
+/* [0.13 fix · P0-3] 弹窗现在还会读/清 1:1 那份绑定（`__app_item_binding::<exe>`）：
+   两个入口都得给桩，否则模块里那两个导出是 undefined —— 加载分支会抛，整屏停在"加载失败"
+   （这正是本文件先前三条用例一起红的原因）。默认"没有 1:1 绑定"，各自用例再按需覆盖。 */
 vi.mock("../../dashboard/services/appItemBinding.ts", () => ({
   listAppItemBindingOptions: h.listItems,
+  loadAppItemBindingFor: h.loadSingleBinding,
+  clearAppItemBinding: h.clearBinding,
 }));
 vi.mock("../../../platform/persistence/classificationSettingsGateway.ts", () => ({
   commitClassificationSettingMutations: h.commitMutations,
+}));
+/* [R8] 镜像那个网关换成桩：要断言"先清 KV 再发全集"的**顺序**（顺序反了中途失败会复活） */
+vi.mock("../../../platform/runtime/itemAppBindingSync.ts", () => ({
+  syncHostItemAppBindings: h.syncBindings,
 }));
 
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
@@ -121,6 +133,12 @@ beforeEach(() => {
   h.saveAppOverride.mockReset();
   h.saveAppOverride.mockResolvedValue(undefined);
   h.listItems.mockReset();
+  h.loadSingleBinding.mockReset();
+  h.loadSingleBinding.mockImplementation(async () => null);
+  h.clearBinding.mockReset();
+  h.clearBinding.mockImplementation(async () => undefined);
+  h.syncBindings.mockReset();
+  h.syncBindings.mockImplementation(async () => undefined);
   h.listItems.mockResolvedValue([{ id: 7, name: "写代码", color: "" }, { id: 9, name: "看论文", color: "" }]);
   h.commitMutations.mockReset();
   h.commitMutations.mockResolvedValue(undefined);
@@ -219,6 +237,35 @@ describe("DataAppEditDialog", () => {
     expect(h.saveAppOverride).toHaveBeenCalledTimes(1);
     /* 先通知重读、再关弹窗（关掉之后再刷新会让用户看不到保存结果） */
     expect(order).toEqual(["saved", "closed"]);
+  });
+
+  /* [0.13 fix · P0-3] 渲染级的接线判据：1:1 那份绑定必须**看得见**、且取消它会清 KV。
+     纯函数判据（`ad19`/`ad20`）挡不住"忘了把 `singleBinding` 喂进去"，所以这里走一遍真弹窗。
+     变异自证：把 `useAppEditDialog` 里的 `withSingleItemBinding(...)` 摘掉 → 9 不勾；
+     把 `clearAppItemBinding(...)` 那一步删掉 → `clearBinding` 不被调用。 */
+  it("ae07_unchecking_the_1to1_binding_is_visible_and_clears_the_kv", async () => {
+    /* override 里只有 7；1:1 那份指向 9（排行卡绑的，不在 override 里） */
+    h.loadSingleBinding.mockResolvedValue(9);
+    await mount(APP);
+
+    expect(itemRow(9)?.hasAttribute("data-checked"), "1:1 那份绑定在弹窗里必须看得见")
+      .toBe(true);
+    expect(saveButton()?.disabled, "并进草稿不等于「用户改过」").toBe(true);
+
+    const checkbox = itemRow(9)?.querySelector<HTMLInputElement>("input[type='checkbox']");
+    await act(async () => { checkbox?.click(); });
+    await flush();
+    await act(async () => { saveButton()?.click(); });
+    await flush();
+
+    /* ① 宿主那一侧：发的是全集（只留 7），② KV 那份必须一起清，否则重启又被补回来 */
+    expect(h.saveAppOverride).toHaveBeenCalledTimes(1);
+    const [, saved] = h.saveAppOverride.mock.calls[0] as [string, AppOverride];
+    expect(saved.itemBindings).toEqual([{ itemId: 7, category: "design" }]);
+    expect(h.clearBinding).toHaveBeenCalledWith("code.exe");
+    /* [R8] 顺序是判据：先清 KV、再发全集。反过来的话，中途失败会让启动补镜像把行补回来 */
+    expect(h.clearBinding.mock.invocationCallOrder[0])
+      .toBeLessThan(h.syncBindings.mock.invocationCallOrder[0]);
   });
 
   it("ae06_the_trend_panel_wires_onSaved_to_its_existing_retry", async () => {

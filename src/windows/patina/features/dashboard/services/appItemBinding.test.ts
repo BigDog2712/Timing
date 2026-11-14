@@ -14,10 +14,14 @@ const g = vi.hoisted(() => ({
   commit: vi.fn(),
   loadSettingRows: vi.fn(),
   listTimingItems: vi.fn(),
+  emitHostIntent: vi.fn(async (_intent: unknown) => true),
 }));
 
 vi.mock("../../../platform/persistence/classificationSettingsGateway", () => ({
   commitClassificationSettingMutations: g.commit,
+}));
+vi.mock("../../../platform/runtime/hostIntentGateway", () => ({
+  emitHostIntent: g.emitHostIntent,
 }));
 vi.mock("../../../platform/persistence/settingsPersistence", () => ({
   loadSettingRows: g.loadSettingRows,
@@ -29,8 +33,11 @@ vi.mock("../../../platform/persistence/timingReadRepository", () => ({
 import {
   APP_ITEM_BINDING_KEY_PREFIX,
   buildAppItemBindingKey,
+  clearAppItemBinding,
   listAppItemBindingOptions,
+  loadAppItemBindingFor,
   loadAppItemBindings,
+  mirrorItemBindingsOnce,
   parseAppItemBindingRows,
   parseAppItemBindingValue,
   saveAppItemBinding,
@@ -42,7 +49,93 @@ beforeEach(() => {
   AppClassification.setAppLinks({});
   g.commit.mockReset();
   g.loadSettingRows.mockReset();
+  /* [R1] 写一条绑定现在要多读两份真源（1:1 上一值 + override）：默认"都没数据" */
+  g.loadSettingRows.mockResolvedValue([]);
   g.listTimingItems.mockReset();
+  g.emitHostIntent.mockReset();
+  g.emitHostIntent.mockResolvedValue(true);
+});
+
+/**
+ * [0.13 fix] 镜像宿主 `item_app`（用户报「启动了燕云但没开始计时」）。
+ *
+ * 这条链路断掉的症状是**零报错**：界面上"已绑定"的标记一切正常（它读的是 KV），
+ * 只有药丸那边永远查不到绑定 → 永远不接管。所以这里钉住"保存之后必须发一条镜像意图"，
+ * 以及 `appKey` 的口径（`normalizeAppKey`，与 `sessions.app_key` 同一个函数 ——
+ * 用错成"统计应用"口径会绑到一条永远读不出来的键上）。
+ */
+describe("镜像宿主 item_app（[0.13 fix]）", () => {
+  it("绑定后发一条 sync_app_item_bindings，appKey 走 normalizeAppKey 口径", async () => {
+    g.commit.mockResolvedValue(undefined);
+    await saveAppItemBinding("Code.EXE", 7);
+
+    expect(g.emitHostIntent).toHaveBeenCalledWith({
+      action: "sync_app_item_bindings",
+      appKey: "code.exe",
+      itemIds: [7],
+    });
+  });
+
+  it("清除绑定 = 空全集（宿主侧据此把该应用的行全解绑）", async () => {
+    g.commit.mockResolvedValue(undefined);
+    await saveAppItemBinding("chrome.exe", null);
+
+    expect(g.emitHostIntent).toHaveBeenCalledWith({
+      action: "sync_app_item_bindings",
+      appKey: "chrome.exe",
+      itemIds: [],
+    });
+  });
+
+  it("配置写失败就不发镜像（否则宿主绑上了、界面却报保存失败）", async () => {
+    g.commit.mockRejectedValue(new Error("db locked"));
+    await expect(saveAppItemBinding("chrome.exe", 7)).rejects.toThrow("db locked");
+    expect(g.emitHostIntent).not.toHaveBeenCalled();
+  });
+
+  it("空 exe 名不发镜像", async () => {
+    g.commit.mockResolvedValue(undefined);
+    await saveAppItemBinding("   ", 7);
+    expect(g.emitHostIntent).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 存量绑定的补镜像（[0.13 fix]）：本轮之前**没有任何代码**往宿主 `item_app` 写过行，
+ * 所以老用户的绑定只存在于 KV 里。不补的话，修完之后老用户仍然「界面显示已绑定、
+ * 切过去不计时」—— 与 bug 本身同一个症状，而且更难排查。
+ *
+ * 一条用例走完三段（模块级只跑一次，所以不能拆成三条互相依赖的用例）：
+ *   ① 发失败**不缓存** → 下次进界面还能重试；
+ *   ② 重试成功 → 每条 1:1 绑定发一次全集（`itemIds: [itemId]`）；
+ *   ③ 第三次 → 进程内不再发（不重复打扰宿主）。
+ */
+describe("存量绑定补镜像（[0.13 fix]）", () => {
+  it("ai05_失败可重试_成功之后进程内不再发", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    g.emitHostIntent.mockRejectedValueOnce(new Error("pill not ready"));
+    await mirrorItemBindingsOnce({ "yanyun.exe": 12 });
+    expect(g.emitHostIntent).toHaveBeenCalledTimes(1);
+
+    g.emitHostIntent.mockClear();
+    await mirrorItemBindingsOnce({ "yanyun.exe": 12, "code.exe": 7 });
+    expect(g.emitHostIntent).toHaveBeenCalledTimes(2);
+    expect(g.emitHostIntent).toHaveBeenCalledWith({
+      action: "sync_app_item_bindings",
+      appKey: "yanyun.exe",
+      itemIds: [12],
+    });
+    expect(g.emitHostIntent).toHaveBeenCalledWith({
+      action: "sync_app_item_bindings",
+      appKey: "code.exe",
+      itemIds: [7],
+    });
+
+    g.emitHostIntent.mockClear();
+    await mirrorItemBindingsOnce({ "yanyun.exe": 12 });
+    expect(g.emitHostIntent).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
 });
 
 describe("键与值的形状", () => {
@@ -170,5 +263,38 @@ describe("读路径（一次前缀扫描）", () => {
       { id: 1, name: "写代码", color: "#123456" },
       { id: 2, name: "开会", color: "" },
     ]);
+  });
+});
+
+/**
+ * [0.13 fix · P0-3] 单个应用的 1:1 读，与「**只**清 KV」的清除（守"解绑了、重启又被补回来"）：
+ *   · 读必须**抛错**而不是降级成"没有绑定"（降级＝下一次保存把真绑定当"用户取消"删掉）；
+ *   · 清除必须**只**动 KV、不发 `itemIds: []`（本场景恰恰是"全集里还留着别的事项"）。
+ * 变异自证：换成 `saveAppItemBinding(exe, null)` → ai08 红；把 `throw` 吞成 `return null` → ai07 红。
+ */
+describe("1:1 绑定的单应用读 / 只清 KV（[0.13 fix · P0-3]）", () => {
+  it("ai06_按完整键前缀读该应用的 1:1 绑定_没有时是 null", async () => {
+    g.loadSettingRows.mockResolvedValue([
+      { key: "__app_item_binding::code.exe", value: '{"itemId":5}' },
+      { key: "__app_item_binding::other.exe", value: '{"itemId":9}' },
+    ]);
+    await expect(loadAppItemBindingFor("Code.exe")).resolves.toBe(5);
+    /* 只读这一个应用：前缀就是**完整键**，别把全表拉回来 */
+    expect(g.loadSettingRows).toHaveBeenCalledWith({ keyPrefix: "__app_item_binding::code.exe" });
+
+    g.loadSettingRows.mockResolvedValue([]);
+    await expect(loadAppItemBindingFor("code.exe")).resolves.toBeNull();
+  });
+
+  it("ai07_读失败往上抛_不许降级成「没有绑定」", async () => {
+    g.loadSettingRows.mockRejectedValue(new Error("boom"));
+    await expect(loadAppItemBindingFor("code.exe")).rejects.toThrow("boom");
+  });
+
+  it("ai08_清除 1:1 只写 KV_不发镜像", async () => {
+    g.commit.mockResolvedValue(undefined);
+    await clearAppItemBinding("Code.exe");
+    expect(g.commit).toHaveBeenCalledWith([{ key: "__app_item_binding::code.exe", value: null }]);
+    expect(g.emitHostIntent).not.toHaveBeenCalled();
   });
 });

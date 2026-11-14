@@ -19,9 +19,12 @@ import { readFileSync } from "node:fs";
 const h = vi.hoisted(() => ({
   handler: null as ((payload: unknown) => void) | null,
   event: "",
-  startOrSwitch: vi.fn(async (_itemId: number) => undefined),
+  /* 回值 = 「这次真的接上了吗」。自动链路只在 true 时记「已接管」（高-1） */
+  startOrSwitch: vi.fn(async (_itemId: number, _options?: { silent?: boolean }) => true),
   listItemsForApp: vi.fn(async (_params: { appKey: string }) => [] as { itemId: number; appKey: string; track: number }[]),
   timerState: { status: "idle", session: null } as { status: string; session: { itemId: number } | null },
+  /* [0.13 R4] 冷启动那条：挂载后主动取一次当前前台（宿主命令 `get_foreground_window`） */
+  getForegroundWindow: vi.fn(async () => null as { exeName: string; processId: number } | null),
 }));
 
 vi.mock("./useTauriEvent", () => ({
@@ -34,7 +37,7 @@ vi.mock("./useTimerActions", () => ({
   useTimerActions: () => ({ startOrSwitch: h.startOrSwitch }),
 }));
 vi.mock("../services/ipc", () => ({
-  ipc: { listItemsForApp: h.listItemsForApp },
+  ipc: { listItemsForApp: h.listItemsForApp, getForegroundWindow: h.getForegroundWindow },
 }));
 vi.mock("../stores/timerStore", () => ({
   useTimerStore: { getState: () => ({ state: h.timerState }) },
@@ -64,12 +67,29 @@ async function activeWindow(exeName: string) {
   await flush();
 }
 
+/**
+ * 冷启动用例专用：卸载后重挂。
+ *
+ * 为什么必须重挂：主动查询发生在**挂载那一刻**，而 `beforeEach` 已经挂过一次了；
+ * 不重挂就只能测到"默认的 null"那条。`mockClear` 只清调用记录（不清 `...Once` 队列），
+ * 所以 `toHaveBeenCalledTimes` 数的是这次重挂。
+ */
+async function remount() {
+  act(() => root.unmount());
+  h.getForegroundWindow.mockClear();
+  root = createRoot(container);
+  await act(async () => { root.render(createElement(Harness)); });
+  await flush();
+}
+
 beforeEach(() => {
   h.event = "";
   h.handler = null;
   h.startOrSwitch.mockClear();
   h.listItemsForApp.mockClear();
   h.listItemsForApp.mockResolvedValue([]);
+  h.getForegroundWindow.mockClear();
+  h.getForegroundWindow.mockResolvedValue(null);
   h.timerState = { status: "idle", session: null };
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -117,7 +137,8 @@ describe("useAppBindingAutoTimer", () => {
     await activeWindow("  Code  ");
 
     expect(h.listItemsForApp).toHaveBeenCalledWith({ appKey: "code.exe" });
-    expect(h.startOrSwitch).toHaveBeenCalledWith(5);
+    /* `silent: true`：用户没点任何东西，失败时不许弹 notice（高-1） */
+    expect(h.startOrSwitch).toHaveBeenCalledWith(5, { silent: true });
   });
 
   it("ab06_没有绑定的应用_一个动作都不做", async () => {
@@ -156,7 +177,7 @@ describe("useAppBindingAutoTimer", () => {
     h.listItemsForApp.mockResolvedValue([{ itemId: 5, appKey: "code.exe", track: 1 }]);
     h.timerState = { status: "running", session: { itemId: 9 } };
     await activeWindow("code.exe");
-    expect(h.startOrSwitch).toHaveBeenCalledWith(5);
+    expect(h.startOrSwitch).toHaveBeenCalledWith(5, { silent: true });
   });
 
   it("ab11_查询失败只吞掉_不抛给用户也不重复打扰", async () => {
@@ -172,5 +193,99 @@ describe("useAppBindingAutoTimer", () => {
     await act(async () => { h.handler?.({}); });
     await flush();
     expect(h.listItemsForApp).not.toHaveBeenCalled();
+  });
+
+  /* [0.13 fix] 用户报的那个 bug 的**真实时序**：先开游戏（那时还没绑）→ 发现没计时 →
+   * 打开面板绑上 → 切回同一个游戏。旧实现把「已处理」写在查询**之前**，于是第二次进入
+   * 同一个应用被 `lastKeyRef` 挡掉，永远不接管，且没有任何提示。
+   * 这条用例咬住的是"未绑定时不许记键"这一条判据 —— 把 `lastKeyRef.current = appKey`
+   * 挪回查询之前，它立刻红。 */
+  it("ab13_先没绑定后补上绑定_切回同一个应用仍然接管", async () => {
+    await activeWindow("yanyun.exe");
+    expect(h.startOrSwitch).not.toHaveBeenCalled();
+
+    /* 用户在面板里绑好（宿主侧 item_app 此时才有行） */
+    h.listItemsForApp.mockResolvedValue([{ itemId: 12, appKey: "yanyun.exe", track: 1 }]);
+    await activeWindow("yanyun.exe");
+
+    expect(h.startOrSwitch).toHaveBeenCalledWith(12, { silent: true });
+  });
+
+  /* 接管失败（事项被删 / IPC 报错）同样不许记键：否则一次失败就把这个应用永久排除。
+   * [高-1] 走的是**真实失败路径**：`startOrSwitch` 回 `false`（它内部已经把错误吞成
+      `silent` 的 notice 抑制 + false），而不是"抛错"这个实际上永远不会发生的情形。 */
+  it("ab14_接管失败之后切回同一个应用仍会重试", async () => {
+    h.listItemsForApp.mockResolvedValue([{ itemId: 5, appKey: "code.exe", track: 1 }]);
+    h.startOrSwitch.mockResolvedValueOnce(false);
+    await activeWindow("code.exe");
+    expect(h.startOrSwitch).toHaveBeenCalledTimes(1);
+
+    await activeWindow("code.exe");
+    expect(h.startOrSwitch).toHaveBeenCalledTimes(2);
+  });
+
+  /* [产品口径] 点药丸时前台会变成**我们自己**（`timing.exe`），随后点回游戏。
+   * 如果那一刻按"离开了应用"处理（清 `handledKeyRef`），用户刚手动切到 C 的计时会被
+   * "回到游戏"重新拽回 B —— 用户点自己的药丸不算离开应用。
+   * 变异自证：删掉 `if (appKey === SELF_EXE_KEY) return;` → 本用例红（第二次回到
+   * code.exe 会又接管一次，`toHaveBeenCalledTimes` 变成 2）。 */
+  it("ab15_点药丸（自家进程到前台）不算离开_回到游戏不重新接管", async () => {
+    h.listItemsForApp.mockResolvedValue([{ itemId: 5, appKey: "code.exe", track: 1 }]);
+    await activeWindow("code.exe");
+    expect(h.startOrSwitch).toHaveBeenCalledTimes(1);
+
+    /* 用户手动把计时切成 C（前台仍在游戏里），接着点药丸 → 前台变成我们自己 */
+    await activeWindow("Timing.exe");
+    /* 点回游戏 */
+    await activeWindow("code.exe");
+
+    /* 没有多接管一次：自家进程那一步既没清 `handledKeyRef`，也没改写 `frontKeyRef` */
+    expect(h.startOrSwitch).toHaveBeenCalledTimes(1);
+    /* 连绑定都不重查（放行的话这里会是 2 次） */
+    expect(h.listItemsForApp).toHaveBeenCalledTimes(1);
+  });
+
+  /* [0.13 R4] 冷启动：引擎那次广播早于本组件订阅（开机自启，或先开游戏再开我们），直接丢了；
+     之后窗口不再变化就永远不会再发 —— 用户看到「游戏明明在前台，就是不计时」。
+     挂载后主动取一次，必须真接管。
+     变异自证：删掉 `useEffect` 里那次 `ipc.getForegroundWindow()` → 本用例红（零调用）。 */
+  it("ab16_冷启动时游戏已在前台_挂载后主动查一次并接管", async () => {
+    h.listItemsForApp.mockResolvedValue([{ itemId: 5, appKey: "code.exe", track: 1 }]);
+    h.getForegroundWindow.mockResolvedValueOnce({ exeName: "Code.exe", processId: 4242 });
+    await remount();
+
+    expect(h.getForegroundWindow).toHaveBeenCalledTimes(1);
+    expect(h.listItemsForApp).toHaveBeenCalledWith({ appKey: "code.exe" });
+    expect(h.startOrSwitch).toHaveBeenCalledWith(5, { silent: true });
+  });
+
+  /* 查不到 / 抛错都等于"不知道"：不接管、不报错、**不 warn**（这条每次启动都跑，噪声会刷屏）。
+     变异自证：把 `catch {}` 改成 `catch (e) { console.warn(e) }` → 本用例红； */
+  it("ab17_主动查询查不到或抛错_不接管也不报错不刷日志", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    h.listItemsForApp.mockResolvedValue([{ itemId: 5, appKey: "code.exe", track: 1 }]);
+
+    h.getForegroundWindow.mockResolvedValueOnce(null);
+    await remount();
+    h.getForegroundWindow.mockRejectedValueOnce(new Error("foreground probe failed"));
+    await remount();
+
+    expect(h.startOrSwitch).not.toHaveBeenCalled();
+    expect(h.listItemsForApp).not.toHaveBeenCalled();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  /* 冷启动时药丸自己很可能就在前台：主动查询必须和事件那条一样跳过自家进程，
+     否则「启动就接管」会在用户没有任何动作的情况下把计时切走。
+     变异自证：把 `if (appKey === SELF_EXE_KEY) return;` 挪到 `inFlight` 之后不影响本用例，
+     删掉它 → 本用例红（绑了自家进程的脏数据会真接管一次）。 */
+  it("ab18_主动查询返回自家进程_不接管", async () => {
+    /* 故意给 timing.exe 也绑了事项：证明跳过靠的是自家进程判定，不是"没绑定" */
+    h.listItemsForApp.mockResolvedValue([{ itemId: 5, appKey: "timing.exe", track: 1 }]);
+    h.getForegroundWindow.mockResolvedValueOnce({ exeName: "timing.exe", processId: 7 });
+    await remount();
+
+    expect(h.startOrSwitch).not.toHaveBeenCalled();
   });
 });

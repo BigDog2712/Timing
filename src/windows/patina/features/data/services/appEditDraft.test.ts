@@ -8,8 +8,12 @@ import {
   isDraftDirty,
   keepItemCategoriesWithin,
   promoteDraftCategory,
+  resolveItemBindingsMirrorPayload,
+  resolveSingleBindingClear,
   toggleDraftCategory,
   toggleDraftItem,
+  withFullItemBindingSet,
+  withSingleItemBinding,
   type AppEditDraft,
 } from "./appEditDraft.ts";
 import type { AppOverride } from "../../../shared/classification/processMapper.ts";
@@ -163,5 +167,120 @@ describe("collectCategoryUsage", () => {
     );
     /* development: 2 个应用；design: 1 应用 + 1 域名；office: 1 应用 + 1 域名 */
     expect(usage).toEqual({ development: 2, design: 2, office: 2 });
+  });
+});
+
+/**
+ * [0.13 fix · P0-2] 镜像载荷的判据。
+ *
+ * 这层守的是「界面显示已绑定、库里其实没有了」：本弹窗的草稿只看得到
+ * `__app_override::.itemBindings`，看不到排行卡那份 1:1 的 `__app_item_binding::<exe>`。
+ * 把"这份 override 没有 `itemBindings`"当成"用户清空了"去发 `itemIds: []`，
+ * 执行端的三向 diff 就会把宿主 `item_app` 里那条 1:1 绑定删掉 —— 下次开游戏仍然不计时。
+ *
+ * 变异自证：把 `heldFullSet` 改成 `true`（即永远发），`ad16` 立刻红。
+ */
+describe("resolveItemBindingsMirrorPayload", () => {
+  it("ad16_原配置没有_itemBindings_时不发镜像_别把排行卡的_1比1_绑定删掉", () => {
+    /* 用户只在排行卡上绑过：override 里只有分类与别名，没有 itemBindings */
+    const before: AppOverride = { category: "development", displayName: "旧名", enabled: true, updatedAt: 1 };
+    /* 他这次只是改了个名字，`buildQuickAppOverride` 照旧不产出 itemBindings */
+    const after: AppOverride = { category: "development", displayName: "新名", enabled: true, updatedAt: 2 };
+
+    expect(resolveItemBindingsMirrorPayload(before, after)).toBeNull();
+    expect(resolveItemBindingsMirrorPayload(null, after)).toBeNull();
+    expect(resolveItemBindingsMirrorPayload(null, null)).toBeNull();
+  });
+
+  it("ad17_有_itemBindings_时发全集_并在_track为false_时降成仅观察", () => {
+    const after: AppOverride = {
+      itemBindings: [{ itemId: 7 }, { itemId: 9 }],
+      enabled: true,
+      updatedAt: 2,
+    };
+    expect(resolveItemBindingsMirrorPayload(null, after)).toEqual({ itemIds: [7, 9], track: 1 });
+    expect(resolveItemBindingsMirrorPayload(null, { ...after, track: false }))
+      .toEqual({ itemIds: [7, 9], track: 0 });
+  });
+
+  it("ad18_原先有_itemBindings_这次被清空_发空全集_那是用户显式的解绑", () => {
+    const before: AppOverride = {
+      itemBindings: [{ itemId: 7 }],
+      enabled: true,
+      updatedAt: 1,
+    };
+    const cleared: AppOverride = { category: "development", enabled: true, updatedAt: 2 };
+
+    /* 空数组是显式删除信号：执行端据此 unbind，而不是"缺字段就当作没这回事" */
+    expect(resolveItemBindingsMirrorPayload(before, cleared)).toEqual({ itemIds: [], track: 1 });
+    /* 显式拿到空数组（调用方自己知道全集）同样按删除处理 */
+    expect(resolveItemBindingsMirrorPayload(before, { ...before, itemBindings: [] }))
+      .toEqual({ itemIds: [], track: 1 });
+  });
+});
+
+/**
+ * [0.13 fix · P0-3] 「我解绑了，重启又被补回来」。
+ *
+ * 应用 → 事项的绑定有两份配置：本弹窗的 `__app_override::.itemBindings[]`，和排行卡
+ * 「绑定事项」的 1:1 `__app_item_binding::<exe>`。只读 override 的后果是双向的：
+ * 用户**看不到** 1:1 那一条（取消无从表达），而且保存后 KV 还留着 → 下次开机补镜像
+ * 把它原样补回 `item_app` → 用户认为"开关坏了"。
+ *
+ * 变异自证：把 `withSingleItemBinding` / `withFullItemBindingSet` 变成恒等 → ad19 红
+ * （草稿里看不到 5、镜像被判成"不持有全集"）；把 `resolveSingleBindingClear` 恒返回
+ * null（不清 KV）→ ad19 红。
+ */
+describe("1:1 绑定并进全集（P0-3：解绑不许被启动补镜像补回）", () => {
+  it("ad19_override 没有 itemBindings、1:1 指向 5、用户取消 5：发空全集且要清 1:1 的 KV", () => {
+    /* 只有排行卡绑过：override 里只有分类，没有 itemBindings */
+    const current: AppOverride = { category: "development", enabled: true, updatedAt: 1 };
+    const single = 5;
+    const fullCurrent = withFullItemBindingSet(current, single);
+
+    /* ① 打开弹窗：草稿里必须**看得到** 5（否则用户根本取消不了它） */
+    const opened = withSingleItemBinding(createAppEditDraft(current), single);
+    expect(opened.itemBindings.map((binding) => binding.itemId)).toEqual([5]);
+    /* 只并这一维：分类原样，不许顺手改别的 */
+    expect(opened.categories).toEqual(["development"]);
+
+    /* ② 用户取消 5 → 保存后的 override 里没有 itemBindings，但全集基线里有 */
+    const next = buildDraftAppOverride(fullCurrent, { categories: opened.categories, itemBindings: [] });
+    expect(resolveItemBindingsMirrorPayload(fullCurrent, next))
+      .toEqual({ itemIds: [], track: 1 });
+    /* ③ KV 必须一起清：否则启动补镜像会把 item_app 那行原样补回来 */
+    expect(resolveSingleBindingClear(single, next)).toBe(5);
+  });
+
+  it("ad20_override 有 5 与 7、1:1 指向 5、用户只取消 7：1:1 的 KV 不许动", () => {
+    const current: AppOverride = {
+      itemBindings: [{ itemId: 5 }, { itemId: 7 }],
+      enabled: true,
+      updatedAt: 1,
+    };
+    const single = 5;
+    /* 5 已在 override 里 → 合并是恒等（不重复、也不改顺序） */
+    expect(withFullItemBindingSet(current, single)).toBe(current);
+
+    const next = buildDraftAppOverride(current, { categories: [], itemBindings: [{ itemId: 5 }] });
+    expect(resolveItemBindingsMirrorPayload(current, next)).toEqual({ itemIds: [5], track: 1 });
+    /* 1:1 指的 5 还在全集里 → 清它就是删了用户没取消的绑定 */
+    expect(resolveSingleBindingClear(single, next)).toBeNull();
+  });
+
+  it("ad21_1:1 指向的事项不在 override 里：并集成全集，取消它才算真取消", () => {
+    const current: AppOverride = {
+      itemBindings: [{ itemId: 7 }],
+      enabled: true,
+      updatedAt: 1,
+    };
+    /* 1:1 是 5，override 只有 7 → 真全集是 [7, 5] */
+    expect(withFullItemBindingSet(current, 5)?.itemBindings).toEqual([
+      { itemId: 7 },
+      { itemId: 5 },
+    ]);
+    /* 读失败（undefined）/ 没有绑定（null）都不许往全集里塞东西 */
+    expect(withFullItemBindingSet(current, null)).toBe(current);
+    expect(withFullItemBindingSet(current, undefined)).toBe(current);
   });
 });

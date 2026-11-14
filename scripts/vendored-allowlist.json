@@ -1362,6 +1362,84 @@
       "change": "modified",
       "reason": "[0.13] 前台观测顺手记下「最近的外部前台窗口」（排除本进程），供手柄发快捷键时抢回焦点",
       "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/engine/tracking/runtime.rs",
+      "change": "modified",
+      "reason": "[0.13 fix] snapshot 为 None 时不再推进 last_emitted_window：推进了这次前台变化就永久丢失，而药丸侧「切到绑定的应用自动接管」只认这条事件（净增 0 行，压掉同文件的 Owner ledger 注释补回）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/runtime/itemAppBindingSync.ts",
+      "change": "added",
+      "reason": "[0.13 fix] 新增：应用↔事项绑定保存后镜像到宿主 item_app（分析窗无写命令，经 patina:host-intent 由药丸执行）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/appItemBinding.ts",
+      "change": "modified",
+      "reason": "[0.13 fix] saveAppItemBinding 保存 KV 之后再镜像宿主 item_app：自动接管读的是那张表，只写 KV 等于「绑了不计时」",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/appItemBinding.test.ts",
+      "change": "modified",
+      "reason": "[0.13 fix] 补四条镜像判据：绑定发全集 / 清除发空集 / 配置写失败不发镜像 / 空 exe 名不发",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/useItemAppBindings.ts",
+      "change": "added",
+      "reason": "[0.13 fix] 新增：事项视角的绑定应用状态（反查 __app_item_binding:: 配置 + 应用目录候选）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/ItemAppBindingField.tsx",
+      "change": "added",
+      "reason": "[0.13 fix] 新增：编辑事项弹层里的「绑定应用」一栏（缺这一栏用户根本找不到绑定入口）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/ItemAppBindingField.test.tsx",
+      "change": "added",
+      "reason": "[0.13 fix] 新增判据：选中应用即绑定当前事项 / 解绑发 null / 候选标出已绑在别的事项 / 未选事项不渲染",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/copyAppBinding.ts",
+      "change": "modified",
+      "reason": "[0.13 fix] 「绑定应用」一栏的 8 个键 × 四语言（标题/说明/空态/占位/解绑/读失败/无候选/已绑在别处）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/useAppItemBindings.ts",
+      "change": "modified",
+      "reason": "[0.13 fix] 读到配置后调一次 mirrorItemBindingsOnce：存量绑定（本轮之前从没写进宿主 item_app）不必让用户重新绑一遍",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/useAppItemBindings.test.ts",
+      "change": "modified",
+      "reason": "[0.13 fix] 夹具补 mirrorItemBindingsOnce 导出（hook 新依赖；行为由 services/appItemBinding.test.ts 钉住）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/engine/tracking/runtime/support.rs",
+      "change": "modified",
+      "reason": "[0.13 fix R3] 抽 should_emit_active_window(process_id, self_pid) 纯函数 + 单测：自家窗口（药丸/分析窗）到前台不再广播 active-window-changed，避免前端把「刚记住的游戏」清掉",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/appItemBindingPlan.ts",
+      "change": "added",
+      "reason": "[0.13 fix R1] 解绑要一次改两个键（1:1 + override.itemBindings），把「该写哪几个键、镜像发哪个并集」摊成纯函数才可测（appItemBinding.ts 卡 300 行）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/appItemBinding.unbind.test.ts",
+      "change": "added",
+      "reason": "[0.13 fix R1] ad22-ad25：解绑 5（override=[5,7]、1:1=5）镜像载荷必须是 [7]、override 只挂 5 时才允许出现空载荷",
+      "owner": "software-engineer"
     }
   ]
 }

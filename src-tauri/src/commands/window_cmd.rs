@@ -9,6 +9,7 @@ use crate::app::events;
 use crate::app::insight::main_window::tools_navigation::{self as patina_nav, HistoryTarget};
 use crate::error::AppResult;
 use crate::infra::window;
+use crate::models::foreground::ForegroundWindow;
 use crate::services;
 use crate::state::AppState;
 
@@ -172,6 +173,28 @@ pub async fn open_patina_window(
         crate::log_warn!("patina target rolled back ({error}); the next request will retry");
     }
     Ok(())
+}
+
+/// 当前前台窗口（[0.13] 冷启动自动接管）。
+///
+/// **为什么需要一条新命令**：追踪引擎只在**前台真的变了**时广播 `active-window-changed`
+/// （`services/insight/engine/tracking/runtime.rs`）。冷启动时（开机自启，或先开游戏再开我们）
+/// 那次广播早于药丸的订阅，直接丢了；之后窗口不再变化就永远不会再发 —— 用户看到的是
+/// 「游戏明明在前台，就是不计时」。药丸订阅之后必须能**主动取一次**。
+///
+/// 实现直接转发 `infra::insight::windows::foreground::get_active_window`：窗口枚举只有那一处
+/// （AFK / 宿主应用 / 桌面壳过滤都在里面），这里**不许**重写第二份口径。
+/// `None` 表示「判不出」（前台是桌面壳 / 锁屏 / 空 exe），调用方按"不知道"处理，不是错误。
+#[tauri::command]
+pub fn get_foreground_window() -> Result<Option<ForegroundWindow>, String> {
+    match crate::infra::insight::windows::foreground::get_active_window() {
+        Ok(info) if !info.exe_name.trim().is_empty() => Ok(Some(ForegroundWindow {
+            exe_name: info.exe_name,
+            process_id: info.process_id,
+        })),
+        Ok(_) => Ok(None),
+        Err(error) => Err(error),
+    }
 }
 
 /* 载荷形状的单测：这条通道的另一半（真实的窗口生命周期）只能手测，但「前端 JSON 到底被

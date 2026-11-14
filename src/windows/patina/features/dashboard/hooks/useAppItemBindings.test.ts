@@ -17,12 +17,16 @@ const g = vi.hoisted(() => ({
   loadAppItemBindings: vi.fn(),
   listAppItemBindingOptions: vi.fn(),
   saveAppItemBinding: vi.fn(),
+  /* [0.13 fix] 存量绑定补镜像：应用卡读配置时顺手调一次（本文件不关心它的内部，
+     但漏了这个导出 hook 会直接崩在 import 上） */
+  mirrorItemBindingsOnce: vi.fn(async (_bindings: Record<string, number>) => undefined),
 }));
 
 vi.mock("../services/appItemBinding.ts", () => ({
   loadAppItemBindings: g.loadAppItemBindings,
   listAppItemBindingOptions: g.listAppItemBindingOptions,
   saveAppItemBinding: g.saveAppItemBinding,
+  mirrorItemBindingsOnce: g.mirrorItemBindingsOnce,
 }));
 
 import { useAppItemBindings, type AppItemBindingsState } from "./useAppItemBindings.ts";

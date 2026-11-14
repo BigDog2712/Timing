@@ -5,6 +5,8 @@ pub mod common;
 pub mod data_root;
 pub mod constants;
 pub mod enums;
+/* [0.13 fix] 前台窗口的最小对外形状（`get_foreground_window` 的返回；两端都有桩，故不放 insight 子树）。 */
+pub mod foreground;
 pub mod item;
 /* [0.13.x] 事项 ↔ 应用绑定（`item_app`）。 */
 pub mod item_app;

@@ -1,4 +1,4 @@
-//! 应用级 IPC 命令表：宿主 79 条 + Patina 118 条（后者仅桌面）。
+//! 应用级 IPC 命令表：宿主 90 条 + Patina 126 条（后者仅桌面）。
 //!
 //! **为什么只有一张表**：Tauri 的 `invoke_handler` 是替换语义，`Invoke` 又不 `Clone`，
 //! 「宿主表 + Patina 表串成闭包」编不过（E0382）；改用插件注册更糟——插件命令走
@@ -75,8 +75,11 @@ macro_rules! define_invoke_handler {
             crate::commands::window_cmd::open_timer_window,
             crate::commands::window_cmd::open_note_window,
             crate::commands::window_cmd::close_note_window,
+            /* [0.13 fix] 药丸冷启动「主动取一次前台」用：引擎那次广播早于前端订阅，丢了就
+               再也不发（详见 `commands/window_cmd.rs` 里那条命令的注释）。 */
+            crate::commands::window_cmd::get_foreground_window,
             crate::commands::todo_cmd::todo_create,
-            // [0.13 · 1.7] 批量创建（单事务 1..=60）；本轮唯一新增命令
+            // [0.13 · 1.7] 批量创建（单事务 1..=60）
             crate::commands::todo_cmd::todo_create_batch,
             crate::commands::todo_cmd::todo_update,
             crate::commands::todo_cmd::todo_delete,

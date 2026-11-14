@@ -4,6 +4,7 @@ import { AppClassification } from "../../../shared/classification/appClassificat
 import {
   listAppItemBindingOptions,
   loadAppItemBindings,
+  mirrorItemBindingsOnce,
   saveAppItemBinding,
   type AppItemBindingOption,
 } from "../services/appItemBinding.ts";
@@ -56,6 +57,9 @@ export function useAppItemBindings(): AppItemBindingsState {
         },
       ),
     ]);
+    /* [0.13 fix] 存量绑定补一次镜像（宿主 `item_app` 在本轮之前根本没被写过）。
+       应用卡是最常被打开的那一扇门，放这里是为了让老用户不必先去别处"重新绑一遍"。 */
+    void mirrorItemBindingsOnce(nextBindings);
     if (!mountedRef.current) return;
     setBindings(nextBindings);
     setItems(nextItems.options);

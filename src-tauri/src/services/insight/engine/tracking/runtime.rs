@@ -49,9 +49,7 @@ pub use support::emit_tracking_data_changed;
 use support::{log_tracker_error, now_ms};
 use window_polling::poll_active_window_with_timeout;
 
-// Owner ledger: run() owns runtime loop orchestration only. Polling,
-// loop-state loading, power lifecycle handling, and event support stay in the
-// sibling runtime/* modules so commands.rs and lib.rs remain thin IPC entrypoints.
+// Owner ledger: run() 只编排循环；轮询 / 循环状态 / 电源事件 / 事件支撑在 runtime/* 兄弟模块。
 pub async fn run<R: Runtime>(
     app: AppHandle<R>,
     health_state: Arc<watchdog::RuntimeHealthState>,
@@ -106,8 +104,7 @@ pub async fn run<R: Runtime>(
             .snapshot()
             .is_some_and(|snapshot| snapshot.generation != generation)
         {
-            // A stop/resume may finish between polls; previous media grace and
-            // continuity are not evidence for the new lifecycle.
+            // 停/续可能发生在两次轮询之间：旧窗口与连续性的证据对新生命周期无效。
             last_window = None;
             title_state.clear_browser_title();
             title_state.clear_anonymous_web();
@@ -318,10 +315,13 @@ pub async fn run<R: Runtime>(
         refresh_active_session_snapshot_if_changed(&app, data.as_ref(), did_change_tracking_data)
             .await;
         if did_change_active_window {
+            /* 快照未发布时**不推进** `last_emitted_window`：推进了这次变化就永久丢（下一轮判否不再发） */
             if let Some(snapshot) = snapshot_state.snapshot() {
-                let _ = app.emit(ACTIVE_WINDOW_CHANGED, &snapshot.window);
+                if support::should_emit_active_window(snapshot.window.process_id, std::process::id()) {
+                    let _ = app.emit(ACTIVE_WINDOW_CHANGED, &snapshot.window);
+                }
+                last_emitted_window = Some(window_info.clone());
             }
-            last_emitted_window = Some(window_info.clone());
         }
         last_window = Some(tracked_window);
         last_tracking_status = Some(tracking_state.tracking_status);

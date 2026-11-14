@@ -10,8 +10,19 @@
 use tauri::{AppHandle, State};
 
 use crate::error::AppResult;
+use crate::models::foreground::ForegroundWindow;
 use crate::platform::host::desktop_only;
 use crate::state::AppState;
+
+/// 当前前台窗口（[0.13] 冷启动自动接管）—— **移动端没有前台窗口追踪**。
+///
+/// 回 `Ok(None)` 而不是 `IO_ERROR`：药丸那条链路把 `None` 当"不知道"，静默跳过正是这里的
+/// 正确语义（移动端本来就没有"切到某个应用就接管"的产品口径）；回错误只会让每次启动都
+/// 多一条被前端吞掉的噪声。
+#[tauri::command]
+pub fn get_foreground_window() -> Result<Option<ForegroundWindow>, String> {
+    Ok(None)
+}
 
 #[tauri::command]
 pub async fn open_settings_window(_app: AppHandle) -> AppResult<()> {

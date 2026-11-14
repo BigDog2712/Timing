@@ -32,6 +32,8 @@ const h = vi.hoisted(() => ({
   saveAppOverride: vi.fn(async (): Promise<void> => undefined),
   saveWebDomainOverride: vi.fn(async (): Promise<void> => undefined),
   listItems: vi.fn(),
+  loadSingleBinding: vi.fn(async () => null as number | null),
+  clearBinding: vi.fn(async (): Promise<void> => undefined),
   commitMutations: vi.fn(async (): Promise<void> => undefined),
 }));
 
@@ -43,8 +45,13 @@ vi.mock("../../classification/services/classificationService.ts", () => ({
     saveWebDomainOverride: h.saveWebDomainOverride,
   },
 }));
+/* [0.13 fix · P0-3] 弹窗现在还会读/清 1:1 那份绑定（`__app_item_binding::<exe>`）：
+   两个入口都得给桩，否则模块里那两个导出是 undefined —— 加载分支会抛，整屏停在"加载失败"
+   （这正是本文件先前三条用例一起红的原因）。默认"没有 1:1 绑定"，各自用例再按需覆盖。 */
 vi.mock("../../dashboard/services/appItemBinding.ts", () => ({
   listAppItemBindingOptions: h.listItems,
+  loadAppItemBindingFor: h.loadSingleBinding,
+  clearAppItemBinding: h.clearBinding,
 }));
 vi.mock("../../../platform/persistence/classificationSettingsGateway.ts", () => ({
   commitClassificationSettingMutations: h.commitMutations,
@@ -100,6 +107,10 @@ beforeEach(() => {
   h.saveAppOverride.mockReset();
   h.saveAppOverride.mockImplementation(async () => undefined);
   h.listItems.mockReset();
+  h.loadSingleBinding.mockReset();
+  h.loadSingleBinding.mockImplementation(async () => null);
+  h.clearBinding.mockReset();
+  h.clearBinding.mockImplementation(async () => undefined);
   h.listItems.mockImplementation(async () => [{ id: 7, name: "写代码", color: "" }]);
   h.commitMutations.mockReset();
   h.commitMutations.mockImplementation(async () => undefined);

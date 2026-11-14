@@ -19,6 +19,7 @@ import { highlightPill } from './highlightActions';
 import { openSettings } from './settingsActions';
 import { openTodosWindow } from './todosActions';
 import { applyCreateItemIntent, applyUpdateItemIntent } from './hostIntentItemWrite';
+import { applySyncAppItemBindingsIntent } from './hostIntentItemAppWrite';
 import { useItemStore } from '../stores/itemStore';
 import { useUiStore } from '../stores/uiStore';
 import { openNoteWindowFor, removeNote } from './noteActions';
@@ -54,7 +55,11 @@ type HostIntent =
   /** [0.13 · T03b] 改计时记录起止：字段名与 `hostIntentGateway.ts` 逐字一致（L9：两侧各写一份）。
    *  执行端复用既有 `recordApi.update`（→ `update_record`，命令面零改动）。payload **没有**
    *  时长字段 —— `accumulated_sec` 由 Rust 按新区间重算（ADR-030 / §3.8 B4）。 */
-  | { action: 'update_record_time'; recordId: number; startedAt: number; endedAt: number };
+  | { action: 'update_record_time'; recordId: number; startedAt: number; endedAt: number }
+  /** [0.13 fix] 事项 ↔ 应用绑定：字段名与 `hostIntentGateway.ts` 逐字一致（L9 两侧各写一份）。
+   *  分析窗的「绑定事项」只写它自己的配置表，自动接管读的是宿主 `item_app` 表，
+   *  这条意图把后者拉成同一份事实（执行体见 `hostIntentItemAppWrite.ts`）。 */
+  | { action: 'sync_app_item_bindings'; appKey: string; itemIds: readonly number[]; track?: number };
 
 /** 菜单在药丸内容区里的固定锚点（见 gateway 侧「锚点口径」注释）。 */
 const PILL_ANCHOR = { x: 12, y: 12 } as const;
@@ -220,6 +225,11 @@ export function useHostIntentBridge(): void {
         return;
       case 'update_record_time':
         void handleUpdateRecordTime(intent.recordId, intent.startedAt, intent.endedAt);
+        return;
+      case 'sync_app_item_bindings':
+        /* 分析窗的绑定配置 → 宿主 `item_app`（自动接管只认这张表）。
+           幂等：载荷是该应用的事项全集，执行端做三向 diff。 */
+        void applySyncAppItemBindingsIntent(intent);
         return;
       default:
         /* 分析窗版本比药丸新时可能发来不认识的动作：忽略，不抛、不提示 */

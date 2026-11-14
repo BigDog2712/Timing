@@ -301,6 +301,8 @@ patina:dashboard-layout:locked:v1  →  "1" | "0"
 | **`EXPECTED_EMIT_SITES = 18`** | **不变**。明确结论：**用事件，不用命令**。`patina:host-intent` 是 `window.dispatchEvent` 的前端事件，Rust 侧既没有 `emit` 也没有 `listen`，而 `check-contract.mjs:260` 数的是 **Rust 的 `emit` 点**，所以它从来不在这个计数里。反过来若让分析窗直接 `invoke('update_record')`，就要往 `patina-todo-notes.toml` 加一条宿主写命令 —— 那等于**在分析窗上开一个写面**，与 §1「分析窗读为主」的核心纪律正面冲突。这条不是"绕开"，是本来就该这么走 |
 | **错误码** | 零新增（复用 `INVALID_DURATION` / `ITEM_NOT_FOUND`）。⚠️ B3 命中时返回的 `ITEM_NOT_FOUND` 语义不精确，**本轮不改**：错误码是两处对齐的（`error.rs` + `errorText()`），还牵手机端，收益不抵风险。前端靠"禁用 + 提示先停止计时"规避 |
 | **无回执的代价** | 与既有改名同型，有先例可抄：本地乐观 + 待确认集合（`hooks/useTodayItems.ts:107-110, 129-140` 的 `pendingRenamesRef` 就是模板）。改时刻的乐观值更简单 —— **区间整体替换**，不需要"等宿主对账" |
+| **[0.13 fix] 追加一条 HostIntent** | `{ action: "sync_app_item_bindings"; appKey: string; itemIds: number[]; track?: number }`（「应用↔事项绑定」镜像进宿主 `item_app`，自动接管只读那张表）。同样两侧各写一份、字段逐字相同，执行分支在 `timing/services/hostIntentItemAppWrite.ts`；存量绑定由 Rust 启动期 `services/item_app_mirror.rs` 补一次（只增不减、不碰分类）。**命令面 / 事件面零改动** |
+| **[0.13 fix R4] 唯一一次命令面扩张：`get_foreground_window`** | 冷启动时引擎那次 `active-window-changed` 早于前端订阅（丢了），所以药丸订阅后要**主动取一次**当前前台。**不复用** insight 段的 `get_current_active_window`：它注册在 `crate::commands::insight::…`，被 `check-contract.mjs` 的宿主段负向断言 `(?!insight::)` 排除，要让它可被药丸调用就得给「前端 call() ↔ 宿主命令」那条断言开例外 —— 而那条断言的价值正是四方对齐，不开。改为**新增一条宿主命令**（89 → 90）：`commands/window_cmd.rs::get_foreground_window`（桌面转发 `infra::insight::windows::foreground::get_active_window`，移动端桩回 `Ok(None)`），DTO 在 `models/foreground.rs`（`{ exeName, processId }`），四处注册 + `permissions/host-commands.toml` 一起加。门禁仍是 **Rust 90 / IpcApi 90 / ipc.ts 90 / mock 90** |
 
 **读侧够不够：够，但不要塞进轮询**
 

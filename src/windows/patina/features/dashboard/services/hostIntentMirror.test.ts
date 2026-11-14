@@ -82,4 +82,14 @@ describe("HostIntent 两侧镜像", () => {
     expect(gateway).toContain("update_record_time{endedAt,recordId,startedAt}");
     expect(bridge).toContain("update_record_time{endedAt,recordId,startedAt}");
   });
+
+  /* [0.13 fix] 「绑定应用 → 自动计时」的镜像意图。它修的是用户报的「启动了燕云却不计时」：
+     两侧漂一个字段（`appKey` 写成 `exeName`、`itemIds` 写成 `itemId`）都会让药丸侧拿到
+     `undefined` → 一条绑定都写不进宿主 `item_app` → **永远不接管**，而且两端零日志
+     （分析窗只发意图、不承诺结果，用户看到的只是"绑了没用"）。
+     所以字段名逐字钉；`track?` 的可选标记也要留着 —— 它是"仅观察 / 计入"的开关。 */
+  it("d02f_sync_app_item_bindings_carries_the_same_fields_on_both_sides", () => {
+    expect(gateway).toContain("sync_app_item_bindings{appKey,itemIds,track?}");
+    expect(bridge).toContain("sync_app_item_bindings{appKey,itemIds,track?}");
+  });
 });

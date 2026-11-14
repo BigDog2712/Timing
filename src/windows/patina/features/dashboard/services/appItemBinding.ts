@@ -1,7 +1,13 @@
-import { commitClassificationSettingMutations } from "../../../platform/persistence/classificationSettingsGateway.ts";
+import { commitClassificationSettingMutations, type ClassificationSettingMutation } from "../../../platform/persistence/classificationSettingsGateway.ts";
+import { syncHostItemAppBindings } from "../../../platform/runtime/itemAppBindingSync.ts";
 import { loadSettingRows } from "../../../platform/persistence/settingsPersistence.ts";
 import { listTimingItems } from "../../../platform/persistence/timingReadRepository.ts";
+import { normalizeItemBindings } from "../../../shared/classification/appOverrideCodec.ts";
 import { AppClassification } from "../../../shared/classification/appClassification.ts";
+import { ClassificationService } from "../../classification/services/classificationService.ts";
+import { buildSaveAppOverrideMutations } from "../../classification/services/classificationStore.ts";
+import { buildQuickAppOverride } from "../../classification/services/quickClassification.ts";
+import { loadAppOverrideFor, planAppItemBindingWrite } from "./appItemBindingPlan.ts";
 
 /**
  * 应用 → 事项的**绑定配置**（0.12.1「双击应用行」那一轮补回的交互）。
@@ -122,15 +128,88 @@ export async function loadAppItemBindings(): Promise<Record<string, number>> {
 }
 
 /**
+ * 读**单个应用**的 1:1 绑定（`__app_item_binding::<exe>`）。
+ *
+ * `null` = 这个应用没有 1:1 绑定；**抛错 = 读不到**（调用方自己降级，见
+ * `useAppEditDialog` 的保存分支）。两者不能混：把"读不到"当成"没有"，下一次保存就会
+ * 把用户那条绑定当成"用户取消了"删掉。
+ *
+ * 为什么按**完整键**做前缀而不是整表：应用设置弹窗一次只看一个应用，
+ * 顺手把全表拉回来没有意义（那张表还有 `parseAppItemBindingRows` 那条全表口径给别处用）。
+ */
+export async function loadAppItemBindingFor(exeName: string): Promise<number | null> {
+  const key = buildAppItemBindingKey(exeName);
+  if (!key) return null;
+  const rows = await loadSettingRows({ keyPrefix: key });
+  const row = rows.find((entry) => entry.key === key);
+  return parseAppItemBindingValue(row?.value ?? null);
+}
+
+/**
+ * **只**清 1:1 键，**不发镜像**（[0.13 fix · P0-3]）。
+ *
+ * 为什么不能直接 `saveAppItemBinding(exe, null)`：那个函数清完 KV 还会发一条
+ * `itemIds: []` —— 1:1 视角下"空"确实等于全集，但本函数的使用场景恰恰是
+ * **全集里还留着别的事项**（用户只取消了 1:1 指的那一个）。发 `[]` 会把那些行一起删掉，
+ * 界面上却看不出来。所以：清 KV 与"发全集"这两件事必须分开，且**先清 KV 再发全集**
+ * （顺序反了的话，中途失败会让启动补镜像把刚删的行补回来）。
+ */
+export async function clearAppItemBinding(exeName: string): Promise<void> {
+  const key = buildAppItemBindingKey(exeName);
+  if (!key) return;
+  await commitClassificationSettingMutations([{ key, value: null }]);
+}
+
+/**
  * 写一条绑定；`itemId === null` 走删除分支（Rust 侧 `DELETE FROM settings`）。
  * `itemId` 非法时 `serializeAppItemBindingValue` 抛错 —— 请求不发出去，绝不变成删除。
+ *
+ * [0.13 fix] 配置落盘之后**再镜像到宿主 `item_app`**：自动接管读的是那张表，
+ * 只写这张 KV 就等于「界面上绑好了、切过去不计时」（用户报的那个 bug）。
+ *
+ * ## [R1] 镜像发的是**真全集**，不是 1:1 视角的 `[itemId]` / `[]`
+ *
+ * 同一个应用的两份真源：本文件的 1:1 键，与应用设置弹窗的
+ * `__app_override::<exe>.itemBindings[]`。执行端（`hostIntentItemAppWrite`）把载荷当
+ * **该应用的全集**做三向 diff，所以这里发 `[]` 就会把同应用另一个事项的行一起解绑 ——
+ * 用户的观感是「我在事项里解绑了燕云，结果写代码这件也不计时了」。
+ *
+ * 所以解绑时做两件事（一次 commit，两个键一起写）：
+ *   1. 删 1:1 键；
+ *   2. 若 override 里也有这个 itemId，把它从 `itemBindings` 里摘掉
+ *      （不摘的话启动补镜像读 override 会把它**补回来** —— 重启又自动计时）。
+ * 然后按摘完之后的并集发镜像。
  */
 export async function saveAppItemBinding(exeName: string, itemId: number | null): Promise<void> {
   const key = buildAppItemBindingKey(exeName);
   if (!key) return;
-  await commitClassificationSettingMutations([
-    { key, value: serializeAppItemBindingValue(itemId) },
+  /* 先把值算出来：非法 id 在这里抛，写命令一条都不会发出去 */
+  const value = serializeAppItemBindingValue(itemId);
+  /* 两份真源都要读，且**读失败就抛**（调用方显示"保存失败"）：把"读不到"当成"没有"
+     会发出一条冒充全集的载荷，把同应用别的事项一起解绑。 */
+  const [previousItemId, override] = await Promise.all([
+    loadAppItemBindingFor(exeName),
+    loadAppOverrideFor(exeName),
   ]);
+  const plan = planAppItemBindingWrite({
+    nextItemId: itemId,
+    previousItemId,
+    overrideItemIds: normalizeItemBindings(override?.itemBindings).map((binding) => binding.itemId),
+  });
+
+  const mutations: ClassificationSettingMutation[] = [{ key, value }];
+  if (plan.rewriteOverride) {
+    /* 走唯一重建入口：它负责"其余维度原样保留"，以及"没有任何字段了就整条置 null" */
+    const next = buildQuickAppOverride(override, { itemBindings: plan.nextItemBindings });
+    mutations.push(...buildSaveAppOverrideMutations(exeName, next));
+  }
+  await commitClassificationSettingMutations(mutations);
+  if (plan.rewriteOverride) {
+    /* bootstrap 缓存里那份 override 还是带旧 itemBindings 的：不清掉，下一次打开
+       应用设置弹窗会把它写回去（同一个"重启复活"的另一种走法）。 */
+    ClassificationService.invalidateBootstrapCache();
+  }
+  await syncHostItemAppBindings(exeName, plan.mirroredItemIds);
 }
 
 /**
@@ -140,4 +219,43 @@ export async function saveAppItemBinding(exeName: string, itemId: number | null)
 export async function listAppItemBindingOptions(): Promise<AppItemBindingOption[]> {
   const items = await listTimingItems();
   return items.map((item) => ({ id: item.id, name: item.name, color: item.color }));
+}
+
+/**
+ * 存量绑定的**一次**补镜像（[0.13 fix]，进程内只跑一次）。
+ *
+ * ## 为什么需要它（不做的话，修完之后老用户还是"绑了不计时"）
+ *
+ * 在本次修复之前，这个仓库里**没有任何代码**往宿主 `item_app` 写行：
+ * `legacy_bindings::backfill` 有 Rust 实现、有 IPC 命令、有网关封装，但**没有任何调用方**，
+ * 所以老用户的绑定只存在于分析窗的 KV 里。修完之后新保存的绑定会被镜像（见
+ * `saveAppItemBinding`），但**已经存下的那些**没人补 —— 界面显示「已绑定」、切过去仍然
+ * 不计时，比不显示更糟。
+ *
+ * 所以每次进分析窗第一次读绑定配置时，把读到的 1:1 配置整体再镜像一遍：
+ * 幂等（执行端做三向 diff，已经在位的不会重复写），一次性（模块级 promise）。
+ * 失败**不缓存**（置回 null，下次进界面再试）—— 这个通道没有回执，唯一能做的重试点
+ * 就是"用户下一次打开"。
+ *
+ * ## 边界：只补 1:1 这份配置
+ *
+ * `__app_override::` 里的多事项 `itemBindings[]` 不在这里补（它属于分类维度，
+ * 由应用设置弹窗保存时镜像）。Rust 侧那条 `backfill_legacy_bindings` 也**不在这里调**：
+ * 它会顺带把 KV 里的分类数组重新灌进 `app_category`，而映射视图改的正是那张表 ——
+ * 在一次普通界面加载里做这件事，会把用户刚在映射视图里调过的分类顺序覆盖回去。
+ */
+let legacyMirrorPromise: Promise<void> | null = null;
+
+export function mirrorItemBindingsOnce(bindings: Record<string, number>): Promise<void> {
+  if (legacyMirrorPromise) return legacyMirrorPromise;
+  const entries = Object.entries(bindings);
+  legacyMirrorPromise = Promise.all(
+    entries.map(([exeName, itemId]) => syncHostItemAppBindings(exeName, [itemId])),
+  )
+    .then(() => undefined)
+    .catch((error: unknown) => {
+      legacyMirrorPromise = null;
+      console.warn("[binding] 存量绑定补镜像失败", error);
+    });
+  return legacyMirrorPromise;
 }

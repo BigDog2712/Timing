@@ -37,6 +37,25 @@ export interface AppBindingCopy {
   itemsEmpty: string;
   /** 写绑定失败 */
   saveFailed: string;
+  /* ── [0.13 fix] 「编辑事项」弹层里的「绑定应用」一栏（事项视角，与上面的应用视角互补）──
+   * 用户报的 bug（「我启动了燕云，但没开始计时」）根因之一是**根本找不到绑定入口**：
+   * 应用视角的入口藏在应用排行卡的双击菜单里，事项视角这条腿是缺的。 */
+  /** 一栏的标题：「绑定应用」 */
+  boundAppsTitle: string;
+  /** 标题下的一句说明：说清「绑了会发生什么」（自动开始计时） */
+  boundAppsHint: string;
+  /** 已绑定清单为空时的陈述句 */
+  boundAppsEmpty: string;
+  /** 下拉的占位/无操作项：「选择一个应用」 */
+  pickApp: string;
+  /** 已绑定行的解绑键 */
+  unbindApp: string;
+  /** 应用目录读不到时的降级文案 */
+  appsLoadFailed: string;
+  /** 应用目录里没有可选应用（还没被采集到） */
+  appsEmpty: string;
+  /** 候选行上的提示：这个应用当前绑在**别的事项**上，选它等于挪过来（1:1 键空间） */
+  boundElsewhere: (name: string) => string;
 }
 
 export const APP_BINDING_COPY: Record<Locale, AppBindingCopy> = {
@@ -50,6 +69,14 @@ export const APP_BINDING_COPY: Record<Locale, AppBindingCopy> = {
     itemsLoadFailed: "暂时读不到事项",
     itemsEmpty: "还没有事项",
     saveFailed: "保存失败，请重试",
+    boundAppsTitle: "绑定应用",
+    boundAppsHint: "这些应用切到前台时会自动开始计这件事。",
+    boundAppsEmpty: "还没有绑定应用",
+    pickApp: "选择一个应用",
+    unbindApp: "解绑",
+    appsLoadFailed: "暂时读不到应用清单",
+    appsEmpty: "还没有可绑定的应用",
+    boundElsewhere: (name) => `已绑在「${name}」`,
   },
   "en-US": {
     editApp: (name) => `Edit ${name}`,
@@ -61,6 +88,14 @@ export const APP_BINDING_COPY: Record<Locale, AppBindingCopy> = {
     itemsLoadFailed: "Items are unavailable right now",
     itemsEmpty: "No items yet",
     saveFailed: "Could not save, try again",
+    boundAppsTitle: "Bound apps",
+    boundAppsHint: "Timing starts this item automatically when one of these apps comes to the front.",
+    boundAppsEmpty: "No apps bound yet",
+    pickApp: "Pick an app",
+    unbindApp: "Unbind",
+    appsLoadFailed: "Apps are unavailable right now",
+    appsEmpty: "No apps to bind yet",
+    boundElsewhere: (name) => `Bound to ${name}`,
   },
   "ru-RU": {
     editApp: (name) => `Изменить «${name}»`,
@@ -72,6 +107,14 @@ export const APP_BINDING_COPY: Record<Locale, AppBindingCopy> = {
     itemsLoadFailed: "Дела сейчас недоступны",
     itemsEmpty: "Дел пока нет",
     saveFailed: "Не удалось сохранить, повторите",
+    boundAppsTitle: "Связанные приложения",
+    boundAppsHint: "Timing запустит это дело, когда одно из этих приложений выйдет на передний план.",
+    boundAppsEmpty: "Связанных приложений пока нет",
+    pickApp: "Выберите приложение",
+    unbindApp: "Отвязать",
+    appsLoadFailed: "Список приложений сейчас недоступен",
+    appsEmpty: "Пока нет приложений для связи",
+    boundElsewhere: (name) => `Связано с «${name}»`,
   },
   es: {
     editApp: (name) => `Editar ${name}`,
@@ -83,5 +126,13 @@ export const APP_BINDING_COPY: Record<Locale, AppBindingCopy> = {
     itemsLoadFailed: "Los asuntos no están disponibles ahora",
     itemsEmpty: "Aún no hay asuntos",
     saveFailed: "No se pudo guardar, inténtalo de nuevo",
+    boundAppsTitle: "Aplicaciones vinculadas",
+    boundAppsHint: "Timing inicia este asunto automáticamente cuando una de estas aplicaciones pasa al frente.",
+    boundAppsEmpty: "Aún no hay aplicaciones vinculadas",
+    pickApp: "Elige una aplicación",
+    unbindApp: "Desvincular",
+    appsLoadFailed: "Las aplicaciones no están disponibles ahora",
+    appsEmpty: "Aún no hay aplicaciones para vincular",
+    boundElsewhere: (name) => `Vinculada a ${name}`,
   },
 };

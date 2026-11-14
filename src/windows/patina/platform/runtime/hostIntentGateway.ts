@@ -86,7 +86,18 @@ export type HostIntent =
    * `accumulated_sec` 由 Rust 按新区间重算（B4，前端**不许**自己算 —— `RecordPatch`
    * 没有 duration 字段，塞了也会被 serde 静默丢弃）。边界规则 B1–B6 的校验
    * 在 `features/dashboard/services/recordTimeEdit.ts`，弹层先拦再发。 */
-  | { action: "update_record_time"; recordId: number; startedAt: number; endedAt: number };
+  | { action: "update_record_time"; recordId: number; startedAt: number; endedAt: number }
+  /* ── [0.13 fix] 事项 ↔ 应用绑定：分析窗的配置 → 宿主 `item_app` 表 ──
+   * 为什么必须镜像：药丸的「切到绑定的应用就自动接管计时」读的是宿主业务库的
+   * `item_app`（`list_items_for_app`），而分析窗这两个绑定界面只写自己的配置表
+   * （`__app_item_binding::<exe>` / `__app_override::<exe>` 的 `itemBindings[]`）。
+   * 两张表之间原本只有一次性的旧配置回填（守卫键 `__migration_item_centric::v1`），
+   * 跑完之后新绑的东西永远进不了 `item_app` —— 用户看到「绑了却不计时」，两端零日志。
+   *
+   * 载荷是**该应用的事项全集**（空数组 = 全部解绑）：执行端做三向 diff，幂等。
+   * 发信方必须持有全集才许发 —— 只有一个事项视角的调用方不能发这条（会误删同一应用
+   * 在别的事项上的绑定）。字段名与 `src/services/hostIntentBridge.ts` 逐字一致（L9）。 */
+  | { action: "sync_app_item_bindings"; appKey: string; itemIds: readonly number[]; track?: number };
 
 /**
  * 发一条意图。返回「有没有发出去」——**不是**「宿主做成了没有」。

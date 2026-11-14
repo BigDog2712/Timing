@@ -177,6 +177,7 @@
 | `toggle_window` | `{}` | `void` | `toggleWindow` |
 | `save_window_position` | `{ x: number, y: number }` | `void` | `saveWindowPosition` |
 | `quit_app` | `{}` | `void` | `quitApp` |
+| `get_foreground_window` | `{}` | `{ exeName: string, processId: number } \| null` | `getForegroundWindow`（[0.13] 冷启动自动接管主动取一次；`null` = 判不出） |
 
 ### 3.8 插件 / Markdown 同步（V0.4.0；V0.11.13 扩云端与备份）
 
@@ -831,6 +832,7 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 | `md_sync_get` / `md_sync_save` / `md_sync_run` / `md_sync_open` / `md_sync_test` | **已实装**（V0.12.0 起走 SAF 编排，见 12.8.4 的历史说明；V0.11.13 加云端那一步） | 落点模型不同构的问题由 `app::md_sync_mobile::sync_once` 吸收，合并规则只有一份 |
 | `md_backup_list` / `md_backup_restore` | **已实装**（V0.11.22） | 备份的「看」与「覆盖回去」全程在应用内完成，一个字节都不需要用户摸到文件；恢复另受归属限制（只认 `webdav__`） |
 | `md_backup_export` | 手机**已实装**（V0.11.23，系统「保存到…」）；桌面是 `mobile_only` 桩 | 这是唯一一个**反方向**的能力：只有手机需要「把私有目录里的文件拿出来」 |
+| `get_foreground_window` | `Ok(null)`（不报错） | 安卓没有「前台窗口」概念（`infra::insight` 整棵不编进来）；`null` 是契约里的合法值 = 「不知道」，调用方静默跳过 |
 | `show_window` / `hide_window` / `toggle_window` / `save_window_position` | **`Ok(())` 幂等空操作**（不报错） | 前端首帧与「拖动结束落盘」会调它们；语义上「已显示 / 位置无处可存」本来就是成功，回错误只会在控制台刷红 |
 | `create_record` | **已实装，与桌面逐字同构**（无 `#[cfg]`） | 补记只写 `time_records`，不碰托盘 / 多窗口 / 文件系统，手机端编的是同一份 `services::record::backfill` |
 | `set_autostart` | 恒返回 `false`（`get_autostart` 同） | `update_settings` 的 `autostartEnabled` 字段**接受但忽略**（不报错），老配置带该字段过来仍成功 |

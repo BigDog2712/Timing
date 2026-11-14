@@ -69,8 +69,7 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         boot_timing::mark("portable_recorded");
     }
 
-    // ①' [V0.4.1] Markdown 落点写前留底目录（md-sync 覆写用户日记前存原内容）。
-    //     放在数据根而不是 vault 里：不在 Obsidian 的库里堆 .bak。
+    // ①' [V0.4.1] md 覆写前留底目录；放数据根而不是 vault（别在 Obsidian 库里堆 .bak）
     crate::infra::md_backup::set_root(data_root.join("backups").join("md"));
     // [V0.11.13] WebDAV 应用密码的密文落点（DPAPI / Keystore）+ 出厂 Obsidian 落点登记。
     crate::infra::secret::install_from_data_root(&data_root);
@@ -79,17 +78,18 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     // ② 建库（含迁移）+ ③ 默认设置
     let pool = tauri::async_runtime::block_on(db::init_pool(&data_root))?;
     boot_timing::mark("db_ready");
-    // [设备维度] 业务库身份：哨兵 '' → 本机 install_id，补 uid（设计 §3.4）。不放 infra 层：
-    // `check-layers` L4 不许 infra 依赖 services。
+    // [设备维度] 业务库身份：哨兵 '' → 本机 install_id（§3.4）；放 services 是因 L4 不许 infra 依赖它
     #[cfg(desktop)]
     tauri::async_runtime::block_on(services::device::startup_business_identity(&pool))?;
     tauri::async_runtime::block_on(services::settings::ensure_defaults(&pool))?;
     app.manage(AppState::new(pool.clone()));
     boot_timing::mark("defaults_ready");
     crate::app::overlay_push::push_on_boot(&app, &pool); // [V0.11.27] 冷启动补推悬浮条快照（必须 spawn 的理由见该函数）
+    // [0.13 fix] 存量「事项↔应用」绑定补镜像（两个库的口径见 services/item_app_mirror.rs）
+    #[cfg(desktop)]
+    services::item_app_mirror::mirror_on_boot(&app, &pool);
 
-    // ④' 移动端通知通道：API 26+ 没有通道的通知会被系统静默丢弃，必须在第一次
-    //    发送前建好（倒计时 / 提醒都走这条通道）。
+    // ④' 移动端通知通道：API 26+ 无通道的通知会被系统静默丢弃，必须在第一次发送前建好
     #[cfg(target_os = "android")]
     crate::infra::notify::ensure_channel(&app);
 
@@ -100,8 +100,8 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         boot_timing::mark("tray_ready");
     }
 
-    // ⑥ 启动即钳制：AC-23①。window-state 的 on_window_ready 早于本回调，此刻窗口位置已是
-    //    「上次的」，越界要在这里纠正；移动端只有一个系统管理的全屏 Activity，无需钳制。
+    // ⑥ 启动即钳制（AC-23①）：window-state 的 on_window_ready 早于本回调，此刻位置已是「上次的」，
+    //    越界要在这里纠正；移动端只有一个系统管理的全屏 Activity，无需钳制。
     #[cfg(desktop)]
     {
         if let Err(err) = window::reclamp_main(&app) {
@@ -131,7 +131,7 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     jobs::md_sync_mobile::spawn_md_sync_watcher(app.clone());
     boot_timing::mark("jobs_spawned");
 
-    // 移动端不跑托盘/钳制/诊断，补个标记点：耗时报告里段落不缺项，一眼看得出不是卡住。
+    // 移动端不跑托盘/钳制/诊断，补个标记点：耗时报告里段落不缺项，一眼看出不是卡住。
     #[cfg(mobile)]
     boot_timing::mark("mobile_skip_desktop");
 

@@ -10,22 +10,15 @@ import type {
   AccentSetParams,
   CloseNoteWindowParams,
   CreateItemParams, HandleCustomActionParams,
-  Item,
-  ItemIdParams,
+  Item, ItemIdParams,
   ItemAppBindParams, ItemAppBinding, ItemAppKeyParams,
-  ListItemsParams,
-  ListRecordsParams,
-  Note,
-  NoteCreateParams,
-  NoteListParams,
-  NoteRefParams,
-  NoteUpdateParams,
-  OpenNoteWindowParams,
-  OverlayStatus,
-  OverlayStyle,
+  ListItemsParams, ListRecordsParams,
+  Note, NoteCreateParams,
+  NoteListParams, NoteRefParams,
+  NoteUpdateParams, OpenNoteWindowParams,
+  OverlayStatus, OverlayStyle,
   Paginated,
-  Reminder,
-  ReminderClearParams,
+  Reminder, ReminderClearParams,
   ReminderSetParams,
   ResolveOpenRecordParams,
   SafStatus,
@@ -140,8 +133,7 @@ export function errorText(err: unknown): string {
       return err instanceof Error && err.message ? err.message : '同步设置不合法';
     case 'MD_SYNC_REMOTE_ERROR':
       return err instanceof Error && err.message ? err.message : '云端同步失败，请检查网络与账号';
-    /* 这条要**保留原文**吗？不 —— 原文是「还没有『使用情况访问』权限」，就是给用户看的，
-       所以直接回它；没带 message 时给一句能照着做的。 */
+    /* 这条**保留原文**：原文是「还没有『使用情况访问』权限」，就是给用户看的；没带 message 时给一句能照着做的。 */
     case 'USAGE_PERMISSION_DENIED':
       return err instanceof Error && err.message ? err.message : '去系统设置里打开「使用情况访问」后才能统计';
     default:
@@ -201,6 +193,8 @@ export const ipc: IpcApi = {
   /* ---- 窗口 / 系统域 ---- */
   showWindow: () => call<void>('show_window'),
   mainWorkArea: () => call<WorkAreaDip>('main_work_area'),
+  /** [0.13] 当前前台窗口（冷启动补一次广播用）；`null` = 判不出，调用方按"不知道"处理 */
+  getForegroundWindow: () => call<{ exeName: string; processId: number } | null>('get_foreground_window'),
   /** 主条（小条）矩形（DIP）：便利贴等浮层「默认落在小条附近」的基准 */
   mainWindowRect: () => call<WindowRectDip>('main_window_rect'),
   hideWindow: () => call<void>('hide_window'),
@@ -208,12 +202,7 @@ export const ipc: IpcApi = {
   saveWindowPosition: (params: SaveWindowPositionParams) => call<void>('save_window_position', { x: params.x, y: params.y }),
   quitApp: () => call<void>('quit_app'),
   /* ---- [V0.2.0] 待办域 ---- */
-  todoCreate: (params: TodoCreateParams) => call<Todo>('todo_create', {
-      title: params.title,
-      itemId: params.itemId ?? null,
-      plannedAt: params.plannedAt,
-      remindAt: params.remindAt,
-    }),
+  todoCreate: (params: TodoCreateParams) => call<Todo>('todo_create', { title: params.title, itemId: params.itemId ?? null, plannedAt: params.plannedAt, remindAt: params.remindAt }),
   todoUpdate: (params: TodoUpdateParams) => call<Todo>('todo_update', { id: params.id, patch: params.patch }),
   todoDelete: (params: TodoRefParams) => call<void>('todo_delete', { id: params.id }),
   todoList: (params: TodoListParams) =>

@@ -293,6 +293,94 @@
 - `clippy --all-targets -D warnings` 0 诊断（`--lib` 看不到新用例的 lint：`too_many_arguments`
   与 `doc_lazy_continuation` 都是只在 `--all-targets` 下才现形的）。
 
+### 修复 · 启动了游戏，却没有自动开始计时（[0.13 fix]）
+
+- 现象（报障原话）：「我启动了燕云 但未自动开始燕云事项计时」。绑定在界面上看着是有的
+  （应用排行卡右键 → 「绑定事项」），切过去什么都不发生，两端日志干净。
+- 根因是一段**没人调用的桥**：绑定写进分析窗配置表（`__app_item_binding::<exe>` /
+  `__app_override::<exe>.itemBindings[]`，落在 `patina.db`），而「切到绑定的应用就接管计时」
+  读的是宿主业务库的 `item_app`（`timing.db`）。两张表之间原本只有一次性的
+  `legacy_bindings::backfill` —— 有实现、有 IPC 命令、有前端封装，但**那个封装零调用方**，
+  守卫键还早就躺在库里。于是回填跑完之后，新绑的东西永远进不了 `item_app`。
+- 修法三条，全部在既有契约内（**命令面 / 权限面 / 事件面零变化**）：
+  1. **补界面**：分析窗「编辑事项」弹层加「绑定应用」一栏（原来只能从应用视角绑，
+     从"我要给这个事项绑个应用"这条思路走过去没有入口）；
+  2. **补镜像写通道**：新意图 `sync_app_item_bindings`（分析窗只 `emitTo("main", …)`，
+     药丸侧用既有 `bind_item_app` / `unbind_item_app` 执行；三向 diff、幂等、分析窗仍然
+     一条写命令都没有）；
+  3. **补存量兜底**：启动期 `item_app_mirror::mirror_on_boot` 从 `patina.db` 读配置表、
+     往 `timing.db` 的 `item_app` 补一次（只增不减 / 窄口径不碰分类 / 单事项键优先）。
+     这一条专治「用户什么都不打开、直接开游戏」—— 前端的即时镜像只覆盖修完之后的保存。
+- 顺带修掉三处**静默失效**：`handledKeyRef` 只在真的接管成功后才写（「先开游戏 → 发现
+  没计时 → 当场绑上 → 切回来」这条真实时序以前被"处理过"挡死）；`runtime.rs` 的快照取不到时
+  不再推进 `last_emitted_window`（防御性修补，**不是**本次报障的原因，别把它写进因果链）；
+  `useAppEditDialog` 不再把"这份 override 没有 `itemBindings`"当成"用户清空了"去发空全集
+  （那会把排行卡绑的 1:1 行从 `item_app` 删掉，而界面还显示"已绑定"）。
+- 自动链路的失败口径：`startOrSwitch(itemId, { silent })` 返回 `boolean`。自动接管传
+  `silent: true`（用户没点任何东西，失败不弹红条）并**只在 `true` 时**记账 ——
+  以前它从不 reject，「失败」与「成功」在调用方眼里一模一样，一次失败就把那个应用永久排除。
+- 点药丸不算「离开应用」：前台出现 `timing.exe`（自己的窗口）时既不更新 `frontKeyRef`、
+  也不清 `handledKeyRef`。否则「点药丸 → 点回游戏」会把用户刚手动切走的事项重新拽回来。
+- **解绑一致性（P0-3）**：绑定有两份配置 —— 应用设置弹窗的多事项 `__app_override::.itemBindings[]`
+  与排行卡「绑定事项」的 1:1 `__app_item_binding::<exe>`。弹窗以前只看前者，后果是双向的：
+  用户**看不到** 1:1 那一条（取消无从表达），而且保存后 KV 还留着 → **启动补镜像把刚解绑的
+  行原样补回来**，用户认为开关坏了。现在：① 弹窗把 1:1 并进真全集（草稿里看得见、可以取消）；
+  ② 取消时除了发全集让宿主解绑，还会把**指向同一个 itemId** 的 1:1 键一起清掉（只清它，
+  1:1 若指向全集里还留着的事项则不动）；③ 两次写的顺序固定为「先清 KV、再发全集」——
+  反过来的话中途失败就会被启动补镜像补回来。
+- **已知限制**（本轮不修，已记债）：
+  1. `legacy_bindings` 的守卫键 `__migration_item_centric::v1` 一旦被消耗就**不会重跑**：
+     那次一次性回填在早期版本的机器上跑过一次之后，配置表再也不会自动进活动库。
+     本轮的启动补镜像只补 `item_app`，**故意**不碰 `app_category`（碰了就会把用户在映射
+     视图里调过的分类顺序覆盖回去），所以那条旧债仍在。
+  2. `services/insight/data/backup/snapshot.rs:292-310` 的备份表清单**不含** `item_app` /
+     `items`（那两张在业务库）：快照只导 `patina.db` 自己的表，跨库外键对齐属于另一件事。
+     也就是说「备份 → 换机恢复」不会带走事项与应用绑定。
+- `docs/design/DASHBOARD-R2-ARCH.md` 的 HostIntent 表补 `sync_app_item_bindings` 一行
+  （跨窗意图必须落档，否则下一个改这里的人会漏掉执行端）。
+- **解绑的另一扇门（R1）**：事项侧的「绑定应用」一栏（`ItemAppBindingField`）与存量补镜像
+  （`mirrorItemBindingsOnce`）都只发 `[当前这个 itemId]`，而镜像的语义是「**这个应用的
+  `item_app` 全集**」—— 于是从事项侧解绑/保存，会把同一个应用上其它事项的行一起删掉
+  （用户视角：我只解了一个，另一个也没了）。修法：解绑时**一次提交两个键**
+  —— 清 `__app_item_binding::<exe>`（若它指向被解的那条）+ 重写 `__app_override::<exe>.itemBindings[]`
+  去掉该 `itemId`（其余保留），然后按**新并集**发镜像；`[]` 只允许出现在"真的空了"的时候。
+  该计划摊成纯函数 `services/appItemBindingPlan.ts::planAppItemBindingWrite`（`appItemBinding.ts`
+  卡 300 行），四语言文案与 UI 零变化。`mirrorItemBindingsOnce` 同批改成发并集 —— 它本来就是
+  「只读不删的存量补镜像」，改成并集是收敛，不是扩张。
+- **自家窗口不该广播给前端（R3）**：用户在分析窗里看数据时前台就是 `timing.exe`，
+  这条广播会让前端把"刚记住的游戏"清掉，于是从分析窗切回游戏不再接管。现在 `runtime.rs`
+  只在 `process_id != 自己` 时才 `emit`（抽成 `runtime/support.rs::should_emit_active_window`
+  + 单测），而 `last_emitted_window` **照常推进** —— 否则切回游戏时判不出变化，那次变化会被永久吞掉。
+  前端的 `SELF_EXE_KEY` 判定保留，降级为双保险（窗口标题/进程名两套口径互不依赖）。
+- **冷启动那一刀补上（R4）**：引擎只在**前台真的变了**时广播，冷启动（开机自启，或先开游戏再开
+  我们）那次广播早于前端订阅，直接丢了；之后窗口不再变化就永远不会再发 —— 这正是本 bug 的另一半。
+  现在订阅之后主动取一次当前前台（`ipc.getForegroundWindow()`），喂给**同一个**处理函数；
+  查不到 / 抛错**静默跳过**、不绕过 `handledKeyRef` / `inFlightRef`（所以它是"补一次广播"，
+  不是"启动就接管"）。为此**新增一条宿主命令** `get_foreground_window`（命令数 89 → **90**，
+  四个面一起加：`ipc_commands.rs` 宿主段 / `IpcApi` / `ipc.ts` / `browserMock` +
+  `permissions/host-commands.toml`）：实现直接转发
+  `infra::insight::windows::foreground::get_active_window`（窗口枚举只有那一处），
+  返回最小 DTO `{ exeName, processId } | null`。**没有**复用 insight 段的
+  `get_current_active_window`：那条命令进不了宿主集合（`check-contract.mjs` 的宿主段
+  用 `(?!insight::)` 把 insight 排除），要么开一个契约例外、要么新命令 —— 选后者，
+  契约保持"四方对齐"（`Rust 90 / IpcApi 90 / ipc.ts 90 / mock 90`）。
+- **`ae07` 钉住解绑的写入顺序（R8）**：光断言"两个键都写了"不够 —— 反过来的话中途失败就会被
+  启动补镜像补回来。改用 `invocationCallOrder` 断言 `clearAppItemBinding` 先于
+  `syncHostItemAppBindings`。
+- 账本：`npm run check` 八步全绿（size 145 条冻结基线 / 扫描 1842 文件 / 超限占比 28.6%，
+  vendored 改 101 · 增 139 · 白名单 240，contract 命令 Rust 90 + Patina 126（四方 90/90/90/90）、
+  事件 11/11，
+  layers L1–L10 全过，brand 违规 0，eslint 0 warning）；`npm test` **223 文件 / 1730 用例**全过；
+  `cargo test --lib` **1844 passed**（唯一红是沙箱把 `reg.exe` 列黑名单，CI 上绿）。
+- 变异自证（九处关键的）：把 `mirror` 的 KV 读取改回业务池（单池退化）→ 补镜像 7 条里 6 条红；
+  去掉自动链路的 `timing.exe` 跳过 → `ab15` 红（接管次数 1 → 3）；把"取消时清 1:1 的 KV"删掉 →
+  `ad19` 与渲染级 `ae07` 同红；把 1:1 并集退回"只读 override" → `ad19` / `ad21` / `ae07` 红；
+  R1 的镜像载荷退回"只发单事项" → `ad22` / `ad24` 红；`planAppItemBindingWrite` 恒
+  `rewritten = false`（不重写 override）→ `ad22` / `ad23` 红；`should_emit_active_window` 的
+  `!=` 改成 `==` → `self_process_never_emits_active_window_change` 红；删掉挂载后那次主动查询 →
+  `ab16` 红；`catch {}` 里加一句 `console.warn` → `ab17` 红（顺序倒过来改先清 KV 再发全集 →
+  `ae07` 的 `invocationCallOrder` 红）。
+
 ## 0.12.2 · 应用多分类绑定 + 设置页导航修复（R3）— 2026-11-13（未出包）
 
 > 版号：`desktop` 0.12.1 → **0.12.2**（六处同步；R2 与本轮同号并入，桌面上一版出包是 0.12.1）。

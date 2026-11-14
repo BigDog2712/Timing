@@ -125,7 +125,7 @@ describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
     expect(readRaw('src-tauri/permissions/patina-host-theme.toml'))
       .toContain('identifier = "host-theme-write"');
     expect(grants.get('host-theme-write')?.has('theme_set')).toBe(true);
-    /* 宿主那 81 条命令面仍拥有这两个命令：摘的是「分析窗的引用」，不是宿主自己的能力。 */
+    /* 宿主命令面仍拥有这两个命令：摘的是「分析窗的引用」，不是宿主自己的能力。 */
     expect(grants.get('host-commands')?.has('theme_set')).toBe(true);
     expect(grants.get('host-commands')?.has('accent_set')).toBe(true);
 

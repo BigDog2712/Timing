@@ -12,10 +12,8 @@ import type {
   AccentColors,
   AccentSetParams,
   CloseNoteWindowParams,
-  Note,
-  NoteCreateParams,
-  NoteListParams,
-  NoteRefParams,
+  Note, NoteCreateParams,
+  NoteListParams, NoteRefParams,
   NoteUpdateParams,
   OpenNoteWindowParams,
   Reminder,
@@ -182,6 +180,8 @@ export interface IpcApi {
 
   /* 窗口 / 系统域 */
   showWindow(): Promise<void>;
+  /** [0.13] 当前前台窗口（冷启动补一次广播）；`null` = 判不出 */
+  getForegroundWindow(): Promise<{ exeName: string; processId: number } | null>;
   /** 主窗所在显示器的工作区（DIP），前端 auto-fit 的布局上界（ADR-020） */
   mainWorkArea(): Promise<WorkAreaDip>;
   /** 主条矩形（DIP）：便利贴「默认落在小条附近」的基准（V0.3.1） */

@@ -241,3 +241,28 @@
   padding-top: var(--qp-space-group);
   border-top: 1px solid var(--qp-border-subtle);
 }
+
+/* ── 「绑定应用」（[0.13 fix] 编辑事项弹层：事项视角的绑定入口）────────────── */
+
+.qp-item-app-binding {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.qp-item-app-binding-hint {
+  margin: 0;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+  line-height: var(--qp-line-height-compact);
+}
+
+.qp-item-app-binding-title {
+  color: var(--qp-text-primary);
+  font-weight: 600;
+}
+
+.qp-item-app-binding-select {
+  max-width: 220px;
+}

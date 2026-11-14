@@ -12,7 +12,12 @@ import {
   saveQuickClassificationOverride,
 } from "../../classification/services/quickClassification.ts";
 import { createQuickAppClassificationTarget } from "../../classification/types.ts";
-import { listAppItemBindingOptions } from "../../dashboard/services/appItemBinding.ts";
+import { syncHostItemAppBindings } from "../../../platform/runtime/itemAppBindingSync.ts";
+import {
+  clearAppItemBinding,
+  listAppItemBindingOptions,
+  loadAppItemBindingFor,
+} from "../../dashboard/services/appItemBinding.ts";
 import { APP_EDIT_COPY } from "../appEditCopy.ts";
 import {
   assignDraftItemCategory,
@@ -20,8 +25,12 @@ import {
   createAppEditDraft,
   isDraftDirty,
   promoteDraftCategory,
+  resolveItemBindingsMirrorPayload,
+  resolveSingleBindingClear,
   toggleDraftCategory,
   toggleDraftItem,
+  withFullItemBindingSet,
+  withSingleItemBinding,
   type AppEditDraft,
 } from "../services/appEditDraft.ts";
 import { buildAppEditCategoryOptions, collectAppEditCategoryUsage } from "../services/categoryCatalog.ts";
@@ -138,6 +147,11 @@ export function useAppEditDialog({
   const [deletedCategories, setDeletedCategories] = useState<AppCategory[]>([]);
   const [items, setItems] = useState<readonly { id: number; name: string; color?: string }[]>([]);
   const [itemsLoadFailed, setItemsLoadFailed] = useState(false);
+  /**
+   * 1:1 那份绑定（`__app_item_binding::<exe>`，app_item_binding.ts 写的）。
+   * `null` = 没有；`undefined` = **读失败**（保存时跳过镜像与清理，见 `save`）。
+   */
+  const [singleBinding, setSingleBinding] = useState<number | null | undefined>(null);
   const busyRef = useRef(false);
 
   /** 分类候选 + 用量 + 已删清单（分类增删改之后重算，但**不许**动草稿） */
@@ -156,15 +170,23 @@ export function useAppEditDialog({
     let active = true;
     void (async () => {
       try {
-        const [bootstrap, itemOptions] = await Promise.all([
+        const [bootstrap, itemOptions, single] = await Promise.all([
           ClassificationService.loadClassificationBootstrap(),
           /* 事项清单失败只降级这一栏（照 `QuickClassificationItemBindingMenu` 的口径） */
           listAppItemBindingOptions().catch(() => null),
+          /* [0.13 fix · P0-3] 1:1 那份绑定不在 override 里，但它是"该应用绑了哪些事项"的
+             真全集的一半：不并进来，用户看不到它、也就无法在这个弹窗里取消它。
+             读失败 → `undefined`（不是 `null`）：保存时跳过镜像与清理，别把"读不到"当"没有"。 */
+          loadAppItemBindingFor(target.exeName).catch(() => undefined),
         ]);
         if (!active) return;
         const override = resolveQuickClassificationOverride(bootstrap, target) as AppOverride | null;
         setCurrent(override);
-        setDraft(createAppEditDraft(override, bootstrap.loadedDeletedCategories));
+        setSingleBinding(single);
+        setDraft(withSingleItemBinding(
+          createAppEditDraft(override, bootstrap.loadedDeletedCategories),
+          single,
+        ));
         applyBootstrap(bootstrap);
         setItems(itemOptions ?? []);
         setItemsLoadFailed(itemOptions === null);
@@ -188,7 +210,28 @@ export function useAppEditDialog({
     setError(null);
     void (async () => {
       try {
-        await saveQuickClassificationOverride(target, buildDraftAppOverride(current, draft));
+        const next = buildDraftAppOverride(current, draft);
+        await saveQuickClassificationOverride(target, next);
+        /* [0.13 fix] 事项清单也要镜像到宿主 `item_app`：自动接管读的是那张表。
+           载荷必须是**这个应用的事项全集**，否则执行端的三向 diff 会误删别的侧面
+           （口径见 `platform/runtime/itemAppBindingSync.ts`）。
+           [P0-3] 全集有两半：override 的 `itemBindings[]` 与 1:1 的
+           `__app_item_binding::<exe>`，判定一律喂 `withFullItemBindingSet` 的合并版本 ——
+           只看 override 的话，"用户取消了 1:1 那一条"与"我们本来就不持有"分不开，
+           结局是解绑了重启又被补回来。`singleBinding === undefined`（读失败）时整段跳过：
+           我们看不见全集，就不许替用户做删除决定。 */
+        if (singleBinding !== undefined) {
+          const fullCurrent = withFullItemBindingSet(current, singleBinding);
+          const mirror = resolveItemBindingsMirrorPayload(fullCurrent, next);
+          if (mirror) {
+            /* 先清 1:1 的 KV、再发全集：启动补镜像的数据源是那份 KV（只增不减），
+               KV 留着就会把刚删掉的 `item_app` 行在下次开机补回来。 */
+            if (resolveSingleBindingClear(singleBinding, next) !== null) {
+              await clearAppItemBinding(target.exeName);
+            }
+            await syncHostItemAppBindings(target.exeName, mirror.itemIds, mirror.track);
+          }
+        }
         /* 作废分类 bootstrap：下一个读这一行的视图（趋势列表 / 分类聚合）必须看到新配置 */
         ClassificationService.invalidateBootstrapCache();
         onSaved?.();
@@ -200,9 +243,15 @@ export function useAppEditDialog({
         setSaving(false);
       }
     })();
-  }, [copy.saveFailed, current, draft, loadFailed, onClose, onSaved, saving, target]);
+  }, [copy.saveFailed, current, draft, loadFailed, onClose, onSaved, saving, singleBinding, target]);
 
-  const dirty = !loading && isDraftDirty(draft, current, deletedCategories);
+  /* 脏判定必须对着**同一个基线**（真全集）：草稿里已经并进了 1:1 那一条，
+     拿裸override 比会一打开就显示"有改动"。 */
+  const dirty = !loading && isDraftDirty(
+    draft,
+    withFullItemBindingSet(current, singleBinding),
+    deletedCategories,
+  );
 
   return {
     loading,

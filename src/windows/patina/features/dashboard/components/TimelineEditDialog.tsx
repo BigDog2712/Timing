@@ -21,6 +21,13 @@
  *     与宿主 `ItemsPrefsMenu.readMinutes()` 同口径，`clampItemMinutes` 在这里解析；
  *   · 没有第二发：置顶/排序不归这个弹层管（那是「事项管理」的事），**别顺手多发**。
  *
+ * ## [0.13 fix] 另挂了「绑定应用」一栏（不属于这张表单）
+ *
+ * 「我启动了燕云，但没开始计时」的根因之一是事项视角**根本没有绑定入口**。这一栏
+ * （`ItemAppBindingField`）就地改就地落，**不经过保存键**：它与"名称 + 默认时长"是两件
+ * 事，各自有各自的写入路径（配置表 + 镜像宿主 `item_app`）。所以上面那条"恰一条意图"
+ * 说的是**保存键**，不是整个弹层。
+ *
  * ## 为什么用 useItemPrefs（而不是 useTodayItems）
  *
  * 编辑的是**事项本身**（名字 + `settings.itemsTimers` 的默认时长），不是"今天那几段记录"；
@@ -37,6 +44,7 @@ import { useItemPrefs } from "../hooks/useItemPrefs.ts";
 import { clampItemMinutes, itemTimerMinutes } from "../services/itemPrefs.ts";
 import { checkItemName, ITEM_NAME_MAX_LEN, type ItemNameIssue } from "../services/timelineItemName.ts";
 import ItemEditForm from "./ItemEditForm.tsx";
+import ItemAppBindingField from "./ItemAppBindingField.tsx";
 
 interface Props {
   open: boolean;
@@ -185,23 +193,28 @@ export default function TimelineEditDialog({ open, onClose, todayItemIds, onLoca
               {candidates.length === 0 ? <li className="qp-empty">{copy.timelineEditEmpty}</li> : null}
             </ul>
             {selected ? (
-              <ItemEditForm
-                draftName={draftName}
-                draftMinutes={draftMinutes}
-                busy={busy}
-                issue={issue}
-                copy={copy}
-                onNameChange={(value) => {
-                  setDraftName(value);
-                  setIssue(null);
-                }}
-                onMinutesChange={(value) => {
-                  setDraftMinutes(value);
-                  setIssue(null);
-                }}
-                onSave={save}
-                onCancel={onClose}
-              />
+              <>
+                <ItemEditForm
+                  draftName={draftName}
+                  draftMinutes={draftMinutes}
+                  busy={busy}
+                  issue={issue}
+                  copy={copy}
+                  onNameChange={(value) => {
+                    setDraftName(value);
+                    setIssue(null);
+                  }}
+                  onMinutesChange={(value) => {
+                    setDraftMinutes(value);
+                    setIssue(null);
+                  }}
+                  onSave={save}
+                  onCancel={onClose}
+                />
+                {/* [0.13 fix] 「绑定应用」在弹层里就改就落（不走本弹层的保存键）：
+                    它是另一件事（应用↔事项），与"名称 + 默认时长"这一张表单的语义不同源。 */}
+                <ItemAppBindingField itemId={selected.id} enabled={open} />
+              </>
             ) : null}
           </>
         ) : null}
