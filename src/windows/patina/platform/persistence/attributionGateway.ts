@@ -51,6 +51,8 @@ export interface FocusBlockRow {
 export interface ChildSegmentRow {
   appKey: string;
   appName: string;
+  /** 产生这段活动的设备（双端并行时同一应用会有两段，靠它区分） */
+  deviceId: string;
   startMs: number;
   endMs: number;
   categoryKey: string;
@@ -130,6 +132,11 @@ export interface ItemTimelineRow {
   segments: ChildSegmentRow[];
   gaps: TimelineGap[];
   totalsByCategory: Record<string, number>;
+  /**
+   * 本机 `device_id`。**设备数 ≤ 1 时界面不许出现任何设备元素**（`deviceLanes` 的既有口径），
+   * 所以判定交给 `buildDeviceLanes(segments, selfDeviceId)`，不要在组件里写 `length > 1`。
+   */
+  selfDeviceId?: string | null;
 }
 
 /** 旧 KV → 新表的回填结果（计数给设置页显示「迁移了 N 条」）。 */

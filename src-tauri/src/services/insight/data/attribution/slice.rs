@@ -27,6 +27,9 @@ use super::{resolve_child_category, AppCategory};
 pub struct FactSpan {
     pub app_key: String,
     pub app_name: String,
+    /// 这条事实由哪台设备产生。双端可同时对同一事项计时，同一应用会有两段不同设备的事实
+    /// —— 不带这一维，界面上就是「chrome 被记了两遍」，而不是「PC 与手机各一段」。
+    pub device_id: String,
     pub start_ms: i64,
     /// 进行中的事实由调用方填「此刻」；切片不认识时钟。
     pub end_ms: i64,
@@ -55,6 +58,8 @@ pub struct SegmentOverride {
 pub struct ChildSegment {
     pub app_key: String,
     pub app_name: String,
+    /// 承接自 `FactSpan`：切片不改写设备归属。
+    pub device_id: String,
     pub start_ms: i64,
     pub end_ms: i64,
     pub category_key: String,
@@ -100,6 +105,7 @@ pub fn slice_block(
                 segments.push(ChildSegment {
                     app_key: fact.app_key.clone(),
                     app_name: fact.app_name.clone(),
+                    device_id: fact.device_id.clone(),
                     start_ms,
                     end_ms,
                     category_key: category.to_string(),
@@ -114,6 +120,7 @@ pub fn slice_block(
         segments.push(ChildSegment {
             app_key: fact.app_key.clone(),
             app_name: fact.app_name.clone(),
+            device_id: fact.device_id.clone(),
             start_ms,
             end_ms,
             category_key: resolved,
@@ -206,3 +213,9 @@ pub fn gaps_within(outer: &[(i64, i64)], covered: &[(i64, i64)]) -> Vec<(i64, i6
 #[cfg(test)]
 #[path = "slice_tests.rs"]
 mod slice_tests;
+
+/* 设备维度单独一个文件：`slice_tests.rs` 已到 300 行硬限，而这一组的判据与切片本身的
+   正确性无关（丢设备不会让任何数字变错，只让双端并行不可见）。 */
+#[cfg(test)]
+#[path = "slice_device_tests.rs"]
+mod slice_device_tests;

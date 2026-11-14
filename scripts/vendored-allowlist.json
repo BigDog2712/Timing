@@ -1036,7 +1036,7 @@
     {
       "path": "src/windows/patina/shell/styles/features/dashboard-r2-cards.css",
       "change": "modified",
-      "reason": "第二层样式。`.qp-timeline-children` 必须 `grid-column: 1 / -1`，否则掉进第一层第 5 格（看起来像数据错位）",
+      "reason": "第二层样式。`.qp-timeline-children` 必须 `grid-column: 1 / -1`，否则掉进第一层第 5 格（看起来像数据错位）；另含设备角标（.qp-timeline-child-device，单设备零元素）",
       "owner": "software-engineer"
     },
     {
@@ -1139,6 +1139,12 @@
       "path": "src/windows/patina/shell/styles/features/settings-app-category.css",
       "change": "added",
       "reason": "面板样式单独成文件：settings.css 是 1667 行冻结基线，一次性 +118 会让整页超限",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/attribution/slice_device_tests.rs",
+      "change": "added",
+      "reason": "设备维度判据 2 条：双端并行两段各带 device_id、覆盖分支改分类不改设备。从 slice_tests.rs 拆出（300 行硬限）",
       "owner": "software-engineer"
     }
   ]

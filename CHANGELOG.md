@@ -85,6 +85,20 @@
 - **新增 10 条用例** `services::item_tests`：断言**落库后**的 `parent_id`/`depth`，不只断言
   返回 Ok（「先插再报错」的实现也要能抓出来）。四项变异自证各自咬住唯一一条（见设计文档 §12）。
 
+### 子记录带设备维度（0.12.2 并入）
+
+- `FactSpan` / `ChildSegment` / `ChildSegmentDto` 增加 `device_id`，`load_facts` 取
+  `sessions.device_id`；`ItemTimelineDto` 增加 `selfDeviceId`。
+- **为什么必须有**：双端可同时对同一事项计时，同一个 chrome 会有两段来自不同设备的事实。
+  不带这一维，界面上就是「chrome 被记了两遍」——数字全对，但「双端并行」这件事不可见。
+- **渲染复用既有口径**：`buildDeviceLanes(segments, selfDeviceId)`，≤1 台设备返回 `[]`
+  ⇒ 一个设备元素都不渲染（历史页那条验收断言的同一套规则）。设备 >1 台时子记录行上出现
+  短 id 角标，title 是完整 id。
+- **分行 / 徽章 / 悬停三选一仍是待裁决点**：本轮只做「不影响布局」的角标，不动时间轴结构。
+- 用例 4 条：Rust 2（双端并行两段各带设备、覆盖分支改分类不改设备）、前端 2
+  （单设备零角标、双端并行两段角标不同）。`slice_tests.rs` 到 300 行硬限，设备组拆成
+  `slice_device_tests.rs`。
+
 ### 应用分类候选：一个应用多个分类（0.12.2 并入）
 
 - **设置页新增「应用分类候选」**（`SettingsAppCategoryPanel`）：一个应用可绑多个分类并
@@ -143,10 +157,10 @@
 ### 账本
 
 - `size` 145 条（`schema.rs` 1887→1751、`hourly.rs` 852→629、`sqlite_pool.rs` 748→747 等向下收紧）；
-  扫描 1805 文件 / 超限占比 29.2%。为压回 300 行硬限，本轮把 `record_session.rs` 拆出
+  扫描 1806 文件 / 超限占比 29.2%。为压回 300 行硬限，本轮把 `record_session.rs` 拆出
   `record_session_split.rs`、`focus_blocks.rs` 拆成 `mod.rs` + `read.rs`、`ipc.ts` 压行。
-- `vendored` 190 条（改 68 / 增 122）；`contract` 88（+Patina 126）/ 错误码 18 / 事件 11-11。
-- `cargo test --lib` **1826 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 208 文件 / 1596 用例。
+- `vendored` 191 条（改 68 / 增 123）；`contract` 88（+Patina 126）/ 错误码 18 / 事件 11-11。
+- `cargo test --lib` **1828 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 208 文件 / 1596 用例。
 - `clippy --all-targets -D warnings` 0 诊断（`--lib` 看不到新用例的 lint：`too_many_arguments`
   与 `doc_lazy_continuation` 都是只在 `--all-targets` 下才现形的）。
 

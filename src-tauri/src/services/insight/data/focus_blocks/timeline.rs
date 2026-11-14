@@ -59,6 +59,12 @@ pub struct ItemTimelineDto {
     pub segments: Vec<ChildSegmentDto>,
     pub gaps: Vec<GapDto>,
     pub totals_by_category: BTreeMap<String, i64>,
+    /// 本机 `device_id`。前端拿它判断「哪一段是本机」，并且**设备数 ≤ 1 时不许渲染
+    /// 任何设备元素**（`deviceLanes` 的既有口径）。
+    ///
+    /// 不给这个值的话前端只能猜 —— 而「手机导入的数据全折成本机 id」这件事让
+    /// 「出现过」与「是本机」是两个不同的判定。
+    pub self_device_id: Option<String>,
 }
 
 /// 按区间取双层时间轴。
@@ -181,5 +187,8 @@ async fn build_item_row(
         segments: segments.into_iter().map(ChildSegmentDto::from).collect(),
         gaps,
         totals_by_category: totals,
+        /* 取一次 `install_id()`（`OnceLock` 缓存），每行都带：前端按行判断要不要渲染
+           设备元素，不需要再发一次取本机 id 的命令。 */
+        self_device_id: crate::services::identity::install_id().map(str::to_string),
     })
 }

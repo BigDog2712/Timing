@@ -17,6 +17,7 @@
 import { useLocale, useLocaleText, type UiText } from "../../../shared/i18n/index.ts";
 import { isExtendedCategory, resolveExtendedCategoryLabel } from "../../../shared/classification/categoryTokens.ts";
 import type { ItemTimelineRow } from "../../../platform/persistence/attributionGateway.ts";
+import { buildDeviceLanes } from "../../history/services/deviceLanes.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 
 /** 第二层的一条：应用段，或「未采集」空档。 */
@@ -27,6 +28,8 @@ export interface ChildEntry {
   endMs: number;
   appName: string;
   categoryKey: string;
+  /** 产生这段的设备；空档没有设备（`""`）。 */
+  deviceId: string;
 }
 
 function clockOf(ms: number): string {
@@ -51,6 +54,7 @@ export function buildChildEntries(row: ItemTimelineRow): ChildEntry[] {
       endMs: segment.endMs,
       appName: segment.appName || segment.appKey,
       categoryKey: segment.categoryKey,
+      deviceId: segment.deviceId,
     })),
     ...row.gaps.map((gap, index) => ({
       kind: "gap" as const,
@@ -59,6 +63,7 @@ export function buildChildEntries(row: ItemTimelineRow): ChildEntry[] {
       endMs: gap.endMs,
       appName: "",
       categoryKey: "",
+      deviceId: "",
     })),
   ];
   return entries.sort((left, right) => left.startMs - right.startMs || left.key.localeCompare(right.key));
@@ -84,6 +89,12 @@ export default function TimelineChildRows({ row }: Props) {
   const copy = DASHBOARD_COPY[useLocale()];
   const UI_TEXT = useLocaleText();
   const entries = buildChildEntries(row);
+  /* 设备数 ≤ 1 时 `buildDeviceLanes` 返回空数组 ⇒ 一个设备元素都不渲染。
+     这条规则复用的是历史页那条泳道：写成组件里的 `if (ids.length > 1)` 就等于
+     多了一处「有几台设备」的判据，将来加一个 chip 就会漏。 */
+  const deviceLabels = new Map(
+    buildDeviceLanes(row.segments, row.selfDeviceId).map((lane) => [lane.deviceId, lane.label]),
+  );
 
   return (
     <ul className="qp-timeline-children">
@@ -97,10 +108,12 @@ export default function TimelineChildRows({ row }: Props) {
           );
         }
         const label = categoryLabelOf(entry.categoryKey, UI_TEXT);
+        const device = deviceLabels.get(entry.deviceId);
         return (
-          <li key={entry.key} className="qp-timeline-child">
+          <li key={entry.key} className="qp-timeline-child" data-device={entry.deviceId || undefined}>
             <span className="qp-timeline-child-app" title={entry.appName}>{entry.appName}</span>
             {label ? <span className="qp-timeline-child-category">{label}</span> : null}
+            {device ? <span className="qp-timeline-child-device" title={entry.deviceId}>{device}</span> : null}
             <span className="qp-timeline-child-range">{range}</span>
           </li>
         );

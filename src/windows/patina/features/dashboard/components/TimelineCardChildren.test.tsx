@@ -61,8 +61,8 @@ function timelineRow(overrides: Partial<ItemTimelineRow> = {}): ItemTimelineRow 
     totalMs: 120 * 60_000,
     blockCount: 1,
     segments: [
-      { appKey: "chrome", appName: "chrome", startMs: at(9, 30), endMs: at(11, 0), categoryKey: "study" },
-      { appKey: "pycharm", appName: "pycharm", startMs: at(11, 10), endMs: at(11, 30), categoryKey: "study" },
+      { appKey: "chrome", appName: "chrome", deviceId: "pc-a", startMs: at(9, 30), endMs: at(11, 0), categoryKey: "study" },
+      { appKey: "pycharm", appName: "pycharm", deviceId: "pc-a", startMs: at(11, 10), endMs: at(11, 30), categoryKey: "study" },
     ],
     gaps: [{ startMs: at(11, 0), endMs: at(11, 10) }],
     totalsByCategory: { study: 110 * 60_000 },
@@ -139,6 +139,36 @@ describe("时间轴第二层", () => {
     await act(async () => toggle.click());
     expect(container.querySelectorAll(".qp-timeline-child")).toHaveLength(0);
   });
+  it("单设备时一个设备角标都不出现", async () => {
+    /* 单设备是常态。「界面上不许出现设备元素」这条在历史页已经是一条验收断言，
+       这里复用同一个 `buildDeviceLanes`（≤1 台返回 `[]`），避免出现第二套判据。 */
+    await render(ITEMS, [timelineRow({ selfDeviceId: "pc-a" })]);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".qp-timeline-toggle")!.click();
+    });
+    expect(container.querySelectorAll(".qp-timeline-child-device").length).toBe(0);
+  });
+
+  it("双端并行时每段带自己的设备角标", async () => {
+    /* 同一事项、同一应用，两端各跑一段：不带设备时这两行长得一模一样，
+       用户的第一反应是「重复记录了」。 */
+    await render(ITEMS, [
+      timelineRow({
+        selfDeviceId: "pc-a",
+        gaps: [],
+        segments: [
+          { appKey: "chrome", appName: "chrome", deviceId: "pc-a", startMs: at(9, 30), endMs: at(10, 0), categoryKey: "study" },
+          { appKey: "chrome", appName: "chrome", deviceId: "phone-b", startMs: at(10, 0), endMs: at(10, 30), categoryKey: "study" },
+        ],
+      }),
+    ]);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>(".qp-timeline-toggle")!.click();
+    });
+    const badges = [...container.querySelectorAll(".qp-timeline-child-device")];
+    expect(badges).toHaveLength(2);
+    expect(badges[0].textContent).not.toBe(badges[1].textContent);
+  });
 });
 
 describe("第二层纯函数", () => {
@@ -148,8 +178,8 @@ describe("第二层纯函数", () => {
     const entries = buildChildEntries(
       timelineRow({
         segments: [
-          { appKey: "chrome", appName: "chrome", startMs: at(9, 30), endMs: at(10, 0), categoryKey: "study" },
-          { appKey: "pycharm", appName: "pycharm", startMs: at(11, 10), endMs: at(11, 30), categoryKey: "study" },
+          { appKey: "chrome", appName: "chrome", deviceId: "pc-a", startMs: at(9, 30), endMs: at(10, 0), categoryKey: "study" },
+          { appKey: "pycharm", appName: "pycharm", deviceId: "pc-a", startMs: at(11, 10), endMs: at(11, 30), categoryKey: "study" },
         ],
         gaps: [{ startMs: at(11, 0), endMs: at(11, 10) }],
       }),
@@ -164,4 +194,5 @@ describe("第二层纯函数", () => {
     expect(categoryLabelOf("学习", uiText)).toBe("学习");
     expect(categoryLabelOf("", uiText)).toBe("");
   });
+
 });

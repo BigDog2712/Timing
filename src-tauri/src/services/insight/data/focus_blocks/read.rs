@@ -31,6 +31,8 @@ pub struct BlockDetailDto {
 pub struct ChildSegmentDto {
     pub app_key: String,
     pub app_name: String,
+    /// 产生这段活动的设备（双端并行时同应用会有两段，靠它区分）。
+    pub device_id: String,
     pub start_ms: i64,
     pub end_ms: i64,
     pub category_key: String,
@@ -41,6 +43,7 @@ impl From<ChildSegment> for ChildSegmentDto {
         Self {
             app_key: segment.app_key,
             app_name: segment.app_name,
+            device_id: segment.device_id,
             start_ms: segment.start_ms,
             end_ms: segment.end_ms,
             category_key: segment.category_key,
@@ -120,7 +123,7 @@ pub(super) async fn load_facts(
     end_ms: i64,
 ) -> Result<Vec<FactSpan>, String> {
     let rows = sqlx::query(
-        "SELECT app_key, app_name, start_time, COALESCE(end_time, ?2) AS effective_end
+        "SELECT app_key, app_name, device_id, start_time, COALESCE(end_time, ?2) AS effective_end
            FROM sessions
           WHERE start_time < ?2 AND COALESCE(end_time, ?2) > ?1
           ORDER BY start_time ASC, app_key ASC",
@@ -135,6 +138,7 @@ pub(super) async fn load_facts(
         .map(|row| FactSpan {
             app_key: row.get("app_key"),
             app_name: row.get::<Option<String>, _>("app_name").unwrap_or_default(),
+            device_id: row.get("device_id"),
             start_ms: row.get("start_time"),
             end_ms: row.get("effective_end"),
         })

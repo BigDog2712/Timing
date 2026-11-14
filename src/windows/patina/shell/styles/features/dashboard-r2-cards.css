@@ -286,3 +286,10 @@
   color: var(--qp-text-tertiary);
   font-style: italic;
 }
+
+/* 设备角标：只在同一事项行出现 ≥2 台设备时渲染（`buildDeviceLanes` 决定），单设备零元素。 */
+.qp-timeline-child-device {
+  padding: 0 4px; border: 1px solid var(--qp-border-subtle); border-radius: 999px;
+  color: var(--qp-text-tertiary); font-size: 10px; font-variant-numeric: tabular-nums;
+  line-height: 14px; white-space: nowrap;
+}

@@ -33,9 +33,15 @@ fn categories(entries: &[(&str, &[&str])]) -> BTreeMap<String, Vec<AppCategory>>
 }
 
 fn fact(app: &str, start_ms: i64, end_ms: i64) -> FactSpan {
+    fact_on("pc-a", app, start_ms, end_ms)
+}
+
+/// 指定设备的同一条事实（双端并行的那一半）。
+fn fact_on(device: &str, app: &str, start_ms: i64, end_ms: i64) -> FactSpan {
     FactSpan {
         app_key: app.to_string(),
         app_name: app.to_string(),
+        device_id: device.to_string(),
         start_ms,
         end_ms,
     }
