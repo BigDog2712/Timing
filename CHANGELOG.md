@@ -162,6 +162,20 @@
 - 用例：改判 3 条（d03 / cm04 / cm11）+ 新增 2 条（cm13 内置删除整批、cm14 恢复写 null），
   `DataAppEditColorReset.test.tsx` → `DataCategoryManageColorReset.test.tsx`（宿主换了）。
 
+### 修复 · 今日时间线卡底三颗入口在空态下是死的（0.12.2 并入）
+
+- 现象：没有计时的那一天（「今天还没有计时」）点「新建事项 / 编辑事项 / 事项管理」，
+  **一点反应都没有**，没有报错也没有提示；有数据的那天反而正常。
+- 根因：三颗入口挂在 `ModuleShell` 的 `footer`（四态常驻），而三个弹层组件写在
+  **`children`** 里 —— children **只在 ready 态渲染**。于是空态 / 错误态下
+  `setDialog("create")` 照常执行，消费这个状态的 `TimelineManage` 却根本没挂载。
+  这正是"今天还没开始计时"最需要入口的时刻，而所有既有用例（tc02 / tc05）都传了行数据、跑在 ready 态。
+- 修法：三个弹层改成 `ModuleShell` 的**兄弟**（同一层 fragment 内、`</ModuleShell>` 之后），
+  与待办卡的 `TodoComposeDialog` 同口径。三个都 portal 到 body，放卡外不影响排版。
+- 用例 `TimelineCardEntry.test.tsx`（3 条）：空态下三颗键逐一点一次、错误态再点一次，
+  判据只有一条 —— **弹层真的在 `document.body` 里**。变异自证：把弹层移回 children，
+  三条一起红（`expected null to be '新建事项'`）。
+
 ### 顺手修掉的两个真 bug
 
 - `ensure_install_id` 的临时文件名是固定的 `install_id.txt.tmp`：两个写者同时进来时，
@@ -175,10 +189,10 @@
 ### 账本
 
 - `size` 145 条（`schema.rs` 1887→1751、`hourly.rs` 852→629、`sqlite_pool.rs` 748→747 等向下收紧）；
-  扫描 1806 文件 / 超限占比 29.2%。为压回 300 行硬限，本轮把 `record_session.rs` 拆出
+  扫描 1807 文件 / 超限占比 29.2%。为压回 300 行硬限，本轮把 `record_session.rs` 拆出
   `record_session_split.rs`、`focus_blocks.rs` 拆成 `mod.rs` + `read.rs`、`ipc.ts` 压行。
-- `vendored` 191 条（改 68 / 增 123）；`contract` 88（+Patina 126）/ 错误码 18 / 事件 11-11。
-- `cargo test --lib` **1828 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 208 文件 / 1596 用例。
+- `vendored` 195 条（改 71 / 增 124）；`contract` 88（+Patina 126）/ 错误码 18 / 事件 11-11。
+- `cargo test --lib` **1828 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 209 文件 / 1603 用例。
 - `clippy --all-targets -D warnings` 0 诊断（`--lib` 看不到新用例的 lint：`too_many_arguments`
   与 `doc_lazy_continuation` 都是只在 `--all-targets` 下才现形的）。
 

@@ -10,6 +10,13 @@
  *   2. **编辑事项**：先选事项 → 改名称 + 默认时长（`TimelineEditDialog`，一条 update_item）；
  *   3. **事项管理**：常用 / 近期两组，行内编辑（`TimelineManage` 的 manage 弹层）。
  *
+ * ## 三个弹层是 `ModuleShell` 的兄弟，不是 children（别改回去）
+ *
+ * 入口在 `footer` 上（四态常驻），弹层最初却写在 children 里 —— 而 children **只在
+ * ready 态渲染**。于是「今天还没有计时」这一天点三颗键一点反应都没有：`setDialog`
+ * 执行了，消费它的组件没挂载，零报错零提示（`TimelineCardEntry.test.tsx` 就是为这条
+ * 留的）。待办卡的 `TodoComposeDialog` 早就是兄弟关系，同一口径。
+ *
  * 行上还有第四个动作 **改起止**（T03b）：打开 `TimelineRecordTimeDialog`，
  * 走 `update_record_time` 意图 —— 这是本轮唯一改写历史数据语义的入口。
  *
@@ -128,81 +135,89 @@ export default function TimelineCard({
   const recordEditItemName = items.find((item) => item.itemId === recordEditItemId)?.name ?? "";
 
   return (
-    <ModuleShell
-      controls={controls}
-      id="t-timeline"
-      title={copy.cardLabels.timeline}
-      className="qp-card-timeline"
-      state={state}
-      skeletonRows={4}
-      skeletonRow="todo"
-      errorText={UI_TEXT.common.readFailed}
-      retryLabel={UI_TEXT.common.retry}
-      onRetry={onRetry}
-      refreshErrorText={refreshError ? UI_TEXT.common.refreshFailed : undefined}
-      emptyText={copy.timerEmpty}
-      /* 卡头读数 = 总计（`useTodayItems.total`，后端口径）。右槽在 ready 才渲染
-         （ModuleShell 的 R9 收口），空态/错误态不给假数字。 */
-      meta={copy.timelineTotal(formatDashboardDuration(total))}
-      /* [本轮] 卡底三个写入口放 **footer** 而不是 children：children 只在 ready 渲染，
-         而「今天还没有计时」正是最想新建/管理事项的时刻（`ModuleShell` 的 footer 注释）。 */
-      footer={(
-        <div className="qp-timeline-manage">
-          <button type="button" className="qp-link-btn" onClick={() => setDialog("create")}>
-            {copy.timelineNewItem}
-          </button>
-          <button type="button" className="qp-link-btn" onClick={() => setDialog("edit")}>
-            {copy.timelineEditItem}
-          </button>
-          <button type="button" className="qp-link-btn" onClick={() => setDialog("manage")}>
-            {copy.timelineManageItems}
-          </button>
-        </div>
-      )}
-    >
-      <ul className="qp-timeline-rows">
-        {rows.map((row) => {
-          const detail = byItemId.get(Number(row.key));
-          const isOpen = expanded.has(row.key);
-          return (
-          <li key={row.key} className="qp-timeline-row" data-running={row.running || undefined}>
-            <span className="qp-timeline-label" title={row.label}>
-              {detail && detail.segments.length + detail.gaps.length > 0 ? (
+    <>
+      <ModuleShell
+        controls={controls}
+        id="t-timeline"
+        title={copy.cardLabels.timeline}
+        className="qp-card-timeline"
+        state={state}
+        skeletonRows={4}
+        skeletonRow="todo"
+        errorText={UI_TEXT.common.readFailed}
+        retryLabel={UI_TEXT.common.retry}
+        onRetry={onRetry}
+        refreshErrorText={refreshError ? UI_TEXT.common.refreshFailed : undefined}
+        emptyText={copy.timerEmpty}
+        /* 卡头读数 = 总计（`useTodayItems.total`，后端口径）。右槽在 ready 才渲染
+           （ModuleShell 的 R9 收口），空态/错误态不给假数字。 */
+        meta={copy.timelineTotal(formatDashboardDuration(total))}
+        /* [本轮] 卡底三个写入口放 **footer** 而不是 children：children 只在 ready 渲染，
+           而「今天还没有计时」正是最想新建/管理事项的时刻（`ModuleShell` 的 footer 注释）。 */
+        footer={(
+          <div className="qp-timeline-manage">
+            <button type="button" className="qp-link-btn" onClick={() => setDialog("create")}>
+              {copy.timelineNewItem}
+            </button>
+            <button type="button" className="qp-link-btn" onClick={() => setDialog("edit")}>
+              {copy.timelineEditItem}
+            </button>
+            <button type="button" className="qp-link-btn" onClick={() => setDialog("manage")}>
+              {copy.timelineManageItems}
+            </button>
+          </div>
+        )}
+      >
+        <ul className="qp-timeline-rows">
+          {rows.map((row) => {
+            const detail = byItemId.get(Number(row.key));
+            const isOpen = expanded.has(row.key);
+            return (
+              <li key={row.key} className="qp-timeline-row" data-running={row.running || undefined}>
+                <span className="qp-timeline-label" title={row.label}>
+                  {detail && detail.segments.length + detail.gaps.length > 0 ? (
+                    <button
+                      type="button"
+                      className="qp-timeline-toggle"
+                      aria-expanded={isOpen}
+                      title={isOpen ? copy.timelineChildrenCollapse : copy.timelineChildrenToggle(detail.segments.length + detail.gaps.length)}
+                      onClick={() => toggle(row.key)}
+                    >
+                      {isOpen ? "▾" : "▸"}
+                    </button>
+                  ) : null}
+                  {row.label}
+                </span>
+                <span
+                  className="qp-timeline-range"
+                  title={row.running ? copy.timelineNoEnd(row.endLabel) : copy.timelineRange(row.startLabel, row.endLabel)}
+                >
+                  {row.running
+                    ? copy.timelineNoEnd(row.endLabel)
+                    : copy.timelineRange(row.startLabel, row.endLabel)}
+                </span>
+                <span className="qp-timeline-duration">{row.duration}</span>
                 <button
                   type="button"
-                  className="qp-timeline-toggle"
-                  aria-expanded={isOpen}
-                  title={isOpen ? copy.timelineChildrenCollapse : copy.timelineChildrenToggle(detail.segments.length + detail.gaps.length)}
-                  onClick={() => toggle(row.key)}
+                  className="qp-link-btn qp-timeline-record-edit"
+                  aria-label={`${copy.editRecordTime} ${row.label}`}
+                  onClick={() => setRecordEditItemId(Number(row.key))}
                 >
-                  {isOpen ? "▾" : "▸"}
+                  {copy.editRecordTime}
                 </button>
-              ) : null}
-              {row.label}
-            </span>
-            <span
-              className="qp-timeline-range"
-              title={row.running ? copy.timelineNoEnd(row.endLabel) : copy.timelineRange(row.startLabel, row.endLabel)}
-            >
-              {row.running
-                ? copy.timelineNoEnd(row.endLabel)
-                : copy.timelineRange(row.startLabel, row.endLabel)}
-            </span>
-            <span className="qp-timeline-duration">{row.duration}</span>
-            <button
-              type="button"
-              className="qp-link-btn qp-timeline-record-edit"
-              aria-label={`${copy.editRecordTime} ${row.label}`}
-              onClick={() => setRecordEditItemId(Number(row.key))}
-            >
-              {copy.editRecordTime}
-            </button>
-            {isOpen && detail ? <TimelineChildRows row={detail} /> : null}
-          </li>
-          );
-        })}
-      </ul>
+                {isOpen && detail ? <TimelineChildRows row={detail} /> : null}
+              </li>
+            );
+          })}
+        </ul>
+      </ModuleShell>
 
+      {/* 三个弹层是 `ModuleShell` 的**兄弟**，不是 children（照待办卡的 `TodoComposeDialog`）：
+          卡底三颗入口挂在 footer 上、empty / error 态都在场，而 children 只在 ready 态渲染 ——
+          弹层留在 children 里就会出现「今天还没有计时 → 点新建事项一点反应都没有」：
+          点得到、`setDialog` 也执行了，但没有人消费那个状态，零报错零提示。
+          （0.13 · 1.6 就是这么写进去的，空态下三颗键全哑。）
+          三个弹层都 portal 到 body，放在卡外不影响这张卡的排版。 */}
       <TimelineManage
         mode={dialog === "edit" ? null : dialog}
         onClose={() => setDialog(null)}
@@ -219,6 +234,6 @@ export default function TimelineCard({
         itemName={recordEditItemName}
         onClose={() => setRecordEditItemId(null)}
       />
-    </ModuleShell>
+    </>
   );
 }

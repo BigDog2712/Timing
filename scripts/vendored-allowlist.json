@@ -46,7 +46,7 @@
     {
       "path": "src/windows/patina/features/dashboard/components/ModuleShell.tsx",
       "change": "modified",
-      "reason": "新增 headAction 槽：卡头右侧的常驻操作，不受四态门控（待办卡的新建入口从卡底 footer 搬上来）",
+      "reason": "footer 常驻槽的注释补一条约束：底条入口要开的弹层必须挂在 children 之外（children 只在 ready 渲染 ⇒ 空态点得到、弹层不挂载，零报错零提示）；原先记的 headAction 槽已下线",
       "owner": "software-engineer"
     },
     {
@@ -1163,6 +1163,12 @@
       "path": "src/windows/patina/features/data/components/DataCategoryManageColorReset.test.tsx",
       "change": "added",
       "reason": "「恢复默认颜色」的接线判据随宿主一起搬到 DataCategoryManageDialog（原文件按旧宿主命名）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineCardEntry.test.tsx",
+      "change": "added",
+      "reason": "卡底三颗入口在 empty/error 态的判据：三颗按钮挂在 footer（四态常驻），弹层原先写在 children 里（只在 ready 渲染）⇒ 空态点击零反应、零报错；用例钉住「点一次，弹层真的在 DOM 里」",
       "owner": "software-engineer"
     }
   ]
