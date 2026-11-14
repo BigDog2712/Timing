@@ -161,7 +161,7 @@ async fn measure_capacity(
     assert!(
         active_probe_plan
             .iter()
-            .any(|line| line.contains("idx_sessions_single_active")),
+            .any(|line| line.contains("idx_sessions_end_start")),
         "active probe must stay bounded with the complete schema: {active_probe_plan:?}"
     );
     let pages: i64 = sqlx::query_scalar("PRAGMA page_count")

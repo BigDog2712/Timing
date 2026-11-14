@@ -35,8 +35,8 @@ struct CatalogProjection {
     has_bucket: bool,
 }
 
-const NORMALIZED_KEY_SQL: &str = "CASE WHEN LOWER(TRIM(exe_name, ' \"')) LIKE '%.exe'
-          THEN LOWER(TRIM(exe_name, ' \"'))
+const NORMALIZED_KEY_SQL: &str = "CASE WHEN INSTR(LOWER(TRIM(exe_name, ' \"')), ':') > 0
+          OR LOWER(TRIM(exe_name, ' \"')) LIKE '%.exe' THEN LOWER(TRIM(exe_name, ' \"'))
           ELSE LOWER(TRIM(exe_name, ' \"')) || '.exe' END";
 
 pub(super) async fn maintain_once(pool: &Pool<Sqlite>) -> Result<bool, String> {

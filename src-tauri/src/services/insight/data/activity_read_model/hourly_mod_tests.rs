@@ -3,24 +3,12 @@
 //! `mod tests` 仍声明在原模块内（`#[path]` 指向本文件），`super::` 语义不变。
 
 use super::*;
-use crate::services::insight::data::schema::{
-    ACTIVITY_READ_MODELS_SCHEMA_SQL, CURRENT_BASELINE_SCHEMA_SQL,
-    IMPORT_DATA_ISOLATION_SCHEMA_SQL, IMPORT_DATA_SCHEMA_SQL,
-};
-use sqlx::{Executor, SqlitePool};
+use sqlx::SqlitePool;
 
+// 夹具与 `contract_tests` 同源（`data/hourly_fixture.rs`）：迁移 28 之后，
+// 库必须带设备维度，否则投影写侧的 `device_id` 无处可写。
 async fn setup_pool() -> SqlitePool {
-    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    pool.execute(CURRENT_BASELINE_SCHEMA_SQL).await.unwrap();
-    pool.execute(IMPORT_DATA_SCHEMA_SQL).await.unwrap();
-    pool.execute(IMPORT_DATA_ISOLATION_SCHEMA_SQL)
-        .await
-        .unwrap();
-    pool.execute(ACTIVITY_READ_MODELS_SCHEMA_SQL).await.unwrap();
-    pool.execute(crate::services::insight::data::repositories::anonymous_activity::SCHEMA_SQL)
-        .await
-        .unwrap();
-    pool
+    crate::services::insight::data::hourly_fixture::setup_pool().await
 }
 
 #[tokio::test]
@@ -113,8 +101,8 @@ async fn stale_worker_generation_never_clears_a_newer_dirty_signal() {
     .await
     .unwrap();
     sqlx::query(
-        "UPDATE read_model_state SET state = 'ready', algorithm_version = 3, coverage_start_ms = 0,
-                coverage_end_ms = 3600000 WHERE model_name = 'activity_hourly'",
+        "UPDATE read_model_state SET state = 'ready', schema_version = 2, algorithm_version = 3,
+         coverage_start_ms = 0, coverage_end_ms = 3600000 WHERE model_name = 'activity_hourly'",
     )
     .execute(&pool)
     .await
@@ -172,8 +160,8 @@ async fn dirty_rebuild_drains_a_bounded_bulk_write_batch_per_worker_turn() {
         .unwrap();
     }
     sqlx::query(
-        "UPDATE read_model_state SET state = 'ready', algorithm_version = 3, coverage_start_ms = 0,
-                coverage_end_ms = 3600000 WHERE model_name = 'activity_hourly'",
+        "UPDATE read_model_state SET state = 'ready', schema_version = 2, algorithm_version = 3,
+         coverage_start_ms = 0, coverage_end_ms = 3600000 WHERE model_name = 'activity_hourly'",
     )
     .execute(&pool)
     .await

@@ -358,7 +358,7 @@ fn current_v6_schema_is_normalized_then_advanced_to_isolated_schema() {
                 .unwrap();
         assert_eq!(recorded_versions, vec![1, 2, 3, 4, 5, 6]);
 
-        run_current_migrations(&pool).await.unwrap();
+        run_current_migrations(&pool, std::path::Path::new("mod-tests.db")).await.unwrap();
 
         assert!(has_import_data_schema(&pool).await.unwrap());
         assert!(has_activity_read_models_schema(&pool).await.unwrap());
@@ -547,7 +547,7 @@ fn current_schema_history_does_not_mark_missing_web_activity_schema_as_applied()
             }));
         }
 
-        run_current_migrations(&pool).await.unwrap();
+        run_current_migrations(&pool, std::path::Path::new("mod-tests.db")).await.unwrap();
         assert!(has_web_activity_schema(&pool).await.unwrap());
     });
 }
@@ -599,7 +599,7 @@ fn current_schema_history_does_not_mark_missing_web_favicon_cache_as_applied() {
             }));
         }
 
-        run_current_migrations(&pool).await.unwrap();
+        run_current_migrations(&pool, std::path::Path::new("mod-tests.db")).await.unwrap();
         assert!(has_web_favicon_cache_schema(&pool).await.unwrap());
     });
 }
@@ -657,7 +657,7 @@ fn current_schema_history_does_not_mark_missing_import_data_schema_as_applied() 
             }));
         }
 
-        run_current_migrations(&pool).await.unwrap();
+        run_current_migrations(&pool, std::path::Path::new("mod-tests.db")).await.unwrap();
         assert!(table_exists(&pool, "import_batches").await.unwrap());
         assert!(!table_exists(&pool, "import_exact_records").await.unwrap());
         assert!(table_exists(&pool, "import_exact_sessions").await.unwrap());
@@ -669,16 +669,14 @@ fn current_schema_history_does_not_mark_missing_import_data_schema_as_applied() 
 fn missing_import_index_is_repaired_by_the_idempotent_migration() {
     tauri::async_runtime::block_on(async {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-        run_current_migrations(&pool).await.unwrap();
+        run_current_migrations(&pool, std::path::Path::new("mod-tests.db")).await.unwrap();
         pool.execute("DROP INDEX idx_import_time_buckets_exe_time")
             .await
             .unwrap();
 
         assert!(!has_import_data_schema(&pool).await.unwrap());
-        normalize_current_baseline_migration_history_for_pool(&pool)
-            .await
-            .unwrap();
-        run_current_migrations(&pool).await.unwrap();
+        // 28 之后历史归一化闸门关闭，"重跑迁移"不再是自愈路径 → 改由启动期补索引。
+        prepare_pool_schema(&pool, Path::new("repair-import-index.db")).await.unwrap();
 
         assert!(has_import_data_schema(&pool).await.unwrap());
         assert!(has_current_schema(&pool).await.unwrap());
@@ -689,7 +687,7 @@ fn missing_import_index_is_repaired_by_the_idempotent_migration() {
 fn partial_import_table_schema_fails_closed() {
     tauri::async_runtime::block_on(async {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-        run_current_migrations(&pool).await.unwrap();
+        run_current_migrations(&pool, std::path::Path::new("mod-tests.db")).await.unwrap();
         pool.execute("ALTER TABLE import_time_buckets DROP COLUMN source_path")
             .await
             .unwrap();

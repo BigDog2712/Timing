@@ -1,10 +1,9 @@
 use crate::services::insight::data::schema;
+use crate::services::insight::data::schema_registry;
 use crate::services::insight::data::schema_contracts;
 use crate::services::insight::data::sqlite_error::SqliteOperationError;
 use crate::infra::insight::storage_paths;
-use futures_util::future::BoxFuture;
-use sqlx::error::BoxDynError;
-use sqlx::migrate::{Migration as SqlxMigration, MigrationSource, MigrationType, Migrator};
+use sqlx::migrate::{Migration as SqlxMigration, MigrationType};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Pool, Row, Sqlite};
 use std::fs::create_dir_all;
@@ -26,12 +25,17 @@ pub(crate) async fn register_sqlite_pool(state: &AppSqlitePool, pool: Pool<Sqlit
         previous.close().await;
     }
 }
-const VALIDATED_SCHEMA_MIGRATION_HEAD: i64 = schema::FOCUS_HISTORY_VERSION;
+const VALIDATED_SCHEMA_MIGRATION_HEAD: i64 =
+    schema_registry::DEVICE_DIMENSION_MIGRATION_VERSION;
 mod activity_read_model_schema;
+mod current_schema;
 pub(super) mod import_schema;
 mod maintenance;
 mod restore;
 pub(super) use activity_read_model_schema::has_activity_read_models_schema;
+pub(super) use current_schema::{
+    ensure_current_indexes, has_current_baseline_schema, has_current_schema,
+};
 use import_schema::{has_import_data_schema, has_import_data_v6_schema};
 #[cfg(test)]
 pub(crate) use maintenance::QUERY_STATISTICS_OPTIMIZE_MASK;
@@ -39,27 +43,6 @@ pub(crate) use maintenance::{
     acquire_sqlite_maintenance, checkpoint_sqlite_pool, optimize_query_statistics,
 };
 pub(crate) use restore::replace_product_db_from_candidate;
-
-#[derive(Debug)]
-struct InlineMigrationList(Vec<schema::Migration>);
-
-impl MigrationSource<'static> for InlineMigrationList {
-    fn resolve(self) -> BoxFuture<'static, Result<Vec<SqlxMigration>, BoxDynError>> {
-        Box::pin(async move {
-            let mut migrations = Vec::new();
-            for migration in self.0 {
-                migrations.push(SqlxMigration::new(
-                    migration.version,
-                    migration.description.into(),
-                    MigrationType::ReversibleUp,
-                    migration.sql.into(),
-                    false,
-                ));
-            }
-            Ok(migrations)
-        })
-    }
-}
 
 pub(crate) fn expected_migration_metadata() -> Vec<(i64, &'static str, Vec<u8>)> {
     schema::tracker_migrations()
@@ -179,11 +162,15 @@ pub(crate) async fn prepare_pool_schema(pool: &Pool<Sqlite>, db_path: &Path) -> 
         crate::log_info!("normalized sqlite migration history to the current schema");
     }
 
-    run_current_migrations(pool).await?;
+    run_current_migrations(pool, db_path).await?;
 
     if normalize_current_baseline_migration_history_for_pool(pool).await? {
         crate::log_info!("normalized sqlite migration history to the current schema");
     }
+
+    // 设备维度：哨兵 `device_id = ''` → 本机 install_id（顺带补 uid），再标记本机。
+    // 必须在迁移之后（列在那时才有），且在验收之前（验收要求 device_id 列存在）。
+    crate::services::device::startup_identity(pool).await?;
 
     if !has_current_schema(pool).await? {
         return Err(format!(
@@ -209,14 +196,9 @@ fn validate_schema_inspection_coverage() -> Result<(), String> {
     Ok(())
 }
 
-async fn run_current_migrations(pool: &Pool<Sqlite>) -> Result<(), String> {
-    let migrator = Migrator::new(InlineMigrationList(schema::tracker_migrations()))
-        .await
-        .map_err(|error| format!("failed to prepare sqlite migrations: {error}"))?;
-    migrator
-        .run(pool)
-        .await
-        .map_err(|error| format!("failed to run sqlite migrations: {error}"))
+/// 跑迁移 + 幂等补列。内核在 `services::insight::schema_core`（零 `AppHandle`，手机端建库走同一份代码）。
+async fn run_current_migrations(pool: &Pool<Sqlite>, db_path: &Path) -> Result<(), String> {
+    crate::services::insight::schema_core::ensure_schema_at(pool, db_path).await
 }
 
 async fn table_exists(pool: &Pool<Sqlite>, table_name: &str) -> Result<bool, String> {
@@ -295,6 +277,7 @@ async fn table_has_index(
         "app_catalog_dirty_keys" => "PRAGMA index_list(app_catalog_dirty_keys)",
         "recorded_app_catalog" => "PRAGMA index_list(recorded_app_catalog)",
         "activity_hourly_effective" => "PRAGMA index_list(activity_hourly_effective)",
+        "import_time_buckets" => "PRAGMA index_list(import_time_buckets)",
         _ => return Err(format!("unsupported index inspection table `{table_name}`")),
     };
 
@@ -344,50 +327,6 @@ async fn ensure_sessions_continuity_group_start_time(pool: &Pool<Sqlite>) -> Res
         .map_err(|error| format!("failed to commit sqlite legacy schema repair: {error}"))?;
 
     Ok(true)
-}
-
-async fn ensure_current_indexes(pool: &Pool<Sqlite>) -> Result<bool, String> {
-    let mut changed = false;
-
-    if !sessions_has_index(pool, "idx_sessions_date").await? {
-        sqlx::query("CREATE INDEX IF NOT EXISTS idx_sessions_date ON sessions(start_time)")
-            .execute(pool)
-            .await
-            .map_err(|error| format!("failed to create sessions date index: {error}"))?;
-        changed = true;
-    }
-
-    if !sessions_has_index(pool, "idx_sessions_single_active").await? {
-        sqlx::query(
-            "UPDATE sessions
-             SET end_time = start_time,
-                 duration = 0
-             WHERE end_time IS NULL
-               AND id NOT IN (
-                 SELECT id
-                 FROM sessions
-                 WHERE end_time IS NULL
-                 ORDER BY start_time DESC, id DESC
-                 LIMIT 1
-               )",
-        )
-        .execute(pool)
-        .await
-        .map_err(|error| {
-            format!("failed to seal duplicate active sessions before index repair: {error}")
-        })?;
-        sqlx::query(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_single_active
-             ON sessions((1))
-             WHERE end_time IS NULL",
-        )
-        .execute(pool)
-        .await
-        .map_err(|error| format!("failed to create single active session index: {error}"))?;
-        changed = true;
-    }
-
-    Ok(changed)
 }
 
 async fn ensure_session_title_samples_schema(pool: &Pool<Sqlite>) -> Result<bool, String> {
@@ -526,67 +465,6 @@ async fn repair_legacy_schema_before_baseline_normalization(
     }
 
     Ok(changed)
-}
-
-pub(super) async fn has_current_baseline_schema(pool: &Pool<Sqlite>) -> Result<bool, String> {
-    if !table_exists(pool, "sessions").await?
-        || !table_exists(pool, "settings").await?
-        || !table_exists(pool, "icon_cache").await?
-    {
-        return Ok(false);
-    }
-
-    let sessions_ready = table_has_columns(
-        pool,
-        "sessions",
-        &[
-            "id",
-            "app_name",
-            "exe_name",
-            "window_title",
-            "start_time",
-            "end_time",
-            "duration",
-            "continuity_group_start_time",
-        ],
-    )
-    .await?;
-    let title_samples_ready = table_has_columns(
-        pool,
-        "session_title_samples",
-        &["id", "session_id", "title", "start_time", "end_time"],
-    )
-    .await?;
-    let settings_ready = table_has_columns(pool, "settings", &["key", "value"]).await?;
-    let icon_cache_ready = table_has_columns(
-        pool,
-        "icon_cache",
-        &["exe_name", "icon_base64", "last_updated"],
-    )
-    .await?;
-    let date_index_ready = sessions_has_index(pool, "idx_sessions_date").await?;
-    let active_index_ready = sessions_has_index(pool, "idx_sessions_single_active").await?;
-    let title_sample_session_index_ready = table_has_index(
-        pool,
-        "session_title_samples",
-        "idx_session_title_samples_session_time",
-    )
-    .await?;
-    let title_sample_time_index_ready = table_has_index(
-        pool,
-        "session_title_samples",
-        "idx_session_title_samples_time",
-    )
-    .await?;
-
-    Ok(sessions_ready
-        && title_samples_ready
-        && settings_ready
-        && icon_cache_ready
-        && date_index_ready
-        && active_index_ready
-        && title_sample_session_index_ready
-        && title_sample_time_index_ready)
 }
 
 pub(super) async fn has_base_tools_schema(pool: &Pool<Sqlite>) -> Result<bool, String> {
@@ -758,36 +636,13 @@ pub(super) async fn has_web_favicon_cache_schema(pool: &Pool<Sqlite>) -> Result<
     .await
 }
 
-async fn has_current_schema(pool: &Pool<Sqlite>) -> Result<bool, String> {
-    let checks = [
-        schema_contracts::has_pomodoro_tasks_schema(pool).await?,
-        schema_contracts::has_free_focus_schema(pool).await?,
-        schema_contracts::has_reminder_identity_schema(pool).await?,
-        schema_contracts::has_focus_history(pool).await?,
-        schema_contracts::has_pomodoro_completions_schema(pool).await?,
-        schema_contracts::has_retired_timer(pool).await?,
-        schema_contracts::has_unique_activity_reminder_targets(pool).await?,
-        schema_contracts::has_reminder_recurrence_schema(pool).await?,
-        schema_contracts::has_activity_reminder_enabled_schema(pool).await?,
-        schema_contracts::has_activity_reminder_extensions_schema(pool).await?,
-        schema_contracts::has_retired_widget_preferences(pool).await?,
-        schema_contracts::has_anonymous_activity_schema(pool).await?,
-        schema_contracts::has_session_range_index(pool).await?,
-        schema_contracts::has_web_activity_session_schema(pool).await?,
-        has_current_baseline_schema(pool).await?,
-        has_base_tools_schema(pool).await?,
-        schema_contracts::has_activity_reminder_rules_schema(pool).await?,
-        has_web_activity_schema(pool).await?,
-        has_web_favicon_cache_schema(pool).await?,
-        has_import_data_schema(pool).await?,
-        has_activity_read_models_schema(pool).await?,
-        schema_contracts::has_web_activity_revision_schema(pool).await?,
-        schema_contracts::has_scheduled_backup_schema(pool).await?,
-        schema_contracts::has_scheduled_export_schema(pool).await?,
-    ];
-    Ok(checks.into_iter().all(|ready| ready))
-}
-
+/// 迁移历史归一化（**危险函数，改前先读 `current_schema.rs` 的文件头**）。
+///
+/// ⚠️ 新迁移一律不要在这里加探测，也不要给 `schema_contracts::schema_revision_limit()`
+/// 加新版本的探测项：探测数不到的新版本会被 `expected.truncate(..)` 剪掉，于是
+/// `_sqlx_migrations` 被改写成「少一行」，下次启动重跑那条迁移就撞 `duplicate column`。
+/// 迁移 28 的安全路径正是「探测合计 = 27 → 本函数整体跳过」：28 之后
+/// `has_current_baseline_schema` 恒为假，这里第一道闸门就 return。
 async fn normalize_current_baseline_migration_history_for_pool(
     pool: &Pool<Sqlite>,
 ) -> Result<bool, String> {

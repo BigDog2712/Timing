@@ -12,6 +12,11 @@ async fn old_pool() -> SqlitePool {
     prepare_pool_schema(&pool, Path::new("retirement-fixture.db"))
         .await
         .unwrap();
+    // 把 28 加的东西拆回去，才谈得上"伪造一条 17 之前的库"：
+    // 28 的 `ADD COLUMN` 不能重跑（见 `legacy_schema_fixture` 的文件头）。
+    crate::services::insight::data::rewind_to_pre_device_dimension(&pool)
+        .await
+        .unwrap();
     pool.execute("DELETE FROM _sqlx_migrations WHERE version=17;
         INSERT INTO settings(key,value) VALUES
         ('minimize_behavior','widget'),('widget_placement','broken'),

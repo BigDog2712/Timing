@@ -106,7 +106,7 @@ async fn h5_extra_actives_closed_and_zero_left_after_resolve() {
     crash_after(&pool, rec.id, 600_000, true).await;
     /* 造第二条脏 active：唯一索引会拦，先摘掉（现实中的脏数据正是索引缺位年代的遗留）。
        它比 rec 晚开始——弹框只该针对最早的 rec。 */
-    exec(&pool, "DROP INDEX uq_records_open").await;
+    exec(&pool, "DROP INDEX uq_records_open_per_device").await;
     let extra_start = now_ms() - 300_000;
     let now = now_ms();
     exec(

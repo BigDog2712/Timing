@@ -1,66 +1,35 @@
+use super::facts::{
+    active_anonymous_start, active_session_start, fact_bounds, load_fact_candidates,
+    local_device_id,
+};
+use super::hourly_write::replace_projection_range;
 use super::{now_ms, ActivityAggregateRangeDto, ActivityAggregateRecordDto};
 use crate::models::insight::activity_read_model::{
-    ceil_to_hour, floor_to_hour, normalize_app_key, resolve_activity_precedence,
-    should_track_activity_fact, ActivityOrigin, OwnedActivityRange, HOUR_MS,
+    ceil_to_hour, floor_to_hour, resolve_activity_precedence,
+    ANONYMOUS_ACTIVITY_KEY as ANONYMOUS_APP_KEY, HOUR_MS,
 };
 use sqlx::{Pool, Row, Sqlite, Transaction};
+/* 只给用例用（它们经 `use super::*` 取）：事实候选读取改成 `facts::load_fact_candidates` 之后
+   本文件不再直接引用，但 `contract_tests` / `benchmark` 还在做 query-plan 断言。 */
+#[cfg(test)]
+use super::facts::{fact_candidates_query, ACTIVE_SESSION_START_SQL, FACT_CANDIDATES_SQL};
+#[cfg(test)]
+use crate::models::insight::activity_read_model::ActivityOrigin;
+#[cfg(test)]
 use std::collections::BTreeMap;
 
-const HOURLY_SCHEMA_VERSION: i64 = 1;
+// 2 = 迁移 28 之后：小时表主键含 `device_id`，旧投影必须整体重建（design §T03）。
+const HOURLY_SCHEMA_VERSION: i64 = 2;
 const HOURLY_ALGORITHM_VERSION: i64 = 3;
-use crate::models::insight::activity_read_model::ANONYMOUS_ACTIVITY_KEY as ANONYMOUS_APP_KEY;
 const HOURLY_FINGERPRINT: &str = "epoch-hour-v1";
 const BACKFILL_BATCH_MS: i64 = 7 * 24 * HOUR_MS;
 const DIRTY_REBUILD_BATCH_SIZE: i64 = 128;
-// The schema permits at most one open session. Pin its partial index so a covering
-// index cannot turn this bounded probe into a scan of the closed-session history.
-const ACTIVE_SESSION_START_SQL: &str = "SELECT start_time
-     FROM sessions INDEXED BY idx_sessions_single_active
-     WHERE end_time IS NULL LIMIT 1";
 const PROJECTION_RANGE_SQL: &str =
     "SELECT bucket_start_ms, bucket_end_ms, app_key, raw_exe_name, display_app_name,
-            effective_duration_ms
+            effective_duration_ms, device_id
      FROM activity_hourly_effective
      WHERE bucket_start_ms >= ? AND bucket_start_ms < ? AND bucket_end_ms > ?
      ORDER BY bucket_start_ms ASC, app_key ASC, origin ASC, source_id ASC";
-const FACT_CANDIDATES_SQL: &str =
-    "SELECT record_id, origin, app_name, exe_name, window_title, start_ms, end_ms, capacity_end_ms,
-            source_id
-     FROM (
-       SELECT id record_id, 'native' origin, app_name, exe_name, window_title, start_time start_ms,
-              COALESCE(end_time, ?) end_ms, NULL capacity_end_ms,
-              'native' source_id, 0 origin_rank
-       FROM sessions
-       WHERE start_time < ? AND (end_time > ? OR (end_time IS NULL AND ? > ?))
-         AND (? = 0 OR end_time IS NOT NULL)
-       UNION ALL
-       SELECT id, 'import_exact', app_name, exe_name, window_title, start_time, end_time, NULL,
-              batch_id, 1
-       FROM import_exact_sessions WHERE start_time < ? AND end_time > ?
-       UNION ALL
-       SELECT id, 'import_bucket', COALESCE(NULLIF(app_name, ''), exe_name), exe_name, '',
-              bucket_start_time, bucket_start_time + duration,
-              bucket_start_time + 3600000, batch_id, 2
-       FROM import_time_buckets
-       WHERE bucket_start_time < ? AND bucket_start_time + 3600000 > ?
-     )
-     ORDER BY start_ms ASC, origin_rank ASC, record_id ASC, end_ms ASC";
-
-#[derive(Clone, Debug)]
-struct CandidateValue {
-    anonymous: bool,
-    app_name: String,
-    exe_name: String,
-    source_id: String,
-}
-
-#[derive(Debug)]
-struct HourlyAccumulator {
-    raw_exe_name: String,
-    display_app_name: String,
-    duration_ms: i64,
-    latest_start_ms: i64,
-}
 
 #[derive(Clone, Copy, Debug)]
 struct Interval {
@@ -131,28 +100,19 @@ async fn initialize_backfill(pool: &Pool<Sqlite>) -> Result<(), String> {
         .await
         .map_err(|error| format!("failed to begin hourly backfill initialization: {error}"))?;
     let source_revision = current_revision(&mut tx).await?;
-    let bounds = sqlx::query(
-        "SELECT MIN(start_ms) start_ms, MAX(end_ms) end_ms
-         FROM (
-           SELECT start_time start_ms, end_time end_ms FROM sessions WHERE end_time IS NOT NULL
-           UNION ALL
-           SELECT start_time, end_time FROM anonymous_activity WHERE end_time IS NOT NULL
-           UNION ALL
-           SELECT start_time, end_time FROM import_exact_sessions
-           UNION ALL
-           SELECT bucket_start_time, bucket_start_time + 3600000 FROM import_time_buckets
-         )",
-    )
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(|error| format!("failed to inspect hourly backfill bounds: {error}"))?;
-    let start_ms = bounds.get::<Option<i64>, _>("start_ms").map(floor_to_hour);
-    let end_ms = bounds.get::<Option<i64>, _>("end_ms").map(ceil_to_hour);
+    let (bounds_start_ms, bounds_end_ms) = fact_bounds(&mut tx).await?;
+    let start_ms = bounds_start_ms.map(floor_to_hour);
+    let end_ms = bounds_end_ms.map(ceil_to_hour);
     let timestamp_ms = now_ms();
     sqlx::query("DELETE FROM activity_hourly_effective")
         .execute(&mut *tx)
         .await
         .map_err(|error| format!("failed to clear hourly projection for rebuild: {error}"))?;
+    // 日级表是小时表的派生物：小时投影整体重建时必须跟着清空，否则增量重算会以为覆盖还在。
+    sqlx::query("DELETE FROM activity_daily_totals")
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| format!("failed to clear daily totals for rebuild: {error}"))?;
     sqlx::query(
         "UPDATE read_model_state
          SET schema_version = ?, algorithm_version = ?, timezone_fingerprint = ?,
@@ -369,115 +329,6 @@ async fn process_dirty_ranges(
         .map_err(|error| format!("failed to commit dirty activity rebuild: {error}"))
 }
 
-async fn replace_projection_range(
-    tx: &mut Transaction<'_, Sqlite>,
-    start_ms: i64,
-    end_ms: i64,
-    source_revision: i64,
-) -> Result<(), String> {
-    let candidates = load_fact_candidates(tx, start_ms, end_ms, true, now_ms()).await?;
-    let resolved = resolve_activity_precedence(&candidates);
-    let mut rows: BTreeMap<(i64, String, ActivityOrigin, String), HourlyAccumulator> =
-        BTreeMap::new();
-    for range in resolved {
-        let clipped_start = range.start_ms.max(start_ms);
-        let clipped_end = range.end_ms.min(end_ms);
-        if clipped_end <= clipped_start {
-            continue;
-        }
-        let Some(app_key) = (if range.value.anonymous {
-            Some(ANONYMOUS_APP_KEY.to_string())
-        } else {
-            normalize_app_key(&range.value.exe_name)
-        }) else {
-            continue;
-        };
-        let mut cursor_ms = clipped_start;
-        while cursor_ms < clipped_end {
-            let bucket_start_ms = floor_to_hour(cursor_ms);
-            let bucket_end_ms = bucket_start_ms + HOUR_MS;
-            let segment_end_ms = clipped_end.min(bucket_end_ms);
-            let duration_ms = segment_end_ms - cursor_ms;
-            if duration_ms > 0 {
-                let key = (
-                    bucket_start_ms,
-                    app_key.clone(),
-                    range.origin,
-                    range.value.source_id.clone(),
-                );
-                let entry = rows.entry(key).or_insert_with(|| HourlyAccumulator {
-                    raw_exe_name: range.value.exe_name.clone(),
-                    display_app_name: range.value.app_name.trim().to_string(),
-                    duration_ms: 0,
-                    latest_start_ms: cursor_ms,
-                });
-                entry.duration_ms += duration_ms;
-                if cursor_ms >= entry.latest_start_ms {
-                    entry.raw_exe_name = range.value.exe_name.clone();
-                    if !range.value.app_name.trim().is_empty() {
-                        entry.display_app_name = range.value.app_name.trim().to_string();
-                    }
-                    entry.latest_start_ms = cursor_ms;
-                }
-            }
-            cursor_ms = segment_end_ms;
-        }
-    }
-
-    sqlx::query(
-        "DELETE FROM activity_hourly_effective
-         WHERE bucket_start_ms >= ? AND bucket_start_ms < ?",
-    )
-    .bind(start_ms)
-    .bind(end_ms)
-    .execute(&mut **tx)
-    .await
-    .map_err(|error| format!("failed to clear hourly projection range: {error}"))?;
-    let timestamp_ms = now_ms();
-    for ((bucket_start_ms, app_key, origin, source_id), row) in rows {
-        // Native facts remain additive when they overlap. Capacity rows preserve that total
-        // without fabricating activity in the next hour or retaining every session identity.
-        let mut remaining_ms = row.duration_ms;
-        let mut capacity_index = 0;
-        while remaining_ms > 0 {
-            let duration_ms = remaining_ms.min(HOUR_MS);
-            let row_source_id = if origin == ActivityOrigin::Native {
-                format!("native:{capacity_index}")
-            } else {
-                source_id.clone()
-            };
-            sqlx::query(
-                "INSERT INTO activity_hourly_effective(
-                   bucket_start_ms, bucket_end_ms, app_key, raw_exe_name, display_app_name,
-                   origin, source_id, effective_duration_ms, computed_revision, updated_at_ms
-                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            )
-            .bind(bucket_start_ms)
-            .bind(bucket_start_ms + HOUR_MS)
-            .bind(&app_key)
-            // This derived table requires a nonempty key in its historical exe column.
-            // The reserved key is never written into facts or returned as an executable.
-            .bind(if app_key == ANONYMOUS_APP_KEY {
-                ANONYMOUS_APP_KEY
-            } else {
-                &row.raw_exe_name
-            })
-            .bind(&row.display_app_name)
-            .bind(origin.as_str())
-            .bind(row_source_id)
-            .bind(duration_ms)
-            .bind(source_revision)
-            .bind(timestamp_ms)
-            .execute(&mut **tx)
-            .await
-            .map_err(|error| format!("failed to insert hourly projection row: {error}"))?;
-            remaining_ms -= duration_ms;
-            capacity_index += 1;
-        }
-    }
-    Ok(())
-}
-
 pub(super) async fn load_range(
     pool: &Pool<Sqlite>,
     start_ms: i64,
@@ -523,18 +374,13 @@ pub(crate) async fn load_range_in_tx(
         ),
         Ok(None) | Err(_) => (false, None, None, 0),
     };
-    let active_start = sqlx::query_scalar::<_, i64>(ACTIVE_SESSION_START_SQL)
-        .fetch_optional(&mut **tx)
-        .await
-        .map_err(|error| format!("failed to inspect active session overlay: {error}"))?
+    // 迁移 28 之后每台设备都可以各有一条进行中的会话，探针因此是 `MIN(start_time)`。
+    let active_start = active_session_start(tx)
+        .await?
         .filter(|active_start| *active_start < end_ms);
-    let anonymous_start = sqlx::query_scalar::<_, i64>(
-        "SELECT start_time FROM anonymous_activity INDEXED BY idx_anonymous_activity_active WHERE end_time IS NULL LIMIT 1",
-    )
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(|error| format!("failed to inspect anonymous overlay: {error}"))?
-    .filter(|start| *start < end_ms);
+    let anonymous_start = active_anonymous_start(tx)
+        .await?
+        .filter(|start| *start < end_ms);
     let active_start = active_start.into_iter().chain(anonymous_start).min();
 
     let mut fact_intervals = Vec::new();
@@ -659,6 +505,7 @@ pub(crate) async fn load_range_in_tx(
             } else {
                 row.get("raw_exe_name")
             },
+            device_id: row.get("device_id"),
             start_time: bucket_start_ms,
             end_time: bucket_start_ms + duration_ms,
         });
@@ -666,10 +513,18 @@ pub(crate) async fn load_range_in_tx(
     }
 
     let mut fact_row_count = 0;
+    // 事实支路的「本机」身份：只在没有事实区间时省掉这次查库。
+    let device_id = if fact_intervals.is_empty() { String::new() } else { local_device_id(tx).await? };
     for interval in &fact_intervals {
-        let candidates =
-            load_fact_candidates(tx, interval.start_ms, interval.end_ms, false, sampled_at_ms)
-                .await?;
+        let candidates = load_fact_candidates(
+            tx,
+            interval.start_ms,
+            interval.end_ms,
+            false,
+            sampled_at_ms,
+            &device_id,
+        )
+        .await?;
         for range in resolve_activity_precedence(&candidates) {
             let clipped_start = range.start_ms.max(interval.start_ms);
             let clipped_end = range.end_ms.min(interval.end_ms);
@@ -680,6 +535,7 @@ pub(crate) async fn load_range_in_tx(
                 anonymous: range.value.anonymous,
                 app_name: range.value.app_name,
                 exe_name: range.value.exe_name,
+                device_id: range.value.device_id.clone(),
                 start_time: clipped_start,
                 end_time: clipped_end,
             });
@@ -707,6 +563,7 @@ pub(crate) async fn load_range_in_tx(
     Ok(ActivityAggregateRangeDto {
         maintenance_pending: maintenance_pending || projection_unavailable,
         records,
+        bucket_union_ms: Vec::new(),
         read_path: if fact_intervals.is_empty() {
             "projection"
         } else if projection_row_count == 0 {
@@ -720,86 +577,6 @@ pub(crate) async fn load_range_in_tx(
         fact_row_count,
         has_active_session: active_start.is_some(),
     })
-}
-
-async fn load_fact_candidates(
-    tx: &mut Transaction<'_, Sqlite>,
-    start_ms: i64,
-    end_ms: i64,
-    closed_only: bool,
-    current_ms: i64,
-) -> Result<Vec<OwnedActivityRange<CandidateValue>>, String> {
-    // Import buckets allocate the hour's remaining capacity. A partial query must include
-    // native/exact facts elsewhere in that hour before clipping the resolved geometry.
-    let start_ms = floor_to_hour(start_ms);
-    let end_ms = ceil_to_hour(end_ms);
-    let rows = sqlx::query(FACT_CANDIDATES_SQL)
-        .bind(current_ms)
-        .bind(end_ms)
-        .bind(start_ms)
-        .bind(current_ms)
-        .bind(start_ms)
-        .bind(i64::from(closed_only))
-        .bind(end_ms)
-        .bind(start_ms)
-        .bind(end_ms)
-        .bind(start_ms)
-        .fetch_all(&mut **tx)
-        .await
-        .map_err(|error| format!("failed to load activity facts for projection: {error}"))?;
-    let mut candidates = Vec::with_capacity(rows.len());
-    for row in rows {
-        let app_name: String = row.get("app_name");
-        let exe_name: String = row.get("exe_name");
-        let window_title: String = row.get("window_title");
-        if !should_track_activity_fact(&exe_name, &app_name, &window_title) {
-            continue;
-        }
-        let origin = match row.get::<String, _>("origin").as_str() {
-            "native" => ActivityOrigin::Native,
-            "import_exact" => ActivityOrigin::ImportExact,
-            "import_bucket" => ActivityOrigin::ImportBucket,
-            value => return Err(format!("unknown activity fact origin `{value}`")),
-        };
-        candidates.push(OwnedActivityRange {
-            origin,
-            start_ms: row.get("start_ms"),
-            end_ms: row.get("end_ms"),
-            capacity_end_ms: row.get("capacity_end_ms"),
-            value: CandidateValue {
-                anonymous: false,
-                app_name,
-                exe_name,
-                source_id: row.get("source_id"),
-            },
-        });
-    }
-    for row in sqlx::query(
-        "SELECT start_time, COALESCE(end_time, observed_until) end_time
-        FROM anonymous_activity WHERE start_time < ? AND COALESCE(end_time, observed_until) > ?
-        AND (? = 0 OR end_time IS NOT NULL)",
-    )
-    .bind(end_ms)
-    .bind(start_ms)
-    .bind(i64::from(closed_only))
-    .fetch_all(&mut **tx)
-    .await
-    .map_err(|error| format!("failed to read anonymous facts: {error}"))?
-    {
-        candidates.push(OwnedActivityRange {
-            origin: ActivityOrigin::Native,
-            start_ms: row.get("start_time"),
-            end_ms: row.get("end_time"),
-            capacity_end_ms: None,
-            value: CandidateValue {
-                anonymous: true,
-                app_name: String::new(),
-                exe_name: String::new(),
-                source_id: "native".into(),
-            },
-        });
-    }
-    Ok(candidates)
 }
 
 fn merge_intervals(mut intervals: Vec<Interval>, start_ms: i64, end_ms: i64) -> Vec<Interval> {

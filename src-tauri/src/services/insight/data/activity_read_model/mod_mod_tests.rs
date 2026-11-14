@@ -164,6 +164,7 @@ fn page_shaped_boundaries_reduce_records_without_changing_duration() {
         ActivityAggregateRecordDto {
             app_name: "Code".into(),
             anonymous: false,
+            device_id: "self".into(),
             exe_name: "code.exe".into(),
             start_time: 0,
             end_time: 10,
@@ -171,6 +172,7 @@ fn page_shaped_boundaries_reduce_records_without_changing_duration() {
         ActivityAggregateRecordDto {
             app_name: "Code".into(),
             anonymous: false,
+            device_id: "self".into(),
             exe_name: "code.exe".into(),
             start_time: 20,
             end_time: 40,
@@ -187,6 +189,7 @@ fn page_shaped_boundaries_preserve_overlapping_duration_without_crossing_the_buc
         ActivityAggregateRecordDto {
             app_name: "App".into(),
             anonymous: false,
+            device_id: "self".into(),
             exe_name: "app.exe".into(),
             start_time: 0,
             end_time: HOUR_MS,
@@ -194,6 +197,7 @@ fn page_shaped_boundaries_preserve_overlapping_duration_without_crossing_the_buc
         ActivityAggregateRecordDto {
             app_name: "App".into(),
             anonymous: false,
+            device_id: "self".into(),
             exe_name: "app.exe".into(),
             start_time: 0,
             end_time: HOUR_MS,
@@ -223,6 +227,7 @@ fn page_shaping_clips_straddling_records_and_ignores_outside_or_empty_intervals(
             ActivityAggregateRecordDto {
                 app_name: "Editor".into(),
                 anonymous: false,
+                device_id: "self".into(),
                 exe_name: "editor.exe".into(),
                 start_time,
                 end_time,

@@ -124,6 +124,8 @@ macro_rules! define_invoke_handler {
 
 #[cfg(desktop)]
 define_invoke_handler![
+    // [设备维度 P1] 日级双口径：Patina 段命令，不计入宿主 79 条契约（但文档总数要 +1）。
+    crate::commands::insight::activity_read_model_cmd::cmd_get_activity_daily_totals,
     crate::commands::insight::tool_notifications_cmd::cmd_get_tool_presentation,
     crate::commands::insight::tool_notifications_cmd::cmd_save_tool_notification_preferences,
     crate::commands::insight::tool_notifications_cmd::cmd_tool_presentation_action,

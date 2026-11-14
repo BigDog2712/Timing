@@ -1130,6 +1130,30 @@ Kotlin 自己读那个文件、写进用户选中的 `content://`。过桥要 ba
 
 ---
 
+### 12.16 V0.12.2 契约增量：日级双口径读命令（设备维度 P1）
+
+> 背景：`activity_hourly_effective` 的主键加上 `device_id` 之后，日级口径需要「全设备并集」
+> （`union_ms`，≤ 24h）与「各设备之和」（`device_sum_ms`，可 > 24h）两个量。
+> 前者不能在前端按桶求和算出来（跨设备重叠会被重复计入），所以新增一条**读命令**。
+>
+> **契约四个数**：命令 **84**（+Patina **118**）/ 错误码 18 / 事件 11-11 / emit 18。
+> 新增的这条是 **Patina 段**命令（`#[cfg(desktop)]` 的 `$extra` 表），宿主 84 条与
+> `check:contract` 的四处（Rust / `IpcApi` / `ipc.ts` / mock）**都不受影响**；
+> 但本文件的 Patina 计数要从 117 改成 118——这一处不会有门禁提醒。
+
+| 面 | 变更 | 理由 |
+|---|---|---|
+| 命令 | **+1**：`cmd_get_activity_daily_totals(dayKeys: string[]) -> DailyTotalsDto[]` | 日级并集必须由服务侧算：前端按桶求和会在多设备重叠时重复计时 |
+| 入参 | `dayKeys`：本地 `YYYY-MM-DD` 数组（与 md 同步的 `{date}.md`、`app_usage.local_date` 同口径） | 只取需要的天，避免整表下发 |
+| 出参 | `DailyTotalsDto { dayKey, unionMs, deviceSumMs, deviceCount, devices[{deviceId, unionMs}] }` | 主指标 `unionMs`；`deviceSumMs` **只许**出现在历史页（P2 硬约束） |
+| 今天的口径 | 今天**不落表**，读命令用同一个纯函数现算 | 今天的"现在"每几秒变一次，落表必然滞后且无法自证 |
+| 错误码 | **无新增**，沿用 `ACTIVITY_READ_MODEL_FAILED` | 读模型故障对前端是同一种处理（提示 + 重试） |
+
+判据：`src-tauri/src/services/insight/data/daily_parity_tests.rs`（逐位相等基线）、
+`daily.rs` 的纯函数用例（两设备完全嵌套 → `union_ms` = 30 分钟、`device_sum_ms` = 60 分钟）。
+
+---
+
 ## 附录 A：capabilities 最小权限白名单（MVP，锁定）
 
 > 依据 Spec §10「安全：`capabilities` 最小权限白名单」与坑 K-4（插件命令运行时被拒）。Phase 3 实现 `src-tauri/capabilities/default.json` 时按本表逐项放行；**本表之外不放行**。

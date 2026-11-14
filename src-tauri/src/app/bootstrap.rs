@@ -79,6 +79,10 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     // ② 建库（含迁移）+ ③ 默认设置
     let pool = tauri::async_runtime::block_on(db::init_pool(&data_root))?;
     boot_timing::mark("db_ready");
+    // [设备维度] 业务库身份：哨兵 '' → 本机 install_id，补 uid（设计 §3.4）。不放 infra 层：
+    // `check-layers` L4 不许 infra 依赖 services。
+    #[cfg(desktop)]
+    tauri::async_runtime::block_on(services::device::startup_business_identity(&pool))?;
     tauri::async_runtime::block_on(services::settings::ensure_defaults(&pool))?;
     app.manage(AppState::new(pool.clone()));
     boot_timing::mark("defaults_ready");
@@ -96,9 +100,8 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         boot_timing::mark("tray_ready");
     }
 
-    // ⑥ 启动即钳制：AC-23①。window-state 插件的 on_window_ready 早于本 setup 回调，
-    //    所以此刻窗口位置已是「上次的」，越界要在这里纠正。
-    //    移动端只有一个系统管理的全屏 Activity，没有可钳制的窗口。
+    // ⑥ 启动即钳制：AC-23①。window-state 的 on_window_ready 早于本回调，此刻窗口位置已是
+    //    「上次的」，越界要在这里纠正；移动端只有一个系统管理的全屏 Activity，无需钳制。
     #[cfg(desktop)]
     {
         if let Err(err) = window::reclamp_main(&app) {
@@ -118,8 +121,7 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     jobs::reminder::spawn_reminder_watcher(app.clone());
     jobs::nudge::spawn_nudge_watcher(app.clone());
     jobs::countdown::spawn_countdown_watcher(app.clone());
-    /* [V0.12.0] md 同步：桌面直接读写文件路径；手机先由原生侧把当天文件镜像进沙箱，
-    再跑同一套合并逻辑（见 `app::md_sync_mobile`）。 */
+    /* [V0.12.0] md 同步：桌面直接读写路径；手机先由原生侧把当天文件镜像进沙箱再合并。 */
     #[cfg(desktop)]
     jobs::md_sync::spawn_md_sync_watcher(app.clone());
     /* [V0.11.19] 云端三档链：与 md 链共用托盘闸，但节奏完全独立（关闭/定时/智能）。 */
@@ -129,14 +131,12 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     jobs::md_sync_mobile::spawn_md_sync_watcher(app.clone());
     boot_timing::mark("jobs_spawned");
 
-    // 移动端跳过了托盘 / 钳制 / 诊断，补一个标记点：启动耗时报告里段落不缺项，
-    // 一眼能看出「不是卡住，是这三步本来就不跑」。
+    // 移动端不跑托盘/钳制/诊断，补个标记点：耗时报告里段落不缺项，一眼看得出不是卡住。
     #[cfg(mobile)]
     boot_timing::mark("mobile_skip_desktop");
 
-    // ⑨ [V0.3.9] 不再恢复上次打开的便利贴窗口（用户口径：启动不要「默认存在一张」）。
-    //    `is_open` 只在点黄点收纳时归零，退出时不清；启动统一清零，避免残留标记占满
-    //    「最多同时开 20 张」的额度。便利贴一律由清单 / 手柄 / 右键显式打开。
+    // ⑨ [V0.3.9] 不再恢复上次打开的便利贴窗口（启动不要「默认存在一张」）。`is_open` 只在
+    //    点黄点收纳时归零、退出不清，启动统一清零以免残留标记占名额；便利贴一律显式打开。
     if let Err(err) = tauri::async_runtime::block_on(services::note::reset_open(&pool)) {
         crate::log_warn!("reset note open flags failed: {err}");
     }

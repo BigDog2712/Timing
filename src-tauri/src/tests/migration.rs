@@ -61,7 +61,7 @@ async fn seed_system_item_uncategorized() {
         )
         .await
         .as_deref(),
-        Some("8")
+        Some("9")
     );
 }
 
@@ -74,7 +74,7 @@ async fn six_indexes_and_partial_unique_open() {
         "idx_records_started_at",
         "idx_records_item_started",
         "idx_records_status",
-        "uq_records_open",
+        "uq_records_open_per_device",
     ];
     for idx in expected {
         let n = sqlx::query_scalar::<_, i64>(
@@ -86,17 +86,27 @@ async fn six_indexes_and_partial_unique_open() {
         .unwrap();
         assert_eq!(n, 1, "索引 {idx} 应存在");
     }
-    // uq_records_open 必须是「仅 active」的部分唯一索引
+    // uq_records_open_per_device 必须是「仅 active」的部分唯一索引，
+    // 且旧的全库单活跃索引 `uq_records_open` 必须已被 0009 的抵消段摘掉
     let sql = scalar_opt_str(
         &pool,
-        "SELECT sql FROM sqlite_master WHERE name = 'uq_records_open'",
+        "SELECT sql FROM sqlite_master WHERE name = 'uq_records_open_per_device'",
     )
     .await
-    .expect("应有 uq_records_open 定义");
+    .expect("应有 uq_records_open_per_device 定义");
     let normalized = sql.to_lowercase().replace(['"', ' '], "");
     assert!(
         normalized.contains("wherestatus='active'"),
-        "uq_records_open 应为 WHERE status='active' 的部分索引，实际：{sql}"
+        "uq_records_open_per_device 应为 WHERE status='active' 的部分索引，实际：{sql}"
+    );
+    assert_eq!(
+        scalar_i64(
+            &pool,
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'uq_records_open'"
+        )
+        .await,
+        0,
+        "0002 每次启动都会建回 uq_records_open，0009 的抵消段必须摘掉它"
     );
 }
 
@@ -113,28 +123,86 @@ async fn migration_is_idempotent() {
         scalar_i64(&p2, "SELECT COUNT(*) FROM items WHERE id = 1").await,
         1
     );
+    // 设备维度（0009）的**第二次**启动：`0002_v020.sql` 会在每次启动时把「全库单活跃」
+    // 的旧索引 `uq_records_open` 建回来，所以抵消段必须无条件跑（它没有版本门）。
+    // 把 `migrate()` 里那段 `run_raw(_guard)` 删掉，这两条断言立刻变红。
+    assert_eq!(
+        scalar_i64(
+            &p2,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='uq_records_open'"
+        )
+        .await,
+        0,
+        "第二次启动后旧索引必须仍被 0009 抵消段摘掉"
+    );
+    assert_eq!(
+        scalar_i64(
+            &p2,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' \
+             AND name='uq_records_open_per_device'"
+        )
+        .await,
+        1
+    );
 }
 
 async fn insert_active(
     pool: &SqlitePool,
     item_id: i64,
+    device_id: &str,
 ) -> Result<sqlx::sqlite::SqliteQueryResult, sqlx::Error> {
     sqlx::query(
         "INSERT INTO time_records \
-         (item_id, status, started_at, ended_at, accumulated_sec, running_since, created_at, updated_at) \
-         VALUES (?, 'active', 1000, NULL, 0, 1000, 1000, 1000)",
+         (item_id, status, started_at, ended_at, accumulated_sec, running_since, created_at, \
+          updated_at, device_id) \
+         VALUES (?, 'active', 1000, NULL, 0, 1000, 1000, 1000, ?)",
     )
     .bind(item_id)
+    .bind(device_id)
     .execute(pool)
     .await
 }
 
+/// 0009 之后「进行中」是**每设备**一条，不再是全库一条。
+///
+/// 旧版本这里只断「第二条 active 失败」——而两条都用 `device_id = ''`，
+/// 命中的其实是 `uq_records_open_per_device` 上「同一个 '' 设备」那一支，
+/// 于是用例在「迁移 28 根本没生效」时也会绿。现在拆成两条断言：
+/// 两台设备各一条**必须都成功**，同一台设备的第二条**必须失败**。
 #[tokio::test]
-async fn unique_active_session_enforced() {
+async fn unique_active_session_is_per_device_not_global() {
     let pool = fresh_pool("mig-active-unique").await;
-    insert_active(&pool, 1).await.expect("第一条 active 应成功");
-    let second = insert_active(&pool, 1).await;
-    assert!(second.is_err(), "第二条 active 应被 uq_records_open 拒绝");
+    insert_active(&pool, 1, "aaaaaaaaaaaa")
+        .await
+        .expect("device a 的 active 应成功");
+    insert_active(&pool, 1, "bbbbbbbbbbbb")
+        .await
+        .expect("device b 的 active 应成功（全库唯一会在这里红）");
+    assert_eq!(
+        scalar_i64(
+            &pool,
+            "SELECT COUNT(*) FROM time_records WHERE status = 'active'"
+        )
+        .await,
+        2,
+        "两台设备的进行中记录都必须留下"
+    );
+    let duplicate = insert_active(&pool, 1, "aaaaaaaaaaaa").await;
+    // SQLite 的唯一约束报错点名**列**（`time_records.device_id`），不是索引名；
+    // 索引按名单独断下面那一行。
+    let message = duplicate
+        .expect_err("同设备第二条 active 应被拒绝")
+        .to_string();
+    assert!(message.contains("time_records.device_id"), "{message}");
+    assert_eq!(
+        scalar_i64(
+            &pool,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='index' \
+             AND name='uq_records_open_per_device'"
+        )
+        .await,
+        1
+    );
 }
 
 #[tokio::test]

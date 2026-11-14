@@ -160,9 +160,7 @@ async fn snapshot_merge_preserves_all_record_domains_and_rolls_back_late_failure
         .await
         .unwrap();
     let archive = dir.0.join("snapshot.zip");
-    write_snapshot_archive(&source, &archive, "test")
-        .await
-        .unwrap();
+    write_snapshot_archive(&source, &archive, "test").await.unwrap();
     source.close().await;
     target.execute("INSERT INTO sessions(id,app_name,exe_name,start_time,end_time,duration) VALUES(1,'Target','target.exe',10,20,10);
         INSERT INTO settings(key,value) VALUES('language','zh-CN');
@@ -279,9 +277,7 @@ async fn running_focus_merge_seals_elapsed_at_backup_without_displacing_target()
     target.execute("INSERT INTO tool_free_focus(label,rest_mode,rest_minutes,rest_ratio,phase,status,started_at,created_at,updated_at)
         VALUES ('Local','fixed',1,2,'focus','running',10,200,200)").await.unwrap();
     let archive = dir.0.join("focus.zip");
-    write_snapshot_archive(&source, &archive, "test")
-        .await
-        .unwrap();
+    write_snapshot_archive(&source, &archive, "test").await.unwrap();
     source.close().await;
     // Use a deterministic export time on the extracted candidate.
     for strategy in [RestoreStrategy::Replace, RestoreStrategy::Merge] {
@@ -357,12 +353,12 @@ async fn pre_identity_snapshot_replay_preserves_independent_reminders() {
     crate::services::insight::data::sqlite_pool::prepare_pool_schema(&source, &path)
         .await
         .unwrap();
+    // 造「迁移 26 之前」的快照：账本截到 25，且 28 加的东西真的拆回去（见 legacy_schema_fixture）。
+    crate::services::insight::data::rewind_to_pre_device_dimension(&source).await.unwrap();
     source.execute("DROP TRIGGER trg_tool_reminder_identity; DROP TABLE tool_reminder_identities; DELETE FROM _sqlx_migrations WHERE version>=26;
         INSERT INTO tool_reminders(label,scheduled_at,created_at,status) VALUES ('A',60000,1000,'scheduled'),('A',60000,1000,'scheduled');").await.unwrap();
     let archive = dir.0.join("old.zip");
-    write_snapshot_archive(&source, &archive, "test")
-        .await
-        .unwrap();
+    write_snapshot_archive(&source, &archive, "test").await.unwrap();
     source.close().await;
     let target = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
     crate::services::insight::data::sqlite_pool::prepare_pool_schema(&target, Path::new(":memory:"))

@@ -1,45 +1,13 @@
 use super::*;
-use crate::services::insight::data::schema::{
-    ACTIVITY_READ_MODELS_SCHEMA_SQL, CURRENT_BASELINE_SCHEMA_SQL, IMPORT_DATA_ISOLATION_SCHEMA_SQL,
-    IMPORT_DATA_SCHEMA_SQL,
-};
 use sqlx::{Executor, SqlitePool};
+// 建库夹具与「插一行会话 / 推平维护队列」的小工具整块在 `data/hourly_fixture.rs`
+// （迁移 28 的设备维度加不进这个冻结文件）。
+pub(super) use crate::services::insight::data::hourly_fixture::{
+    drain, insert_native, insert_open_session, setup_pool,
+};
 
-pub(super) async fn setup_pool() -> SqlitePool {
-    let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    for schema in [
-        CURRENT_BASELINE_SCHEMA_SQL,
-        IMPORT_DATA_SCHEMA_SQL,
-        IMPORT_DATA_ISOLATION_SCHEMA_SQL,
-        ACTIVITY_READ_MODELS_SCHEMA_SQL,
-        crate::services::insight::data::repositories::anonymous_activity::SCHEMA_SQL,
-    ] {
-        pool.execute(schema).await.unwrap();
-    }
-    pool
-}
-
-async fn insert_native(pool: &SqlitePool, start: i64, end: Option<i64>) {
-    sqlx::query(
-        "INSERT INTO sessions(app_name, exe_name, start_time, end_time, duration)
-         VALUES ('Editor', 'editor.exe', ?, ?, ?)",
-    )
-    .bind(start)
-    .bind(end)
-    .bind(end.map(|end| end - start))
-    .execute(pool)
-    .await
-    .unwrap();
-}
-
-async fn drain(pool: &SqlitePool) {
-    for _ in 0..1000 {
-        if !maintain_once(pool).await.unwrap() {
-            return;
-        }
-    }
-    panic!("hourly maintenance did not converge");
-}
+/// 本机身份（与 `hourly_fixture` 的夹具设备同值）：事实支路里的「本机」参数。
+const SELF_DEVICE: &str = "00000000f1c0";
 
 #[tokio::test]
 async fn anonymous_facts_match_projection_and_partial_ranges_without_identity_or_double_counting() {
@@ -104,6 +72,10 @@ async fn native_range_candidates_preserve_boundaries_and_choose_selective_indexe
     {
         pool.execute(migration.sql).await.unwrap();
     }
+    // 只跑到 15 是为了冻住索引集合；迁移 28 的加列在这里手工补上（事实 SQL 要读 device_id）。
+    pool.execute("ALTER TABLE sessions ADD COLUMN device_id TEXT NOT NULL DEFAULT ''")
+        .await
+        .unwrap();
     pool.execute(
         "WITH RECURSIVE n(i) AS (VALUES(0) UNION ALL SELECT i+1 FROM n WHERE i<19999)
         INSERT INTO sessions(app_name,exe_name,start_time,end_time,duration)
@@ -130,21 +102,9 @@ async fn native_range_candidates_preserve_boundaries_and_choose_selective_indexe
         for closed_only in [false, true] {
             let current = now_ms();
             let explain_sql = format!("EXPLAIN QUERY PLAN {FACT_CANDIDATES_SQL}");
-            let mut query = sqlx::query(&explain_sql);
-            for value in [
-                current,
-                end,
-                start,
-                current,
-                start,
-                i64::from(closed_only),
-                end,
-                start,
-                end,
-                start,
-            ] {
-                query = query.bind(value);
-            }
+            // 绑定顺序借用生产侧的同一份实现，测试不再自己另抄一张绑定表。
+            let query =
+                fact_candidates_query(&explain_sql, SELF_DEVICE, start, end, closed_only, current);
             let plan: Vec<String> = query
                 .fetch_all(&pool)
                 .await
@@ -172,9 +132,10 @@ async fn native_range_candidates_preserve_boundaries_and_choose_selective_indexe
             .await
             .unwrap();
             let mut tx = pool.begin().await.unwrap();
-            let actual = load_fact_candidates(&mut tx, start, end, closed_only, current)
-                .await
-                .unwrap();
+            let actual =
+                load_fact_candidates(&mut tx, start, end, closed_only, current, SELF_DEVICE)
+                    .await
+                    .unwrap();
             tx.commit().await.unwrap();
             assert_eq!(
                 actual
@@ -469,7 +430,7 @@ async fn projection_query_plan_bounds_both_ends_of_the_requested_hours() {
 }
 
 #[tokio::test]
-async fn active_probe_uses_the_schema_enforced_single_active_index() {
+async fn active_probe_uses_the_per_device_open_index() {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
     crate::services::insight::data::sqlite_pool::prepare_pool_schema(
         &pool,
@@ -486,21 +447,34 @@ async fn active_probe_uses_the_schema_enforced_single_active_index() {
     .await
     .unwrap();
     assert_eq!(competing_index, 1);
-    let empty = sqlx::query_scalar::<_, i64>(ACTIVE_SESSION_START_SQL)
-        .fetch_optional(&pool)
+    // 聚合形态（`MIN(...)`）无论有没有行都会返回一行，所以这里必须按 `Option<i64>` 解，
+    // 用 `query_scalar::<_, i64>` + `fetch_optional` 会把「零行」读成 `Some(0)`。
+    let empty = sqlx::query_scalar::<_, Option<i64>>(ACTIVE_SESSION_START_SQL)
+        .fetch_one(&pool)
         .await
         .unwrap();
     assert_eq!(empty, None);
-    insert_native(&pool, HOUR_MS, None).await;
+    // 迁移 28 起「进行中」是按设备限一条：两台设备各开一条必须**都成功**。
+    for device_id in ["aaaaaaaaaaaa", "bbbbbbbbbbbb"] {
+        insert_open_session(&pool, device_id, HOUR_MS).await;
+    }
+    // 同一台设备再来第二条：只有这条该失败。SQLite 的报错点名**列**（不是索引名），
+    // 所以这里断 `sessions.device_id`；`uq_sessions_open_per_device` 存在这件事由
+    // 「它失败了」本身证明，另在 `sqlite_pool` 的建库用例里按名断过。
     let duplicate = sqlx::query(
-        "INSERT INTO sessions(app_name, exe_name, start_time, end_time)
-         VALUES ('Other', 'other.exe', 7200000, NULL)",
+        "INSERT INTO sessions(app_name, exe_name, start_time, device_id)
+         VALUES ('Other', 'other.exe', 7200000, 'aaaaaaaaaaaa')",
     )
     .execute(&pool)
     .await
     .unwrap_err();
+    let open_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions WHERE end_time IS NULL")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(open_rows, 2, "两台设备的进行中会话都必须留下");
     assert!(
-        duplicate.to_string().contains("idx_sessions_single_active"),
+        duplicate.to_string().contains("sessions.device_id"),
         "{duplicate}"
     );
     let plan = sqlx::query(&format!("EXPLAIN QUERY PLAN {ACTIVE_SESSION_START_SQL}"))
@@ -512,7 +486,7 @@ async fn active_probe_uses_the_schema_enforced_single_active_index() {
         .collect::<Vec<_>>();
     assert!(
         plan.iter()
-            .any(|line| line.contains("idx_sessions_single_active")),
+            .any(|line| line.contains("idx_sessions_end_start")),
         "{plan:?}"
     );
     assert!(
@@ -524,10 +498,11 @@ async fn active_probe_uses_the_schema_enforced_single_active_index() {
         .await
         .unwrap();
     crate::log_info!("SQLx SQLite {version}: active probe {plan:?}");
-    let active = sqlx::query_scalar::<_, i64>(ACTIVE_SESSION_START_SQL)
-        .fetch_optional(&pool)
+    let active = sqlx::query_scalar::<_, Option<i64>>(ACTIVE_SESSION_START_SQL)
+        .fetch_one(&pool)
         .await
         .unwrap();
+    // 两条并存的进行中会话 → 探针取**最早**的一条，而不是「唯一那条」。
     assert_eq!(active, Some(HOUR_MS));
 }
 
@@ -810,7 +785,7 @@ async fn missing_projection_falls_back_and_schema_repair_rebuilds_from_facts() {
     let fallback = load_range(&pool, 0, HOUR_MS, &[]).await.unwrap();
     assert_eq!(fallback.fallback_reason, Some("projection_unavailable"));
     assert_eq!(total(&fallback), 1000);
-    pool.execute(ACTIVITY_READ_MODELS_SCHEMA_SQL).await.unwrap();
+    crate::services::insight::data::hourly_fixture::recreate_projection(&pool).await;
     drain(&pool).await;
     assert_eq!(
         load_range(&pool, 0, HOUR_MS, &[]).await.unwrap().read_path,

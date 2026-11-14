@@ -15,6 +15,7 @@ pub mod scheduled_backup;
 pub mod scheduled_export;
 pub mod schema;
 pub mod schema_contracts;
+pub mod schema_registry;
 pub mod settings_payload_service;
 pub mod sqlite_error;
 pub mod sqlite_pool;
@@ -33,3 +34,16 @@ pub mod web_activity_store;
 #[cfg(test)]
 mod sqlite_pool_upgrade_tests;
 pub mod tool_notification_store;
+#[cfg(test)]
+mod device_schema_upgrade_tests;
+#[cfg(test)]
+mod hourly_fixture;
+#[cfg(test)]
+mod legacy_schema_fixture;
+#[cfg(test)]
+mod device_migration_timing;
+#[cfg(test)]
+mod daily_parity_tests;
+/// 测试夹具的短路径（`merge_tests` 用；长路径会把那一行挤成多行，越过 `check:size`）。
+#[cfg(test)]
+pub(crate) use legacy_schema_fixture::rewind_to_pre_device_dimension;

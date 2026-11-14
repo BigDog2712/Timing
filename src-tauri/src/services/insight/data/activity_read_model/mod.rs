@@ -1,25 +1,44 @@
+mod buckets;
 mod catalog;
+mod daily;
+mod facts;
 mod hourly;
+mod hourly_write;
+mod worker;
 pub(crate) use hourly::load_range_in_tx;
+pub(crate) use worker::{spawn_background_worker, wake_worker, ReadModelWake};
+/* 后台维护的调度器只被用例实例化（生产侧由 `spawn_background_worker` 自己持有），
+   所以回挂成 `#[cfg(test)]`，否则 lib 构建会报 unused import。 */
+#[cfg(test)]
+pub(crate) use worker::{record_maintenance_failure, MaintenanceSchedule};
+use buckets::{aggregate_records_into_boundaries, validate_aggregate_boundaries};
 
+#[cfg(test)]
+mod app_key_equivalence_tests;
+#[cfg(test)]
+mod bucket_union_tests;
+#[cfg(test)]
+mod daily_tests;
 #[cfg(test)]
 mod contention_tests;
 #[cfg(test)]
 mod name_enrichment_tests;
 
-use crate::services::insight::data::sqlite_pool::{optimize_query_statistics, wait_for_sqlite_pool};
+use crate::services::insight::data::sqlite_pool::wait_for_sqlite_pool;
+/* 只给 `mod_mod_tests` 用（它经 `use super::*` 取）：统计优化已搬进 `worker.rs`。 */
+#[cfg(test)]
+use crate::services::insight::data::sqlite_pool::optimize_query_statistics;
 use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Row, Sqlite};
+/* 只给 `mod_mod_tests` 用（它经 `use super::*` 取）：测试文件已冻结在行数上，
+   搬出去的桶裁剪函数不再需要它，但用例里还在用它做对照表。 */
+#[cfg(test)]
 use std::collections::BTreeMap;
-use std::sync::{Arc, Weak};
-use std::time::Instant;
-use tauri::{AppHandle, Manager, Runtime};
-use tokio::time::{sleep, Duration};
-
-const WORKER_ACTIVE_DELAY: Duration = Duration::from_millis(50);
-const WORKER_IDLE_DELAY: Duration = Duration::from_secs(3);
-const MAX_IDLE_DELAY: Duration = Duration::from_secs(12);
-const STATISTICS_RECHECK: Duration = Duration::from_secs(3600);
+/* 只给 `contention_tests` 用（它经 `use super::*` 取）：`Duration` 原本是 `mod.rs`
+   自己的导入，后台维护搬走之后 lib 构建不需要它了。 */
+#[cfg(test)]
+use tokio::time::Duration;
+use sqlx::{Pool, Row, Sqlite};
+use tauri::{AppHandle, Runtime};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,6 +75,10 @@ pub struct ActivityAggregateRecordDto {
     pub anonymous: bool,
     pub app_name: String,
     pub exe_name: String,
+    /// 归属设备（设计 §6.1）。读路径**永远不产出空串**：迁移期哨兵在事实 SQL 里就被
+    /// `COALESCE(NULLIF(TRIM(device_id), ''), <本机 id>)` 折成本机，投影行则由写侧保证。
+    /// 单设备时前端拿它只是为了"数一数有几台"，**不上界面**（§6.5）。
+    pub device_id: String,
     pub start_time: i64,
     pub end_time: i64,
 }
@@ -66,12 +89,40 @@ pub struct ActivityAggregateRangeDto {
     #[serde(skip)]
     pub(crate) maintenance_pending: bool,
     pub records: Vec<ActivityAggregateRecordDto>,
+    /// 逐桶并集（`跨设备去重 + 设备内加总`），长度 = 桶数；没有桶边界时为 `[]`。
+    ///
+    /// 为什么后端算而不是前端算：桶里的**位置信息**在 `records` 里已经没了
+    /// （每条都被压成"起点 = 桶起点、长度 = 该桶时长"），前端没法再求并集。
+    /// 两台设备在同一小时各 30 分钟重叠时，这里给 30 分钟，而 `records` 加起来是 60。
+    pub bucket_union_ms: Vec<i64>,
     pub read_path: &'static str,
     pub fallback_reason: Option<&'static str>,
     pub source_revision: i64,
     pub projection_row_count: usize,
     pub fact_row_count: usize,
     pub has_active_session: bool,
+}
+
+/// 一天的「某台设备自己的墙钟」（P2 才会展示，P1 只保证字段在）。
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyDeviceTotalDto {
+    pub device_id: String,
+    pub union_ms: i64,
+}
+
+/// 一天的日级双口径。
+///
+/// 主指标是 `union_ms`（≤ 24h，可以画进度条）；`device_sum_ms` 可 > 24h，
+/// **只许**出现在历史页（design §6.5）。单设备时两者恒等。
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyTotalsDto {
+    pub day_key: String,
+    pub union_ms: i64,
+    pub device_sum_ms: i64,
+    pub device_count: i64,
+    pub devices: Vec<DailyDeviceTotalDto>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -106,6 +157,7 @@ pub async fn load_activity_aggregate_range<R: Runtime>(
         return Ok(ActivityAggregateRangeDto {
             maintenance_pending: false,
             records: Vec::new(),
+            bucket_union_ms: Vec::new(),
             read_path: "projection",
             fallback_reason: None,
             source_revision: 0,
@@ -129,77 +181,26 @@ pub async fn load_activity_aggregate_range<R: Runtime>(
         wake_worker(app);
     }
     if let Some(boundaries) = bucket_boundaries_ms {
+        /* 并集要在**未聚合**的 records 上算：`aggregate_records_into_boundaries` 把每条
+           压成「起点 = 桶起点」，位置一丢就再也分不清「两台机器各 30 分钟」与「叠着 30 分钟」。 */
+        response.bucket_union_ms =
+            facts::bucket_unions(&pool, start_ms, end_ms, &boundaries, &response.records).await?;
         response.records =
             aggregate_records_into_boundaries(response.records, start_ms, end_ms, &boundaries)?;
     }
     Ok(response)
 }
 
-fn aggregate_records_into_boundaries(
-    records: Vec<ActivityAggregateRecordDto>,
-    start_ms: i64,
-    end_ms: i64,
-    boundaries: &[i64],
-) -> Result<Vec<ActivityAggregateRecordDto>, String> {
-    validate_aggregate_boundaries(start_ms, end_ms, boundaries)?;
-    let mut aggregated: BTreeMap<(usize, bool, String), (String, i64)> = BTreeMap::new();
-    for record in records {
-        let first_bucket = boundaries
-            .partition_point(|boundary| *boundary <= record.start_time)
-            .saturating_sub(1);
-        for (index, pair) in boundaries.windows(2).enumerate().skip(first_bucket) {
-            if pair[0] >= record.end_time {
-                break;
-            }
-            let clipped_start = record.start_time.max(pair[0]);
-            let clipped_end = record.end_time.min(pair[1]);
-            let duration_ms = clipped_end - clipped_start;
-            if duration_ms <= 0 {
-                continue;
-            }
-            let key = (index, record.anonymous, record.exe_name.clone());
-            let entry = aggregated
-                .entry(key)
-                .or_insert((record.app_name.clone(), 0));
-            if !record.app_name.trim().is_empty() {
-                entry.0 = record.app_name.clone();
-            }
-            entry.1 += duration_ms;
-        }
+/// 读一批本地日的日级双口径。今天由纯函数现算（不落表），其余读 `activity_daily_totals`。
+pub async fn load_activity_daily_totals<R: Runtime>(
+    app: &AppHandle<R>,
+    day_keys: Vec<String>,
+) -> Result<Vec<DailyTotalsDto>, String> {
+    if day_keys.is_empty() {
+        return Ok(Vec::new());
     }
-    let mut result = Vec::new();
-    for ((index, anonymous, exe_name), (app_name, duration_ms)) in aggregated {
-        let bucket_duration_ms = boundaries[index + 1] - boundaries[index];
-        let mut remaining_ms = duration_ms;
-        while remaining_ms > 0 {
-            let chunk_ms = remaining_ms.min(bucket_duration_ms);
-            result.push(ActivityAggregateRecordDto {
-                anonymous,
-                app_name: app_name.clone(),
-                exe_name: exe_name.clone(),
-                start_time: boundaries[index],
-                end_time: boundaries[index] + chunk_ms,
-            });
-            remaining_ms -= chunk_ms;
-        }
-    }
-    Ok(result)
-}
-
-fn validate_aggregate_boundaries(
-    start_ms: i64,
-    end_ms: i64,
-    boundaries: &[i64],
-) -> Result<(), String> {
-    if boundaries.len() < 2
-        || boundaries.len() > 5_000
-        || boundaries.first().copied() != Some(start_ms)
-        || boundaries.last().copied() != Some(end_ms)
-        || boundaries.windows(2).any(|pair| pair[1] <= pair[0])
-    {
-        return Err("activity aggregate bucket boundaries are invalid".to_string());
-    }
-    Ok(())
+    let pool = wait_for_sqlite_pool(app).await?;
+    daily::load_range(&pool, &day_keys, now_ms()).await
 }
 
 pub async fn load_status<R: Runtime>(app: &AppHandle<R>) -> Result<ReadModelStatusDto, String> {
@@ -247,109 +248,6 @@ pub async fn invalidate_all(pool: &Pool<Sqlite>, reason: &'static str) -> Result
     tx.commit()
         .await
         .map_err(|error| format!("failed to commit read model invalidation: {error}"))
-}
-
-#[derive(Default)]
-pub(crate) struct ReadModelWake(tokio::sync::Notify);
-
-pub(crate) fn wake_worker<R: Runtime>(app: &AppHandle<R>) {
-    if let Some(wake) = app.try_state::<ReadModelWake>() {
-        wake.0.notify_one();
-    }
-}
-
-pub fn spawn_background_worker<R: Runtime + 'static>(app: AppHandle<R>) {
-    tauri::async_runtime::spawn(async move {
-        let wake = app.state::<ReadModelWake>();
-        let mut schedule = MaintenanceSchedule::default();
-        let mut idle_delay = WORKER_IDLE_DELAY;
-        loop {
-            let pool = wait_for_sqlite_pool(&app).await;
-            let result = match pool {
-                Ok(pool) => {
-                    let result = schedule.tick(&pool).await;
-                    if result.is_err() {
-                        let _ = record_maintenance_failure(&pool).await;
-                    }
-                    result
-                }
-                Err(error) => Err(error),
-            };
-            match result {
-                Ok(true) => {
-                    idle_delay = WORKER_IDLE_DELAY;
-                    sleep(WORKER_ACTIVE_DELAY).await;
-                }
-                Ok(false) => {
-                    tokio::select! {
-                        _ = sleep(idle_delay) => idle_delay = (idle_delay * 2).min(MAX_IDLE_DELAY),
-                        _ = wake.0.notified() => idle_delay = WORKER_IDLE_DELAY,
-                    }
-                }
-                Err(error) => {
-                    idle_delay = WORKER_IDLE_DELAY;
-                    crate::log_warn!("background maintenance failed: {error}");
-                    sleep(WORKER_IDLE_DELAY).await;
-                }
-            }
-        }
-    });
-}
-
-#[derive(Default)]
-struct MaintenanceSchedule {
-    pool_options: Weak<sqlx::sqlite::SqliteConnectOptions>,
-    pending_statistics: bool,
-    next_statistics: Option<Instant>,
-    retry_after: Option<Instant>,
-}
-
-impl MaintenanceSchedule {
-    async fn tick(&mut self, pool: &Pool<Sqlite>) -> Result<bool, String> {
-        let identity = Arc::downgrade(&pool.connect_options());
-        if !self.pool_options.ptr_eq(&identity) {
-            *self = Self {
-                pool_options: identity,
-                ..Default::default()
-            };
-        }
-        let did_work = maintain_once(pool).await?;
-        if did_work {
-            self.pending_statistics = true;
-            return Ok(true);
-        }
-        let now = Instant::now();
-        if self.retry_after.is_some_and(|retry| now < retry)
-            || (!self.pending_statistics && self.next_statistics.is_some_and(|due| now < due))
-        {
-            return Ok(false);
-        }
-        match optimize_query_statistics(pool).await {
-            Ok(()) => {
-                self.pending_statistics = false;
-                self.next_statistics = Some(now + STATISTICS_RECHECK);
-                self.retry_after = None;
-            }
-            Err(error) => {
-                self.retry_after = Some(now + Duration::from_secs(60));
-                crate::log_warn!("query statistics optimization deferred: {error}");
-            }
-        }
-        Ok(false)
-    }
-}
-
-async fn record_maintenance_failure(pool: &Pool<Sqlite>) -> Result<(), String> {
-    sqlx::query(
-        "UPDATE read_model_state
-         SET state = CASE WHEN state = 'building' THEN 'failed' ELSE state END,
-             last_error_code = 'maintenance_failed', updated_at_ms = ?",
-    )
-    .bind(now_ms())
-    .execute(pool)
-    .await
-    .map(|_| ())
-    .map_err(|error| format!("failed to record read model maintenance failure: {error}"))
 }
 
 pub(crate) async fn maintain_once(pool: &Pool<Sqlite>) -> Result<bool, String> {

@@ -1,5 +1,10 @@
 //! 业务层：计时状态机、事项规则、记录编排、设置读写。所有业务逻辑归属此处。
 pub mod countdown;
+/* [0.12.2] 设备维度：本机 install_id 与设备花名册的启动接线。桌面独占 —— 它依赖
+   `services::insight::schema_core`，而 `insight` 整体是 `#[cfg(desktop)]`（P3 让手机端
+   建库时会把这条依赖翻过来，届时再放开 cfg）。 */
+#[cfg(desktop)]
+pub mod device;
 /* [V0.11.15] 数据根（`%APP_DIR%`）的落点信息与切换。桌面独占：`appdata_dir` 与原生
 选目录对话框都只在桌面存在，手机端走 `commands/data_root_cmd_mobile.rs` 的桩。 */
 #[cfg(desktop)]

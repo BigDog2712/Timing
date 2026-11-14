@@ -1,4 +1,5 @@
-//! 迁移执行器（幂等）：`0001_init` → 补列 → `0002_v020` → 补列(v3) → `0003_v030` → 版本推进 → `0006_v0113`。
+//! 迁移执行器（幂等）：`0001_init` → 补列 → `0002_v020` → 补列(v3) → `0003_v030` → 版本推进 → `0006_v0113`
+//! → `0007`/`0008`/`0009`（这三条带版本门，因为各自都有"只许跑一次"的语义，见各步注释）。
 //!
 //! **K-13 硬约束**：SQLite 不支持 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`，重复
 //! `ADD COLUMN` 报 `duplicate column name`。故 items / time_records / notes 的加列**不能**
@@ -45,6 +46,20 @@ const MIGRATE_COLUMNS_V4: &[(&str, &str, &str)] = &[
 /// 可空 —— 老数据不回填（回填等于重跑一次标题匹配，同名待办会被绑成一条），
 /// 新建时也不强制选事项。空值由 `todo_start` 兜底并回填，见 `services::todo_start`。
 const MIGRATE_COLUMNS_V5: &[(&str, &str, &str)] = &[("todos", "item_id", "INTEGER")];
+
+/// 0.12.2 加列清单（设备维度）。
+///
+/// `device_id` 的 `DEFAULT ''` 是**迁移期哨兵**，由 `services::device` 在启动时改写成
+/// 真实 `install_id`。用 `''` 而不是方案书写的 `'local'`：`'local'` 会与「本机 id 就叫
+/// local」混淆，而空串在所有 `CHECK(TRIM(device_id) <> '')` 之外的地方都能被自然忽略。
+///
+/// 走 `ensure_column`（`PRAGMA table_info` 守卫）而不是裸 `ALTER`：SQLite 没有
+/// `ADD COLUMN IF NOT EXISTS`，而本函数每次启动都会跑（K-13）。
+const MIGRATE_COLUMNS_V9: &[(&str, &str, &str)] = &[
+    ("time_records", "device_id", "TEXT NOT NULL DEFAULT ''"),
+    ("time_records", "uid", "TEXT"),
+    ("time_records", "merged_into_uid", "TEXT"),
+];
 
 /// 执行全部迁移（幂等）。由 `infra::db::init_pool` 调用。
 pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
@@ -98,6 +113,29 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
     // 老库升级的判据（任务书 U6）：五张老表行数与升级前逐表相等 —— 本文件不碰任何老表。
     if schema_version(pool).await? < 8 {
         run_raw(pool, include_str!("../migrations/0008_v01300.sql")).await?;
+    }
+    // ⑬ v9（0.12.2）：设备维度。
+    //
+    // 三步，顺序不可换：
+    //   ① 补列 —— 幂等守卫（PRAGMA），每次启动都跑，顺带修复"被人手工删过列"的库；
+    //   ② 抵消段 —— **每次启动无条件跑**：`0002_v020.sql` 每次启动都会把
+    //      `uq_records_open`（全库单活跃）建回来，这里 DROP 是唯一抵消点。
+    //      加了版本门 = 第二次启动退化回单设备；
+    //   ③ 版本推进 —— 必须在版本门里：`UPDATE … value='9'` 会把更高的版本号改写回 9。
+    for (table, column, def) in MIGRATE_COLUMNS_V9 {
+        ensure_column(pool, table, column, def).await?;
+    }
+    run_raw(
+        pool,
+        include_str!("../migrations/0009_v0140_device_dimension_guard.sql"),
+    )
+    .await?;
+    if schema_version(pool).await? < 9 {
+        run_raw(
+            pool,
+            include_str!("../migrations/0009_v0140_device_dimension.sql"),
+        )
+        .await?;
     }
     Ok(())
 }

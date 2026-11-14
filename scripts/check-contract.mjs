@@ -48,7 +48,7 @@ function typesSource() {
 /** 1. Rust 注册的命令
  *
  * 命令表在 `src-tauri/src/ipc_commands.rs`（V0.12.0 融合 Patina 时从 `lib.rs` 拆出：
- * 宿主 80 条 + insight 117 条，一张 `generate_handler!` 内）。这里只取**宿主**那一段
+ * 宿主 84 条 + insight 118 条，一张 `generate_handler!` 内）。这里只取**宿主**那一段
  * （`crate::commands::…`，且模块名不得是 `insight`）——insight 的命令由
  * `src/windows/patina/shell/**` `src/windows/patina/features/**` 等前端自己调用，不进 `ipc.ts` / `IpcApi` /
  * `browserMock` 这套宿主契约。
@@ -66,7 +66,8 @@ function rustCommands() {
 }
 
 /** 分析窗（原 Patina，vendored 子系统）注册的命令，用于「不许与宿主重名」这一条。
- *  归一后多一层嵌套（`commands::insight::<模块>::<函数>`），单独解析；计数必须恒为 117。 */
+ *  归一后多一层嵌套（`commands::insight::<模块>::<函数>`），单独解析。此数只进摘要、不做断言
+ *  （V0.12.2 起 118 条：新增 `cmd_get_activity_daily_totals`）；真正的硬断言是「与宿主不重名」。 */
 function patinaCommands() {
   const src = read('src-tauri/src/ipc_commands.rs');
   return new Set([...src.matchAll(/crate::commands::insight::(\w+)::(\w+)/g)].map((m) => m[2]));

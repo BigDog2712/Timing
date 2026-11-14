@@ -14,6 +14,8 @@ async fn widget_retirement_snapshot_replace_merge_and_reexport_preserve_data() {
         let source = crate::services::insight::data::sqlite_pool::open_single_connection_sqlite_pool(&source_path,true).await.unwrap();
         pools.push(source.clone());
         crate::services::insight::data::sqlite_pool::prepare_pool_schema(&source,&source_path).await.unwrap();
+        // 造「迁移 17 之前」的快照：28 加的东西真的拆回去（见 legacy_schema_fixture）。
+        crate::services::insight::data::rewind_to_pre_device_dimension(&source).await.unwrap();
         source.execute("DELETE FROM _sqlx_migrations WHERE version>=17;
             DROP TABLE tool_activity_reminder_extensions;
             INSERT INTO settings(key,value) VALUES ('minimize_behavior','widget'),('widget_placement','broken'),('widget_expansion_preference','pinned'),('widget_side','right'),('widget_anchor_y','0.7'),('mini_window_preferences','{\"held\":true}'),('language','es');

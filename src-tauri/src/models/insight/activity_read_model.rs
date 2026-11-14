@@ -50,54 +50,20 @@ pub fn normalize_app_key(exe_name: &str) -> Option<String> {
     if normalized.is_empty() {
         return None;
     }
-    if normalized.ends_with(".exe") {
+    // 含 `:` 的键是**已是完整键**的形态（`activity:anonymous`、安卓包名 `com.x.y`），
+    // 再补 `.exe` 会造出 `activity:anonymous.exe` 这种对不上生成列的值（迁移 28 ③）。
+    if normalized.contains(':') || normalized.ends_with(".exe") {
         Some(normalized)
     } else {
         Some(format!("{normalized}.exe"))
     }
 }
 
-const LIFECYCLE_MARKERS: &[&str] = &[
-    "setup",
-    "install",
-    "installer",
-    "uninstall",
-    "uninstaller",
-    "unins",
-    "unins000",
-    "update",
-    "updater",
-    "upgrade",
-    "remove",
-    "maintenance",
-    "maintenancetool",
-];
-
-const LIFECYCLE_TITLE_MARKERS: &[&str] = &[
-    "setup",
-    "install",
-    "installer",
-    "installation",
-    "installing",
-    "uninstall",
-    "uninstaller",
-    "uninstallation",
-    "uninstalling",
-    "unins",
-    "unins000",
-    "update",
-    "updater",
-    "updating",
-    "upgrade",
-    "remove",
-    "maintenance",
-    "maintenancetool",
-];
-
-const LIFECYCLE_BUILD_TOKENS: &[&str] = &[
-    "win", "windows", "x64", "x86", "amd64", "arm64", "ia32", "portable", "release", "latest",
-    "beta", "alpha", "nightly", "stable", "desktop", "app",
-];
+// 三张生命周期词表搬到 `activity_lifecycle.rs`（本文件压在 `check:size` 冻结线上）。
+// 回挂成 `pub(crate)`，下面的判定函数与仓内其他引用都不需要改路径。
+pub(crate) use super::activity_lifecycle::{
+    LIFECYCLE_BUILD_TOKENS, LIFECYCLE_MARKERS, LIFECYCLE_TITLE_MARKERS,
+};
 
 const NON_TRACKABLE_EXES: &[&str] = &[
     "",

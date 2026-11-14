@@ -1,7 +1,7 @@
 use crate::commands::insight::error::CommandErrorDto;
 use crate::services::insight::data::activity_read_model::{
-    self, ActivityAggregateRangeDto, ReadModelStatusDto, RecordedAppCatalogCursorDto,
-    RecordedAppCatalogPageDto,
+    self, ActivityAggregateRangeDto, DailyTotalsDto, ReadModelStatusDto,
+    RecordedAppCatalogCursorDto, RecordedAppCatalogPageDto,
 };
 use tauri::{AppHandle, Runtime};
 
@@ -44,4 +44,17 @@ pub async fn cmd_get_activity_read_model_status<R: Runtime>(
     activity_read_model::load_status(&app)
         .await
         .map_err(|error| command_error("failed to read activity model status", error))
+}
+
+/// 日级双口径（热力 / 趋势 / 周月总览的唯一取数口）。
+///
+/// `dayKeys` 是本地 `YYYY-MM-DD`；今天由服务侧现算，其余读 `activity_daily_totals`。
+#[tauri::command]
+pub async fn cmd_get_activity_daily_totals<R: Runtime>(
+    day_keys: Vec<String>,
+    app: AppHandle<R>,
+) -> Result<Vec<DailyTotalsDto>, CommandErrorDto> {
+    activity_read_model::load_activity_daily_totals(&app, day_keys)
+        .await
+        .map_err(|error| command_error("failed to read activity daily totals", error))
 }
