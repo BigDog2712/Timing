@@ -56,8 +56,6 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
     title: "计时与记录",
     anchors: [
       { id: "s-tracking", title: "记录规则" },
-      /* [0.13.x] 应用 → 分类候选：决定子记录归到哪个分类（首位是兜底答案）。 */
-      { id: "s-app-categories", title: "应用分类候选" },
       { id: "s-interface", title: "接口" },
     ],
   },

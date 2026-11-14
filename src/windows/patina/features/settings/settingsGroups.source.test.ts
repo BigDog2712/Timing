@@ -31,8 +31,6 @@ const DOM_ORDER = [
   's-pill-handles', 's-pill-look',
   's-theme', 's-highlight', 's-display', 's-interface', 's-board-widgets',
   's-tracking',
-  /* [0.13.x] 应用分类候选：独立那张卡，物理上就长在「记录规则」卡之后。 */
-  's-app-categories',
   's-sync', 's-backup',
   's-general', 's-resident', 's-plugins',
 ];

@@ -13,7 +13,6 @@
 @import "./styles/app-shell.css";
 @import "./styles/mini-window.css";
 @import "./styles/features/settings.css";
-@import "./styles/features/settings-app-category.css";
 @import "./styles/features/settings-handles.css";
 /* [0.12.1 T04b] 设置页从「药丸内联面板」搬进分析窗：原来只被宿主窗加载的 8 份
    settings-*.css 一并搬到这里（`features/host/`）。className 一个字都没改，所以样式

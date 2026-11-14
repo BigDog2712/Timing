@@ -1082,57 +1082,9 @@
       "owner": "software-engineer"
     },
     {
-      "path": "src/windows/patina/features/settings/components/SettingsAppCategoryPanel.tsx",
-      "change": "added",
-      "reason": "设置页「应用分类候选」面板：一个应用多分类 + 顺序，首位徽章 = 规则 2 的兜底答案",
-      "owner": "software-engineer"
-    },
-    {
-      "path": "src/windows/patina/features/settings/components/SettingsAppCategoryPanel.test.tsx",
-      "change": "added",
-      "reason": "面板判据 4 条：首位徽章唯一、前移写整组重排后的 priority、只写真变了的那条、首位禁用前移",
-      "owner": "software-engineer"
-    },
-    {
-      "path": "src/windows/patina/features/settings/hooks/useAppCategories.ts",
-      "change": "added",
-      "reason": "取数与写入：写失败回到库里的旧顺序（顺序会被切片当真，不留乐观结果）",
-      "owner": "software-engineer"
-    },
-    {
-      "path": "src/windows/patina/features/settings/services/appCategoryOrder.ts",
-      "change": "added",
-      "reason": "排序/重排纯函数。compareAppCategory 必须与 Rust resolve_child_category 的 tiebreak 一字不差",
-      "owner": "software-engineer"
-    },
-    {
-      "path": "src/windows/patina/features/settings/services/appCategoryOrder.test.ts",
-      "change": "added",
-      "reason": "排序判据 13 条：同 priority 字典序、乱序入参下按 priority 判邻居、空组不落空 appKey",
-      "owner": "software-engineer"
-    },
-    {
-      "path": "src/windows/patina/features/settings/settingsGroups.ts",
-      "change": "modified",
-      "reason": "「计时与记录」组加 s-app-categories 锚点（新卡必须同时登记，否则锚点导航点上去不动也不报错）",
-      "owner": "software-engineer"
-    },
-    {
-      "path": "src/windows/patina/features/settings/settingsGroups.source.test.ts",
-      "change": "modified",
-      "reason": "DOM_ORDER 补 s-app-categories：物理顺序变了，这张表是「表 = 页面 = 导航」的唯一口径",
-      "owner": "software-engineer"
-    },
-    {
       "path": "src/windows/patina/features/settings/components/Settings.tsx",
       "change": "modified",
       "reason": "挂载面板。为守住 344 行冻结值同批压掉三处注释（只减不增）",
-      "owner": "software-engineer"
-    },
-    {
-      "path": "src/windows/patina/shell/styles/features/settings-app-category.css",
-      "change": "added",
-      "reason": "面板样式单独成文件：settings.css 是 1667 行冻结基线，一次性 +118 会让整页超限",
       "owner": "software-engineer"
     },
     {

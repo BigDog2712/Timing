@@ -13,7 +13,6 @@ import SettingsHandlesPanel from "./SettingsHandlesPanel";
 import SettingsInterfacePanel from "./SettingsInterfacePanel";
 import SettingsResidentPanel from "./SettingsResidentPanel";
 import SettingsTrackingPanel from "./SettingsTrackingPanel";
-import SettingsAppCategoryPanel from "./SettingsAppCategoryPanel.tsx";
 import SettingsBoardPanel from "./SettingsBoardPanel";
 import { HostGeneralPanel } from "./host/HostGeneralPanel";
 import HostHighlightCard from "./host/HostHighlightCard";
@@ -256,7 +255,6 @@ export default function Settings({
               onTitleRecordingEnabledChange={(nextChecked) => handleChange("titleRecordingEnabled", nextChecked)}
             />
           </div>
-          <SettingsAppCategoryPanel id="s-app-categories" />
           {/* 第 4 组「数据与同步」：宿主的 md_sync（计时记录）在前，活动库备份在后。 */}
           <div id="s-sync"><HostSyncPanel /></div>
           <div id="s-backup">

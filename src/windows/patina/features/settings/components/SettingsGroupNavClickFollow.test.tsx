@@ -225,6 +225,6 @@ describe("点击之后的后续交互（钉子与到底规则）", () => {
       "pill", "appearance", "board", "tracking", "data", "general",
     ]);
     expect(SETTINGS_GROUPS.find((group) => group.id === "tracking")?.anchors.map((anchor) => anchor.id))
-      .toEqual(["s-tracking", "s-app-categories", "s-interface"]);
+      .toEqual(["s-tracking", "s-interface"]);
   });
 });
