@@ -175,12 +175,26 @@ export async function clearAppItemBinding(exeName: string): Promise<void> {
  * 用户的观感是「我在事项里解绑了燕云，结果写代码这件也不计时了」。
  *
  * 所以解绑时做两件事（一次 commit，两个键一起写）：
- *   1. 删 1:1 键；
+ *   1. 删 1:1 键（**仅当**要摘的那一条就是 1:1 指的那一条，见下）；
  *   2. 若 override 里也有这个 itemId，把它从 `itemBindings` 里摘掉
  *      （不摘的话启动补镜像读 override 会把它**补回来** —— 重启又自动计时）。
  * 然后按摘完之后的并集发镜像。
+ *
+ * ## [第 6 条] 第三个参数 `removeItemId`：解绑的是**哪一个**事项
+ *
+ * 两个调用方的语义不同，不能共用"1:1 那一条"来猜：
+ *   · **应用视角**（排行卡的行内编辑 `useAppItemBindings`）：界面上只有一个主值
+ *     `oneToOne ?? itemIds[0]`，不传第三个参数 → 计划自己按同一条规则推；
+ *   · **事项视角**（「编辑事项 → 绑定应用」`useItemAppBindings`）：解绑的是**当前事项**，
+ *     它可能既不是 1:1 指的那条、也不是并集第一个（应用同时绑了事项 3 与 9，用户在 9 上解绑）。
+ *     这时必须传 `removeItemId = 9`，否则会去摘 3 —— 用户没碰的那一条被删掉（`ad27` 钉住）。
+ *     同一条规则也决定 **1:1 键删不删**：只有 `previousItemId === removedItemId` 时才删。
  */
-export async function saveAppItemBinding(exeName: string, itemId: number | null): Promise<void> {
+export async function saveAppItemBinding(
+  exeName: string,
+  itemId: number | null,
+  removeItemId: number | null = null,
+): Promise<void> {
   const key = buildAppItemBindingKey(exeName);
   if (!key) return;
   /* 先把值算出来：非法 id 在这里抛，写命令一条都不会发出去 */
@@ -195,15 +209,17 @@ export async function saveAppItemBinding(exeName: string, itemId: number | null)
     nextItemId: itemId,
     previousItemId,
     overrideItemIds: normalizeItemBindings(override?.itemBindings).map((binding) => binding.itemId),
+    removeItemId,
   });
 
-  const mutations: ClassificationSettingMutation[] = [{ key, value }];
+  const mutations: ClassificationSettingMutation[] = [];
+  if (itemId !== null || plan.clearOneToOne) mutations.push({ key, value });
   if (plan.rewriteOverride) {
     /* 走唯一重建入口：它负责"其余维度原样保留"，以及"没有任何字段了就整条置 null" */
     const next = buildQuickAppOverride(override, { itemBindings: plan.nextItemBindings });
     mutations.push(...buildSaveAppOverrideMutations(exeName, next));
   }
-  await commitClassificationSettingMutations(mutations);
+  if (mutations.length > 0) await commitClassificationSettingMutations(mutations);
   if (plan.rewriteOverride) {
     /* bootstrap 缓存里那份 override 还是带旧 itemBindings 的：不清掉，下一次打开
        应用设置弹窗会把它写回去（同一个"重启复活"的另一种走法）。 */
@@ -222,40 +238,8 @@ export async function listAppItemBindingOptions(): Promise<AppItemBindingOption[
 }
 
 /**
- * 存量绑定的**一次**补镜像（[0.13 fix]，进程内只跑一次）。
- *
- * ## 为什么需要它（不做的话，修完之后老用户还是"绑了不计时"）
- *
- * 在本次修复之前，这个仓库里**没有任何代码**往宿主 `item_app` 写行：
- * `legacy_bindings::backfill` 有 Rust 实现、有 IPC 命令、有网关封装，但**没有任何调用方**，
- * 所以老用户的绑定只存在于分析窗的 KV 里。修完之后新保存的绑定会被镜像（见
- * `saveAppItemBinding`），但**已经存下的那些**没人补 —— 界面显示「已绑定」、切过去仍然
- * 不计时，比不显示更糟。
- *
- * 所以每次进分析窗第一次读绑定配置时，把读到的 1:1 配置整体再镜像一遍：
- * 幂等（执行端做三向 diff，已经在位的不会重复写），一次性（模块级 promise）。
- * 失败**不缓存**（置回 null，下次进界面再试）—— 这个通道没有回执，唯一能做的重试点
- * 就是"用户下一次打开"。
- *
- * ## 边界：只补 1:1 这份配置
- *
- * `__app_override::` 里的多事项 `itemBindings[]` 不在这里补（它属于分类维度，
- * 由应用设置弹窗保存时镜像）。Rust 侧那条 `backfill_legacy_bindings` 也**不在这里调**：
- * 它会顺带把 KV 里的分类数组重新灌进 `app_category`，而映射视图改的正是那张表 ——
- * 在一次普通界面加载里做这件事，会把用户刚在映射视图里调过的分类顺序覆盖回去。
+ * 存量绑定的补镜像（`mirrorItemBindingsOnce`）与**真全集**（`loadAppItemBindingUnions`）
+ * 都在 `appItemBindingMirror.ts`：前者要同时读本文件的 1:1 与 override 两份真源，
+ * 而本文件卡在 300 行硬限上（同 R1 把写计划摊到 `appItemBindingPlan.ts` 的理由）。
+ * 补镜像的载荷必须是**并集** —— 只发 1:1 视角的 `[itemId]` 会误删同应用其它事项的绑定。
  */
-let legacyMirrorPromise: Promise<void> | null = null;
-
-export function mirrorItemBindingsOnce(bindings: Record<string, number>): Promise<void> {
-  if (legacyMirrorPromise) return legacyMirrorPromise;
-  const entries = Object.entries(bindings);
-  legacyMirrorPromise = Promise.all(
-    entries.map(([exeName, itemId]) => syncHostItemAppBindings(exeName, [itemId])),
-  )
-    .then(() => undefined)
-    .catch((error: unknown) => {
-      legacyMirrorPromise = null;
-      console.warn("[binding] 存量绑定补镜像失败", error);
-    });
-  return legacyMirrorPromise;
-}

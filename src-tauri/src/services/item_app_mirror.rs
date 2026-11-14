@@ -41,6 +41,14 @@
 //!    「绑定事项」写的那份，也是前端即时镜像的载荷）说了算；`__app_override::` 只补它
 //!    没覆盖的应用。合并规则只有这一处，否则前端即时镜像与这里的启动补丁会各说一套。
 //!
+//!    但**「不计入」（`track: false`）不属于"口径 3 让位"的那部分**：它是用户的明确决定，
+//!    从哪份配置读到的都得保住。所以单事项键写进 `wanted` 时用的是"这个应用在 override 里
+//!    有没有标过不计入"（`track_off` 集合），而不是恒 `track = 1` —— 否则同一应用只要在
+//!    应用卡上绑过一条，每次开机都会把"仅观察"翻回"计入"。与前端
+//!    `loadAppItemBindingUnions` 的 `trackOff` 用 **OR** 合并是同一条口径（前端那份注释里
+//!    写了为什么只能 OR：归一后成员 exe 与父应用是同一个统计应用，没法只对成员生效）。
+//!    注意这只影响**新插入**的行：已有行一律不改 `track`（口径 1），那条别动。
+//!
 //! ## 失败与副作用
 //!
 //! 只记日志、不阻断启动、**不打 `dirty::mark`**（L8：业务写入信号只许出现在
@@ -50,7 +58,7 @@
 //! 桌面独占：`app_key` 的归一实现（`models::insight::activity_read_model::normalize_app_key`）
 //! 与分析窗配置表都只在桌面存在；手机端没有前台窗口这条链路，也没有消费者。
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use sqlx::SqlitePool;
 
@@ -99,6 +107,8 @@ fn parse_override_bindings(raw: &str) -> Option<(Vec<i64>, i64)> {
 /// 配置表全表 → `app_key → {item_id: track}`（口径 3：单事项键覆盖同一应用）。
 fn collect_wanted(rows: &HashMap<String, String>) -> BTreeMap<String, BTreeMap<i64, i64>> {
     let mut wanted: BTreeMap<String, BTreeMap<i64, i64>> = BTreeMap::new();
+    /* 这个应用有没有被标过「不计入」。只在**新插入**时用（口径 1：已有行不改 track）。 */
+    let mut track_off: BTreeSet<String> = BTreeSet::new();
     for (key, raw) in rows {
         let Some(exe) = key.strip_prefix(APP_OVERRIDE_PREFIX) else {
             continue;
@@ -111,6 +121,9 @@ fn collect_wanted(rows: &HashMap<String, String>) -> BTreeMap<String, BTreeMap<i
         };
         if item_ids.is_empty() {
             continue;
+        }
+        if track == 0 {
+            track_off.insert(app_key.clone());
         }
         let slot = wanted.entry(app_key).or_default();
         for item_id in item_ids {
@@ -127,7 +140,11 @@ fn collect_wanted(rows: &HashMap<String, String>) -> BTreeMap<String, BTreeMap<i
         let Some(item_id) = parse_item_id(raw) else {
             continue;
         };
-        wanted.insert(app_key, BTreeMap::from([(item_id, 1)]));
+        /* 口径 3 覆盖的是**哪些事项**，不是"计不计入"：应用在 override 里标了 `track: false`
+           时，1:1 这一路补出来的行也必须带 `track = 0`，否则每次开机把用户的"仅观察"翻回
+           接管。用例 `single_item_key_keeps_the_track_off_flag`。 */
+        let track = if track_off.contains(&app_key) { 0 } else { 1 };
+        wanted.insert(app_key, BTreeMap::from([(item_id, track)]));
     }
     wanted
 }

@@ -117,7 +117,7 @@
     "src/windows/patina/features/history/hooks/useHistoryTimelineViewportInteraction.ts": 311,
     "src/windows/patina/features/history/services/historyBootstrapSnapshot.ts": 394,
     "src/windows/patina/features/history/services/historyReadModel.ts": 484,
-    "src/windows/patina/features/settings/components/Settings.tsx": 344,
+    "src/windows/patina/features/settings/components/Settings.tsx": 342,
     "src/windows/patina/features/settings/components/SettingsBackupDialog.tsx": 497,
     "src/windows/patina/features/settings/components/SettingsDataExportDialog.tsx": 477,
     "src/windows/patina/features/settings/components/SettingsInterfacePanel.tsx": 598,

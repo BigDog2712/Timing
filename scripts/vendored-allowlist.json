@@ -1384,13 +1384,25 @@
     {
       "path": "src/windows/patina/features/dashboard/services/appItemBindingPlan.ts",
       "change": "added",
-      "reason": "[0.13 fix R1] 解绑要一次改两个键（1:1 + override.itemBindings），把「该写哪几个键、镜像发哪个并集」摊成纯函数才可测（appItemBinding.ts 卡 300 行）",
+      "reason": "[0.13 fix R1 + 第 6 条] 解绑要一次改两个键（1:1 + override.itemBindings），把「该写哪几个键、镜像发哪个并集」摊成纯函数才可测（appItemBinding.ts 卡 300 行）；[第 6 条] 增 loadAppOverrideBindingSources（并集的第二真源），并给 removedItemId 加 `?? base[0]` fallback（override 型解绑要摘得掉）",
       "owner": "software-engineer"
     },
     {
       "path": "src/windows/patina/features/dashboard/services/appItemBinding.unbind.test.ts",
       "change": "added",
-      "reason": "[0.13 fix R1] ad22-ad25：解绑 5（override=[5,7]、1:1=5）镜像载荷必须是 [7]、override 只挂 5 时才允许出现空载荷",
+      "reason": "[0.13 fix R1 + 第 6 条] ad22-ad26：解绑 5（override=[5,7]、1:1=5）镜像载荷必须是 [7]、override 只挂 5 时才允许出现空载荷；ad26 钉 override 型（没有 1:1）解绑必须真的摘掉那一条",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/appItemBindingMirror.ts",
+      "change": "added",
+      "reason": "[第 6 条] 绑定的两份真源（1:1 / override.itemBindings）收敛到唯一的全集产出点 loadAppItemBindingUnions，补镜像 mirrorItemBindingsOnce 只吃它的输出并按每应用并集发（旧版发 [itemId] 会被执行端当全集做三向 diff，误删同应用别的事项）；从卡 300 行的 appItemBinding.ts 拆出",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/appItemBindingMirror.test.ts",
+      "change": "added",
+      "reason": "[第 6 条] ai05 载荷必须是并集 [7,12]（1:1=12、override=[12,7]）/ ai09 并集与键归一 / ai10 任一真源读失败整体抛，不许拿半份数据发镜像",
       "owner": "software-engineer"
     }
   ]

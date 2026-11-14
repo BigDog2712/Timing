@@ -28,6 +28,9 @@ mod item_app_mirror_tests;
    因为它正好 300 行（`check:size` 硬限，棘轮只许减不许增）。 */
 #[cfg(all(test, desktop))]
 mod item_app_mirror_unbind_tests;
+/* 「不计入」口径（`track: false` 不许被单事项键翻回 1）：同样因为上一个文件正好 300 行。 */
+#[cfg(all(test, desktop))]
+mod item_app_mirror_track_tests;
 /* [0.13.x] 事项树（2 层硬限）与绑定的判据：断言落库后的 `parent_id`/`depth`，
    而不是只断言调用返回 Ok（两者不同步时全链路零报错）。 */
 #[cfg(test)]

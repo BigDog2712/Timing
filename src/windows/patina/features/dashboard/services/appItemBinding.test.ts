@@ -37,7 +37,6 @@ import {
   listAppItemBindingOptions,
   loadAppItemBindingFor,
   loadAppItemBindings,
-  mirrorItemBindingsOnce,
   parseAppItemBindingRows,
   parseAppItemBindingValue,
   saveAppItemBinding,
@@ -101,42 +100,10 @@ describe("镜像宿主 item_app（[0.13 fix]）", () => {
 });
 
 /**
- * 存量绑定的补镜像（[0.13 fix]）：本轮之前**没有任何代码**往宿主 `item_app` 写过行，
- * 所以老用户的绑定只存在于 KV 里。不补的话，修完之后老用户仍然「界面显示已绑定、
- * 切过去不计时」—— 与 bug 本身同一个症状，而且更难排查。
- *
- * 一条用例走完三段（模块级只跑一次，所以不能拆成三条互相依赖的用例）：
- *   ① 发失败**不缓存** → 下次进界面还能重试；
- *   ② 重试成功 → 每条 1:1 绑定发一次全集（`itemIds: [itemId]`）；
- *   ③ 第三次 → 进程内不再发（不重复打扰宿主）。
+ * 存量绑定的补镜像（`mirrorItemBindingsOnce`）已搬到 `appItemBindingMirror.test.ts`：
+ * [第 6 条] 它不再收调用方传进来的 1:1 视图，而是自己读两份真源发并集 ——
+ * 那个文件同时钉住"载荷是并集"这条 P0 判据。
  */
-describe("存量绑定补镜像（[0.13 fix]）", () => {
-  it("ai05_失败可重试_成功之后进程内不再发", async () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    g.emitHostIntent.mockRejectedValueOnce(new Error("pill not ready"));
-    await mirrorItemBindingsOnce({ "yanyun.exe": 12 });
-    expect(g.emitHostIntent).toHaveBeenCalledTimes(1);
-
-    g.emitHostIntent.mockClear();
-    await mirrorItemBindingsOnce({ "yanyun.exe": 12, "code.exe": 7 });
-    expect(g.emitHostIntent).toHaveBeenCalledTimes(2);
-    expect(g.emitHostIntent).toHaveBeenCalledWith({
-      action: "sync_app_item_bindings",
-      appKey: "yanyun.exe",
-      itemIds: [12],
-    });
-    expect(g.emitHostIntent).toHaveBeenCalledWith({
-      action: "sync_app_item_bindings",
-      appKey: "code.exe",
-      itemIds: [7],
-    });
-
-    g.emitHostIntent.mockClear();
-    await mirrorItemBindingsOnce({ "yanyun.exe": 12 });
-    expect(g.emitHostIntent).not.toHaveBeenCalled();
-    warn.mockRestore();
-  });
-});
 
 describe("键与值的形状", () => {
   it("键 = 前缀 + 归一后 exe 名（trim + 小写，与写侧同一个函数）", () => {

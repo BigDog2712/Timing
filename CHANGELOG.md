@@ -345,8 +345,101 @@
   —— 清 `__app_item_binding::<exe>`（若它指向被解的那条）+ 重写 `__app_override::<exe>.itemBindings[]`
   去掉该 `itemId`（其余保留），然后按**新并集**发镜像；`[]` 只允许出现在"真的空了"的时候。
   该计划摊成纯函数 `services/appItemBindingPlan.ts::planAppItemBindingWrite`（`appItemBinding.ts`
-  卡 300 行），四语言文案与 UI 零变化。`mirrorItemBindingsOnce` 同批改成发并集 —— 它本来就是
-  「只读不删的存量补镜像」，改成并集是收敛，不是扩张。
+  卡 300 行），四语言文案与 UI 零变化。
+- **事项面板会误删同应用的其它绑定（第 6 条 · P0，与上一版一起看）**：
+  ① **用户能感知的形态**：打开过一次「编辑事项 → 绑定应用」或应用排行卡之后，
+  某个应用**在别的事项上的绑定没了** —— 在药丸上切过去不再自动计时，界面上却可能还显示着
+  "已绑定"。同一处还有第二个症状：在应用设置弹窗里绑过的事项，回到事项这边显示
+  **"还没有绑定应用"**（用户报的原话：「应用绑定事项唤起的事项结束后，事项未绑定到应用」）。
+  ② **两个症状同一个根因**：绑定的**两份真源**（1:1 `__app_item_binding::<exe>` /
+  多事项 `__app_override::<exe>.itemBindings[]`）被当成了一份。读侧（`useItemAppBindings`
+  与应用排行卡的行标记 `useAppItemBindings`）只读 1:1，于是 override 型绑定在事项视角
+  **不存在**、在排行卡的行走上也没有标记；镜像侧（存量补镜像 `mirrorItemBindingsOnce`）
+  收的是调用方手里的 1:1 视图，逐应用发 `[itemId]`，而执行端
+  （`hostIntentItemAppWrite`）把载荷当**该应用的全集**做三向 diff —— "不在载荷里"的事项被
+  `unbindItemApp` 删掉。
+  ③ **修法**：全集收敛到**一个产出点** `services/appItemBindingMirror.ts::loadAppItemBindingUnions`
+  （1:1 ∪ override，两次前缀读并行、**任一失败就整体抛**，绝不拿半份数据去发镜像），
+  显示面（`bound` = 并集里有没有这个事项）、排行卡行标记（主值 = `oneToOne ?? itemIds[0]`，
+  行上只画一个事项名，完整清单在事项视角）与补镜像（每应用发并集、override 标了「不计入」
+  时带 `track: 0`）都只吃它；同时**取消补镜像的入参** —— 调用方再也没有传一个"自己以为的
+  全集"进来的口子，这才是那个 P0 的成因。
+  ④ 上一版这句记述**是错的、已改**：`mirrorItemBindingsOnce` 当时并**没有**"同批改成发并集"，
+  它一直是 `[itemId]`，用例 `ai05` 还把 `itemIds: [12]` 钉成了期望（把 bug 钉成了正确行为）。
+  这次一起改掉，并补交叉判据：1:1 = 12、override = [12, 7] → 载荷必须是 `[7, 12]`。
+  ⑤ 变异自证（七处，都实跑）：把补镜像载荷退回 `[union.oneToOne]` → `ai05` 红；把 `bound`
+  的判据退回 `union.oneToOne === itemId` → `ai05` / `ai06` 红（`boundRows()` 为空）；把行标记
+  退回只用 `union.oneToOne` → `hook07` / `hook08` 红；把计划里的 `removeItemId ??` 摘掉、
+  或把 `clearOneToOne` 恒 true → `ad27` 红；把 `survivors` 从解绑载荷里去掉 → `ad28` 红；
+  把载荷的升序去掉 → `ad24` 红。
+  ⑥ **行标记改读并集带来的第二处必须同步**：解绑摘谁、1:1 键删不删。界面上显示的主值是
+  `oneToOne ?? itemIds[0]`，而 `planAppItemBindingWrite` 原来的 `removedItemId` 只认 1:1 ——
+  于是两个方向都错：只在应用设置弹窗里绑过的应用"看得见、摘不掉"（点「不绑定」一个键都不重写，
+  载荷还是原样）；反过来，事项视角解绑**当前事项**时又会按"1:1 那一条"去摘，把用户没碰的
+  那条删掉。现在 `saveAppItemBinding(exe, null, removeItemId)` 多了第三个参数（事项视角传
+  当前事项 id，应用视角不传），计划里 `removedItemId = removeItemId ?? previousItemId ?? base[0]`
+  （`base` 同时改成升序，与并集的 `itemIds` 同一个顺序），并新增 `clearOneToOne` ——
+  **只有**要摘的那一条就是 1:1 指的那一条才删 KV。判据 `ad26` / `ad27`。
+  ⑧ **1:1 不在 override 里时，解绑别的事项会漏掉仍存活的 1:1（QA 验收抓到的 P0 续集）**：
+  可达路径全是正常 UI —— 应用设置弹窗先绑 9（override=[9]）→ 排行卡再绑 3（1:1=3，载荷
+  `[3,9]`）→ 事项面板在 9 上解绑。旧实现 `mirroredItemIds` 取 `remaining`（= override 去掉
+  9 = `[]`），等于发"空全集"：执行端删掉事项 3 的 `item_app` 行，而 KV 里 1:1=3 一动没动、
+  界面照旧显示"已绑定 3" —— 界面与宿主静默分叉，要等下次重启 Rust 补镜像才自愈，正是本次
+  要修的症状的另一半。修法：载荷 = `remaining` ∪ **存活项**（`clearOneToOne === false` 时
+  的 `previousItemId`），并统一走升序去重。`ad22` / `ad27` 的夹具都是 **1:1 ⊆ override**，
+  1:1 项天然躺在 `remaining` 里，抓不住这一格 —— 判据 `ad28`（变异：去掉 `survivors` → 红）、
+  `ad29`（两步骤钉"最后一条被摘掉才允许空载荷 / 才删 1:1 键"；变异：`survivors` 无条件并入
+  → `ad22` / `ad23` / `ad29` 红）。
+  ⑨ **1:1 那一侧的读失败此前没有任何用例（QA 变异打穿，1721 条全绿）**：`ai10` 只钉了
+  override 一侧。1:1 独有的应用（只在排行卡 / 事项栏绑过）如果"读不到 1:1 就当没有"，并集会
+  算成空 → 补镜像发 `itemIds: []` → 执行端把该应用**所有**事项的行删掉。补 `ai11`：
+  1:1 侧抛错 → `loadAppItemBindingUnions` reject → `mirrorItemBindingsOnce` **一条意图都不发**
+  （不是发空、不是发半份）。变异：`loadAppItemBindings().catch(() => ({}))` → `ai11` 红
+  （`ai10` 仍绿，正是它覆盖不到的那一半）。
+  ⑩ **「不计入」的口径（主理人拍）**：`track: false` 是用户的明确决定，**任何路径都不许把它
+  翻回 1**。
+  · 前端 `trackOff` 跨行用 **OR** 合并（归一后成员 exe 与父应用是同一个统计应用，没法只对
+  成员生效；last-wins 会变成"谁的键排在后面谁说了算"，每次开机互相翻）—— 判据 `ai12`，
+  变异：改成 `target.trackOff = source.trackOff` → 红；`appItemBindingMirror.ts` 的
+  `AppItemBindingUnion.trackOff` 注释里写明了理由。
+  · Rust `services/item_app_mirror.rs::collect_wanted` 原来在单事项键那一路恒 `track = 1`，
+  口径 3 覆盖"哪些事项"的同时把"计不计入"也一起覆盖了 → 应用卡绑一条就把「仅观察」翻回
+  接管。现在先收一遍 `track_off: BTreeSet<app_key>`，单事项键补行时用它决定 `track`
+  （**已有行一律不改 track**，口径 1 原样保留）。判据新增
+  `services/item_app_mirror_track_tests.rs::single_item_key_keeps_the_track_off_flag`
+  （该文件从正好 300 行的 `item_app_mirror_tests.rs` 拆出）；变异：1:1 那一路改回恒 `1` → 红。
+  ⑪ **已知限制 · Rust 启动补镜像的口径 3（本轮不修，主理人已拍单开卡）**：
+  `services/item_app_mirror.rs::collect_wanted` 是"单事项键**整条替换**同一应用"
+  （`wanted.insert(app_key, {itemId})`），已由 `single_item_key_wins_over_multi_item_config` 钉死。
+  后果：应用**同时**有 1:1 与 override 时，override 里多出来的事项不会被**开机**补镜像补回。
+  自愈点只有两个：**下一次进程启动 + 第一次打开应用卡 / 事项面板**，或者**下一次保存**
+  （保存路径的即时镜像发的是真并集）。⚠️ 不是"下次打开分析窗就自愈" ——
+  `mirrorItemBindingsOnce` 是**进程内只跑一次**的模块级 promise，同一次进程里再打开界面不会重发。
+- **已知限制 · 「仅观察」在"该应用在弹窗里没绑事项"时会丢（QA 验收新发现，本轮不修）**：
+  override 只有 `{"track": false}`、没有 `itemBindings[]` 时，Rust `item_app_mirror.rs` 的
+  `track_off.insert` 排在 `if item_ids.is_empty() { continue }` **之后**，前端
+  `appItemBindingPlan.ts::loadAppOverrideBindingSources` 同样是 `itemIds.length === 0 → continue`
+  —— 两侧**同病且行为一致**（所以不是前后端互相翻），但都错：用户标了「不计入」、随后在应用卡
+  绑一条事项，开机补镜像会按"没标过"写 `track = 1`，把「仅观察」翻回接管。可达性：`"不计入"`
+  可以在一件事项都没勾的情况下被写下（`buildQuickAppOverride` 会丢掉空的 `itemBindings`），
+  所以可达。判据 `ai12` 用的是**有** `itemBindings` 的夹具，覆盖不到这一格。**本轮不修**，
+  修法是"把 trackOff 的收集提到 empty 判断之前"（前后端各一处）。
+  ⑫ **R6 产品取舍（主理人：保留现状，不改）**：排行卡点「不绑定」后行标记可能**换成下一件事项**
+  而不是消失 —— 因为解绑摘的是当前主值，应用若还绑着别的事项，并集非空。反过来"解绑即清空
+  全部"会删掉用户在应用设置弹窗里配的其它事项，那是删数据。已在 `useAppItemBindings` 头注
+  写明这是刻意的。
+- **已知限制 · 应用关联（`__app_link::`）下两个 key 空间不一致（pre-existing，本轮不修）**：
+  `saveAppItemBinding` 的 KV 键走 `buildAppItemBindingKey`（= `resolveStatisticalApp`，**会**走
+  应用关联），而它的即时镜像 `syncHostItemAppBindings(exeName, ...)` 走 `normalizeAppKey`
+  （= Rust `normalize_app_key` 的复刻，**不走**应用关联）。于是配了应用关联的用户：KV 落父应用、
+  即时镜像落成员 appKey，而补镜像（`appItemBindingMirror.ts` 按并集键）发的是**父** appKey ——
+  而 `sessions.app_key` 是成员口径。
+  **影响面（写清，别扩大）**：只影响**配过应用关联的用户**，且只影响**存量补镜像**那一条路径
+  （开机 / 首次打开界面时补的那些行匹配不上会话）。**新保存的即时镜像是好的** —— 它传的是
+  原始 exe，正好等于 `sessions.app_key` 的成员口径。所以不阻塞第 6 条主诉。
+  **修法**：让 `AppItemBindingUnion` 额外留一份"原始 / 规范化 exe"，补镜像按 appKey 逐条发
+  （现在按统计应用归并时原值已丢），要防"父键与成员键同时被发"。与**第 7 条（事项读模型）**
+  同批做 —— 那批本来就要动读模型，一次改干净比现在切两刀好。
 - **自家窗口不该广播给前端（R3）**：用户在分析窗里看数据时前台就是 `timing.exe`，
   这条广播会让前端把"刚记住的游戏"清掉，于是从分析窗切回游戏不再接管。现在 `runtime.rs`
   只在 `process_id != 自己` 时才 `emit`（抽成 `runtime/support.rs::should_emit_active_window`
@@ -380,6 +473,26 @@
   `!=` 改成 `==` → `self_process_never_emits_active_window_change` 红；删掉挂载后那次主动查询 →
   `ab16` 红；`catch {}` 里加一句 `console.warn` → `ab17` 红（顺序倒过来改先清 KV 再发全集 →
   `ae07` 的 `invocationCallOrder` 红）。
+
+### 第 6 条账本（事项侧绑定读并集 + 补镜像发并集）
+
+- 新增 `features/dashboard/services/appItemBindingMirror.ts`（全集 `loadAppItemBindingUnions`
+  + 补镜像 `mirrorItemBindingsOnce`，从 `appItemBinding.ts` 拆出 —— 那边离 300 行硬限只剩 38 行）；
+  `appItemBinding.ts` 261 → **245** 行，`appItemBindingPlan.ts` 83 → 148 行（新增
+  `loadAppOverrideBindingSources`，override 前缀仍只在这一个文件里出现；另加 `removedItemId`
+  的 `?? base[0]` fallback、`base` 升序、`clearOneToOne` 与载荷的 `survivors` 并回）。
+- 用例：新增 `appItemBindingMirror.test.ts` 3 条（`ai05` 重试 + 并集载荷 / `ai09` 并集与键归一 /
+  `ai10` 半份数据不许发）；`ItemAppBindingField.test.tsx` 补 `ai05`（override 型也要显示）与
+  `ai06`（同应用多事项，每个事项下都看得到）；`useAppItemBindings.test.ts` 补 `hook07`（行标记
+  读并集）/ `hook08`（解绑摘的是主值、别的事项留着）；`appItemBinding.unbind.test.ts` 补 `ad26`
+  （override 型解绑要摘得掉）/ `ad27`（事项视角摘当前事项、不碰 1:1 那条）/ `ad28`（1:1 ∉
+  override 时解绑别的事项，载荷必须留着 1:1 那条 —— QA 验收抓到的 P0 续集），并把 `ad24` 的
+  载荷期望按升序改成 `[5, 7]`；`appItemBinding.test.ts` 的补镜像段落整体迁出。
+- `useAppItemBindings` 的读面从 `loadAppItemBindings()`（1:1）换成 `loadAppItemBindingUnions()`，
+  `bindings: Record<string, number>` 的**形状与消费者零变化**（值 = 主值 `oneToOne ?? itemIds[0]`），
+  所以 `AppsModule.tsx` 一行没动。
+- `npm run check:size` 顺带收紧一条：`Settings.tsx` 冻结值 344 → **342**（第 4 条删面板之后的
+  唯一低于冻结值的条目，全表其余 144 条不动，**没有新增条目**）。
 
 ## 0.12.2 · 应用多分类绑定 + 设置页导航修复（R3）— 2026-11-13（未出包）
 
