@@ -115,7 +115,7 @@ async fn verify_names_the_table_that_differs_and_incomplete_file_is_written() {
     std::fs::remove_dir_all(&dest).ok();
 }
 
-/// ③ 五项清单与体积：源里没有的项 `present: false` 且 0 字节（**不造空目录**）。
+/// ③ 六项清单与体积：源里没有的项 `present: false` 且 0 字节（**不造空目录**）。
 #[test]
 fn entries_report_presence_and_skip_missing_dirs() {
     let root = support::unique_dir("transfer-entries");
@@ -132,9 +132,10 @@ fn entries_report_presence_and_skip_missing_dirs() {
             "backups",
             "logs",
             "md",
+            "patina",
             "migrated-from-tickbar-app.json"
         ],
-        "五项与顺序是 PRD 4.2 的口径"
+        "六项与顺序是 PRD 4.2 的口径"
     );
     let db_entry = &entries[0];
     assert!(db_entry.present && db_entry.bytes == 10 && !db_entry.is_dir);
@@ -142,7 +143,12 @@ fn entries_report_presence_and_skip_missing_dirs() {
     assert!(md_entry.present && md_entry.is_dir && md_entry.bytes == 3);
     let backups = &entries[1];
     assert!(!backups.present, "源里没有就不许报 0 字节");
-    assert_eq!(transfer::total_bytes(&root), 13, "只算五项之和");
+    /* `patina` 的名字与路径不同（只搬 `patina/data`）：显示给用户的必须是短名，
+       否则确认对话框里会出现 `patina/data\` 这种要用户自己翻译的目录结构。 */
+    let patina = &entries[4];
+    assert_eq!(patina.name, "patina");
+    assert!(patina.is_dir && !patina.present, "没有活动数据就不许报 0 字节");
+    assert_eq!(transfer::total_bytes(&root), 13, "只算六项之和");
     std::fs::remove_dir_all(&root).ok();
 }
 

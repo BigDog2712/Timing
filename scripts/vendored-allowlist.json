@@ -1404,6 +1404,12 @@
       "change": "added",
       "reason": "[第 6 条] ai05 载荷必须是并集 [7,12]（1:1=12、override=[12,7]）/ ai09 并集与键归一 / ai10 任一真源读失败整体抛，不许拿半份数据发镜像",
       "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/host/MdDataRootChange.tsx",
+      "change": "modified",
+      "reason": "[数据根搬迁 T01] 清单多了第六项 patina（只搬 patina/data），三处「五项」文案改成按快照项数算（不写字面量，漏改一处就是自己打自己的脸），并补一句「会一并搬到新位置的包括活动数据」——用户是照着这句判断搬得全不全的",
+      "owner": "software-engineer"
     }
   ]
 }

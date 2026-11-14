@@ -1028,8 +1028,8 @@ Kotlin 自己读那个文件、写进用户选中的 `content://`。过桥要 ba
 | `writable` / `writableError` | `bool` / `string \| null` | 进页签时探测一次（建目录 + 写 16B + 回读 + 删） |
 | `pending` | `string \| null` | 指针里写的、重启后才生效的新位置 |
 | `previous` | `string \| null` | 「改回旧位置」的目标 |
-| `sizeBytes` | `number` | 五项之和（递归求和） |
-| `entries` | `DataRootEntry[]` | `{ name, isDir, present, bytes }`，顺序固定五项 |
+| `sizeBytes` | `number` | 六项之和（递归求和） |
+| `entries` | `DataRootEntry[]` | `{ name, isDir, present, bytes }`，顺序固定六项（`timing.db` / `backups` / `logs` / `md` / `patina` / 迁移标记文件；`patina` 实际搬 `patina/data`，`name` 是给人看的短名） |
 | `affected` | `string[]` | 受 `%APP_DIR%` 影响、会跟着搬的落点**种类名** |
 | `pluginsInDataRoot` | `boolean` | 回退态下插件目录也在数据根里，块②要追加一句说明 |
 

@@ -186,8 +186,11 @@ pub fn run() {
     let builder = builder.setup(|app| {
         app::bootstrap::setup(app.handle().clone())?;
         /* Patina 的数据落点要在它自己的 setup 之前定好：它建库时读的是注入值。
-        导入失败只记日志、不阻断启动（历史为空好过应用起不来）。 */
-        if let Err(err) = app::patina_bridge::prepare() {
+        导入失败只记日志、不阻断启动（历史为空好过应用起不来）。
+        `identifier` 是给「数据根是不是用户显式选的」那道闸用的（指针文件在
+        `%APPDATA%\<identifier>` 下）。 */
+        let identifier = app.config().identifier.clone();
+        if let Err(err) = app::patina_bridge::prepare(&identifier) {
             crate::log_warn!("patina: data preparation failed: {err}");
         }
         crate::app::insight::bootstrap::setup(app, false)?;

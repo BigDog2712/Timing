@@ -42,6 +42,10 @@ pub mod preboot;
 WebView2 / Win32，Android 上根本编不进来。 */
 #[cfg(desktop)]
 pub mod patina_bridge;
+/* [数据根搬迁] Patina 首启导入（含「已处理过」标记，从 `patina_bridge` 拆出：
+那边只该管落点与读侧，导入是带自己状态的一次性写动作）。 */
+#[cfg(desktop)]
+pub mod patina_seed;
 #[cfg(desktop)]
 pub mod tray;
 /* [V0.11.18] 托盘「退出」之前那一轮同步（PRD §13.3）。与 `tray_sync` 拆开：那边是

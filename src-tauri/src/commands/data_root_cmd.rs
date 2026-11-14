@@ -25,7 +25,7 @@ fn identifier(app: &AppHandle) -> String {
     app.config().identifier.clone()
 }
 
-/// 当前数据根 + 五项清单 + 受影响落点（设置页进页签时调一次）。
+/// 当前数据根 + 六项清单 + 受影响落点（设置页进页签时调一次）。
 #[tauri::command]
 pub async fn data_root_get(app: AppHandle) -> AppResult<DataRootInfo> {
     data_root::info(&pool_of(&app), &identifier(&app)).await

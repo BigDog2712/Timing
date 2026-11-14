@@ -192,7 +192,7 @@ flowchart TB
   共用载体只能放在 `src/windows/shared/**`，而它不许反向依赖任一窗（L10）。
 - **后端四层（L4 / L5）**：`commands → services → repositories → infra`，`infra` 不许反向依赖
   `services`，`commands` 不许绕过 service 直连 repository。
-- 分层、单文件体积、契约、版本号、第三方改动都用 `npm run check` 的八步门禁机械断言，
+- 分层、单文件体积、契约、版本号、第三方改动、变异残留都用 `npm run check` 的九步门禁机械断言，
   改坏了 CI 就红 —— 不是"建议"。
 
 目录：
@@ -210,7 +210,7 @@ flowchart TB
 │   └── capabilities/          # Tauri 2 权限放行清单（只留实际用到的）
 ├── android-app/               # 已归档的原生 Kotlin 工程（冻结 0.3.6，见 ARCHIVED.md）
 ├── plugins/md-sync/           # 首个 v2 插件：计时 / 便利贴 ↔ Markdown 双向同步
-├── scripts/                   # 八步门禁 + 出包脚本
+├── scripts/                   # 九步门禁 + 出包脚本
 ├── tests/fixtures/            # 双端黄金用例（Rust 与 TS 共用同一份 JSON）
 ├── preview/                   # 静态设计稿（不参与构建）
 ├── docs/                      # 规格 / 架构 / 设计 / ADR / QA
@@ -227,7 +227,7 @@ Patina 是 vendored 第三方源码，结构已归一：前端四根与宿主窗
 npm install
 npm run dev          # 前端单独跑（浏览器 mock IPC，端口 1420）
 npm run tauri dev    # 完整桌面应用
-npm run check        # 八步门禁：typecheck · contract · size · vendored · version · layers · brand · lint
+npm run check        # 九步门禁：typecheck · contract · size · vendored · version · layers · brand · lint · mutation
 npm test             # vitest（含双端时间公式黄金用例）
 npm run build        # tsc + vite build
 ```

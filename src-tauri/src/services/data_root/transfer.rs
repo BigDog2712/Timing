@@ -19,20 +19,38 @@ use std::path::{Component, Path, PathBuf};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::SqlitePool;
 
+use super::activity_copy::{self, DB_FILE as ACTIVITY_DB};
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::infra::appdata_migrate::marker::MARKER_FILE;
 use crate::models::data_root::{DataRootEntry, USER_TABLES};
 
-/// 五项清单（顺序固定，与 PRD 4.2 / 设计 §3.6 一致）。
+/// 清单里的一项。`path` 与 `label` 分开：`patina` 只搬 `patina/data`，而给用户看的名字
+/// 该是「patina」——把 `patina/data` 原样印进确认对话框等于让用户自己翻译目录结构。
+struct Entry {
+    /// 相对数据根的路径（可以带子目录，`/` 分段在 Windows 上同样成立）。
+    path: &'static str,
+    /// 确认对话框里显示的名字。
+    label: &'static str,
+    is_dir: bool,
+}
+
+/// 活动数据那一项：**不能按普通目录拷**——库是活的，见 `activity_copy`。
+pub(super) const ACTIVITY_DIR: &str = "patina/data";
+
+/// 六项清单（顺序固定，与 PRD 4.2 / 设计 §3.6 一致）。
 ///
 /// `is_dir = true` 的项在目标里 `create_dir_all` 后逐文件复制；源不存在 → 跳过且
 /// `present: false`（**不造空目录**）。
-const ENTRIES: [(&str, bool); 5] = [
-    ("timing.db", false),
-    ("backups", true),
-    ("logs", true),
-    ("md", true),
-    (MARKER_FILE, false),
+///
+/// `patina` 只搬 `patina/data`，**不搬 `patina/webview`**（WebView2 的用户数据目录，
+/// 切换时正被运行中的窗口占着），且这一项不走上面的普通复制，见 `ACTIVITY_DIR`。
+const ENTRIES: [Entry; 6] = [
+    Entry { path: "timing.db", label: "timing.db", is_dir: false },
+    Entry { path: "backups", label: "backups", is_dir: true },
+    Entry { path: "logs", label: "logs", is_dir: true },
+    Entry { path: "md", label: "md", is_dir: true },
+    Entry { path: ACTIVITY_DIR, label: "patina", is_dir: true },
+    Entry { path: MARKER_FILE, label: MARKER_FILE, is_dir: false },
 ];
 
 /// 核对失败时留在目标目录里的说明文件名（用户可自己删）。
@@ -46,16 +64,20 @@ pub(crate) fn io_fail(message: impl Into<String>) -> AppError {
     AppError::new(ErrorCode::IoError, message.into())
 }
 
-/// 五项清单的当前状态（给确认对话框用）。
+/// 六项清单的当前状态（给确认对话框用）。
 pub fn entries(root: &Path) -> Vec<DataRootEntry> {
     ENTRIES
         .iter()
-        .map(|(name, is_dir)| {
-            let path = root.join(name);
-            let present = if *is_dir { path.is_dir() } else { path.is_file() };
+        .map(|entry| {
+            let path = root.join(entry.path);
+            let present = if entry.is_dir {
+                path.is_dir()
+            } else {
+                path.is_file()
+            };
             DataRootEntry {
-                name: (*name).to_string(),
-                is_dir: *is_dir,
+                name: entry.label.to_string(),
+                is_dir: entry.is_dir,
                 present,
                 bytes: if present { measure(&path) } else { 0 },
             }
@@ -63,29 +85,30 @@ pub fn entries(root: &Path) -> Vec<DataRootEntry> {
         .collect()
 }
 
-/// 五项体积之和（递归求和，不设上限——这是应用自己的数据根）。
+/// 六项体积之和（递归求和，不设上限——这是应用自己的数据根）。
 pub fn total_bytes(root: &Path) -> u64 {
     entries(root).iter().map(|entry| entry.bytes).sum()
 }
 
-/// 复制五项到目标。目标目录由调用方保证「空或不存在」。
+/// 复制六项到目标。目标目录由调用方保证「空或不存在」。
 pub async fn copy_all(pool: &SqlitePool, source: &Path, dest: &Path) -> AppResult<()> {
     fs::create_dir_all(dest)
         .map_err(|err| io_fail(format!("建不了目标目录 {}：{err}", dest.display())))?;
     /* 库先走 VACUUM INTO（不碰 -wal / -shm，见模块头）。 */
     copy_db(pool, &dest.join("timing.db")).await?;
-    for (name, is_dir) in ENTRIES {
-        let from = source.join(name);
-        if name == "timing.db" || !from.exists() {
+    for entry in ENTRIES {
+        let from = source.join(entry.path);
+        if entry.path == "timing.db" || !from.exists() {
             continue;
         }
-        let to = dest.join(name);
-        let copied = if is_dir {
-            copy_tree(&from, &to)
-        } else {
-            fs::copy(&from, &to).map_err(|err| format!("{err}"))
+        let to = dest.join(entry.path);
+        let copied = match entry.path {
+            /* 活动库是**活的**（分析窗开着、池开着）：只能 `VACUUM INTO`，见 `activity_copy`。 */
+            ACTIVITY_DIR => activity_copy::copy_activity_dir(&from, &to).await,
+            _ if entry.is_dir => copy_tree(&from, &to),
+            _ => fs::copy(&from, &to).map_err(|err| format!("{err}")),
         };
-        copied.map_err(|err| io_fail(format!("复制 {name} 失败：{err}")))?;
+        copied.map_err(|err| io_fail(format!("复制 {} 失败：{err}", entry.path)))?;
     }
     Ok(())
 }
@@ -113,6 +136,11 @@ pub async fn verify(pool: &SqlitePool, dest: &Path) -> AppResult<()> {
             )));
         }
     }
+    /* 活动库那份副本同样得核，但只查**副本自身**（不与源库比行数：用户此刻可能正在记
+    一条新的，比出不一致就是假报警）。损坏的副本一样落进 `write_incomplete` 那条路。 */
+    activity_copy::verify_copy(&dest.join(ACTIVITY_DIR).join(ACTIVITY_DB))
+        .await
+        .map_err(io_fail)?;
     Ok(())
 }
 
@@ -176,7 +204,9 @@ fn measure(path: &Path) -> u64 {
 }
 
 /// 逐文件递归复制（目录不存在就建）。返回复制的字节数。
-fn copy_tree(source: &Path, dest: &Path) -> Result<u64, String> {
+///
+/// `pub(super)`：`activity_copy` 要用它搬活动库目录里除库文件之外的条目（`diagnostics/`）。
+pub(super) fn copy_tree(source: &Path, dest: &Path) -> Result<u64, String> {
     fs::create_dir_all(dest).map_err(|err| format!("建不了 {}：{err}", dest.display()))?;
     let items = fs::read_dir(source).map_err(|err| format!("读不了 {}：{err}", source.display()))?;
     let mut total = 0u64;

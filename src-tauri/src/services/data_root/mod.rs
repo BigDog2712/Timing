@@ -16,11 +16,17 @@
 //! 第三条的取舍：用户「选错了目录」时想回的是**上一个能用的位置**，直接回默认等于把
 //! 他之前那次正常切换也一起撤销了（设计 §9-6）。于是每点一次退一级，最终收敛到默认。
 //!
-//! ## 五项清单与「旧目录不删」
+//! ## 六项清单与「旧目录不删」
 //!
 //! 切换只**复制**、不删除源。确认文案必须写清这一点（PRD 4.2）：用户重启确认没问题
 //! 之后自己删，比程序替他删安全一个数量级。
+//!
+//! 第六项是 `patina`（只搬 `patina/data` 里的活动库）：不搬它，新位置就没有活动库，
+//! 启动期的「首启导入」会以为这是第一次用，从独立安装的 Patina 那里再拷一份——
+//! 用户看到的活动历史会突然变成另一份数据集，且全程零报错。
 
+/* 活动库那一项的复制与核对：库是活的（分析窗开着），不能按普通目录拷。 */
+mod activity_copy;
 pub mod transfer;
 
 use std::path::{Path, PathBuf};
@@ -126,7 +132,14 @@ pub(crate) async fn switch(
 ) -> AppResult<()> {
     let target = transfer::normalize_target(raw)?;
     preflight(&target, current)?;
+    /* 指针里记着「上一个能用的根」——**必须在下面 `root_pointer::write` 之前读**：那次写会
+    把 `previous` 换成这次生效的 `current`，旧根就再也找不回来了。 */
+    let legacy = root_pointer::read(appdata).and_then(|pointer| pointer.previous);
+    let legacy_path = legacy.as_deref().map(Path::new);
     transfer::copy_all(pool, current, &target).await?;
+    /* 旧版（五项清单）搬过的用户：`patina/data` 当时没跟过去，还留在旧根。这里只补这一项，
+    判据与日志都在 `activity_copy::recover_legacy` 里。 */
+    activity_copy::recover_legacy(current, legacy_path, &target).await;
     /* 核对失败：**不写指针**，并在目标目录留一份说明（用户可自己删）。 */
     if let Err(err) = transfer::verify(pool, &target).await {
         transfer::write_incomplete(&target, &err.message);

@@ -26,6 +26,15 @@ mod daily_status;
 /* [V0.11.15] 数据根指针与搬迁（指针优先于 optout；`VACUUM INTO` 的参数绑定）。 */
 mod data_root_pointer;
 mod data_root_transfer;
+/* [数据根搬迁] 活动库必须跟着搬 + 搬完之后不许再导一次（「已处理过」标记 / 指针闸）。
+   桌面独占：导入走 `app::patina_seed`，那是 WebView2 侧的子系统。 */
+#[cfg(desktop)]
+mod data_root_transfer_activity;
+#[cfg(desktop)]
+mod data_root_transfer_patina;
+/* 旧版（五项清单）搬过的用户：`patina/data` 留在旧根，切换时按指针 `previous` 捞回来。 */
+#[cfg(desktop)]
+mod data_root_transfer_patina_legacy;
 mod item;
 mod item_batch2;
 /* [QA 独立验收 V0.11.19] T04 变更 A：LocalFolder 半场（I9a/I9b/I9c + 闸③父子 + 闸⑤a +

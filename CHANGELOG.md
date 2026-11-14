@@ -4,6 +4,103 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 修复 · 切换数据根把独立安装 Patina 的历史当成自己的（活动数据随根搬迁）— 2026-11-14（未出包）
+
+> 后端 6 个文件 + 前端 1 处文案 + 1 个新门禁脚本。**零 schema 变更、零迁移、零 DB 结构变更**；
+> 契约 `90/90/90/90`、错误码 18、事件 11/11/18 一字未动。新门禁与它防的那批改动**同一个 commit**：
+> 门禁单独成一个 commit 的话，中间那个 commit 是不设防的。
+
+### 现象：活动历史突然变成另一份数据集，零报错
+
+`services/data_root::transfer::ENTRIES` 是**五项**硬编码清单（`timing.db` / `backups` / `logs` / `md` /
+迁移标记），**没有 `patina/`**。于是切换数据根之后新位置没有 `patina/data/patina.db`，而启动期
+`app::patina_bridge::prepare()` 的判据是「目标库不存在 → 从 `%APPDATA%\Patina\patina.db` 拷一份」——
+它把这个状态读成「用户第一次用」，于是把**独立安装那份**历史灌进新根。用户看到活动记录换了一份、
+界面正常、日志干净。
+
+### 六项清单：`patina` 只搬 `patina/data`
+
+- `ENTRIES` 从 `[(&str, bool); 5]` 改成 `[Entry; 6]`，新增 `path` / `label` 分开的结构：磁盘路径是
+  `patina/data`，给人看的名字是 `patina`（`patina/data\` 印在确认框里等于让用户自己翻译目录结构）。
+- **不搬 `patina/webview`**：它是 WebView2 的用户数据目录（`app_paths::product_webview_data_dir` 在
+  `ROOT_OVERRIDE` 下就指着它），而切换命令正是**在分析窗里**点的——那一刻缓存被浏览器进程占着，
+  整目录复制要么因文件被锁让整次搬运失败，要么搬过去一份半截缓存；新位置本来就会自己重建。
+- 源里没有 → `present: false` + **不建空目录**（既有语义不变）。
+
+### 活动库走 `VACUUM INTO` + `quick_check`（新文件 `services/data_root/activity_copy.rs`）
+
+- 业务库早就用 `VACUUM INTO`（`transfer.rs` 模块头论证：WAL 下主文件与 `-wal` 是两个时刻的快照，
+  直接拷可能撕裂），而活动库原来被当成普通目录整份拷——**同一个函数里两套标准**。现在
+  `copy_activity_dir` 对 `patina.db` 也走 `VACUUM INTO`（read-write 单连接：`VACUUM` 在
+  `SQLITE_OPEN_READONLY` 上要依赖库里的状态标志，不值得赌），再跳过 `patina.db` / `-wal` / `-shm` /
+  `-journal` 搬目录里其余条目（如 `diagnostics/`）。
+- `verify()` 补一段：行数核对之后 `read_only` 打开活动库副本跑 `PRAGMA quick_check`，非 `ok` 就
+  `IO_ERROR` 并走同一条 `write_incomplete` 路径。**不与源库比行数**——用户此刻可能正在记一条新的，
+  比出不一致就是假报警。
+- 两处硬化：`create_if_missing(false)` 显式写出（sqlx 0.8 默认就是 `false`，这是把「靠默认值」改成
+  「写明白」，不冒充修了个洞）；`VACUUM INTO` 前先删 `dest` 残片，重试幂等。
+
+### 三道闸：`patina_seed`（首启导入从 `patina_bridge` 拆出，那边只留落点与读侧）
+
+| 顺序 | 判据 | 挡的是什么 |
+|---|---|---|
+| ① | 数据根存在指针（`%APPDATA%\<identifier>\data-root.json`） | 这个根是用户显式选的，不是「第一次用」 |
+| ② | 标记 `patina/data/.patina-import-done` 在 | 搬完以后新位置没有活动库的那个洞 |
+| ③ | 目标库 `patina/data/patina.db` 已存在 | 兜底：已装用户升级上来时标记可能还没有 |
+
+- **③ 是原来那道闸，保留不动；①② 是加在它前面的**，删任何一道都会重开一个已知洞。
+- ①的三句理由（代码注释里也有）：指针在 = 这个根是用户显式选的，没有活动库只说明「这个位置还没放过
+  活动数据」，不等于「第一次用」；`%APPDATA%\Patina` 是**另一个产品**的目录，那份历史属于用户独立装
+  的 Patina；两种坏结果里**空活动库是诚实的**（用户知道这位置还没有活动数据），**灌入另一份数据集是
+  撒谎**（用户不知道自己的历史被换掉了）。
+- ①触发时**连标记都不写**：用户哪天把根挪回默认位置，首启导入该还能正常工作。
+- 标记放在 `patina/data/` 里而**不是** `patina/` 根下：搬迁只搬 `patina/data`，标记必须跟着被搬的那份
+  数据走，否则搬完新位置没标记，等于把首启导入重新武装一遍。
+- 失败语义不变：`copy_database` 失败 → `Err` 且**不写**标记（真失败不是「已处理过」，下次启动重试）。
+
+### 旧版搬过的用户：孤儿活动库由 `switch()` 捞回来
+
+旧版（五项清单）搬过的用户，`patina/data` 留在**旧根**；新清单只在当前根里找它 → 报「缺失跳过」，
+标记也不在当前根 → 当前根缺库时就重导一份。`switch()` 现在在 `root_pointer::write` **之前**读
+`pointer.previous`（那次写会把 `previous` 换成新的 `current`，旧根就再也找不回来），`copy_all` 之后调
+`recover_legacy`：**只补活动库**（其余五项当年已搬过，再搬会覆盖新根里的新数据）、当前根已有则不插手
+（旧根那份可能更旧）、旧根无效静默跳过、失败记 ERROR 但**不阻断切换**。恢复排在 `verify` 之前，
+补回来的副本同样过 `quick_check`。
+
+### 新门禁：`check:mutation`（`npm run check` 从八步变九步）
+
+扫 `src/**` + `src-tauri/src/**`，命中全大写 `MUTATION` 即红并点名 文件:行。起因是一个下午三次
+「合法且零告警」的注入残留（`if true ||` / `&& false` / `let _ = x;`）：三者都能编译、
+`cargo check` **0 warning**、都对用例有真实影响，**磁盘状态与正常代码无法区分**——所以约定必须与内容
+无关。不扫中文「变异」：仓里那些是长期说明「这里是用例靶子」的正常注释，扫到就是假阳性。
+
+判据是 `/\bMUTATION/`——**只在左侧设词边界**。右侧设 `\b` 会漏掉 `MUTATION_FLAG` / `MUTATION_SKIP`：
+下划线是词字符，`M` 与 `_` 之间不成边界，而那两种写法恰恰是最像注入的形态（QA 的矩阵实测：
+`MUTATION = false` 命中、`MUTATION_FLAG = true` 不命中）。右侧放开后 `MUTATIONOFF` 也一并抓到；
+`SMUTATION` / `X_MUTATION`（下划线是词字符，左侧无边界）与全小写仍放过。不扫 `scripts/`：
+本脚本头注与提示文案里必须写 `MUTATION`，自扫必然自红——代价是往脚本里塞注入抓不到，
+但脚本不是产品代码，注入在那儿跑不出用户可见行为。
+
+### 已知行为：默认根下删掉 `patina/data` 会重新导入上游历史（不修）
+
+判据是「指针存在与否」——默认根由程序自动选，**没有指针**，用户手动删掉 `patina/data` 等于重置这个根，
+此时从 `%APPDATA%\Patina` 重导一份是合理语义（用户删的正是这份数据）。要区分「重置」与「误删」
+需要的是别的信号面，当前没有；指针已经是能拿到的最强信号。写在这里备查，**不进限制清单**。
+
+### 验证
+
+- `cargo test --lib data_root_transfer` **14/14**；`cargo test --lib` **1853 passed / 1 failed
+  （沙箱拦 `reg.exe`）/ 14 ignored**；`cargo check --lib --tests` 源码 0 warning。
+- 变异自证四组，各两段（注入红 → 撤销绿）：整目录拷 → 活库快照用例红；跳过 `quick_check` → 坏副本用例红；
+  短路指针闸 → 指针用例红；断掉 `recover_legacy` 调用 → 孤儿用例红。撤销后 `cmp` 逐字节一致 +
+  `grep -rn "MUTATION"` 空。
+- `npm run check` **九步全绿**（contract `90/90/90/90`；size 1849 文件；vendored 235 条；mutation 0 处）。
+- `check:mutation` 自身也两段自证：临时探针放进 6 种写法 → `FAILED — 扫描 1745 个文件，命中 4 处`
+  （`MUTATION_FLAG` / `MUTATION_SKIP` / `MUTATIONOFF` / `// MUTATION:` 全中点名，`SMUTATION` /
+  `X_MUTATION` / 全小写 0 命中）→ 删探针 → `OK — 扫描 1744 个文件，MUTATION 标记 0 处`。
+- 单文件行数：`transfer.rs` 299 / `activity_copy.rs` 150 / `patina_seed.rs` 147 / `patina_bridge.rs` 218 /
+  `data_root/mod.rs` 242；测试 280 / 104 / 92。
+
 ## 修复 · 小圆点形态看不见高亮 / 分针太具象 — 2026-11-14（未出包）
 
 > 纯前端改动，全部落在 `src/windows/timing/**`：**零 Rust 改动、零 schema 变更、零迁移、零契约变更**。

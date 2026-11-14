@@ -15,7 +15,7 @@ import type { DataRootInfo } from '../../services/host/hostTypes';
 import { formatBytes } from '../../services/host/mdSyncConfig';
 
 interface MdDataRootChangeProps {
-  /** 当前快照：五项清单与旧目录都从这里来（不自己拼路径、不自己算体积） */
+  /** 当前快照：六项清单与旧目录都从这里来（不自己拼路径、不自己算体积） */
   info: DataRootInfo;
   onCancel: () => void;
   /** 成功：父级用返回的快照刷新（`pending` 此刻是新目录 = 待重启生效） */
@@ -26,9 +26,15 @@ export function MdDataRootChange({ info, onCancel, onDone }: MdDataRootChangePro
   const [target, setTarget] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /* 项数从快照里数，别写字面量：清单加过一项（活动数据），三处文案漏改一处就是自己打
+     自己的脸——而用户是照着这句话判断「我搬的东西全不全」。 */
+  const entryCount = info.entries.length;
 
   const pick = async () => {
-    const picked = await pickFolder('选择新的数据目录（会把这五项复制过去）', info.current);
+    const picked = await pickFolder(
+      `选择新的数据目录（会把这 ${entryCount} 项复制过去）`,
+      info.current,
+    );
     if (!picked) return; /* 用户取消：保留原状态，什么都不改 */
     setTarget(picked);
     setError(null);
@@ -53,7 +59,8 @@ export function MdDataRootChange({ info, onCancel, onDone }: MdDataRootChangePro
       {target === null ? (
         <>
           <p className="data__note">
-            选一个空文件夹（没有就新建一个）。确认后会把下面这五项复制过去，重启 Timing 才生效。
+            选一个空文件夹（没有就新建一个）。确认后会把下面这 {entryCount} 项复制过去，
+            重启 Timing 才生效。
           </p>
           <div className="data__confirm-actions">
             <button type="button" className="btn btn--ghost" onClick={onCancel}>取消</button>
@@ -65,7 +72,7 @@ export function MdDataRootChange({ info, onCancel, onDone }: MdDataRootChangePro
       ) : (
         <>
           <p className="data__note">
-            将把这五项复制到
+            将把这 {entryCount} 项复制到
             <br />
             <code>{target}</code>
           </p>
@@ -81,8 +88,8 @@ export function MdDataRootChange({ info, onCancel, onDone }: MdDataRootChangePro
             ))}
           </ul>
           <p className="data__note">
-            合计 {formatBytes(info.sizeBytes)}。旧目录 {info.current} 不会删除，
-            重启后确认没问题再自己删。
+            合计 {formatBytes(info.sizeBytes)}。会一并搬到新位置的包括活动数据
+            （电脑活动记录）。旧目录 {info.current} 不会删除，重启后确认没问题再自己删。
           </p>
           {error && <p className="sync__error">{error}</p>}
           <div className="data__confirm-actions">

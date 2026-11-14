@@ -47,7 +47,7 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 ```bash
 npm run dev          # 前端 + 浏览器 mock（1420）
 npm run tauri dev    # 完整桌面应用
-npm run check        # 全部门禁：typecheck + contract + size + vendored + version + layers + brand + lint
+npm run check        # 全部门禁：typecheck + contract + size + vendored + version + layers + brand + lint + mutation
 npm run typecheck    # tsc --noEmit，必须 0 错
 npm run lint         # ESLint（只查正确性，不查风格）
 npm test             # vitest（含双端时间公式黄金用例）
@@ -83,6 +83,10 @@ clippy 那两条 `-A` 是**存量豁免**，不是抄错命令：`unwrap_used` /
 - **双轨版号** → `npm run check:version`
   真源 `scripts/platform-versions.json`。桌面六处（`package.json` · `package-lock.json` 2 处 · `src-tauri/Cargo.toml` · `src-tauri/Cargo.lock` · `src-tauri/tauri.conf.json`）必须等于 `desktop`；手机 `versionCode` 必须与 `versionName` 同源（`major*1_000_000 + minor*1_000 + patch`）且**不低于 `release/` 已发出的最大号**。另含归档冻结表。**不再需要人工核对**；变更记录写 `CHANGELOG.md`。
   ⚠️ 安卓出包**只能走** `node scripts/android-apk.mjs`：`npm run tauri android build` 会读 `tauri.conf.json` 的桌面号，出来的包版号是错的。
+- **变异注入必须可见** → `npm run check:mutation`
+  变异自证（注入一处错误 → 看用例是否红 → 撤销）是本仓验收的固定动作。规矩：**注入那一行必须带 `MUTATION` 字样**（全大写），撤销时连同标记一起删；门禁扫 `src/**` + `src-tauri/src/**` 命中即红并点名 文件:行。
+  为什么不能靠自觉：2026-11-14 一个下午出现三次「合法且零告警」的注入残留——`if true ||`（判据恒真）、`&& false`（闸门恒不成立）、`let _ = x;`（消除未使用告警，让整段调用消失）。三者都能编译、`cargo check` 0 warning、都对用例有真实影响，**磁盘状态与正常代码无法区分**。所以约定必须与内容无关。
+  报告里「注入期」与「撤销后」要分开写：注入期贴红输出（点名哪条用例），撤销后贴 `grep -rn "MUTATION" src-tauri/src/ src/` 的**空输出** + 全量绿汇总行。三样齐了才算完成。
 - CSS 只用 `var(--*)` 令牌，零字面量色值、零 emoji、零紫粉渐变；令牌定义在 `src/windows/timing/styles/design-tokens.css`（索引，实体在 `src/windows/timing/styles/tokens/*.css`，**@import 顺序不可调换**）。
 - 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/windows/timing/types/domain/models.ts::ErrorCode` 与文案 `src/windows/timing/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **18** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
 - 文档目录：现行文档在 `docs/`；`docs/archive/v1/` 只作历史，不作为实现依据。

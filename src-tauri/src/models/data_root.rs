@@ -4,11 +4,14 @@
 //! 逐字对应（`rename_all = "camelCase"`）。这里只有形状，没有判据——「该不该切、
 //! 能不能切」在 `services::data_root`。
 
-/// 五项清单里的一项（PRD 4.2：切换前必须让用户看清「搬什么、多大」）。
+/// 六项清单里的一项（PRD 4.2：切换前必须让用户看清「搬什么、多大」）。
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DataRootEntry {
-    /// `timing.db` / `backups` / `logs` / `md` / `migrated-from-tickbar-app.json`
+    /// `timing.db` / `backups` / `logs` / `md` / `patina` / `migrated-from-tickbar-app.json`
+    ///
+    /// 是**给人看的短名**，不一定是磁盘上的相对路径：`patina` 实际搬的是 `patina/data`
+    /// （活动库），`webview` 是运行中的缓存，不在清单里。
     pub name: String,
     pub is_dir: bool,
     /// 源里到底有没有这一项。`false` 时前端不显示体积——「0 B」与「没有」是两件事。
@@ -34,7 +37,7 @@ pub struct DataRootInfo {
     pub pending: Option<String>,
     /// 「改回旧位置」的目标（指针里的 `previous`）。
     pub previous: Option<String>,
-    /// 五项体积之和。
+    /// 六项体积之和。
     pub size_bytes: u64,
     pub entries: Vec<DataRootEntry>,
     /// 受 `%APP_DIR%` 影响的落点种类名（`事项计时` / `便利贴` / `待办事项`）。
