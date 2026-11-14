@@ -1230,6 +1230,108 @@
       "change": "modified",
       "reason": "补 todayTimedItemIds 的两条（时序 + 不吃档位行数），与画行共用同一判据",
       "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/services/classificationCandidateFiltering.ts",
+      "change": "modified",
+      "reason": "未分类应用沉底：排序加一级「已分类在前、other 在后」，两组组内仍按名字排（主人反馈：未分类应用默认沉底）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/services/classificationCandidateFiltering.test.ts",
+      "change": "added",
+      "reason": "沉底规则的判据：已分类在前 / 组内按名字 / 过滤后不变 / 全未分类退化成名字序 / 沉底优先于字典序",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineItemRows.tsx",
+      "change": "modified",
+      "reason": "常用/近期事项行加分类下拉（改一条落一条）；弹层底部加「管理分类」入口",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineManage.test.tsx",
+      "change": "modified",
+      "reason": "跟接口：create_item 载荷新增 categoryKey（未选分类时显式 null）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineManage.tsx",
+      "change": "modified",
+      "reason": "新建表单整块交给 TimelineCreateDialog；事项管理接分类候选 + 分类管理入口；handleUpdate 透传 categoryKey",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/useItemPrefs.ts",
+      "change": "modified",
+      "reason": "LocalItemPatch 支持 categoryKey 三态（缺省不改 / null 清空 / 值设置），乐观更新与待确认表同口径",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/hostIntentMirror.test.ts",
+      "change": "modified",
+      "reason": "镜像断言补 categoryKey（create_item / update_item 两侧字段名逐字一致）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/itemPrefs.ts",
+      "change": "modified",
+      "reason": "ItemPrefsLike 加可选 categoryKey（行上渲染分类下拉要用）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/persistence/timingReadRepository.ts",
+      "change": "modified",
+      "reason": "TimingItem 透传 categoryKey（list_items 原样给，非字符串/空串归一成 null）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/runtime/hostIntentGateway.ts",
+      "change": "modified",
+      "reason": "create_item / update_item 意图新增 categoryKey?: string | null（三态，与执行端逐字一致）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/dashboard-timeline-manage.css",
+      "change": "modified",
+      "reason": "事项分类下拉与底部「管理分类」行的样式（.qp-item-category / .qp-timeline-category-manage-row）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/ItemCategoryField.tsx",
+      "change": "added",
+      "reason": "事项分类下拉（未分类哨兵 + 可选的管理分类入口），新建弹层与事项管理行共用",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineCategories.test.tsx",
+      "change": "added",
+      "reason": "事项分类判据：新建带 categoryKey、行上改分类、改回未分类发 null、失败不乐观更新、管理分类只有一个入口且写后重取候选",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineCreateDialog.tsx",
+      "change": "added",
+      "reason": "新建事项弹层（名称 + 时长 + 分类 + 设为常用），从 TimelineManage 抽出并自带分类管理入口",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/useItemCategoryOptions.ts",
+      "change": "added",
+      "reason": "事项分类候选：读 __custom_category__ 定义 + 已删除过滤 + label 覆盖；other 不在候选集里（由字段组件补）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/components/QuietColorField.test.tsx",
+      "change": "added",
+      "reason": "调色盘「完成」键的判据：head 有确认键、点了收起弹层并把焦点还给触发键、收起后还能再打开",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/components/QuietColorField.tsx",
+      "change": "modified",
+      "reason": "[0.13] 调色盘 head 加「完成」确认键（esc 与它共用 closePopover 收尾）",
+      "owner": "software-engineer"
     }
   ]
 }

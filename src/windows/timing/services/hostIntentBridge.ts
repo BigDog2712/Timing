@@ -18,7 +18,7 @@ import { itemApi, recordApi } from './api';
 import { highlightPill } from './highlightActions';
 import { openSettings } from './settingsActions';
 import { openTodosWindow } from './todosActions';
-import { writeItemTimer } from './itemTimerWrite';
+import { applyCreateItemIntent, applyUpdateItemIntent } from './hostIntentItemWrite';
 import { useItemStore } from '../stores/itemStore';
 import { useUiStore } from '../stores/uiStore';
 import { openNoteWindowFor, removeNote } from './noteActions';
@@ -49,8 +49,8 @@ type HostIntent =
   | { action: 'delete_note'; noteId: number }
   /** [本轮] 时间线卡的写动作：字段名与 `hostIntentGateway.ts` 逐字一致（L9：两侧各写一份）。
    *  `timerMinutes` 三态：缺省 = 不改；`null` = 清除（回正计时）；数字 = 设为该分钟数。 */
-  | { action: 'create_item'; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number }
-  | { action: 'update_item'; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null }
+  | { action: 'create_item'; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number; categoryKey?: string | null }
+  | { action: 'update_item'; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null; categoryKey?: string | null }
   /** [0.13 · T03b] 改计时记录起止：字段名与 `hostIntentGateway.ts` 逐字一致（L9：两侧各写一份）。
    *  执行端复用既有 `recordApi.update`（→ `update_record`，命令面零改动）。payload **没有**
    *  时长字段 —— `accumulated_sec` 由 Rust 按新区间重算（ADR-030 / §3.8 B4）。 */
@@ -93,23 +93,6 @@ async function ensureItemByName(rawName: string): Promise<{ id: number } | null>
 }
 
 /**
- * 从意图里挑出**真给了的**事项字段。`undefined` 一律不带 = Rust 侧「不改这个字段」；
- * `name` 先 trim，纯空白丢弃（后端也会拒，但没必要多打一次 IPC）。
- */
-function pickItemPatch(intent: { name?: string; isPinned?: boolean; sortOrder?: number }): {
-  name?: string; isPinned?: boolean; sortOrder?: number;
-} {
-  const patch: { name?: string; isPinned?: boolean; sortOrder?: number } = {};
-  if (typeof intent.name === 'string') {
-    const name = intent.name.trim();
-    if (name) patch.name = name;
-  }
-  if (intent.isPinned !== undefined) patch.isPinned = intent.isPinned;
-  if (intent.sortOrder !== undefined) patch.sortOrder = intent.sortOrder;
-  return patch;
-}
-
-/**
  * 挂一次意图监听。**只在药丸根组件里调用一次**（`src/App.tsx` 的 `MainWindow`）：
  * 挂两处会让同一条意图被执行两次（`toggle_timer` 连切两下 = 看起来没反应）。
  */
@@ -142,58 +125,6 @@ export function useHostIntentBridge(): void {
       const target = await ensureItemByName(itemName);
       if (!target) return;
       await ipc.createRecord({ itemId: target.id, startedAt, endedAt, note: null });
-    } catch (err) {
-      useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
-    }
-  }, []);
-
-  /**
-   * [本轮] 新建事项（时间线卡的「＋ 新建事项」）。
-   *
-   * 校验只做**后端也会做**的那一层（trim 后非空）：`services::item::create` 允许同名
-   * （ADR-021），所以这里**不**做任何去重 —— 在药丸侧拦重名会与「归档后重建同名」
-   * 这类正当用法打架。也**不**能退化成 `ensureItemByName`：用户明确说了"新建"，
-   * 静默变成"复用同名事项"是另一种错。
-   *
-   * 落库顺序与宿主菜单 `ItemsPrefsMenu.submit()` 相同：建 → 置顶 → 时长，最后 `reload()`。
-   */
-  const handleCreateItem = useCallback(async (intent: {
-    name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number;
-  }) => {
-    const name = intent.name.trim();
-    if (!name) return;
-    try {
-      const created = await itemApi.create({ name });
-      const patch = pickItemPatch({ isPinned: intent.isPinned, sortOrder: intent.sortOrder });
-      /* name 不塞回 patch：`create` 已经落过名字了（口径同 update） */
-      if (Object.keys(patch).length > 0) await itemApi.update({ id: created.id, patch });
-      if (intent.timerMinutes !== undefined) await writeItemTimer(created.id, intent.timerMinutes);
-      await useItemStore.getState().reload();
-    } catch (err) {
-      useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
-    }
-  }, []);
-
-  /**
-   * [本轮] 改事项（事项管理弹层：就地改名 / 设默认时长 / 设为或取消常用 / 上移下移）。
-   *
-   * 只把**给了的字段**拼进 patch：颜色 / 提醒一个都不带 —— 传 `undefined` 与"不传"在
-   * Rust 侧都表示"不改"，但少写一个字段就少一处「改个名顺手把提醒清了」的可能。
-   * `timerMinutes` 不是事项字段：它落 `settings.itemsTimers`（三态见 `withItemTimer`）。
-   * 「什么都没给」→ 不提交、不刷新（不该因为一次空点击多打两条 IPC）。
-   */
-  const handleUpdateItem = useCallback(async (intent: {
-    id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null;
-  }) => {
-    const patch = pickItemPatch(intent);
-    const touchesItem = Object.keys(patch).length > 0;
-    if (!touchesItem && intent.timerMinutes === undefined) return;
-    try {
-      if (touchesItem) await itemApi.update({ id: intent.id, patch });
-      if (intent.timerMinutes !== undefined) {
-        await writeItemTimer(intent.id, intent.timerMinutes);
-      }
-      await useItemStore.getState().reload();
     } catch (err) {
       useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
     }
@@ -280,11 +211,12 @@ export function useHostIntentBridge(): void {
         });
         return;
       case 'create_item':
-        /* 分析窗只发意图、不承诺结果（§6.5）；建失败由药丸的 setNotice 呈现 */
-        void handleCreateItem(intent);
+        /* 分析窗只发意图、不承诺结果（§6.5）；建失败由药丸的 setNotice 呈现。
+           [0.13] 执行体抽到 `hostIntentItemWrite`（本文件贴 300 行棘轮），语义未变。 */
+        void applyCreateItemIntent(intent);
         return;
       case 'update_item':
-        void handleUpdateItem(intent);
+        void applyUpdateItemIntent(intent);
         return;
       case 'update_record_time':
         void handleUpdateRecordTime(intent.recordId, intent.startedAt, intent.endedAt);
@@ -293,7 +225,7 @@ export function useHostIntentBridge(): void {
         /* 分析窗版本比药丸新时可能发来不认识的动作：忽略，不抛、不提示 */
         return;
     }
-  }, [handleStartForActivity, handleBackfill, togglePause, handleCreateItem, handleUpdateItem, handleUpdateRecordTime]);
+  }, [handleStartForActivity, handleBackfill, togglePause, handleUpdateRecordTime]);
 
   useTauriEvent<HostIntent>(HOST_INTENT, handleIntent);
 }

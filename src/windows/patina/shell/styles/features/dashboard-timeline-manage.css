@@ -215,3 +215,26 @@
   gap: 8px;
   margin-left: auto;
 }
+
+/* ── 事项分类（[0.13] 新建弹层与事项管理行共用）──────────────────────────── */
+
+/* `inline-flex` 保证下拉与「管理分类」小键在同一行；`flex: 0 0 auto` 让它在行内
+   不抢名称的弹性空间（行是 `flex-wrap`，窄了会整体换行而不是把名称压成省略号）。 */
+.qp-item-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.qp-item-category-select {
+  max-width: 148px;
+}
+
+/* 弹层底部那颗「管理分类」：与两组列表之间有一条分隔线，避免看起来属于最后一项 */
+.qp-timeline-category-manage-row {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--qp-space-group);
+  border-top: 1px solid var(--qp-border-subtle);
+}

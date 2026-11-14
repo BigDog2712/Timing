@@ -41,11 +41,17 @@ import {
  *   ④ 刷回来与本地一致（宿主已落库）才把这条从待确认表里摘掉。
  */
 
-/** 本地能改的事项字段（`timerMinutes` 不在其中：它落设置，另走 `applyLocalTimer`）。 */
+/**
+ * 本地能改的事项字段（`timerMinutes` 不在其中：它落设置，另走 `applyLocalTimer`）。
+ *
+ * `categoryKey` 是**三态**：缺省 = 不改（如只改个名字时不能顺手把分类清了）、
+ * `null` = 回到未分类、字符串 = 设为该分类。
+ */
 export interface LocalItemPatch {
   name?: string;
   isPinned?: boolean;
   sortOrder?: number;
+  categoryKey?: string | null;
 }
 
 export interface ItemPrefsState {
@@ -176,6 +182,8 @@ export function useItemPrefs(active: boolean): ItemPrefsState {
     if (patch.name !== undefined) clean.name = patch.name;
     if (patch.isPinned !== undefined) clean.isPinned = patch.isPinned;
     if (patch.sortOrder !== undefined) clean.sortOrder = patch.sortOrder;
+    /* `null` 是「回到未分类」，是**要传的值**，所以判据必须是 `!== undefined` */
+    if (patch.categoryKey !== undefined) clean.categoryKey = patch.categoryKey;
     if (Object.keys(clean).length === 0) return;
     const pending = pendingItemsRef.current;
     pending.set(itemId, { ...pending.get(itemId), ...clean });

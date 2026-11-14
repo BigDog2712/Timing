@@ -24,7 +24,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Intent =
-  | { action: 'create_item'; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number }
+  | { action: 'create_item'; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number; categoryKey?: string | null }
   | {
     action: 'update_item';
     id: number;
@@ -32,6 +32,7 @@ type Intent =
     isPinned?: boolean;
     sortOrder?: number;
     timerMinutes?: number | null;
+    categoryKey?: string | null;
   };
 
 const h = vi.hoisted(() => ({
@@ -212,7 +213,8 @@ describe('useHostIntentBridge · 时间线卡的写意图', () => {
       sortOrder: 5,
     });
 
-    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文' });
+    /* 没给分类时 `categoryKey` 传 `undefined`（= 不设置），命令层再归一成 `null` */
+    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文', categoryKey: undefined });
     /* 用**新建出来的 id**（42），不是意图里的任何东西 */
     expect(h.updateItem).toHaveBeenCalledWith({ id: 42, patch: { isPinned: true, sortOrder: 5 } });
     /* 时长落 settings.itemsTimers（itemId → 分钟），并且把宿主返回的快照写回 store */
@@ -224,7 +226,8 @@ describe('useHostIntentBridge · 时间线卡的写意图', () => {
   it('tl09_create_item_without_a_pin_leaves_the_item_patch_empty', async () => {
     await dispatch({ action: 'create_item', name: '看论文', isPinned: false, timerMinutes: null });
 
-    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文' });
+    /* 没给分类时 `categoryKey` 传 `undefined`（= 不设置），命令层再归一成 `null` */
+    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文', categoryKey: undefined });
     /* `isPinned: false` 也要写（用户明确选了"不设为常用"），但不该带 sortOrder */
     expect(h.updateItem).toHaveBeenCalledWith({ id: 42, patch: { isPinned: false } });
     /* `timerMinutes: null` = 明确不设时长 → 写一次设置（清键），而不是留着旧值 */
@@ -246,6 +249,23 @@ describe('useHostIntentBridge · 时间线卡的写意图', () => {
     expect(h.updateItem).not.toHaveBeenCalled();
     /* `null` 删掉这个键，别的事项的时长原样保留 */
     expect(h.updateSettings).toHaveBeenCalledWith({ itemsTimers: { '9': 10 } });
+    expect(h.reloadItems).toHaveBeenCalledTimes(1);
+  });
+
+  /* [0.13] 事项分类：新建时选中的分类走 `create` 一步落库；行上改分类走 `update_item`
+     的 `categoryKey` 三态 —— `null` 必须原样带过去（`if (value)` 会把"清空分类"吞掉）。 */
+  it('tl13_create_item_carries_categoryKey_into_create', async () => {
+    await dispatch({ action: 'create_item', name: '看论文', categoryKey: ' development ' });
+
+    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文', categoryKey: 'development' });
+    /* 分类不是"再 patch 一次"的字段：`create` 已经落了，不该出现在 update 的 patch 里 */
+    expect(h.updateItem).not.toHaveBeenCalled();
+  });
+
+  it('tl14_update_item_clears_category_with_null_and_keeps_other_fields_alone', async () => {
+    await dispatch({ action: 'update_item', id: 7, categoryKey: null });
+
+    expect(h.updateItem).toHaveBeenCalledWith({ id: 7, patch: { categoryKey: null } });
     expect(h.reloadItems).toHaveBeenCalledTimes(1);
   });
 

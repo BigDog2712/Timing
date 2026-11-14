@@ -133,7 +133,7 @@
     "src/windows/patina/shared/charts/HourlyActivityChart.tsx": 354,
     "src/windows/patina/shared/charts/NativeTrendChart.tsx": 336,
     "src/windows/patina/shared/classification/processNormalization.ts": 532,
-    "src/windows/patina/shared/components/QuietColorField.tsx": 521,
+    "src/windows/patina/shared/components/QuietColorField.tsx": 516,
     "src/windows/patina/shared/components/QuietSelect.tsx": 449,
     "src/windows/patina/shared/i18n/generated/contract.ts": 1131,
     "src/windows/patina/shared/lib/activityTimelineCompiler.ts": 917,

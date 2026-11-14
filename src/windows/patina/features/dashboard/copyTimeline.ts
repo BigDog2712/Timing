@@ -25,6 +25,12 @@ export interface TimelineManageCopy {
   timelineCreateTitle: string;
   /** 名称输入框的 placeholder（`aria-label` 也复用它，见 `TimelineManage`） */
   timelineCreatePlaceholder: string;
+  /** [0.13] 事项分类下拉的标签（下拉的 `aria-label`，新建弹层与行内共用） */
+  timelineCategoryLabel: string;
+  /** 分类下拉里那一项「不归任何分类」（写回的是 `null`，不是空串） */
+  timelineCategoryNone: string;
+  /** 打开分类管理弹层的入口（新建弹层里那颗小键） */
+  timelineManageCategories: string;
   /** 管理弹层第一组的组标题 */
   timelinePinnedGroup: string;
   /** 管理弹层第二组的组标题 */
@@ -102,6 +108,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineManageItems: "事项管理",
     timelineCreateTitle: "新建事项",
     timelineCreatePlaceholder: "事项名称",
+    timelineCategoryLabel: "分类",
+    timelineCategoryNone: "未分类",
+    timelineManageCategories: "管理分类",
     timelinePinnedGroup: "常用事项",
     timelineRecentGroup: "近期事项",
     timelineTimerLabel: "默认时长（分钟）",
@@ -143,6 +152,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineManageItems: "Manage items",
     timelineCreateTitle: "New item",
     timelineCreatePlaceholder: "Item name",
+    timelineCategoryLabel: "Category",
+    timelineCategoryNone: "Uncategorized",
+    timelineManageCategories: "Manage categories",
     timelinePinnedGroup: "Frequent items",
     timelineRecentGroup: "Recent items",
     timelineTimerLabel: "Default length (minutes)",
@@ -184,6 +196,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineManageItems: "Управление делами",
     timelineCreateTitle: "Новое дело",
     timelineCreatePlaceholder: "Название дела",
+    timelineCategoryLabel: "Категория",
+    timelineCategoryNone: "Без категории",
+    timelineManageCategories: "Управление категориями",
     timelinePinnedGroup: "Частые дела",
     timelineRecentGroup: "Недавние дела",
     timelineTimerLabel: "Длительность по умолчанию (мин)",
@@ -225,6 +240,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineManageItems: "Gestionar asuntos",
     timelineCreateTitle: "Nuevo asunto",
     timelineCreatePlaceholder: "Nombre del asunto",
+    timelineCategoryLabel: "Categoría",
+    timelineCategoryNone: "Sin categoría",
+    timelineManageCategories: "Gestionar categorías",
     timelinePinnedGroup: "Asuntos frecuentes",
     timelineRecentGroup: "Asuntos recientes",
     timelineTimerLabel: "Duración por defecto (min)",

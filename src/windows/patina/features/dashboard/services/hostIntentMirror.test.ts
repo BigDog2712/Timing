@@ -65,10 +65,12 @@ describe("HostIntent 两侧镜像", () => {
      注意抽取器保留可选标记 `?`（`isPinned?: boolean` → 字段名 `isPinned?`）：
      这是「可选 vs 必填」的额外契约，别为了好看把 `?` 从断言里抹掉。 */
   it("d02d_create_item_and_update_item_carry_the_same_fields_on_both_sides", () => {
-    expect(gateway).toContain("create_item{isPinned?,name,sortOrder?,timerMinutes?}");
-    expect(bridge).toContain("create_item{isPinned?,name,sortOrder?,timerMinutes?}");
-    expect(gateway).toContain("update_item{id,isPinned?,name?,sortOrder?,timerMinutes?}");
-    expect(bridge).toContain("update_item{id,isPinned?,name?,sortOrder?,timerMinutes?}");
+    /* [0.13] 两个动作都长出了 `categoryKey?`（事项分类）。漏了它的症状同样是静默的：
+       用户在下拉里选了分类，药丸侧 `pickItemPatch` 收不到字段 → 库里不写 → 下次刷新弹回未分类。 */
+    expect(gateway).toContain("create_item{categoryKey?,isPinned?,name,sortOrder?,timerMinutes?}");
+    expect(bridge).toContain("create_item{categoryKey?,isPinned?,name,sortOrder?,timerMinutes?}");
+    expect(gateway).toContain("update_item{categoryKey?,id,isPinned?,name?,sortOrder?,timerMinutes?}");
+    expect(bridge).toContain("update_item{categoryKey?,id,isPinned?,name?,sortOrder?,timerMinutes?}");
   });
 
   /* [0.13 · T03b] 本轮唯一的**新语义**意图：改计时记录起止。三条静默失败路径：

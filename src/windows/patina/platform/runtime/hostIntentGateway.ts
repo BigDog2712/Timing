@@ -75,9 +75,10 @@ export type HostIntent =
    * `sortOrder` 只在上移/下移与「设为常用」时给：分析窗按当前常用组的
    * `max(sortOrder)+1` 算出落点，宿主照写，不自己再猜一遍顺序。
    */
-  | { action: "create_item"; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number }
-  /** 改某一件事项。只提交**给了的字段**：改色 / 删除 / 提醒时刻各自牵连历史与语义，属独立改造。 */
-  | { action: "update_item"; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null }
+  | { action: "create_item"; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number; categoryKey?: string | null }
+  /** 改某一件事项。只提交**给了的字段**：改色 / 删除 / 提醒时刻各自牵连历史与语义，属独立改造。
+   *  `categoryKey` 与 `timerMinutes` 同为三态：缺省 = 不改 / `null` = 清成未分类 / 字符串 = 设为该分类。 */
+  | { action: "update_item"; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null; categoryKey?: string | null }
   /* ── [0.13 · T03b] 改一条计时记录的起止时刻（Q1 裁决 (b)，设计 §3.8）──
    * 复用药丸既有的 `update_record`（`RecordPatch { item_id, started_at, ended_at, note }`
    * 四处齐全），Rust **零改动**：不新增命令、不动四处命令表、不动 host-commands.toml

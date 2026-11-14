@@ -32,8 +32,9 @@ import { buildTodayItemRows, useTodayItems, type TodayItemsState } from "./useTo
 import type { TimingItem, TimingRecord } from "../../../platform/persistence/timingReadRepository.ts";
 
 function item(id: number, name: string, isSystem = false): TimingItem {
-  /* [本轮] `list_items` 现在也透传 isPinned / sortOrder / updatedAt（「事项管理」要用） */
-  return { id, name, color: "", isSystem, isPinned: false, sortOrder: 0, updatedAt: 0 };
+  /* [0.13] `list_items` 透传 isPinned / sortOrder / updatedAt / categoryKey
+     （「事项管理」的置顶、近期分组、分类下拉都要用） */
+  return { id, name, color: "", isSystem, isPinned: false, sortOrder: 0, updatedAt: 0, categoryKey: null };
 }
 
 /**

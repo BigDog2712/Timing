@@ -190,6 +190,36 @@
 - 用例：改判 3 条（d03 / cm04 / cm11）+ 新增 2 条（cm13 内置删除整批、cm14 恢复写 null），
   `DataAppEditColorReset.test.tsx` → `DataCategoryManageColorReset.test.tsx`（宿主换了）。
 
+### 交互收口：调色盘出口、未分类沉底、事项分类、应用绑定自动计时（0.12.2 并入）
+
+- **调色盘没有出口**：head 只有「恢复默认色 / 取色器」，挑完色只能点空白或按 Esc。
+  加一颗 ✓（复用 `dialog.confirm` 文案），与 Esc 共用 `closePopover`（收起 + 焦点回触发键）。
+  `QuietColorField.tsx` 冻在 521 行 —— 加按钮的同时压掉 5 行等价代码（516），并跑 `--freeze` 收紧基线。
+- **未分类应用沉底**：分类页的应用列表原先纯按显示名排，分完类的还会沉在中间。
+  `filterAndSortCandidates` 的排序加一级「已分类在前、`other` 在后」，两组**组内**仍按名字排。
+  不做置顶：这份列表的用途是"刚分完类的上浮、待处理的沉底"。
+- **事项分类**（新建事项 + 常用事项行）：`create_item` / `update_item` 意图新增
+  `categoryKey?: string | null`（三态：缺省不改 / `null` 清空 / 值设置），执行端在 `create`
+  一步就落库（少一次 IPC，也不会出现"建好了但分类没跟上"）。候选读 `__custom_category::`
+  定义 + 已删除过滤 + label 覆盖；**`other` 不在候选集里** —— 它由字段组件作为
+  "空串 ∥ 未分类"补一次，两边都补会出现两个「未分类」（一个 `value=""`、一个 `"other"`，
+  选哪个还决定落库写 `null` 还是 `"other"`）。
+- **分类管理入口下沉**到两个弹层（新建 / 事项管理），复用 `DataCategoryManageDialog`，
+  写成功后重取候选（否则刚建的分类当场选不到）。
+- **应用绑定自动计时**：药丸订阅 `active-window-changed`（引擎只在**前台真的变了**时才 emit，
+  所以"进入这个应用"天然就是一次事件，不需要前端自己去重时间窗）→ 归一 `exe_name` →
+  查 `item_app` → `startOrSwitch`（running 时先 pause 再 `end_and_start` 分段，
+  正是"结束当前计时、以绑定事项开始"）。三条边界：同一应用不重复接管（否则会把用户
+  手动切走的计时拽回来）、已经在该事项就不动、失败只 `console.warn`（用户没点任何东西，
+  弹错误框只会让人困惑）。
+- `app_key` 归一是**镜像**：`src/windows/shared/appKey.ts` 与 Rust
+  `models::insight::activity_read_model::normalize_app_key` 逐字一致（含 `:` 或已 `.exe`
+  结尾不补后缀、只小写 ASCII 而不是 `toLowerCase()`），`appKey.test.ts` 用 source test
+  直接读 Rust 那句钉住 —— 口径漂了的症状是"绑了 Chrome、切过去不计时"，两端日志干净。
+- **拆分**（300 行棘轮）：`hostIntentBridge.ts` 涨到 310 → 事项写执行体抽到
+  `hostIntentItemWrite.ts`（231 + 110）；新建表单抽到 `TimelineCreateDialog.tsx`；
+  `TimelineItemRows` 保留行结构与下拉。
+
 ### 修复 · 今日时间线卡底三颗入口在空态下是死的（0.12.2 并入）
 
 - 现象：没有计时的那一天（「今天还没有计时」）点「新建事项 / 编辑事项 / 事项管理」，
@@ -216,11 +246,13 @@
 
 ### 账本
 
-- `size` 145 条（`schema.rs` 1887→1751、`hourly.rs` 852→629、`sqlite_pool.rs` 748→747 等向下收紧）；
-  扫描 1807 文件 / 超限占比 29.2%。为压回 300 行硬限，本轮把 `record_session.rs` 拆出
-  `record_session_split.rs`、`focus_blocks.rs` 拆成 `mod.rs` + `read.rs`、`ipc.ts` 压行。
-- `vendored` 195 条（改 71 / 增 124）；`contract` 88（+Patina 126）/ 错误码 18 / 事件 11-11。
-- `cargo test --lib` **1828 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 209 文件 / 1603 用例。
+- `size` 145 条（`schema.rs` 1887→1751、`hourly.rs` 852→629、`sqlite_pool.rs` 748→747、
+  `QuietColorField.tsx` 521→516 等向下收紧）；扫描 1821 文件 / 超限占比 29.0%。
+  为压回 300 行硬限，本轮把 `record_session.rs` 拆出 `record_session_split.rs`、
+  `focus_blocks.rs` 拆成 `mod.rs` + `read.rs`、`hostIntentBridge.ts` 拆出
+  `hostIntentItemWrite.ts`、新建表单拆出 `TimelineCreateDialog.tsx`、`ipc.ts` 压行。
+- `vendored` 222 条（改 90 / 增 132）；`contract` 88（+Patina 126）/ 错误码 18 / 事件 11-11。
+- `cargo test --lib` **1828 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 216 文件 / 1650 用例。
 - `clippy --all-targets -D warnings` 0 诊断（`--lib` 看不到新用例的 lint：`too_many_arguments`
   与 `doc_lazy_continuation` 都是只在 `--all-targets` 下才现形的）。
 

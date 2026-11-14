@@ -46,10 +46,18 @@ export function filterAndSortCandidates({
         category,
       ].join(" ").toLocaleLowerCase(locale).includes(normalizedQuery);
     })
-    .sort((left, right) => (
-      collator.compare(resolveEffectiveDisplayName(left), resolveEffectiveDisplayName(right))
-      || collator.compare(left.exeName, right.exeName)
-    ));
+    /* 「未分类」沉底（[0.13] 主人口径）：已分类的排前面，未分类的压到最后一行组。
+       两组**组内**仍按显示名排 —— 沉底只决定"哪一组在前"，不重排组内顺序。
+       为什么不做成置顶：这份列表的主用途是"刚分完类的应用上浮、待处理的沉底"，
+       置顶会把最不需要动作的那一撮（已经分好的）推到眼球上方。
+       `filter === "other"` 时这一级恒等（只有一组），保留是为了少一条分支。 */
+    .sort((left, right) => {
+      const leftOther = resolveMappedCategory(left) === "other";
+      const rightOther = resolveMappedCategory(right) === "other";
+      if (leftOther !== rightOther) return leftOther ? 1 : -1;
+      return collator.compare(resolveEffectiveDisplayName(left), resolveEffectiveDisplayName(right))
+        || collator.compare(left.exeName, right.exeName);
+    });
 }
 
 export function collectCandidateCategories<T>(

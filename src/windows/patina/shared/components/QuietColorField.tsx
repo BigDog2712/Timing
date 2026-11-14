@@ -10,7 +10,7 @@ import {
   type CSSProperties,
 } from "react";
 import { createPortal } from "react-dom";
-import { Pipette, RotateCcw } from "lucide-react";
+import { Check, Pipette, RotateCcw } from "lucide-react";
 import QuietTooltip from "./QuietTooltip";
 import QuietIconAction from "./QuietIconAction";
 import {
@@ -54,31 +54,23 @@ const FORMAT_OPTIONS: QuietSegmentedFilterOption<ColorDisplayFormat>[] = FORMAT_
   label: value.toUpperCase(),
 }));
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
+function clamp(value: number, min: number, max: number): number { return Math.max(min, Math.min(max, value)); }
 
 function normalizeHex(input: string): string {
   const trimmed = input.trim().toUpperCase();
-  if (/^#[0-9A-F]{6}$/.test(trimmed)) return trimmed;
-  if (/^[0-9A-F]{6}$/.test(trimmed)) return `#${trimmed}`;
-  return "#000000";
+  return /^#[0-9A-F]{6}$/.test(trimmed) ? trimmed : /^[0-9A-F]{6}$/.test(trimmed) ? `#${trimmed}` : "#000000";
 }
 
 function toHexDraft(input: string): string {
-  const value = input.toUpperCase().replace(/[^#0-9A-F]/g, "");
-  const noHash = value.replace(/#/g, "");
-  return `#${noHash.slice(0, 6)}`;
+  const value = input.toUpperCase().replace(/[^#0-9A-F]/g, "").replace(/#/g, "");
+  return `#${value.slice(0, 6)}`;
 }
 
-function isCompleteHex(value: string): boolean {
-  return /^#[0-9A-F]{6}$/.test(value);
-}
+function isCompleteHex(value: string): boolean { return /^#[0-9A-F]{6}$/.test(value); }
 
 function parseRgbField(value: string, fallback: number): number {
   const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed)) return fallback;
-  return clamp(parsed, 0, 255);
+  return Number.isNaN(parsed) ? fallback : clamp(parsed, 0, 255);
 }
 
 function parseHslField(value: string, fallback: number, max: number): number {
@@ -104,6 +96,11 @@ export default function QuietColorField({
   const titleRef = useRef<HTMLDivElement | null>(null);
   const svAreaRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
+
+  /* 收起 + 回焦：调色盘是"改一次落一次"，所以「完成」不是提交动作，只是让用户有个显式出口。
+     head 的 ✓ 与 Esc 共用这一处收尾（焦点落在哪只写一遍）。 */
+  const closePopover = useCallback(() => { setOpen(false); window.requestAnimationFrame(() => triggerRef.current?.focus()); }, []);
+
   const [position, setPosition] = useState<PopoverPosition>({ top: 0, left: 0, placement: "bottom" });
   const normalizedColor = useMemo(() => normalizeHex(color), [color]);
   const hsl = useMemo(() => hexToHsl(normalizedColor), [normalizedColor]);
@@ -209,8 +206,7 @@ export default function QuietColorField({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        setOpen(false);
-        window.requestAnimationFrame(() => triggerRef.current?.focus());
+        closePopover();
       }
     };
     document.addEventListener("pointerdown", handlePointerDown);
@@ -220,7 +216,7 @@ export default function QuietColorField({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open]);
+  }, [open, closePopover]);
 
   const applyHsl = (next: Partial<HslColor>) => {
     const nextHsl: HslColor = {
@@ -326,9 +322,7 @@ export default function QuietColorField({
       {presentation === "value" && <span className="qp-color-trigger-value">{normalizedColor}</span>}
     </button>
   );
-  const eyedropperLabel = supportsEyedropper
-    ? UI_TEXT.accessibility.color.eyedropper
-    : UI_TEXT.accessibility.color.eyedropperUnsupported;
+  const eyedropperLabel = supportsEyedropper ? UI_TEXT.accessibility.color.eyedropper : UI_TEXT.accessibility.color.eyedropperUnsupported;
 
   return (
     <>
@@ -376,6 +370,7 @@ export default function QuietColorField({
                   <Pipette size={14} />
                 </button>
               </QuietTooltip>
+              <QuietIconAction icon={<Check size={14} />} title={UI_TEXT.dialog.confirm} onClick={closePopover} />
             </div>
           </div>
 

@@ -29,6 +29,14 @@ export interface TimingItem {
   sortOrder: number;
   /** 最后修改时刻（epoch 毫秒）——「近期事项」按它倒序取前 N。脏值回落 0。 */
   updatedAt: number;
+  /**
+   * 事项归属的分类键（`app_category` 那一套的同一份 token；`null` = 未分类）。
+   *
+   * 为什么用 `null` 而不是 `""` 表示未分类：`update_item` 的 `categoryKey` 是三态
+   * （缺省不改 / `null` 清空 / 字符串设置），空串在这条链上会被当成"一个叫空串的分类"
+   * 写进库 —— 历史记录里就会出现一个永远匹配不到分类定义的键。
+   */
+  categoryKey: string | null;
 }
 
 export interface TimingRecord {
@@ -56,6 +64,8 @@ export async function listTimingItems(): Promise<TimingItem[]> {
        `isPinned` 只认真正的 `true`，`"true"` / `1` 一律当 false（宿主序列化的是布尔）。 */
     const sortOrder = Number(record.sortOrder);
     const updatedAt = Number(record.updatedAt);
+    /* 分类键容错读：非字符串 / 空串一律当"未分类"（`null`），不把整条事项丢掉。 */
+    const rawCategory = typeof record.categoryKey === "string" ? record.categoryKey.trim() : "";
     return [{
       id,
       name,
@@ -64,6 +74,7 @@ export async function listTimingItems(): Promise<TimingItem[]> {
       isPinned: record.isPinned === true,
       sortOrder: Number.isFinite(sortOrder) ? sortOrder : 0,
       updatedAt: Number.isFinite(updatedAt) ? updatedAt : 0,
+      categoryKey: rawCategory ? rawCategory : null,
     }];
   });
 }

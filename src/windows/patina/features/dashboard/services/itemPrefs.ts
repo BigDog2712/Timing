@@ -43,6 +43,8 @@ export interface ItemPrefsLike {
   isPinned: boolean;
   sortOrder: number;
   updatedAt: number;
+  /** 分类键（`null`/缺省 = 未分类）。可选：`listTimingItems()` 一定给，夹具可以不凑。 */
+  categoryKey?: string | null;
 }
 
 /**

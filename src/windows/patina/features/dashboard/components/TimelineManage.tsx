@@ -4,10 +4,11 @@
  * 主人口径（原话）：「事项管理应参考悬浮窗部分事项菜单内的功能，支持时间等……
  * 常用事项应在新建时可添加，如快捷添加一致……建议直接在该处调用原功能」。
  * 落地成两颗卡底入口：
- *   1. **＋ 新建事项**：名称 + 默认时长（可空 = 正计时）+「设为常用」勾选（**默认不勾**，
- *      勾选才进常用组）。
- *   2. **事项管理**：常用事项（上移/下移/取消常用/编辑）+ 近期事项（设为常用/编辑），
- *      行内就地展开「名称 + 默认时长」。**不再**把全表摊开、**没有**单独的改名按钮列。
+ *   1. **＋ 新建事项**：名称 + 默认时长（可空 = 正计时）+ 分类 +「设为常用」勾选
+ *      （**默认不勾**，勾选才进常用组）。[0.13] 表单整块交给 `TimelineCreateDialog`。
+ *   2. **事项管理**：常用事项（上移/下移/取消常用/编辑/改分类）+ 近期事项
+ *      （设为常用/编辑/改分类），行内就地展开「名称 + 默认时长」。
+ *      **不再**把全表摊开、**没有**单独的改名按钮列。
  *
  * ## 为什么这里一条写命令都没有
  *
@@ -19,25 +20,22 @@
  *     （照 `NotesStrip` 删除便利贴的先例）；
  *   · 返回 `true` → 本地乐观更新 + 待确认集（`useItemPrefs` 里那两张 pending 表）。
  *
- * ## 明确不做（别在下一次需求里“顺手”加回来）
+ * ## 明确不做（别在下一次需求里"顺手"加回来）
  *
  * 删除事项（牵连 `time_records` 的历史归属）、HTML5 拖拽排序（主界面卡片本身已有拖拽，
  * 会抢事件 → 只用 ↑/↓ 按钮）、改色、提醒时刻 —— 各自是独立改造。
  */
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { emitHostIntent, type HostIntent } from "../../../platform/runtime/hostIntentGateway.ts";
 import QuietDialog from "../../../shared/components/QuietDialog.tsx";
+import DataCategoryManageDialog from "../../data/components/DataCategoryManageDialog.tsx";
 import { DASHBOARD_COPY } from "../copy.ts";
+import { useItemCategoryOptions } from "../hooks/useItemCategoryOptions.ts";
 import { useItemPrefs } from "../hooks/useItemPrefs.ts";
-import {
-  clampItemMinutes,
-  nextSortOrder,
-  pinnedItems,
-  recentItems,
-} from "../services/itemPrefs.ts";
-import { checkItemName, ITEM_NAME_MAX_LEN, type ItemNameIssue } from "../services/timelineItemName.ts";
+import { nextSortOrder, pinnedItems, recentItems } from "../services/itemPrefs.ts";
+import TimelineCreateDialog from "./TimelineCreateDialog.tsx";
 import TimelineItemRows, { type ItemPatchIntent } from "./TimelineItemRows.tsx";
 
 export type TimelineManageMode = "create" | "manage" | null;
@@ -56,72 +54,18 @@ export default function TimelineManage({ mode, onClose, onLocalRename, onLocalCr
   const UI_TEXT = useLocaleText();
   const { items, timers, recentCount, showRecent, status, applyLocalItem, applyLocalTimer } =
     useItemPrefs(mode !== null);
+  /* 分类候选只在「事项管理」打开时取：两个弹层互斥，各自一条 `active` 就不会重复打 IPC */
+  const { options: categoryOptions, reload: reloadCategories } = useItemCategoryOptions(mode === "manage");
 
-  const createInputRef = useRef<HTMLInputElement>(null);
-  const [createName, setCreateName] = useState("");
-  const [createMinutes, setCreateMinutes] = useState("");
-  /* 「设为常用」**默认不勾**：宿主侧「快捷添加」建的是普通事项，只有「常用事项管理」卡里
-     新建才强制置顶；用户要的是「新建时**可以**加进常用」，不是强制。不勾 → 由 `updatedAt`
-     自然进「近期事项」组；勾上 → `isPinned: true` + `sortOrder = max+1` 落「常用事项」组。 */
-  const [pinNew, setPinNew] = useState(false);
-  const [createIssue, setCreateIssue] = useState<string | null>(null);
   const [manageIssue, setManageIssue] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
 
   const pinned = useMemo(() => pinnedItems(items), [items]);
   const recent = useMemo(
     () => (showRecent ? recentItems(items, recentCount) : []),
     [items, showRecent, recentCount],
   );
-
-  const createMinutesInvalid = createMinutes.trim() !== "" && clampItemMinutes(createMinutes) === null;
-
-  /* 只有两种校验结果（`ItemNameIssue` 已收窄）：意图没发出去不走这里，它在 `submitCreate`
-     的 `!sent` 分支里直接赋 `copy.timelineSaveFailed`。 */
-  const describeNameIssue = useCallback(
-    (issue: ItemNameIssue): string =>
-      issue === "empty" ? copy.timelineNameEmpty : copy.timelineNameTooLong(ITEM_NAME_MAX_LEN),
-    [copy],
-  );
-
-  const submitCreate = useCallback(() => {
-    if (busy) return;
-    const name = createName.trim();
-    const nameIssue = checkItemName(name);
-    if (nameIssue) {
-      setCreateIssue(describeNameIssue(nameIssue));
-      return;
-    }
-    if (createMinutesInvalid) {
-      setCreateIssue(copy.timelineTimerInvalid);
-      return;
-    }
-    const timerMinutes = clampItemMinutes(createMinutes);
-    /* 勾了「设为常用」→ 落点 = 现用组 `max(sortOrder)+1`（与宿主 `ItemsPrefsMenu` 同算法）。
-       `timerMinutes` 三态：`null`（留空）在这里表示“明确不设时长”，宿主侧等价于清键。 */
-    const intent: HostIntent = pinNew
-      ? { action: "create_item", name, isPinned: true, timerMinutes, sortOrder: nextSortOrder(pinned) }
-      : { action: "create_item", name, isPinned: false, timerMinutes };
-    setBusy(true);
-    void emitHostIntent(intent).then((sent) => {
-      setBusy(false);
-      if (!sent) {
-        /* 意图没发出去（不在 Tauri 里 / emit 失败）：不要报成“保存失败”——
-           我们只知道没发出去，不知道宿主的账。弹层留着让用户重试。 */
-        setCreateIssue(copy.timelineSaveFailed);
-        return;
-      }
-      onLocalCreate(name);
-      setCreateName("");
-      setCreateMinutes("");
-      setPinNew(false);
-      setCreateIssue(null);
-      onClose();
-    });
-  }, [
-    busy, createMinutes, createMinutesInvalid, createName, copy, describeNameIssue,
-    onClose, onLocalCreate, pinNew, pinned,
-  ]);
 
   /** 发一条意图；返回「有没有发出去」。发失败留弹层 + 一句提示，本地一个字都不改。 */
   const sendIntent = useCallback(async (intent: HostIntent): Promise<boolean> => {
@@ -136,7 +80,10 @@ export default function TimelineManage({ mode, onClose, onLocalRename, onLocalCr
     return true;
   }, [copy.timelineSaveFailed]);
 
-  /** 行上的写动作（改名 / 时长 / 设或取消常用）。「设为常用」时顺手补 `max+1` 的落点。 */
+  /**
+   * 行上的写动作（改名 / 时长 / 设或取消常用 / 改分类）。
+   * 「设为常用」时顺手补 `max+1` 的落点。
+   */
   const handleUpdate = useCallback(async (id: number, patch: ItemPatchIntent): Promise<boolean> => {
     const resolved: ItemPatchIntent = { ...patch };
     if (resolved.isPinned === true && resolved.sortOrder === undefined) {
@@ -151,6 +98,9 @@ export default function TimelineManage({ mode, onClose, onLocalRename, onLocalCr
     }
     if (resolved.isPinned !== undefined || resolved.sortOrder !== undefined) {
       applyLocalItem(id, { isPinned: resolved.isPinned, sortOrder: resolved.sortOrder });
+    }
+    if (resolved.categoryKey !== undefined) {
+      applyLocalItem(id, { categoryKey: resolved.categoryKey });
     }
     if (resolved.timerMinutes !== undefined) {
       applyLocalTimer(id, resolved.timerMinutes);
@@ -183,84 +133,13 @@ export default function TimelineManage({ mode, onClose, onLocalRename, onLocalCr
 
   return (
     <>
-      <QuietDialog
+      <TimelineCreateDialog
         open={mode === "create"}
-        title={copy.timelineCreateTitle}
-        surfaceClassName="qp-timeline-manage-dialog"
-        initialFocusRef={createInputRef}
+        copy={copy}
+        pinned={pinned}
         onClose={onClose}
-        actions={(
-          <>
-            <button
-              type="button"
-              className="qp-button qp-button-compact qp-button-secondary"
-              onClick={onClose}
-            >
-              {UI_TEXT.dialog.cancel}
-            </button>
-            <button
-              type="button"
-              className="qp-button qp-button-compact qp-button-primary"
-              disabled={busy || createName.trim().length === 0}
-              onClick={submitCreate}
-            >
-              {UI_TEXT.dialog.confirm}
-            </button>
-          </>
-        )}
-      >
-        <div className="qp-timeline-manage-form">
-          <input
-            ref={createInputRef}
-            className="qp-input qp-timeline-manage-input"
-            value={createName}
-            maxLength={ITEM_NAME_MAX_LEN}
-            placeholder={copy.timelineCreatePlaceholder}
-            aria-label={copy.timelineCreatePlaceholder}
-            aria-invalid={createIssue ? true : undefined}
-            onChange={(event) => {
-              setCreateName(event.target.value);
-              setCreateIssue(null);
-            }}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              submitCreate();
-            }}
-          />
-          <label className="qp-timeline-manage-field">
-            <span className="qp-timeline-manage-label">{copy.timelineTimerLabel}</span>
-            <input
-              className="qp-input qp-timeline-manage-timer"
-              value={createMinutes}
-              inputMode="numeric"
-              placeholder={copy.timelineTimerPlaceholder}
-              aria-label={copy.timelineTimerLabel}
-              aria-invalid={createMinutesInvalid ? true : undefined}
-              onChange={(event) => {
-                setCreateMinutes(event.target.value);
-                setCreateIssue(null);
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter") return;
-                event.preventDefault();
-                submitCreate();
-              }}
-            />
-          </label>
-          <label className="qp-timeline-manage-check">
-            <input
-              type="checkbox"
-              checked={pinNew}
-              onChange={(event) => setPinNew(event.target.checked)}
-            />
-            <span>{copy.timelinePinAction}</span>
-          </label>
-          {createIssue ? (
-            <p className="qp-timeline-manage-issue" role="status">{createIssue}</p>
-          ) : null}
-        </div>
-      </QuietDialog>
+        onLocalCreate={onLocalCreate}
+      />
 
       <QuietDialog
         open={mode === "manage"}
@@ -286,10 +165,20 @@ export default function TimelineManage({ mode, onClose, onLocalRename, onLocalCr
           issue={manageIssue}
           showRecent={showRecent}
           copy={copy}
+          categoryOptions={categoryOptions}
           onUpdate={handleUpdate}
           onMove={handleMove}
+          onManageCategories={() => setManageCategoriesOpen(true)}
         />
       </QuietDialog>
+
+      {/* 分类管理挂在「事项管理」**之外**：两者都 portal 到 body，套进去只会让 Escape 与
+          焦点陷阱各关一层。增删改之后重取候选 —— 否则刚建的分类在下拉里还选不到。 */}
+      <DataCategoryManageDialog
+        open={manageCategoriesOpen}
+        onClose={() => setManageCategoriesOpen(false)}
+        onChanged={reloadCategories}
+      />
     </>
   );
 }

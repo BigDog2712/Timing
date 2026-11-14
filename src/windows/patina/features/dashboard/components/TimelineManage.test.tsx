@@ -157,6 +157,9 @@ describe("TimelineManage · 新建事项", () => {
       isPinned: true,
       timerMinutes: 25,
       sortOrder: 5, // 常用组里 max(sortOrder)=4 → +1
+      /* [0.13] 没选分类也显式带 `null`：让载荷读起来是"用户选了未分类"，
+         而不是"这一版忘了带分类"（两者在落库上等价，在排查时不等价）。 */
+      categoryKey: null,
     });
     expect(onLocalCreate).toHaveBeenCalledWith("看论文");
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -174,6 +177,7 @@ describe("TimelineManage · 新建事项", () => {
       name: "看论文",
       isPinned: false,
       timerMinutes: null,
+      categoryKey: null,
     });
     expect((h.emitHostIntent.mock.calls[0]?.[0] as { sortOrder?: number }).sortOrder).toBeUndefined();
   });

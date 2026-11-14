@@ -34,13 +34,20 @@ import {
   type ItemNameIssue,
 } from "../services/timelineItemName.ts";
 import ItemEditForm from "./ItemEditForm.tsx";
+import ItemCategoryField from "./ItemCategoryField.tsx";
+import type { ItemCategoryOption } from "../hooks/useItemCategoryOptions.ts";
 
-/** 一次写意图的载荷（容器按它拼 `update_item`）。`timerMinutes` 三态见 `withItemTimer`。 */
+/**
+ * 一次写意图的载荷（容器按它拼 `update_item`）。
+ * `timerMinutes` 三态见 `withItemTimer`；`categoryKey` 同型三态
+ * （缺省不改 / `null` 回到未分类 / 字符串设为该分类）。
+ */
 export interface ItemPatchIntent {
   name?: string;
   isPinned?: boolean;
   sortOrder?: number;
   timerMinutes?: number | null;
+  categoryKey?: string | null;
 }
 
 interface Props {
@@ -53,8 +60,12 @@ interface Props {
   issue: string | null;
   showRecent: boolean;
   copy: TimelineManageCopy;
+  /** 事项分类候选（「未分类」由 `ItemCategoryField` 自己补，不在这个数组里） */
+  categoryOptions: readonly ItemCategoryOption[];
   onUpdate: (itemId: number, patch: ItemPatchIntent) => Promise<boolean>;
   onMove: (from: number, to: number) => Promise<boolean>;
+  /** 打开分类管理（增删改分类）—— 全弹层只一颗，行内不重复 */
+  onManageCategories: () => void;
 }
 
 export default function TimelineItemRows({
@@ -66,8 +77,10 @@ export default function TimelineItemRows({
   issue,
   showRecent,
   copy,
+  categoryOptions,
   onUpdate,
   onMove,
+  onManageCategories,
 }: Props) {
   const UI_TEXT = useLocaleText();
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -150,6 +163,16 @@ export default function TimelineItemRows({
     return (
       <li key={item.id} className="qp-timeline-item-row">
         <span className="qp-timeline-item-name" title={item.name}>{item.name}</span>
+        {/* 分类是"改一条落一条"（不像名称/时长要进编辑态）：它不影响行的其它字段，
+            多一层编辑态只会让"常用事项也能改分类"变成三步操作。 */}
+        <ItemCategoryField
+          value={item.categoryKey ?? null}
+          options={categoryOptions}
+          noneLabel={copy.timelineCategoryNone}
+          ariaLabel={`${copy.timelineCategoryLabel} ${item.name}`}
+          disabled={busy}
+          onChange={(next) => { void onUpdate(item.id, { categoryKey: next }); }}
+        />
         <span className="qp-timeline-item-timer">
           {minutes === null ? copy.timelineTimerOff : copy.timelineMinutesShort(minutes)}
         </span>
@@ -240,6 +263,16 @@ export default function TimelineItemRows({
               )}
             </section>
           ) : null}
+          <div className="qp-timeline-category-manage-row">
+            <button
+              type="button"
+              className="qp-link-btn qp-timeline-item-action"
+              disabled={busy}
+              onClick={onManageCategories}
+            >
+              {copy.timelineManageCategories}
+            </button>
+          </div>
         </>
       ) : null}
     </div>
