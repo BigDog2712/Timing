@@ -10,10 +10,18 @@
  * 或过期的。推与读拆成两个动作是因为代价不对称：推要跨库读全表，读只查区间。
  * 计时结束、启动、以及用户手动点「刷新」时各推一次即可。
  *
- * ## 为什么切片结果里没有「未归属」这一项
+ * ## 「未采集」与「未归属」是两件事
  *
- * 切片只保留与块相交的事实；块内没被采集到的时间**不出现**，而不是补一条 `other`。
- * 补零会让「隐私排除 / 追踪没启动」看起来像「在别的应用上待了一小时」。
+ * 切片只保留与块相交的事实 —— 块内没被采集到的时间**不补 `other` 分类**
+ * （补零会让「隐私排除 / 追踪没启动」看起来像「在别的应用上待了一小时」）。
+ * 但它必须作为 `gaps` **单独返回**：块到 11:30、chrome 只到 11:00，中间那半小时
+ * 不显示出来，上下两层就对不上，而用户只会以为「时间轴画错了」。
+ *
+ * ## 旧 KV 的迁移
+ *
+ * `backfillLegacyBindings` 是设计文档 §13 的那条路：把 `__app_override::` /
+ * `__app_item_binding::` 灌进新表，守卫键保证只真跑一次。CRUD 面板上线后
+ * 旧 KV 写入点会被删掉，这个命令随之退役。
  */
 import { invokeWithCommandError } from "./commandError.ts";
 
@@ -96,4 +104,50 @@ export function listFocusBlocks(startMs: number, endMs: number): Promise<FocusBl
 /** 读一个块的子记录。块不存在时抛错（消息里带「先跑投影」）。 */
 export function getBlockDetail(blockUid: string): Promise<BlockDetail> {
   return invokeWithCommandError<BlockDetail>("cmd_get_block_detail", { blockUid });
+}
+
+/** 一段「未采集」的区间（块内在跑，但没有应用事实落进来）。 */
+export interface TimelineGap {
+  startMs: number;
+  endMs: number;
+}
+
+/** 时间轴上层的一行（= 一个事项）。 */
+export interface ItemTimelineRow {
+  itemUid: string;
+  itemName: string;
+  categoryKey: string | null;
+  startMs: number;
+  /** null = 还有块在跑 */
+  endMs: number | null;
+  running: boolean;
+  /** 并集时长（**不是**各块之和：双端并行不能算两遍） */
+  totalMs: number;
+  /** 块数量，>1 说明中途停过 */
+  blockCount: number;
+  segments: ChildSegmentRow[];
+  gaps: TimelineGap[];
+  totalsByCategory: Record<string, number>;
+}
+
+/** 旧 KV → 新表的回填结果（计数给设置页显示「迁移了 N 条」）。 */
+export interface BackfillReport {
+  alreadyDone: boolean;
+  appCategories: number;
+  itemBindings: number;
+  skipped: number;
+}
+
+/**
+ * 双层时间轴：事项 → 子记录 + 空档。
+ *
+ * 读之前后端会补一次增量投影（自愈），所以不需要调用方先 `projectFocusBlocks`。
+ */
+export function getItemTimeline(startMs: number, endMs: number): Promise<ItemTimelineRow[]> {
+  return invokeWithCommandError<ItemTimelineRow[]>("cmd_get_item_timeline", { startMs, endMs });
+}
+
+/** 把旧 KV 配置灌进新表（守卫键保证只真跑一次，重复调用是空操作）。 */
+export function backfillLegacyBindings(): Promise<BackfillReport> {
+  return invokeWithCommandError<BackfillReport>("cmd_backfill_legacy_bindings", {});
 }

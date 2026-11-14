@@ -66,6 +66,11 @@ export interface TimelineManageCopy {
   timelineRange: (start: string, end: string) => string;
   /** 进行中那一行的「止」：`14:32 · 进行中`（`{clock}` = 此刻钟点，实时变） */
   timelineNoEnd: (clock: string) => string;
+  /** 行上的展开键：`展开 3 条子记录` / `收起子记录`（`count` = 子记录 + 空档的总条数） */
+  timelineChildrenToggle: (count: number) => string;
+  timelineChildrenCollapse: string;
+  /** 块内没采集到应用的那一段：`未采集 11:00–11:30`（不是 0 秒，见设计文档 §6） */
+  timelineUnmeasured: (range: string) => string;
 
   /* ── [0.13 · T03b] 改起止（`update_record_time` 意图；边界规则见 §3.8） ── */
   /** 行上与弹层标题共用的「改起止」 */
@@ -116,6 +121,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineTotal: (text) => `总计 ${text}`,
     timelineRange: (start, end) => `${start}–${end}`,
     timelineNoEnd: (clock) => `${clock} · 进行中`,
+    timelineChildrenToggle: (count) => `展开 ${count} 条子记录`,
+    timelineChildrenCollapse: "收起子记录",
+    timelineUnmeasured: (range) => `未采集 ${range}`,
     editRecordTime: "改起止",
     recordStartLabel: "开始时刻",
     recordEndLabel: "结束时刻",
@@ -153,6 +161,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineTotal: (text) => `Total ${text}`,
     timelineRange: (start, end) => `${start}–${end}`,
     timelineNoEnd: (clock) => `${clock} · running`,
+    timelineChildrenToggle: (count) => `Show ${count} child records`,
+    timelineChildrenCollapse: "Hide child records",
+    timelineUnmeasured: (range) => `Not captured ${range}`,
     editRecordTime: "Edit times",
     recordStartLabel: "Start time",
     recordEndLabel: "End time",
@@ -190,6 +201,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineTotal: (text) => `Всего ${text}`,
     timelineRange: (start, end) => `${start}–${end}`,
     timelineNoEnd: (clock) => `${clock} · идёт`,
+    timelineChildrenToggle: (count) => `Показать дочерние записи: ${count}`,
+    timelineChildrenCollapse: "Скрыть дочерние записи",
+    timelineUnmeasured: (range) => `Не записано ${range}`,
     editRecordTime: "Изменить время",
     recordStartLabel: "Время начала",
     recordEndLabel: "Время конца",
@@ -227,6 +241,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineTotal: (text) => `Total ${text}`,
     timelineRange: (start, end) => `${start}–${end}`,
     timelineNoEnd: (clock) => `${clock} · en curso`,
+    timelineChildrenToggle: (count) => `Mostrar ${count} registros hijos`,
+    timelineChildrenCollapse: "Ocultar registros hijos",
+    timelineUnmeasured: (range) => `Sin capturar ${range}`,
     editRecordTime: "Editar horas",
     recordStartLabel: "Hora de inicio",
     recordEndLabel: "Hora de fin",

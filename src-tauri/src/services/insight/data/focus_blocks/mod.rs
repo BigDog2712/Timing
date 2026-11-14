@@ -19,8 +19,10 @@
 use sqlx::{Pool, Row, Sqlite};
 
 mod read;
+mod timeline;
 
 pub use read::{block_detail, list_blocks, BlockDetailDto};
+pub use timeline::{item_timeline, ItemTimelineDto};
 
 /// 投影写入统计（命令出参：让用户知道「同步了多少块」）。
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]

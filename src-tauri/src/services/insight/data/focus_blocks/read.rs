@@ -114,7 +114,7 @@ async fn load_block(activity: &Pool<Sqlite>, block_uid: &str) -> Result<FocusBlo
 }
 
 /// 与区间相交的应用事实。进行中的事实按 `now` 收尾（调用方把 now 传成区间上界）。
-async fn load_facts(
+pub(super) async fn load_facts(
     activity: &Pool<Sqlite>,
     start_ms: i64,
     end_ms: i64,
@@ -142,7 +142,7 @@ async fn load_facts(
 }
 
 /// 事实里出现过的应用各自的分类集（按 priority 升序，首个即「分类首位」）。
-async fn load_categories(
+pub(super) async fn load_categories(
     activity: &Pool<Sqlite>,
     facts: &[FactSpan],
 ) -> Result<BTreeMap<String, Vec<AppCategory>>, String> {
@@ -183,7 +183,7 @@ async fn load_categories(
     Ok(map)
 }
 
-async fn load_overrides(
+pub(super) async fn load_overrides(
     activity: &Pool<Sqlite>,
     block_uid: &str,
 ) -> Result<Vec<SegmentOverride>, String> {

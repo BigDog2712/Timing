@@ -52,3 +52,22 @@ pub async fn cmd_remove_app_category<R: Runtime>(
     let pool = wait_for_sqlite_pool(&app).await?;
     app_category_service::remove(&pool, &app_key, &category_key).await
 }
+
+/// 旧 KV 配置（`__app_override::` / `__app_item_binding::`）→ 新表的一次性回填。
+///
+/// **幂等**：守卫键 `__migration_item_centric::v1` 写入后即不再执行；删掉它可重跑。
+/// 返回的计数是给设置页显示「迁移了 N 条分类 / M 条绑定」用的 —— 静默成功会让
+/// 「规则 1 一直没命中」这件事永远没人发现（设计文档 §13）。
+#[tauri::command]
+pub async fn cmd_backfill_legacy_bindings<R: Runtime>(
+    state: tauri::State<'_, crate::state::AppState>,
+    app: AppHandle<R>,
+) -> Result<crate::services::insight::data::legacy_bindings::BackfillReport, String> {
+    let activity = wait_for_sqlite_pool(&app).await?;
+    crate::services::insight::data::legacy_bindings::backfill(
+        &state.pool,
+        &activity,
+        crate::infra::insight::clock::unix_timestamp_millis_i64(),
+    )
+    .await
+}

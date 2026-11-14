@@ -138,6 +138,71 @@ pub fn summarize_by_category(segments: &[ChildSegment]) -> BTreeMap<String, i64>
     totals
 }
 
+/// 区间**并集**（running max），输出按起点升序、互不重叠。
+///
+/// ## 为什么不能求和
+///
+/// 双端并行计时会给出两条重叠块（PC 09:30–11:30、手机 10:00–10:40），
+/// `sum` 会把这天算成 2 小时 40 分。并集之后才是「这件事实际占用了多久」。
+/// 同型问题在 P2 的热力/趋势上已经出现过一次（服务侧逐桶并集），这里不重复犯错。
+///
+/// ## 为什么不用 `LAG`
+///
+/// 完全嵌套（`10:00–10:40` 整个落在 `09:30–11:30` 里）时，「与前一条比较」的写法
+/// 会把并集判成两条独立段，少算且**零报错**。running max 对嵌套、包含、相邻全对。
+///
+/// 零长与倒挂（`end <= start`）的区间在入口就被丢掉：它们只可能来自坏数据，
+/// 留在结果里会让「并集」比原始数据还长。
+pub fn union_ranges(ranges: &[(i64, i64)]) -> Vec<(i64, i64)> {
+    let mut valid: Vec<(i64, i64)> = ranges
+        .iter()
+        .copied()
+        .filter(|(start, end)| end > start)
+        .collect();
+    valid.sort_unstable();
+    let mut merged: Vec<(i64, i64)> = Vec::with_capacity(valid.len());
+    for (start, end) in valid {
+        match merged.last_mut() {
+            /* `start <= last.1` 相邻也算接上：两段 09:30–10:00 与 10:00–10:30 之间
+               没有任何缝，分成两段会让界面上多出一条 0 宽的空档。 */
+            Some(last) if start <= last.1 => last.1 = last.1.max(end),
+            _ => merged.push((start, end)),
+        }
+    }
+    merged
+}
+
+/// `outer` 内**没有被** `covered` 覆盖的部分（两者都必须是已并集的区间）。
+///
+/// 时间轴上层画块、下层画子记录，中间剩下的就是「块内在跑，但没采集到应用」——
+/// 用户例子里的 11:00–11:30（块到 11:30，chrome 只到 11:00）。这部分必须**显式**
+/// 产出：显示 0 会让人以为计时坏了，不显示则看起来块与子记录对不上。
+pub fn gaps_within(outer: &[(i64, i64)], covered: &[(i64, i64)]) -> Vec<(i64, i64)> {
+    let mut gaps: Vec<(i64, i64)> = Vec::new();
+    for &(outer_start, outer_end) in outer {
+        let mut cursor = outer_start;
+        for &(cover_start, cover_end) in covered {
+            if cover_end <= cursor {
+                continue;
+            }
+            if cover_start >= outer_end {
+                break;
+            }
+            if cover_start > cursor {
+                gaps.push((cursor, cover_start.min(outer_end)));
+            }
+            cursor = cursor.max(cover_end);
+            if cursor >= outer_end {
+                break;
+            }
+        }
+        if cursor < outer_end {
+            gaps.push((cursor, outer_end));
+        }
+    }
+    gaps
+}
+
 #[cfg(test)]
 #[path = "slice_tests.rs"]
 mod slice_tests;

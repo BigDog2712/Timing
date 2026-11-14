@@ -224,3 +224,65 @@
 .qp-todo-edit:hover {
   color: var(--qp-text-primary);
 }
+
+/* ── [0.13.x · T18] 时间轴第二层：事项行下的子记录 ─────────────────────────
+   第一层 `.qp-timeline-row` 是 4 列 grid（名称 | 起止 | 时长 | 改起止键）。
+   第二层必须是它的**整行子项**（`grid-column: 1 / -1`），否则会掉进第一行第 5 格，
+   表现为「子记录挤在时长右边」——看起来像数据错位，其实是网格流。 */
+.qp-timeline-toggle {
+  margin-right: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--qp-text-tertiary);
+  font: inherit;
+  font-size: var(--qp-font-size-caption);
+  cursor: pointer;
+}
+
+.qp-timeline-toggle:hover {
+  color: var(--qp-text-secondary);
+}
+
+.qp-timeline-children {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 0;
+  padding: 0 0 0 14px;
+  list-style: none;
+  border-left: 1px solid var(--qp-border-subtle);
+}
+
+.qp-timeline-child {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  color: var(--qp-text-secondary);
+  font-size: var(--qp-font-size-caption);
+}
+
+.qp-timeline-child-app {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.qp-timeline-child-category {
+  color: var(--qp-text-tertiary);
+}
+
+.qp-timeline-child-range {
+  color: var(--qp-text-tertiary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 「未采集」不是 0 秒，也不是错误：用最弱的颜色 + 斜体，与真实的应用段区分开 */
+.qp-timeline-child[data-gap] {
+  grid-template-columns: minmax(0, 1fr);
+  color: var(--qp-text-tertiary);
+  font-style: italic;
+}

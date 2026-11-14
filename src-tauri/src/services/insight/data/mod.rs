@@ -9,6 +9,8 @@ pub mod classification_service;
 pub mod export;
 /* [0.13.x] 事项块投影（focus_blocks）+ 子记录切片取数。 */
 pub mod focus_blocks;
+/* [0.13.x] 旧 KV 配置 → 新表的一次性回填（设计文档 §13）。 */
+pub mod legacy_bindings;
 pub mod icon_cache_service;
 pub mod import;
 pub mod mini_window_store;

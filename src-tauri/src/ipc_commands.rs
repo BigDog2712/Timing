@@ -136,10 +136,13 @@ define_invoke_handler![
     crate::commands::insight::attribution_cmd::cmd_list_app_categories,
     crate::commands::insight::attribution_cmd::cmd_set_app_category,
     crate::commands::insight::attribution_cmd::cmd_remove_app_category,
+    /* [0.13.x] 旧 KV 绑定 → 新表的一次性回填（守卫键保证只跑一次）。 */
+    crate::commands::insight::attribution_cmd::cmd_backfill_legacy_bindings,
     /* [0.13.x] 事项块投影 + 子记录切片（时间轴点开一个块）。 */
     crate::commands::insight::focus_block_cmd::cmd_project_focus_blocks,
     crate::commands::insight::focus_block_cmd::cmd_list_focus_blocks,
     crate::commands::insight::focus_block_cmd::cmd_get_block_detail,
+    crate::commands::insight::focus_block_cmd::cmd_get_item_timeline,
     crate::commands::insight::tool_notifications_cmd::cmd_get_tool_presentation,
     crate::commands::insight::tool_notifications_cmd::cmd_save_tool_notification_preferences,
     crate::commands::insight::tool_notifications_cmd::cmd_tool_presentation_action,

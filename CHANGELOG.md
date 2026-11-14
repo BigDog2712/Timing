@@ -85,6 +85,27 @@
 - **新增 10 条用例** `services::item_tests`：断言**落库后**的 `parent_id`/`depth`，不只断言
   返回 Ok（「先插再报错」的实现也要能抓出来）。四项变异自证各自咬住唯一一条（见设计文档 §12）。
 
+### T18 · 双层时间轴 + 旧 KV 回填（同一版号并入）
+
+- **读模型** `focus_blocks/timeline.rs`：`item_timeline` 按 `item_uid` 聚块 →
+  `union_ranges` 求并集 → `slice_block` 切子记录 → `gaps_within` 产空档。
+  **并集不是求和**：双端并行（PC 09:30–11:30 + 手机 10:00–10:40）按块相加会把 2 小时
+  算成 2 小时 40 分，数字看起来「合理」，只有对账时才发现。
+- **空档显式产出**：块 09:30–11:30、事实只到 11:00 ⇒ 11:00–11:30 是「未采集」不是 0 秒。
+  不产出这一段，上下两层时长对不上，而用户只会以为「时间轴画错了」。
+- **渲染**：`TimelineCard` 行上展开键 → `TimelineChildRows`（应用 · 分类 · 起止），
+  空档以 `data-gap` 弱化。分类名**运行时查本地化表**：`getCategoryToken` 只认内置 8 键，
+  而 `category_key` 是新模型里的自由字符串（用户写的「学习」「摸鱼」就是它本身），
+  走 token 表会把它们全部落到 `other`。
+- **旧 KV 回填**（设计文档 §13）：`__app_override::` / `__app_item_binding::` → `app_category` /
+  `item_app`，守卫键 `__migration_item_centric::v1` 保证只跑一次。`categories[]` 的**下标**
+  就是 `priority`（丢了顺序，bilibili 的「摸鱼」会排到「娱乐」后面）。
+  悬空 `itemId` 不写：外键在 SQLite 默认关闭，写进去只是一条永远解不开的绑定。
+- **新命令 2 条**（Patina 124 → 126）：`cmd_get_item_timeline`、`cmd_backfill_legacy_bindings`。
+  前者读之前补一次**增量投影 + 回填**（都是幂等、都有守卫或 `since_ms` 界定）——
+  推的时机没地方放：`services::timer` 跨平台，手机侧没有活动库。
+- **新增用例 15 条**：Rust 13（7 条并集/空档 + 6 条回填）、前端 5（3 行为 + 2 纯函数）。
+
 ### 顺手修掉的两个真 bug
 
 - `ensure_install_id` 的临时文件名是固定的 `install_id.txt.tmp`：两个写者同时进来时，
@@ -98,10 +119,10 @@
 ### 账本
 
 - `size` 145 条（`schema.rs` 1887→1751、`hourly.rs` 852→629、`sqlite_pool.rs` 748→747 等向下收紧）；
-  扫描 1791 文件 / 超限占比 29.4%。为压回 300 行硬限，本轮把 `record_session.rs` 拆出
+  扫描 1797 文件 / 超限占比 29.3%。为压回 300 行硬限，本轮把 `record_session.rs` 拆出
   `record_session_split.rs`、`focus_blocks.rs` 拆成 `mod.rs` + `read.rs`、`ipc.ts` 压行。
-- `vendored` 171 条（改 63 / 增 108）；`contract` 88（+Patina 124）/ 错误码 18 / 事件 11-11。
-- `cargo test --lib` **1813 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 204 文件 / 1566 用例。
+- `vendored` 179 条（改 65 / 增 114）；`contract` 88（+Patina 126）/ 错误码 18 / 事件 11-11。
+- `cargo test --lib` **1826 passed**（唯一红是沙箱拦 `reg.exe`，CI 上绿）；`npm test` 205 文件 / 1571 用例。
 - `clippy --all-targets -D warnings` 0 诊断（`--lib` 看不到新用例的 lint：`too_many_arguments`
   与 `doc_lazy_continuation` 都是只在 `--all-targets` 下才现形的）。
 

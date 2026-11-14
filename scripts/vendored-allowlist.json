@@ -1026,6 +1026,54 @@
       "change": "modified",
       "reason": "登记 attribution_cmd / focus_block_cmd 两个命令模块（两行）",
       "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineCard.tsx",
+      "change": "modified",
+      "reason": "时间线卡接入第二层：展开键 + TimelineChildRows。展开态只存本卡 state（不是偏好，不落盘）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/dashboard-r2-cards.css",
+      "change": "modified",
+      "reason": "第二层样式。`.qp-timeline-children` 必须 `grid-column: 1 / -1`，否则掉进第一层第 5 格（看起来像数据错位）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/focus_blocks/timeline.rs",
+      "change": "added",
+      "reason": "双层时间轴读模型：按 item_uid 聚块、并集求时长、gaps_within 产空档。并集不是求和（双端并行不能算两遍）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/legacy_bindings.rs",
+      "change": "added",
+      "reason": "旧 KV（__app_override__ / __app_item_binding__）→ 新表的一次性回填，守卫键防被旧数据覆盖回去（设计文档 §13）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/legacy_bindings_tests.rs",
+      "change": "added",
+      "reason": "回填判据 6 条：数组下标成 priority、小写归一、悬空 itemId 不写、守卫只跑一次、坏 JSON 不中断整批",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineCardChildren.test.tsx",
+      "change": "added",
+      "reason": "第二层行为判据：无子记录不出展开键、段落与空档按起点合并排序、分类名不被 token 表吞成 other",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TimelineChildRows.tsx",
+      "change": "added",
+      "reason": "第二层渲染：分类名运行时查本地化表（自由字符串原样显示），空档以 data-gap 弱化呈现",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/useItemTimeline.ts",
+      "change": "added",
+      "reason": "今日「事项 → 子记录」取数。失败只让第二层消失，不把整卡打红（与主数据源的失败语义不同）",
+      "owner": "software-engineer"
     }
   ]
 }

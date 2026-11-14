@@ -23,6 +23,8 @@ import { formatDashboardDuration } from "../services/dashboardFormatting.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import type { CardTier } from "../layout/contract.ts";
 import ModuleShell, { moduleState } from "./ModuleShell.tsx";
+import TimelineChildRows from "./TimelineChildRows.tsx";
+import { useItemTimeline } from "../hooks/useItemTimeline.ts";
 import TimelineManage from "./TimelineManage.tsx";
 import TimelineEditDialog from "./TimelineEditDialog.tsx";
 import TimelineRecordTimeDialog from "./TimelineRecordTimeDialog.tsx";
@@ -111,6 +113,18 @@ export default function TimelineCard({
   const [dialog, setDialog] = useState<TimelineDialogMode>(null);
   /** 「改起止」弹层：`null` = 关着；数字 = 该事项的 itemId（弹层自己按需拉段） */
   const [recordEditItemId, setRecordEditItemId] = useState<number | null>(null);
+  /* 第二层数据（事项 → 子记录 + 空档）。它是**附加信息**：拿不到就只有第一层，
+     不把卡片打成错误态（见 `useItemTimeline` 头注释）。 */
+  const { byItemId } = useItemTimeline();
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const toggle = (key: string) => {
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
   const recordEditItemName = items.find((item) => item.itemId === recordEditItemId)?.name ?? "";
 
   return (
@@ -147,9 +161,25 @@ export default function TimelineCard({
       )}
     >
       <ul className="qp-timeline-rows">
-        {rows.map((row) => (
+        {rows.map((row) => {
+          const detail = byItemId.get(Number(row.key));
+          const isOpen = expanded.has(row.key);
+          return (
           <li key={row.key} className="qp-timeline-row" data-running={row.running || undefined}>
-            <span className="qp-timeline-label" title={row.label}>{row.label}</span>
+            <span className="qp-timeline-label" title={row.label}>
+              {detail && detail.segments.length + detail.gaps.length > 0 ? (
+                <button
+                  type="button"
+                  className="qp-timeline-toggle"
+                  aria-expanded={isOpen}
+                  title={isOpen ? copy.timelineChildrenCollapse : copy.timelineChildrenToggle(detail.segments.length + detail.gaps.length)}
+                  onClick={() => toggle(row.key)}
+                >
+                  {isOpen ? "▾" : "▸"}
+                </button>
+              ) : null}
+              {row.label}
+            </span>
             <span
               className="qp-timeline-range"
               title={row.running ? copy.timelineNoEnd(row.endLabel) : copy.timelineRange(row.startLabel, row.endLabel)}
@@ -167,8 +197,10 @@ export default function TimelineCard({
             >
               {copy.editRecordTime}
             </button>
+            {isOpen && detail ? <TimelineChildRows row={detail} /> : null}
           </li>
-        ))}
+          );
+        })}
       </ul>
 
       <TimelineManage
