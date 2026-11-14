@@ -85,3 +85,50 @@
 .inline-error svg {
   flex: 0 0 auto;
 }
+
+/* ── [本轮] 「同步与备份」卡的宿主语义变量桥 ──
+ * 这张卡（`HostSyncPanel` → 六块折叠面板 + 底部保存条）的全部样式在 `settings-data*.css` /
+ * `settings-sync*.css` 里，而那些规则只引用**宿主窗的语义变量**（`--line` / `--ink-*` /
+ * `--space-*` / `--text-*` / `--accent` …）。宿主的定义在
+ * `src/windows/timing/styles/tokens/*`，分析窗的样式表一条都没引
+ * （`patina/shell/styles/tokens.css` 只产 `--qp-*`）—— 于是这张卡在分析窗里边框、间距、字号
+ * 全部落空，跟同页其它卡不是一套。上面 `.btn` 是同一类问题的一处补丁，这里把**变量本身**补齐。
+ *
+ * 为什么桥接而不是重写那六块的样式：搬家纪律是「className 一个字都不改」（`[0.12.1] T04b`），
+ * 所以在不动标记的前提下让它们跟上本页配色与间距，只剩改变量映射这一条路。
+ * 值取宿主 primitives 的等价档（`01-primitives.css`：`--space-1..4` = 4/8/12/16，
+ * `--text-cap` = 11px，`--radius-sm/md` = 6/10px）；颜色一律转发到 `--qp-*`，换主题时跟着变。
+ * 作用域挂在卡片根上（不是 `:root`）：不污染全局，也不会顺手改到别处还留着同名变量的面板。 */
+.settings-host-sync {
+  --accent: var(--qp-accent-default);
+  --bg-panel: var(--qp-bg-panel);
+  --bg-field: var(--qp-bg-elevated);
+  --bg-seg: var(--qp-bg-elevated);
+  --line: var(--qp-border-subtle);
+  --line-3: var(--qp-border-strong);
+  --ink: var(--qp-text-primary);
+  --ink-2: var(--qp-text-secondary);
+  --ink-3: var(--qp-text-tertiary);
+  --ink-4: var(--qp-text-disabled);
+  --ok: var(--qp-success);
+  --warn: var(--qp-warning);
+  --danger: var(--qp-danger);
+  --danger-wash: color-mix(in srgb, var(--qp-danger) 12%, transparent);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --text-xs: 11.5px;
+  --text-cap: 11px;
+  --text-body: 13px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+}
+
+/* 六块折叠面板竖排：原来这条排版职责由外层 `.data`（`display:flex` + `gap`）提供，
+   卡片外壳统一到 `qp-panel` 之后 `.data` 就没意义了（它除了 flex 什么都不给）。 */
+.settings-host-sync-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

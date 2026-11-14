@@ -10,18 +10,22 @@ import TodoEditDialog from "./TodoEditDialog.tsx";
 import TodoRow from "./TodoRow.tsx";
 
 /**
- * 模块 4 · 待办事项（01 §4.3 骨架：head / list / fade / undo / footer）
+ * 模块 4 · 待办事项（01 §4.3 骨架：head / list / fade / undo）
  *
- * ## 新建入口 = **卡头**那颗文字键（[本轮] 从卡底 footer 搬上来）
+ * ## 新建入口 = 卡头**下方**的独立一行（[本轮]：卡头右槽 → 卡头之下）
  *
  * 顶部行内输入行早已下线（用户口径「新增代办应与新增事项一致，可以填写时间，选择是否提醒」），
- * 入口挪进 `TodoComposeDialog`。本轮再按用户要求把入口从卡底 footer 挪到**卡头右槽**
- * （`ModuleShell` 的 `headAction`）：footer 会吃掉 32px 卡高，而待办卡最缺的就是行。
+ * 入口挪进 `TodoComposeDialog`。入口的位置搬过两次：卡底 footer（吃掉 32px 卡高）→ 卡头
+ * 右槽（[上一轮]）→ **卡头之下的一条通栏窄行**（本轮）。最后这次是用户口径「往下挪」：
+ * 右槽要同时摆「N 条待办」读数与 `⋯` 控件，一颗 12px 的文字键挤在里面既抢读数也不好点。
  *
- * `headAction` 是四态常驻的（`ModuleShell` 的 Props 注释）：empty / error / loading 时
- * 那颗键也在 —— 「今天还没有待办」恰恰是最需要新建入口的时刻，这条语义不能因为搬家丢掉。
- * 弹层本身挂在 `ModuleShell` **外面**（同一层 fragment 的兄弟）：`children` 只在 ready
- * 渲染，挂在里面的话空态下点开弹层什么都不会出现。
+ * 这一行走 `ModuleShell` 的 `subhead` 槽（`children` **只在 ready 渲染**，而
+ * 「今天还没有待办」恰恰是最需要新建入口的时刻 —— 这条语义不能因为搬家丢掉，所以槽必须
+ * 在四态之外）。行高 24 是"一行文字键"的紧凑高度，不是大号按钮：列表可用高度只少 28，
+ * 而「还有 K 项」是从量出来的 `clientHeight` 推的，少多少它自己会算。
+ *
+ * 弹层本身挂在 `ModuleShell` **外面**（同一层 fragment 的兄弟）：挂进 children 就只有
+ * ready 态才渲染，空态下点开弹层什么都不会出现。
  * 时间口径的唯一实现在 `services/todoDraft.ts` 的 `planTodoWrite`，这里不写三元。
  *
  * ## 「还有 N 项」的 N 是**量出来的**，不是写死的
@@ -31,9 +35,9 @@ import TodoRow from "./TodoRow.tsx";
  * 挂在列表上，pitch 从第 1、2 行的 `offsetTop` 差里读，**不读 CSS 变量、不算魔法数**：
  *   visible = floor((clientHeight − rowH) / pitch) + 1     // 末行不需要 trailing gap
  *
- * 入口搬到卡头之后这套测量**照常工作**：可见行数从量出来的 `clientHeight` 推，
- * 「还有 K 项」自动适配。卡的可用高度确实变了（footer 那 32px 回到了列表），
- * 但那是**量**出来的，不是常量 —— 所以这里一个数字都不用改。
+ * 入口两次搬家（footer → 卡头 → 卡头下方一行）这套测量**照常工作**：可见行数从量出来的
+ * `clientHeight` 推，「还有 K 项」自动适配。卡的可用高度确实在变，但那是**量**出来的，
+ * 不是常量 —— 所以这里一个数字都不用改（判据见 `TodosLayout.test.tsx`）。
  *
  * 两个推导量（可见行数、底部渐隐）由**同一个** `syncTodoDerived()` 算，它是一个可同步
  * 调用的普通函数：`useLayoutEffect`（列表变了）、RO 回调（容器变了）、`scroll`（滚动位置
@@ -136,16 +140,18 @@ export default function TodosModule({ controls, model }: Props) {
         onRetry={retry}
         refreshErrorText={refreshError ? UI_TEXT.common.refreshFailed : undefined}
         emptyText={copy.todosEmpty}
-        /* [本轮] 新建入口搬到卡头右槽（原来是卡底 footer）。`headAction` 不受四态门控，
-           empty / error / loading 时这颗键都在 —— 「今天还没有待办」正是最该点它的时刻。 */
-        headAction={(
-          <button
-            type="button"
-            className="qp-link-btn qp-card-head-link"
-            onClick={() => setComposeOpen(true)}
-          >
-            {copy.todoNewTodo}
-          </button>
+        /* [本轮] 新建入口下移到卡头**下方**一条通栏窄行（`subhead`，四态常驻）；
+           卡头右槽（`headAction`）那一版下线 —— 它和 meta 读数抢同一段 20px 高的横排。 */
+        subhead={(
+          <div className="qp-todo-new-row">
+            <button
+              type="button"
+              className="qp-link-btn"
+              onClick={() => setComposeOpen(true)}
+            >
+              {copy.todoNewTodo}
+            </button>
+          </div>
         )}
         /* 三段式：① 无（加载 / 空） ② `全部 N 项 ▸` 常驻 ③ 溢出时再加 `还有 K 项 ▸`。
         两个 N 是**两个数**（总数 / 没排下的条数），谁也不许拿另一个推。

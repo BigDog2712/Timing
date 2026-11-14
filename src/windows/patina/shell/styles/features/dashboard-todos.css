@@ -14,12 +14,19 @@
 /* ── 待办卡（DOM 见 01 §4.3：head / list / fade / undo；[本轮] footer 下线，入口上卡头） ── */
 .qp-card-todos { position: relative; }
 
-/* 卡头右槽的「新建待办」（`ModuleShell` 的 `headAction`，四态常驻）。
- * 用 compact 一档：卡头高只有 46，12px 的 caption 会跟 13.5 的标题抢视觉层级，
- * 而它是个**次级**入口（主操作仍是「勾完一条」）。 */
-.qp-card-head-link {
-  font-size: var(--qp-font-size-compact);
-  line-height: var(--qp-line-height-compact);
+/* 「新建待办」所在的那一行（`ModuleShell` 的 `subhead`，四态常驻）。
+ * [本轮] 位置从卡头右槽搬到卡头**下方**：右槽要同时摆「N 条待办」读数与 `⋯` 控件，
+ * 一颗 12px 文字键挤在 20px 高的头里，读数的可用宽度被压掉、按钮本身也不好点。
+ * 高度 24 是"一行文字键"的紧凑高度（**不是**大号按钮）：列表可用高度只少 28px，
+ * 而「还有 K 项」是从量出来的 clientHeight 推的，少多少它自己会算。
+ * 右对齐：与卡头右槽同一根轴线，扫视时入口永远在右手边。 */
+.qp-todo-new-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  height: 24px;
+  margin-bottom: 4px;
 }
 
 .qp-todo-list {
@@ -230,7 +237,9 @@
 
 /* 撤销条：乐观删除 + 窗内撤销（语义照抄主窗 todoStore.remove/undoRemove，AC-32）
  *
- * [本轮] 新建入口搬去卡头（`ModuleShell` 的 `headAction`），卡底那 32 高的 footer 条下线，
+ * [本轮] 新建入口搬去卡头**下方**一条通栏窄行（`ModuleShell` 的 `subhead` 槽，
+ * 四态常驻；上一版的 `headAction` 右槽已整段删除，`subhead` 是卡头之后的独立一行），
+ * 卡底那 32 高的 footer 条下线，
  * 所以让位量回到卡片自己的底部内距：`--qp-card-pad-b`（16）+ 8px 间隙。原来为了不压住
  * footer 按钮而写的 `--qp-card-foot-h` 已经没有对应的实体（`--qp-card-foot-h` 仍被应用卡
  * 的 `.qp-card-footer` 使用，不能删）。两者差 16px：留着旧值撤销条会悬空。 */

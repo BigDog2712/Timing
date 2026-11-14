@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import SettingsGroupNav from "./SettingsGroupNav.tsx";
+import { SETTINGS_GROUPS } from "../settingsGroups";
 
 /**
  * 设置页分组导航的**判定算法**回归（[本轮]）。
@@ -80,7 +81,13 @@ function pinTop(element: HTMLElement, absoluteTop: number) {
 function buildScrollHost() {
   const host = document.createElement("div");
   host.id = "settings-scroll";
-  Object.defineProperty(host, "scrollTop", { configurable: true, get: () => scrollTop, set: () => {} });
+  /* setter 必须真的写进去：`jump()` 现在**自己算 scrollTop**（不再 scrollIntoView），
+     桩要是吞掉写入，"落点算得对不对"就成了一处测不到的空白。 */
+  Object.defineProperty(host, "scrollTop", {
+    configurable: true,
+    get: () => scrollTop,
+    set: (next: number) => { scrollTop = next; },
+  });
   Object.defineProperty(host, "scrollHeight", { configurable: true, get: () => scrollHeight });
   Object.defineProperty(host, "clientHeight", { configurable: true, get: () => clientHeight });
   /* 滚动容器**自己**的 rect 不随 scrollTop 变（真实浏览器里它在视口里的位置是固定的）：
@@ -210,6 +217,84 @@ describe("SettingsGroupNav · 滚动高亮判定", () => {
     activeOffset = 4;
     await mount();
     await scrollTo(690);
+    expect(activeTitle()).toBe("主界面");
+  });
+});
+
+/**
+ * [本轮] 「点一组、亮另一组」的回归（用户报的那个形状）。
+ *
+ * 根因不是"点错了锚点"，而是**落点恰好压在判定线上**：`jump()` 的偏移与判定线读同一个
+ * `scroll-margin-top`，理想落点是 `锚点 top === 判定线`（差值 0）。零容差下设备像素取整
+ * 把落点推高 0.4px（`top = 判定线 + 0.4`）就判成"还没越线"，循环回落到上一个已越线锚点：
+ * 点「主界面」→ 亮「计时与记录」，点「计时与记录」→ 亮「主界面」，完全对称。
+ *
+ * 两条判据都用**点击**驱动、偏差 ±0.4px：`+0.4` 是变异靶点（去掉 `LINE_TOLERANCE` 必红），
+ * `−0.4` 在零容差实现下本来就绿，留着证明容差没把结论推向另一边。第三条盯「点击即钉住」的
+ * **位置**语义（停在落点上不被抢、离开落点立刻交回几何）。
+ */
+describe("SettingsGroupNav · 点击跳转（落点压线 + 点击即钉住）", () => {
+  /** 落点相对判定线的偏差（px）= `锚点 top − 判定线`；正 = 停在判定线下方 0.4px 那一半 */
+  let landingDrift = 0;
+
+  beforeEach(() => {
+    landingDrift = 0;
+    /* 给旧 `scrollIntoView` 路径留一份浏览器语义的桩：万一有人改回去，这里不会变成
+       TypeError 假红，而是照旧按真实落点算高亮 —— 判据仍然咬得住。 */
+    Element.prototype.scrollIntoView = function scrollIntoViewStub(this: Element) {
+      const id = (this as HTMLElement).id;
+      scrollTop = (ANCHOR_TOPS[id] ?? 0) - CSS_ACTIVE_OFFSET - landingDrift;
+      scrollHost?.dispatchEvent(new Event("scroll"));
+    } as typeof Element.prototype.scrollIntoView;
+  });
+
+  const titleButton = (title: string) => Array.from(
+    document.querySelectorAll<HTMLButtonElement>(".settings-group-nav__title"),
+  ).find((button) => button.textContent === title);
+
+  /** 点一下某组，再把「浏览器落定那一刻」的 scroll 事件如实打进场景 */
+  async function clickGroup(title: string) {
+    const group = SETTINGS_GROUPS.find((item) => item.title === title);
+    expect(group, `分组表里没有「${title}」`).toBeDefined();
+    const anchorId = group?.anchors[0]?.id ?? "";
+    act(() => { titleButton(title)?.click(); });
+    /* 落点 = 锚点顶到判定线 ± 设备像素取整（唯一变量）：`+0.4` 造出"还没越线"的那一半 */
+    scrollTop = (ANCHOR_TOPS[anchorId] ?? 0) - CSS_ACTIVE_OFFSET - landingDrift;
+    await act(async () => { scrollHost?.dispatchEvent(new Event("scroll")); });
+    await settle();
+  }
+
+  it("sg06_a_landing_point_04px_below_the_line_still_lights_the_clicked_group", async () => {
+    /* 变异靶点：把 `top <= line + LINE_TOLERANCE` 改回 `top <= line`，这一条必红
+       （实测红：亮的是「计时与记录」，见交付说明里的原始输出）。 */
+    landingDrift = 0.4;
+    await mount();
+    await clickGroup("主界面");
+    expect(activeTitle()).toBe("主界面");
+  });
+
+  it("sg07_a_landing_point_04px_above_the_line_also_lights_the_clicked_group", async () => {
+    landingDrift = -0.4;
+    await mount();
+    await clickGroup("计时与记录");
+    expect(activeTitle()).toBe("计时与记录");
+  });
+
+  it("sg08_a_click_lights_the_group_and_the_pin_holds_only_while_it_sits_on_the_landing", async () => {
+    /* [本轮] 钉住语义从「帧数」改成「位置」（见 `SettingsGroupNav.tsx` 文件头 ②）：停在落点上 →
+       保持用户点的组；离开落点 → 立刻交回几何。跳转是瞬时的（无 `scroll-behavior: smooth`）。 */
+    await mount();
+    act(() => { titleButton("数据与同步")?.click(); });
+    /* ① 点击**立刻**亮目标组：用户在等的是这个反馈，不是"滚完再看运气" */
+    expect(activeTitle()).toBe("数据与同步");
+    /* ② 还停在落点上（`jump()` 自己写下去的 802）→ 钉子有效，几何派生不许抢走高亮 */
+    await scrollTo((ANCHOR_TOPS["s-sync"] ?? 0) - CSS_ACTIVE_OFFSET);
+    expect(activeTitle()).toBe("数据与同步");
+    /* ③ 离开落点 → 解钉，高亮按几何走（钉子不常驻） */
+    await scrollTo(400);
+    expect(activeTitle()).toBe("计时与记录");
+    /* ④ 再滚回上面也一样跟着位置走 */
+    await scrollTo(520);
     expect(activeTitle()).toBe("主界面");
   });
 });

@@ -36,13 +36,26 @@ function item(id: number, name: string, isSystem = false): TimingItem {
   return { id, name, color: "", isSystem, isPinned: false, sortOrder: 0, updatedAt: 0 };
 }
 
-/** 今天刚发生的一段记录：`startedAt` 落在今天，`accumulatedSec` 给一个正数。 */
+/**
+ * 今天刚发生的一段记录：`startedAt` 保证落在**当天之内**，`accumulatedSec` 给一个正数。
+ *
+ * 不能直接写 `Date.now() - 5min`：本地 00:00–00:05 之间跑测时那个值属于**昨天**，
+ * `useTodayItems` 用 `startOfLocalDay` 过滤后整行消失（i01–i05 全红、过了 00:05 又全绿，
+ * 同一份代码）。所以起点取「当天 00:00 之后 1s」与「5 分钟前」的**较晚者**：前者天然在
+ * 今天之内、且不依赖跑测时刻，后者在白天保持不变（仍是一条"刚发生"的记录）。
+ * 回归用例见下面 i09（时钟钉在 00:01）。
+ */
 function record(id: number, itemId: number, minutes: number): TimingRecord {
+  const now = Date.now();
+  const dayStart = new Date(now);
+  dayStart.setHours(0, 0, 0, 0);
+  const startedAt = Math.max(dayStart.getTime() + 1000, now - 5 * 60 * 1000 - id);
   return {
     id,
     itemId,
-    startedAt: Date.now() - 5 * 60 * 1000 - id,
-    endedAt: Date.now() - 4 * 60 * 1000,
+    startedAt,
+    /* 段长固定 4 分钟：`startedAt` 最早是当天 00:00:01，两者都稳稳落在当天之内 */
+    endedAt: startedAt + 4 * 60 * 1000,
     accumulatedSec: minutes * 60,
     status: "saved",
   };
@@ -161,6 +174,34 @@ describe("useTodayItems · 改名后的本地收敛", () => {
     act(() => { latest?.applyLocalRename(3, "开会（周会）"); });
 
     expect(names()).toEqual(["写代码", "开会（周会）", "看论文"]);
+  });
+});
+
+/**
+ * 跨天边界：上面 i01–i05 的 fixture 必须**锚在当天之内**。
+ *
+ * 缺陷形状（QA 实测）：`startedAt: Date.now() - 5 * 60 * 1000 - id` 在本地 00:00–00:05
+ * 之间跑到**昨天**，`useTodayItems` 用 `startOfLocalDay` 过滤后一行不剩 →
+ * `00:01:56` 跑 = `5 failed | 1518 passed`，`00:05:57` 跑同一份代码 = `1524 passed`。
+ * 也就是说这不是"某条用例写错了"，而是**跑测时刻决定结果**的 flake：CI 任何时段都可能红。
+ *
+ * 这里把时钟钉在当天 00:01（最容易红的那一分钟）跑同一条断言 —— 修好之前它必红，
+ * 修好之后它无论几点跑都绿。`toFake` 只钉 `Date`：定时器保持真实，免得干扰 React 的调度。
+ */
+describe("useTodayItems · 跨天边界（本地 00:00–00:05 跑测）", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("i09_the_fixture_survives_the_first_minute_of_the_local_day", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 10, 11, 0, 1, 0));
+
+    g.listTimingItems.mockResolvedValue([item(2, "写代码")]);
+    g.listTimingRecords.mockResolvedValue([record(1, 2, 30)]);
+    await mount();
+
+    expect(names()).toEqual(["写代码"]);
   });
 });
 

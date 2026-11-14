@@ -6,9 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * 待办卡「还有 K 项」的**量测回归**（[QA 本轮独立复核]）。
  *
- * 本轮把「新建待办」从卡底 `footer` 搬到卡头 `headAction`，卡片可用高度变了（那 32px
- * 回到了列表）。`TodosModule` 的注释主张"可见行数是从 `offsetTop` 差量出来的，所以
- * 一个数字都不用改"——这条主张必须被**量测**验证，而不是被注释说服：
+ * 入口搬过两次家：卡底 `footer` → 卡头 `headAction` → 卡头下方一条 24 高的通栏窄行
+ * （[本轮]）。每一次卡片可用高度都会变（本轮少 28px）。`TodosModule` 的注释主张
+ * "可见行数是从 `offsetTop` 差量出来的，所以一个数字都不用改"——这条主张必须被**量测**
+ * 验证，而不是被注释说服：
  *
  *   visible = floor((clientHeight − rowH) / pitch) + 1
  *   hidden  = rows.length − visible
@@ -116,12 +117,12 @@ afterEach(() => {
   root = null;
 });
 
-describe("待办卡 · 入口在卡头之后的「还有 K 项」", () => {
+describe("待办卡 · 入口在卡头之下时的「还有 K 项」", () => {
   it("tl01_the_empty_state_has_the_entry_and_no_overflow_readout", async () => {
     await mount();
-    /* 空态：入口在（这是上一轮把入口从 footer 搬上来的全部理由） */
+    /* 空态：入口在（这是入口一路搬家的全部理由） */
     expect(entry()).not.toBeUndefined();
-    expect(entry()?.closest(".qp-card-head-right")).not.toBeNull();
+    expect(entry()?.closest(".qp-todo-new-row"), "入口在卡头下方那条窄行里").not.toBeNull();
     /* 空态没有列表、也没有 meta 读数 */
     expect(list()).toBeNull();
     expect(metaText()).toBe("");

@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * 待办卡「增删改 + 批量新建」的判据（[0.13 · 1.7]）。
  *
  * 钉的是"错了也照样出货"的静默项：
- *   ① 卡头那颗「新建待办」能开弹层（[本轮] 入口从卡底 footer 搬到卡头 `headAction`）；
+ *   ① 卡头**下方**那一行里的「新建待办」能开弹层（[本轮] 入口从卡头右槽下移到
+ *      `ModuleShell` 的 `subhead` 槽，四态常驻）；
  *   ② 批量创建 = **一条** `todo_create_batch`（不是前端循环 `todo_create`）——
  *      勾提醒 → 每条 plan 的 `remindAt === plannedAt`（同一时刻）；
  *   ③ 不勾提醒 → `remindAt: null`（每条都弹两次提醒是这个口径写错的症状）；
@@ -248,29 +249,39 @@ describe("TodosModule · 新建待办（批量）", () => {
   });
 });
 
-describe("TodosModule · 新建入口在卡头（[本轮]）", () => {
-  it("tq08_the_entry_lives_in_the_card_head_and_survives_the_empty_state", async () => {
+describe("TodosModule · 新建入口在卡头下方那一行（[本轮]）", () => {
+  it("tq08_the_entry_lives_below_the_card_head_and_survives_the_empty_state", async () => {
     /* 空态（今天一条待办都没有）必须**也有**入口：这正是「新建」最该出现的时刻，
-       也是 old 版把它放在 footer 的唯一理由。搬到卡头之后这条语义不许丢。 */
+       也是 old 版把它放在 footer 的唯一理由。搬到卡头下方之后这条语义不许丢。 */
     await mount();
     const entry = byText("新建待办");
     expect(entry, "空态没有「新建待办」= 入口被四态门控吃掉了").not.toBeUndefined();
-    expect(entry?.closest(".qp-card-head-right"), "入口必须在卡头右槽（ModuleShell 的 headAction）")
+    expect(entry?.closest(".qp-todo-new-row"), "入口必须在那条通栏窄行里（ModuleShell 的 subhead）")
       .not.toBeNull();
+    expect(entry?.closest(".qp-card-head-right"), "入口已从卡头右槽下移，不许留在那儿")
+      .toBeNull();
     expect(container?.querySelector(".qp-card-foot, .qp-todo-foot"), "卡底那条入口条必须已经下线")
       .toBeNull();
   });
 
-  it("tq09_the_entry_does_not_displace_the_card_controls_slot", async () => {
-    /* 卡头右槽的排法：headAction 在最左，meta 与 `⋯` 控件各占原位。
-       若把 headAction 排到 meta 之后，它会落进 meta 给 `⋯` 让出的 30px 里。 */
+  it("tq09_the_entry_row_sits_after_the_head_and_before_the_list", async () => {
+    /* 位置判据（[本轮] 用户口径「往下挪」）：那一行是**卡头的下一个兄弟**，而且排在列表
+       之前。搬回卡头右槽 / 掉到列表下面都会被这一条挡住 —— 变异靶点。 */
+    h.listPendingTodos.mockResolvedValue([todo(1)]);
     await mount();
-    const right = container?.querySelector(".qp-card-head-right");
-    const children = Array.from(right?.children ?? []);
-    const actionIndex = children.findIndex((node) => node.className.includes("qp-card-head-link"));
-    const metaIndex = children.findIndex((node) => node.className.includes("qp-card-meta"));
-    expect(actionIndex).toBe(0);
-    if (metaIndex >= 0) expect(actionIndex).toBeLessThan(metaIndex);
+    const head = container?.querySelector(".qp-card-head");
+    const row = container?.querySelector(".qp-todo-new-row");
+    const list = container?.querySelector(".qp-todo-list");
+    expect(head, "找不到卡头").not.toBeNull();
+    expect(row, "找不到「新建待办」那一行").not.toBeNull();
+    expect(list, "ready 态应有列表").not.toBeNull();
+    expect(head?.nextElementSibling, "那一行必须紧跟在卡头之后").toBe(row);
+    /* `compareDocumentPosition`：row 在 list **之前**（FOLLOWING 位） */
+    expect((row as Node).compareDocumentPosition(list as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    /* 右槽里不再有入口键：读数与 `⋯` 控件才该占那儿 */
+    expect(container?.querySelector(".qp-card-head-right .qp-link-btn"), "卡头右槽里不该再有入口键")
+      .toBeNull();
   });
 });
 

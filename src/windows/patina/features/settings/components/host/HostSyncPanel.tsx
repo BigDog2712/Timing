@@ -23,7 +23,9 @@
  */
 /* patina bundle 桌面独占：宿主那份编译期常量在这里恒为 false（分支保留，便于与宿主同构） */
 const IS_MOBILE = false;
+import { Cloud } from 'lucide-react';
 import QuietSwitch from '../../../../shared/components/QuietSwitch';
+import SettingsPanelHeader from '../SettingsPanelHeader';
 import { FoldBlock } from './FoldBlock';
 import { MdBackupSummaryLine } from './MdBackupSummaryLine';
 import { MdDataRootBlock } from './MdDataRootBlock';
@@ -49,95 +51,103 @@ export function HostSyncPanel() {
   const globalError = error && !inline ? error : null;
 
   return (
-    <div className="data">
-      <header className="data__head">
-        <h3 className="data__title">数据管理</h3>
-      </header>
+    <section className="qp-panel p-5 md:p-6 settings-host-sync">
+      {/* [本轮] 卡片外壳统一：同页另外四组都是 `qp-panel` + `SettingsPanelHeader`，
+          这一组原来直接用宿主页签那套 `.data` + `.data__head`（连标题都是页签名「数据管理」）。
+          标题改用分组锚点表里的名字「同步与备份」—— 导航点的是这个名，卡上写另一个名，
+          用户得靠位置才能对上。行为零改动：六块折叠面板与底部保存条一字未动。 */}
+      <SettingsPanelHeader
+        icon={<Cloud size={16} className="text-[var(--qp-accent-default)]" />}
+        title="同步与备份"
+        className="mb-4"
+      />
 
       {globalError && <p className="sync__error">{globalError}</p>}
       {notice && <p className="sync__ok">{notice}</p>}
 
-      <FoldBlock id="data-format" title="Markdown 落点设置" hint={COPY.formatHint} dirty={dirtyParts.format}>
-        <MdFormatBlock draft={draft} />
-      </FoldBlock>
+      <div className="settings-host-sync-blocks">
+        <FoldBlock id="data-format" title="Markdown 落点设置" hint={COPY.formatHint} dirty={dirtyParts.format}>
+          <MdFormatBlock draft={draft} />
+        </FoldBlock>
 
-      <FoldBlock id="data-root" title="SQLite 落点设置" hint={COPY.dataRootHint}>
-        <MdDataRootBlock />
-      </FoldBlock>
+        <FoldBlock id="data-root" title="SQLite 落点设置" hint={COPY.dataRootHint}>
+          <MdDataRootBlock />
+        </FoldBlock>
 
-      <FoldBlock
-        id="data-sync"
-        title="Markdown 同步"
-        hint={COPY.syncHint}
-        dirty={dirtyParts.sync}
-        actions={(
-          /* 总开关放标题右侧：它管的就是这一摊（PRD 4.3），两条通路各有自己的开关（④⑤） */
-          <QuietSwitch checked={enabled} ariaLabel="启用 Markdown 同步" disabled={saving}
-            onChange={(next) => draft.setEnabled(next)} />
-        )}
-      >
-        <MdSyncLocalBlock draft={draft} />
-      </FoldBlock>
-
-      {/* [V0.11.26] 块④ 本地同步：桌面 only（PRD R7 / O19）。手机上只有 WebDAV 一条路，
-          本地目录靠电脑上的网盘客户端，手机既没有那个目录也没有客户端。 */}
-      {/* [V0.11.33] 块④⑤标题加 WebDAV 前缀（W1/W2 / P1，主人原话逐字；托盘标签不跟，R5）。
-          折叠按钮 aria 由 FoldBlock 自动派生（`展开WebDAV 本地同步` 等）。 */}
-      {!IS_MOBILE && (
         <FoldBlock
-          id="data-local"
-          title="WebDAV 本地同步"
-          hint={COPY.localHint}
-          dirty={dirtyParts.local}
+          id="data-sync"
+          title="Markdown 同步"
+          hint={COPY.syncHint}
+          dirty={dirtyParts.sync}
           actions={(
-            <QuietSwitch checked={draft.folder.enabled} ariaLabel="启用本地同步" disabled={saving}
-              onChange={(next) => draft.setFolderEnabled(next)} />
+            /* 总开关放标题右侧：它管的就是这一摊（PRD 4.3），两条通路各有自己的开关（④⑤） */
+            <QuietSwitch checked={enabled} ariaLabel="启用 Markdown 同步" disabled={saving}
+              onChange={(next) => draft.setEnabled(next)} />
           )}
         >
-          <MdSyncLocalCard draft={draft} />
+          <MdSyncLocalBlock draft={draft} />
         </FoldBlock>
-      )}
 
-      <FoldBlock
-        id="data-cloud"
-        title="WebDAV 云端同步"
-        hint={COPY.cloudHint}
-        dirty={dirtyParts.cloud}
-        actions={(
-          <QuietSwitch checked={draft.webdav.enabled} ariaLabel="启用云端同步" disabled={saving}
-            onChange={(next) => draft.setWebdavEnabled(next)} />
+        {/* [V0.11.26] 块④ 本地同步：桌面 only（PRD R7 / O19）。手机上只有 WebDAV 一条路，
+            本地目录靠电脑上的网盘客户端，手机既没有那个目录也没有客户端。 */}
+        {/* [V0.11.33] 块④⑤标题加 WebDAV 前缀（W1/W2 / P1，主人原话逐字；托盘标签不跟，R5）。
+            折叠按钮 aria 由 FoldBlock 自动派生（`展开WebDAV 本地同步` 等）。 */}
+        {!IS_MOBILE && (
+          <FoldBlock
+            id="data-local"
+            title="WebDAV 本地同步"
+            hint={COPY.localHint}
+            dirty={dirtyParts.local}
+            actions={(
+              <QuietSwitch checked={draft.folder.enabled} ariaLabel="启用本地同步" disabled={saving}
+                onChange={(next) => draft.setFolderEnabled(next)} />
+            )}
+          >
+            <MdSyncLocalCard draft={draft} />
+          </FoldBlock>
         )}
-      >
-        <MdSyncWebdavCard draft={draft} />
-      </FoldBlock>
 
-      <FoldBlock
-        id="data-backup"
-        title="计时数据备份与恢复"
-        hint={COPY.backupHint}
-        summary={<MdBackupSummaryLine list={backupList} />}
-      >
-        <MdSyncBackupCard list={backupList} />
-      </FoldBlock>
-
-      <div className="data__bar" data-dirty={dirty ? 'true' : 'false'}>
-        <span className="data__bar-hint">{dirty ? '有未保存的修改' : ''}</span>
-        <button type="button" className="btn btn--ghost" disabled={!dirty} onClick={draft.discard}>
-          放弃修改
-        </button>
-        <button
-          type="button"
-          className="btn btn--ghost"
-          disabled={blocked || dirty}
-          title={dirty ? '有未保存的修改，先保存再同步' : '按已保存的配置同步一轮'}
-          onClick={() => void draft.run()}
+        <FoldBlock
+          id="data-cloud"
+          title="WebDAV 云端同步"
+          hint={COPY.cloudHint}
+          dirty={dirtyParts.cloud}
+          actions={(
+            <QuietSwitch checked={draft.webdav.enabled} ariaLabel="启用云端同步" disabled={saving}
+              onChange={(next) => draft.setWebdavEnabled(next)} />
+          )}
         >
-          立即同步
-        </button>
-        <button type="button" className="btn btn--primary" disabled={blocked} onClick={() => void draft.save()}>
-          {saving ? '保存中…' : '保存并同步'}
-        </button>
+          <MdSyncWebdavCard draft={draft} />
+        </FoldBlock>
+
+        <FoldBlock
+          id="data-backup"
+          title="计时数据备份与恢复"
+          hint={COPY.backupHint}
+          summary={<MdBackupSummaryLine list={backupList} />}
+        >
+          <MdSyncBackupCard list={backupList} />
+        </FoldBlock>
+
+        <div className="data__bar" data-dirty={dirty ? 'true' : 'false'}>
+          <span className="data__bar-hint">{dirty ? '有未保存的修改' : ''}</span>
+          <button type="button" className="btn btn--ghost" disabled={!dirty} onClick={draft.discard}>
+            放弃修改
+          </button>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            disabled={blocked || dirty}
+            title={dirty ? '有未保存的修改，先保存再同步' : '按已保存的配置同步一轮'}
+            onClick={() => void draft.run()}
+          >
+            立即同步
+          </button>
+          <button type="button" className="btn btn--primary" disabled={blocked} onClick={() => void draft.save()}>
+            {saving ? '保存中…' : '保存并同步'}
+          </button>
+        </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -22,6 +22,18 @@ import { useBoardInstance, withInstance } from "../layout/instanceContext.ts";
  *
  * 卡头右侧只能二选一：`action`（可点）或 `meta`（只读读数）。两者同时给会让 20 高的
  * 卡头挤成两行，而卡头高是几何表锁死的值。
+ *
+ * ## 卡头右槽**没有**"常驻操作槽"（`headAction` 已下线）
+ *
+ * 上一版给待办卡加过一个 `headAction`：卡头右槽最左侧、四态常驻。它已经随「新建待办」
+ * 搬到卡头下方那条通栏窄行（`subhead`）而下线 —— 右槽要同时摆「N 条待办」读数与 `⋯`
+ * 控件，20px 高的头里再挤一颗文字键，读数就被压窄了（`TodosModule` 的原始理由）。
+ * 现在全仓零调用点，留着这个 prop 就是"哪天有人顺手用回去"的入口，所以整段删掉：
+ *
+ *   · 想放**常驻**入口 → `subhead`（四态都在，卡头之下一整行）；
+ *   · 想放**只在 ready** 出现的操作 → `action`；
+ *   · 想放布局工具条 → `controls`。
+ * 判据（渲染级 + 类型级）：`ModuleShellHeadSlot.test.tsx`。
  */
 export type ModuleState = "ready" | "empty" | "loading" | "error";
 
@@ -50,15 +62,11 @@ interface Props {
   title: string;
   meta?: ReactNode;
   action?: ReactNode;
-  /** [本轮] 卡头右侧的**常驻**操作槽：empty / error / loading 都在场。
-   *  为什么需要它（而不是复用 `action`）：`action` 是 `meta` 的替代品、而且和 meta 一样
-   *  只在 ready 渲染 —— 而「今天还没有待办」正是最想点「新建待办」的时刻。旧做法是把入口
-   *  挂在卡底 `footer`（四态常驻）里，本轮按用户要求把这个入口搬到卡头。
-   *  **排版**：渲染在 `.qp-card-head-right` 的**最左侧**（在 meta / E3 图标之前、`controls` 之前）。
-   *  理由：`.qp-card-meta` 自带 `margin-right: 30px`，那 30px 是给绝对定位的 `⋯` 工具条让的位；
-   *  把新槽放在 meta **之后**会正好落进那块让位区，和 `controls` 抢同一段横向空间。
-   *  放最左 → 右槽读数 `[headAction][meta][⋯]`，`controls` 一位不少、meta 的让位仍成立。 */
-  headAction?: ReactNode;
+  /** 卡头**下方**的独立一行（通栏、四态常驻）。
+   *  为什么不是 `children`：`children` **只在 ready 渲染**，而「今天还没有待办」正是最该
+   *  看到新建入口的时刻（待办卡的那条设计理由）。所以要一个"四态都在"、又在卡头之下的槽。
+   *  不传 → 逐字等于旧形态（其余卡片一个像素都不变）。 */
+  subhead?: ReactNode;
   state: ModuleState;
   emptyText: string;
   skeletonRows?: number;
@@ -93,7 +101,7 @@ export default function ModuleShell({
   title,
   meta,
   action,
-  headAction,
+  subhead,
   state,
   emptyText,
   skeletonRows = 5,
@@ -133,8 +141,6 @@ export default function ModuleShell({
          *  散写守卫的必然结果）。h2 标题保持恒在（M12/M13）。 */}
         {/* [A 批] 右槽顺序 = meta 在前、⋯ 在后：读数贴左、操作贴右，「看」与「动」各占一端 */}
         <span className="qp-card-head-right">
-          {/* [本轮] `headAction` 是**唯一**不受四态门控的东西：放在最左，见 Props 注释里的排版理由 */}
-          {headAction}
           {state === "ready" ? (
             <>
               {/* E3 只在这一层出现：条件渲染，不常驻空容器（常驻的 role=alert 挂载时就有内容，
@@ -152,6 +158,8 @@ export default function ModuleShell({
           {controls}
         </span>
       </div>
+      {/* 卡头之下的常驻行（四态都在）。放在四态分支**之前**，与 `state` 无关 */}
+      {subhead}
       {state === "loading" ? (
         /* `data-row` 只决定条高（CSS）；**条数**由 tiers.css 的档位规则裁，不在这里读断点 */
         <div className="qp-skeleton" data-row={skeletonRow} aria-hidden="true">

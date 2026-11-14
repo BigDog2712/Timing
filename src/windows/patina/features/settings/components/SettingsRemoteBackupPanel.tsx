@@ -6,6 +6,7 @@ import QuietDialog from "../../../shared/components/QuietDialog";
 import QuietButton from "../../../shared/components/QuietButton";
 
 import type { RemoteBackupEntry, RemoteBackupState, RemoteBackupFormDraft } from "../hooks/useRemoteBackupState.ts";
+import { SettingsPreferenceRow } from "./SettingsPreferenceLayout";
 import { DEFAULT_WEBDAV_REMOTE_DIR } from "../hooks/useRemoteBackupState.ts";
 
 interface SettingsRemoteBackupPanelProps {
@@ -160,47 +161,37 @@ export default function SettingsRemoteBackupPanel({
 
   return (
     <>
-      <div className="settings-data-action-row settings-remote-backup-row">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0 flex items-center gap-1.5">
-            <p className="qp-text-body qp-weight-medium text-[var(--qp-text-primary)]">
-              {UI_TEXT.settings.remoteBackupTitle}
-            </p>
-          </div>
-
-          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
-            {configured && (
-              <QuietButton
-                size="regular"
-                onClick={() => void remoteBackup.testConfig()}
-                disabled={busy || !canUseRemote}
-                busy={remoteBackup.isTesting}
-                className="shrink-0 rounded-[8px] text-[var(--qp-text-secondary)]"
-              >
-                {remoteBackup.isTesting ? UI_TEXT.settings.webDavTesting : UI_TEXT.settings.webDavTestConnection}
-              </QuietButton>
-            )}
+      {/* [本轮] 行统一成 `SettingsPreferenceRow`（原来是数据组那套自定义行，
+          见 `settings.css` 里下线说明）：行标题仍是「WebDAV 配置」，
+          右侧三个键（测试连接 / 配置或编辑 / 删除）原样保留，只是收到 compact 一档，
+          与本卡另外两行同一高度。`flex-wrap` 留着：窄卡里三个键要能折成两排。 */}
+      <SettingsPreferenceRow title={UI_TEXT.settings.remoteBackupTitle}>
+        <span className="settings-preference-actions flex-wrap justify-end">
+          {configured && (
             <QuietButton
-              size="regular"
-              onClick={remoteBackup.openConfigDialog}
-              disabled={busy}
-              className="shrink-0 rounded-[8px] text-[var(--qp-text-secondary)]"
+              size="compact"
+              onClick={() => void remoteBackup.testConfig()}
+              disabled={busy || !canUseRemote}
+              busy={remoteBackup.isTesting}
             >
-              {configured ? UI_TEXT.settings.webDavEdit : UI_TEXT.settings.webDavConfigure}
+              {remoteBackup.isTesting ? UI_TEXT.settings.webDavTesting : UI_TEXT.settings.webDavTestConnection}
             </QuietButton>
-            {configured && (
-              <QuietButton
-                size="regular"
-                onClick={() => void remoteBackup.deleteConfig()}
-                disabled={busy}
-                className="shrink-0 rounded-[8px] text-[var(--qp-danger)]"
-              >
-                {UI_TEXT.settings.webDavDeleteAction}
-              </QuietButton>
-            )}
-          </div>
-        </div>
-      </div>
+          )}
+          <QuietButton size="compact" onClick={remoteBackup.openConfigDialog} disabled={busy}>
+            {configured ? UI_TEXT.settings.webDavEdit : UI_TEXT.settings.webDavConfigure}
+          </QuietButton>
+          {configured && (
+            <QuietButton
+              size="compact"
+              onClick={() => void remoteBackup.deleteConfig()}
+              disabled={busy}
+              className="text-[var(--qp-danger)]"
+            >
+              {UI_TEXT.settings.webDavDeleteAction}
+            </QuietButton>
+          )}
+        </span>
+      </SettingsPreferenceRow>
 
       <QuietDialog
         open={remoteBackup.configDialogOpen}

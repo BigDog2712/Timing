@@ -27,14 +27,12 @@ import type { DataTrendRangeSelection } from "../services/dataTrendRange.ts";
 import DataTrendRangeControl from "./DataTrendRangeControl.tsx";
 import DataAppTrendSkeleton from "./DataAppTrendSkeleton.tsx";
 import DataAppEditDialog from "./DataAppEditDialog.tsx";
+import DataCategoryManageEntry from "./DataCategoryManageEntry.tsx";
 import { useAppTrendRowEdit } from "../hooks/useAppTrendRowEdit.ts";
 import QuickClassificationStatus from "../../classification/components/QuickClassificationStatus.tsx";
 import type { QuickClassificationAnchor } from "../../classification/types.ts";
 
-interface DataChartDimension {
-  width: number;
-  height: number;
-}
+interface DataChartDimension { width: number; height: number }
 
 interface DataAppTrendPanelProps {
   allTimeEndDateKey: string;
@@ -190,9 +188,10 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
     event.stopPropagation();
     onOptionOpenDetails(option);
   };
-  /* [本轮] 单击选中 / 双击编辑的时序、"行首图标 = 详情"的分支、以及超窗双击的选中补偿都在这个 hook 里 */
+  /* 单击选中 / 双击编辑的时序、"行首图标 = 详情"的分支、超窗双击的选中补偿、分类 tab 的双击都在这个 hook 里 */
   const rowEdit = useAppTrendRowEdit({
     editable: destinationMode === "app",
+    manageableCategories: destinationMode === "category",
     supportsDestinationDetails,
     selectedKeys: selectedOptions.map((option) => option.key),
     onOptionSelect,
@@ -205,10 +204,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
     category: UI_TEXT.data.destinationCategory,
     web: UI_TEXT.data.destinationWeb,
   };
-  const modeOptions = availableDestinationModes.map((value) => ({
-    value,
-    label: modeLabels[value],
-  }));
+  const modeOptions = availableDestinationModes.map((value) => ({ value, label: modeLabels[value] }));
   useLayoutEffect(() => {
     onContentCommitted?.();
   }, [onContentCommitted]);
@@ -355,6 +351,8 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
               placeholder={searchPlaceholder}
               aria-label={searchPlaceholder}
             />
+            <DataCategoryManageEntry visible={destinationMode === "category"} open={rowEdit.categoryManageOpen}
+              onOpen={rowEdit.openCategoryManage} onClose={rowEdit.closeCategoryManage} onChanged={onRetry} />
             <div
               key={hasSearchQuery ? "searching" : "all"}
               ref={listRef}

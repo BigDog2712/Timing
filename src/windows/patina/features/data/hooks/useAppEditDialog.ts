@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { AppCategory, UserAssignableAppCategory } from "../../../shared/classification/categoryTokens.ts";
-import { ProcessMapper, type AppOverride } from "../../../shared/classification/processMapper.ts";
+import type { AppOverride } from "../../../shared/classification/processMapper.ts";
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import {
   ClassificationService,
   type ClassificationBootstrapData,
 } from "../../classification/services/classificationService.ts";
 import {
-  buildQuickClassificationCategoryOptions,
   resolveQuickClassificationOverride,
   saveQuickClassificationOverride,
 } from "../../classification/services/quickClassification.ts";
@@ -18,7 +17,6 @@ import { APP_EDIT_COPY } from "../appEditCopy.ts";
 import {
   assignDraftItemCategory,
   buildDraftAppOverride,
-  collectCategoryUsage,
   createAppEditDraft,
   isDraftDirty,
   promoteDraftCategory,
@@ -26,6 +24,7 @@ import {
   toggleDraftItem,
   type AppEditDraft,
 } from "../services/appEditDraft.ts";
+import { buildAppEditCategoryOptions, collectAppEditCategoryUsage } from "../services/categoryCatalog.ts";
 import {
   useAppEditCategoryAdmin,
   type AppEditCategoryOption,
@@ -55,6 +54,32 @@ export type { AppEditCategoryOption };
  * 全在这份数据里，不额外查库）+ `listAppItemBindingOptions()`（事项清单，失败只降级那一栏）。
  * 写 = `saveQuickClassificationOverride()` —— 与快捷分类菜单同一条老路，**不新增 IPC 命令**
  * （insight 命令数被 contract 门禁钉着）。
+ *
+ * ## 加载 effect 里**故意没有** `loadedRef` 守卫（别加回来）
+ *
+ * 与 `hooks/useCategoryAdminSession.ts` 是同一款缺陷、同一天漏网：曾经的写法是
+ * 「`if (loadedRef.current) return; loadedRef.current = true;` + 下面那个 `active` 作废」，
+ * 两者放在一起会**在 dev 下永久停在"加载中"**：
+ *
+ *   · `shell/main.tsx` 挂着 `<StrictMode>`，dev 里 effect 会被 setup → cleanup → setup
+ *     跑两遍（本仓测试默认不用 StrictMode、生产构建也不双调用，所以测试与 CI 都抓不到）；
+ *   · setup1 把 `loadedRef` 置 true 并**发起唯一一次**异步加载，`active1 = true`；
+ *   · cleanup1 把 `active1` 置 false；
+ *   · setup2 被 `loadedRef` 挡掉 —— 既不再发起加载，也**不再持有 cleanup**；
+ *   · 那次异步 resolve 时 `active1` 已是 false，`setLoading(false)` 被跳过。
+ *   于是 `loading` 永远是 true：弹窗永远画「加载中...」，`dirty` / `canSave` 恒 false
+ *   （`dirty` 带着 `!loading`），用户连"没得改"都看不出来。
+ *
+ * 去掉守卫是安全的：`ClassificationService.loadClassificationBootstrap` 自带 in-flight
+ * 去重（`classificationBootstrapInFlight`）与缓存（`getClassificationBootstrapCache`），
+ * 双调用不会打两次 IPC，第二次拿到的就是同一个 promise；卸载后 `setState` 是 no-op，
+ * 所以 `active` 仍然留着防"组件已经没了还 setState"。
+ *
+ * 守门的用例（两条，缺一不可）：
+ *   · `components/DataAppEditDialogStrictMode.test.tsx`（渲染级：把消费方包在**根级**
+ *     `<StrictMode>` 里，断言加载会结束、改了勾选保存键能亮）；
+ *   · `hooks/appEditLoadingGuard.source.test.ts`（源码级：本文件与
+ *     `useCategoryAdminSession.ts` 里**都不许出现** `loadedRef`）。
  */
 export interface AppEditDialogTarget {
   exeName: string;
@@ -81,7 +106,7 @@ export interface AppEditDialogState {
   toggleItem: (itemId: number) => void;
   assignItemCategory: (itemId: number, category: UserAssignableAppCategory | undefined) => void;
   save: () => void;
-  createCategory: () => Promise<void>;
+  createCategory: (label: string, color: string | null) => Promise<void>;
   renameCategory: (category: AppCategory, label: string) => Promise<void>;
   /** `null` = 恢复默认色（写 `value: null`），不是"什么都不做" */
   recolorCategory: (category: AppCategory, color: string | null) => Promise<void>;
@@ -121,24 +146,20 @@ export function useAppEditDialog({
   const [items, setItems] = useState<readonly { id: number; name: string; color?: string }[]>([]);
   const [itemsLoadFailed, setItemsLoadFailed] = useState(false);
   const busyRef = useRef(false);
-  const loadedRef = useRef(false);
 
   /** 分类候选 + 用量 + 已删清单（分类增删改之后重算，但**不许**动草稿） */
   const applyBootstrap = useCallback((bootstrap: ClassificationBootstrapData) => {
-    setCategoryOptions(buildQuickClassificationCategoryOptions(bootstrap, UI_TEXT, locale).map((option) => ({
-      ...option,
-      /* 色块要画**生效**颜色：自定义色优先，没有就用该分类的默认色（不能留空串 ——
-         `QuietColorField` 会把空串当颜色去解析） */
-      color: bootstrap.loadedCategoryColorOverrides[option.value]
-        ?? ProcessMapper.getDefaultCategoryColor(option.value),
-    })));
-    setCategoryUsage(collectCategoryUsage(bootstrap.loadedOverrides, bootstrap.loadedWebDomainOverrides));
+    /* 候选与用量走 `services/categoryCatalog.ts` 的共用件：独立开的「管理分类」弹窗读的是
+       同一份口径，复制一份就会两处分叉（色块取色规则、删除影响面都各算一遍）。 */
+    setCategoryOptions(buildAppEditCategoryOptions(bootstrap, UI_TEXT, locale));
+    setCategoryUsage(collectAppEditCategoryUsage(bootstrap));
     setDeletedCategories(bootstrap.loadedDeletedCategories);
   }, [UI_TEXT, locale]);
 
   useEffect(() => {
-    if (loadedRef.current) return;
-    loadedRef.current = true;
+    /* 这里**故意没有** `loadedRef` 守卫：机制与后果见文件头「加载 effect 里故意没有
+       `loadedRef` 守卫」那一段（StrictMode setup→cleanup→setup 会把唯一一次加载的
+       `active` 置 false，而守卫又挡住第二次加载 → `loading` 永远为 true）。 */
     let active = true;
     void (async () => {
       try {

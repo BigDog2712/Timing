@@ -68,11 +68,17 @@ async function mount() {
   await flush();
 }
 
-/** 分类管理区（第三段）里的第一个色块触发器 */
+/**
+ * 分类行上的第一个色块触发器。
+ *
+ * [本轮] 必须限定在 `.qp-category-management-grid`（= 分类行那一栏）里找：新建表单
+ * 也带一颗色块（新建时选颜色），它排在行**前面**且没有「恢复默认颜色」—— 在整段里取
+ * 第一颗会取到它，于是点击什么都不会发生（用例变成永假的假红）。
+ */
 function firstColorTrigger(): HTMLButtonElement | null {
   const sections = Array.from(document.body.querySelectorAll<HTMLElement>(".qp-app-edit-section"));
   const manage = sections[sections.length - 1];
-  return manage?.querySelector<HTMLButtonElement>(".qp-color-trigger") ?? null;
+  return manage?.querySelector<HTMLButtonElement>(".qp-category-management-grid .qp-color-trigger") ?? null;
 }
 
 /** 打开色块弹层后点「恢复默认颜色」（弹层 actions 区的第一颗图标键） */

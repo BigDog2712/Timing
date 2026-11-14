@@ -7,6 +7,7 @@ import canvasSource from "../layout/BoardCanvas.tsx?raw";
 import zoomSource from "../layout/useBoardZoom.ts?raw";
 import frameSource from "../layout/BoardCardFrame.tsx?raw";
 import dragSource from "../layout/useBoardDrag.ts?raw";
+import todosSource from "./TodosModule.tsx?raw";
 
 /**
  * [v3 自由摆位] 主界面「板子塌了 / 缩放没接对 / 卡拖不动」的回归判据。
@@ -166,5 +167,34 @@ describe("待办卡的卡底守卫", () => {
     const css = readCss("../../../shell/styles/features/dashboard-todos.css");
     expect(cssBlock(css, ".qp-todo-list"), "列表必须 min-height: 0，否则行数一多就把卡片顶出滚动区")
       .toContain("min-height: 0");
+  });
+});
+
+/**
+ * 待办卡「新建待办」**入口位置**守卫（[本轮]：卡头右槽 → 卡头下方一条通栏窄行）。
+ *
+ * 搬这一趟的理由是排版（右槽要同时摆「N 条待办」读数与 `⋯` 控件），所以这里钉的是
+ * **那一行的样式契约**：必须是紧凑的 —— 长成大号按钮就等于把列表的可见行数还回去
+ * （那正是上一轮把入口从 footer 搬走的理由），旧的卡头键样式也不许留成死规则。
+ *
+ * 「入口不许搬回卡头右槽」那一条**不再**是源码 grep：`headAction` 这个 prop 已经整段
+ * 删除，`not.toContain("headAction=")` 就成了一句永真的废话。改成渲染级判据：
+ *   · `ModuleShellHeadSlot.test.tsx` —— 外壳右槽四态里都没有文字键（`headAction` 槽下线）；
+ *   · `TodosModule.test.tsx` 的 tq09 —— 待办卡右槽里没有那颗入口键。
+ */
+describe("待办卡的新建入口位置", () => {
+  it("p07c_the_new_entry_is_a_compact_row_below_the_card_head", () => {
+    const css = readCss("../../../shell/styles/features/dashboard-todos.css");
+    const row = cssBlock(css, ".qp-todo-new-row");
+    expect(row, "一行文字键的紧凑高度：长成大号按钮会吃掉列表可见行数").toContain("height: 24px");
+    expect(row, "右对齐：与卡头右槽同一根轴线").toContain("justify-content: flex-end");
+    expect(css, "旧的卡头键样式随入口一起下线，别留死规则").not.toContain(".qp-card-head-link");
+
+    /* 这一条只证明"源码里有这个行容器"，**证明不了它在 subhead 里**（同文件里出现一次就够）。
+       真正的位置判据是渲染级的 `TodosModule.test.tsx` 的 tq09：`head.nextElementSibling`
+       === 这一行 + `compareDocumentPosition` 排在列表之前。这里保留它只是因为"入口整段
+       消失"这种编辑在源码层面一句话就能红，位置对不对交给 tq09。 */
+    expect(todosSource, "源码里必须有 `qp-todo-new-row` 这个行容器；位置判据见 TodosModule.test.tsx 的 tq09")
+      .toContain('className="qp-todo-new-row"');
   });
 });

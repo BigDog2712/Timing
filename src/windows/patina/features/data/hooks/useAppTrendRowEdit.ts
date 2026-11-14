@@ -50,6 +50,20 @@ import type { DataAppEditDialogApp } from "../components/DataAppEditDialog.tsx";
  * 行首图标的单击/双击是**既有**的"打开应用详情"入口（`data-destination-detail-trigger`），
  * 本轮不许动它。所以双击先判命中不命中那个锚点：命中走详情，没命中才开编辑弹窗。
  *
+ * ## 分类模式**不套**这套补偿 —— 别顺手补上（[本轮] 把这条理由从测试注释搬进源码）
+ *
+ * 分类 tab（`manageableCategories`）的单击**本来就是立即 `replace`**（走 `canEdit` 为假那条
+ * 分支：直接 `selectRef.current(...)`），既没有 260ms 窗口，也没有 `pendingRef` 挂起项，
+ * 更没有 `burstRef` 快照。所以分类模式里：
+ *
+ *     双击 = 两次单击的净效果 = 选中换成这一行的那一类
+ *
+ * 这是**一次真实单击**的实际行为，不是误伤：分类选中只决定"画哪几条曲线"，没有守卫、
+ * 没有提示、也不写库。所以双击分支里**不该**调 `restoreAfterSlowDoubleClick` ——
+ * 这条路径压根没建过快照，硬补只会把"双击之后选中莫名跳回某个旧集合"引入进来
+ * （`burstRef` 里留着的可能是上一次应用模式、甚至另一行的快照）。看代码的人容易以为
+ * "这里漏了补偿"顺手补一行，补上的正是 bug。
+ *
  * ## 只有"能编辑的行"才推迟
  *
  * `editable` 为假（分类/网页模式、匿名活动、没有 exeName）时，单击立即生效 ——
@@ -60,6 +74,14 @@ const DOUBLE_CLICK_WINDOW_MS = 260;
 interface Params {
   /** 当前是否处于"双击可以编辑"的模式（= 应用趋势） */
   editable: boolean;
+  /**
+   * [本轮] 当前是否处于**分类** tab（双击一行 → 打开「分类管理」，见文件头最后一段）。
+   *
+   * 为什么不和 `editable` 合并成一个 `mode` 三态：`editable` 已经被四个测试与面板各自
+   * 传着（真 / 假两种语义都是"能不能改这一行"），换签名会把"网页 tab 上双击什么都不做"
+   * 这条既有行为一起改写。两个布尔在调用点上是同一行相邻参数，传错会立刻被渲染测试抓到。
+   */
+  manageableCategories?: boolean;
   supportsDestinationDetails: boolean;
   /**
    * 左侧已选的 key（面板的 `selectedOptions` 口径）。
@@ -80,6 +102,10 @@ export interface AppTrendRowEditState {
   /** 打开中的编辑弹窗目标（`null` = 关着） */
   editing: DataAppEditDialogApp | null;
   closeEditor: () => void;
+  /** 打开中的「分类管理」弹窗（分类 tab 的「管理分类」与双击分类行共用这一个开关） */
+  categoryManageOpen: boolean;
+  openCategoryManage: () => void;
+  closeCategoryManage: () => void;
   /** 挂在每一行 `<button>` 上的三个处理器 */
   handlers: (option: DataDestinationTrendOption) => {
     onClick: (event: { detail: number; ctrlKey: boolean }) => void;
@@ -89,6 +115,7 @@ export interface AppTrendRowEditState {
 
 export function useAppTrendRowEdit({
   editable,
+  manageableCategories = false,
   supportsDestinationDetails,
   selectedKeys,
   onOptionSelect,
@@ -96,6 +123,7 @@ export function useAppTrendRowEdit({
   onOptionOpenDetails,
 }: Params): AppTrendRowEditState {
   const [editing, setEditing] = useState<DataAppEditDialogApp | null>(null);
+  const [categoryManageOpen, setCategoryManageOpen] = useState(false);
   const timerRef = useRef<number | null>(null);
   const pendingRef = useRef<{ key: string; multi: boolean } | null>(null);
   /* 回调与选中集都可能在下次渲染时变（父组件没 memo）：异步回调里必须读**最新**的 */
@@ -200,6 +228,13 @@ export function useAppTrendRowEdit({
         openDetailsRef.current(option);
         return;
       }
+      /* [本轮] 分类 tab：双击任意一行 → 打开「分类管理」（内置与自定义一行都不少）。
+         这里**不做**选中集补偿 —— 理由与"为什么补上去反而是 bug"写在文件头
+         「分类模式不套这套补偿」那一段（单击即生效 → 双击 = 两次单击的净效果）。 */
+      if (manageableCategories) {
+        setCategoryManageOpen(true);
+        return;
+      }
       if (!canEdit(option) || !option.exeName) return;
       setEditing({
         exeName: option.exeName,
@@ -208,9 +243,21 @@ export function useAppTrendRowEdit({
         iconUrl: option.iconUrl ?? undefined,
       });
     },
-  }), [applySelect, canEdit, cancelPending, flushPending, restoreAfterSlowDoubleClick, supportsDestinationDetails]);
+  }), [
+    applySelect, canEdit, cancelPending, flushPending, manageableCategories,
+    restoreAfterSlowDoubleClick, supportsDestinationDetails,
+  ]);
 
   const closeEditor = useCallback(() => setEditing(null), []);
+  const openCategoryManage = useCallback(() => setCategoryManageOpen(true), []);
+  const closeCategoryManage = useCallback(() => setCategoryManageOpen(false), []);
 
-  return { editing, closeEditor, handlers };
+  return {
+    editing,
+    closeEditor,
+    categoryManageOpen,
+    openCategoryManage,
+    closeCategoryManage,
+    handlers,
+  };
 }

@@ -244,3 +244,20 @@
   }
 
 }
+
+/* ── [本轮] 分类 tab 的「管理分类」入口 ──
+ * 搜索框下面、列表上面的一条通栏窄行（24px，右对齐）：搜索那一行要留给"搜什么"，
+ * 塞一颗常驻按钮会把输入宽度挤掉一半；这条行高与卡头右槽的图标行同档，不额外占视觉重量。
+ * 只服务分类 tab（`DataCategoryManageEntry` 在应用/网页 tab 不画它）。 */
+.data-category-manage-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  height: 24px;
+  margin-bottom: 4px;
+}
+
+.data-category-manage-action {
+  cursor: pointer;
+}

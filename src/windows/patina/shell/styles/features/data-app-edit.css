@@ -204,3 +204,44 @@
   line-height: var(--qp-line-height-compact);
   white-space: nowrap;
 }
+
+/* ── [本轮] 「分类管理」的新建行与独立弹窗 ──
+ * 新建从 `prompt`（只能收一行字）改成一行表单：名字 + 色块 + 按钮。
+ * 三件并排，名字占满剩余宽度 —— 分类名通常两三个字，给固定宽度会让色块与按钮飘在中间。 */
+.data-category-create-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px;
+}
+
+.data-category-create-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-button);
+  background: var(--qp-bg-panel);
+  font-size: var(--qp-font-size-caption);
+  color: var(--qp-text-primary);
+}
+
+.data-category-create-input:focus-visible {
+  outline: 2px solid var(--qp-focus-ring);
+  outline-offset: 1px;
+}
+
+.data-category-create-input:disabled {
+  color: var(--qp-text-disabled);
+}
+
+/* 未选色的小字（「不选色则按调色板自动取色」）：紧贴新建行，别把分类格栅往下推一截 */
+.data-category-create-hint {
+  margin: -6px 0 10px;
+}
+
+/* 独立打开的「分类管理」弹窗：比应用设置弹窗窄一档（里面只有一栏，不是三段的表单） */
+.qp-category-manage-dialog {
+  width: min(560px, 92vw);
+}

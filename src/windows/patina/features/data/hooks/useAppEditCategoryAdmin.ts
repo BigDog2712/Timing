@@ -60,7 +60,8 @@ interface Params {
 }
 
 export interface AppEditCategoryAdminState {
-  createCategory: () => Promise<void>;
+  /** [本轮] 名字与颜色一起收：新建表单里有取色块，没选色时传 `null`（不写覆盖）。 */
+  createCategory: (label: string, color: string | null) => Promise<void>;
   renameCategory: (category: AppCategory, label: string) => Promise<void>;
   /** [修复 D-5] `null` = 恢复默认色（写 `value: null`），不是"什么也不做" */
   recolorCategory: (category: AppCategory, color: string | null) => Promise<void>;
@@ -101,14 +102,10 @@ export function useAppEditCategoryAdmin({
     }
   }, [UI_TEXT.mapping.quickSaveFailed, onError, onManagingChange]);
 
-  const createCategory = useCallback(() => withManaging(async () => {
-    const raw = await dialogs.prompt({
-      title: UI_TEXT.mapping.createCategoryTitle,
-      surfaceClassName: "qp-category-create-dialog",
-      placeholder: UI_TEXT.mapping.createCategoryPlaceholder,
-    });
-    if (!raw) return;
-    const label = normalizeCategoryLabelInput(raw);
+  /* [本轮] 名字与颜色由**表单**收（不再弹 `prompt`）：`prompt` 只能收一行文字，
+     分类颜色就没有地方选，用户建完还得再点一次色块。空名 / 重名一律不提交但要说一句。 */
+  const createCategory = useCallback((rawLabel: string, color: string | null) => withManaging(async () => {
+    const label = normalizeCategoryLabelInput(rawLabel);
     if (!label) return;
     /* 重名**不提交**但要说一句：静默返回会被当成"点了没反应"（与快捷菜单同一口径） */
     const wanted = label.toLocaleLowerCase();
@@ -120,12 +117,17 @@ export function useAppEditCategoryAdmin({
     const taken = new Set<string>(categoryOptions.map((option) => option.value));
     let category = createCategoryId();
     while (taken.has(category)) category = createCategoryId();
-    await commitClassificationSettingMutations(buildCreateCategoryDefinitionMutations(category, label));
+    /* 名称与颜色**一次提交**：分两次会出现"分类建好了、颜色没跟上"的中间态，
+       而且第二次失败时用户以为自己选的色没生效却没有任何提示。 */
+    await commitClassificationSettingMutations([
+      ...buildCreateCategoryDefinitionMutations(category, label),
+      ...(color ? buildSaveCategoryColorOverrideMutations(category, color) : []),
+    ]);
     await refreshBootstrap();
     onCreated(category);
   }), [
-    adminCopy.duplicateName, categoryOptions, dialogs, onCreated, onError,
-    refreshBootstrap, UI_TEXT, withManaging,
+    adminCopy.duplicateName, categoryOptions, onCreated, onError,
+    refreshBootstrap, withManaging,
   ]);
 
   const renameCategory = useCallback((category: AppCategory, label: string) => withManaging(async () => {

@@ -1,13 +1,9 @@
-import { useState } from "react";
-
-import type { AppCategory } from "../../../shared/classification/categoryTokens.ts";
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import QuietButton from "../../../shared/components/QuietButton.tsx";
 import QuietDialog from "../../../shared/components/QuietDialog.tsx";
-import QuickClassificationRenameDialog from "../../classification/components/QuickClassificationRenameDialog.tsx";
 import { APP_EDIT_COPY } from "../appEditCopy.ts";
 import { useAppEditDialog, type AppEditDialogTarget } from "../hooks/useAppEditDialog.ts";
-import DataAppEditCategoryManager from "./DataAppEditCategoryManager.tsx";
+import DataCategoryManagePanel from "./DataCategoryManagePanel.tsx";
 import DataAppEditCategoryPicker from "./DataAppEditCategoryPicker.tsx";
 import DataAppEditItemPicker from "./DataAppEditItemPicker.tsx";
 
@@ -51,9 +47,6 @@ function DataAppEditDialogSurface({
   const locale = useLocale();
   const copy = APP_EDIT_COPY[locale];
   const state = useAppEditDialog({ target: app, onClose, onSaved });
-  /* 改名弹窗由弹窗层持有（`QuickClassificationRenameDialog` 是既有可复用件） */
-  const [renameTarget, setRenameTarget] = useState<{ category: AppCategory; label: string } | null>(null);
-  const [renameValue, setRenameValue] = useState("");
   const busy = state.saving || state.managing;
   const checkedCategories = state.categoryOptions.filter(
     (option) => state.draft.categories.includes(option.value),
@@ -118,38 +111,23 @@ function DataAppEditDialogSurface({
             onToggle={state.toggleItem}
             onAssign={state.assignItemCategory}
           />
-          <DataAppEditCategoryManager
+          {/* [本轮] 分类管理整段走共用件 `DataCategoryManagePanel`：数据页那个独立弹窗装的是
+              **同一个组件**（改名弹窗与提示/确认框都在它里面），所以两处永远长得一样。
+              `null` 色值 = 「恢复默认颜色」（写 `value: null` = 删掉覆盖），不能当"没选色"过滤。 */}
+          <DataCategoryManagePanel
             options={state.categoryOptions}
             usage={state.categoryUsage}
             disabled={busy}
-            labels={{ title: copy.manage, usage: copy.usageCount }}
-            onRequestRename={(category, label) => {
-              setRenameTarget({ category, label });
-              setRenameValue(label);
-            }}
+            managing={state.managing}
+            labels={{ title: copy.manage, usage: copy.usageCount, createColorHint: copy.createColorHint }}
+            onCreate={(label, color) => { void state.createCategory(label, color); }}
+            onRename={state.renameCategory}
             onDelete={(category) => { void state.deleteCategory(category); }}
-            /* [修复 D-5] `null` 是「恢复默认颜色」的实参（写 `value: null` = 删掉覆盖），
-               不能按"没选颜色"过滤掉 —— 那样这颗键点了等于没点（死按钮）。 */
             onApplyColor={(category, color) => { void state.recolorCategory(category, color); }}
-            onCreate={() => { void state.createCategory(); }}
+            dialogsElement={state.dialogsElement}
           />
         </>
       )}
-      <QuickClassificationRenameDialog
-        open={renameTarget !== null}
-        saving={state.managing}
-        value={renameValue}
-        currentDisplayName={renameTarget?.label ?? ""}
-        fallbackName={renameTarget?.label ?? ""}
-        onChange={setRenameValue}
-        onSubmit={() => {
-          if (!renameTarget) return;
-          void state.renameCategory(renameTarget.category, renameValue).then(() => setRenameTarget(null));
-        }}
-        onClose={() => setRenameTarget(null)}
-      />
-      {/* `useQuietDialogs` 的提示框 / 确认框（新建分类、删除确认），自己 portal 到 body */}
-      {state.dialogsElement}
     </QuietDialog>
   );
 }

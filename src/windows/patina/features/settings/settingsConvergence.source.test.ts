@@ -35,7 +35,19 @@ import { resolve } from 'node:path';
 
 const SETTINGS = code('src/windows/patina/features/settings/components/Settings.tsx');
 const APPEARANCE = code('src/windows/patina/features/settings/components/SettingsAppearancePanel.tsx');
-const DATA_SAFETY = code('src/windows/patina/features/settings/components/SettingsDataSafetyPanel.tsx');
+/* [本轮] 「数据与同步」那一组统一成 `SettingsPreferenceGroup` 后拆成了子文件，
+   判据不能只读外壳：否则把备份行整个删掉、只留组合壳，本组仍会全绿。
+   所以探针改成**整组拼起来**读：外壳 + 四个子组 + 对话框层。 */
+const DATA_SAFETY = [
+  'SettingsDataSafetyPanel.tsx',
+  'SettingsDataExportGroup.tsx',
+  'SettingsDataBackupGroup.tsx',
+  'SettingsStoragePathsGroup.tsx',
+  'SettingsDataCleanupGroup.tsx',
+  'SettingsDataSafetyDialogs.tsx',
+]
+  .map((file) => code(`src/windows/patina/features/settings/components/${file}`))
+  .join('\n');
 
 describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
   it('p006_analysis_window_cannot_write_theme_or_accents', () => {

@@ -168,7 +168,12 @@ describe('挂载与六块骨架', () => {
     ]);
     expect(g.mdSyncGet).toHaveBeenCalledTimes(1);
     expect(g.mdBackupList).toHaveBeenCalledTimes(1);
-    expect(text()).toContain('数据管理');
+    /* [本轮] 卡片外壳与标题统一到同页其它卡：根节点是 `qp-panel`，标题走
+       `SettingsPanelHeader` 的 `h2`，且用分组锚点表里的名字「同步与备份」——
+       原来写的是宿主页签名「数据管理」（导航点的是前者，卡上写后者就得靠位置才对得上）。 */
+    expect(container.firstElementChild?.className).toContain('qp-panel');
+    expect(container.querySelector('h2')?.textContent).toBe('同步与备份');
+    expect(text()).not.toContain('数据管理');
   });
 
   it('s02_reads_back_the_saved_config_into_the_controls', async () => {

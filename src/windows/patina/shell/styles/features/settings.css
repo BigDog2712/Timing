@@ -27,16 +27,12 @@
 }
 
 .settings-preference-pair > :last-child,
-.settings-interface-fields > :last-child,
-.settings-data-actions-grid > .settings-data-action-row + .settings-data-action-row,
-.settings-storage-path-row + .settings-storage-path-row {
+.settings-interface-fields > :last-child {
   position: relative;
 }
 
 .settings-preference-pair > :last-child::before,
-.settings-interface-fields > :last-child::before,
-.settings-data-actions-grid > .settings-data-action-row + .settings-data-action-row::before,
-.settings-storage-path-row + .settings-storage-path-row::before {
+.settings-interface-fields > :last-child::before {
   position: absolute;
   display: none;
   inset: 12px auto 12px -12px;
@@ -325,26 +321,19 @@
   border-top: 1px solid var(--qp-border-subtle);
 }
 
-.settings-data-actions-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.settings-data-actions-list,
-.settings-data-actions-grid.qp-action-row,
-.settings-storage-path-card {
-  padding: 0 16px;
-}
-
-.settings-data-action-row {
-  min-width: 0;
-  padding: 12px 0;
-}
-
-.settings-data-action-row + .settings-data-action-row,
-.settings-remote-backup-row {
-  border-top: 1px solid var(--qp-border-subtle);
-}
+/* ── [本轮] 数据那组的自定义行样式整批下线 ──
+ * `.settings-data-actions-grid` / `.settings-data-actions-list` / `.settings-data-action-row`
+ * / `.settings-remote-backup-row` 与 `.settings-storage-path-*` 是「存储」卡自己那一套
+ * 排法（`flex items-center justify-between` 的裸按钮行、三列目录网格）。它们和本页另外
+ * 四组（`SettingsPreferenceGroup` + `SettingsPreferenceRow`：标题 + hint + 右侧控制槽）
+ * 的字重、行距、分隔线全对不上 —— 用户口径「数据管理部分 UI 太差」就是这一处。
+ * 现在那两段都改用 `SettingsPreferenceRow`，分隔线走下面的
+ * `.settings-preference-list > .settings-preference-row + .settings-preference-row`。
+ *
+ * **这批类是有意删掉的，不是丢样式**：搜索它们只会在注释里命中。要加回"数据行"，
+ * 用 `SettingsPreferenceRow`，不要复活这一套。
+ * （`.settings-history-cleanup-*` 留着：那是「清理历史记录」对话框**内容区**的版式，
+ *  不是行排法，本轮对话框原样搬走。） */
 
 .settings-interface-fields {
   column-gap: 24px;
@@ -364,82 +353,34 @@
     display: block;
   }
 
-  .settings-data-actions-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 24px;
-  }
-
-  .settings-data-actions-grid > .settings-data-action-row + .settings-data-action-row {
-    border-top: 0;
-  }
-
-  .settings-data-actions-grid > .settings-data-action-row + .settings-data-action-row::before {
-    display: block;
-  }
 }
 
-.settings-storage-path-list {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: 24px;
-}
-
-.settings-storage-path-row {
-  display: grid;
-  min-width: 0;
-  min-height: 48px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 0;
-}
-
-@media (min-width: 768px) {
-  .settings-storage-path-row + .settings-storage-path-row::before {
-    display: block;
-  }
-}
-
-.settings-storage-path-heading {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.settings-storage-path-heading p {
-  margin: 0;
-  color: var(--qp-text-primary);
-  font-size: var(--qp-font-size-body);
-  font-weight: var(--qp-font-weight-medium);
-  line-height: var(--qp-line-height-body);
-}
-
-.settings-storage-path-heading span {
+/* 目录行的两个零件（[本轮] 替代 `.settings-storage-path-heading` / `-actions`）：
+ *   · `-meta`：标题旁的体积读数（28 MB）—— 次级文字，不进 hint（hint 是解释，不是数字）；
+ *   · `-actions`：右侧控件簇（打开 / 更改 / 恢复默认三个图标键）。
+ * 与 `settings-preference-title` / `-control` 是**同一条轨道**上的两件小事，所以只补
+ * 这两条，不再新造"目录行"这一整族类。 */
+.settings-preference-meta {
   color: var(--qp-text-tertiary);
   font-size: var(--qp-font-size-caption);
   font-weight: var(--qp-font-weight-regular);
   line-height: var(--qp-line-height-caption);
 }
 
-.settings-storage-path-actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 2px;
-}
-
-.settings-storage-path-row-placeholder {
-  color: var(--qp-text-tertiary);
-  pointer-events: none;
-}
-
-.settings-storage-path-placeholder-meta {
+/* 快照还没回来时的骨架块：留出与体积读数等宽的灰条，行高不跳 */
+.settings-preference-meta-placeholder {
   display: inline-block;
   width: 44px;
   height: 10px;
   border-radius: var(--qp-radius-chip);
   background: color-mix(in srgb, var(--qp-border-subtle) 62%, var(--qp-bg-elevated));
+}
+
+.settings-preference-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
 }
 
 .settings-history-cleanup-dialog {
@@ -468,16 +409,6 @@
 .settings-history-cleanup-slider {
   max-width: 224px;
   flex: 0 0 auto;
-}
-
-@media (max-width: 767px) {
-  .settings-storage-path-list {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-storage-path-row + .settings-storage-path-row {
-    border-top: 1px solid var(--qp-border-subtle);
-  }
 }
 
 @media (max-width: 760px) {
