@@ -25,7 +25,7 @@ pub(crate) async fn register_sqlite_pool(state: &AppSqlitePool, pool: Pool<Sqlit
         previous.close().await;
     }
 }
-const VALIDATED_SCHEMA_MIGRATION_HEAD: i64 = schema_registry::SYNC_BOOKKEEPING_MIGRATION_VERSION;
+const VALIDATED_SCHEMA_MIGRATION_HEAD: i64 = schema_registry::ITEM_ATTRIBUTION_MIGRATION_VERSION;
 mod activity_read_model_schema;
 mod current_schema;
 pub(super) mod import_schema;

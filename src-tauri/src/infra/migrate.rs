@@ -13,6 +13,8 @@
 
 use sqlx::{Row, SqlitePool};
 
+mod tombstone;
+
 use crate::error::{AppError, AppResult};
 
 /// V0.2.0 加列清单 `(表, 列, 定义)`。定义与 `schema-V0.2.0.sql` 目标 DDL 对齐；
@@ -67,6 +69,24 @@ const MIGRATE_COLUMNS_V9: &[(&str, &str, &str)] = &[
 /// （不能依赖调用点记得写——写入口有四个，漏一个就是「那批行永远不会被导出且零报错」）。
 const MIGRATE_COLUMNS_V10: &[(&str, &str, &str)] =
     &[("time_records", "updated_at_ms", "INTEGER NOT NULL DEFAULT 0")];
+
+/// 0.13.x 加列清单（事项归属）。
+///
+/// `parent_id` / `depth` / `category_key` 是「事项升为主数据」的三件：树、深度、分类。
+/// 深度硬限 2 层由应用层守（`depth <= 1`），不写成 CHECK：ALTER 加的列在 SQLite 上
+/// 带不了 CHECK，而新库的 DDL 与旧库的列定义一旦不一致，就会出现「新库拦得住、
+/// 旧库拦不住」的分裂——取值合法性统一由 `services::item` 保证。
+///
+/// `device_id` 的 `DEFAULT ''` 与 `time_records` 同义（迁移期哨兵），由
+/// `services::device::startup_business_identity` 认领。
+const MIGRATE_COLUMNS_V11: &[(&str, &str, &str)] = &[
+    ("items", "parent_id", "INTEGER"),
+    ("items", "depth", "INTEGER NOT NULL DEFAULT 0"),
+    ("items", "category_key", "TEXT"),
+    ("items", "device_id", "TEXT NOT NULL DEFAULT ''"),
+    ("items", "uid", "TEXT"),
+    ("items", "updated_at_ms", "INTEGER NOT NULL DEFAULT 0"),
+];
 
 /// 执行全部迁移（幂等）。由 `infra::db::init_pool` 调用。
 pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
@@ -163,8 +183,35 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
         )
         .await?;
     }
+    // ⑮ v11（0.13.x）：事项归属（树 + 分类 + 绑定 + 计时事件）。
+    //
+    // 四步，顺序不可换：
+    //   ① 补列 —— items 的新列由 PRAGMA 守卫，每次启动都跑；
+    //   ② 放宽墓碑类别 —— 必须在 ③ 之前：guard 里的 `i`/`b`/`p` 墓碑会撞上旧
+    //      `CHECK (kind IN ('s','t'))`，而那一刻的报错会指向「插入被约束拒绝」，
+    //      排查方向完全错误；
+    //   ③ 幂等段 —— 索引 / 新表 / 触发器，每次启动无条件跑；
+    //   ④ 版本推进 —— 关在版本门里，否则会把更高的版本号改回 11。
+    for (table, column, def) in MIGRATE_COLUMNS_V11 {
+        ensure_column(pool, table, column, def).await?;
+    }
+    tombstone::widen_kinds(pool).await?;
+    run_raw(
+        pool,
+        include_str!("../migrations/0011_v0142_item_attribution_guard.sql"),
+    )
+    .await?;
+    if schema_version(pool).await? < 11 {
+        run_raw(
+            pool,
+            include_str!("../migrations/0011_v0142_item_attribution.sql"),
+        )
+        .await?;
+    }
     Ok(())
 }
+
+
 
 /// 读 `settings.schema.version`（缺失按 0：全新库的种子在 0002 里写入）。
 async fn schema_version(pool: &SqlitePool) -> AppResult<i64> {

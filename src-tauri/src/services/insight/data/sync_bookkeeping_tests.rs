@@ -29,8 +29,8 @@ fn registered_head_is_the_sync_bookkeeping_version() {
         .map(|migration| migration.version)
         .max()
         .unwrap_or_default();
-    assert_eq!(head, schema_registry::SYNC_BOOKKEEPING_MIGRATION_VERSION);
-    assert_eq!(head, 29);
+    assert_eq!(head, schema_registry::head_version());
+    assert_eq!(head, 30, "这一轮把 head 抬到了事项归属（30）");
 }
 
 /// 本轮**不同步** `time_records`（`items` 未过桥 ⇒ `itemId` 跨设备悬空）。
@@ -65,7 +65,7 @@ fn fresh_database_reaches_sync_bookkeeping_head() {
             assert!(trigger_exists(&pool, trigger).await, "missing trigger {trigger}");
         }
         assert!(index_exists(&pool, "idx_sessions_updated").await);
-        assert_eq!(applied_head(&pool).await, 29);
+        assert_eq!(applied_head(&pool).await, 30);
     });
 }
 
@@ -240,7 +240,7 @@ fn file_backed_pool_reaches_the_same_head() {
             .await
             .unwrap();
         prepare_pool_schema(&pool, &db_path).await.unwrap();
-        assert_eq!(applied_head(&pool).await, 29);
+        assert_eq!(applied_head(&pool).await, 30);
         assert_eq!(sync_tombstone_rows(&pool).await, 0);
         pool.close().await;
         let _ = std::fs::remove_dir_all(&dir);

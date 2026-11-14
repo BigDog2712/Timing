@@ -948,6 +948,24 @@
       "change": "added",
       "reason": "P4 T11 验收（业务库侧）：timing.db 与 patina.db 是两套迁移机制，只改一边不会有任何报错、只是那侧 updated_at_ms 永远 0。另钉「第二次启动不重盖已盖过戳的行」（守卫段回填条件是 WHERE updated_at_ms = 0）",
       "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/attribution.rs",
+      "change": "added",
+      "reason": "事项归属 T14：子记录分类解析的**唯一**入口。3 条规则（事项分类命中→事项分类 / 否则应用首位 / 否则 other）压在这里，是因为「chrome 在游戏事项里记游戏」与「wechat 在游戏事项里记社交」看着矛盾，只有把顺序写死才同时成立；散在两处就一定会各自实现一套",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/attribution/tests.rs",
+      "change": "added",
+      "reason": "事项归属 T14 验收：需求里给的五个例子逐条成为用例（chrome/pycharm/bilibili/wechat），另钉确定性——乱序输入、同 priority 的字典序决胜、空白事项分类按缺失处理。这三样不钉就会变成「同一份数据两次读出来分类不同」",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sql/0030_item_attribution.sql",
+      "change": "added",
+      "reason": "事项归属迁移 30：app_category / block_segment_override / focus_blocks 三张表。放 .sql 而不是 Rust 字符串是因为多语句 + 注释 + 触发器体挤进字符串后无法审阅；且 check:size 不扫 .sql",
+      "owner": "software-engineer"
     }
   ]
 }

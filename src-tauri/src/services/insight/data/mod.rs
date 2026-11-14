@@ -1,5 +1,7 @@
 pub mod activity_read_model;
 pub mod app_settings_service;
+/* [0.13.x] 事项归属：子记录分类解析（纯函数）与切片。 */
+pub mod attribution;
 pub mod backup;
 pub(crate) mod classification_deletion;
 pub mod classification_service;

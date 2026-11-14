@@ -28,6 +28,14 @@ pub mod reminder;
 pub mod settings;
 pub mod theme;
 pub mod timer;
+/* [0.13.x] 计时操作日志：事件真源与折叠（`fold_session`）。跨端同步只传这里的事件，
+   状态由两端各自折叠得出 —— 详见 `docs/design/PLAN-20261114-事项为中心的计时模型.md` §7。
+
+   `allow(dead_code)` 是**临时**的：接线（`timer::start/pause/resume/stop` 末尾追加事件）
+   要先把本机 `device_id` 送到这条链路，而它现在只有 `services::device`（desktop-only）
+   持有。摘除条件写在 `repositories::timer_ops` 的模块头，接线那一轮一起删。 */
+#[allow(dead_code)]
+pub mod timer_ops;
 pub mod timer_flush;
 pub mod timer_recover;
 pub mod timer_split;

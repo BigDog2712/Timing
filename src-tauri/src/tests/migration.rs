@@ -61,7 +61,7 @@ async fn seed_system_item_uncategorized() {
         )
         .await
         .as_deref(),
-        Some("10")
+        Some("11")
     );
 }
 

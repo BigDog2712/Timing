@@ -26,11 +26,16 @@ use super::schema::*;
 /// schema 巡检（`VALIDATED_SCHEMA_MIGRATION_HEAD`）要拿它对齐，两者必须同源。
 pub const DEVICE_DIMENSION_MIGRATION_VERSION: i64 = 28;
 
-/// 同步簿记迁移的版本号（当前 head）。
+/// 同步簿记迁移的版本号。
 ///
 /// ⚠️ 与 28 一样：**不要**去 `schema_contracts::schema_revision_limit()` 里加它的探测项
 /// （见该函数与本文件头注释）。
 pub const SYNC_BOOKKEEPING_MIGRATION_VERSION: i64 = 29;
+
+/// 事项归属迁移的版本号（当前 head）。
+///
+/// ⚠️ 同上：**不要**给 `schema_revision_limit()` 加 30 的探测项。
+pub const ITEM_ATTRIBUTION_MIGRATION_VERSION: i64 = 30;
 
 /// 设备维度迁移的正文。放 `.sql` 文件：`check:size` 不扫 `.sql`，而且 DDL 用 SQL 写
 /// 比挤在 Rust 字符串里可读（多语句、注释、反引号都不用转义）。
@@ -38,6 +43,9 @@ pub const DEVICE_DIMENSION_SQL: &str = include_str!("sql/0028_device_dimension.s
 
 /// 同步簿记（P4 · T11）的正文：`updated_at_ms` 盖戳、墓碑、四张同步表。
 pub const SYNC_BOOKKEEPING_SQL: &str = include_str!("sql/0029_sync_bookkeeping.sql");
+
+/// 事项归属的正文：`app_category` / `block_segment_override` / `focus_blocks`。
+pub const ITEM_ATTRIBUTION_SQL: &str = include_str!("sql/0030_item_attribution.sql");
 
 /// 登记表里的最大版本（= 当前 head）。
 ///
@@ -198,6 +206,11 @@ pub fn tracker_migrations() -> Vec<Migration> {
             version: SYNC_BOOKKEEPING_MIGRATION_VERSION,
             description: "sync_bookkeeping",
             sql: SYNC_BOOKKEEPING_SQL,
+        },
+        Migration {
+            version: ITEM_ATTRIBUTION_MIGRATION_VERSION,
+            description: "item_attribution",
+            sql: ITEM_ATTRIBUTION_SQL,
         },
     ]
 }
