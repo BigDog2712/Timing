@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatLocalDateKey } from "../../../shared/lib/localDate.ts";
 import { loadActivityAggregateRange } from "../../../platform/persistence/activityReadModelGateway.ts";
-import { getSessionsInRangeWithoutTitleSamples } from "../../../platform/persistence/sessionReadRepository.ts";
+import { getHistoryRangeSnapshot } from "../../../platform/persistence/sessionReadRepository.ts";
 import {
   loadHistoryRangeNotes,
   loadHistoryRangeRecords,
@@ -22,6 +22,7 @@ import {
   type HistoryRangeAggregate,
   type HistoryRangeSessionInput,
 } from "../services/historyRangeAggregate.ts";
+import { buildDeviceLanes, type DeviceLane } from "../services/deviceLanes.ts";
 
 /**
  * 区间视图的取数编排（历史页 `mode !== "day"` 时才启用）。
@@ -40,6 +41,15 @@ import {
  */
 export interface HistoryRangeDataState {
   aggregate: HistoryRangeAggregate | null;
+  /**
+   * 设备泳道（**空数组 = 单设备**）。空数组时界面不许出现任何设备元素（chip / 图例 / 泳道），
+   * 所以"单设备"这件事只在这里判一次，组件不要各自写 `length > 1`。
+   *
+   * 可选是刻意的：既有用例直接造 `HistoryRangeDataState` 字面量（不经过这个 hook），
+   * 缺省按"单设备"解释。为了加一个字段去改四份既有夹具的期望值，等于把"行为没变"
+   * 这件事变得无法从 diff 上看出来。
+   */
+  deviceLanes?: DeviceLane[];
   loading: boolean;
   error: boolean;
   retry: () => void;
@@ -84,6 +94,7 @@ interface RangeReadState {
   nowMs: number;
   queryKey: string | null;
   aggregate: HistoryRangeAggregate | null;
+  deviceLanes: DeviceLane[];
   status: "loading" | "ready" | "error";
 }
 
@@ -91,6 +102,7 @@ const EMPTY_STATE: RangeReadState = {
   nowMs: 0,
   queryKey: null,
   aggregate: null,
+  deviceLanes: [],
   status: "loading",
 };
 
@@ -133,7 +145,7 @@ export function useHistoryRangeData({
     const nowMs = Date.now();
     const nextRange = resolveWindow(mode, customWindow, dayDateKey, nowMs, labels);
     if (!nextRange) {
-      setState({ nowMs, queryKey: null, aggregate: null, status: "loading" });
+      setState({ nowMs, queryKey: null, aggregate: null, deviceLanes: [], status: "loading" });
       return undefined;
     }
 
@@ -142,12 +154,13 @@ export function useHistoryRangeData({
       nowMs,
       queryKey: nextKey,
       aggregate: current.queryKey === nextKey ? current.aggregate : null,
+      deviceLanes: current.queryKey === nextKey ? current.deviceLanes : [],
       status: "loading",
     }));
 
     void (async () => {
       const boundaries = buildHistoryRangeBucketBoundaries(nextRange);
-      const [sessions, records, items, notes, todos, timelineSessions] = await Promise.all([
+      const [sessions, records, items, notes, todos, snapshot] = await Promise.all([
         loadActivityAggregateRange(nextRange.startMs, nextRange.endMs, boundaries)
           .then((result): HistoryRangeSessionInput[] => result.records.map((record) => ({
             exeName: record.exeName,
@@ -178,26 +191,29 @@ export function useHistoryRangeData({
         /* 时间轴要**真实起止时刻**：上面那份 `sessions` 已被后端按「天 × 应用」压过，
            起点统一落在当日 00:00（见 `historyRangeAggregate.timelineSessions` 的注释）。
            这里只取几何、不要标题样本（30 天几千条，标题样本会让 IPC 体积翻几倍）。 */
-        getSessionsInRangeWithoutTitleSamples(nextRange.startMs, nextRange.endMs)
-          .then((rows) => rows.map((row) => ({
-            exeName: row.exeName,
-            appName: row.appName,
-            startMs: row.startTime,
-            endMs: row.endTime ?? nowMs,
-          })))
+        getHistoryRangeSnapshot(nextRange.startMs, nextRange.endMs)
           .catch((error) => {
             console.warn("Failed to read range timeline sessions:", error);
-            return [];
+            return { sessions: [], selfDeviceId: null };
           }),
       ]);
       if (cancelled) return;
 
       const allFailed = sessions === null && records === null && notes === null && todos === null;
       if (allFailed) {
-        setState({ nowMs, queryKey: nextKey, aggregate: null, status: "error" });
+        setState({ nowMs, queryKey: nextKey, aggregate: null, deviceLanes: [], status: "error" });
         return;
       }
 
+      const timelineSessions = snapshot.sessions.map((row) => ({
+        exeName: row.exeName,
+        appName: row.appName,
+        startMs: row.startTime,
+        endMs: row.endTime ?? nowMs,
+        deviceId: row.deviceId,
+      }));
+      /* 设备泳道只在这里算一次：`<=1 台 → []`，组件因此不需要各自判台数 */
+      const deviceLanes = buildDeviceLanes(timelineSessions, snapshot.selfDeviceId);
       const aggregate = buildHistoryRangeAggregate({
         days: nextRange.days,
         sessions: sessions ?? [],
@@ -207,8 +223,9 @@ export function useHistoryRangeData({
         todos: todos ?? [],
         unnamedItemLabel,
         timelineSessions,
+        deviceOrder: deviceLanes.map((lane) => lane.deviceId),
       });
-      setState({ nowMs, queryKey: nextKey, aggregate, status: "ready" });
+      setState({ nowMs, queryKey: nextKey, aggregate, deviceLanes, status: "ready" });
     })();
 
     return () => {
@@ -229,6 +246,7 @@ export function useHistoryRangeData({
   const matchesQuery = resolvedRange !== null && state.queryKey === resolvedRange.cacheKey;
   return {
     aggregate: matchesQuery ? state.aggregate : null,
+    deviceLanes: matchesQuery ? state.deviceLanes : [],
     loading: enabled && (!matchesQuery || state.status === "loading"),
     error: enabled && matchesQuery && state.status === "error",
     retry,

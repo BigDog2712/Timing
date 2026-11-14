@@ -50,6 +50,10 @@ export interface HistoryRangeCopy {
   timelineEmpty: string;
   timelineLaneAria: (dateLabel: string, spanLabel: string, appCount: number) => string;
   /** 逐日柱的读屏名：点它 = 跳那天的单日视图 */
+  /** 多设备时「本机」那一栏的名字；单设备时界面不出现它，但仍要译好 */
+  selfDevice: string;
+  /** 设备图例的读屏名（多设备才渲染） */
+  deviceLegend: string;
   openDay: (dateLabel: string, durationLabel: string) => string;
   unnamedItem: string;
   noteOnItem: (itemName: string) => string;
@@ -93,6 +97,8 @@ export const HISTORY_RANGE_COPY: Record<Locale, HistoryRangeCopy> = {
     timelineHint: "每行一天 · 空白是没有记录",
     timelineEmpty: "这段时间没有应用记录",
     timelineLaneAria: (dateLabel, spanLabel, appCount) => `查看 ${dateLabel} 的时间轴（${spanLabel}，${appCount} 个应用）`,
+    selfDevice: "本机",
+    deviceLegend: "设备",
     openDay: (dateLabel, durationLabel) => `查看 ${dateLabel} 的单日记录（${durationLabel}）`,
     unnamedItem: "未命名计时",
     noteOnItem: (itemName) => `挂在「${itemName}」`,
@@ -132,6 +138,8 @@ export const HISTORY_RANGE_COPY: Record<Locale, HistoryRangeCopy> = {
     timelineHint: "One row per day · gaps mean no activity",
     timelineEmpty: "No app activity in this range",
     timelineLaneAria: (dateLabel, spanLabel, appCount) => `Open the ${dateLabel} timeline (${spanLabel}, ${appCount} apps)`,
+    selfDevice: "This device",
+    deviceLegend: "Devices",
     openDay: (dateLabel, durationLabel) => `Open ${dateLabel} (${durationLabel})`,
     unnamedItem: "Untitled timing",
     noteOnItem: (itemName) => `On “${itemName}”`,
@@ -171,6 +179,8 @@ export const HISTORY_RANGE_COPY: Record<Locale, HistoryRangeCopy> = {
     timelineHint: "Строка = день · пробел = нет записей",
     timelineEmpty: "За этот период активности нет",
     timelineLaneAria: (dateLabel, spanLabel, appCount) => `Шкала ${dateLabel} (${spanLabel}, приложений: ${appCount})`,
+    selfDevice: "Это устройство",
+    deviceLegend: "Устройства",
     openDay: (dateLabel, durationLabel) => `Открыть ${dateLabel} (${durationLabel})`,
     unnamedItem: "Без названия",
     noteOnItem: (itemName) => `К делу «${itemName}»`,
@@ -210,6 +220,8 @@ export const HISTORY_RANGE_COPY: Record<Locale, HistoryRangeCopy> = {
     timelineHint: "Una fila por día · los huecos son pausas",
     timelineEmpty: "Sin actividad en este rango",
     timelineLaneAria: (dateLabel, spanLabel, appCount) => `Abrir la línea de ${dateLabel} (${spanLabel}, ${appCount} apps)`,
+    selfDevice: "Este equipo",
+    deviceLegend: "Equipos",
     openDay: (dateLabel, durationLabel) => `Abrir ${dateLabel} (${durationLabel})`,
     unnamedItem: "Sin nombre",
     noteOnItem: (itemName) => `En «${itemName}»`,

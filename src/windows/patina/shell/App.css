@@ -73,6 +73,9 @@
 @import "./styles/features/timing-lane.css";
 @import "./styles/features/history-range.css";
 @import "./styles/features/history-range-timeline.css";
+/* [P2 设备维度] 设备色令牌 --qp-device-0..7（浅/深两套）+ chip/图例版式。
+   单开一份是为了不动 tokens.css 的 298/298 冻结线，理由见该文件头注释。 */
+@import "./styles/features/device-lanes.css";
 @import "./styles/features/data.css";
 /* [本轮] 「应用设置」弹窗（双击应用趋势的一行打开）：独立文件，避让 data.css 与
    quiet-pro.css 的行数棘轮（后者冻在 1936 行、加不进任何一行）。 */

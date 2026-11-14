@@ -6,6 +6,8 @@ import { objectColor } from "../../../shared/classification/objectColor.ts";
 import { formatDateLabel, formatTime } from "../services/historyFormatting.ts";
 import type { HistoryRangeTimelineLane } from "../services/historyRangeTimeline.ts";
 import type { HistoryRangeCopy } from "../rangeCopy.ts";
+import type { DeviceLane } from "../services/deviceLanes.ts";
+import DeviceChip from "./DeviceChip.tsx";
 
 /**
  * 区间视图的**逐日时间轴**：一行一天，横轴 0–24h。
@@ -26,6 +28,8 @@ interface Props {
   uiText: UiText;
   locale: Locale;
   lanes: HistoryRangeTimelineLane[];
+  /** 空数组 = 单设备：此时**一个设备节点都不渲染**（§6.5） */
+  deviceLanes: DeviceLane[];
   onOpenDay: (dateKey: string) => void;
 }
 
@@ -38,7 +42,14 @@ function resolveAppColor(key: string): string {
   return objectColor("app", parent, override, undefined, mapped.category, mapped.color);
 }
 
-export default function HistoryRangeTimeline({ copy, uiText, locale, lanes, onOpenDay }: Props) {
+export default function HistoryRangeTimeline({
+  copy,
+  uiText,
+  locale,
+  lanes,
+  deviceLanes,
+  onOpenDay,
+}: Props) {
   const displayColor = useActivityDisplayColor();
 
   const colors = useMemo(() => {
@@ -86,9 +97,12 @@ export default function HistoryRangeTimeline({ copy, uiText, locale, lanes, onOp
               : `${dateLabel} · ${copy.timelineEmpty}`;
             return (
               <div
-                key={lane.dateKey}
+                key={`${lane.dateKey}:${lane.deviceId ?? ""}`}
                 className="history-range-timeline-row"
                 data-history-range-timeline-day={lane.dateKey}
+                /* 只有多设备才有这个 testid：单设备时 `queryAllByTestId('device-lane')` 必须是 0 */
+                data-testid={lane.deviceId ? "device-lane" : undefined}
+                data-device-id={lane.deviceId}
               >
                 <button
                   type="button"
@@ -98,6 +112,13 @@ export default function HistoryRangeTimeline({ copy, uiText, locale, lanes, onOp
                   onClick={() => onOpenDay(lane.dateKey)}
                 >
                   {lane.dateKey.slice(5)}
+                  {lane.deviceId ? (
+                    <DeviceChip
+                      deviceId={lane.deviceId}
+                      isSelf={deviceLanes.find((entry) => entry.deviceId === lane.deviceId)?.isSelf ?? false}
+                      selfLabel={copy.selfDevice}
+                    />
+                  ) : null}
                 </button>
                 <span className="history-range-timeline-track" role="img" aria-label={ariaLabel}>
                   {lane.blocks.map((block) => (

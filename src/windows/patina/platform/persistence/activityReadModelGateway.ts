@@ -6,6 +6,13 @@ import {
   isPlainRecord as isRecord,
 } from "../../shared/lib/runtimeTypeGuards.ts";
 
+/*
+ * 这里**故意不导出日级双口径的读方法**（`cmd_get_activity_daily_totals`）。
+ * 那句命令已经存在、也有 30 天位对位用例（Rust 侧 `daily_parity_verify`），
+ * 但前端目前零消费者：热力与趋势要的是**小时**格，日级表只有 `day_key` 粒度
+ * （见 `bucketUnionMs` 那条注释）。`device_sum_ms` 副标会在 P4 随「历史页日卡」一起接，
+ * 在那之前留一个没人调的网关方法只会让人以为 UI 已经接了。
+ */
 export type ActivityReadPath = "projection" | "facts" | "hybrid";
 
 interface ActivityCatalogCursor {
@@ -35,12 +42,21 @@ interface ActivityAggregateRecord {
   anonymous?: boolean;
   appName: string;
   exeName: string;
+  /** 归属设备。**可选**：旧快照与既有夹具没有这一项，装配泳道时按"未标注"处理 */
+  deviceId?: string;
   startTime: number;
   endTime: number;
 }
 
 interface ActivityAggregateRange {
   records: ActivityAggregateRecord[];
+  /**
+   * 逐桶并集（后端算好的）。长度 = 桶数；没传桶边界时后端给空数组。
+   *
+   * 热力 / 趋势的格值**只读这里**：`records` 的起点被压到了桶起点，用它求和得到的是
+   * `device_sum_ms`（两台机器各 30 分钟 = 60），而格子上该显示的是 `union_ms`（30）。
+   */
+  bucketUnionMs?: number[];
   readPath: ActivityReadPath;
   fallbackReason: string | null;
   sourceRevision: number;
@@ -89,15 +105,21 @@ function isAggregateRecord(value: unknown): value is ActivityAggregateRecord {
     && typeof value.exeName === "string"
     && (value.anonymous === undefined || typeof value.anonymous === "boolean")
     && (value.anonymous !== true || (value.exeName === "" && value.appName === ""))
+    && (value.deviceId === undefined || typeof value.deviceId === "string")
     && isFiniteNumber(value.startTime)
     && isFiniteNumber(value.endTime)
     && value.endTime >= value.startTime;
+}
+
+function isBucketUnion(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every((item) => isFiniteNumber(item) && item >= 0);
 }
 
 export function parseActivityAggregateRange(value: unknown): ActivityAggregateRange {
   if (!isRecord(value)
     || !Array.isArray(value.records)
     || !value.records.every(isAggregateRecord)
+    || !(value.bucketUnionMs === undefined || isBucketUnion(value.bucketUnionMs))
     || !isReadPath(value.readPath)
     || !isNullableString(value.fallbackReason)
     || !isFiniteNumber(value.sourceRevision)

@@ -38,6 +38,12 @@
       "owner": "software-engineer"
     },
     {
+      "path": "src/windows/patina/features/dashboard/hooks/useTodayItems.test.tsx",
+      "change": "modified",
+      "reason": "[跨天 flake] 记录 fixture 的 startedAt 改为锚在当天之内（max(当天00:00+1s, now-5min-id)）并补 i09：时钟钉在本地 00:01 跑同一断言。原写法在 00:00–00:05 之间跑测必红 5 条（QA 实测 00:01:56 = 5 failed / 00:05:57 = 1524 passed），纯测试改动，生产代码未动",
+      "owner": "software-engineer"
+    },
+    {
       "path": "src/windows/patina/features/dashboard/components/ModuleShell.tsx",
       "change": "modified",
       "reason": "新增 headAction 槽：卡头右侧的常驻操作，不受四态门控（待办卡的新建入口从卡底 footer 搬上来）",
@@ -269,6 +275,648 @@
       "path": "src/windows/patina/features/classification/services/categoryFallbackVariants.test.ts",
       "change": "added",
       "reason": "D-4 副分类变体（成员判定看整个集合）、D-9 siteRule 写侧不丢、D-3「其他」及其反向（遗留 other 行做别名编辑不许清集合）；原 QA 最终回归临时件改名转正",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsDataSafetyPanel.tsx",
+      "change": "modified",
+      "reason": "[本轮] 695 → 170 行：只留组合（SettingsPanelHeader + 四组 + 对话框层），busy 七项口径逐字保留；四组行统一到 SettingsPreferenceGroup/Row，五个对话框的状态机与 JSX 搬到新文件，并从 size-allowlist 删掉 695 这条冻结基线",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsRemoteBackupPanel.tsx",
+      "change": "modified",
+      "reason": "[本轮] WebDAV 那一行从自定义 flex 行改成 SettingsPreferenceRow（与同页其它行同一套字重/行距/分隔线），331 → 322 行并顺带收紧 allowlist",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/host/HostSyncPanel.tsx",
+      "change": "modified",
+      "reason": "[本轮] 卡片外壳统一：`.data` + `.data__head`（宿主页签名「数据管理」）→ `qp-panel` + SettingsPanelHeader「同步与备份」（与分组锚点同名）；六块折叠面板与底部保存条一字未动",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/host/HostSyncPanel.test.tsx",
+      "change": "modified",
+      "reason": "[本轮] s01 从「文本里有『数据管理』」改成结构断言：根是 qp-panel、标题是 h2「同步与备份」、且不再出现旧页签名",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/settingsConvergence.source.test.ts",
+      "change": "modified",
+      "reason": "[本轮] DATA_SAFETY 探针从「只读外壳」改成「外壳 + 四个子组 + 对话框层整组拼读」：拆文件后那三处字面量搬到了子组里，只读外壳会让判据变成假绿",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/settings.css",
+      "change": "modified",
+      "reason": "[本轮] 数据组自定义行类整批下线（settings-data-action-* / settings-storage-path-*，含两处 @media 块）并留注释说明下线原因；新增 .settings-preference-meta / -meta-placeholder / -actions 三个零件；1736 → 1667 行并收紧 allowlist",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/host/settings-bits.css",
+      "change": "modified",
+      "reason": "[本轮] 新增 .settings-host-sync 宿主语义变量桥（--line/--ink-*/--space-*/--text-*/--accent… → --qp-*）：那六块面板的样式只引用宿主变量，而分析窗只产 --qp-*，不桥接就是一片落空（= 用户说的『和别的卡不是一套』）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/data.css",
+      "change": "modified",
+      "reason": "[本轮] 新增 .data-category-manage-row / .data-category-manage-action：分类 tab 的「管理分类」是一条 24px 通栏窄行（搜索框下、列表上）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsDataExportGroup.tsx",
+      "change": "added",
+      "reason": "[本轮] 从 SettingsDataSafetyPanel 拆出：导出/导入两行统一到 SettingsPreferenceGroup + SettingsPreferenceRow，回调与 busy 禁用态原样",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsDataBackupGroup.tsx",
+      "change": "added",
+      "reason": "[本轮] 从 SettingsDataSafetyPanel 拆出：备份/恢复两行 + SettingsRemoteBackupPanel 排进同一个 settings-preference-list；busy 口径（导出中∨上传中 / 恢复中∨列表拉取中∨下载中）原样",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsStoragePathsGroup.tsx",
+      "change": "added",
+      "reason": "[本轮] 从 SettingsDataSafetyPanel 拆出：安装/缓存/数据三个目录各一行（原来三列网格挤成半截），体积读数当标题旁次级文字，右侧图标键原样；快照未到时给同构占位行（键真的禁用）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsDataCleanupGroup.tsx",
+      "change": "added",
+      "reason": "[本轮] 从 SettingsDataSafetyPanel 拆出：清理缓存/清理历史记录各升成一行带 hint 说明影响面（原来是藏在目录行末尾的两颗图标键，点不准也没说明）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsDataSafetyDialogs.tsx",
+      "change": "added",
+      "reason": "[本轮] 从 SettingsDataSafetyPanel 拆出：五个 QuietDialog（历史清理含档位滑杆 / 缓存清理 / 备份目标 lazy / 恢复来源 / 恢复策略）+ 远端上传框，行为与文案逐字保留",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/hooks/useSettingsDataSafetyDialogs.ts",
+      "change": "added",
+      "reason": "[本轮] 从 SettingsDataSafetyPanel 拆出：五个对话框的状态机、cleanupRange 档位派生、恢复来源与策略编排，返回类型作为对话框层的入参（外壳只做组合与 busy 汇总）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/settingsDataGroupUniform.test.tsx",
+      "change": "added",
+      "reason": "[本轮] 新增：数据组旧行类在七个文件与 settings.css 选择器里都为零 + 每个可操作项在 .settings-preference-row/.settings-preference-control 里（渲染级）+ 宿主变量桥覆盖被引用的每个变量 + HostSyncPanel 卡壳统一（变异自证：把一行改回 settings-data-action-row → 3 条红）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataCategoryManageDialog.tsx",
+      "change": "added",
+      "reason": "[本轮] 独立打开的「分类管理」弹窗：分类 tab 上原本只能看不能改，现在有门。内容整段复用 DataCategoryManagePanel（与应用设置弹窗同一组件）；open=false 不挂载，会话随卸载丢弃",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataCategoryManagePanel.tsx",
+      "change": "added",
+      "reason": "[本轮] 「分类管理」内容层（无弹窗外壳）：应用设置弹窗的第三段与独立弹窗共用它，持有改名弹窗状态与 useQuietDialogs 节点，增删改查编排全在 useAppEditCategoryAdmin（不复制 UI）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataCategoryManageEntry.tsx",
+      "change": "added",
+      "reason": "[本轮] 分类 tab 的「管理分类」入口键 + 它打开的弹窗（同一个开关：双击分类行也写它）；应用/网页 tab 不画键",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/hooks/useCategoryAdminSession.ts",
+      "change": "added",
+      "reason": "[本轮] 独立分类会话：自己读 bootstrap（application 侧语义的 useAppEditDialog 塞不进假 target），与它共用 categoryCatalog 派生件与 useAppEditCategoryAdmin 写路径；每次写成功回调 onChanged 让页面重取数",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/services/categoryCatalog.ts",
+      "change": "added",
+      "reason": "[本轮] 分类候选与用量的共用派生件（从 useAppEditDialog 抽出）：两处入口必须看到同一份候选/用量，否则同一页里两处给出不同的删除影响面",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataCategoryManageEntry.test.tsx",
+      "change": "added",
+      "reason": "[本轮] 新增：分类 tab 有「管理分类」、应用/网页 tab 没有、点了开弹窗、关着不读库、弹窗提示说清删除影响面（变异自证：visible 取反 → cm01 红）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataCategoryManageCreate.test.tsx",
+      "change": "added",
+      "reason": "[本轮] 新增：新建行空名禁提交、**没动色块只写两条**（定义/标签，一条颜色覆盖都没有；动过色块才三条）、写完重读后新分类当场出现在列表里（假库驱动，不是断言 mutation 被调用）、写成功后通知页面重取数（onChanged）、重名不提交但有提示、纯空格名归一后不写库",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataCategoryManageEdit.test.tsx",
+      "change": "added",
+      "reason": "[本轮] 新增：改名写 label 覆盖、恢复默认色写 value:null、删除键只给 custom: 前缀、删除确认先给影响面再一次整批提交（成员回落 + 四条定义清理同一事务）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataCategoryManageRow.test.tsx",
+      "change": "added",
+      "reason": "[本轮] 新增：分类模式双击开「分类管理」且不发第二道选中命令、不做选中集补偿；应用模式双击仍开应用设置；网页模式两样都不开",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/dataCategoryManage.test-utils.tsx",
+      "change": "added",
+      "reason": "[本轮] 分类管理四个测试文件共用的纯查询/夹具（bootstrap 夹具、DOM 查询、mutation 拍平、受控 input 打字）；不含 vi.mock（按文件提升，放这里会挂空）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsGroupNavClickFollow.test.tsx",
+      "change": "added",
+      "reason": "[QA 补测] 点击之后的后续交互：连续两次点击不互相干扰、点完一路滚到底末组要亮、内容一屏装得下不许改判末组、落点可达时钉子必须解掉；scrollTop 按浏览器语义夹到 [0, maxScroll]",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsDataGroupStates.test.tsx",
+      "change": "added",
+      "reason": "[QA 补测] 数据组渲染级（补 settingsDataGroupUniform 只渲染了导出/清理两组）：备份组与目录组每行都有标题+右侧控件、busy 禁用态逐个动作核、快照占位行同构且键真禁用",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataCategoryManageListRefresh.test.tsx",
+      "change": "added",
+      "reason": "[QA 补测] 改名/改色/删除之后的**可见行**（上一轮只断言了写库与作废缓存）：假库回灌后名字真的变了、改色行没丢、删除行消失且内置分类不受牵连",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsDataSafetyPanelDialogs.test.tsx",
+      "change": "added",
+      "reason": "[QA 补测] 695 → 170 行拆分后，五个对话框此前没有任何运行时用例：这里从行点进去断言「打开的是哪个框、确认后调的是哪个回调」（清理历史记录含档位滑杆、清理缓存、恢复先等 onPrepareRestoreBackup 再问策略）",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataCategoryManageStrictMode.test.tsx",
+      "change": "added",
+      "reason": "[dev-only bug 守卫] 「管理分类」弹窗在 dev 里永久停在「加载中」：StrictMode 双调用 effect 时 loadedRef 守卫挡掉第二次挂载、唯一那次加载的 active 又被 cleanup 作废。本用例把消费方包在**根级** StrictMode 里断言加载会结束、分类行会出现（生产构建与默认测试都不双调用，这是唯一能抓到它的门）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsGroupNavPin.test.tsx",
+      "change": "added",
+      "reason": "[QA 探针转正] 点击后「钉住」的位置语义：scrollTop 按浏览器语义夹到 [0, maxScroll]（页尾锚点落点 802/982 > 500）、一次离散滚动只发一个 scroll 事件。6 条 = 点末尾/数据组后一次 Home 必须翻回首组（改前红）、两次点击不互相干扰、落点够不着的组点击后不被到底规则改判、停在落点上抖动 14 帧不许跳组（改前红）、点末尾组后 Home→End 双向都要对；探针原 probe6 断言的是缺陷现状，转正时按修复后行为写死",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsGroupNavPinEdge.test.tsx",
+      "change": "added",
+      "reason": "[QA 补测] 钉住语义的位置边界：点自己那一组不跳高亮、落点被夹后单次 scroll 到位仍亮该组且下一次立刻交回几何、±2 容差边界（498 保持 / 497 交回）、一屏装得下不误判末组、连点三组只认第三次落点、锚点缺失的点击不留钉子（6 例）",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsDataPanelBusy.test.tsx",
+      "change": "added",
+      "reason": "[QA 补测] 「存储」卡的 busy 七项汇总口径（逐个来源打开，六颗动作键必须全禁用；变异自证：漏 isImportBusy → qd11 红）+ 六颗键的接线（导出/导入/备份选位置后再导出/清理缓存必须走确认框/清理中文案与禁用态）",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsStoragePathCallbacks.test.tsx",
+      "change": "added",
+      "reason": "[QA 补测] 目录行与档位滑杆的**回调接线**（已有用例只核了渲染与禁用态）：三个「打开目录」各带自己的路径（缓存要的是 EBWebView 那一层）、自定义根把「更改目录」换成「恢复默认目录」且不串路、卡头刷新键、清理档位滑杆上报的是排序后的档位值而不是下标（夹具故意乱序 30/7）",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/TodosSubheadStates.test.tsx",
+      "change": "added",
+      "reason": "[QA 补测] 待办「新建待办」那条 subhead 行在 loading / error / empty 三态都要在（已有用例只覆盖 empty 与 ready），error 态点它必须能开弹层",
+      "owner": "software-qa-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/components/DataAppEditDialogStrictMode.test.tsx",
+      "change": "added",
+      "reason": "[复核阻塞修复] 「应用设置」弹窗在 StrictMode 下永久停在「加载中」的回归：把消费方包在**根级** <StrictMode> 里断言加载会结束、改了勾选保存键能亮（变异靶点：把 loadedRef 守卫加回 useAppEditDialog → 两条全红）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/data/hooks/appEditLoadingGuard.source.test.ts",
+      "change": "added",
+      "reason": "[复核阻塞修复] 源码护栏：useAppEditDialog.ts 与 useCategoryAdminSession.ts 剥离注释后都不许出现 loadedRef（loadedRef 守卫 + active 作废同时存在 = StrictMode 下永久加载中，已复发两次；渲染级用例抓不住『下一个人顺手加回缓存守卫』这次编辑）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/ModuleShellHeadSlot.test.tsx",
+      "change": "added",
+      "reason": "[复核修复] ModuleShell 的 headAction 死槽下线后的渲染级护栏：四态右槽只有图标键与读数（没有文字键）、subhead 是卡头下一个兄弟且四态都在、@ts-expect-error 钉住 headAction 这个 prop 不许复活（替代 dashboardBoardLayout.test.ts 里那条已成永真的源码 grep）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/hourly.rs",
+      "change": "modified",
+      "reason": "T01 拆分：把投影写侧 `replace_projection_range` + `HourlyAccumulator` 搬到 hourly_write.rs，把 buckets 两个函数搬到 buckets.rs（冻结线 852/852）；T02：`ACTIVE_SESSION_START_SQL` 的 `INDEXED BY` 从被迁移 28 摘掉的 `idx_sessions_single_active` 改成 `uq_sessions_open_per_device`",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/hourly_benchmark.rs",
+      "change": "modified",
+      "reason": "T02：基准用例的索引断言跟着迁移 28 改名（旧的全库单活跃索引已不存在，改成每设备一条的 uq_sessions_open_per_device）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/hourly_contract_tests.rs",
+      "change": "modified",
+      "reason": "T02：契约用例断言迁移 28 的新索引与新唯一冲突列；建库夹具整块搬到 data/hourly_fixture.rs（865 行冻结线加不下设备维度），'投影被删→修复'改用新的投影表 DDL",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/hourly_mod_tests.rs",
+      "change": "modified",
+      "reason": "T02：建库夹具改为复用 data/hourly_fixture.rs（迁移 28 之后库必须带设备维度，否则投影写侧无处写 device_id），顺带少 12 行",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/mod.rs",
+      "change": "modified",
+      "reason": "T01：把 buckets 两个纯函数搬进 buckets.rs、投影写侧搬进 hourly_write.rs，本文件只留聚合骨架（冻结线 371/371）；T02：测试期 BTreeMap 重新引入",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/backup/snapshot/merge_tests.rs",
+      "change": "modified",
+      "reason": "T02：造'迁移 26 之前的快照'的夹具改用 legacy_schema_fixture 把 28 加的东西真的拆回去——28 的 ADD COLUMN 不能重跑（K-13），只删账本会撞 duplicate column",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/backup/snapshot/widget_retirement_tests.rs",
+      "change": "modified",
+      "reason": "T02：同上，造'迁移 17 之前'的快照先把设备维度拆回 27",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/mod.rs",
+      "change": "modified",
+      "reason": "T02：登记 schema_registry、device_schema_upgrade_tests、hourly_fixture、legacy_schema_fixture 四个新模块",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/schema.rs",
+      "change": "modified",
+      "reason": "T01：把 `tracker_migrations()` 整段（版本 1–28 的登记表，约 140 行）搬到 schema_registry.rs 并 re-export，本文件只留可改的 DDL 常量（冻结线 1887/1887）。迁移正文逐字节未动，账本 checksum 不变",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sqlite_pool.rs",
+      "change": "modified",
+      "reason": "T02：`ensure_current_indexes` / `has_current_schema` 那半边搬到 sqlite_pool/current_schema.rs；`VALIDATED_SCHEMA_MIGRATION_HEAD` 改指迁移 28；`run_current_migrations` 收敛成 schema_core::ensure_schema 一层名字；启动序列插入 device::startup_identity；索引巡检白名单补 import_time_buckets",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sqlite_pool/widget_retirement_tests.rs",
+      "change": "modified",
+      "reason": "T02：'旧库'夹具先把设备维度拆回 27 再删账本，否则 normalize 的闸门（按 idx_sessions_single_active 判）在 28 库上恒为假，用例验的就不再是归一化",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sqlite_pool_mod_tests.rs",
+      "change": "modified",
+      "reason": "T02：'缺导入索引'用例的修复路径从'历史归一化截短账本→重跑迁移'改成'启动期补索引'（28 之后归一化闸门关闭），并改用 prepare_pool_schema",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sqlite_pool_upgrade_tests.rs",
+      "change": "modified",
+      "reason": "T02：两条 upgrade 用例的 `MAX(version)` 期望从 FOCUS_HISTORY_VERSION(27) 改指 DEVICE_DIMENSION_MIGRATION_VERSION(28)",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/mod.rs",
+      "change": "modified",
+      "reason": "T02：登记 `pub mod schema_core;`（零 AppHandle 的可移植建库内核，手机端走同一份）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/buckets.rs",
+      "change": "added",
+      "reason": "T01 新建：`validate_aggregate_boundaries` + `aggregate_records_into_boundaries` 从 activity_read_model/mod.rs 原样搬出（逐字未改），腾出冻结线的空间",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/hourly_write.rs",
+      "change": "added",
+      "reason": "T01 新建：小时投影的写侧（`replace_projection_range` + `HourlyAccumulator`）从 hourly.rs 原样搬出；T02 在写侧补 `device_id`（取 devices.is_self=1 的本机身份）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/device_schema_upgrade_tests.rs",
+      "change": "added",
+      "reason": "T02 新建：设备维度验收（注册头=28 / bundled SQLite≥3.31 才支持生成列 / 空库走到 head 28 / uid 由触发器发且每设备只能一条 open / 重启两次不回退不丢另一设备的 open），最后一条守的是 normalize 把 28 那行删掉的致命分支",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/hourly_fixture.rs",
+      "change": "added",
+      "reason": "T02 新建：小时投影用例的公共建库夹具（迁移 28 之后夹具必须带设备维度），并有一条用例把夹具那份投影 DDL 与迁移 28 建出来的表结构逐字比对，防止两处漂移",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/legacy_schema_fixture.rs",
+      "change": "added",
+      "reason": "T02 新建：测试专用'把库物理回退到 27'的夹具——既有用例靠删 `_sqlx_migrations` 伪造旧库，而迁移 28 的 ADD COLUMN 不能重跑，必须把列/索引/触发器/新表真的拆回去",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/schema_registry.rs",
+      "change": "added",
+      "reason": "T01/T02 新建：迁移登记表（版本 1–28 升序）。与 schema.rs 的可改 DDL 常量分离——登记表只增不改，checksum 逐字节比对；新迁移正文走 data/sql/00NN_*.sql + include_str!",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sql/0028_device_dimension.sql",
+      "change": "added",
+      "reason": "T02 新建：迁移 28 正文（devices 花名册 / sessions 加 4 列 + app_key 生成列 / uid 触发器 / 拆全库单活跃索引 / 重建带 device_id 的小时投影 / 日级双口径表 / 置 read_model_state 为 invalid 让投影全量重建）。顺序是硬约束，反了会 no such column",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/sqlite_pool/current_schema.rs",
+      "change": "added",
+      "reason": "T02 新建：从 sqlite_pool.rs 搬出的就绪判定与索引修复。`ensure_current_indexes` 现在按'有没有 device_id 列'分岔：28 之后走'按 device_id 分组封口 + 建 uq_sessions_open_per_device'，28 之前保持旧的全库单活跃行为",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/schema_core/ddl.rs",
+      "change": "added",
+      "reason": "T02 新建：可移植内核持有的迁移 28 DDL 常量（include_str! 同一份 .sql，不复制正文）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/schema_core/device.rs",
+      "change": "added",
+      "reason": "T02 新建：install_id 的读写（12 位小写 hex，原子写 tmp+rename+sync_all，读到损坏值 fail-closed 而不是静默换新身份）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/schema_core/ensure.rs",
+      "change": "added",
+      "reason": "T02 新建：`ensure_schema`（sqlx Migrator + 幂等补列）与 `adopt_local_rows`（把 device_id='' 的哨兵行认领到本机、补 uid；**先查重再回填**，冲突只 WARN 不写，否则老库里有重复 uid 时整个迁移会失败、开机即挂）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/schema_core/mod.rs",
+      "change": "added",
+      "reason": "T02 新建：设备维度的可移植建库内核入口（4 个文件、零 AppHandle，只吃 &Pool/&Path）。桌面侧接线在 services/device.rs，手机端 P3 复用同一份",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/device_migration_timing.rs",
+      "change": "added",
+      "reason": "T02 新建：迁移 28 的耗时实测（#[ignore]）。造一个真的停在 27、13375 行会话的文件库，分别给「迁移 28」与「认领哨兵行」计时 —— 这是任务书要求回答的「老库迁移要多久、是否长时间持写锁」的唯一可信出处",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/commands/insight/activity_read_model_cmd.rs",
+      "change": "modified",
+      "reason": "[设备维度 T04] 新增 cmd_get_activity_daily_totals：日级双口径的唯一取数口（今天现算、历史读表）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/models/insight/activity_read_model.rs",
+      "change": "modified",
+      "reason": "[设备维度 T03] normalize_app_key 加 `:` 分支（与迁移 28 ③ 的生成列逐字等价）；三张 LIFECYCLE 词表搬到 activity_lifecycle.rs 用 pub(crate) use 回挂，净减 34 行让出冻结线位",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/models/insight/mod.rs",
+      "change": "modified",
+      "reason": "[设备维度 T03] 注册 pub mod activity_lifecycle（三张生命周期词表的新家）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/catalog.rs",
+      "change": "modified",
+      "reason": "[设备维度 T03] NORMALIZED_KEY_SQL 补 `:` 分支：应用目录的键必须与 normalize_app_key / 生成列同义，否则 activity:anonymous 会裂成 activity:anonymous.exe",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/persistence/activityReadModelGateway.ts",
+      "change": "modified",
+      "reason": "[设备维度 T04] 新增 loadActivityDailyTotals + parseActivityDailyTotals：日级双口径（unionMs 主指标 / deviceSumMs 副标）的类型守卫取数口",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/models/insight/activity_lifecycle.rs",
+      "change": "added",
+      "reason": "[设备维度 T03] 从 activity_read_model.rs 整块搬出的三张生命周期词表（安装/卸载/更新器识别），为 T03 的 normalize_app_key 改动腾出冻结线位",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/app_key_equivalence_tests.rs",
+      "change": "added",
+      "reason": "[设备维度 T03] 裁决 C 代价 2：12 个夹具 × 三张表的生成列与 Rust 归一函数逐字相等；并对 recorded_app_catalog 现存键做「重算 == 现值」全等断言",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/daily.rs",
+      "change": "added",
+      "reason": "[设备维度 T04] 日级双口径核心：compute_day 纯函数（排序 + 前缀最大终点求并集、按设备求和）、refresh_days（只落已关闭的天）、load_range（今天现算）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/daily_tests.rs",
+      "change": "added",
+      "reason": "[设备维度 T04] compute_day 的几何用例：完全嵌套不再少算（变异自证靶子）、两设备重合时 union<device_sum、零长度/相邻边界",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/facts.rs",
+      "change": "added",
+      "reason": "[设备维度 T03] 事实候选读取从 hourly.rs 搬出：三支各带出 device_id（sessions 取行上、导入与匿名取本机），并把绑定顺序收敛成一个函数供生产与 query-plan 用例共用",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/worker.rs",
+      "change": "added",
+      "reason": "[设备维度 T01] 后台维护线程整块搬出 mod.rs（纯移动，语义零改），为 T03/T04 往 mod.rs 加 mod 声明与日级 DTO 腾出冻结线位",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/daily_parity_tests.rs",
+      "change": "added",
+      "reason": "[设备维度 T04] 逐位相等基线：capture 只读投影与会话（不碰 daily.rs），verify 强制全量重建后断言每日 union_ms==device_sum_ms==基线 hourlySumMs、投影行数不变、今天不落表",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/schema_core/version_guard_tests.rs",
+      "change": "added",
+      "reason": "[设备维度 裁决 2] 版本守卫：真的用只含 1–27 的 Migrator 去跑 28 库，断言 VersionMissing 被翻成「此数据目录已被更新版本的 Timing 使用」+ 真实路径 + backups 出口",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/mod_mod_tests.rs",
+      "change": "modified",
+      "reason": "T05：ActivityAggregateRecordDto 新增 device_id，5 处测试字面量补字段（桶裁剪断言与数值不变）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/repositories/sessions/read.rs",
+      "change": "modified",
+      "reason": "T05/T06：历史区间行带出 device_id（哨兵与导入/匿名两支用标量子查询折成本机 id，避免多绑一个位置参数）与 self_device_id（本机排第一泳道）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/useHeatmapModel.ts",
+      "change": "modified",
+      "reason": "T07：格值改读后端逐桶并集 bucketUnionMs（多设备时 union≠device_sum），旧后端缺字段时自动退回记录求和",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/useTrendDays.ts",
+      "change": "modified",
+      "reason": "T07：同上，柱高来自逐桶并集而不是 records 相加",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/heatmapDays.ts",
+      "change": "modified",
+      "reason": "T07：accumulateHeatmap 增加可选 bucketUnion 入参；不传时逐行保持改造前实现（旧路径仍在，供 oracle 比对）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/trendDays.ts",
+      "change": "modified",
+      "reason": "T07：accumulateTrendDays 增加可选 bucketUnion 入参；不传时逐行保持改造前实现",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/components/HistoryRangeTimeline.tsx",
+      "change": "modified",
+      "reason": "T06：多设备时按设备分行（data-testid=device-lane + DeviceChip），单设备时结构逐字节不变",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/components/HistoryRangeView.tsx",
+      "change": "modified",
+      "reason": "T06：多设备时在时间轴上方渲染设备图例；deviceLanes 为空（单设备）时一个节点都不渲染",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/hooks/useHistoryRangeData.ts",
+      "change": "modified",
+      "reason": "T05/T06：改读 getHistoryRangeSnapshot（带 selfDeviceId），并在此处唯一一次计算设备泳道（≤1 台 → 空数组）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/rangeCopy.ts",
+      "change": "modified",
+      "reason": "T06：四种语言补 selfDevice / deviceLegend 两条文案（单设备时不渲染，但必须译好）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/services/historyRangeAggregate.ts",
+      "change": "modified",
+      "reason": "T06：透传 deviceOrder 给时间轴（加了 1 行入参 + 1 行注释，为守住 300 行已压缩同文件其他注释）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/services/historyRangeTimeline.ts",
+      "change": "modified",
+      "reason": "T06：会话/泳道带上 deviceId；deviceOrder ≥2 时按「天 × 设备」展开，<2 时一天一条（与改造前一致）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/persistence/sessionReadRepository.ts",
+      "change": "modified",
+      "reason": "T05：新增 getHistoryRangeSnapshot（会话 + selfDeviceId），旧两个出口改为委托，签名不变",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/types/sessions.ts",
+      "change": "modified",
+      "reason": "T05：HistorySession 增加可选 deviceId（可选是刻意的：单设备时不许出现设备元素，缺失等同未标注）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/lib/deviceColor.ts",
+      "change": "added",
+      "reason": "T06：设备色唯一实现（FNV-1a 32 → 8 色相派生）。§6.4 原写「取 tokens 里 8 个 accent」，但 tokens.css 只有 2 个 accent 且已压在 298/298 冻结线，无法新增令牌——详见文件头注释",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/lib/bucketUnion.ts",
+      "change": "added",
+      "reason": "T07：把后端逐桶并集摊到展示窗口的比例分配（末窗口裁到此刻、DST 少一格都靠它对齐）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/services/deviceLanes.ts",
+      "change": "added",
+      "reason": "T06：设备泳道装配规则，**≤1 台返回空数组**——单设备零设备元素这条验收的唯一判定点",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/components/DeviceChip.tsx",
+      "change": "added",
+      "reason": "T06：设备 chip（圆点 + 本机/短 id），样式复用 qp-badge，颜色只来自 deviceColor()",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/components/DeviceLegend.tsx",
+      "change": "added",
+      "reason": "T06：设备图例，lanes 为空时返回 null（不是 display:none，DOM 里没有节点）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/lib/bucketUnion.test.ts",
+      "change": "added",
+      "reason": "T07：比例分配用例（整桶/半格/跨桶/空边界/桶数不齐）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/services/deviceLanes.test.ts",
+      "change": "added",
+      "reason": "T06：单设备→空数组、本机第一、selfDeviceId 不在集合时不硬认",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/heatmapOracle.test.ts",
+      "change": "added",
+      "reason": "T07：672 格逐格相等，旧求和路径留在测试里当 oracle（自写期望值表等于把同一个错误抄两遍）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/services/trendOracle.test.ts",
+      "change": "added",
+      "reason": "T07：24 格逐格相等 + 查询桶少于展示窗口时多出来的格必须为 0 + 裁到此刻按比例分摊",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/persistence/activityReadModelGateway.union.test.ts",
+      "change": "added",
+      "reason": "T07：双设备重叠时格值 = 30 分钟（union）而不是 60（device_sum），并反向断言少了并集层就是 60",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/components/HistoryRangeDeviceLanes.test.tsx",
+      "change": "added",
+      "reason": "T06：单设备 DOM 零设备元素（device-lane / chip / legend 三条 + 文案不出现）、多设备本机在第一行",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/history/historyRangeBridge.source.test.ts",
+      "change": "modified",
+      "reason": "P2 T05：h06 钉的是「时间轴取原始会话」这个不变式，不是函数名；出口改名为 getHistoryRangeSnapshot（同一个查询，多带回 selfDeviceId），并补一条 not.toContain 防止退回聚合路径",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/activity_read_model/bucket_union_tests.rs",
+      "change": "added",
+      "reason": "P2 T07：逐桶并集纯函数用例。双设备完全重合必须是 30 分钟（union）而不是 60（device_sum）——这条只能在 Rust 侧钉，前端拿到的 records 已经没有位置；另含「相邻不重叠仍取满段」防跨设备取 max 的偷懒实现",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/device-lanes.css",
+      "change": "added",
+      "reason": "P2 T06：设备泳道色令牌 + 版式单开一份。tokens.css 冻在 298/298、history.css 冻在 817，改它们必红棘轮，故与 history-range.css / timing-lane.css 同处置；色值必须是 var(--qp-device-N)（运行时拼 hsl 等于把字面量换个写法，主题切换调不到）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shared/lib/deviceColor.tokens.test.ts",
+      "change": "added",
+      "reason": "P2 T06：钉「8 个令牌在浅/深两套里各定义一次、且没有 0..7 之外的槽位」。缺令牌不报错、jsdom 不做样式计算也测不出（圆点静默变透明），只能读源文件断言；顺带钉住 FNV-1a 的已知值，换算法必须改这里",
       "owner": "software-engineer"
     }
   ]

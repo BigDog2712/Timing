@@ -37,7 +37,14 @@ export function useHeatmapModel(refreshKey: number, weeks: number = HEATMAP_WEEK
       const result = await loadActivityAggregateRange(plan.startMs, plan.endMs, plan.boundaries);
       if (!aliveRef.current) return;
       hasDataRef.current = true;
-      setModel(accumulateHeatmap(plan, result.records));
+      setModel(accumulateHeatmap(
+        plan,
+        result.records,
+        /* 与 `useTrendDays` 同一条口径：格值来自后端的逐桶并集，不是把 records 加起来 */
+        result.bucketUnionMs
+          ? { boundaries: plan.boundaries, unionByBucket: result.bucketUnionMs }
+          : undefined,
+      ));
       setStatus("ready");
     } catch {
       if (!aliveRef.current) return;

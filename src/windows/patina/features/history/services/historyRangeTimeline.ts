@@ -28,6 +28,8 @@ export interface HistoryRangeTimelineSession {
   appName: string;
   startMs: number;
   endMs: number;
+  /** 归属设备；缺省 = 未标注（旧快照/夹具），此时不拆设备泳道 */
+  deviceId?: string;
 }
 
 export interface HistoryRangeTimelineBlock {
@@ -49,6 +51,8 @@ export interface HistoryRangeTimelineLane {
   /** 分母（完整一天的长度；DST 那天不是 24h，所以必须由日期算，不能写死） */
   spanMs: number;
   blocks: HistoryRangeTimelineBlock[];
+  /** 非空 = 这条带子属于某台设备（多设备时一天会拆成 N 条）。单设备时恒为 `undefined`。 */
+  deviceId?: string;
 }
 
 /**
@@ -74,9 +78,17 @@ interface CellWinner {
   ms: number;
 }
 
+/**
+ * 逐日活动带。
+ *
+ * `deviceOrder` 为空（或只有一台）时**一天一条**，与改造前逐字节相同——这是 P2 的
+ * 「单设备界面不变」在数据层的落点，不是渲染层少画一列。
+ * 两台以上时按 `天 × 设备` 展开，顺序跟 `deviceOrder`（本机在前，由 `buildDeviceLanes` 定）。
+ */
 export function buildHistoryRangeTimeline(
   days: HistoryRangeDay[],
   sessions: HistoryRangeTimelineSession[],
+  deviceOrder: readonly string[] = [],
 ): HistoryRangeTimelineLane[] {
   if (days.length === 0) return [];
 
@@ -87,7 +99,17 @@ export function buildHistoryRangeTimeline(
   }
 
   const cellMs = resolveRangeTimelineCellMs(days.length);
-  return days.map((day) => buildLane(day, sessions, cellMs, labels));
+  if (deviceOrder.length < 2) {
+    return days.map((day) => buildLane(day, sessions, cellMs, labels));
+  }
+  const lanes: HistoryRangeTimelineLane[] = [];
+  for (const day of days) {
+    for (const deviceId of deviceOrder) {
+      const scoped = sessions.filter((session) => session.deviceId === deviceId);
+      lanes.push(buildLane(day, scoped, cellMs, labels, deviceId));
+    }
+  }
+  return lanes;
 }
 
 function buildLane(
@@ -95,6 +117,7 @@ function buildLane(
   sessions: HistoryRangeTimelineSession[],
   cellMs: number,
   labels: Map<string, string>,
+  deviceId?: string,
 ): HistoryRangeTimelineLane {
   const dayStartMs = day.startMs;
   const spanMs = Math.max(cellMs, addLocalDays(new Date(dayStartMs), 1).getTime() - dayStartMs);
@@ -164,5 +187,5 @@ function buildLane(
   }
   flush(winners.length);
 
-  return { dateKey: day.dateKey, startMs: dayStartMs, viewEndMs, spanMs, blocks };
+  return { dateKey: day.dateKey, startMs: dayStartMs, viewEndMs, spanMs, blocks, deviceId };
 }

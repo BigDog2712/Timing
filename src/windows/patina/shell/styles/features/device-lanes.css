@@ -1,0 +1,93 @@
+/*
+ * 设备泳道的颜色令牌与版式（P2 · T06）
+ * ==========================================================================
+ * 为什么单开一份：`tokens.css` 冻结在 **298/298 行**（size-allowlist 棘轮），
+ * `history.css` 冻在 817 行，`App.css` 只做 `@import` 清单。这与
+ * `history-range.css` / `timing-lane.css` / `data-app-edit.css` 是同一个处置：
+ * 新功能单开一个文件，不碰任何已有规则，删掉本文件只会少功能、不会变形。
+ *
+ * ## 为什么设备色必须走令牌而不是运行时拼 hsl()
+ *
+ * 上一版 `deviceColor()` 直接返回 `hsl(212 62% 52%)`。它确实"一处实现、确定性、
+ * 跨机器一致"，但**运行时拼出来的色值就是字面量色值的另一种写法**：
+ *   · 主题切换时没人能统一调（暗底上 52% 亮度发闷，而它不经过任何主题机制）；
+ *   · 设计侧改色要去翻 TypeScript，而不是改 CSS；
+ *   · 项目硬约束「样式只用 `var(--*)` 令牌」被绕过了。
+ * 现在：色相表在这里，`deviceColor(installId)` 只返回 `var(--qp-device-N)`。
+ *
+ * ## 两套值必须成对出现
+ *
+ * 与 `tokens.css` 的既有写法一致：浅色 `:root`、暗色 `:root[data-theme="dark"]`。
+ * 漏一个 → 暗色下静默沿用浅色值，是这一仓里最难发现的一类 bug
+ * （`deviceColor.tokens.test.ts` 会数两套里各有 8 个，漏一个直接红）。
+ *
+ * 色相挑过的：相邻两项至少差 20°，避免两台设备撞成"看起来一样"的颜色。
+ * 暗色不是把浅色搬过来：同一个色相在深底上要提亮度（52% → 66%）才不发闷。
+ * ========================================================================== */
+
+:root {
+  --qp-device-0: hsl(212 62% 46%);
+  --qp-device-1: hsl(268 55% 52%);
+  --qp-device-2: hsl(336 58% 50%);
+  --qp-device-3: hsl(12 62% 48%);
+  --qp-device-4: hsl(32 68% 42%);
+  --qp-device-5: hsl(152 52% 34%);
+  --qp-device-6: hsl(184 58% 34%);
+  --qp-device-7: hsl(96 48% 36%);
+}
+
+:root[data-theme="dark"] {
+  --qp-device-0: hsl(212 70% 66%);
+  --qp-device-1: hsl(268 66% 72%);
+  --qp-device-2: hsl(336 66% 70%);
+  --qp-device-3: hsl(12 72% 68%);
+  --qp-device-4: hsl(32 76% 62%);
+  --qp-device-5: hsl(152 56% 58%);
+  --qp-device-6: hsl(184 62% 58%);
+  --qp-device-7: hsl(96 52% 60%);
+}
+
+/* ── 版式 ────────────────────────────────────────────────────────────────
+ * 只挂 `.device-*` 前缀，不覆盖既有类。尺寸全部走 `--qp-*`，不写 px 以外的魔法数
+ * （6/8px 是圆点直径，与 `qp-badge` 家族的紧凑档对齐）。 */
+
+.device-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.device-chip-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--qp-device-0);
+}
+
+.device-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--qp-space-2, 8px);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--qp-font-size-caption);
+  color: var(--qp-text-secondary);
+}
+
+.device-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.device-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--qp-device-0);
+}

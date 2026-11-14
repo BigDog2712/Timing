@@ -14,6 +14,7 @@
  * 一天之内看不出走势，"今天几点在干什么"才是有用的那句话。
  */
 import { formatLocalDateKey, startOfLocalDay } from "../../../shared/lib/localDate.ts";
+import { distributeBucketUnionMs } from "../../../shared/lib/bucketUnion.ts";
 
 export interface TrendWindow {
   /** `YYYY-MM-DDTHH`：既是 React key 也是"这是哪个小时"的唯一标识 */
@@ -177,7 +178,27 @@ interface RangeRecord {
  *
  * 边界外的残段（首尾跨出查询范围）靠同一个交集自然裁掉，不需要额外判断。
  */
-export function accumulateTrendDays(windows: readonly TrendWindow[], records: readonly RangeRecord[]): TrendDay[] {
+/**
+ * 后端逐桶并集（`ActivityAggregateRange.bucketUnionMs` 那一份）。
+ *
+ * **这就是「格子读数是 union 还是 device_sum」的分界线**：传了它，柱高来自后端并集；
+ * 不传（旧快照 / 旧假数据），退回按记录求交集的老路径。两条路在单设备数据上必须逐格相等，
+ * `trendDays.oracle` 用例把旧实现留着当对照。
+ */
+export interface TrendBucketUnion {
+  boundaries: readonly number[];
+  unionByBucket: readonly number[];
+}
+
+export function accumulateTrendDays(
+  windows: readonly TrendWindow[],
+  records: readonly RangeRecord[],
+  union?: TrendBucketUnion,
+): TrendDay[] {
+  if (union) {
+    const perWindow = distributeBucketUnionMs(union.boundaries, union.unionByBucket, windows);
+    return windows.map((window, index) => ({ ...window, durationMs: perWindow[index] }));
+  }
   const totals = windows.map((window) => ({ ...window, durationMs: 0 }));
   for (const record of records) {
     const start = Number(record.startTime);

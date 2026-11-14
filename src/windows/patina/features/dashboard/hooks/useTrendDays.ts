@@ -42,7 +42,15 @@ export function useTrendDays(refreshKey: number): TrendState {
       const plan = buildTodayTrendPlan(at);
       const result = await loadActivityAggregateRange(plan.query.startMs, plan.query.endMs, plan.query.boundaries);
       if (!aliveRef.current) return;
-      const next = accumulateTrendDays(plan.windows, result.records);
+      const next = accumulateTrendDays(
+        plan.windows,
+        result.records,
+        /* 有逐桶并集就以它为准：多设备时 records 加起来是 `device_sum_ms`（会 >24h），
+           柱高要的是 `union_ms`（§6.5）。旧后端不回这个字段时自动退回老路径。 */
+        result.bucketUnionMs
+          ? { boundaries: plan.query.boundaries, unionByBucket: result.bucketUnionMs }
+          : undefined,
+      );
       hasDataRef.current = true;
       setDays(next);
       setNowMs(at);

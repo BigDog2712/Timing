@@ -6,6 +6,7 @@ import HistoryRangeRanking, { type HistoryRangeRankRow } from "./HistoryRangeRan
 import HistoryRangeRecords from "./HistoryRangeRecords.tsx";
 import HistoryRangeSummary from "./HistoryRangeSummary.tsx";
 import HistoryRangeTimeline from "./HistoryRangeTimeline.tsx";
+import DeviceLegend from "./DeviceLegend.tsx";
 
 /**
  * 区间总览（历史页 `mode !== "day"` 时**替换**单日主体）。
@@ -47,7 +48,9 @@ export default function HistoryRangeView({
   showTimeline = true,
   extraBlock,
 }: Props) {
+  /* `deviceLanes` 为空 = 单设备：图例与泳道都不出现（§6.5），不需要在这里再判一次台数 */
   const { aggregate, loading, error, retry } = data;
+  const deviceLanes = data.deviceLanes ?? [];
 
   if (!aggregate && error) {
     return (
@@ -97,12 +100,16 @@ export default function HistoryRangeView({
           onOpenDay={onOpenDay}
           showDailyBars={showDailyBars}
         />
+        {showTimeline && deviceLanes.length > 0 ? (
+          <DeviceLegend lanes={deviceLanes} selfLabel={copy.selfDevice} title={copy.deviceLegend} />
+        ) : null}
         {showTimeline && aggregate.timeline.length > 0 ? (
           <HistoryRangeTimeline
             copy={copy}
             uiText={uiText}
             locale={locale}
             lanes={aggregate.timeline}
+            deviceLanes={deviceLanes}
             onOpenDay={onOpenDay}
           />
         ) : null}

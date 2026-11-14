@@ -122,6 +122,8 @@ export interface HistoryRangeAggregateInput {
    * 位置全丢。时间轴要的是"几点到几点在哪个应用"，只能另取一份未聚合的。
    */
   timelineSessions?: HistoryRangeTimelineSession[];
+  /** 设备泳道顺序（本机在前）；**空数组 = 单设备**，时间轴保持"一天一条"（§6.5） */
+  deviceOrder?: string[];
 }
 
 const toMs = (seconds: number) => Math.max(0, Math.round(seconds * 1000));
@@ -282,7 +284,7 @@ export function buildHistoryRangeAggregate(
   )).length;
 
   /* ---- 时间轴（独立输入：见 `timelineSessions` 的说明） ---- */
-  aggregate.timeline = buildHistoryRangeTimeline(days, input.timelineSessions ?? []);
+  aggregate.timeline = buildHistoryRangeTimeline(days, input.timelineSessions ?? [], input.deviceOrder ?? []);
 
   return aggregate;
 }

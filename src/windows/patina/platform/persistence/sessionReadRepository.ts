@@ -18,6 +18,8 @@ interface RawHistorySessionRow {
   end_time: number | null;
   duration: number | null;
   continuity_group_start_time: number | null;
+  /** 可选：旧夹具与旧快照没有这个字段，校验按"缺失等于未标注"处理（见 `HistorySession`） */
+  device_id?: string;
 }
 
 interface RawTitleSampleRow {
@@ -63,6 +65,7 @@ function mapRawHistorySession(
     endTime: row.end_time,
     duration: row.duration,
     continuityGroupStartTime: row.continuity_group_start_time,
+    ...(typeof row.device_id === "string" ? { deviceId: row.device_id } : {}),
     titleSampleDetails,
   };
 }
@@ -136,11 +139,31 @@ export async function getSessionsInRangeWithoutTitleSamples(startMs: number, end
   return loadHistoryRange(startMs, endMs, false);
 }
 
+/** 一段区间里的会话 + **本机设备 id**（时间轴要把"本机"排第一条泳道） */
+export interface HistoryRangeSnapshot {
+  sessions: HistorySession[];
+  selfDeviceId: string | null;
+}
+
+export async function getHistoryRangeSnapshot(startMs: number, endMs: number): Promise<HistoryRangeSnapshot> {
+  return loadHistoryRangeSnapshot(startMs, endMs, false);
+}
+
 async function loadHistoryRange(startMs: number, endMs: number, includeTitleSamples: boolean): Promise<HistorySession[]> {
+  const snapshot = await loadHistoryRangeSnapshot(startMs, endMs, includeTitleSamples);
+  return snapshot.sessions;
+}
+
+async function loadHistoryRangeSnapshot(
+  startMs: number,
+  endMs: number,
+  includeTitleSamples: boolean,
+): Promise<HistoryRangeSnapshot> {
   const now = Date.now();
   const result = await invokeWithCommandError<{
     sessions: RawHistorySessionRow[];
     titleSamples: RawTitleSampleRow[];
+    selfDeviceId?: string | null;
   }>("cmd_get_history_range_rows", { startMs, endMs, nowMs: now, includeTitleSamples });
   const samplesBySessionId = new Map<number, TitleSampleDetail[]>();
   for (const sample of result.titleSamples) {
@@ -148,9 +171,14 @@ async function loadHistoryRange(startMs: number, endMs: number, includeTitleSamp
     samples.push(mapRawTitleSample(sample));
     samplesBySessionId.set(sample.session_id, samples);
   }
-  return parseHistoryRangeRows(result.sessions, now).map((row) => ({ ...row,
-    titleSampleDetails: samplesBySessionId.get(row.id) ?? [],
-  }));
+  return {
+    sessions: parseHistoryRangeRows(result.sessions, now).map((row) => ({ ...row,
+      titleSampleDetails: samplesBySessionId.get(row.id) ?? [],
+    })),
+    selfDeviceId: typeof result.selfDeviceId === "string" && result.selfDeviceId.trim()
+      ? result.selfDeviceId
+      : null,
+  };
 }
 
 export function parseHistoryRangeRows(value: unknown, now: number): HistorySession[] {
@@ -162,7 +190,8 @@ export function parseHistoryRangeRows(value: unknown, now: number): HistorySessi
       && typeof record.window_title === "string" && Number.isSafeInteger(record.start_time)
         && (record.end_time === null || (Number.isSafeInteger(record.end_time) && Number(record.end_time) >= Number(record.start_time)))
         && (record.duration === null || (typeof record.duration === "number" && Number.isFinite(record.duration) && record.duration >= 0))
-      && (record.continuity_group_start_time === null || Number.isSafeInteger(record.continuity_group_start_time));
+      && (record.continuity_group_start_time === null || Number.isSafeInteger(record.continuity_group_start_time))
+      && (record.device_id === undefined || typeof record.device_id === "string");
   })) throw new Error("Invalid history range rows");
   return resolveEffectiveHistoryRows(value as RawHistorySessionRow[], now).map((row) =>
     mapRawHistorySession(row));

@@ -91,7 +91,11 @@ describe('历史页区间视图 · 反向桥接线', () => {
        后端已把记录压成「起点 = 当日 00:00、长度 = 当日总时长」，时长对、位置全丢。
        用那份画时间轴，结果是每天一根从 00:00 起的实心柱 —— 不报错、也绝不可能是对的。
        所以这条钉死：hook 里另取一份原始会话，并且真的把它传进聚合。 */
-    expect(HOOK).toContain('getSessionsInRangeWithoutTitleSamples');
+    /* [P2 T05] 出口从 `getSessionsInRangeWithoutTitleSamples` 换成 `getHistoryRangeSnapshot`：
+       同一个原始会话查询，多带回一个 `selfDeviceId`（时间轴要把本机排第一泳道）。
+       钉的是**不变式**不是函数名——所以这里同步换名，同时断言"没有再走聚合那条路"。 */
+    expect(HOOK).toContain('getHistoryRangeSnapshot');
+    expect(HOOK).not.toContain('getSessionsInRangeWithoutTitleSamples');
     expect(HOOK).toContain('timelineSessions');
     /* 单日也要显式关掉逐日带：那一天上面已经有可缩放的时间轴，两条并存会自相矛盾 */
     expect(HISTORY).toContain('showTimeline={false}');

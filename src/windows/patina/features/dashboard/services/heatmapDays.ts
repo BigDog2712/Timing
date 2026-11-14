@@ -17,6 +17,7 @@
  *   ③ **今天只到此刻**：未来的小时不进分母（否则今天那一行平均被"还没发生"的时段拉低）。
  */
 import { addLocalDays, formatLocalDateKey, startOfLocalDay } from "../../../shared/lib/localDate.ts";
+import { distributeBucketUnionMs } from "../../../shared/lib/bucketUnion.ts";
 
 /** 取几周：4 周是「同一星期几有 4 个样本」的最小值，再少就是单天运气 */
 export const HEATMAP_WEEKS = 4;
@@ -129,28 +130,46 @@ interface RangeRecord {
   endTime: number;
 }
 
+/** 后端逐桶并集（与 `trendDays` 同一份契约，见那里的注释） */
+export interface HeatmapBucketUnion {
+  boundaries: readonly number[];
+  unionByBucket: readonly number[];
+}
+
 /**
  * 每条记录与**每一格**求交集，按 (星期几, 小时) 累加，再除以各自的样本数。
  *
  * 分母是**有样本的次数**而不是固定 4：今天 15 点以后还没发生，那些格的样本只有 3 个，
  * 拿 4 去平均会把整行的傍晚压下去（看起来像"我傍晚不干活"）。
+ *
+ * 传了 `union` 就用后端的逐桶并集（多设备时这才是 union 口径），否则按记录求交集
+ * （老路径，单设备数据上与并集逐格相等）。
  */
 export function accumulateHeatmap(
   plan: HeatmapPlan,
   records: readonly RangeRecord[],
+  union?: HeatmapBucketUnion,
 ): HeatmapModel {
   const totals = Array.from({ length: HEATMAP_ROWS }, () => new Array<number>(HEATMAP_HOURS).fill(0));
   const samples = Array.from({ length: HEATMAP_ROWS }, () => new Array<number>(HEATMAP_HOURS).fill(0));
 
   for (const cell of plan.cells) samples[cell.weekday][cell.hour] += 1;
 
-  for (const record of records) {
-    const start = Number(record.startTime);
-    const end = Number(record.endTime);
-    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
-    for (const cell of plan.cells) {
-      const overlap = Math.min(end, cell.endMs) - Math.max(start, cell.startMs);
-      if (overlap > 0) totals[cell.weekday][cell.hour] += overlap;
+  if (union) {
+    const perCell = distributeBucketUnionMs(union.boundaries, union.unionByBucket, plan.cells);
+    for (let index = 0; index < plan.cells.length; index += 1) {
+      const cell = plan.cells[index];
+      totals[cell.weekday][cell.hour] += perCell[index];
+    }
+  } else {
+    for (const record of records) {
+      const start = Number(record.startTime);
+      const end = Number(record.endTime);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue;
+      for (const cell of plan.cells) {
+        const overlap = Math.min(end, cell.endMs) - Math.max(start, cell.startMs);
+        if (overlap > 0) totals[cell.weekday][cell.hour] += overlap;
+      }
     }
   }
 
