@@ -451,9 +451,11 @@ const capabilityPermissionRefs = () => {
       defined.add(m[1]);
     }
   }
+  const capFiles = readdirSync(join(root, 'src-tauri/capabilities')).filter((n) => n.endsWith('.json'));
   const refs = [];
   const undefinedRefs = [];
-  for (const f of readdirSync(join(root, 'src-tauri/capabilities')).filter((n) => n.endsWith('.json'))) {
+  const skipped = [];
+  for (const f of capFiles) {
     let doc;
     try {
       doc = JSON.parse(read(`src-tauri/capabilities/${f}`));
@@ -464,23 +466,38 @@ const capabilityPermissionRefs = () => {
     }
     for (const perm of doc.permissions ?? []) {
       const id = typeof perm === 'string' ? perm : perm.identifier;
-      if (id.includes(':')) continue;
+      if (id.includes(':')) {
+        skipped.push(`${f} :: ${id}`);
+        continue;
+      }
       refs.push(id);
       if (!defined.has(id)) undefinedRefs.push(`${f} :: ${id}`);
     }
   }
-  return { refs, defined, undefinedRefs };
+  return { capFiles, refs, defined, undefinedRefs, skipped };
 };
 
 const capPerms = capabilityPermissionRefs();
 
-/* 防空转：一条自定义引用都没扫到，说明目录改名 / 解析失配，判据在空转。 */
-if (capPerms.refs.length === 0) {
+/* **被校验单元下限**（与"命中 0 处"是两件事，必须分开表达）：
+ *   命中 0 处 = 目标达成；扫到 0 个单元 = 事故（判据没在看东西）。
+ * 终态下命中恒为 0，**只打印命中数的话"干净"和"扫空"长得一模一样** —— 所以要把
+ * "看过了多少个单元"一并打出来并设下限。三处各挡一种失联：目录为空 / 正则失配 / 字段名被改。
+ * 用 `>=`（下限）而不是精确相等：新增 capability 或 permission 不该要求同批改判据
+ * （否则又是"新增忘了改门禁"的入口），删减才需要人显式承认。 */
+const CONTRACT_UNIT_FLOOR = { capFiles: 1, defined: 1, refs: 1 };
+const unitShortfalls = [
+  ['capabilities/*.json 文件数', capPerms.capFiles.length, CONTRACT_UNIT_FLOOR.capFiles],
+  ['本仓 permission identifier 数', capPerms.defined.size, CONTRACT_UNIT_FLOOR.defined],
+  ['被校验的裸标识符引用数', capPerms.refs.length, CONTRACT_UNIT_FLOOR.refs],
+].filter(([, actual, floor]) => actual < floor);
+
+if (unitShortfalls.length > 0) {
   failures.push({
-    label: 'capabilities 的自定义 permissions 引用集合为空',
-    missing: [],
+    label: '被校验单元数低于下限（判据在空转）',
+    missing: unitShortfalls.map(([name, actual, floor]) => `${name} ${actual} < 下限 ${floor}`),
     extra: [],
-    hint: '一条非插件的权限引用都没扫到 —— 目录或字段名变了，这条判据在空转',
+    hint: '目录改名 / 文件被清空 / 字段名被改都会走到这里；命中 0 处是目标，扫到 0 个文件是事故',
   });
 }
 check(
@@ -494,7 +511,8 @@ const summary = [
   `命令：Rust ${commands.size}（+Patina ${patinaCmds.size}）/ IpcApi ${api.size} / ipc.ts ${calls.size} / mock ${mocks.size}`,
   `错误码：Rust ${rustCodes.size} / 前端 ${feCodes.size}`,
   `事件：后端 ${rEvents.size} / 前端 ${fEvents.size} / emit 点 ${emitted.size}`,
-  `权限引用：capabilities 自定义 ${capPerms.refs.length} 条 / 本仓已定义 ${capPerms.defined.size} 个`,
+  `权限引用：capability 文件 ${capPerms.capFiles.length} 个 / 本仓 permission 标识符 ${capPerms.defined.size} 个 / ` +
+    `裸标识符引用 ${capPerms.refs.length} 处（跳过插件命名空间 ${capPerms.skipped.length} 处）`,
 ].join('；');
 
 if (failures.length === 0) {
