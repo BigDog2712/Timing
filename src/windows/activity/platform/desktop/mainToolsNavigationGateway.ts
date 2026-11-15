@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { MAIN_TOOLS_TARGET_CHANGED } from "../runtime/insightEvents.ts";
+import { MAIN_TOOLS_TARGET_CHANGED } from "../runtime/activityEvents.ts";
 
 export type MainToolsSection = "pomodoro" | "reminders";
 

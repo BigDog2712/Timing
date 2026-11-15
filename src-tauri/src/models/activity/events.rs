@@ -8,7 +8,7 @@
 //! 规则要拦住的方向。`models/insight` 是「纯类型 + 规则、出边 0」的叶子（见
 //! `docs/refactor/patina-structural-merge.md` §2.2 B1），所有层都能依赖它。
 //!
-//! 前端镜像：`src/platform/runtime/insightEvents.ts`（同名同值；只收前端真的在 listen 的
+//! 前端镜像：`src/platform/runtime/activityEvents.ts`（同名同值；只收前端真的在 listen 的
 //! 7 个，`POWER_*` 两个是 Rust 内部事件）。
 //!
 //! 归一前这 14 处都是以字符串字面量作为事件名 emit 的；`check-contract.mjs` 当时靠

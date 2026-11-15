@@ -2,7 +2,7 @@
  * 前台应用的「事实键」——`active-window-changed` 的事件名与载荷里的 `exe_name`（[0.13]）。
  *
  * 为什么要有这一层：主窗（药丸）要监听追踪引擎广播的前台窗口变化，但事件名常量原来只写在
- * 分析窗的 `platform/runtime/insightEvents.ts` 里（那是 Patina 子树，L9 禁止主窗 import）。
+ * 分析窗的 `platform/runtime/activityEvents.ts` 里（那是 Patina 子树，L9 禁止主窗 import）。
  * 主窗如果直接写字符串字面量，改名时没有任何东西会红 —— 症状是「切到绑定的应用不计时」，
  * 而两端日志都干净。
  *

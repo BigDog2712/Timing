@@ -1,6 +1,6 @@
 import { emit, listen, type Event } from "@tauri-apps/api/event";
 import type { AppSettings } from "../../shared/settings/appSettings.ts";
-import { APP_SETTINGS_CHANGED } from "./insightEvents.ts";
+import { APP_SETTINGS_CHANGED } from "./activityEvents.ts";
 
 export type AppSettingsChangedPayload = Partial<AppSettings>;
 

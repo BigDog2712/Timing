@@ -54,6 +54,10 @@ const T04_BASELINE = "fcbbab5";
  *   · `preRenamePath` —— 取基线内容时换成旧名路径；
  *   · `preRenameSource` —— 比"零 diff"前把新名规范化回旧名。
  *
+ * T02b 追加第三条：`runtime/insightEvents.ts` → `runtime/activityEvents.ts`（同一次
+ * 去 Patina 化，只是文件名不在上面两条**目录**规则的覆盖范围内）。被保护清单里的
+ * `toolNotificationGateway.ts` 有一行 import 因此改字面，规范化后仍与基线逐字相同。
+ *
  * **判据强度不变**：规范化只把新名映射回旧名，任何真实改动规范化后依旧与基线不同，
  * 测试照样红。之所以不直接重钉 `T04_BASELINE`，是因为重钉要等 T02 落地成一个 commit
  * 之后才成立（钉一个还不存在的 sha 没有意义）。
@@ -74,6 +78,9 @@ const preRenameSource = (src: string): string =>
     .replace(/\bactivity::/g, "insight::")
     .replace(/\bmod activity;/g, "mod insight;")
     .replace(/::activity as\b/g, "::insight as")
+    /* T02b：事件名常量文件 `insightEvents.ts` → `activityEvents.ts`（纯文件名改名，
+     * 不是目录改名，故不走上面两条规则）。 */
+    .replace(/\bactivityEvents\b/g, "insightEvents")
     .replace(/\bactivity_bridge\b/g, "patina_bridge")
     .replace(/\bactivity_root\b/g, "patina_root")
     .replace(/\blegacy_import\b/g, "patina_seed");

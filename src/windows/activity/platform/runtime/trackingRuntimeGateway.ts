@@ -12,7 +12,7 @@ import type {
   TrackingDataChangedPayload,
   TrackingWindowSnapshot,
 } from "../../shared/types/tracking.ts";
-import { ACTIVE_WINDOW_CHANGED, TRACKING_DATA_CHANGED } from "./insightEvents.ts";
+import { ACTIVE_WINDOW_CHANGED, TRACKING_DATA_CHANGED } from "./activityEvents.ts";
 
 export async function getCurrentWindow(): Promise<TrackingWindowSnapshot | null> {
   try {

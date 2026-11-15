@@ -1,6 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { publishAppIconChange } from "../../shared/hooks/appIconChanges.ts";
-import { APP_ICON_CHANGED } from "./insightEvents.ts";
+import { APP_ICON_CHANGED } from "./activityEvents.ts";
 
 export function installAppIconEvents(): () => void {
   let disposed = false;

@@ -1,6 +1,6 @@
 import { emitTo } from "@tauri-apps/api/event";
 
-import { HOST_INTENT } from "./insightEvents.ts";
+import { HOST_INTENT } from "./activityEvents.ts";
 
 /**
  * 分析窗 → 药丸（label = `main`）的**意图**通道（P0-04 / P0-05，FUSION-ARCH-v1 §6.4）。

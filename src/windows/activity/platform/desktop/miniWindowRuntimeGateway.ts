@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { MINI_WINDOW_STATE } from "../runtime/insightEvents.ts";
+import { MINI_WINDOW_STATE } from "../runtime/activityEvents.ts";
 
 export type MiniEdge = "top" | "left" | "right";
 export type MiniPage = "activity" | "tools";
