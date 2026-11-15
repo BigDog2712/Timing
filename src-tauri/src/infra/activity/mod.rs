@@ -1,3 +1,4 @@
+pub mod activity_layout;
 pub mod app_paths;
 pub mod clock;
 pub mod credentials;

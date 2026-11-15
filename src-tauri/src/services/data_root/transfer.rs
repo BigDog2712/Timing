@@ -19,39 +19,16 @@ use std::path::{Component, Path, PathBuf};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::SqlitePool;
 
-use super::activity_copy::{self, DB_FILE as ACTIVITY_DB};
+use super::activity_copy;
+use super::entries::layout_entries;
 use crate::error::{AppError, AppResult, ErrorCode};
-use crate::infra::appdata_migrate::marker::MARKER_FILE;
-use crate::models::data_root::{DataRootEntry, USER_TABLES};
+use crate::infra::activity::storage_paths::{ACTIVITY_DATA_REL, SQLITE_DB_FILE_NAME};
+use crate::models::data_root::USER_TABLES;
 
-/// 清单里的一项。`path` 与 `label` 分开：`patina` 只搬 `patina/data`，而给用户看的名字
-/// 该是「patina」——把 `patina/data` 原样印进确认对话框等于让用户自己翻译目录结构。
-struct Entry {
-    /// 相对数据根的路径（可以带子目录，`/` 分段在 Windows 上同样成立）。
-    path: &'static str,
-    /// 确认对话框里显示的名字。
-    label: &'static str,
-    is_dir: bool,
-}
-
-/// 活动数据那一项：**不能按普通目录拷**——库是活的，见 `activity_copy`。
-pub(super) const ACTIVITY_DIR: &str = "patina/data";
-
-/// 六项清单（顺序固定，与 PRD 4.2 / 设计 §3.6 一致）。
-///
-/// `is_dir = true` 的项在目标里 `create_dir_all` 后逐文件复制；源不存在 → 跳过且
-/// `present: false`（**不造空目录**）。
-///
-/// `patina` 只搬 `patina/data`，**不搬 `patina/webview`**（WebView2 的用户数据目录，
-/// 切换时正被运行中的窗口占着），且这一项不走上面的普通复制，见 `ACTIVITY_DIR`。
-const ENTRIES: [Entry; 6] = [
-    Entry { path: "timing.db", label: "timing.db", is_dir: false },
-    Entry { path: "backups", label: "backups", is_dir: true },
-    Entry { path: "logs", label: "logs", is_dir: true },
-    Entry { path: "md", label: "md", is_dir: true },
-    Entry { path: ACTIVITY_DIR, label: "patina", is_dir: true },
-    Entry { path: MARKER_FILE, label: MARKER_FILE, is_dir: false },
-];
+/* 六项清单与体积住在 `entries` 里（拆出去的理由见那个模块头）：活动数据那一项的
+**源**路径是运行期派生的——T05 迁移 fail-open 回旧布局时它在 `patina/data`，
+写成编译期常量就会让「搬盘」静默漏掉整个活动历史。这里重导出，调用点不变。 */
+pub use super::entries::{entries, total_bytes};
 
 /// 核对失败时留在目标目录里的说明文件名（用户可自己删）。
 pub const INCOMPLETE_FILE: &str = "MIGRATION-INCOMPLETE.txt";
@@ -64,51 +41,35 @@ pub(crate) fn io_fail(message: impl Into<String>) -> AppError {
     AppError::new(ErrorCode::IoError, message.into())
 }
 
-/// 六项清单的当前状态（给确认对话框用）。
-pub fn entries(root: &Path) -> Vec<DataRootEntry> {
-    ENTRIES
-        .iter()
-        .map(|entry| {
-            let path = root.join(entry.path);
-            let present = if entry.is_dir {
-                path.is_dir()
-            } else {
-                path.is_file()
-            };
-            DataRootEntry {
-                name: entry.label.to_string(),
-                is_dir: entry.is_dir,
-                present,
-                bytes: if present { measure(&path) } else { 0 },
-            }
-        })
-        .collect()
-}
-
-/// 六项体积之和（递归求和，不设上限——这是应用自己的数据根）。
-pub fn total_bytes(root: &Path) -> u64 {
-    entries(root).iter().map(|entry| entry.bytes).sum()
-}
-
 /// 复制六项到目标。目标目录由调用方保证「空或不存在」。
 pub async fn copy_all(pool: &SqlitePool, source: &Path, dest: &Path) -> AppResult<()> {
     fs::create_dir_all(dest)
         .map_err(|err| io_fail(format!("建不了目标目录 {}：{err}", dest.display())))?;
     /* 库先走 VACUUM INTO（不碰 -wal / -shm，见模块头）。 */
     copy_db(pool, &dest.join("timing.db")).await?;
-    for entry in ENTRIES {
+    /* 清单按**源根的实际布局**派生：Legacy 时活动数据在 `patina/data`，目标仍写
+    `activity/data`（新根永远是新布局）。 */
+    for entry in layout_entries(source) {
         let from = source.join(entry.path);
         if entry.path == "timing.db" || !from.exists() {
             continue;
         }
-        let to = dest.join(entry.path);
-        let copied = match entry.path {
-            /* 活动库是**活的**（分析窗开着、池开着）：只能 `VACUUM INTO`，见 `activity_copy`。 */
-            ACTIVITY_DIR => activity_copy::copy_activity_dir(&from, &to).await,
-            _ if entry.is_dir => copy_tree(&from, &to),
-            _ => fs::copy(&from, &to).map_err(|err| format!("{err}")),
+        let to = dest.join(entry.dest_path);
+        let copied = match entry.activity_source_db {
+            /* 活动库是**活的**（分析窗开着、池开着）：只能 `VACUUM INTO`，见 `activity_copy`。
+            源库名与目标库名可能不同（T05 迁移时 `patina.db` → `activity.db`）。
+
+            这里搬的是 `activity_layout::source_spec_in` 按**纯文件系统**口径选出的那一份，
+            **不是** `data_layout()` 判据认可的那一份（`fs_only_layout_in` 的文档写了为什么：
+            `quick_check` 要 `block_on`，在异步命令里会 panic）。所以「搬一个判据不认可的库」
+            是**故意**的——搬盘的职责是「用户的数据在哪个文件里，就把那个文件搬到新根去」，
+            判据不认可只影响「应用读谁」，不影响「哪个文件里有数据」。真要连判据一起搬，
+            得先把完整性检测挪进 `spawn_blocking`，那是另一件事。 */
+            Some(source_db) => activity_copy::copy_activity_dir(&from, &to, source_db).await,
+            None if entry.is_dir => copy_tree(&from, &to),
+            None => fs::copy(&from, &to).map_err(|err| format!("{err}")),
         };
-        copied.map_err(|err| io_fail(format!("复制 {} 失败：{err}", entry.path)))?;
+        copied.map_err(|err| io_fail(format!("复制 {} 失败：{err}", entry.label)))?;
     }
     Ok(())
 }
@@ -137,8 +98,9 @@ pub async fn verify(pool: &SqlitePool, dest: &Path) -> AppResult<()> {
         }
     }
     /* 活动库那份副本同样得核，但只查**副本自身**（不与源库比行数：用户此刻可能正在记
-    一条新的，比出不一致就是假报警）。损坏的副本一样落进 `write_incomplete` 那条路。 */
-    activity_copy::verify_copy(&dest.join(ACTIVITY_DIR).join(ACTIVITY_DB))
+    一条新的，比出不一致就是假报警）。损坏的副本一样落进 `write_incomplete` 那条路。
+    目标侧恒为新布局（`ACTIVITY_DATA_REL` + 新库名），与源是哪种布局无关。 */
+    activity_copy::verify_copy(&dest.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME))
         .await
         .map_err(io_fail)?;
     Ok(())
@@ -189,18 +151,6 @@ async fn counts_of(pool: &SqlitePool) -> AppResult<Vec<(String, i64)>> {
         out.push((table.to_string(), rows));
     }
     Ok(out)
-}
-
-/// 递归体积（文件取 `len`，目录递归求和）。
-fn measure(path: &Path) -> u64 {
-    let Ok(meta) = fs::metadata(path) else { return 0 };
-    if meta.is_file() {
-        return meta.len();
-    }
-    let Ok(items) = fs::read_dir(path) else {
-        return 0;
-    };
-    items.flatten().map(|item| measure(&item.path())).sum()
 }
 
 /// 逐文件递归复制（目录不存在就建）。返回复制的字节数。

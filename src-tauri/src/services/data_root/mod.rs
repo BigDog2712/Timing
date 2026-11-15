@@ -27,6 +27,8 @@
 
 /* 活动库那一项的复制与核对：库是活的（分析窗开着），不能按普通目录拷。 */
 mod activity_copy;
+/* 六项清单：活动数据那一项的源路径是运行期派生的（T05 可能 fail-open 回旧布局）。 */
+mod entries;
 pub mod transfer;
 
 use std::path::{Path, PathBuf};

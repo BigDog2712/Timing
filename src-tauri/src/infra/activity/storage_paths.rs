@@ -5,19 +5,49 @@ use tauri::{AppHandle, Runtime};
 /// 活动库的**唯一真源**。
 ///
 /// ⚠️ 这是**已落盘坐标**：它同时是用户磁盘上的文件名、`_sqlx_migrations` 之外一切
-/// 搬迁/备份/核对的基准。改名必须与一次数据迁移同时做（T05），单独改这里等于让
-/// 同一进程去开两个库文件。
-pub const SQLITE_DB_FILE_NAME: &str = "patina.db";
+/// 搬迁/备份/核对的基准。[T05] 已由 `patina.db` 改为 `activity.db`；旧库
+/// （`LEGACY_ACTIVITY_DB_FILE`）由迁移复制过来，**不删**。
+pub const SQLITE_DB_FILE_NAME: &str = "activity.db";
 
-/// 活动数据在数据根下的子目录名（`<数据根>/patina/data`）。
+/// 活动数据在数据根下的子目录名（`<数据根>/activity`）。
+pub const ACTIVITY_SUBDIR: &str = "activity";
+
+/// 活动数据相对数据根的子目录（`<数据根>/activity/data`）。
+pub const ACTIVITY_DATA_REL: &str = "activity/data";
+
+/// 活动数据在数据根下的子目录名（`data` 那一层，`<数据根>/activity/data`）。
 pub const DATA_SUBDIR: &str = "data";
+
+/// 活动 **webview profile** 在活动子目录下的名字（`<数据根>/activity/webview`）。
+pub const WEBVIEW_SUBDIR: &str = "webview";
+
+/// **T05 之前**活动数据相对数据根的目录（`<数据根>/patina/data`）。
+///
+/// 只许出现在「读旧布局」的地方：迁移的源侧、旧根探测。**不许**用它新建任何东西——
+/// 这条与 `UPSTREAM_PRODUCT_FOLDER` 同性质（别人的/过去的坐标，永久冻结），
+/// 区别只是那个是上游安装目录，这个是**我们自己**的旧目录。
+pub const LEGACY_ACTIVITY_DATA_REL: &str = "patina/data";
+
+/// **T05 之前**的活动库文件名（`<数据根>/patina/data/patina.db`）。
+///
+/// 与 `LEGACY_ACTIVITY_DATA_REL` 成对：迁移时源库叫这个名字，目标库恒用
+/// `SQLITE_DB_FILE_NAME`。两者**不能合成一个常量**——合成之后「源 ≠ 目标」这件事
+/// 就从代码里消失了，而它正是这次迁移的全部内容。
+pub const LEGACY_ACTIVITY_DB_FILE: &str = "patina.db";
 
 /// 活动库的三个伴生文件：`-wal` / `-shm` / `-journal`。
 ///
 /// **由 `SQLITE_DB_FILE_NAME` 派生，不许再写字面量。** 库名与伴生名一旦分叉，
 /// 数据根搬迁时会把 `-wal` 当成普通文件拷过去（得到撕裂的一页），或反过来漏掉它。
 pub fn sqlite_sidecar_names() -> [String; 3] {
-    ["-wal", "-shm", "-journal"].map(|suffix| format!("{SQLITE_DB_FILE_NAME}{suffix}"))
+    sqlite_sidecar_names_of(SQLITE_DB_FILE_NAME)
+}
+
+/// 指定库名的伴生文件。迁移要按**源**库名跳过伴生文件（源叫 `patina.db` 时它的伴生
+/// 是 `patina.db-wal`，不是 `activity.db-wal`）——按目标名跳会漏掉它们，把 `-wal` 当
+/// 普通文件拷进新目录。
+pub fn sqlite_sidecar_names_of(file_name: &str) -> [String; 3] {
+    ["-wal", "-shm", "-journal"].map(|suffix| format!("{file_name}{suffix}"))
 }
 
 const BACKUP_DIR_NAME: &str = "backups";
@@ -25,14 +55,14 @@ const REMOTE_BACKUP_TEMP_DIR_NAME: &str = "remote-backup-temp";
 
 /// Timing 真正的数据根（`%APPDATA%\com.timing.app`）。
 ///
-/// `StoragePaths` 描述的是它下面 `patina/data` 那一层（活动库 + 备份 + 远端临时件）。
+/// `StoragePaths` 描述的是它下面 `activity/data` 那一层（活动库 + 备份 + 远端临时件）。
 /// 设置页「数据目录」那一行要给用户看的是**数据根**，不是这一层——用户问的是
-/// 「我的数据都在哪」，答案里有 `timing.db`、`md/`、`logs/`、`plugins/`、`patina/`。
+/// 「我的数据都在哪」，答案里有 `timing.db`、`md/`、`logs/`、`plugins/`、`activity/`。
 ///
-/// 顺带核实（V0.13.x，**只做判定，不做清理**）：`<数据根>/patina/patina.db` 与
-/// `<数据根>/patina/data/patina.db` 在真机上同时存在，前者是 **0 字节的遗留空文件**
-/// （早期融合布局把 `data_root` 当成 `patina/` 时留下的），活库在后者。
-/// 不写自动删除：那是用户目录里的文件，判据不足时删库的代价远大于留一个空文件。
+/// 顺带核实（V0.13.x，**只做判定，不做清理**）：老布局里 `<数据根>/patina/patina.db`
+/// 与 `<数据根>/patina/data/patina.db` 在真机上同时存在，前者是 **0 字节的遗留空文件**
+/// （早期融合布局把 `data_root` 当成 `patina/` 时留下的），活库在后者。T05 迁移后
+/// 这两份都留在 `patina/` 下当只读快照，由用户自己删。
 pub fn timing_data_root() -> PathBuf {
     crate::platform::app_dir::data_root()
 }
@@ -169,87 +199,8 @@ fn product_folder_name_eq(left: &str, right: &str) -> bool {
     }
 }
 
+/* 本文件已贴着 300 行门禁：用例住到 `storage_paths_tests.rs`（仓里既有做法，
+见 `activity_layout_tests.rs` / `storage_usage_tests.rs`）。 */
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn missing_custom_database_never_uses_existing_default_database() {
-        let root =
-            std::env::temp_dir().join(format!("patina-path-resolution-{}", std::process::id()));
-        std::fs::create_dir_all(&root).unwrap();
-        std::fs::write(root.join(SQLITE_DB_FILE_NAME), b"different database").unwrap();
-        let defaults = StoragePaths::from_roots(root.clone(), root.clone(), false, false);
-        let state = serde_json::from_value(serde_json::json!({
-            "format":"patina.storage-control.v1", "profile":"dev", "dataRoot":root.join("missing"),
-            "webviewRoot":null, "pending":null, "cleanupFiles":[],
-            "maintenance":{"format":"patina.storage-maintenance-state.v1", "lastWebviewCacheTrimAtMs":null,"lastMaintenanceError":null}
-        })).unwrap();
-        assert!(resolve_roots(defaults, state)
-            .unwrap_err()
-            .contains("custom database"));
-        assert_eq!(
-            std::fs::read(root.join(SQLITE_DB_FILE_NAME)).unwrap(),
-            b"different database"
-        );
-        std::fs::remove_file(root.join(SQLITE_DB_FILE_NAME)).unwrap();
-        std::fs::remove_dir(root).unwrap();
-    }
-
-    #[test]
-    fn custom_webview_root_uses_product_root_as_webview_parent() {
-        assert_eq!(
-            derive_custom_webview_root(Path::new("D:\\Patina Data")),
-            PathBuf::from("D:\\Patina Data")
-        );
-    }
-
-    #[test]
-    fn custom_data_root_uses_product_folder_under_selected_root() {
-        assert_eq!(
-            derive_custom_data_root(Path::new("D:\\Storage"), "Patina"),
-            PathBuf::from("D:\\Storage\\Patina")
-        );
-    }
-
-    #[test]
-    fn custom_data_root_does_not_duplicate_product_folder() {
-        assert_eq!(
-            derive_custom_data_root(Path::new("D:\\Storage\\Patina"), "Patina"),
-            PathBuf::from("D:\\Storage\\Patina")
-        );
-    }
-
-    #[test]
-    fn custom_data_root_still_honours_the_shipped_product_folder_name() {
-        /* 这条锁的是 `PRODUCT_FOLDER` 的**后果**，值锁在 `app_paths` 的
-        `product_and_identifier_coordinates_are_frozen` 里。为什么两处都要：用户选根时
-        选成 `D:\Patina`，`derive_custom_data_root` 必须认作「已经是产品目录」而不再拼一层。
-        `PRODUCT_FOLDER` 一改名，同一句话就变成 `D:\Patina\NewName` —— 数据根静默搬家，
-        用户在设置页看到的是「已切换」而历史全空。
-
-        传真实常量而不是字面量：传字面量的话它只测到 `product_folder_name_eq` 的实现，
-        `PRODUCT_FOLDER` 改了照样绿。 */
-        assert_eq!(
-            derive_custom_data_root(Path::new(r"D:\Patina"), app_paths::PRODUCT_FOLDER),
-            PathBuf::from(r"D:\Patina")
-        );
-    }
-
-    #[test]
-    fn storage_paths_keep_remote_temp_under_data_root() {
-        let paths = StoragePaths::from_roots(
-            PathBuf::from("D:\\Patina Data"),
-            PathBuf::from("D:\\Patina Data\\webview"),
-            true,
-            true,
-        );
-
-        assert_eq!(paths.db_path, PathBuf::from("D:\\Patina Data\\patina.db"));
-        assert_eq!(paths.backup_dir, PathBuf::from("D:\\Patina Data\\backups"));
-        assert_eq!(
-            paths.remote_backup_temp_dir,
-            PathBuf::from("D:\\Patina Data\\remote-backup-temp")
-        );
-    }
-}
+#[path = "storage_paths_tests.rs"]
+mod storage_paths_tests;

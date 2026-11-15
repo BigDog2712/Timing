@@ -1,4 +1,4 @@
-//! 活动库（`<数据根>/patina/data/patina.db`）的搬迁复制。
+//! 活动库（`<数据根>/activity/data/activity.db`，T05 之前是 `patina/…/patina.db`）的搬迁复制。
 //!
 //! 为什么单独一个文件：`transfer.rs` 已经贴着 300 行门禁，而这半场是整份清单里唯一
 //! 「被搬的库正被另一个子系统写着」的一项，复制方式与其余五项不同，硬塞进那个循环里
@@ -23,19 +23,28 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 /* 活动库的文件名与伴生文件都**从 `storage_paths` 取**，本模块不再自带字面量。
 
    为什么重要：这个文件是搬迁的**写侧**，而 `storage_paths` 是读侧的基准。两边各写
-   一份 `"patina.db"` 时今天恰好一致，改名的那个提交里就会分叉 —— 搬迁把新库写到
-   `activity.db`、核对却盯着 `patina.db`，表现为「切过去了但历史是空的」。 */
-use crate::infra::activity::storage_paths::{sqlite_sidecar_names, SQLITE_DB_FILE_NAME};
+   一份库名时今天恰好一致，改名的那个提交里就会分叉 —— 搬迁把新库写到 `activity.db`、
+   核对却盯着旧名，表现为「切过去了但历史是空的」。 */
+use crate::infra::activity::activity_layout;
+use crate::infra::activity::storage_paths::{
+    sqlite_sidecar_names_of, ACTIVITY_DATA_REL, SQLITE_DB_FILE_NAME,
+};
 
-/* `DB_FILE` 是给 `transfer.rs` 用的**别名**，不是第二份字面量：`transfer.rs` 正好贴着
-   300 行门禁，让它改 import 就必然涨到 301；而别名一行解决，且「库名只有一个真源」
-   照样成立（别名指向 `storage_paths::SQLITE_DB_FILE_NAME`）。 */
-pub(super) use crate::infra::activity::storage_paths::SQLITE_DB_FILE_NAME as DB_FILE;
-
-/// 复制 `<source>`（= `patina/data`）整个目录到 `<dest>`，返回搬过去的字节数。
-pub(super) async fn copy_activity_dir(source: &Path, dest: &Path) -> Result<u64, String> {
+/// 复制一份活动数据目录到 `<dest>`，返回搬过去的字节数。
+///
+/// `source_db_name` 是**源库的文件名**，可能与目标库名不同：T05 迁移时源是
+/// `patina.db`、目标是 `activity.db`。这个参数就是为那件事存在的，**不许**图省事
+/// 把它当成两处共用的名字——源侧用它判断「有没有库要搬」，目标侧恒用
+/// `SQLITE_DB_FILE_NAME`。把它写成两处共用的名字，迁移就会产出
+/// `activity/data/patina.db`，而布局决议按 `activity.db` 找 ⇒ 判「没迁」，用户看到
+/// 空历史、零报错。
+pub(super) async fn copy_activity_dir(
+    source: &Path,
+    dest: &Path,
+    source_db_name: &str,
+) -> Result<u64, String> {
     fs::create_dir_all(dest).map_err(|err| format!("建不了 {}：{err}", dest.display()))?;
-    let from_db = source.join(SQLITE_DB_FILE_NAME);
+    let from_db = source.join(source_db_name);
     if !from_db.is_file() {
         /* 首启还没建库的正常情况：目录里只剩 `diagnostics/` 之类，照原样拷（没有活的库，
         也就没有撕裂可言）。 */
@@ -43,14 +52,15 @@ pub(super) async fn copy_activity_dir(source: &Path, dest: &Path) -> Result<u64,
     }
     vacuum_into(&from_db, &dest.join(SQLITE_DB_FILE_NAME)).await?;
     let mut bytes = fs::metadata(dest.join(SQLITE_DB_FILE_NAME)).map_or(0, |meta| meta.len());
-    /* 伴生文件按 `SQLITE_DB_FILE_NAME` 现场派生：手写 `patina.db-wal` 会在库名改名时
-    静默失效，于是 `-wal` 被当成普通文件搬过去（别处拷走的是撕裂的那一页）。 */
-    let sidecars = sqlite_sidecar_names();
+    /* 伴生文件按**源**库名现场派生：迁移时源叫 `patina.db`，它的伴生是
+    `patina.db-wal`。按目标名派生会一个也匹配不上，于是 `-wal` 被当成普通文件搬过去
+    （搬走的是撕裂的那一页）。 */
+    let sidecars = sqlite_sidecar_names_of(source_db_name);
     let items =
         fs::read_dir(source).map_err(|err| format!("读不了 {}：{err}", source.display()))?;
     for item in items.flatten() {
         let name = item.file_name().to_string_lossy().into_owned();
-        if name == SQLITE_DB_FILE_NAME || sidecars.iter().any(|side| side == &name) {
+        if name == source_db_name || sidecars.iter().any(|side| side == &name) {
             continue;
         }
         let path = item.path();
@@ -58,6 +68,9 @@ pub(super) async fn copy_activity_dir(source: &Path, dest: &Path) -> Result<u64,
         bytes += if path.is_dir() {
             super::transfer::copy_tree(&path, &to)?
         } else {
+            /* 本文件是**唯一**会产出 `.db` 的地方（上面 `vacuum_into` 的目标）；
+            走到这里的都是非库文件（`backups/` `diagnostics/` 标记文件），
+            库与伴生已在上一行被跳过。 */
             fs::copy(&path, &to).map_err(|err| format!("{}：{err}", path.display()))?
         };
     }
@@ -101,7 +114,7 @@ async fn vacuum_into(source: &Path, dest: &Path) -> Result<(), String> {
 ///
 /// 为什么不比行数：源库此刻可能正在被用户记一条新的，比出不一致就是假报警；而
 /// `quick_check` 让 SQLite 自己把副本的 B-tree 走一遍，看不见的结构性损坏当场现形。
-pub(super) async fn verify_copy(path: &Path) -> Result<(), String> {
+pub(crate) async fn verify_copy(path: &Path) -> Result<(), String> {
     if !path.is_file() {
         return Ok(());
     }
@@ -135,16 +148,19 @@ pub(super) async fn verify_copy(path: &Path) -> Result<(), String> {
 /// - 当前根已经有活动库 → 不插手（正常路径已经搬过）。
 pub(super) async fn recover_legacy(current: &Path, legacy: Option<&Path>, dest: &Path) {
     let Some(legacy) = legacy else { return };
-    let from_dir = Path::new(legacy).join(super::transfer::ACTIVITY_DIR);
-    let already_there = current
-        .join(super::transfer::ACTIVITY_DIR)
-        .join(SQLITE_DB_FILE_NAME)
-        .exists();
-    if already_there || !from_dir.join(SQLITE_DB_FILE_NAME).is_file() {
+    let legacy = Path::new(legacy);
+    /* 当前根已经有活动库（任一套布局）→ 正常路径已经搬过，不插手。 */
+    if activity_layout::activity_source_in(current).is_some() {
         return;
     }
-    let to = dest.join(super::transfer::ACTIVITY_DIR);
-    match copy_activity_dir(&from_dir, &to).await {
+    /* 旧根是被**哪一代版本**写的并不确定：T05 之后版本写的根里是 `activity/data`，
+    之前的是 `patina/data`。两套都探，两份都在时按约束 8 取 mtime 较新（平局取新命名）
+    ——`activity_source_in` 是那条规则的唯一实现，这里不另写一份。 */
+    let Some((layout, from_dir)) = activity_layout::activity_source_in(legacy) else {
+        return;
+    };
+    let to = dest.join(ACTIVITY_DATA_REL);
+    match copy_activity_dir(&from_dir, &to, activity_layout::db_file_of(layout)).await {
         Ok(bytes) => crate::log_info!(
             "data root: 旧根 {} 的活动库补到 {}（{bytes} 字节）",
             from_dir.display(),

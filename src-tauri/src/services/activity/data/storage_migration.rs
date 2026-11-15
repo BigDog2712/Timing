@@ -1023,6 +1023,12 @@ fn pause_migration_for_recovery_test(phase: &str) {
 mod tests {
     use super::*;
 
+    /// 伴生文件名，由 `SQLITE_DB_FILE_NAME` 派生（夹具不许写字面量：库名一改，它会去
+    /// 断言一个永不存在的文件，于是「伴生文件被跳过」的用例变成空转）。
+    fn sidecar_name(suffix: &str) -> String {
+        format!("{}-{suffix}", storage_paths::SQLITE_DB_FILE_NAME)
+    }
+
     #[test]
     fn interrupted_sqlite_writer() {
         let Ok(root) = std::env::var("PATINA_TEST_INTERRUPTED_MIGRATION_SOURCE") else {
@@ -1063,7 +1069,7 @@ mod tests {
             .status()
             .unwrap();
         assert!(status.success());
-        assert!(source.join("patina.db-journal").exists());
+        assert!(source.join(sidecar_name("journal")).exists());
         copy_sqlite_files(&source, &target).unwrap();
         tauri::async_runtime::block_on(async {
             for directory in [&target, &source] {
@@ -1454,24 +1460,18 @@ mod tests {
         fs::create_dir_all(root.join("remote-backup-temp")).unwrap();
         fs::create_dir_all(root.join("webview").join("EBWebView")).unwrap();
         fs::write(root.join(storage_paths::SQLITE_DB_FILE_NAME), b"db").unwrap();
-        fs::write(
-            root.join(format!("{}-wal", storage_paths::SQLITE_DB_FILE_NAME)),
-            b"wal",
-        )
-        .unwrap();
+        fs::write(root.join(sidecar_name("wal")), b"wal").unwrap();
         fs::write(root.join("backups").join("backup.zip"), b"backup").unwrap();
         fs::write(root.join("remote-backup-temp").join("temp.zip"), b"temp").unwrap();
         fs::write(root.join("data-anchor.json"), b"anchor").unwrap();
-        fs::write(root.join("patina.db-journal"), b"journal").unwrap();
+        fs::write(root.join(sidecar_name("journal")), b"journal").unwrap();
 
         clean_old_data_payload(&root, false).unwrap();
 
         assert!(!root.join(storage_paths::SQLITE_DB_FILE_NAME).exists());
-        assert!(!root
-            .join(format!("{}-wal", storage_paths::SQLITE_DB_FILE_NAME))
-            .exists());
+        assert!(!root.join(sidecar_name("wal")).exists());
         assert!(!root.join("backups").exists());
-        assert!(!root.join("patina.db-journal").exists());
+        assert!(!root.join(sidecar_name("journal")).exists());
         assert!(!root.join("remote-backup-temp").exists());
         assert!(root.join("data-anchor.json").exists());
         assert!(root.join("webview").join("EBWebView").exists());

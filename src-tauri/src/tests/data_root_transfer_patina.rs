@@ -23,6 +23,10 @@ use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::SqlitePool;
 
 use crate::app::legacy_import;
+use crate::infra::activity::app_paths::UPSTREAM_DB_FILE;
+use crate::infra::activity::storage_paths::{
+    ACTIVITY_DATA_REL, ACTIVITY_SUBDIR, SQLITE_DB_FILE_NAME,
+};
 use crate::infra::db;
 use crate::infra::root_pointer;
 use crate::services::data_root::transfer;
@@ -107,15 +111,18 @@ async fn count_sessions(path: &Path) -> i64 {
 }
 
 /// 旧根：一个正常的数据根（`timing.db` + 活动库 + 运行中的 WebView2 缓存）。
+///
+/// 活动数据按**当前**布局搭（`activity/data/activity.db`）：这是 T05 之后的常态，
+/// 「旧布局也能搬」由 `data_root_transfer_patina_legacy` 与 M-16 那组用例覆盖。
 async fn root_with_activity(tag: &str) -> (std::path::PathBuf, SqlitePool) {
     let dir = support::unique_dir(tag);
     let pool = db::init_pool(&dir).await.expect("建库");
-    let activity = dir.join("patina").join("data");
-    std::fs::create_dir_all(&activity).expect("建 patina/data");
-    write_activity_db(&activity.join("patina.db"), 1).await;
+    let activity = dir.join(ACTIVITY_DATA_REL);
+    std::fs::create_dir_all(&activity).expect("建 activity/data");
+    write_activity_db(&activity.join(SQLITE_DB_FILE_NAME), 1).await;
     std::fs::write(activity.join(legacy_import::IMPORT_MARKER), b"imported\n").expect("写标记");
     /* WebView2 的用户数据目录：切换时正被窗口占着，搬它只会拿到一批被锁的文件。 */
-    let cache = dir.join("patina").join("webview").join("Cache");
+    let cache = dir.join(ACTIVITY_SUBDIR).join("webview").join("Cache");
     std::fs::create_dir_all(&cache).expect("建缓存目录");
     std::fs::write(cache.join("blob"), b"cache").expect("写缓存");
     (dir, pool)
@@ -131,7 +138,7 @@ async fn moving_the_root_carries_the_activity_database() {
         .await
         .expect("复制应成功");
 
-    let copied = dest.join("patina").join("data").join("patina.db");
+    let copied = dest.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME);
     assert!(
         copied.is_file(),
         "活动库必须跟着数据根一起搬：新位置没有它 = 用户的活动历史没了"
@@ -139,15 +146,15 @@ async fn moving_the_root_carries_the_activity_database() {
     assert!(dest.join("timing.db").is_file(), "两个库都要在新根里");
     assert_eq!(count_sessions(&copied).await, 1, "搬过去的是那份历史，不是空库");
     assert!(
-        source.join("patina/data/patina.db").is_file(),
+        source.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME).is_file(),
         "旧目录不删（用户重启确认没问题之后自己删）"
     );
     assert!(
-        dest.join("patina/data").join(legacy_import::IMPORT_MARKER).is_file(),
+        dest.join(ACTIVITY_DATA_REL).join(legacy_import::IMPORT_MARKER).is_file(),
         "「已处理过」标记必须跟着活动数据一起走，否则新位置等于从没导入过"
     );
     assert!(
-        !dest.join("patina").join("webview").exists(),
+        !dest.join(ACTIVITY_SUBDIR).join("webview").exists(),
         "WebView2 缓存不搬：它正被运行中的窗口占用，新位置会自己重建"
     );
 
@@ -162,10 +169,10 @@ async fn moving_the_root_carries_the_activity_database() {
 #[test]
 fn marker_blocks_the_first_run_import_even_when_the_library_is_missing() {
     let root = support::unique_dir("patina-marker");
-    let data_dir = root.join("patina").join("data");
+    let data_dir = root.join(ACTIVITY_DATA_REL);
     std::fs::create_dir_all(&data_dir).expect("建 data");
     std::fs::write(data_dir.join(legacy_import::IMPORT_MARKER), b"imported\n").expect("写标记");
-    let upstream = root.join("upstream").join("patina.db");
+    let upstream = root.join("upstream").join(UPSTREAM_DB_FILE);
     std::fs::create_dir_all(root.join("upstream")).expect("建 upstream 目录");
     block_on(write_activity_db(&upstream, 2));
     assert_eq!(
@@ -178,7 +185,7 @@ fn marker_blocks_the_first_run_import_even_when_the_library_is_missing() {
 
     assert!(outcome.is_none(), "标记在 = 已处理过，不许再导一次");
     assert!(
-        !data_dir.join("patina.db").exists(),
+        !data_dir.join(SQLITE_DB_FILE_NAME).exists(),
         "标记在时一个字节都不该落盘"
     );
     std::fs::remove_dir_all(&root).ok();
@@ -189,16 +196,16 @@ fn marker_blocks_the_first_run_import_even_when_the_library_is_missing() {
 #[test]
 fn first_run_import_copies_the_upstream_database_and_writes_the_marker() {
     let root = support::unique_dir("patina-import");
-    let data_dir = root.join("patina").join("data");
+    let data_dir = root.join(ACTIVITY_DATA_REL);
     std::fs::create_dir_all(&data_dir).expect("建 data");
-    let upstream = root.join("upstream").join("patina.db");
+    let upstream = root.join("upstream").join(UPSTREAM_DB_FILE);
     std::fs::create_dir_all(root.join("upstream")).expect("建 upstream 目录");
     block_on(write_activity_db(&upstream, 2));
 
     let target = legacy_import::seed_from(&data_dir, None, Some(&upstream))
         .expect("首启导入应成功")
         .expect("第一次必须要导");
-    assert_eq!(target, data_dir.join("patina.db"));
+    assert_eq!(target, data_dir.join(SQLITE_DB_FILE_NAME));
     assert_eq!(
         block_on(count_sessions(&target)),
         2,
@@ -246,9 +253,9 @@ fn first_run_import_copies_the_upstream_database_and_writes_the_marker() {
 #[test]
 fn pointer_present_blocks_the_first_run_import_without_writing_the_marker() {
     let root = support::unique_dir("patina-pointer");
-    let data_dir = root.join("patina").join("data");
+    let data_dir = root.join(ACTIVITY_DATA_REL);
     std::fs::create_dir_all(&data_dir).expect("建 data");
-    let upstream = root.join("upstream").join("patina.db");
+    let upstream = root.join("upstream").join(UPSTREAM_DB_FILE);
     std::fs::create_dir_all(root.join("upstream")).expect("建 upstream 目录");
     block_on(write_activity_db(&upstream, 2));
     assert_eq!(
@@ -269,7 +276,7 @@ fn pointer_present_blocks_the_first_run_import_without_writing_the_marker() {
         "指针在 = 数据根是用户显式选的，不许从上游灌一份"
     );
     assert!(
-        !data_dir.join("patina.db").exists(),
+        !data_dir.join(SQLITE_DB_FILE_NAME).exists(),
         "指针在时一个字节都不该落盘"
     );
     assert!(

@@ -10,6 +10,9 @@
 //! ① 当前根没有活动库 + 旧根有 → 捞回来；
 //! ② 当前根已经有活动库 → 不插手（正常路径已经搬过，旧根那份可能更旧，覆盖就是倒退）。
 
+use crate::infra::activity::storage_paths::{
+    ACTIVITY_DATA_REL, LEGACY_ACTIVITY_DATA_REL, LEGACY_ACTIVITY_DB_FILE, SQLITE_DB_FILE_NAME,
+};
 use crate::infra::db;
 use crate::infra::root_pointer;
 use crate::services::data_root::switch;
@@ -32,9 +35,10 @@ fn pointer_pointing_back(appdata: &std::path::Path, current: &std::path::Path, l
 #[tokio::test]
 async fn orphan_activity_database_in_the_previous_root_is_recovered() {
     let legacy = support::unique_dir("patina-legacy-old");
-    let legacy_activity = legacy.join("patina").join("data");
-    std::fs::create_dir_all(&legacy_activity).expect("建旧根 patina/data");
-    write_activity_db(&legacy_activity.join("patina.db"), 3).await;
+    /* 旧根是 **T05 之前的版本**写的 ⇒ 它里面就是 `patina/data/patina.db`。 */
+    let legacy_activity = legacy.join(LEGACY_ACTIVITY_DATA_REL);
+    std::fs::create_dir_all(&legacy_activity).expect("建旧根活动数据目录");
+    write_activity_db(&legacy_activity.join(LEGACY_ACTIVITY_DB_FILE), 3).await;
     /* 旧根里再放一个**别的**项：捞回只补活动库，不许把它也带过来。 */
     std::fs::create_dir_all(legacy.join("logs")).expect("建旧根 logs");
     std::fs::write(legacy.join("logs").join("app.log"), b"old").expect("写旧日志");
@@ -49,13 +53,13 @@ async fn orphan_activity_database_in_the_previous_root_is_recovered() {
         .await
         .expect("切换应成功");
 
-    let recovered = target.join("patina").join("data").join("patina.db");
+    let recovered = target.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME);
     assert!(recovered.is_file(), "旧根的孤儿活动库必须被捞到新根");
     let (rows, verdict) = inspect_activity(&recovered).await;
     assert_eq!(rows, 3, "捞回来的必须是那份历史，不是空库");
     assert_eq!(verdict, "ok", "捞回来的库必须结构完好");
     assert!(
-        legacy_activity.join("patina.db").is_file(),
+        legacy_activity.join(LEGACY_ACTIVITY_DB_FILE).is_file(),
         "旧根不删（搬迁只复制）"
     );
     assert!(
@@ -73,15 +77,16 @@ async fn orphan_activity_database_in_the_previous_root_is_recovered() {
 #[tokio::test]
 async fn existing_activity_database_in_the_current_root_is_not_overwritten_by_the_orphan() {
     let legacy = support::unique_dir("patina-legacy-old2");
-    let legacy_activity = legacy.join("patina").join("data");
-    std::fs::create_dir_all(&legacy_activity).expect("建旧根 patina/data");
-    write_activity_db(&legacy_activity.join("patina.db"), 5).await;
+    let legacy_activity = legacy.join(LEGACY_ACTIVITY_DATA_REL);
+    std::fs::create_dir_all(&legacy_activity).expect("建旧根活动数据目录");
+    write_activity_db(&legacy_activity.join(LEGACY_ACTIVITY_DB_FILE), 5).await;
 
     let current = support::unique_dir("patina-legacy-current2");
     let pool = db::init_pool(&current).await.expect("建业务库");
-    let current_activity = current.join("patina").join("data");
-    std::fs::create_dir_all(&current_activity).expect("建当前根 patina/data");
-    write_activity_db(&current_activity.join("patina.db"), 1).await;
+    /* 当前根按**新**布局有库：这是 T05 之后的常态，也是「不许被旧根那份覆盖」的保护对象。 */
+    let current_activity = current.join(ACTIVITY_DATA_REL);
+    std::fs::create_dir_all(&current_activity).expect("建当前根活动数据目录");
+    write_activity_db(&current_activity.join(SQLITE_DB_FILE_NAME), 1).await;
     let appdata = support::unique_dir("patina-legacy-appdata2");
     pointer_pointing_back(&appdata, &current, &legacy);
 
@@ -90,12 +95,62 @@ async fn existing_activity_database_in_the_current_root_is_not_overwritten_by_th
         .await
         .expect("切换应成功");
 
-    let copied = target.join("patina").join("data").join("patina.db");
+    let copied = target.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME);
     let (rows, _) = inspect_activity(&copied).await;
     assert_eq!(
         rows, 1,
         "搬的必须是当前根那份；旧根那 5 行是更早的历史，不许覆盖回来"
     );
+    pool.close().await;
+    std::fs::remove_dir_all(&legacy).ok();
+    std::fs::remove_dir_all(&current).ok();
+    std::fs::remove_dir_all(&appdata).ok();
+    std::fs::remove_dir_all(&target).ok();
+}
+
+/// **M-17（回滚窗口分支）**：旧根里**两套布局都在**时，取 mtime 较新的那一份。
+///
+/// 现场是真实会发生的：T05 迁移过 → 用户回滚到旧版本 → 旧版本继续写
+/// `patina/data/patina.db` → 再升级回来。此时旧根里 `activity/data` 是「升级那一刻冻结
+/// 的副本」、`patina/data` 是「回滚期间继续写的那份」。按「探到哪个用哪个」会取到冻结
+/// 的那份 ⇒ 回滚期间写的历史静默消失。所以这里与约束 8 同口径：比 mtime，取较新。
+#[tokio::test]
+async fn when_the_old_root_has_both_layouts_the_newer_one_wins() {
+    let legacy = support::unique_dir("patina-legacy-both");
+    /* 冻结的那份：迁移时刻的副本，1 行。 */
+    let frozen = legacy.join(ACTIVITY_DATA_REL);
+    std::fs::create_dir_all(&frozen).expect("建 activity/data");
+    write_activity_db(&frozen.join(SQLITE_DB_FILE_NAME), 1).await;
+    /* 回滚期间继续写的旧库：4 行，而且 mtime 更新。 */
+    let rolled = legacy.join(LEGACY_ACTIVITY_DATA_REL);
+    std::fs::create_dir_all(&rolled).expect("建 patina/data");
+    let rolled_db = rolled.join(LEGACY_ACTIVITY_DB_FILE);
+    write_activity_db(&rolled_db, 4).await;
+    let later = std::time::SystemTime::now() + std::time::Duration::from_secs(1);
+    std::fs::File::options()
+        .write(true)
+        .open(&rolled_db)
+        .expect("打开旧库改 mtime")
+        .set_modified(later)
+        .expect("改 mtime");
+
+    let current = support::unique_dir("patina-legacy-both-current");
+    let pool = db::init_pool(&current).await.expect("建业务库");
+    let appdata = support::unique_dir("patina-legacy-both-appdata");
+    pointer_pointing_back(&appdata, &current, &legacy);
+
+    let target = support::unique_dir("patina-legacy-both-new");
+    switch(&pool, &appdata, &current, &target.display().to_string())
+        .await
+        .expect("切换应成功");
+
+    let copied = target.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME);
+    let (rows, verdict) = inspect_activity(&copied).await;
+    assert_eq!(
+        rows, 4,
+        "回滚窗口：必须取 mtime 较新的那份（回滚期间写的 4 行），否则这段历史静默消失"
+    );
+    assert_eq!(verdict, "ok");
     pool.close().await;
     std::fs::remove_dir_all(&legacy).ok();
     std::fs::remove_dir_all(&current).ok();

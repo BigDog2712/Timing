@@ -132,7 +132,7 @@ fn entries_report_presence_and_skip_missing_dirs() {
             "backups",
             "logs",
             "md",
-            "patina",
+            "activity",
             "migrated-from-tickbar-app.json"
         ],
         "六项与顺序是 PRD 4.2 的口径"
@@ -143,11 +143,14 @@ fn entries_report_presence_and_skip_missing_dirs() {
     assert!(md_entry.present && md_entry.is_dir && md_entry.bytes == 3);
     let backups = &entries[1];
     assert!(!backups.present, "源里没有就不许报 0 字节");
-    /* `patina` 的名字与路径不同（只搬 `patina/data`）：显示给用户的必须是短名，
-       否则确认对话框里会出现 `patina/data\` 这种要用户自己翻译的目录结构。 */
-    let patina = &entries[4];
-    assert_eq!(patina.name, "patina");
-    assert!(patina.is_dir && !patina.present, "没有活动数据就不许报 0 字节");
+    /* 活动数据那一项的名字与路径不同（只搬 `<活动子目录>/data`）：显示给用户的必须是
+       短名，否则确认对话框里会出现 `activity/data\` 这种要用户自己翻译的目录结构。 */
+    let activity = &entries[4];
+    assert_eq!(activity.name, "activity");
+    assert!(
+        activity.is_dir && !activity.present,
+        "没有活动数据就不许报 0 字节"
+    );
     assert_eq!(transfer::total_bytes(&root), 13, "只算六项之和");
     std::fs::remove_dir_all(&root).ok();
 }
