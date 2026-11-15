@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
+    "check:build": "vite build",
     "check:contract": "node scripts/check-contract.mjs",
     "check:brand": "node scripts/brand-gate.mjs",
     "check:size": "node scripts/check-size.mjs",
@@ -15,13 +16,12 @@
     "check:layers": "node scripts/check-layers.mjs",
     "check:mutation": "node scripts/check-mutation-markers.mjs",
     "check:runtime-ids": "node scripts/check-runtime-ids.mjs",
-    "check": "npm run typecheck && npm run check:contract && npm run check:size && npm run check:version && npm run check:layers && npm run check:brand && npm run lint && npm run check:mutation && npm run check:runtime-ids",
+    "check": "npm run typecheck && npm run check:build && npm run check:contract && npm run check:size && npm run check:version && npm run check:layers && npm run check:brand && npm run lint && npm run check:mutation && npm run check:runtime-ids",
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "check:layers": "node scripts/check-layers.mjs"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.5",

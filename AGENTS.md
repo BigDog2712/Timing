@@ -47,7 +47,7 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 ```bash
 npm run dev          # 前端 + 浏览器 mock（1420）
 npm run tauri dev    # 完整桌面应用
-npm run check        # 全部门禁：typecheck + contract + size + version + layers + brand + lint + mutation + runtime-ids
+npm run check        # 全部门禁：typecheck + build + contract + size + version + layers + brand + lint + mutation + runtime-ids
 npm run typecheck    # tsc --noEmit，必须 0 错
 npm run lint         # ESLint（只查正确性，不查风格）
 npm test             # vitest（含双端时间公式黄金用例）
@@ -71,6 +71,9 @@ clippy 那两条 `-A` 是**存量豁免**，不是抄错命令：`unwrap_used` /
 
 ## 硬约束（全部由 CI 机械执行，不靠记性）
 
+- **产物必须能生成** → `npm run check:build`（就是 `vite build`）
+  T02 把分析窗子树改成 `activity/` 之后，`src/windows/timing/entry/main.tsx` 还留着 8 行 `../../patina/shell/styles/…css`，**整包构建不出来，而当时九步门禁 + 1844 个测试全绿**。原因有两层：`vitest` 根本不解析 CSS 说明符；`tsc` 也拦不住 —— `vite/client` 把 `*.css` 声明成**通配模块**，任何路径都算「解析成功」。所以这一类错只有真的打包一次才看得见。
+  没有这一步，前面所有判据守的是**一个构建不出来的包**。
 - **单文件 ≤300 行**（前后端一致）→ `npm run check:size`
   超限文件登记在 `scripts/size-allowlist.json` 的**冻结基线**（条数看该文件，由 `--freeze` 扫描生成，禁止手写）——**别在这里写死数字**，它每批都在变，写死就是下一次过期。它是**棘轮**：只许减不许增——行数超过冻结值、或出现不在基线里的新超限文件，一律红。拆分后跑 `node scripts/check-size.mjs --freeze` 收紧。
   **硬目标（2026-11-12 拍板）**：每版至少 **−10 条**，0.15.0 前压到 **100 条以内**；未达标不提交出包。门禁摘要会打印「超限行数 / 总行数」占比 —— 具体数字以 `node scripts/check-size.mjs` 的**输出为准**，别只看条数。
