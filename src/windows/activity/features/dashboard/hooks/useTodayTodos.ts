@@ -135,7 +135,7 @@ export function useTodayTodos(refreshKey: number): TodayTodosState {
     const trimmed = title.trim();
     if (!trimmed) return false;
     /* 这条链路走**直接 IPC**（`patina-todo-notes` 已放行 `todo_create`），
-     * 不是 `patina:host-intent` 事件桥 —— 所以没有"意图有没有发出去"的 `sent` 布尔：
+     * 不是 `activity:host-intent` 事件桥 —— 所以没有"意图有没有发出去"的 `sent` 布尔：
      * 失败就是抛错，`catch` 返回 false。别照 `TimelineManage` 那样写 `if (!sent)`。 */
     try {
       await createTodo(trimmed, plannedAt, remindAt);

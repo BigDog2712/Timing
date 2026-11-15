@@ -33,7 +33,7 @@
 import { errorText, ipc } from './ipc';
 import { useUiStore } from '../stores/uiStore';
 
-/** `patina:host-intent` 里 `sync_app_item_bindings` 的载荷（字段名与 gateway 侧逐字一致） */
+/** `activity:host-intent` 里 `sync_app_item_bindings` 的载荷（字段名与 gateway 侧逐字一致） */
 export interface SyncAppItemBindingsIntent {
   /** 活动库归一后的应用键（`normalize_app_key` / `sessions.app_key` 的同一个值） */
   appKey: string;

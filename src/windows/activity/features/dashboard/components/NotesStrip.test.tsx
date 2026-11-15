@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *      断言立刻红（宿主会去删一张不存在的贴，而用户那张还在）；
  *   ③ 发完意图要立刻调 `model.removeLocal(id)` 并关弹层 —— 否则 30s 后的刷新会把它放回来。
  *
- * 三个写操作都没有：分析窗没有写命令，唯一的出口是 `patina:host-intent`。
+ * 三个写操作都没有：分析窗没有写命令，唯一的出口是 `activity:host-intent`。
  */
 const h = vi.hoisted(() => ({
   emitHostIntent: vi.fn(async () => true),

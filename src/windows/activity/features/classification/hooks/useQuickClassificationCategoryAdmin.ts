@@ -41,7 +41,7 @@ import type { QuickClassificationTarget } from "../types.ts";
  *
  * 分类的写走 `platform/persistence/classificationSettingsGateway`（`cmd_commit_classification_settings`），
  * 分析窗**有这条命令的权限**，映射页一直就是这么写的。事项的写没有这条通道，
- * 所以那一边只能走 `patina:host-intent` —— 两个领域的边界不一样，别照抄。
+ * 所以那一边只能走 `activity:host-intent` —— 两个领域的边界不一样，别照抄。
  *
  * ## 两件事的收尾不一样（有意的）
  *

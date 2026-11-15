@@ -109,7 +109,7 @@ describe("HostIntent 两侧镜像", () => {
  * 两侧实现必须同时跟上——漏改任何一侧，下面两条断言都会红。
  * （T04-3 把命名空间从 `patina` 改成 `activity` 时，只翻转这个常量，不要改断言。）
  */
-const EXPECTED_NAMESPACE = "patina";
+const EXPECTED_NAMESPACE = "activity";
 const EXPECTED_EVENT = `${EXPECTED_NAMESPACE}:host-intent`;
 const EVENT_LITERAL = /const\s+HOST_INTENT\s*=\s*['"]([^'"]+)['"]/;
 

@@ -12,7 +12,7 @@ import { invokeWithCommandError } from "./commandError.ts";
  *   2. 本目录出现 `invokeWithCommandError` 是合法的（L1 组件规则不覆盖 persistence）。
  *   3. 命令名 snake_case、入参 camelCase；ACL 由 `permissions/activity-host-data.toml` 放行两条只读命令。
  *
- * 只读：创建/改名/删除一律走 `patina:host-intent` 事件桥，药丸侧执行 —— 不扩大这扇门。
+ * 只读：创建/改名/删除一律走 `activity:host-intent` 事件桥，药丸侧执行 —— 不扩大这扇门。
  */
 
 export interface TimingItem {

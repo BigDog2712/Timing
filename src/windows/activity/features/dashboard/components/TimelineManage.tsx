@@ -13,7 +13,7 @@
  * ## 为什么这里一条写命令都没有
  *
  * 分析窗的权限面里**没有**写命令（`permissions/activity-host-bridge.toml` 只放行三条只读），
- * 所以每个动作都只是 `patina:host-intent` 的一条意图，由药丸用 `itemApi` / `settingsApi` 落库。
+ * 所以每个动作都只是 `activity:host-intent` 的一条意图，由药丸用 `itemApi` / `settingsApi` 落库。
  * 意图**没有回执**：这里既拿不到新 id，也拿不到失败文案（失败弹在药丸上，§6.5）。
  * 于是两种本地收敛：
  *   · `emitHostIntent` 返回 `false` → **一步都不许推进本地状态**，弹层留着让用户重试

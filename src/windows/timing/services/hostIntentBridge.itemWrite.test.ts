@@ -1,7 +1,7 @@
 /**
  * Timing — 意图执行端：**时间线卡的写意图**（[本轮] 「事项管理」扩了载荷）
  * -----------------------------------------------------------------------------
- * 「新建事项 / 事项管理」在分析窗里都只是 `patina:host-intent` 的一条意图
+ * 「新建事项 / 事项管理」在分析窗里都只是 `activity:host-intent` 的一条意图
  * （分析窗一条写命令都没有）。真正落库的只有这里：`itemApi.create` / `itemApi.update` /
  * `settingsApi.update`。
  *
@@ -136,7 +136,7 @@ async function dispatch(intent: Intent) {
 
 describe('useHostIntentBridge · 时间线卡的写意图', () => {
   it('tl01_listens_on_the_documented_event_name', () => {
-    expect(h.event).toBe('patina:host-intent');
+    expect(h.event).toBe('activity:host-intent');
   });
 
   it('tl02_create_item_creates_with_the_intent_name_and_reloads', async () => {

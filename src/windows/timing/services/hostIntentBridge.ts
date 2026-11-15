@@ -29,7 +29,7 @@ import { openNoteWindowFor, removeNote } from './noteActions';
  * （L9 禁止跨窗 import，两侧各写一份；改一处必须改两处，否则意图「静默不达」）。
  * ⚠️ **不进** 宿主 `IPC_EVENTS`：Rust 从不 emit 它，写进去会被契约门禁判成死常量。
  */
-const HOST_INTENT = 'patina:host-intent';
+const HOST_INTENT = 'activity:host-intent';
 
 /** 与 `hostIntentGateway.ts` 的 `HostIntent` 字段名逐字一致（两侧各声明一份，L9）。 */
 type HostIntent =

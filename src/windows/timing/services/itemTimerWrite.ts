@@ -9,7 +9,7 @@
  * 为什么单独成文件：`hostIntentBridge.ts` 已经**正好 300 行**（`scripts/check-size.mjs`
  * 的棘轮，判据 `> 300` 才红），零余量 —— 再往里加一段就等于把下一个改这个文件的人逼到
  * 「要么拆、要么违规」。而这段逻辑本来就不属于意图分发：它是「settings 里一个 KV 的
- * 读-改-写」，与 `patina:host-intent` 的协议无关。
+ * 读-改-写」，与 `activity:host-intent` 的协议无关。
  *
  * ## 两条纪律，缺一条就丢用户数据
  *

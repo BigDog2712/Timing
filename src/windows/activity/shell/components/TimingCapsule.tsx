@@ -12,7 +12,7 @@ import { emitHostIntent } from "../../platform/runtime/hostIntentGateway.ts";
  * ## 只读 + 只表达意图
  *
  * 分析窗**没有**任何写命令（`activity-host-bridge.toml` 的边界）。暂停/继续与「回药丸」
- * 都只发一条 `patina:host-intent`（`hostIntentGateway.ts`），由药丸用它自己的 IPC 执行。
+ * 都只发一条 `activity:host-intent`（`hostIntentGateway.ts`），由药丸用它自己的 IPC 执行。
  * 本组件不直接碰传输层：只经 `useHostTimerState` 与 `emitHostIntent` 两个门面（L1）。
  *
  * ## 为什么不渲染「未知」态

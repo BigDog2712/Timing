@@ -34,5 +34,5 @@ export const TOOL_PRESENTATION_CHANGED = 'tool-presentation-changed';
  * 对侧常量在宿主 `src/services/hostIntentBridge.ts` 顶部（L9 禁止跨窗 import，
  * 两边各写一份，改一处必须改两处）。
  */
-export const HOST_INTENT = 'patina:host-intent';
+export const HOST_INTENT = 'activity:host-intent';
 

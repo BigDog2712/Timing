@@ -21,7 +21,7 @@
  * 走 `update_record_time` 意图 —— 这是本轮唯一改写历史数据语义的入口。
  *
  * 三条克制（沿用）：时间线行只读展示（除「改起止」）；一行一个事项；顺序按第一段
- * 开始时刻升序。写动作一律 `patina:host-intent`，分析窗没有写命令。
+ * 开始时刻升序。写动作一律 `activity:host-intent`，分析窗没有写命令。
  */
 import { useState } from "react";
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";

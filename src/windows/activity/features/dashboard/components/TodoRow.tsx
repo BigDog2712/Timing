@@ -39,7 +39,7 @@ export default function TodoRow({ todo, onToggle, onRemove, onEdit }: Props) {
     <li
       className="at-todo-row"
       data-done={done || undefined}
-      /* 行体单击开独立待办窗（06 T12）。走 patina:host-intent 事件桥
+      /* 行体单击开独立待办窗（06 T12）。走 activity:host-intent 事件桥
        * （{action:'open_todos'}），不是新 IPC 命令 —— 契约不动、L9 不破。 */
       onClick={() => { void emitHostIntent({ action: "open_todos" }); }}
     >

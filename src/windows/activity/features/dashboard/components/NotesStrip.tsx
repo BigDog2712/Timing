@@ -18,7 +18,7 @@ import { useBoardInstance, withInstance } from "../layout/instanceContext.ts";
  *
  * 四条克制：
  *   · **没有写命令，只有意图**（L9）。点开看全文，展开的弹层里可以删：删除走
- *     `patina:host-intent` 的 `delete_note`，由药丸用 `services/noteActions.removeNote`
+ *     `activity:host-intent` 的 `delete_note`，由药丸用 `services/noteActions.removeNote`
  *     落库（note_delete + 关窗）。分析窗一条写命令都没有，这条边界是**协议级**的；
  *     意图**没发出去**（`emitHostIntent` 解析成 `false`：不在 Tauri 里 / `emitTo` 抛错）时
  *     **不摘本地、不关弹层**，只给一句提示 —— 否则界面已摘、`pendingDeletedRef` 又挡住

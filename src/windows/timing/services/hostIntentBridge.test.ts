@@ -1,7 +1,7 @@
 /**
  * Timing — P0-04/P0-05 意图执行端（药丸侧）的判据
  * -----------------------------------------------------------------------------
- * 分析窗那条 `patina:host-intent` 发出去之后，真正改数据的只有这里。它一旦分派错，
+ * 分析窗那条 `activity:host-intent` 发出去之后，真正改数据的只有这里。它一旦分派错，
  * 症状都是「跨窗静默不达」：分析窗点了没反应、或者更糟——新建了一条重名事项。
  *
  * 钉六件事：① 命中同名事项 → 不新建直接用；② 没有同名事项 → 先建再开始并刷新列表
@@ -139,7 +139,7 @@ async function dispatch(intent: Intent) {
 describe('useHostIntentBridge（P0-04 / P0-05 执行端）', () => {
   it('p005_listens_on_the_documented_event_name', () => {
     /* 两侧各写一份字符串（L9 禁止跨窗 import），所以名字本身必须被钉住 */
-    expect(h.event).toBe('patina:host-intent');
+    expect(h.event).toBe('activity:host-intent');
   });
 
   it('p005_reuses_an_existing_item_without_creating_a_duplicate', async () => {
