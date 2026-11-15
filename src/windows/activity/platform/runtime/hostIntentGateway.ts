@@ -55,7 +55,7 @@ export type HostIntent =
   /** [本轮] 删除某张便利贴：宿主侧 `services/noteActions.removeNote(id)`（note_delete + 关窗）。
    *  分析窗自己**没有**写命令，所以"删除"也只能是一条意图 —— 由药丸用它自己的 typed IPC 落库。
    *  字段名与 `src/services/hostIntentBridge.ts` 的同名类型**逐字一致**（L9 两侧各写一份，
-   *  靠 `services/hostIntentMirror.test.ts` 的 source test 钉相等）。 */
+   *  靠 `features/dashboard/services/hostIntentMirror.test.ts` 的 source test 钉相等）。 */
   | { action: "delete_note"; noteId: number }
   /* ── [本轮] 「今日时间线」卡上的写动作（新建事项 / 事项管理）──
    * 分析窗**没有写命令**（`permissions/patina-host-bridge.toml` 只放行三条只读），

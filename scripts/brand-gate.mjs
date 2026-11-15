@@ -46,7 +46,7 @@
  * 「已跳过归档目录 android-app：N 处」，N 随残留增减而变——这是「不静默」的可测判据。
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -71,15 +71,16 @@ const NARROW_SCOPES = [
  *   · 落地（T04-1）：51 = capabilities 9 + permissions 37 + vite.config.ts 5
  *   · T04-2 后：5（capability / permission 清零，只剩 vite 的入口名）
  *   · T04-3 后：0（入口页改名完成）
- * ⚠️ 入口页改名时 `patina.html` → `activity.html`，本数组里的文件名**必须同批改**，
- *    否则下面「范围存在性哨兵」会红（这是有意的：scope 静默失效等于关掉这条判据）。 */
+ * 入口页**不写死文件名**：扫「仓根所有 `*.html`」。写死 `patina.html` 的话，T04-3 改名
+ * 时必须同批改这里，而"改名时忘了改门禁"正是 scope 静默失效的来源（`git grep` 对不存在的
+ * 路径spec 返回"无命中"，于是判据安静地永远绿）。 */
 const NARROW_PATTERN_2 = 'patina';
+const ROOT_HTML_SCOPES = readdirSync(root).filter((name) => name.endsWith('.html'));
 const NARROW_SCOPES_2 = [
   'src-tauri/capabilities/',
   'src-tauri/permissions/',
   'vite.config.ts',
-  'patina.html',
-  'index.html',
+  ...ROOT_HTML_SCOPES,
 ];
 const NARROW_2_BUDGET = 51;
 const ARCHIVE_DIRS = ['android-app/'];
@@ -200,9 +201,10 @@ const narrow = classify(narrowHits);
 const contractHits = scan(NARROW_PATTERN_2, NARROW_SCOPES_2);
 
 /* ③ 的范围存在性哨兵：`git grep` 对不存在的路径spec 返回「无命中」，
- * 于是 scope 写错（目录改名了、入口页改名了）会让这条判据**安静地永远绿**。
- * 所以逐个确认 scope 真的落在磁盘上。 */
+ * 于是 scope 写错（目录改名了、路径删了）会让这条判据**安静地永远绿**。
+ * 逐个确认 scope 真的落在磁盘上；另外仓根一个 html 都没有时同样算哨兵失败。 */
 const missingScopes = NARROW_SCOPES_2.filter((p) => !existsSync(join(root, p)));
+if (ROOT_HTML_SCOPES.length === 0) missingScopes.push('仓根 *.html（一个都没有）');
 
 /* 归档目录必须显式报数：静默跳过等于把「这里还有残留」这件事藏起来。 */
 for (const dir of ARCHIVE_DIRS) {

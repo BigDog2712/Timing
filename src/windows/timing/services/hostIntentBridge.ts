@@ -25,7 +25,7 @@ import { useUiStore } from '../stores/uiStore';
 import { openNoteWindowFor, removeNote } from './noteActions';
 
 /**
- * 与 `src/platform/runtime/activityEvents.ts` 的 `HOST_INTENT` **逐字一致**
+ * 与 `src/windows/activity/platform/runtime/activityEvents.ts` 的 `HOST_INTENT` **逐字一致**
  * （L9 禁止跨窗 import，两侧各写一份；改一处必须改两处，否则意图「静默不达」）。
  * ⚠️ **不进** 宿主 `IPC_EVENTS`：Rust 从不 emit 它，写进去会被契约门禁判成死常量。
  */
