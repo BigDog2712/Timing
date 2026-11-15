@@ -64,14 +64,12 @@ Timing 0.12.0 起把 **Patina**（自动使用追踪 / 番茄 / 使用上限提�
    `src-tauri/src/lib.rs` 的 setup / on_window_event / run 事件串联。
 7. 质量门禁：0.12.0 归一后**不再有 vendored 子树豁免**——行数、分层、eslint、契约全部
    回到宿主同一套口径（`eslint.config.js` 的子树 override 与各门禁的豁免清单已撤销）。
-8. **上游对账账本（保留）**：`scripts/vendored-baseline.json` 固化归一态的逐文件哈希
-   （前端锚 `7bc7bd7`、后端锚 `9a7772f`，机械改写批次按 `_reanchor` 重锚），
-   `scripts/vendored-allowlist.json` 记录此后的每一次改动（`path` + `change` + `reason` +
-   `owner`，**owner 必填**）。`npm run check:vendored` 让未登记的改动直接失败；
-   `node scripts/check-vendored-diff.mjs --upstream <patina-main>` 按 `UPSTREAM_MAP`
-   把本地归一态反推回上游坐标系，报「同 / 实质差异 / 仅上游 / 仅本地」四项数字。
-   这套东西管的不是「不许改」，而是保住「能 diff 上游、按需同步」的能力。
-   上面第 1–7 条是基线之前的那批改动，故不在登记表里重复。
+8. **上游对账账本（2026-11-15 已下线）**：本项目自 0.12.2 起转入**完全自主维护**，不再与上游
+   做逐文件对账。原 `scripts/vendored-baseline.json`、`scripts/vendored-allowlist.json`、
+   `scripts/check-vendored-diff.mjs` 与 `npm run check:vendored` 一并删除。
+   **MIT 归属义务不依赖任何脚本**：本文件保留上游的版权声明与许可全文，并说明哪些代码源自
+   上游、哪些已被本项目修改 —— 这是许可证要求的全部，与「有没有对账工具」无关。
+   上面第 1–7 条描述的是并入时与归一时的改动，作为历史记录保留。
 
 ### MIT 许可全文（Patina）
 

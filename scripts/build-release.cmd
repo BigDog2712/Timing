@@ -47,6 +47,14 @@ if errorlevel 1 goto vcfail
 
 pushd "%REPO%" || exit /b 1
 
+rem Gate (V0.12.x): a release must pass the eight-step check and the frontend test suite
+rem BEFORE building. The release chain used to skip every gate - npm run check was CI-only,
+rem and CI does not gate this local script, so a broken tree could still produce an installer.
+call npm run check
+if errorlevel 1 goto fail
+call npm test
+if errorlevel 1 goto fail
+
 rem The frontend/rust rebuild decision lives in build-desktop.mjs (dist fingerprint, not
 rem "cargo clean -p timing"). Do not add cleaning steps here - they would defeat it.
 if defined FLAG (

@@ -46,3 +46,7 @@ skills-lock.json
 
 # 归档的旧安装包（构建产物，挪出来只为让打包脚本第 4 步只看到 1 个 setup）
 release/archive/
+
+# 真机调试临时产物（adb 抓包 dump 等）：未跟踪但会被 brand 门禁的 git grep --untracked 扫到，
+# 里面残留的旧安卓包名会造成假红。这类目录一律不入库。
+.tmpdbg/
