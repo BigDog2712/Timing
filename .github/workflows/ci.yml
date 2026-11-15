@@ -31,6 +31,12 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      # 放第一步是刻意的：它判的是"这一串名字本身接得对不对"，1 秒内出结论。
+      # 若某个 check 脚本没接进链、或链里引用了不存在的脚本，后面十几步的耗时
+      # 都白花了，而且最后给出的红会指向某个无辜的门禁而不是接线错误。
+      - name: 接线自检（scripts / check 链 / verify / 本文件 四处名字不许漂）
+        run: npm run check:ci-parity
+
       - name: 单文件体积（≤300 行 · 白名单须带 owner + 到期日）
         run: npm run check:size
 
