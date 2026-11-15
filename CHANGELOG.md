@@ -4,6 +4,35 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 修复 · 「读不到应用数据」：跨桥列表送错了重载（`Not a primitive array`）— 2026-11-15（未出包）
+
+> 手机版号 0.12.2 → **0.12.3（12003）**。零新命令、零 schema、零迁移：契约仍 92/92/92/92。
+
+真机原话（截图）：`读不到应用使用数据` / `原生桥 usageDay 失败: Not a primitive array:
+class org.json.JSONArray (IO_ERROR)`。上一版把失败原文透出来就是为了这一刻 —— 一行字直接定位，
+不用再猜是权限、ACL 还是 R8。
+
+**成因**：`payload.put("rows", JSArray(UsageStats.queryDay(…)))`。`queryDay` 回的是
+`org.json.JSONArray`，它既不是 `Collection` 也不是原生数组，于是 `JSArray` 的
+`(Collection)` / `(Object[])` 两个重载都不适用，被当成 `(Object)` 收下，转手调
+`org.json.JSONArray(Object)` —— 那个构造函数只认原生数组，见非数组即抛。
+
+**为什么每次必抛、且与权限无关**：`queryDay` 在无权限时回空 `JSONArray()`，同样抛。
+`app_usage` 从 0.13.0 起一直是 0 行 —— 不是「用户没打开统计页」，是这一页从来没调通过。
+
+**为什么静态检查抓不到**：Kotlin 编得过，`JSArray` 的构造签名也确实存在，只是**选错了重载**。
+同一文件里 `mirrorIn` / `mirrorOut` 传的是 `ArrayList<String>`，选中的是 `(Collection)`，一路正常 ——
+一样的写法一半对一半错，靠眼睛核对签名发现不了。
+
+**修法**：插件「内部」区新增 `jsArrayOf(JSONArray): JSArray`，把元素逐项搬进
+`ArrayList<Any>` 再包一层，走与 `mirrorIn` 同一条**已在真机跑通**的路径；`usageDay` 改用它。
+顺带改掉 `models/usage.rs` 里「`granted` 恒为 true」那句已失真的注释（0.12.2 已改成如实回读）。
+
+**判据 +2**（接线 15 条）：`st13` 扫插件里**每一个** `JSArray(…)` 的实参，出现
+`JSONArray` / `queryDay` / `optJSONArray` 即红并点名表达式；`st14` 钉 `jsArrayOf` 存在、
+真把元素搬进 `ArrayList<Any>`、且 `rows` 走的是它。变异自证：退回
+`JSArray(UsageStats.queryDay(...))` ⇒ `st13` / `st14` 双红；撤销后 142 条全绿、`MUTATION` 0 处。
+
 ## 修复 + 结构 · 应用使用并进记录页 + 桥如实上报授权 + 失败不再被润色 — 2026-11-15（未出包）
 
 > 手机版号 0.12.1 → **0.12.2（12002）**。零新命令、零 schema、零迁移：

@@ -28,20 +28,23 @@ pub struct UsageRowDto {
 
 /// Kotlin `usageDay` 的整包回值。
 ///
-/// `granted` 恒为 true（授权状态有单独的命令语义：未授权时 `usage_stats_get` 直接回
-/// `USAGE_PERMISSION_DENIED`，不会走到这里）。保留字段是为了将来「部分授权」的 ROM。
+/// `granted` 是 Kotlin 侧**如实回读**的系统状态（`UsageStats.hasPermission`）。
+///
+/// 0.12.1 及以前这里被写死成 `true`，于是「没开权限」被说成「开了但今天没用手机」：
+/// 宿主那条 `if !reply.granted → USAGE_PERMISSION_DENIED` 永不触发，界面上永远等不到
+/// 「去系统设置打开」的按钮，只剩一片 0 分钟，零报错。**不要再用「未授权时不会走到这里」
+/// 的假设**去简化这条判断 —— 那是成因本身。
 ///
 /// 唯一的构造点是 `usage_stats_get` 的 `#[cfg(mobile)]` 分支（`bridge.call("usageDay")`
 /// 反序列化），桌面只用到它的邻居 `UsageDay`。**不 `cfg` 掉**：它和手机包共用同一份
 /// 定义，`cfg` 掉之后两平台就得各写一份 DTO，字段名迟早分叉。
 ///
-/// **当前没有任何自动化判据**：仓库里没有断言 Rust 字段名与 Kotlin `usageDay` 回值一致的
-/// 测试 —— `cargo test` 只验到这份 struct 编得过，编得过 ≠ 字段对得上；而且 `first` /
-/// `last` / `granted` / `rows` 都带 `#[serde(default)]`，字段名改错了不报错，只静默读成
-/// 0 / 空数组。对齐全靠人看：
-/// `gen/android/…/com/timing/app/native/UsageStats.kt` 的 `row.put("packageName"/"sec"/
-/// "first"/"last")`，以及 `com/timing/app/TimingNativePlugin.kt` 的 `payload.put("rows"/
-/// "granted")`。改字段请两边同批改。
+/// **字段名没有自动化判据**：`rows` / `granted` / `first` / `last` 全带 `#[serde(default)]`，
+/// Kotlin 那边改名不会有任何告警，只会静默读成空数组 / 0 —— 编译器看不见 Kotlin。
+/// 对齐全靠人看 `gen/android/…/TimingNativePlugin.kt` 的 `payload.put("rows"/"granted")`
+/// 与 `native/UsageStats.kt` 的 `row.put("packageName"/"sec"/"first"/"last")`。
+/// （0.12.2 那个「读不到应用数据」就是这一层的邻居问题：字段名没错，但 `rows` 的
+/// **装箱方式**错了，抛的是 `Not a primitive array`。跨桥的类型与字段同样没有编译期保护。）
 #[derive(Debug, Clone, Deserialize)]
 #[cfg_attr(desktop, allow(dead_code))]
 pub struct UsageDayReply {

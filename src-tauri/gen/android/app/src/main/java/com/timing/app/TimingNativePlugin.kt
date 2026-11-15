@@ -360,8 +360,10 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
             invoke.resolve(payload)
             return
         }
-        /* ADR-056：跨桥的列表只许 JSArray（org.json.JSONArray 直接 put 会被序列化成字符串） */
-        payload.put("rows", JSArray(UsageStats.queryDay(activity, from, to)))
+        /* ADR-056：跨桥的列表只许 JSArray —— 且必须经 `jsArrayOf`。
+           直接写 `JSArray(JSONArray)` 会抛 "Not a primitive array"（0.12.2 真机就是这句），
+           与权限无关、每次必抛。见 `jsArrayOf` 的注释。 */
+        payload.put("rows", jsArrayOf(UsageStats.queryDay(activity, from, to)))
         /* **必须如实回读**（0.13.3 修）：这里原先是硬编码 `true`，于是「没开权限」被说成
            「开了但今天没用手机」—— 宿主那条 `if (!reply.granted) → USAGE_PERMISSION_DENIED`
            永远不触发，界面上永远等不到「去系统设置打开」那个按钮，只剩一片 0 分钟。
@@ -545,6 +547,28 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
             if (rel.isNotEmpty() && !out.contains(rel)) out.add(rel)
         }
         return out
+    }
+
+    /**
+     * `org.json.JSONArray` → `JSArray`：跨桥传列表的**唯一正确姿势**。
+     *
+     * **不许写 `JSArray(jsonArray)`。** `JSArray` 只有 `(Collection)` 与 `(Object[])` 两个
+     * 有用的重载，`JSONArray` 两个都不是，于是被当成 `(Object)` 收下，转手调
+     * `org.json.JSONArray(Object)` —— 那个构造函数只认原生数组，见非数组就抛
+     * `Not a primitive array: class org.json.JSONArray`。
+     *
+     * 症状（0.12.2 真机复现）：统计页整块写着「读不到应用使用数据」，附一个与业务
+     * 毫无关系的 org.json 异常；`app_usage` 永远 0 行 —— 因为**每一次**都在这里就抛了，
+     * 与有没有权限无关（`queryDay` 无权限时回空 `JSONArray`，照样抛）。
+     *
+     * 为什么逐项取出再包一层：`JSArray(Collection)` 最终走 `JSONArray(Collection)`，
+     * 它对每个元素做一次 `JSONObject.wrap`，`JSONObject` 元素原样返回 —— 这条路
+     * 与 `mirrorIn` 的 `JSArray(done)` 同一条，是已经在真机上跑通的。
+     */
+    private fun jsArrayOf(items: org.json.JSONArray): JSArray {
+        val list = ArrayList<Any>(items.length())
+        for (index in 0 until items.length()) list.add(items.get(index))
+        return JSArray(list)
     }
 
     /** 单步操作的安全网：异常被记进 `errors` 并返回 null，调用方 `continue`。 */
