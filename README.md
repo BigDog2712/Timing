@@ -175,7 +175,7 @@ flowchart TB
   subgraph FE["前端（同一 bundle，按 label 分流）"]
     direction LR
     MAIN["main 窗<br/>悬浮条 · 待办 · 设置"]
-    PAT["patina 窗<br/>时间统计"]
+    PAT["activity 窗<br/>时间统计"]
     SH["windows/shared<br/>两窗共用载体"]
     MAIN -.-> SH
     PAT -.-> SH
