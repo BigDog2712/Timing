@@ -101,8 +101,9 @@ const preRenameSource = (src: string): string =>
      * 吞掉换行会让「零 diff」因差一个空行而假红。 */
     .replace(/^use crate::app::(?:activity|insight)::main_window::MAIN_WINDOW_LABEL;$/m, "")
     .replace(/\bMAIN_WINDOW_LABEL\b/g, '"patina"')
-    /* T04：capability 改名 + description 首词的旧产品名。 */
+    /* T04：capability / 入口页改名 + description 首词的旧产品名。 */
     .replace(/\bactivity-tool-notification\b/g, "patina-tool-notification")
+    .replace(/\bactivity\.html\b/g, "patina.html")
     .replace(/"description": "工具提醒弹窗/, '"description": "Patina 工具提醒弹窗')
     .replace(/\bactivity_bridge\b/g, "patina_bridge")
     .replace(/\bactivity_root\b/g, "patina_root")
@@ -228,10 +229,9 @@ describe("[T04] V-2h · tool-notification 投递链守门（Q4 = (A)）", () => 
   ];
 
   test("V-2h · 6 条整文件保护路径相对 T04 基线除 T02 改名外零 diff", () => {
-    /* 原判据是 `git diff --name-only <基线> -- <同一组路径>`。T02 改了目录名，
-     * 同一组路径在基线提交里根本不存在，`git diff` 于是把它们全报成「新增」。
-     * 改为：取基线那份的原文，把 T02 的机械改名规范化回旧名后与工作树逐字比 ——
-     * 判据仍是「整文件零 diff」，只是把改名这一层显式化。 */
+    /* 原判据是 `git diff --name-only <基线> -- <同一组路径>`。T02 改了目录名，同一组路径在基线
+     * 提交里根本不存在，`git diff` 于是把它们全报成「新增」。改为：取基线那份的原文，把机械改名
+     * 规范化回旧名后与工作树逐字比 —— 判据仍是「整文件零 diff」，只是把改名这层显式化。 */
     const drifted = WHOLE_FILE_PROTECTED.filter((path) => {
       const baseline = git(["show", `${T04_BASELINE}:${preRenamePath(path)}`]);
       const working = readFileSync(join(repoRoot, path), "utf8");

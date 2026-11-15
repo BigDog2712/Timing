@@ -92,7 +92,7 @@ pub(super) fn create<R: Runtime + 'static>(
         monitor.scale_factor(),
     );
     let root = crate::infra::activity::storage_paths::resolve_storage_paths(app)?.webview_root;
-    let builder = WebviewWindowBuilder::new(app, MINI_WINDOW_LABEL, WebviewUrl::App("patina.html".into()))
+    let builder = WebviewWindowBuilder::new(app, MINI_WINDOW_LABEL, WebviewUrl::App("activity.html".into()))
         .title("Timing Mini")
         .inner_size(PANEL_WIDTH, PANEL_HEIGHT)
         .resizable(false)

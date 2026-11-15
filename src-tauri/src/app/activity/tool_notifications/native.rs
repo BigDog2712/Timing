@@ -5,7 +5,7 @@ use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 pub(super) fn create<R: Runtime + 'static>(app: &AppHandle<R>) -> Result<(), String> {
     let root = crate::infra::activity::storage_paths::resolve_storage_paths(app)?.webview_root;
     let builder =
-        WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::App("patina.html".into()))
+        WebviewWindowBuilder::new(app, WINDOW_LABEL, WebviewUrl::App("activity.html".into()))
             .title("Timing Notification")
             .inner_size(520.0, 240.0)
             .resizable(false)

@@ -605,14 +605,14 @@ fn main_window_url() -> WebviewUrl {
 
     #[cfg(not(debug_assertions))]
     {
-        WebviewUrl::App("patina.html".into())
+        WebviewUrl::App("activity.html".into())
     }
 }
 
 #[cfg(debug_assertions)]
 fn debug_main_window_url(e2e_frontend_url: Option<&str>) -> WebviewUrl {
-    /* 融合要点：宿主是**双入口**（`index.html` = 悬浮条，`patina.html` = 本窗口）。
-    上游只有一个入口，dev 地址写的是根路径；这里必须带上 `/patina.html`，
+    /* 融合要点：宿主是**双入口**（`index.html` = 悬浮条，`activity.html` = 本窗口）。
+    上游只有一个入口，dev 地址写的是根路径；这里必须带上 `/activity.html`，
     否则开发模式下这扇窗口会加载 Timing 的悬浮条界面（表现为「窗口一片黑 / 尺寸不对」，
     而且 `ready` 事件永远等不到 → 窗口被 watchdog 判超时后保持隐藏）。
 
@@ -624,7 +624,7 @@ fn debug_main_window_url(e2e_frontend_url: Option<&str>) -> WebviewUrl {
     `vite.config.ts`）必须一起改。 */
     WebviewUrl::External(
         e2e_frontend_url
-            .unwrap_or("http://127.0.0.1:1420/patina.html")
+            .unwrap_or("http://127.0.0.1:1420/activity.html")
             .parse()
             .expect("valid dev server URL"),
     )

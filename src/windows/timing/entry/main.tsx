@@ -20,25 +20,25 @@ import '../styles/menu.css';
 import '../styles/panels.css';
 /* [0.12.0] 同期电脑活动条（Patina 融合）：panels.css 已 258 行，单拆一份守住门禁 */
 import '../styles/activity-strip.css';
-/* [0.12.1 T04b] 设置页搬进分析窗后，这 8 份样式也搬到了 `src/app/styles/features/host/`
+/* [0.12.1 T04b] 设置页搬进分析窗后，这 8 份样式也搬到了 `src/windows/activity/shell/styles/features/host/`
    （分析窗的 `App.css` 里同样 @import 它们）。**宿主入口这里仍然要 import**：手机端
-   （`src/components/mobile/SettingsPage.tsx`）复用旧的 GeneralTab / PluginsTab / ThemePicker
+   （`src/windows/timing/components/mobile/SettingsPage.tsx`）复用旧的 GeneralTab / PluginsTab / ThemePicker
    与 `SyncPane`，它们用的还是同一批 className。桌面宿主窗已经不再渲染设置页，所以这几份
    在桌面包里是纯余量——留着是为了不把手机端的样式一起删掉。 */
-import '../../patina/shell/styles/features/host/settings-dialog.css';
-import '../../patina/shell/styles/features/host/settings-panel.css';
+import '../../activity/shell/styles/features/host/settings-dialog.css';
+import '../../activity/shell/styles/features/host/settings-panel.css';
 /* [V0.3.4] 插件页签样式（从 settings-panel.css 拆出，控制单文件行数） */
-import '../../patina/shell/styles/features/host/settings-plugins.css';
+import '../../activity/shell/styles/features/host/settings-plugins.css';
 /* [V0.4.0] Markdown 同步页签（md-sync 插件的落点配置） */
-import '../../patina/shell/styles/features/host/settings-sync.css';
+import '../../activity/shell/styles/features/host/settings-sync.css';
 /* [V0.11.3] 同步间隔行（settings-sync.css 已到 299 行，单拆一份守住门禁） */
-import '../../patina/shell/styles/features/host/settings-sync-interval.css';
+import '../../activity/shell/styles/features/host/settings-sync-interval.css';
 /* [V0.11.13] 云端通道卡 + 备份卡（settings-sync.css 是本轮不许动的红线，新结构另起一份） */
-import '../../patina/shell/styles/features/host/settings-sync-cloud.css';
+import '../../activity/shell/styles/features/host/settings-sync-cloud.css';
 /* [V0.11.15] 数据管理页签的壳：折叠块 / 底部 sticky 条 / 黄条 / 徽标（③④⑤ 仍用 sync__*） */
-import '../../patina/shell/styles/features/host/settings-data.css';
+import '../../activity/shell/styles/features/host/settings-data.css';
 /* [V0.11.16] 做完减法之后的那几个新位置（①的「今天」/③的聚合行与逐档提示/④三关/⑤当条记录） */
-import '../../patina/shell/styles/features/host/settings-data-slim.css';
+import '../../activity/shell/styles/features/host/settings-data-slim.css';
 /* [V0.4.1] 渲染异常兜底（透明窗里渲染抛错 = 药丸凭空消失，必须留住可点的界面） */
 import '../styles/error-boundary.css';
 import '../styles/theme-picker.css';
