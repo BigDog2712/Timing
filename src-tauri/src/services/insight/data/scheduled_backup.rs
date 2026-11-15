@@ -282,16 +282,15 @@ async fn reconcile_published_run(
     Ok(())
 }
 
-async fn load_or_create_config(
-    app: &AppHandle,
-    pool: &Pool<Sqlite>,
-) -> Result<ScheduledBackupConfig, String> {
-    if let Some(config) = repository::load_config(pool).await? {
-        return Ok(config);
-    }
+/// [批 2 · 决策 2 · 定时备份下线] **配置读取恒为「未配置」**：`tick` 拿到的永远是
+/// `enabled: false`，于是每轮都走 `SchedulerAction::Idle` —— 不 claim、不建 run、不上传。
+/// 刻意既不读也不写库里的 `scheduled_backup_config`：老用户那条 `enabled: true` 就此失效，
+/// 配置本身原样留着（将来 UI 回来能接着用）。摘掉的调用（原来各一处）是
+/// `repository::load_config` 与 `repository::save_config`；判据见 `tests::scheduled_backup_off`。
+async fn load_or_create_config(app: &AppHandle, _pool: &Pool<Sqlite>) -> Result<ScheduledBackupConfig, String> {
     let target = default_local_target_dir(app)?;
     let now = Local::now();
-    let config = ScheduledBackupConfig {
+    Ok(ScheduledBackupConfig {
         enabled: false,
         cadence: ScheduledBackupCadence::Weekly,
         weekday: Some(5),
@@ -300,9 +299,7 @@ async fn load_or_create_config(
         target_generation: new_generation(),
         schedule_anchor_at_ms: now.timestamp_millis(),
         updated_at_ms: now.timestamp_millis(),
-    };
-    repository::save_config(pool, &config).await?;
-    Ok(config)
+    })
 }
 
 fn default_local_target_dir(app: &AppHandle) -> Result<String, String> {

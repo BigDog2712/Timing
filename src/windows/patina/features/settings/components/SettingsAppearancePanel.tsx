@@ -1,6 +1,6 @@
 import { LOCALE_METADATA, SUPPORTED_LOCALES, useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { ChevronRight, Palette } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState } from "react";
 import QuietActionRow from "../../../shared/components/QuietActionRow";
 import QuietBadge from "../../../shared/components/QuietBadge";
 import QuietDialog from "../../../shared/components/QuietDialog";
@@ -37,8 +37,6 @@ type SettingsAppearancePanelProps = {
   onDynamicEffectsChange: (nextChecked: boolean) => void;
   onConfirmColorSchemeChange: (library: ThemeLibrary) => Promise<boolean>;
   colorSchemeConfirming: boolean;
-  /** 「接口」那一组（P0-06 把独立分区并进来：分析窗设置分区 5 → 4） */
-  interfaceSection?: ReactNode;
 };
 
 export default function SettingsAppearancePanel({
@@ -53,7 +51,6 @@ export default function SettingsAppearancePanel({
   onDynamicEffectsChange,
   onConfirmColorSchemeChange,
   colorSchemeConfirming,
-  interfaceSection,
 }: SettingsAppearancePanelProps) {
   const UI_TEXT = useLocaleText();
   const copy = useLocale().startsWith("zh") ? COPY.zh : COPY.en;
@@ -170,7 +167,6 @@ export default function SettingsAppearancePanel({
             </SettingsPreferenceRow>
           </QuietActionRow>
         </SettingsPreferenceGroup>
-        {interfaceSection}
       </div>
 
       <QuietDialog

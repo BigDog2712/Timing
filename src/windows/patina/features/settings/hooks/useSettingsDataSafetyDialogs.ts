@@ -1,95 +1,40 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { useLocaleText } from "../../../shared/i18n/index.ts";
 import type { CleanupRange } from "../types";
-import type { BackupRestoreStrategy } from "../services/settingsRuntimeAdapterService.ts";
-import type { RemoteBackupEntry, RemoteBackupState } from "../hooks/useRemoteBackupState.ts";
 
 /**
- * 「存储」卡里那五个对话框的**状态机**（[本轮] 从 `SettingsDataSafetyPanel` 抽出来的）。
+ * 「存储」卡里那两个对话框的**状态机**（清理缓存 / 清理历史记录）。
  *
- * 为什么抽：那几个 `useState` / `useRef` / 「关掉远端列表后把焦点还给恢复键」的 effect
- * 与"哪一行触发了哪个框"是同一件事，散在面板里就只能和行排版挤在同一个文件 —— 而那个
- * 文件 695 行、冻结在 size 门禁里。状态机单独一份之后，面板只做组合，对话框层只画。
+ * [设置页七项改造·批 5] 原来这里有五个：选备份位置、选恢复来源、恢复策略三个随
+ * 「活动库备份与恢复」一起下线（本地 zip 备份 + WebDAV 远端备份/上传/下载/删除全套都删了）。
+ * 剩下的两个是**数据清理**，与本卡另外三组（导出导入 / 本机目录 / 清理）同一条命：
+ * 清理缓存要重启并应用，所以必须二次确认；清理历史记录要先选档位。
  *
- * 行为零改动：每个 `open*` 都是原来那颗按钮的 `onClick` 逐字搬过来的（含 `busy` 门控、
- * 远端列表的焦点回归、以及"策略确认之后按来源分派到本地/远端"的分支）。
+ * 状态与画分开的理由没变：`SettingsDataSafetyPanel` 只做组合，对话框层只画 JSX。
  */
 interface Params {
   cleanupRange: CleanupRange;
   cleanupOptions: readonly { value: CleanupRange; label: string }[];
-  restoreStrategy: BackupRestoreStrategy;
   onCleanupRangeChange: (value: CleanupRange) => void;
   isCleaning: boolean;
-  isRestoringBackup: boolean;
-  remoteBackup: RemoteBackupState;
-  onRestoreStrategyChange: (value: BackupRestoreStrategy) => void;
   onCleanup: () => void;
-  onExportBackup: () => void;
-  onPrepareRestoreBackup: () => Promise<boolean | void>;
-  onRestoreBackup: (restoreStrategy: BackupRestoreStrategy) => void;
-  onClearPendingRestoreBackup: () => void;
   onScheduleWebviewCacheClear: () => Promise<void> | void;
 }
-
-export type RestoreStrategyOption = { value: BackupRestoreStrategy; label: string; tooltip: string };
 
 export function useSettingsDataSafetyDialogs({
   cleanupRange,
   cleanupOptions,
-  restoreStrategy,
   onCleanupRangeChange,
   isCleaning,
-  isRestoringBackup,
-  remoteBackup,
-  onRestoreStrategyChange,
   onCleanup,
-  onExportBackup,
-  onPrepareRestoreBackup,
-  onRestoreBackup,
-  onClearPendingRestoreBackup,
   onScheduleWebviewCacheClear,
 }: Params) {
   const UI_TEXT = useLocaleText();
   const cacheClearCancelRef = useRef<HTMLButtonElement>(null);
-  const localRestoreRef = useRef<HTMLButtonElement>(null);
-  const backupButtonRef = useRef<HTMLButtonElement>(null);
-  const restoreButtonRef = useRef<HTMLButtonElement>(null);
-  const selectedRestoreStrategyRef = useRef<HTMLButtonElement>(null);
-  const wasRemoteListOpen = useRef(false);
 
-  const [strategyDialogOpen, setStrategyDialogOpen] = useState(false);
-  const [restoreStrategySource, setRestoreStrategySource] = useState<"local" | "remote">("local");
-  const [pendingRemoteRestoreEntry, setPendingRemoteRestoreEntry] = useState<RemoteBackupEntry | null>(null);
-  const [backupTargetDialogOpen, setBackupTargetDialogOpen] = useState(false);
-  const [uploadTarget, setUploadTarget] = useState<RemoteBackupState["config"]>(null);
-  const [restoreSourceDialogOpen, setRestoreSourceDialogOpen] = useState(false);
   const [cacheClearDialogOpen, setCacheClearDialogOpen] = useState(false);
   const [historyCleanupDialogOpen, setHistoryCleanupDialogOpen] = useState(false);
-
-  /* 远端备份列表关掉之后把焦点还给「恢复活动库」：不还的话焦点落在 body 上，
-     Tab 一下回到页首 —— 键盘用户会以为弹窗把页面弄坏了。 */
-  useEffect(() => {
-    const closed = wasRemoteListOpen.current && !remoteBackup.restoreDialogOpen;
-    wasRemoteListOpen.current = remoteBackup.restoreDialogOpen;
-    if (!closed || strategyDialogOpen) return;
-    const frame = requestAnimationFrame(() => restoreButtonRef.current?.focus());
-    return () => cancelAnimationFrame(frame);
-  }, [remoteBackup.restoreDialogOpen, strategyDialogOpen]);
-
-  const hasRemoteBackupTarget = Boolean(remoteBackup.config && remoteBackup.hasSecret);
-  const restoreStrategyOptions: RestoreStrategyOption[] = [
-    {
-      value: "merge",
-      label: UI_TEXT.settings.restoreStrategyOptions.merge,
-      tooltip: UI_TEXT.settings.restoreStrategyOptionHints.merge,
-    },
-    {
-      value: "replace",
-      label: UI_TEXT.settings.restoreStrategyOptions.replace,
-      tooltip: UI_TEXT.settings.restoreStrategyOptionHints.replace,
-    },
-  ];
 
   /* 清理档位：滑杆的档位就是 `cleanupOptions` 排序后的下标，不在前端硬编码档位表 */
   const cleanupSliderOptions = [...cleanupOptions].sort((left, right) => left.value - right.value);
@@ -105,53 +50,14 @@ export function useSettingsDataSafetyDialogs({
     }
   };
 
-  const prepareLocalRestore = async () => {
-    setRestoreStrategySource("local");
-    setPendingRemoteRestoreEntry(null);
-    const prepared = await onPrepareRestoreBackup();
-    if (prepared) {
-      setStrategyDialogOpen(true);
-    }
-  };
-
-  const openRemoteRestoreList = async () => {
-    setRestoreStrategySource("remote");
-    setPendingRemoteRestoreEntry(null);
-    await remoteBackup.openRestoreDialog();
-  };
-
-  const confirmRestoreStrategy = () => {
-    setStrategyDialogOpen(false);
-    if (restoreStrategySource === "remote") {
-      if (pendingRemoteRestoreEntry) {
-        void remoteBackup.restoreEntry(pendingRemoteRestoreEntry, restoreStrategy);
-      }
-      setPendingRemoteRestoreEntry(null);
-      return;
-    }
-    onRestoreBackup(restoreStrategy);
-  };
-
   return {
     UI_TEXT,
     isCleaning,
-    isRestoringBackup,
-    remoteBackup,
-    hasRemoteBackupTarget,
-    restoreStrategy,
-    onRestoreStrategyChange,
-    onCleanup,
-    onExportBackup,
-    refs: { cacheClearCancelRef, localRestoreRef, backupButtonRef, restoreButtonRef, selectedRestoreStrategyRef },
+    refs: { cacheClearCancelRef },
     flags: {
-      strategyDialogOpen,
-      backupTargetDialogOpen,
-      restoreSourceDialogOpen,
       cacheClearDialogOpen,
       historyCleanupDialogOpen,
     },
-    uploadTarget,
-    restoreStrategyOptions,
     cleanupSliderOptions,
     cleanupRange,
     cleanupRangeIndex,
@@ -159,31 +65,6 @@ export function useSettingsDataSafetyDialogs({
     updateCleanupRangeIndex,
     openHistoryCleanup: () => setHistoryCleanupDialogOpen(true),
     openCacheClear: () => setCacheClearDialogOpen(true),
-    openBackupTarget: () => setBackupTargetDialogOpen(true),
-    closeBackupTarget: () => setBackupTargetDialogOpen(false),
-    openRestore: () => {
-      if (hasRemoteBackupTarget) {
-        setRestoreSourceDialogOpen(true);
-        return;
-      }
-      void prepareLocalRestore();
-    },
-    closeRestoreSource: () => setRestoreSourceDialogOpen(false),
-    prepareLocalRestore,
-    openRemoteRestoreList,
-    handleRemoteRestoreEntrySelected: (entry: RemoteBackupEntry) => {
-      remoteBackup.closeRestoreDialog();
-      setRestoreStrategySource("remote");
-      setPendingRemoteRestoreEntry(entry);
-      setStrategyDialogOpen(true);
-    },
-    confirmRestoreStrategy,
-    closeStrategyDialog: () => {
-      setStrategyDialogOpen(false);
-      setPendingRemoteRestoreEntry(null);
-      onClearPendingRestoreBackup();
-      requestAnimationFrame(() => restoreButtonRef.current?.focus());
-    },
     restartAndClearWebviewCacheFromDialog: () => {
       setCacheClearDialogOpen(false);
       void onScheduleWebviewCacheClear();
@@ -192,7 +73,6 @@ export function useSettingsDataSafetyDialogs({
       setHistoryCleanupDialogOpen(false);
       onCleanup();
     },
-    setUploadTarget,
     closeCacheClear: () => setCacheClearDialogOpen(false),
     closeHistoryCleanup: () => setHistoryCleanupDialogOpen(false),
   };

@@ -4,6 +4,14 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 pub struct StoragePathSnapshot {
     pub install_dir: String,
+    /// Timing 真正的数据根（`%APPDATA%\com.timing.app`）：计时库 `timing.db`、
+    /// `md/` / `logs/` / `plugins/` / `backups/` 与 `patina/`（活动库那套）都在它下面。
+    ///
+    /// 与 `data_root` 是**包含关系**，不是一个东西：`data_root` 只描述活动库那一层
+    /// （`<timing_data_root>/patina/data`，`patina.db` + `backups` + `remote-backup-temp`）。
+    /// 设置页「数据目录」那一行要给用户看的是**这一个**——它才是「我的数据都在哪」。
+    pub timing_data_root: String,
+    /// 活动库那一层（见 `timing_data_root` 的说明）；SQLite 落点设置改的就是它。
     pub data_root: String,
     pub database_path: String,
     pub backup_dir: String,
@@ -17,7 +25,11 @@ pub struct StoragePathSnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct StorageSizeSnapshot {
     pub install_dir_size_bytes: u64,
+    /// `data_root` 里 sqlite 家族三个文件的合计（库文件本身多大）。
     pub data_size_bytes: u64,
+    /// `timing_data_root` 的**递归**体积：计时库 + Markdown + 活动库 + 日志 + 插件 + 备份。
+    /// 不能只算 sqlite 三个文件——那会让「数据目录 12 MB」与资源管理器里看到的 400 MB 对不上。
+    pub timing_data_size_bytes: u64,
     pub backup_dir_size_bytes: u64,
 }
 

@@ -11,6 +11,7 @@ import QuietRangeControl from "../../../shared/components/QuietRangeControl.tsx"
 import type { QuietToastTone } from "../../../shared/types/toast.ts";
 
 import { formatLocalDateKey, startOfLocalDay } from "../../../shared/lib/localDate.ts";
+import { ACTIVITY_ONLY_NOTE } from "./fullBundleCopy.ts";
 import {
   SETTINGS_DATA_EXPORT_DEFAULT_FIELDS_BY_FORMAT,
   SETTINGS_DATA_EXPORT_FIELD_KEYS,
@@ -336,11 +337,7 @@ export default function SettingsDataExportDialog({ open, onClose, onToast }: Pro
         )}
         actions={(
           <>
-            <QuietButton
-              size="large"
-              onClick={onClose}
-              disabled={exporting}
-            >
+            <QuietButton size="large" onClick={onClose} disabled={exporting}>
               {UI_TEXT.common.cancel}
             </QuietButton>
             <QuietButton
@@ -363,6 +360,8 @@ export default function SettingsDataExportDialog({ open, onClose, onToast }: Pro
         )}
       >
         <div className="settings-data-export-dialog-body">
+          {/* [批 2] 本对话框只导活动库；「完整数据包（JSON）」才是全量。 */}
+          <p className="qp-text-caption text-[var(--qp-text-tertiary)]">{ACTIVITY_ONLY_NOTE}</p>
           <section className="settings-data-export-section settings-data-export-range-section">
             <div className="settings-data-export-section-header">
               <div className="min-w-0">

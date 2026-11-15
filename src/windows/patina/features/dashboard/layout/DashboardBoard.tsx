@@ -160,6 +160,8 @@ export default function DashboardBoard({ layout, copy, labelOf, renderBody, empt
           library={layout.library}
           locked={locked}
           canCreate={layout.layout.cards.length > 0}
+          snap={layout.layout.snap}
+          setSnap={layout.setSnap}
           onSwitch={(id) => {
             layout.switchToLayout(id);
             setManageOpen(false);

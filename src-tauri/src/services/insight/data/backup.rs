@@ -14,7 +14,6 @@ mod snapshot;
 
 static BACKUP_SNAPSHOT_LOCK: Mutex<()> = Mutex::const_new(());
 use paths::resolve_backup_path;
-pub use paths::{pick_backup_file, pick_backup_save_file};
 use prepared_source::{prepare_snapshot_source, PreparedBackupSource};
 pub use records::RestoreStrategy;
 pub(crate) use snapshot::{export_scheduled_backup_create_new, validate_scheduled_snapshot};

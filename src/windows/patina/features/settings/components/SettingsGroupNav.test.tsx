@@ -7,34 +7,31 @@ import SettingsGroupNav from "./SettingsGroupNav.tsx";
 import { SETTINGS_GROUPS } from "../settingsGroups";
 
 /**
- * 设置页分组导航的**判定算法**回归（[本轮]）。
+ * 设置页分组导航的**判定算法**回归。
  *
- * 这里复现的是真实 DOM 结构里那处致命错位：`s-interface` 嵌在 `s-display` 卡片内部
- * （`Settings.tsx` 的「接口」小节），因此它的文档位置**早于** `s-board-widgets`，而
- * `settingsGroups.ts` 把它登记在 `tracking` 组、排在 `s-board-widgets` **之后**。
- * 旧实现按表顺序遍历取"最后一个越过判定线"的锚点，于是滚到「主界面」区间时被
- * `s-interface` 覆盖成「计时与记录」——「主界面」永远不亮。
- *
- * 所以第一条判据就是：把错位结构原样搭出来，滚到「主界面」区间必须亮「主界面」。
- * 第二条：滚到容器底部必须亮最后一组（旧实现里 `s-general` 的 top 再也推不过判定线）。
- * 第三条：中间某组正常（防止"永远亮第一组/最后一组"也能过前两条）。
- * 第四条：内容一屏放得下时不许直接跳到最后一组（到底规则的 `canScroll` 前置条件）。
- * 第五条：判定线**真的**取自 CSS 的 `scroll-margin-top`（改成 4px 结论就变），
- *        防止有人把 `readActiveOffset()` 退回写死常量。
+ * [设置页七项改造·批 1/2] 页面结构变了：`s-interface`（内嵌在「显示」卡里的「服务」小节）
+ * 与 `s-board-widgets`（「主界面组件」卡）都随功能下线，**页面顺序与分组表现在逐条一致**。
+ * 原来这条文件是围着「锚点物理位置早于表里登记位置」那个串组缺陷写的，靶点已经消失；
+ * 但判定算法本身（取最后一个越线锚点 / 到底规则 / CSS 判定线）仍在服役，所以保留结构、
+ * 更新判据：
+ *   第一条：分组表里不再有那两个锚点，滚到原「主界面」区间只亮一组（唯一性）；
+ *   第二条：滚到容器底部必须亮最后一组；
+ *   第三条：中间某组正常（防止"永远亮第一组/最后一组"也能过前两条）；
+ *   第四条：内容一屏放得下时不许直接跳到最后一组（到底规则的 `canScroll` 前置条件）；
+ *   第五条：判定线**真的**取自 CSS 的 `scroll-margin-top`（改成 4px 结论就变），
+ *          防止有人把 `readActiveOffset()` 退回写死常量。
  *
  * 布局全靠 mock `getBoundingClientRect` + 自定义 `scrollTop/clientHeight/scrollHeight`：
  * jsdom 没有排版，真读 DOM 只会得到一堆 0，什么也证明不了。
  */
 
-/** 各锚点的**文档绝对**纵坐标（px）。刻意保留 `s-interface` 的嵌套与靠前位置。 */
+/** 各锚点的**文档绝对**纵坐标（px）。与原页面同序，两位被删的锚点不再出现。 */
 const ANCHOR_TOPS: Readonly<Record<string, number>> = {
   "s-pill-handles": 0,
   "s-pill-look": 80,
   "s-theme": 160,
   "s-highlight": 240,
   "s-display": 320,
-  "s-interface": 380,
-  "s-board-widgets": 520,
   "s-tracking": 700,
   "s-sync": 820,
   "s-backup": 900,
@@ -77,7 +74,7 @@ function pinTop(element: HTMLElement, absoluteTop: number) {
   });
 }
 
-/** 搭出与 `Settings.tsx` 同构的滚动区（含 `s-interface` 嵌在 `s-display` 内部） */
+/** 搭出与 `Settings.tsx` 同构的滚动区（锚点全部平铺：本轮已无嵌套小节） */
 function buildScrollHost() {
   const host = document.createElement("div");
   host.id = "settings-scroll";
@@ -110,10 +107,7 @@ function buildScrollHost() {
   make("s-pill-look", host);
   make("s-theme", host);
   make("s-highlight", host);
-  const display = make("s-display", host);
-  /* 真实结构：`s-interface` 在 `s-display` **卡片内部** —— 这正是串组的根因 */
-  make("s-interface", display);
-  make("s-board-widgets", host);
+  make("s-display", host);
   make("s-tracking", host);
   make("s-sync", host);
   make("s-backup", host);
@@ -178,13 +172,19 @@ afterEach(() => {
 });
 
 describe("SettingsGroupNav · 滚动高亮判定", () => {
-  it("sg01_the_board_group_lights_up_even_though_s_interface_is_registered_later", async () => {
+  it("sg01_deleted_entries_are_gone_and_every_anchor_lights_exactly_one_group", async () => {
+    /* [设置页七项改造·批 1/2] 两个入口下线后，页面上只剩 11 个锚点，且表与页面逐条一致。
+       这里既钉「入口不再存在」（改回来的话第一步就红），也钉「一个锚点只亮一组」——
+       原来的串组缺陷靠的就是这条唯一性断言。 */
+    expect(SETTINGS_GROUPS.flatMap((group) => group.anchors.map((anchor) => anchor.id)))
+      .not.toContain("s-interface");
+    expect(SETTINGS_GROUPS.flatMap((group) => group.anchors.map((anchor) => anchor.id)))
+      .not.toContain("s-board-widgets");
+    expect(SETTINGS_GROUPS.map((group) => group.id)).not.toContain("board");
     await mount();
-    /* 滚到「主界面」区间：s-board-widgets 顶到判定线（top = 520 − 520 = 0 ≤ 18）。
-       旧算法在这里会被 s-interface（top = −140，登记在 tracking 组、排在 board 之后）
-       覆盖成「计时与记录」—— 这就是本条判据的变异靶点。 */
+    /* 原「主界面」区间（520）现在落在「外观与配色」里：s-display(top = −200) 是最后一个越线锚点 */
     await scrollTo(520);
-    expect(activeTitle()).toBe("主界面");
+    expect(activeTitle()).toBe("外观与配色");
   });
 
   it("sg02_reaching_the_bottom_lights_the_last_group", async () => {
@@ -213,11 +213,11 @@ describe("SettingsGroupNav · 滚动高亮判定", () => {
 
   it("sg05_the_threshold_really_comes_from_css_scroll_margin_top", async () => {
     /* 判定线缩到 4px：s-tracking(top = 10) 不再越线，「计时与记录」区间里最靠下的越线锚点
-       只剩 s-board-widgets(−170) → 亮「主界面」。结论跟着 CSS 走，说明判定线没被写死。 */
+       只剩 s-display(−370) → 亮「外观与配色」。结论跟着 CSS 走，说明判定线没被写死。 */
     activeOffset = 4;
     await mount();
     await scrollTo(690);
-    expect(activeTitle()).toBe("主界面");
+    expect(activeTitle()).toBe("外观与配色");
   });
 });
 
@@ -227,7 +227,7 @@ describe("SettingsGroupNav · 滚动高亮判定", () => {
  * 根因不是"点错了锚点"，而是**落点恰好压在判定线上**：`jump()` 的偏移与判定线读同一个
  * `scroll-margin-top`，理想落点是 `锚点 top === 判定线`（差值 0）。零容差下设备像素取整
  * 把落点推高 0.4px（`top = 判定线 + 0.4`）就判成"还没越线"，循环回落到上一个已越线锚点：
- * 点「主界面」→ 亮「计时与记录」，点「计时与记录」→ 亮「主界面」，完全对称。
+ * 点「计时与记录」→ 亮「外观与配色」，完全对称地错位。
  *
  * 两条判据都用**点击**驱动、偏差 ±0.4px：`+0.4` 是变异靶点（去掉 `LINE_TOLERANCE` 必红），
  * `−0.4` 在零容差实现下本来就绿，留着证明容差没把结论推向另一边。第三条盯「点击即钉住」的
@@ -269,8 +269,8 @@ describe("SettingsGroupNav · 点击跳转（落点压线 + 点击即钉住）",
        （实测红：亮的是「计时与记录」，见交付说明里的原始输出）。 */
     landingDrift = 0.4;
     await mount();
-    await clickGroup("主界面");
-    expect(activeTitle()).toBe("主界面");
+    await clickGroup("计时与记录");
+    expect(activeTitle()).toBe("计时与记录");
   });
 
   it("sg07_a_landing_point_04px_above_the_line_also_lights_the_clicked_group", async () => {
@@ -291,10 +291,10 @@ describe("SettingsGroupNav · 点击跳转（落点压线 + 点击即钉住）",
     await scrollTo((ANCHOR_TOPS["s-sync"] ?? 0) - CSS_ACTIVE_OFFSET);
     expect(activeTitle()).toBe("数据与同步");
     /* ③ 离开落点 → 解钉，高亮按几何走（钉子不常驻） */
-    await scrollTo(400);
+    await scrollTo(690);
     expect(activeTitle()).toBe("计时与记录");
     /* ④ 再滚回上面也一样跟着位置走 */
-    await scrollTo(520);
-    expect(activeTitle()).toBe("主界面");
+    await scrollTo(200);
+    expect(activeTitle()).toBe("外观与配色");
   });
 });

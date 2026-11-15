@@ -21,6 +21,14 @@ pub(crate) use md::{cloud_purge as md_cloud_purge, fake_webdav, fake_webdav_dir,
 mod appdata_migrate;
 mod appdata_migrate_edges;
 mod boot_timing;
+/* [批 2 · 第 5 项] 全额数据包（单个 JSON）：schema 往返 / 幂等 / 无 uid 表走 skipped。 */
+mod bundle;
+/* [批 2] 真机数据上的导出往返（`#[ignore]`：只在本机跑，只读打开两个库）。 */
+mod bundle_real_data;
+/* [批 2 · 返工] uid 为空的行：合成 uid 后非空且稳定 / 无 id 的退化路径。 */
+mod bundle_uid;
+/* [批 2 · 决策 2] 「定时备份」不许再自己跑：两条源码哨兵（配置读取恒未配置）。 */
+mod scheduled_backup_off;
 mod countdown;
 mod daily_status;
 /* [V0.11.15] 数据根指针与搬迁（指针优先于 optout；`VACUUM INTO` 的参数绑定）。 */

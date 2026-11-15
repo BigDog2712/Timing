@@ -71,20 +71,9 @@ export interface BoardCopy {
   /** 锁定态下试图改结构时的一句回应（弹层的守卫用） */
   lockedNotice: string;
 
-  /* ── 设置页「主界面组件」面板（[本轮 T05] T02 的中文字面量纳入四语言表） ── */
-  boardPanelTitle: string;
-  boardPanelHint: string;
-  boardPanelEmpty: string;
+  /* ── 8px 吸附（[设置页七项改造·批 2] 设置页那张卡下线，从布局管理弹层读写） ── */
   snapTitle: string;
   snapHint: string;
-  tidyHint: string;
-  layoutLibTitle: string;
-  layoutLibHint: string;
-  restoreSaved: string;
-  /** 行尾「移除」键的无障碍名字（`移除 「{label}」`） */
-  removeNamed: (label: string) => string;
-  /** 尺寸按钮组的无障碍名字（`{label} 尺寸`） */
-  sizeNamed: (label: string) => string;
 }
 
 export const BOARD_COPY: Record<Locale, BoardCopy> = {
@@ -128,17 +117,8 @@ export const BOARD_COPY: Record<Locale, BoardCopy> = {
     layoutUnlocked: "布局已解锁 · 现在可以拖动与改尺寸",
     lockedHint: "锁定中：拖动 / 尺寸 / 整理 / 添加与移除组件 / 切换与新建布局都已禁用；改卡标题与卡内参数仍可用",
     lockedNotice: "布局已锁定 · 先解锁再改",
-    boardPanelTitle: "主界面组件",
-    boardPanelHint: "组件板是自由摆位：在主界面拖卡头挪位置、拖右缘下缘改尺寸，位置会记住。这里管的是有哪些组件与全局手感。",
-    boardPanelEmpty: "板子是空的。点右上「添加组件」放一张，主界面才有内容。",
     snapTitle: "8px 对齐",
     snapHint: "拖动与缩放时吸附到 8px 网格。关掉后按 1px 精度移动，适合卡着像素对齐。",
-    tidyHint: "把现有组件按三列重新排紧凑（exe 的装箱算法）。",
-    layoutLibTitle: "布局库",
-    layoutLibHint: "「新建布局」把当前排布存成库里的一条；「回到已存版本」把面板还原成当前这条布局上次保存的样子；「出厂布局」回到内置排布。完整的列表 / 切换 / 删除在主界面左上角的「布局管理」里。",
-    restoreSaved: "回到已存版本",
-    removeNamed: (label) => `移除「${label}」`,
-    sizeNamed: (label) => `${label} 尺寸`,
   },
   "en-US": {
     addCard: "＋ Add widget",
@@ -180,17 +160,8 @@ export const BOARD_COPY: Record<Locale, BoardCopy> = {
     layoutUnlocked: "Layout unlocked · dragging and resizing are back",
     lockedHint: "Locked: dragging, resizing, tidying, adding or removing widgets, switching and creating layouts are off. Renaming a widget and its options still work.",
     lockedNotice: "The layout is locked · unlock it first",
-    boardPanelTitle: "Main board widgets",
-    boardPanelHint: "The board is free-form: drag a card header to move it, drag its edge to resize — positions are remembered. This panel manages which widgets exist and the global feel.",
-    boardPanelEmpty: "The board is empty. Use “Add widget” (top right) to place one.",
     snapTitle: "8px snapping",
     snapHint: "Dragging and resizing snap to an 8px grid. Turn it off for 1px precision.",
-    tidyHint: "Repack the current widgets into the three columns (the exe's packing algorithm).",
-    layoutLibTitle: "Layouts",
-    layoutLibHint: "“New layout” saves the current arrangement into the library; “Restore saved” reverts the board to the last saved state of the active layout; “Factory layout” returns to the built-in one. The full list, switching and deleting live in “Layouts” on the board.",
-    restoreSaved: "Restore saved",
-    removeNamed: (label) => `Remove ${label}`,
-    sizeNamed: (label) => `${label} size`,
   },
   "ru-RU": {
     addCard: "＋ Добавить виджет",
@@ -232,17 +203,8 @@ export const BOARD_COPY: Record<Locale, BoardCopy> = {
     layoutUnlocked: "Раскладка откреплена · перетаскивание снова работает",
     lockedHint: "Закреплено: перетаскивание, размер, упорядочивание, добавление и удаление виджетов, переключение и создание раскладок отключены. Заголовок виджета и его параметры по-прежнему доступны.",
     lockedNotice: "Раскладка закреплена · сначала открепите её",
-    boardPanelTitle: "Виджеты главного экрана",
-    boardPanelHint: "Доска свободная: тяните заголовок карточки, чтобы передвинуть, край — чтобы изменить размер; положение запоминается. Здесь управляют составом виджетов и общей настройкой.",
-    boardPanelEmpty: "Доска пуста. Нажмите «Добавить виджет» (справа вверху).",
     snapTitle: "Шаг 8px",
     snapHint: "При перетаскивании и изменении размера шаг сетки 8px. Выключите — точность 1px.",
-    tidyHint: "Плотно разложить текущие виджеты по трём колонкам (алгоритм упаковки из exe).",
-    layoutLibTitle: "Раскладки",
-    layoutLibHint: "«Новая раскладка» сохранит текущее расположение в библиотеку; «Вернуть сохранённое» откатит доску к последнему сохранённому виду текущей раскладки; «Заводская раскладка» вернёт встроенную. Полный список, переключение и удаление — в «Раскладках» на доске.",
-    restoreSaved: "Вернуть сохранённое",
-    removeNamed: (label) => `Удалить «${label}»`,
-    sizeNamed: (label) => `Размер «${label}»`,
   },
   es: {
     addCard: "＋ Añadir tarjeta",
@@ -284,16 +246,7 @@ export const BOARD_COPY: Record<Locale, BoardCopy> = {
     layoutUnlocked: "Diseño desbloqueado · arrastrar y redimensionar vuelven",
     lockedHint: "Bloqueado: arrastrar, redimensionar, ordenar, añadir o quitar tarjetas, cambiar y crear diseños están desactivados. El título de la tarjeta y sus opciones siguen disponibles.",
     lockedNotice: "El diseño está bloqueado · desbloquéalo primero",
-    boardPanelTitle: "Tarjetas del tablero",
-    boardPanelHint: "El tablero es libre: arrastra la cabecera para mover una tarjeta y su borde para redimensionar; la posición se recuerda. Aquí se gestionan qué tarjetas existen y el ajuste global.",
-    boardPanelEmpty: "El tablero está vacío. Usa «Añadir tarjeta» (arriba a la derecha).",
     snapTitle: "Ajuste de 8px",
     snapHint: "Al arrastrar y redimensionar se ajusta a una rejilla de 8px. Desactívalo para precisión de 1px.",
-    tidyHint: "Reacomoda las tarjetas en las tres columnas (el algoritmo de empaquetado del exe).",
-    layoutLibTitle: "Diseños",
-    layoutLibHint: "«Nuevo diseño» guarda la disposición actual en la biblioteca; «Restaurar guardado» devuelve el tablero al último estado guardado del diseño activo; «Diseño de fábrica» vuelve al integrado. La lista completa, el cambio y el borrado están en «Diseños» del tablero.",
-    restoreSaved: "Restaurar guardado",
-    removeNamed: (label) => `Quitar ${label}`,
-    sizeNamed: (label) => `Tamaño de ${label}`,
   },
 };

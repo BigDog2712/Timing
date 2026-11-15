@@ -1,6 +1,6 @@
 use crate::services::insight::data::backup;
 use crate::services::insight::data::repositories::remote_backup_settings;
-use crate::models::insight::backup::{BackupError, BackupPreview};
+use crate::models::insight::backup::BackupPreview;
 use crate::models::insight::backup_schedule::ScheduledBackupRun;
 use crate::infra::insight::storage_paths;
 use crate::infra::insight::webdav::{WebDavClient, WebDavConfig};
@@ -478,155 +478,6 @@ async fn webdav_client_with_password(
     }
 }
 
-pub async fn test_webdav_backup_target(
-    app: &AppHandle,
-    config: WebDavBackupConfigDto,
-    password: Option<String>,
-) -> Result<WebDavTestResult, String> {
-    let (config, client) = webdav_client_with_password(app, config, password).await?;
-    client.ping(&config.remote_dir).await?;
-    Ok(WebDavTestResult { ok: true })
-}
-
-pub async fn upload_webdav_backup(
-    app: AppHandle,
-    config: WebDavBackupConfigDto,
-    file_name: String,
-) -> Result<RemoteBackupUploadResult, String> {
-    validate_upload_file_name(&file_name)?;
-    let _transfer_guard = REMOTE_TRANSFER_LOCK.lock().await;
-    let (config, client) = webdav_client(&app, config).await?;
-    client.ensure_dir(&config.remote_dir).await?;
-
-    let base_id = remote_backup_id();
-    let local_file_name = remote_backup_file_name(&base_id);
-    let local_path = temp_backup_path(&app, &local_file_name)?;
-    let temp_dir = local_path
-        .parent()
-        .map(Path::to_path_buf)
-        .ok_or_else(|| "remote backup temp path has no parent directory".to_string())?;
-    let local_path_string = local_path.to_string_lossy().to_string();
-    let upload_result = async {
-        backup::export_backup(Some(local_path_string.clone()), app).await?;
-        let preview = backup::preview_backup(local_path_string)
-            .await
-            .map_err(|error| error.to_string())?;
-        let size_bytes = fs::metadata(&local_path)
-            .map_err(|error| format!("failed to read local backup metadata: {error}"))?
-            .len();
-        let remote_path = remote_path(&config.remote_dir, &file_name);
-        client
-            .upload_file_create_new(&local_path, &remote_path)
-            .await?;
-        Ok::<_, String>(build_entry(
-            base_id,
-            file_name,
-            remote_path,
-            size_bytes,
-            &preview,
-        ))
-    }
-    .await;
-    let _ = remove_temp_backup_file(&local_path, &temp_dir);
-    let entry = upload_result?;
-    let _index_guard = REMOTE_INDEX_LOCK.lock().await;
-    let entry_for_update = entry.clone();
-    match update_index(
-        &client,
-        &config.remote_dir,
-        |index| {
-            index.backups.retain(|item| item.id != entry_for_update.id);
-            index.backups.insert(0, entry_for_update.clone());
-            index
-                .backups
-                .sort_by_key(|entry| Reverse(entry.created_at_ms));
-        },
-        |index| index.backups.iter().any(|item| item == &entry_for_update),
-    )
-    .await
-    {
-        Ok(_) => Ok(RemoteBackupUploadResult {
-            entry,
-            index_updated: true,
-            index_message: None,
-        }),
-        Err(error) => Ok(RemoteBackupUploadResult {
-            entry,
-            index_updated: false,
-            index_message: Some(error),
-        }),
-    }
-}
-
-pub async fn list_webdav_backups(
-    app: &AppHandle,
-    config: WebDavBackupConfigDto,
-) -> Result<Vec<RemoteBackupEntry>, String> {
-    let (config, client) = webdav_client(app, config).await?;
-    let mut index = load_index(&client, &config.remote_dir).await?;
-    index
-        .backups
-        .sort_by_key(|entry| Reverse(entry.created_at_ms));
-    index.backups.truncate(MAX_BACKUP_LIST_ITEMS);
-    Ok(index.backups)
-}
-
-pub async fn download_webdav_backup(
-    app: AppHandle,
-    config: WebDavBackupConfigDto,
-    id: String,
-) -> Result<RemoteBackupDownloadResult, BackupError> {
-    let _transfer_guard = REMOTE_TRANSFER_LOCK.lock().await;
-    let trimmed_id = id.trim();
-    if trimmed_id.is_empty() {
-        return Err("remote backup id cannot be empty".to_string().into());
-    }
-
-    let (config, client) = webdav_client(&app, config).await?;
-    let index = load_index(&client, &config.remote_dir).await?;
-    let entry = index
-        .backups
-        .iter()
-        .find(|entry| entry.id == trimmed_id)
-        .ok_or_else(|| "remote backup was not found in the WebDAV index".to_string())?;
-    validate_backup_file_name(&entry.file_name)?;
-    let local_path = temp_backup_path(&app, &entry.file_name)?;
-    let temp_dir = local_path
-        .parent()
-        .map(Path::to_path_buf)
-        .ok_or_else(|| "remote backup temp path has no parent directory".to_string())?;
-    let trusted_remote_path = remote_path(&config.remote_dir, &entry.file_name);
-    if let Err(error) = client
-        .download_file(&trusted_remote_path, &local_path)
-        .await
-    {
-        let _ = remove_temp_backup_file(&local_path, &temp_dir);
-        return Err(error.into());
-    }
-    let local_path_string = local_path.to_string_lossy().to_string();
-    let preview = match backup::preview_backup(local_path_string.clone()).await {
-        Ok(preview) => {
-            if let Some(expected) = &entry.archive_sha256 {
-                if !expected.eq_ignore_ascii_case(&preview.hash) {
-                    remove_temp_backup_file(&local_path, &temp_dir)?;
-                    return Err("downloaded backup digest differs from the WebDAV index"
-                        .to_string()
-                        .into());
-                }
-            }
-            preview
-        }
-        Err(error) => {
-            let _ = remove_temp_backup_file(&local_path, &temp_dir);
-            return Err(error);
-        }
-    };
-    Ok(RemoteBackupDownloadResult {
-        path: local_path_string,
-        preview,
-    })
-}
-
 pub(crate) fn cleanup_remote_backup_temp_if_owned(
     app: &AppHandle,
     raw_path: &str,
@@ -643,14 +494,6 @@ pub(crate) fn cleanup_remote_backup_temp_if_owned(
     )?;
     remove_temp_backup_file(&path, &temp_dir)?;
     Ok(true)
-}
-
-pub fn delete_remote_backup_temp(app: AppHandle, raw_path: String) -> Result<(), String> {
-    if cleanup_remote_backup_temp_if_owned(&app, &raw_path)? {
-        Ok(())
-    } else {
-        Err("refusing to delete a file outside the remote backup temp directory".to_string())
-    }
 }
 
 pub(crate) struct ScheduledWebDavTarget {

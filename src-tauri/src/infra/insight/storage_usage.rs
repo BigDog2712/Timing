@@ -5,12 +5,26 @@ use std::path::{Path, PathBuf};
 
 const EBWEBVIEW_DIR_NAME: &str = "EBWebView";
 
-pub fn storage_size_snapshot(install_dir: &Path, paths: &StoragePaths) -> StorageSizeSnapshot {
+pub fn storage_size_snapshot(
+    install_dir: &Path,
+    paths: &StoragePaths,
+    timing_data_root: &Path,
+) -> StorageSizeSnapshot {
     StorageSizeSnapshot {
         install_dir_size_bytes: install_dir_size(install_dir, paths),
         data_size_bytes: sqlite_data_size(&paths.data_root),
+        timing_data_size_bytes: timing_data_size(timing_data_root),
         backup_dir_size_bytes: dir_size(&paths.backup_dir),
     }
+}
+
+/// 数据根的**递归**体积（计时库 + Markdown + 活动库 + 日志 + 插件 + 备份）。
+///
+/// 口径与设置页那一行一致：用户点开资源管理器看到多少，这里就报多少。
+/// 递归本身跳过 reparse point / symlink（`dir_size_excluding`），否则一个指向
+/// 整块盘的联接点就能让读数瞬间变成 1 TB。
+fn timing_data_size(data_root: &Path) -> u64 {
+    dir_size(data_root)
 }
 
 fn install_dir_size(install_dir: &Path, paths: &StoragePaths) -> u64 {
@@ -163,105 +177,5 @@ fn is_reparse_or_symlink(path: &Path) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Write;
-
-    fn temp_dir(label: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!(
-            "patina-storage-usage-{label}-{}",
-            std::process::id()
-        ));
-        let _ = fs::remove_dir_all(&path);
-        fs::create_dir_all(&path).unwrap();
-        path
-    }
-
-    fn write_file(path: &Path, bytes: usize) {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).unwrap();
-        }
-        let mut file = fs::File::create(path).unwrap();
-        file.write_all(&vec![1; bytes]).unwrap();
-    }
-
-    fn storage_paths(data_root: PathBuf, webview_root: PathBuf) -> StoragePaths {
-        StoragePaths {
-            db_path: data_root.join(SQLITE_DB_FILE_NAME),
-            backup_dir: data_root.join("backups"),
-            remote_backup_temp_dir: data_root.join("remote-backup-temp"),
-            data_root,
-            webview_root,
-            is_custom_data_root: true,
-            is_custom_webview_root: true,
-        }
-    }
-
-    #[test]
-    fn install_size_excludes_webview_cache_when_cache_root_is_install_dir() {
-        let root = temp_dir("install-cache");
-        let install_dir = root.join("Patina");
-        let data_root = root.join("Data");
-        let paths = storage_paths(data_root.clone(), install_dir.clone());
-
-        write_file(&install_dir.join("Patina.exe"), 10);
-        write_file(
-            &install_dir
-                .join(EBWEBVIEW_DIR_NAME)
-                .join("Default")
-                .join("Cache")
-                .join("cached"),
-            20,
-        );
-        write_file(&data_root.join(SQLITE_DB_FILE_NAME), 7);
-
-        let snapshot = storage_size_snapshot(&install_dir, &paths);
-        let _ = fs::remove_dir_all(&root);
-
-        assert_eq!(snapshot.install_dir_size_bytes, 10);
-        assert_eq!(snapshot.data_size_bytes, 7);
-    }
-
-    #[test]
-    fn install_size_excludes_nested_custom_data_root() {
-        let root = temp_dir("nested-data");
-        let install_dir = root.join("Patina");
-        let data_root = install_dir.join("Data");
-        let webview_root = data_root.clone();
-        let paths = storage_paths(data_root.clone(), webview_root.clone());
-
-        write_file(&install_dir.join("Patina.exe"), 10);
-        write_file(&data_root.join(SQLITE_DB_FILE_NAME), 7);
-        write_file(&data_root.join("notes"), 5);
-        write_file(&data_root.join("backups").join("backup.zip"), 9);
-        write_file(&webview_root.join(EBWEBVIEW_DIR_NAME).join("cache"), 20);
-
-        let snapshot = storage_size_snapshot(&install_dir, &paths);
-        let _ = fs::remove_dir_all(&root);
-
-        assert_eq!(snapshot.install_dir_size_bytes, 10);
-        assert_eq!(snapshot.data_size_bytes, 7);
-        assert_eq!(snapshot.backup_dir_size_bytes, 9);
-    }
-
-    #[test]
-    fn data_size_counts_sqlite_family_files_only() {
-        let root = temp_dir("sqlite-family");
-        let install_dir = root.join("Patina");
-        let data_root = install_dir.clone();
-        let paths = storage_paths(data_root.clone(), data_root.clone());
-
-        write_file(&install_dir.join("Patina.exe"), 10);
-        write_file(&data_root.join(SQLITE_DB_FILE_NAME), 5);
-        write_file(&data_root.join(format!("{SQLITE_DB_FILE_NAME}-wal")), 6);
-        write_file(&data_root.join(format!("{SQLITE_DB_FILE_NAME}-shm")), 7);
-        write_file(&data_root.join("remote-backup-temp").join("temp.zip"), 11);
-        write_file(&data_root.join(EBWEBVIEW_DIR_NAME).join("cache"), 13);
-
-        let snapshot = storage_size_snapshot(&install_dir, &paths);
-        let _ = fs::remove_dir_all(&root);
-
-        assert_eq!(snapshot.install_dir_size_bytes, 10);
-        assert_eq!(snapshot.data_size_bytes, 18);
-    }
-}
+#[path = "storage_usage_tests.rs"]
+mod tests;

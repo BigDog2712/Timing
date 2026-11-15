@@ -26,8 +26,6 @@ const ANCHOR_TOPS: Readonly<Record<string, number>> = {
   "s-theme": 160,
   "s-highlight": 240,
   "s-display": 320,
-  "s-interface": 380,
-  "s-board-widgets": 520,
   "s-tracking": 700,
   "s-sync": 820,
   "s-backup": 900,
@@ -88,9 +86,7 @@ function buildHost() {
   make("s-pill-look", el);
   make("s-theme", el);
   make("s-highlight", el);
-  const display = make("s-display", el);
-  make("s-interface", display);
-  make("s-board-widgets", el);
+  make("s-display", el);
   make("s-tracking", el);
   make("s-sync", el);
   make("s-backup", el);
@@ -166,9 +162,9 @@ function activeTitle(): string {
 describe("点击之后的后续交互（钉子与到底规则）", () => {
   it("qn01_two_consecutive_clicks_on_different_groups_do_not_interfere", async () => {
     await mount();
-    act(() => { titleButton("主界面")?.click(); });
-    await oneScroll(ANCHOR_TOPS["s-board-widgets"] - CSS_ACTIVE_OFFSET);
-    expect(activeTitle()).toBe("主界面");
+    act(() => { titleButton("计时与记录")?.click(); });
+    await oneScroll(ANCHOR_TOPS["s-tracking"] - CSS_ACTIVE_OFFSET);
+    expect(activeTitle()).toBe("计时与记录");
 
     /* 第二次点击另一个组：第一次的钉子不许把高亮拉回去 */
     act(() => { titleButton("外观与配色")?.click(); });
@@ -208,23 +204,24 @@ describe("点击之后的后续交互（钉子与到底规则）", () => {
   });
 
   it("qn04_a_click_whose_landing_is_reachable_releases_the_pin_on_landing", async () => {
-    /* 对照组：落点**可达**（`主界面` 的 landing = 502 <= maxScroll 1200）时，钉子必须在落定那一帧
-       就解掉 —— 否则用户接着往上滚，高亮会黏在「主界面」上。 */
+    /* 对照组：落点**可达**（`计时与记录` 的 landing = 682 <= maxScroll 1200）时，钉子必须在落定那一帧
+       就解掉 —— 否则用户接着往上滚，高亮会黏在「计时与记录」上。 */
     await mount();
-    act(() => { titleButton("主界面")?.click(); });
-    expect(activeTitle(), "点击瞬间就该亮目标组").toBe("主界面");
-    await oneScroll(ANCHOR_TOPS["s-board-widgets"] - CSS_ACTIVE_OFFSET);
-    expect(activeTitle()).toBe("主界面");
+    act(() => { titleButton("计时与记录")?.click(); });
+    expect(activeTitle(), "点击瞬间就该亮目标组").toBe("计时与记录");
+    await oneScroll(ANCHOR_TOPS["s-tracking"] - CSS_ACTIVE_OFFSET);
+    expect(activeTitle()).toBe("计时与记录");
     await oneScroll(ANCHOR_TOPS["s-theme"] - CSS_ACTIVE_OFFSET);
     expect(activeTitle(), "落定后钉子未解，往上滚高亮不跟").toBe("外观与配色");
   });
 
-  it("qn05_the_group_table_is_untouched_by_this_round", () => {
-    /* 锚点表是本轮唯一**不该**动的文件：判据算法整套都建立在"表顺序 = 页面顺序"上 */
+  it("qn05_the_group_table_matches_the_page_after_the_entries_were_removed", () => {
+    /* 判据算法整套都建立在"表顺序 = 页面顺序"上。[设置页七项改造·批 1/2] 两个入口下线后，
+       表里只剩 5 组；「计时与记录」组也回到只有一个锚点。 */
     expect(SETTINGS_GROUPS.map((group) => group.id)).toEqual([
-      "pill", "appearance", "board", "tracking", "data", "general",
+      "pill", "appearance", "tracking", "data", "general",
     ]);
     expect(SETTINGS_GROUPS.find((group) => group.id === "tracking")?.anchors.map((anchor) => anchor.id))
-      .toEqual(["s-tracking", "s-interface"]);
+      .toEqual(["s-tracking"]);
   });
 });

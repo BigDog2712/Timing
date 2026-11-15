@@ -2,6 +2,12 @@
   "_doc": "单文件/vendored 差异账本。由 check-vendored-diff.mjs 的提示驱动清理（提示「已与基线一致可删」时立刻删），条目在两次重锚之间是暂存的：重锚（--refresh <sha> + 手写 _reanchor）会把已登记的改动固化进基线，此后条目全部失效归零。2026-11-13 DASHBOARD-R2 重锚（f5f3f29）后清空，此前 305 条；本轮（设置高亮 / 开关开启态 / 应用设置弹窗与分类管理 / 待办入口上移 / 文案去加号）共 36 条，均 < 10 批次粒度外的收口改动，故逐条登记而不重锚。",
   "entries": [
     {
+      "path": "src-tauri/src/services/insight/data/sync_bookkeeping_business_tests.rs",
+      "change": "modified",
+      "reason": "[0.12.5 应用使用时段] schema.version 断言 11 → 12（迁移 0012 新增 app_usage_span 表）；只改这一个字面量，簿记逻辑与断言集合一行未动",
+      "owner": "software-engineer"
+    },
+    {
       "path": "src/windows/patina/features/classification/services/categoryDefinitionMutations.ts",
       "change": "modified",
       "reason": "[复核修复 D-4/D-9] 应用成员回落改走 buildQuickAppOverride（唯一重建入口，透传 categories/itemBindings），并把被删分类从集合里摘掉、主分类顺延；网页成员回落原样带上 builder 不产出的 siteRule/knownDomain，避免归一判空把整条记录写成 null（删掉用户的分组规则）",
@@ -279,8 +285,8 @@
     },
     {
       "path": "src/windows/patina/features/settings/components/SettingsRemoteBackupPanel.tsx",
-      "change": "modified",
-      "reason": "[本轮] WebDAV 那一行从自定义 flex 行改成 SettingsPreferenceRow（与同页其它行同一套字重/行距/分隔线），331 → 322 行并顺带收紧 allowlist",
+      "change": "deleted",
+      "reason": "[批 5] 远端备份面板（322 行）整卡下线",
       "owner": "software-engineer"
     },
     {
@@ -323,12 +329,6 @@
       "path": "src/windows/patina/features/settings/components/SettingsDataExportGroup.tsx",
       "change": "added",
       "reason": "[本轮] 从 SettingsDataSafetyPanel 拆出：导出/导入两行统一到 SettingsPreferenceGroup + SettingsPreferenceRow，回调与 busy 禁用态原样",
-      "owner": "software-engineer"
-    },
-    {
-      "path": "src/windows/patina/features/settings/components/SettingsDataBackupGroup.tsx",
-      "change": "added",
-      "reason": "[本轮] 从 SettingsDataSafetyPanel 拆出：备份/恢复两行 + SettingsRemoteBackupPanel 排进同一个 settings-preference-list；busy 口径（导出中∨上传中 / 恢复中∨列表拉取中∨下载中）原样",
       "owner": "software-engineer"
     },
     {
@@ -1439,6 +1439,372 @@
       "path": "src/windows/patina/features/dashboard/hooks/categoryCatalogParity.test.ts",
       "change": "added",
       "reason": "[0.14] parity 判据：共享 BUILTIN_CATEGORY_LABELS_ZH ↔ patina uiText.categories 十键逐字相等（zh-only 药丸注入表与分析窗展示同词）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/commands/insight/storage_cmd.rs",
+      "change": "modified",
+      "reason": "[批 3/6] 新增 cmd_pick_markdown_file（日记模板路径的文件选择器，只回路径不读文件）；storage_snapshot 增发 timing_data_root，体积改用数据根递归求和",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/infra/insight/storage_paths.rs",
+      "change": "modified",
+      "reason": "[批 6] 新增 timing_data_root()：数据目录口径 = %APPDATA%\\com.timing.app（不是它下面的 patina/data）；注释里记下 patina/patina.db 0 字节遗留文件的判定（不做清理）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/infra/insight/storage_usage.rs",
+      "change": "modified",
+      "reason": "[批 6] storage_size_snapshot 增发 timing_data_size_bytes（数据根递归体积，走 dir_size_excluding 跳过 reparse point）；测试拆到 storage_usage_tests.rs 以满足 ≤300 行",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/models/insight/storage.rs",
+      "change": "modified",
+      "reason": "[批 6] StoragePathSnapshot 加 timing_data_root、StorageSizeSnapshot 加 timing_data_size_bytes，字段注释写清两者是包含关系",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/backup.rs",
+      "change": "modified",
+      "reason": "[批 5] 删 pick_backup_file / pick_backup_save_file 再导出（随 backup_cmd 下线）；export_backup / preview_backup 原样保留（迁移兜底备份与定时备份仍用）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/backup/paths.rs",
+      "change": "modified",
+      "reason": "[批 5] 删两个 rfd 备份文件选择器与其私有 resolve_dialog_directory：只服务已下线的「选备份位置 / 选恢复来源」",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/remote_backup.rs",
+      "change": "modified",
+      "reason": "[批 5] 删 test/upload/list/download_webdav_backup 与 delete_remote_backup_temp（只服务已下线的远端备份面板）；定时备份那一路原样保留",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/remote_backup_config.rs",
+      "change": "modified",
+      "reason": "[批 5] 删 reveal()（只服务 cmd_reveal_webdav_backup_secret）；snapshot / network_snapshot / save / clear 保留",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/layout/DashboardBoard.tsx",
+      "change": "modified",
+      "reason": "[批 2] 给 LayoutManagerDialog 传 snap / setSnap（8px 吸附从设置页那张卡搬进布局管理弹层）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/layout/LayoutManagerDialog.tsx",
+      "change": "modified",
+      "reason": "[批 2] 新增 8px 吸附开关行（QuietSwitch 读写 layout.layout.snap / layout.setSnap），不属于结构变更，锁定态仍可切换",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/layout/boardCopy.ts",
+      "change": "modified",
+      "reason": "[批 2] 删只服务 SettingsBoardPanel 的 9 个键（四语言各一份）；snapTitle / snapHint 保留并改注释指向新落点",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/layout/boardLock.test.tsx",
+      "change": "modified",
+      "reason": "[批 2] 补 snap / setSnap 两个必填 prop，锁定态判据不变",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsAppearancePanel.tsx",
+      "change": "modified",
+      "reason": "[批 1] 去掉 interfaceSection 插槽与 ReactNode 引入（「服务」面板下线后没人再往外观卡里塞子区块）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/host/MdFormatBlock.tsx",
+      "change": "modified",
+      "reason": "[批 3] 日记模板路径行加「选择文件…」按钮：选完写进同一份草稿（setDiaryTemplate），取消不清空原值",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/host/MdSyncCloudAuto.tsx",
+      "change": "modified",
+      "reason": "[批 4] 三档下方渲染当前档说明；off 档只挂 offNote、interval 档才出分钟框并补「上传一次 / （5 ~ 120）」、smart 档只挂 smartNote",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/hooks/useSettingsPageState.ts",
+      "change": "modified",
+      "reason": "[批 1/5/6] 删 Web 活动面板状态、备份导出/恢复六个 state 与四个回调、数据目录搬根两个回调（搬根入口唯一在 SQLite 落点设置）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/settingsPageActions.ts",
+      "change": "modified",
+      "reason": "[批 5] 只剩 runSettingsCleanupFlow：备份导出/恢复准备/恢复提交三条流程随「活动库备份与恢复」下线",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/settingsRuntimeAdapterService.ts",
+      "change": "modified",
+      "reason": "[批 5] 删备份导出/预览/恢复、Web 活动帮助链接与剪贴板/桥快照几个 static（对应面板已下线）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/settingsGroups.source.test.ts",
+      "change": "modified",
+      "reason": "[批 1/2/5] 锚点表去掉 s-interface / s-board-widgets 与 board 组；原「接口嵌在外观卡里」用例改成反向回归「入口不再存在」",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/settingsGroups.ts",
+      "change": "modified",
+      "reason": "[批 1/2] 删 s-interface 锚点与整个 board 组，组数 7 → 5",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/persistence/persistenceWriteRuntimeGateway.ts",
+      "change": "modified",
+      "reason": "[批 5] 删 saveRemoteBackupLastBackupAt（只被已删的 remoteBackupSettingsStore 调用）；其余 bootstrap 快照通道不动",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/storage/storageRuntimeGateway.ts",
+      "change": "modified",
+      "reason": "[批 3/6] 新增 pickMarkdownFile；StoragePathSnapshot 加 timingDataRoot、StorageSizeSnapshot 加 timingDataSizeBytes，与后端字段对齐",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/dashboard-r2.css",
+      "change": "modified",
+      "reason": "[批 2] 新增 .qp-layout-manager__switch-row/-copy/-title 三条（只用 --* 令牌），承载搬进来的 8px 吸附行",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/infra/insight/storage_usage_tests.rs",
+      "change": "added",
+      "reason": "[批 6] 从 storage_usage.rs 拆出的体积判据（≤300 行硬约束），并新增「数据根递归求和」那条用例",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/commands/insight/backup_cmd.rs",
+      "change": "deleted",
+      "reason": "[批 5] 「活动库备份与恢复」的 15 条命令整块下线（pick/preview/export/restore/远端 WebDAV/定时备份快照），ipc_commands.rs 与 ACL 同步删",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/assets/store-badges/chrome-web-store.png",
+      "change": "deleted",
+      "reason": "[批 1] 「服务」面板的商店徽标素材，随 SettingsInterfacePanel 下线",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/assets/store-badges/edge-add-ons.png",
+      "change": "deleted",
+      "reason": "[批 1] 同上",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/assets/store-badges/firefox-add-ons.svg",
+      "change": "deleted",
+      "reason": "[批 1] 同上",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsBackupDialog.tsx",
+      "change": "deleted",
+      "reason": "[批 5] 备份导出/预览/恢复三个弹层（497 行）随「活动库备份与恢复」下线",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsBoardPanel.tsx",
+      "change": "deleted",
+      "reason": "[批 2] 「主界面组件」卡整卡下线；8px 吸附搬进 LayoutManagerDialog，版式库/精简卡片那几行直接删",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsInterfacePanel.tsx",
+      "change": "deleted",
+      "reason": "[批 1] 「服务」卡整卡下线（网页同步 + 远程推送，598 行）；AppSettings 字段与后端能力保留",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsRemoteUploadDialog.tsx",
+      "change": "deleted",
+      "reason": "[批 5] 远端上传草稿弹层随面板下线",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/hooks/useRemoteBackupState.ts",
+      "change": "deleted",
+      "reason": "[批 5] 远端备份状态机（381 行）随面板下线",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/hooks/useWebActivitySetupState.ts",
+      "change": "deleted",
+      "reason": "[批 1] Web 活动桥面板的提示状态机随「服务」面板下线",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/remoteBackupService.ts",
+      "change": "deleted",
+      "reason": "[批 5] 远端备份调用封装（只被已删面板使用）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/remoteBackupTargetSummary.ts",
+      "change": "deleted",
+      "reason": "[批 5] 远端目标摘要文案（只被已删面板使用）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/remoteBackupUploadDraft.ts",
+      "change": "deleted",
+      "reason": "[批 5] 远端上传草稿类型/校验（只被已删弹层使用）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/scheduledBackupService.ts",
+      "change": "deleted",
+      "reason": "[批 5] 定时备份面板的调用封装随面板下线（后端 scheduled_backup 运行时保留）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/services/settingsTokenService.ts",
+      "change": "deleted",
+      "reason": "[批 1] 远程推送令牌读写（只被「服务」面板使用）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/backup/backupRuntimeGateway.ts",
+      "change": "deleted",
+      "reason": "[批 5] 备份 zip 的 pick/preview/export/restore IPC 网关（对应命令已删）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/backup/remoteBackupRuntimeGateway.ts",
+      "change": "deleted",
+      "reason": "[批 5] 远端 WebDAV 备份 IPC 网关（对应命令已删）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/backup/scheduledBackupRuntimeGateway.ts",
+      "change": "deleted",
+      "reason": "[批 5] 定时备份配置 IPC 网关（对应命令已删，运行时保留）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/persistence/remoteBackupSettingsStore.ts",
+      "change": "deleted",
+      "reason": "[批 5] 远端备份设置的前端 store：面板下线后没有任何 import 方，留着只会继续调无人使用的 IPC",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/shell/styles/features/settings-board.css",
+      "change": "deleted",
+      "reason": "[批 2] 「主界面组件」卡的样式表（App.css 的 @import 同步删）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/host/MdFormatBlock.pickFile.test.tsx",
+      "change": "added",
+      "reason": "[批 3] 日记模板路径「选择文件…」的回归：选到 → 只写一次 setDiaryTemplate；取消（null）→ 一次都不写、原值保留；saving 时按钮禁用",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/bundle/mod.rs",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] 全额数据包 schema：FORMAT 硬契约、两张库的表清单与合并策略、非便携 settings 键、流式 BundleWriter（10 万行 sessions 不进内存）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/bundle/export.rs",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] 导出：两个库各扫一遍逐表逐行流式写 JSON；业务库走宿主池、活动库走 patina_bridge 的 mode=ro 只读池（导出不给写能力）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/bundle/import.rs",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] 预览（只读，不建表不写库）与导入编排：活动库事务先交、业务库后交；表名带 business./activity. 前缀区分两库各自的 settings",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/bundle/merge.rs",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] 逐表合并：uid 表丢自增 id 避免换机撞主键、子表 item_id/parent_id 按源 id→本地 id 改写、按 table_xinfo 跳过生成列（sessions.app_key）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/bundle/sql.rs",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] upsert SQL 构造：部分唯一索引必须带 WHERE uid IS NOT NULL、LWW 版本守卫、INSERT OR IGNORE 三种写法",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/bundle/mod_tests.rs",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] 纯函数单测：流式写盘的行/表顺序、两种 ON CONFLICT 写法、LWW 守卫随版本列消失而降级",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/bundle/synth.rs",
+      "change": "added",
+      "reason": "[批 2 · 返工] uid 为空的行：按触发器同一格式合成 uid（<前缀>:<来源设备>:<原始 id>），device_id 一并补来源设备；替代「按 id INSERT OR IGNORE」的静默跳过",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/commands/insight/bundle_cmd.rs",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] 5 条命令：选落点 / 导出 / 选文件 / 预览 / 导入（导入锁主窗；预览只读不加守卫）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src-tauri/src/services/insight/data/scheduled_backup.rs",
+      "change": "modified",
+      "reason": "[批 2 · 决策 2] 定时备份下线：load_or_create_config 恒返回 enabled:false 且不再读写库里的 scheduled_backup_config，tick 每轮走 Idle，后台不再上传",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/platform/persistence/fullBundleRuntimeGateway.ts",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] 5 条命令的前端口岸 + 运行时校验（命令改名时在口岸处带命令名炸，而不是渲染出 undefined 行）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/fullBundleCopy.ts",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] 本地 copy 常量：i18n 冻结在 939 键，本轮不插新键；同时给现有导出对话框补一句「只含活动数据」",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsFullBundleExportRow.tsx",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] 导出这一行：选落点→导出→把「多少行/多大」留在行下（导出是只读动作，不锁整页表单）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsFullBundleImportCard.tsx",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] 导入卡片 + 预览/结果对话框：不兼容时确认键根本不渲染；结果按表报新增/更新/跳过",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsFullBundle.test.tsx",
+      "change": "added",
+      "reason": "[批 2 · 第 5 项] vitest：导出走对两条命令、取消不发命令、失败留原话、不兼容不放行导入、确认后才写库并回报按表结果",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsDataExportDialog.tsx",
+      "change": "modified",
+      "reason": "[批 2 · 第 5 项] 只在正文顶部补一句「本对话框只导活动库，全量在完整数据包」（并压缩一处按钮写法以守住 477 行基线）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/settings/components/SettingsDataImportDialog.tsx",
+      "change": "modified",
+      "reason": "[批 2 · 第 5 项] 操作列表加「完整数据包（JSON）」卡片；CSV 导入那台状态机一行未动（卡片自带状态）",
       "owner": "software-engineer"
     }
   ]

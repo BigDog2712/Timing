@@ -6,6 +6,20 @@ pub const SQLITE_DB_FILE_NAME: &str = "patina.db";
 const BACKUP_DIR_NAME: &str = "backups";
 const REMOTE_BACKUP_TEMP_DIR_NAME: &str = "remote-backup-temp";
 
+/// Timing 真正的数据根（`%APPDATA%\com.timing.app`）。
+///
+/// `StoragePaths` 描述的是它下面 `patina/data` 那一层（活动库 + 备份 + 远端临时件）。
+/// 设置页「数据目录」那一行要给用户看的是**数据根**，不是这一层——用户问的是
+/// 「我的数据都在哪」，答案里有 `timing.db`、`md/`、`logs/`、`plugins/`、`patina/`。
+///
+/// 顺带核实（V0.13.x，**只做判定，不做清理**）：`<数据根>/patina/patina.db` 与
+/// `<数据根>/patina/data/patina.db` 在真机上同时存在，前者是 **0 字节的遗留空文件**
+/// （早期融合布局把 `data_root` 当成 `patina/` 时留下的），活库在后者。
+/// 不写自动删除：那是用户目录里的文件，判据不足时删库的代价远大于留一个空文件。
+pub fn timing_data_root() -> PathBuf {
+    crate::platform::app_dir::data_root()
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StoragePaths {
     pub data_root: PathBuf,

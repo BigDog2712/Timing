@@ -216,7 +216,7 @@
 
 | 命令 | 入参 | 出参 | ipc.ts 方法 |
 |---|---|---|---|
-| `usage_stats_get` | `{ date: string }`（本地日 `yyyy-MM-dd`） | `UsageDay` | `usageStatsGet`（[0.13.3] rows 里多了 `label` / `icon`） |
+| `usage_stats_get` | `{ date: string }`（本地日 `yyyy-MM-dd`） | `UsageDay` | `usageStatsGet`（[0.13.3] rows 里多了 `label` / `icon`；[0.12.5] 多了 `spans`） |
 | `usage_stats_settings` | `{}` | `void` | `usageStatsSettings`（跳系统「使用情况访问」页） |
 
 `UsageDay` 的形状：
@@ -230,7 +230,8 @@
     packageName: string,
     sec: number, first: number, last: number,  // 与 app_usage 逐字对齐的**事实**
     label: string,   // 系统真名（getApplicationLabel）；空串 = 不知道（包已卸载）
-    icon: string     // 'data:image/webp;base64,…'（64px）；空串 = 没有图标
+    icon: string,    // 'data:image/webp;base64,…'（64px）；空串 = 没有图标
+    spans: [{ from: number, to: number }]  // [0.12.5] 这天的前台区间，升序已合并
   }]
 }
 ```
@@ -239,8 +240,25 @@
 每次查询由原生桥现查、在 `usage_stats_get` 里合并。前端只有一条显示规则
 （`components/mobile/usageFormat.ts:displayName`）：真名为空才回落包名短名。
 
+**`spans` 落库**（`app_usage_span`，迁移 `0012_v01250_usage_span_guard.sql`），理由与
+`app_usage` 同源：系统只留约 7 天事件明细，不落库的话第 8 天起「9:00-9:30」就永久消失。
+与 `label` 的区别是它**不是会过期的副本**，而是一条事实 —— 所以它进库，名字不进。
+
+`spans` 的口径：
+
+- `[from, to)` 毫秒时刻，本地时区；一次连续前台一段。
+- 桥（`usageDay`）回的是**扁平** `spans: [{packageName, from, to}]`，不塞进各自的 row ——
+  跨桥列表只走 `jsArrayOf`，元素为 `JSONObject` 这条路已验证，嵌套 `JSONArray` 没有先例。
+  Rust 侧按 `packageName` 分组挂回行上，所以**对外形状**是每行一个 `spans` 数组。
+- 不足 1 秒的碎段不记（切屏瞬间配出的段显示成「09:00-09:00」毫无意义）。
+- 读出来时合并重叠/相接的段（`services::usage::merge_spans`）：库里按 `start_ms` 去重，
+  起点不同而内容重叠的段会并存，不合并就会出现两条时间交错的读数。
+- **空数组是合法且需要区分原因的**：老日期系统已回收明细（只剩合计），
+  与「这天没用过这个应用」不是一回事，前端要按 `first > 0` 分两种文案。
+
 超 7 天的历史日期：系统明细已过期，但宿主会把**库里该日出现过的包名**一并下传给桥
-（`usageDay` 的 `packages` 参数），所以名字与图标照样解析得出来 —— 与系统明细还在不在无关。
+（`usageDay` 的 `packages` 参数），所以名字与图标照样解析得出来 —— 与系统明细还在不在无关；
+`spans` 同样从库里读，不依赖系统。
 
 ## 4. 命令详解（入参 / 出参 / 语义 / 错误码 / 事件）
 
@@ -1284,6 +1302,54 @@ Kotlin 自己读那个文件、写进用户选中的 `content://`。过桥要 ba
 判据：`HostSyncPanel.test.tsx`（三档文案与控件可见性）、
 `settingsGroups.source.test.ts`（接口/主界面两条入口不再存在）、
 `SettingsStoragePathCallbacks.test.tsx`（数据目录行不再有第二套搬根入口）。
+
+---
+
+### 12.20 [0.14] 契约增量：全额数据包（单个 JSON）导出 / 预览 / 导入
+
+> 背景：设置页七项改造第二批 —— ⑤「全额数据导出/导入」。现有「数据导出」对话框只导
+> **活动库**（应用使用 CSV / SQLite / Parquet / Markdown）；用户要的是「换台机器，东西都在」：
+> 事项、计时、便利贴、待办、应用活动、手机端数据，**一个 JSON 文件**。
+>
+> **契约四个数**：命令 **92**（+Patina **117**）/ 错误码 19 / 事件 11-11 / emit 18。
+> 宿主 92 条、错误码、事件都没动；变的是 Patina 段 **112 → 117**（+5）。
+
+| 命令 | 入参 | 出参 |
+|---|---|---|
+| `cmd_pick_full_bundle_save_file` | — | `Option<String>`（默认名 `Timing-full-<YYYYMMDD-HHmm>.json`，本地时间） |
+| `cmd_export_full_bundle` | `outputPath: String` | `{ rowCount, tableCount, bytes }` |
+| `cmd_pick_full_bundle_file` | — | `Option<String>`（filter `json`） |
+| `cmd_inspect_full_bundle` | `path: String` | `{ format, exportedAtMs, appVersion, deviceId, tables[{name,rows}], totalRows, compatible, message }` |
+| `cmd_import_full_bundle` | `path: String` | `{ tables[{name,inserted,updated,skipped}], totalInserted, totalUpdated }` |
+
+**包格式（硬契约）**：`format = "timing.full-bundle.v1"`；`business` / `activity` 两个对象，
+每张表是一个数组，元素是 **`{"列名": 值}` 的对象**（不是位置数组 —— 加列不会让旧包错位）。
+
+1. **`app_usage` 本批加进契约**：产品口径的「手机端数据」就是它（`package_name + local_date`，
+   手机端每日上传）。不加，导出的包里就没有手机端数据。
+2. **`inspect` 只读**：不建表、不写库、不动 `install_id.txt`。`compatible = (format == 上面那串)`，
+   不兼容时前端连确认键都不渲染（灰键仍可聚焦，读屏用户会以为能点）。
+3. **`tables[].name` 带库前缀**（`business.items` / `activity.sessions`）：两个库里都有
+   `settings`，不带前缀会出现两行同名、数字不同，且 `totalRows` 会漏算活动库那一份。
+4. **导入只 merge**：uid 表按 `uid` upsert（部分唯一索引必须写成
+   `ON CONFLICT("uid") WHERE "uid" IS NOT NULL`，否则 SQLite 报「没有匹配」）；
+   无 uid 的表（`todos` / `notes` / `icon_cache` / 活动库 `settings`）走 `INSERT OR IGNORE`；
+   `settings` 与 `app_usage` / `app_category` 按版本列 LWW。
+5. **uid 表导入时不带自增 `id`**：uid 是 `i:<device>:<id>`，换机时目标库的 `id=1` 已被本机
+   默认事项占着，带 `id` 会撞主键把整包回滚。子表的 `item_id` / `items.parent_id` 按
+   「源 id → 本地 id」映射改写；`items.parent_id` 推迟到第二遍写（行序不保证父在子前）。
+6. **生成列不写回**：`sessions.app_key` 是 `GENERATED ALWAYS AS (...)`，列清单用
+   `PRAGMA table_xinfo` 取、只留 `hidden = 0`。
+7. **本机身份不跨设备搬**：`settings` 里 `schema.version` / `ui.last_item_id` /
+   `remote_status_bridge_token` / `remote_status_bridge_machine_id` / `web_activity_token` /
+   `__tracker_last_*` 这些键导入时跳过（导出照常全导）。包的 `deviceId` 原样保留在行里，
+   本机 `install_id.txt` 一个字节都不动。
+8. **整包一个事务**：活动库先交、业务库后交；任一步失败两边各自回滚并原文报错。
+   导入后要提示「统计图要等**重启**后才完全一致」（读模型要重算）。
+
+判据：`src-tauri/src/tests/bundle.rs`（schema 往返 / 导入到空库行数一致 / 同包再导
+`inserted == 0` / 无 uid 表走 `skipped` 不炸）、`bundle/mod_tests.rs`（两种 `ON CONFLICT`
+写法 + LWW 守卫）、`SettingsFullBundle.test.tsx`（导出走对两条命令；不兼容不放行导入）。
 
 ---
 

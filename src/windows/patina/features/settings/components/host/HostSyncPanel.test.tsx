@@ -49,6 +49,8 @@ vi.mock('../../services/host/hostEvents', () => ({
 }));
 
 import { HostSyncPanel } from './HostSyncPanel';
+import { AUTO_COPY } from '../../services/host/mdSyncCopy';
+import type { MdSyncViewCloud } from '../../services/host/hostTypes';
 import { useMdSyncStore } from '../../services/host/mdSyncRuntimeStore';
 
 const BINDING = (kind: 'timers' | 'notes' | 'todos') => ({
@@ -56,7 +58,7 @@ const BINDING = (kind: 'timers' | 'notes' | 'todos') => ({
 });
 
 /** `md_sync_get` 的最小合法视图（字段严格照 `MdSyncViewCloud`，缺一个就是渲染期崩） */
-function view() {
+function view(): MdSyncViewCloud {
   return {
     today: '2026-11-11',
     config: {
@@ -249,5 +251,50 @@ describe('失败面：出错误文案，不静默', () => {
     /* 定位不到具体落点的失败留在页签顶部（能定位的交给块①/③），但一个字都不许吞 */
     expect(text()).toContain('落点写入失败：磁盘只读');
     expect(buttonByText('保存并同步').disabled).toBe(false); /* saving 复位，可重试 */
+  });
+});
+
+/**
+ * [设置页七项改造·批 4] 自动同步三档：标签逐字 + 每档只出现自己那句说明。
+ * 「关闭 / 自动 / 智能」读不出差别（整块本来就叫「自动同步」），故第二档改回「定时」；
+ * 智能档见 `smartNote`、关闭档见 `offNote`、只有定时档出现分钟框（min/max 仍是 5/120，
+ * 夹值在 `clampAutoMinutes`）—— 前两档挂个灰框会被读成「选了却没生效」。
+ */
+describe('[批 4] 自动同步三档的文案与控件可见性', () => {
+  it('t01_each_tier_shows_only_its_own_note_and_minutes_field_is_interval_only', async () => {
+    const webdavView = view();
+    webdavView.config.cloudWebdav = {
+      enabled: true,
+      baseUrl: 'https://dav.example/dav/',
+      user: 'someone',
+      auto: { schedule: 'smart', intervalMinutes: 15 },
+    };
+    g.mdSyncGet.mockResolvedValue(webdavView);
+    await mount();
+    act(() => toggleOf('WebDAV 云端同步').click());
+    await flush();
+    /* 块④（本地）也可挂一份；挑**可用**的那一份，禁用态点了没反应 */
+    const auto = Array.from(container.querySelectorAll<HTMLElement>('.sync-cloud__auto'))
+      .find((el) => el.getAttribute('data-disabled') === 'false');
+    if (!auto) throw new Error('找不到可用的「自动同步」三档控件');
+    const labels = Array.from(auto.querySelectorAll('.sync-cloud__auto-item'), (el) => el.textContent?.trim());
+    expect(labels).toEqual([AUTO_COPY.off, AUTO_COPY.interval, AUTO_COPY.smart]);
+    expect(labels).toEqual(['关闭', '定时', '智能']);
+    /* 默认档是智能：只有那句行为说明，没有分钟框 */
+    expect(auto.textContent).toContain(AUTO_COPY.smartNote);
+    expect(auto.querySelector('input[type="number"]')).toBeNull();
+    /* 关闭档：一句「只在手动同步时上传」，仍然没有分钟框 */
+    act(() => (auto.querySelector('[data-tier="off"]') as HTMLButtonElement).click());
+    await flush();
+    expect(auto.textContent).toContain(AUTO_COPY.offNote);
+    expect(auto.querySelector('input[type="number"]')).toBeNull();
+    /* 定时档：分钟框出现，边界仍是 5 ~ 120 */
+    act(() => (auto.querySelector('[data-tier="interval"]') as HTMLButtonElement).click());
+    await flush();
+    const minutes = auto.querySelector<HTMLInputElement>('input[type="number"]');
+    expect(minutes?.min).toBe('5');
+    expect(minutes?.max).toBe('120');
+    expect(auto.textContent).toContain(AUTO_COPY.times);
+    expect(auto.textContent).toContain(AUTO_COPY.range);
   });
 });

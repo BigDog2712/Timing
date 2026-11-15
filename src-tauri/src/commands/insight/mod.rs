@@ -1,6 +1,7 @@
 pub mod activity_read_model_cmd;
 pub mod attribution_cmd;
-pub mod backup_cmd;
+/* [批 2] 全额数据包（单个 JSON）：选落点 / 导出 / 选文件 / 预览 / 导入。 */
+pub mod bundle_cmd;
 pub mod diagnostics_cmd;
 pub mod error;
 pub mod export_cmd;

@@ -27,15 +27,13 @@ import { SETTINGS_GROUPS } from "../settingsGroups";
  * 每条用例都点名它咬住的机制；pin03 / pin04 在修复前后都是绿的，作为回归留着（防改坏）。
  */
 
-/** 各锚点的**文档绝对**纵坐标（px）。同心跳测试，保留 `s-interface` 的嵌套与靠前位置。 */
+/** 各锚点的**文档绝对**纵坐标（px）。同心跳测试；两位被删的锚点不再出现。 */
 const ANCHOR_TOPS: Readonly<Record<string, number>> = {
   "s-pill-handles": 0,
   "s-pill-look": 80,
   "s-theme": 160,
   "s-highlight": 240,
   "s-display": 320,
-  "s-interface": 380,
-  "s-board-widgets": 520,
   "s-tracking": 700,
   "s-sync": 820,
   "s-backup": 900,
@@ -103,10 +101,7 @@ function buildHost() {
   make("s-pill-look", el);
   make("s-theme", el);
   make("s-highlight", el);
-  const display = make("s-display", el);
-  /* 真实结构：`s-interface` 在 `s-display` 卡片内部（串组的根因，别摊平） */
-  make("s-interface", display);
-  make("s-board-widgets", el);
+  make("s-display", el);
   make("s-tracking", el);
   make("s-sync", el);
   make("s-backup", el);
@@ -206,9 +201,9 @@ describe("SettingsGroupNav · 点击后的钉住语义（落点被夹 + 单次�
   it("pin03_two_consecutive_clicks_on_different_groups_do_not_interfere", async () => {
     /* 回归（修复前后都绿）：第一次的钉子不许把第二次的高亮拉回去 */
     await mount();
-    await clickGroup("主界面");
-    await oneScroll(ANCHOR_TOPS["s-board-widgets"]! - CSS_ACTIVE_OFFSET);
-    expect(activeTitle()).toBe("主界面");
+    await clickGroup("计时与记录");
+    await oneScroll(ANCHOR_TOPS["s-tracking"]! - CSS_ACTIVE_OFFSET);
+    expect(activeTitle()).toBe("计时与记录");
     await clickGroup("外观与配色");
     await oneScroll(ANCHOR_TOPS["s-theme"]! - CSS_ACTIVE_OFFSET);
     expect(activeTitle()).toBe("外观与配色");

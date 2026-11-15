@@ -261,6 +261,7 @@ describe("V-1.4d 布局管理弹层", () => {
         library: emptyLibrary(),
         locked,
         canCreate: true,
+        snap: true, setSnap: () => undefined,
         onSwitch: () => undefined,
         onCreate: handlers.onCreate,
         onRemove: () => undefined,

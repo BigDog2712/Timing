@@ -4,10 +4,6 @@ export async function deleteSessionsBefore(cutoffTime: number): Promise<void> {
   await invokeWithCommandError("cmd_delete_sessions_before", { cutoffTime });
 }
 
-export async function saveRemoteBackupLastBackupAt(timestampMs: number): Promise<void> {
-  await invokeWithCommandError("cmd_save_remote_backup_last_backup_at", { timestampMs });
-}
-
 export async function saveDataBootstrapSnapshotPayload(payload: string): Promise<void> {
   await invokeWithCommandError("cmd_save_data_bootstrap_snapshot_payload", { payload });
 }

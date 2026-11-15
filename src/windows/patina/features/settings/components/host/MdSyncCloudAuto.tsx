@@ -90,6 +90,10 @@ export function MdSyncCloudAuto({
         ))}
       </div>
 
+      {auto.schedule === 'off' && (
+        <p className="sync-cloud__hint">{AUTO_COPY.offNote}</p>
+      )}
+
       {auto.schedule === 'interval' && (
         <div className="sync-cloud__auto-interval">
           <span className="sync-cloud__hint">{AUTO_COPY.every}</span>
@@ -121,6 +125,7 @@ export function MdSyncCloudAuto({
             />
             <span className="sync-cloud__hint">{AUTO_COPY.minutes}</span>
           </label>
+          <span className="sync-cloud__hint">{AUTO_COPY.times}</span>
           <span className="sync-cloud__hint">{AUTO_COPY.range}</span>
         </div>
       )}

@@ -17,6 +17,19 @@ pub fn cmd_pick_storage_directory() -> Option<String> {
         .map(|path| path.to_string_lossy().to_string())
 }
 
+/// 选一个 Markdown 文件（设置 → 同步 → 日记模板路径）。
+///
+/// 与 `cmd_pick_storage_directory` 同风格：**只返回路径**，不读文件、不校验内容 ——
+/// 落库与校验都在设置保存那一步，这里多做的任何事都会变成「选文件就报错」。
+/// 过滤器只放 md / markdown：模板是 Markdown，选到别的东西多半是选错了地方。
+#[tauri::command]
+pub fn cmd_pick_markdown_file() -> Option<String> {
+    rfd::FileDialog::new()
+        .add_filter("Markdown", &["md", "markdown"])
+        .pick_file()
+        .map(|path| path.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 pub async fn cmd_get_storage_snapshot<R: Runtime>(
     app: AppHandle<R>,
@@ -158,6 +171,9 @@ pub fn cmd_open_storage_directory(path: String) -> Result<(), String> {
 
 fn storage_snapshot<R: Runtime>(app: &AppHandle<R>) -> Result<StorageSnapshot, String> {
     let paths = storage_paths::resolve_storage_paths(app)?;
+    /* 设置页「数据目录」那一行要的是**数据根**（`%APPDATA%\com.timing.app`），
+       不是 `paths.data_root`（那只是它下面的 `patina/data`）。两者都给出去，由前端选。 */
+    let timing_data_root = storage_paths::timing_data_root();
     let install_dir = install_dir()?;
     let maintenance = storage_control::read_maintenance_state(app)
         .unwrap_or_else(|_| storage_control::StorageMaintenanceState::new());
@@ -165,6 +181,7 @@ fn storage_snapshot<R: Runtime>(app: &AppHandle<R>) -> Result<StorageSnapshot, S
     Ok(StorageSnapshot {
         paths: StoragePathSnapshot {
             install_dir: install_dir.to_string_lossy().to_string(),
+            timing_data_root: timing_data_root.to_string_lossy().to_string(),
             data_root: paths.data_root.to_string_lossy().to_string(),
             database_path: paths.db_path.to_string_lossy().to_string(),
             backup_dir: paths.backup_dir.to_string_lossy().to_string(),
@@ -173,7 +190,7 @@ fn storage_snapshot<R: Runtime>(app: &AppHandle<R>) -> Result<StorageSnapshot, S
             is_custom_data_root: paths.is_custom_data_root,
             is_custom_webview_root: paths.is_custom_webview_root,
         },
-        sizes: storage_usage::storage_size_snapshot(&install_dir, &paths),
+        sizes: storage_usage::storage_size_snapshot(&install_dir, &paths, &timing_data_root),
         webview_cache: webview_cache::webview_cache_snapshot(app)?,
         maintenance: StorageMaintenanceSnapshot {
             last_error: maintenance.last_maintenance_error,

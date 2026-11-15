@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useLocale, useLocaleText, type UiText } from "../../../shared/i18n/index.ts";
+import { useLocaleText, type UiText } from "../../../shared/i18n/index.ts";
 import type { QuietToastTone } from "../../../shared/types/toast";
 import { useQuietDialogs } from "../../../shared/hooks/useQuietDialogs";
 import { getSettingsBootstrapCache, setSettingsBootstrapCache } from "../services/settingsBootstrapCache";
@@ -9,12 +9,7 @@ import {
   prewarmSettingsBootstrapCache,
 } from "../services/settingsBootstrapService.ts";
 import { SettingsRuntimeAdapterService } from "../services/settingsRuntimeAdapterService";
-import {
-  commitPreparedBackupRestoreFlow,
-  prepareBackupRestoreFlow,
-  runBackupExportFlow,
-  runSettingsCleanupFlow,
-} from "../services/settingsPageActions.ts";
+import { runSettingsCleanupFlow } from "../services/settingsPageActions.ts";
 import {
   applyExternalTitleRecordingSetting,
   cancelSettingsPageState,
@@ -24,12 +19,7 @@ import {
 import type { AppSettings } from "../../../shared/settings/appSettings";
 import type { ThemeLibrary } from "../../../shared/settings/colorSchemeOptions.ts";
 import type { CleanupRange } from "../types";
-import type {
-  BackupRestorePreparation,
-  BackupRestoreStrategy,
-  StorageSnapshot,
-} from "../services/settingsRuntimeAdapterService.ts";
-import { useRemoteBackupState } from "./useRemoteBackupState.ts";
+import type { StorageSnapshot } from "../services/settingsRuntimeAdapterService.ts";
 import { toEbwebviewCachePath } from "../services/storagePathDisplay.ts";
 
 const buildCleanupOptions = (uiText: UiText): Array<{ value: CleanupRange; label: string }> => [
@@ -93,7 +83,6 @@ export function useSettingsPageState({
   onRegisterSaveHandler,
 }: UseSettingsPageStateOptions) {
   const UI_TEXT = useLocaleText();
-  const locale = useLocale();
   const { confirm, dialogs } = useQuietDialogs();
   const initialBootstrap = getSettingsBootstrapCache();
   const initialBootstrapError = initialBootstrap ? null : getSettingsBootstrapPrewarmError();
@@ -109,12 +98,6 @@ export function useSettingsPageState({
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [cleanupRange, setCleanupRange] = useState<CleanupRange>(30);
   const [isCleaning, setIsCleaning] = useState(false);
-  const [exportPath, setExportPath] = useState("");
-  const [restorePath, setRestorePath] = useState("");
-  const [restoreStrategy, setRestoreStrategy] = useState<BackupRestoreStrategy>("merge");
-  const [pendingRestorePreparation, setPendingRestorePreparation] = useState<BackupRestorePreparation | null>(null);
-  const [isExportingBackup, setIsExportingBackup] = useState(false);
-  const [isRestoringBackup, setIsRestoringBackup] = useState(false);
   const [storageSnapshot, setStorageSnapshot] = useState<StorageSnapshot | null>(() => cachedStorageSnapshot);
   const [isStorageBusy, setIsStorageBusy] = useState(false);
   const [appVersion, setAppVersion] = useState(() => initialBootstrap?.appVersion ?? "-");
@@ -125,13 +108,6 @@ export function useSettingsPageState({
   const notify = useCallback((message: string, tone: QuietToastTone = "info") => {
     onToast?.(message, tone);
   }, [onToast]);
-
-  const remoteBackup = useRemoteBackupState({
-    confirm,
-    notify,
-    restoreBackup: SettingsRuntimeAdapterService.restoreBackup,
-    reload: () => window.location.reload(),
-  });
 
   const refreshStorageSnapshot = useCallback(async () => {
     try {
@@ -440,67 +416,6 @@ export function useSettingsPageState({
     });
   }, [cleanupOptions, cleanupRange, confirm, notify, UI_TEXT]);
 
-  const handleExportBackup = useCallback(async () => {
-    if (isExportingBackup) return;
-    await runBackupExportFlow({
-      uiText: UI_TEXT,
-      initialPath: exportPath,
-      exportBackupWithPicker: SettingsRuntimeAdapterService.exportBackupWithPicker,
-      setExportPath,
-      notify,
-      onExecutionStart: () => setIsExportingBackup(true),
-      onExecutionEnd: () => setIsExportingBackup(false),
-      reportError: (message, error) => {
-        console.error(message, error);
-      },
-    });
-  }, [exportPath, isExportingBackup, notify, UI_TEXT]);
-
-  const handlePrepareRestoreBackup = useCallback(async () => {
-    if (isRestoringBackup) return;
-    const preparation = await prepareBackupRestoreFlow({
-      uiText: UI_TEXT,
-      initialPath: restorePath,
-      prepareBackupRestore: (initialPath) => SettingsRuntimeAdapterService.prepareBackupRestore(
-        initialPath,
-        UI_TEXT,
-        locale,
-      ),
-      setRestorePath,
-      notify,
-      onExecutionStart: () => setIsRestoringBackup(true),
-      onExecutionEnd: () => setIsRestoringBackup(false),
-      reportError: (message, error) => {
-        console.error(message, error);
-      },
-    });
-    setPendingRestorePreparation(preparation);
-    return Boolean(preparation);
-  }, [isRestoringBackup, notify, restorePath, UI_TEXT, locale]);
-
-  const handleRestoreBackup = useCallback(async (selectedRestoreStrategy: BackupRestoreStrategy = restoreStrategy) => {
-    if (isRestoringBackup || !pendingRestorePreparation) return;
-    await commitPreparedBackupRestoreFlow({
-      uiText: UI_TEXT,
-      preparation: pendingRestorePreparation,
-      restoreStrategy: selectedRestoreStrategy,
-      confirm,
-      restoreBackup: SettingsRuntimeAdapterService.restoreBackup,
-      notify,
-      reload: () => window.location.reload(),
-      onExecutionStart: () => setIsRestoringBackup(true),
-      onExecutionEnd: () => setIsRestoringBackup(false),
-      reportError: (message, error) => {
-        console.error(message, error);
-      },
-    });
-    setPendingRestorePreparation(null);
-  }, [confirm, isRestoringBackup, notify, pendingRestorePreparation, restoreStrategy, UI_TEXT]);
-
-  const clearPendingRestoreBackup = useCallback(() => {
-    setPendingRestorePreparation(null);
-  }, []);
-
   const handleScheduleWebviewCacheClear = useCallback(async () => {
     if (isStorageBusy) return;
     const storageText = UI_TEXT.settings.storage;
@@ -515,35 +430,6 @@ export function useSettingsPageState({
       setIsStorageBusy(false);
     }
   }, [isStorageBusy, notify, UI_TEXT]);
-
-  const handleChooseDataDirectory = useCallback(async () => {
-    if (isStorageBusy) return;
-    const storageText = UI_TEXT.settings.storage;
-
-    setIsStorageBusy(true);
-    try {
-      const selectedPath = await SettingsRuntimeAdapterService.pickStorageDirectory();
-      if (!selectedPath) return;
-
-      const preview = await SettingsRuntimeAdapterService.previewStorageMigration(selectedPath);
-      const confirmed = await confirm({
-        title: storageText.storageDataMigrationConfirmTitle,
-        description: storageText.storageDataMigrationConfirmDetail(
-          preview.currentDataRoot,
-          preview.targetDataRoot,
-        ),
-        confirmLabel: storageText.restartAndApplyAction,
-      });
-      if (!confirmed) return;
-
-      await SettingsRuntimeAdapterService.restartAndApplyStorageMigration(selectedPath);
-    } catch (error) {
-      console.error("schedule data directory migration failed", error);
-      notify(storageText.storageMigrationFailed, "error");
-    } finally {
-      setIsStorageBusy(false);
-    }
-  }, [confirm, isStorageBusy, notify, UI_TEXT]);
 
   const handleChooseCacheDirectory = useCallback(async () => {
     if (isStorageBusy) return;
@@ -573,32 +459,6 @@ export function useSettingsPageState({
       setIsStorageBusy(false);
     }
   }, [confirm, isStorageBusy, notify, UI_TEXT]);
-
-  const handleRestoreDefaultDataDirectory = useCallback(async () => {
-    if (isStorageBusy || !storageSnapshot?.paths.isCustomDataRoot) return;
-    const storageText = UI_TEXT.settings.storage;
-
-    setIsStorageBusy(true);
-    try {
-      const preview = await SettingsRuntimeAdapterService.previewRestoreDefaultStorageMigration();
-      const confirmed = await confirm({
-        title: storageText.restoreDefaultPathAction,
-        description: storageText.storageRestoreDefaultDataConfirmDetail(
-          preview.currentDataRoot,
-          preview.targetDataRoot,
-        ),
-        confirmLabel: storageText.restartAndApplyAction,
-      });
-      if (!confirmed) return;
-
-      await SettingsRuntimeAdapterService.restartAndApplyRestoreDefaultStorageMigration();
-    } catch (error) {
-      console.error("schedule restore default data directory failed", error);
-      notify(storageText.storageMigrationFailed, "error");
-    } finally {
-      setIsStorageBusy(false);
-    }
-  }, [confirm, isStorageBusy, notify, storageSnapshot?.paths.isCustomDataRoot, UI_TEXT]);
 
   const handleRestoreDefaultCacheDirectory = useCallback(async () => {
     if (isStorageBusy || !storageSnapshot?.paths.isCustomWebviewRoot) return;
@@ -684,24 +544,13 @@ export function useSettingsPageState({
     handleChange,
     cleanupRange,
     setCleanupRange,
-    restoreStrategy,
-    setRestoreStrategy,
     isCleaning,
-    isExportingBackup,
-    isRestoringBackup,
     handleCleanup,
-    handleExportBackup,
-    handlePrepareRestoreBackup,
-    handleRestoreBackup,
-    clearPendingRestoreBackup,
-    remoteBackup,
     storageSnapshot,
     isStorageBusy,
     handleRefreshStorageSnapshot,
     handleScheduleWebviewCacheClear,
-    handleChooseDataDirectory,
     handleChooseCacheDirectory,
-    handleRestoreDefaultDataDirectory,
     handleRestoreDefaultCacheDirectory,
     handleOpenStorageDirectory,
     handleOpenReleaseNotes,

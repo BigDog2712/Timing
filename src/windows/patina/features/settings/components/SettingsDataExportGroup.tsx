@@ -1,6 +1,8 @@
 import { useLocaleText } from "../../../shared/i18n/index.ts";
 import QuietActionRow from "../../../shared/components/QuietActionRow";
 import QuietButton from "../../../shared/components/QuietButton";
+import SettingsFullBundleExportRow from "./SettingsFullBundleExportRow";
+import { ACTIVITY_ONLY_NOTE } from "./fullBundleCopy.ts";
 import { SettingsPreferenceGroup, SettingsPreferenceRow } from "./SettingsPreferenceLayout";
 
 /**
@@ -29,7 +31,10 @@ export default function SettingsDataExportGroup({
   return (
     <SettingsPreferenceGroup title={UI_TEXT.settings.dataExportTitle}>
       <QuietActionRow className="settings-preference-list">
-        <SettingsPreferenceRow title={UI_TEXT.export.title} hint={UI_TEXT.export.subtitle}>
+        <SettingsPreferenceRow
+          title={UI_TEXT.export.title}
+          hint={`${UI_TEXT.export.subtitle}。${ACTIVITY_ONLY_NOTE}`}
+        >
           <QuietButton size="compact" disabled={busy} onClick={onOpenDataExport}>
             {UI_TEXT.settings.dataExportAction}
           </QuietButton>
@@ -39,6 +44,8 @@ export default function SettingsDataExportGroup({
             {UI_TEXT.settings.dataImportAction}
           </QuietButton>
         </SettingsPreferenceRow>
+        {/* [批 2] 全额数据包：事项 + 计时 + 便利贴 + 待办 + 应用活动 + 手机端数据，一个 JSON。 */}
+        <SettingsFullBundleExportRow disabled={busy} />
       </QuietActionRow>
     </SettingsPreferenceGroup>
   );

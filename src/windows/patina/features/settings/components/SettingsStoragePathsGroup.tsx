@@ -21,8 +21,21 @@ function formatDirectorySize(bytes: number): string {
   return `${Math.max(0, Math.round(bytes / 1048576))} MB`;
 }
 
+/**
+ * 「数据目录」那一行的说明（i18n 生成物本轮冻结，不新增 key，故用本地字面量）。
+ *
+ * 两件事必须一起说：
+ * 1. 这一行报的是**整个数据根**（`%APPDATA%\com.timing.app`）——计时库、Markdown、
+ *    活动库、日志、插件都在它下面，不是只有活动库那一个 sqlite。
+ * 2. 改位置的动作只有一处：同步里的「SQLite 落点设置」（`dataRootApi`）。这一行
+ *    因此**不挂**更改/恢复默认两个键 —— 原来那两个键走的是 `cmd_*_storage_migration`
+ *    （只搬 `patina/data` 那一层），口径与本行显示的数据根不一致，属于第二套搬根入口。
+ */
+const DATA_DIRECTORY_HINT = "包含计时库、Markdown、活动库与日志；改位置见「同步 · SQLite 落点设置」";
+
 function StoragePathRow({
   title,
+  hint,
   meta,
   onOpen,
   onChangePath,
@@ -31,6 +44,7 @@ function StoragePathRow({
   restoreDisabled,
 }: {
   title: string;
+  hint?: string;
   meta?: string;
   onOpen: () => void;
   onChangePath?: () => void;
@@ -42,6 +56,7 @@ function StoragePathRow({
   const storageText = UI_TEXT.settings.storage;
   return (
     <SettingsPreferenceRow
+      hint={hint}
       title={(
         <>
           <span>{title}</span>
@@ -107,9 +122,7 @@ export default function SettingsStoragePathsGroup({
   isStorageBusy,
   busy,
   onRefreshStorageSnapshot,
-  onChooseDataDirectory,
   onChooseCacheDirectory,
-  onRestoreDefaultDataDirectory,
   onRestoreDefaultCacheDirectory,
   onOpenStorageDirectory,
 }: {
@@ -117,9 +130,7 @@ export default function SettingsStoragePathsGroup({
   isStorageBusy: boolean;
   busy: boolean;
   onRefreshStorageSnapshot: () => Promise<void> | void;
-  onChooseDataDirectory: () => Promise<void> | void;
   onChooseCacheDirectory: () => Promise<void> | void;
-  onRestoreDefaultDataDirectory: () => Promise<void> | void;
   onRestoreDefaultCacheDirectory: () => Promise<void> | void;
   onOpenStorageDirectory: (path: string) => Promise<void> | void;
 }) {
@@ -128,7 +139,6 @@ export default function SettingsStoragePathsGroup({
   const webviewCache = storageSnapshot?.webviewCache;
   const webviewCachePath = webviewCache?.ebwebviewPath
     ?? (storageSnapshot ? toEbwebviewCachePath(storageSnapshot.paths.webviewRoot) : "");
-  const isCustomDataRoot = Boolean(storageSnapshot?.paths.isCustomDataRoot);
   const isCustomWebviewRoot = Boolean(storageSnapshot?.paths.isCustomWebviewRoot);
 
   return (
@@ -170,12 +180,9 @@ export default function SettingsStoragePathsGroup({
             />
             <StoragePathRow
               title={storageText.dataDirectoryLabel}
-              meta={formatDirectorySize(storageSnapshot.sizes.dataSizeBytes)}
-              onChangePath={!isCustomDataRoot ? () => void onChooseDataDirectory() : undefined}
-              onRestoreDefault={isCustomDataRoot ? () => void onRestoreDefaultDataDirectory() : undefined}
-              changeDisabled={busy}
-              restoreDisabled={busy}
-              onOpen={() => void onOpenStorageDirectory(storageSnapshot.paths.dataRoot)}
+              hint={DATA_DIRECTORY_HINT}
+              meta={formatDirectorySize(storageSnapshot.sizes.timingDataSizeBytes)}
+              onOpen={() => void onOpenStorageDirectory(storageSnapshot.paths.timingDataRoot)}
             />
           </>
         ) : (
@@ -190,7 +197,7 @@ export default function SettingsStoragePathsGroup({
             />
             <StoragePathPlaceholderRow
               title={storageText.dataDirectoryLabel}
-              actionTitles={[storageText.openDirectoryAction, storageText.changePathAction]}
+              actionTitles={[storageText.openDirectoryAction]}
             />
           </>
         )}

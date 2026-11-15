@@ -158,13 +158,16 @@ describe('手机端云端通道', () => {
   });
 
   /**
-   * [V0.11.33] P6 手机端半（R2 已批准解除 components/mobile 红线一次）：档位第二档
-   * 渲染为「自动」，旧标签「定时」在渲染文本零命中；REMOVED_PHRASES 全表照扫。
+   * [设置页七项改造·批 4] P6 手机端半：档位第二档渲染为「定时」（与桌面同一份
+   * `AUTO_COPY`）；REMOVED_PHRASES 全表照扫（`同步间隔` 仍是禁词）。
    */
-  it('p6_tier_label_is_auto_and_removed_phrases_absent', () => {
+  it('p6_tier_label_is_interval_and_removed_phrases_absent', () => {
+    /* [设置页七项改造·批 4] 第二档改回「定时」：手机端与桌面共用 `AUTO_COPY`，
+       所以这条断言与桌面侧同一个真源。`'定时'` 已从 REMOVED_PHRASES 除名，
+       下面那条全表扫描照旧（`同步间隔` 仍是禁词）。 */
     mount(view(CLOUD));
-    expect(text()).toContain('自动');
-    expect(text()).not.toContain('定时');
+    expect(text()).toContain('自动同步');
+    expect(text()).toContain('定时');
     for (const phrase of REMOVED_PHRASES) expect(text()).not.toContain(phrase);
   });
 

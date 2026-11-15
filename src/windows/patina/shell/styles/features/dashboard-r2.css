@@ -239,3 +239,25 @@
   margin-top: 10px;
   min-height: 56px;
 }
+
+/* 布局管理弹层里的「8px 对齐」一行（[设置页七项改造·批 2] 从设置页卡片搬来） */
+.qp-layout-manager__switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--qp-border-subtle);
+  border-radius: var(--qp-radius-control);
+}
+
+.qp-layout-manager__switch-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.qp-layout-manager__switch-title {
+  font-size: var(--qp-font-size-body);
+}

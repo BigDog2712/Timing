@@ -7,7 +7,6 @@ import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { resolveLocaleActivation } from "../../../shared/i18n/runtime.ts";
 import SettingsStoragePathsGroup from "./SettingsStoragePathsGroup";
 import SettingsDataSafetyPanel from "./SettingsDataSafetyPanel";
-import type { RemoteBackupState } from "../hooks/useRemoteBackupState.ts";
 import type { StorageSnapshot } from "../services/settingsRuntimeAdapterService.ts";
 import type { CleanupRange } from "../types";
 
@@ -23,6 +22,7 @@ import type { CleanupRange } from "../types";
 const snapshot: StorageSnapshot = {
   paths: {
     installDir: "C:\\Apps\\Timing",
+    timingDataRoot: "C:\\Users\\me\\AppData\\com.timing.app",
     dataRoot: "C:\\Users\\me\\AppData\\Timing",
     databasePath: "C:\\Users\\me\\AppData\\Timing\\timing.db",
     backupDir: "C:\\Users\\me\\AppData\\Timing\\backups",
@@ -31,7 +31,7 @@ const snapshot: StorageSnapshot = {
     isCustomDataRoot: false,
     isCustomWebviewRoot: false,
   },
-  sizes: { installDirSizeBytes: 1048576, dataSizeBytes: 524288, backupDirSizeBytes: 0 },
+  sizes: { installDirSizeBytes: 1048576, dataSizeBytes: 524288, timingDataSizeBytes: 2097152, backupDirSizeBytes: 0 },
   webviewCache: {
     webviewRoot: "C:\\Users\\me\\AppData\\Timing\\webview",
     ebwebviewPath: "C:\\Users\\me\\AppData\\Timing\\webview\\EBWebView",
@@ -43,32 +43,6 @@ const snapshot: StorageSnapshot = {
   maintenance: { lastError: null },
 };
 
-function remoteBackup(): RemoteBackupState {
-  return {
-    config: null,
-    hasSecret: false,
-    loading: false,
-    configDialogOpen: false,
-    restoreDialogOpen: false,
-    entries: [],
-    isTesting: false,
-    isSaving: false,
-    isUploading: false,
-    isListing: false,
-    isDownloading: false,
-    connectionStatus: "unknown",
-    openConfigDialog: () => undefined,
-    closeConfigDialog: () => undefined,
-    revealSavedPassword: async () => null,
-    saveConfig: async () => true,
-    deleteConfig: async () => undefined,
-    testConfig: async () => true,
-    uploadBackup: async () => null,
-    openRestoreDialog: async () => undefined,
-    closeRestoreDialog: () => undefined,
-    restoreEntry: async () => undefined,
-  } as RemoteBackupState;
-}
 
 let container: HTMLDivElement;
 let root: Root;
@@ -89,9 +63,7 @@ afterEach(() => {
 function mountPaths(overrides: Partial<Parameters<typeof SettingsStoragePathsGroup>[0]> = {}): void {
   const cb = {
     onRefreshStorageSnapshot: vi.fn(),
-    onChooseDataDirectory: vi.fn(),
     onChooseCacheDirectory: vi.fn(),
-    onRestoreDefaultDataDirectory: vi.fn(),
     onRestoreDefaultCacheDirectory: vi.fn(),
     onOpenStorageDirectory: vi.fn(),
   };
@@ -131,33 +103,42 @@ describe("本机目录：三个目录行的回调各接各的", () => {
       snapshot.paths.installDir,
       /* 缓存目录要的是 EBWebView 那一层，不是 webviewRoot —— 打开到上一级等于没打开 */
       snapshot.webviewCache?.ebwebviewPath,
-      snapshot.paths.dataRoot,
+      /* 数据目录要的是**数据根**（`timingDataRoot`），不是活动库那一层 `dataRoot`：
+         「我的数据都在哪」的答案里有 timing.db / md / logs / plugins / patina。 */
+      snapshot.paths.timingDataRoot,
     ]);
   });
 
-  it("spc02_a_custom_root_swaps_change_for_restore_default", () => {
+  /**
+   * [设置页七项改造·批 6] 数据目录行不再挂「更改 / 恢复默认」两个键。
+   *
+   * 原因不是样式：那两个键走的是 `cmd_*_storage_migration`（只搬 `patina/data` 那一层），
+   * 而这一行显示的是整个数据根（`%APPDATA%\com.timing.app`）—— 键一点下去，搬走的
+   * 与用户看到的不是同一个目录。搬根只有一处入口：同步里的「SQLite 落点设置」。
+   * 所以这里反过来钉：数据目录行**只有**「打开」，缓存目录行仍保留那对键。
+   */
+  it("spc02_the_data_row_has_no_second_move_entry_and_the_cache_row_keeps_it", () => {
     mountPaths({
       storageSnapshot: {
         ...snapshot,
         paths: { ...snapshot.paths, isCustomDataRoot: true, isCustomWebviewRoot: true },
       },
     });
-    /* 自定义根 → 那一行给的是「恢复默认目录」（不是「更改目录」） */
-    expect(rowKey("数据目录", "更改目录"), "自定义数据根不该再给「更改目录」").toBeNull();
+    expect(rowKey("数据目录", "更改目录"), "数据目录行又长出第二套搬根入口").toBeNull();
+    expect(rowKey("数据目录", "恢复默认目录"), "数据目录行又长出第二套搬根入口").toBeNull();
+    expect(rowKey("数据目录", "打开目录"), "数据目录行的「打开」没了").not.toBeNull();
+    /* 缓存目录：自定义根 → 给「恢复默认目录」而不是「更改目录」 */
     expect(rowKey("缓存目录", "更改目录"), "自定义缓存根不该再给「更改目录」").toBeNull();
-    act(() => { rowKey("数据目录", "恢复默认目录")?.click(); });
-    act(() => { rowKey("缓存目录", "恢复默认目录")?.click(); });
-    expect(mounted.onRestoreDefaultDataDirectory, "「恢复默认目录」没接到数据目录那一路").toHaveBeenCalledTimes(1);
+    const restore = rowKey("缓存目录", "恢复默认目录");
+    expect(restore, "自定义缓存根缺少「恢复默认目录」").not.toBeNull();
+    act(() => { restore?.click(); });
     expect(mounted.onRestoreDefaultCacheDirectory, "「恢复默认目录」没接到缓存目录那一路").toHaveBeenCalledTimes(1);
-    expect(mounted.onChooseDataDirectory).not.toHaveBeenCalled();
-    expect(mounted.onChooseCacheDirectory).not.toHaveBeenCalled();
   });
 
   it("spc03_choosing_a_directory_hits_the_right_callback", () => {
     mountPaths();
-    act(() => { rowKey("数据目录", "更改目录")?.click(); });
+    expect(rowKey("数据目录", "更改目录"), "数据目录行不该有「更改目录」").toBeNull();
     act(() => { rowKey("缓存目录", "更改目录")?.click(); });
-    expect(mounted.onChooseDataDirectory, "数据目录那行的「更改目录」接错了").toHaveBeenCalledTimes(1);
     expect(mounted.onChooseCacheDirectory, "缓存目录那行的「更改目录」接错了").toHaveBeenCalledTimes(1);
     /* 卡头那颗刷新快照键（`headerAside`）：aria-label 是「检查存储」 */
     const refreshKey = Array.from(container.querySelectorAll<HTMLButtonElement>("button"))
@@ -200,29 +181,18 @@ describe("清理档位滑杆：下标 → cleanupOptions 的值", () => {
           cleanupRange: 7,
           /* 故意乱序：滑杆必须先排序，档位才是 [7, 30] */
           cleanupOptions: [{ value: 30, label: "30 天" }, { value: 7, label: "7 天" }],
-          restoreStrategy: "merge",
           isCleaning: false,
-          isExportingBackup: false,
-          isRestoringBackup: false,
           onCleanupRangeChange: rangeChange,
-          onRestoreStrategyChange: () => undefined,
           onCleanup: () => undefined,
-          onExportBackup: () => undefined,
-          onPrepareRestoreBackup: async () => true,
-          onRestoreBackup: () => undefined,
-          onClearPendingRestoreBackup: () => undefined,
           onOpenDataExport: () => undefined,
           onOpenDataImport: () => undefined,
           isImportBusy: false,
-          remoteBackup: remoteBackup(),
           storageSnapshot: snapshot,
           isStorageBusy: false,
           onRefreshStorageSnapshot: () => undefined,
           onScheduleWebviewCacheClear: () => undefined,
-          onChooseDataDirectory: () => undefined,
-          onChooseCacheDirectory: () => undefined,
-          onRestoreDefaultDataDirectory: () => undefined,
-          onRestoreDefaultCacheDirectory: () => undefined,
+              onChooseCacheDirectory: () => undefined,
+              onRestoreDefaultCacheDirectory: () => undefined,
           onOpenStorageDirectory: () => undefined,
         }),
       }));

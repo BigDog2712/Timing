@@ -41,7 +41,6 @@ const APPEARANCE = code('src/windows/patina/features/settings/components/Setting
 const DATA_SAFETY = [
   'SettingsDataSafetyPanel.tsx',
   'SettingsDataExportGroup.tsx',
-  'SettingsDataBackupGroup.tsx',
   'SettingsStoragePathsGroup.tsx',
   'SettingsDataCleanupGroup.tsx',
   'SettingsDataSafetyDialogs.tsx',
@@ -57,7 +56,6 @@ describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
     const analysisUi = [
       'src/windows/patina/features/settings/components/Settings.tsx',
       'src/windows/patina/features/settings/components/SettingsAppearancePanel.tsx',
-      'src/windows/patina/features/settings/components/SettingsInterfacePanel.tsx',
       'src/windows/patina/shell/AppShell.tsx',
       'src/windows/patina/shell/hooks/useAppThemeMode.ts',
       'src/windows/patina/shell/hooks/useHostThemeMode.ts',
@@ -236,17 +234,18 @@ describe('⑤ 两处备份的对象不同（判据 4）', () => {
     return (key: string) => String(values[keyList.indexOf(key)]);
   }
 
-  it('p006_analysis_backup_says_activity_library', () => {
-    /* 分析窗这套备份的是**电脑活动库**：文案里必须出现「活动库」，不能再只写「备份」。 */
+  it('p006_analysis_activity_backup_entry_is_gone_and_host_backup_stays_separate', () => {
+    /* [设置页七项改造·批 5] 分析窗那套「活动库备份与恢复」整块下线。
+       这条从「文案里必须出现活动库」改成**反向回归**：界面代码里不许再有那两个入口，
+       也不许把宿主的 md_sync 备份接进这张卡（两套备份语义混用正是当初的隐患）。
+       i18n 的键仍在（生成物冻结，不许增删），所以这里判的是**组件**不再引用它们。 */
     const at = readZhText();
-    expect(at('settings.backupRestoreTitle')).toContain('活动库');
-    expect(at('settings.backupExportTitle')).toContain('活动库');
-    /* 唯一入口的措辞落在「显示」分区里。 */
     expect(at('settings.appearanceTitle')).toBe('显示');
-    /* 备份卡仍是活动库那套（没有被误接到宿主的计时数据上）。 */
-    expect(DATA_SAFETY).toContain('onExportBackup');
-    expect(DATA_SAFETY).toContain('settings.backupRestoreTitle');
-    expect(DATA_SAFETY).toContain('settings.backupExportTitle');
+    expect(DATA_SAFETY).not.toContain('onExportBackup');
+    expect(DATA_SAFETY).not.toContain('onPrepareRestoreBackup');
+    expect(DATA_SAFETY).not.toContain('settings.backupRestoreTitle');
+    expect(DATA_SAFETY).not.toContain('settings.backupExportTitle');
+    expect(DATA_SAFETY).not.toContain('remoteBackup');
     /* 分析窗这套**不碰** md_sync（那是宿主的计时数据备份）。 */
     expect(DATA_SAFETY).not.toContain('mdBackupApi');
     expect(DATA_SAFETY).not.toContain('MdSyncBackupCard');

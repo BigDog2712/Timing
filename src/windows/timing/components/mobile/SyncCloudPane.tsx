@@ -56,10 +56,15 @@ interface SyncCloudPaneProps {
 const SCHEDULES: CloudSchedule[] = ['off', 'interval', 'smart'];
 /* [V0.11.33] 档位标签第二档「定时」→「自动」（R2 已批准解除 components/mobile 红线一次，
    仅此一处字面量；线缆值 `interval` 与枚举名零改动，P6 两端零命中） */
+/**
+ * [设置页七项改造·批 4] 三档标签改成**直接取 `AUTO_COPY`**：手机端原来自己抄了一份，
+ * 桌面把第二档改叫「定时」之后两份就分叉了（同一个开关在两扇窗里叫两个名字）。
+ * 现在只有一份真源；下面那句 hint 也是同一份文案表里的（`smartNote` / `offNote`）。
+ */
 const SCHEDULE_LABELS: Record<CloudSchedule, string> = {
-  off: '关闭',
-  interval: '自动',
-  smart: '智能',
+  off: AUTO_COPY.off,
+  interval: AUTO_COPY.interval,
+  smart: AUTO_COPY.smart,
 };
 
 export function SyncCloudPane({ view, busy, onSave, onTest }: SyncCloudPaneProps) {
@@ -195,9 +200,9 @@ export function SyncCloudPane({ view, busy, onSave, onTest }: SyncCloudPaneProps
         )}
         <p className="m-hint">
           {auto.schedule === 'off'
-            ? '自动路径不跑，只有点「立即同步」才传。'
+            ? AUTO_COPY.offNote
             : auto.schedule === 'interval'
-              ? `每 ${auto.intervalMinutes} 分钟传一次，不管有没有改动。`
+              ? `每 ${auto.intervalMinutes} 分钟${AUTO_COPY.times}，不管有没有改动。`
               : AUTO_COPY.smartNote}
         </p>
       </div>

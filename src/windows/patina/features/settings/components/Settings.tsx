@@ -10,18 +10,14 @@ import SettingsDataSafetyPanel from "./SettingsDataSafetyPanel";
 import SettingsHeaderActions from "./SettingsHeaderActions";
 import SettingsGroupNav from "./SettingsGroupNav";
 import SettingsHandlesPanel from "./SettingsHandlesPanel";
-import SettingsInterfacePanel from "./SettingsInterfacePanel";
 import SettingsResidentPanel from "./SettingsResidentPanel";
-import SettingsTrackingPanel from "./SettingsTrackingPanel";
-import SettingsBoardPanel from "./SettingsBoardPanel";
-import { HostGeneralPanel } from "./host/HostGeneralPanel";
+import SettingsTrackingPanel from "./SettingsTrackingPanel";import { HostGeneralPanel } from "./host/HostGeneralPanel";
 import HostHighlightCard from "./host/HostHighlightCard";
 import HostPillLookCard from "./host/HostPillLookCard";
 import { HostPluginsPanel } from "./host/HostPluginsPanel";
 import { HostSyncPanel } from "./host/HostSyncPanel";
 import HostThemeCard from "./host/HostThemeCard";
 import { useSettingsPageState } from "../hooks/useSettingsPageState";
-import { useWebActivitySetupState } from "../hooks/useWebActivitySetupState";
 import { useSettingsImportState } from "../hooks/useSettingsImportState.ts";
 import { prepareSettingsLanguagePreview } from "../services/settingsLanguagePreview.ts";
 
@@ -69,24 +65,13 @@ export default function Settings({
     handleChange,
     cleanupRange,
     setCleanupRange,
-    restoreStrategy,
-    setRestoreStrategy,
     isCleaning,
-    isExportingBackup,
-    isRestoringBackup,
     handleCleanup,
-    handleExportBackup,
-    handlePrepareRestoreBackup,
-    handleRestoreBackup,
-    clearPendingRestoreBackup,
-    remoteBackup,
     storageSnapshot,
     isStorageBusy,
     handleRefreshStorageSnapshot,
     handleScheduleWebviewCacheClear,
-    handleChooseDataDirectory,
     handleChooseCacheDirectory,
-    handleRestoreDefaultDataDirectory,
     handleRestoreDefaultCacheDirectory,
     handleOpenStorageDirectory,
     idleTimeoutMinutes,
@@ -100,10 +85,6 @@ export default function Settings({
     onDirtyChange,
     onToast,
     onRegisterSaveHandler: registerSaveHandler,
-  });
-  const { showWebActivityHelp } = useWebActivitySetupState({
-    savedSettings,
-    draftSettings,
   });
   const handleLanguageChange = useCallback(async (nextLanguage: AppLanguage) => {
     if (languageSelectionPendingRef.current || draftSettings?.language === nextLanguage) return;
@@ -203,34 +184,10 @@ export default function Settings({
               onDynamicEffectsChange={(nextChecked) => handleChange("dynamicEffects", nextChecked)}
               onConfirmColorSchemeChange={handleSaveColorScheme}
               colorSchemeConfirming={saveStatus === "saving"}
-              /* P0-06：接口内嵌进「显示」分区。锚点套在内嵌值最外层，所以 s-interface 长在这张卡里，
-                 但它和第 3 组的 s-tracking 同组——滚动判定按锚点位置算，归属仍是「计时与记录」。 */
-              interfaceSection={(
-                <div id="s-interface">
-                  <SettingsInterfacePanel
-                    embedded
-                    webActivityEnabled={draftSettings.webActivityEnabled}
-                    showWebActivityHelp={showWebActivityHelp}
-                    port={draftSettings.webActivityPort}
-                    webActivityToken={draftSettings.webActivityToken}
-                    remoteStatusBridgeEnabled={draftSettings.remoteStatusBridgeEnabled}
-                    remoteStatusBridgeUrl={draftSettings.remoteStatusBridgeUrl}
-                    remoteStatusBridgeToken={draftSettings.remoteStatusBridgeToken}
-                    remoteStatusBridgeMachineId={draftSettings.remoteStatusBridgeMachineId}
-                    onWebActivityEnabledChange={(nextChecked) => handleChange("webActivityEnabled", nextChecked)}
-                    onPortChange={(nextPort) => handleChange("webActivityPort", nextPort)}
-                    onWebActivityTokenChange={(nextToken) => handleChange("webActivityToken", nextToken)}
-                    onRemoteStatusBridgeEnabledChange={(nextChecked) => handleChange("remoteStatusBridgeEnabled", nextChecked)}
-                    onRemoteStatusBridgeUrlChange={(nextUrl) => handleChange("remoteStatusBridgeUrl", nextUrl)}
-                    onRemoteStatusBridgeTokenChange={(nextToken) => handleChange("remoteStatusBridgeToken", nextToken)}
-                  />
-                </div>
-              )}
             />
           </div>
 
-          <SettingsBoardPanel id="s-board-widgets" />
-          {/* 第 4 组「计时与记录」：`timelineMergeGapSecs` 全应用只有这一处可编辑。 */}
+          {/* 第 3 组「计时与记录」：`timelineMergeGapSecs` 全应用只有这一处可编辑。 */}
           <div id="s-tracking">
             <SettingsTrackingPanel
               timelineMergeGapControl={{
@@ -261,28 +218,17 @@ export default function Settings({
             <SettingsDataSafetyPanel
               cleanupRange={cleanupRange}
               cleanupOptions={cleanupOptions}
-              restoreStrategy={restoreStrategy}
               isCleaning={isCleaning}
-              isExportingBackup={isExportingBackup}
-              isRestoringBackup={isRestoringBackup}
               onCleanupRangeChange={setCleanupRange}
-              onRestoreStrategyChange={setRestoreStrategy}
               onCleanup={() => { void handleCleanup(); }}
-              onExportBackup={() => void handleExportBackup()}
               onOpenDataExport={() => setExportDialogOpen(true)}
               onOpenDataImport={() => void importState.openDialog()}
               isImportBusy={importState.busy}
-              onPrepareRestoreBackup={handlePrepareRestoreBackup}
-              onRestoreBackup={() => { void handleRestoreBackup(); }}
-              onClearPendingRestoreBackup={clearPendingRestoreBackup}
-              remoteBackup={remoteBackup}
               storageSnapshot={storageSnapshot}
               isStorageBusy={isStorageBusy}
               onRefreshStorageSnapshot={handleRefreshStorageSnapshot}
               onScheduleWebviewCacheClear={handleScheduleWebviewCacheClear}
-              onChooseDataDirectory={handleChooseDataDirectory}
               onChooseCacheDirectory={handleChooseCacheDirectory}
-              onRestoreDefaultDataDirectory={handleRestoreDefaultDataDirectory}
               onRestoreDefaultCacheDirectory={handleRestoreDefaultCacheDirectory}
               onOpenStorageDirectory={handleOpenStorageDirectory}
             />
@@ -334,6 +280,7 @@ export default function Settings({
             onShowBatches={importState.showBatches}
             onShowActions={importState.showActions}
             onRemoveBatch={(batchId) => void importState.removeBatch(batchId)}
+            onImportedDataChanged={onImportedDataChanged}
           />
         </Suspense>
       ) : null}

@@ -10,7 +10,7 @@
  *   B. 表里每一个锚点 id 在页面上**恰好出现一次**（拼错 = 点了不滚也不报错）
  *   C. 锚点在页面里的**出现顺序** = 导航顺序（本文末尾的 `DOM_ORDER` 是唯一口径）
  *   D. 第一组是「悬浮条与手柄」，且它的第一张卡紧贴网格开头（第一屏可达）
- *   E. 「接口」仍然内嵌在「显示」卡里，不另起一张卡（P0-06 的既有结论不许被 T04b 推翻）
+ *   E. 「接口」那一族入口**不再存在**（[设置页七项改造·批 1] 整卡下线后的反向回归）
  */
 import { describe, expect, it } from 'vitest';
 import { code } from './settingsSourceProbe.test-utils';
@@ -20,16 +20,14 @@ const SETTINGS = code('src/windows/patina/features/settings/components/Settings.
 const APPEARANCE = code('src/windows/patina/features/settings/components/SettingsAppearancePanel.tsx');
 
 /**
- * 锚点在页面源码里的**真实出现顺序**。
- * 它与 `SETTINGS_ANCHOR_IDS` 差一处，而且是**故意的**：`s-interface` 长在「显示」卡内部
- * （P0-06 把「接口」内嵌进「显示」，见判据 E），所以它出现在 `s-display` 之后、`s-tracking`
- * 之前，而表里它挂在「计时与记录」那一组（语义归属）。`s-board-widgets`（v3 组件板）
- * 是同一个形状的反面例子：它是**独立那张卡**，物理位置就在 `s-interface` 之后。这张表就是把「物理顺序」与
- * 「语义归属」两件事分开钉住——挪卡片的人必须同时改这两处，改一半就红。
+ * 锚点在页面源码里的**真实出现顺序**。它必须与 `SETTINGS_ANCHOR_IDS` 一致：
+ * 语义归属与物理顺序在本轮已经收成一条（「接口」内嵌卡与「主界面组件」卡都下线了，
+ * 不再有「挂在 A 组、长在 B 卡里」的形状）。这张表就是把「物理顺序」钉住——
+ * 挪卡片的人必须同时改表与页面，改一半就红。
  */
 const DOM_ORDER = [
   's-pill-handles', 's-pill-look',
-  's-theme', 's-highlight', 's-display', 's-interface', 's-board-widgets',
+  's-theme', 's-highlight', 's-display',
   's-tracking',
   's-sync', 's-backup',
   's-general', 's-resident', 's-plugins',
@@ -46,14 +44,14 @@ function anchorsInSourceOrder(): string[] {
 
 describe('② 五组锚点（P0-06 判据 2 的替代口径）', () => {
   it('p006_six_groups_and_no_standalone_appearance', () => {
-    /* [v3] 第五组之后插入「主界面」（组件板）：分组从 5 变 6 是**功能变化**，
-       所以这条断言同批改；下表仍是「表 = 页面 = 导航」三者的唯一口径。 */
+    /* [设置页七项改造·批 2] 「主界面」组随「主界面组件」卡一起下线：分组 6 → 5。
+       这张表仍是「表 = 页面 = 导航」三者的唯一口径。 */
     expect(SETTINGS_GROUPS.map((group) => group.id))
-      .toEqual(['pill', 'appearance', 'board', 'tracking', 'data', 'general']);
+      .toEqual(['pill', 'appearance', 'tracking', 'data', 'general']);
     /* 标题是中文常量、不进 i18n（`contract.ts` 本轮零行余量）：所以文案本身要钉住，
        不然「改一个字」这种改动会静默溜过去。 */
     expect(SETTINGS_GROUPS.map((group) => group.title))
-      .toEqual(['悬浮条与手柄', '外观与配色', '主界面', '计时与记录', '数据与同步', '通用与启动']);
+      .toEqual(['悬浮条与手柄', '外观与配色', '计时与记录', '数据与同步', '通用与启动']);
     for (const group of SETTINGS_GROUPS) {
       expect(group.anchors.length, `${group.id} 组没有锚点`).toBeGreaterThan(0);
       for (const anchor of group.anchors) {
@@ -96,20 +94,18 @@ describe('② 五组锚点（P0-06 判据 2 的替代口径）', () => {
     expect(SETTINGS.slice(gridAt, firstCardAt)).not.toContain('<Settings');
   });
 
-  it('p006_interface_section_is_embedded_not_a_card', () => {
-    /* P0-06 的既有结论：接口内嵌进「显示」分区（不落卡片外壳），T04b 不改这条。
-       锚点套在内嵌值的最外层，所以 `s-interface` 物理上长在「显示」卡里（见 DOM_ORDER 注释）。 */
-    const embeddedProp = SETTINGS.match(/interfaceSection=\{\([\s\S]*?\n\s*\)\}/);
-    expect(embeddedProp, '找不到 interfaceSection 的 JSX 值（「接口」应内嵌进「显示」分区）').not.toBeNull();
-    expect(embeddedProp![0]).toContain('SettingsInterfacePanel');
-    expect(embeddedProp![0]).toContain('id="s-interface"');
-    /* 内嵌必须关掉卡片外壳，否则是「卡片套卡片」。 */
-    expect(embeddedProp![0]).toContain('embedded');
-    expect(code('src/windows/patina/features/settings/components/SettingsInterfacePanel.tsx'))
-      .toContain('embedded ? "" : "qp-panel p-5 md:p-6"');
-    /* 顶层不许再有独立的「接口」卡：整份源码里 `<SettingsInterfacePanel` 这个 JSX 标签
-       只应出现一次，且那一次就在上面这个内嵌值里（import 行不算标签，所以数 `<` 前缀）。 */
-    expect(SETTINGS.split('<SettingsInterfacePanel').length - 1).toBe(1);
-    expect(SETTINGS.replace(embeddedProp![0], '')).not.toContain('<SettingsInterfacePanel');
+  it('p006_interface_section_is_gone', () => {
+    /* [设置页七项改造·批 1] 「服务」面板（网页同步 / 远程推送）整卡下线：
+       没有内嵌值、没有锚点、没有组件文件。这条回归的作用是**挡住入口复活**——
+       功能被删了，但把卡片接回设置页只需要一次 import，没人会记得为什么删。 */
+    expect(SETTINGS).not.toContain('interfaceSection');
+    expect(SETTINGS).not.toContain('SettingsInterfacePanel');
+    expect(SETTINGS).not.toContain('id="s-interface"');
+    expect(SETTINGS_ANCHOR_IDS).not.toContain('s-interface');
+    expect(() => code('src/windows/patina/features/settings/components/SettingsInterfacePanel.tsx')
+    ).toThrow();
+    /* 字段本身**保留**（后端与 `features/data` 仍在读 `webActivityEnabled`），
+       所以这条不是「连 setting 一起删」，只钉界面入口。 */
+    expect(SETTINGS).not.toContain('showWebActivityHelp');
   });
 });

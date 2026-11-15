@@ -64,7 +64,6 @@
 /* [v3.1 热力图] 周一→周日 × 24 小时的格子。图例用容器查询取舍，
  * 锚点在上面的 dashboard-card-fit.css。 */
 @import "./styles/features/dashboard-heatmap.css";
-@import "./styles/features/settings-board.css";
 @import "./styles/features/classification.css";
 /* [本轮] 快捷分类子菜单的「删除分类 / ＋ 新建分类」。紧跟 classification.css：
    只新增 `.quick-classification-category-manage*` / `-delete` / `-create`，不改既有规则。 */

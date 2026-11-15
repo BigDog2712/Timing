@@ -1,9 +1,16 @@
-import { parseCommandError } from "../../../platform/persistence/commandError.ts";
 import type { QuietToastTone } from "../../../shared/types/toast";
 import type { UiText } from "../../../shared/i18n/index.ts";
 import type { CleanupRange } from "../types.ts";
-import type { BackupRestorePreparation, BackupRestoreStrategy } from "./settingsRuntimeAdapterService.ts";
 
+/**
+ * 设置页「数据安全」卡里那几条**带副作用的动作编排**（[设置页七项改造·批 5] 大幅收窄）。
+ *
+ * 只剩「清理历史记录」一条：确认 → 清 → toast → reload。拆出来的理由是它需要
+ * `confirm` / `notify` / `reload` 三个外部依赖，写在 hook 里会与状态机纠缠；
+ * 而「备份导出 / 恢复准备 / 恢复提交」三条随活动库备份整块下线一起删掉了。
+ *
+ * 纯函数化（依赖通过 options 注入）让它能被单测直接跑，不必挂 React。
+ */
 interface ConfirmOptions {
   title: string;
   description: string;
@@ -29,50 +36,6 @@ type CleanupFlowOptions = {
   reportError?: ErrorReporter;
 };
 
-type BackupExportFlowOptions = {
-  uiText: UiText;
-  initialPath?: string;
-  exportBackupWithPicker: (initialPath?: string) => Promise<string | null>;
-  setExportPath: (path: string) => void;
-  notify: NotifyAction;
-  onExecutionStart?: BusyHook;
-  onExecutionEnd?: BusyHook;
-  reportError?: ErrorReporter;
-};
-
-type BackupRestorePrepareFlowOptions = {
-  uiText: UiText;
-  initialPath?: string;
-  prepareBackupRestore: (initialPath?: string) => Promise<BackupRestorePreparation | null>;
-  setRestorePath: (path: string) => void;
-  notify: NotifyAction;
-  onExecutionStart?: BusyHook;
-  onExecutionEnd?: BusyHook;
-  reportError?: ErrorReporter;
-};
-
-type BackupRestoreCommitFlowOptions = {
-  uiText: UiText;
-  preparation: BackupRestorePreparation;
-  restoreStrategy: BackupRestoreStrategy;
-  confirm: ConfirmAction;
-  restoreBackup: (
-    path: string,
-    restoreStrategy: BackupRestoreStrategy,
-    hash: string,
-  ) => Promise<void>;
-  notify: NotifyAction;
-  reload: () => void;
-  onExecutionStart?: BusyHook;
-  onExecutionEnd?: BusyHook;
-  reportError?: ErrorReporter;
-};
-
-function normalizeOptionalPath(path: string | undefined): string | undefined {
-  const trimmed = path?.trim();
-  return trimmed ? trimmed : undefined;
-}
-
 export async function runSettingsCleanupFlow(options: CleanupFlowOptions): Promise<boolean> {
   const UI_TEXT = options.uiText;
   const confirmed = await options.confirm({
@@ -94,94 +57,6 @@ export async function runSettingsCleanupFlow(options: CleanupFlowOptions): Promi
   } catch (error) {
     options.reportError?.("cleanup failed", error);
     options.notify(UI_TEXT.toast.cleanupFailed, "error");
-    return false;
-  } finally {
-    options.onExecutionEnd?.();
-  }
-}
-
-export async function runBackupExportFlow(options: BackupExportFlowOptions): Promise<string | null> {
-  const UI_TEXT = options.uiText;
-  options.onExecutionStart?.();
-  try {
-    const exportedPath = await options.exportBackupWithPicker(normalizeOptionalPath(options.initialPath));
-    if (!exportedPath) {
-      return null;
-    }
-
-    options.setExportPath(exportedPath);
-    options.notify(UI_TEXT.toast.backupExportSuccess(exportedPath), "success");
-    return exportedPath;
-  } catch (error) {
-    options.reportError?.("export backup failed", error);
-    options.notify(UI_TEXT.toast.backupExportFailed, "error");
-    return null;
-  } finally {
-    options.onExecutionEnd?.();
-  }
-}
-
-export async function prepareBackupRestoreFlow(
-  options: BackupRestorePrepareFlowOptions,
-): Promise<BackupRestorePreparation | null> {
-  const UI_TEXT = options.uiText;
-  options.onExecutionStart?.();
-  try {
-    const preparation = await options.prepareBackupRestore(normalizeOptionalPath(options.initialPath));
-    if (!preparation) {
-      return null;
-    }
-
-    options.setRestorePath(preparation.path);
-    if (!preparation.compatible) {
-      options.notify(UI_TEXT.toast.backupIncompatible(preparation.incompatibilityMessage), "warning");
-      return null;
-    }
-
-    return preparation;
-  } catch (error) {
-    options.reportError?.("prepare backup restore failed", error);
-    options.notify(parseCommandError(error).code === "BACKUP_FORMAT_UNSUPPORTED"
-      ? UI_TEXT.toast.backupFormatUnsupported : UI_TEXT.toast.backupPreviewFailed, "error");
-    return null;
-  } finally {
-    options.onExecutionEnd?.();
-  }
-}
-
-export async function commitPreparedBackupRestoreFlow(options: BackupRestoreCommitFlowOptions): Promise<boolean> {
-  const UI_TEXT = options.uiText;
-  const confirmed = await options.confirm({
-    title: UI_TEXT.settings.restoreConfirmTitle,
-    description: UI_TEXT.settings.restoreConfirmDetail(
-      options.preparation.path,
-      options.preparation.previewSummary,
-      UI_TEXT.settings.restoreStrategyOptions[options.restoreStrategy],
-    ),
-    confirmLabel: UI_TEXT.dialog.confirmDanger,
-    danger: true,
-  });
-  if (!confirmed) {
-    return false;
-  }
-
-  options.onExecutionStart?.();
-  try {
-    await options.restoreBackup(
-      options.preparation.path,
-      options.restoreStrategy,
-      options.preparation.preview.hash,
-    );
-    options.notify(
-      UI_TEXT.toast.backupRestoreSuccess,
-      "success",
-    );
-    options.reload();
-    return true;
-  } catch (error) {
-    options.reportError?.("restore backup failed", error);
-    options.notify(parseCommandError(error).code === "BACKUP_FORMAT_UNSUPPORTED"
-      ? UI_TEXT.toast.backupFormatUnsupported : UI_TEXT.toast.backupRestoreFailed, "error");
     return false;
   } finally {
     options.onExecutionEnd?.();

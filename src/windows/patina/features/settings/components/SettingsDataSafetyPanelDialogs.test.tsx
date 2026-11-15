@@ -6,55 +6,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { resolveLocaleActivation } from "../../../shared/i18n/runtime.ts";
 import SettingsDataSafetyPanel from "./SettingsDataSafetyPanel";
-import type { RemoteBackupState } from "../hooks/useRemoteBackupState.ts";
 import type { StorageSnapshot } from "../services/settingsRuntimeAdapterService.ts";
 
 /**
- * [QA 补测] 「存储」卡的**外壳 + 五个对话框**（`SettingsDataSafetyPanel` 170 行 +
- * `useSettingsDataSafetyDialogs` 201 行 + `SettingsDataSafetyDialogs` 291 行）。
+ * 「数据安全」卡的**外壳 + 两个对话框**（`SettingsDataSafetyPanel` +
+ * `useSettingsDataSafetyDialogs` + `SettingsDataSafetyDialogs`）。
  *
- * 为什么必须补：本轮把 695 行的面板拆成六个文件，其中**五个对话框的状态机与 JSX 整体搬走**，
- * 而原来就没有任何用例挂过这个面板 —— 搬迁时"丢掉一个对话框 / 把某颗键接到别的 open* 上"
- * 不会有任何测试变红（`settingsDataGroupUniform` 只做源码级类名与行数断言）。
- * 这里从**行**点进去，断言"点了那颗键，出现的是哪个框、确认之后调的是哪个回调"：
+ * 判据从**行**点进去，看"点了那颗键，出现的是哪个框、确认之后调的是哪个回调"：
  *   ① 清理历史记录（含档位滑杆）→ `onCleanup`；
- *   ② 清理缓存 → `onScheduleWebviewCacheClear`；
- *   ③ 恢复：没有远端目标时直接走"选策略"，且先等 `onPrepareRestoreBackup` 返回真。
+ *   ② 清理缓存（重启并应用）→ `onScheduleWebviewCacheClear`。
+ *
+ * [设置页七项改造·批 5] 「活动库备份与恢复」整块下线：原来还有
+ * ③ 选备份位置 ④ 选恢复来源 ⑤ 恢复策略 三个框，连同它们的行一起删了。
+ * 最后一条用例（qd09）改成**反向回归**：那两个入口与那三个框都不许再出现 ——
+ * 功能删掉之后，把它接回来只需要一次 import，没人会记得为什么删。
  */
-const REMOTE_DIR = "Timing/";
-
-function remoteBackup(overrides: Partial<RemoteBackupState> = {}): RemoteBackupState {
-  return {
-    config: null,
-    hasSecret: false,
-    loading: false,
-    configDialogOpen: false,
-    restoreDialogOpen: false,
-    entries: [],
-    isTesting: false,
-    isSaving: false,
-    isUploading: false,
-    isListing: false,
-    isDownloading: false,
-    connectionStatus: "unknown",
-    openConfigDialog: () => undefined,
-    closeConfigDialog: () => undefined,
-    revealSavedPassword: async () => null,
-    saveConfig: async () => true,
-    deleteConfig: async () => undefined,
-    testConfig: async () => true,
-    uploadBackup: async () => null,
-    openRestoreDialog: async () => undefined,
-    closeRestoreDialog: () => undefined,
-    restoreEntry: async () => undefined,
-    remoteDir: REMOTE_DIR,
-    ...overrides,
-  } as RemoteBackupState;
-}
-
 const snapshot: StorageSnapshot = {
   paths: {
     installDir: "C:\\Apps\\Timing",
+    timingDataRoot: "C:\\Users\\me\\AppData\\com.timing.app",
     dataRoot: "C:\\Users\\me\\AppData\\Timing",
     databasePath: "C:\\Users\\me\\AppData\\Timing\\timing.db",
     backupDir: "C:\\Users\\me\\AppData\\Timing\\backups",
@@ -63,7 +33,7 @@ const snapshot: StorageSnapshot = {
     isCustomDataRoot: false,
     isCustomWebviewRoot: false,
   },
-  sizes: { installDirSizeBytes: 1048576, dataSizeBytes: 524288, backupDirSizeBytes: 0 },
+  sizes: { installDirSizeBytes: 1048576, dataSizeBytes: 524288, timingDataSizeBytes: 2097152, backupDirSizeBytes: 0 },
   webviewCache: {
     webviewRoot: "C:\\Users\\me\\AppData\\Timing\\webview",
     ebwebviewPath: "C:\\Users\\me\\AppData\\Timing\\webview\\EBWebView",
@@ -91,16 +61,10 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-/* `vi.fn()` 不带签名时是 `Mock<Procedure | Constructable>`，赋给具体回调类型会报 TS2769 ——
-   所以每个桩都写上它替代的那个签名。 */
 type VoidMock = ReturnType<typeof vi.fn<() => void>>;
 
 type Callbacks = {
   onCleanup: VoidMock;
-  onExportBackup: VoidMock;
-  onPrepareRestoreBackup: ReturnType<typeof vi.fn<() => Promise<boolean>>>;
-  onRestoreBackup: ReturnType<typeof vi.fn<(strategy: "merge" | "replace") => void>>;
-  onClearPendingRestoreBackup: VoidMock;
   onScheduleWebviewCacheClear: VoidMock;
   onOpenDataExport: VoidMock;
   onOpenDataImport: VoidMock;
@@ -111,10 +75,6 @@ let cb: Callbacks;
 function mountShell(): void {
   cb = {
     onCleanup: vi.fn<() => void>(),
-    onExportBackup: vi.fn<() => void>(),
-    onPrepareRestoreBackup: vi.fn<() => Promise<boolean>>(async () => true),
-    onRestoreBackup: vi.fn<(strategy: "merge" | "replace") => void>(),
-    onClearPendingRestoreBackup: vi.fn<() => void>(),
     onScheduleWebviewCacheClear: vi.fn<() => void>(),
     onOpenDataExport: vi.fn<() => void>(),
     onOpenDataImport: vi.fn<() => void>(),
@@ -125,29 +85,18 @@ function mountShell(): void {
       children: createElement(SettingsDataSafetyPanel, {
         cleanupRange: 7,
         cleanupOptions: [{ value: 7, label: "7 天" }, { value: 30, label: "30 天" }],
-        restoreStrategy: "merge",
         isCleaning: false,
-        isExportingBackup: false,
-        isRestoringBackup: false,
         onCleanupRangeChange: () => undefined,
-        onRestoreStrategyChange: () => undefined,
         onCleanup: cb.onCleanup,
-        onExportBackup: cb.onExportBackup,
-        onPrepareRestoreBackup: cb.onPrepareRestoreBackup,
-        onRestoreBackup: cb.onRestoreBackup,
-        onClearPendingRestoreBackup: cb.onClearPendingRestoreBackup,
         onOpenDataExport: cb.onOpenDataExport,
         onOpenDataImport: cb.onOpenDataImport,
         isImportBusy: false,
-        remoteBackup: remoteBackup(),
         storageSnapshot: snapshot,
         isStorageBusy: false,
         onRefreshStorageSnapshot: () => undefined,
         onScheduleWebviewCacheClear: cb.onScheduleWebviewCacheClear,
-        onChooseDataDirectory: () => undefined,
-        onChooseCacheDirectory: () => undefined,
-        onRestoreDefaultDataDirectory: () => undefined,
-        onRestoreDefaultCacheDirectory: () => undefined,
+          onChooseCacheDirectory: () => undefined,
+          onRestoreDefaultCacheDirectory: () => undefined,
         onOpenStorageDirectory: () => undefined,
       }),
     }));
@@ -179,11 +128,11 @@ const confirmOf = (surface: HTMLElement | undefined) => Array.from(
   surface?.querySelectorAll<HTMLButtonElement>(".qp-dialog-actions button") ?? [],
 ).pop() ?? null;
 
-describe("外壳 + 五个对话框：从行点进去，看的是哪个框、调的是哪个回调", () => {
-  it("qd06_the_shell_renders_the_four_groups_and_the_card_header", () => {
+describe("外壳 + 两个对话框：从行点进去，看的是哪个框、调的是哪个回调", () => {
+  it("qd06_the_shell_renders_the_three_groups_and_the_card_header", () => {
     mountShell();
-    expect(document.querySelectorAll(".settings-preference-group"), "四个子组没全渲染")
-      .toHaveLength(4);
+    expect(document.querySelectorAll(".settings-preference-group"), "三个子组没全渲染")
+      .toHaveLength(3);
     const header = document.querySelector(".qp-panel .settings-panel-header, .qp-panel h3");
     expect(header, "卡片没有标题（与同页其它卡不同构）").not.toBeNull();
     expect((header?.textContent ?? "").trim(), "卡片标题是空的").not.toBe("");
@@ -227,24 +176,16 @@ describe("外壳 + 五个对话框：从行点进去，看的是哪个框、调�
     expect(cb.onScheduleWebviewCacheClear, "确认缓存清理后没有安排清理动作").toHaveBeenCalledTimes(1);
   });
 
-  it("qd09_restore_waits_for_the_prepare_step_and_then_asks_for_a_strategy", async () => {
+  it("qd09_the_activity_library_backup_and_restore_entries_are_gone", () => {
+    /* 反向回归（批 5）：这两颗键、那三个框、以及它们赖以存在的组名都不许再出现。
+       想加回来的人会先撞上这条，然后去读 `SettingsDataSafetyPanel` 顶部为什么删。 */
     mountShell();
-    const restoreKey = buttonsInGroup("备份与恢复")[1];
-    expect(restoreKey, "备份与恢复组里没有恢复键").toBeDefined();
-    act(() => { restoreKey?.click(); });
-    await flush();
-
-    /* 没有远端目标 → 不弹「选来源」，直接走本地准备 */
-    expect(cb.onPrepareRestoreBackup, "恢复没有先走准备动作").toHaveBeenCalledTimes(1);
-    expect(document.querySelector(".settings-data-action-dialog"), "没有远端目标却弹了「选来源」")
-      .toBeNull();
-    /* 准备成功之后才问策略（合并 / 替换） */
-    const strategy = document.querySelector<HTMLElement>(".qp-segmented-filter");
-    expect(strategy, "准备完成之后没有弹恢复策略选择").not.toBeNull();
-    expect(strategy?.querySelectorAll(".qp-segmented-filter-item").length, "策略选项不是两项").toBe(2);
-
-    act(() => { confirmOf(lastDialog())?.click(); });
-    await flush();
-    expect(cb.onRestoreBackup, "确认策略之后没有真的恢复").toHaveBeenCalledTimes(1);
+    const text = document.body.textContent ?? "";
+    expect(text, "「备份活动库」入口又回来了").not.toContain("备份活动库");
+    expect(text, "「恢复活动库」入口又回来了").not.toContain("恢复活动库");
+    expect(text, "「备份与恢复」组又回来了").not.toContain("备份与恢复");
+    expect(text, "WebDAV 远端备份入口又回来了").not.toContain("远端备份");
+    expect(document.querySelector(".settings-data-action-dialog"), "「选恢复来源」框又回来了").toBeNull();
+    expect(document.querySelector(".qp-segmented-filter"), "恢复策略选择器又回来了").toBeNull();
   });
 });

@@ -47,16 +47,16 @@ function stripCssComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
-/** 「数据与同步」整组在拆分后的全部产物（外壳 + 四个子组 + 对话框层 + 远端面板）。 */
+/** 「数据与同步」整组在拆分后的全部产物（外壳 + 三个子组 + 对话框层）。
+ *  [设置页七项改造·批 5] `SettingsDataBackupGroup` / `SettingsRemoteBackupPanel` 随
+ *  「活动库备份与恢复」下线一起删除。 */
 const DATA_GROUP_DIR = "src/windows/patina/features/settings/components";
 const DATA_GROUP_FILES = [
   "SettingsDataSafetyPanel.tsx",
   "SettingsDataExportGroup.tsx",
-  "SettingsDataBackupGroup.tsx",
   "SettingsStoragePathsGroup.tsx",
   "SettingsDataCleanupGroup.tsx",
   "SettingsDataSafetyDialogs.tsx",
-  "SettingsRemoteBackupPanel.tsx",
 ] as const;
 
 /** 这一轮下线的两个自定义行类（只在 `settings.css` 的下线注释里出现，代码里必须为零）。 */
@@ -102,10 +102,8 @@ describe("② 每个可操作项都排在偏好行里（源码）", () => {
   /** 每个子组：必须 import 偏好行、必须用 `settings-preference-list` 容器、必须真有行。 */
   const GROUPS = [
     { file: "SettingsDataExportGroup.tsx", rows: 2 },
-    { file: "SettingsDataBackupGroup.tsx", rows: 2 },
     { file: "SettingsDataCleanupGroup.tsx", rows: 2 },
     { file: "SettingsStoragePathsGroup.tsx", rows: 2 },
-    { file: "SettingsRemoteBackupPanel.tsx", rows: 1 },
   ] as const;
 
   for (const { file, rows } of GROUPS) {
@@ -120,39 +118,30 @@ describe("② 每个可操作项都排在偏好行里（源码）", () => {
 
   it("g05_every_group_puts_its_rows_in_the_shared_divider_list", () => {
     /* 行距与分隔线由 `.settings-preference-list > .settings-preference-row + .settings-preference-row`
-       给；不进这个容器，四个子组就会各画一条粗细不一的边。 */
-    /* `SettingsRemoteBackupPanel` 是**一行**：它把行插进父组的 `settings-preference-list`
-       （见 `SettingsDataBackupGroup`），所以它自己不该再画一个容器 —— 否则行距与分隔线
-       会在中间断一次。剩下四个子组各拥有自己的容器。 */
-    for (const { file } of GROUPS.filter((group) => group.file !== "SettingsRemoteBackupPanel.tsx")) {
+       给；不进这个容器，每个子组就会各画一条粗细不一的边。 */
+    for (const { file } of GROUPS) {
       const source = read(`${DATA_GROUP_DIR}/${file}`);
       expect(source, `${file} 的偏好行没有进 settings-preference-list`).toContain(
         'className="settings-preference-list"',
       );
     }
-    expect(read(`${DATA_GROUP_DIR}/SettingsRemoteBackupPanel.tsx`)).not.toContain(
-      'className="settings-preference-list"',
-    );
-    expect(read(`${DATA_GROUP_DIR}/SettingsDataBackupGroup.tsx`)).toContain(
-      "<SettingsRemoteBackupPanel",
-    );
   });
 
   it("g06_the_shell_only_composes_and_keeps_the_busy_aggregate", () => {
-    /* 外壳文件只做组合：它自己不再排行（出现 `<SettingsPreferenceRow` 就说明有行没搬走），
-       而且 `busy` 的七项口径一项都不许少（少一项 = 长任务并行时按钮可点）。 */
+    /* 外壳文件只做组合：它自己不再排行（出现 `<SettingsPreferenceRow` 就说明有行没搬走）。
+       [设置页七项改造·批 5] `busy` 从七项收窄到两项（备份那五项随功能下线），
+       两项一项都不许少 —— 少一项就是长任务并行时按钮可点。 */
     const shell = read(`${DATA_GROUP_DIR}/SettingsDataSafetyPanel.tsx`);
     expect(shell).not.toContain("<SettingsPreferenceRow");
-    for (const flag of [
-      "isExportingBackup",
-      "isRestoringBackup",
-      "isStorageBusy",
-      "remoteBackup.isUploading",
-      "remoteBackup.isListing",
-      "remoteBackup.isDownloading",
-      "isImportBusy",
-    ]) {
-      expect(shell, `busy 口径少了 ${flag}`).toContain(flag);
+    expect(shell, "busy 口径少了 isStorageBusy").toContain("isStorageBusy");
+    expect(shell, "busy 口径少了 isImportBusy").toContain("isImportBusy");
+    /* 已删的备份维度的 props **不许**再出现在外壳**代码**里（接回来就会带着整套远端备份复活）。
+       注释里会写明「这些东西删了」，那不是复活 —— 所以先按行去掉注释行。 */
+    const shellCode = shell.split("\n")
+      .filter((line) => !/^\s*(\*|\/\/|\/\*)/.test(line))
+      .join("\n");
+    for (const gone of ["isExportingBackup", "isRestoringBackup", "remoteBackup"]) {
+      expect(shellCode, `外壳上又出现了已删除的 ${gone}`).not.toContain(gone);
     }
   });
 });
@@ -232,17 +221,20 @@ describe("④ 渲染级：行是真的（不是源码看着像）", () => {
     const buttons = Array.from(
       container.querySelectorAll<HTMLButtonElement>(".settings-preference-control button"),
     );
-    expect(buttons).toHaveLength(2);
+    /* 三行：数据导出 / 数据导入 / 完整数据包（JSON，[批 2] 新增）。 */
+    expect(buttons).toHaveLength(3);
     for (const button of buttons) {
       expect(button.closest(".settings-preference-row"), "按钮掉到偏好行外面了").not.toBeNull();
       expect(button.closest(".settings-preference-control"), "按钮没落在行的右侧控件区").not.toBeNull();
     }
     /* 两个动作各在自己的行里（不是两行并成一行） */
     const rows = new Set(buttons.map((button) => button.closest(".settings-preference-row")));
-    expect(rows.size).toBe(2);
+    expect(rows.size).toBe(3);
     /* 旧类名的节点一个都不许有 */
     expect(container.querySelector(".settings-data-action-row, .settings-storage-path-row")).toBeNull();
-    /* 回调仍然各接各的（换行排法不改行为） */
+    /* 回调仍然各接各的（换行排法不改行为）。
+       第三颗（完整数据包）自己走命令，接线另有 `SettingsFullBundle.test.tsx` 管，
+       这里不点它——本文件不 mock 那个口岸，点了只会拿到 jsdom 里没有的 IPC。 */
     buttons[0].click();
     buttons[1].click();
     expect(calls).toEqual(["export", "import"]);

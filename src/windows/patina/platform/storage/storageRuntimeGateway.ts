@@ -2,6 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 
 interface StoragePathSnapshot {
   installDir: string;
+  /** Timing 真正的数据根（`%APPDATA%\com.timing.app`）：计时库 / md / logs / plugins / patina 都在它下面。 */
+  timingDataRoot: string;
+  /** 活动库那一层（`<timingDataRoot>/patina/data`）；SQLite 落点设置改的是它。 */
   dataRoot: string;
   databasePath: string;
   backupDir: string;
@@ -13,7 +16,10 @@ interface StoragePathSnapshot {
 
 interface StorageSizeSnapshot {
   installDirSizeBytes: number;
+  /** `dataRoot` 里 sqlite 家族三个文件的合计。 */
   dataSizeBytes: number;
+  /** `timingDataRoot` 的**递归**体积（设置页「数据目录」那一行读的就是它）。 */
+  timingDataSizeBytes: number;
   backupDirSizeBytes: number;
 }
 
@@ -60,6 +66,26 @@ export async function getStorageSnapshot(): Promise<StorageSnapshot> {
 
 export async function pickStorageDirectory(): Promise<string | null> {
   return invoke<string | null>("cmd_pick_storage_directory");
+}
+
+const isTauriRuntime = (): boolean =>
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
+/**
+ * 选一个 Markdown 文件（设置 → 同步 → 日记模板路径的「选择文件…」）。
+ *
+ * 三种「没选到」都返回 `null`：浏览器 mock 里没有原生对话框、用户点了取消、命令报错。
+ * 调用方据此**保留输入框原值**——把取消写成空串等于「点一下取消就清空模板」。
+ */
+export async function pickMarkdownFile(): Promise<string | null> {
+  if (!isTauriRuntime()) return null;
+  try {
+    const selected = await invoke<string | null>("cmd_pick_markdown_file");
+    return selected && selected.trim() ? selected : null;
+  } catch (error) {
+    console.error("pick markdown file failed", error);
+    return null;
+  }
 }
 
 export async function previewStorageMigration(targetDataRoot: string): Promise<StorageMigrationPreview> {

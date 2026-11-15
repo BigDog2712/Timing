@@ -59,7 +59,9 @@ fn activity_db_path() -> PathBuf {
     patina_root().join("data").join("patina.db")
 }
 
-async fn activity_pool() -> Result<&'static sqlx::SqlitePool, String> {
+/// 活动库连接池：只读、单连接、懒建。**导出全额数据包也用它**（`bundle_cmd`），
+/// 所以是 `pub(crate)`——但依旧是 `mode=ro` 的那一条，拿不到写能力。
+pub(crate) async fn activity_pool() -> Result<&'static sqlx::SqlitePool, String> {
     ACTIVITY_POOL
         .get_or_try_init(|| async {
             use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};

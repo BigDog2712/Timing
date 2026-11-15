@@ -17,6 +17,7 @@
  *      provider 依赖不划算，而且这块要被单测直接渲染。
  */
 import { useEffect, useRef, useState } from "react";
+import QuietSwitch from "../../../shared/components/QuietSwitch";
 import type { BoardCopy } from "./boardCopy";
 import {
   FACTORY_LAYOUT_ID,
@@ -31,6 +32,15 @@ interface Props {
   locked: boolean;
   /** 板子是空的 → 新建布局没有意义（会被 store 拒），这里先禁用 */
   canCreate: boolean;
+  /**
+   * [设置页七项改造·批 2] 8px 吸附（`layout.layout.snap`）。
+   *
+   * 从设置页那张「主界面组件」面板搬来：那张卡整卡下线，但吸附是**全局手感**，
+   * 主界面本来没有位置放它，所以跟着「布局管理」这个唯一的布局入口走。
+   * 它不属于结构变更，锁定态下仍可切换。
+   */
+  snap: boolean;
+  setSnap: (on: boolean) => void;
   onSwitch: (id: string) => void;
   onCreate: () => void;
   onRemove: (id: string) => void;
@@ -39,7 +49,7 @@ interface Props {
 }
 
 export default function LayoutManagerDialog({
-  copy, library, locked, canCreate, onSwitch, onCreate, onRemove, onTidy, onClose,
+  copy, library, locked, canCreate, snap, setSnap, onSwitch, onCreate, onRemove, onTidy, onClose,
 }: Props) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const firstRef = useRef<HTMLButtonElement | null>(null);
@@ -98,6 +108,19 @@ export default function LayoutManagerDialog({
           {locked ? copy.lockedHint : copy.manageHint}
         </p>
         <p className="qp-layout-manager__hint">{copy.layoutCount(entries.length)}</p>
+
+        {/* 8px 吸附：原来在设置页「主界面组件」卡里，卡下线后搬到这里 */}
+        <div className="qp-layout-manager__switch-row">
+          <span className="qp-layout-manager__switch-copy">
+            <span className="qp-layout-manager__switch-title">{copy.snapTitle}</span>
+            <span className="qp-layout-manager__hint">{copy.snapHint}</span>
+          </span>
+          <QuietSwitch
+            checked={snap}
+            ariaLabel={copy.snapTitle}
+            onChange={setSnap}
+          />
+        </div>
 
         <ul className="qp-layout-manager__list">
           {entries.map((entry, index) => {

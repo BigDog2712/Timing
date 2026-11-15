@@ -54,9 +54,9 @@ describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
     expect(COPY.backupHint).toBe(EXPECTED.C21);
   });
 
-  /* [V0.11.33] 三档标签与智能描述换稿（P5/P6/P7 的常量半；DOM 半在 mdSyncAuto.test.tsx） */
-  it('[V0.11.33] AUTO_COPY：第二档逐字「自动」，smartNote 逐字 = PM 裁定句', () => {
-    expect(AUTO_COPY.interval).toBe('自动');
+  /* [设置页七项改造·批 4] 三档标签改稿（常量半；DOM 半在 MdSyncCloudAuto） */
+  it('[批 4] AUTO_COPY：第二档逐字「定时」，smartNote 逐字 = PM 裁定句', () => {
+    expect(AUTO_COPY.interval).toBe('定时');
     expect(AUTO_COPY.off).toBe('关闭');
     expect(AUTO_COPY.smart).toBe('智能');
     expect(AUTO_COPY.smartNote).toBe(
@@ -119,7 +119,7 @@ describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
       '同步目录：交给网盘客户端多端一致。',
       '多端一致用：体积小，读得快。',
       '日记本：双向，保留你手写的内容。',
-      '定时',
+      /* [设置页七项改造·批 4] `'定时'` 在原位除名：它重新成为第二档的标签 */
       '停手 5 分钟后同步；启动时一次。',
     ]);
     /* 它们不许悄悄回到常量表里 */

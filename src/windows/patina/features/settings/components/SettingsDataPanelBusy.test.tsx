@@ -6,55 +6,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { resolveLocaleActivation } from "../../../shared/i18n/runtime.ts";
 import SettingsDataSafetyPanel from "./SettingsDataSafetyPanel";
-import type { RemoteBackupState } from "../hooks/useRemoteBackupState.ts";
 import type { StorageSnapshot } from "../services/settingsRuntimeAdapterService.ts";
 
 /**
- * [QA 补测] 「存储」卡的 **`busy` 汇总口径 + 六颗动作键的接线**（面板级）。
+ * 「数据安全」卡的 **`busy` 汇总口径 + 四颗动作键的接线**（面板级）。
  *
- * `SettingsDataGroupStates.test.tsx` 逐个子组核禁用态，但 `busy` 是**面板**算出来的
- * （七项 or 起来），任何一个来源漏进 `busy`，子组里那颗键就会在"另一条长任务正在写库"
- * 的时候还能点 —— 这正是拆分时最容易掉的一档，而原来没有任何用例从面板这一层验过。
- *
- * 七项来源（`SettingsDataSafetyPanel` 里的 `busy` 表达式）：
- *   isExportingBackup / isRestoringBackup / isStorageBusy /
- *   remoteBackup.isUploading / isListing / isDownloading / isImportBusy
+ * [设置页七项改造·批 5] 「活动库备份与恢复」整块下线后，`busy` 的来源从七项收窄到两项：
+ *   `isStorageBusy`（目录快照 / 迁移）、`isImportBusy`（导入）。
+ * 这两项任一项为真时，本卡**所有**动作键都必须禁用 —— 漏一项就是"导入一半又去搬目录"。
+ * 清理自己的运行态（`isCleaning`）单独门控清理那一组、不进 `busy`：清理跑着的时候
+ * 目录键仍可点（两件事不写同一行），但清理键自己要显示「正在清理」。
  *
  * 判据一律用**用户能看见的东西**：`.settings-preference-control button` 的 `disabled`
- * 与文案，不去读 props。行标题取自 zh-CN 真实文案（`dataExportTitle` 等），不手抄近似值。
+ * 与文案；行标题取自 zh-CN 真实文案，不手抄近似值。
  */
-
-function remoteBackup(overrides: Partial<RemoteBackupState> = {}): RemoteBackupState {
-  return {
-    config: null,
-    hasSecret: false,
-    loading: false,
-    configDialogOpen: false,
-    restoreDialogOpen: false,
-    entries: [],
-    isTesting: false,
-    isSaving: false,
-    isUploading: false,
-    isListing: false,
-    isDownloading: false,
-    connectionStatus: "unknown",
-    openConfigDialog: () => undefined,
-    closeConfigDialog: () => undefined,
-    revealSavedPassword: async () => null,
-    saveConfig: async () => true,
-    deleteConfig: async () => undefined,
-    testConfig: async () => true,
-    uploadBackup: async () => null,
-    openRestoreDialog: async () => undefined,
-    closeRestoreDialog: () => undefined,
-    restoreEntry: async () => undefined,
-    ...overrides,
-  } as RemoteBackupState;
-}
 
 const snapshot: StorageSnapshot = {
   paths: {
     installDir: "C:\\Apps\\Timing",
+    timingDataRoot: "C:\\Users\\me\\AppData\\com.timing.app",
     dataRoot: "C:\\Users\\me\\AppData\\Timing",
     databasePath: "C:\\Users\\me\\AppData\\Timing\\timing.db",
     backupDir: "C:\\Users\\me\\AppData\\Timing\\backups",
@@ -63,7 +33,7 @@ const snapshot: StorageSnapshot = {
     isCustomDataRoot: false,
     isCustomWebviewRoot: false,
   },
-  sizes: { installDirSizeBytes: 1048576, dataSizeBytes: 524288, backupDirSizeBytes: 0 },
+  sizes: { installDirSizeBytes: 1048576, dataSizeBytes: 524288, timingDataSizeBytes: 2097152, backupDirSizeBytes: 0 },
   webviewCache: {
     webviewRoot: "C:\\Users\\me\\AppData\\Timing\\webview",
     ebwebviewPath: "C:\\Users\\me\\AppData\\Timing\\webview\\EBWebView",
@@ -75,12 +45,10 @@ const snapshot: StorageSnapshot = {
   maintenance: { lastError: null },
 };
 
-/** zh-CN 里这六行的行标题（= 用户屏幕上看到的字，不是类名） */
+/** zh-CN 里这四行动作键的行标题（= 用户屏幕上看到的字，不是类名） */
 const ACTION_ROW_TITLES = [
   "数据导出",
   "导入",
-  "备份活动库",
-  "恢复活动库",
   "清理缓存",
   "清理历史记录",
 ] as const;
@@ -91,10 +59,6 @@ let container: HTMLDivElement;
 let root: Root;
 const cb = {
   onCleanup: vi.fn<() => void>(),
-  onExportBackup: vi.fn<() => void>(),
-  onPrepareRestoreBackup: vi.fn<() => Promise<boolean>>(async () => true),
-  onRestoreBackup: vi.fn<(strategy: "merge" | "replace") => void>(),
-  onClearPendingRestoreBackup: vi.fn<() => void>(),
   onOpenDataExport: vi.fn<() => void>(),
   onOpenDataImport: vi.fn<() => void>(),
   onScheduleWebviewCacheClear: vi.fn<() => void>(),
@@ -123,29 +87,18 @@ function mount(overrides: Overrides = {}): void {
       children: createElement(SettingsDataSafetyPanel, {
         cleanupRange: 7,
         cleanupOptions: [{ value: 7, label: "7 天" }, { value: 30, label: "30 天" }],
-        restoreStrategy: "merge",
         isCleaning: false,
-        isExportingBackup: false,
-        isRestoringBackup: false,
         onCleanupRangeChange: rangeChange as never,
-        onRestoreStrategyChange: () => undefined,
         onCleanup: cb.onCleanup,
-        onExportBackup: cb.onExportBackup,
-        onPrepareRestoreBackup: cb.onPrepareRestoreBackup,
-        onRestoreBackup: cb.onRestoreBackup,
-        onClearPendingRestoreBackup: cb.onClearPendingRestoreBackup,
         onOpenDataExport: cb.onOpenDataExport,
         onOpenDataImport: cb.onOpenDataImport,
         isImportBusy: false,
-        remoteBackup: remoteBackup(),
         storageSnapshot: snapshot,
         isStorageBusy: false,
         onRefreshStorageSnapshot: () => undefined,
         onScheduleWebviewCacheClear: cb.onScheduleWebviewCacheClear,
-        onChooseDataDirectory: () => undefined,
-        onChooseCacheDirectory: () => undefined,
-        onRestoreDefaultDataDirectory: () => undefined,
-        onRestoreDefaultCacheDirectory: () => undefined,
+          onChooseCacheDirectory: () => undefined,
+          onRestoreDefaultCacheDirectory: () => undefined,
         onOpenStorageDirectory: () => undefined,
         ...overrides,
       }),
@@ -155,14 +108,6 @@ function mount(overrides: Overrides = {}): void {
 
 async function flush(): Promise<void> {
   for (let i = 0; i < 5; i += 1) await act(async () => { await Promise.resolve(); });
-}
-
-/** `SettingsBackupDialog` 是 `lazy()` 的：要等一次真实的模块加载（macrotask）才挂上 */
-async function waitForLazyDialog(): Promise<void> {
-  for (let i = 0; i < 10; i += 1) {
-    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)); });
-    if (document.body.querySelector(".qp-dialog-surface")) return;
-  }
 }
 
 function rows(): HTMLElement[] {
@@ -181,21 +126,16 @@ function actionKey(title: string): HTMLButtonElement | null {
   return actionRow(title)?.querySelector<HTMLButtonElement>(".settings-preference-control button") ?? null;
 }
 
-/** 七项 `busy` 来源，逐个打开 */
+/** `busy` 的两项来源，逐个打开 */
 const BUSY_SOURCES: [string, Overrides][] = [
-  ["isExportingBackup", { isExportingBackup: true }],
-  ["isRestoringBackup", { isRestoringBackup: true }],
   ["isStorageBusy", { isStorageBusy: true }],
-  ["remoteBackup.isUploading", { remoteBackup: remoteBackup({ isUploading: true }) }],
-  ["remoteBackup.isListing", { remoteBackup: remoteBackup({ isListing: true }) }],
-  ["remoteBackup.isDownloading", { remoteBackup: remoteBackup({ isDownloading: true }) }],
   ["isImportBusy", { isImportBusy: true }],
 ];
 
-describe("「存储」卡的 busy 汇总口径（七项，逐个验）", () => {
-  it("qd10_idle_renders_four_groups_and_six_clickable_action_keys", () => {
+describe("「数据安全」卡的 busy 汇总口径（两项，逐个验）", () => {
+  it("qd10_idle_renders_three_groups_and_four_clickable_action_keys", () => {
     mount();
-    expect(document.querySelectorAll(".settings-preference-group"), "四个子组没全渲染").toHaveLength(4);
+    expect(document.querySelectorAll(".settings-preference-group"), "三个子组没全渲染").toHaveLength(3);
     for (const title of ACTION_ROW_TITLES) {
       const key = actionKey(title);
       expect(key, `空闲态找不到「${title}」那一行的按钮（标题 + 右侧控件）`).not.toBeNull();
@@ -204,7 +144,7 @@ describe("「存储」卡的 busy 汇总口径（七项，逐个验）", () => {
   });
 
   it.each(BUSY_SOURCES)("qd11_busy_from_%s_disables_every_action_key", (name, patch) => {
-    /* 任何一条长任务在跑 → 六颗动作键全部禁用。漏一项就是"导出的同时点了恢复"。 */
+    /* 任何一条长任务在跑 → 四颗动作键全部禁用。漏一项就是"导入的同时点了搬目录"。 */
     mount(patch);
     for (const title of ACTION_ROW_TITLES) {
       const key = actionKey(title);
@@ -212,40 +152,29 @@ describe("「存储」卡的 busy 汇总口径（七项，逐个验）", () => {
       expect(key?.disabled, `[${name}] 时「${title}」仍可点（busy 汇总漏了这一项）`).toBe(true);
     }
   });
+
+  it("qd11b_cleaning_does_not_flip_the_busy_aggregate", () => {
+    /* 清理跑着的时候：清理键自己禁用并换成「正在清理」，但它**不进** busy ——
+       其余动作键仍可点（清理与导出不写同一行）。 */
+    mount({ isCleaning: true });
+    expect(actionKey("清理历史记录")?.disabled, "清理进行中仍可再次发起清理").toBe(true);
+    expect(actionKey("清理历史记录")?.textContent ?? "").toContain("正在清理");
+    expect(actionKey("数据导出")?.disabled, "清理被误算进 busy（导出键也跟着灰了）").toBe(false);
+  });
 });
 
-describe("六颗动作键的接线（点了调的是哪个回调）", () => {
+describe("四颗动作键的接线（点了调的是哪个回调）", () => {
   it("qd12_export_and_import_keys_call_their_own_callbacks", async () => {
     mount();
     act(() => { actionKey("数据导出")?.click(); });
     await flush();
     expect(cb.onOpenDataExport, "「数据导出」没接到 onOpenDataExport").toHaveBeenCalledTimes(1);
     expect(cb.onOpenDataImport, "点导出却调了导入").not.toHaveBeenCalled();
-    expect(cb.onExportBackup, "点导出跳到了活动库备份").not.toHaveBeenCalled();
 
     act(() => { actionKey("导入")?.click(); });
     await flush();
     expect(cb.onOpenDataImport, "「导入」没接到 onOpenDataImport").toHaveBeenCalledTimes(1);
     expect(cb.onOpenDataExport).toHaveBeenCalledTimes(1);
-  });
-
-  it("qd13_backup_key_opens_the_target_dialog_and_only_then_exports", async () => {
-    /* 「备份活动库」先问存哪儿（本地 / WebDAV），选完本地才调 `onExportBackup` */
-    mount();
-    act(() => { actionKey("备份活动库")?.click(); });
-    await waitForLazyDialog();
-    await flush();
-    expect(cb.onExportBackup, "还没选备份位置就导出了").not.toHaveBeenCalled();
-    const surface = Array.from(document.body.querySelectorAll<HTMLElement>(".qp-dialog-surface")).pop();
-    expect(surface, "点「备份活动库」没有弹出选位置的对话框").toBeDefined();
-    /* 「本机 ZIP 文件」那一项是 `settings-dialog-action-composite` 的整块命中区（按钮本身没有文字） */
-    const localKey = surface?.querySelector<HTMLButtonElement>(
-      ".settings-backup-local-trigger .settings-dialog-action-hit-target",
-    );
-    expect(localKey ?? null, "选位置的对话框里没有「本机 ZIP 文件」那一项").not.toBeNull();
-    act(() => { localKey?.click(); });
-    await flush();
-    expect(cb.onExportBackup, "选了本机备份却没触发导出").toHaveBeenCalledTimes(1);
   });
 
   it("qd14_history_cleanup_key_switches_to_running_copy_and_locks_while_cleaning", () => {

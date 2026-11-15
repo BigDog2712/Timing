@@ -108,12 +108,6 @@ pub async fn snapshot<R: Runtime>(app: &AppHandle<R>) -> Result<ConfigSnapshot, 
     .await
 }
 
-pub async fn reveal<R: Runtime>(app: &AppHandle<R>) -> Result<Option<String>, String> {
-    let _guard = CONFIG_LOCK.lock().await;
-    let state = repository::load_state(&wait_for_sqlite_pool(app).await?).await?;
-    password(&WebDavCredentialStore::for_app(app)?, &state)
-}
-
 pub async fn network_snapshot<R: Runtime>(
     app: &AppHandle<R>,
     pool: &SqlitePool,

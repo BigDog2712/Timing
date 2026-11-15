@@ -15,6 +15,7 @@
  * 校验：前端**只判空**；其余规则由后端 `MdSyncBinding::validate` 在保存时返回原文，
  * `splitBindingError` 把它落到对应行下方。
  */
+import { useState } from 'react';
 import { useMdSyncStore } from '../../services/host/mdSyncRuntimeStore';
 import { MD_SYNC_KIND_LABELS } from '../../services/host/hostTypes';
 import type { MdSyncBinding } from '../../services/host/hostTypes';
@@ -22,6 +23,7 @@ import { COPY, mixedFileNote } from '../../services/host/mdSyncCopy';
 import { differingBindings, sharedValue } from '../../services/host/mdSyncShared';
 import { previewFile, splitBindingError } from '../../services/host/mdSyncConfig';
 import type { MdSyncDraft } from '../../services/host/useMdSyncDraft';
+import { pickMarkdownFile } from '../../../../platform/storage/storageRuntimeGateway';
 
 interface MdFormatBlockProps {
   draft: MdSyncDraft;
@@ -31,6 +33,19 @@ export function MdFormatBlock({ draft }: MdFormatBlockProps) {
   const today = useMdSyncStore((s) => s.view?.today ?? '');
   /* [V0.11.33] 模板路径一行进块①（W8 / P15）：全局一份，全局只有这一个入口 */
   const { bindings, shared, saving, loading, error, updateBinding, setSharedFile, diaryTemplate, setDiaryTemplate } = draft;
+  /** 原生文件对话框开着的时候按钮要显示「选择中…」，否则连点两次会叠两个对话框 */
+  const [picking, setPicking] = useState(false);
+  const chooseTemplateFile = async () => {
+    if (picking) return;
+    setPicking(true);
+    try {
+      const selected = await pickMarkdownFile();
+      /* 取消 / 浏览器 mock / 命令失败一律 `null`：**保留原值**，不写空串 */
+      if (selected) setDiaryTemplate(selected);
+    } finally {
+      setPicking(false);
+    }
+  };
   /* 后端那条「第 2 个落点：标题行必须以 # 开头」→ 落到第 2 行下方；不是这种形状
      → `null`，红字退回页签顶部（不猜是哪一行） */
   const inline = error ? splitBindingError(error, bindings.length) : null;
@@ -75,19 +90,33 @@ export function MdFormatBlock({ draft }: MdFormatBlockProps) {
           </p>
         )}
         {/* [V0.11.33] W8：日记模板路径（全局一份，R3）。A1b 纪律不豁免新句——
-            说明交给 placeholder 与 PRD 语义，不加 hint 不进 EXPLAIN_KEYS */}
-        <label className="sync__field">
-          <span className="sync__label">日记模板路径</span>
-          <input
-            className="sync__input"
-            value={diaryTemplate}
-            disabled={saving}
-            spellCheck={false}
-            placeholder="如 %APP_DIR%\模板.md，留空 = 不套模板"
-            aria-label="日记模板路径"
-            onChange={(event) => setDiaryTemplate(event.target.value)}
-          />
-        </label>
+            说明交给 placeholder 与 PRD 语义，不加 hint 不进 EXPLAIN_KEYS。
+            [设置页七项改造·批 3] 右侧加「选择文件…」：以前只能手打绝对路径，
+            99% 的人会打在错的目录里。选择结果**写进同一份草稿**（`setDiaryTemplate`），
+            与手打完全同一条路径 → 保存并同步时才落库，取消选择不动原值。 */}
+        <div className="sync__field">
+          <label className="sync__label" htmlFor="md-diary-template">日记模板路径</label>
+          <div className="sync__row">
+            <input
+              id="md-diary-template"
+              className="sync__input"
+              value={diaryTemplate}
+              disabled={saving}
+              spellCheck={false}
+              placeholder="如 %APP_DIR%\模板.md，留空 = 不套模板"
+              aria-label="日记模板路径"
+              onChange={(event) => setDiaryTemplate(event.target.value)}
+            />
+            <button
+              type="button"
+              className="btn btn--ghost"
+              disabled={saving || picking}
+              onClick={() => { void chooseTemplateFile(); }}
+            >
+              {picking ? '选择中…' : '选择文件…'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {bindings.map((binding, index) => {

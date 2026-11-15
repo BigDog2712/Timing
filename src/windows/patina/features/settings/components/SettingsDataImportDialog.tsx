@@ -7,6 +7,7 @@ import QuietConfirmDialog from "../../../shared/components/QuietConfirmDialog.ts
 import QuietDialog from "../../../shared/components/QuietDialog.tsx";
 import QuietIconAction from "../../../shared/components/QuietIconAction.tsx";
 import QuietTooltip from "../../../shared/components/QuietTooltip.tsx";
+import SettingsFullBundleImportCard from "./SettingsFullBundleImportCard.tsx";
 
 import type { ImportBatch, ImportPreview } from "../services/settingsImportService.ts";
 
@@ -23,6 +24,8 @@ interface Props {
   onShowBatches: () => void;
   onShowActions: () => void;
   onRemoveBatch: (batchId: string) => void;
+  /** [批 2] 完整数据包导入成功后让页面刷新（与 CSV 导入共用同一个回调）。 */
+  onImportedDataChanged?: () => void;
 }
 
 export default function SettingsDataImportDialog({
@@ -38,6 +41,7 @@ export default function SettingsDataImportDialog({
   onShowBatches,
   onShowActions,
   onRemoveBatch,
+  onImportedDataChanged,
 }: Props) {
   const UI_TEXT = useLocaleText();
   const [pendingDelete, setPendingDelete] = useState<ImportBatch | null>(null);
@@ -154,6 +158,8 @@ export default function SettingsDataImportDialog({
                 </div>
               </div>
             </QuietActionRow>
+            {/* [批 2] 完整数据包（单个 JSON）：预览 → 合并，自带状态。 */}
+            <SettingsFullBundleImportCard disabled={busy} onImported={onImportedDataChanged} />
           </div>
         ) : preview ? (
           <div className="settings-import-preview">
