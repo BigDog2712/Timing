@@ -38,7 +38,7 @@ Timing 0.12.0 起把 **Patina**（自动使用追踪 / 番茄 / 使用上限提�
   `src/windows/timing/services/ipc.ts` 的 ACL 注释都按它授权）；
 - 入口 HTML 是 `activity.html`（`WebviewUrl::App("activity.html")` 与 `vite.config.ts` 的
   `rollupOptions.input.activity`）；
-- 数据根仍是 `%APPDATA%\com.timing.app`，Patina 库在其下 `patina/data/patina.db`。
+- 数据根仍是 `%APPDATA%\com.timing.app`，活动库在其下 `activity/data/activity.db`。
 
 改前两样的代价是：老用户已经开着的窗口、快捷方式/书签会直接失联。所以结构归一那一轮**这两样没动**，
 它们与数据落点/库文件名一起，留在随后的 de-Patina 批次里单独改。
@@ -59,7 +59,7 @@ Timing 0.12.0 起把 **Patina**（自动使用追踪 / 番茄 / 使用上限提�
    托盘入口统一归宿主（宿主托盘「时间统计…」+ 设置页「通用 → 时间统计」）。
 4. 更新器摘除：不注册 `tauri-plugin-updater`、启动不做更新自检、capability 不含
    `updater:default`。上游更新端点指向 Patina 自己的仓库，留着会把 Timing 更新成 Patina。
-5. 数据落点：`<数据根>/patina/data/patina.db`（与 `timing.db` 并排），首启可从
+5. 数据落点：`<数据根>/activity/data/activity.db`（与 `timing.db` 并排），首启可从
    `%APPDATA%\Patina\patina.db` 导入一次（`VACUUM INTO`）。
 6. 宿主侧接线：`src-tauri/src/app/activity_bridge.rs`、`src-tauri/src/ipc_commands.rs`、
    `src-tauri/src/lib.rs` 的 setup / on_window_event / run 事件串联。
