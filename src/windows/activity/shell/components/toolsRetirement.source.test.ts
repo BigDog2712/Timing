@@ -254,10 +254,9 @@ describe("[T04] V-2h · tool-notification 投递链守门（Q4 = (A)）", () => 
   });
 
   test("V-2h · window-commands.toml 的 tool-notification-commands 段与基线逐字相同", () => {
-    /* 本轮 T03 等任务可能动该文件的其他段（如 patina-todo-notes）；保护的只有
+    /* 别的任务可能动该文件的其他段（如 activity-todo-notes）；保护的只有
      * `[[permission]] identifier = "tool-notification-commands"` 这一段（不是 TOML 表头）。
-     * 注意真实路径是 `src-tauri/permissions/`，设计文档写的 `src-tauri/src/permissions/`
-     * 多了一层 `src`（已报告）。 */
+     * 路径是 `src-tauri/permissions/` —— `tauri-build` 只扫这一层，`src-tauri/src/` 下没有。 */
     const section = (source: string) => {
       const lines = source.split("\n");
       const start = lines.findIndex((line) => line.trim() === 'identifier = "tool-notification-commands"');
