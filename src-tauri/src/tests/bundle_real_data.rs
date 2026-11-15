@@ -10,6 +10,7 @@
 //!
 //! 缺库就安静跳过（CI / 新机器没有 `%APPDATA%\com.timing.app`）。
 
+use crate::infra::activity::storage_paths;
 use crate::services::activity::data::bundle::{export_full_bundle, inspect_file};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Pool, Sqlite};
@@ -52,6 +53,17 @@ async fn open_read_only(path: &Path) -> Option<Pool<Sqlite>> {
         .ok()
 }
 
+/// 活动库在真机数据根下的路径。
+///
+/// `"patina"` 是**落盘坐标**（活动子系统在数据根下的目录名，T05 才动）；`data` 与库名
+/// 走 `storage_paths` 的常量 —— 夹具自己再写一份 `"patina.db"` 的话，改名那个提交里
+/// 夹具会继续指向老路径，于是「真机往返」这条判据静默变成「缺库跳过」。
+fn activity_db_path(root: &Path) -> PathBuf {
+    root.join("patina")
+        .join(storage_paths::DATA_SUBDIR)
+        .join(storage_paths::SQLITE_DB_FILE_NAME)
+}
+
 async fn count(pool: &Pool<Sqlite>, sql: &str) -> i64 {
     sqlx::query_scalar::<_, i64>(sql)
         .fetch_one(pool)
@@ -68,7 +80,7 @@ async fn bundle_real_counts_match_the_live_databases() {
     };
     let (Some(business), Some(activity)) = (
         open_read_only(&root.join("timing.db")).await,
-        open_read_only(&root.join("patina").join("data").join("patina.db")).await,
+        open_read_only(&activity_db_path(&root)).await,
     ) else {
         println!("跳过：两个库没有同时存在");
         return;
@@ -137,7 +149,7 @@ async fn a_real_bundle_imports_into_a_fresh_database() {
     };
     let (Some(business), Some(activity)) = (
         open_read_only(&root.join("timing.db")).await,
-        open_read_only(&root.join("patina").join("data").join("patina.db")).await,
+        open_read_only(&activity_db_path(&root)).await,
     ) else {
         println!("跳过：两个库没有同时存在");
         return;

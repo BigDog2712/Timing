@@ -34,6 +34,7 @@
 //! 失败是真的失败（不是「已经处理过」），返回 `Err` 且**不写**标记，下次启动重试。
 //! ①把闸拉下时连标记都不写：用户哪天把数据根挪回默认位置，首启导入应该还能正常工作。
 
+use crate::infra::activity::{app_paths, storage_paths};
 use std::path::{Path, PathBuf};
 
 /// 「首启导入已处理」标记的文件名（落在 `patina/data/` 里）。
@@ -65,8 +66,13 @@ pub(crate) fn seed_from(
     if marker.exists() {
         return Ok(None);
     }
-    /* 闸③：目标库在 → 这个根里本来就有历史，不需要也不该被另一份覆盖（兜底，保留）。 */
-    let target = data_dir.join("patina.db");
+    /* 闸③：目标库在 → 这个根里本来就有历史，不需要也不该被另一份覆盖（兜底，保留）。
+
+       这里**必须**引 `SQLITE_DB_FILE_NAME` 而不是写 `"patina.db"`：闸③ 的判断与下面
+       `write_marker` 是无条件的一对——库名翻新而这里仍是旧名时，干净的自定义根会被判
+       「该导」，上游历史被拷成旧名文件，标记照写，随后按新名读不到库 ⇒ 建空库，
+       而下次启动闸② 见标记在就直接返回 ⇒ **这次导入永久作废、用户侧不可自愈**。 */
+    let target = data_dir.join(storage_paths::SQLITE_DB_FILE_NAME);
     let imported = match source {
         Some(from) if !target.exists() => {
             copy_database(from, &target)?;
@@ -84,8 +90,15 @@ pub(crate) fn seed_from(
 }
 
 /// 独立安装的 Patina 的库文件（认不到就当没有）。
+///
+/// 两个值走 `app_paths::UPSTREAM_*`，与 `PRODUCT_FOLDER` / `SQLITE_DB_FILE_NAME` **分成
+/// 两套常量**：这里读的是**别人**的数据目录，永远不变；我们自己那两只会被 T05 改掉。
+/// 合并成一套的话，T05 之后首启导入会去 `%APPDATA%\Activity` 里找，那里什么都没有 ——
+/// 导入静默失效，且标记照写。
 fn upstream_database() -> Option<PathBuf> {
-    let candidate = dirs::data_dir()?.join("Patina").join("patina.db");
+    let candidate = dirs::data_dir()?
+        .join(app_paths::UPSTREAM_PRODUCT_FOLDER)
+        .join(app_paths::UPSTREAM_DB_FILE);
     candidate.is_file().then_some(candidate)
 }
 

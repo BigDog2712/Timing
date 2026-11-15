@@ -20,27 +20,37 @@ use std::path::Path;
 
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
-/// 活动库的文件名。
-pub(super) const DB_FILE: &str = "patina.db";
-/// 同一份库的伴生文件：它们必须和主文件**同一个时刻**，单独搬过去只会得到撕裂状态。
-const SIDECARS: [&str; 3] = ["patina.db-wal", "patina.db-shm", "patina.db-journal"];
+/* 活动库的文件名与伴生文件都**从 `storage_paths` 取**，本模块不再自带字面量。
+
+   为什么重要：这个文件是搬迁的**写侧**，而 `storage_paths` 是读侧的基准。两边各写
+   一份 `"patina.db"` 时今天恰好一致，改名的那个提交里就会分叉 —— 搬迁把新库写到
+   `activity.db`、核对却盯着 `patina.db`，表现为「切过去了但历史是空的」。 */
+use crate::infra::activity::storage_paths::{sqlite_sidecar_names, SQLITE_DB_FILE_NAME};
+
+/* `DB_FILE` 是给 `transfer.rs` 用的**别名**，不是第二份字面量：`transfer.rs` 正好贴着
+   300 行门禁，让它改 import 就必然涨到 301；而别名一行解决，且「库名只有一个真源」
+   照样成立（别名指向 `storage_paths::SQLITE_DB_FILE_NAME`）。 */
+pub(super) use crate::infra::activity::storage_paths::SQLITE_DB_FILE_NAME as DB_FILE;
 
 /// 复制 `<source>`（= `patina/data`）整个目录到 `<dest>`，返回搬过去的字节数。
 pub(super) async fn copy_activity_dir(source: &Path, dest: &Path) -> Result<u64, String> {
     fs::create_dir_all(dest).map_err(|err| format!("建不了 {}：{err}", dest.display()))?;
-    let from_db = source.join(DB_FILE);
+    let from_db = source.join(SQLITE_DB_FILE_NAME);
     if !from_db.is_file() {
         /* 首启还没建库的正常情况：目录里只剩 `diagnostics/` 之类，照原样拷（没有活的库，
         也就没有撕裂可言）。 */
         return super::transfer::copy_tree(source, dest);
     }
-    vacuum_into(&from_db, &dest.join(DB_FILE)).await?;
-    let mut bytes = fs::metadata(dest.join(DB_FILE)).map_or(0, |meta| meta.len());
+    vacuum_into(&from_db, &dest.join(SQLITE_DB_FILE_NAME)).await?;
+    let mut bytes = fs::metadata(dest.join(SQLITE_DB_FILE_NAME)).map_or(0, |meta| meta.len());
+    /* 伴生文件按 `SQLITE_DB_FILE_NAME` 现场派生：手写 `patina.db-wal` 会在库名改名时
+    静默失效，于是 `-wal` 被当成普通文件搬过去（别处拷走的是撕裂的那一页）。 */
+    let sidecars = sqlite_sidecar_names();
     let items =
         fs::read_dir(source).map_err(|err| format!("读不了 {}：{err}", source.display()))?;
     for item in items.flatten() {
         let name = item.file_name().to_string_lossy().into_owned();
-        if name == DB_FILE || SIDECARS.contains(&name.as_str()) {
+        if name == SQLITE_DB_FILE_NAME || sidecars.iter().any(|side| side == &name) {
             continue;
         }
         let path = item.path();
@@ -128,9 +138,9 @@ pub(super) async fn recover_legacy(current: &Path, legacy: Option<&Path>, dest: 
     let from_dir = Path::new(legacy).join(super::transfer::ACTIVITY_DIR);
     let already_there = current
         .join(super::transfer::ACTIVITY_DIR)
-        .join(DB_FILE)
+        .join(SQLITE_DB_FILE_NAME)
         .exists();
-    if already_there || !from_dir.join(DB_FILE).is_file() {
+    if already_there || !from_dir.join(SQLITE_DB_FILE_NAME).is_file() {
         return;
     }
     let to = dest.join(super::transfer::ACTIVITY_DIR);

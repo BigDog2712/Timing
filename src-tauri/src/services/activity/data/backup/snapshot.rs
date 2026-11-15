@@ -9,7 +9,7 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Pool, Row, Sqlite};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, File};
-use std::io::{Read, Seek, Write};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::AppHandle;
@@ -19,16 +19,27 @@ use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
 #[cfg(test)]
 mod merge_tests;
+#[cfg(test)]
+mod legacy_format_tests;
 mod restore;
 #[cfg(test)]
 mod widget_retirement_tests;
 
 pub(super) use restore::{prepare_snapshot_backup, restore_snapshot_backup};
 
-pub(super) const SNAPSHOT_FORMAT: &str = "PatinaSQLiteSnapshot-1";
-const MANIFEST_ENTRY: &str = "manifest.json";
-const CHECKSUMS_ENTRY: &str = "checksums.json";
-const DATABASE_ENTRY: &str = "database/patina.db";
+/* 存档的格式契约（条目名 / format / product / 摘要算法 / 回滚策略）全部住在
+   `snapshot/manifest_contract.rs`：那几个字面量已写进用户已有的备份文件里，
+   放在单独文件里才写清「为什么不能改」。这里只做再导出，让既有调用点
+   （`prepared_source` 的 `is_snapshot_archive`、本文件与测试里的条目名）不变。 */
+mod manifest_contract;
+pub(super) use manifest_contract::{
+    is_snapshot_archive, CHECKSUMS_ENTRY, DATABASE_ENTRY, MANIFEST_ENTRY, SNAPSHOT_FORMAT,
+};
+use manifest_contract::{
+    supported_database_entries, supported_manifest, CHECKSUM_ALGORITHM, SNAPSHOT_PRODUCT,
+    SUPPORTED_RESTORE_STRATEGIES,
+};
+
 const MAX_METADATA_BYTES: u64 = 256 * 1024;
 pub(crate) const MAX_DATABASE_BYTES: u64 = 512 * 1024 * 1024;
 static UNIQUE_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -636,8 +647,8 @@ async fn write_snapshot_archive_internal(
         .unwrap_or_else(|| Path::new("."));
     fs::create_dir_all(parent)
         .map_err(|error| format!("failed to create backup target directory: {error}"))?;
-    let work_dir = create_private_work_dir(parent, "patina-snapshot")?;
-    let db_path = work_dir.join("patina.db");
+    let work_dir = create_private_work_dir(parent, "activity-snapshot")?;
+    let db_path = work_dir.join(crate::infra::activity::storage_paths::SQLITE_DB_FILE_NAME);
     let archive_path = work_dir.join("backup.zip");
     let result = async {
         sqlx::query("VACUUM INTO ?")
@@ -654,7 +665,7 @@ async fn write_snapshot_archive_internal(
         let database_sha256 = sha256_file(&db_path)?;
         let manifest = SnapshotManifest {
             format: SNAPSHOT_FORMAT.to_string(),
-            product: "Patina".to_string(),
+            product: SNAPSHOT_PRODUCT.to_string(),
             created_at_ms: now_ms(),
             app_version: app_version.to_string(),
             database: SnapshotDatabaseManifest {
@@ -665,7 +676,10 @@ async fn write_snapshot_archive_internal(
                 migration_fingerprint,
             },
             restore: SnapshotRestoreManifest {
-                strategies: vec!["replace".to_string(), "merge".to_string()],
+                strategies: SUPPORTED_RESTORE_STRATEGIES
+                    .iter()
+                    .map(|strategy| strategy.to_string())
+                    .collect(),
             },
             counts,
         };
@@ -675,7 +689,7 @@ async fn write_snapshot_archive_internal(
         checksum_files.insert(MANIFEST_ENTRY.to_string(), sha256_bytes(&manifest_bytes));
         checksum_files.insert(DATABASE_ENTRY.to_string(), database_sha256);
         let checksum_bytes = serde_json::to_vec_pretty(&SnapshotChecksums {
-            algorithm: "sha256".to_string(),
+            algorithm: CHECKSUM_ALGORITHM.to_string(),
             files: checksum_files,
         })
         .map_err(|error| format!("failed to serialize snapshot checksums: {error}"))?;
@@ -746,37 +760,13 @@ fn read_metadata_entry(archive: &mut ZipArchive<File>, name: &str) -> Result<Vec
     Ok(bytes)
 }
 
-pub(super) fn is_snapshot_archive(path: &Path) -> Result<bool, String> {
-    let mut file = File::open(path)
-        .map_err(|error| format!("failed to open backup file `{}`: {error}", path.display()))?;
-    let mut magic = [0_u8; 2];
-    if file.read_exact(&mut magic).is_err() || magic != *b"PK" {
-        return Ok(false);
-    }
-    file.rewind()
-        .map_err(|error| format!("failed to inspect backup file: {error}"))?;
-    let mut archive = ZipArchive::new(file).map_err(|error| {
-        format!(
-            "failed to open backup archive `{}`: {error}",
-            path.display()
-        )
-    })?;
-    let manifest_bytes = match read_metadata_entry(&mut archive, MANIFEST_ENTRY) {
-        Ok(bytes) => bytes,
-        Err(_) => return Ok(false),
-    };
-    let value: serde_json::Value = serde_json::from_slice(&manifest_bytes)
-        .map_err(|error| format!("failed to parse backup manifest: {error}"))?;
-    Ok(value.get("format").and_then(|value| value.as_str()) == Some(SNAPSHOT_FORMAT))
-}
-
 pub(super) async fn extract_snapshot_archive(
     backup_path: &Path,
     full_check: bool,
 ) -> Result<ExtractedSnapshot, String> {
     let parent = std::env::temp_dir();
-    let work_dir = create_private_work_dir(&parent, "patina-restore")?;
-    let db_path = work_dir.join("patina.db");
+    let work_dir = create_private_work_dir(&parent, "activity-restore")?;
+    let db_path = work_dir.join(crate::infra::activity::storage_paths::SQLITE_DB_FILE_NAME);
     let result = async {
         let file = File::open(backup_path).map_err(|error| {
             format!(
@@ -809,12 +799,18 @@ pub(super) async fn extract_snapshot_archive(
                 return Err("snapshot archive contains an unsafe or duplicate path".to_string());
             }
         }
-        let expected = BTreeSet::from([
-            MANIFEST_ENTRY.to_string(),
-            CHECKSUMS_ENTRY.to_string(),
-            DATABASE_ENTRY.to_string(),
-        ]);
-        if names != expected {
+        /* 这一步发生在 manifest 解析**之前**，拿不到声明值，所以只能验「集合形状」：
+           必须含 `manifest.json` 与 `checksums.json`，第三项必须是**允许的**库条目名。
+           真值以 manifest 里声明的那个为准（见下面 `database_entry` 的复核）。 */
+        if !names.contains(MANIFEST_ENTRY) || !names.contains(CHECKSUMS_ENTRY) {
+            return Err("snapshot archive has an unexpected file set".to_string());
+        }
+        let database_name = names
+            .iter()
+            .find(|name| name.as_str() != MANIFEST_ENTRY && name.as_str() != CHECKSUMS_ENTRY)
+            .cloned()
+            .ok_or_else(|| "snapshot archive has an unexpected file set".to_string())?;
+        if !supported_database_entries().contains(&database_name) {
             return Err("snapshot archive has an unexpected file set".to_string());
         }
         let manifest_bytes = read_metadata_entry(&mut archive, MANIFEST_ENTRY)?;
@@ -823,17 +819,20 @@ pub(super) async fn extract_snapshot_archive(
             .map_err(|error| format!("failed to parse snapshot manifest: {error}"))?;
         let checksums: SnapshotChecksums = serde_json::from_slice(&checksum_bytes)
             .map_err(|error| format!("failed to parse snapshot checksums: {error}"))?;
-        if manifest.format != SNAPSHOT_FORMAT
-            || manifest.product != "Patina"
-            || manifest.database.path != DATABASE_ENTRY
-            || checksums.algorithm != "sha256"
-            || manifest.restore.strategies != vec!["replace".to_string(), "merge".to_string()]
-        {
+        if !supported_manifest(&manifest, &checksums) {
             return Err("snapshot manifest is not supported".to_string());
         }
+        /* manifest 声明的条目名必须**就是**刚在 zip 里看到的那个：否则集合判定
+           与声明值会各走各的，后面查表该用哪个都说不清（而且是静默的）。 */
+        if manifest.database.path != database_name {
+            return Err("snapshot manifest is not supported".to_string());
+        }
+        /* 以下一律用已解析出的 `database_entry`，不再用 `DATABASE_ENTRY` 常量：
+           它是查表键，必须与 manifest 声明一致；常量只是「今天唯一的合法值」。 */
+        let database_entry = database_name.as_str();
         let checksum_names = checksums.files.keys().cloned().collect::<BTreeSet<_>>();
         let expected_checksum_names =
-            BTreeSet::from([MANIFEST_ENTRY.to_string(), DATABASE_ENTRY.to_string()]);
+            BTreeSet::from([MANIFEST_ENTRY.to_string(), database_entry.to_string()]);
         if checksum_names != expected_checksum_names {
             return Err("snapshot checksum file set is invalid".to_string());
         }
@@ -845,7 +844,7 @@ pub(super) async fn extract_snapshot_archive(
             return Err("snapshot manifest checksum mismatch".to_string());
         }
         let db_entry = archive
-            .by_name(DATABASE_ENTRY)
+            .by_name(database_entry)
             .map_err(|error| format!("snapshot database is missing: {error}"))?;
         if db_entry.size() == 0
             || db_entry.size() > MAX_DATABASE_BYTES
@@ -866,7 +865,7 @@ pub(super) async fn extract_snapshot_archive(
         let digest = sha256_file(&db_path)?;
         let checksum_digest = checksums
             .files
-            .get(DATABASE_ENTRY)
+            .get(database_entry)
             .ok_or_else(|| "snapshot database checksum is missing".to_string())?;
         if digest != manifest.database.sha256 || &digest != checksum_digest {
             return Err("snapshot database checksum mismatch".to_string());

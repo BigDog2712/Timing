@@ -2,7 +2,24 @@ use crate::infra::activity::{app_paths, storage_control};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Runtime};
 
+/// 活动库的**唯一真源**。
+///
+/// ⚠️ 这是**已落盘坐标**：它同时是用户磁盘上的文件名、`_sqlx_migrations` 之外一切
+/// 搬迁/备份/核对的基准。改名必须与一次数据迁移同时做（T05），单独改这里等于让
+/// 同一进程去开两个库文件。
 pub const SQLITE_DB_FILE_NAME: &str = "patina.db";
+
+/// 活动数据在数据根下的子目录名（`<数据根>/patina/data`）。
+pub const DATA_SUBDIR: &str = "data";
+
+/// 活动库的三个伴生文件：`-wal` / `-shm` / `-journal`。
+///
+/// **由 `SQLITE_DB_FILE_NAME` 派生，不许再写字面量。** 库名与伴生名一旦分叉，
+/// 数据根搬迁时会把 `-wal` 当成普通文件拷过去（得到撕裂的一页），或反过来漏掉它。
+pub fn sqlite_sidecar_names() -> [String; 3] {
+    ["-wal", "-shm", "-journal"].map(|suffix| format!("{SQLITE_DB_FILE_NAME}{suffix}"))
+}
+
 const BACKUP_DIR_NAME: &str = "backups";
 const REMOTE_BACKUP_TEMP_DIR_NAME: &str = "remote-backup-temp";
 
@@ -200,6 +217,22 @@ mod tests {
         assert_eq!(
             derive_custom_data_root(Path::new("D:\\Storage\\Patina"), "Patina"),
             PathBuf::from("D:\\Storage\\Patina")
+        );
+    }
+
+    #[test]
+    fn custom_data_root_still_honours_the_shipped_product_folder_name() {
+        /* 这条锁的是 `PRODUCT_FOLDER` 的**后果**，值锁在 `app_paths` 的
+        `product_and_identifier_coordinates_are_frozen` 里。为什么两处都要：用户选根时
+        选成 `D:\Patina`，`derive_custom_data_root` 必须认作「已经是产品目录」而不再拼一层。
+        `PRODUCT_FOLDER` 一改名，同一句话就变成 `D:\Patina\NewName` —— 数据根静默搬家，
+        用户在设置页看到的是「已切换」而历史全空。
+
+        传真实常量而不是字面量：传字面量的话它只测到 `product_folder_name_eq` 的实现，
+        `PRODUCT_FOLDER` 改了照样绿。 */
+        assert_eq!(
+            derive_custom_data_root(Path::new(r"D:\Patina"), app_paths::PRODUCT_FOLDER),
+            PathBuf::from(r"D:\Patina")
         );
     }
 

@@ -25,6 +25,15 @@ pub const IDENTIFIER_PROD: &str = "com.ceceliaee.patina";
 pub const IDENTIFIER_LOCAL: &str = "com.ceceliaee.patina.local";
 pub const IDENTIFIER_DEV: &str = "com.ceceliaee.patina.dev";
 
+/// **上游**（用户自己独立安装的 Patina）的数据目录名。永久冻结。
+///
+/// 与 `PRODUCT_FOLDER` 分成两个常量，不是为了整洁能合并的那种重复：`PRODUCT_FOLDER`
+/// 是**我们自己**的坐标（T05 会翻），上游目录是**别人**的坐标（永不翻）。合并成一个，
+/// 首启导入就会去 `%APPDATA%\<新名>` 里找历史——那里什么都没有，导入静默失效。
+pub const UPSTREAM_PRODUCT_FOLDER: &str = "Patina";
+/// **上游**的库文件名（`%APPDATA%\Patina\patina.db`）。永久冻结，理由同上。
+pub const UPSTREAM_DB_FILE: &str = "patina.db";
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AppProfile {
     Production,
@@ -255,5 +264,31 @@ mod tests {
         assert_eq!(AppProfile::Production.key(), "production");
         assert_eq!(AppProfile::Local.key(), "local");
         assert_eq!(AppProfile::Dev.key(), "dev");
+    }
+
+    #[test]
+    fn product_and_identifier_coordinates_are_frozen() {
+        /* 这 6 个值是**外部坐标**：安装目录 / 注册表键 / 凭证键 / WebView 缓存目录全由
+        它们派生。改动不是「文案变了」，而是老用户的数据与凭证整体失联 —— 且多数路径
+        是静默的（`webview_cache` 直接按目录名定位、凭证 target 由 identifier 拼出来）。
+        字面量就是判据本体：不许推导（`PRODUCT_FOLDER` 与 `PRODUCT_FOLDER_LOCAL` 若按
+        前缀拼出来，两个值一起漂也不会报）。 */
+        assert_eq!(PRODUCT_FOLDER, "Patina");
+        assert_eq!(PRODUCT_FOLDER_LOCAL, "Patina Local");
+        assert_eq!(PRODUCT_FOLDER_DEV, "Patina Dev");
+        assert_eq!(IDENTIFIER_PROD, "com.ceceliaee.patina");
+        assert_eq!(IDENTIFIER_LOCAL, "com.ceceliaee.patina.local");
+        assert_eq!(IDENTIFIER_DEV, "com.ceceliaee.patina.dev");
+    }
+
+    #[test]
+    fn upstream_coordinates_are_frozen() {
+        // 上游源库是**别人的**安装位置（独立安装的 Patina），永久冻结。
+        assert_eq!(UPSTREAM_PRODUCT_FOLDER, "Patina");
+        assert_eq!(UPSTREAM_DB_FILE, "patina.db");
+        // 注：`assert_ne!(UPSTREAM_DB_FILE, SQLITE_DB_FILE_NAME)` 这条**不能**在本批加
+        // —— T02a 阶段两个常量合法地同值（都是 "patina.db"），只有 T05 把
+        // `SQLITE_DB_FILE_NAME` 翻成 "activity.db" 之后它们才分叉。
+        // 那条防「为整洁把两个常量合并」的断言随 T05 一起加，届时才可能为真。
     }
 }

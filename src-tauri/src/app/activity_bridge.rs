@@ -54,9 +54,14 @@ pub fn prepare(identifier: &str) -> Result<Option<PathBuf>, String> {
 /// Patina 尚未建库）时会在下一次调用重试，而不是永久缓存一个「没有」。
 static ACTIVITY_POOL: tokio::sync::OnceCell<sqlx::SqlitePool> = tokio::sync::OnceCell::const_new();
 
-/// `patina.db` 的绝对路径。
+/// 活动库的绝对路径。
+///
+/// `"data"` 与 `"patina.db"` 都走 `storage_paths` 的常量，不在这里另写一份：
+/// 库名是**单真源**，任何一处自带字面量都会在改名时与主路径分叉，导致同进程
+/// 开两个库文件（一个新建、一个已存在，WAL 互不锁）。
 fn activity_db_path() -> PathBuf {
-    activity_root().join("data").join("patina.db")
+    use crate::infra::activity::storage_paths::{DATA_SUBDIR, SQLITE_DB_FILE_NAME};
+    activity_root().join(DATA_SUBDIR).join(SQLITE_DB_FILE_NAME)
 }
 
 /// 活动库连接池：只读、单连接、懒建。**导出全额数据包也用它**（`bundle_cmd`），

@@ -698,7 +698,7 @@ fn validate_target_data_root(
         if matches!(mode, TargetDataRootMode::Custom)
             && storage_paths::db_path_for_data_root(target).exists()
         {
-            return Err("target data directory already contains patina.db".to_string());
+            return Err(format!("target data directory already contains {}", storage_paths::SQLITE_DB_FILE_NAME));
         }
     }
 
