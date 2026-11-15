@@ -65,6 +65,12 @@ jobs:
       - name: 运行时标识符（窗口 label / 入口页 / 前端常量三处一致）
         run: npm run check:runtime-ids
 
+      # [T04-4] 存储键改名判据：patina:/patina. 字面量只住注册表、24 槽双向一致、
+      # 迁移只复制不删、迁移零循环。键改名的失效形态是静默的（读不到⇒默认值），
+      # 这条把"谁又写了一个 patina 字面量"变成当场红。
+      - name: 存储键注册表（patina 字面量只住声明行 + 槽账本双向一致）
+        run: npm run check:storage-keys
+
   frontend:
     name: 前端 · 类型 / Lint / 测试 / 构建
     runs-on: windows-latest
