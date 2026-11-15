@@ -68,8 +68,11 @@ pub async fn ensure_self(pool: &Pool<Sqlite>, install_id: &str) -> Result<(), St
 /// 「登记缓存」这一步不能省：`identity::install_id()` 是计时事件流唯一的取值来源，
 /// 它填不上就等于所有事件都没有 `device_id`（→ uid 恒 NULL → 永不同步，且零报错）。
 pub async fn startup_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
-    let install_id = crate::services::identity::load_install_id()?;
-    crate::services::identity::remember_install_id(&install_id);
+    /* 以缓存里的那一份为准：认领历史行与新写入的行必须是同一个 `device_id`，
+       否则同一台机器会出现两个设备（见 `identity::remember_and_lock_install_id`）。 */
+    let install_id = crate::services::identity::remember_and_lock_install_id(
+        crate::services::identity::load_install_id()?,
+    );
     let adopted = crate::services::insight::schema_core::adopt_local_rows(pool, &install_id).await?;
     if adopted > 0 {
         crate::log_info!("adopted {adopted} local activity row(s) into device {install_id}");
@@ -78,7 +81,9 @@ pub async fn startup_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
     Ok(install_id)
 }
 
-/// 业务库（`timing.db`）的身份接线：把 `time_records.device_id = ''` 认领到本机并补 `uid`。
+/// 业务库（`timing.db`）的身份接线：把四张带 uid 语义的表（`items` / `time_records` /
+/// `item_app` / `timer_ops`，清单见 `schema_core::ensure` 的 `BUSINESS_UID_ADOPTIONS`）里
+/// `device_id = ''` 的行认领到本机，并让库补出 `uid`。
 ///
 /// 与 [`startup_identity`] 分开是因为两个库走两个池、两条初始化路径（业务库在
 /// `app::bootstrap`，活动库在 `sqlite_pool::prepare_pool_schema`）。身份本身是同一份：
@@ -88,66 +93,16 @@ pub async fn startup_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
 /// ⚠️ 必须在 `infra::db::init_pool`（迁移）之后调：列是迁移加的。调用点放在
 /// `app::bootstrap` 而不是 `infra` 层，因为 `check-layers` 的 L4 不许 `infra` 依赖 `services`。
 pub async fn startup_business_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
-    let install_id = crate::services::identity::load_install_id()?;
-    crate::services::identity::remember_install_id(&install_id);
+    /* 同 [`startup_identity`]：认领时用的 `device_id` 必须与缓存一致，否则被认领的历史行
+       与之后新建的行会落在两台「设备」上。 */
+    let install_id = crate::services::identity::remember_and_lock_install_id(
+        crate::services::identity::load_install_id()?,
+    );
     let adopted = crate::services::insight::schema_core::adopt_business_rows(pool, &install_id).await?;
     if adopted > 0 {
-        crate::log_info!("adopted {adopted} local time record(s) into device {install_id}");
+        crate::log_info!("adopted {adopted} local business row(s) into device {install_id}");
     }
     Ok(install_id)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// 业务库的认领：哨兵 `''` → 本机，`uid` 由 `t:` 前缀发出，重复跑不改值。
-    #[test]
-    fn business_identity_adopts_sentinel_rows_and_mints_time_record_uids() {
-        tauri::async_runtime::block_on(async {
-            let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
-            crate::infra::migrate::migrate(&pool).await.unwrap();
-            sqlx::query(
-                "INSERT INTO time_records (item_id, status, started_at, ended_at, created_at, updated_at)
-                 VALUES (1, 'saved', 1000, 2000, 1000, 1000)",
-            )
-            .execute(&pool)
-            .await
-            .unwrap();
-
-            let install_id = startup_business_identity(&pool).await.unwrap();
-            let (device_id, uid): (String, Option<String>) =
-                sqlx::query_as("SELECT device_id, uid FROM time_records")
-                    .fetch_one(&pool)
-                    .await
-                    .unwrap();
-            assert_eq!(device_id, install_id);
-            assert_eq!(uid.as_deref(), Some(format!("t:{install_id}:1").as_str()));
-
-            // 幂等：第二次启动不改任何值，也不再产生新的 uid。
-            startup_business_identity(&pool).await.unwrap();
-            let again: (String, Option<String>) =
-                sqlx::query_as("SELECT device_id, uid FROM time_records")
-                    .fetch_one(&pool)
-                    .await
-                    .unwrap();
-            assert_eq!((again.0, again.1), (device_id, uid));
-        });
-    }
-
-    /// 启动接线必须把身份登记进缓存 —— 这是计时事件流唯一的取值来源。
-    ///
-    /// 没有这条断言，「缓存没填」的表现是「所有计时事件 `device_id` 为空、uid 恒 NULL、
-    /// 永远不同步」，而且零报错。用例必须跑在**没有别的用例填过缓存**的前提下才有意义，
-    /// 所以它断言的是「登记后能读到同一个值」而不是「首次调用能生成」。
-    #[test]
-    fn startup_registers_the_identity_for_the_timer_event_stream() {
-        tauri::async_runtime::block_on(async {
-            let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
-            crate::infra::migrate::migrate(&pool).await.unwrap();
-            let install_id = startup_business_identity(&pool).await.unwrap();
-            assert_eq!(crate::services::identity::install_id(), Some(install_id.as_str()));
-            assert!(crate::services::identity::is_valid(install_id.as_str()));
-        });
-    }
-}
+/* 判据（认领哨兵行 / 发 uid / 四张表全覆盖）在 `device_tests.rs`：正文贴着 300 行门禁。 */

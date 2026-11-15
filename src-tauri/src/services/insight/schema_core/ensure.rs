@@ -147,17 +147,49 @@ pub async fn adopt_local_rows(pool: &Pool<Sqlite>, device_id: &str) -> Result<u6
     adopt_rows(pool, "sessions", "s:", device_id).await
 }
 
-/// 同一件事，做在业务库的 `time_records` 上（设计 §3.4：`timing.db` 也要认领）。
+/// 业务库里**全部带 `uid` 语义的四张表**与各自的 `uid` 前缀（设计 §3.4：`timing.db`
+/// 也要认领）。
 ///
-/// 为什么不把两张表塞进一个"表名参数化"的公开函数：`uid` 前缀（`s:` / `t:`）与唯一索引
-/// 名都不同，合并只会把「哪张表用哪个前缀」变成运行时才知道的事。
+/// 这张表必须是**本文件里的字面量**：`table` / `prefix` 一旦能由外部传入，`UPDATE {table}`
+/// 就成了运行时可拼接的 SQL，而「哪张表配哪个前缀」也会变成只有跑起来才知道的事
+/// （前缀写错不会报错，只会让那批行的 uid 与触发器的口径不一致、同步时两边对不上）。
+///
+/// 为什么只有这四张：
+/// · 它们的建表 / 加列里都有 `device_id` + `uid` + 触发器（`migrations/0011…`、
+///   `migrations/0009…` 的 `trg_*_uid`），也就是「一行只有一个属主」的设备维度；
+/// · `notes` / `todos` / `settings` / `app_usage*` **没有 `uid` 列**，不在设备维度里
+///   —— 不给它们造一个 `uid` 是刻意的（那是新功能，不是修数据）。
+///
+/// 顺序无关（各表互相独立，`adopt_rows` 每次都是独立的事务语句）。
+const BUSINESS_UID_ADOPTIONS: &[(&str, &str)] = &[
+    ("items", "i:"),
+    ("time_records", "t:"),
+    ("item_app", "b:"),
+    ("timer_ops", "p:"),
+];
+
+/// 同一件事，做在业务库那**四张带 uid 的表**上：把迁移期哨兵 `device_id = ''` 认领到
+/// 本机，并让库补出 `uid`（表清单见 [`BUSINESS_UID_ADOPTIONS`]）。
+///
+/// 为什么要遍历整表而不是只认领 `time_records`：漏一张表**不会报任何错**。表现是那张表
+/// 的历史行 `uid` 恒 NULL（触发器的 `WHEN NEW.uid IS NULL AND TRIM(NEW.device_id) <> ''`
+/// 在 `device_id` 为空串时不成立）⇒ 那些行永不导出、永不参与跨设备同步。真机上
+/// `items` 的 22 行就是这么静默丢了身份的。
+///
+/// 返回四张表认领到的行数之和；**任何一张表失败都立刻 `?` 冒泡**，不吞错：认领失败
+/// 意味着那批行还是没有属主，装作成功只会把问题推迟到「同步时少了一半数据」。
 pub async fn adopt_business_rows(pool: &Pool<Sqlite>, device_id: &str) -> Result<u64, String> {
-    adopt_rows(pool, "time_records", "t:", device_id).await
+    let mut adopted = 0_u64;
+    for &(table, prefix) in BUSINESS_UID_ADOPTIONS {
+        adopted += adopt_rows(pool, table, prefix, device_id).await?;
+    }
+    Ok(adopted)
 }
 
 /// 认领 + 补 `uid` 的共用实现。`table` / `prefix` 只接受本文件里的字面量。
 ///
-/// ⚠️ `uid` 回填前**先查重**：`uq_sessions_uid` / `uq_time_records_uid` 是唯一索引，一旦某条
+/// ⚠️ `uid` 回填前**先查重**：`uq_sessions_uid` / `uq_time_records_uid` / `uq_items_uid` /
+/// `uq_item_app_uid` / `uq_timer_ops_uid` 都是部分唯一索引，一旦某条
 /// 待回填的 `<前缀>||device_id||':'||id` 撞上库里已有的 uid（手工改过库的历史脏数据），
 /// 整条 UPDATE 会因唯一约束失败、启动直接挂。有冲突就**不写**、只 WARN，留人工处理
 /// —— 静默跳过是更坏的选择（那会让行永远没有 uid，P4 的分片里就少这一行）。

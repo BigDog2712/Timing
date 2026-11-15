@@ -107,11 +107,18 @@ pub struct NewItem<'a> {
 ///
 /// `depth` 由调用方算好传进来（`services::item` 是分层规则的唯一入口）：
 /// 仓储层不该知道「2 层硬限」这条业务规则，否则规则会有第二个实现。
+///
+/// ⚠️ `device_id` 必须显式写：`uid`（`i:<device>:<id>`）由 `trg_items_uid` 这个
+/// AFTER INSERT 触发器按它拼出来，漏写就永远发不出 uid（`WHEN NEW.uid IS NULL AND
+/// TRIM(NEW.device_id) <> ''` 不成立）⇒ 该行永不导出、永不参与跨设备同步，且零报错、
+/// 零红测试。取不到身份时退化成哨兵 `''` 而不是报错：新建事项必须能建，交给下次启动的
+/// `services::device::startup_business_identity` 认领兜底（与 `insert_active` 同一约定）。
 pub async fn insert(pool: &SqlitePool, new: NewItem<'_>) -> AppResult<i64> {
+    let device_id = crate::services::identity::install_id().unwrap_or_default();
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO items (name, color, status, is_system, sort_order, created_at, updated_at, \
-                            parent_id, depth, category_key) \
-         VALUES (?, ?, 'active', 0, ?, ?, ?, ?, ?, ?) RETURNING id",
+                            parent_id, depth, category_key, device_id) \
+         VALUES (?, ?, 'active', 0, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
     )
     .bind(new.name)
     .bind(new.color)
@@ -121,6 +128,7 @@ pub async fn insert(pool: &SqlitePool, new: NewItem<'_>) -> AppResult<i64> {
     .bind(new.parent_id)
     .bind(new.depth)
     .bind(new.category_key)
+    .bind(device_id)
     .fetch_one(pool)
     .await?;
     Ok(id)

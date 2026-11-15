@@ -1,8 +1,11 @@
 //! [批 2 · 返工] uid 为空的行：**合成 uid** 的两条可执行判据。
 //!
-//! 背景（`synth.rs` 文件头有完整版）：`adopt_business_rows` 只认领 `time_records`，
-//! 真机 `items` 的 `uid` 至今全空。老写法「uid 为空 → `INSERT OR IGNORE` 且保留 `id`」
-//! 会让换机导入按自增 id 幂等 —— 撞上目标库种子就**静默丢一行**。
+//! 背景（`synth.rs` 文件头有完整版）：`uid` 由 AFTER INSERT 触发器按 `device_id` 发，
+//! 旧版本的 `items` 插入点漏写了 `device_id` ⇒ 那批行 `uid` 全空。启动认领现已覆盖
+//! `items` / `time_records` / `item_app` / `timer_ops` 四张表（`BUSINESS_UID_ADOPTIONS`），
+//! 但它只修**本机**的库，修不了「别的设备在升级前导出的包」，所以导入侧仍要自己兜。
+//! 老写法「uid 为空 → `INSERT OR IGNORE` 且保留 `id`」会让换机导入按自增 id 幂等
+//! —— 撞上目标库种子就**静默丢一行**。
 //!
 //! · ③ 源行 uid 为空、包里有 `id` → 导入后 uid 非空、形状与触发器同格式、重复导入稳定；
 //! · ④ 连原始 `id` 都没有 → 继续退化成 `INSERT OR IGNORE`（不报错、不合成、不会凭空

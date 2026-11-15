@@ -27,6 +27,10 @@ mod bundle;
 mod bundle_real_data;
 /* [批 2 · 返工] uid 为空的行：合成 uid 后非空且稳定 / 无 id 的退化路径。 */
 mod bundle_uid;
+/* [BugFix 设备维度] 真机库副本上的认领验收（`#[ignore]`：原库只读，只写副本）：
+   items 那批 uid NULL 的历史行能不能拿到 `i:<install>:<id>`。 */
+#[cfg(desktop)]
+mod business_uid_real_data;
 /* [批 2 · 决策 2] 「定时备份」不许再自己跑：两条源码哨兵（配置读取恒未配置）。 */
 mod scheduled_backup_off;
 mod countdown;

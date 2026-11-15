@@ -113,6 +113,29 @@ pub fn remember_install_id(install_id: &str) {
     let _ = INSTALL_ID.set(Some(install_id.to_string()));
 }
 
+/// 登记本机身份，并返回**本进程接下来真会用的那一份**（以缓存为准）。
+///
+/// ## 为什么不能直接用调用方手上那一个
+///
+/// [`remember_install_id`] 是「先到先得」：`OnceLock::set` 后续失败被忽略，所以
+/// 传进去的 `candidate` 未必真的进了缓存。一旦两者不同，这次启动就会拿 `candidate`
+/// 去认领历史行，而之后新写入的行用的是缓存里那个 ⇒ **同一台机器出现两个
+/// `device_id`**：历史行被认领到一台「不存在」的设备上，新行归属另一台，
+/// 同步时分片对不上，而两边都不报错。
+///
+/// 这不是假想：`ensure_install_id` 的并发写者各自 rename，落盘值以最后一个为准，
+/// 于是「同时解析身份的两个线程」可以读到两个不同的值（两个池的启动接线一起跑、
+/// 或身份文件刚被创建时都会命中）。所以对外只认缓存 —— 它是本进程接下来每条行都会
+/// 写下的那个值。
+pub fn remember_and_lock_install_id(candidate: String) -> String {
+    remember_install_id(&candidate);
+    match install_id() {
+        Some(cached) => cached.to_string(),
+        /* 缓存里明确是 `None`（读写失败降级）时没有更权威的值，用读到的这一份。 */
+        None => candidate,
+    }
+}
+
 /// 本地日键（`YYYY-MM-DD`，本地时区）。
 ///
 /// 与 `activity_daily_totals.day_key` 和远端分片名 `day-YYYY-MM-DD.jsonl` 同一个口径：

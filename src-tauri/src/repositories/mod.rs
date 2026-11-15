@@ -1,6 +1,10 @@
 //! 数据访问层：仅 SQL + 行映射，不含业务规则。
 
 pub mod item;
+/* 写入口判据（`insert` 必须自己写 `device_id`，否则 uid 永远发不出来）。
+   拆出来是因为 `item.rs` 正文贴近单文件 300 行门禁，与 `timer_ops_tests` 同一套挂法。 */
+#[cfg(test)]
+mod item_tests;
 /* [0.13.x] 事项 ↔ 应用绑定：幂等绑定 / 解绑 / 正反两向查询。 */
 pub mod item_app;
 pub mod md_cloud_pending;

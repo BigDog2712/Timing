@@ -182,9 +182,13 @@ async fn a_real_bundle_imports_into_a_fresh_database() {
 
     /* 判据 ①（原话是「导入后 `SELECT COUNT(*) FROM items WHERE uid IS NULL` = 0」，实现
        口径要说清楚）：新装库自带一条种子事项（`id=1`、`uid` 空、`device_id` 空串），
-       它不是导入产生的、`adopt_business_rows` 也不认领它 —— 所以「= 0」唯一能成立的
-       形态是**除种子外为 0**。合成 uid 上线后，包里的每一行都拿到了
-       `i:<包里 deviceId>:<包里的原始 id>`（真机这 22 条事项的 uid 原本全是 NULL）。 */
+       它不是导入产生的 —— 所以「= 0」唯一能成立的形态是**除种子外为 0**。
+       种子这一行为什么至今仍空：这条用例的库来自 `support::fresh_pool`，它**只跑迁移**，
+       而认领（`services::device::startup_business_identity` → `adopt_business_rows`）挂在
+       `app::bootstrap` 上，本用例没有走那条路。注意认领现已覆盖 `items`
+       （`BUSINESS_UID_ADOPTIONS`）：一旦这里接上启动流程，「= 1」就得改成「= 0」。
+       合成 uid 上线后，包里的每一行都拿到了 `i:<包里 deviceId>:<包里的原始 id>`
+       （真机那批事项的 uid 在修好写入点之前全是 NULL）。 */
     let packed_items = package["business"]["items"]
         .as_array()
         .map(|rows| rows.len() as i64)

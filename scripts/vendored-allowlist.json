@@ -640,7 +640,7 @@
     {
       "path": "src-tauri/src/services/insight/schema_core/ensure.rs",
       "change": "added",
-      "reason": "T02 新建：`ensure_schema`（sqlx Migrator + 幂等补列）与 `adopt_local_rows`（把 device_id='' 的哨兵行认领到本机、补 uid；**先查重再回填**，冲突只 WARN 不写，否则老库里有重复 uid 时整个迁移会失败、开机即挂）",
+      "reason": "T02 新建：`ensure_schema`（sqlx Migrator + 幂等补列）与 `adopt_local_rows`（把 device_id='' 的哨兵行认领到本机、补 uid；**先查重再回填**，冲突只 WARN 不写，否则老库里有重复 uid 时整个迁移会失败、开机即挂）；[BugFix 设备维度] `adopt_business_rows` 从「只认领 time_records」扩成遍历本文件字面量表 BUSINESS_UID_ADOPTIONS（items / time_records / item_app / timer_ops 四张表），真机 items 那批 uid NULL 的历史行因此能被认领；单表失败立刻 ? 冒泡",
       "owner": "software-engineer"
     },
     {
@@ -1750,7 +1750,7 @@
     {
       "path": "src-tauri/src/services/insight/data/bundle/synth.rs",
       "change": "added",
-      "reason": "[批 2 · 返工] uid 为空的行：按触发器同一格式合成 uid（<前缀>:<来源设备>:<原始 id>），device_id 一并补来源设备；替代「按 id INSERT OR IGNORE」的静默跳过",
+      "reason": "[批 2 · 返工] uid 为空的行：按触发器同一格式合成 uid（<前缀>:<来源设备>:<原始 id>），device_id 一并补来源设备；替代「按 id INSERT OR IGNORE」的静默跳过；[BugFix 设备维度] 文件头改口径：启动认领现已覆盖四张表，保留「导入侧仍要合成 uid」的理由换成「包可能来自还没升级的旧版本」，不再引用已失效的「adopt 不管 items」",
       "owner": "software-engineer"
     },
     {

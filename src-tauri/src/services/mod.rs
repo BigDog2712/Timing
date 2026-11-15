@@ -22,6 +22,10 @@ pub mod identity;
    `services::insight::schema_core`，而 `insight` 整体是 `#[cfg(desktop)]`。 */
 #[cfg(desktop)]
 pub mod device;
+/* 设备维度的启动判据（认领哨兵行 / 发 uid / 四张 uid 表全覆盖）。拆出来是因为
+   `device.rs` 正文贴着单文件 300 行门禁，与 `timer_ops_tests` 同一套挂法。 */
+#[cfg(all(test, desktop))]
+mod device_tests;
 /* [V0.11.15] 数据根（`%APP_DIR%`）的落点信息与切换。桌面独占：`appdata_dir` 与原生
 选目录对话框都只在桌面存在，手机端走 `commands/data_root_cmd_mobile.rs` 的桩。 */
 #[cfg(desktop)]

@@ -2,10 +2,16 @@
 //!
 //! ## 为什么需要这一层
 //!
-//! 真机库里有整表 `uid` 为空的情况：`services::device::startup_business_identity`
-//! → `adopt_business_rows` **只认领 `time_records`**，`items` 那 22 行至今 `uid` 全
-//! `NULL`、`device_id` 全空串（既有问题，**不在本模块职责内**——别在这里顺手改启动行为）。
-//! 于是「用本项目真实数据导出的包」里就有一批没有合并键的行。
+//! 导入的包可能带着整表 `uid` 为空的行：`uid` 由 AFTER INSERT 触发器按 `device_id` 发
+//! （`WHEN NEW.uid IS NULL AND TRIM(NEW.device_id) <> ''`），而**旧版本**的 `items`
+//! 插入点没写 `device_id` ⇒ 那批行 `uid` 全 `NULL`、`device_id` 全空串。
+//!
+//! 启动认领（`services::device::startup_business_identity` → `adopt_business_rows`，
+//! 现已覆盖 `items` / `time_records` / `item_app` / `timer_ops` 四张表，清单是
+//! `schema_core/ensure.rs` 里的私有字面量表 `BUSINESS_UID_ADOPTIONS`）只修**本机自己**
+//! 的库；而包描述的是**别的设备**在升级前导出的快照，本机的认领够不着它 —— 所以导入侧
+//! 仍然必须自己能给空 `uid` 的行补上合并键 —— 否则「用这类包导入」就是一批没有合并键
+//! 的行。
 //!
 //! 老做法（uid 为空 → `INSERT OR IGNORE` + 保留 `id`）有两个后果：
 //! · **换机导入会静默丢数据** —— `id` 是本地自增号，包里的 `id=1` 与目标库的种子事项
