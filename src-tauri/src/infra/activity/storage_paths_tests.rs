@@ -74,6 +74,8 @@ fn custom_data_root_still_honours_the_shipped_product_folder_name() {
     );
 }
 
+/// 备份目录与远端临时目录都挂在 `data_root` 下（`db_path` 不在这里断——那一条按布局
+/// 钉在 `db_path_follows_the_layout_file_name_it_is_given` 里，见下面那段注释）。
 #[test]
 fn storage_paths_keep_remote_temp_under_data_root() {
     let paths = StoragePaths::from_roots(
@@ -81,15 +83,13 @@ fn storage_paths_keep_remote_temp_under_data_root() {
         PathBuf::from("D:\\Patina Data\\webview"),
         true,
         true,
-        SQLITE_DB_FILE_NAME,
+        db_file_of(Layout::New),
     );
 
-    /* 用常量拼期望值而不是写字面量：这条测的是「库名只有一个真源」，写死**新库名**就只
-    测到常量当天等于什么，改名时它照样绿。 */
-    assert_eq!(
-        paths.db_path,
-        PathBuf::from("D:\\Patina Data").join(SQLITE_DB_FILE_NAME)
-    );
+    /* 曾经这里有一条 `assert_eq!(paths.db_path, root.join(SQLITE_DB_FILE_NAME))`：
+    左边是 `from_roots` 里的 `data_root.join(库名)`、右边同样是 `join(同一个常量)`，
+    于是它**对任何常量取值都恒真**——库名接错时它照样绿。现在库名是入参了，等价断言
+    只能是「两个不同的入参给出两个不同的结果」，那正是下面那条用例干的事。 */
     assert_eq!(paths.backup_dir, PathBuf::from("D:\\Patina Data\\backups"));
     assert_eq!(
         paths.remote_backup_temp_dir,
@@ -143,16 +143,33 @@ fn activity_data_rel_is_the_concatenation_of_its_two_parts() {
 
 /// `db_path` 的文件名必须是**调用方给的那个**，`from_roots` 不许自己去猜。
 ///
-/// fail-open 到 Old 时 `data_root` 是 `<数据根>/patina/data`；库名若恒用
-/// `SQLITE_DB_FILE_NAME`（= `activity.db`），应用会去开一个**空的新库**，用户历史留在
-/// 同目录的 `patina.db` 里没人读——界面正常、日志干净，只有历史全空。
+/// 两套布局各断一次，理由：只断一套时，把库名写死成**另一套**的那个值仍然绿——而
+/// 「写死 `activity.db`」正是 fail-open 到 Old 之后的实际坏法：`data_root` 是
+/// `<数据根>/patina/data`，应用会去开一个**空的新库**，用户历史留在同目录的 `patina.db`
+/// 里没人读。界面正常、日志干净，只有历史全空。
 ///
 /// 传给它的值就是生产侧 `default_storage_paths` 传的同一个来源（`db_file_of(<数据布局>)`）。
 #[test]
 fn db_path_follows_the_layout_file_name_it_is_given() {
     let root = std::env::temp_dir().join(format!("layout-db-name-{}", std::process::id()));
+    let new_data_root = root.join(ACTIVITY_DATA_REL);
     let old_data_root = root.join(LEGACY_ACTIVITY_DATA_REL);
-    let paths = StoragePaths::from_roots(
+
+    let new_paths = StoragePaths::from_roots(
+        new_data_root.clone(),
+        root.join(activity_subdir_of(Layout::New)).join(WEBVIEW_SUBDIR),
+        false,
+        false,
+        db_file_of(Layout::New),
+    );
+    assert_eq!(
+        new_paths.db_path,
+        new_data_root.join(SQLITE_DB_FILE_NAME),
+        "New 布局下 db_path 必须是 activity/data/activity.db，实际是 {:?}",
+        new_paths.db_path
+    );
+
+    let old_paths = StoragePaths::from_roots(
         old_data_root.clone(),
         root.join(activity_subdir_of(Layout::Old)).join(WEBVIEW_SUBDIR),
         false,
@@ -160,12 +177,13 @@ fn db_path_follows_the_layout_file_name_it_is_given() {
         db_file_of(Layout::Old),
     );
     assert_eq!(
-        paths.db_path,
+        old_paths.db_path,
         old_data_root.join(LEGACY_ACTIVITY_DB_FILE),
-        "Old 布局下 db_path 的文件名必须是 {:?}，实际是 {:?}",
-        LEGACY_ACTIVITY_DB_FILE,
-        paths.db_path
+        "Old 布局下 db_path 必须是 patina/data/patina.db，实际是 {:?}",
+        old_paths.db_path
     );
+    /* 两次调用的唯一差别是入参，所以这两条断言一起证明「库名是透传的，不是猜的」。 */
+    assert_ne!(new_paths.db_path, old_paths.db_path);
 }
 
 /// 自定义数据根的库名只能看**磁盘事实**（`db_file_in`），不能借用产品根的 `data_layout()`。

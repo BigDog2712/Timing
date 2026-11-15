@@ -101,6 +101,11 @@ pub fn db_path_in(root: &Path, layout: Layout) -> PathBuf {
 /// 拿进程级的 [`data_layout`] 去回答它是「产品根的答案」，会把自定义根判成新库名，
 /// 于是应用在用户自己的目录里开一个空的新库。自定义根里两份都在时取新库名是有意的：
 /// 只有 `activity.db` 会被 T05 之后的写入碰到，`patina.db` 那份是只读快照。
+///
+/// ⚠️ **这里不做完整性判定**，与 `fs_only_layout_in` 是同一类「只看文件在不在」的判定。
+/// 别顺着 [`data_layout`] 那条链以为这里也有 `quick_check`：本函数回答的是「该用哪个
+/// 名字」，不是「哪一份能读」；一份坏掉的 `activity.db` 在这里仍然叫 `activity.db`，
+/// 之后读它失败会以别的形式暴露（自定义根那道 `metadata` 闸只看存在性）。
 pub fn db_file_in(dir: &Path) -> &'static str {
     let new_db = dir.join(SQLITE_DB_FILE_NAME).is_file();
     let old_db = dir.join(LEGACY_ACTIVITY_DB_FILE).is_file();
