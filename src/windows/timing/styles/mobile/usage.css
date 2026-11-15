@@ -258,35 +258,3 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-
-/* ------------------------------ 卡片 / 提示 / 注脚 ------------------------------ */
-.m-usage__card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border-radius: var(--m-radius);
-  background: var(--bg-card);
-  border: 1px solid var(--line);
-}
-
-.m-usage__title {
-  margin: 0;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-}
-
-.m-usage__hint {
-  margin: 0;
-  font-size: var(--text-sm);
-  line-height: 1.55;
-  color: var(--ink-3);
-}
-
-.m-usage__note {
-  margin: 0;
-  font-size: var(--text-xs);
-  line-height: 1.5;
-  color: var(--ink-4);
-}

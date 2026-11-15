@@ -34,10 +34,17 @@ const SWITCH = code('./UsageRangeSwitch.tsx');
 const INSIGHTS = code('./UsageInsightList.tsx');
 const CSS = code('../../styles/mobile/usage.css');
 const CSS2 = code('../../styles/mobile/usage-overview.css');
+const CSS3 = code('../../styles/mobile/usage-cards.css');
 const ENTRY = code('../../entry/main.tsx');
+const RECORDS = code('./RecordsPage.tsx');
+const SHELL = code('./MobileShell.tsx');
+const UI_STORE = code('../../stores/mobileUiStore.ts');
+const KOTLIN = code(
+  '../../../../../src-tauri/gen/android/app/src/main/java/com/timing/app/TimingNativePlugin.kt',
+);
 
 const COMPONENTS = [PAGE, DAY, WEEK, TREND, OVERVIEW, RANKING, DETAIL, GATE, SWITCH, INSIGHTS];
-const STYLES = `${CSS}\n${CSS2}`;
+const STYLES = `${CSS}\n${CSS2}\n${CSS3}`;
 
 /** 从 TSX 里捞出所有 `m-usage*` 类名（含 BEM 修饰），顺序无关。 */
 function usedClasses(source: string): string[] {
@@ -63,10 +70,13 @@ describe('样式必须真的落地', () => {
   });
 
   /** 样式表必须被入口引入：写在 src 里没人 import，等于没写。 */
-  it('st02_entry_imports_both_stylesheets', () => {
+  it('st02_entry_imports_every_stylesheet', () => {
     expect(ENTRY, 'main.tsx 没有引入 usage.css').toContain("'../styles/mobile/usage.css'");
     expect(ENTRY, 'main.tsx 没有引入 usage-overview.css').toContain(
       "'../styles/mobile/usage-overview.css'",
+    );
+    expect(ENTRY, 'main.tsx 没有引入 usage-cards.css').toContain(
+      "'../styles/mobile/usage-cards.css'",
     );
   });
 
@@ -74,6 +84,7 @@ describe('样式必须真的落地', () => {
   it('st03_no_hover_rules', () => {
     expect(CSS).not.toContain(':hover');
     expect(CSS2).not.toContain(':hover');
+    expect(CSS3).not.toContain(':hover');
   });
 });
 
@@ -108,7 +119,7 @@ describe('读数同源（合计与条长）', () => {
 
   /** 某一天读失败只标那一天：不许把整页翻成错误态。 */
   it('st06_one_bad_day_does_not_blank_the_page', () => {
-    expect(PAGE).toContain('setFailed((prev) => ({ ...prev, [key]: errorText(error) }))');
+    expect(PAGE).toContain('setFailed((prev) => ({ ...prev, [key]: failureText(error) }))');
   });
 
   /** 排行条长按「本列表第一条」归一，不拿后端返回顺序的第一条当契约。 */
@@ -130,5 +141,64 @@ describe('单应用详情与洞察', () => {
     expect(PAGE).not.toContain('m-usage-insight');
     expect(DAY).not.toContain('m-usage-insight');
     expect(WEEK).not.toContain('m-usage-insight');
+  });
+});
+
+/**
+ * 失败必须说人话之外的**真话**。
+ *
+ * 这一页曾经把 `errorText()` 的结果当失败文案，而它把所有 `IO_ERROR` 一律说成
+ * 「系统调用失败，请重试」：原生桥没注册、桥内抛异常、命令被 ACL 拒绝，三种原因在屏幕上
+ * 长得一模一样 —— 用户没法复述，开发也没法定位（真机上就那么瞎了一轮）。
+ * 所以这里钉住：失败走 `failureText()`（原文 + 错误码），不许回退到润色版。
+ */
+describe('失败文案不许被润色掉', () => {
+  it('st10_failures_surface_the_raw_message_and_code', () => {
+    expect(PAGE, '页面又用回 errorText 了').toContain('function failureText');
+    expect(PAGE).toContain('rawIpcText(err)');
+    expect(PAGE, '错误码没有进文案').toContain('`${raw}（${code}）`');
+    /* 三处失败口都必须走 failureText：首屏失败、翻日失败、单日标记失败 */
+    expect(PAGE.match(/failureText\(error\)/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    expect(GATE, '门禁屏把原文丢了').toContain('{message || ');
+    expect(GATE).toContain('m-usage__raw');
+    expect(CSS3, '原文样式没落地').toContain('.m-usage__raw');
+  });
+});
+
+/**
+ * 统计已并入记录页（[0.13.3]）。
+ *
+ * 底栏原本 6 格（计时 / 事项 / 记录 / 统计 / 便利贴 / 设置），在 375px 上挤成图标条；
+ * 而「我记了多久」与「手机被谁拿走了」本来就是一件事的两面。所以删掉独立页签、
+ * 把统计挂到记录页的总计卡下面。
+ *
+ * 三条一起钉，是因为这个改动**任何一条漏掉都能正常构建**：
+ * 只删页签不删渲染 → 记录页什么都看不到；只删渲染不删类型 → 编不过（算是唯一会被抓到的）；
+ * 删了入口但没接进记录页 → 功能整块消失，测试全绿。
+ */
+describe('统计并入记录页（不再有独立页签）', () => {
+  it('st11_usage_tab_is_gone_and_records_page_hosts_it', () => {
+    expect(SHELL, '底栏还留着 usage 页签').not.toContain("id: 'usage'");
+    expect(SHELL, '外壳还在渲染 UsagePage').not.toContain('<UsagePage');
+    expect(UI_STORE, 'MobileTab 里还有 usage').not.toContain("'usage'");
+    expect(RECORDS, '记录页没有挂统计').toContain('<UsagePage />');
+    /* 只能在记录页里出现一次：多挂一处就是两份取数、两份「今日合计」 */
+    expect(RECORDS.match(/<UsagePage/g)?.length ?? 0).toBe(1);
+  });
+});
+
+/**
+ * 桥不许替系统下「已授权」的结论。
+ *
+ * 真机上踩到的静默缺陷：`usageDay` 原来硬编码 `payload.put("granted", true)`，
+ * 于是「没开使用情况访问」被说成「开了但今天没用手机」—— 宿主那条
+ * `if (!reply.granted) → USAGE_PERMISSION_DENIED` 永远不触发，界面上永远等不到
+ * 「去系统设置打开」的按钮，只剩一片 0 分钟（而且零报错、测试全绿）。
+ * 权限状态只有一个真源：`UsageStats.hasPermission`。
+ */
+describe('授权状态如实上报', () => {
+  it('st12_kotlin_must_not_hardcode_granted', () => {
+    expect(KOTLIN, 'Kotlin 又把 granted 写死了').not.toContain('payload.put("granted", true)');
+    expect(KOTLIN).toContain('payload.put("granted", UsageStats.hasPermission(activity))');
   });
 });

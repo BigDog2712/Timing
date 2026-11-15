@@ -1,0 +1,52 @@
+/* =============================================================================
+ * Timing — 移动端 · 统计页的卡片与文本
+ * -----------------------------------------------------------------------------
+ * 从 `usage.css` 拆出来的第二块（那边撞到 300 行上限）：卡片壳、标题、提示句、注脚、
+ * 失败原文。这几个类**跨视图共用**（`__card` 同时在单日失败卡与门禁屏、`__hint` 四处、
+ * `__note` 三处），所以不属于任何单个视图的样式表。
+ *
+ * 只写本块自己的规则：颜色一律走令牌，字号走 `--text-*`。
+ * ========================================================================== */
+
+.m-usage__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--m-radius);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+.m-usage__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.m-usage__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+
+.m-usage__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--ink-4);
+}
+
+/* 失败原文：允许长句折行、按字符断，后端报错往往是一长串英文（桥名 + 异常） */
+.m-usage__raw {
+  margin: 0;
+  max-width: 100%;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-4);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

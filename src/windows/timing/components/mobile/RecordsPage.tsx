@@ -32,6 +32,7 @@ import {
 } from '../../lib/time';
 import { useMobileUiStore } from '../../stores/mobileUiStore';
 import { itemName, useItemStore } from '../../stores/itemStore';
+import { UsagePage } from './UsagePage';
 
 /** 档位顺序就是主人念的顺序：先眼前，再放大，最后才是回头挑一天 */
 const TABS: { key: RecordsRange; label: string }[] = [
@@ -107,6 +108,19 @@ export function RecordsPage() {
           <strong className="m-total__value">{formatDuration(totalSec)}</strong>
         </div>
         <span className="m-total__meta">{recordCount} 条 · {formatMinutes(totalSec)}</span>
+      </section>
+
+      {/* [0.13.3] 「应用使用」并入本页（原先是第 4 个独立页签「统计」）。
+          手机底栏已经 6 格，再加就挤成图标条；而这两块本来就是同一件事的两面 ——
+          「我记了多久」与「手机被谁拿走了」，放在一屏里才对照得出来。
+          它自带范围（今天 / 近 7 天）：系统只保留 7 天明细，跟不了上方的「本月」「往日」，
+          所以把自己的范围写在卡头，不让人以为是跟着上面走的。 */}
+      <section className="m-section">
+        <header className="m-section__head">
+          <h2 className="m-section__title">应用使用</h2>
+          <span className="m-section__meta">系统记录 · 只留 7 天</span>
+        </header>
+        <UsagePage />
       </section>
 
       {loading ? (

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { errorText } from '../../services/ipc';
+import { errorText, rawIpcText } from '../../services/api';
 import {
   TREND_DAYS,
   loadUsageDay,
@@ -38,6 +38,21 @@ import { useUiStore } from '../../stores/uiStore';
  * - 合计与排行**必须同一份数**：都走 `rangeOf()`（由行求和），不另读一个总量。
  */
 type Phase = 'loading' | 'ready' | 'denied' | 'unsupported' | 'error';
+
+/**
+ * 失败的**原文**，不做润色。
+ *
+ * `errorText()` 把所有 `IO_ERROR` 一律说成「系统调用失败，请重试」—— 原生桥没注册、
+ * 桥内抛异常、命令被 ACL 拒绝，三种完全不同的原因在界面上长得一模一样：用户没法复述，
+ * 我们也无从定位（这一页就这么瞎过一轮）。所以这里保留后端 `message` 原文，并把 `code`
+ * 缀在后面：能照着查的原文 > 好看的空话（同 `lib/mdSyncText` / `SyncBackupPane` 的口径）。
+ */
+function failureText(err: unknown): string {
+  const data = err as { code?: unknown } | null;
+  const code = typeof data?.code === 'string' ? data.code : '';
+  const raw = rawIpcText(err);
+  return code === '' || raw.includes(code) ? raw : `${raw}（${code}）`;
+}
 
 export function UsagePage() {
   const today = useMemo(() => todayKey(), []);
@@ -106,12 +121,12 @@ export function UsagePage() {
             return;
           }
           if (filled === 0) {
-            setMessage(errorText(error));
+            setMessage(failureText(error));
             setPhase('error');
             return;
           }
           /* 已经有数据：这一天记成失败，不打断整页 */
-          setFailed((prev) => ({ ...prev, [key]: errorText(error) }));
+          setFailed((prev) => ({ ...prev, [key]: failureText(error) }));
         }
       }
       if (alive && filled > 0) setPhase('ready');
@@ -139,7 +154,7 @@ export function UsagePage() {
             setPhase('denied');
             return;
           }
-          setFailed((prev) => ({ ...prev, [key]: errorText(error) }));
+          setFailed((prev) => ({ ...prev, [key]: failureText(error) }));
         }
       })();
     },

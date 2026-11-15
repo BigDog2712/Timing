@@ -42,7 +42,9 @@ export function UsageGate({ kind, message, onGrant, onRetry }: Props) {
   return (
     <div className="m-usage">
       <div className="m-usage__card">
-        <p className="m-usage__hint">{message || '读取失败'}</p>
+        <h2 className="m-usage__title">读不到应用使用数据</h2>
+        {/* 原文照登：这一层是最后一道防线，把原因润色成「请重试」就再也没人能修它了 */}
+        <p className="m-usage__raw">{message || '系统没有返回原因'}</p>
         <button type="button" className="m-btn" onClick={onRetry}>
           重试
         </button>

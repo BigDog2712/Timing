@@ -15,7 +15,11 @@
 import { create } from 'zustand';
 import type { TimeRecord } from '../types/domain';
 
-export type MobileTab = 'timer' | 'items' | 'records' | 'usage' | 'notes' | 'settings';
+/**
+ * 底栏页签。`usage` 已于 [0.13.3] 并进 `records`（应用使用是记录页里的一块），
+ * 不再是一个能到达的页签 —— 类型里留着它只会让「切到一个渲染不出东西的页」编得过。
+ */
+export type MobileTab = 'timer' | 'items' | 'records' | 'notes' | 'settings';
 
 /** 底部 Sheet 的载荷（每种 Sheet 自带它需要的那一条数据，避免二次拉取） */
 export type MobileSheet =

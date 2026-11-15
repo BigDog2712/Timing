@@ -362,7 +362,11 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
         }
         /* ADR-056：跨桥的列表只许 JSArray（org.json.JSONArray 直接 put 会被序列化成字符串） */
         payload.put("rows", JSArray(UsageStats.queryDay(activity, from, to)))
-        payload.put("granted", true)
+        /* **必须如实回读**（0.13.3 修）：这里原先是硬编码 `true`，于是「没开权限」被说成
+           「开了但今天没用手机」—— 宿主那条 `if (!reply.granted) → USAGE_PERMISSION_DENIED`
+           永远不触发，界面上永远等不到「去系统设置打开」那个按钮，只剩一片 0 分钟。
+           权限状态只有一个真源，即 `UsageStats.hasPermission`，桥不许替它下结论。 */
+        payload.put("granted", UsageStats.hasPermission(activity))
         invoke.resolve(payload)
     }
 
