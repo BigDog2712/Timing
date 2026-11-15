@@ -188,7 +188,7 @@ export function createMockApiV020(
     open_todos_window: () => undefined,
     open_settings_window: () => undefined,
     /* [V0.12.0 Patina 融合] 浏览器里没有 Patina 窗，no-op（与其它多窗口命令同口径）。 */
-    open_patina_window: () => undefined,
+    open_activity_window: () => undefined,
     get_reference_settings: () => ({ ...s.reference }),
     /* 参考设置在浏览器里只有内存态（`MockState.reference`）：设置页改完滑杆要能立刻
        读回新值，且 `stop_timer` 的阈值判定必须读同一份。 */

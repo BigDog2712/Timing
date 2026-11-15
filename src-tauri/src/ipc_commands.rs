@@ -264,7 +264,7 @@ define_invoke_handler![
     只是因为它必须 `#[cfg(desktop)]`（Patina 子系统只在桌面上编进来）；它走的是宿主
     `IpcApi` 契约，不带 patina 前缀，也不受 window-commands 的 ACL 限制。
     见 `commands::window_cmd` 里那条命令的注释。 */
-    crate::commands::window_cmd::open_patina_window,
+    crate::commands::window_cmd::open_activity_window,
     /* [0.13] 手柄自定义动作（启动应用 / 发送快捷键）。桌面独占：手机没有「把按键发给
     当前前台应用」这件事，也没有可启动的外部程序 —— 前端在手机上不给这两个选项，
     命令也就不注册（注册了只能回 IO_ERROR 的假成功更像缺陷）。 */

@@ -7,7 +7,7 @@
  *     药丸右键、记录面板头部按钮）。此前 `openPanel('records')` 全仓 **0 处调用**——「同时在
  *     用」这条唯一的融合可见物在 UI 上根本没有入口。
  *  ③ `openTodayInAnalysis(focusApp?)` / ④ `openOverviewInAnalysis()`：把「今天」/「总览」递给
- *     分析窗，走宿主命令 `open_patina_window` 的**可选落点**参数（命令名与条数不变）；Rust
+ *     分析窗，走宿主命令 `open_activity_window` 的**可选落点**参数（命令名与条数不变）；Rust
  *     侧先写 pending 状态再 show，所以**冷启动（分析窗还没创建）也能落到指定页**。
  *
  * 失败口径（FUSION-ARCH-v1 §6.5）：窗没就绪不算错误（Rust 只 `log_warn`，用户再点一次就
@@ -37,11 +37,11 @@ function warnOpenFailed(err: unknown): void {
  * 在分析窗里看「今天」。
  * @param focusApp 可选的聚焦应用名（记录面板「同时在用」chip 带的旁证）。值由分析窗
  *   `History` 侧派生为高亮键（`highlightSourceKey`）；**不为聚焦新增命令或事件**，仍然只走
- *   `open_patina_window` 这一个既有可选落点。
+ *   `open_activity_window` 这一个既有可选落点。
  */
 export async function openTodayInAnalysis(focusApp: string | null = null): Promise<void> {
   try {
-    await ipc.openPatinaWindow({ target: { history: { dateKey: todayDateKey(), focusApp } } });
+    await ipc.openActivityWindow({ target: { history: { dateKey: todayDateKey(), focusApp } } });
   } catch (err) {
     warnOpenFailed(err);
   }
@@ -50,7 +50,7 @@ export async function openTodayInAnalysis(focusApp: string | null = null): Promi
 /** 在分析窗里看「总览」（P1-02 E4）：不带日期、不带聚焦，只把分析窗切到总览页。 */
 export async function openOverviewInAnalysis(): Promise<void> {
   try {
-    await ipc.openPatinaWindow({ target: { overview: true } });
+    await ipc.openActivityWindow({ target: { overview: true } });
   } catch (err) {
     warnOpenFailed(err);
   }

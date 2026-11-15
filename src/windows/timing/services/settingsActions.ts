@@ -34,7 +34,7 @@ export const settingsActions = {
    * 它还没就绪时后端返回的成功也是「已请求」，用户点第二次就会出来。
    */
   async openPatina(): Promise<void> {
-    await ipc.openPatinaWindow();
+    await ipc.openActivityWindow();
   },
 };
 
@@ -54,13 +54,13 @@ export async function openSettings(): Promise<void> {
 /**
  * [V0.12.1] 设置落点：把**分析窗**叫到前台并落到设置视图。
  *
- * 走 `open_patina_window` 的可选落点参数 —— 命令名与命令条数都不变，只是 `target` 多认
+ * 走 `open_activity_window` 的可选落点参数 —— 命令名与命令条数都不变，只是 `target` 多认
  * 一个布尔键（判序 `history > settings > overview`，见 Rust `PatinaOpenTarget::into_view`）。
  * 冷启动也成立：Rust 侧先写 pending 再 show，分析窗起来后自己 take。
  */
 export async function openSettingsInPatina(): Promise<void> {
   try {
-    await ipc.openPatinaWindow({ target: { settings: true } });
+    await ipc.openActivityWindow({ target: { settings: true } });
   } catch (err) {
     /* 与分析窗其它落点同口径（FUSION-ARCH-v1 §6.5）：窗没就绪不算错，
        只有 invoke 真的失败才提示 —— 用户手上有一个可重试的动作 */

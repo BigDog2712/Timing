@@ -5,7 +5,7 @@
  *  ① `openTodayPanel()` 必须真的打开 `records` 面板。这个面板在本轮之前**全仓 0 处调用**
  *     （`openPanel('records')` 无人调），也就是说「同时在用」这条融合可见物在 UI 上根本
  *     没有入口——补丁要钉住的正是「有人真的调了它」。
- *  ② `openTodayInAnalysis()` 发给宿主 `open_patina_window` 的 JSON 必须与 Rust 侧
+ *  ② `openTodayInAnalysis()` 发给宿主 `open_activity_window` 的 JSON 必须与 Rust 侧
  *     `PatinaOpenTarget`（`src-tauri/src/commands/window_cmd.rs`，`deny_unknown_fields`
  *     + `rename_all = "camelCase"`）逐字对齐：`{ target: { history: { dateKey, focusApp } } }`。
  *     拼错一个键 → 宿主侧反序列化报错 → 用户看到「没能打开分析窗」，且**日期永远是今天**
@@ -13,14 +13,14 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { openPatinaWindowMock, errorTextMock } = vi.hoisted(() => ({
-  openPatinaWindowMock: vi.fn(),
+const { openActivityWindowMock, errorTextMock } = vi.hoisted(() => ({
+  openActivityWindowMock: vi.fn(),
   errorTextMock: vi.fn((error: unknown) => String(error)),
 }));
 
 vi.mock('./ipc', () => ({
   errorText: errorTextMock,
-  ipc: { openPatinaWindow: openPatinaWindowMock },
+  ipc: { openActivityWindow: openActivityWindowMock },
 }));
 
 import { todayDateKey } from '../lib/dateKey';
@@ -58,23 +58,23 @@ describe('openDigestPanel —— 摘要面板的两条一步入口（P1-02 E1/E2
 
 describe('openTodayInAnalysis —— 递给宿主的落点载荷', () => {
   beforeEach(() => {
-    openPatinaWindowMock.mockReset();
-    openPatinaWindowMock.mockResolvedValue(undefined);
+    openActivityWindowMock.mockReset();
+    openActivityWindowMock.mockResolvedValue(undefined);
     useUiStore.setState({ notice: null });
   });
 
   it('p003_sends_exactly_the_rust_patina_open_target_shape', async () => {
     await openTodayInAnalysis();
-    expect(openPatinaWindowMock).toHaveBeenCalledTimes(1);
+    expect(openActivityWindowMock).toHaveBeenCalledTimes(1);
     /* 精确对象断言：`target.history.dateKey/focusApp` 少一个键、多一个键都要红。 */
-    expect(openPatinaWindowMock).toHaveBeenCalledWith({
+    expect(openActivityWindowMock).toHaveBeenCalledWith({
       target: { history: { dateKey: todayDateKey(), focusApp: null } },
     });
   });
 
   it('p003_carries_the_focus_app_through', async () => {
     await openTodayInAnalysis('Code.exe');
-    expect(openPatinaWindowMock).toHaveBeenCalledWith({
+    expect(openActivityWindowMock).toHaveBeenCalledWith({
       target: { history: { dateKey: todayDateKey(), focusApp: 'Code.exe' } },
     });
   });
@@ -94,7 +94,7 @@ describe('openTodayInAnalysis —— 递给宿主的落点载荷', () => {
   it('p003_invoke_failure_becomes_a_danger_notice_and_never_throws', async () => {
     /* 落点通道失败（ACL / 序列化 / 运行时缺失）不能静默吞：用户需要知道「再点一次」。
        但也不能把 Promise 抛给调用方（按钮回调里没地方接）。 */
-    openPatinaWindowMock.mockRejectedValueOnce(new Error('acl denied'));
+    openActivityWindowMock.mockRejectedValueOnce(new Error('acl denied'));
     await expect(openTodayInAnalysis()).resolves.toBeUndefined();
     const notice = useUiStore.getState().notice;
     expect(notice?.tone).toBe('danger');
@@ -105,8 +105,8 @@ describe('openTodayInAnalysis —— 递给宿主的落点载荷', () => {
 
 describe('openOverviewInAnalysis —— 递给宿主的「总览」落点（P1-02 E4）', () => {
   beforeEach(() => {
-    openPatinaWindowMock.mockReset();
-    openPatinaWindowMock.mockResolvedValue(undefined);
+    openActivityWindowMock.mockReset();
+    openActivityWindowMock.mockResolvedValue(undefined);
     useUiStore.setState({ notice: null });
   });
 
@@ -114,14 +114,14 @@ describe('openOverviewInAnalysis —— 递给宿主的「总览」落点（P1-0
     /* 精确对象断言：Rust `PatinaOpenTarget` 是 `deny_unknown_fields` + camelCase，多一个键
        少一个键都会被宿主拒收（症状是「点了看总览，窗开了但停在默认页」）。 */
     await openOverviewInAnalysis();
-    expect(openPatinaWindowMock).toHaveBeenCalledTimes(1);
-    expect(openPatinaWindowMock).toHaveBeenCalledWith({ target: { overview: true } });
+    expect(openActivityWindowMock).toHaveBeenCalledTimes(1);
+    expect(openActivityWindowMock).toHaveBeenCalledWith({ target: { overview: true } });
     /* 不许顺手带上历史落点：三键互斥，带上 dateKey 就变成「落 history」了。 */
-    expect(openPatinaWindowMock.mock.calls[0]?.[0]).not.toHaveProperty('target.history');
+    expect(openActivityWindowMock.mock.calls[0]?.[0]).not.toHaveProperty('target.history');
   });
 
   it('p102_invoke_failure_becomes_a_danger_notice_and_never_throws', async () => {
-    openPatinaWindowMock.mockRejectedValueOnce(new Error('acl denied'));
+    openActivityWindowMock.mockRejectedValueOnce(new Error('acl denied'));
     await expect(openOverviewInAnalysis()).resolves.toBeUndefined();
     const notice = useUiStore.getState().notice;
     expect(notice?.tone).toBe('danger');

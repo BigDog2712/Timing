@@ -245,7 +245,7 @@ export const ipc: IpcApi = {
   openSettingsWindow: () => call<void>('open_settings_window'),
   openTimerWindow: () => call<void>('open_timer_window'),
   /* [V0.12.0] 时间统计窗口 · 宿主命令（`cmd_show_main_window` 被 ACL 锁在 `windows: ["patina"]`）；[P0-03] 只加可选落点（`null` 显式传），命令名与条数不变（本文件卡 300 行，净变化 = 0） */
-  openPatinaWindow: (params) => call<void>('open_patina_window', { target: params?.target ?? null }),
+  openActivityWindow: (params) => call<void>('open_activity_window', { target: params?.target ?? null }),
   /* [V0.3.4] 日记域四条命令实现随模块下架删除（ADR-023）。 */
 
   /* ---- [V0.2.0] 主题域 ---- */

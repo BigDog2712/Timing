@@ -14,8 +14,8 @@
  * `Patina`**，于是「门禁绿」对这件事根本没有任何证明力，实际还剩约 90 条 × 4 语种。
  * 教训：门禁的判据必须与「本次改名改的是什么」对齐，否则绿灯是假的（PRD §3.3.1 纪律二）。
  *
- * 但下游不能照抄 ① 的做法。全仓有 692 处合法的小写 `patina`：文件路径、
- * 模块名、`patina.db`、`open_patina_window`、`patina_coverage` feature、注释……
+ * 但下游不能照抄 ① 的做法。全仓有大量合法的小写 `patina`：文件路径、模块名、
+ * `patina.db`、`patina_coverage` feature、注释……
  * 它们是**技术标识符**，改名会拆掉数据库定位、迁移与上游 diff 能力（见 docs/refactor/
  * patina-structural-merge.md）。把 `patina` 塞进 ① 的 PATTERN 只会得到一条永久红的门禁，
  * 而永久红 = 被忽略 = 等于没有门禁。
@@ -69,10 +69,14 @@ const NARROW_SCOPES = [
  *
  * **棘轮预算**：只许减不许增。分档目标（改 `BUDGET` 必须同批改这一行注释）：
  *   · 落地（T04-1）：51 = capabilities 9 + permissions 37 + vite.config.ts 5
- *   · T04-2 后：6 = vite.config.ts 5 + `open_patina_window` 1（命令名，属 T04-3）
- *   · T04-3 入口页改名后：**1** = 只剩 `open_patina_window`；命令名改名后：0
+ *   · T04-2 后：6 = vite.config.ts 5 + 命令名 `open_patina_window` 1
+ *   · T04-3 入口页改名后：1 = 只剩那个命令名；命令名改名后：**0 = 终态**
  * 注：`vite.config.ts` 那 5 处**不是**入口页文件名，是它注释里的旧产品名；入口页改名的
  * 收益落在「仓根 `*.html`」这个动态 scope 上（改名后旧页不存在 ⇒ 命中自然消失）。
+ * **0 是终态，因此"扫空集合后全绿"的风险必须另外挡住**：靠上面那条 scope 存在性哨兵
+ * （路径不存在即红、仓根零 html 即红）+ `check:contract` 对命令名的双向断言
+ * （`host-commands` 的 allow ↔ `ipc_commands.rs` 的函数名）+ `check:runtime-ids` 的 d
+ * （入口页必须既存在又是 vite 入口）。三条任一失效，0 就只是"没扫到"而不是"没有"。
  * 入口页**不写死文件名**：扫「仓根所有 `*.html`」。写死 `patina.html` 的话，T04-3 改名
  * 时必须同批改这里，而"改名时忘了改门禁"正是 scope 静默失效的来源（`git grep` 对不存在的
  * 路径spec 返回"无命中"，于是判据安静地永远绿）。 */
@@ -84,7 +88,7 @@ const NARROW_SCOPES_2 = [
   'vite.config.ts',
   ...ROOT_HTML_SCOPES,
 ];
-const NARROW_2_BUDGET = 1;
+const NARROW_2_BUDGET = 0;
 const ARCHIVE_DIRS = ['android-app/'];
 
 const allowPath = join(root, 'scripts/brand-allowlist.txt');

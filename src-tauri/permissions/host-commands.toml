@@ -67,7 +67,7 @@ commands.allow = [
   "note_update",
   "open_legacy_dir",
   "open_note_window",
-  "open_patina_window",
+  "open_activity_window",
   "open_settings_window",
   "open_timer_window",
   "open_todos_window",

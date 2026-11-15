@@ -115,7 +115,7 @@ pub fn setup(
     「两个应用」，配置项也重复。是否创建由 `tray::PATINA_OWN_TRAY` 一处开关决定，
     保持调用点不变只是为了将来恢复独立托盘时不用改这层编排。
     入口改由宿主托盘「时间统计…」与设置页「通用 → 时间统计」提供，见
-    `infra::tray_menu::ID_OPEN_STATS` 与 `commands::window_cmd::open_patina_window`。 */
+    `infra::tray_menu::ID_OPEN_STATS` 与 `commands::window_cmd::open_activity_window`。 */
     setup_tray(&app_handle)?;
     if !desktop_behavior::apply_startup_desktop_behavior(
         &app_handle,

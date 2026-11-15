@@ -70,14 +70,14 @@ ACL 只授权给 `windows: ["activity"]`，从宿主窗口调用会被 Tauri 拒
 窗的生命周期仍归 Patina：它自己管「最后可见 / 重建 / 就绪握手」，这里只递一个
 show 请求。返回 false = 窗正在重建或还没就绪（点第二次就好），不当错误。 */
 
-/// 分析窗历史页落点（[P0-03]，`open_patina_window` 的**可选**参数）。
+/// 分析窗历史页落点（[P0-03]，`open_activity_window` 的**可选**参数）。
 ///
 /// 命名口径（硬约定，FUSION-ARCH-v1 §6.6）：宿主`药丸`的窗口 label 是 `main`，
 /// 分析窗的 label 是 `activity`；本结构描述「分析窗该落到哪里」，与窗口名无关。
 #[cfg(desktop)]
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct PatinaHistoryTarget {
+pub struct ActivityHistoryTarget {
     /// 本地日 `YYYY-MM-DD`（宿主 `src/lib/dateKey.ts` 的 `todayDateKey()`）。
     date_key: String,
     /// 想在分析窗里聚焦的应用名（可空；分析窗侧以高亮环消费）。
@@ -85,7 +85,7 @@ pub struct PatinaHistoryTarget {
     focus_app: Option<String>,
 }
 
-/// `open_patina_window` 的可选落点。省略 = 只把分析窗叫到前台（V0.12.0 原行为）。
+/// `open_activity_window` 的可选落点。省略 = 只把分析窗叫到前台（V0.12.0 原行为）。
 ///
 /// `history` / `settings` / `overview` 三键互斥（`{ "history": { … } }` / `{ "settings": true }` /
 /// `{ "overview": true }`）。并存时判序 **history > settings > overview**，与前端网关
@@ -95,7 +95,7 @@ pub struct PatinaHistoryTarget {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PatinaOpenTarget {
     #[serde(default)]
-    history: Option<PatinaHistoryTarget>,
+    history: Option<ActivityHistoryTarget>,
     /// [0.12.1] `true` = 分析窗的设置视图（独立设置窗下线后，所有「打开设置」入口的落点）。
     #[serde(default)]
     settings: bool,
@@ -130,7 +130,7 @@ impl PatinaOpenTarget {
         let history = self.history?;
         let date_key = history.date_key.trim().to_string();
         if date_key.is_empty() {
-            crate::log_warn!("open_patina_window: empty history date; falling back to show only");
+            crate::log_warn!("open_activity_window: empty history date; falling back to show only");
             return None;
         }
         Some(HistoryTarget {
@@ -142,7 +142,7 @@ impl PatinaOpenTarget {
 
 /// 只把分析窗叫到前台（V0.12.0 原路径）：未就绪不是错误，用户再点一次即可。
 #[cfg(desktop)]
-fn show_patina_window(app: &AppHandle) {
+fn show_activity_window(app: &AppHandle) {
     if !crate::app::activity::tray::show_main_window(
         app,
         crate::app::activity::main_window::MainWindowShowReason::TrayMenu,
@@ -153,12 +153,12 @@ fn show_patina_window(app: &AppHandle) {
 
 #[cfg(desktop)]
 #[tauri::command]
-pub async fn open_patina_window(
+pub async fn open_activity_window(
     app: AppHandle,
     target: Option<PatinaOpenTarget>,
 ) -> AppResult<()> {
     let Some(view) = target.and_then(PatinaOpenTarget::into_view) else {
-        show_patina_window(&app);
+        show_activity_window(&app);
         return Ok(());
     };
 

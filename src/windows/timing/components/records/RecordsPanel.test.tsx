@@ -25,7 +25,7 @@ vi.mock('../../services/api', () => ({
 }));
 vi.mock('../../services/ipc', () => ({
   errorText: (error: unknown) => String(error),
-  ipc: { openPatinaWindow: vi.fn() },
+  ipc: { openActivityWindow: vi.fn() },
 }));
 
 import { useUiStore } from '../../stores/uiStore';

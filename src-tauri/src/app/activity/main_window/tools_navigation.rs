@@ -8,7 +8,7 @@
 //! 是**发给分析窗**。注释里禁止用裸 `main` 表示药丸，一律写「药丸（label = main）」。
 //!
 //! 生命周期（FUSION-ARCH-v1 §6.3）：
-//!   · 写入方：宿主命令 `open_patina_window(target?)`（唯一入口）；
+//!   · 写入方：宿主命令 `open_activity_window(target?)`（唯一入口）；
 //!   · 消费方：只有分析窗（`cmd_take_main_tools_target` 带 `require_main_window_string` 守卫）；
 //!   · `take()` 即清空，一次性；后写覆盖先写（目标幂等，连点两次只落最后一次）；
 //!   · 唤醒事件 `main-tools-target-changed` 只是「该来取一次」的门铃，**不带载荷**；

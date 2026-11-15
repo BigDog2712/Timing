@@ -12,7 +12,7 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { openPatinaWindowMock } = vi.hoisted(() => ({ openPatinaWindowMock: vi.fn() }));
+const { openActivityWindowMock } = vi.hoisted(() => ({ openActivityWindowMock: vi.fn() }));
 
 vi.mock('../../hooks/useTodayRecords', () => ({
   useTodayRecords: () => ({ rows: [], loading: false, error: null, reload: vi.fn() }),
@@ -28,7 +28,7 @@ vi.mock('../../services/dailyStatusActions', () => ({
 vi.mock('../../services/api', () => ({ recordApi: { remove: vi.fn() } }));
 vi.mock('../../services/ipc', () => ({
   errorText: (error: unknown) => String(error),
-  ipc: { openPatinaWindow: openPatinaWindowMock },
+  ipc: { openActivityWindow: openActivityWindowMock },
 }));
 
 import { TodayDigest } from './TodayDigest.tsx';
@@ -42,8 +42,8 @@ describe('TodayDigest 页脚的「在分析窗看总览」（P1-02 E4）', () =>
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
-    openPatinaWindowMock.mockReset();
-    openPatinaWindowMock.mockResolvedValue(undefined);
+    openActivityWindowMock.mockReset();
+    openActivityWindowMock.mockResolvedValue(undefined);
     /* 挂载会把「事项状态」的 Promise 放完（`:45` 的 effect），必须在 act 里等它落地，
        否则状态更新跑到 act 外面，jsdom 会报 "not wrapped in act"。 */
     await act(async () => {
@@ -69,9 +69,9 @@ describe('TodayDigest 页脚的「在分析窗看总览」（P1-02 E4）', () =>
       footerButton('在分析窗看总览').click();
       await Promise.resolve();
     });
-    expect(openPatinaWindowMock).toHaveBeenCalledTimes(1);
+    expect(openActivityWindowMock).toHaveBeenCalledTimes(1);
     /* 精确对象断言：变异成 `{ target: { history: { … } } }` → 本用例红 */
-    expect(openPatinaWindowMock).toHaveBeenCalledWith({ target: { overview: true } });
+    expect(openActivityWindowMock).toHaveBeenCalledWith({ target: { overview: true } });
   });
 
   it('p102_the_existing_footer_actions_are_untouched', () => {
