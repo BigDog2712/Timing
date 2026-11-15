@@ -47,7 +47,7 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 ```bash
 npm run dev          # 前端 + 浏览器 mock（1420）
 npm run tauri dev    # 完整桌面应用
-npm run check        # 全部门禁：typecheck + contract + size + vendored + version + layers + brand + lint + mutation
+npm run check        # 全部门禁：typecheck + contract + size + version + layers + brand + lint + mutation + runtime-ids
 npm run typecheck    # tsc --noEmit，必须 0 错
 npm run lint         # ESLint（只查正确性，不查风格）
 npm test             # vitest（含双端时间公式黄金用例）
