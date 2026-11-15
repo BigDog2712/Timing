@@ -31,7 +31,7 @@ import TodoRow from "./TodoRow.tsx";
  * ## 「还有 N 项」的 N 是**量出来的**，不是写死的
  *
  * 02 §4.2 #1 点名了这一处：可见整行数 = f(卡高, 行高, gap)，两档不同（5 / 4 行），
- * 一旦有人改 `--qp-row-todo` 或卡高，写死的 4 会立刻错。这里用一个 `ResizeObserver`
+ * 一旦有人改 `--at-row-todo` 或卡高，写死的 4 会立刻错。这里用一个 `ResizeObserver`
  * 挂在列表上，pitch 从第 1、2 行的 `offsetTop` 差里读，**不读 CSS 变量、不算魔法数**：
  *   visible = floor((clientHeight − rowH) / pitch) + 1     // 末行不需要 trailing gap
  *
@@ -131,7 +131,7 @@ export default function TodosModule({ controls, model }: Props) {
         controls={controls}
         id="t-todos"
         title={copy.todosTitle}
-        className="qp-card-todos"
+        className="at-card-todos"
         state={state}
         skeletonRows={5}
         skeletonRow="todo"
@@ -143,10 +143,10 @@ export default function TodosModule({ controls, model }: Props) {
         /* [本轮] 新建入口下移到卡头**下方**一条通栏窄行（`subhead`，四态常驻）；
            卡头右槽（`headAction`）那一版下线 —— 它和 meta 读数抢同一段 20px 高的横排。 */
         subhead={(
-          <div className="qp-todo-new-row">
+          <div className="at-todo-new-row">
             <button
               type="button"
-              className="qp-link-btn"
+              className="at-link-btn"
               onClick={() => setComposeOpen(true)}
             >
               {copy.todoNewTodo}
@@ -173,7 +173,7 @@ export default function TodosModule({ controls, model }: Props) {
           onClose={() => setEditingTodo(null)}
           update={model.update}
         />
-        <ul className="qp-todo-list qp-scroll-region qp-scroll-region-stable" ref={listRef}>
+        <ul className="at-todo-list at-scroll-region at-scroll-region-stable" ref={listRef}>
           {todos.map((todo) => (
             <TodoRow
               key={todo.id}
@@ -185,14 +185,14 @@ export default function TodosModule({ controls, model }: Props) {
           ))}
         </ul>
 
-        {fadeVisible ? <div className="qp-fade-bottom" /> : null}
+        {fadeVisible ? <div className="at-fade-bottom" /> : null}
 
         {pending ? (
-          <div className="qp-undo-bar" role="status">
-            <span className="qp-undo-text" title={pending.todo.title}>
+          <div className="at-undo-bar" role="status">
+            <span className="at-undo-text" title={pending.todo.title}>
               {pending.kind === "delete" ? copy.undoDeleted(pending.todo.title) : copy.undoToggled(pending.todo.title)}
             </span>
-            <button ref={undoRef} type="button" className="qp-undo-btn" onClick={undoPending}>
+            <button ref={undoRef} type="button" className="at-undo-btn" onClick={undoPending}>
               {copy.undoAction}
             </button>
           </div>

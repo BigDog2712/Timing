@@ -153,7 +153,7 @@ describe("写完之后列表要跟着变（可见行，不是缓存开关）", (
       open: true, onClose: () => undefined, onChanged,
     }));
     const trigger = manageDialog()?.querySelector<HTMLButtonElement>(
-      `[data-category="${CUSTOM}"] .qp-color-trigger`,
+      `[data-category="${CUSTOM}"] .at-color-trigger`,
     );
     expect(trigger, "分类行没有色块").not.toBeNull();
     const loadsBefore = h.loadBootstrap.mock.calls.length;
@@ -161,7 +161,7 @@ describe("写完之后列表要跟着变（可见行，不是缓存开关）", (
 
     act(() => { trigger?.click(); });
     await flush();
-    const reset = document.body.querySelector<HTMLButtonElement>(".qp-color-popover-actions button");
+    const reset = document.body.querySelector<HTMLButtonElement>(".at-color-popover-actions button");
     await act(async () => { reset?.click(); });
     await flush();
 
@@ -177,15 +177,15 @@ describe("写完之后列表要跟着变（可见行，不是缓存开关）", (
        `qcm02` 原来只验了"行还在 + 名字不变"，色块没换等于用户改了白改
        （`buildAppEditCategoryOptions` 取的是 `loadedCategoryColorOverrides`）。 */
     const swatch = () =>
-      categoryRow(CUSTOM)?.querySelector<HTMLElement>(".qp-color-trigger-swatch")?.style.backgroundColor ?? "";
+      categoryRow(CUSTOM)?.querySelector<HTMLElement>(".at-color-trigger-swatch")?.style.backgroundColor ?? "";
     const beforeSwatch = swatch();
     /* 「恢复默认色」之后弹层可能还开着（它不负责关闭），点一次是开还是关取决于当前状态 ——
        所以按"输入框在不在"决定要不要点，别赌弹层的开关顺序。 */
-    if (!document.body.querySelector(".qp-color-text-input")) {
-      act(() => { categoryRow(CUSTOM)?.querySelector<HTMLButtonElement>(".qp-color-trigger")?.click(); });
+    if (!document.body.querySelector(".at-color-text-input")) {
+      act(() => { categoryRow(CUSTOM)?.querySelector<HTMLButtonElement>(".at-color-trigger")?.click(); });
       await flush();
     }
-    const hexInput = document.body.querySelector<HTMLInputElement>(".qp-color-text-input");
+    const hexInput = document.body.querySelector<HTMLInputElement>(".at-color-text-input");
     expect(hexInput, "色块弹层里没有 HEX 输入框").not.toBeNull();
     typeInto(hexInput, "#123456");
     await flush();

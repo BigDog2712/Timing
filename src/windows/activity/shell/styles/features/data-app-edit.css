@@ -5,96 +5,96 @@
  * `data.css`（246 行）或 `quiet-pro.css`（1936 行、被 size 门禁冻死在 1936）——
  * 那两个文件加不进任何一行，而这份版式与"数据页"的骨架没有共用点。
  *
- * 分层照旧：颜色一律 `var(--qp-*)` 令牌（深浅两套主题自动跟随），间距只引用
- * `--qp-space-*` / `--qp-radius-*`，不写字面量色值、不写 emoji。
+ * 分层照旧：颜色一律 `var(--at-*)` 令牌（深浅两套主题自动跟随），间距只引用
+ * `--at-space-*` / `--at-radius-*`，不写字面量色值、不写 emoji。
  *
  * 视觉口径（为什么这么排）：
  *   · 三段用**细分割线**隔开而不是三个卡片：弹窗里再套卡片会让"哪一段可滚"变得模糊；
  *   · 勾选行整行可点（`label` 包住 checkbox + 色块 + 名字），命中区 28 高；
- *   · 主分类用一枚 `--qp-accent-muted` 底的小角标，颜色与"设为主分类"文字键同色系，
+ *   · 主分类用一枚 `--at-accent-muted` 底的小角标，颜色与"设为主分类"文字键同色系，
  *     让"谁现在是主分类"和"怎么换"在同一处可见。
  * ========================================================================== */
 
-.qp-app-edit-dialog {
-  width: min(560px, calc(100vw - 2 * var(--qp-space-page)));
+.at-app-edit-dialog {
+  width: min(560px, calc(100vw - 2 * var(--at-space-page)));
 }
 
 /* ── 标题：应用图标 + 应用名 + 一句"应用设置" ── */
-.qp-app-edit-heading {
+.at-app-edit-heading {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
-.qp-app-edit-icon {
+.at-app-edit-icon {
   flex: 0 0 auto;
   width: 18px;
   height: 18px;
-  border-radius: var(--qp-radius-chip);
+  border-radius: var(--at-radius-chip);
   object-fit: contain;
 }
 
-.qp-app-edit-app-name {
+.at-app-edit-app-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.qp-app-edit-kicker {
+.at-app-edit-kicker {
   flex: 0 0 auto;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-compact);
-  font-weight: var(--qp-font-weight-regular);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-compact);
+  font-weight: var(--at-font-weight-regular);
 }
 
 /* ── 三段：分割线 + 段标题 ── */
-.qp-app-edit-section {
+.at-app-edit-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 12px 0;
-  border-top: 1px solid var(--qp-border-subtle);
+  border-top: 1px solid var(--at-border-subtle);
 }
 
-.qp-app-edit-section:first-child {
+.at-app-edit-section:first-child {
   padding-top: 0;
   border-top: 0;
 }
 
-.qp-app-edit-section-head {
+.at-app-edit-section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.qp-app-edit-section-title {
+.at-app-edit-section-title {
   margin: 0;
-  font-size: var(--qp-font-size-body);
-  font-weight: var(--qp-font-weight-emphasis);
-  line-height: var(--qp-line-height-body);
-  color: var(--qp-text-primary);
+  font-size: var(--at-font-size-body);
+  font-weight: var(--at-font-weight-emphasis);
+  line-height: var(--at-line-height-body);
+  color: var(--at-text-primary);
 }
 
-.qp-app-edit-hint {
+.at-app-edit-hint {
   margin: 0;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-compact);
-  line-height: var(--qp-line-height-compact);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-compact);
 }
 
 /* 错误行（读取失败 / 保存失败 / 重名）：与提示行区分开 */
-.qp-app-edit-issue {
+.at-app-edit-issue {
   margin: 0 0 8px;
-  color: var(--qp-danger);
-  font-size: var(--qp-font-size-compact);
-  line-height: var(--qp-line-height-compact);
+  color: var(--at-danger);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-compact);
 }
 
 /* ── 勾选列表（分类 / 事项共用同一套行） ── */
-.qp-app-edit-picker {
+.at-app-edit-picker {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -105,24 +105,24 @@
   overflow-y: auto;
 }
 
-.qp-app-edit-picker-items {
+.at-app-edit-picker-items {
   max-height: 196px;
 }
 
-.qp-app-edit-option {
+.at-app-edit-option {
   display: flex;
   align-items: center;
   gap: 8px;
   min-height: 28px;
   padding: 0 6px;
-  border-radius: var(--qp-radius-chip);
+  border-radius: var(--at-radius-chip);
 }
 
-.qp-app-edit-option[data-checked] {
-  background: var(--qp-accent-muted);
+.at-app-edit-option[data-checked] {
+  background: var(--at-accent-muted);
 }
 
-.qp-app-edit-option-label {
+.at-app-edit-option-label {
   display: inline-flex;
   flex: 1 1 auto;
   align-items: center;
@@ -131,77 +131,77 @@
   cursor: default;
 }
 
-.qp-app-edit-check {
+.at-app-edit-check {
   flex: 0 0 auto;
   width: 13px;
   height: 13px;
   margin: 0;
-  accent-color: var(--qp-accent-default);
+  accent-color: var(--at-accent-default);
 }
 
-/* 分类色块。没有自定义色时不画（`--qp-app-edit-swatch` 缺席 → transparent） */
-.qp-app-edit-swatch {
+/* 分类色块。没有自定义色时不画（`--at-app-edit-swatch` 缺席 → transparent） */
+.at-app-edit-swatch {
   flex: 0 0 auto;
   width: 10px;
   height: 10px;
-  border: 1px solid var(--qp-border-subtle);
+  border: 1px solid var(--at-border-subtle);
   border-radius: 999px;
-  background: var(--qp-app-edit-swatch, transparent);
+  background: var(--at-app-edit-swatch, transparent);
 }
 
-.qp-app-edit-option-name {
+.at-app-edit-option-name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
 }
 
-.qp-app-edit-option[data-checked] .qp-app-edit-option-name {
-  color: var(--qp-text-primary);
+.at-app-edit-option[data-checked] .at-app-edit-option-name {
+  color: var(--at-text-primary);
 }
 
 /* 主分类角标：与"设为主分类"同色系，两件事在同一处可见 */
-.qp-app-edit-badge {
+.at-app-edit-badge {
   flex: 0 0 auto;
   padding: 0 6px;
-  border-radius: var(--qp-radius-chip);
-  background: var(--qp-accent-muted);
-  color: var(--qp-accent-default);
-  font-size: var(--qp-font-size-compact);
-  line-height: var(--qp-line-height-compact);
-  font-weight: var(--qp-font-weight-medium);
+  border-radius: var(--at-radius-chip);
+  background: var(--at-accent-muted);
+  color: var(--at-accent-default);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-compact);
+  font-weight: var(--at-font-weight-medium);
 }
 
-.qp-app-edit-row-action {
+.at-app-edit-row-action {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-  color: var(--qp-accent-default);
-  font-size: var(--qp-font-size-compact);
-  line-height: var(--qp-line-height-compact);
+  color: var(--at-accent-default);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-compact);
 }
 
-.qp-app-edit-row-action:disabled {
-  color: var(--qp-text-disabled);
+.at-app-edit-row-action:disabled {
+  color: var(--at-text-disabled);
   cursor: not-allowed;
 }
 
 /* ── 事项行：右端那颗分类下拉 ── */
-.qp-app-edit-item-category {
+.at-app-edit-item-category {
   flex: 0 0 auto;
   max-width: 148px;
 }
 
 /* ── 分类管理的用量读数（删除前的唯一判据） ── */
-.qp-app-edit-usage {
+.at-app-edit-usage {
   flex: 0 0 auto;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-compact);
-  line-height: var(--qp-line-height-compact);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-compact);
   white-space: nowrap;
 }
 
@@ -220,20 +220,20 @@
   min-width: 0;
   height: 28px;
   padding: 0 10px;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-button);
-  background: var(--qp-bg-panel);
-  font-size: var(--qp-font-size-caption);
-  color: var(--qp-text-primary);
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-button);
+  background: var(--at-bg-panel);
+  font-size: var(--at-font-size-caption);
+  color: var(--at-text-primary);
 }
 
 .data-category-create-input:focus-visible {
-  outline: 2px solid var(--qp-focus-ring);
+  outline: 2px solid var(--at-focus-ring);
   outline-offset: 1px;
 }
 
 .data-category-create-input:disabled {
-  color: var(--qp-text-disabled);
+  color: var(--at-text-disabled);
 }
 
 /* 未选色的小字（「不选色则按调色板自动取色」）：紧贴新建行，别把分类格栅往下推一截 */
@@ -242,27 +242,27 @@
 }
 
 /* 独立打开的「分类管理」弹窗：比应用设置弹窗窄一档（里面只有一栏，不是三段的表单） */
-.qp-category-manage-dialog {
+.at-category-manage-dialog {
   width: min(560px, 92vw);
 }
 
 /* 「已删除」那一行：恢复入口。单独成行、小一号，不能和上面的分类格栅混成一片 ——
    它列的是"已经不在列表里"的分类，视觉上必须与可编辑行区分开。 */
-.qp-category-restore-row {
+.at-category-restore-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px dashed var(--qp-border-subtle);
+  border-top: 1px dashed var(--at-border-subtle);
 }
 
-.qp-category-restore-row .qp-app-edit-hint {
+.at-category-restore-row .at-app-edit-hint {
   margin: 0;
 }
 
-.qp-category-restore-action {
+.at-category-restore-action {
   display: inline-flex;
   align-items: center;
   gap: 4px;

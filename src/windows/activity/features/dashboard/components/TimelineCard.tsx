@@ -170,7 +170,7 @@ export default function TimelineCard({
         controls={controls}
         id="t-timeline"
         title={copy.cardLabels.timeline}
-        className="qp-card-timeline"
+        className="at-card-timeline"
         state={state}
         skeletonRows={4}
         skeletonRow="todo"
@@ -185,30 +185,30 @@ export default function TimelineCard({
         /* [本轮] 卡底三个写入口放 **footer** 而不是 children：children 只在 ready 渲染，
            而「今天还没有计时」正是最想新建/管理事项的时刻（`ModuleShell` 的 footer 注释）。 */
         footer={(
-          <div className="qp-timeline-manage">
-            <button type="button" className="qp-link-btn" onClick={() => setDialog("create")}>
+          <div className="at-timeline-manage">
+            <button type="button" className="at-link-btn" onClick={() => setDialog("create")}>
               {copy.timelineNewItem}
             </button>
-            <button type="button" className="qp-link-btn" onClick={() => setDialog("edit")}>
+            <button type="button" className="at-link-btn" onClick={() => setDialog("edit")}>
               {copy.timelineEditItem}
             </button>
-            <button type="button" className="qp-link-btn" onClick={() => setDialog("manage")}>
+            <button type="button" className="at-link-btn" onClick={() => setDialog("manage")}>
               {copy.timelineManageItems}
             </button>
           </div>
         )}
       >
-        <ul className="qp-timeline-rows">
+        <ul className="at-timeline-rows">
           {rows.map((row) => {
             const detail = byItemId.get(Number(row.key));
             const isOpen = expanded.has(row.key);
             return (
-              <li key={row.key} className="qp-timeline-row" data-running={row.running || undefined}>
-                <span className="qp-timeline-label" title={row.label}>
+              <li key={row.key} className="at-timeline-row" data-running={row.running || undefined}>
+                <span className="at-timeline-label" title={row.label}>
                   {detail && detail.segments.length + detail.gaps.length > 0 ? (
                     <button
                       type="button"
-                      className="qp-timeline-toggle"
+                      className="at-timeline-toggle"
                       aria-expanded={isOpen}
                       title={isOpen ? copy.timelineChildrenCollapse : copy.timelineChildrenToggle(detail.segments.length + detail.gaps.length)}
                       onClick={() => toggle(row.key)}
@@ -219,17 +219,17 @@ export default function TimelineCard({
                   {row.label}
                 </span>
                 <span
-                  className="qp-timeline-range"
+                  className="at-timeline-range"
                   title={row.running ? copy.timelineNoEnd(row.endLabel) : copy.timelineRange(row.startLabel, row.endLabel)}
                 >
                   {row.running
                     ? copy.timelineNoEnd(row.endLabel)
                     : copy.timelineRange(row.startLabel, row.endLabel)}
                 </span>
-                <span className="qp-timeline-duration">{row.duration}</span>
+                <span className="at-timeline-duration">{row.duration}</span>
                 <button
                   type="button"
-                  className="qp-link-btn qp-timeline-record-edit"
+                  className="at-link-btn at-timeline-record-edit"
                   aria-label={`${copy.editRecordTime} ${row.label}`}
                   onClick={() => setRecordEditItemId(Number(row.key))}
                 >

@@ -69,13 +69,13 @@ function todo(id: number, over: Partial<TodoSummary> = {}): TodoSummary {
   return { id, title: `待办 ${id}`, plannedAt: null, remindAt: null, doneAt: null, sortOrder: id, ...over };
 }
 
-const dialog = () => document.body.querySelector<HTMLElement>(".qp-todo-dialog");
-const nameInput = () => dialog()?.querySelector<HTMLInputElement>("input.qp-todo-name-input") ?? null;
+const dialog = () => document.body.querySelector<HTMLElement>(".at-todo-dialog");
+const nameInput = () => dialog()?.querySelector<HTMLInputElement>("input.at-todo-name-input") ?? null;
 const dateInput = () => dialog()?.querySelector<HTMLInputElement>("input[type='date']") ?? null;
 const timeInput = () => dialog()?.querySelector<HTMLInputElement>("input[type='time']") ?? null;
 const remindBox = () => dialog()?.querySelector<HTMLInputElement>("input[type='checkbox']") ?? null;
-const pickers = () => Array.from(dialog()?.querySelectorAll<HTMLElement>(".qp-todo-batch-picker") ?? []);
-const chips = () => Array.from(dialog()?.querySelectorAll<HTMLElement>(".qp-todo-batch-chip") ?? []);
+const pickers = () => Array.from(dialog()?.querySelectorAll<HTMLElement>(".at-todo-batch-picker") ?? []);
+const chips = () => Array.from(dialog()?.querySelectorAll<HTMLElement>(".at-todo-batch-chip") ?? []);
 const byText = (text: string) =>
   Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
     .find((button) => button.textContent === text);
@@ -214,7 +214,7 @@ describe("TodosModule · 新建待办（批量）", () => {
     await mount();
     await openComposeWithSlot("2030-01-02", "09:00");
     /* 把日期 chip 移除 → 只剩时刻：笛卡尔积展开成 0 条的静默失败在这里先拦 */
-    act(() => { chips()[0]?.querySelector<HTMLButtonElement>(".qp-todo-batch-chip-remove")?.click(); });
+    act(() => { chips()[0]?.querySelector<HTMLButtonElement>(".at-todo-batch-chip-remove")?.click(); });
     act(() => { byText("确认")?.click(); });
     await flush();
     expect(statusText()).toContain("日期和时刻至少各选一个");
@@ -256,11 +256,11 @@ describe("TodosModule · 新建入口在卡头下方那一行（[本轮]）", ()
     await mount();
     const entry = byText("新建待办");
     expect(entry, "空态没有「新建待办」= 入口被四态门控吃掉了").not.toBeUndefined();
-    expect(entry?.closest(".qp-todo-new-row"), "入口必须在那条通栏窄行里（ModuleShell 的 subhead）")
+    expect(entry?.closest(".at-todo-new-row"), "入口必须在那条通栏窄行里（ModuleShell 的 subhead）")
       .not.toBeNull();
-    expect(entry?.closest(".qp-card-head-right"), "入口已从卡头右槽下移，不许留在那儿")
+    expect(entry?.closest(".at-card-head-right"), "入口已从卡头右槽下移，不许留在那儿")
       .toBeNull();
-    expect(container?.querySelector(".qp-card-foot, .qp-todo-foot"), "卡底那条入口条必须已经下线")
+    expect(container?.querySelector(".at-card-foot, .at-todo-foot"), "卡底那条入口条必须已经下线")
       .toBeNull();
   });
 
@@ -269,9 +269,9 @@ describe("TodosModule · 新建入口在卡头下方那一行（[本轮]）", ()
        之前。搬回卡头右槽 / 掉到列表下面都会被这一条挡住 —— 变异靶点。 */
     h.listPendingTodos.mockResolvedValue([todo(1)]);
     await mount();
-    const head = container?.querySelector(".qp-card-head");
-    const row = container?.querySelector(".qp-todo-new-row");
-    const list = container?.querySelector(".qp-todo-list");
+    const head = container?.querySelector(".at-card-head");
+    const row = container?.querySelector(".at-todo-new-row");
+    const list = container?.querySelector(".at-todo-list");
     expect(head, "找不到卡头").not.toBeNull();
     expect(row, "找不到「新建待办」那一行").not.toBeNull();
     expect(list, "ready 态应有列表").not.toBeNull();
@@ -280,7 +280,7 @@ describe("TodosModule · 新建入口在卡头下方那一行（[本轮]）", ()
     expect((row as Node).compareDocumentPosition(list as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     /* 右槽里不再有入口键：读数与 `⋯` 控件才该占那儿 */
-    expect(container?.querySelector(".qp-card-head-right .qp-link-btn"), "卡头右槽里不该再有入口键")
+    expect(container?.querySelector(".at-card-head-right .at-link-btn"), "卡头右槽里不该再有入口键")
       .toBeNull();
   });
 });
@@ -291,9 +291,9 @@ describe("TodosModule · 列表全量渲染（V-1.7a）", () => {
     h.listPendingTodos.mockResolvedValue(Array.from({ length: 8 }, (_, i) => todo(i + 1)));
     await mount();
 
-    const rows = container?.querySelectorAll(".qp-todo-row") ?? [];
+    const rows = container?.querySelectorAll(".at-todo-row") ?? [];
     expect(rows).toHaveLength(8);
-    const meta = container?.querySelector(".qp-card-meta")?.textContent ?? "";
+    const meta = container?.querySelector(".at-card-meta")?.textContent ?? "";
     expect(meta).toContain("8 条待办");
   });
 });

@@ -53,7 +53,7 @@ export default function CategorySearchField({ value, options, onChange, placehol
   }, [disabled]);
 
   return (
-    <div ref={anchorRef} className="qp-category-search">
+    <div ref={anchorRef} className="at-category-search">
       <QuietSearchField
         ref={inputRef}
         value={value}
@@ -70,7 +70,7 @@ export default function CategorySearchField({ value, options, onChange, placehol
         disabled={disabled}
         expanded={expanded}
         controls={expanded ? id : undefined}
-        className="qp-category-filter-trigger"
+        className="at-category-filter-trigger"
         onClick={() => {
           if (expanded) close();
           else {
@@ -85,12 +85,12 @@ export default function CategorySearchField({ value, options, onChange, placehol
         anchor={anchorRef.current}
         ariaLabel={text.mapping.categoryFilter}
         onClose={close}
-        className="qp-category-filter-popover"
+        className="at-category-filter-popover"
         initialFocusRef={listRef}
       >
         <div ref={listRef} role="listbox" tabIndex={0} aria-label={text.mapping.categoryFilter}
           aria-activedescendant={options.length ? `${id}-option-${index}` : undefined}
-          className="qp-category-filter-list qp-scroll-region"
+          className="at-category-filter-list at-scroll-region"
           onBlur={() => setOpen(false)}
           onKeyDown={(event) => {
             if (event.key === "Tab") close();
@@ -105,15 +105,15 @@ export default function CategorySearchField({ value, options, onChange, placehol
           {options.map((option, optionIndex) => (
             <button key={option.value} id={`${id}-option-${optionIndex}`} type="button" role="option"
               aria-selected={option.label === value} tabIndex={-1}
-              className={`qp-category-filter-option ${optionIndex === index ? "qp-category-filter-option-active" : ""}`}
+              className={`at-category-filter-option ${optionIndex === index ? "at-category-filter-option-active" : ""}`}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => select(option.label)}>
-              <span className="qp-category-filter-dot" aria-hidden style={{ backgroundColor: displayColor(option.color, "elevated") }} />
-              <span className="qp-category-filter-label">{option.label}</span>
+              <span className="at-category-filter-dot" aria-hidden style={{ backgroundColor: displayColor(option.color, "elevated") }} />
+              <span className="at-category-filter-label">{option.label}</span>
             </button>
           ))}
         </div>
-        {!options.length && <p className="qp-category-filter-empty" role="status">{text.data.categoryTrendNoMatch}</p>}
+        {!options.length && <p className="at-category-filter-empty" role="status">{text.data.categoryTrendNoMatch}</p>}
       </QuietAnchoredPopover>
     </div>
   );

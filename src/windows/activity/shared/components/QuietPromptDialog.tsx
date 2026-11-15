@@ -46,7 +46,7 @@ export default function QuietPromptDialog({
           <QuietButton
             size="large"
             onClick={onCancel}
-            className="qp-dialog-action"
+            className="at-dialog-action"
           >
             {cancelLabel}
           </QuietButton>
@@ -55,7 +55,7 @@ export default function QuietPromptDialog({
             size="large"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className="qp-dialog-action"
+            className="at-dialog-action"
           >
             {confirmLabel}
           </QuietButton>
@@ -74,7 +74,7 @@ export default function QuietPromptDialog({
             onConfirm();
           }
         }}
-        className="qp-input qp-dialog-input"
+        className="at-input at-dialog-input"
       />
     </QuietDialog>
   );

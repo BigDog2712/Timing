@@ -51,13 +51,13 @@ export function HostSyncPanel() {
   const globalError = error && !inline ? error : null;
 
   return (
-    <section className="qp-panel p-5 md:p-6 settings-host-sync">
-      {/* [本轮] 卡片外壳统一：同页另外四组都是 `qp-panel` + `SettingsPanelHeader`，
+    <section className="at-panel p-5 md:p-6 settings-host-sync">
+      {/* [本轮] 卡片外壳统一：同页另外四组都是 `at-panel` + `SettingsPanelHeader`，
           这一组原来直接用宿主页签那套 `.data` + `.data__head`（连标题都是页签名「数据管理」）。
           标题改用分组锚点表里的名字「同步与备份」—— 导航点的是这个名，卡上写另一个名，
           用户得靠位置才能对上。行为零改动：六块折叠面板与底部保存条一字未动。 */}
       <SettingsPanelHeader
-        icon={<Cloud size={16} className="text-[var(--qp-accent-default)]" />}
+        icon={<Cloud size={16} className="text-[var(--at-accent-default)]" />}
         title="同步与备份"
         className="mb-4"
       />

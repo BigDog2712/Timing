@@ -121,9 +121,9 @@ export default function HostThemeCard({ id }: HostThemeCardProps) {
   };
 
   return (
-    <section className="qp-panel p-5 md:p-6" id={id}>
+    <section className="at-panel p-5 md:p-6" id={id}>
       <SettingsPanelHeader
-        icon={<Palette size={16} strokeWidth={STROKE} className="text-[var(--qp-accent-default)]" />}
+        icon={<Palette size={16} strokeWidth={STROKE} className="text-[var(--at-accent-default)]" />}
         title="主题与主色"
       />
       <div className="mt-4 grid gap-4">
@@ -139,10 +139,10 @@ export default function HostThemeCard({ id }: HostThemeCardProps) {
                   aria-checked={on}
                   disabled={busy}
                   onClick={() => pickTheme(themeId)}
-                  className={`flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 qp-text-body disabled:opacity-50 ${
+                  className={`flex items-center gap-1.5 rounded-[8px] border px-3 py-1.5 at-text-body disabled:opacity-50 ${
                     on
-                      ? "border-[var(--qp-accent-default)] text-[var(--qp-text-primary)]"
-                      : "border-[var(--qp-border-subtle)] text-[var(--qp-text-secondary)]"
+                      ? "border-[var(--at-accent-default)] text-[var(--at-text-primary)]"
+                      : "border-[var(--at-border-subtle)] text-[var(--at-text-secondary)]"
                   }`}
                 >
                   <Icon size={14} strokeWidth={STROKE} aria-hidden />
@@ -185,14 +185,14 @@ export default function HostThemeCard({ id }: HostThemeCardProps) {
                     onReset: () => pickAccent(key, DEFAULT_HOST_ACCENTS[key]),
                   }}
                 />
-                <span className="qp-text-caption text-[var(--qp-text-tertiary)]">{hexOf(key)}</span>
+                <span className="at-text-caption text-[var(--at-text-tertiary)]">{hexOf(key)}</span>
               </span>
             </SettingsPreferenceRow>
           ))}
         </SettingsPreferenceGroup>
 
         {error ? (
-          <p className="qp-text-caption text-[var(--qp-danger)]" role="alert">{error}</p>
+          <p className="at-text-caption text-[var(--at-danger)]" role="alert">{error}</p>
         ) : null}
       </div>
     </section>

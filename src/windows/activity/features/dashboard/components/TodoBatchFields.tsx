@@ -53,13 +53,13 @@ export default function TodoBatchFields({ dates, times, onDatesChange, onTimesCh
   const removeTime = (value: string) => onTimesChange(times.filter((entry) => entry !== value));
 
   return (
-    <div className="qp-todo-batch">
-      <div className="qp-todo-field">
-        <span className="qp-todo-field-label" id="qp-todo-batch-dates">{copy.todoBatchDates}</span>
-        <div className="qp-todo-batch-picker" role="group" aria-labelledby="qp-todo-batch-dates">
+    <div className="at-todo-batch">
+      <div className="at-todo-field">
+        <span className="at-todo-field-label" id="at-todo-batch-dates">{copy.todoBatchDates}</span>
+        <div className="at-todo-batch-picker" role="group" aria-labelledby="at-todo-batch-dates">
           <input
             type="date"
-            className="qp-input qp-todo-time-input"
+            className="at-input at-todo-time-input"
             value={dateDraft}
             aria-label={copy.todoBatchDates}
             onChange={(event) => setDateDraft(event.target.value)}
@@ -72,7 +72,7 @@ export default function TodoBatchFields({ dates, times, onDatesChange, onTimesCh
           />
           <button
             type="button"
-            className="qp-button qp-button-compact qp-button-secondary"
+            className="at-button at-button-compact at-button-secondary"
             disabled={dateDraft.trim() === ""}
             aria-label={copy.todoBatchAddTime}
             onClick={addDate}
@@ -81,13 +81,13 @@ export default function TodoBatchFields({ dates, times, onDatesChange, onTimesCh
           </button>
         </div>
         {dates.length > 0 ? (
-          <ul className="qp-todo-batch-chips">
+          <ul className="at-todo-batch-chips">
             {dates.map((value) => (
-              <li key={value} className="qp-todo-batch-chip">
+              <li key={value} className="at-todo-batch-chip">
                 <span>{describeBatchDate(value, locale)}</span>
                 <button
                   type="button"
-                  className="qp-todo-batch-chip-remove"
+                  className="at-todo-batch-chip-remove"
                   aria-label={copy.todoBatchRemove(describeBatchDate(value, locale))}
                   onClick={() => removeDate(value)}
                 >
@@ -99,12 +99,12 @@ export default function TodoBatchFields({ dates, times, onDatesChange, onTimesCh
         ) : null}
       </div>
 
-      <div className="qp-todo-field">
-        <span className="qp-todo-field-label" id="qp-todo-batch-times">{copy.todoBatchTimes}</span>
-        <div className="qp-todo-batch-picker" role="group" aria-labelledby="qp-todo-batch-times">
+      <div className="at-todo-field">
+        <span className="at-todo-field-label" id="at-todo-batch-times">{copy.todoBatchTimes}</span>
+        <div className="at-todo-batch-picker" role="group" aria-labelledby="at-todo-batch-times">
           <input
             type="time"
-            className="qp-input qp-todo-time-input"
+            className="at-input at-todo-time-input"
             value={timeDraft}
             aria-label={copy.todoBatchTimes}
             onChange={(event) => setTimeDraft(event.target.value)}
@@ -117,7 +117,7 @@ export default function TodoBatchFields({ dates, times, onDatesChange, onTimesCh
           />
           <button
             type="button"
-            className="qp-button qp-button-compact qp-button-secondary"
+            className="at-button at-button-compact at-button-secondary"
             disabled={timeDraft.trim() === ""}
             aria-label={copy.todoBatchAddTime}
             onClick={addTime}
@@ -126,13 +126,13 @@ export default function TodoBatchFields({ dates, times, onDatesChange, onTimesCh
           </button>
         </div>
         {times.length > 0 ? (
-          <ul className="qp-todo-batch-chips">
+          <ul className="at-todo-batch-chips">
             {times.map((value) => (
-              <li key={value} className="qp-todo-batch-chip">
+              <li key={value} className="at-todo-batch-chip">
                 <span>{value}</span>
                 <button
                   type="button"
-                  className="qp-todo-batch-chip-remove"
+                  className="at-todo-batch-chip-remove"
                   aria-label={copy.todoBatchRemove(value)}
                   onClick={() => removeTime(value)}
                 >

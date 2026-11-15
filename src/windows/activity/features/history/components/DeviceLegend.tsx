@@ -8,7 +8,7 @@ import type { DeviceLane } from "../services/deviceLanes.ts";
  * 不是 `display:none`。用例断言的是 `queryAllByTestId('device-legend')` 为 null /
  * `queryAllByTestId('device-chip')` 长度 0，藏起来过不了。
  *
- * 版式与色值都在 `shell/styles/features/device-lanes.css`（`--qp-device-0..7`）。
+ * 版式与色值都在 `shell/styles/features/device-lanes.css`（`--at-device-0..7`）。
  */
 interface Props {
   lanes: DeviceLane[];

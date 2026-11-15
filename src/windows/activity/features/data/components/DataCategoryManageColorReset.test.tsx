@@ -65,16 +65,16 @@ async function mount() {
 
 /** 分类行上的第一个色块触发器（限定在分类格栅里：新建行那颗色块没有「恢复默认颜色」） */
 function firstColorTrigger(): HTMLButtonElement | null {
-  const surface = document.body.querySelector<HTMLElement>(".qp-category-manage-dialog");
-  return surface?.querySelector<HTMLButtonElement>(".qp-category-management-grid .qp-color-trigger") ?? null;
+  const surface = document.body.querySelector<HTMLElement>(".at-category-manage-dialog");
+  return surface?.querySelector<HTMLButtonElement>(".at-category-management-grid .at-color-trigger") ?? null;
 }
 
 /** 打开色块弹层后点「恢复默认颜色」（弹层 actions 区的第一颗图标键） */
 async function clickReset() {
   await act(async () => { firstColorTrigger()?.click(); });
   await flush();
-  const popover = document.body.querySelector<HTMLElement>(".qp-color-popover");
-  const reset = popover?.querySelector<HTMLButtonElement>(".qp-color-popover-actions button");
+  const popover = document.body.querySelector<HTMLElement>(".at-color-popover");
+  const reset = popover?.querySelector<HTMLButtonElement>(".at-color-popover-actions button");
   await act(async () => { reset?.click(); });
   await flush();
   return { popoverFound: popover !== null, resetFound: reset !== undefined && reset !== null };

@@ -15,8 +15,8 @@
  * 必须定宽：名字列是唯一可压项，按钮若是 `0 1 auto`，宽度不够时浏览器会连按钮
  * 一起压（"名字列还有余量"就成了假象）。
  * 高度 24 而非 height:100%：胶囊 py-0.5 + 1px 边 → 整体 30~32，落在"≤34"验收内。 */
-.qp-cap-action,
-.qp-topbar-tools-door {
+.at-cap-action,
+.at-topbar-tools-door {
   display: inline-flex;
   flex: 0 0 28px;
   width: 28px;
@@ -25,38 +25,38 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: var(--qp-radius-button);
+  border-radius: var(--at-radius-button);
   background: transparent;
   padding: 0;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   cursor: default;
-  transition: background-color var(--qp-motion-fast) var(--qp-motion-ease),
-    color var(--qp-motion-fast) var(--qp-motion-ease);
+  transition: background-color var(--at-motion-fast) var(--at-motion-ease),
+    color var(--at-motion-fast) var(--at-motion-ease);
 }
 
-.qp-cap-action:hover,
-.qp-cap-action:active,
-.qp-topbar-tools-door:hover,
-.qp-topbar-tools-door:active {
-  background: var(--qp-bg-elevated);
-  color: var(--qp-text-primary);
+.at-cap-action:hover,
+.at-cap-action:active,
+.at-topbar-tools-door:hover,
+.at-topbar-tools-door:active {
+  background: var(--at-bg-elevated);
+  color: var(--at-text-primary);
 }
 
 /* 门「面开着」时只换底色、不染 accent：accent 全站只归「当前 tab」一处（01 §2.3），
  * 门是入口不是状态。 */
-.qp-topbar-tools-door[data-tools-open="true"] {
-  background: var(--qp-bg-elevated);
-  color: var(--qp-text-secondary);
+.at-topbar-tools-door[data-tools-open="true"] {
+  background: var(--at-bg-elevated);
+  color: var(--at-text-secondary);
 }
 
 /* 焦点环走 token，与紧邻的 update 键同源（tokens.css 的全局基线段）。 */
-.qp-cap-action:focus-visible,
-.qp-topbar-tools-door:focus-visible {
-  outline: 2px solid var(--qp-focus-ring);
+.at-cap-action:focus-visible,
+.at-topbar-tools-door:focus-visible {
+  outline: 2px solid var(--at-focus-ring);
   outline-offset: -2px;
 }
 
-.qp-topbar-tools-door svg {
+.at-topbar-tools-door svg {
   width: 16px;
   height: 16px;
   stroke-width: 2.4;

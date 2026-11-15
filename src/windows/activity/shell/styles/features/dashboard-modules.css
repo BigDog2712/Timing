@@ -8,25 +8,25 @@
 
 /* ── 计时分布：环 + 图例（**逐条对照 `widgets/focus.rs`**） ── */
 /* 环与图例之间 14（`focus.rs:128` 的 `ring.right() + 14.0`） */
-.qp-donut-body {
+.at-donut-body {
   display: grid;
   flex: 1 1 auto;
-  grid-template-columns: var(--qp-donut) minmax(0, 1fr);
+  grid-template-columns: var(--at-donut) minmax(0, 1fr);
   align-items: center;
   gap: 14px;
   min-height: 0;
 }
 
-.qp-donut {
+.at-donut {
   position: relative;
-  width: var(--qp-donut);
-  height: var(--qp-donut);
+  width: var(--at-donut);
+  height: var(--at-donut);
 }
 
-.qp-donut svg { display: block; width: 100%; height: 100%; }
+.at-donut svg { display: block; width: 100%; height: 100%; }
 
 /* 环心是全屏唯一居中块（几何表） */
-.qp-donut-center {
+.at-donut-center {
   position: absolute;
   inset: 0;
   display: flex;
@@ -40,30 +40,30 @@
  * 三档其实是同一条线性关系（19.5/144 ≈ 0.135），所以用环径乘系数一次算完：
  * 158 → 20.9（Rust 上限 158 时取 19.5，差 1.4px）、132 → 17.4（Rust 17）、
  * 110 → 14.5（Rust 14.5）。取 0.128 让三档同时贴合：158→20.2、132→16.9、110→14.1。 */
-.qp-donut-total {
+.at-donut-total {
   min-width: 0;
   text-align: center;
   /* 环心读数：Rust 是**按环径分三档**（`focus.rs:105`，d<118 → 14.5 / d<140 → 17 / 否则 19.5），
    * 用 clamp 连续逼近：两端钉死在 14.5 与 19.5，中段偏差 < 1px。 */
-  font-size: clamp(14.5px, var(--qp-donut-fit, 158px) * 0.128, 19.5px);
+  font-size: clamp(14.5px, var(--at-donut-fit, 158px) * 0.128, 19.5px);
   font-variant-numeric: tabular-nums;
-  font-weight: var(--qp-font-weight-emphasis);
+  font-weight: var(--at-font-weight-emphasis);
   line-height: 1.05;
   letter-spacing: -0.01em;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
 }
 
 /* 「今日合计」10（`focus.rs:121`） */
-.qp-donut-cap {
+.at-donut-cap {
   font-size: 10px;
   line-height: 13px;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
 }
 
 /* 图例区：Rust 的行是**连续**的 30px（`row_h = 30.0`，行内不再留 gap），
  * 10 / 12 两行文字都排在行内，所以这里不能有 gap —— 有 gap 时 5 行会多出 16px，
  * 最小卡里就会莫名其妙地滚起来。 */
-.qp-readouts {
+.at-readouts {
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -76,23 +76,23 @@
 /* 一行图例 = Rust `focus.rs:134-177`：
  *   点 3.5 半径，圆心在行内 x=9 / y=8；名称 12 从 x=19 起，副行 10 紧跟其下。
  * 行高 30、两行文字 15 + 13 在 30 里上下各留 1。 */
-.qp-readout {
+.at-readout {
   display: grid;
   grid-template-columns: 19px minmax(0, 1fr);
   grid-template-rows: 15px 13px;
   align-content: center;
   height: 30px;
   border-radius: 6px;
-  color: var(--qp-text-secondary);
+  color: var(--at-text-secondary);
 }
 
 /* hover 弧段 ↔ 读数行 双向联动（01 §4.2）。只改底色，不动几何（否则 5 行会跳）。
  * Rust 的悬停块是 `row.expand2(6, 0)` + 8 圆角；这里用内侧 6 圆角贴住 30 高，
  * 外扩交给负 margin 会撞到环 —— 6 圆角已经足够"贴上来"。 */
-.qp-readout[data-hover="true"] { background: var(--qp-surface-raise); }
+.at-readout[data-hover="true"] { background: var(--at-surface-raise); }
 
 /* 点 7px（Rust 半径 3.5），圆心落在行内 x=9：左缘 5.5 = 9 − 3.5 */
-.qp-readout-dot {
+.at-readout-dot {
   width: 7px;
   height: 7px;
   margin-left: 5.5px;
@@ -100,35 +100,35 @@
 }
 
 /* 名称 12 / 15（Rust `focus.rs:161` 的 `label(..., 12.0, th.text, ...)`） */
-.qp-readout-name {
+.at-readout-name {
   min-width: 0;
   overflow: hidden;
   font-size: 12px;
   line-height: 15px;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 /* 副行「62% · 3h 20m」10 / 13（Rust `focus.rs:174` 的 `10.0 / th.text3`） */
-.qp-readout-sub {
+.at-readout-sub {
   grid-column: 2;
   min-width: 0;
   overflow: hidden;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   line-height: 13px;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ── 事项分布：6 行裸条（dot / 名字 / `--qp-bar-max` 裸条 / 数字） ── */
+/* ── 事项分布：6 行裸条（dot / 名字 / `--at-bar-max` 裸条 / 数字） ── */
 /* 列表的"重置"只留事项 / 应用两条：待办列表的那一份搬进 `dashboard-todos.css`，
- * 与 `.qp-todo-row` / `.qp-todo-list` 的其余规则放在一起 —— 一张卡的样式不跨两个文件，
+ * 与 `.at-todo-row` / `.at-todo-list` 的其余规则放在一起 —— 一张卡的样式不跨两个文件，
  * 否则改列宽/间距时要来回翻。 */
-.qp-item-list,
-.qp-app-list {
+.at-item-list,
+.at-app-list {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -136,46 +136,46 @@
   overflow-y: auto;
 }
 
-.qp-item-list {
+.at-item-list {
   display: flex;
   flex-direction: column;
   align-content: start;
-  gap: var(--qp-row-gap);
+  gap: var(--at-row-gap);
 }
 
 /* [P1 视觉层] 首列保持与 dot 同宽；行 hover 用 raise 层 + 8 圆角（与图例同一口径）。
- * 行高**没动**（`--qp-row-items` 30 是档位令牌，本批不许改）。 */
-.qp-item-row {
+ * 行高**没动**（`--at-row-items` 30 是档位令牌，本批不许改）。 */
+.at-item-row {
   display: grid;
   flex: 0 0 auto;
-  grid-template-columns: 8px minmax(0, 1fr) var(--qp-bar-max) var(--qp-col-num);
+  grid-template-columns: 8px minmax(0, 1fr) var(--at-bar-max) var(--at-col-num);
   align-items: center;
   gap: 8px;
-  height: var(--qp-row-items);
+  height: var(--at-row-items);
   border-radius: 8px;
 }
 
-.qp-item-row:hover { background: var(--qp-surface-raise); }
+.at-item-row:hover { background: var(--at-surface-raise); }
 
-.qp-item-name {
+.at-item-name {
   min-width: 0;
   overflow: hidden;
-  font-size: var(--qp-font-size-row);
-  line-height: var(--qp-line-height-row);
-  color: var(--qp-text-secondary);
+  font-size: var(--at-font-size-row);
+  line-height: var(--at-line-height-row);
+  color: var(--at-text-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 /* 裸条 4 → 6：行高 30 里 4px 的条太细，6px 才在 13px 名字旁边立得住 */
-.qp-item-bar {
+.at-item-bar {
   height: 6px;
   border-radius: 999px;
-  background: var(--qp-chart-track);
+  background: var(--at-chart-track);
   overflow: hidden;
 }
 
-.qp-item-bar > span {
+.at-item-bar > span {
   display: block;
   height: 100%;
   border-radius: 999px;
@@ -184,9 +184,9 @@
 
 /* ── 空态里的环（0.13 · F2）：环 + 一句空文案纵排 ──
  * 环径跟着这块可用空间走（62cqh 给下面那行字留位置），矮卡里不会溢出被裁。
- * 宽高的全局值是 `var(--qp-donut)`（档位上限 158），空态没有 `.qp-donut-body`
- * 那层容器尺寸，所以这里自己定义 `--qp-donut-fit`（环心字号也吃这个变量）。 */
-.qp-empty-figure {
+ * 宽高的全局值是 `var(--at-donut)`（档位上限 158），空态没有 `.at-donut-body`
+ * 那层容器尺寸，所以这里自己定义 `--at-donut-fit`（环心字号也吃这个变量）。 */
+.at-empty-figure {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -195,13 +195,13 @@
   gap: 8px;
   min-height: 0;
   container-type: size;
-  --qp-donut-fit: clamp(72px, min(46cqw, 62cqh), 158px);
+  --at-donut-fit: clamp(72px, min(46cqw, 62cqh), 158px);
 }
 
 /* 文案在环下面，不参与抢高度 */
-.qp-empty-figure .qp-empty { flex: 0 0 auto; }
+.at-empty-figure .at-empty { flex: 0 0 auto; }
 
-.qp-empty-figure .qp-donut {
-  width: var(--qp-donut-fit);
-  height: var(--qp-donut-fit);
+.at-empty-figure .at-donut {
+  width: var(--at-donut-fit);
+  height: var(--at-donut-fit);
 }

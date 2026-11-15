@@ -8,7 +8,7 @@
  * 现在倍率归用户（Ctrl + 滚轮，见 `useBoardZoom`），画布按倍率长出真实尺寸，
  * 超出的部分由滚动容器吃掉：上下滚、Shift 横向滚，卡片大小与窗口大小彻底解耦。
  *
- * 舞台（`.qp-board-stage`）只负责"缩放后的占位"，画布本体仍是 1250×820 的设计点
+ * 舞台（`.at-board-stage`）只负责"缩放后的占位"，画布本体仍是 1250×820 的设计点
  * 坐标系 + `transform: scale()`（左上原点）。这样卡片的 x/y 永远不会被重排。
  */
 import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
@@ -52,8 +52,8 @@ export default function BoardCanvas({
     if (!windowDragEnabled) return;
     const target = event.target as Element | null;
     const onBackdrop = target === event.currentTarget
-      || target?.classList.contains("qp-board-stage")
-      || target?.classList.contains("qp-board-canvas");
+      || target?.classList.contains("at-board-stage")
+      || target?.classList.contains("at-board-canvas");
     if (!onBackdrop) return;
     windowDrag.onPointerDown(event);
   };
@@ -61,29 +61,29 @@ export default function BoardCanvas({
   return (
     <>
       <div
-        className="qp-board-scroll"
+        className="at-board-scroll"
         ref={hostRef}
         data-board-zoom={zoom}
         onPointerDown={handleBackdropPointerDown}
         onClickCapture={windowDragEnabled ? windowDrag.onClickCapture : undefined}
       >
-        <div className="qp-board-stage" style={{ width: BOARD_W * zoom, height: height * zoom }}>
+        <div className="at-board-stage" style={{ width: BOARD_W * zoom, height: height * zoom }}>
           <div
-            className="qp-board-canvas"
+            className="at-board-canvas"
             style={{ width: BOARD_W, height, transform: `scale(${zoom})` }}
-            aria-describedby="qp-board-hint"
+            aria-describedby="at-board-hint"
           >
             {layout.cards.map((card) => renderCard(card, zoom))}
             {layout.cards.length === 0 ? (
-              <p className="qp-board-empty">{emptyText}</p>
+              <p className="at-board-empty">{emptyText}</p>
             ) : null}
           </div>
         </div>
-        <p id="qp-board-hint" className="qp-board-hint">{hintText}</p>
+        <p id="at-board-hint" className="at-board-hint">{hintText}</p>
       </div>
       {/* 缩放反馈：只在动手那 900ms 里出现，静息不占视觉 */}
       {adjusting ? (
-        <span className="qp-board-zoom" aria-hidden="true">{Math.round(zoom * 100)}%</span>
+        <span className="at-board-zoom" aria-hidden="true">{Math.round(zoom * 100)}%</span>
       ) : null}
     </>
   );

@@ -133,41 +133,41 @@ export default function TimelineRecordTimeDialog({ itemId, itemName, onClose }: 
     <QuietDialog
       open={itemId !== null}
       title={`${copy.editRecordTime} · ${itemName}`}
-      surfaceClassName="qp-timeline-manage-dialog"
+      surfaceClassName="at-timeline-manage-dialog"
       onClose={onClose}
       actions={(
         <button
           type="button"
-          className="qp-button qp-button-compact qp-button-secondary"
+          className="at-button at-button-compact at-button-secondary"
           onClick={onClose}
         >
           {UI_TEXT.common.close}
         </button>
       )}
     >
-      <div className="qp-record-time">
-        {status === "loading" ? <p className="qp-empty">{UI_TEXT.common.loading}</p> : null}
+      <div className="at-record-time">
+        {status === "loading" ? <p className="at-empty">{UI_TEXT.common.loading}</p> : null}
         {status === "error" ? (
-          <p className="qp-timeline-manage-issue" role="status">{UI_TEXT.common.readFailed}</p>
+          <p className="at-timeline-manage-issue" role="status">{UI_TEXT.common.readFailed}</p>
         ) : null}
         {status === "ready" ? (
-          <ul className="qp-record-time-list">
+          <ul className="at-record-time-list">
             {segments.map((segment) => {
               const running = segment.endedAt === null;
               const editing = editingId === segment.id;
               return (
                 <li
                   key={segment.id}
-                  className="qp-record-time-row"
+                  className="at-record-time-row"
                   data-running={running || undefined}
                 >
                   {editing ? (
-                    <div className="qp-record-time-editor">
-                      <label className="qp-record-time-field">
-                        <span className="qp-timeline-manage-label">{copy.recordStartLabel}</span>
+                    <div className="at-record-time-editor">
+                      <label className="at-record-time-field">
+                        <span className="at-timeline-manage-label">{copy.recordStartLabel}</span>
                         <input
                           type="datetime-local"
-                          className="qp-input qp-todo-time-input"
+                          className="at-input at-todo-time-input"
                           value={startLocal}
                           aria-label={copy.recordStartLabel}
                           onChange={(event) => {
@@ -176,11 +176,11 @@ export default function TimelineRecordTimeDialog({ itemId, itemName, onClose }: 
                           }}
                         />
                       </label>
-                      <label className="qp-record-time-field">
-                        <span className="qp-timeline-manage-label">{copy.recordEndLabel}</span>
+                      <label className="at-record-time-field">
+                        <span className="at-timeline-manage-label">{copy.recordEndLabel}</span>
                         <input
                           type="datetime-local"
-                          className="qp-input qp-todo-time-input"
+                          className="at-input at-todo-time-input"
                           value={endLocal}
                           aria-label={copy.recordEndLabel}
                           onChange={(event) => {
@@ -189,10 +189,10 @@ export default function TimelineRecordTimeDialog({ itemId, itemName, onClose }: 
                           }}
                         />
                       </label>
-                      <span className="qp-timeline-item-editor-actions">
+                      <span className="at-timeline-item-editor-actions">
                         <button
                           type="button"
-                          className="qp-button qp-button-compact qp-button-primary"
+                          className="at-button at-button-compact at-button-primary"
                           disabled={busy || running || !inputsReady}
                           onClick={save}
                         >
@@ -200,7 +200,7 @@ export default function TimelineRecordTimeDialog({ itemId, itemName, onClose }: 
                         </button>
                         <button
                           type="button"
-                          className="qp-button qp-button-compact qp-button-secondary"
+                          className="at-button at-button-compact at-button-secondary"
                           disabled={busy}
                           onClick={() => setEditingId(null)}
                         >
@@ -210,19 +210,19 @@ export default function TimelineRecordTimeDialog({ itemId, itemName, onClose }: 
                     </div>
                   ) : (
                     <>
-                      <span className="qp-record-time-range">
+                      <span className="at-record-time-range">
                         {running
                           ? copy.timelineNoEnd(clockOf(segment.startedAt))
                           : copy.timelineRange(clockOf(segment.startedAt), clockOf(segment.endedAt as number))}
                       </span>
-                      <span className="qp-record-time-duration">
+                      <span className="at-record-time-duration">
                         {formatDashboardDuration(running
                           ? segment.accumulatedSec * 1000 + Math.max(0, Date.now() - segment.startedAt)
                           : segment.accumulatedSec * 1000)}
                       </span>
                       <button
                         type="button"
-                        className="qp-link-btn qp-timeline-item-action"
+                        className="at-link-btn at-timeline-item-action"
                         aria-label={`${copy.editRecordTime} ${itemName}`}
                         onClick={() => beginEdit(segment)}
                       >
@@ -231,15 +231,15 @@ export default function TimelineRecordTimeDialog({ itemId, itemName, onClose }: 
                     </>
                   )}
                   {running ? (
-                    <p className="qp-record-time-note" role="note">{copy.onlySavedEditable}</p>
+                    <p className="at-record-time-note" role="note">{copy.onlySavedEditable}</p>
                   ) : null}
                 </li>
               );
             })}
           </ul>
         ) : null}
-        {saved && !issue ? <p className="qp-timeline-manage-issue" role="status">{copy.recordSaved}</p> : null}
-        {issue ? <p className="qp-timeline-manage-issue" role="alert">{issue}</p> : null}
+        {saved && !issue ? <p className="at-timeline-manage-issue" role="status">{copy.recordSaved}</p> : null}
+        {issue ? <p className="at-timeline-manage-issue" role="alert">{issue}</p> : null}
       </div>
     </QuietDialog>
   );

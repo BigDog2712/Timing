@@ -45,20 +45,20 @@ export default function AddCardDialog({ copy, countOf, locked = false, onAdd, on
 
   return (
     <div
-      className="qp-add-card"
+      className="at-add-card"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="qp-add-card-title"
+      aria-labelledby="at-add-card-title"
       onPointerDown={(event) => {
         /* 点遮罩关闭；点面板内部不动。用 pointerdown 而不是 click：
          * 拖拽用的是 pointer 事件，click 在拖动结束后可能不触发。 */
         if (!panelRef.current?.contains(event.target as Node)) onClose();
       }}
     >
-      <div className="qp-add-card__panel" ref={panelRef}>
-        <h2 id="qp-add-card-title" className="qp-add-card__title">{copy.addTitle}</h2>
-        <p className="qp-add-card__empty">{locked ? copy.lockedNotice : copy.addNote}</p>
-        <ul className="qp-add-card__list">
+      <div className="at-add-card__panel" ref={panelRef}>
+        <h2 id="at-add-card-title" className="at-add-card__title">{copy.addTitle}</h2>
+        <p className="at-add-card__empty">{locked ? copy.lockedNotice : copy.addNote}</p>
+        <ul className="at-add-card__list">
           {CARD_IDS.map((kind, index) => {
             const spec = KIND_SPECS[kind];
             const count = countOf(kind);
@@ -67,20 +67,20 @@ export default function AddCardDialog({ copy, countOf, locked = false, onAdd, on
                 <button
                   ref={index === 0 ? firstRef : undefined}
                   type="button"
-                  className="qp-add-card__item"
+                  className="at-add-card__item"
                   disabled={locked}
                   onClick={() => onAdd(kind)}
                 >
                   <Plus size={14} strokeWidth={2} aria-hidden="true" />
-                  <span className="qp-add-card__name">{spec.label}</span>
-                  <span className="qp-add-card__hint">{spec.hint}</span>
-                  <span className="qp-add-card__count">{copy.onBoard(count)}</span>
+                  <span className="at-add-card__name">{spec.label}</span>
+                  <span className="at-add-card__hint">{spec.hint}</span>
+                  <span className="at-add-card__count">{copy.onBoard(count)}</span>
                 </button>
               </li>
             );
           })}
         </ul>
-        <button type="button" className="qp-control" onClick={onClose}>{copy.close}</button>
+        <button type="button" className="at-control" onClick={onClose}>{copy.close}</button>
       </div>
     </div>
   );

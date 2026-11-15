@@ -144,7 +144,7 @@ export default function SettingsStoragePathsGroup({
   return (
     <SettingsPreferenceGroup
       /* [复核修复] 这个 class 是**样式挂点**，不是装饰：`settings.css` 里
-         `.settings-local-paths-panel .qp-icon-action-neutral:hover/:active` 两条规则靠它命中，
+         `.settings-local-paths-panel .at-icon-action-neutral:hover/:active` 两条规则靠它命中，
          给三个目录行的图标键配 hover/按下态的背景与前景。拆分本文件时这一处丢了，
          结果那两条规则成了永不命中的孤岛 —— 症状不是报错，是"图标键 hover 没反应"。
          别删那两条选择器，也别把这个 class 摘掉（判据见

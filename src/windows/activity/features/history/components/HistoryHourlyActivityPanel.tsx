@@ -28,9 +28,9 @@ export default function HistoryHourlyActivityPanel({
 }: HistoryHourlyActivityPanelProps) {
   const UI_TEXT = useLocaleText();
   return (
-    <div className="qp-panel p-5 history-pulse-card history-pulse-card-primary">
+    <div className="at-panel p-5 history-pulse-card history-pulse-card-primary">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="qp-weight-emphasis text-[var(--qp-text-primary)] qp-text-section-title">{UI_TEXT.history.dailyHourlyActivity}</h3>
+        <h3 className="at-weight-emphasis text-[var(--at-text-primary)] at-text-section-title">{UI_TEXT.history.dailyHourlyActivity}</h3>
         <QuietIconAction
           icon={<Layers3 size={15} />}
           title={actionLabel}

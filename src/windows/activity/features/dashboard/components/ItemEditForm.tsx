@@ -57,9 +57,9 @@ export default function ItemEditForm({
   };
 
   return (
-    <div className="qp-timeline-item-editor">
+    <div className="at-timeline-item-editor">
       <input
-        className="qp-input qp-timeline-manage-input"
+        className="at-input at-timeline-manage-input"
         value={draftName}
         maxLength={ITEM_NAME_MAX_LEN}
         autoFocus
@@ -69,7 +69,7 @@ export default function ItemEditForm({
         onKeyDown={onKeyDown}
       />
       <input
-        className="qp-input qp-timeline-manage-timer"
+        className="at-input at-timeline-manage-timer"
         value={draftMinutes}
         inputMode="numeric"
         aria-label={copy.timelineTimerLabel}
@@ -77,10 +77,10 @@ export default function ItemEditForm({
         onChange={(event) => onMinutesChange(event.target.value)}
         onKeyDown={onKeyDown}
       />
-      <span className="qp-timeline-item-editor-actions">
+      <span className="at-timeline-item-editor-actions">
         <button
           type="button"
-          className="qp-button qp-button-compact qp-button-primary"
+          className="at-button at-button-compact at-button-primary"
           disabled={busy}
           onClick={onSave}
         >
@@ -88,7 +88,7 @@ export default function ItemEditForm({
         </button>
         <button
           type="button"
-          className="qp-button qp-button-compact qp-button-secondary"
+          className="at-button at-button-compact at-button-secondary"
           disabled={busy}
           onClick={onCancel}
         >
@@ -96,7 +96,7 @@ export default function ItemEditForm({
         </button>
       </span>
       {issue ? (
-        <p className="qp-timeline-manage-issue" role="status">{issue}</p>
+        <p className="at-timeline-manage-issue" role="status">{issue}</p>
       ) : null}
     </div>
   );

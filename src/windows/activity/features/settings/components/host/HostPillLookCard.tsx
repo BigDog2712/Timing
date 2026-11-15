@@ -118,9 +118,9 @@ export default function HostPillLookCard({ id }: HostPillLookCardProps) {
   };
 
   return (
-    <section className="qp-panel p-5 md:p-6" id={id}>
+    <section className="at-panel p-5 md:p-6" id={id}>
       <SettingsPanelHeader
-        icon={<Droplet size={16} strokeWidth={STROKE} className="text-[var(--qp-accent-default)]" />}
+        icon={<Droplet size={16} strokeWidth={STROKE} className="text-[var(--at-accent-default)]" />}
         title="悬浮条外观"
       />
       <div className="mt-4">
@@ -135,10 +135,10 @@ export default function HostPillLookCard({ id }: HostPillLookCardProps) {
                     type="button"
                     aria-pressed={on}
                     onClick={() => patch({ floatForm: option.id })}
-                    className={`rounded-[8px] border px-3 py-1.5 qp-text-body ${
+                    className={`rounded-[8px] border px-3 py-1.5 at-text-body ${
                       on
-                        ? "border-[var(--qp-accent-default)] text-[var(--qp-text-primary)]"
-                        : "border-[var(--qp-border-subtle)] text-[var(--qp-text-secondary)]"
+                        ? "border-[var(--at-accent-default)] text-[var(--at-text-primary)]"
+                        : "border-[var(--at-border-subtle)] text-[var(--at-text-secondary)]"
                     }`}
                   >
                     {option.label}
@@ -155,7 +155,7 @@ export default function HostPillLookCard({ id }: HostPillLookCardProps) {
             {error}
           </p>
         )}
-        <p className="mt-3 flex items-center gap-1.5 qp-text-caption text-[var(--qp-text-tertiary)]">
+        <p className="mt-3 flex items-center gap-1.5 at-text-caption text-[var(--at-text-tertiary)]">
           <Type size={12} strokeWidth={STROKE} aria-hidden />
           改完回到悬浮条即时生效（最长延迟 = 一次焦点切换）。
         </p>

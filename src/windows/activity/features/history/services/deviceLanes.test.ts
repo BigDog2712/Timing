@@ -53,7 +53,7 @@ describe("deviceColor", () => {
   });
 
   it("空 id 给中性令牌而不是色相（不参与轮盘）", () => {
-    expect(deviceColor("   ")).toBe("var(--qp-text-tertiary)");
+    expect(deviceColor("   ")).toBe("var(--at-text-tertiary)");
   });
 
   it("短名取前 6 位", () => {

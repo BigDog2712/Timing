@@ -100,11 +100,11 @@ export default function ActivityReminderAlertDialog({ details, onAction, notific
       <div className="tools-usage-step-limit" inert={step !== "limit"}>
         <div className="tools-usage-alert-identity"><span className="tools-usage-alert-icon" aria-hidden>{targetIcon}</span>
           <span className="tools-usage-alert-name">{details.targetLabel}</span></div>
-        <div className="qp-dialog-title">{text.tools.usageLimitReached}</div>
+        <div className="at-dialog-title">{text.tools.usageLimitReached}</div>
         <p className="tools-usage-alert-summary">{text.tools.usageLimitSummary(duration(details.usageMs))}</p>
       </div>
       <div inert={step !== "extend"}>
-        <div className="qp-dialog-title">{text.tools.usageExtendTitle(details.targetLabel)}</div>
+        <div className="at-dialog-title">{text.tools.usageExtendTitle(details.targetLabel)}</div>
         <fieldset className="tools-usage-alert-options" aria-label={text.tools.usageExtensionDuration} disabled={busy}>
           {choices.map(choice => <label key={choice.value} className="tools-usage-alert-option">
             <span>{choice.label}</span>

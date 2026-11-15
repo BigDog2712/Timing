@@ -6,32 +6,32 @@
   --font-sans: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
   --font-mono: "Consolas", "SFMono-Regular", "JetBrains Mono", monospace;
 
-  --color-bg-app: var(--qp-bg-app);
-  --color-bg-canvas: var(--qp-bg-canvas);
-  --color-bg-panel: var(--qp-bg-panel);
-  --color-bg-elevated: var(--qp-bg-elevated);
+  --color-bg-app: var(--at-bg-app);
+  --color-bg-canvas: var(--at-bg-canvas);
+  --color-bg-panel: var(--at-bg-panel);
+  --color-bg-elevated: var(--at-bg-elevated);
 
-  --color-border-subtle: var(--qp-border-subtle);
-  --color-border-strong: var(--qp-border-strong);
+  --color-border-subtle: var(--at-border-subtle);
+  --color-border-strong: var(--at-border-strong);
 
-  --color-text-primary: var(--qp-text-primary);
-  --color-text-secondary: var(--qp-text-secondary);
-  --color-text-tertiary: var(--qp-text-tertiary);
+  --color-text-primary: var(--at-text-primary);
+  --color-text-secondary: var(--at-text-secondary);
+  --color-text-tertiary: var(--at-text-tertiary);
 
-  --color-accent-default: var(--qp-accent-default);
-  --color-accent-muted: var(--qp-accent-muted);
+  --color-accent-default: var(--at-accent-default);
+  --color-accent-muted: var(--at-accent-muted);
 
-  --color-success: var(--qp-success);
-  --color-participation: var(--qp-participation);
-  --color-warning: var(--qp-warning);
-  --color-danger: var(--qp-danger);
+  --color-success: var(--at-success);
+  --color-participation: var(--at-participation);
+  --color-warning: var(--at-warning);
+  --color-danger: var(--at-danger);
 
-  --color-control-off: var(--qp-control-off);
-  --color-track-muted: var(--qp-track-muted);
-  --color-badge-subtle: var(--qp-badge-subtle);
-  --color-text-disabled: var(--qp-text-disabled);
-  --color-scrollbar-default: var(--qp-scrollbar-default);
-  --color-scrollbar-hover: var(--qp-scrollbar-hover);
+  --color-control-off: var(--at-control-off);
+  --color-track-muted: var(--at-track-muted);
+  --color-badge-subtle: var(--at-badge-subtle);
+  --color-text-disabled: var(--at-text-disabled);
+  --color-scrollbar-default: var(--at-scrollbar-default);
+  --color-scrollbar-hover: var(--at-scrollbar-hover);
 }
 
 :root {
@@ -48,62 +48,62 @@
    * 各字重 advance 完全相同（实测全档 98.00），"用宽度判中文塌陷"是恒真式、永远绿。
    * 实测 ink（28px）：雅黑 300=341539 / 400·450·500=469334 / 550·600·650·700=702837；
    *                 拉丁 300=225501 / 400·450=326524 / 500·550·600=425004 / 650·700=521826。 */
-  --qp-font-weight-regular: 400;
+  --at-font-weight-regular: 400;
   /* deprecated: 与 regular 同值，新代码禁用；保留名字只为不波及 70 处引用 */
-  --qp-font-weight-medium: 400;
-  --qp-font-weight-emphasis: 700;
-  --qp-font-size-compact: 0.625rem;
-  --qp-line-height-compact: 0.875rem;
-  --qp-font-size-page-title: 1.125rem;
-  --qp-line-height-page-title: 1.5rem;
-  --qp-font-size-section-title: 1rem;
-  --qp-line-height-section-title: 1.375rem;
-  --qp-font-size-group-title: 0.9375rem;
-  --qp-line-height-group-title: 1.25rem;
-  --qp-font-size-body: 0.875rem;
-  --qp-line-height-body: 1.25rem;
-  --qp-font-size-caption: 0.75rem;
-  --qp-line-height-caption: 1.125rem;
-  --qp-font-size-metric: 1.5rem;
-  --qp-line-height-metric: 1.75rem;
+  --at-font-weight-medium: 400;
+  --at-font-weight-emphasis: 700;
+  --at-font-size-compact: 0.625rem;
+  --at-line-height-compact: 0.875rem;
+  --at-font-size-page-title: 1.125rem;
+  --at-line-height-page-title: 1.5rem;
+  --at-font-size-section-title: 1rem;
+  --at-line-height-section-title: 1.375rem;
+  --at-font-size-group-title: 0.9375rem;
+  --at-line-height-group-title: 1.25rem;
+  --at-font-size-body: 0.875rem;
+  --at-line-height-body: 1.25rem;
+  --at-font-size-caption: 0.75rem;
+  --at-line-height-caption: 1.125rem;
+  --at-font-size-metric: 1.5rem;
+  --at-line-height-metric: 1.75rem;
 
-  --qp-scrollbar-size: 6px;
-  --qp-scrollbar-button-size: 6px;
-  --qp-scrollbar-thumb-inset: 0px;
+  --at-scrollbar-size: 6px;
+  --at-scrollbar-button-size: 6px;
+  --at-scrollbar-thumb-inset: 0px;
 
-  --qp-radius-panel: 14px;
-  /* 卡片面。**不要用 `--qp-radius-panel` 顶替**：那个 14 全仓 18 处在用（`.qp-panel`
+  --at-radius-panel: 14px;
+  /* 卡片面。**不要用 `--at-radius-panel` 顶替**：那个 14 全仓 18 处在用（`.at-panel`
    * 系的数据管理/设置两视图），改它等于改那些视图的排版；卡片层单独一条。
    * `-drag` 留给下一批的拖拽态（本批无消费者，见 dashboard-surface.css 顶部）。 */
-  --qp-radius-card: 18px;
-  --qp-radius-card-drag: 22px;
-  --qp-radius-control: 10px;
-  --qp-radius-button: 8px;
-  --qp-radius-chip: 8px;
-  --qp-radius-timeline-segment: 2px;
+  --at-radius-card: 18px;
+  --at-radius-card-drag: 22px;
+  --at-radius-control: 10px;
+  --at-radius-button: 8px;
+  --at-radius-chip: 8px;
+  --at-radius-timeline-segment: 2px;
 
-  --qp-shadow-overlay: 0 10px 24px rgba(17, 24, 39, 0.08);
-  --qp-shadow-toast: 0 8px 20px rgba(17, 24, 39, 0.1);
+  --at-shadow-overlay: 0 10px 24px rgba(17, 24, 39, 0.08);
+  --at-shadow-toast: 0 8px 20px rgba(17, 24, 39, 0.1);
 
-  --qp-space-page: 24px;
-  --qp-space-section: 20px;
-  --qp-space-group: 14px;
-  --qp-row-height: 42px;
+  --at-space-page: 24px;
+  --at-space-section: 20px;
+  --at-space-group: 14px;
+  --at-row-height: 42px;
   /* 顶栏 52 = 长档基准（1100×736）。短档 44 的覆盖只写在 topbar.css 的
    * @media (max-height: 735.98px) 里，不在这里重复定义第二个真相源。全仓消费点只有
    * quiet-pro.css:19-20 的 .app-titlebar（flex-basis + height），改 token 即两头一起变。 */
-  --qp-titlebar-height: 52px;
-  --qp-window-corner-radius: 8px;
+  --at-titlebar-height: 52px;
+  --at-window-corner-radius: 8px;
   /* 工具区段轨内缩，设计里散在 5 处；新写的类必须引用它，不许写裸 6px（01 §2.3） */
-  --qp-rail-inset: 6px;
+  --at-rail-inset: 6px;
 
-  --qp-motion-fast: 120ms;
-  --qp-motion-base: 180ms;
-  --qp-motion-ease: cubic-bezier(0.2, 0, 0, 1);
+  --at-motion-fast: 120ms;
+  --at-motion-base: 180ms;
+  --at-motion-ease: cubic-bezier(0.2, 0, 0, 1);
 
 
   background-color: transparent;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
   color-scheme: light;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -112,14 +112,14 @@
 }
 
 :root[data-theme="dark"] {
-  --qp-shadow-overlay: 0 10px 24px rgba(0, 0, 0, 0.28);
-  --qp-shadow-toast: 0 8px 20px rgba(0, 0, 0, 0.3);
+  --at-shadow-overlay: 0 10px 24px rgba(0, 0, 0, 0.28);
+  --at-shadow-toast: 0 8px 20px rgba(0, 0, 0, 0.3);
   color-scheme: dark;
 }
 
-/* ── 派生色（01 §2.1）：一律用 color-mix 引用既有 --qp-*，**不写死 hex、不进 deriveTheme**。
+/* ── 派生色（01 §2.1）：一律用 color-mix 引用既有 --at-*，**不写死 hex、不进 deriveTheme**。
  * 理由：deriveTheme 的返回值被 useAppThemeMode 逐条写进 :root 行内样式；宿主换色后
- * --qp-accent-default 还会被 applyHostAccents 再改一次。写成 CSS 里的引用式 color-mix
+ * --at-accent-default 还会被 applyHostAccents 再改一次。写成 CSS 里的引用式 color-mix
  * 才能自动跟随宿主取色，且 5 套主题预设一行都不用改。
  * 这块是**默认/回退值**（= 浅色那套），不是"只在 light 下生效"：html 上 data-theme 恒有值，
  * dark 时会先套用这块、再被下一块同名 token 覆盖。所以**两处同名 token 必须成对出现**，
@@ -127,9 +127,9 @@
 :root {
   /* 占位符：浅色**不许**照搬暗色的 40% 混合（会得到 ≈6.3:1，占位比正文还响）。
    * 直接等于 tertiary = #707070 on panel(#fff) = 4.95:1（正文 15.9:1，层级正确）。 */
-  --qp-text-placeholder: var(--qp-text-tertiary);
+  --at-text-placeholder: var(--at-text-tertiary);
   /* 选中底：浅色 55% → #8ea7ca，对 panel 2.46:1、primary(#171717) 在其上 7.28:1 */
-  --qp-selection-bg: color-mix(in srgb, var(--qp-accent-default) 55%, var(--qp-bg-panel));
+  --at-selection-bg: color-mix(in srgb, var(--at-accent-default) 55%, var(--at-bg-panel));
   /* 焦点环（修既有缺陷：全仓 5 处引用、0 处定义，见 topbar.css 顶部注释与 02 §0 末段）。
    * 74% 是 44 §3.4 的终值；但 74% 那一档在**浅色**最不利的背景（bg-app #f4f4f4）上只有
    * ≈3.27:1，低于"两主题都不需要运气"的 3.41 下限，所以浅色提一档到 78%（实测对 app 3.58）。
@@ -146,45 +146,45 @@
    * 两个主题的全局最差 3.57 / 3.58，都 ≥ WCAG 2.2 SC 1.4.11 的 3.0。
    * 对照：若混 transparent（= alpha 版），同一环在四层背景上会渲染成 4 个不同色
    * （暗 #6f7f96/#708097/#728299/#718198），对比度变成四个答案 3.95/3.76/3.52/3.62。 */
-  --qp-focus-ring: color-mix(in srgb, var(--qp-accent-default) 78%, var(--qp-bg-panel));
+  --at-focus-ring: color-mix(in srgb, var(--at-accent-default) 78%, var(--at-bg-panel));
 }
 
 :root[data-theme="dark"] {
   /* 暗 40% = #9199a3 on panel(#2d2d2d) = 4.78:1 */
-  --qp-text-placeholder: color-mix(in srgb, var(--qp-text-secondary) 40%, var(--qp-text-tertiary));
+  --at-text-placeholder: color-mix(in srgb, var(--at-text-secondary) 40%, var(--at-text-tertiary));
   /* 暗 40% = #535b68：对 panel 2.01:1、primary 在其上 4.65:1。
    * 可行区间只有 40%–41.4%：再淡看不出选中，再深选中区的字跌破 4.5:1 —— 不许顺手调圆整。 */
-  --qp-selection-bg: color-mix(in srgb, var(--qp-accent-default) 40%, var(--qp-bg-panel));
-  --qp-focus-ring: color-mix(in srgb, var(--qp-accent-default) 74%, var(--qp-bg-panel));
+  --at-selection-bg: color-mix(in srgb, var(--at-accent-default) 40%, var(--at-bg-panel));
+  --at-focus-ring: color-mix(in srgb, var(--at-accent-default) 74%, var(--at-bg-panel));
 }
 
 /* ── 卡片表面层次（P1 视觉层）：board / card / inset / raise 四层 + 边与影 ──
- * 写法与上面 `--qp-focus-ring` 那块一致：浅色 `:root`、暗色 `:root[data-theme="dark"]`，
+ * 写法与上面 `--at-focus-ring` 那块一致：浅色 `:root`、暗色 `:root[data-theme="dark"]`，
  * **两处同名 token 必须成对**（漏一个 = 暗色静默沿用浅色值）。不进 `deriveTheme`：
  * 那套管"随宿主取色 / 主题预设漂移"的颜色，表面层次是固定的中性灰阶，不跟预设。
  * 消费点：`features/dashboard-surface.css` 与六张卡各自的版式文件。 */
 :root {
-  --qp-surface-board: #f7f7f7;
-  --qp-surface-card: #ffffff;
-  --qp-surface-inset: #f1f1f1;
-  --qp-surface-raise: #f8f8f8;
-  --qp-card-edge: #e2e4e7;
+  --at-surface-board: #f7f7f7;
+  --at-surface-card: #ffffff;
+  --at-surface-inset: #f1f1f1;
+  --at-surface-raise: #f8f8f8;
+  --at-card-edge: #e2e4e7;
   /* 亮色立边靠 outline；不再叠 0 0 0 1px 黑边（同位置两层会读成 2px 深边） */
-  --qp-card-shadow-rest: 0 1px 2px rgb(20 24 30 / 8%);
-  --qp-card-shadow-hover: 0 2px 8px rgb(20 24 30 / 12%);
+  --at-card-shadow-rest: 0 1px 2px rgb(20 24 30 / 8%);
+  --at-card-shadow-hover: 0 2px 8px rgb(20 24 30 / 12%);
 }
 
 :root[data-theme="dark"] {
-  --qp-surface-board: #1d1d1d;
-  --qp-surface-card: #2d2d2d;
-  --qp-surface-inset: #2a2a2a;
-  --qp-surface-raise: #393a3c;
+  --at-surface-board: #1d1d1d;
+  --at-surface-card: #2d2d2d;
+  --at-surface-inset: #2a2a2a;
+  --at-surface-raise: #393a3c;
   /* 暗色不画 outline（卡面 : 画布仅 1.14:1），边界靠三层影：inset 上缘反光(厚度) +
    * inset 内环(轮廓，外扩会胖 1px、缝 16→14) + 投影(离地)。降级只降内环 34%→24%→18% 永不删；
    * rest/hover **层数必须相等**，否则 transition:box-shadow 不插值、悬停是硬切。 */
-  --qp-card-edge: transparent;
-  --qp-card-shadow-rest: inset 0 1px 0 rgb(209 213 220 / 9%), inset 0 0 0 1px rgb(0 0 0 / 34%), 0 1px 2px rgb(0 0 0 / 34%);
-  --qp-card-shadow-hover: inset 0 1px 0 rgb(209 213 220 / 12%), inset 0 0 0 1px rgb(0 0 0 / 34%), 0 2px 8px rgb(0 0 0 / 30%);
+  --at-card-edge: transparent;
+  --at-card-shadow-rest: inset 0 1px 0 rgb(209 213 220 / 9%), inset 0 0 0 1px rgb(0 0 0 / 34%), 0 1px 2px rgb(0 0 0 / 34%);
+  --at-card-shadow-hover: inset 0 1px 0 rgb(209 213 220 / 12%), inset 0 0 0 1px rgb(0 0 0 / 34%), 0 2px 8px rgb(0 0 0 / 30%);
 }
 
 * {
@@ -202,11 +202,11 @@ body {
   margin: 0;
   min-height: 100vh;
   background: transparent;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
   font-family: var(--font-sans);
-  font-weight: var(--qp-font-weight-regular);
-  font-size: var(--qp-font-size-body);
-  line-height: var(--qp-line-height-body);
+  font-weight: var(--at-font-weight-regular);
+  font-size: var(--at-font-size-body);
+  line-height: var(--at-line-height-body);
   overflow: hidden;
 }
 
@@ -215,25 +215,25 @@ h2,
 h3 {
   margin: 0;
   letter-spacing: -0.015em;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
 }
 
 @layer base {
-  strong, b { font-weight: var(--qp-font-weight-emphasis); }
+  strong, b { font-weight: var(--at-font-weight-emphasis); }
   h1 {
-    font-size: var(--qp-font-size-page-title);
-    font-weight: var(--qp-font-weight-emphasis);
-    line-height: var(--qp-line-height-page-title);
+    font-size: var(--at-font-size-page-title);
+    font-weight: var(--at-font-weight-emphasis);
+    line-height: var(--at-line-height-page-title);
   }
   h2 {
-    font-size: var(--qp-font-size-section-title);
-    font-weight: var(--qp-font-weight-emphasis);
-    line-height: var(--qp-line-height-section-title);
+    font-size: var(--at-font-size-section-title);
+    font-weight: var(--at-font-weight-emphasis);
+    line-height: var(--at-line-height-section-title);
   }
   h3 {
-    font-size: var(--qp-font-size-group-title);
-    font-weight: var(--qp-font-weight-emphasis);
-    line-height: var(--qp-line-height-group-title);
+    font-size: var(--at-font-size-group-title);
+    font-weight: var(--at-font-weight-emphasis);
+    line-height: var(--at-line-height-group-title);
   }
 }
 
@@ -252,40 +252,40 @@ textarea {
 }
 
 button {
-  transition: color var(--qp-motion-fast) var(--qp-motion-ease),
-    border-color var(--qp-motion-fast) var(--qp-motion-ease),
-    background-color var(--qp-motion-fast) var(--qp-motion-ease),
-    transform var(--qp-motion-fast) var(--qp-motion-ease);
+  transition: color var(--at-motion-fast) var(--at-motion-ease),
+    border-color var(--at-motion-fast) var(--at-motion-ease),
+    background-color var(--at-motion-fast) var(--at-motion-ease),
+    transform var(--at-motion-fast) var(--at-motion-ease);
 }
 
 :where(button, [role="button"], input, select, textarea):focus-visible {
-  outline: 2px solid var(--qp-focus-ring);
+  outline: 2px solid var(--at-focus-ring);
   outline-offset: 1px;
 }
 
 @layer utilities {
-  .qp-weight-regular { font-weight: var(--qp-font-weight-regular); }
-  .qp-weight-medium { font-weight: var(--qp-font-weight-medium); }
-  .qp-weight-emphasis { font-weight: var(--qp-font-weight-emphasis); }
-  .qp-text-section-title {
-    font-size: var(--qp-font-size-section-title);
-    line-height: var(--qp-line-height-section-title);
+  .at-weight-regular { font-weight: var(--at-font-weight-regular); }
+  .at-weight-medium { font-weight: var(--at-font-weight-medium); }
+  .at-weight-emphasis { font-weight: var(--at-font-weight-emphasis); }
+  .at-text-section-title {
+    font-size: var(--at-font-size-section-title);
+    line-height: var(--at-line-height-section-title);
   }
-  .qp-text-group-title {
-    font-size: var(--qp-font-size-group-title);
-    line-height: var(--qp-line-height-group-title);
+  .at-text-group-title {
+    font-size: var(--at-font-size-group-title);
+    line-height: var(--at-line-height-group-title);
   }
-  .qp-text-body {
-    font-size: var(--qp-font-size-body);
-    line-height: var(--qp-line-height-body);
+  .at-text-body {
+    font-size: var(--at-font-size-body);
+    line-height: var(--at-line-height-body);
   }
-  .qp-text-caption {
-    font-size: var(--qp-font-size-caption);
-    line-height: var(--qp-line-height-caption);
+  .at-text-caption {
+    font-size: var(--at-font-size-caption);
+    line-height: var(--at-line-height-caption);
   }
-  .qp-text-metric {
-    font-size: var(--qp-font-size-metric);
-    line-height: var(--qp-line-height-metric);
+  .at-text-metric {
+    font-size: var(--at-font-size-metric);
+    line-height: var(--at-line-height-metric);
   }
 }
 
@@ -293,6 +293,6 @@ button {
  * 3.24:1，写了才统一到 primary（暗 4.65:1 / 浅 7.28:1）。
  * 全仓此前 ::selection 规则 0 处，无旧值要覆盖。 */
 ::selection {
-  background: var(--qp-selection-bg);
-  color: var(--qp-text-primary);
+  background: var(--at-selection-bg);
+  color: var(--at-text-primary);
 }

@@ -33,7 +33,7 @@ export default function CategoryColorControls({
   }
 
   return (
-    <div className="qp-category-management-grid">
+    <div className="at-category-management-grid">
       {categories.map((category) => {
         const label = getCategoryLabel(category);
         const color = getCategoryColor(category);
@@ -41,7 +41,7 @@ export default function CategoryColorControls({
         return (
           <div
             key={category}
-            className="rounded-[10px] border border-[var(--qp-border-subtle)] bg-[var(--qp-bg-panel)] px-3 py-2.5"
+            className="rounded-[10px] border border-[var(--at-border-subtle)] bg-[var(--at-bg-panel)] px-3 py-2.5"
           >
             <div className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 items-center gap-1">
@@ -54,10 +54,10 @@ export default function CategoryColorControls({
                   title={UI_TEXT.mapping.color}
                   resetAction={{ label: UI_TEXT.mapping.restoreDefaultColor, onReset: () => onApplyColor(category, null) }}
                 />
-                <span className="min-w-0 truncate qp-text-body qp-weight-medium text-[var(--qp-text-primary)]">{label}</span>
+                <span className="min-w-0 truncate at-text-body at-weight-medium text-[var(--at-text-primary)]">{label}</span>
                 <QuietIconAction
                   icon={<PencilLine size={13} />}
-                  className="qp-icon-action-dimmed"
+                  className="at-icon-action-dimmed"
                   onClick={() => onRenameCategory(category)}
                   title={UI_TEXT.mapping.renameCategory(label)}
                 />

@@ -54,19 +54,19 @@ export default function TrendModule({ controls, model }: Props) {
       onRetry={model.retry}
       emptyText={copy.trendEmpty}
     >
-      <div className="qp-trend-head">
+      <div className="at-trend-head">
         <span>{copy.trendTotal(formatDashboardDuration(total))}</span>
         {peakLabel ? <span>{copy.trendPeak(peakLabel)}</span> : null}
       </div>
 
-      {/* 基线（`trend.rs:52-55`）用 `::after` 画在 `.qp-trend` 上 —— `ul` 里塞别的元素是
+      {/* 基线（`trend.rs:52-55`）用 `::after` 画在 `.at-trend` 上 —— `ul` 里塞别的元素是
           非法结构，而这条线本来也没有语义。 */}
       <ul
-        className="qp-trend"
+        className="at-trend"
         /* 属性名沿用 `data-trend-days`（QA 脚本/截图契约里就是它），**语义是「展示桶数」**：
            正常日恒 24（DST 前跳日少一格 —— 那一小时本地不存在）。 */
         data-trend-days={windows.length}
-        style={{ "--qp-trend-n": windows.length } as CSSProperties}
+        style={{ "--at-trend-n": windows.length } as CSSProperties}
       >
         {windows.map((window, index) => {
           /* 覆盖 now 的那一桶 = 唯一还在长的柱，用强调色标出来（不是"最后一桶"） */
@@ -90,12 +90,12 @@ export default function TrendModule({ controls, model }: Props) {
           return (
             <li
               key={window.key}
-              className={`qp-trend__day${isNow ? " is-today" : ""}`}
+              className={`at-trend__day${isNow ? " is-today" : ""}`}
               data-duration={window.durationMs}
               data-empty={window.durationMs > 0 ? undefined : "1"}
             >
               <span
-                className="qp-trend__bar"
+                className="at-trend__bar"
                 /* 有量但极小的小时至少 3px（`trend.rs:82` 的 `.max(3.0)`）：0 高等于
                    "这个小时没用过"，是假话。真为 0 的留下 2px 底桩（exe 是 1.5，取整到 2）。 */
                 style={{
@@ -103,7 +103,7 @@ export default function TrendModule({ controls, model }: Props) {
                 }}
                 title={copy.trendBar(slot, formatDashboardDuration(window.durationMs))}
               />
-              <span className="qp-trend__label">{showLabel ? label : ""}</span>
+              <span className="at-trend__label">{showLabel ? label : ""}</span>
             </li>
           );
         })}

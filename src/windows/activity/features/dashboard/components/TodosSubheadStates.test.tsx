@@ -63,11 +63,11 @@ async function mount(): Promise<void> {
   await flush();
 }
 
-const entryRow = () => container?.querySelector<HTMLElement>(".qp-todo-new-row") ?? null;
+const entryRow = () => container?.querySelector<HTMLElement>(".at-todo-new-row") ?? null;
 const entryButton = () =>
   Array.from(entryRow()?.querySelectorAll<HTMLButtonElement>("button") ?? [])
     .find((button) => (button.textContent ?? "").includes("新建待办")) ?? null;
-const dialog = () => document.body.querySelector<HTMLElement>(".qp-todo-dialog");
+const dialog = () => document.body.querySelector<HTMLElement>(".at-todo-dialog");
 
 beforeEach(() => {
   h.listPendingTodos.mockReset();
@@ -89,7 +89,7 @@ describe("待办卡 · 新建入口在四态里都要在（subhead 不受 state 
     /* 永不 resolve：模块停在 loading 态 */
     h.listPendingTodos.mockImplementation(() => new Promise(() => {}));
     await mount();
-    expect(container?.querySelector(".qp-skeleton"), "没进 loading 态（夹具失效）").not.toBeNull();
+    expect(container?.querySelector(".at-skeleton"), "没进 loading 态（夹具失效）").not.toBeNull();
     expect(entryRow(), "loading 态没有「新建待办」那一行").not.toBeNull();
     expect(entryButton(), "loading 态那一行里没有按钮").not.toBeNull();
   });
@@ -97,7 +97,7 @@ describe("待办卡 · 新建入口在四态里都要在（subhead 不受 state 
   it("ts02_error_state_still_shows_the_entry_row_and_it_opens_the_dialog", async () => {
     h.listPendingTodos.mockRejectedValue(new Error("ipc down"));
     await mount();
-    expect(container?.querySelector(".qp-skeleton"), "读取失败时不该停在骨架").toBeNull();
+    expect(container?.querySelector(".at-skeleton"), "读取失败时不该停在骨架").toBeNull();
     expect(entryRow(), "error 态没有「新建待办」那一行").not.toBeNull();
     /* 弹层挂在 `ModuleShell` 外面：error 态点它必须能打开，否则入口是个死链 */
     act(() => { entryButton()?.click(); });
@@ -109,7 +109,7 @@ describe("待办卡 · 新建入口在四态里都要在（subhead 不受 state 
     h.listPendingTodos.mockResolvedValue([]);
     await mount();
     expect(entryRow(), "空态没有「新建待办」那一行").not.toBeNull();
-    expect(container?.querySelector(".qp-todo-list"), "空态不该有列表").toBeNull();
-    expect(container?.querySelector(".qp-card-head-right .qp-link-btn"), "入口又回到卡头右槽了").toBeNull();
+    expect(container?.querySelector(".at-todo-list"), "空态不该有列表").toBeNull();
+    expect(container?.querySelector(".at-card-head-right .at-link-btn"), "入口又回到卡头右槽了").toBeNull();
   });
 });

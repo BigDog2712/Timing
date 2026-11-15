@@ -37,7 +37,7 @@ export default function ItemCategoryField({
   onChange,
 }: Props) {
   /* [0.14] selectedOption 兜底：当前值非空且不在候选时追加原键名一项。
-     `.qp-select-label` 默认 hidden、仅当前项可见（quiet-select.css），兜底缺位时
+     `.at-select-label` 默认 hidden、仅当前项可见（quiet-select.css），兜底缺位时
      触发器整块空白 —— 修在消费侧（共享 `withCurrentValueOption`），不动 QuietSelect 本体。 */
   const selectOptions = [
     { value: "", label: noneLabel },
@@ -48,7 +48,7 @@ export default function ItemCategoryField({
   ];
 
   return (
-    <span className="qp-item-category">
+    <span className="at-item-category">
       <QuietSelect
         value={value ?? ""}
         options={selectOptions}
@@ -56,12 +56,12 @@ export default function ItemCategoryField({
         ariaLabel={ariaLabel}
         density="compact"
         disabled={disabled}
-        className="qp-item-category-select"
+        className="at-item-category-select"
       />
       {manageAction ? (
         <button
           type="button"
-          className="qp-link-btn qp-timeline-item-action"
+          className="at-link-btn at-timeline-item-action"
           disabled={disabled}
           onClick={manageAction.onManage}
         >

@@ -109,7 +109,7 @@ export default function QuickClassificationCategoryMenu({
   return (
     <div
       ref={menuRef}
-      className="quick-classification-menu quick-classification-category-menu qp-scroll-region"
+      className="quick-classification-menu quick-classification-category-menu at-scroll-region"
       role="menu"
       aria-label={UI_TEXT.mapping.quickCategoryMenuLabel}
       style={{ left: position.left, top: position.top }}
@@ -146,7 +146,7 @@ export default function QuickClassificationCategoryMenu({
               className="quick-classification-menu-item quick-classification-category-delete"
               role="menuitem"
               /* 测试与将来的键盘扩展都按这个锚点找（不要按文案找：四语言各一份） */
-              data-qp-delete-category={option.value}
+              data-at-delete-category={option.value}
               disabled={disabled}
               onClick={() => onDelete(option.value as ExtendedAppCategory)}
             >
@@ -160,7 +160,7 @@ export default function QuickClassificationCategoryMenu({
         type="button"
         className="quick-classification-menu-item quick-classification-category-create"
         role="menuitem"
-        data-qp-create-category=""
+        data-at-create-category=""
         disabled={disabled}
         onClick={onCreate}
       >

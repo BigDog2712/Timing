@@ -54,16 +54,16 @@ export default function HistoryRangeView({
 
   if (!aggregate && error) {
     return (
-      <div className="qp-panel p-5 history-range-status" role="status" data-history-range-error>
+      <div className="at-panel p-5 history-range-status" role="status" data-history-range-error>
         <span>{copy.readFailed}</span>
-        <button type="button" className="qp-control" onClick={retry}>{uiText.common.retry}</button>
+        <button type="button" className="at-control" onClick={retry}>{uiText.common.retry}</button>
       </div>
     );
   }
 
   if (!aggregate) {
     return (
-      <div className="qp-panel p-5 history-range-status" role="status" data-history-range-loading>
+      <div className="at-panel p-5 history-range-status" role="status" data-history-range-loading>
         <span>{copy.loading}</span>
       </div>
     );
@@ -84,11 +84,11 @@ export default function HistoryRangeView({
   }));
 
   return (
-    <div className="history-range-scroll qp-scroll-region qp-scroll-region-stable">
+    <div className="history-range-scroll at-scroll-region at-scroll-region-stable">
       {error && !loading ? (
-        <div className="qp-panel history-range-refresh-error" role="alert">
+        <div className="at-panel history-range-refresh-error" role="alert">
           <span>{uiText.common.refreshFailed}</span>
-          <button type="button" className="qp-control" onClick={retry}>{uiText.common.retry}</button>
+          <button type="button" className="at-control" onClick={retry}>{uiText.common.retry}</button>
         </div>
       ) : null}
       <div className="history-range-grid" data-history-range-ready>

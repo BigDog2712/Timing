@@ -81,14 +81,14 @@ export default function SettingsDataSafetyPanel({
 
   return (
     <>
-      <section className="qp-panel p-5 md:p-6">
+      <section className="at-panel p-5 md:p-6">
         <SettingsPanelHeader
-          icon={<Database size={16} className="text-[var(--qp-accent-default)]" />}
+          icon={<Database size={16} className="text-[var(--at-accent-default)]" />}
           title={UI_TEXT.settings.dataSafetyTitle}
           className="mb-5"
         />
 
-        {/* 与同页其它面板同构：`qp-panel` 不带内边距，组间距靠 `space-y-5` */}
+        {/* 与同页其它面板同构：`at-panel` 不带内边距，组间距靠 `space-y-5` */}
         <div className="space-y-5">
           <SettingsDataExportGroup
             busy={busy}

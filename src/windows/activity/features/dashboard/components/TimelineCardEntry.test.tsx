@@ -66,13 +66,13 @@ async function mount(status: LoadStatus) {
 
 /** 卡底那颗入口（按文案找，不按下标 —— 顺序变了要能自己报出来） */
 function entry(label: string): HTMLButtonElement | null {
-  return Array.from(container?.querySelectorAll<HTMLButtonElement>(".qp-timeline-manage button") ?? [])
+  return Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-timeline-manage button") ?? [])
     .find((button) => button.textContent === label) ?? null;
 }
 
 function openDialogTitle(): string | null {
-  const surface = document.body.querySelector(".qp-dialog-surface");
-  return surface?.querySelector(".qp-dialog-title")?.textContent ?? null;
+  const surface = document.body.querySelector(".at-dialog-surface");
+  return surface?.querySelector(".at-dialog-title")?.textContent ?? null;
 }
 
 beforeEach(() => {
@@ -93,14 +93,14 @@ afterEach(() => {
   container = null;
   root = null;
   /* 弹层 portal 到 body：卸载不会带走它们（`QuietDialog` 卸载时才关），逐个摘掉 */
-  document.body.querySelectorAll(".qp-dialog-backdrop").forEach((node) => node.remove());
+  document.body.querySelectorAll(".at-dialog-backdrop").forEach((node) => node.remove());
 });
 
 describe("时间线卡 · 卡底入口在非 ready 态也要能开弹层", () => {
   it("tl09_empty_state_new_item_opens_the_create_dialog", async () => {
     await mount("ready");
     /* 前提：没有行 ⇒ 卡进空态（"今天还没有计时"），但三颗入口在场 */
-    expect(container?.querySelector(".qp-card")?.getAttribute("data-state")).toBe("empty");
+    expect(container?.querySelector(".at-card")?.getAttribute("data-state")).toBe("empty");
     expect(entry("新建事项")).not.toBeNull();
 
     act(() => { entry("新建事项")?.click(); });
@@ -123,7 +123,7 @@ describe("时间线卡 · 卡底入口在非 ready 态也要能开弹层", () =>
   it("tl11_error_state_entries_are_alive_as_well", async () => {
     /* 读失败（E2）时卡里只有错误块，三颗入口同样在场 —— 一样的坑，一起钉住 */
     await mount("error");
-    expect(container?.querySelector(".qp-card")?.getAttribute("data-state")).toBe("error");
+    expect(container?.querySelector(".at-card")?.getAttribute("data-state")).toBe("error");
     act(() => { entry("新建事项")?.click(); });
     await flush();
     expect(openDialogTitle(), "错误态下点「新建事项」没有弹出任何东西").toBe("新建事项");

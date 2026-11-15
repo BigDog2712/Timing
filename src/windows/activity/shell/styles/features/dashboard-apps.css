@@ -1,5 +1,5 @@
 /*
- * dashboard-apps.css — 应用排行卡（`.qp-app-*`）的版式
+ * dashboard-apps.css — 应用排行卡（`.at-app-*`）的版式
  * -----------------------------------------------------------------------------
  * [0.12.1] 从 `dashboard-modules.css` 拆出来的：那张表在加「行内绑定标记」之后
  * 顶穿了单文件 300 行硬限（`npm run check:size` 是逐文件棘轮，不许新增豁免）。
@@ -13,22 +13,22 @@
  */
 
 /* ── 应用排行：一行 = 图标砖 / 名称 / 时长 / 细条（逐值对照 `widgets/apps.rs`） ── */
-.qp-app-list { display: flex; flex: 1 1 auto; flex-direction: column; }
+.at-app-list { display: flex; flex: 1 1 auto; flex-direction: column; }
 
-/* 自绘滚动条（轨道 6px 不动：右缘对齐靠 `qp-scroll-region-stable` 常驻的那 6px 槽，
+/* 自绘滚动条（轨道 6px 不动：右缘对齐靠 `at-scroll-region-stable` 常驻的那 6px 槽，
  * 宽度改 4 会让数字列整体右移 2px）。视觉上的"细"靠 thumb 的 1px 透明边 +
  * content-box 裁切做出来（6 − 2 = 4px）。 */
-.qp-app-list {
+.at-app-list {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--qp-text-tertiary) 55%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--at-text-tertiary) 55%, transparent) transparent;
 }
 
-.qp-app-list::-webkit-scrollbar { width: var(--qp-scrollbar-size); }
+.at-app-list::-webkit-scrollbar { width: var(--at-scrollbar-size); }
 
-.qp-app-list::-webkit-scrollbar-thumb {
+.at-app-list::-webkit-scrollbar-thumb {
   border: 1px solid transparent;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--qp-text-tertiary) 55%, transparent);
+  background: color-mix(in srgb, var(--at-text-tertiary) 55%, transparent);
   background-clip: content-box;
 }
 
@@ -36,7 +36,7 @@
  * 行盒 34（`row_h - 4`），条落在 row.bottom()−6 → 行内 y 28..32。
  * 用 `19 + 9` 凑出 28：名称行 19（行高就是 19），条贴 28 起 —— 与 Rust 逐像素同位。
  * 不写 `padding-top` 也是这个原因：Rust 的图标砖在 row.top()+3，多 1px 内距就会变成 4。 */
-.qp-app-row {
+.at-app-row {
   position: relative;
   display: grid;
   flex: 0 0 auto;
@@ -45,7 +45,7 @@
   align-content: start;
   column-gap: 10px;
   row-gap: 9px;
-  height: var(--qp-row-app);
+  height: var(--at-row-app);
   box-sizing: border-box;
 }
 
@@ -54,7 +54,7 @@
  * 分隔交给行高差与图标底块，不加回任何分隔线。 */
 
 /* 图标砖 24×24 / 圆角 7（`apps.rs:40-41`），首字 11.5 粗（`apps.rs:42`） */
-.qp-app-icon {
+.at-app-icon {
   display: flex;
   width: 24px;
   height: 24px;
@@ -64,51 +64,51 @@
   justify-content: center;
   overflow: hidden;
   border-radius: 7px;
-  background: var(--qp-surface-raise);
+  background: var(--at-surface-raise);
   font-size: 11.5px;
-  font-weight: var(--qp-font-weight-emphasis);
+  font-weight: var(--at-font-weight-emphasis);
   line-height: 15px;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
 }
 
-.qp-app-icon > img { width: 100%; height: 100%; object-fit: contain; }
+.at-app-icon > img { width: 100%; height: 100%; object-fit: contain; }
 
 /* 名称 12.5 / 19（`apps.rs:47`） */
-.qp-app-name {
+.at-app-name {
   min-width: 0;
   overflow: hidden;
   font-size: 12.5px;
   line-height: 19px;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 /* 时长 11.5 / 19（`apps.rs:48-55`） */
-.qp-app-value {
+.at-app-value {
   text-align: right;
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
   line-height: 19px;
-  color: var(--qp-text-secondary);
+  color: var(--at-text-secondary);
   white-space: nowrap;
 }
 
 /* 占比条：4 高 / 圆角 2，从图标砖右侧一直拉到行尾（`apps.rs:57`）。
  * 填充是 accent 的 59%（Rust `with_alpha(th.accent, 150)` = 150/255）。 */
-.qp-app-bar {
+.at-app-bar {
   grid-column: 2 / 4;
   height: 4px;
   border-radius: 2px;
-  background: var(--qp-chart-track);
+  background: var(--at-chart-track);
   overflow: hidden;
 }
 
-.qp-app-bar > span {
+.at-app-bar > span {
   display: block;
   height: 100%;
   border-radius: 2px;
-  background: color-mix(in srgb, var(--qp-accent-default) 59%, transparent);
+  background: color-mix(in srgb, var(--at-accent-default) 59%, transparent);
 }
 
 /* ── [0.12.1] 行内「已绑定事项」标记 ──
@@ -118,7 +118,7 @@
  *   · 标记最多吃掉 46% 宽度，剩下的全留给名字（名字是主信息，标记是补充）；
  *   · 标记自身 `align-items: center` + 固定 5px 的点，行高仍由名字的 19px 决定，
  *     不会因为「有绑定 / 没绑定」跳动。 */
-.qp-app-label {
+.at-app-label {
   display: flex;
   min-width: 0;
   align-items: baseline;
@@ -126,26 +126,26 @@
   overflow: hidden;
 }
 
-.qp-app-binding {
+.at-app-binding {
   display: inline-flex;
   flex: 0 1 auto;
   min-width: 0;
   max-width: 46%;
   align-items: center;
   gap: 4px;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   white-space: nowrap;
 }
 
-.qp-app-binding-dot {
+.at-app-binding-dot {
   flex: none;
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--qp-accent-default);
+  background: var(--at-accent-default);
 }
 
-.qp-app-binding-name {
+.at-app-binding-name {
   min-width: 0;
   overflow: hidden;
   font-size: 10.5px;
@@ -156,21 +156,21 @@
 
 /* 行是键盘可达的编辑入口（`role="button"` + `tabIndex=0`），焦点必须看得见。
  * 用内嵌描边（负 offset）而不是外扩：行与行之间只有 9px，外扩会压到上一行的占比条。 */
-.qp-app-row:focus-visible {
-  outline: 2px solid var(--qp-focus-ring);
+.at-app-row:focus-visible {
+  outline: 2px solid var(--at-focus-ring);
   outline-offset: -2px;
   border-radius: 6px;
 }
 
 /* 编辑失败的内联提示（主界面没有全局 toast 通道，见 `AppsModule` 注释）：
  * 单行省略号，不参与排行布局，出现/消失不改变列表高度之外的东西。 */
-.qp-app-notice {
+.at-app-notice {
   margin: 0;
   padding: 2px 0;
   overflow: hidden;
   font-size: 10.5px;
   line-height: 14px;
-  color: var(--qp-warning);
+  color: var(--at-warning);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

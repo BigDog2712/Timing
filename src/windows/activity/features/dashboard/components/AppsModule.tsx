@@ -18,8 +18,8 @@ import { useAppItemBindings } from "../hooks/useAppItemBindings.ts";
 /**
  * 模块 3 · 应用排行（01 §4.2：数据复用 `topApplications` + `icons`，UI 重写）
  *
- * 旧形态是"卡中卡"（每行一张 `.qp-panel` + 100×6 进度条），新形态是**裸排行**：
- * 行 = `grid 24px / 1fr / 52px`，行高走 `--qp-row-app`（视觉层 32 → 28）。
+ * 旧形态是"卡中卡"（每行一张 `.at-panel` + 100×6 进度条），新形态是**裸排行**：
+ * 行 = `grid 24px / 1fr / 52px`，行高走 `--at-row-app`（视觉层 32 → 28）。
  * [视觉层 0.12.x] 行间那 2px 发丝已删，图标 20 → 22、圆角 5 → 6、底色升到 raise 层。
  *
  * ## 行**可编辑**：双击 / 回车 / 右键都能打开快捷编辑（0.12.1 补回）
@@ -124,7 +124,7 @@ export default function AppsModule({ controls, applications, icons, status, refr
       emptyText={copy.appsEmpty}
       meta={copy.appsMeta(formatDashboardDuration(totalDuration))}
     >
-      <ul className="qp-app-list qp-scroll-region qp-scroll-region-stable">
+      <ul className="at-app-list at-scroll-region at-scroll-region-stable">
         {visible.map((app) => {
           /* 查表用**归一后**的键（与写侧 `resolveStatisticalApp` 同一个函数）：
              `TopApplicationItem.exeName` 来自 `AppStat.exeName`，会保留记录时的原始大小写
@@ -135,7 +135,7 @@ export default function AppsModule({ controls, applications, icons, status, refr
           return (
             <li
               key={app.exeName}
-              className="qp-app-row"
+              className="at-app-row"
               role="button"
               tabIndex={0}
               aria-haspopup="menu"
@@ -164,31 +164,31 @@ export default function AppsModule({ controls, applications, icons, status, refr
                 openEditor(app, event.currentTarget);
               }}
             >
-              <span className="qp-app-icon" aria-hidden="true">
+              <span className="at-app-icon" aria-hidden="true">
                 {icons[app.exeName]
                   ? <img src={icons[app.exeName]} alt="" />
                   : app.categoryInitial}
               </span>
               {/* 名称与绑定标记同处第二列：`minmax(0,1fr)` + 各自省略号，
                   卡宽拖到 w=1（约 300px）时也不横向滚动、不挤变形时长列。 */}
-              <span className="qp-app-label">
-                <span className="qp-app-name">{app.name}</span>
+              <span className="at-app-label">
+                <span className="at-app-name">{app.name}</span>
                 {bound ? (
-                  <span className="qp-app-binding" aria-hidden="true">
+                  <span className="at-app-binding" aria-hidden="true">
                     <span
-                      className="qp-app-binding-dot"
+                      className="at-app-binding-dot"
                       style={bound.color ? { background: bound.color } : undefined}
                     />
-                    <span className="qp-app-binding-name">{bound.name}</span>
+                    <span className="at-app-binding-name">{bound.name}</span>
                   </span>
                 ) : null}
               </span>
-              <span className="qp-app-value" title={`${app.percentage}%`}>
+              <span className="at-app-value" title={`${app.percentage}%`}>
                 {formatDashboardDuration(app.duration)}
               </span>
               {/* 行底那根 4px 占比条（Rust `apps.rs:57` 的 `kit::progress`）：宽度按百分比，
                   对读屏隐藏 —— 同一份占比已经写在 `title` 与卡头读数里。 */}
-              <span className="qp-app-bar" aria-hidden="true">
+              <span className="at-app-bar" aria-hidden="true">
                 <span style={{ width: `${Math.min(100, Math.max(0, app.percentage))}%` }} />
               </span>
             </li>
@@ -197,10 +197,10 @@ export default function AppsModule({ controls, applications, icons, status, refr
       </ul>
       {/* 编辑失败的内联提示：主界面没有全局 toast 通道（`pushToast` 挂在 AppShell，
           而 `AppShell.tsx` 是冻结行数），所以这一卡自己说一句，下一次打开编辑器时清掉。 */}
-      {editError ? <p className="qp-app-notice" role="status">{editError}</p> : null}
+      {editError ? <p className="at-app-notice" role="status">{editError}</p> : null}
       {/* 底注照 exe（`apps.rs:80-92`）：分隔线 + 一行 10.5 的汇总。这行同时是
           「分类映射」的入口（exe 里它只是文字），点它仍然去映射视图。 */}
-      <button type="button" className="qp-card-footer" onClick={onOpenMapping}>
+      <button type="button" className="at-card-footer" onClick={onOpenMapping}>
         {copy.appsSummary(applications.length, formatDashboardDuration(totalDuration))}
       </button>
       {/* 弹层本身挂在本卡内（懒加载）：`key` 带上锚点坐标 —— 换一个应用要重挂，

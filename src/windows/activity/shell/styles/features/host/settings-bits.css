@@ -9,7 +9,7 @@
 
    所以这里按**等价语义**补一份，只覆盖搬家后仍被引用的三个选择器（`MdSyncBackupCard` 的
    危险按钮、`HostGeneralPanel` 的错误条）。不复制宿主的全部 `.btn--*`：没有引用就没有理由。
-   颜色与圆角一律走 `--qp-*` 令牌（宿主的 `--surface-3` / `--danger` 在分析窗不存在，
+   颜色与圆角一律走 `--at-*` 令牌（宿主的 `--surface-3` / `--danger` 在分析窗不存在，
    硬搬会得到一堆 `var()` 失效的空规则，比没有样式更难查）。
    ============================================================================= */
 
@@ -20,20 +20,20 @@
   height: 30px;
   padding: 0 14px;
   border: 1px solid transparent;
-  border-radius: var(--qp-radius-chip);
-  font-size: var(--qp-font-size-caption);
-  font-weight: var(--qp-font-weight-emphasis);
-  color: var(--qp-text-primary);
-  background: var(--qp-bg-elevated);
+  border-radius: var(--at-radius-chip);
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-emphasis);
+  color: var(--at-text-primary);
+  background: var(--at-bg-elevated);
   cursor: pointer;
   transition:
-    background-color var(--qp-motion-fast) var(--qp-motion-ease),
-    border-color var(--qp-motion-fast) var(--qp-motion-ease),
-    transform var(--qp-motion-fast) var(--qp-motion-ease);
+    background-color var(--at-motion-fast) var(--at-motion-ease),
+    border-color var(--at-motion-fast) var(--at-motion-ease),
+    transform var(--at-motion-fast) var(--at-motion-ease);
 }
 
 .btn:hover:not(:disabled) {
-  background: var(--qp-bg-panel);
+  background: var(--at-bg-panel);
 }
 
 .btn:active:not(:disabled) {
@@ -41,33 +41,33 @@
 }
 
 .btn:disabled {
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   cursor: not-allowed;
 }
 
 /* 危险动作（「恢复」会覆盖当前文件）：只染文字与描边，不做实心红 ——
    实心红在这套配色里对比度不够，且它和「删除」不是一回事（恢复本身不丢数据）。 */
 .btn--danger {
-  color: var(--qp-danger);
-  border-color: color-mix(in srgb, var(--qp-danger) 40%, transparent);
+  color: var(--at-danger);
+  border-color: color-mix(in srgb, var(--at-danger) 40%, transparent);
 }
 
 .btn--danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--qp-danger) 12%, transparent);
+  background: color-mix(in srgb, var(--at-danger) 12%, transparent);
 }
 
 /* 两个 accent 档：搬家后仍被引用的只有这两个（`btn--primary` = 该块的确认动作，
    `btn--ghost` = 次要动作）。宿主的实心强调蓝在这里换成 accent tint —— 分析窗的配色是
    「中性底 + 一个 accent」，实心按钮会和药丸抢注意力。 */
 .btn--primary {
-  color: var(--qp-accent-default);
-  border-color: color-mix(in srgb, var(--qp-accent-default) 45%, transparent);
-  background: color-mix(in srgb, var(--qp-accent-default) 10%, transparent);
+  color: var(--at-accent-default);
+  border-color: color-mix(in srgb, var(--at-accent-default) 45%, transparent);
+  background: color-mix(in srgb, var(--at-accent-default) 10%, transparent);
 }
 
 .btn--ghost {
   background: transparent;
-  border-color: var(--qp-border-subtle);
+  border-color: var(--at-border-subtle);
 }
 
 /* 行内错误条：一行字 + 图标，不进卡片、不弹层（这些错误都发生在「刚才那一下」之后）。 */
@@ -77,9 +77,9 @@
   align-items: center;
   gap: 8px;
   margin: 12px 0 0;
-  font-size: var(--qp-font-size-compact);
-  line-height: var(--qp-line-height-compact);
-  color: var(--qp-danger);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-compact);
+  color: var(--at-danger);
 }
 
 .inline-error svg {
@@ -91,29 +91,29 @@
  * `settings-sync*.css` 里，而那些规则只引用**宿主窗的语义变量**（`--line` / `--ink-*` /
  * `--space-*` / `--text-*` / `--accent` …）。宿主的定义在
  * `src/windows/timing/styles/tokens/*`，分析窗的样式表一条都没引
- * （`patina/shell/styles/tokens.css` 只产 `--qp-*`）—— 于是这张卡在分析窗里边框、间距、字号
+ * （`patina/shell/styles/tokens.css` 只产 `--at-*`）—— 于是这张卡在分析窗里边框、间距、字号
  * 全部落空，跟同页其它卡不是一套。上面 `.btn` 是同一类问题的一处补丁，这里把**变量本身**补齐。
  *
  * 为什么桥接而不是重写那六块的样式：搬家纪律是「className 一个字都不改」（`[0.12.1] T04b`），
  * 所以在不动标记的前提下让它们跟上本页配色与间距，只剩改变量映射这一条路。
  * 值取宿主 primitives 的等价档（`01-primitives.css`：`--space-1..4` = 4/8/12/16，
- * `--text-cap` = 11px，`--radius-sm/md` = 6/10px）；颜色一律转发到 `--qp-*`，换主题时跟着变。
+ * `--text-cap` = 11px，`--radius-sm/md` = 6/10px）；颜色一律转发到 `--at-*`，换主题时跟着变。
  * 作用域挂在卡片根上（不是 `:root`）：不污染全局，也不会顺手改到别处还留着同名变量的面板。 */
 .settings-host-sync {
-  --accent: var(--qp-accent-default);
-  --bg-panel: var(--qp-bg-panel);
-  --bg-field: var(--qp-bg-elevated);
-  --bg-seg: var(--qp-bg-elevated);
-  --line: var(--qp-border-subtle);
-  --line-3: var(--qp-border-strong);
-  --ink: var(--qp-text-primary);
-  --ink-2: var(--qp-text-secondary);
-  --ink-3: var(--qp-text-tertiary);
-  --ink-4: var(--qp-text-disabled);
-  --ok: var(--qp-success);
-  --warn: var(--qp-warning);
-  --danger: var(--qp-danger);
-  --danger-wash: color-mix(in srgb, var(--qp-danger) 12%, transparent);
+  --accent: var(--at-accent-default);
+  --bg-panel: var(--at-bg-panel);
+  --bg-field: var(--at-bg-elevated);
+  --bg-seg: var(--at-bg-elevated);
+  --line: var(--at-border-subtle);
+  --line-3: var(--at-border-strong);
+  --ink: var(--at-text-primary);
+  --ink-2: var(--at-text-secondary);
+  --ink-3: var(--at-text-tertiary);
+  --ink-4: var(--at-text-disabled);
+  --ok: var(--at-success);
+  --warn: var(--at-warning);
+  --danger: var(--at-danger);
+  --danger-wash: color-mix(in srgb, var(--at-danger) 12%, transparent);
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -126,7 +126,7 @@
 }
 
 /* 六块折叠面板竖排：原来这条排版职责由外层 `.data`（`display:flex` + `gap`）提供，
-   卡片外壳统一到 `qp-panel` 之后 `.data` 就没意义了（它除了 flex 什么都不给）。 */
+   卡片外壳统一到 `at-panel` 之后 `.data` 就没意义了（它除了 flex 什么都不给）。 */
 .settings-host-sync-blocks {
   display: flex;
   flex-direction: column;

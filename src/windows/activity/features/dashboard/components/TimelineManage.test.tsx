@@ -66,13 +66,13 @@ let onLocalRename: Mock<(itemId: number, name: string) => void>;
 let onLocalCreate: Mock<(name: string) => void>;
 
 /** 弹层是 portal 到 body 的，查询也在 body 上做；同一时刻只有一个弹层是打开的 */
-const dialog = () => document.body.querySelector<HTMLElement>(".qp-timeline-manage-dialog");
+const dialog = () => document.body.querySelector<HTMLElement>(".at-timeline-manage-dialog");
 const inputIn = (scope: HTMLElement | null) =>
-  scope?.querySelector<HTMLInputElement>("input.qp-timeline-manage-input") ?? null;
+  scope?.querySelector<HTMLInputElement>("input.at-timeline-manage-input") ?? null;
 const timerIn = (scope: HTMLElement | null) =>
-  scope?.querySelector<HTMLInputElement>("input.qp-timeline-manage-timer") ?? null;
+  scope?.querySelector<HTMLInputElement>("input.at-timeline-manage-timer") ?? null;
 const byText = (text: string) =>
-  Array.from(dialog()?.querySelectorAll<HTMLButtonElement>(".qp-dialog-actions button") ?? [])
+  Array.from(dialog()?.querySelectorAll<HTMLButtonElement>(".at-dialog-actions button") ?? [])
     .find((button) => button.textContent === text);
 const statusText = () =>
   Array.from(dialog()?.querySelectorAll('[role="status"]') ?? [])

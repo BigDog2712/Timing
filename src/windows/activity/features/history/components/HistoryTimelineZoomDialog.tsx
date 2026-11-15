@@ -58,7 +58,7 @@ export default function HistoryTimelineZoomDialog({
     >
       <button
         type="button"
-        className="qp-dialog-close-button history-timeline-dialog-close"
+        className="at-dialog-close-button history-timeline-dialog-close"
         aria-label={UI_TEXT.common.close}
         onClick={onClose}
       >

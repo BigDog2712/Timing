@@ -28,11 +28,11 @@ export default function DataAppTrendSkeleton({
 }: Props) {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col" aria-busy>
-      <div role="status" className="absolute qp-text-caption text-[var(--qp-text-tertiary)]">{loadingLabel}</div>
+      <div role="status" className="absolute at-text-caption text-[var(--at-text-tertiary)]">{loadingLabel}</div>
       <div className="data-app-grid pointer-events-none invisible" aria-hidden>
         <div className="data-app-sidebar" data-hint="">
           <div className="data-app-search" />
-          <div className="data-app-list data-app-trend-list qp-scroll-region" />
+          <div className="data-app-list data-app-trend-list at-scroll-region" />
         </div>
         <div className="data-app-chart-column">
           <div className="data-app-metric-strip">

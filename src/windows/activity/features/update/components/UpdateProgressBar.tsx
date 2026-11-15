@@ -17,12 +17,12 @@ export default function UpdateProgressBar({
 
   return (
     <div className={className}>
-      <div className="mb-1.5 flex items-center justify-between gap-3 qp-text-caption text-[var(--qp-text-tertiary)]">
+      <div className="mb-1.5 flex items-center justify-between gap-3 at-text-caption text-[var(--at-text-tertiary)]">
         <span className="min-w-0 flex-1 truncate">{label}</span>
         {valueText ? <span className="shrink-0">{valueText}</span> : null}
       </div>
       <div
-        className="relative h-2 overflow-hidden rounded-full bg-[var(--qp-track-muted)]"
+        className="relative h-2 overflow-hidden rounded-full bg-[var(--at-track-muted)]"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
@@ -30,10 +30,10 @@ export default function UpdateProgressBar({
         aria-valuetext={valueText ?? label}
       >
         {indeterminate ? (
-          <div className="qp-progress-indeterminate absolute inset-y-0 left-0 w-[32%] rounded-full bg-[var(--qp-accent-default)] opacity-90" />
+          <div className="at-progress-indeterminate absolute inset-y-0 left-0 w-[32%] rounded-full bg-[var(--at-accent-default)] opacity-90" />
         ) : (
           <div
-            className="h-full rounded-full bg-[var(--qp-accent-default)] transition-[width] duration-300 ease-out"
+            className="h-full rounded-full bg-[var(--at-accent-default)] transition-[width] duration-300 ease-out"
             style={{ width: `${resolvedPercent}%` }}
           />
         )}

@@ -106,7 +106,7 @@ export default function AppTitleBar({
 
       <div className="app-titlebar-side app-titlebar-side-right">
         {/* ④ status 段：在自己的栏内吸收剩余宽度；更新入口留在胶囊旁（01 §3.1） */}
-        <div className="qp-topbar-status" data-titlebar-status="">
+        <div className="at-topbar-status" data-titlebar-status="">
           {timingStatusEntry}
           {showUpdateEntry ? (
             <button

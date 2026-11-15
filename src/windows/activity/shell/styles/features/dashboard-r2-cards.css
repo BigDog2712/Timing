@@ -3,7 +3,7 @@
  * -----------------------------------------------------------------------------
  * 从 `dashboard-r2.css` 拆出（300 行棘轮）：那一份只留布局层（工具条 / 兜底面板 /
  * 锁定态 / 布局管理弹层），卡面内容（时间线行、改起止弹层、待办批量表单）住这里，
- * 一段对应一个任务号。红线同全仓：零字面量色值，只用 `var(--qp-*)`；不加阴影渐变。
+ * 一段对应一个任务号。红线同全仓：零字面量色值，只用 `var(--at-*)`；不加阴影渐变。
  *
  *   T03a · 时间线行三列（名称 - 起止 - 总用时）+ 行上「改起止」入口 + 编辑事项弹层
  *   T03b · 改起止弹层
@@ -13,40 +13,40 @@
 /* ── T03a · 时间线行三列（名称 - 起止 - 总用时）+ 行上「改起止」入口 ──
  * 行是 grid：名称可省略（title 兜底全名），起止列贴中、总用时贴右。
  * 进行中的行（data-running）不加删除线类效果 —— 它的"止"就是此刻，实时变。 */
-.qp-timeline-row {
+.at-timeline-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 10px;
 }
 
-.qp-timeline-range {
+.at-timeline-range {
   overflow: hidden;
-  color: var(--qp-text-secondary);
-  font-size: var(--qp-font-size-caption);
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.qp-timeline-record-edit {
+.at-timeline-record-edit {
   flex: 0 0 auto;
   visibility: hidden;
 }
 
-.qp-timeline-row:hover .qp-timeline-record-edit,
-.qp-timeline-row:focus-within .qp-timeline-record-edit {
+.at-timeline-row:hover .at-timeline-record-edit,
+.at-timeline-row:focus-within .at-timeline-record-edit {
   visibility: visible;
 }
 
-/* 「编辑事项」弹层：左侧选择列表 + 底部编辑表单（复用 `.qp-timeline-item-editor`） */
-.qp-timeline-edit {
+/* 「编辑事项」弹层：左侧选择列表 + 底部编辑表单（复用 `.at-timeline-item-editor`） */
+.at-timeline-edit {
   display: flex;
   flex-direction: column;
-  gap: var(--qp-space-group);
+  gap: var(--at-space-group);
   min-height: 0;
 }
 
-.qp-timeline-edit-list {
+.at-timeline-edit-list {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -57,27 +57,27 @@
   list-style: none;
 }
 
-.qp-timeline-edit-choice {
+.at-timeline-edit-choice {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-control);
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
   background: none;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.qp-timeline-edit-choice[data-selected] {
-  border-color: var(--qp-border-strong);
-  background: var(--qp-surface-inset);
+.at-timeline-edit-choice[data-selected] {
+  border-color: var(--at-border-strong);
+  background: var(--at-surface-inset);
 }
 
-.qp-timeline-edit-name {
+.at-timeline-edit-name {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -86,14 +86,14 @@
 }
 
 /* ── T03b · 改起止弹层 ── */
-.qp-record-time {
+.at-record-time {
   display: flex;
   flex-direction: column;
-  gap: var(--qp-space-group);
+  gap: var(--at-space-group);
   min-height: 0;
 }
 
-.qp-record-time-list {
+.at-record-time-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -104,40 +104,40 @@
   list-style: none;
 }
 
-.qp-record-time-row {
+.at-record-time-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-control);
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
 }
 
-.qp-record-time-range {
+.at-record-time-range {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: var(--qp-text-primary);
-  font-size: var(--qp-font-size-body);
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-body);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.qp-record-time-duration {
+.at-record-time-duration {
   flex: 0 0 auto;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-caption);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
 }
 
-.qp-record-time-note {
+.at-record-time-note {
   flex-basis: 100%;
   margin: 0;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-caption);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
 }
 
-.qp-record-time-editor {
+.at-record-time-editor {
   display: flex;
   flex-wrap: wrap;
   flex-basis: 100%;
@@ -145,26 +145,26 @@
   gap: 10px;
 }
 
-.qp-record-time-field {
+.at-record-time-field {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 /* ── T03a · 待办批量表单（多日期 × 多时刻 chip 流）── */
-.qp-todo-batch {
+.at-todo-batch {
   display: flex;
   flex-direction: column;
-  gap: var(--qp-space-group);
+  gap: var(--at-space-group);
 }
 
-.qp-todo-batch-picker {
+.at-todo-batch-picker {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.qp-todo-batch-chips {
+.at-todo-batch-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -173,34 +173,34 @@
   list-style: none;
 }
 
-.qp-todo-batch-chip {
+.at-todo-batch-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 3px 8px;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-button);
-  background: var(--qp-surface-inset);
-  color: var(--qp-text-primary);
-  font-size: var(--qp-font-size-caption);
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-button);
+  background: var(--at-surface-inset);
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-caption);
 }
 
-.qp-todo-batch-chip-remove {
+.at-todo-batch-chip-remove {
   border: 0;
   padding: 0 2px;
   background: none;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   font: inherit;
   cursor: pointer;
 }
 
-.qp-todo-batch-chip-remove:hover {
-  color: var(--qp-text-primary);
+.at-todo-batch-chip-remove:hover {
+  color: var(--at-text-primary);
 }
 
 /* [0.13 · 1.7] 行上的「编辑」键与删除键同区：绝对定位盖在时间列上，
-   不参与 grid 列宽（与 `.qp-todo-del` 同一条几何纪律）。 */
-.qp-todo-edit {
+   不参与 grid 列宽（与 `.at-todo-del` 同一条几何纪律）。 */
+.at-todo-edit {
   position: absolute;
   right: 22px;
   display: inline-flex;
@@ -211,40 +211,40 @@
   border: 0;
   padding: 0;
   background: none;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   cursor: pointer;
   opacity: 0;
 }
 
-.qp-todo-row:hover .qp-todo-edit,
-.qp-todo-row:focus-within .qp-todo-edit {
+.at-todo-row:hover .at-todo-edit,
+.at-todo-row:focus-within .at-todo-edit {
   opacity: 1;
 }
 
-.qp-todo-edit:hover {
-  color: var(--qp-text-primary);
+.at-todo-edit:hover {
+  color: var(--at-text-primary);
 }
 
 /* ── [0.13.x · T18] 时间轴第二层：事项行下的子记录 ─────────────────────────
-   第一层 `.qp-timeline-row` 是 4 列 grid（名称 | 起止 | 时长 | 改起止键）。
+   第一层 `.at-timeline-row` 是 4 列 grid（名称 | 起止 | 时长 | 改起止键）。
    第二层必须是它的**整行子项**（`grid-column: 1 / -1`），否则会掉进第一行第 5 格，
    表现为「子记录挤在时长右边」——看起来像数据错位，其实是网格流。 */
-.qp-timeline-toggle {
+.at-timeline-toggle {
   margin-right: 4px;
   padding: 0;
   border: 0;
   background: none;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   font: inherit;
-  font-size: var(--qp-font-size-caption);
+  font-size: var(--at-font-size-caption);
   cursor: pointer;
 }
 
-.qp-timeline-toggle:hover {
-  color: var(--qp-text-secondary);
+.at-timeline-toggle:hover {
+  color: var(--at-text-secondary);
 }
 
-.qp-timeline-children {
+.at-timeline-children {
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
@@ -252,44 +252,44 @@
   margin: 2px 0 0;
   padding: 0 0 0 14px;
   list-style: none;
-  border-left: 1px solid var(--qp-border-subtle);
+  border-left: 1px solid var(--at-border-subtle);
 }
 
-.qp-timeline-child {
+.at-timeline-child {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 8px;
-  color: var(--qp-text-secondary);
-  font-size: var(--qp-font-size-caption);
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
 }
 
-.qp-timeline-child-app {
+.at-timeline-child-app {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.qp-timeline-child-category {
-  color: var(--qp-text-tertiary);
+.at-timeline-child-category {
+  color: var(--at-text-tertiary);
 }
 
-.qp-timeline-child-range {
-  color: var(--qp-text-tertiary);
+.at-timeline-child-range {
+  color: var(--at-text-tertiary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 /* 「未采集」不是 0 秒，也不是错误：用最弱的颜色 + 斜体，与真实的应用段区分开 */
-.qp-timeline-child[data-gap] {
+.at-timeline-child[data-gap] {
   grid-template-columns: minmax(0, 1fr);
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   font-style: italic;
 }
 
 /* 设备角标：只在同一事项行出现 ≥2 台设备时渲染（`buildDeviceLanes` 决定），单设备零元素。 */
-.qp-timeline-child-device {
-  padding: 0 4px; border: 1px solid var(--qp-border-subtle); border-radius: 999px;
-  color: var(--qp-text-tertiary); font-size: 10px; font-variant-numeric: tabular-nums;
+.at-timeline-child-device {
+  padding: 0 4px; border: 1px solid var(--at-border-subtle); border-radius: 999px;
+  color: var(--at-text-tertiary); font-size: 10px; font-variant-numeric: tabular-nums;
   line-height: 14px; white-space: nowrap;
 }

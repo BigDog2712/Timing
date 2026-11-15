@@ -93,7 +93,7 @@ export default function UpdateStatusPanel({
 
   if (variant === "compact") {
     return (
-      <div className={`qp-subpanel update-status-compact ${className ?? ""}`.trim()}>
+      <div className={`at-subpanel update-status-compact ${className ?? ""}`.trim()}>
         <div className="update-status-compact-main">
           <div className="update-status-compact-copy">
             <p className="update-status-compact-title">{UI_TEXT.update.appUpdate}</p>
@@ -118,11 +118,11 @@ export default function UpdateStatusPanel({
   }
 
   return (
-    <div className={`qp-subpanel ${className ?? ""}`.trim()}>
-      <p className="qp-text-body qp-weight-emphasis text-[var(--qp-text-primary)]">{UI_TEXT.update.appUpdate}</p>
-      <p className="mt-2 qp-text-body qp-weight-emphasis text-[var(--qp-text-primary)]">{viewModel.statusTitle}</p>
+    <div className={`at-subpanel ${className ?? ""}`.trim()}>
+      <p className="at-text-body at-weight-emphasis text-[var(--at-text-primary)]">{UI_TEXT.update.appUpdate}</p>
+      <p className="mt-2 at-text-body at-weight-emphasis text-[var(--at-text-primary)]">{viewModel.statusTitle}</p>
       {viewModel.statusDetail ? (
-        <p className="mt-1 qp-text-caption leading-relaxed break-words text-[var(--qp-text-secondary)]">
+        <p className="mt-1 at-text-caption leading-relaxed break-words text-[var(--at-text-secondary)]">
           {viewModel.statusDetail}
         </p>
       ) : null}
@@ -138,11 +138,11 @@ export default function UpdateStatusPanel({
 
       <div className={`mt-4 flex flex-wrap items-end gap-3 ${showSupportLinks ? "justify-between" : "justify-end"}`}>
         {showSupportLinks ? (
-          <div className="flex items-center gap-1.5 qp-text-caption text-[var(--qp-text-tertiary)]">
+          <div className="flex items-center gap-1.5 at-text-caption text-[var(--at-text-tertiary)]">
             <button
               type="button"
               onClick={onOpenReleaseNotes}
-              className="qp-text-caption text-[var(--qp-text-tertiary)] hover:text-[var(--qp-text-secondary)]"
+              className="at-text-caption text-[var(--at-text-tertiary)] hover:text-[var(--at-text-secondary)]"
             >
               {UI_TEXT.update.releaseNotes}
             </button>
@@ -150,7 +150,7 @@ export default function UpdateStatusPanel({
             <button
               type="button"
               onClick={onOpenFeedback}
-              className="qp-text-caption text-[var(--qp-text-tertiary)] hover:text-[var(--qp-text-secondary)]"
+              className="at-text-caption text-[var(--at-text-tertiary)] hover:text-[var(--at-text-secondary)]"
             >
               {UI_TEXT.update.feedback}
             </button>

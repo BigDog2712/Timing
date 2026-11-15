@@ -86,7 +86,7 @@ export default function DestinationDetailRecords({
 
   return (
     <>
-      <ol className="destination-detail-records qp-scroll-region">
+      <ol className="destination-detail-records at-scroll-region">
         {visibleActivities.map((activity) => {
           const start = formatTime(activity.startTime, day.dayEndMs, locale);
           const end = formatTime(activity.endTime, day.dayEndMs, locale);
@@ -97,7 +97,7 @@ export default function DestinationDetailRecords({
           return (
             <li
               key={activity.id}
-              className="qp-workbench-list-card destination-detail-activity"
+              className="at-workbench-list-card destination-detail-activity"
             >
               <div
                 className="destination-detail-activity-summary"
@@ -106,7 +106,7 @@ export default function DestinationDetailRecords({
                 <span className="destination-detail-record-copy">
                   <strong>{activityName}</strong>
                   {mode === "app" && !anonymous ? (
-                    <span className="qp-workbench-list-meta destination-detail-record-meta">
+                    <span className="at-workbench-list-meta destination-detail-record-meta">
                       <span>{UI_TEXT.history.activitySegmentCount(
                         activity.activityCount ?? activity.records.length,
                       )}</span>
@@ -114,7 +114,7 @@ export default function DestinationDetailRecords({
                       <span>{UI_TEXT.history.titleRowCount(titleCount)}</span>
                     </span>
                   ) : titleCount > 0 ? (
-                    <span className="qp-workbench-list-meta destination-detail-record-meta">
+                    <span className="at-workbench-list-meta destination-detail-record-meta">
                       {UI_TEXT.history.titleRowCount(titleCount)}
                     </span>
                   ) : null}
@@ -124,7 +124,7 @@ export default function DestinationDetailRecords({
                   {titleCount > 0 ? (
                     <button
                       type="button"
-                      className="qp-button-secondary qp-compact-disclosure destination-detail-activity-disclosure"
+                      className="at-button-secondary at-compact-disclosure destination-detail-activity-disclosure"
                       aria-expanded={expanded}
                       aria-controls={expanded ? popoverId : undefined}
                       aria-label={copy.toggleTitleDetails(expanded, activityName)}
@@ -171,7 +171,7 @@ export default function DestinationDetailRecords({
                 aria-label={copy.recordAria(start, end, record.title, duration)}
               >
                 <span className="destination-detail-popover-copy">
-                  <strong className="qp-record-detail-title">{record.title}</strong>
+                  <strong className="at-record-detail-title">{record.title}</strong>
                   {record.secondaryText ? <span>{record.secondaryText}</span> : null}
                 </span>
                 <span className="destination-detail-popover-time">

@@ -116,7 +116,7 @@ export default function SettingsFullBundleImportCard({ disabled = false, onImpor
           />
           <div className="settings-dialog-action-copy">
             <div className="settings-import-action-heading">
-              <p className="settings-import-action-title qp-text-body qp-weight-medium text-[var(--qp-text-primary)]">
+              <p className="settings-import-action-title at-text-body at-weight-medium text-[var(--at-text-primary)]">
                 {FULL_BUNDLE_TITLE}
               </p>
               <QuietTooltip
@@ -154,7 +154,7 @@ export default function SettingsFullBundleImportCard({ disabled = false, onImpor
         )}
       >
         {error ? (
-          <p className="qp-text-caption text-[var(--qp-danger)]" role="alert">{error}</p>
+          <p className="at-text-caption text-[var(--at-danger)]" role="alert">{error}</p>
         ) : null}
 
         {phase === "preview" && inspect ? (
@@ -163,36 +163,36 @@ export default function SettingsFullBundleImportCard({ disabled = false, onImpor
               <div><dt>来源</dt><dd>{fullBundleSourceLine(inspect)}</dd></div>
               <div><dt>合计</dt><dd>{inspect.message}</dd></div>
             </dl>
-            <p className="qp-text-caption text-[var(--qp-text-tertiary)]">
+            <p className="at-text-caption text-[var(--at-text-tertiary)]">
               {FULL_BUNDLE_RULE_LABEL}：{FULL_BUNDLE_RULE_TEXT}
             </p>
             {inspect.compatible ? null : (
-              <p className="qp-text-caption text-[var(--qp-danger)]" role="alert">
+              <p className="at-text-caption text-[var(--at-danger)]" role="alert">
                 {FULL_BUNDLE_INCOMPATIBLE_NOTE}
               </p>
             )}
-            <ul className="qp-scroll-region qp-text-caption">
+            <ul className="at-scroll-region at-text-caption">
               {inspect.tables.filter((table) => table.rows > 0).map((table) => (
                 <li key={table.name}>{table.name} · {table.rows} 行</li>
               ))}
             </ul>
-            <p className="qp-text-caption text-[var(--qp-text-tertiary)]">{FULL_BUNDLE_RESTART_NOTE}</p>
+            <p className="at-text-caption text-[var(--at-text-tertiary)]">{FULL_BUNDLE_RESTART_NOTE}</p>
           </div>
         ) : null}
 
         {phase === "result" && result ? (
           <div className="settings-import-preview">
-            <p className="qp-text-body qp-weight-medium">
+            <p className="at-text-body at-weight-medium">
               {fullBundleImported(result.totalInserted, result.totalUpdated)}
             </p>
-            <ul className="qp-scroll-region qp-text-caption">
+            <ul className="at-scroll-region at-text-caption">
               {result.tables
                 .filter((stat) => stat.inserted + stat.updated + stat.skipped > 0)
                 .map((stat) => (
                   <li key={stat.name}>{stat.name} · {fullBundleTableRow(stat)}</li>
                 ))}
             </ul>
-            <p className="qp-text-caption text-[var(--qp-text-tertiary)]">{FULL_BUNDLE_RESTART_NOTE}</p>
+            <p className="at-text-caption text-[var(--at-text-tertiary)]">{FULL_BUNDLE_RESTART_NOTE}</p>
           </div>
         ) : null}
       </QuietDialog>

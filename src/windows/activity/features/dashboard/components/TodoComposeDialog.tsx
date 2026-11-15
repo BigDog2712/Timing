@@ -110,21 +110,21 @@ export default function TodoComposeDialog({ open, onClose, createBatch }: Props)
     <QuietDialog
       open={open}
       title={copy.todoCreateTitle}
-      surfaceClassName="qp-todo-dialog"
+      surfaceClassName="at-todo-dialog"
       initialFocusRef={nameRef}
       onClose={handleClose}
       actions={(
         <>
           <button
             type="button"
-            className="qp-button qp-button-compact qp-button-secondary"
+            className="at-button at-button-compact at-button-secondary"
             onClick={handleClose}
           >
             {UI_TEXT.dialog.cancel}
           </button>
           <button
             type="button"
-            className="qp-button qp-button-compact qp-button-primary"
+            className="at-button at-button-compact at-button-primary"
             disabled={!canSubmit}
             onClick={submit}
           >
@@ -134,20 +134,20 @@ export default function TodoComposeDialog({ open, onClose, createBatch }: Props)
       )}
     >
       <form
-        className="qp-todo-form"
+        className="at-todo-form"
         onSubmit={(event) => {
           event.preventDefault();
           submit();
         }}
       >
-        <div className="qp-todo-field">
-          <label className="qp-todo-field-label" htmlFor={nameId}>
+        <div className="at-todo-field">
+          <label className="at-todo-field-label" htmlFor={nameId}>
             {copy.todoNameLabel}
           </label>
           <input
             id={nameId}
             ref={nameRef}
-            className="qp-input qp-todo-name-input"
+            className="at-input at-todo-name-input"
             value={name}
             maxLength={TODO_TITLE_MAX_CHARS}
             placeholder={copy.todoCompose}
@@ -175,7 +175,7 @@ export default function TodoComposeDialog({ open, onClose, createBatch }: Props)
           onTimesChange={setTimes}
         />
 
-        <label className="qp-todo-remind">
+        <label className="at-todo-remind">
           <input
             type="checkbox"
             checked={remind}
@@ -188,9 +188,9 @@ export default function TodoComposeDialog({ open, onClose, createBatch }: Props)
         </label>
 
         {/* 勾上之后说清宿主真实行为（提前 15 / 5 分钟两档），不是"到点提醒" */}
-        {remind ? <p className="qp-todo-hint">{copy.todoRemindHint}</p> : null}
+        {remind ? <p className="at-todo-hint">{copy.todoRemindHint}</p> : null}
 
-        {issue ? <p className="qp-todo-issue" role="status">{issue}</p> : null}
+        {issue ? <p className="at-todo-issue" role="status">{issue}</p> : null}
       </form>
     </QuietDialog>
   );

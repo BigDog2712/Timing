@@ -231,7 +231,7 @@ export default function QuietTooltip({
     <>
       <span
         ref={anchorRef}
-        className={`qp-tooltip-anchor ${className ?? ""}`.trim()}
+        className={`at-tooltip-anchor ${className ?? ""}`.trim()}
         style={style}
         onFocus={showTooltip}
         onBlur={hideTooltipAfterBlur}
@@ -249,7 +249,7 @@ export default function QuietTooltip({
           ref={tooltipRef}
           id={tooltipId}
           role="tooltip"
-          className={`qp-tooltip ${tooltipClassName ?? ""}`.trim()}
+          className={`at-tooltip ${tooltipClassName ?? ""}`.trim()}
           style={{
             top: position ? `${position.top}px` : 0,
             left: position ? `${position.left}px` : 0,

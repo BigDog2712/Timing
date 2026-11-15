@@ -119,13 +119,13 @@ function buttonsInGroup(groupTitlePart: string): HTMLButtonElement[] {
 }
 
 const lastDialog = (): HTMLElement | undefined => {
-  const dialogs = Array.from(document.body.querySelectorAll<HTMLElement>(".qp-dialog-surface"));
+  const dialogs = Array.from(document.body.querySelectorAll<HTMLElement>(".at-dialog-surface"));
   return dialogs[dialogs.length - 1];
 };
 
 /** 对话框 actions 里的最后一颗（确认键） */
 const confirmOf = (surface: HTMLElement | undefined) => Array.from(
-  surface?.querySelectorAll<HTMLButtonElement>(".qp-dialog-actions button") ?? [],
+  surface?.querySelectorAll<HTMLButtonElement>(".at-dialog-actions button") ?? [],
 ).pop() ?? null;
 
 describe("外壳 + 两个对话框：从行点进去，看的是哪个框、调的是哪个回调", () => {
@@ -133,11 +133,11 @@ describe("外壳 + 两个对话框：从行点进去，看的是哪个框、调�
     mountShell();
     expect(document.querySelectorAll(".settings-preference-group"), "三个子组没全渲染")
       .toHaveLength(3);
-    const header = document.querySelector(".qp-panel .settings-panel-header, .qp-panel h3");
+    const header = document.querySelector(".at-panel .settings-panel-header, .at-panel h3");
     expect(header, "卡片没有标题（与同页其它卡不同构）").not.toBeNull();
     expect((header?.textContent ?? "").trim(), "卡片标题是空的").not.toBe("");
     /* 未点任何键时一个对话框都不许冒出来 */
-    expect(document.querySelectorAll(".qp-dialog-surface"), "一进页面就有对话框").toHaveLength(0);
+    expect(document.querySelectorAll(".at-dialog-surface"), "一进页面就有对话框").toHaveLength(0);
   });
 
   it("qd07_history_cleanup_row_opens_its_dialog_with_the_range_slider", async () => {
@@ -186,6 +186,6 @@ describe("外壳 + 两个对话框：从行点进去，看的是哪个框、调�
     expect(text, "「备份与恢复」组又回来了").not.toContain("备份与恢复");
     expect(text, "WebDAV 远端备份入口又回来了").not.toContain("远端备份");
     expect(document.querySelector(".settings-data-action-dialog"), "「选恢复来源」框又回来了").toBeNull();
-    expect(document.querySelector(".qp-segmented-filter"), "恢复策略选择器又回来了").toBeNull();
+    expect(document.querySelector(".at-segmented-filter"), "恢复策略选择器又回来了").toBeNull();
   });
 });

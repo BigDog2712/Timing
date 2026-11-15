@@ -1,8 +1,8 @@
 /* ============================================================================
  * tiers.css — 主界面五模块的**档位 token**（01 §2.6 / 02 §4.3c）
  * -----------------------------------------------------------------------------
- * 本文件是"两档"数值的唯一真相源之一：**顶栏**那一半（`--qp-titlebar-height`、
- * `--qp-nav-item-w`、`--qp-nav-item-h`、`--qp-shell-pad`）在 batch 1 已落在
+ * 本文件是"两档"数值的唯一真相源之一：**顶栏**那一半（`--at-titlebar-height`、
+ * `--at-nav-item-w`、`--at-nav-item-h`、`--at-shell-pad`）在 batch 1 已落在
  * `topbar.css:28-97`，这里**不重复定义**（两个真相源比缺一个更危险）。
  * 本文件只管**画布与五模块**：板式尺寸、卡间距、五个模块高、行高、环径。
  *
@@ -21,54 +21,54 @@
 
 :root {
   /* ── 板式（01 §4.5 方案 A：>1100×736 时居中留白，绝不拉伸） ── */
-  --qp-board-w: 1052px;
-  --qp-board-h: 636px;
+  --at-board-w: 1052px;
+  --at-board-h: 636px;
 
   /* ── 卡间距 / 卡内距（**对照 timing-board.exe**：`kit.rs` PAD/GAP 16 + `app.rs` 的卡壳） ──
    * 卡头 46 高、标题 13.5 粗、右侧读数 11；卡身左右内距 20、底 16（顶部由卡头吃掉）。
    * 这三个数是 Rust 版卡壳的**原值**，不再走「两档几何表」——v3 画布整体等比缩放，
    * 卡内不再是"窗高变了就换一套行高"，而是"窗变小了整张卡一起缩"。 */
-  --qp-card-gap: 16px;
-  --qp-card-pad: 20px;
-  --qp-card-pad-b: 16px;
-  --qp-card-head-h: 46px;
-  --qp-card-head-gap: 0px;
-  --qp-card-foot-h: 32px;
+  --at-card-gap: 16px;
+  --at-card-pad: 20px;
+  --at-card-pad-b: 16px;
+  --at-card-head-h: 46px;
+  --at-card-head-gap: 0px;
+  --at-card-foot-h: 32px;
 
   /* ── 五模块高（左列 264+16+284 = 564 = 636−56−16；右列 254+16+294 = 564） ── */
-  --qp-mod-timer: 264px;
-  --qp-mod-items: 284px;
-  --qp-mod-apps: 254px;
-  --qp-mod-todos: 294px;
-  --qp-mod-note: 56px;
+  --at-mod-timer: 264px;
+  --at-mod-items: 284px;
+  --at-mod-apps: 254px;
+  --at-mod-todos: 294px;
+  --at-mod-note: 56px;
 
   /* ── [v2 网格] 基准行高 = 计时分布卡（264）。所有卡高 = 该值 × 占行数 h。
    * 这是网格统一尺寸的口径：主人要求「所有卡片都改为计时分布那么大」，
    * 内容多的卡（应用排行/待办）占 2 行（h:2），不是把单卡塞高。 */
-  --qp-grid-row: 264px;
+  --at-grid-row: 264px;
 
   /* ── 卡片三档（P1 · 0.12.1 组件化仪表盘） ──
-   * `M` = 今天的行高，由上面那五个 `--qp-mod-*` 承担，**不再复制一份**（两个真相源更危险）。
+   * `M` = 今天的行高，由上面那五个 `--at-mod-*` 承担，**不再复制一份**（两个真相源更危险）。
    * 这里只补 `S` / `L` 两档；`cardRowToken(id, tier)` 在 M 档返回不带后缀的基名。
    * 选值口径：S/L 与 M 的差按「一行读数」的整数倍取，保证卡内行数变化是整行为单位
    * （S 少 2 行、L 多 2 行，行高 24/30/32/36 见下），而不是拍一个好看的数。 */
-  --qp-mod-timer-s: 216px;
-  --qp-mod-timer-l: 360px;
-  --qp-mod-items-s: 224px;
-  --qp-mod-items-l: 404px;
-  --qp-mod-apps-s: 190px;
-  --qp-mod-apps-l: 382px;
-  --qp-mod-todos-s: 230px;
-  --qp-mod-todos-l: 406px;
-  --qp-mod-note-s: 44px;
-  --qp-mod-note-l: 88px;
+  --at-mod-timer-s: 216px;
+  --at-mod-timer-l: 360px;
+  --at-mod-items-s: 224px;
+  --at-mod-items-l: 404px;
+  --at-mod-apps-s: 190px;
+  --at-mod-apps-l: 382px;
+  --at-mod-todos-s: 230px;
+  --at-mod-todos-l: 406px;
+  --at-mod-note-s: 44px;
+  --at-mod-note-l: 88px;
 
   /* ── [0.12.1] 两张通栏真卡（应用趋势 / 提醒窗口）──
    * 趋势卡要放得下 7 根柱 + 一行日期；高度取「卡头 20 + 8 + 柱 120 + 日期 16 + 上下内距 32」≈ 184。
-   * 提醒卡按 `--qp-row-items` 30 + gap 4 排 5 行 = 166，加卡头与内距 = 200。
+   * 提醒卡按 `--at-row-items` 30 + gap 4 排 5 行 = 166，加卡头与内距 = 200。
    * 这两个值不进像素验收（默认布局里没有它们），只保证"加进来时内容不被裁"。 */
-  --qp-mod-trend: 184px;
-  --qp-mod-reminder: 200px;
+  --at-mod-trend: 184px;
+  --at-mod-reminder: 200px;
 
   /* ── 行高（**逐条照抄 Rust 组件**，两档同值） ──
    *   readout 30 = `focus.rs` 图例 row_h
@@ -77,68 +77,68 @@
    *   todo    32 = `todos.rs` row_h
    * 两个数都**不再是档位量**：窗高变化由画布 zoom 承担，卡内行高必须稳在 Rust 的值上，
    * 否则同一张卡在 900 高与 1100 高的窗里行距不同，和 timing-board.exe 对不上。 */
-  --qp-row-readout: 30px;
-  --qp-row-items: 30px;
-  --qp-row-app: 38px;
-  --qp-row-todo: 32px;
-  --qp-row-gap: 4px;
+  --at-row-readout: 30px;
+  --at-row-items: 30px;
+  --at-row-app: 38px;
+  --at-row-todo: 32px;
+  --at-row-gap: 4px;
   /* 四条数字列的列宽（读数 / 事项 / 应用 / 待办同宽）。四列右缘对齐是验收项
    * （443.14 / 548.86），列宽散在四个文件里改一处漏三处，所以提成一个 token。 */
-  --qp-col-num: 44px;
+  --at-col-num: 44px;
 
   /* ── 环 / 裸条 / 便利贴卡 ──
-   * `--qp-donut` 是**上限**而不是定值：Rust `focus.rs` 的环径 = min(内容高, 0.46×内容宽)
+   * `--at-donut` 是**上限**而不是定值：Rust `focus.rs` 的环径 = min(内容高, 0.46×内容宽)
    * 再 clamp 到 86–158，所以真正的尺寸在 `dashboard-card-fit.css` 里由容器查询算，
    * 这里只留那个 158 的上限。 */
-  --qp-donut: 158px;
-  --qp-bar-max: 64px;
+  --at-donut: 158px;
+  --at-bar-max: 64px;
   /* 便利贴纸片高 = Rust `notes.rs` 的双列档 88。单列档 78 不在这里：它取决于**这张卡多宽**，
    * 由 `dashboard-notes.css` 的容器查询就地覆盖（卡宽 < 470 → 78）。 */
-  --qp-note-card-h: 88px;
+  --at-note-card-h: 88px;
 
   /* ── 字阶（视觉层 0.12.x）：主读数 / 行主文 ──
-   * `--qp-font-size-metric`（1.5rem = 24）**不动**：它在别处还有消费者，本批只给环心
-   * 主读数另立一条 26/30；行主文 13/18 同理另立，不改 `--qp-font-size-body`(14/20)
-   * 与 `--qp-font-size-caption`(12/18) —— 那两个是全仓正文/小字的基准。 */
-  --qp-font-size-readout: 26px;
-  --qp-line-height-readout: 30px;
-  --qp-font-size-row: 13px;
-  --qp-line-height-row: 18px;
+   * `--at-font-size-metric`（1.5rem = 24）**不动**：它在别处还有消费者，本批只给环心
+   * 主读数另立一条 26/30；行主文 13/18 同理另立，不改 `--at-font-size-body`(14/20)
+   * 与 `--at-font-size-caption`(12/18) —— 那两个是全仓正文/小字的基准。 */
+  --at-font-size-readout: 26px;
+  --at-line-height-readout: 30px;
+  --at-font-size-row: 13px;
+  --at-line-height-row: 18px;
 }
 
 @media (max-height: 735.98px) {
   :root {
-    /* --qp-board-w 不在短档改写：它是**宽度** token，宽度断点不该由高度断点决定。
+    /* --at-board-w 不在短档改写：它是**宽度** token，宽度断点不该由高度断点决定。
      *  900 宽时 `min(1052, 100%)` 本来就夹到 860，覆盖纯属冗余；1100×636（宽够高不够）
      *  时它会把板压成 860、左右各空 100px。删掉后 1100×636 = 1052（与长档一致）。 */
-    --qp-board-h: 552px;
+    --at-board-h: 552px;
 
-    --qp-mod-timer: 232px;
-    --qp-mod-items: 244px;
-    --qp-mod-apps: 222px;
-    --qp-mod-todos: 254px;
-    --qp-mod-note: 52px;
+    --at-mod-timer: 232px;
+    --at-mod-items: 244px;
+    --at-mod-apps: 222px;
+    --at-mod-todos: 254px;
+    --at-mod-note: 52px;
 
     /* 行高 / 卡间距 / 环径**不在短档改写**：v3 画布整体缩放，卡内版式必须与
      * timing-board.exe 逐值一致（16 / 30 / 38 / 32）。这里再压一套短档值，
      * 同一张卡就会在矮窗里换一套行距，正是"和 Rust 版对不上"的来源。 */
-    --qp-bar-max: 48px;
+    --at-bar-max: 48px;
 
     /* P1：短档的 S/L 同样按「少 2 行 / 多 2 行」重算，不许直接沿用长档数
      * （短档行高更小，沿用会出现「切档后卡内反而更空」）。 */
-    --qp-mod-timer-s: 184px;
-    --qp-mod-timer-l: 312px;
-    --qp-mod-items-s: 192px;
-    --qp-mod-items-l: 344px;
-    --qp-mod-apps-s: 158px;
-    --qp-mod-apps-l: 318px;
-    --qp-mod-todos-s: 190px;
-    --qp-mod-todos-l: 350px;
-    --qp-mod-note-s: 40px;
-    --qp-mod-note-l: 76px;
+    --at-mod-timer-s: 184px;
+    --at-mod-timer-l: 312px;
+    --at-mod-items-s: 192px;
+    --at-mod-items-l: 344px;
+    --at-mod-apps-s: 158px;
+    --at-mod-apps-l: 318px;
+    --at-mod-todos-s: 190px;
+    --at-mod-todos-l: 350px;
+    --at-mod-note-s: 40px;
+    --at-mod-note-l: 76px;
 
-    --qp-mod-trend: 164px;
-    --qp-mod-reminder: 180px;
+    --at-mod-trend: 164px;
+    --at-mod-reminder: 180px;
   }
 }
 
@@ -149,15 +149,15 @@
  * 计时卡骨架固定 5 行（= 5 条读数，短档下 5×24+4×4 = 136 ⊂ 172，不裁切）。
  * DOM 里恒画 5 条，短档藏掉第 5 条 —— 不靠 JS 读断点（02 §4.2 末条）。 */
 @media (max-height: 735.98px) {
-  .qp-skeleton[data-row="todo"] > span:nth-child(n + 5),
-  .qp-skeleton[data-row="app"] > span:nth-child(n + 5) {
+  .at-skeleton[data-row="todo"] > span:nth-child(n + 5),
+  .at-skeleton[data-row="app"] > span:nth-child(n + 5) {
     display: none;
   }
 }
 
 /* ── 为什么短档的环不需要第二套 SVG 常量 ──
  * 两档环是同一张图按比例缩：132/16.83/115.17 · 112/14.29/97.71，比例 112/132 = .8485。
- * 所以 SVG 只写一套 viewBox 144（center 72 / r 65 / stroke 14），尺寸交给 `--qp-donut`：
+ * 所以 SVG 只写一套 viewBox 144（center 72 / r 65 / stroke 14），尺寸交给 `--at-donut`：
  *   长档 132 → 描边 **12.83px**（= 14×132/144，推算值）
  *   短档 112 → 描边 **11.88px**（= 14×112/144，推算值）
  * 想做到整数描边就必须按档位换 viewBox（= 组件里读断点），为 0.2px 引入一套 JS 断点不值得
@@ -165,6 +165,6 @@
  * [视觉层 0.12.x] 环径 144/120 → 132/112：卡内可用高压到 178（计时卡 264 − 32 内距 − 28 卡头
  * − 26 维度行），144 时环与 5 行读数（5×26+4×4 = 146）都顶着格线，缩到 132 才留出呼吸。
  *
- * **`--qp-donut-stroke` 已删**（原 14/12 两档）：它从来没有任何 `var()` 消费者 —— 描边宽度
+ * **`--at-donut-stroke` 已删**（原 14/12 两档）：它从来没有任何 `var()` 消费者 —— 描边宽度
  * 写在 SVG 的 `strokeWidth={14}` 属性里，推算值与实测值都按 14 走。留一个 0 引用的 token
  * 等于给下一个人一条假线索（"改这里应该有用"），所以删掉，而不是改成注释保留。 */

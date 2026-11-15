@@ -67,7 +67,7 @@ export default function HistoryCalendarPopover({
         <div
           id={id}
           ref={popoverRef}
-          className="qp-calendar-popover history-calendar-popover qp-motion-popover-enter"
+          className="at-calendar-popover history-calendar-popover at-motion-popover-enter"
           role="dialog"
           aria-label={UI_TEXT.date.pickDate}
           style={{

@@ -8,7 +8,7 @@
  *
  * 上一版这里直接返回 `hsl(212 62% 52%)`。那等于把字面量色值换了个地方写：
  * 主题切换时它不跟随（深底上发闷）、设计侧改色要翻 TypeScript、项目
- * 「样式只用 `var(--*)` 令牌」的硬约束被绕过。现在只返回 `var(--qp-device-N)`，
+ * 「样式只用 `var(--*)` 令牌」的硬约束被绕过。现在只返回 `var(--at-device-N)`，
  * 真正的色值（浅/深两套）在 `shell/styles/features/device-lanes.css` 里。
  *
  * `shell/styles/tokens.css` 压在 298/298 冻结线上，所以那 8 个令牌没有进 tokens.css
@@ -39,8 +39,8 @@ export function deviceColorIndex(deviceId: string): number {
  */
 export function deviceColor(deviceId: string): string {
   const id = deviceId.trim();
-  if (!id) return "var(--qp-text-tertiary)";
-  return `var(--qp-device-${deviceColorIndex(id)})`;
+  if (!id) return "var(--at-text-tertiary)";
+  return `var(--at-device-${deviceColorIndex(id)})`;
 }
 
 /** 设备短名：12 位 hex 取前 6 位。够区分（同机群的 install_id 前缀随机），又不占宽。 */

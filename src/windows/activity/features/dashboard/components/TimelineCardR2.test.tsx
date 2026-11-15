@@ -101,7 +101,7 @@ function typeInto(input: HTMLInputElement | null, value: string) {
 }
 
 const footerButtons = () =>
-  Array.from(container?.querySelectorAll<HTMLButtonElement>(".qp-timeline-manage button") ?? []);
+  Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-timeline-manage button") ?? []);
 const byText = (text: string) =>
   Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
     .find((button) => button.textContent === text);
@@ -140,7 +140,7 @@ describe("TimelineCard · 入口收敛与总计（V-1.6a）", () => {
   it("tc01_header_has_no_menu_buttons_and_only_the_total_readout", async () => {
     await mount([itemRow()]);
     /* 卡头右侧 = 总计读数（来自 `useTodayItems.total`，后端口径） */
-    const head = container?.querySelector(".qp-card-head");
+    const head = container?.querySelector(".at-card-head");
     expect(head?.textContent).toContain("总计 1h 20m");
     /* 「常用事项 / 事项菜单」两颗唤起按钮已删：卡头一颗按钮都不该有 */
     expect(head?.querySelectorAll("button")).toHaveLength(0);
@@ -156,18 +156,18 @@ describe("TimelineCard · 入口收敛与总计（V-1.6a）", () => {
 
   it("tc03_rows_show_name_range_and_total", async () => {
     await mount([itemRow()]);
-    const row = container?.querySelector(".qp-timeline-row");
-    expect(row?.querySelector(".qp-timeline-label")?.textContent).toBe("事项 A");
-    expect(row?.querySelector(".qp-timeline-range")?.textContent).toBe("09:00–10:30");
-    expect(row?.querySelector(".qp-timeline-duration")?.textContent).toBe("1h 20m");
+    const row = container?.querySelector(".at-timeline-row");
+    expect(row?.querySelector(".at-timeline-label")?.textContent).toBe("事项 A");
+    expect(row?.querySelector(".at-timeline-range")?.textContent).toBe("09:00–10:30");
+    expect(row?.querySelector(".at-timeline-duration")?.textContent).toBe("1h 20m");
   });
 
   it("tc04_a_running_row_says_now_not_a_blank_end", async () => {
     /* V-1.6b：`lastEnd === null` → 止列 = "此刻 · 进行中"，不是空白 */
     await mount([itemRow({ lastEnd: null })]);
-    const range = container?.querySelector(".qp-timeline-range")?.textContent ?? "";
+    const range = container?.querySelector(".at-timeline-range")?.textContent ?? "";
     expect(range).toContain("进行中");
-    expect(container?.querySelector(".qp-timeline-row")?.hasAttribute("data-running")).toBe(true);
+    expect(container?.querySelector(".at-timeline-row")?.hasAttribute("data-running")).toBe(true);
   });
 });
 
@@ -178,13 +178,13 @@ describe("TimelineCard · 编辑事项弹层（V-1.6c）", () => {
     await flush();
 
     /* 先选事项，再改名称 + 默认时长（候选按 updatedAt 倒序 —— 按名字找，不按下标） */
-    const choices = Array.from(document.body.querySelectorAll<HTMLButtonElement>(".qp-timeline-edit-choice"));
+    const choices = Array.from(document.body.querySelectorAll<HTMLButtonElement>(".at-timeline-edit-choice"));
     act(() => {
       choices.find((button) => button.textContent?.includes("事项 A"))?.click();
     });
     await flush();
     const nameInput = document.body.querySelector<HTMLInputElement>(
-      ".qp-timeline-manage-dialog input.qp-timeline-manage-input",
+      ".at-timeline-manage-dialog input.at-timeline-manage-input",
     );
     expect(nameInput?.value).toBe("事项 A");
     typeInto(nameInput, "事项 A2");
@@ -211,22 +211,22 @@ describe("TimelineCard · 改起止弹层（V-1.6e / B2 / B3）", () => {
       container?.querySelector<HTMLButtonElement>("button[aria-label='改起止 事项 A']")?.click();
     });
     await flush();
-    expect(document.body.querySelector(".qp-record-time")).not.toBeNull();
-    expect(document.body.querySelectorAll(".qp-record-time-row")).toHaveLength(1);
+    expect(document.body.querySelector(".at-record-time")).not.toBeNull();
+    expect(document.body.querySelectorAll(".at-record-time-row")).toHaveLength(1);
   }
 
   const editorSave = () =>
-    document.body.querySelector<HTMLButtonElement>(".qp-record-time-editor .qp-button-primary");
+    document.body.querySelector<HTMLButtonElement>(".at-record-time-editor .at-button-primary");
   const editorInputs = () =>
     Array.from(document.body.querySelectorAll<HTMLInputElement>(
-      ".qp-record-time-editor input[type='datetime-local']",
+      ".at-record-time-editor input[type='datetime-local']",
     ));
 
   it("tc06_save_emits_exactly_one_camel_case_intent_without_a_duration_field", async () => {
     await openRecordDialog();
     /* 逐段改（B5）：点这一段的「改起止」展开编辑器 */
     act(() => {
-      document.body.querySelector<HTMLButtonElement>(".qp-record-time-row .qp-timeline-item-action")?.click();
+      document.body.querySelector<HTMLButtonElement>(".at-record-time-row .at-timeline-item-action")?.click();
     });
     await flush();
 
@@ -253,7 +253,7 @@ describe("TimelineCard · 改起止弹层（V-1.6e / B2 / B3）", () => {
   it("tc07_a_cross_midnight_edit_is_refused_in_place_and_emits_nothing", async () => {
     await openRecordDialog();
     act(() => {
-      document.body.querySelector<HTMLButtonElement>(".qp-record-time-row .qp-timeline-item-action")?.click();
+      document.body.querySelector<HTMLButtonElement>(".at-record-time-row .at-timeline-item-action")?.click();
     });
     await flush();
 
@@ -280,16 +280,16 @@ describe("TimelineCard · 改起止弹层（V-1.6e / B2 / B3）", () => {
       container?.querySelector<HTMLButtonElement>("button[aria-label='改起止 事项 A']")?.click();
     });
     await flush();
-    expect(document.body.querySelectorAll(".qp-record-time-row")).toHaveLength(2);
+    expect(document.body.querySelectorAll(".at-record-time-row")).toHaveLength(2);
 
     /* B3 的 UI 形态：进行中的段行上**显示**说明（不是空白、不是英文码） */
-    const notes = Array.from(document.body.querySelectorAll(".qp-record-time-note"))
+    const notes = Array.from(document.body.querySelectorAll(".at-record-time-note"))
       .map((node) => node.textContent ?? "");
     expect(notes).toContain("进行中的记录要等结束之后才能改");
 
     /* 展开进行中那一段：输入随便填多合法，保存键也必须 disabled */
-    const runningRow = document.body.querySelectorAll(".qp-record-time-row")[1];
-    act(() => { runningRow.querySelector<HTMLButtonElement>(".qp-timeline-item-action")?.click(); });
+    const runningRow = document.body.querySelectorAll(".at-record-time-row")[1];
+    act(() => { runningRow.querySelector<HTMLButtonElement>(".at-timeline-item-action")?.click(); });
     await flush();
     const inputs = editorInputs();
     typeInto(inputs[0], formatDateTimeLocal(DAY + 11 * HOUR));

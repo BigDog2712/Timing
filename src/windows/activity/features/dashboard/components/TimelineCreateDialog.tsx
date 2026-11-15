@@ -99,21 +99,21 @@ export default function TimelineCreateDialog({ open, copy, pinned, onClose, onLo
       <QuietDialog
         open={open}
         title={copy.timelineCreateTitle}
-        surfaceClassName="qp-timeline-manage-dialog"
+        surfaceClassName="at-timeline-manage-dialog"
         initialFocusRef={inputRef}
         onClose={onClose}
         actions={(
           <>
             <button
               type="button"
-              className="qp-button qp-button-compact qp-button-secondary"
+              className="at-button at-button-compact at-button-secondary"
               onClick={onClose}
             >
               {UI_TEXT.dialog.cancel}
             </button>
             <button
               type="button"
-              className="qp-button qp-button-compact qp-button-primary"
+              className="at-button at-button-compact at-button-primary"
               disabled={busy || name.trim().length === 0}
               onClick={submit}
             >
@@ -122,10 +122,10 @@ export default function TimelineCreateDialog({ open, copy, pinned, onClose, onLo
           </>
         )}
       >
-        <div className="qp-timeline-manage-form">
+        <div className="at-timeline-manage-form">
           <input
             ref={inputRef}
-            className="qp-input qp-timeline-manage-input"
+            className="at-input at-timeline-manage-input"
             value={name}
             maxLength={ITEM_NAME_MAX_LEN}
             placeholder={copy.timelineCreatePlaceholder}
@@ -141,10 +141,10 @@ export default function TimelineCreateDialog({ open, copy, pinned, onClose, onLo
               submit();
             }}
           />
-          <label className="qp-timeline-manage-field">
-            <span className="qp-timeline-manage-label">{copy.timelineTimerLabel}</span>
+          <label className="at-timeline-manage-field">
+            <span className="at-timeline-manage-label">{copy.timelineTimerLabel}</span>
             <input
-              className="qp-input qp-timeline-manage-timer"
+              className="at-input at-timeline-manage-timer"
               value={minutes}
               inputMode="numeric"
               placeholder={copy.timelineTimerPlaceholder}
@@ -161,8 +161,8 @@ export default function TimelineCreateDialog({ open, copy, pinned, onClose, onLo
               }}
             />
           </label>
-          <label className="qp-timeline-manage-field">
-            <span className="qp-timeline-manage-label">{copy.timelineCategoryLabel}</span>
+          <label className="at-timeline-manage-field">
+            <span className="at-timeline-manage-label">{copy.timelineCategoryLabel}</span>
             {/* 「管理分类」放在标签行里：新建时顺手加一个分类，不用退出去再回来 */}
             <ItemCategoryField
               value={category}
@@ -177,7 +177,7 @@ export default function TimelineCreateDialog({ open, copy, pinned, onClose, onLo
               onChange={setCategory}
             />
           </label>
-          <label className="qp-timeline-manage-check">
+          <label className="at-timeline-manage-check">
             <input
               type="checkbox"
               checked={pin}
@@ -186,7 +186,7 @@ export default function TimelineCreateDialog({ open, copy, pinned, onClose, onLo
             <span>{copy.timelinePinAction}</span>
           </label>
           {issue ? (
-            <p className="qp-timeline-manage-issue" role="status">{issue}</p>
+            <p className="at-timeline-manage-issue" role="status">{issue}</p>
           ) : null}
         </div>
       </QuietDialog>

@@ -149,7 +149,7 @@ export default function QuickClassificationItemBindingMenu({ binding, disabled, 
       {open ? (
         <div
           ref={menuRef}
-          className="quick-classification-menu quick-classification-category-menu qp-scroll-region"
+          className="quick-classification-menu quick-classification-category-menu at-scroll-region"
           role="menu"
           aria-label={labels.menuLabel}
           tabIndex={-1}

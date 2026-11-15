@@ -13,7 +13,7 @@
  *   · 主题切换时没人能统一调（暗底上 52% 亮度发闷，而它不经过任何主题机制）；
  *   · 设计侧改色要去翻 TypeScript，而不是改 CSS；
  *   · 项目硬约束「样式只用 `var(--*)` 令牌」被绕过了。
- * 现在：色相表在这里，`deviceColor(installId)` 只返回 `var(--qp-device-N)`。
+ * 现在：色相表在这里，`deviceColor(installId)` 只返回 `var(--at-device-N)`。
  *
  * ## 两套值必须成对出现
  *
@@ -26,30 +26,30 @@
  * ========================================================================== */
 
 :root {
-  --qp-device-0: hsl(212 62% 46%);
-  --qp-device-1: hsl(268 55% 52%);
-  --qp-device-2: hsl(336 58% 50%);
-  --qp-device-3: hsl(12 62% 48%);
-  --qp-device-4: hsl(32 68% 42%);
-  --qp-device-5: hsl(152 52% 34%);
-  --qp-device-6: hsl(184 58% 34%);
-  --qp-device-7: hsl(96 48% 36%);
+  --at-device-0: hsl(212 62% 46%);
+  --at-device-1: hsl(268 55% 52%);
+  --at-device-2: hsl(336 58% 50%);
+  --at-device-3: hsl(12 62% 48%);
+  --at-device-4: hsl(32 68% 42%);
+  --at-device-5: hsl(152 52% 34%);
+  --at-device-6: hsl(184 58% 34%);
+  --at-device-7: hsl(96 48% 36%);
 }
 
 :root[data-theme="dark"] {
-  --qp-device-0: hsl(212 70% 66%);
-  --qp-device-1: hsl(268 66% 72%);
-  --qp-device-2: hsl(336 66% 70%);
-  --qp-device-3: hsl(12 72% 68%);
-  --qp-device-4: hsl(32 76% 62%);
-  --qp-device-5: hsl(152 56% 58%);
-  --qp-device-6: hsl(184 62% 58%);
-  --qp-device-7: hsl(96 52% 60%);
+  --at-device-0: hsl(212 70% 66%);
+  --at-device-1: hsl(268 66% 72%);
+  --at-device-2: hsl(336 66% 70%);
+  --at-device-3: hsl(12 72% 68%);
+  --at-device-4: hsl(32 76% 62%);
+  --at-device-5: hsl(152 56% 58%);
+  --at-device-6: hsl(184 62% 58%);
+  --at-device-7: hsl(96 52% 60%);
 }
 
 /* ── 版式 ────────────────────────────────────────────────────────────────
- * 只挂 `.device-*` 前缀，不覆盖既有类。尺寸全部走 `--qp-*`，不写 px 以外的魔法数
- * （6/8px 是圆点直径，与 `qp-badge` 家族的紧凑档对齐）。 */
+ * 只挂 `.device-*` 前缀，不覆盖既有类。尺寸全部走 `--at-*`，不写 px 以外的魔法数
+ * （6/8px 是圆点直径，与 `at-badge` 家族的紧凑档对齐）。 */
 
 .device-chip {
   display: inline-flex;
@@ -63,19 +63,19 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--qp-device-0);
+  background: var(--at-device-0);
 }
 
 .device-legend {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--qp-space-2, 8px);
+  gap: var(--at-space-2, 8px);
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: var(--qp-font-size-caption);
-  color: var(--qp-text-secondary);
+  font-size: var(--at-font-size-caption);
+  color: var(--at-text-secondary);
 }
 
 .device-legend-item {
@@ -89,5 +89,5 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--qp-device-0);
+  background: var(--at-device-0);
 }

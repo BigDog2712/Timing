@@ -117,12 +117,12 @@ async function mount(
   await flush();
 }
 
-const surface = () => document.body.querySelector<HTMLElement>(".qp-app-edit-dialog");
-const sections = () => Array.from(document.body.querySelectorAll<HTMLElement>(".qp-app-edit-section"));
+const surface = () => document.body.querySelector<HTMLElement>(".at-app-edit-dialog");
+const sections = () => Array.from(document.body.querySelectorAll<HTMLElement>(".at-app-edit-section"));
 const categoryRow = (category: string) =>
-  document.body.querySelector<HTMLElement>(`.qp-app-edit-option[data-category="${category}"]`);
+  document.body.querySelector<HTMLElement>(`.at-app-edit-option[data-category="${category}"]`);
 const itemRow = (itemId: number) =>
-  document.body.querySelector<HTMLElement>(`.qp-app-edit-option[data-item-id="${itemId}"]`);
+  document.body.querySelector<HTMLElement>(`.at-app-edit-option[data-item-id="${itemId}"]`);
 const saveButton = () => Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
   .find((button) => button.textContent === "保存");
 
@@ -166,7 +166,7 @@ describe("DataAppEditDialog", () => {
     /* [本轮] 只有「分类」「绑定事项」两段：分类管理整段搬去了分类趋势页的「管理分类」 */
     expect(sections()).toHaveLength(2);
     expect(surface()?.textContent, "分类管理又被塞回应用设置弹窗了").not.toContain("分类管理");
-    expect(surface()?.querySelector(".qp-category-management-grid"), "弹窗里不该再有分类管理的行").toBeNull();
+    expect(surface()?.querySelector(".at-category-management-grid"), "弹窗里不该再有分类管理的行").toBeNull();
     /* 落库态落到勾选上：development 是主分类（带「主」角标），design 也勾着 */
     expect(categoryRow("development")?.hasAttribute("data-primary")).toBe(true);
     expect(categoryRow("development")?.textContent).toContain("主");
@@ -217,7 +217,7 @@ describe("DataAppEditDialog", () => {
     h.loadBootstrap.mockRejectedValue(new Error("boom"));
     await mount(APP);
     expect(saveButton()?.disabled).toBe(true);
-    expect(document.body.querySelector(".qp-app-edit-issue")?.textContent).toBe("读取这个应用的设置失败");
+    expect(document.body.querySelector(".at-app-edit-issue")?.textContent).toBe("读取这个应用的设置失败");
   });
 
   it("ae05_a_successful_save_notifies_onSaved_before_closing", async () => {

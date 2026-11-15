@@ -20,26 +20,26 @@ export interface LinkedWebMenuProps {
 export default function LinkedWebMenu({ openIdentity, onOpenIdentity, onBeforeRegroup, candidate, overrides, disabled, globalTitleEnabled, onChange }: LinkedWebMenuProps) {
   const text = useLocaleText(), id = useId(), trigger = useRef<HTMLButtonElement>(null);
   const identity = candidate.normalizedDomain, parent = webDisplayDomain(identity);
-  if (!webLinkParent(identity)) return <IdentityText text={parent} className="qp-app-mapping-exe" />;
+  if (!webLinkParent(identity)) return <IdentityText text={parent} className="at-app-mapping-exe" />;
   const open = openIdentity === identity;
   const close = (reason: QuietPopoverCloseReason) => { onOpenIdentity(null, reason); if (reason === "escape") trigger.current?.focus({ preventScroll: true }); };
   return <>
-    <button ref={trigger} type="button" className="qp-app-link-trigger qp-app-mapping-exe"
+    <button ref={trigger} type="button" className="at-app-link-trigger at-app-mapping-exe"
       aria-label={`${text.mapping.webLinks}: ${parent}`} aria-expanded={open} aria-controls={open ? id : undefined}
       disabled={disabled} onClick={() => onOpenIdentity(open ? null : identity)}>
       <span>{parent}</span><ChevronDown size={12} aria-hidden />
     </button>
     <QuietAnchoredPopover open={open && !disabled} anchor={trigger.current} id={id} ariaLabel={text.mapping.webLinks}
-      onClose={close} className="qp-app-link-popover qp-web-grouping-popover" horizontalAlign="start">
+      onClose={close} className="at-app-link-popover at-web-grouping-popover" horizontalAlign="start">
       <strong>{text.mapping.webLinks}</strong>
-      <div className="qp-app-link-list qp-scroll-region">
-        <div className="qp-app-link-option"><IdentityText text={parent} className="qp-app-mapping-exe" />
-          <div className="qp-app-link-main-icon"><House size={12} role="img" aria-label={text.mapping.mainWebDomain} /></div></div>
+      <div className="at-app-link-list at-scroll-region">
+        <div className="at-app-link-option"><IdentityText text={parent} className="at-app-mapping-exe" />
+          <div className="at-app-link-main-icon"><House size={12} role="img" aria-label={text.mapping.mainWebDomain} /></div></div>
         {open && candidate.memberCandidates?.map(member => {
           const domain = member.normalizedDomain, override = overrides[domain] ?? {};
-          return <div key={domain} className="qp-app-link-option qp-app-link-member">
-            <IdentityText text={domain} className="qp-app-mapping-exe" />
-            <div className="qp-app-link-controls">
+          return <div key={domain} className="at-app-link-option at-app-link-member">
+            <IdentityText text={domain} className="at-app-mapping-exe" />
+            <div className="at-app-link-controls">
               <QuietIconAction icon={override.captureTitle === false ? <CaptionsOff size={12} /> : <Captions size={12} />}
                 title={`${text.mapping.titleRecorded}: ${domain}`} showTooltip={false} pressed={override.captureTitle !== false} showPressedStyle={false}
                 disabled={disabled || !globalTitleEnabled} onClick={() => onChange(domain, { ...override, captureTitle: override.captureTitle === false })} />

@@ -18,7 +18,7 @@ export async function confirmObjectDeletion(target: DeletionTarget, name: string
     title,
     description: text.mapping.deleteObjectDetail(name),
     details: sections.map(([heading, items]) => items.length > 0 && (
-      <section key={heading} className="qp-object-delete-section"><strong>{heading}</strong><ul>
+      <section key={heading} className="at-object-delete-section"><strong>{heading}</strong><ul>
         {items.map(item => <li key={item}>{item}</li>)}</ul></section>
     )),
     confirmLabel: title,

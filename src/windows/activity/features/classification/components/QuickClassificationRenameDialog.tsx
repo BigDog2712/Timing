@@ -87,7 +87,7 @@ export default function QuickClassificationRenameDialog({
       <form id="quick-classification-rename-form" className="quick-classification-rename-form" onSubmit={submit}>
         <input
           ref={inputRef}
-          className="qp-control qp-dialog-input quick-classification-rename-input"
+          className="at-control at-dialog-input quick-classification-rename-input"
           value={value}
           placeholder={UI_TEXT.mapping.quickRenamePlaceholder}
           disabled={saving}

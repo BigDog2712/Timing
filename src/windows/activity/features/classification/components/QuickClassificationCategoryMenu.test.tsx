@@ -70,11 +70,11 @@ async function mount(props: HarnessProps): Promise<void> {
 }
 
 function deleteButtons(): HTMLButtonElement[] {
-  return Array.from(container?.querySelectorAll<HTMLButtonElement>("[data-qp-delete-category]") ?? []);
+  return Array.from(container?.querySelectorAll<HTMLButtonElement>("[data-at-delete-category]") ?? []);
 }
 
 function createButton(): HTMLButtonElement {
-  const found = container?.querySelector<HTMLButtonElement>("[data-qp-create-category]");
+  const found = container?.querySelector<HTMLButtonElement>("[data-at-create-category]");
   if (!found) throw new Error("找不到「＋ 新建分类」");
   return found;
 }
@@ -103,14 +103,14 @@ describe("分类子菜单 · 删除入口只给自定义分类", () => {
 
     expect(deleteButtons()).toHaveLength(0);
     /* 11 个内置分类一个都不许出现删除键 —— 尤其 `other`（回落目标） */
-    expect(container?.querySelector("[data-qp-delete-category='other']")).toBeNull();
-    expect(container?.querySelector("[data-qp-delete-category='browser']")).toBeNull();
+    expect(container?.querySelector("[data-at-delete-category='other']")).toBeNull();
+    expect(container?.querySelector("[data-at-delete-category='browser']")).toBeNull();
   });
 
   it("m02_custom_categories_get_one_delete_entry_each", async () => {
     await mount({ options: WITH_CUSTOM, currentCategory: "browser" });
 
-    const values = deleteButtons().map((button) => button.getAttribute("data-qp-delete-category"));
+    const values = deleteButtons().map((button) => button.getAttribute("data-at-delete-category"));
     expect(values).toEqual(["custom:category_reading", "custom:category_lab"]);
   });
 
@@ -152,7 +152,7 @@ describe("分类子菜单 · 接线", () => {
     /* 必须排在所有 `menuitemradio` 之后：`focusMenuItem` 按序号找菜单项，
        插在中间会让"打开时焦点落在当前分类"错位（看起来像勾错了分类）。 */
     const items = Array.from(container?.querySelectorAll<HTMLElement>("[role^='menuitem']") ?? []);
-    expect(items[items.length - 1]?.hasAttribute("data-qp-create-category")).toBe(true);
+    expect(items[items.length - 1]?.hasAttribute("data-at-create-category")).toBe(true);
   });
 
   it("m07_picking_a_category_still_hands_over_the_option_itself", async () => {

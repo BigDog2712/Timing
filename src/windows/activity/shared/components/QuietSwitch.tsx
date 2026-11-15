@@ -19,9 +19,9 @@ export default function QuietSwitch({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`qp-switch ${checked ? "qp-switch-checked" : ""}`.trim()}
+      className={`at-switch ${checked ? "at-switch-checked" : ""}`.trim()}
     >
-      <span className={`qp-switch-thumb ${checked ? "qp-switch-thumb-checked" : ""}`.trim()} />
+      <span className={`at-switch-thumb ${checked ? "at-switch-thumb-checked" : ""}`.trim()} />
     </button>
   );
 }

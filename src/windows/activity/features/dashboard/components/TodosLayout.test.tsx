@@ -81,8 +81,8 @@ async function mount() {
   await flush();
 }
 
-const list = () => container?.querySelector<HTMLElement>(".qp-todo-list") ?? null;
-const metaText = () => container?.querySelector(".qp-card-meta")?.textContent ?? "";
+const list = () => container?.querySelector<HTMLElement>(".at-todo-list") ?? null;
+const metaText = () => container?.querySelector(".at-card-meta")?.textContent ?? "";
 const entry = () => Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
   .find((button) => button.textContent === "新建待办");
 
@@ -122,7 +122,7 @@ describe("待办卡 · 入口在卡头之下时的「还有 K 项」", () => {
     await mount();
     /* 空态：入口在（这是入口一路搬家的全部理由） */
     expect(entry()).not.toBeUndefined();
-    expect(entry()?.closest(".qp-todo-new-row"), "入口在卡头下方那条窄行里").not.toBeNull();
+    expect(entry()?.closest(".at-todo-new-row"), "入口在卡头下方那条窄行里").not.toBeNull();
     /* 空态没有列表、也没有 meta 读数 */
     expect(list()).toBeNull();
     expect(metaText()).toBe("");
@@ -132,7 +132,7 @@ describe("待办卡 · 入口在卡头之下时的「还有 K 项」", () => {
     h.listPendingTodos.mockResolvedValue([todo(1)]);
     await mount();
     layout(176);
-    expect(container?.querySelectorAll(".qp-todo-row")).toHaveLength(1);
+    expect(container?.querySelectorAll(".at-todo-row")).toHaveLength(1);
     expect(metaText()).toBe("1 条待办");
     expect(metaText()).not.toContain("还有");
   });

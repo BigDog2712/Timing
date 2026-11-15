@@ -17,7 +17,7 @@ import {
  * 「显示」分区（P0-06 · 原「外观」）：深/浅已跟随宿主（`useHostTheme`），所以不再有主题模式
  * 开关——那个开关写回宿主，用户却会以为只改分析窗，是「两个 App」感最典型的一处。主题与
  * 主色全应用只有宿主一个入口，这里只留一行指路文案。配色预设（28 套）原地保留：它只决定
- * **中性底色**（`--qp-bg-*` / `--qp-border-*` / `--qp-text-*`），不碰宿主四色派生的 6 个令牌。
+ * **中性底色**（`--at-bg-*` / `--at-border-*` / `--at-text-*`），不碰宿主四色派生的 6 个令牌。
  */
 const COPY = {
   zh: { ownerHint: "主题与主色在本页「主题与主色」卡里改，全应用共用一份；配色预设只决定这里的中性底色。", neutralOnly: "仅影响中性底色" },
@@ -109,18 +109,18 @@ export default function SettingsAppearancePanel({
   };
 
   return (
-    <section className="qp-panel p-5 md:p-6">
+    <section className="at-panel p-5 md:p-6">
       <SettingsPanelHeader
-        icon={<Palette size={16} className="text-[var(--qp-accent-default)]" />}
+        icon={<Palette size={16} className="text-[var(--at-accent-default)]" />}
         title={UI_TEXT.settings.appearanceTitle}
       />
 
-      <div className="mt-3 qp-text-caption text-[var(--qp-text-tertiary)]">{copy.ownerHint}</div>
+      <div className="mt-3 at-text-caption text-[var(--at-text-tertiary)]">{copy.ownerHint}</div>
 
       <div className="mt-5 space-y-5">
         <SettingsPreferenceGroup
           title={UI_TEXT.settings.themeGroupTitle}
-          headerAside={<span className="qp-text-caption text-[var(--qp-text-tertiary)]">{copy.neutralOnly}</span>}
+          headerAside={<span className="at-text-caption text-[var(--at-text-tertiary)]">{copy.neutralOnly}</span>}
         >
           <QuietActionRow className="settings-preference-list">
             <SettingsPreferenceRow title={UI_TEXT.settings.colorSchemeLabel} stacked>
@@ -174,13 +174,13 @@ export default function SettingsAppearancePanel({
         title={activeLibraryOption?.label ?? UI_TEXT.settings.colorSchemeDialogFallbackTitle}
         onClose={closeColorSchemeDialog}
         initialFocusRef={selectedSchemeRef}
-        surfaceClassName="qp-theme-dialog-surface"
+        surfaceClassName="at-theme-dialog-surface"
         actions={(
           <>
             <QuietButton
               size="large"
               onClick={closeColorSchemeDialog}
-              className="qp-dialog-action"
+              className="at-dialog-action"
               disabled={colorSchemeConfirming}
             >
               {UI_TEXT.common.cancel}
@@ -190,7 +190,7 @@ export default function SettingsAppearancePanel({
               size="large"
               onClick={() => void handleConfirmColorScheme()}
               busy={colorSchemeConfirming}
-              className="qp-dialog-action"
+              className="at-dialog-action"
             >
               {colorSchemeConfirming ? UI_TEXT.settings.colorSchemeSaving : UI_TEXT.common.confirm}
             </QuietButton>
@@ -198,7 +198,7 @@ export default function SettingsAppearancePanel({
         )}
       >
         {activeLibrary ? (
-          <div className="qp-theme-dialog-body qp-scroll-region">
+          <div className="at-theme-dialog-body at-scroll-region">
             <div className="settings-color-scheme-list" role="group" aria-label={activeLibraryOption?.label}>
               {COLOR_SCHEME_OPTIONS[activeLibrary].map((option) => {
                 const selected = option.value === activeColorScheme;

@@ -35,12 +35,12 @@ describe("主界面组件板结构（v3 自由摆位）", () => {
   it("p01a_dashboard_renders_the_board_not_a_grid", () => {
     expect(dashboard).toContain("<DashboardBoard");
     /* v2 的网格容器彻底下线：留着它就是两套定位在抢同一批卡片 */
-    expect(dashboard).not.toContain("qp-grid");
+    expect(dashboard).not.toContain("at-grid");
     expect(dashboard).not.toContain("buildGridCards");
   });
 
   it("p01b_toolbar_is_a_sibling_and_before_the_canvas", () => {
-    const toolbar = boardSource.indexOf("qp-dashboard-toolbar");
+    const toolbar = boardSource.indexOf("at-dashboard-toolbar");
     const canvas = boardSource.indexOf("<BoardCanvas");
     expect(toolbar).toBeGreaterThan(-1);
     expect(canvas).toBeGreaterThan(-1);
@@ -63,19 +63,19 @@ describe("主界面组件板结构（v3 自由摆位）", () => {
 
     const css = readCss("../../../shell/styles/features/dashboard-board.css");
     /* 原点必须是左上：以中心为原点缩放时，卡片会越缩越往右下漂 */
-    expect(cssBlock(css, ".qp-board-canvas")).toContain("transform-origin: top left");
+    expect(cssBlock(css, ".at-board-canvas")).toContain("transform-origin: top left");
     /* 画布是绝对定位的，尺寸完全由 inline 宽高 + scale 决定 */
-    expect(cssBlock(css, ".qp-board-canvas")).toContain("position: absolute");
+    expect(cssBlock(css, ".at-board-canvas")).toContain("position: absolute");
 
     /* 滚动归属：画布两个方向都要能滚，否则倍率 > 1 时右边那列看不到 */
     const zoomCss = readCss("../../../shell/styles/features/dashboard-board-zoom.css");
-    expect(cssBlock(zoomCss, ".qp-board-scroll")).toContain("overflow: auto");
-    expect(cssBlock(zoomCss, ".qp-main-view")).toContain("min-height: 0");
+    expect(cssBlock(zoomCss, ".at-board-scroll")).toContain("overflow: auto");
+    expect(cssBlock(zoomCss, ".at-main-view")).toContain("min-height: 0");
   });
 
   it("p01d_cards_are_positioned_by_the_layout_model", () => {
     expect(frameSource).toContain("left: card.x, top: card.y, width: card.w, height: card.h");
-    expect(cssBlock(readCss("../../../shell/styles/features/dashboard-board.css"), ".qp-board-card"))
+    expect(cssBlock(readCss("../../../shell/styles/features/dashboard-board.css"), ".at-board-card"))
       .toContain("position: absolute");
   });
 });
@@ -94,7 +94,7 @@ describe("三种抓取（移动 / 改宽 / 改高）", () => {
     /* 卡里有勾选框、输入框、⋯：误判的表现是「点勾选没反应，卡被拖走了」。
      * 判据顺序必须是「先认手柄、再认交互元素、最后才认卡头」。 */
     const interactive = frameSource.indexOf("button, a, input, textarea, select");
-    const head = frameSource.indexOf(".qp-card-head, .qp-notes-head, .qp-board-grab");
+    const head = frameSource.indexOf(".at-card-head, .at-notes-head, .at-board-grab");
     expect(interactive).toBeGreaterThan(-1);
     expect(head).toBeGreaterThan(-1);
     expect(interactive).toBeLessThan(head);
@@ -133,12 +133,12 @@ describe("组件分发", () => {
 describe("时间线卡的行容器守卫", () => {
   it("p06a_timeline_rows_scroll_instead_of_clipping", () => {
     const layoutCss = readCss("../../../shell/styles/features/dashboard-layout.css");
-    const rows = cssBlock(layoutCss, ".qp-card-timeline .qp-timeline-rows");
+    const rows = cssBlock(layoutCss, ".at-card-timeline .at-timeline-rows");
     expect(rows, "行容器必须纵向可滚（否则 S 档裁半行）").toContain("overflow-y: auto");
     expect(rows, "横向仍要裁：时间线不横向滚动").toContain("overflow-x: hidden");
     /* 行项不许被压扁：列向 flex 子项默认 `flex-shrink: 1`，容器一矮就把 30px 挤成 26/15。
        压扁比裁行更隐蔽（裁口消失了，但行高已经不是 30），所以这条也要钉。 */
-    expect(cssBlock(layoutCss, ".qp-timeline-row"), "行高必须固定 30，不许被压缩")
+    expect(cssBlock(layoutCss, ".at-timeline-row"), "行高必须固定 30，不许被压缩")
       .toContain("flex: 0 0 auto");
   });
 });
@@ -147,25 +147,25 @@ describe("时间线卡的行容器守卫", () => {
  * 待办卡的卡底 / 收缩守卫（2026-11-12 建，[本轮] 入口从卡底 footer 搬到卡头后重锚）。
  *
  * 两类"改回去零报错、只会某天被报『撤销条悬空 / 卡片顶出滚动』"的接线：
- *  ① 撤销条是 absolute；卡底那条 32 高的入口条（`.qp-todo-foot`）本轮随入口搬到卡头
- *     一起下线，所以 `bottom` 回到卡片自己的底部内距 `--qp-card-pad-b` + 8px 间隙。
- *     还留着 `--qp-card-foot-h` 就是照旧几何算的 —— 没有实体接住那 32px，撤销条会悬空。
+ *  ① 撤销条是 absolute；卡底那条 32 高的入口条（`.at-todo-foot`）本轮随入口搬到卡头
+ *     一起下线，所以 `bottom` 回到卡片自己的底部内距 `--at-card-pad-b` + 8px 间隙。
+ *     还留着 `--at-card-foot-h` 就是照旧几何算的 —— 没有实体接住那 32px，撤销条会悬空。
  *  ② 列表是 flex 子项，默认 `min-height: auto` —— 容器一矮，列表拒不收缩，整卡被顶出滚动区。
  */
 describe("待办卡的卡底守卫", () => {
   it("p07a_todo_undo_bar_sits_above_the_card_bottom_padding", () => {
     const css = readCss("../../../shell/styles/features/dashboard-todos.css");
-    const bar = cssBlock(css, ".qp-undo-bar");
+    const bar = cssBlock(css, ".at-undo-bar");
     const bottom = (/bottom: ([^;]+);/.exec(bar)?.[1] ?? "");
-    expect(bottom, "撤销条的 bottom 必须挂在卡片底部内距（--qp-card-pad-b）上")
-      .toContain("var(--qp-card-pad-b)");
-    expect(bottom, "卡底入口条已下线，再留 --qp-card-foot-h 会让撤销条悬空 16px")
-      .not.toContain("var(--qp-card-foot-h)");
+    expect(bottom, "撤销条的 bottom 必须挂在卡片底部内距（--at-card-pad-b）上")
+      .toContain("var(--at-card-pad-b)");
+    expect(bottom, "卡底入口条已下线，再留 --at-card-foot-h 会让撤销条悬空 16px")
+      .not.toContain("var(--at-card-foot-h)");
   });
 
   it("p07b_todo_list_still_shrinks_so_the_card_never_overflows", () => {
     const css = readCss("../../../shell/styles/features/dashboard-todos.css");
-    expect(cssBlock(css, ".qp-todo-list"), "列表必须 min-height: 0，否则行数一多就把卡片顶出滚动区")
+    expect(cssBlock(css, ".at-todo-list"), "列表必须 min-height: 0，否则行数一多就把卡片顶出滚动区")
       .toContain("min-height: 0");
   });
 });
@@ -185,16 +185,16 @@ describe("待办卡的卡底守卫", () => {
 describe("待办卡的新建入口位置", () => {
   it("p07c_the_new_entry_is_a_compact_row_below_the_card_head", () => {
     const css = readCss("../../../shell/styles/features/dashboard-todos.css");
-    const row = cssBlock(css, ".qp-todo-new-row");
+    const row = cssBlock(css, ".at-todo-new-row");
     expect(row, "一行文字键的紧凑高度：长成大号按钮会吃掉列表可见行数").toContain("height: 24px");
     expect(row, "右对齐：与卡头右槽同一根轴线").toContain("justify-content: flex-end");
-    expect(css, "旧的卡头键样式随入口一起下线，别留死规则").not.toContain(".qp-card-head-link");
+    expect(css, "旧的卡头键样式随入口一起下线，别留死规则").not.toContain(".at-card-head-link");
 
     /* 这一条只证明"源码里有这个行容器"，**证明不了它在 subhead 里**（同文件里出现一次就够）。
        真正的位置判据是渲染级的 `TodosModule.test.tsx` 的 tq09：`head.nextElementSibling`
        === 这一行 + `compareDocumentPosition` 排在列表之前。这里保留它只是因为"入口整段
        消失"这种编辑在源码层面一句话就能红，位置对不对交给 tq09。 */
-    expect(todosSource, "源码里必须有 `qp-todo-new-row` 这个行容器；位置判据见 TodosModule.test.tsx 的 tq09")
-      .toContain('className="qp-todo-new-row"');
+    expect(todosSource, "源码里必须有 `at-todo-new-row` 这个行容器；位置判据见 TodosModule.test.tsx 的 tq09")
+      .toContain('className="at-todo-new-row"');
   });
 });

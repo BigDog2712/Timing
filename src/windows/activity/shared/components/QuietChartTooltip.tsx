@@ -30,24 +30,24 @@ export default function QuietChartTooltip({
 
   return (
     <div
-      className={`qp-chart-tooltip${fixedBottom ? " qp-chart-tooltip-fixed-bottom" : ""} ${className}`}
+      className={`at-chart-tooltip${fixedBottom ? " at-chart-tooltip-fixed-bottom" : ""} ${className}`}
       role="tooltip"
       style={style}
     >
       {label !== null && label !== undefined && label !== "" ? (
-        <div className="qp-chart-tooltip-label">{label}</div>
+        <div className="at-chart-tooltip-label">{label}</div>
       ) : null}
-      <ul className="qp-chart-tooltip-list">
+      <ul className="at-chart-tooltip-list">
         {items.map((item) => (
-          <li key={item.key} className="qp-chart-tooltip-item">
-            <span className="qp-chart-tooltip-key">
+          <li key={item.key} className="at-chart-tooltip-item">
+            <span className="at-chart-tooltip-key">
               <span
-                className="qp-chart-tooltip-dot"
-                style={{ backgroundColor: item.color ? displayColor(item.color) : "var(--qp-accent-default)" }}
+                className="at-chart-tooltip-dot"
+                style={{ backgroundColor: item.color ? displayColor(item.color) : "var(--at-accent-default)" }}
               />
-              <span className="qp-chart-tooltip-name">{item.name}</span>
+              <span className="at-chart-tooltip-name">{item.name}</span>
             </span>
-            <span className="qp-chart-tooltip-value">{item.value}</span>
+            <span className="at-chart-tooltip-value">{item.value}</span>
           </li>
         ))}
       </ul>

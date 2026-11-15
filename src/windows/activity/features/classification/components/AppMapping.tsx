@@ -159,7 +159,7 @@ export default function AppMapping(props: Props) {
     const deletionFinished = previousDeletion.current !== null && deletingSessionsExe === null;
     previousDeletion.current = deletingSessionsExe;
     if (deletionFinished && document.activeElement === document.body) {
-      mappingRoot.current?.querySelector<HTMLInputElement>(".qp-category-search input")?.focus({ preventScroll: true });
+      mappingRoot.current?.querySelector<HTMLInputElement>(".at-category-search input")?.focus({ preventScroll: true });
     }
   }, [deletingSessionsExe]);
   return (
@@ -174,28 +174,28 @@ export default function AppMapping(props: Props) {
         rightSlot={(
           <div className="flex items-center gap-2.5">
             <div
-              className={`qp-status ${
-                saveStatus !== "saving" && hasUnsavedChanges ? "qp-status-danger" : ""
-              } flex px-3 py-1.5 rounded-[8px] items-center qp-text-caption qp-weight-emphasis`}
+              className={`at-status ${
+                saveStatus !== "saving" && hasUnsavedChanges ? "at-status-danger" : ""
+              } flex px-3 py-1.5 rounded-[8px] items-center at-text-caption at-weight-emphasis`}
             >
               {!bootstrapReady && (
-                <span className="text-[var(--qp-text-tertiary)]" aria-hidden>—</span>
+                <span className="text-[var(--at-text-tertiary)]" aria-hidden>—</span>
               )}
               {bootstrapReady && saveStatus === "saving" && (
-                <span className="text-[var(--qp-accent-default)] flex items-center gap-2">
+                <span className="text-[var(--at-accent-default)] flex items-center gap-2">
                   <RefreshCw size={12} className="animate-spin" />
                   {UI_TEXT.mapping.saving}
                 </span>
               )}
               {bootstrapReady && saveStatus === "saved" && !hasUnsavedChanges && (
-                <span className="text-[var(--qp-success)] flex items-center gap-1.5">
+                <span className="text-[var(--at-success)] flex items-center gap-1.5">
                   <Save size={14} />
                   {UI_TEXT.settings.saved}
                 </span>
               )}
               {bootstrapReady && saveStatus !== "saving" && hasUnsavedChanges && <span>{UI_TEXT.mapping.unsaved}</span>}
               {bootstrapReady && saveStatus === "idle" && !hasUnsavedChanges && (
-                <span className="text-[var(--qp-text-tertiary)]">{UI_TEXT.mapping.idle}</span>
+                <span className="text-[var(--at-text-tertiary)]">{UI_TEXT.mapping.idle}</span>
               )}
             </div>
             <QuietButton
@@ -220,13 +220,13 @@ export default function AppMapping(props: Props) {
         )}
       />
 
-      {actionError && <p role="alert" className="qp-app-mapping-error">{actionError === "refresh" ? <>{UI_TEXT.common.refreshFailed} <QuietButton onClick={retryLoading}>{UI_TEXT.common.retry}</QuietButton></> : actionError === "save" ? UI_TEXT.mapping.saveFailed : UI_TEXT.mapping.deleteFailed}</p>}
-      {!titleRecordingEnabled && <p id="classification-global-title-disabled" className="qp-app-mapping-notice">{UI_TEXT.mapping.globalTitleDisabled}</p>}
-      <section className="qp-panel p-4">
+      {actionError && <p role="alert" className="at-app-mapping-error">{actionError === "refresh" ? <>{UI_TEXT.common.refreshFailed} <QuietButton onClick={retryLoading}>{UI_TEXT.common.retry}</QuietButton></> : actionError === "save" ? UI_TEXT.mapping.saveFailed : UI_TEXT.mapping.deleteFailed}</p>}
+      {!titleRecordingEnabled && <p id="classification-global-title-disabled" className="at-app-mapping-notice">{UI_TEXT.mapping.globalTitleDisabled}</p>}
+      <section className="at-panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <QuietSegmentedFilter<CandidateFilter>
-              className="qp-classification-count-filter"
+              className="at-classification-count-filter"
               value={filter}
               onChange={setFilter}
               options={filterOptions.map((item) => {
@@ -285,13 +285,13 @@ export default function AppMapping(props: Props) {
         </div>
       </section>
 
-      <div className="qp-panel flex-1 min-h-0 p-4">
+      <div className="at-panel flex-1 min-h-0 p-4">
         {contentError ? (
           <div
             className="flex h-full flex-col items-center justify-center gap-3 text-center"
             role="alert"
           >
-            <p className="qp-text-body qp-weight-emphasis text-[var(--qp-text-secondary)]">
+            <p className="at-text-body at-weight-emphasis text-[var(--at-text-secondary)]">
               {UI_TEXT.mapping.loadFailed}
             </p>
             <QuietButton size="regular" onClick={retryContent}>
@@ -302,14 +302,14 @@ export default function AppMapping(props: Props) {
         ) : !activeCatalogReady ? (
           <div className="h-full" aria-hidden />
         ) : effectiveObjectMode === "web" ? (
-          <div key={contentPaneKey} className="qp-classification-object-pane h-full">
+          <div key={contentPaneKey} className="at-classification-object-pane h-full">
             {filteredWebDomainCandidates.length === 0 ? (
-              <div className="h-full flex items-center justify-center qp-text-body text-[var(--qp-text-tertiary)]">
+              <div className="h-full flex items-center justify-center at-text-body text-[var(--at-text-tertiary)]">
                 {UI_TEXT.mapping.webEmptyState}
               </div>
             ) : (
-              <div className="h-full overflow-y-auto qp-scroll-region pr-1">
-                <div className="qp-app-mapping-list">
+              <div className="h-full overflow-y-auto at-scroll-region pr-1">
+                <div className="at-app-mapping-list">
                   {webLayout.slots.map(({ identity, height, candidate }) => {
                     if (!candidate) return <div key={identity} aria-hidden="true" style={{ height }} />;
                     const displayName = resolveWebDomainDisplayName(candidate);
@@ -360,16 +360,16 @@ export default function AppMapping(props: Props) {
             )}
           </div>
         ) : filteredCandidates.length === 0 ? (
-          <div key={contentPaneKey} className="qp-classification-object-pane h-full">
-            <div className="h-full flex flex-col items-center justify-center gap-3 qp-text-body text-[var(--qp-text-tertiary)]">
+          <div key={contentPaneKey} className="at-classification-object-pane h-full">
+            <div className="h-full flex flex-col items-center justify-center gap-3 at-text-body text-[var(--at-text-tertiary)]">
               {!appCatalogLoading && (
                 <span>{searchQuery.trim() ? UI_TEXT.mapping.searchNoResults : UI_TEXT.mapping.emptyState}</span>
               )}
             </div>
           </div>
         ) : (
-          <div key={contentPaneKey} className="qp-classification-object-pane h-full overflow-y-auto qp-scroll-region pr-1">
-            <div className="qp-app-mapping-list">
+          <div key={contentPaneKey} className="at-classification-object-pane h-full overflow-y-auto at-scroll-region pr-1">
+            <div className="at-app-mapping-list">
               {appLayout.slots.map(({ identity, height, candidate: liveCandidate, preview }) => {
                 const candidate = liveCandidate ?? preview;
                 const inactive = !liveCandidate;
@@ -438,13 +438,13 @@ export default function AppMapping(props: Props) {
         open={showCategoryDialog}
         title={UI_TEXT.mapping.categoryDialogTitle}
         onClose={() => setShowCategoryDialog(false)}
-        surfaceClassName="qp-category-dialog-surface"
+        surfaceClassName="at-category-dialog-surface"
         actions={(
           <>
             <QuietButton
               size="large"
               onClick={() => setShowCategoryDialog(false)}
-              className="qp-dialog-action"
+              className="at-dialog-action"
             >
               {UI_TEXT.common.close}
             </QuietButton>
@@ -452,14 +452,14 @@ export default function AppMapping(props: Props) {
               tone="primary"
               size="large"
               onClick={() => void handleCreateCategory()}
-              className="qp-dialog-action"
+              className="at-dialog-action"
             >
               {UI_TEXT.mapping.createCategoryAction}
             </QuietButton>
           </>
         )}
       >
-        <div className="qp-category-dialog-body qp-scroll-region">
+        <div className="at-category-dialog-body at-scroll-region">
           <CategoryColorControls
             categories={categoryControlCategories}
             colorFormat={colorFormat}

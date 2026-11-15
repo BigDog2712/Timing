@@ -81,7 +81,7 @@ export default function CardMenu({
       <button
         ref={triggerRef}
         type="button"
-        className="qp-card-more"
+        className="at-card-more"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -98,11 +98,11 @@ export default function CardMenu({
         ariaLabel={copy.more(label)}
         onClose={close}
       >
-        <div className="qp-card-menu" role="menu" aria-label={copy.more(label)} onKeyDown={onMenuKeyDown}>
-          <label className="qp-card-menu-field">
-            <span className="qp-card-menu-label">{copy.rename}</span>
+        <div className="at-card-menu" role="menu" aria-label={copy.more(label)} onKeyDown={onMenuKeyDown}>
+          <label className="at-card-menu-field">
+            <span className="at-card-menu-label">{copy.rename}</span>
             <input
-              className="qp-card-menu-input"
+              className="at-card-menu-input"
               value={draft}
               placeholder={copy.renamePlaceholder}
               maxLength={24}
@@ -120,16 +120,16 @@ export default function CardMenu({
             />
           </label>
 
-          <hr className="qp-card-menu-sep" />
+          <hr className="at-card-menu-sep" />
 
-          <div className="qp-card-menu-tiers" role="radiogroup" aria-label={copy.size}>
+          <div className="at-card-menu-tiers" role="radiogroup" aria-label={copy.size}>
             {TIERS.map((item) => (
               <button
                 key={item}
                 type="button"
                 role="menuitemradio"
                 aria-checked={item === tier}
-                className="qp-card-menu-item qp-card-menu-tier"
+                className="at-card-menu-item at-card-menu-tier"
                 disabled={locked}
                 onClick={run(() => onTier(item))}
               >
@@ -138,12 +138,12 @@ export default function CardMenu({
             ))}
           </div>
 
-          <hr className="qp-card-menu-sep" />
+          <hr className="at-card-menu-sep" />
 
           <button
             type="button"
             role="menuitem"
-            className="qp-card-menu-item"
+            className="at-card-menu-item"
             disabled={locked}
             onClick={run(onDuplicate)}
           >
@@ -152,7 +152,7 @@ export default function CardMenu({
           <button
             type="button"
             role="menuitem"
-            className="qp-card-menu-item"
+            className="at-card-menu-item"
             disabled={locked}
             onClick={run(onRemove)}
           >

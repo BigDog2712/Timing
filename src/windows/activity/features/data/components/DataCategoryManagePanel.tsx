@@ -89,13 +89,13 @@ export default function DataCategoryManagePanel({
         onApplyColor={onApplyColor}
       />
       {deletedOptions.length > 0 ? (
-        <div className="qp-category-restore-row">
-          <span className="qp-app-edit-hint">{labels.deletedHint}</span>
+        <div className="at-category-restore-row">
+          <span className="at-app-edit-hint">{labels.deletedHint}</span>
           {deletedOptions.map((option) => (
             <button
               key={option.value}
               type="button"
-              className="qp-link-btn qp-category-restore-action"
+              className="at-link-btn at-category-restore-action"
               /* 不复用 `data-category`：那个属性在分类行上表示"这一行是某个分类"，
                  恢复键是另一件事（它列的分类当前并不在列表里），混用会让按行查询的
                  选择器把恢复键也捞进去。 */

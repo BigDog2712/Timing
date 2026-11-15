@@ -51,35 +51,35 @@ export default function DataAppEditItemPicker({
   ];
 
   return (
-    <section className="qp-app-edit-section" aria-label={labels.title}>
-      <h4 className="qp-app-edit-section-title">{labels.title}</h4>
+    <section className="at-app-edit-section" aria-label={labels.title}>
+      <h4 className="at-app-edit-section-title">{labels.title}</h4>
       {loadFailed ? (
-        <p className="qp-app-edit-hint" role="status">{labels.loadFailed}</p>
+        <p className="at-app-edit-hint" role="status">{labels.loadFailed}</p>
       ) : items.length === 0 ? (
-        <p className="qp-app-edit-hint">{labels.empty}</p>
+        <p className="at-app-edit-hint">{labels.empty}</p>
       ) : (
         <>
-          <p className="qp-app-edit-hint">{labels.hint}</p>
-          <ul className="qp-app-edit-picker qp-app-edit-picker-items">
+          <p className="at-app-edit-hint">{labels.hint}</p>
+          <ul className="at-app-edit-picker at-app-edit-picker-items">
             {items.map((item) => {
               const binding = draft.itemBindings.find((entry) => entry.itemId === item.id);
               const bound = binding !== undefined;
               return (
                 <li
                   key={item.id}
-                  className="qp-app-edit-option qp-app-edit-item"
+                  className="at-app-edit-option at-app-edit-item"
                   data-checked={bound ? "" : undefined}
                   data-item-id={item.id}
                 >
-                  <label className="qp-app-edit-option-label">
+                  <label className="at-app-edit-option-label">
                     <input
                       type="checkbox"
-                      className="qp-app-edit-check"
+                      className="at-app-edit-check"
                       checked={bound}
                       disabled={disabled}
                       onChange={() => onToggle(item.id)}
                     />
-                    <span className="qp-app-edit-option-name" title={item.name}>{item.name}</span>
+                    <span className="at-app-edit-option-name" title={item.name}>{item.name}</span>
                   </label>
                   {bound ? (
                     <QuietSelect
@@ -92,7 +92,7 @@ export default function DataAppEditItemPicker({
                       ariaLabel={`${item.name} · ${labels.followPrimary}`}
                       density="compact"
                       disabled={disabled || checkedCategories.length === 0}
-                      className="qp-app-edit-item-category"
+                      className="at-app-edit-item-category"
                     />
                   ) : null}
                 </li>

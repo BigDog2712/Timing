@@ -63,7 +63,7 @@ export default function DataTrendRangeControl({
         {isSpecial ? (
           <button
             type="button"
-            className="qp-control data-trend-range-reset"
+            className="at-control data-trend-range-reset"
             aria-label={UI_TEXT.accessibility.data.resetTrendRange}
             onClick={() => {
               setOpen(false);

@@ -4,9 +4,9 @@
  * 旧三面板（页头 + 环卡 + 今日节律 + 应用排行大面板）已整块下线，本文件随之重写。
  * 记住两条不能再犯的：
  *   ① 卡片的 1px 边必须是 **outline + outline-offset:-1**，不是 `border`。
- *      `.qp-panel` 是 border 版 → 内容宽 465.14−2−32 = 431.14，而验收值是 443.14/548.86
+ *      `.at-panel` 是 border 版 → 内容宽 465.14−2−32 = 431.14，而验收值是 443.14/548.86
  *      （= 465.14−16−6 / 570.86−16−6）。outline 不占布局，才有 433.14。
- *      也**不许**去改 `.qp-panel` —— 数据管理/设置两视图内部排版是按 border 版算的。
+ *      也**不许**去改 `.at-panel` —— 数据管理/设置两视图内部排版是按 border 版算的。
  *   ② 所有档位数值只引用 tiers.css 的变量，本文件不写 264/284/144 这类裸数。
  * ========================================================================== */
 
@@ -15,7 +15,7 @@
  * 原来卡片变高没有任何去处：板子高写死、外层裁切 → 拖大只是把同列另一张压小，
  * 通栏卡往上拖则直接被裁掉半截（症状：「高度拖不动」「卡片显示不完全」）。
  * 现在板子按内容长高，超出视图就滚起来。横向仍裁：宽度由列宽比控制，不该滚。 */
-.qp-dashboard {
+.at-dashboard {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -26,35 +26,35 @@
   overflow-x: hidden;
 }
 
-/* 读取失败提示条（可重试）。用 qp-panel 是**故意**的：它不是五模块之一，
+/* 读取失败提示条（可重试）。用 at-panel 是**故意**的：它不是五模块之一，
  * 不参与 443.14/548.86 的列宽验收，用现成的 border 版即可。 */
-.qp-dashboard-notice {
+.at-dashboard-notice {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
 }
 
 /* ── 板式：>1052×636 时居中留白，绝不拉伸（01 §4.5 方案 A） ── */
 /* [P1 修复] 板式从「两行固定网格」改为 flex 列：
- * 原 `grid-template-rows: minmax(0,1fr) var(--qp-mod-note)` 预设了「正好两行」（双列区 + 便利贴）。
+ * 原 `grid-template-rows: minmax(0,1fr) var(--at-mod-note)` 预设了「正好两行」（双列区 + 便利贴）。
  * 组件化之后通栏卡可以有多张（便利贴 / 事项菜单 / 趋势…），第三张起只能落到隐式行上，
  * 而任何**多出来的子元素**（例如加卡工具条）都会先吃掉那个 1fr 行 —— 于是双列区被压到 56px、
  * 卡片互相重叠。改成 flex 后：双列区 `flex:1` 吃剩余空间，通栏卡按 token 各占一行，加多少张都不打架。 */
 /* [自由调大小] `height` → `min-height`：默认内容恰好等于板高，几何一个像素没动；
  * 一旦拖动让某张卡变高，板子跟着长高（父级可滚），而不是把同列邻居压扁。 */
-.qp-main-view {
+.at-main-view {
   display: flex;
   flex-direction: column;
-  gap: var(--qp-card-gap);
-  width: min(var(--qp-board-w), 100%);
-  min-height: min(var(--qp-board-h), 100%);
+  gap: var(--at-card-gap);
+  width: min(var(--at-board-w), 100%);
+  min-height: min(var(--at-board-h), 100%);
   /* [可调大小 · 0.12.1 二次修复] **不许被压缩**。
-   * 板子是 flex 子项、父级 `.qp-dashboard` 高 100%，默认 `flex: 0 1 auto` 会把它压回 636：
+   * 板子是 flex 子项、父级 `.at-dashboard` 高 100%，默认 `flex: 0 1 auto` 会把它压回 636：
    * 内容长到 840 也没用，卡片高度被算回原值。实测（headless Chrome）：
    * 行高 288 → 480，加这一行前卡片恒 282，加之后 480、板高 840、外层可滚。 */
   flex: 0 0 auto;
@@ -63,15 +63,15 @@
 }
 
 /* ── [v2] 单网格：4 列，卡用 grid-column/grid-row 定位，自动流式补位 ──
- * 取代 v1 的双列 `.qp-ws` + `.qp-col` + `.qp-split`。`grid-auto-flow: dense` 让卡片
+ * 取代 v1 的双列 `.at-ws` + `.at-col` + `.at-split`。`grid-auto-flow: dense` 让卡片
  * 自动向上补空（小组件桌面的行为）；行高 = 基准行高令牌（计时分布卡 264），卡占 2 行时
  * 由 `grid-row: span 2` 撑高。 */
-.qp-grid {
+.at-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-auto-rows: var(--qp-grid-row);
+  grid-auto-rows: var(--at-grid-row);
   grid-auto-flow: dense;
-  gap: var(--qp-card-gap);
+  gap: var(--at-card-gap);
   align-content: start;
   min-height: 0;
 }
@@ -79,10 +79,10 @@
 /* ── 卡片（outline 版，见文件头 ①） ── */
 /* [P1 视觉层] 半径 / 底色 / 边色**原地换成卡片层令牌**（阴影与悬停在同批新增的
  * `dashboard-surface.css`，本文件不放阴影：同一个属性两处写 = 后加载覆盖前者）。
- * `--qp-radius-card` 18 是新令牌，**不是** `--qp-radius-panel` 14 —— 那个 14 全仓 18 处在用。
- * `--qp-card-edge` 亮色 #e2e4e7 / 暗色 transparent（暗色靠 9% 内高光当上缘）。
+ * `--at-radius-card` 18 是新令牌，**不是** `--at-radius-panel` 14 —— 那个 14 全仓 18 处在用。
+ * `--at-card-edge` 亮色 #e2e4e7 / 暗色 transparent（暗色靠 9% 内高光当上缘）。
  * outline 仍是 1px + offset -1：不占布局，才有 465.14−16−6 = 443.14 的列右缘。 */
-.qp-card {
+.at-card {
   display: flex;
   flex-direction: column;
   /* [拖拽调整大小] 下边缘拖拽区的定位锚点 */
@@ -91,42 +91,42 @@
   /* [Rust 对照 · `app.rs:439`] 卡身内距 = 左右 20、底 16，顶部由 46 高的卡头吃掉。
    * 原来四边 16 + 卡头 20/8 是宿主自己的口径，与 timing-board.exe 差一截：
    * 标题离左边只有 16、卡头只有 28 高，两版并排一眼就能看出"不是同一个壳"。 */
-  padding: 0 var(--qp-card-pad) var(--qp-card-pad-b);
+  padding: 0 var(--at-card-pad) var(--at-card-pad-b);
   border: 0;
-  border-radius: var(--qp-radius-card);
-  outline: 1px solid var(--qp-card-edge);
+  border-radius: var(--at-radius-card);
+  outline: 1px solid var(--at-card-edge);
   outline-offset: -1px;
-  background: var(--qp-surface-card);
+  background: var(--at-surface-card);
   overflow: hidden;
 }
 
 /* 卡头 = Rust 的 `HEADER_H = 46`（`app.rs:19`）。标题在 46 高的带子里垂直居中、
  * 离左缘 20（卡身内距），不再有 8px 的"头与正文之间"的额外留白 —— 那 8px 在 Rust 里
  * 属于卡头内部，正文从 y=46 直接开始。 */
-.qp-card-head {
+.at-card-head {
   display: flex;
-  flex: 0 0 var(--qp-card-head-h);
-  height: var(--qp-card-head-h);
+  flex: 0 0 var(--at-card-head-h);
+  height: var(--at-card-head-h);
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: var(--qp-card-head-gap);
+  margin-bottom: var(--at-card-head-gap);
 }
 
 /* 标题 13.5（Rust `app.rs:422` 的 `text_b(..., 13.5, th.text)`） */
-.qp-card-title {
+.at-card-title {
   margin: 0;
   font-size: 13.5px;
-  font-weight: var(--qp-font-weight-emphasis);
+  font-weight: var(--at-font-weight-emphasis);
   line-height: 18px;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
   white-space: nowrap;
 }
 
 /* 卡头右侧读数 11（Rust `app.rs:433` 的 `elide_right(..., 11.0, th.text3)`）。
  * 颜色仍留在 secondary 而不是 Rust 的 text3：11px 的 text3 在深色卡上只有 3.6:1，
  * 这一仓的对比度门槛是 4.5（02 §14），尺寸对齐、颜色不降级。 */
-.qp-card-meta {
+.at-card-meta {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -138,34 +138,34 @@
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   line-height: 15px;
-  color: var(--qp-text-secondary);
+  color: var(--at-text-secondary);
   white-space: nowrap;
 }
 
-.qp-link-btn {
+.at-link-btn {
   flex: 0 0 auto;
   padding: 0;
   border: 0;
   background: none;
-  font-size: var(--qp-font-size-caption);
-  font-weight: var(--qp-font-weight-medium);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-secondary);
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-medium);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
   cursor: default;
   white-space: nowrap;
 }
 
-.qp-link-btn:hover { color: var(--qp-text-primary); }
+.at-link-btn:hover { color: var(--at-text-primary); }
 
-.qp-link-btn:focus-visible {
-  outline: 2px solid var(--qp-focus-ring);
+.at-link-btn:focus-visible {
+  outline: 2px solid var(--at-focus-ring);
   outline-offset: 2px;
-  border-radius: var(--qp-radius-button);
+  border-radius: var(--at-radius-button);
 }
 
 /* 卡头右侧那一组（E3 图标 + meta/action）：包一层是为了让 `space-between` 仍然只有
- * 两端 —— 直接把图标塞进 `.qp-card-head` 会让它被摊到中间，20 高的头里飘一个 12px 红点。 */
-.qp-card-head-right {
+ * 两端 —— 直接把图标塞进 `.at-card-head` 会让它被摊到中间，20 高的头里飘一个 12px 红点。 */
+.at-card-head-right {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -175,37 +175,37 @@
 }
 
 /* E3：有数据但刷新失败，只给一个 12px 图标（不占版面、不动卡高）。
- * 颜色用 `--qp-danger`，实测对比度见 `02 §14` 的验收记录。 */
-.qp-refresh-error {
+ * 颜色用 `--at-danger`，实测对比度见 `02 §14` 的验收记录。 */
+.at-refresh-error {
   display: inline-flex;
   align-items: center;
-  color: var(--qp-danger);
+  color: var(--at-danger);
 }
 
 /* 通栏 footer（应用排行的「全部分类…」）：吃掉列表剩余高度，自己只占 32。
  * 刻意**不加** border-top：列表最后一行自己的 `.hair` 就是那条分隔线，
  * 两者相邻会叠成 3px（2px 发丝 + 1px 边），比设计里任何一条线都粗。 */
-.qp-card-footer {
-  flex: 0 0 var(--qp-card-foot-h);
-  height: var(--qp-card-foot-h);
-  /* 底部内距现在是 16（`--qp-card-pad-b`），左右仍是 20：负边距要分两轴写，
+.at-card-footer {
+  flex: 0 0 var(--at-card-foot-h);
+  height: var(--at-card-foot-h);
+  /* 底部内距现在是 16（`--at-card-pad-b`），左右仍是 20：负边距要分两轴写，
    * 否则 footer 的底边会比卡底低 4px、被 `overflow:hidden` 切掉一行字。 */
-  margin: 0 calc(-1 * var(--qp-card-pad)) calc(-1 * var(--qp-card-pad-b));
-  padding: 0 var(--qp-card-pad);
+  margin: 0 calc(-1 * var(--at-card-pad)) calc(-1 * var(--at-card-pad-b));
+  padding: 0 var(--at-card-pad);
   border: 0;
   background: none;
   text-align: left;
   font-size: 10.5px;
-  font-weight: var(--qp-font-weight-medium);
-  line-height: var(--qp-card-foot-h);
-  color: var(--qp-text-secondary);
+  font-weight: var(--at-font-weight-medium);
+  line-height: var(--at-card-foot-h);
+  color: var(--at-text-secondary);
   cursor: default;
 }
 
-.qp-card-footer:hover { color: var(--qp-text-primary); background: var(--qp-bg-elevated); }
+.at-card-footer:hover { color: var(--at-text-primary); background: var(--at-bg-elevated); }
 
-.qp-card-footer:focus-visible {
-  outline: 2px solid var(--qp-focus-ring);
+.at-card-footer:focus-visible {
+  outline: 2px solid var(--at-focus-ring);
   outline-offset: -2px;
 }
 
@@ -214,7 +214,7 @@
  * 与空态**必须长得不一样**：空态是"今天没有"，错误是"没读到"。同一句灰字会把
  * "库挂了"读成"你做完了" —— 这是这一轮最贵的一条区分。
  * 面积随严重度单调上升：E3 一个 12px 图标 ⊂ E2 卡内一块 ⊂ E5 页级一条。 */
-.qp-module-error {
+.at-module-error {
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
@@ -225,17 +225,17 @@
   text-align: center;
 }
 
-.qp-module-error-text {
+.at-module-error-text {
   margin: 0;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
 }
 
 /* ── 空态 / 骨架（五卡共用，只有这一份） ── */
 /* 12.5 = Rust `empty_with_hint` 的标题档（`mod.rs:166`）。空态是卡内唯一的"正文"，
  * 12 与 12.5 差半像素，但它是**整套字阶的锚**：卡头 13.5 / 空态 12.5 / 元信息 11。 */
-.qp-empty {
+.at-empty {
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
@@ -243,40 +243,40 @@
   justify-content: center;
   font-size: 12.5px;
   line-height: 18px;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   text-align: center;
 }
 
 /* ── 骨架（五卡共用）：条高 = 该卡**真实行高**，条数按档位裁 ──
  * 条高不等于真行高的话，加载完成那一帧整块要重排（最明显的是应用卡 24→32：
  * 5 条 24 撑 136，真行 5×32 = 160，一下就长出 24）。所以这里不做"统一 24"，
- * 按 `data-row` 取 `--qp-row-*`；没有 data-row 的（计时卡）落回 readout 24 ——
+ * 按 `data-row` 取 `--at-row-*`；没有 data-row 的（计时卡）落回 readout 24 ——
  * 计时卡的真实内容就是 5 条读数。
  * 条数**不在这里**：长档 5 / 短档 4 是档位量，规则在 `tiers.css` 的短档媒体块里。 */
-.qp-skeleton {
+.at-skeleton {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--qp-skeleton-gap, var(--qp-row-gap));
+  gap: var(--at-skeleton-gap, var(--at-row-gap));
   min-height: 0;
   overflow: hidden;
 }
 
-.qp-skeleton[data-row="items"] { --qp-skeleton-row: var(--qp-row-items); }
+.at-skeleton[data-row="items"] { --at-skeleton-row: var(--at-row-items); }
 
 /* 应用排行行间没有 gap（分隔靠行内 `.hair`），骨架也必须是 0：
  * 保留 4 的话 5 条会撑到 176，而真行是 160。 */
-.qp-skeleton[data-row="app"] {
-  --qp-skeleton-row: var(--qp-row-app);
-  --qp-skeleton-gap: 0px;
+.at-skeleton[data-row="app"] {
+  --at-skeleton-row: var(--at-row-app);
+  --at-skeleton-gap: 0px;
 }
 
-.qp-skeleton[data-row="todo"] { --qp-skeleton-row: var(--qp-row-todo); }
+.at-skeleton[data-row="todo"] { --at-skeleton-row: var(--at-row-todo); }
 
-.qp-skeleton > span {
+.at-skeleton > span {
   display: block;
   flex: 0 0 auto;
-  height: var(--qp-skeleton-row, var(--qp-row-readout));
-  border-radius: var(--qp-radius-button);
-  background: var(--qp-bg-elevated);
+  height: var(--at-skeleton-row, var(--at-row-readout));
+  border-radius: var(--at-radius-button);
+  background: var(--at-bg-elevated);
 }

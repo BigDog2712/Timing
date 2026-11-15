@@ -96,7 +96,7 @@ export function QuietTimeColumns({ value, onChange, onCommit, autoFocus = false,
     const frame = requestAnimationFrame(() => {
       for (const part of ["hour", "minute"]) {
         const option = rootRef.current?.querySelector<HTMLElement>(`[data-selected-time-part="${part}"]`);
-        const list = option?.closest<HTMLElement>(".qp-time-picker-list");
+        const list = option?.closest<HTMLElement>(".at-time-picker-list");
         if (option && list) {
           list.scrollTop += option.getBoundingClientRect().top - list.getBoundingClientRect().top
             - (list.clientHeight - option.offsetHeight) / 2;
@@ -108,21 +108,21 @@ export function QuietTimeColumns({ value, onChange, onCommit, autoFocus = false,
     });
     return () => cancelAnimationFrame(frame);
   }, [autoFocus, selected.hour, selected.minute]);
-  return <div ref={rootRef} className="qp-time-picker-content">
-    <div className="qp-time-picker-column-headings" aria-hidden="true">
-      <div className="qp-time-picker-column-title">{text.time.hours}</div>
-      <div className="qp-time-picker-column-title">{text.time.minutes}</div>
+  return <div ref={rootRef} className="at-time-picker-content">
+    <div className="at-time-picker-column-headings" aria-hidden="true">
+      <div className="at-time-picker-column-title">{text.time.hours}</div>
+      <div className="at-time-picker-column-title">{text.time.minutes}</div>
     </div>
-    <div className="qp-time-picker-columns">
-      {(["hour", "minute"] as const).map(part => <div key={part} className="qp-time-picker-column">
-        <div className="qp-time-picker-list qp-scroll-region" role="listbox" aria-label={part === "hour" ? text.time.hours : text.time.minutes}>
+    <div className="at-time-picker-columns">
+      {(["hour", "minute"] as const).map(part => <div key={part} className="at-time-picker-column">
+        <div className="at-time-picker-list at-scroll-region" role="listbox" aria-label={part === "hour" ? text.time.hours : text.time.minutes}>
           {options[part].map(option => <button key={option} type="button" role="option"
             aria-selected={option === selected[part]} tabIndex={option === selected[part] ? 0 : -1}
             data-selected-time-part={option === selected[part] ? part : undefined}
             data-time-picker-part={part} data-time-picker-value={option}
             onKeyDown={event => handleKeyDown(event, part, option)}
             onClick={() => { select(part, option); if (part === "minute") onCommit?.(); }}
-            className={`qp-time-picker-option ${option === selected[part] ? "qp-time-picker-option-selected" : ""}`.trim()}>
+            className={`at-time-picker-option ${option === selected[part] ? "at-time-picker-option-selected" : ""}`.trim()}>
             {pad2(option)}
           </button>)}
         </div>
@@ -224,7 +224,7 @@ export default function QuietTimePicker({
       id={dialogId}
       role="dialog"
       aria-label={resolvedAriaLabel}
-      className={`qp-time-picker-popover qp-time-picker-popover-${position.placement}`}
+      className={`at-time-picker-popover at-time-picker-popover-${position.placement}`}
       style={{ left: position.left, top: position.top }}
       onKeyDown={event => {
         if (event.key !== "Escape") return;
@@ -238,7 +238,7 @@ export default function QuietTimePicker({
   ) : null;
 
   return (
-    <div ref={rootRef} className="qp-time-picker">
+    <div ref={rootRef} className="at-time-picker">
       <button
         ref={triggerRef}
         type="button"
@@ -248,7 +248,7 @@ export default function QuietTimePicker({
         aria-expanded={open}
         aria-controls={open ? dialogId : undefined}
         onClick={toggleTimePicker}
-        className={`qp-input qp-time-picker-trigger ${open ? "qp-time-picker-trigger-open" : ""} ${
+        className={`at-input at-time-picker-trigger ${open ? "at-time-picker-trigger-open" : ""} ${
           className ?? ""
         }`.trim()}
       >

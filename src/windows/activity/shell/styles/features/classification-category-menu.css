@@ -17,23 +17,23 @@
   flex-direction: column;
   margin-top: 4px;
   padding-top: 4px;
-  border-top: 1px solid var(--qp-border-subtle);
+  border-top: 1px solid var(--at-border-subtle);
 }
 
 /* 删除是破坏性动作：用 danger 色，且与"选一个分类"的正常色区分开 */
 .quick-classification-category-manage .quick-classification-category-delete {
-  color: var(--qp-danger);
+  color: var(--at-danger);
 }
 
 .quick-classification-category-manage .quick-classification-category-delete:hover:not(:disabled),
 .quick-classification-category-manage .quick-classification-category-delete:focus-visible {
-  color: var(--qp-danger);
+  color: var(--at-danger);
 }
 
 /* 「＋ 新建分类」是**建设性**动作：贴在菜单最底、与列表同层但不带勾选占位 */
 .quick-classification-category-create {
   margin-top: 4px;
-  color: var(--qp-text-secondary);
+  color: var(--at-text-secondary);
 }
 
 /* 「删除分类：{名字}」在 184px 里放不下时省略，别把菜单撑宽（宽了会盖住根菜单） */

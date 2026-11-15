@@ -228,10 +228,10 @@ export default function QuietAnchoredPopover({
       aria-label={ariaLabel}
       data-placement={position?.placement}
       className={[
-        "qp-anchored-popover",
-        "qp-scroll-region",
-        position ? `qp-anchored-popover-${position.placement}` : "",
-        "qp-motion-popover-enter",
+        "at-anchored-popover",
+        "at-scroll-region",
+        position ? `at-anchored-popover-${position.placement}` : "",
+        "at-motion-popover-enter",
         className ?? "",
       ].filter(Boolean).join(" ")}
       style={style}

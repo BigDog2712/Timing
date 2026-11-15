@@ -13,10 +13,10 @@ function blend(base: string, top: ColorVector, opacity: number) {
 }
 
 export function applyActivityDisplayTheme(mode: "light" | "dark", tokens: Record<string, string>) {
-  const panel = tokens["--qp-bg-panel"];
-  const elevated = tokens["--qp-bg-elevated"];
-  const canvas = tokens["--qp-bg-canvas"];
-  const track = tokens["--qp-chart-track"].match(/[\d.]+/g)!.map(Number);
+  const panel = tokens["--at-bg-panel"];
+  const elevated = tokens["--at-bg-elevated"];
+  const canvas = tokens["--at-bg-canvas"];
+  const track = tokens["--at-chart-track"].match(/[\d.]+/g)!.map(Number);
   const trackOver = (base: string) => blend(base, track.slice(0, 3) as ColorVector, track[3]);
   const surfaces: Record<Surface, string> = {
     panel, elevated, canvas,

@@ -41,7 +41,7 @@ export default function DataCategoryManageEntry({
     <>
       {visible ? (
         <div className="data-category-manage-row">
-          <button type="button" className="qp-link-btn data-category-manage-action" onClick={onOpen}>
+          <button type="button" className="at-link-btn data-category-manage-action" onClick={onOpen}>
             {copy.manageAction}
           </button>
         </div>

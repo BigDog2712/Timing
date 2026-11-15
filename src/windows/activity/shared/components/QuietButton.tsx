@@ -25,7 +25,7 @@ const QuietButton = forwardRef<HTMLButtonElement, QuietButtonProps>(function Qui
       type={type}
       disabled={disabled || busy}
       aria-busy={busy || undefined}
-      className={`qp-button qp-button-${size} qp-button-${tone} disabled:cursor-not-allowed disabled:opacity-50 ${className ?? ""}`.trim()}
+      className={`at-button at-button-${size} at-button-${tone} disabled:cursor-not-allowed disabled:opacity-50 ${className ?? ""}`.trim()}
     />
   );
 });

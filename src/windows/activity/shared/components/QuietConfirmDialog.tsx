@@ -46,7 +46,7 @@ export default function QuietConfirmDialog({
             ref={cancelButtonRef}
             size="large"
             onClick={onCancel}
-            className="qp-dialog-action"
+            className="at-dialog-action"
           >
             {cancelLabel}
           </QuietButton>
@@ -56,7 +56,7 @@ export default function QuietConfirmDialog({
             onClick={onConfirm}
             disabled={confirmDisabled}
             busy={confirmLoading}
-            className="qp-dialog-action"
+            className="at-dialog-action"
           >
             {confirmLoading ? UI_TEXT.common.processing : confirmLabel}
           </QuietButton>

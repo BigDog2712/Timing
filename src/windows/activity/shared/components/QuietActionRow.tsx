@@ -7,7 +7,7 @@ interface Props {
 
 export default function QuietActionRow({ children, className }: Props) {
   return (
-    <div className={`qp-action-row ${className ?? ""}`.trim()}>
+    <div className={`at-action-row ${className ?? ""}`.trim()}>
       {children}
     </div>
   );

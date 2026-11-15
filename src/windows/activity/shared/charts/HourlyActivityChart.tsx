@@ -205,7 +205,7 @@ export default function HourlyActivityChart({
           <AnonymousActivityPattern id={anonymousPatternId} />
           {activeIndex !== null ? (
             <rect
-              fill="var(--qp-chart-cursor)"
+              fill="var(--at-chart-cursor)"
               height={chartHeight}
               width={slotWidth}
               x={chartLeft + slotWidth * activeIndex}
@@ -223,7 +223,7 @@ export default function HourlyActivityChart({
               return (
                 <path
                   key={point.hour}
-                  className="qp-hourly-chart-bar"
+                  className="at-hourly-chart-bar"
                   d={buildTopRoundedBarPath(
                     x,
                     y,
@@ -231,7 +231,7 @@ export default function HourlyActivityChart({
                     barHeight,
                     radius,
                   )}
-                  fill="var(--qp-accent-default)"
+                  fill="var(--at-accent-default)"
                 />
               );
             }
@@ -250,7 +250,7 @@ export default function HourlyActivityChart({
                     return (
                       <path
                         key={dataKey}
-                        className="qp-hourly-chart-bar"
+                        className="at-hourly-chart-bar"
                         d={buildTopRoundedBarPath(
                           x,
                           y,
@@ -265,7 +265,7 @@ export default function HourlyActivityChart({
                   return (
                     <rect
                       key={dataKey}
-                      className="qp-hourly-chart-bar"
+                      className="at-hourly-chart-bar"
                       fill={segment.category === "anonymous" ? `url(#${anonymousPatternId})` : displayColor(segment.color)}
                       height={segmentHeight}
                       width={renderedBarWidth}
@@ -283,7 +283,7 @@ export default function HourlyActivityChart({
               <rect
                 key={`hit-${point.hour}`}
                 aria-label={formatHourlyChartAriaLabel(point, categoryMode, UI_TEXT.hourlyActivityChart)}
-                className="qp-hourly-chart-hit"
+                className="at-hourly-chart-hit"
                 fill="transparent"
                 height={chartHeight}
                 onBlur={() => setActiveIndex((current) => current === index ? null : current)}
@@ -303,9 +303,9 @@ export default function HourlyActivityChart({
             return (
               <text
                 key={`tick-${point.hour}`}
-                className="qp-weight-medium"
-                fill="var(--qp-text-tertiary)"
-                fontSize="var(--qp-font-size-caption)"
+                className="at-weight-medium"
+                fill="var(--at-text-tertiary)"
+                fontSize="var(--at-font-size-caption)"
                 textAnchor="middle"
                 x={chartLeft + slotWidth * (index + 0.5)}
                 y={chartBottom + 18}
@@ -318,7 +318,7 @@ export default function HourlyActivityChart({
       ) : null}
       {activePoint && activePoint.minutes > 0 ? (
         <QuietChartTooltip
-          className={compactTooltip ? "qp-scroll-region" : undefined}
+          className={compactTooltip ? "at-scroll-region" : undefined}
           items={categoryMode
             ? getPointSegments(activePoint as HourlyCategoryActivityPoint)
               .slice()

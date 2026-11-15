@@ -75,7 +75,7 @@ describe("① 入口：只有分类 tab 有，点了就开弹窗", () => {
     const button = entryButton();
     expect(button, "分类 tab 上没有「管理分类」入口").not.toBeNull();
     expect(button?.textContent).toBe("管理分类");
-    expect(button?.className, "入口是 qp-link-btn（与页面其它文字动作同一档）").toContain("qp-link-btn");
+    expect(button?.className, "入口是 at-link-btn（与页面其它文字动作同一档）").toContain("at-link-btn");
     act(() => button?.click());
     expect(opened, "点了入口没有开弹窗").toBe(1);
   });

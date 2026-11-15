@@ -208,7 +208,7 @@ export default function NativeTrendChart({
           return (
             <g key={tick}>
               <line
-                stroke="var(--qp-chart-grid)"
+                stroke="var(--at-chart-grid)"
                 strokeDasharray="3 3"
                 x1={plotLeft}
                 x2={plotLeft + plotWidth}
@@ -216,8 +216,8 @@ export default function NativeTrendChart({
                 y2={y}
               />
               <text
-                fill="var(--qp-text-tertiary)"
-                fontSize="var(--qp-font-size-caption)"
+                fill="var(--at-text-tertiary)"
+                fontSize="var(--at-font-size-caption)"
                 textAnchor="end"
                 x={plotLeft - 8}
                 y={y + 4}
@@ -231,9 +231,9 @@ export default function NativeTrendChart({
           const row = rows[index];
           const x = getPointX(index, rows.length, plotLeft, plotWidth);
           return (
-            <g className="qp-native-trend-x-tick" key={`${row.label}-${index}`}>
+            <g className="at-native-trend-x-tick" key={`${row.label}-${index}`}>
               <line
-                stroke="var(--qp-chart-grid)"
+                stroke="var(--at-chart-grid)"
                 strokeDasharray="3 3"
                 x1={x}
                 x2={x}
@@ -241,8 +241,8 @@ export default function NativeTrendChart({
                 y2={plotBottom}
               />
               <text
-                fill="var(--qp-text-tertiary)"
-                fontSize="var(--qp-font-size-caption)"
+                fill="var(--at-text-tertiary)"
+                fontSize="var(--at-font-size-caption)"
                 textAnchor={index === 0 ? "start" : index === rows.length - 1 ? "end" : "middle"}
                 x={x}
                 y={plotBottom + 19}
@@ -261,7 +261,7 @@ export default function NativeTrendChart({
             <g key={item.key}>
               <path d={areaPath} fill={displayColor(item.color)} fillOpacity="0.12" />
               <path
-                className="qp-native-trend-line"
+                className="at-native-trend-line"
                 d={linePath}
                 fill="none"
                 stroke={displayColor(item.color)}
@@ -270,7 +270,7 @@ export default function NativeTrendChart({
               {points.map((point, index) => (
                 <circle
                   key={`${item.key}-${index}`}
-                  className="qp-native-trend-dot"
+                  className="at-native-trend-dot"
                   cx={point.x}
                   cy={point.y}
                   fill={displayColor(item.color)}
@@ -282,8 +282,8 @@ export default function NativeTrendChart({
         })}
         {activeIndex !== null ? (
           <line
-            className="qp-native-trend-cursor"
-            stroke="var(--qp-border-strong)"
+            className="at-native-trend-cursor"
+            stroke="var(--at-border-strong)"
             x1={activeX}
             x2={activeX}
             y1={plotTop}
@@ -298,7 +298,7 @@ export default function NativeTrendChart({
               key={`hit-${row.label}-${index}`}
               aria-label={row.label}
               aria-keyshortcuts={onPointActivate ? "Enter Space" : undefined}
-              className="qp-native-trend-hit"
+              className="at-native-trend-hit"
               fill="transparent"
               height={plotHeight}
               onBlur={() => setActiveIndex((current) => current === index ? null : current)}

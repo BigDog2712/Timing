@@ -33,7 +33,7 @@ function mount(element: Parameters<Root["render"]>[0]) {
 }
 
 function items(): HTMLButtonElement[] {
-  return Array.from(container?.querySelectorAll<HTMLButtonElement>(".qp-add-card__item") ?? []);
+  return Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-add-card__item") ?? []);
 }
 
 describe("AddCardDialog（v3）", () => {

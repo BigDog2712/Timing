@@ -16,27 +16,27 @@
  * （编辑便利贴属主窗），这里只有只读展示与一个"看全文"的弹层。
  * ========================================================================== */
 
-/* ── 卡体：与 `.qp-card` 同一套卡壳（18 圆角 / 1px 边 / 左右 20、底 16 内距） ──
+/* ── 卡体：与 `.at-card` 同一套卡壳（18 圆角 / 1px 边 / 左右 20、底 16 内距） ──
  * `container-type: inline-size` 只为下面那条「单列 → 纸片 78 高」的查询服务：
  * 便利贴现在宽高都能拖（下限 320×152），窄到单列时纸片要按 Rust 的单列档变矮。 */
-.qp-notes {
+.at-notes {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 0 var(--qp-card-pad) var(--qp-card-pad-b);
-  border-radius: var(--qp-radius-card);
-  outline: 1px solid var(--qp-card-edge);
+  padding: 0 var(--at-card-pad) var(--at-card-pad-b);
+  border-radius: var(--at-radius-card);
+  outline: 1px solid var(--at-card-edge);
   outline-offset: -1px;
-  background: var(--qp-surface-card);
+  background: var(--at-surface-card);
   overflow: hidden;
   container-type: inline-size;
 }
 
-/* 卡头 46，标题左、读数与 ⋯ 右（与 `.qp-card-head` 同高，五张卡的标题在同一条水平线上） */
-.qp-notes-head {
+/* 卡头 46，标题左、读数与 ⋯ 右（与 `.at-card-head` 同高，五张卡的标题在同一条水平线上） */
+.at-notes-head {
   display: flex;
-  flex: 0 0 var(--qp-card-head-h);
-  height: var(--qp-card-head-h);
+  flex: 0 0 var(--at-card-head-h);
+  height: var(--at-card-head-h);
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -44,25 +44,25 @@
 }
 
 /* 标题 13.5（Rust `app.rs:422`） */
-.qp-notes-title {
+.at-notes-title {
   margin: 0;
   font-size: 13.5px;
-  font-weight: var(--qp-font-weight-emphasis);
+  font-weight: var(--at-font-weight-emphasis);
   line-height: 18px;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
   white-space: nowrap;
 }
 
 /* 张数 11（Rust 卡头 meta 是 11） */
-.qp-notes-count {
+.at-notes-count {
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   line-height: 15px;
-  color: var(--qp-text-secondary);
+  color: var(--at-text-secondary);
 }
 
 /* 右槽：E3 图标 / 张数 / ⋯ 横排，不换行 */
-.qp-notes-more {
+.at-notes-more {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -71,7 +71,7 @@
   font-size: 11px;
   font-variant-numeric: tabular-nums;
   line-height: 15px;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
 }
 
 /* ── 纸片墙 ──
@@ -82,10 +82,10 @@
  *
  * 卡被拖窄到单列时（Rust `notes.rs:22-23`：正文宽 < 430 → 单列，纸片 78），行高跟着降到
  * 78 —— 280×88 的纸片看着像竖条，280×78 才还是"一张便签"。阈值 470 = 正文 430 + 左右内距 40。 */
-.qp-notes-track {
+.at-notes-track {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 193px), 1fr));
-  grid-auto-rows: var(--qp-note-card-h);
+  grid-auto-rows: var(--at-note-card-h);
   gap: 10px;
   flex: 1 1 auto;
   align-content: start;
@@ -95,8 +95,8 @@
 }
 
 @container (max-width: 470px) {
-  .qp-notes-track {
-    --qp-note-card-h: 78px;
+  .at-notes-track {
+    --at-note-card-h: 78px;
   }
 }
 
@@ -106,18 +106,18 @@
  * 上内距 11 → **7**（主人：「文字再靠上一点」）：只动垂直留白，字号 / 行高 / 圆角 / 颜色
  * 一像素不动。两行正文（7 + 32 = 39）与元信息（底内距 5 + 14 → 顶边在 59）之间仍空 20px，
  * 78 / 88 两档都不重叠 —— 这条是改这个值的**唯一**约束。 */
-.qp-note-card {
+.at-note-card {
   position: relative;
   display: block;
   min-width: 0;
-  height: var(--qp-note-card-h);
+  height: var(--at-note-card-h);
   padding: 7px 12px 5px 14px;
   border: 0;
   border-radius: 12px;
-  outline: 1px solid color-mix(in srgb, var(--qp-accent-default) 18%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--at-accent-default) 18%, transparent);
   outline-offset: -1px;
-  background: color-mix(in srgb, var(--qp-accent-default) 5%, var(--qp-surface-card));
-  color: var(--qp-text-primary);
+  background: color-mix(in srgb, var(--at-accent-default) 5%, var(--at-surface-card));
+  color: var(--at-text-primary);
   overflow: hidden;
   text-align: left;
   cursor: default;
@@ -125,7 +125,7 @@
 
 /* 左侧色条：宽 2.5，圆角 2。上下各让 8 —— 与正文的上内距 7 同步（正文整体上移 4px，
  * 色条不跟着走就会比第一行字低半格，像贴歪了）。 */
-.qp-note-card::before {
+.at-note-card::before {
   content: "";
   position: absolute;
   top: 8px;
@@ -133,24 +133,24 @@
   left: 1px;
   width: 2.5px;
   border-radius: 2px;
-  background: var(--qp-accent-default);
+  background: var(--at-accent-default);
 }
 
 /* 正文两行截断：`-webkit-line-clamp` 是这里唯一能表达"两行 + 省略号"的手段
  * （`text-overflow` 只对单行生效）。`overflow-wrap: anywhere` 兜住长英文串。 */
-.qp-note-body {
+.at-note-body {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
   font-size: 11.5px;
   line-height: 16px;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
   overflow-wrap: anywhere;
 }
 
 /* 元信息：相对时间，10 / 14 */
-.qp-note-meta {
+.at-note-meta {
   position: absolute;
   right: 12px;
   bottom: 5px;
@@ -158,74 +158,74 @@
   overflow: hidden;
   font-size: 10px;
   line-height: 14px;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 /* 空态 / 骨架占位：同尺寸，避免 0 张 ↔ 3 张之间卡内高度跳。
  * 虚线 + 无纸片底 + 不画色条 —— 它没有"这是一张便利贴"的语义。 */
-.qp-note-placeholder {
+.at-note-placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
   outline-style: dashed;
   background: none;
   font-size: 12.5px;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
 }
 
-.qp-note-placeholder::before { content: none; }
+.at-note-placeholder::before { content: none; }
 
-/* 便利贴卡的错误块（E2）：内容高 88 里放得下，沿用 `.qp-module-error` 的竖排口径 */
-.qp-notes-error {
+/* 便利贴卡的错误块（E2）：内容高 88 里放得下，沿用 `.at-module-error` 的竖排口径 */
+.at-notes-error {
   grid-column: 1 / -1;
   align-self: center;
   min-width: 0;
 }
 
 /* 全文对话框：body 封顶 52vh 并**自己滚**（正文可能几十行，不能把对话框顶出窗口）。
- * `overflow-y` 必须自己写：`qp-dialog-body` 上那个 `qp-scroll-region` 只配滚动条外观，
+ * `overflow-y` 必须自己写：`at-dialog-body` 上那个 `at-scroll-region` 只配滚动条外观，
  * 不含 `overflow` 声明 —— 实测只给 `max-height` 时 computed `overflow-y` 仍是 `visible`。
  *
- * 归属说明：这条规则的**真正业主**是共享的 `.qp-dialog-body`。本轮只在这里隔离，
+ * 归属说明：这条规则的**真正业主**是共享的 `.at-dialog-body`。本轮只在这里隔离，
  * 是因为给共享层加 `overflow-y` 会同时改 10+ 个对话框的滚动行为 —— 横切改动
  * 必须单项改、单项验。共享层修好后这条可以删。 */
-.qp-note-dialog .qp-dialog-body {
+.at-note-dialog .at-dialog-body {
   max-height: 52vh;
   overflow-y: auto;
 }
 
 /* `pre-wrap` 是**内容要求**：便利贴里换行有意义，折成一行等于改写了用户的话。
  * 也**不**加 `-webkit-line-clamp` —— 这里就是"看全文"的那一处。 */
-.qp-note-dialog-text {
+.at-note-dialog-text {
   margin: 0;
-  font-size: var(--qp-font-size-body);
-  line-height: var(--qp-line-height-body);
-  color: var(--qp-text-primary);
+  font-size: var(--at-font-size-body);
+  line-height: var(--at-line-height-body);
+  color: var(--at-text-primary);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
 /* ── 展开弹层底部的「删除」与内联二次确认 ──
  * 确认条与两颗键**同排**（不开第二层弹窗：两层弹窗的 Escape 与焦点陷阱会互相打架）。
- * `margin-right: auto` 是这条的全部技巧：`.qp-dialog-actions` 是 `justify-content: flex-end`，
+ * `margin-right: auto` 是这条的全部技巧：`.at-dialog-actions` 是 `justify-content: flex-end`，
  * 不加它问句会被一起推到右边，读起来像按钮的标签而不是一个问题。 */
-.qp-note-dialog-confirm {
+.at-note-dialog-confirm {
   align-self: center;
   min-width: 0;
   margin-right: auto;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
 }
 
 /* 「删除意图没发出去」的提示：排在正文下方、与正文同一条左边线。
  * 用 danger 色是因为这一下**确实没成**（宿主没收到），不是中性信息；
  * 但它不是表单校验错误，所以不加 `aria-invalid`、不抢焦点。 */
-.qp-note-dialog-issue {
-  margin: var(--qp-space-group) 0 0;
-  color: var(--qp-danger);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+.at-note-dialog-issue {
+  margin: var(--at-space-group) 0 0;
+  color: var(--at-danger);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
 }

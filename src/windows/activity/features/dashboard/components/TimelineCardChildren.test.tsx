@@ -113,17 +113,17 @@ describe("时间轴第二层", () => {
 
   it("没有子记录时不渲染展开键", async () => {
     await render(ITEMS, []);
-    expect(container.querySelector(".qp-timeline-toggle")).toBeNull();
+    expect(container.querySelector(".at-timeline-toggle")).toBeNull();
   });
 
   it("展开后按起点合并渲染应用段与未采集空档", async () => {
     await render(ITEMS, [timelineRow()]);
-    const toggle = container.querySelector<HTMLButtonElement>(".qp-timeline-toggle");
+    const toggle = container.querySelector<HTMLButtonElement>(".at-timeline-toggle");
     expect(toggle, "有子记录就必须有展开键").not.toBeNull();
 
     await act(async () => toggle!.click());
 
-    const rows = Array.from(container.querySelectorAll(".qp-timeline-child"));
+    const rows = Array.from(container.querySelectorAll(".at-timeline-child"));
     expect(rows).toHaveLength(3);
     /* 09:30 chrome → 11:00 空档 → 11:10 pycharm：按起点排序，空档夹在中间。 */
     expect(rows[0].textContent).toContain("chrome");
@@ -134,19 +134,19 @@ describe("时间轴第二层", () => {
 
   it("再点一次收起", async () => {
     await render(ITEMS, [timelineRow()]);
-    const toggle = container.querySelector<HTMLButtonElement>(".qp-timeline-toggle")!;
+    const toggle = container.querySelector<HTMLButtonElement>(".at-timeline-toggle")!;
     await act(async () => toggle.click());
     await act(async () => toggle.click());
-    expect(container.querySelectorAll(".qp-timeline-child")).toHaveLength(0);
+    expect(container.querySelectorAll(".at-timeline-child")).toHaveLength(0);
   });
   it("单设备时一个设备角标都不出现", async () => {
     /* 单设备是常态。「界面上不许出现设备元素」这条在历史页已经是一条验收断言，
        这里复用同一个 `buildDeviceLanes`（≤1 台返回 `[]`），避免出现第二套判据。 */
     await render(ITEMS, [timelineRow({ selfDeviceId: "pc-a" })]);
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".qp-timeline-toggle")!.click();
+      container.querySelector<HTMLButtonElement>(".at-timeline-toggle")!.click();
     });
-    expect(container.querySelectorAll(".qp-timeline-child-device").length).toBe(0);
+    expect(container.querySelectorAll(".at-timeline-child-device").length).toBe(0);
   });
 
   it("双端并行时每段带自己的设备角标", async () => {
@@ -163,9 +163,9 @@ describe("时间轴第二层", () => {
       }),
     ]);
     await act(async () => {
-      container.querySelector<HTMLButtonElement>(".qp-timeline-toggle")!.click();
+      container.querySelector<HTMLButtonElement>(".at-timeline-toggle")!.click();
     });
-    const badges = [...container.querySelectorAll(".qp-timeline-child-device")];
+    const badges = [...container.querySelectorAll(".at-timeline-child-device")];
     expect(badges).toHaveLength(2);
     expect(badges[0].textContent).not.toBe(badges[1].textContent);
   });

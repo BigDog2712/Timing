@@ -54,7 +54,7 @@ export default function BoardCardFrame({
     /* ② 卡里的交互元素：点它们不是拖卡 */
     if (target.closest("button, a, input, textarea, select, [role='switch'], [data-no-drag]")) return;
     /* ③ 只有卡头是抓取热区（正文里要能选中文字、点行） */
-    if (!target.closest(".qp-card-head, .qp-notes-head, .qp-board-grab")) return;
+    if (!target.closest(".at-card-head, .at-notes-head, .at-board-grab")) return;
     onBegin(event, rect, "move");
   };
 
@@ -86,7 +86,7 @@ export default function BoardCardFrame({
 
   const handle = (mode: Exclude<DragMode, "move">, className: string, labelText: string, orientation: "horizontal" | "vertical") => (
     <span
-      className={`qp-board-handle ${className}`}
+      className={`at-board-handle ${className}`}
       data-resize={mode}
       role="separator"
       aria-orientation={orientation}
@@ -102,7 +102,7 @@ export default function BoardCardFrame({
 
   return (
     <div
-      className="qp-board-card"
+      className="at-board-card"
       data-board-card={card.uid}
       data-kind={card.kind}
       data-dragging={dragging || undefined}
@@ -117,9 +117,9 @@ export default function BoardCardFrame({
           「分隔条」—— 那是一句谎话（读屏会念「调整宽度」）。 */}
       {locked ? null : (
         <>
-          {handle("e", "qp-board-handle-e", copy.resizeWidth(label), "vertical")}
-          {handle("s", "qp-board-handle-s", copy.resizeHeight(label), "horizontal")}
-          {handle("se", "qp-board-handle-se", copy.resizeBoth(label), "horizontal")}
+          {handle("e", "at-board-handle-e", copy.resizeWidth(label), "vertical")}
+          {handle("s", "at-board-handle-s", copy.resizeHeight(label), "horizontal")}
+          {handle("se", "at-board-handle-se", copy.resizeBoth(label), "horizontal")}
         </>
       )}
     </div>

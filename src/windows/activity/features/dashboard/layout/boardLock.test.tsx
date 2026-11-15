@@ -117,7 +117,7 @@ describe("V-1.3b 锁定态卡头菜单", () => {
         onRemove: () => undefined,
       }));
     });
-    const trigger = container?.querySelector<HTMLButtonElement>(".qp-card-more");
+    const trigger = container?.querySelector<HTMLButtonElement>(".at-card-more");
     if (!trigger) throw new Error("没有 ⋯ 触发键");
     act(() => {
       trigger.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -125,7 +125,7 @@ describe("V-1.3b 锁定态卡头菜单", () => {
   }
 
   function menuItems(): HTMLButtonElement[] {
-    return Array.from(document.body.querySelectorAll<HTMLButtonElement>(".qp-card-menu-item"));
+    return Array.from(document.body.querySelectorAll<HTMLButtonElement>(".at-card-menu-item"));
   }
 
   it("v13b_structural_actions_are_disabled_but_title_stays_editable", () => {
@@ -134,7 +134,7 @@ describe("V-1.3b 锁定态卡头菜单", () => {
     /* 3 档尺寸 + 复制 + 移除 = 5 颗按钮，另有 1 个 input（标题） */
     expect(items.length).toBe(5);
     for (const item of items) expect(item.disabled).toBe(true);
-    const input = document.body.querySelector<HTMLInputElement>(".qp-card-menu-input");
+    const input = document.body.querySelector<HTMLInputElement>(".at-card-menu-input");
     expect(input?.disabled).toBe(false);
   });
 
@@ -152,14 +152,14 @@ describe("V-1.3c 锁定态工具条仍可点（不许 pointer-events: none）", 
     /* 三颗键在锁定态都必须 disabled=false（工具条本体由 DashboardBoard 渲染，
      * 其可点性在 board.test.tsx 的 v14c 里测）。 */
     const buttons = [
-      createElement("button", { type: "button", className: "qp-link-btn", "data-toolbar-add": true }, COPY.addCard),
-      createElement("button", { type: "button", className: "qp-link-btn", "data-toolbar-manage": true }, COPY.manageLayout),
-      createElement("button", { type: "button", className: "qp-link-btn", "data-toolbar-lock": true }, COPY.lockLayout),
+      createElement("button", { type: "button", className: "at-link-btn", "data-toolbar-add": true }, COPY.addCard),
+      createElement("button", { type: "button", className: "at-link-btn", "data-toolbar-manage": true }, COPY.manageLayout),
+      createElement("button", { type: "button", className: "at-link-btn", "data-toolbar-lock": true }, COPY.lockLayout),
     ];
     act(() => {
-      root?.render(createElement("div", { className: "qp-page-toolbar qp-dashboard-toolbar", "data-locked": true }, ...buttons));
+      root?.render(createElement("div", { className: "at-page-toolbar at-dashboard-toolbar", "data-locked": true }, ...buttons));
     });
-    for (const el of Array.from(container?.querySelectorAll<HTMLButtonElement>(".qp-link-btn") ?? [])) {
+    for (const el of Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-link-btn") ?? [])) {
       expect(el.disabled).toBe(false);
       expect(getComputedStyle(el).pointerEvents).not.toBe("none");
     }
@@ -168,8 +168,8 @@ describe("V-1.3c 锁定态工具条仍可点（不许 pointer-events: none）", 
   it("v13c_toolbar_css_never_disables_pointer_events", () => {
     /* 源码判据（死锁的唯一机械保证：jsdom 不加载样式表，量不出继承） */
     const rules = readCss("../../../shell/styles/features/dashboard-r2.css");
-    expect(rules).toContain(".qp-page-toolbar");
-    expect(rules).not.toMatch(/\.qp-page-toolbar[^{]*\{[^}]*pointer-events:\s*none/);
+    expect(rules).toContain(".at-page-toolbar");
+    expect(rules).not.toMatch(/\.at-page-toolbar[^{]*\{[^}]*pointer-events:\s*none/);
   });
 });
 
@@ -185,7 +185,7 @@ describe("V-1.3d 卡框在锁定态", () => {
         locked,
         onBegin: (_event, _rect: Rect, mode) => onBegin(mode),
         onNudge: () => undefined,
-        children: createElement("div", { className: "qp-card-head" }, "卡头"),
+        children: createElement("div", { className: "at-card-head" }, "卡头"),
       }));
     });
   }
@@ -193,11 +193,11 @@ describe("V-1.3d 卡框在锁定态", () => {
   it("v13d_locked_renders_no_handles_and_ignores_drag", () => {
     const onBegin = vi.fn();
     mountFrame(true, onBegin);
-    const card = container?.querySelector<HTMLElement>(".qp-board-card");
+    const card = container?.querySelector<HTMLElement>(".at-board-card");
     expect(card?.querySelectorAll("[data-resize]").length).toBe(0);
     expect(card?.getAttribute("data-locked")).toBe("true");
 
-    const head = container?.querySelector<HTMLElement>(".qp-card-head");
+    const head = container?.querySelector<HTMLElement>(".at-card-head");
     if (!head) throw new Error("没有卡头");
     act(() => {
       head.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
@@ -210,7 +210,7 @@ describe("V-1.3d 卡框在锁定态", () => {
     mountFrame(false, onBegin);
     expect(container?.querySelectorAll("[data-resize]").length).toBe(3);
 
-    const head = container?.querySelector<HTMLElement>(".qp-card-head");
+    const head = container?.querySelector<HTMLElement>(".at-card-head");
     if (!head) throw new Error("没有卡头");
     act(() => {
       head.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));
@@ -235,15 +235,15 @@ describe("V-3a 卡内交互元素不触发拖卡", () => {
         onNudge: () => undefined,
         children: createElement(
           "div",
-          { className: "qp-card-head" },
-          createElement("input", { className: "qp-probe", value, readOnly: true }),
+          { className: "at-card-head" },
+          createElement("input", { className: "at-probe", value, readOnly: true }),
         ),
       });
     }
     act(() => {
       root?.render(createElement(Harness));
     });
-    const input = container?.querySelector<HTMLElement>(".qp-probe");
+    const input = container?.querySelector<HTMLElement>(".at-probe");
     if (!input) throw new Error("没有输入框");
     act(() => {
       input.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0 }));

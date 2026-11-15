@@ -94,76 +94,76 @@ export default function NotesStrip({ model, controls }: Props) {
 
   return (
     <>
-      <section className="qp-notes" aria-labelledby={domId} aria-busy={loading || undefined} data-card="notes">
-        <div className="qp-notes-head">
-          <h2 id={domId} className="qp-notes-title">{copy.notesTitle}</h2>
-          <span className="qp-notes-more">
+      <section className="at-notes" aria-labelledby={domId} aria-busy={loading || undefined} data-card="notes">
+        <div className="at-notes-head">
+          <h2 id={domId} className="at-notes-title">{copy.notesTitle}</h2>
+          <span className="at-notes-more">
             {errorWithData ? (
-              <span className="qp-refresh-error" data-error-layer="refresh" role="alert" title={UI_TEXT.common.refreshFailed}>
+              <span className="at-refresh-error" data-error-layer="refresh" role="alert" title={UI_TEXT.common.refreshFailed}>
                 <AlertCircle size={12} strokeWidth={2} aria-hidden="true" />
                 <span className="sr-only">{UI_TEXT.common.refreshFailed}</span>
               </span>
             ) : null}
-            <span className="qp-notes-count">{copy.notesCount(total)}</span>
+            <span className="at-notes-count">{copy.notesCount(total)}</span>
             {controls}
           </span>
         </div>
 
-        <div className="qp-notes-track qp-scroll-region">
+        <div className="at-notes-track at-scroll-region">
           {errorWithoutData ? (
             /* E2：与四张卡同一套（条件渲染 → 出现即播报；重试用 aria-disabled 不用 disabled） */
             <div
-              className="qp-module-error qp-notes-error"
+              className="at-module-error at-notes-error"
               role="alert"
               data-error-layer="module"
               aria-labelledby={`${domId} ${domId}-error`}
             >
-              <p id={`${domId}-error`} className="qp-module-error-text">{UI_TEXT.common.readFailed}</p>
-              <button type="button" className="qp-link-btn" onClick={retry}>
+              <p id={`${domId}-error`} className="at-module-error-text">{UI_TEXT.common.readFailed}</p>
+              <button type="button" className="at-link-btn" onClick={retry}>
                 {UI_TEXT.common.retry}
               </button>
             </div>
           ) : loading
             ? Array.from({ length: 3 }, (_, index) => (
-              <span key={index} className="qp-note-card qp-note-placeholder" aria-hidden="true" />
+              <span key={index} className="at-note-card at-note-placeholder" aria-hidden="true" />
             ))
             : notes.length > 0
               ? notes.map((note) => (
                 <button
                   key={note.id}
                   type="button"
-                  className="qp-note-card"
+                  className="at-note-card"
                   title={firstLine(note.content)}
                   aria-haspopup="dialog"
                   onClick={() => openNote(note)}
                 >
-                  <span className="qp-note-body">{firstLine(note.content)}</span>
-                  <span className="qp-note-meta">{relativeTime(note.updatedAt, now, locale)}</span>
+                  <span className="at-note-body">{firstLine(note.content)}</span>
+                  <span className="at-note-meta">{relativeTime(note.updatedAt, now, locale)}</span>
                 </button>
               ))
-              : <span className="qp-note-card qp-note-placeholder">{copy.notesEmpty}</span>}
+              : <span className="at-note-card at-note-placeholder">{copy.notesEmpty}</span>}
         </div>
       </section>
 
       <QuietDialog
         open={opened !== null}
         title={copy.notesTitle}
-        surfaceClassName="qp-note-dialog"
+        surfaceClassName="at-note-dialog"
         onClose={closeDialog}
         actions={opened ? (
           confirming ? (
             <>
-              <span className="qp-note-dialog-confirm">{copy.noteDeleteConfirm}</span>
+              <span className="at-note-dialog-confirm">{copy.noteDeleteConfirm}</span>
               <button
                 type="button"
-                className="qp-button qp-button-compact qp-button-secondary"
+                className="at-button at-button-compact at-button-secondary"
                 onClick={() => setConfirming(false)}
               >
                 {UI_TEXT.dialog.cancel}
               </button>
               <button
                 type="button"
-                className="qp-button qp-button-compact qp-button-danger"
+                className="at-button at-button-compact at-button-danger"
                 onClick={deleteOpened}
               >
                 {copy.noteDelete}
@@ -173,14 +173,14 @@ export default function NotesStrip({ model, controls }: Props) {
             <>
               <button
                 type="button"
-                className="qp-button qp-button-compact qp-button-secondary"
+                className="at-button at-button-compact at-button-secondary"
                 onClick={closeDialog}
               >
                 {UI_TEXT.dialog.cancel}
               </button>
               <button
                 type="button"
-                className="qp-button qp-button-compact qp-button-danger"
+                className="at-button at-button-compact at-button-danger"
                 onClick={() => setConfirming(true)}
               >
                 {copy.noteDelete}
@@ -189,11 +189,11 @@ export default function NotesStrip({ model, controls }: Props) {
           )
         ) : undefined}
       >
-        <p className="qp-note-dialog-text">{opened?.content ?? ""}</p>
+        <p className="at-note-dialog-text">{opened?.content ?? ""}</p>
         {/* 意图没发出去：条件渲染（出现即播报），文案说清"没发出去"而不是"删除失败" ——
             我们只知道桥没通，不知道宿主的账。 */}
         {deleteNotSent ? (
-          <p className="qp-note-dialog-issue" role="status">{copy.noteDeleteNotSent}</p>
+          <p className="at-note-dialog-issue" role="status">{copy.noteDeleteNotSent}</p>
         ) : null}
       </QuietDialog>
     </>

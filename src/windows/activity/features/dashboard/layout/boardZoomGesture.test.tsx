@@ -50,7 +50,7 @@ function Harness() {
 
 function mount() {
   act(() => root?.render(createElement(Harness)));
-  const host = container?.querySelector<HTMLElement>(".qp-board-scroll");
+  const host = container?.querySelector<HTMLElement>(".at-board-scroll");
   expect(host, "画布滚动容器没渲染出来").toBeTruthy();
   return host as HTMLElement;
 }
@@ -72,7 +72,7 @@ describe("画布缩放（Ctrl + 滚轮）", () => {
   it("默认 100%：倍率不跟窗口大小联动", () => {
     const host = mount();
     expect(zoomOf(host)).toBe(1);
-    const canvas = container?.querySelector<HTMLElement>(".qp-board-canvas");
+    const canvas = container?.querySelector<HTMLElement>(".at-board-canvas");
     expect(canvas?.style.transform).toBe("scale(1)");
   });
 
@@ -80,7 +80,7 @@ describe("画布缩放（Ctrl + 滚轮）", () => {
     const host = mount();
     expect(wheel(host, { ctrlKey: true, deltaY: -120 })).toBe(true);
     expect(zoomOf(host)).toBeGreaterThan(1);
-    expect(container?.querySelector<HTMLElement>(".qp-board-canvas")?.style.transform)
+    expect(container?.querySelector<HTMLElement>(".at-board-canvas")?.style.transform)
       .toBe(`scale(${zoomOf(host)})`);
 
     const zoomedIn = zoomOf(host);

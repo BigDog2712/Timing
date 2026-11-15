@@ -49,7 +49,7 @@ export default function HistoryRangeSummary({
   ];
 
   return (
-    <section className="qp-panel p-5 history-range-summary" data-history-range-summary>
+    <section className="at-panel p-5 history-range-summary" data-history-range-summary>
       <div className="history-range-summary-metrics">
         {metrics.map((metric) => (
           <div key={metric.key} className="history-range-summary-metric" data-history-range-metric={metric.key}>

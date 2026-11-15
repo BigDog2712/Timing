@@ -54,10 +54,10 @@ async function mount(options: {
   });
 }
 
-const card = () => container?.querySelector<HTMLElement>(".qp-card") ?? null;
-const donutTotal = () => container?.querySelector(".qp-donut-total")?.textContent ?? null;
-const donutCap = () => container?.querySelector(".qp-donut-cap")?.textContent ?? null;
-const emptyText = () => container?.querySelector(".qp-empty")?.textContent ?? null;
+const card = () => container?.querySelector<HTMLElement>(".at-card") ?? null;
+const donutTotal = () => container?.querySelector(".at-donut-total")?.textContent ?? null;
+const donutCap = () => container?.querySelector(".at-donut-cap")?.textContent ?? null;
+const emptyText = () => container?.querySelector(".at-empty")?.textContent ?? null;
 
 beforeEach(() => {
   container = document.createElement("div");
@@ -83,7 +83,7 @@ describe("计时分布卡 · 读数口径", () => {
     expect(donutCap()).toBe("今日事项合计");
     expect(emptyText()).toBe("今天还没有计时事项");
     /* 事项维度不显示「较昨日」：那是应用活动的差值，挂在事项维度上就是假话 */
-    expect(container?.querySelector(".qp-focus-delta")).toBeNull();
+    expect(container?.querySelector(".at-focus-delta")).toBeNull();
   });
 
   it("tm02_item_dimension_shows_its_own_total", async () => {
@@ -91,15 +91,15 @@ describe("计时分布卡 · 读数口径", () => {
 
     expect(card()?.getAttribute("data-state")).toBe("ready");
     expect(donutTotal()).toBe("1h 0m");
-    expect(container?.querySelector(".qp-card-meta")?.textContent).toContain("今日 1h 0m");
+    expect(container?.querySelector(".at-card-meta")?.textContent).toContain("今日 1h 0m");
     /* 底圈 + 两段 = 三根 circle（段数 = 读数行数这条不变）。
        只数 svg 的**直接子节点**：`AnonymousActivityPattern` 在 `<defs>` 里也有 circle。 */
-    expect(container?.querySelectorAll(".qp-donut svg > circle")).toHaveLength(3);
+    expect(container?.querySelectorAll(".at-donut svg > circle")).toHaveLength(3);
   });
 
   it("tm03_category_dimension_keeps_yesterday_delta", async () => {
     await mount({ categoryDist: [slice("开发", 40, "development")], dimension: "category", dayDeltaTrackedTime: 10 * MIN });
-    expect(container?.querySelector(".qp-focus-delta")).not.toBeNull();
+    expect(container?.querySelector(".at-focus-delta")).not.toBeNull();
     expect(donutCap()).toBe("今日合计");
   });
 
@@ -109,21 +109,21 @@ describe("计时分布卡 · 读数口径", () => {
     const onDimensionChange = vi.fn<(dimension: FocusDimension) => void>();
     await mount({ categoryDist: [], dimension: "item", onDimensionChange });
 
-    const tabs = Array.from(container?.querySelectorAll<HTMLButtonElement>(".qp-focus-dim") ?? []);
+    const tabs = Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-focus-dim") ?? []);
     expect(tabs.map((tab) => tab.textContent)).toHaveLength(3);
     act(() => { tabs[0]?.click(); });
     expect(onDimensionChange).toHaveBeenCalledWith("category");
   });
 
   it("tm04_empty_ring_is_wrapped_so_the_caption_cannot_cover_it", async () => {
-    /* 布局前提：环与空文案在**同一块**里纵排（`.qp-empty-figure`）。
-       写成两个并列子项时，`.qp-empty` 的 `flex: 1 1 auto` 会吃满整卡剩余高度，
+    /* 布局前提：环与空文案在**同一块**里纵排（`.at-empty-figure`）。
+       写成两个并列子项时，`.at-empty` 的 `flex: 1 1 auto` 会吃满整卡剩余高度，
        环只能溢出卡外被裁 —— 观感是"文字压在环上、环只剩上半截"。 */
     await mount({ categoryDist: [], dimension: "category" });
-    const donut = container?.querySelector(".qp-donut");
-    const figure = container?.querySelector(".qp-empty-figure");
+    const donut = container?.querySelector(".at-donut");
+    const figure = container?.querySelector(".at-empty-figure");
     expect(figure).not.toBeNull();
     expect(donut?.parentElement).toBe(figure);
-    expect(figure?.querySelector(".qp-empty")).not.toBeNull();
+    expect(figure?.querySelector(".at-empty")).not.toBeNull();
   });
 });

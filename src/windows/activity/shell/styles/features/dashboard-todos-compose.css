@@ -9,52 +9,52 @@
  * 为什么单拆：`dashboard-todos.css` 管"卡体 + 行网格"，本文件管"弹层表单"——
  * 两块互不影响，拆开之后各自都有余量（行数棘轮）。
  *
- * 全部只用既有 `--qp-*` 变量；深浅两套主题都靠变量切换，这里不写死任何颜色。
- * 窄卡口径：弹层宽 `min(380px, 100vw − 2*page)`（照 `.qp-timeline-manage-dialog`），
+ * 全部只用既有 `--at-*` 变量；深浅两套主题都靠变量切换，这里不写死任何颜色。
+ * 窄卡口径：弹层宽 `min(380px, 100vw − 2*page)`（照 `.at-timeline-manage-dialog`），
  * 时间行允许收缩（`min-width: 0`），极窄时也不横向溢出。
  * ========================================================================== */
 
 /* ── 卡底入口条已下线 ──
  * 「新建待办」现在长在**卡头下方一条通栏窄行**里（`ModuleShell` 的 `subhead` 槽 +
- * `.qp-todo-new-row`，见 `dashboard-todos.css`）。这里曾经是 `.qp-todo-foot`
+ * `.at-todo-new-row`，见 `dashboard-todos.css`）。这里曾经是 `.at-todo-foot`
  * （32 高 + 两侧负边距贴卡片下缘），撤销条的让位量就是按它算的 —— 现在撤销条回到
- * `calc(var(--qp-card-pad-b) + 8px)`。那 32px 卡高回到了列表：待办卡本来就缺行。 */
+ * `calc(var(--at-card-pad-b) + 8px)`。那 32px 卡高回到了列表：待办卡本来就缺行。 */
 
 /* ── 弹层：窄一点，一行一个字段不需要整屏 ── */
-.qp-todo-dialog {
-  width: min(380px, calc(100vw - 2 * var(--qp-space-page)));
+.at-todo-dialog {
+  width: min(380px, calc(100vw - 2 * var(--at-space-page)));
 }
 
-.qp-todo-form {
+.at-todo-form {
   display: flex;
   flex-direction: column;
-  gap: var(--qp-space-group);
+  gap: var(--at-space-group);
 }
 
-.qp-todo-field {
+.at-todo-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.qp-todo-field-label {
-  color: var(--qp-text-secondary);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+.at-todo-field-label {
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
 }
 
-.qp-todo-name-input {
+.at-todo-name-input {
   width: 100%;
 }
 
 /* ── 计划时间：datetime-local 原生控件 + 清除键同行 ── */
-.qp-todo-time-row {
+.at-todo-time-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.qp-todo-time-input {
+.at-todo-time-input {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -62,34 +62,34 @@
 /* 深色主题下原生 datetime-local 的日历图标/弹出面板是系统绘制的：不声明
  * `color-scheme` 时 WebView 按 light 渲染，深色面板上一个"看不见的黑色图标"。
  * 跟随 `tokens.css` 的主题选择器（`:root[data-theme="dark"]`）走。 */
-.qp-todo-form input { color-scheme: light; }
+.at-todo-form input { color-scheme: light; }
 
-:root[data-theme="dark"] .qp-todo-form input { color-scheme: dark; }
+:root[data-theme="dark"] .at-todo-form input { color-scheme: dark; }
 
 /* ── 「提醒我」勾选行：时间为空时 disabled + 一句解释，不是灰着不解释 ── */
-.qp-todo-remind {
+.at-todo-remind {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--qp-text-secondary);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
 }
 
-.qp-todo-remind input:disabled { cursor: not-allowed; }
+.at-todo-remind input:disabled { cursor: not-allowed; }
 
 /* 提示行（勾选解释）： tertiary 灰字，与"错误"长得不一样 */
-.qp-todo-hint {
+.at-todo-hint {
   margin: 0;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-compact);
-  line-height: var(--qp-line-height-compact);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-compact);
 }
 
-/* 错误行（校验不过 / 落库失败，role=status）：danger，照 `.qp-timeline-manage-issue` */
-.qp-todo-issue {
+/* 错误行（校验不过 / 落库失败，role=status）：danger，照 `.at-timeline-manage-issue` */
+.at-todo-issue {
   margin: 0;
-  color: var(--qp-danger);
-  font-size: var(--qp-font-size-compact);
-  line-height: var(--qp-line-height-compact);
+  color: var(--at-danger);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-compact);
 }

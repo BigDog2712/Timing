@@ -67,14 +67,14 @@ export default function AboutPanel({
     : `v${appVersion}`;
   return (
     <div className="about-center-workbench">
-      <section className="qp-panel about-center-panel">
+      <section className="at-panel about-center-panel">
         <div className="about-center-profile">
           <div className="about-center-icon-shell" aria-hidden>
             <img src={appIconUrl} alt="" draggable={false} />
           </div>
           <div className="about-center-title-row">
             <h2>Timing</h2>
-            <span className="about-center-version qp-text-caption qp-weight-emphasis">{versionLabel}</span>
+            <span className="about-center-version at-text-caption at-weight-emphasis">{versionLabel}</span>
           </div>
           <p>{UI_TEXT.about.description}</p>
         </div>

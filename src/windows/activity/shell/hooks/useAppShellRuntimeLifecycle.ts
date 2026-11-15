@@ -51,9 +51,9 @@ export function useAppShellRuntimeLifecycle({
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
 
-    document.documentElement.dataset.qpMotion = quietMotionMode;
+    document.documentElement.dataset.atMotion = quietMotionMode;
     return () => {
-      delete document.documentElement.dataset.qpMotion;
+      delete document.documentElement.dataset.atMotion;
     };
   }, [quietMotionMode]);
 

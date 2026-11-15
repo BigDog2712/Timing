@@ -1,9 +1,9 @@
 /**
  * [本轮 T05] 顶栏两条判据：
  *   · V-3b（居中，源码级）：`.app-titlebar` 必须是三栏 grid（`minmax(0,1fr) auto
- *     minmax(0,1fr)`），左右两栏等宽才可能让 tab 段落在窗口正中；`.qp-topbar-nav`
+ *     minmax(0,1fr)`），左右两栏等宽才可能让 tab 段落在窗口正中；`.at-topbar-nav`
  *     不得恢复 flex 顺序排布（无对称吸收就没有居中）。段宽锁死：brand 用
- *     `--qp-brand-w`、controls 用 `--qp-controls-w`，两个变量不许被绕开。
+ *     `--at-brand-w`、controls 用 `--at-controls-w`，两个变量不许被绕开。
  *   · V-3c（拖窗，运行时）：`isInteractive` 判据 —— topbar 空白处 pointerdown 触发
  *     `startDragging`；tab / 窗口控件 / `[data-no-drag]` 上 pointerdown 不触发。
  *     jsdom 没有布局引擎，居中量不出像素，几何用源码判据钉；手势行为用真渲染钉。
@@ -53,9 +53,9 @@ describe("[T05] V-3b · 顶栏居中（源码级）", () => {
     expect(topbar).toMatch(/\.app-titlebar\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+auto\s+minmax\(0,\s*1fr\)/);
   });
 
-  test("段宽变量未被绕开：brand 用 --qp-brand-w、controls 用 --qp-controls-w", () => {
-    expect(topbar).toMatch(/\.app-titlebar-brand\s*\{[^}]*var\(--qp-brand-w\)/);
-    expect(topbar).toMatch(/\.app-titlebar-controls\s*\{[^}]*var\(--qp-controls-w\)/);
+  test("段宽变量未被绕开：brand 用 --at-brand-w、controls 用 --at-controls-w", () => {
+    expect(topbar).toMatch(/\.app-titlebar-brand\s*\{[^}]*var\(--at-brand-w\)/);
+    expect(topbar).toMatch(/\.app-titlebar-controls\s*\{[^}]*var\(--at-controls-w\)/);
   });
 
   test("左右两栏等宽：.app-titlebar-side 不再 flex-grow（吸收由 grid 均分完成）", () => {
@@ -81,8 +81,8 @@ describe("[T05] V-3c · 拖窗判据 isInteractive（运行时）", () => {
             timingStatusEntry: null,
             navigationSlot: createElement(
               "nav",
-              { className: "qp-topbar-nav", "data-topbar-nav": "" },
-              createElement("button", { type: "button", className: "qp-topbar-tab" }, "tab"),
+              { className: "at-topbar-nav", "data-topbar-nav": "" },
+              createElement("button", { type: "button", className: "at-topbar-tab" }, "tab"),
             ),
           }),
           }),
@@ -116,7 +116,7 @@ describe("[T05] V-3c · 拖窗判据 isInteractive（运行时）", () => {
   });
 
   test("tab 上 pointerdown + 移动 → 不拖窗（变异③：isInteractive 短路必红）", () => {
-    drag(container.querySelector(".qp-topbar-tab") as HTMLElement);
+    drag(container.querySelector(".at-topbar-tab") as HTMLElement);
     expect(startCurrentWindowDrag).not.toHaveBeenCalled();
   });
 

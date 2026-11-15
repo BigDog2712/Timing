@@ -140,7 +140,7 @@ export default function DestinationDetailDialog({
         <div className="destination-detail-header-actions">
           <button
             type="button"
-            className="qp-dialog-close-button"
+            className="at-dialog-close-button"
             aria-label={copy.close}
             onClick={onClose}
           >
@@ -165,7 +165,7 @@ export default function DestinationDetailDialog({
             {detail.day.status === "error" && !displayDay ? (
               <div className="destination-detail-error" role="status">
                 <span>{copy.dayError}</span>
-                <button type="button" className="qp-inline-action qp-inline-action-accent" onClick={detail.retryDay}>
+                <button type="button" className="at-inline-action at-inline-action-accent" onClick={detail.retryDay}>
                   {copy.retry}
                 </button>
               </div>
@@ -176,7 +176,7 @@ export default function DestinationDetailDialog({
                     <span>{copy.dayError}</span>
                     <button
                       type="button"
-                      className="qp-inline-action qp-inline-action-accent"
+                      className="at-inline-action at-inline-action-accent"
                       onClick={detail.retryDay}
                     >
                       {copy.retry}
@@ -246,7 +246,7 @@ export default function DestinationDetailDialog({
             >
               <button
                 type="button"
-                className="qp-button-secondary destination-detail-duration-button"
+                className="at-button-secondary destination-detail-duration-button"
                 disabled={!canDecreaseMinSession}
                 aria-label={UI_TEXT.accessibility.history.decreaseMinDuration}
                 onClick={() => updateMinSessionMinutes(minSessionMinutes - 1)}
@@ -258,7 +258,7 @@ export default function DestinationDetailDialog({
               </span>
               <button
                 type="button"
-                className="qp-button-secondary destination-detail-duration-button"
+                className="at-button-secondary destination-detail-duration-button"
                 disabled={!canIncreaseMinSession}
                 aria-label={UI_TEXT.accessibility.history.increaseMinDuration}
                 onClick={() => updateMinSessionMinutes(minSessionMinutes + 1)}

@@ -138,7 +138,7 @@ export default function Dashboard({
     <div
       ref={panelRef}
       tabIndex={-1}
-      className="qp-dashboard"
+      className="at-dashboard"
       data-view="dashboard"
       data-dashboard-read-state={readState.status}
     >
@@ -146,11 +146,11 @@ export default function Dashboard({
       <h1 className="sr-only">{copy.pageTitle}</h1>
 
       {showPageError ? (
-        <div className="qp-panel qp-dashboard-notice" role="status" data-dashboard-read-error>
+        <div className="at-panel at-dashboard-notice" role="status" data-dashboard-read-error>
           <span>{hasAnyData ? UI_TEXT.common.refreshFailed : UI_TEXT.common.readFailed}</span>
           <button
             type="button"
-            className="qp-control shrink-0"
+            className="at-control shrink-0"
             onClick={(event) => {
               returnRetryFocusRef.current = document.activeElement === event.currentTarget;
               readState.retry();
@@ -161,7 +161,7 @@ export default function Dashboard({
         </div>
       ) : null}
 
-      <div className="qp-main-view" aria-busy={snapshotStatus === "loading" || undefined}>
+      <div className="at-main-view" aria-busy={snapshotStatus === "loading" || undefined}>
         <DashboardBoard
           layout={layout}
           copy={boardCopy}

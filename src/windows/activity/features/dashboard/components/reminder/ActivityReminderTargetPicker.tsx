@@ -201,7 +201,7 @@ export default function ActivityReminderTargetPicker({
       {listOpen ? (
         <div
           id={listId}
-          className="tools-activity-target-candidate-list data-app-list qp-scroll-region qp-scroll-region-stable"
+          className="tools-activity-target-candidate-list data-app-list at-scroll-region at-scroll-region-stable"
           style={candidateListStyle}
           role="listbox"
           aria-label={ariaLabel}

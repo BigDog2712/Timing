@@ -89,9 +89,9 @@ export default function SettingsTrackingPanel({
 }: SettingsTrackingPanelProps) {
   const UI_TEXT = useLocaleText();
   return (
-    <section className="qp-panel p-5 md:p-6">
+    <section className="at-panel p-5 md:p-6">
       <SettingsPanelHeader
-        icon={<MousePointerClick size={16} className="text-[var(--qp-accent-default)]" />}
+        icon={<MousePointerClick size={16} className="text-[var(--at-accent-default)]" />}
         title={UI_TEXT.settings.trackingPanelTitle}
       />
 

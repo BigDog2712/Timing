@@ -71,15 +71,15 @@ let root: Root | null = null;
 
 /** 新建行里的名字输入框 */
 const nameInput = () => manageDialog()?.querySelector<HTMLInputElement>(".data-category-create-input") ?? null;
-/** 新建行里的「新建分类」键（`qp-link-btn`；色块不是 button） */
+/** 新建行里的「新建分类」键（`at-link-btn`；色块不是 button） */
 function createButton(): HTMLButtonElement | null {
   return Array.from(manageDialog()?.querySelectorAll<HTMLButtonElement>(".data-category-create-row button") ?? [])
-    .find((button) => button.className.includes("qp-link-btn")) ?? null;
+    .find((button) => button.className.includes("at-link-btn")) ?? null;
 }
 /** 新建行里的色块（`QuietColorField` 的触发器） */
-const createSwatch = () => manageDialog()?.querySelector<HTMLButtonElement>(".data-category-create-row .qp-color-trigger") ?? null;
+const createSwatch = () => manageDialog()?.querySelector<HTMLButtonElement>(".data-category-create-row .at-color-trigger") ?? null;
 /** 色块弹层里的 HEX 输入（弹层 portal 到 body） */
-const hexInput = () => document.body.querySelector<HTMLInputElement>(".qp-color-popover input.qp-color-text-input");
+const hexInput = () => document.body.querySelector<HTMLInputElement>(".at-color-popover input.at-color-text-input");
 /** 「不选色则按调色板自动取色」那行小字（只有未选色时才在） */
 const createHint = () => manageDialog()?.querySelector<HTMLElement>(".data-category-create-hint");
 const dialogElement = createElement(DataCategoryManageDialog, { open: true, onClose: () => undefined });

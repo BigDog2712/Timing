@@ -1,14 +1,14 @@
-.qp-select-root {
+.at-select-root {
   position: relative;
 }
 
-.qp-select-root-compact {
+.at-select-root-compact {
   display: inline-block;
   width: max-content;
   max-width: min(220px, 100%);
 }
 
-.qp-select-trigger {
+.at-select-trigger {
   width: 100%;
   min-height: 34px;
   padding: 0 10px;
@@ -17,30 +17,30 @@
   justify-content: space-between;
   gap: 8px;
   text-align: left;
-  font-size: var(--qp-font-size-body);
-  line-height: var(--qp-line-height-body);
-  font-weight: var(--qp-font-weight-medium);
+  font-size: var(--at-font-size-body);
+  line-height: var(--at-line-height-body);
+  font-weight: var(--at-font-weight-medium);
 }
 
-.qp-select-trigger-compact {
+.at-select-trigger-compact {
   width: max-content;
   max-width: 100%;
   min-height: 28px;
   padding: 0 8px;
   gap: 6px;
-  color: var(--qp-text-secondary);
-  font-size: var(--qp-font-size-caption);
-  font-weight: var(--qp-font-weight-medium);
-  line-height: var(--qp-line-height-caption);
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-medium);
+  line-height: var(--at-line-height-caption);
 }
 
-.qp-select-label-stack {
+.at-select-label-stack {
   display: grid;
   min-width: 0;
   flex: 1 1 auto;
 }
 
-.qp-select-label {
+.at-select-label {
   grid-area: 1 / 1;
   min-width: 0;
   overflow: hidden;
@@ -49,117 +49,117 @@
   white-space: nowrap;
 }
 
-.qp-select-label-current {
+.at-select-label-current {
   visibility: visible;
 }
 
-.qp-select-trigger-compact .qp-select-caret {
+.at-select-trigger-compact .at-select-caret {
   width: 12px;
   height: 12px;
   flex: 0 0 auto;
 }
 
-.qp-select-trigger:disabled {
+.at-select-trigger:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
 
-.qp-select-caret {
-  color: var(--qp-text-tertiary);
-  transition: transform var(--qp-motion-fast) var(--qp-motion-ease);
+.at-select-caret {
+  color: var(--at-text-tertiary);
+  transition: transform var(--at-motion-fast) var(--at-motion-ease);
 }
 
-.qp-select-caret-open {
+.at-select-caret-open {
   transform: rotate(180deg);
 }
 
-.qp-select-menu {
+.at-select-menu {
   position: fixed;
   z-index: 90;
   margin: 0;
   padding: 6px;
   list-style: none;
-  border-radius: var(--qp-radius-control);
-  border: 1px solid var(--qp-border-subtle);
-  background: var(--qp-bg-panel);
-  box-shadow: var(--qp-shadow-overlay);
+  border-radius: var(--at-radius-control);
+  border: 1px solid var(--at-border-subtle);
+  background: var(--at-bg-panel);
+  box-shadow: var(--at-shadow-overlay);
   overflow-y: auto;
 }
 
-.qp-select-menu-top {
+.at-select-menu-top {
   transform-origin: bottom center;
 }
 
-.qp-select-menu-bottom {
+.at-select-menu-bottom {
   transform-origin: top center;
 }
 
-.qp-select-menu-density-compact {
+.at-select-menu-density-compact {
   padding: 4px;
 }
 
-.qp-select-option {
+.at-select-option {
   width: 100%;
   min-height: 32px;
   border: 1px solid transparent;
-  border-radius: var(--qp-radius-button);
+  border-radius: var(--at-radius-button);
   background: transparent;
-  color: var(--qp-text-secondary);
+  color: var(--at-text-secondary);
   text-align: left;
   padding: 0 9px;
-  font-size: var(--qp-font-size-body);
-  line-height: var(--qp-line-height-body);
-  font-weight: var(--qp-font-weight-medium);
+  font-size: var(--at-font-size-body);
+  line-height: var(--at-line-height-body);
+  font-weight: var(--at-font-weight-medium);
 }
 
-.qp-select-option-highlighted,
-.qp-select-option:hover {
-  background: var(--qp-bg-elevated);
-  color: var(--qp-text-primary);
+.at-select-option-highlighted,
+.at-select-option:hover {
+  background: var(--at-bg-elevated);
+  color: var(--at-text-primary);
 }
 
-.qp-select-option-selected {
-  border-color: color-mix(in srgb, var(--qp-accent-default) 22%, var(--qp-border-subtle));
-  background: var(--qp-accent-muted);
-  color: var(--qp-accent-default);
+.at-select-option-selected {
+  border-color: color-mix(in srgb, var(--at-accent-default) 22%, var(--at-border-subtle));
+  background: var(--at-accent-muted);
+  color: var(--at-accent-default);
 }
 
-.qp-select-option[aria-disabled="true"] {
-  color: var(--qp-text-disabled);
+.at-select-option[aria-disabled="true"] {
+  color: var(--at-text-disabled);
   cursor: not-allowed;
 }
 
-.qp-select-menu-density-compact .qp-select-option {
+.at-select-menu-density-compact .at-select-option {
   min-height: 28px;
   padding: 0 8px;
   overflow: hidden;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-caption);
-  font-weight: var(--qp-font-weight-medium);
-  line-height: var(--qp-line-height-caption);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-medium);
+  line-height: var(--at-line-height-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.qp-select-menu-density-compact .qp-select-option-highlighted,
-.qp-select-menu-density-compact .qp-select-option:hover {
-  background: var(--qp-bg-elevated);
-  color: var(--qp-text-primary);
+.at-select-menu-density-compact .at-select-option-highlighted,
+.at-select-menu-density-compact .at-select-option:hover {
+  background: var(--at-bg-elevated);
+  color: var(--at-text-primary);
 }
 
-.qp-select-menu-density-compact .qp-select-option-selected {
+.at-select-menu-density-compact .at-select-option-selected {
   border-color: transparent;
-  background: var(--qp-bg-elevated);
-  color: var(--qp-text-secondary);
+  background: var(--at-bg-elevated);
+  color: var(--at-text-secondary);
 }
 
-.qp-select-menu-density-compact .qp-select-option[aria-disabled="true"] {
-  color: var(--qp-text-disabled);
+.at-select-menu-density-compact .at-select-option[aria-disabled="true"] {
+  color: var(--at-text-disabled);
 }
 
-.qp-select-trigger[data-text-style="input"],
-.qp-select-menu[data-text-style="input"] .qp-select-option {
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  font-weight: var(--qp-font-weight-medium);
+.at-select-trigger[data-text-style="input"],
+.at-select-menu[data-text-style="input"] .at-select-option {
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  font-weight: var(--at-font-weight-medium);
 }

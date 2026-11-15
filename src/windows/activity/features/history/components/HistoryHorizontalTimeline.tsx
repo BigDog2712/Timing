@@ -120,7 +120,7 @@ export default function HistoryHorizontalTimeline({
   const trackStyle: QuietTimelineTrackStyle | undefined = timelineMetrics
     ? {
       height: timelineMetrics.trackHeight,
-      "--qp-timeline-segment-height": timelineMetrics.segmentHeight,
+      "--at-timeline-segment-height": timelineMetrics.segmentHeight,
     }
     : undefined;
   const visibleLegendItems = viewModel.legendItems.slice(0, MAX_LEGEND_ITEMS);
@@ -164,7 +164,7 @@ export default function HistoryHorizontalTimeline({
           {(headingTitle || titleAction) && (
             <div className="history-horizontal-timeline-title-row">
               {headingTitle && (
-                <h3 className="history-horizontal-timeline-title qp-weight-emphasis text-[var(--qp-text-primary)] qp-text-section-title">
+                <h3 className="history-horizontal-timeline-title at-weight-emphasis text-[var(--at-text-primary)] at-text-section-title">
                   {headingTitle}
                 </h3>
               )}

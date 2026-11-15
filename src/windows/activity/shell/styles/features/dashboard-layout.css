@@ -5,58 +5,58 @@
  * 卡本身的几何（高度/内距/边）仍在 `dashboard.css` 与 `tiers.css`，本文件一个像素都不改
  * —— 零像素回归的判据（B1/B2）靠这条成立。
  *
- * 红线同全仓：零字面量色值，只用 `var(--qp-*)`；不加阴影渐变，不动 `--qp-card-*`。
+ * 红线同全仓：零字面量色值，只用 `var(--at-*)`；不加阴影渐变，不动 `--at-card-*`。
  * ========================================================================== */
 
 /* ── 卡头工具条已迁走（A 批 · 0.12.x）──
- * 旧的 `.qp-card-controls` / `.qp-card-control`（6 颗 12px 图标）整块删除，
+ * 旧的 `.at-card-controls` / `.at-card-control`（6 颗 12px 图标）整块删除，
  * 接替者是 ⋯ + 弹出菜单，样式在新文件 `dashboard-dnd.css`（本文件 300 行贴死，
- * 只能减不能加）。CardControls.tsx 现在只渲染一颗 `.qp-card-more`。 */
+ * 只能减不能加）。CardControls.tsx 现在只渲染一颗 `.at-card-more`。 */
 
 /* ── 加卡入口：与卡头同一行视觉重量 ── */
-/* [0.13 · 需求 1.3/1.4] 工具条那一块（`.qp-dashboard-toolbar` 几何 + 悬停显形）
- * **已搬走**到 `dashboard-r2.css` 的 `.qp-page-toolbar` 一族：设置页要复用同一套
+/* [0.13 · 需求 1.3/1.4] 工具条那一块（`.at-dashboard-toolbar` 几何 + 悬停显形）
+ * **已搬走**到 `dashboard-r2.css` 的 `.at-page-toolbar` 一族：设置页要复用同一套
  * 几何与淡显（需求 4 的「工具条统一」落在容器这一维），而本文件 273 行贴 300 行硬顶，
  * 就地加只能先减。搬走之后**位置也变了**：从板子右上角改成左上角（锁定入口按需求在左）。
  * 本文件因此净减 28 行。 */
 
 /* ── 加卡弹层：居中面板 + 半透明遮罩 ── */
-.qp-add-card {
+.at-add-card {
   position: fixed;
   inset: 0;
   z-index: 40;
   display: grid;
   place-items: center;
-  background: var(--qp-scrim, rgb(0 0 0 / 45%));
+  background: var(--at-scrim, rgb(0 0 0 / 45%));
 }
 
-.qp-add-card__panel {
+.at-add-card__panel {
   display: flex;
   flex-direction: column;
-  gap: var(--qp-card-head-gap);
+  gap: var(--at-card-head-gap);
   width: min(420px, 80vw);
   max-height: 70vh;
   overflow-y: auto;
-  padding: var(--qp-card-pad);
-  border-radius: var(--qp-radius-card, 12px);
-  background: var(--qp-bg-panel);
-  color: var(--qp-text-primary);
-  outline: 1px solid var(--qp-border-subtle);
+  padding: var(--at-card-pad);
+  border-radius: var(--at-radius-card, 12px);
+  background: var(--at-bg-panel);
+  color: var(--at-text-primary);
+  outline: 1px solid var(--at-border-subtle);
   outline-offset: -1px;
 }
 
-.qp-add-card__title {
-  font-size: var(--qp-font-size-body);
-  font-weight: var(--qp-weight-strong, 600);
+.at-add-card__title {
+  font-size: var(--at-font-size-body);
+  font-weight: var(--at-weight-strong, 600);
 }
 
-.qp-add-card__empty {
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-secondary);
+.at-add-card__empty {
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
 }
 
-.qp-add-card__list {
+.at-add-card__list {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -65,39 +65,39 @@
   list-style: none;
 }
 
-.qp-add-card__item {
+.at-add-card__item {
   display: grid;
   grid-template-columns: auto auto 1fr;
   align-items: center;
-  gap: var(--qp-card-head-gap);
+  gap: var(--at-card-head-gap);
   width: 100%;
   padding: 6px 8px;
   border: 0;
-  border-radius: var(--qp-radius-control);
+  border-radius: var(--at-radius-control);
   background: transparent;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
   text-align: left;
   cursor: pointer;
 }
 
-.qp-add-card__item:hover {
-  background: var(--qp-bg-elevated);
+.at-add-card__item:hover {
+  background: var(--at-bg-elevated);
 }
 
-.qp-add-card__item:focus-visible {
-  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+.at-add-card__item:focus-visible {
+  outline: var(--at-focus-ring-w, 2px) solid var(--at-accent-default);
   outline-offset: 1px;
 }
 
-.qp-add-card__name {
-  font-size: var(--qp-font-size-body);
+.at-add-card__name {
+  font-size: var(--at-font-size-body);
   white-space: nowrap;
 }
 
-.qp-add-card__hint {
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-tertiary);
+.at-add-card__hint {
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -111,7 +111,7 @@
  * 与正文之间 10（`tabs.bottom() + 10`）—— 原来 6 那 4px 是宿主自己的节奏。 */
 /* 维度行 = 左 tab + 右「较昨日」（`focus.rs:24-69`：两者共用同一条 24 高横带）。
  * 早先「较昨日」挂在卡头，卡头因此被挤成两行；exe 里它在这一行右侧，10.5px。 */
-.qp-focus-bar {
+.at-focus-bar {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -121,14 +121,14 @@
   margin-bottom: 10px;
 }
 
-.qp-focus-dims {
+.at-focus-dims {
   display: flex;
   flex: 0 0 auto;
   gap: 4px;
 }
 
 /* 较昨日：涨了用强调色，跌/平用三级字（`focus.rs:56` 的 `if sign >= 0 { accent } else { text3 }`） */
-.qp-focus-delta {
+.at-focus-delta {
   display: inline-flex;
   flex: 0 1 auto;
   align-items: center;
@@ -137,52 +137,52 @@
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   line-height: 14px;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   white-space: nowrap;
 }
 
-.qp-focus-delta[data-dir="increase"] {
-  color: var(--qp-accent-default);
+.at-focus-delta[data-dir="increase"] {
+  color: var(--at-accent-default);
 }
 
-.qp-focus-dim {
+.at-focus-dim {
   width: 50px;
   height: 24px;
   padding: 0;
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   font-size: 11.5px;
   line-height: 24px;
   text-align: center;
   cursor: pointer;
 }
 
-.qp-focus-dim[data-active] {
-  background: var(--qp-accent-muted);
-  color: var(--qp-accent-default);
-  font-weight: var(--qp-font-weight-emphasis);
+.at-focus-dim[data-active] {
+  background: var(--at-accent-muted);
+  color: var(--at-accent-default);
+  font-weight: var(--at-font-weight-emphasis);
 }
 
-.qp-focus-dim:hover {
-  color: var(--qp-text-primary);
+.at-focus-dim:hover {
+  color: var(--at-text-primary);
 }
 
-.qp-focus-dim[data-active]:hover {
-  color: var(--qp-accent-default);
+.at-focus-dim[data-active]:hover {
+  color: var(--at-accent-default);
 }
 
-.qp-focus-dim:focus-visible {
-  outline: var(--qp-focus-ring-w, 2px) solid var(--qp-accent-default);
+.at-focus-dim:focus-visible {
+  outline: var(--at-focus-ring-w, 2px) solid var(--at-accent-default);
   outline-offset: 1px;
 }
 
 /* ── 事项菜单卡（P3）：时序行 ──
  * 三列固定（时间 / 名称 / 时长）。字号照 `items.rs`：名称 12.5、时长尾巴 11.5，
- * 行高 30（`row_h = 30.0`）。`--qp-card-head-gap` 现在是 0（卡头 46 自带留白），
+ * 行高 30（`row_h = 30.0`）。`--at-card-head-gap` 现在是 0（卡头 46 自带留白），
  * 所以列间距必须显式给 8，否则三列会贴在一起。 */
-.qp-card-timeline .qp-timeline-rows {
+.at-card-timeline .at-timeline-rows {
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -191,40 +191,40 @@
   list-style: none;
   min-height: 0;
   /* 宁可出滚动条，也别裁半行。S 档卡高 200：扣掉卡头与内距 62、再扣掉卡底操作条
-   * `.qp-timeline-manage` 的 47，只剩 91 —— 而 4 行 × 30 需要 120。原来的
+   * `.at-timeline-manage` 的 47，只剩 91 —— 而 4 行 × 30 需要 120。原来的
    * `overflow: hidden` 会把第 4 行裁在中间（看着像"只有 3 行半"，也不报错）。
-   * 口径与 `.qp-notes-track` 逐字一致：纵向滚、横向裁。
+   * 口径与 `.at-notes-track` 逐字一致：纵向滚、横向裁。
    * **别**去动 `layout/contract.ts` 的 `KIND_SPECS`：那是所有卡的档位换算与布局契约
    * 测试的正本，改它换来的不是"这张卡不裁"，而是每张卡的高度都变。 */
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: var(--qp-border-strong) transparent;
+  scrollbar-color: var(--at-border-strong) transparent;
 }
 
-.qp-timeline-row {
+.at-timeline-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
-  height: var(--qp-row-items);
+  height: var(--at-row-items);
   /* `flex: 0 0 auto` 不能省：列向 flex 的子项默认 `flex-shrink: 1`，行容器一矮就会被
    * 挤成 26 / 15 那种高度 —— 结果是"看起来没坏、行高却不是 30 了"，而不是出滚动条
-   * （`.qp-readout` 那次踩的就是这个）。放不下就由上面那条 `overflow-y: auto` 兜。 */
+   * （`.at-readout` 那次踩的就是这个）。放不下就由上面那条 `overflow-y: auto` 兜。 */
   flex: 0 0 auto;
   font-size: 11.5px;
   line-height: 15px;
 }
 
-.qp-timeline-time {
-  color: var(--qp-text-tertiary);
+.at-timeline-time {
+  color: var(--at-text-tertiary);
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
 
-.qp-timeline-label {
-  color: var(--qp-text-primary);
+.at-timeline-label {
+  color: var(--at-text-primary);
   font-size: 12.5px;
   line-height: 19px;
   overflow: hidden;
@@ -232,16 +232,16 @@
   white-space: nowrap;
 }
 
-.qp-timeline-duration {
-  color: var(--qp-text-secondary);
+.at-timeline-duration {
+  color: var(--at-text-secondary);
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
 }
 
 /* ── 事项卡的两颗唤起按钮（P3）：与卡头 meta 同排 ── */
-/* 卡头两颗入口（事项菜单 / 常用）：字号 11，间距 8 —— 原来跟着 `--qp-card-head-gap`
+/* 卡头两颗入口（事项菜单 / 常用）：字号 11，间距 8 —— 原来跟着 `--at-card-head-gap`
  * 走，那个令牌已经改成 0，两颗按钮会贴成一个词「事项菜单常用」。 */
-.qp-timeline-actions {
+.at-timeline-actions {
   display: inline-flex;
   align-items: center;
   gap: 8px;

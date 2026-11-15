@@ -142,20 +142,20 @@ export default function TimelineEditDialog({ open, onClose, todayItemIds, onLoca
     <QuietDialog
       open={open}
       title={copy.timelineEditItem}
-      surfaceClassName="qp-timeline-manage-dialog"
+      surfaceClassName="at-timeline-manage-dialog"
       onClose={onClose}
       actions={(
         <>
           <button
             type="button"
-            className="qp-button qp-button-compact qp-button-secondary"
+            className="at-button at-button-compact at-button-secondary"
             onClick={onClose}
           >
             {UI_TEXT.dialog.cancel}
           </button>
           <button
             type="button"
-            className="qp-button qp-button-compact qp-button-primary"
+            className="at-button at-button-compact at-button-primary"
             disabled={!selected || busy}
             onClick={save}
           >
@@ -164,25 +164,25 @@ export default function TimelineEditDialog({ open, onClose, todayItemIds, onLoca
         </>
       )}
     >
-      <div className="qp-timeline-edit">
-        {status === "loading" ? <p className="qp-empty">{UI_TEXT.common.loading}</p> : null}
+      <div className="at-timeline-edit">
+        {status === "loading" ? <p className="at-empty">{UI_TEXT.common.loading}</p> : null}
         {status === "error" ? (
-          <p className="qp-timeline-manage-issue" role="status">{UI_TEXT.common.readFailed}</p>
+          <p className="at-timeline-manage-issue" role="status">{UI_TEXT.common.readFailed}</p>
         ) : null}
         {status === "ready" ? (
           <>
-            <ul ref={listRef} className="qp-timeline-edit-list qp-scroll-region" aria-label={copy.timelineEditItem}>
+            <ul ref={listRef} className="at-timeline-edit-list at-scroll-region" aria-label={copy.timelineEditItem}>
               {candidates.map((item) => (
                 <li key={item.id}>
                   <button
                     type="button"
-                    className="qp-timeline-edit-choice"
+                    className="at-timeline-edit-choice"
                     data-selected={item.id === selectedId || undefined}
                     aria-pressed={item.id === selectedId}
                     onClick={() => pick(item.id)}
                   >
-                    <span className="qp-timeline-edit-name" title={item.name}>{item.name}</span>
-                    <span className="qp-timeline-item-timer">
+                    <span className="at-timeline-edit-name" title={item.name}>{item.name}</span>
+                    <span className="at-timeline-item-timer">
                       {itemTimerMinutes(timers, item.id) === null
                         ? copy.timelineTimerOff
                         : copy.timelineMinutesShort(itemTimerMinutes(timers, item.id) as number)}
@@ -190,7 +190,7 @@ export default function TimelineEditDialog({ open, onClose, todayItemIds, onLoca
                   </button>
                 </li>
               ))}
-              {candidates.length === 0 ? <li className="qp-empty">{copy.timelineEditEmpty}</li> : null}
+              {candidates.length === 0 ? <li className="at-empty">{copy.timelineEditEmpty}</li> : null}
             </ul>
             {selected ? (
               <>

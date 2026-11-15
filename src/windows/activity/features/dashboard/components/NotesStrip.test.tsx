@@ -57,11 +57,11 @@ async function mount(element: Parameters<Root["render"]>[0]) {
 
 /** 弹层是 portal 到 `document.body` 的，查询也在 body 上做，不能只看 container */
 function dialog(): HTMLElement | null {
-  return document.body.querySelector<HTMLElement>(".qp-note-dialog");
+  return document.body.querySelector<HTMLElement>(".at-note-dialog");
 }
 
 function actionButtons(): HTMLButtonElement[] {
-  return Array.from(dialog()?.querySelectorAll<HTMLButtonElement>(".qp-dialog-actions button") ?? []);
+  return Array.from(dialog()?.querySelectorAll<HTMLButtonElement>(".at-dialog-actions button") ?? []);
 }
 
 function clickButton(target: HTMLButtonElement) {
@@ -88,7 +88,7 @@ describe("NotesStrip · 展开后的删除", () => {
     await mount(createElement(NotesStrip, { model: state }));
 
     await act(async () => {
-      container?.querySelector<HTMLButtonElement>(".qp-note-card")?.click();
+      container?.querySelector<HTMLButtonElement>(".at-note-card")?.click();
     });
     expect(dialog()?.textContent).toContain("买牛奶");
 
@@ -100,7 +100,7 @@ describe("NotesStrip · 展开后的删除", () => {
     expect(dialog()?.textContent).toContain("删除这张便利贴？");
     expect(removeLocal).not.toHaveBeenCalled();
     /* 弹层还在（确认条是内联的，没有第二层弹窗） */
-    expect(document.body.querySelectorAll(".qp-note-dialog")).toHaveLength(1);
+    expect(document.body.querySelectorAll(".at-note-dialog")).toHaveLength(1);
   });
 
   it("n08_confirming_emits_delete_note_with_that_note_id_and_closes_the_dialog", async () => {
@@ -108,7 +108,7 @@ describe("NotesStrip · 展开后的删除", () => {
     await mount(createElement(NotesStrip, { model: state }));
 
     await act(async () => {
-      container?.querySelectorAll<HTMLButtonElement>(".qp-note-card")[1]?.click();
+      container?.querySelectorAll<HTMLButtonElement>(".at-note-card")[1]?.click();
     });
     clickButton(actionButtons().find((button) => button.textContent === "删除") as HTMLButtonElement);
     /* 确认这一下现在是异步的：先发意图、`sent === true` 才摘本地并关弹层，
@@ -131,7 +131,7 @@ describe("NotesStrip · 展开后的删除", () => {
     await mount(createElement(NotesStrip, { model: state }));
 
     await act(async () => {
-      container?.querySelector<HTMLButtonElement>(".qp-note-card")?.click();
+      container?.querySelector<HTMLButtonElement>(".at-note-card")?.click();
     });
     clickButton(actionButtons().find((button) => button.textContent === "删除") as HTMLButtonElement);
     /* 确认条里的「取消」是第一颗（问句在最左，按钮贴右） */
@@ -148,13 +148,13 @@ describe("NotesStrip · 展开后的删除", () => {
     await mount(createElement(NotesStrip, { model: state }));
 
     await act(async () => {
-      container?.querySelector<HTMLButtonElement>(".qp-note-card")?.click();
+      container?.querySelector<HTMLButtonElement>(".at-note-card")?.click();
     });
     clickButton(actionButtons().find((button) => button.textContent === "删除") as HTMLButtonElement);
     clickButton(actionButtons().find((button) => button.textContent === "取消") as HTMLButtonElement);
     /* 关掉再打开另一张：确认条不许"跟着"到下一张上 */
     await act(async () => {
-      container?.querySelector<HTMLButtonElement>(".qp-note-card")?.click();
+      container?.querySelector<HTMLButtonElement>(".at-note-card")?.click();
     });
     expect(dialog()?.textContent).not.toContain("删除这张便利贴？");
     expect(actionButtons().map((button) => button.textContent)).toEqual(["取消", "删除"]);
@@ -177,7 +177,7 @@ describe("NotesStrip · 展开后的删除", () => {
     await mount(createElement(NotesStrip, { model: state }));
 
     await act(async () => {
-      container?.querySelector<HTMLButtonElement>(".qp-note-card")?.click();
+      container?.querySelector<HTMLButtonElement>(".at-note-card")?.click();
     });
     clickButton(actionButtons().find((button) => button.textContent === "删除") as HTMLButtonElement);
     /* 确认这一下是异步的（要等 `emitHostIntent` 的 promise 落），必须 await act */

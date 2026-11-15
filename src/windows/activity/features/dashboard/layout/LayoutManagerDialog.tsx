@@ -93,27 +93,27 @@ export default function LayoutManagerDialog({
 
   return (
     <div
-      className="qp-layout-manager"
+      className="at-layout-manager"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="qp-layout-manager-title"
+      aria-labelledby="at-layout-manager-title"
       onPointerDown={(event) => {
         /* 点遮罩关闭；点面板内部不动（用 pointerdown：拖拽走 pointer，click 在拖动后可能不触发） */
         if (!panelRef.current?.contains(event.target as Node)) onClose();
       }}
     >
-      <div className="qp-layout-manager__panel" ref={panelRef}>
-        <h2 id="qp-layout-manager-title" className="qp-layout-manager__title">{copy.manageLayout}</h2>
-        <p className="qp-layout-manager__hint">
+      <div className="at-layout-manager__panel" ref={panelRef}>
+        <h2 id="at-layout-manager-title" className="at-layout-manager__title">{copy.manageLayout}</h2>
+        <p className="at-layout-manager__hint">
           {locked ? copy.lockedHint : copy.manageHint}
         </p>
-        <p className="qp-layout-manager__hint">{copy.layoutCount(entries.length)}</p>
+        <p className="at-layout-manager__hint">{copy.layoutCount(entries.length)}</p>
 
         {/* 8px 吸附：原来在设置页「主界面组件」卡里，卡下线后搬到这里 */}
-        <div className="qp-layout-manager__switch-row">
-          <span className="qp-layout-manager__switch-copy">
-            <span className="qp-layout-manager__switch-title">{copy.snapTitle}</span>
-            <span className="qp-layout-manager__hint">{copy.snapHint}</span>
+        <div className="at-layout-manager__switch-row">
+          <span className="at-layout-manager__switch-copy">
+            <span className="at-layout-manager__switch-title">{copy.snapTitle}</span>
+            <span className="at-layout-manager__hint">{copy.snapHint}</span>
           </span>
           <QuietSwitch
             checked={snap}
@@ -122,23 +122,23 @@ export default function LayoutManagerDialog({
           />
         </div>
 
-        <ul className="qp-layout-manager__list">
+        <ul className="at-layout-manager__list">
           {entries.map((entry, index) => {
             const active = entry.id === library.activeId;
             const builtIn = entry.id === FACTORY_LAYOUT_ID;
             return (
               <li
                 key={entry.id}
-                className="qp-layout-manager__row"
+                className="at-layout-manager__row"
                 data-active={active}
                 data-layout-entry={entry.id}
               >
-                <span className="qp-layout-manager__name">{nameOf(entry.id, entry.name, index)}</span>
-                <span className="qp-layout-manager__actions">
+                <span className="at-layout-manager__name">{nameOf(entry.id, entry.name, index)}</span>
+                <span className="at-layout-manager__actions">
                   <button
                     ref={index === 0 ? firstRef : undefined}
                     type="button"
-                    className="qp-link-btn"
+                    className="at-link-btn"
                     data-layout-switch={entry.id}
                     disabled={locked || active}
                     onClick={() => runSwitch(entry.id)}
@@ -148,7 +148,7 @@ export default function LayoutManagerDialog({
                   {builtIn ? null : (
                     <button
                       type="button"
-                      className="qp-link-btn"
+                      className="at-link-btn"
                       data-layout-delete={entry.id}
                       disabled={locked}
                       onClick={() => runRemove(entry.id)}
@@ -162,10 +162,10 @@ export default function LayoutManagerDialog({
           })}
         </ul>
 
-        <div className="qp-layout-manager__foot">
+        <div className="at-layout-manager__foot">
           <button
             type="button"
-            className="qp-link-btn"
+            className="at-link-btn"
             data-layout-create
             disabled={locked || !canCreate}
             title={copy.newLayoutHint}
@@ -178,7 +178,7 @@ export default function LayoutManagerDialog({
           </button>
           <button
             type="button"
-            className="qp-link-btn"
+            className="at-link-btn"
             data-layout-tidy
             disabled={locked}
             title={copy.tidy}
@@ -186,7 +186,7 @@ export default function LayoutManagerDialog({
           >
             {copy.tidy}
           </button>
-          <button type="button" className="qp-control" onClick={onClose}>{copy.close}</button>
+          <button type="button" className="at-control" onClick={onClose}>{copy.close}</button>
         </div>
       </div>
     </div>

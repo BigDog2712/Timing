@@ -64,7 +64,7 @@ export default function HistoryDateHeader({
               type="button"
               onClick={() => onChangeDate(-1)}
               aria-label={UI_TEXT.accessibility.history.previousDay(formatDateLabel(addLocalDays(readState.requestedDate, -1), UI_TEXT, locale))}
-              className="qp-control w-9 h-9 !min-h-0 flex items-center justify-center text-[var(--qp-text-secondary)] hover:text-[var(--qp-text-primary)]"
+              className="at-control w-9 h-9 !min-h-0 flex items-center justify-center text-[var(--at-text-secondary)] hover:text-[var(--at-text-primary)]"
             >
               <ChevronLeft size={16} />
             </button>
@@ -75,7 +75,7 @@ export default function HistoryDateHeader({
                 aria-expanded={calendarOpen}
                 aria-controls={calendarOpen ? calendarId : undefined}
                 onClick={onOpenDatePicker}
-                className="qp-status history-date-label relative inline-flex min-w-[102px] cursor-pointer items-center justify-center px-3 py-[5px] text-center text-[var(--qp-text-secondary)]"
+                className="at-status history-date-label relative inline-flex min-w-[102px] cursor-pointer items-center justify-center px-3 py-[5px] text-center text-[var(--at-text-secondary)]"
               >
                 {formatDateLabel(presentedDate, UI_TEXT, locale)}
               </button>
@@ -97,7 +97,7 @@ export default function HistoryDateHeader({
               onClick={() => onChangeDate(1)}
               aria-label={UI_TEXT.accessibility.history.nextDay(formatDateLabel(addLocalDays(readState.requestedDate, 1), UI_TEXT, locale))}
               disabled={isToday}
-              className="qp-control w-9 h-9 !min-h-0 flex items-center justify-center text-[var(--qp-text-secondary)] hover:text-[var(--qp-text-primary)] disabled:opacity-35 disabled:cursor-not-allowed"
+              className="at-control w-9 h-9 !min-h-0 flex items-center justify-center text-[var(--at-text-secondary)] hover:text-[var(--at-text-primary)] disabled:opacity-35 disabled:cursor-not-allowed"
             >
               <ChevronRight size={16} />
             </button>
@@ -105,9 +105,9 @@ export default function HistoryDateHeader({
         )}
       />
       {readState.failed && (
-        <div className="qp-panel flex items-center gap-3 p-4 qp-text-body text-[var(--qp-text-secondary)]" role="status" data-history-read-error>
+        <div className="at-panel flex items-center gap-3 p-4 at-text-body text-[var(--at-text-secondary)]" role="status" data-history-read-error>
           <span>{formatDateLabel(readState.requestedDate, UI_TEXT, locale)} · {readState.hasSnapshot ? UI_TEXT.common.refreshFailed : UI_TEXT.common.readFailed}</span>
-          <button type="button" className="qp-control shrink-0" onClick={(event) => {
+          <button type="button" className="at-control shrink-0" onClick={(event) => {
             if (document.activeElement === event.currentTarget) {
               datePickerRef.current?.querySelector<HTMLButtonElement>(".history-date-label")?.focus();
             }

@@ -63,10 +63,10 @@ let onClose: Mock<() => void>;
 let onLocalRename: Mock<(itemId: number, name: string) => void>;
 let onLocalCreate: Mock<(name: string) => void>;
 
-const dialog = () => document.body.querySelector<HTMLElement>(".qp-timeline-manage-dialog");
-const groups = () => Array.from(dialog()?.querySelectorAll(".qp-timeline-prefs-group") ?? []);
+const dialog = () => document.body.querySelector<HTMLElement>(".at-timeline-manage-dialog");
+const groups = () => Array.from(dialog()?.querySelectorAll(".at-timeline-prefs-group") ?? []);
 const namesIn = (index: number) =>
-  Array.from(groups()[index]?.querySelectorAll(".qp-timeline-item-name") ?? [])
+  Array.from(groups()[index]?.querySelectorAll(".at-timeline-item-name") ?? [])
     .map((node) => node.textContent);
 const byLabel = (label: string) =>
   dialog()?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`) ?? null;
@@ -133,8 +133,8 @@ describe("TimelineManage · 事项管理", () => {
     await mount("manage");
 
     expect(groups()).toHaveLength(2);
-    expect(groups()[0].querySelector(".qp-timeline-group-title")?.textContent).toBe("常用事项");
-    expect(groups()[1].querySelector(".qp-timeline-group-title")?.textContent).toBe("近期事项");
+    expect(groups()[0].querySelector(".at-timeline-group-title")?.textContent).toBe("常用事项");
+    expect(groups()[1].querySelector(".at-timeline-group-title")?.textContent).toBe("近期事项");
     expect(namesIn(0)).toEqual(["写代码"]);
     expect(namesIn(1)).toEqual(["开会"]);
     /* 系统事项两组都不列（改名/移出常用会破坏语义） */
@@ -193,7 +193,7 @@ describe("TimelineManage · 事项管理", () => {
     h.getSettings.mockResolvedValue({ itemsTimers: { "2": 25 }, itemsRecentCount: 5, itemsShowRecent: true });
     await mount("manage");
 
-    const timers = Array.from(dialog()?.querySelectorAll(".qp-timeline-item-timer") ?? [])
+    const timers = Array.from(dialog()?.querySelectorAll(".at-timeline-item-timer") ?? [])
       .map((node) => node.textContent);
     expect(timers).toEqual(["25 分钟", "正计时"]);
   });
@@ -203,9 +203,9 @@ describe("TimelineManage · 事项管理", () => {
     await mount("manage");
 
     act(() => { (byLabel("编辑 写代码") as HTMLButtonElement).click(); });
-    const editor = dialog()?.querySelector(".qp-timeline-item-editor") ?? null;
-    typeInto(editor?.querySelector("input.qp-timeline-manage-input") ?? null, "重构");
-    typeInto(editor?.querySelector("input.qp-timeline-manage-timer") ?? null, "30");
+    const editor = dialog()?.querySelector(".at-timeline-item-editor") ?? null;
+    typeInto(editor?.querySelector("input.at-timeline-manage-input") ?? null, "重构");
+    typeInto(editor?.querySelector("input.at-timeline-manage-timer") ?? null, "30");
     act(() => {
       (Array.from(editor?.querySelectorAll("button") ?? [])
         .find((button) => button.textContent === "保存") as HTMLButtonElement).click();
@@ -229,7 +229,7 @@ describe("TimelineManage · 事项管理", () => {
 
     act(() => { (byLabel("编辑 写代码") as HTMLButtonElement).click(); });
     const editor = dialog()?.querySelector<HTMLInputElement>(
-      ".qp-timeline-item-editor input.qp-timeline-manage-input",
+      ".at-timeline-item-editor input.at-timeline-manage-input",
     ) ?? null;
     typeInto(editor, "改了但不想存");
     act(() => {
@@ -239,7 +239,7 @@ describe("TimelineManage · 事项管理", () => {
 
     expect(h.emitHostIntent).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
-    expect(dialog()?.querySelector(".qp-timeline-item-name")?.textContent).toBe("写代码");
+    expect(dialog()?.querySelector(".at-timeline-item-name")?.textContent).toBe("写代码");
   });
 
   it("tp08_the_recent_group_disappears_when_the_host_switch_is_off", async () => {

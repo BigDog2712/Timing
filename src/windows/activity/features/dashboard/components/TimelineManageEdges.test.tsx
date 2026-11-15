@@ -63,15 +63,15 @@ let onClose: Mock<() => void>;
 let onLocalRename: Mock<(itemId: number, name: string) => void>;
 let onLocalCreate: Mock<(name: string) => void>;
 
-const dialog = () => document.body.querySelector<HTMLElement>(".qp-timeline-manage-dialog");
-const groups = () => Array.from(dialog()?.querySelectorAll(".qp-timeline-prefs-group") ?? []);
+const dialog = () => document.body.querySelector<HTMLElement>(".at-timeline-manage-dialog");
+const groups = () => Array.from(dialog()?.querySelectorAll(".at-timeline-prefs-group") ?? []);
 const namesIn = (index: number) =>
-  Array.from(groups()[index]?.querySelectorAll(".qp-timeline-item-name") ?? [])
+  Array.from(groups()[index]?.querySelectorAll(".at-timeline-item-name") ?? [])
     .map((node) => node.textContent);
 const byLabel = (label: string) =>
   dialog()?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`) ?? null;
 const timersIn = (index: number) =>
-  Array.from(groups()[index]?.querySelectorAll(".qp-timeline-item-timer") ?? [])
+  Array.from(groups()[index]?.querySelectorAll(".at-timeline-item-timer") ?? [])
     .map((node) => node.textContent);
 
 async function flush() {
@@ -191,9 +191,9 @@ describe("TimelineManage · 行内编辑的时长三态", () => {
     expect(timersIn(0)).toEqual(["25 分钟"]);
 
     act(() => { (byLabel("编辑 写代码") as HTMLButtonElement).click(); });
-    const editor = dialog()?.querySelector(".qp-timeline-item-editor") ?? null;
+    const editor = dialog()?.querySelector(".at-timeline-item-editor") ?? null;
     /* 名称不动、只清时长 → 载荷里只能有 timerMinutes: null（`undefined` = 不改 = 清不掉） */
-    typeInto(editor?.querySelector("input.qp-timeline-manage-timer") ?? null, "");
+    typeInto(editor?.querySelector("input.at-timeline-manage-timer") ?? null, "");
     act(() => {
       (Array.from(editor?.querySelectorAll("button") ?? [])
         .find((button) => button.textContent === "保存") as HTMLButtonElement).click();
@@ -209,8 +209,8 @@ describe("TimelineManage · 行内编辑的时长三态", () => {
     await mount("manage");
 
     act(() => { (byLabel("编辑 写代码") as HTMLButtonElement).click(); });
-    const editor = dialog()?.querySelector(".qp-timeline-item-editor") ?? null;
-    typeInto(editor?.querySelector("input.qp-timeline-manage-timer") ?? null, "半小时");
+    const editor = dialog()?.querySelector(".at-timeline-item-editor") ?? null;
+    typeInto(editor?.querySelector("input.at-timeline-manage-timer") ?? null, "半小时");
     act(() => {
       (Array.from(editor?.querySelectorAll("button") ?? [])
         .find((button) => button.textContent === "保存") as HTMLButtonElement).click();
@@ -252,14 +252,14 @@ describe("TimelineManage · 设为常用", () => {
 describe("TimelineManage · 新建弹层的复位", () => {
   it("te06_the_pin_box_and_inputs_reset_after_a_successful_create", async () => {
     await mount("create");
-    typeInto(dialog()?.querySelector("input.qp-timeline-manage-input") ?? null, "看论文");
-    typeInto(dialog()?.querySelector("input.qp-timeline-manage-timer") ?? null, "25");
+    typeInto(dialog()?.querySelector("input.at-timeline-manage-input") ?? null, "看论文");
+    typeInto(dialog()?.querySelector("input.at-timeline-manage-timer") ?? null, "25");
     const pinBox = () => dialog()?.querySelector<HTMLInputElement>('input[type="checkbox"]') as HTMLInputElement;
     act(() => { pinBox().click(); });
     expect(pinBox().checked).toBe(true);
 
     act(() => {
-      (Array.from(dialog()?.querySelectorAll(".qp-dialog-actions button") ?? [])
+      (Array.from(dialog()?.querySelectorAll(".at-dialog-actions button") ?? [])
         .find((button) => button.textContent === "确认") as HTMLButtonElement).click();
     });
     await flush();
@@ -269,7 +269,7 @@ describe("TimelineManage · 新建弹层的复位", () => {
     await mount(null);
     await mount("create");
     expect(pinBox().checked).toBe(false);
-    expect((dialog()?.querySelector("input.qp-timeline-manage-input") as HTMLInputElement).value).toBe("");
-    expect((dialog()?.querySelector("input.qp-timeline-manage-timer") as HTMLInputElement).value).toBe("");
+    expect((dialog()?.querySelector("input.at-timeline-manage-input") as HTMLInputElement).value).toBe("");
+    expect((dialog()?.querySelector("input.at-timeline-manage-timer") as HTMLInputElement).value).toBe("");
   });
 });

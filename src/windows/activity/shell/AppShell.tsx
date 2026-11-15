@@ -194,8 +194,8 @@ export default function AppShellContent({
   return (
     <div
       ref={appFrameRef}
-      data-qp-motion={quietMotionMode}
-      className={["qp-app-frame", isWindowMaximized ? "qp-app-frame-maximized" : ""].filter(Boolean).join(" ")}
+      data-at-motion={quietMotionMode}
+      className={["at-app-frame", isWindowMaximized ? "at-app-frame-maximized" : ""].filter(Boolean).join(" ")}
     >
       <AppTitleBar
         isMaximized={isWindowMaximized}
@@ -206,7 +206,7 @@ export default function AppShellContent({
       />
 
       {/* 无 gap：本容器只有 AppViewOutlet 的 <main> 一个在流子元素，其余三个图层都是 fixed */}
-      <div className="qp-shell flex-1 min-h-0 flex overflow-hidden">
+      <div className="at-shell flex-1 min-h-0 flex overflow-hidden">
         <QuietToastStack toasts={toasts} />
         {/* 活动提醒 / 旧定时提醒到点弹窗（工具页下线后这条投递链保留，Q4） */}
         <ToolAlertDialog />

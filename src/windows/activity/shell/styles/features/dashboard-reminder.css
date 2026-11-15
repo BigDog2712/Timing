@@ -5,7 +5,7 @@
  * `features/tools/` 搬迁而来，类名不变 → 它们的样式从 tools.css 原样搬到这里
  * （工具页整页下线，tools.css 删除；这段皮现在是主界面卡片的）。
  * 卡级布局差异（列表滚动上限等）在 `dashboard-r2.css` 的 T04 段。
- * 红线同全仓：零字面量色值，只用 `var(--qp-*)`。
+ * 红线同全仓：零字面量色值，只用 `var(--at-*)`。
  * ========================================================================== */
 
 /* ── 表单族 ── */
@@ -17,10 +17,10 @@
 
 .tools-form-field > span {
   display: block;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-body);
-  font-weight: var(--qp-font-weight-medium);
-  line-height: var(--qp-line-height-body);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-body);
+  font-weight: var(--at-font-weight-medium);
+  line-height: var(--at-line-height-body);
   text-transform: uppercase;
 }
 
@@ -44,9 +44,9 @@
   min-width: 0;
   align-items: center;
   gap: 8px;
-  color: var(--qp-text-secondary);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
 }
 
 .tools-activity-target-search-field {
@@ -63,17 +63,17 @@
   max-width: calc(100vw - 24px);
   overflow-y: auto;
   overscroll-behavior: contain;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-panel);
-  background: var(--qp-bg-panel);
-  box-shadow: var(--qp-shadow-overlay);
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-panel);
+  background: var(--at-bg-panel);
+  box-shadow: var(--at-shadow-overlay);
   padding: 6px;
 }
 
 .tools-activity-target-option-active {
-  border-color: color-mix(in srgb, var(--qp-accent-default) 34%, var(--qp-border-subtle));
-  background: var(--qp-accent-muted);
-  color: var(--qp-accent-default);
+  border-color: color-mix(in srgb, var(--at-accent-default) 34%, var(--at-border-subtle));
+  background: var(--at-accent-muted);
+  color: var(--at-accent-default);
 }
 
 .data-app-option-icon[data-activity-category-marker] {
@@ -86,15 +86,15 @@
   flex: 0 0 auto;
   margin-top: 0;
   border-radius: 50%;
-  background: var(--activity-category-color, var(--qp-text-tertiary));
+  background: var(--activity-category-color, var(--at-text-tertiary));
 }
 
 .tools-validation-message {
   margin: 0;
-  color: var(--qp-danger);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  font-weight: var(--qp-font-weight-regular);
+  color: var(--at-danger);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  font-weight: var(--at-font-weight-regular);
 }
 
 .tools-form-actions {
@@ -123,8 +123,8 @@
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px dashed var(--qp-border-subtle);
-  border-radius: var(--qp-radius-panel);
+  border: 1px dashed var(--at-border-subtle);
+  border-radius: var(--at-radius-panel);
   padding: 10px;
   padding-inline-end: 4px;
 }
@@ -143,12 +143,12 @@
   min-height: 76px;
   align-items: center;
   justify-content: center;
-  border: 1px dashed var(--qp-border-subtle);
-  border-radius: var(--qp-radius-panel);
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  font-weight: var(--qp-font-weight-regular);
+  border: 1px dashed var(--at-border-subtle);
+  border-radius: var(--at-radius-panel);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  font-weight: var(--at-font-weight-regular);
 }
 
 .tools-reminder-row {
@@ -157,9 +157,9 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-control);
-  background: var(--qp-bg-elevated);
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
+  background: var(--at-bg-elevated);
   padding: 9px 10px;
 }
 
@@ -181,22 +181,22 @@
 .tools-reminder-row-main strong {
   display: block;
   overflow: hidden;
-  color: var(--qp-text-primary);
-  font-size: var(--qp-font-size-body);
-  line-height: var(--qp-line-height-body);
-  font-weight: var(--qp-font-weight-medium);
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-body);
+  line-height: var(--at-line-height-body);
+  font-weight: var(--at-font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tools-reminder-row-main span:where(:not(.qp-badge)) {
+.tools-reminder-row-main span:where(:not(.at-badge)) {
   display: block;
   margin-top: 3px;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
   font-variant-numeric: tabular-nums;
-  font-weight: var(--qp-font-weight-regular);
+  font-weight: var(--at-font-weight-regular);
 }
 
 .tools-software-rule-main .data-app-option-icon {
@@ -205,7 +205,7 @@
   border: 0;
   background: transparent;
   padding: 4px;
-  color: var(--qp-text-secondary);
+  color: var(--at-text-secondary);
 }
 
 .tools-software-rule-main img {
@@ -239,7 +239,7 @@
   gap: 0;
 }
 
-.tools-reminder-row-actions .qp-icon-action {
+.tools-reminder-row-actions .at-icon-action {
   width: 28px;
   height: 28px;
   min-height: 28px;
@@ -255,14 +255,14 @@
   padding: 8px;
 }
 
-.tools-usage-duration-popover .qp-time-picker-list {
+.tools-usage-duration-popover .at-time-picker-list {
   height: 170px;
   grid-auto-rows: 24px;
   align-content: start;
 }
 
 /* ── 阈值编辑弹层（RuleEditor）宽度 ── */
-.qp-dialog-surface:has(.tools-reminder-editor) {
+.at-dialog-surface:has(.tools-reminder-editor) {
   max-width: 400px;
 }
 

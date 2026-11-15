@@ -31,7 +31,7 @@ let root: Root | null = null;
 /** 四态取全：`headAction` 当年唯一的特点就是"不受四态门控"，所以四态都要验 */
 const STATES: readonly ModuleState[] = ["ready", "empty", "loading", "error"];
 
-/** 右槽里那颗图标键（真实板的 `controls` 就是 `QuietIconAction`，类名 `qp-icon-action`） */
+/** 右槽里那颗图标键（真实板的 `controls` 就是 `QuietIconAction`，类名 `at-icon-action`） */
 const controlsNode = () => createElement(QuietIconAction, {
   icon: createElement(ChevronUp, { size: 14 }),
   title: "上移",
@@ -53,24 +53,24 @@ function mount(state: ModuleState): void {
       /* 入口现在的家：卡头下方的通栏窄行 */
       subhead: createElement(
         "div",
-        { className: "qp-probe-subhead" },
-        createElement("button", { type: "button", className: "qp-link-btn" }, "新建待办"),
+        { className: "at-probe-subhead" },
+        createElement("button", { type: "button", className: "at-link-btn" }, "新建待办"),
       ),
-      children: createElement("div", { className: "qp-probe-body" }, "内容"),
+      children: createElement("div", { className: "at-probe-body" }, "内容"),
     }));
   });
 }
 
-const headRight = () => container?.querySelector<HTMLElement>(".qp-card-head-right") ?? null;
+const headRight = () => container?.querySelector<HTMLElement>(".at-card-head-right") ?? null;
 
 /**
- * 右槽里的**文字键** = 不带 `qp-icon-action` 类的 `button`。
+ * 右槽里的**文字键** = 不带 `at-icon-action` 类的 `button`。
  * 图标键的可见内容都挂在 `aria-hidden` 的子节点上，可读名字走 `aria-label`；
- * 一颗文字键（"新建待办"这种）没有 `qp-icon-action` 类 —— 这就是判据。
+ * 一颗文字键（"新建待办"这种）没有 `at-icon-action` 类 —— 这就是判据。
  */
 const textKeys = (): HTMLButtonElement[] => Array.from(
   headRight()?.querySelectorAll<HTMLButtonElement>("button") ?? [],
-).filter((button) => !button.classList.contains("qp-icon-action"));
+).filter((button) => !button.classList.contains("at-icon-action"));
 
 beforeEach(() => {
   container = document.createElement("div");
@@ -94,7 +94,7 @@ describe("ModuleShell · 卡头右槽只有图标键与读数", () => {
       expect(right, `${state} 态没有卡头右槽`).not.toBeNull();
       /* 图标键控件照旧在（不是"把整个右槽删了"也算过） */
       expect(
-        right?.querySelector(".qp-icon-action"),
+        right?.querySelector(".at-icon-action"),
         `${state} 态把 controls 弄丢了（判据不能靠"右槽整个空掉"过关）`,
       ).not.toBeNull();
       expect(
@@ -111,7 +111,7 @@ describe("ModuleShell · 卡头右槽只有图标键与读数", () => {
   it("mh02_the_meta_readout_only_appears_in_the_ready_state", () => {
     for (const state of STATES) {
       mount(state);
-      const meta = container?.querySelector(".qp-card-meta");
+      const meta = container?.querySelector(".at-card-meta");
       if (state === "ready") {
         expect(meta?.textContent, "ready 态丢了读数").toBe("3 条待办");
       } else {
@@ -126,8 +126,8 @@ describe("ModuleShell · 卡头右槽只有图标键与读数", () => {
        （空态正是最想点「新建待办」的时刻）。`children` 只在 ready 渲染，替代不了它。 */
     for (const state of STATES) {
       mount(state);
-      const head = container?.querySelector(".qp-card-head");
-      const subhead = container?.querySelector(".qp-probe-subhead");
+      const head = container?.querySelector(".at-card-head");
+      const subhead = container?.querySelector(".at-probe-subhead");
       expect(subhead, `${state} 态没有 subhead 那一行`).not.toBeNull();
       expect(head?.nextElementSibling, `${state} 态 subhead 不在卡头之后`).toBe(subhead);
     }
@@ -156,8 +156,8 @@ describe("ModuleShell · 卡头右槽只有图标键与读数", () => {
        ready 分支之前，两条断言都会红。 */
     mount("ready");
     const right = headRight();
-    const meta = right?.querySelector<HTMLElement>(".qp-card-meta") ?? null;
-    const control = right?.querySelector<HTMLElement>(".qp-icon-action") ?? null;
+    const meta = right?.querySelector<HTMLElement>(".at-card-meta") ?? null;
+    const control = right?.querySelector<HTMLElement>(".at-icon-action") ?? null;
     expect(meta, "ready 态丢了读数").not.toBeNull();
     expect(control, "ready 态丢了工具条").not.toBeNull();
     expect(

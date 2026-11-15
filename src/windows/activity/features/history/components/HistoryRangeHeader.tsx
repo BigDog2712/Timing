@@ -23,7 +23,7 @@ export default function HistoryRangeHeader({ title, rangeLabel, rangeBar }: Prop
       rightSlot={(
         <div className="flex items-center gap-2 shrink-0">
           {rangeBar}
-          <span className="qp-status history-date-label relative inline-flex min-w-[102px] cursor-default items-center justify-center px-3 py-[5px] text-center text-[var(--qp-text-secondary)]">
+          <span className="at-status history-date-label relative inline-flex min-w-[102px] cursor-default items-center justify-center px-3 py-[5px] text-center text-[var(--at-text-secondary)]">
             {rangeLabel}
           </span>
         </div>

@@ -31,7 +31,7 @@ export default function HistoryTimelineDialogDateControls({
         type="button"
         onClick={() => onChangeDate(-1)}
         aria-label={UI_TEXT.accessibility.history.previousDay(previousDateLabel)}
-        className="qp-button-secondary inline-flex h-6 w-6 items-center justify-center rounded-[6px] p-0 history-timeline-dialog-date-button history-timeline-dialog-date-previous disabled:cursor-not-allowed disabled:opacity-50"
+        className="at-button-secondary inline-flex h-6 w-6 items-center justify-center rounded-[6px] p-0 history-timeline-dialog-date-button history-timeline-dialog-date-previous disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ChevronLeft size={11} aria-hidden />
       </button>
@@ -43,7 +43,7 @@ export default function HistoryTimelineDialogDateControls({
         onClick={() => onChangeDate(1)}
         disabled={isToday}
         aria-label={UI_TEXT.accessibility.history.nextDay(nextDateLabel)}
-        className="qp-button-secondary inline-flex h-6 w-6 items-center justify-center rounded-[6px] p-0 history-timeline-dialog-date-button history-timeline-dialog-date-next disabled:cursor-not-allowed disabled:opacity-50"
+        className="at-button-secondary inline-flex h-6 w-6 items-center justify-center rounded-[6px] p-0 history-timeline-dialog-date-button history-timeline-dialog-date-next disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ChevronRight size={11} aria-hidden />
       </button>

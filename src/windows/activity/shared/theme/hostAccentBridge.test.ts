@@ -28,33 +28,33 @@ const ACCENTS: HostAccentColors = {
 
 /* 令牌底座取 `deriveTheme('light'|'dark', 'default', null)` 的三个中性键真实值——
    换成随手写的假底色，就测不出「派生用的底色对不对」。 */
-const DARK_TOKENS = { '--qp-bg-canvas': '#262626', '--qp-bg-panel': '#2d2d2d', '--qp-bg-elevated': '#2a2a2a' };
-const LIGHT_TOKENS = { '--qp-bg-canvas': '#fbfbfb', '--qp-bg-panel': '#ffffff', '--qp-bg-elevated': '#f8f8f8' };
+const DARK_TOKENS = { '--at-bg-canvas': '#262626', '--at-bg-panel': '#2d2d2d', '--at-bg-elevated': '#2a2a2a' };
+const LIGHT_TOKENS = { '--at-bg-canvas': '#fbfbfb', '--at-bg-panel': '#ffffff', '--at-bg-elevated': '#f8f8f8' };
 
 describe('applyHostAccents —— §4.3 的 8 行映射', () => {
   it("p001_dark_maps_six_keys_verbatim", () => {
     /* 深色：宿主直接用用户原值（与 `src/lib/theme.ts` 的 `applyAccents` 深色分支一致），
        只把 3 位缩写展开成 6 位小写，防 `primaryButtonBackground` 的 parse 算出 NaN。 */
     expect(applyHostAccents(DARK_TOKENS, ACCENTS, 'dark')).toEqual({
-      '--qp-accent-default': '#4da3e8',
-      '--qp-accent-muted': 'color-mix(in srgb, #4da3e8 20%, #262626)',
-      '--qp-button-primary-bg': '#3a7bb0',
-      '--qp-chart-cursor': 'color-mix(in srgb, #4da3e8 14%, transparent)',
-      '--qp-success': '#4cc38a',
-      '--qp-warning': '#e8a33d',
+      '--at-accent-default': '#4da3e8',
+      '--at-accent-muted': 'color-mix(in srgb, #4da3e8 20%, #262626)',
+      '--at-button-primary-bg': '#3a7bb0',
+      '--at-chart-cursor': 'color-mix(in srgb, #4da3e8 14%, transparent)',
+      '--at-success': '#4cc38a',
+      '--at-warning': '#e8a33d',
     });
   });
 
   it("p001_light_derives_for_contrast", () => {
-    /* 浅色：running/done 作非文本 ≥3:1（对 `--qp-bg-panel` 亮度），warn 作文字 ≥4.5:1
-       （对 `--qp-bg-elevated` 亮度）。下面每个 hex 都是派生算法的精确输出。 */
+    /* 浅色：running/done 作非文本 ≥3:1（对 `--at-bg-panel` 亮度），warn 作文字 ≥4.5:1
+       （对 `--at-bg-elevated` 亮度）。下面每个 hex 都是派生算法的精确输出。 */
     expect(applyHostAccents(LIGHT_TOKENS, ACCENTS, 'light')).toEqual({
-      '--qp-accent-default': '#4593D1',
-      '--qp-accent-muted': 'color-mix(in srgb, #4593D1 14%, #fbfbfb)',
-      '--qp-button-primary-bg': '#3a7bb0',
-      '--qp-chart-cursor': 'color-mix(in srgb, #4593D1 12%, transparent)',
-      '--qp-success': '#3E9F70',
-      '--qp-warning': '#926726',
+      '--at-accent-default': '#4593D1',
+      '--at-accent-muted': 'color-mix(in srgb, #4593D1 14%, #fbfbfb)',
+      '--at-button-primary-bg': '#3a7bb0',
+      '--at-chart-cursor': 'color-mix(in srgb, #4593D1 12%, transparent)',
+      '--at-success': '#3E9F70',
+      '--at-warning': '#926726',
     });
   });
 
@@ -63,11 +63,11 @@ describe('applyHostAccents —— §4.3 的 8 行映射', () => {
     /* 6 个 = 上限。多出来的一定是中性底色键被误覆盖（「28 套预设」边界线破了）。 */
     expect(keys).toHaveLength(6);
     /* 宿主没有 danger / participation 键 → 必须留给 `deriveTheme` 的预设值。 */
-    expect(keys).not.toContain('--qp-danger');
-    expect(keys).not.toContain('--qp-participation');
+    expect(keys).not.toContain('--at-danger');
+    expect(keys).not.toContain('--at-participation');
     /* `bar` 是药丸底板色，不参与分析窗令牌；这里不可能出现任何来自它的键。 */
-    expect(keys).not.toContain('--qp-bar');
-    expect(keys.filter((key) => !key.startsWith('--qp-'))).toEqual([]);
+    expect(keys).not.toContain('--at-bar');
+    expect(keys.filter((key) => !key.startsWith('--at-'))).toEqual([]);
   });
 
   it("p001_no_accents_keeps_presets", () => {
@@ -86,7 +86,7 @@ describe('applyHostAccents —— §4.3 的 8 行映射', () => {
         { ...ACCENTS, running: '#GGGGGG' },
         'light',
       );
-      expect(overrides).toEqual({ '--qp-success': '#3E9F70', '--qp-warning': '#926726' });
+      expect(overrides).toEqual({ '--at-success': '#3E9F70', '--at-warning': '#926726' });
       expect(warn).toHaveBeenCalledTimes(1);
     } finally {
       warn.mockRestore();

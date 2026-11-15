@@ -56,7 +56,7 @@ function DataTrendPanel({
   return (
     <div className="data-trend-panel" aria-busy={loading}>
       <div className="data-trend-header">
-        <h3 className="qp-weight-emphasis text-[var(--qp-text-primary)] qp-text-section-title">
+        <h3 className="at-weight-emphasis text-[var(--at-text-primary)] at-text-section-title">
           {UI_TEXT.data.activityTrend}
         </h3>
         <div className="data-trend-inline-metrics" aria-label={UI_TEXT.accessibility.data.trendSummary}>
@@ -81,7 +81,7 @@ function DataTrendPanel({
       {error ? (
         <div className="data-app-refresh-status mt-3" role="status" data-trend-read-error>
           <span>{viewModel ? UI_TEXT.common.refreshFailed : UI_TEXT.common.readFailed}</span>
-          <button type="button" className="qp-inline-action qp-inline-action-accent" onClick={(event) => {
+          <button type="button" className="at-inline-action at-inline-action-accent" onClick={(event) => {
             if (document.activeElement === event.currentTarget) {
               event.currentTarget.closest(".data-trend-panel")?.querySelector<HTMLElement>(".data-trend-range-trigger")?.focus();
             }
@@ -93,7 +93,7 @@ function DataTrendPanel({
       ) : null}
       <div className="relative pt-4">
         {!viewModel && !error ? (
-          <div className="absolute inset-x-0 top-4 bottom-0 flex items-center justify-center qp-text-caption text-[var(--qp-text-tertiary)]" role="status">
+          <div className="absolute inset-x-0 top-4 bottom-0 flex items-center justify-center at-text-caption text-[var(--at-text-tertiary)]" role="status">
             {UI_TEXT.common.loading}
           </div>
         ) : null}
@@ -102,7 +102,7 @@ function DataTrendPanel({
           className={`data-trend-chart ${
             viewModel
               ? canOpenHistory ? "data-chart-openable" : ""
-              : "data-chart-placeholder flex items-center justify-center text-[var(--qp-text-tertiary)] qp-text-caption"
+              : "data-chart-placeholder flex items-center justify-center text-[var(--at-text-tertiary)] at-text-caption"
           }`}
           onMouseDownCapture={onMouseDownCapture}
           onDoubleClickCapture={onDoubleClickCapture}
@@ -121,7 +121,7 @@ function DataTrendPanel({
               rows={viewModel.chartData}
               showAllXAxisTicks={viewModel.granularity === "month"}
               series={[{
-                color: "var(--qp-accent-default)",
+                color: "var(--at-accent-default)",
                 dataKey: "hours",
                 key: "hours",
                 name: UI_TEXT.data.duration,

@@ -12,7 +12,7 @@
  * ========================================================================== */
 
 /* ── 待办卡（DOM 见 01 §4.3：head / list / fade / undo；[本轮] footer 下线，入口上卡头） ── */
-.qp-card-todos { position: relative; }
+.at-card-todos { position: relative; }
 
 /* 「新建待办」所在的那一行（`ModuleShell` 的 `subhead`，四态常驻）。
  * [本轮] 位置从卡头右槽搬到卡头**下方**：右槽要同时摆「N 条待办」读数与 `⋯` 控件，
@@ -20,7 +20,7 @@
  * 高度 24 是"一行文字键"的紧凑高度（**不是**大号按钮）：列表可用高度只少 28px，
  * 而「还有 K 项」是从量出来的 clientHeight 推的，少多少它自己会算。
  * 右对齐：与卡头右槽同一根轴线，扫视时入口永远在右手边。 */
-.qp-todo-new-row {
+.at-todo-new-row {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -29,11 +29,11 @@
   margin-bottom: 4px;
 }
 
-.qp-todo-list {
+.at-todo-list {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--qp-row-gap);
+  gap: var(--at-row-gap);
   /* 列表重置（原来挂在 dashboard-modules.css 的三合一选择器上，现在归到本卡） */
   margin: 0;
   padding: 0;
@@ -46,10 +46,10 @@
 /* 行网格 = Rust `todos.rs:29-59`：行高 32、圆点中心在行内 x=8、名称从 x=22 起、
  * 右侧时间胶囊 54×18。所以三列是 22 / 1fr / auto，勾选按钮自己往左探 3px 把
  * 24 的命中区中心对到 9（视觉圆点仍落在 8）。
- * [本轮] 第三列 54 → auto：`qp-todo-when` 里只有胶囊时 = 54，带提醒铃铛时 = 68。
+ * [本轮] 第三列 54 → auto：`at-todo-when` 里只有胶囊时 = 54，带提醒铃铛时 = 68。
  * 两种情况下该列的**右缘**都在卡内右缘（auto 轨贴着容器右缘、内容右对齐）——
  * 行内删除键与时间胶囊的右缘对齐不因铃铛出现而动；代价只是有铃铛的行标题窄 14px。 */
-.qp-todo-row {
+.at-todo-row {
   position: relative;
   display: grid;
   flex: 0 0 auto;
@@ -58,11 +58,11 @@
   grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
   gap: 0;
-  height: var(--qp-row-todo);
+  height: var(--at-row-todo);
 }
 
 /* 时间列容器（胶囊 + 可选的提醒铃铛）：右对齐，保证胶囊右缘与删除键同轴 */
-.qp-todo-when {
+.at-todo-when {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
@@ -72,16 +72,16 @@
 /* 提醒铃铛（12px，`role="img"` + aria-label，不是按钮 —— 本轮不做编辑提醒）。
  * 灰字而不是 accent：提醒是"已设"的事实陈述，不是需要抢注意力的主操作
  * （FW-6 的"每屏一个强调色元素"留给今天的时刻胶囊）。 */
-.qp-todo-bell {
+.at-todo-bell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
 }
 
 /* 行内删除键：**绝对定位盖在时间列上**，不进 grid 列宽（否则 44px 数字列被挤窄，
  * 四条数字列右缘 443.14/548.86 立刻失效）。命中区 24×24 = WCAG 2.5.8 AA 下限（A9）。 */
-.qp-todo-del {
+.at-todo-del {
   position: absolute;
   right: 0;
   display: flex;
@@ -92,19 +92,19 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   opacity: 0;
   cursor: default;
 }
 
-.qp-todo-row:hover .qp-todo-del,
-.qp-todo-del:focus-visible { opacity: 1; }
+.at-todo-row:hover .at-todo-del,
+.at-todo-del:focus-visible { opacity: 1; }
 
 /* 删除键出现时藏掉时间，避免两串文字压在 20px 里互相糊 */
-.qp-todo-row:hover .qp-todo-time { opacity: 0; }
+.at-todo-row:hover .at-todo-time { opacity: 0; }
 
-.qp-todo-del:focus-visible {
-  outline: 2px solid var(--qp-focus-ring);
+.at-todo-del:focus-visible {
+  outline: 2px solid var(--at-focus-ring);
   outline-offset: 1px;
   border-radius: 4px;
 }
@@ -115,7 +115,7 @@
  * 相邻区域的代价更高时，就把命中区扩过去盖住它。
  * 视觉方框仍是 16×16 且居中（`align-items: center` 在按钮内部），**一像素不动版式**。
  * 24 这个宽度仍满足 WCAG 2.5.8 AA 的下限，改的只是高度。 */
-.qp-todo-check {
+.at-todo-check {
   display: flex;
   align-self: stretch;
   width: 24px;
@@ -130,19 +130,19 @@
 
 /* 状态标记画成**圆**（Rust `todos.rs:43-55`）：未完成 = 6.5 半径细描边，
  * 完成 = 7 半径实心 + 白勾。方框是宿主自己的形状语言，与 Rust 版并排一眼就分得出。 */
-.qp-todo-box {
+.at-todo-box {
   display: flex;
   width: 13px;
   height: 13px;
   align-items: center;
   justify-content: center;
-  border: 1.3px solid var(--qp-border-strong);
+  border: 1.3px solid var(--at-border-strong);
   border-radius: 999px;
   background: none;
-  color: var(--qp-bg-panel);
+  color: var(--at-bg-panel);
 }
 
-.qp-todo-box::after {
+.at-todo-box::after {
   content: "";
   display: block;
   width: 6px;
@@ -154,84 +154,84 @@
   opacity: 0;
 }
 
-.qp-todo-check[aria-checked="true"] .qp-todo-box {
-  border-color: var(--qp-success);
-  background: var(--qp-success);
+.at-todo-check[aria-checked="true"] .at-todo-box {
+  border-color: var(--at-success);
+  background: var(--at-success);
 }
 
-.qp-todo-check[aria-checked="true"] .qp-todo-box::after {
+.at-todo-check[aria-checked="true"] .at-todo-box::after {
   opacity: 1;
 }
 
-.qp-todo-check:focus-visible {
-  outline: 2px solid var(--qp-focus-ring);
+.at-todo-check:focus-visible {
+  outline: 2px solid var(--at-focus-ring);
   outline-offset: 2px;
 }
 
 /* 名称 12.5 / 19（Rust `todos.rs:63` 的 `galley(..., 12.5, ...)`） */
-.qp-todo-title {
+.at-todo-title {
   min-width: 0;
   overflow: hidden;
   font-size: 12.5px;
   line-height: 19px;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.qp-todo-row[data-done="true"] .qp-todo-title {
-  color: var(--qp-text-tertiary);
+.at-todo-row[data-done="true"] .at-todo-title {
+  color: var(--at-text-tertiary);
   text-decoration: line-through;
 }
 
 /* 时间胶囊 54×18 / 字 10.5（`todos.rs:77-99`）：底是 accent 9%（= `with_alpha(accent, 22)`）。 */
-.qp-todo-time {
+.at-todo-time {
   display: inline-flex;
   width: 54px;
   height: 18px;
   align-items: center;
   justify-content: center;
   border-radius: 6px;
-  background: color-mix(in srgb, var(--qp-accent-default) 9%, transparent);
+  background: color-mix(in srgb, var(--at-accent-default) 9%, transparent);
   text-align: center;
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   line-height: 18px;
-  color: var(--qp-text-secondary);
+  color: var(--at-text-secondary);
   white-space: nowrap;
 }
 
 /* 已完成 / 更远的日期：不铺底、只留灰字（时刻在这是记录，不是"要去做"的信号）；
  * 逾期：danger 字 + danger 10% 底（Rust `with_alpha(th.danger, 26)`）。 */
-.qp-todo-time[data-state="done"],
-.qp-todo-time[data-state="later"] {
+.at-todo-time[data-state="done"],
+.at-todo-time[data-state="later"] {
   background: transparent;
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
 }
 
-.qp-todo-time[data-state="overdue"] {
-  background: color-mix(in srgb, var(--qp-danger) 10%, transparent);
-  color: var(--qp-danger);
+.at-todo-time[data-state="overdue"] {
+  background: color-mix(in srgb, var(--at-danger) 10%, transparent);
+  color: var(--at-danger);
 }
 
-/* 底部渐隐（01 §4.3 的 .qp-fade-bottom）：只在"还能往下滚"时出现，
+/* 底部渐隐（01 §4.3 的 .at-fade-bottom）：只在"还能往下滚"时出现，
  * 判据是 scrollTop+clientHeight < scrollHeight−1（02 §4.2 #2）——由 hook 算，不靠 CSS。
  * 16px 而不是 20：16 只盖住一行的下半，20 会把最后一行的字形压掉；
  * `margin-right` 让出 6px 滚动条槽 —— 不挡的话渐隐会横着压过右轨，把数字列末端糊掉
- * （列表用 `qp-scroll-region-stable`，那条 6px 是常驻的，不是只有溢出时才有）。
+ * （列表用 `at-scroll-region-stable`，那条 6px 是常驻的，不是只有溢出时才有）。
  *
  * `flex: 0 0 auto` 不是可选的：这块靠 `margin-top: -16` 把占位抵成 0，若它还能被 flex 压缩
  * （默认 flex-shrink: 1），列表会把它压到 10.31，净占位变成 −5.69，**列表反而多出 5.69**
  * （实测长档 clientHeight 204 而非 198、末行被 `overflow: hidden` 咬掉 6px）。
  * 负 margin + 可压缩高度这个组合必须靠 flex-shrink: 0 收口。 */
-.qp-fade-bottom {
+.at-fade-bottom {
   position: sticky;
   bottom: 0;
   flex: 0 0 auto;
   height: 16px;
   margin-top: -16px;
-  margin-right: var(--qp-scrollbar-size);
-  background: linear-gradient(to top, var(--qp-bg-panel), transparent);
+  margin-right: var(--at-scrollbar-size);
+  background: linear-gradient(to top, var(--at-bg-panel), transparent);
   pointer-events: none;
 }
 
@@ -240,29 +240,29 @@
  * [本轮] 新建入口搬去卡头**下方**一条通栏窄行（`ModuleShell` 的 `subhead` 槽，
  * 四态常驻；上一版的 `headAction` 右槽已整段删除，`subhead` 是卡头之后的独立一行），
  * 卡底那 32 高的 footer 条下线，
- * 所以让位量回到卡片自己的底部内距：`--qp-card-pad-b`（16）+ 8px 间隙。原来为了不压住
- * footer 按钮而写的 `--qp-card-foot-h` 已经没有对应的实体（`--qp-card-foot-h` 仍被应用卡
- * 的 `.qp-card-footer` 使用，不能删）。两者差 16px：留着旧值撤销条会悬空。 */
-.qp-undo-bar {
+ * 所以让位量回到卡片自己的底部内距：`--at-card-pad-b`（16）+ 8px 间隙。原来为了不压住
+ * footer 按钮而写的 `--at-card-foot-h` 已经没有对应的实体（`--at-card-foot-h` 仍被应用卡
+ * 的 `.at-card-footer` 使用，不能删）。两者差 16px：留着旧值撤销条会悬空。 */
+.at-undo-bar {
   position: absolute;
-  right: var(--qp-card-pad);
-  bottom: calc(var(--qp-card-pad-b) + 8px);
-  left: var(--qp-card-pad);
+  right: var(--at-card-pad);
+  bottom: calc(var(--at-card-pad-b) + 8px);
+  left: var(--at-card-pad);
   display: flex;
   align-items: center;
   gap: 8px;
   height: 34px;
   padding: 0 10px;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-control);
-  background: var(--qp-bg-elevated);
-  box-shadow: var(--qp-shadow-overlay);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-secondary);
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
+  background: var(--at-bg-elevated);
+  box-shadow: var(--at-shadow-overlay);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
 }
 
-.qp-undo-text {
+.at-undo-text {
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -272,20 +272,20 @@
 
 /* 撤销键是**普通文字 + 主文本色**，不是强调色加粗：撤销条是一条状态提示（role=status），
  * 不是需要抢注意力的主操作；强调色留给真正的主按钮（FW-6 的"每屏一个强调色元素"就靠这个）。 */
-.qp-undo-btn {
+.at-undo-btn {
   flex: 0 0 auto;
   padding: 0 4px;
   border: 0;
   background: none;
-  font-size: var(--qp-font-size-caption);
-  font-weight: var(--qp-font-weight-regular);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-primary);
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-regular);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-primary);
   cursor: default;
 }
 
-.qp-undo-btn:focus-visible {
-  outline: 2px solid var(--qp-focus-ring);
+.at-undo-btn:focus-visible {
+  outline: 2px solid var(--at-focus-ring);
   outline-offset: 2px;
-  border-radius: var(--qp-radius-button);
+  border-radius: var(--at-radius-button);
 }

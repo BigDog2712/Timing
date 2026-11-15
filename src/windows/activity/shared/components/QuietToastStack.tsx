@@ -12,7 +12,7 @@ export default function QuietToastStack({ toasts }: Props) {
       className="pointer-events-none fixed right-4 top-4 md:right-6 md:top-6 z-[80] flex w-[320px] max-w-[calc(100vw-2rem)] flex-col gap-2"
     >
       {toasts.map((toast) => (
-        <div key={toast.id} className="qp-toast-entry">
+        <div key={toast.id} className="at-toast-entry">
           <QuietToast message={toast.message} tone={toast.tone} />
         </div>
       ))}

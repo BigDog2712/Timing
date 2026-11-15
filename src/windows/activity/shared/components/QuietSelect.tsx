@@ -374,7 +374,7 @@ export default function QuietSelect<T extends string | number>({
       aria-labelledby={`${listboxId}-trigger`}
       aria-activedescendant={highlightedIndex >= 0 ? `${listboxId}-option-${highlightedIndex}` : undefined}
       onKeyDown={handleListKeyDown}
-      className={`qp-select-menu qp-scroll-region qp-select-menu-${menuPosition?.placement ?? "bottom"} qp-select-menu-density-${density}`}
+      className={`at-select-menu at-scroll-region at-select-menu-${menuPosition?.placement ?? "bottom"} at-select-menu-density-${density}`}
       style={menuStyle}
     >
       {options.map((option, index) => {
@@ -396,7 +396,7 @@ export default function QuietSelect<T extends string | number>({
                 onChange(option.value);
                 closeMenu(true);
               }}
-              className={`qp-select-option ${selected ? "qp-select-option-selected" : ""} ${highlighted ? "qp-select-option-highlighted" : ""}`}
+              className={`at-select-option ${selected ? "at-select-option-selected" : ""} ${highlighted ? "at-select-option-highlighted" : ""}`}
             >
               {option.label}
             </button>
@@ -409,7 +409,7 @@ export default function QuietSelect<T extends string | number>({
   return (
     <div
       ref={rootRef}
-      className={`qp-select-root qp-select-root-${density} ${className ?? ""}`}
+      className={`at-select-root at-select-root-${density} ${className ?? ""}`}
     >
       <button
         ref={triggerRef}
@@ -429,19 +429,19 @@ export default function QuietSelect<T extends string | number>({
           }
         }}
         onKeyDown={handleKeyDown}
-        className={`qp-control qp-select-trigger qp-select-trigger-${density}`}
+        className={`at-control at-select-trigger at-select-trigger-${density}`}
       >
-        {displayLabel ? <span className="qp-select-label-stack" aria-hidden="true"><span className="qp-select-label qp-select-label-current">{displayLabel}</span></span> : <span className="qp-select-label-stack" aria-hidden="true">
+        {displayLabel ? <span className="at-select-label-stack" aria-hidden="true"><span className="at-select-label at-select-label-current">{displayLabel}</span></span> : <span className="at-select-label-stack" aria-hidden="true">
           {options.map((option) => (
             <span
               key={String(option.value)}
-              className={`qp-select-label ${option.value === value ? "qp-select-label-current" : ""}`}
+              className={`at-select-label ${option.value === value ? "at-select-label-current" : ""}`}
             >
               {option.label}
             </span>
           ))}
         </span>}
-        <ChevronDown size={14} className={`qp-select-caret ${open ? "qp-select-caret-open" : ""}`} />
+        <ChevronDown size={14} className={`at-select-caret ${open ? "at-select-caret-open" : ""}`} />
       </button>
       {menu ? createPortal(menu, document.body) : null}
     </div>

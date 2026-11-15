@@ -18,9 +18,9 @@ const QuietBadge = forwardRef<HTMLSpanElement, Props>(function QuietBadge({
   className = "",
   ...spanProps
 }, ref) {
-  const variantClass = variant === "beta" ? " qp-badge-beta" : "";
+  const variantClass = variant === "beta" ? " at-badge-beta" : "";
   return (
-    <span {...spanProps} ref={ref} className={`qp-badge qp-badge-${tone} qp-badge-${size}${variantClass} ${className}`.trim()}>
+    <span {...spanProps} ref={ref} className={`at-badge at-badge-${tone} at-badge-${size}${variantClass} ${className}`.trim()}>
       {children}
     </span>
   );

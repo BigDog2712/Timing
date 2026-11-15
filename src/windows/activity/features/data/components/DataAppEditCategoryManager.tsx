@@ -20,7 +20,7 @@ import type { AppEditCategoryOption } from "../hooks/useAppEditDialog.ts";
  *   · **删的边界**：内置与自定义都能删，唯独「未分类」不能（`other` 是所有回落的目标，
  *     判据 `isDeletableCategory` 与写库 builder 同源）。
  * 所以这里自己排行，但**复用同一批原子件**（`QuietColorField` 取色、
- * `QuietIconAction` 图标键、`qp-category-management-grid` 那套版式类），
+ * `QuietIconAction` 图标键、`at-category-management-grid` 那套版式类），
  * 外观与映射页的分类面板一致，不新造一套视觉。
  *
  * ## [本轮] 「新建」从 `prompt` 换成一行表单：名字与颜色一起收
@@ -97,9 +97,9 @@ export default function DataAppEditCategoryManager({
   };
 
   return (
-    <section className="qp-app-edit-section" aria-label={labels.title}>
-      <div className="qp-app-edit-section-head">
-        <h4 className="qp-app-edit-section-title">{labels.title}</h4>
+    <section className="at-app-edit-section" aria-label={labels.title}>
+      <div className="at-app-edit-section-head">
+        <h4 className="at-app-edit-section-title">{labels.title}</h4>
       </div>
       <div className="data-category-create-row">
         <input
@@ -133,7 +133,7 @@ export default function DataAppEditCategoryManager({
         />
         <button
           type="button"
-          className="qp-link-btn qp-app-edit-row-action"
+          className="at-link-btn at-app-edit-row-action"
           disabled={!canCreate}
           onClick={submitCreate}
         >
@@ -142,15 +142,15 @@ export default function DataAppEditCategoryManager({
       </div>
       {/* 未选色的小字：没有它，色块里那个灰读起来就是"已经选好的灰" */}
       {colorUnset ? (
-        <p className="qp-app-edit-hint data-category-create-hint">{labels.createColorHint}</p>
+        <p className="at-app-edit-hint data-category-create-hint">{labels.createColorHint}</p>
       ) : null}
-      <div className="qp-category-management-grid">
+      <div className="at-category-management-grid">
         {options.map((option) => {
           const label = option.label;
           return (
             <div
               key={option.value}
-              className="rounded-[10px] border border-[var(--qp-border-subtle)] bg-[var(--qp-bg-panel)] px-3 py-2.5"
+              className="rounded-[10px] border border-[var(--at-border-subtle)] bg-[var(--at-bg-panel)] px-3 py-2.5"
               data-category={option.value}
             >
               <div className="flex items-center justify-between gap-2">
@@ -168,12 +168,12 @@ export default function DataAppEditCategoryManager({
                       onReset: () => onApplyColor(option.value, null),
                     }}
                   />
-                  <span className="min-w-0 truncate qp-text-body qp-weight-medium text-[var(--qp-text-primary)]">
+                  <span className="min-w-0 truncate at-text-body at-weight-medium text-[var(--at-text-primary)]">
                     {label}
                   </span>
                   <QuietIconAction
                     icon={<PencilLine size={13} />}
-                    className="qp-icon-action-dimmed"
+                    className="at-icon-action-dimmed"
                     disabled={disabled}
                     onClick={() => onRequestRename(option.value, label)}
                     title={UI_TEXT.mapping.renameCategory(label)}
@@ -181,7 +181,7 @@ export default function DataAppEditCategoryManager({
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                   {/* 查：用量读数是删除前的唯一判据，所以放在删除键旁边 */}
-                  <span className="qp-app-edit-usage">{labels.usage(usage[option.value] ?? 0)}</span>
+                  <span className="at-app-edit-usage">{labels.usage(usage[option.value] ?? 0)}</span>
                   {/* 删：内置分类与自定义分类都能删，唯一例外是「未分类」（`other` 是所有
                       回落的目标，判据在 `isDeletableCategory`，与写库 builder 同一入口） */}
                   {isDeletableCategory(option.value) ? (

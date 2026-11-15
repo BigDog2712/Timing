@@ -5,15 +5,15 @@ import { ANONYMOUS_ACTIVITY_BACKGROUND } from "../charts/AnonymousActivityPatter
 import type { TimelineAxisTick } from "../lib/timelineAxis.ts";
 
 type TimelineTrackStyle = CSSProperties & Partial<Record<
-  "--qp-timeline-segment-height",
+  "--at-timeline-segment-height",
   string
 >>;
 
 type TimelineSegmentStyle = CSSProperties & Record<
-  | "--qp-timeline-segment-pattern"
-  | "--qp-timeline-segment-left"
-  | "--qp-timeline-segment-width"
-  | "--qp-timeline-segment-color",
+  | "--at-timeline-segment-pattern"
+  | "--at-timeline-segment-left"
+  | "--at-timeline-segment-width"
+  | "--at-timeline-segment-color",
   string
 >;
 
@@ -63,16 +63,16 @@ export function QuietTimelineTrack({
   showAxis = true,
 }: QuietTimelineTrackProps) {
   return (
-    <div className={joinClasses("qp-timeline-canvas", className)}>
+    <div className={joinClasses("at-timeline-canvas", className)}>
       <div
-        className={joinClasses("qp-timeline-track", trackClassName)}
+        className={joinClasses("at-timeline-track", trackClassName)}
         style={trackStyle}
       >
         {children}
       </div>
       {showAxis && (
         <div
-          className={joinClasses("qp-timeline-axis", axisClassName)}
+          className={joinClasses("at-timeline-axis", axisClassName)}
           aria-hidden="true"
         >
           {axisTicks.map((tick) => (
@@ -104,10 +104,10 @@ export function QuietTimelineSegment({
 }: QuietTimelineSegmentProps) {
   const displayColor = useActivityDisplayColor();
   const style: TimelineSegmentStyle = {
-    "--qp-timeline-segment-pattern": anonymous ? ANONYMOUS_ACTIVITY_BACKGROUND : "none",
-    "--qp-timeline-segment-left": `${leftRatio * 100}%`,
-    "--qp-timeline-segment-width": `${Math.max(0, widthRatio) * 100}%`,
-    "--qp-timeline-segment-color": displayColor(color, "timeline"),
+    "--at-timeline-segment-pattern": anonymous ? ANONYMOUS_ACTIVITY_BACKGROUND : "none",
+    "--at-timeline-segment-left": `${leftRatio * 100}%`,
+    "--at-timeline-segment-width": `${Math.max(0, widthRatio) * 100}%`,
+    "--at-timeline-segment-color": displayColor(color, "timeline"),
   };
   /* 键盘可达：段是绝对定位的窄色块，鼠标点得中、Tab 也要能到。只在可点时挂。 */
   const handleKeyDown = onActivate === undefined
@@ -124,7 +124,7 @@ export function QuietTimelineSegment({
       placement="top"
       disabled={disabled}
       hideOnPointerDown={hideOnPointerDown}
-      className={joinClasses("qp-timeline-segment", className)}
+      className={joinClasses("at-timeline-segment", className)}
       tooltipClassName={tooltipClassName}
       style={style}
     >

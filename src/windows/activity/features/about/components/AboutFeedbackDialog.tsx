@@ -53,11 +53,11 @@ export default function AboutFeedbackDialog({
       title={copy.title}
       onClose={close}
       initialFocusRef={githubButtonRef}
-      surfaceClassName="about-feedback-dialog-surface qp-scroll-region"
+      surfaceClassName="about-feedback-dialog-surface at-scroll-region"
     >
       <button
         type="button"
-        className="qp-dialog-close-button about-feedback-dialog-close"
+        className="at-dialog-close-button about-feedback-dialog-close"
         aria-label={UI_TEXT.common.close}
         onClick={close}
       >
@@ -73,7 +73,7 @@ export default function AboutFeedbackDialog({
             <button
               ref={githubButtonRef}
               type="button"
-              className="qp-button-secondary about-feedback-github-action"
+              className="at-button-secondary about-feedback-github-action"
               disabled={openingGitHub}
               aria-busy={openingGitHub}
               aria-label={copy.githubAction}

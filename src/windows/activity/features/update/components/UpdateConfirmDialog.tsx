@@ -67,7 +67,7 @@ export default function UpdateConfirmDialog({
             ref={laterButtonRef}
             size="large"
             onClick={onClose}
-            className="qp-dialog-action"
+            className="at-dialog-action"
           >
             {UI_TEXT.update.later}
           </QuietButton>
@@ -77,7 +77,7 @@ export default function UpdateConfirmDialog({
               size="large"
               onClick={() => handleAction(viewModel.secondaryAction)}
               disabled={viewModel.secondaryAction.disabled}
-              className="qp-dialog-action"
+              className="at-dialog-action"
             >
               {viewModel.secondaryAction.label}
             </QuietButton>
@@ -89,7 +89,7 @@ export default function UpdateConfirmDialog({
               onClick={() => handleAction(viewModel.primaryAction)}
               disabled={installing || viewModel.primaryAction.disabled}
               busy={installing && viewModel.primaryAction.action === "open_confirm"}
-              className="qp-dialog-action"
+              className="at-dialog-action"
             >
               {installing && viewModel.primaryAction.action === "open_confirm"
                 ? UI_TEXT.update.processing
@@ -100,8 +100,8 @@ export default function UpdateConfirmDialog({
       )}
     >
       <div className="space-y-3">
-        <p className="qp-text-body qp-weight-emphasis text-[var(--qp-text-primary)]">{viewModel.versionCompareLabel}</p>
-        <p className="qp-text-body leading-relaxed text-[var(--qp-text-secondary)]">{viewModel.confirmDescription}</p>
+        <p className="at-text-body at-weight-emphasis text-[var(--at-text-primary)]">{viewModel.versionCompareLabel}</p>
+        <p className="at-text-body leading-relaxed text-[var(--at-text-secondary)]">{viewModel.confirmDescription}</p>
         {viewModel.progress ? (
           <UpdateProgressBar
             percent={viewModel.progress.percent}
@@ -111,10 +111,10 @@ export default function UpdateConfirmDialog({
           />
         ) : null}
         {viewModel.notesPreview ? (
-          <div className="qp-subpanel">
-            <p className="qp-text-caption qp-weight-emphasis text-[var(--qp-text-tertiary)]">{UI_TEXT.update.releaseNotes}</p>
+          <div className="at-subpanel">
+            <p className="at-text-caption at-weight-emphasis text-[var(--at-text-tertiary)]">{UI_TEXT.update.releaseNotes}</p>
             <p
-              className="mt-1 break-words qp-text-caption leading-relaxed text-[var(--qp-text-tertiary)]"
+              className="mt-1 break-words at-text-caption leading-relaxed text-[var(--at-text-tertiary)]"
               style={{
                 display: "-webkit-box",
                 WebkitLineClamp: 4,

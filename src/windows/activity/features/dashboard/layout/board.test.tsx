@@ -64,12 +64,12 @@ function mount() {
 }
 
 function frames(): HTMLElement[] {
-  return Array.from(container?.querySelectorAll<HTMLElement>(".qp-board-card") ?? []);
+  return Array.from(container?.querySelectorAll<HTMLElement>(".at-board-card") ?? []);
 }
 
 function toolbarButtons(): HTMLButtonElement[] {
   return Array.from(
-    container?.querySelectorAll<HTMLButtonElement>(".qp-page-toolbar .qp-link-btn") ?? [],
+    container?.querySelectorAll<HTMLButtonElement>(".at-page-toolbar .at-link-btn") ?? [],
   );
 }
 
@@ -132,11 +132,11 @@ describe("工具条三入口", () => {
 
   it("v14c_toolbar_uses_the_shared_page_toolbar_container", () => {
     mount();
-    const toolbar = container?.querySelector<HTMLElement>(".qp-page-toolbar");
+    const toolbar = container?.querySelector<HTMLElement>(".at-page-toolbar");
     expect(toolbar).not.toBeNull();
-    /* 修饰类保留 `qp-dashboard-toolbar`：位置（贴板子左上角）靠它，
-     * 几何与淡显靠 `.qp-page-toolbar`（设置页复用同一套）。 */
-    expect(toolbar?.classList.contains("qp-dashboard-toolbar")).toBe(true);
+    /* 修饰类保留 `at-dashboard-toolbar`：位置（贴板子左上角）靠它，
+     * 几何与淡显靠 `.at-page-toolbar`（设置页复用同一套）。 */
+    expect(toolbar?.classList.contains("at-dashboard-toolbar")).toBe(true);
   });
 
   it("v14c_lock_toggle_flips_label_and_store", () => {
@@ -165,13 +165,13 @@ describe("工具条三入口", () => {
 
   it("v14c_manage_entry_opens_the_layout_manager", () => {
     mount();
-    expect(container?.querySelector(".qp-layout-manager")).toBeNull();
+    expect(container?.querySelector(".at-layout-manager")).toBeNull();
     const manage = toolbarButtons().find((el) => el.matches("[data-toolbar-manage]"));
     if (!manage) throw new Error("工具条上没有布局管理键");
     act(() => {
       manage.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(container?.querySelector(".qp-layout-manager")).not.toBeNull();
+    expect(container?.querySelector(".at-layout-manager")).not.toBeNull();
     /* 内置的出厂条目永远在列表里（删不掉、是删当前布局的唯一落点） */
     expect(container?.querySelector('[data-layout-entry="factory"]')).not.toBeNull();
     expect(container?.textContent ?? "").toContain(copy.factoryLayoutName);

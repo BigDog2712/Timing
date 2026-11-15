@@ -86,13 +86,13 @@ export default function AppViewOutlet({
 
   return (
     <main
-      className="qp-canvas flex-1 min-h-0 flex flex-col gap-4 md:gap-5 p-4 md:p-5 relative overflow-hidden"
+      className="at-canvas flex-1 min-h-0 flex flex-col gap-4 md:gap-5 p-4 md:p-5 relative overflow-hidden"
       data-presented-view={outgoingView ?? displayedView}
       data-view-transition-state={transitionActive ? "handoff" : "settled"}
     >
       <Suspense
         fallback={
-          <div className="flex-1 min-h-0 flex items-center justify-center text-[var(--qp-text-tertiary)] text-sm">
+          <div className="flex-1 min-h-0 flex items-center justify-center text-[var(--at-text-tertiary)] text-sm">
             {uiText.app.loadingView}
           </div>
         }
@@ -101,7 +101,7 @@ export default function AppViewOutlet({
           key={displayedView}
           inert={transitionActive}
           aria-hidden={transitionActive || undefined}
-          className="qp-view-container flex-1 min-h-0 flex flex-col h-full overflow-hidden"
+          className="at-view-container flex-1 min-h-0 flex flex-col h-full overflow-hidden"
         >
           {/* [0.13 · 1.2「无数据时全黑 + 无法返回」] 边界只包**视图内容**：
               标题栏与顶栏在 `AppShell` 层（本组件之上），因此单页崩了还能换页 ——
@@ -115,7 +115,7 @@ export default function AppViewOutlet({
           <div
             key={outgoingView}
             aria-hidden="true"
-            className="qp-view-container qp-view-container-outgoing absolute inset-4 md:inset-5 z-10 flex min-h-0 flex-col overflow-hidden pointer-events-none"
+            className="at-view-container at-view-container-outgoing absolute inset-4 md:inset-5 z-10 flex min-h-0 flex-col overflow-hidden pointer-events-none"
           >
             {views[outgoingView]}
           </div>

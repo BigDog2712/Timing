@@ -95,12 +95,12 @@ export default function SettingsHandlesPanel({ id }: SettingsHandlesPanelProps) 
   };
 
   return (
-    <section className="qp-panel p-5 md:p-6" id={id}>
+    <section className="at-panel p-5 md:p-6" id={id}>
       <SettingsPanelHeader
-        icon={<MousePointerClick size={16} strokeWidth={STROKE} className="text-[var(--qp-accent-default)]" />}
+        icon={<MousePointerClick size={16} strokeWidth={STROKE} className="text-[var(--at-accent-default)]" />}
         title="悬浮条与手柄"
       />
-      <p className="mt-3 qp-text-caption text-[var(--qp-text-tertiary)]">
+      <p className="mt-3 at-text-caption text-[var(--at-text-tertiary)]">
         每个形态可以单独启用；同一形态里「左键 / 右键」是单击，「左双击 / 右双击」是同键双击。
         双击与单击落在同一颗键上时，单击要等一次双击判定窗才派发 —— 这是双击能生效的代价。
       </p>

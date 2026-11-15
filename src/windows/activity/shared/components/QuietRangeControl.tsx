@@ -36,7 +36,7 @@ const QuietRangeControl = forwardRef<HTMLButtonElement, QuietRangeControlProps>(
 }, ref) {
   return (
     <div
-      className={`qp-range-control ${className ?? ""}`.trim()}
+      className={`at-range-control ${className ?? ""}`.trim()}
       role="group"
       aria-label={ariaLabel}
     >
@@ -44,7 +44,7 @@ const QuietRangeControl = forwardRef<HTMLButtonElement, QuietRangeControlProps>(
         type="button"
         onClick={onPrevious}
         disabled={previousDisabled}
-        className="qp-control qp-range-control-arrow"
+        className="at-control at-range-control-arrow"
         aria-label={previousAriaLabel}
       >
         <ChevronLeft size={14} />
@@ -53,28 +53,28 @@ const QuietRangeControl = forwardRef<HTMLButtonElement, QuietRangeControlProps>(
         <button
           ref={ref}
           type="button"
-          className={`qp-status qp-range-control-label ${labelClassName ?? ""}`.trim()}
+          className={`at-status at-range-control-label ${labelClassName ?? ""}`.trim()}
           aria-label={labelAriaLabel}
           aria-expanded={expanded}
           aria-haspopup="dialog"
           aria-controls={labelControls}
           onClick={onLabelClick}
         >
-          <span className="qp-range-control-label-text">{label}</span>
+          <span className="at-range-control-label-text">{label}</span>
         </button>
       ) : (
         <span
-          className={`qp-status qp-range-control-label ${labelClassName ?? ""}`.trim()}
+          className={`at-status at-range-control-label ${labelClassName ?? ""}`.trim()}
           aria-label={labelAriaLabel}
         >
-          <span className="qp-range-control-label-text">{label}</span>
+          <span className="at-range-control-label-text">{label}</span>
         </span>
       )}
       <button
         type="button"
         onClick={onNext}
         disabled={nextDisabled}
-        className="qp-control qp-range-control-arrow"
+        className="at-control at-range-control-arrow"
         aria-label={nextAriaLabel}
       >
         <ChevronRight size={14} />

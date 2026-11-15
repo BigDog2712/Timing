@@ -152,8 +152,8 @@ describe("本机目录：三个目录行的回调各接各的", () => {
 describe("本机目录组的样式挂点（[复核修复]）", () => {
   it("spc05_the_group_carries_the_local_paths_panel_class_on_the_preference_group", () => {
     /* `settings.css` 里的
-         `.settings-local-paths-panel .qp-icon-action-neutral:hover:not(:disabled)`
-         `.settings-local-paths-panel .qp-icon-action-neutral:active:not(:disabled)`
+         `.settings-local-paths-panel .at-icon-action-neutral:hover:not(:disabled)`
+         `.settings-local-paths-panel .at-icon-action-neutral:active:not(:disabled)`
        两条规则靠这个 class 给三个目录行的图标键配 hover / 按下的背景与前景。
        本文件拆出来时这一处丢了 → 两条规则成了永不命中的孤岛，症状不是报错，是
        "图标键 hover 没反应"。判据按**渲染结果**断言（grep 源码证明不了 class 落在哪个元素上，
@@ -165,9 +165,9 @@ describe("本机目录组的样式挂点（[复核修复]）", () => {
       panel?.classList.contains("settings-preference-group"),
       "这个 class 必须挂在 SettingsPreferenceGroup 上（CSS 的两条规则是它的后代选择器）",
     ).toBe(true);
-    /* 规则要真能命中：目录行右侧的控制键必须就是 `.qp-icon-action-neutral` */
-    const action = panel?.querySelector(".settings-preference-control .qp-icon-action-neutral");
-    expect(action, "目录行里的图标键不是 .qp-icon-action-neutral，两条 CSS 规则仍然命中不了").not.toBeNull();
+    /* 规则要真能命中：目录行右侧的控制键必须就是 `.at-icon-action-neutral` */
+    const action = panel?.querySelector(".settings-preference-control .at-icon-action-neutral");
+    expect(action, "目录行里的图标键不是 .at-icon-action-neutral，两条 CSS 规则仍然命中不了").not.toBeNull();
   });
 });
 

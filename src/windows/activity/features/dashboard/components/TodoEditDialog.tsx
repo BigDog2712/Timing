@@ -114,21 +114,21 @@ export default function TodoEditDialog({ todo, onClose, update }: Props) {
     <QuietDialog
       open={todo !== null}
       title={copy.todoEditTitle}
-      surfaceClassName="qp-todo-dialog"
+      surfaceClassName="at-todo-dialog"
       initialFocusRef={nameRef}
       onClose={onClose}
       actions={(
         <>
           <button
             type="button"
-            className="qp-button qp-button-compact qp-button-secondary"
+            className="at-button at-button-compact at-button-secondary"
             onClick={onClose}
           >
             {UI_TEXT.dialog.cancel}
           </button>
           <button
             type="button"
-            className="qp-button qp-button-compact qp-button-primary"
+            className="at-button at-button-compact at-button-primary"
             disabled={busy || name.trim().length === 0}
             onClick={submit}
           >
@@ -138,18 +138,18 @@ export default function TodoEditDialog({ todo, onClose, update }: Props) {
       )}
     >
       <form
-        className="qp-todo-form"
+        className="at-todo-form"
         onSubmit={(event) => {
           event.preventDefault();
           submit();
         }}
       >
-        <div className="qp-todo-field">
-          <label className="qp-todo-field-label" htmlFor={nameId}>{copy.todoNameLabel}</label>
+        <div className="at-todo-field">
+          <label className="at-todo-field-label" htmlFor={nameId}>{copy.todoNameLabel}</label>
           <input
             id={nameId}
             ref={nameRef}
-            className="qp-input qp-todo-name-input"
+            className="at-input at-todo-name-input"
             value={name}
             maxLength={TODO_TITLE_MAX_CHARS}
             aria-label={copy.todoNameLabel}
@@ -167,13 +167,13 @@ export default function TodoEditDialog({ todo, onClose, update }: Props) {
           />
         </div>
 
-        <div className="qp-todo-field">
-          <label className="qp-todo-field-label" htmlFor={timeId}>{copy.todoTimeLabel}</label>
-          <div className="qp-todo-time-row">
+        <div className="at-todo-field">
+          <label className="at-todo-field-label" htmlFor={timeId}>{copy.todoTimeLabel}</label>
+          <div className="at-todo-time-row">
             <input
               id={timeId}
               type="datetime-local"
-              className="qp-input qp-todo-time-input"
+              className="at-input at-todo-time-input"
               value={timeLocal}
               aria-invalid={timeInvalid || undefined}
               onChange={(event) => {
@@ -185,7 +185,7 @@ export default function TodoEditDialog({ todo, onClose, update }: Props) {
             {hasTime ? (
               <button
                 type="button"
-                className="qp-button qp-button-compact qp-button-secondary"
+                className="at-button at-button-compact at-button-secondary"
                 onClick={() => {
                   /* 清空时间 = 不排期，连带取消提醒 */
                   setTimeLocal("");
@@ -199,7 +199,7 @@ export default function TodoEditDialog({ todo, onClose, update }: Props) {
           </div>
         </div>
 
-        <label className="qp-todo-remind">
+        <label className="at-todo-remind">
           <input
             type="checkbox"
             checked={remind}
@@ -213,12 +213,12 @@ export default function TodoEditDialog({ todo, onClose, update }: Props) {
         </label>
 
         {!hasTime ? (
-          <p className="qp-todo-hint">{copy.todoRemindNeedsTime}</p>
+          <p className="at-todo-hint">{copy.todoRemindNeedsTime}</p>
         ) : remind ? (
-          <p className="qp-todo-hint">{copy.todoRemindHint}</p>
+          <p className="at-todo-hint">{copy.todoRemindHint}</p>
         ) : null}
 
-        {issue ? <p className="qp-todo-issue" role="status">{issue}</p> : null}
+        {issue ? <p className="at-todo-issue" role="status">{issue}</p> : null}
       </form>
     </QuietDialog>
   );

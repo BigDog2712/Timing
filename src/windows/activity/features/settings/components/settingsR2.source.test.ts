@@ -4,7 +4,7 @@
  *     两页都有 `h1.sr-only`（无障碍名字不丢）。
  *   · V-4b（源码级）：设置的保存/取消仍渲染，且位于 `QuietPageToolbar` 容器内；
  *     `SettingsHeaderActions` 的 `QuietButton` 是 `compact`（不是被降级成
- *     `qp-link-btn`，也必须**不是**原来的 `large` —— 容器变窄了）。
+ *     `at-link-btn`，也必须**不是**原来的 `large` —— 容器变窄了）。
  *   · V-4c（运行时）：`SettingsGroupNav` 的高亮判定线**读自 CSS**（锚点的
  *     `scroll-margin-top`），不是第二个手抄常量 —— stub 成另一个值，高亮随之变；
  *     以及 `settings-handles.css` 里的值就是 18px（页头删除后的配套值，
@@ -61,7 +61,7 @@ describe("[T05] V-4b · 保存/取消进 QuietPageToolbar（源码级）", () =>
     const source = read("src/windows/activity/features/settings/components/SettingsHeaderActions.tsx");
     expect(source).not.toMatch(/size="large"/);
     expect(source.match(/size="compact"/g)?.length).toBe(2);
-    expect(source).not.toContain("qp-link-btn");
+    expect(source).not.toContain("at-link-btn");
   });
 });
 

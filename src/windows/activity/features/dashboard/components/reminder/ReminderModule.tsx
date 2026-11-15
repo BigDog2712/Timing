@@ -145,7 +145,7 @@ export default function ReminderModule({ controls, icons }: Props) {
       onRetry={reminders.retryLoad}
       controls={controls}
     >
-      <div className="tools-reminder-form tools-software-reminder-form qp-reminder-form">
+      <div className="tools-reminder-form tools-software-reminder-form at-reminder-form">
         <div className="tools-form-field">
           <span>{UI_TEXT.tools.activityReminderTargetLabel}</span>
           <ActivityReminderTargetPicker
@@ -196,7 +196,7 @@ export default function ReminderModule({ controls, icons }: Props) {
         <div className="tools-empty-state">{copy.reminderEmpty}</div>
       ) : (
         <div className="tools-reminder-list-frame">
-          <div className="tools-reminder-list qp-scroll-region qp-scroll-region-stable">
+          <div className="tools-reminder-list at-scroll-region at-scroll-region-stable">
             {reminders.ruleRows.map((row) => {
               const busy = reminders.busyAction !== null;
               const webCandidate = row.kind === "web"

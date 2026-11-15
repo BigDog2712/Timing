@@ -60,7 +60,7 @@ export default function SettingsFullBundleExportRow({ disabled = false }: { disa
       </SettingsPreferenceRow>
       {status ? (
         <p
-          className={`qp-text-caption ${failed ? "text-[var(--qp-danger)]" : "text-[var(--qp-text-tertiary)]"}`}
+          className={`at-text-caption ${failed ? "text-[var(--at-danger)]" : "text-[var(--at-text-tertiary)]"}`}
           role={failed ? "alert" : "status"}
         >
           {status}

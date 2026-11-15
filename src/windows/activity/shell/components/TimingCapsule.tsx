@@ -77,7 +77,7 @@ export default function TimingCapsule() {
 
   return (
     <section
-      className="app-titlebar-timing flex min-w-0 items-center gap-1.5 rounded-full border border-[var(--qp-border-subtle)] bg-[var(--qp-bg-panel)] py-0.5 pl-2 pr-1"
+      className="app-titlebar-timing flex min-w-0 items-center gap-1.5 rounded-full border border-[var(--at-border-subtle)] bg-[var(--at-bg-panel)] py-0.5 pl-2 pr-1"
       aria-label={copy.live}
       data-titlebar-timing-capsule={timer.status}
       data-titlebar-timing-item={name}
@@ -85,14 +85,14 @@ export default function TimingCapsule() {
     >
       <span
         className="h-1.5 w-1.5 shrink-0 rounded-full"
-        style={{ backgroundColor: "var(--qp-accent-default)", opacity: running ? 1 : 0.45 }}
+        style={{ backgroundColor: "var(--at-accent-default)", opacity: running ? 1 : 0.45 }}
         aria-hidden="true"
       />
-      <span className="max-w-[9rem] truncate text-[var(--qp-text-primary)]" title={name}>
+      <span className="max-w-[9rem] truncate text-[var(--at-text-primary)]" title={name}>
         {name}
       </span>
       <span
-        className="shrink-0 font-mono tabular-nums text-[var(--qp-text-primary)]"
+        className="shrink-0 font-mono tabular-nums text-[var(--at-text-primary)]"
         aria-label={`${copy.live} ${formatClock(timer.liveSec)}`}
       >
         {formatClock(timer.liveSec)}
@@ -102,7 +102,7 @@ export default function TimingCapsule() {
            窄宽档靠它省 75.3px 给名字列（topbar.css 的 max-width: 999.98px 块）。
            不要换成 :nth-child / :last-of-type —— 胶囊内部结构一改就静默失效且不会红。 */
         <span
-          className="shrink-0 font-mono tabular-nums text-[var(--qp-text-tertiary)]"
+          className="shrink-0 font-mono tabular-nums text-[var(--at-text-tertiary)]"
           data-titlebar-capsule-today=""
           aria-label={`${copy.today} ${formatClock(timer.todaySec)}`}
           title={`${copy.today} ${formatClock(timer.todaySec)}`}
@@ -112,7 +112,7 @@ export default function TimingCapsule() {
       )}
       <button
         type="button"
-        className="qp-cap-action"
+        className="at-cap-action"
         aria-label={running ? copy.pause : copy.resume}
         aria-busy={busy}
         data-titlebar-timing-action="toggle"
@@ -124,7 +124,7 @@ export default function TimingCapsule() {
       </button>
       <button
         type="button"
-        className="qp-cap-action"
+        className="at-cap-action"
         aria-label={copy.openPill}
         data-titlebar-timing-action="show-pill"
         onClick={() => send({ action: "show_pill" })}

@@ -97,24 +97,24 @@ export default function TimelineChildRows({ row }: Props) {
   );
 
   return (
-    <ul className="qp-timeline-children">
+    <ul className="at-timeline-children">
       {entries.map((entry) => {
         const range = copy.timelineRange(clockOf(entry.startMs), clockOf(entry.endMs));
         if (entry.kind === "gap") {
           return (
-            <li key={entry.key} className="qp-timeline-child" data-gap="">
-              <span className="qp-timeline-child-app">{copy.timelineUnmeasured(range)}</span>
+            <li key={entry.key} className="at-timeline-child" data-gap="">
+              <span className="at-timeline-child-app">{copy.timelineUnmeasured(range)}</span>
             </li>
           );
         }
         const label = categoryLabelOf(entry.categoryKey, UI_TEXT);
         const device = deviceLabels.get(entry.deviceId);
         return (
-          <li key={entry.key} className="qp-timeline-child" data-device={entry.deviceId || undefined}>
-            <span className="qp-timeline-child-app" title={entry.appName}>{entry.appName}</span>
-            {label ? <span className="qp-timeline-child-category">{label}</span> : null}
-            {device ? <span className="qp-timeline-child-device" title={entry.deviceId}>{device}</span> : null}
-            <span className="qp-timeline-child-range">{range}</span>
+          <li key={entry.key} className="at-timeline-child" data-device={entry.deviceId || undefined}>
+            <span className="at-timeline-child-app" title={entry.appName}>{entry.appName}</span>
+            {label ? <span className="at-timeline-child-category">{label}</span> : null}
+            {device ? <span className="at-timeline-child-device" title={entry.deviceId}>{device}</span> : null}
+            <span className="at-timeline-child-range">{range}</span>
           </li>
         );
       })}

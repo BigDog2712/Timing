@@ -36,29 +36,29 @@
    卡自身几何仍在 dashboard.css 与 tiers.css，本文件不改一个像素。 */
 @import "./styles/features/dashboard-layout.css";
 /* [本轮] 时间线卡底的两个写入口（新建事项 / 编辑事项）与它们的弹层。
-   紧跟 layout：只新增 `.qp-timeline-manage*` 一族，不覆盖上面的 `.qp-timeline-*`。 */
+   紧跟 layout：只新增 `.at-timeline-manage*` 一族，不覆盖上面的 `.at-timeline-*`。 */
 @import "./styles/features/dashboard-timeline-manage.css";
 @import "./styles/features/dashboard-modules.css";
-/* [0.12.1] 应用排行卡（`.qp-app-*`）从 modules 拆出来单独成文件（那张表顶穿了 300 行）。
-   必须紧跟 modules：它只覆盖 `.qp-app-*` 一族，与 `dashboard-todos.css` 同一层级口径。 */
+/* [0.12.1] 应用排行卡（`.at-app-*`）从 modules 拆出来单独成文件（那张表顶穿了 300 行）。
+   必须紧跟 modules：它只覆盖 `.at-app-*` 一族，与 `dashboard-todos.css` 同一层级口径。 */
 @import "./styles/features/dashboard-apps.css";
 /* [v3.1 卡内自适应] 容器查询锚点 + 计时卡在小尺寸下的环收缩 / 读数滚动。
- * 必须在 modules 之后：它覆盖 `.qp-donut-body` / `.qp-donut` / `.qp-readouts` 的既有值。 */
+ * 必须在 modules 之后：它覆盖 `.at-donut-body` / `.at-donut` / `.at-readouts` 的既有值。 */
 @import "./styles/features/dashboard-card-fit.css";
 @import "./styles/features/dashboard-todos-compose.css";
 @import "./styles/features/dashboard-todos.css";
 @import "./styles/features/dashboard-notes.css";
 /* [A 批 · 0.12.x] 卡头控件（⋯ 菜单 + grip）与手柄显形。dnd.css 只新增
- * .qp-card-more / .qp-card-menu-* / .qp-card-grip，不覆盖既有规则，
+ * .at-card-more / .at-card-menu-* / .at-card-grip，不覆盖既有规则，
  * 放这里是为了让「控件层最后加载」一眼可见。 */
 @import "./styles/features/dashboard-dnd.css";
 /* [v3 自由摆位] 画布 / 卡框 / 三根手柄 / 加卡弹层补丁。**必须排在 dnd.css 之后**：
- * 它给 `.qp-card-more` 补了「便利贴卡 hover 也显形」这一条，前加载会被 dnd 的
+ * 它给 `.at-card-more` 补了「便利贴卡 hover 也显形」这一条，前加载会被 dnd 的
  * `opacity: 0` 规则按同权重后置覆盖（顺序错了的表现：便利贴上的 ⋯ 永远看不见）。 */
 @import "./styles/features/dashboard-board.css";
 /* [v3.1 缩放] 滚动归属 + 百分比徽标。**必须排在 dashboard-board.css 之后**：
- * 它把 `.qp-board-scroll` 的 overflow 从「只纵向」改成「两个方向」，并给
- * `.qp-main-view` 补 `min-height: 0`（dashboard.css 的 min-height 会让画布滚不动）。 */
+ * 它把 `.at-board-scroll` 的 overflow 从「只纵向」改成「两个方向」，并给
+ * `.at-main-view` 补 `min-height: 0`（dashboard.css 的 min-height 会让画布滚不动）。 */
 @import "./styles/features/dashboard-board-zoom.css";
 @import "./styles/features/dashboard-trend.css";
 /* [v3.1 热力图] 周一→周日 × 24 小时的格子。图例用容器查询取舍，
@@ -72,7 +72,7 @@
 @import "./styles/features/timing-lane.css";
 @import "./styles/features/history-range.css";
 @import "./styles/features/history-range-timeline.css";
-/* [P2 设备维度] 设备色令牌 --qp-device-0..7（浅/深两套）+ chip/图例版式。
+/* [P2 设备维度] 设备色令牌 --at-device-0..7（浅/深两套）+ chip/图例版式。
    单开一份是为了不动 tokens.css 的 298/298 冻结线，理由见该文件头注释。 */
 @import "./styles/features/device-lanes.css";
 @import "./styles/features/data.css";
@@ -87,7 +87,7 @@
 @import "./styles/topbar.css";
 @import "./styles/topbar-keys.css";
 /* [0.13 · 主界面第二轮改造] 本轮**新增**的选择器（页级工具条容器 / 错误兜底面板 /
-   锁定态 / 布局管理弹层）。排在最后：它含 `.qp-page-toolbar` 一族，而这一族是从
+   锁定态 / 布局管理弹层）。排在最后：它含 `.at-page-toolbar` 一族，而这一族是从
    `dashboard-layout.css` 搬出来的（原文件那块已删），需要盖住任何残留的同名规则。 */
 @import "./styles/features/dashboard-r2.css";
 /* [0.13 · T03a/T03b] 卡面侧的新选择器（时间线行三列 / 改起止弹层 / 待办批量表单），

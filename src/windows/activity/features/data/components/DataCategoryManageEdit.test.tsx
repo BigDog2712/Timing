@@ -111,12 +111,12 @@ describe("③ 改名 / 改色 / 删除", () => {
   it("cm10_reset_color_writes_a_null_override_not_an_empty_string", async () => {
     await mount(root!, createElement(DataCategoryManageDialog, { open: true, onClose: () => undefined }));
     const trigger = manageDialog()?.querySelector<HTMLButtonElement>(
-      `[data-category="${CUSTOM}"] .qp-color-trigger`,
+      `[data-category="${CUSTOM}"] .at-color-trigger`,
     );
     expect(trigger, "分类行没有色块").not.toBeNull();
     await act(async () => { trigger?.click(); });
     await act(async () => { await Promise.resolve(); });
-    const reset = document.body.querySelector<HTMLButtonElement>(".qp-color-popover-actions button");
+    const reset = document.body.querySelector<HTMLButtonElement>(".at-color-popover-actions button");
     expect(reset, "色块弹层里没有「恢复默认颜色」").not.toBeNull();
     await act(async () => { reset?.click(); });
     await act(async () => { await Promise.resolve(); });
@@ -144,7 +144,7 @@ describe("③ 改名 / 改色 / 删除", () => {
     await act(async () => { deleteButton(CUSTOM)?.click(); });
     await act(async () => { await Promise.resolve(); });
     /* 确认框里必须先说清影响面：用量 + "应用会回到「未分类」"（界面上的分类名就是这个） */
-    const surfaces = Array.from(document.body.querySelectorAll<HTMLElement>(".qp-dialog-surface"));
+    const surfaces = Array.from(document.body.querySelectorAll<HTMLElement>(".at-dialog-surface"));
     const confirmSurface = surfaces[surfaces.length - 1];
     expect(confirmSurface?.textContent, "删除确认里没有影响面").toContain("回到「未分类」");
     expect(confirmSurface?.textContent).toContain("1 个在用");
@@ -177,7 +177,7 @@ describe("③ 改名 / 改色 / 删除", () => {
     await mount(root!, createElement(DataCategoryManageDialog, { open: true, onClose: () => undefined }));
     await act(async () => { deleteButton("design")?.click(); });
     await act(async () => { await Promise.resolve(); });
-    const surfaces = Array.from(document.body.querySelectorAll<HTMLElement>(".qp-dialog-surface"));
+    const surfaces = Array.from(document.body.querySelectorAll<HTMLElement>(".at-dialog-surface"));
     expect(surfaces[surfaces.length - 1]?.textContent, "删除确认里没有影响面").toContain("回到「未分类」");
 
     await act(async () => { confirmButton()?.click(); });

@@ -210,10 +210,10 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
   }, [onContentCommitted]);
 
   return (
-    <div className="qp-panel p-5 data-app-panel relative">
+    <div className="at-panel p-5 data-app-panel relative">
       <div className="data-app-panel-header">
         <div className="data-app-panel-heading">
-          <h3 className="qp-weight-emphasis text-[var(--qp-text-primary)] qp-text-section-title">
+          <h3 className="at-weight-emphasis text-[var(--at-text-primary)] at-text-section-title">
             {title}
           </h3>
           {modeOptions.length > 1 ? (
@@ -298,7 +298,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
               <span>{UI_TEXT.common.refreshFailed}</span>
               <button
                 type="button"
-                className="qp-inline-action qp-inline-action-accent"
+                className="at-inline-action at-inline-action-accent"
                 onClick={handleRetry}
               >
                 {UI_TEXT.common.retry}
@@ -321,7 +321,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
       {errorMessage ? (
         <div className="data-app-loading data-web-error" role="status">
           <span>{errorMessage}</span>
-          <button type="button" className="qp-control" onClick={handleRetry}>
+          <button type="button" className="at-control" onClick={handleRetry}>
             {UI_TEXT.common.retry}
           </button>
         </div>
@@ -332,7 +332,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
           loadingLabel={UI_TEXT.common.loading}
         />
       ) : filteredOptions.length === 0 && !hasSearchQuery ? (
-        <div className="data-app-loading text-[var(--qp-text-tertiary)] qp-text-caption" role="status">
+        <div className="data-app-loading text-[var(--at-text-tertiary)] at-text-caption" role="status">
           {emptyLabel}
         </div>
       ) : (
@@ -356,12 +356,12 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
             <div
               key={hasSearchQuery ? "searching" : "all"}
               ref={listRef}
-              className="data-app-list data-app-trend-list qp-scroll-region"
+              className="data-app-list data-app-trend-list at-scroll-region"
               aria-label={listAriaLabel}
               aria-description={interactionHint}
             >
               {filteredOptions.length === 0 ? (
-                <div className="data-app-empty text-[var(--qp-text-tertiary)] qp-text-caption">
+                <div className="data-app-empty text-[var(--at-text-tertiary)] at-text-caption">
                   {noMatchLabel}
                 </div>
               ) : filteredOptions.map((option) => {

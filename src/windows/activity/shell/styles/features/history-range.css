@@ -24,7 +24,7 @@
 .history-range-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--qp-card-gap, 16px);
+  gap: var(--at-card-gap, 16px);
   align-content: start;
 }
 
@@ -38,13 +38,13 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: var(--qp-font-size-body);
-  line-height: var(--qp-line-height-body);
-  color: var(--qp-text-secondary);
+  font-size: var(--at-font-size-body);
+  line-height: var(--at-line-height-body);
+  color: var(--at-text-secondary);
 }
 
 .history-range-refresh-error {
-  margin-bottom: var(--qp-card-gap, 16px);
+  margin-bottom: var(--at-card-gap, 16px);
 }
 
 /* ---- 四格摘要 ---- */
@@ -63,10 +63,10 @@
 
 
 .history-range-summary-metric-value {
-  font-size: var(--qp-font-size-page-title);
-  line-height: var(--qp-line-height-page-title);
-  font-weight: var(--qp-font-weight-emphasis);
-  color: var(--qp-text-primary);
+  font-size: var(--at-font-size-page-title);
+  line-height: var(--at-line-height-page-title);
+  font-weight: var(--at-font-weight-emphasis);
+  color: var(--at-text-primary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -74,7 +74,7 @@
 .history-range-daily {
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px solid var(--qp-border-subtle);
+  border-top: 1px solid var(--at-border-subtle);
 }
 
 .history-range-daily-head {
@@ -88,9 +88,9 @@
 /* 三级灰小字：摘要格标签与逐日提示语 */
 .history-range-summary-metric-label,
 .history-range-daily-hint {
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-tertiary);
 }
 
 .history-range-daily-bars {
@@ -119,7 +119,7 @@
   height: 64px;
   align-items: flex-end;
   border-radius: 3px;
-  background: var(--qp-chart-track);
+  background: var(--at-chart-track);
   overflow: hidden;
 }
 
@@ -127,20 +127,20 @@
   display: block;
   width: 100%;
   border-radius: 3px;
-  background: var(--qp-accent-default);
-  transition: height var(--qp-motion-base) var(--qp-motion-ease);
+  background: var(--at-accent-default);
+  transition: height var(--at-motion-base) var(--at-motion-ease);
 }
 
 .history-range-daily-bar[data-empty="true"] .history-range-daily-bar-fill {
-  background: var(--qp-border-subtle);
+  background: var(--at-border-subtle);
 }
 
 .history-range-daily-bar:hover .history-range-daily-bar-fill {
-  background: var(--qp-accent-strong, var(--qp-accent-default));
+  background: var(--at-accent-strong, var(--at-accent-default));
 }
 
 .history-range-daily-bar:focus-visible {
-  outline: 2px solid var(--qp-accent-default);
+  outline: 2px solid var(--at-accent-default);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -159,19 +159,19 @@
 .history-range-daily-title,
 .history-range-card-title {
   margin: 0;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  font-weight: var(--qp-font-weight-medium);
-  color: var(--qp-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  font-weight: var(--at-font-weight-medium);
+  color: var(--at-text-secondary);
 }
 
 
 .history-range-empty {
   margin: 0;
   padding: 12px 0;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-tertiary);
 }
 
 /* ---- 排行榜 ---- */
@@ -202,10 +202,10 @@
 
 .history-range-rank-name {
   overflow: hidden;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  font-weight: var(--qp-font-weight-medium);
-  color: var(--qp-text-primary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  font-weight: var(--at-font-weight-medium);
+  color: var(--at-text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -214,7 +214,7 @@
   display: block;
   height: 6px;
   border-radius: 999px;
-  background: var(--qp-chart-track);
+  background: var(--at-chart-track);
   overflow: hidden;
 }
 
@@ -222,7 +222,7 @@
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: var(--qp-accent-default);
+  background: var(--at-accent-default);
 }
 
 /* 三处"次要小字"共用一套度量：柱标签 / 卡头计数 / 排行数值。
@@ -230,9 +230,9 @@
 .history-range-daily-bar-label,
 .history-range-card-meta,
 .history-range-rank-value {
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-tertiary);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -245,7 +245,7 @@
 .history-range-records {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--qp-card-gap, 16px);
+  gap: var(--at-card-gap, 16px);
 }
 
 .history-range-record-block {
@@ -275,9 +275,9 @@
 
 .history-range-record-text {
   overflow: hidden;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-primary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-primary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -286,9 +286,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-tertiary);
 }
 
 .history-range-record-time {

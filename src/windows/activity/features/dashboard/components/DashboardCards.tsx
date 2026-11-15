@@ -114,12 +114,12 @@ export function buildCardBody(card: BoardCard, label: string, props: CardProps):
 export function CardPlaceholder({ card, controls }: { card: BoardCard; controls: ReactNode }) {
   const copy = DASHBOARD_COPY[useLocale()];
   return (
-    <section className="qp-card qp-card-placeholder" data-card={card.kind}>
-      <div className="qp-card-head">
-        <h2 className="qp-card-title">{copy.cardLabels[card.kind] ?? card.kind}</h2>
-        <span className="qp-card-head-right">{controls}</span>
+    <section className="at-card at-card-placeholder" data-card={card.kind}>
+      <div className="at-card-head">
+        <h2 className="at-card-title">{copy.cardLabels[card.kind] ?? card.kind}</h2>
+        <span className="at-card-head-right">{controls}</span>
       </div>
-      <p className="qp-empty">这张卡还没做。布局已经记住它的位置与尺寸，实现后会自动出现在这里。</p>
+      <p className="at-empty">这张卡还没做。布局已经记住它的位置与尺寸，实现后会自动出现在这里。</p>
     </section>
   );
 }

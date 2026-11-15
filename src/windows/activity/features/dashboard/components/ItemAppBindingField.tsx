@@ -57,20 +57,20 @@ export default function ItemAppBindingField({ itemId, enabled }: Props) {
   if (itemId === null) return null;
 
   return (
-    <div className="qp-item-app-binding">
-      <p className="qp-item-app-binding-hint">
-        <span className="qp-item-app-binding-title">{copy.boundAppsTitle}</span>
+    <div className="at-item-app-binding">
+      <p className="at-item-app-binding-hint">
+        <span className="at-item-app-binding-title">{copy.boundAppsTitle}</span>
         {" "}
         {copy.boundAppsHint}
       </p>
-      <ul className="qp-timeline-edit-list" aria-label={copy.boundAppsTitle}>
+      <ul className="at-timeline-edit-list" aria-label={copy.boundAppsTitle}>
         {state.bound.map((row) => (
           <li key={row.exeName}>
-            <div className="qp-timeline-edit-choice">
-              <span className="qp-timeline-edit-name" title={row.appName}>{row.appName}</span>
+            <div className="at-timeline-edit-choice">
+              <span className="at-timeline-edit-name" title={row.appName}>{row.appName}</span>
               <button
                 type="button"
-                className="qp-link-btn qp-timeline-item-action"
+                className="at-link-btn at-timeline-item-action"
                 aria-label={`${copy.unbindApp} ${row.appName}`}
                 onClick={() => state.unbind(row.exeName)}
               >
@@ -79,12 +79,12 @@ export default function ItemAppBindingField({ itemId, enabled }: Props) {
             </div>
           </li>
         ))}
-        {state.loading ? <li className="qp-empty">{UI_TEXT.common.loading}</li> : null}
+        {state.loading ? <li className="at-empty">{UI_TEXT.common.loading}</li> : null}
         {!state.loading && state.bound.length === 0 ? (
-          <li className="qp-empty">{copy.boundAppsEmpty}</li>
+          <li className="at-empty">{copy.boundAppsEmpty}</li>
         ) : null}
       </ul>
-      <div className="qp-timeline-item-editor">
+      <div className="at-timeline-item-editor">
         <QuietSelect
           value=""
           options={options}
@@ -94,17 +94,17 @@ export default function ItemAppBindingField({ itemId, enabled }: Props) {
           ariaLabel={copy.pickApp}
           density="compact"
           disabled={state.candidates.length === 0}
-          className="qp-item-app-binding-select"
+          className="at-item-app-binding-select"
         />
       </div>
       {state.candidates.length === 0 && !state.appsFailed && !state.loading ? (
-        <p className="qp-item-app-binding-hint">{copy.appsEmpty}</p>
+        <p className="at-item-app-binding-hint">{copy.appsEmpty}</p>
       ) : null}
       {state.appsFailed ? (
-        <p className="qp-timeline-manage-issue" role="status">{copy.appsLoadFailed}</p>
+        <p className="at-timeline-manage-issue" role="status">{copy.appsLoadFailed}</p>
       ) : null}
       {state.saveFailed ? (
-        <p className="qp-timeline-manage-issue" role="status">{copy.saveFailed}</p>
+        <p className="at-timeline-manage-issue" role="status">{copy.saveFailed}</p>
       ) : null}
     </div>
   );

@@ -1041,9 +1041,9 @@ export default function Data({
       {/* [本轮 T05] 视觉页头下线（顶栏 tab 已声明位置），读屏的名字不丢 */}
       <h1 className="sr-only">{UI_TEXT.data.title}</h1>
 
-      <div className="data-page-scroll min-h-0 flex-1 overflow-y-auto pr-1 qp-scroll-region qp-scroll-region-stable">
+      <div className="data-page-scroll min-h-0 flex-1 overflow-y-auto pr-1 at-scroll-region at-scroll-region-stable">
         <div className="data-dashboard-grid">
-          <div className="qp-panel p-5 data-overview">
+          <div className="at-panel p-5 data-overview">
             <DataTrendPanel
               allTimeEndDateKey={allTimeEndDateKey}
               allTimeStartDateKey={allTimeStartDateKey}

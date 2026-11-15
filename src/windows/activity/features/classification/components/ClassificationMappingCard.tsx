@@ -60,7 +60,7 @@ export function IdentityText({ text, className }: { text: string; className: str
     return () => observer.disconnect();
   }, [text]);
   return (
-    <QuietTooltip label={text} disabled={!truncated} className="qp-app-identity-tooltip">
+    <QuietTooltip label={text} disabled={!truncated} className="at-app-identity-tooltip">
       <span ref={ref} className={className} tabIndex={truncated ? 0 : undefined}>{text}</span>
     </QuietTooltip>
   );
@@ -128,13 +128,13 @@ export default function ClassificationMappingCard({
     };
   }, []);
   return (
-    <div ref={rowRef} inert={inactive} aria-hidden={inactive || undefined} data-classification-app={!inactive && kind === "app" ? identity : undefined} data-classification-web={!inactive && kind === "web" ? identity : undefined} className="qp-app-mapping-row" role="group" aria-label={displayName}>
-      <div className="qp-app-mapping-identity">
-        <div className="qp-app-mapping-icon" style={{ boxShadow: `0 0 0 2px ${displayColor}22` }}>
+    <div ref={rowRef} inert={inactive} aria-hidden={inactive || undefined} data-classification-app={!inactive && kind === "app" ? identity : undefined} data-classification-web={!inactive && kind === "web" ? identity : undefined} className="at-app-mapping-row" role="group" aria-label={displayName}>
+      <div className="at-app-mapping-identity">
+        <div className="at-app-mapping-icon" style={{ boxShadow: `0 0 0 2px ${displayColor}22` }}>
           {icon ? <img src={icon} alt="" /> : fallbackIcon ?? <span>{(displayName || identity).slice(0, 1).toUpperCase()}</span>}
         </div>
-        <div className="qp-app-mapping-details">
-          <div className="qp-app-mapping-name-line">
+        <div className="at-app-mapping-details">
+          <div className="at-app-mapping-name-line">
             {isEditingName ? (
               <input
                 id={`${kind === "app" ? "app-name" : "web-domain-name"}-${identity}`}
@@ -157,34 +157,34 @@ export default function ClassificationMappingCard({
                     editButtonRef.current?.focus();
                   }
                 }}
-                className="qp-input qp-app-mapping-name-input"
+                className="at-input at-app-mapping-name-input"
               />
-            ) : <IdentityText text={displayName} className="qp-app-mapping-name" />}
+            ) : <IdentityText text={displayName} className="at-app-mapping-name" />}
             <QuietIconAction
               buttonRef={editButtonRef}
               icon={<PencilLine size={14} />}
-              className="qp-icon-action-dimmed"
+              className="at-icon-action-dimmed"
               title={editNameLabel}
               disabled={isBusy}
               onClick={onStartNameEdit}
             />
             {!trackingEnabled && !trackingMixed && <QuietBadge tone="warning">{UI_TEXT.mapping.noStats}</QuietBadge>}
           </div>
-          <div className="qp-app-mapping-exe-line">
-            {identityContent ?? <IdentityText text={identity} className="qp-app-mapping-exe" />}
+          <div className="at-app-mapping-exe-line">
+            {identityContent ?? <IdentityText text={identity} className="at-app-mapping-exe" />}
           </div>
         </div>
       </div>
-      <div className="qp-app-mapping-controls">
+      <div className="at-app-mapping-controls">
         <QuietSelect
           value={assignedCategory}
           ariaLabel={UI_TEXT.mapping.categorySelectLabel(displayName)}
           disabled={isBusy}
-          className="qp-app-mapping-category"
+          className="at-app-mapping-category"
           onChange={(value) => onCategoryAssign(String(value))}
           options={categoryOptions}
         />
-        <div className="qp-app-mapping-actions">
+        <div className="at-app-mapping-actions">
         <QuietColorField
           color={displayColor}
           format={colorFormat}
@@ -219,7 +219,7 @@ export default function ClassificationMappingCard({
             icon={<Trash2 size={16} />}
             title={deletionBlocked ? UI_TEXT.mapping.deletionPendingChanges : deleteRecordsLabel}
             tone="danger"
-            className="qp-app-mapping-delete"
+            className="at-app-mapping-delete"
             buttonRef={deleteButtonRef}
             disabled={isBusy || deletionBlocked}
             onClick={() => {

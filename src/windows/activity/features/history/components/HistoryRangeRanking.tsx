@@ -26,7 +26,7 @@ interface Props {
 
 export default function HistoryRangeRanking({ title, emptyLabel, rows, scope }: Props) {
   return (
-    <section className="qp-panel p-5 history-range-ranking" data-history-range-ranking={scope}>
+    <section className="at-panel p-5 history-range-ranking" data-history-range-ranking={scope}>
       <header className="history-range-card-head">
         <h3 className="history-range-card-title">{title}</h3>
         <span className="history-range-card-meta">{rows.length}</span>
@@ -34,7 +34,7 @@ export default function HistoryRangeRanking({ title, emptyLabel, rows, scope }: 
       {rows.length === 0 ? (
         <p className="history-range-empty">{emptyLabel}</p>
       ) : (
-        <ul className="history-range-rank-list qp-scroll-region">
+        <ul className="history-range-rank-list at-scroll-region">
           {rows.map((row) => (
             <li key={row.key} className="history-range-rank-row" data-history-range-rank-row>
               <span className="history-range-rank-name" title={row.name}>{row.name}</span>

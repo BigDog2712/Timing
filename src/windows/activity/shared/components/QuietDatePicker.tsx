@@ -196,7 +196,7 @@ export default function QuietDatePicker({
     if (
       activeElement instanceof HTMLElement
       && popoverRef.current?.contains(activeElement)
-      && !activeElement.classList.contains("qp-calendar-day")
+      && !activeElement.classList.contains("at-calendar-day")
     ) {
       return;
     }
@@ -226,7 +226,7 @@ export default function QuietDatePicker({
       id={dialogId}
       role="dialog"
       aria-label={resolvedAriaLabel}
-      className={`qp-calendar-popover qp-calendar-popover-${position.placement} qp-motion-popover-enter`}
+      className={`at-calendar-popover at-calendar-popover-${position.placement} at-motion-popover-enter`}
       style={popoverStyle}
     >
       <QuietCalendar
@@ -248,7 +248,7 @@ export default function QuietDatePicker({
   return (
     <div
       ref={rootRef}
-      className={`qp-date-picker ${dayNavigation ? "qp-date-picker-day-navigation" : ""}`.trim()}
+      className={`at-date-picker ${dayNavigation ? "at-date-picker-day-navigation" : ""}`.trim()}
     >
       {dayNavigation ? (
         <QuietRangeControl
@@ -266,8 +266,8 @@ export default function QuietDatePicker({
           onLabelClick={toggleCalendar}
           expanded={open}
           labelControls={open ? dialogId : undefined}
-          labelClassName={`qp-date-picker-range-trigger ${
-            open ? "qp-date-picker-range-trigger-open" : ""
+          labelClassName={`at-date-picker-range-trigger ${
+            open ? "at-date-picker-range-trigger-open" : ""
           } ${className ?? ""}`.trim()}
         />
       ) : (
@@ -280,7 +280,7 @@ export default function QuietDatePicker({
           aria-expanded={open}
           aria-controls={open ? dialogId : undefined}
           onClick={toggleCalendar}
-          className={`qp-input qp-date-picker-trigger ${open ? "qp-date-picker-trigger-open" : ""} ${
+          className={`at-input at-date-picker-trigger ${open ? "at-date-picker-trigger-open" : ""} ${
             className ?? ""
           }`.trim()}
         >

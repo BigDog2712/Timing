@@ -156,27 +156,27 @@ export default function HistoryActivityActionDialog({ target, onClose }: Props) 
           className="flex items-baseline justify-between gap-3"
           data-history-activity-app={target.exeName}
         >
-          <span className="qp-weight-emphasis text-[var(--qp-text-primary)]">{appName}</span>
-          <span className="font-mono tabular-nums text-[var(--qp-text-secondary)]">
+          <span className="at-weight-emphasis text-[var(--at-text-primary)]">{appName}</span>
+          <span className="font-mono tabular-nums text-[var(--at-text-secondary)]">
             {`${formatTime(target.startTimeMs, locale)} - ${formatTime(target.endTimeMs, locale)}`}
           </span>
         </div>
-        <div className="flex items-baseline justify-between gap-3 text-[var(--qp-text-tertiary)]">
+        <div className="flex items-baseline justify-between gap-3 text-[var(--at-text-tertiary)]">
           <span>{copy.duration}</span>
           <span className="tabular-nums">{formatDuration(durationMs)}</span>
         </div>
-        <p className="m-0 text-[var(--qp-text-secondary)]" data-history-activity-match={matchState}>
+        <p className="m-0 text-[var(--at-text-secondary)]" data-history-activity-match={matchState}>
           {matchHint}
         </p>
         {busy && (
           <div
-            className="mt-1 rounded-[var(--qp-radius-control)] border border-[var(--qp-border-subtle)] p-2"
+            className="mt-1 rounded-[var(--at-radius-control)] border border-[var(--at-border-subtle)] p-2"
             data-history-activity-busy="true"
           >
-            <p className="m-0 qp-weight-emphasis text-[var(--qp-text-primary)]">
+            <p className="m-0 at-weight-emphasis text-[var(--at-text-primary)]">
               {copy.busyTitle(runningName, formatClock(timer.liveSec))}
             </p>
-            <p className="m-0 mt-1 text-[var(--qp-text-tertiary)]">{copy.busyHint}</p>
+            <p className="m-0 mt-1 text-[var(--at-text-tertiary)]">{copy.busyHint}</p>
           </div>
         )}
       </div>

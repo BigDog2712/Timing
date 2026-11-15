@@ -65,13 +65,13 @@ function DataAppEditDialogSurface({
     <QuietDialog
       open
       title={(
-        <span className="qp-app-edit-heading">
-          {app.iconUrl ? <img className="qp-app-edit-icon" src={app.iconUrl} alt="" draggable={false} /> : null}
-          <span className="qp-app-edit-app-name">{app.displayName}</span>
-          <span className="qp-app-edit-kicker">{copy.title}</span>
+        <span className="at-app-edit-heading">
+          {app.iconUrl ? <img className="at-app-edit-icon" src={app.iconUrl} alt="" draggable={false} /> : null}
+          <span className="at-app-edit-app-name">{app.displayName}</span>
+          <span className="at-app-edit-kicker">{copy.title}</span>
         </span>
       )}
-      surfaceClassName="qp-app-edit-dialog"
+      surfaceClassName="at-app-edit-dialog"
       onClose={() => {
         if (!busy) onClose();
       }}
@@ -86,9 +86,9 @@ function DataAppEditDialogSurface({
         </>
       )}
     >
-      {state.error ? <p className="qp-app-edit-issue" role="status">{state.error}</p> : null}
+      {state.error ? <p className="at-app-edit-issue" role="status">{state.error}</p> : null}
       {state.loading ? (
-        <p className="qp-app-edit-hint" role="status">{UI_TEXT.common.loading}</p>
+        <p className="at-app-edit-hint" role="status">{UI_TEXT.common.loading}</p>
       ) : (
         <>
           <DataAppEditCategoryPicker

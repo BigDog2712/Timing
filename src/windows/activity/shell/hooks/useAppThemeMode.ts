@@ -28,7 +28,7 @@ function applyDocumentTheme(
   root.dataset.colorScheme = colorScheme;
   const tokens = deriveTheme(effectiveTheme, colorScheme, null);
   /* 覆盖顺序（ARCH §4.3 注 1）：deriveTheme → applyHostAccents → 写 DOM → 活动色混色。
-     活动色从 tokens 读 `--qp-bg-panel/-elevated/-canvas` 算混色底，必须在这之后算，
+     活动色从 tokens 读 `--at-bg-panel/-elevated/-canvas` 算混色底，必须在这之后算，
      否则浅色反差会按预设底而不是实际底来调。宿主四色只覆盖 6 个强调/语义键，
      中性底色（bg/border/text/control/chart-track）一律还是预设的。 */
   Object.assign(tokens, applyHostAccents(tokens, hostAccents, effectiveTheme));

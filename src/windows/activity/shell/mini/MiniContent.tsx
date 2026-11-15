@@ -7,7 +7,7 @@ export default function MiniContent({ tracking }: {
 }) {
   const text = useLocaleText();
   if (!tracking.presentationReady) return <div className="mini-content mini-empty" role={tracking.presentationFailed ? "alert" : "status"}>
-    {tracking.presentationFailed ? <><span>{text.miniWindow.failed}</span><button className="qp-button qp-button-secondary" onClick={tracking.retry}>{text.common.retry}</button></> : text.common.loading}
+    {tracking.presentationFailed ? <><span>{text.miniWindow.failed}</span><button className="at-button at-button-secondary" onClick={tracking.retry}>{text.common.retry}</button></> : text.common.loading}
   </div>;
   return <MiniActivityContent health={tracking.trackerHealth} />;
 }

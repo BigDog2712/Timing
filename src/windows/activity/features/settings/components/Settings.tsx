@@ -129,8 +129,8 @@ export default function Settings({
       <div className="flex h-full min-w-0 flex-col gap-4 md:gap-5">
         {/* [本轮 T05] 视觉页头下线，读屏的名字不丢 */}
         <h1 className="sr-only">{UI_TEXT.settings.title}</h1>
-        <div className="qp-panel flex flex-1 items-center justify-center gap-3 text-[var(--qp-text-tertiary)]">
-          <span className="qp-text-body qp-weight-medium">
+        <div className="at-panel flex flex-1 items-center justify-center gap-3 text-[var(--at-text-tertiary)]">
+          <span className="at-text-body at-weight-medium">
             {loadError ? UI_TEXT.settings.loadFailed : UI_TEXT.settings.loading}
           </span>
           {loadError ? (
@@ -144,11 +144,11 @@ export default function Settings({
   }
 
   return (
-    /* `relative`：工具条是绝对定位（`dashboard-r2.css` 的 `.qp-page-toolbar`），锚点必须是本页根。 */
+    /* `relative`：工具条是绝对定位（`dashboard-r2.css` 的 `.at-page-toolbar`），锚点必须是本页根。 */
     <div className="settings-button-preview relative flex h-full w-full min-w-0 flex-col gap-4 md:gap-5">
       {dialogs}
       {/* [T05] 页头删了但保存/取消不能丢：搬进 `QuietPageToolbar`（仍是 QuietButton，size compact）。 */}
-      <QuietPageToolbar ariaLabel={UI_TEXT.settings.title} modifier="qp-settings-toolbar">
+      <QuietPageToolbar ariaLabel={UI_TEXT.settings.title} modifier="at-settings-toolbar">
         <SettingsHeaderActions
           saveStatus={saveStatus}
           hasUnsavedChanges={hasUnsavedChanges}
@@ -161,7 +161,7 @@ export default function Settings({
 
       <SettingsGroupNav />
 
-      <div className="flex-1 overflow-y-auto qp-scroll-region pr-2" id="settings-scroll">
+      <div className="flex-1 overflow-y-auto at-scroll-region pr-2" id="settings-scroll">
         {/* 网格顺序 = `settingsGroups.ts` 的五组顺序：挪卡片必须同批改那张表，否则导航跳到空处。 */}
         <div className="grid grid-cols-1 gap-4 md:gap-5">
           {/* 第 1 组「悬浮条与手柄」：必须落在第一屏，进设置页第一眼就能看到手柄绑定。 */}

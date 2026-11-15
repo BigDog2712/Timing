@@ -62,7 +62,7 @@ function hourModel(durations: number[], nowMs?: number): TrendState {
 }
 
 function bars() {
-  return Array.from(container?.querySelectorAll<HTMLElement>(".qp-trend__bar") ?? []);
+  return Array.from(container?.querySelectorAll<HTMLElement>(".at-trend__bar") ?? []);
 }
 
 describe("今日活动趋势卡", async () => {
@@ -75,11 +75,11 @@ describe("今日活动趋势卡", async () => {
        柱子会缩成看不见的一条 —— Rust `trend.rs:82` 也是 `h.max(3.0)`。 */
     expect(list[1].style.height).toBe("max(100%, 3px)");
     expect(list[0].style.height).toBe("max(50%, 3px)");
-    const nowLanes = container?.querySelectorAll(".qp-trend__day.is-today") ?? [];
+    const nowLanes = container?.querySelectorAll(".at-trend__day.is-today") ?? [];
     expect(nowLanes).toHaveLength(1);
     /* 「当前这一桶」= 覆盖 now 的那一桶（`model.nowMs` 缺省落在最后一桶正中），
        不再是"最后一桶"—— 轴铺满 24 桶之后"最后一桶"恒是 23:00，那是明天的事。 */
-    expect(Array.from(container?.querySelectorAll(".qp-trend__day") ?? []).at(-1)?.className).toContain("is-today");
+    expect(Array.from(container?.querySelectorAll(".at-trend__day") ?? []).at(-1)?.className).toContain("is-today");
   });
 
   it("tr01b_the_now_bucket_is_the_one_covering_now_not_the_last", async () => {
@@ -87,7 +87,7 @@ describe("今日活动趋势卡", async () => {
     await mount(createElement(TrendModule, {
       model: hourModel(Array.from({ length: 24 }, () => HOUR), DAY_START + 9.5 * HOUR),
     }));
-    const lanes = Array.from(container?.querySelectorAll(".qp-trend__day") ?? []);
+    const lanes = Array.from(container?.querySelectorAll(".at-trend__day") ?? []);
     expect(lanes[9]?.className).toContain("is-today");
     expect(lanes[23]?.className).not.toContain("is-today");
     expect(lanes.filter((lane) => lane.className.includes("is-today"))).toHaveLength(1);
@@ -99,15 +99,15 @@ describe("今日活动趋势卡", async () => {
     /* 0 = 这个小时真的没用过：不给柱高百分比，只留 2px 底桩（Rust `1.5` 高的 track 色桩），
        并用 `data-empty` 换成轨道色 —— 与"有量但极小"那根区分开 */
     expect(list[0].style.height).toBe("2px");
-    expect(list[0].closest(".qp-trend__day")?.hasAttribute("data-empty")).toBe(true);
+    expect(list[0].closest(".at-trend__day")?.hasAttribute("data-empty")).toBe(true);
     /* 12 秒那种极小值必须留一条可见的边：0 高等于在说"没用过"，是假话 */
     expect(list[1].style.height).toBe("max(4%, 3px)");
-    expect(list[1].closest(".qp-trend__day")?.hasAttribute("data-empty")).toBe(false);
+    expect(list[1].closest(".at-trend__day")?.hasAttribute("data-empty")).toBe(false);
   });
 
   it("tr03_all_zero_renders_the_empty_state_not_a_wall_of_stubs", async () => {
     await mount(createElement(TrendModule, { model: hourModel([0, 0, 0]) }));
-    expect(container?.querySelector(".qp-trend")).toBeNull();
+    expect(container?.querySelector(".at-trend")).toBeNull();
     expect(container?.textContent).toBeTruthy();
   });
 
@@ -115,7 +115,7 @@ describe("今日活动趋势卡", async () => {
     /* 0 点 30 分钟 + 14 点 1h20m（峰值），其余小时为 0 → 今日合计 1h 50m */
     const durations = [30 * 60_000, ...Array.from({ length: 13 }, () => 0), 80 * 60_000];
     await mount(createElement(TrendModule, { model: hourModel(durations) }));
-    const head = container?.querySelector(".qp-trend-head");
+    const head = container?.querySelector(".at-trend-head");
     const text = head?.textContent ?? "";
     expect(text).toContain("今日 1h 50m");
     /* 峰值读数必须带**时刻**（14:00），不是只有时长 —— "峰值 1h 20m"说不出是哪一小时 */
@@ -130,7 +130,7 @@ describe("今日活动趋势卡", async () => {
     await mount(createElement(TrendModule, {
       model: hourModel(durations, DAY_START + 9.5 * HOUR),
     }));
-    const labels = Array.from(container?.querySelectorAll<HTMLElement>(".qp-trend__label") ?? [])
+    const labels = Array.from(container?.querySelectorAll<HTMLElement>(".at-trend__label") ?? [])
       .map((node) => node.textContent ?? "");
     /* 每根柱都有一个 span，但只写 5 处轴字 */
     expect(labels).toHaveLength(24);
@@ -141,9 +141,9 @@ describe("今日活动趋势卡", async () => {
     expect(labels[18]).toBe("18:00");
     /* 末桶写 24:00（轴的右端点），不是重复一次"23:00" */
     expect(labels[23]).toBe("24:00");
-    /* 窗口数进 DOM 与 CSS 变量：24 根柱靠 `--qp-trend-n` 平分容器宽度（不横向滚动） */
-    expect(container?.querySelector(".qp-trend")?.getAttribute("data-trend-days")).toBe("24");
-    expect(container?.querySelector<HTMLElement>(".qp-trend")?.style.getPropertyValue("--qp-trend-n")).toBe("24");
+    /* 窗口数进 DOM 与 CSS 变量：24 根柱靠 `--at-trend-n` 平分容器宽度（不横向滚动） */
+    expect(container?.querySelector(".at-trend")?.getAttribute("data-trend-days")).toBe("24");
+    expect(container?.querySelector<HTMLElement>(".at-trend")?.style.getPropertyValue("--at-trend-n")).toBe("24");
   });
 
   it("tr06_bar_tooltip_says_the_hour_range_and_the_duration", async () => {

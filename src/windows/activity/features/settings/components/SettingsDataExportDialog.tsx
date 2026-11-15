@@ -361,7 +361,7 @@ export default function SettingsDataExportDialog({ open, onClose, onToast }: Pro
       >
         <div className="settings-data-export-dialog-body">
           {/* [批 2] 本对话框只导活动库；「完整数据包（JSON）」才是全量。 */}
-          <p className="qp-text-caption text-[var(--qp-text-tertiary)]">{ACTIVITY_ONLY_NOTE}</p>
+          <p className="at-text-caption text-[var(--at-text-tertiary)]">{ACTIVITY_ONLY_NOTE}</p>
           <section className="settings-data-export-section settings-data-export-range-section">
             <div className="settings-data-export-section-header">
               <div className="min-w-0">
@@ -419,7 +419,7 @@ export default function SettingsDataExportDialog({ open, onClose, onToast }: Pro
             <div className="settings-data-export-section-header">
               <div className="min-w-0">
                 <p className="settings-data-export-section-title">{UI_TEXT.export.fieldsSectionTitle}</p>
-                <p className={`settings-data-export-section-hint ${selectedFields.length === 0 ? "text-[var(--qp-danger)]" : ""}`}>
+                <p className={`settings-data-export-section-hint ${selectedFields.length === 0 ? "text-[var(--at-danger)]" : ""}`}>
                   {UI_TEXT.export.configFieldsCount(selectedFields.length, SETTINGS_DATA_EXPORT_FIELD_KEYS.length)}
                 </p>
               </div>

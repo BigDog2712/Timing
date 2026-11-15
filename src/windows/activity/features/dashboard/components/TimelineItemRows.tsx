@@ -137,7 +137,7 @@ export default function TimelineItemRows({
   const renderRow = (item: ItemPrefsLike, group: "pinned" | "recent", index: number) => {
     if (editingId === item.id) {
       return (
-        <li key={item.id} className="qp-timeline-item-row qp-timeline-item-row--editing">
+        <li key={item.id} className="at-timeline-item-row at-timeline-item-row--editing">
           <ItemEditForm
             draftName={draftName}
             draftMinutes={draftMinutes}
@@ -161,8 +161,8 @@ export default function TimelineItemRows({
 
     const minutes = itemTimerMinutes(timers, item.id);
     return (
-      <li key={item.id} className="qp-timeline-item-row">
-        <span className="qp-timeline-item-name" title={item.name}>{item.name}</span>
+      <li key={item.id} className="at-timeline-item-row">
+        <span className="at-timeline-item-name" title={item.name}>{item.name}</span>
         {/* 分类是"改一条落一条"（不像名称/时长要进编辑态）：它不影响行的其它字段，
             多一层编辑态只会让"常用事项也能改分类"变成三步操作。 */}
         <ItemCategoryField
@@ -173,15 +173,15 @@ export default function TimelineItemRows({
           disabled={busy}
           onChange={(next) => { void onUpdate(item.id, { categoryKey: next }); }}
         />
-        <span className="qp-timeline-item-timer">
+        <span className="at-timeline-item-timer">
           {minutes === null ? copy.timelineTimerOff : copy.timelineMinutesShort(minutes)}
         </span>
-        <span className="qp-timeline-item-actions">
+        <span className="at-timeline-item-actions">
           {group === "pinned" ? (
             <>
               <button
                 type="button"
-                className="qp-timeline-icon-btn"
+                className="at-timeline-icon-btn"
                 aria-label={`${copy.timelineMoveUp} ${item.name}`}
                 disabled={busy || index === 0}
                 onClick={() => { void onMove(index, index - 1); }}
@@ -190,7 +190,7 @@ export default function TimelineItemRows({
               </button>
               <button
                 type="button"
-                className="qp-timeline-icon-btn"
+                className="at-timeline-icon-btn"
                 aria-label={`${copy.timelineMoveDown} ${item.name}`}
                 disabled={busy || index === pinned.length - 1}
                 onClick={() => { void onMove(index, index + 1); }}
@@ -199,7 +199,7 @@ export default function TimelineItemRows({
               </button>
               <button
                 type="button"
-                className="qp-link-btn qp-timeline-item-action"
+                className="at-link-btn at-timeline-item-action"
                 aria-label={`${copy.timelineUnpinAction} ${item.name}`}
                 disabled={busy}
                 onClick={() => { void onUpdate(item.id, { isPinned: false }); }}
@@ -210,7 +210,7 @@ export default function TimelineItemRows({
           ) : (
             <button
               type="button"
-              className="qp-link-btn qp-timeline-item-action"
+              className="at-link-btn at-timeline-item-action"
               aria-label={`${copy.timelinePinAction} ${item.name}`}
               disabled={busy}
               onClick={() => { void onUpdate(item.id, { isPinned: true }); }}
@@ -220,7 +220,7 @@ export default function TimelineItemRows({
           )}
           <button
             type="button"
-            className="qp-link-btn qp-timeline-item-action"
+            className="at-link-btn at-timeline-item-action"
             aria-label={`${copy.timelineEditAction} ${item.name}`}
             disabled={busy}
             onClick={() => startEdit(item)}
@@ -233,40 +233,40 @@ export default function TimelineItemRows({
   };
 
   return (
-    <div className="qp-timeline-prefs">
-      {status === "loading" ? <p className="qp-empty">{UI_TEXT.common.loading}</p> : null}
+    <div className="at-timeline-prefs">
+      {status === "loading" ? <p className="at-empty">{UI_TEXT.common.loading}</p> : null}
       {status === "error" ? (
-        <p className="qp-timeline-manage-issue" role="status">{UI_TEXT.common.readFailed}</p>
+        <p className="at-timeline-manage-issue" role="status">{UI_TEXT.common.readFailed}</p>
       ) : null}
-      {issue ? <p className="qp-timeline-manage-issue" role="status">{issue}</p> : null}
+      {issue ? <p className="at-timeline-manage-issue" role="status">{issue}</p> : null}
       {status === "ready" ? (
         <>
-          <section className="qp-timeline-prefs-group">
-            <h4 className="qp-timeline-group-title">{copy.timelinePinnedGroup}</h4>
+          <section className="at-timeline-prefs-group">
+            <h4 className="at-timeline-group-title">{copy.timelinePinnedGroup}</h4>
             {pinned.length === 0 ? (
-              <p className="qp-empty">{copy.timelineManageEmpty}</p>
+              <p className="at-empty">{copy.timelineManageEmpty}</p>
             ) : (
-              <ul className="qp-timeline-item-list">
+              <ul className="at-timeline-item-list">
                 {pinned.map((item, index) => renderRow(item, "pinned", index))}
               </ul>
             )}
           </section>
           {showRecent ? (
-            <section className="qp-timeline-prefs-group">
-              <h4 className="qp-timeline-group-title">{copy.timelineRecentGroup}</h4>
+            <section className="at-timeline-prefs-group">
+              <h4 className="at-timeline-group-title">{copy.timelineRecentGroup}</h4>
               {recent.length === 0 ? (
-                <p className="qp-empty">{copy.timelineRecentEmpty}</p>
+                <p className="at-empty">{copy.timelineRecentEmpty}</p>
               ) : (
-                <ul className="qp-timeline-item-list">
+                <ul className="at-timeline-item-list">
                   {recent.map((item, index) => renderRow(item, "recent", index))}
                 </ul>
               )}
             </section>
           ) : null}
-          <div className="qp-timeline-category-manage-row">
+          <div className="at-timeline-category-manage-row">
             <button
               type="button"
-              className="qp-link-btn qp-timeline-item-action"
+              className="at-link-btn at-timeline-item-action"
               disabled={busy}
               onClick={onManageCategories}
             >

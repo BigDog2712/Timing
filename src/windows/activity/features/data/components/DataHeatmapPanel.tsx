@@ -283,13 +283,13 @@ function DataHeatmapPanel(props: DataHeatmapPanelProps) {
     <div tabIndex={-1} aria-busy={props.loading} className={`data-heatmap-panel ${compact ? "data-heatmap-panel-compact" : ""}`}>
       <div className="data-heatmap-panel-header">
         <div className="data-heatmap-panel-heading">
-          <h3 className="qp-weight-emphasis text-[var(--qp-text-primary)] qp-text-section-title">{resolvedTitle}</h3>
+          <h3 className="at-weight-emphasis text-[var(--at-text-primary)] at-text-section-title">{resolvedTitle}</h3>
           {refreshFailed ? (
             <div className="data-heatmap-refresh-status" role="status">
               <span>{UI_TEXT.data.webTrendRefreshError}</span>
               <button
                 type="button"
-                className="qp-inline-action qp-inline-action-accent"
+                className="at-inline-action at-inline-action-accent"
                 onClick={handleRetry}
               >
                 {UI_TEXT.data.webTrendRetry}
@@ -320,11 +320,11 @@ function DataHeatmapPanel(props: DataHeatmapPanelProps) {
 
       {errorMessage ? (
         <div
-          className="mt-5 flex min-h-32 flex-col items-center justify-center gap-2 qp-text-body text-[var(--qp-text-secondary)]"
+          className="mt-5 flex min-h-32 flex-col items-center justify-center gap-2 at-text-body text-[var(--at-text-secondary)]"
           role="status"
         >
           <span>{errorMessage}</span>
-          <button type="button" className="qp-control" onClick={handleRetry}>
+          <button type="button" className="at-control" onClick={handleRetry}>
             {UI_TEXT.data.webTrendRetry}
           </button>
         </div>
@@ -333,8 +333,8 @@ function DataHeatmapPanel(props: DataHeatmapPanelProps) {
           <div className="data-heatmap-content">
             <div
               className={loading
-                ? "data-heatmap-scroll data-heatmap-loading-state qp-scroll-region"
-                : "data-heatmap-scroll qp-scroll-region"}
+                ? "data-heatmap-scroll data-heatmap-loading-state at-scroll-region"
+                : "data-heatmap-scroll at-scroll-region"}
               style={{ "--data-heatmap-week-count": rows.length } as CSSProperties}
             >
             <div className="data-heatmap-months" aria-hidden>

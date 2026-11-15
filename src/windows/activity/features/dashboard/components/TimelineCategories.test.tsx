@@ -87,10 +87,10 @@ let onClose: Mock<() => void>;
 let onLocalRename: Mock<(itemId: number, name: string) => void>;
 let onLocalCreate: Mock<(name: string) => void>;
 
-const dialog = () => document.body.querySelector<HTMLElement>(".qp-timeline-manage-dialog");
+const dialog = () => document.body.querySelector<HTMLElement>(".at-timeline-manage-dialog");
 /** 行内那颗分类下拉的触发键（新建弹层里那个也用同一个 class，同一时刻只有一处） */
 const categoryTrigger = () =>
-  document.body.querySelector<HTMLButtonElement>(".qp-item-category-select .qp-select-trigger");
+  document.body.querySelector<HTMLButtonElement>(".at-item-category-select .at-select-trigger");
 /**
  * 下拉当前显示的那个 label。
  * ⚠️ 不能用 `trigger.textContent`：`QuietSelect` 把**所有**选项的 label 都渲染进触发键里
@@ -98,7 +98,7 @@ const categoryTrigger = () =>
  * 那样写的断言对"选没选中"完全无感（变异测试会绿着过去）。
  */
 const currentLabel = () =>
-  document.body.querySelector<HTMLElement>(".qp-item-category-select .qp-select-label-current")?.textContent?.trim() ?? "";
+  document.body.querySelector<HTMLElement>(".at-item-category-select .at-select-label-current")?.textContent?.trim() ?? "";
 const menuOptions = () => Array.from(document.body.querySelectorAll<HTMLElement>('[role="option"]'));
 const optionByText = (text: string) => menuOptions().find((node) => node.textContent?.trim() === text) ?? null;
 const typeInto = (input: HTMLInputElement | null, value: string) => {
@@ -197,9 +197,9 @@ describe("事项分类 · 候选与顺序", () => {
 describe("事项分类 · 新建事项", () => {
   it("tc02_选中的分类进_create_item_载荷", async () => {
     await mount("create");
-    typeInto(dialog()?.querySelector<HTMLInputElement>("input.qp-timeline-manage-input") ?? null, "写周报");
+    typeInto(dialog()?.querySelector<HTMLInputElement>("input.at-timeline-manage-input") ?? null, "写周报");
     await pickOption("开发");
-    const confirm = Array.from(dialog()?.querySelectorAll<HTMLButtonElement>(".qp-dialog-actions button") ?? [])
+    const confirm = Array.from(dialog()?.querySelectorAll<HTMLButtonElement>(".at-dialog-actions button") ?? [])
       .find((button) => button.textContent === "确认");
     await act(async () => { confirm?.click(); });
     await flush();
@@ -213,8 +213,8 @@ describe("事项分类 · 新建事项", () => {
 
   it("tc03_没选分类时载荷仍显式带_null", async () => {
     await mount("create");
-    typeInto(dialog()?.querySelector<HTMLInputElement>("input.qp-timeline-manage-input") ?? null, "写周报");
-    const confirm = Array.from(dialog()?.querySelectorAll<HTMLButtonElement>(".qp-dialog-actions button") ?? [])
+    typeInto(dialog()?.querySelector<HTMLInputElement>("input.at-timeline-manage-input") ?? null, "写周报");
+    const confirm = Array.from(dialog()?.querySelectorAll<HTMLButtonElement>(".at-dialog-actions button") ?? [])
       .find((button) => button.textContent === "确认");
     await act(async () => { confirm?.click(); });
     await flush();

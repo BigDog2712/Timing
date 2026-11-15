@@ -20,18 +20,18 @@
   border-color: transparent;
   background: transparent;
   box-shadow: none;
-  color: var(--qp-text-disabled);
+  color: var(--at-text-disabled);
 }
 
 .data-trend-range-reset:hover {
   border-color: transparent;
-  background: color-mix(in srgb, var(--qp-bg-elevated) 72%, transparent);
-  color: var(--qp-text-secondary);
+  background: color-mix(in srgb, var(--at-bg-elevated) 72%, transparent);
+  color: var(--at-text-secondary);
 }
 
 .data-trend-range-reset:focus-visible {
   border-color: transparent;
-  outline: 2px solid color-mix(in srgb, var(--qp-accent-default) 42%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--at-accent-default) 42%, transparent);
   outline-offset: 1px;
 }
 
@@ -39,11 +39,11 @@
   cursor: pointer;
 }
 
-.data-heatmap-granularity.qp-segmented-filter-compact {
+.data-heatmap-granularity.at-segmented-filter-compact {
   flex-wrap: nowrap;
 }
 
-.data-destination-mode.qp-segmented-filter-compact {
+.data-destination-mode.at-segmented-filter-compact {
   flex-wrap: nowrap;
 }
 
@@ -77,19 +77,19 @@
   min-width: 0;
   align-items: center;
   gap: 2px;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
   white-space: nowrap;
 }
 
-.data-app-refresh-status:has(.qp-inline-action),
-.data-heatmap-refresh-status:has(.qp-inline-action) {
-  color: var(--qp-text-secondary);
+.data-app-refresh-status:has(.at-inline-action),
+.data-heatmap-refresh-status:has(.at-inline-action) {
+  color: var(--at-text-secondary);
 }
 
-.data-app-refresh-status .qp-inline-action,
-.data-heatmap-refresh-status .qp-inline-action {
+.data-app-refresh-status .at-inline-action,
+.data-heatmap-refresh-status .at-inline-action {
   padding: 2px 4px;
 }
 
@@ -100,10 +100,10 @@
   flex: 0 0 14px;
   overflow: hidden;
   padding-inline: 2px;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-caption);
-  font-weight: var(--qp-font-weight-regular);
-  line-height: var(--qp-line-height-caption);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-regular);
+  line-height: var(--at-line-height-caption);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -116,7 +116,7 @@
 .data-app-selected-icon {
   appearance: none;
   border: 0;
-  border-radius: var(--qp-radius-control);
+  border-radius: var(--at-radius-control);
   background: transparent;
   padding: 0;
 }
@@ -127,7 +127,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--data-category-color, var(--qp-text-tertiary));
+  background: var(--data-category-color, var(--at-text-tertiary));
 }
 
 .data-app-option-icon[data-category-marker] {
@@ -175,35 +175,35 @@
 }
 
 .data-app-selected-icon:hover {
-  background: var(--qp-bg-elevated);
+  background: var(--at-bg-elevated);
 }
 
 .data-app-selected-icon:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--qp-accent-default) 42%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--at-accent-default) 42%, transparent);
   outline-offset: 1px;
 }
 
 .data-app-option-selected {
   border-color: color-mix(
     in srgb,
-    var(--data-series-color, var(--qp-accent-default)) 34%,
-    var(--qp-border-subtle)
+    var(--data-series-color, var(--at-accent-default)) 34%,
+    var(--at-border-subtle)
   );
   background: color-mix(
     in srgb,
-    var(--data-series-color, var(--qp-accent-default)) 9%,
-    var(--qp-bg-elevated)
+    var(--data-series-color, var(--at-accent-default)) 9%,
+    var(--at-bg-elevated)
   );
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
 }
 
 .data-app-option-selected .data-app-option-icon {
   border-color: color-mix(
     in srgb,
-    var(--data-series-color, var(--qp-accent-default)) 26%,
-    var(--qp-border-subtle)
+    var(--data-series-color, var(--at-accent-default)) 26%,
+    var(--at-border-subtle)
   );
-  color: var(--data-series-color, var(--qp-accent-default));
+  color: var(--data-series-color, var(--at-accent-default));
 }
 
 .data-heatmap-cell-unavailable {

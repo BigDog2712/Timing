@@ -26,18 +26,18 @@
   gap: 10px;
   min-width: 0;
   padding: 12px 14px 10px;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-control);
-  background: var(--qp-bg-elevated);
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
+  background: var(--at-bg-elevated);
   transition:
-    opacity var(--qp-motion-fast) ease,
-    border-color var(--qp-motion-fast) ease;
+    opacity var(--at-motion-fast) ease,
+    border-color var(--at-motion-fast) ease;
 }
 
 /* A-07：关闭态整卡降墨（0.62 仍能读清槽位名），控件全部保持可用 */
 .settings-handle-card[data-enabled="false"] {
   opacity: 0.62;
-  border-color: color-mix(in srgb, var(--qp-border-subtle) 60%, transparent);
+  border-color: color-mix(in srgb, var(--at-border-subtle) 60%, transparent);
 }
 
 .settings-handle-card[data-enabled="false"]:hover,
@@ -56,10 +56,10 @@
 .settings-handle-card__title {
   margin: 0;
   min-width: 0;
-  color: var(--qp-text-primary);
-  font-size: var(--qp-font-size-body);
-  font-weight: var(--qp-font-weight-emphasis);
-  line-height: var(--qp-line-height-body);
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-body);
+  font-weight: var(--at-font-weight-emphasis);
+  line-height: var(--at-line-height-body);
 }
 
 .settings-handle-card__rows {
@@ -78,20 +78,20 @@
 
 .settings-handle-card__label {
   min-width: 0;
-  color: var(--qp-text-secondary);
-  font-size: var(--qp-font-size-caption);
-  font-weight: var(--qp-font-weight-medium);
-  line-height: var(--qp-line-height-caption);
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-medium);
+  line-height: var(--at-line-height-caption);
   white-space: nowrap;
 }
 
 /* 双击代价提示（§6.4）：不写出来，用户只会觉得「点了有时候没反应」 */
 .settings-handle-card__hint {
   margin: 0;
-  color: var(--qp-warning);
-  font-size: var(--qp-font-size-caption);
-  font-weight: var(--qp-font-weight-medium);
-  line-height: var(--qp-line-height-caption);
+  color: var(--at-warning);
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-medium);
+  line-height: var(--at-line-height-caption);
 }
 
 .settings-handle-card__foot {
@@ -104,7 +104,7 @@
 .settings-handle-card__row :focus-visible,
 .settings-handle-card__head :focus-visible,
 .settings-handle-card__foot :focus-visible {
-  outline: 2px solid var(--qp-accent-default);
+  outline: 2px solid var(--at-accent-default);
   outline-offset: 2px;
   border-radius: 6px;
 }
@@ -138,30 +138,30 @@
   justify-content: center;
   min-height: 56px;
   padding: 12px;
-  border: 1px dashed var(--qp-border-strong);
-  border-radius: var(--qp-radius-control);
-  color: var(--qp-text-primary);
+  border: 1px dashed var(--at-border-strong);
+  border-radius: var(--at-radius-control);
+  color: var(--at-text-primary);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--qp-font-size-section-title);
-  font-weight: var(--qp-font-weight-medium);
+  font-size: var(--at-font-size-section-title);
+  font-weight: var(--at-font-weight-medium);
   letter-spacing: 0.02em;
   word-break: break-all;
 }
 
 .settings-handle-hotkey[data-empty="true"] {
-  color: var(--qp-text-tertiary);
+  color: var(--at-text-tertiary);
   font-family: inherit;
-  font-size: var(--qp-font-size-caption);
+  font-size: var(--at-font-size-caption);
 }
 
 .settings-handle-hotkey__hint {
   margin: 8px 0 0;
-  color: var(--qp-text-tertiary);
-  font-size: var(--qp-font-size-caption);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
 }
 
 /* 错误与「双击会延迟 250ms」共用 `.settings-handle-card__hint`（warning 色），
    但红字要能区分开：一句是"提醒"，一句是"刚才那步没成"。 */
 .settings-handle-card__hint[data-tone="error"] {
-  color: var(--qp-danger);
+  color: var(--at-danger);
 }

@@ -38,7 +38,7 @@ export default function MiniActivityContent({ health }: { health: TrackerHealthS
     detail.style.top = `${Math.max(8, Math.min(top, container.height - height - 8))}px`;
   };
   if (!view || !today || view.kind !== "activity") return <div className="mini-content mini-empty" role={failed ? "alert" : "status"}>
-    {failed ? <><span>{text.miniWindow.failed}</span><button className="qp-button qp-button-secondary" onClick={retry}>{text.common.retry}</button></> : text.common.loading}
+    {failed ? <><span>{text.miniWindow.failed}</span><button className="at-button at-button-secondary" onClick={retry}>{text.common.retry}</button></> : text.common.loading}
   </div>;
   const scope = `${view.kind}:${view.mode}:${new Date(view.sampledAtMs).toDateString()}`;
   const details: Record<string, { label?: string; items: QuietChartTooltipItem[] }> = {};
@@ -105,6 +105,6 @@ export default function MiniActivityContent({ health }: { health: TrackerHealthS
           <span className="mini-leader-name">{item.label}</span><span className="mini-duration">{formatMiniActivityDuration(item.duration)}</span>
         </li>)}
       </ul>
-    {currentDetail() && <div ref={positionDetail} className="mini-detail qp-scroll-region"><QuietChartTooltip {...currentDetail()!} /></div>}
+    {currentDetail() && <div ref={positionDetail} className="mini-detail at-scroll-region"><QuietChartTooltip {...currentDetail()!} /></div>}
   </div>;
 }

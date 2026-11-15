@@ -54,13 +54,13 @@ async function mount(): Promise<void> {
 }
 
 function trigger(): HTMLButtonElement {
-  const el = container.querySelector<HTMLButtonElement>(".qp-color-trigger");
+  const el = container.querySelector<HTMLButtonElement>(".at-color-trigger");
   if (!el) throw new Error("找不到颜色触发键");
   return el;
 }
 
 function popover(): HTMLElement | null {
-  return document.body.querySelector<HTMLElement>(".qp-color-popover");
+  return document.body.querySelector<HTMLElement>(".at-color-popover");
 }
 
 function doneButton(): HTMLButtonElement {

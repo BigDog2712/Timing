@@ -82,7 +82,7 @@ export default function HistoryTimelineDetailsPopover({
     popover ? (
         <div
           ref={popoverRef}
-          className={`history-activity-popover qp-motion-popover-enter history-activity-popover-${popover.placement}`}
+          className={`history-activity-popover at-motion-popover-enter history-activity-popover-${popover.placement}`}
           style={{
             left: popover.left,
             top: popover.top,
@@ -91,14 +91,14 @@ export default function HistoryTimelineDetailsPopover({
           <div className="history-activity-popover-title">
             {UI_TEXT.history.titleDetails}
           </div>
-          <div className="history-activity-popover-list qp-scroll-region">
+          <div className="history-activity-popover-list at-scroll-region">
             {popover.titleSamples.map((sample, index) => (
               <div
                 key={`${popover.sessionId}-${index}-${sample.title}`}
                 className="history-activity-popover-item"
               >
                 <span className="history-activity-popover-item-copy">
-                  <span className="qp-record-detail-title history-activity-popover-item-title">
+                  <span className="at-record-detail-title history-activity-popover-item-title">
                     {sample.isUntitled ? UI_TEXT.history.webTimelineUntitledPage : sample.title}
                   </span>
                   {sample.secondaryText ? (

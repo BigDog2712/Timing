@@ -60,9 +60,9 @@ let onClose: Mock<() => void>;
 let onLocalRename: Mock<(itemId: number, name: string) => void>;
 
 const choices = () =>
-  Array.from(document.body.querySelectorAll<HTMLButtonElement>(".qp-timeline-edit-choice"))
-    .map((node) => node.querySelector(".qp-timeline-edit-name")?.textContent ?? "");
-const dialogText = () => document.body.querySelector(".qp-timeline-edit")?.textContent ?? "";
+  Array.from(document.body.querySelectorAll<HTMLButtonElement>(".at-timeline-edit-choice"))
+    .map((node) => node.querySelector(".at-timeline-edit-name")?.textContent ?? "");
+const dialogText = () => document.body.querySelector(".at-timeline-edit")?.textContent ?? "";
 
 async function flush() {
   for (let i = 0; i < 4; i += 1) {

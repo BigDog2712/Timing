@@ -34,7 +34,7 @@ function stamp(timeMs: number, locale: Locale): string {
 
 export default function HistoryRangeRecords({ copy, locale, notes, todos }: Props) {
   return (
-    <section className="qp-panel p-5 history-range-records" data-history-range-records>
+    <section className="at-panel p-5 history-range-records" data-history-range-records>
       <div className="history-range-record-block" data-history-range-record-block="notes">
         <header className="history-range-card-head">
           <h3 className="history-range-card-title">{copy.notesTitle}</h3>
@@ -43,7 +43,7 @@ export default function HistoryRangeRecords({ copy, locale, notes, todos }: Prop
         {notes.length === 0 ? (
           <p className="history-range-empty">{copy.notesEmpty}</p>
         ) : (
-          <ul className="history-range-record-list qp-scroll-region">
+          <ul className="history-range-record-list at-scroll-region">
             {notes.map((note) => (
               <li key={note.id} className="history-range-record-row" data-history-range-note>
                 <span className="history-range-record-text" title={note.content}>
@@ -67,7 +67,7 @@ export default function HistoryRangeRecords({ copy, locale, notes, todos }: Prop
         {todos.length === 0 ? (
           <p className="history-range-empty">{copy.todosEmpty}</p>
         ) : (
-          <ul className="history-range-record-list qp-scroll-region">
+          <ul className="history-range-record-list at-scroll-region">
             {todos.map((todo) => (
               <li key={todo.id} className="history-range-record-row" data-history-range-todo>
                 <span className="history-range-record-text" title={todo.title}>{todo.title}</span>

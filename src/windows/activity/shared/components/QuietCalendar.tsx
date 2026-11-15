@@ -87,36 +87,36 @@ export function QuietCalendarMonthFrame({
   const range = variant === "range";
 
   return (
-    <div className="qp-calendar-month" data-range={range || undefined}>
-      <header className="qp-calendar-header">
+    <div className="at-calendar-month" data-range={range || undefined}>
+      <header className="at-calendar-header">
         <button
           type="button"
           onClick={onPreviousMonth}
           disabled={previousMonthDisabled}
-          className="qp-calendar-nav"
+          className="at-calendar-nav"
           aria-label={previousMonthLabel}
         >
           {previousMonthIcon}
         </button>
-        <div className="qp-calendar-title">
+        <div className="at-calendar-title">
           {monthLabel}
         </div>
         <button
           type="button"
           onClick={onNextMonth}
           disabled={nextMonthDisabled}
-          className="qp-calendar-nav"
+          className="at-calendar-nav"
           aria-label={nextMonthLabel}
         >
           {nextMonthIcon}
         </button>
       </header>
 
-      <div className="qp-calendar-grid qp-calendar-weekdays">
+      <div className="at-calendar-grid at-calendar-weekdays">
         {weekdays.map((weekday) => <span key={weekday}>{weekday}</span>)}
       </div>
 
-      <div className="qp-calendar-grid qp-calendar-days">
+      <div className="at-calendar-grid at-calendar-days">
         {days.map((date) => {
           const day = getDay(date);
           return (
@@ -125,7 +125,7 @@ export function QuietCalendarMonthFrame({
               {...day.buttonProps}
               {...day.dataAttributes}
               type="button"
-              className="qp-calendar-day"
+              className="at-calendar-day"
               data-muted={day.muted || undefined}
               data-in-range={day.inRange || undefined}
               data-selected={day.selected || undefined}

@@ -57,7 +57,7 @@ export function createTestContainer(): HTMLDivElement {
 }
 
 /* `QuietDialog` 是 portal 到 body 的，所以查询一律从 `document.body` 上做 */
-export const manageDialog = () => document.body.querySelector<HTMLElement>(".qp-category-manage-dialog");
+export const manageDialog = () => document.body.querySelector<HTMLElement>(".at-category-manage-dialog");
 export const entryButton = () => document.body.querySelector<HTMLButtonElement>(".data-category-manage-action");
 export const categoryRow = (category: string) =>
   manageDialog()?.querySelector<HTMLElement>(`[data-category="${category}"]`) ?? null;
@@ -66,14 +66,14 @@ export const renameButton = (category: string) =>
   categoryRow(category)?.querySelector<HTMLButtonElement>("button[aria-label^='重命名分类']") ?? null;
 export const deleteButton = (category: string) =>
   categoryRow(category)?.querySelector<HTMLButtonElement>("button[aria-label^='删除分类']")
-  ?? categoryRow(category)?.querySelector<HTMLButtonElement>(".qp-icon-action-danger")
+  ?? categoryRow(category)?.querySelector<HTMLButtonElement>(".at-icon-action-danger")
   ?? null;
 
 /** 确认框是最后一个 dialog（弹窗层里它总在最上面），确认键是 actions 里的最后一颗 */
 export function confirmButton(): HTMLButtonElement | null {
-  const dialogs = Array.from(document.body.querySelectorAll<HTMLElement>(".qp-dialog-surface"));
+  const dialogs = Array.from(document.body.querySelectorAll<HTMLElement>(".at-dialog-surface"));
   const actions = Array.from(
-    dialogs[dialogs.length - 1]?.querySelectorAll<HTMLButtonElement>(".qp-dialog-actions button") ?? [],
+    dialogs[dialogs.length - 1]?.querySelectorAll<HTMLButtonElement>(".at-dialog-actions button") ?? [],
   );
   return actions[actions.length - 1] ?? null;
 }

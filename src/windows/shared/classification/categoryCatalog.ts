@@ -167,8 +167,8 @@ export function buildCategoryCatalog(args: BuildCategoryCatalogArgs): CategoryCa
 /**
  * selectedOption 兜底：当前值非空且**不在候选**时追加 `{ value, label: 原键名 }`。
  *
- * 为什么修在消费侧而不是 QuietSelect 本体：`.qp-select-label` 默认 `visibility:hidden`、
- * 仅 `.qp-select-label-current` 可见（`quiet-select.css:43-54`），当前值不在候选时
+ * 为什么修在消费侧而不是 QuietSelect 本体：`.at-select-label` 默认 `visibility:hidden`、
+ * 仅 `.at-select-label-current` 可见（`quiet-select.css:43-54`），当前值不在候选时
  * 触发器整块空白；QuietSelect 有 12 个消费方，动本体等于全量回归。三分支：
  * 空值原样 / 在候选原样 / 不在候选追加。返回**新数组**（消费方直接当 options 传）。
  */

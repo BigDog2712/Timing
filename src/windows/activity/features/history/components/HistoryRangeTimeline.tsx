@@ -67,7 +67,7 @@ export default function HistoryRangeTimeline({
   const hasAnyBlock = lanes.some((lane) => lane.blocks.length > 0);
 
   return (
-    <section className="qp-panel p-5 history-range-timeline" data-history-range-timeline>
+    <section className="at-panel p-5 history-range-timeline" data-history-range-timeline>
       <header className="history-range-card-head">
         <h3 className="history-range-card-title">{copy.timelineTitle}</h3>
         <span className="history-range-card-meta">{copy.timelineHint}</span>

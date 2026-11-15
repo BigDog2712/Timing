@@ -54,7 +54,7 @@ function resolveAdjacentPageFocusTarget(trigger: HTMLElement, backwards: boolean
     "[tabindex]:not([tabindex='-1'])",
   ].join(","))).filter((element) => (
     !element.closest(".quick-classification-menu")
-    && !element.closest(".qp-dialog-backdrop")
+    && !element.closest(".at-dialog-backdrop")
     && element.getClientRects().length > 0
   ));
   const triggerIndex = focusable.indexOf(trigger);
@@ -259,7 +259,7 @@ export default function QuickClassificationSurface({
       {!renameOpen ? (
         <div
           ref={menuRef}
-          className="quick-classification-menu qp-motion-overlay-enter"
+          className="quick-classification-menu at-motion-overlay-enter"
           role="menu"
           aria-label={UI_TEXT.mapping.quickMenuLabel(target.displayName)}
           style={{ left: position.left, top: position.top }}

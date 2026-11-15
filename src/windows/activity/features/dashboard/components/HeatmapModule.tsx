@@ -8,7 +8,7 @@
  * 三个刻意的取舍：
  *   · 格子 `aria-hidden`，整张图是一个 `role="img"` + 一句摘要 —— 168 个格子逐个念
  *     对读屏是灾难，而"周几几点最忙"已经由摘要代表；
- *   · 零活动格用 `--qp-surface-raise`（比卡面亮一档），**不是透明**：看不见的格子会让
+ *   · 零活动格用 `--at-surface-raise`（比卡面亮一档），**不是透明**：看不见的格子会让
  *     "这天只有几个小时"变成假话；
  *   · 图例按卡片高度取舍（容器查询），S 档只有 ~110px 可用高，塞图例会把最后一行挤掉。
  */
@@ -60,11 +60,11 @@ export default function HeatmapModule({ controls, state: heat }: Props) {
       meta={maxMs > 0 ? copy.meta(weeks) : undefined}
     >
       <div
-        className="qp-heatmap"
+        className="at-heatmap"
         role="img"
         aria-label={copy.summary(weeks, formatDashboardDuration(weeklyTotalMs), peakText)}
       >
-        <div className="qp-heatmap__rows" aria-hidden="true">
+        <div className="at-heatmap__rows" aria-hidden="true">
           {rows.map((row) => {
             /* 行标用**窄名**（「一」而不是「周一」）：这一列只有 16px，与 `heatmap.rs:28`
              * 的 `label_w` 同宽，用短名会被省略成「周…」。 */
@@ -72,14 +72,14 @@ export default function HeatmapModule({ controls, state: heat }: Props) {
             const full = formatWeekdayShort(row.sampleStartMs, locale);
             return (
               <Fragment key={row.weekday}>
-                <span className="qp-heatmap__day" title={full}>{label}</span>
-                <span className="qp-heatmap__cells">
+                <span className="at-heatmap__day" title={full}>{label}</span>
+                <span className="at-heatmap__cells">
                   {row.cells.map((ms, hour) => {
                     const level = heatmapLevel(ms, maxMs);
                     return (
                       <span
                         key={hour}
-                        className="qp-heatmap__cell"
+                        className="at-heatmap__cell"
                         data-level={level}
                         title={level > 0 ? copy.cell(full, hour, formatDashboardDuration(ms)) : undefined}
                       />
@@ -91,13 +91,13 @@ export default function HeatmapModule({ controls, state: heat }: Props) {
           })}
         </div>
 
-        <div className="qp-heatmap__foot" aria-hidden="true">
-          <span className="qp-heatmap__axis">
+        <div className="at-heatmap__foot" aria-hidden="true">
+          <span className="at-heatmap__axis">
             {HOUR_TICKS.map((hour) => (
               <span key={hour} style={{ gridColumn: hour + 1 }}>{hour}</span>
             ))}
           </span>
-          <span className="qp-heatmap__legend">
+          <span className="at-heatmap__legend">
             {copy.legendLow}
             {LEGEND_LEVELS.map((level) => <i key={level} data-level={level} />)}
             {copy.legendHigh}

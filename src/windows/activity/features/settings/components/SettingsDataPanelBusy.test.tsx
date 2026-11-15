@@ -191,7 +191,7 @@ describe("四颗动作键的接线（点了调的是哪个回调）", () => {
     await flush();
     expect(cb.onScheduleWebviewCacheClear, "还没确认就安排了缓存清理（会直接重启应用）")
       .not.toHaveBeenCalled();
-    const surface = Array.from(document.body.querySelectorAll<HTMLElement>(".qp-dialog-surface")).pop();
+    const surface = Array.from(document.body.querySelectorAll<HTMLElement>(".at-dialog-surface")).pop();
     expect(surface, "「清理缓存」没有确认框").toBeDefined();
     expect(surface?.textContent ?? "", "确认框里没有「重启并应用」").toContain("重启并应用");
   });

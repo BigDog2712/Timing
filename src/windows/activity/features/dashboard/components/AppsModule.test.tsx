@@ -91,7 +91,7 @@ async function mount(apps: TopApplicationItem[] = APPS): Promise<void> {
 }
 
 function rows(): HTMLLIElement[] {
-  return Array.from(container?.querySelectorAll<HTMLLIElement>(".qp-app-row") ?? []);
+  return Array.from(container?.querySelectorAll<HTMLLIElement>(".at-app-row") ?? []);
 }
 
 /** jsdom 的 `getBoundingClientRect` 恒为 0；锚点判据需要真实的盒。 */
@@ -213,7 +213,7 @@ describe("行上的绑定标记", () => {
 
     const chrome = rows()[1]!;
     expect(chrome.textContent, "已绑定的应用行上没有事项名").toContain("写代码");
-    expect(chrome.querySelector(".qp-app-binding"), "行上没有绑定标记").not.toBeNull();
+    expect(chrome.querySelector(".at-app-binding"), "行上没有绑定标记").not.toBeNull();
     expect(chrome.getAttribute("aria-label")).toContain("写代码");
   });
 
@@ -227,7 +227,7 @@ describe("行上的绑定标记", () => {
 
     const code = rows()[0]!;
     expect(code.textContent, "大写 exe 的应用行上没有事项名").toContain("写代码");
-    expect(code.querySelector(".qp-app-binding"), "大写 exe 的应用行上没有绑定标记").not.toBeNull();
+    expect(code.querySelector(".at-app-binding"), "大写 exe 的应用行上没有绑定标记").not.toBeNull();
   });
 
   it("apps06c_row_label_separates_edit_and_binding", async () => {
@@ -242,7 +242,7 @@ describe("行上的绑定标记", () => {
   it("apps07_no_marker_when_unbound", async () => {
     await mount();
     for (const row of rows()) {
-      expect(row.querySelector(".qp-app-binding")).toBeNull();
+      expect(row.querySelector(".at-app-binding")).toBeNull();
     }
   });
 
@@ -251,11 +251,11 @@ describe("行上的绑定标记", () => {
     g.items = [{ id: 7, name: "写代码", color: "" }];
     await mount();
     const chrome = rows()[1]!;
-    const label = chrome.querySelector(".qp-app-label")!;
-    /* 行高由 `grid-template-rows: 19px 4px` + `height: var(--qp-row-app)` 锁死，
+    const label = chrome.querySelector(".at-app-label")!;
+    /* 行高由 `grid-template-rows: 19px 4px` + `height: var(--at-row-app)` 锁死，
        标记不允许用 padding/border 把行顶高 —— 这两条属性就是那条判据。 */
-    expect(label.querySelector(".qp-app-binding-name")).not.toBeNull();
-    expect(label.querySelector(".qp-app-name"), "名字必须还在（标记不能顶掉名字）").not.toBeNull();
+    expect(label.querySelector(".at-app-binding-name")).not.toBeNull();
+    expect(label.querySelector(".at-app-name"), "名字必须还在（标记不能顶掉名字）").not.toBeNull();
   });
 });
 
@@ -291,7 +291,7 @@ describe("弹层里的绑定栏接线", () => {
 describe("第二条出口不许被拿走", () => {
   it("apps11_footer_still_opens_the_mapping_view", async () => {
     await mount();
-    const footer = container!.querySelector<HTMLButtonElement>(".qp-card-footer");
+    const footer = container!.querySelector<HTMLButtonElement>(".at-card-footer");
     expect(footer, "卡底「全部分类…」入口不见了").not.toBeNull();
     act(() => footer!.click());
     expect(onOpenMapping).toHaveBeenCalledTimes(1);

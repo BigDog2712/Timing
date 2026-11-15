@@ -193,7 +193,7 @@ export default function DataHeatmapTooltip({
     <div
       ref={heatmapTooltipRef}
       role="tooltip"
-      className="qp-tooltip"
+      className="at-tooltip"
       style={{
         top: heatmapTooltipPosition ? `${heatmapTooltipPosition.top}px` : 0,
         left: heatmapTooltipPosition ? `${heatmapTooltipPosition.left}px` : 0,

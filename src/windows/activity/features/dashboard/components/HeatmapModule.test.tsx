@@ -57,13 +57,13 @@ function seeded(): HeatmapState {
 }
 
 function cells(): HTMLElement[] {
-  return Array.from(container?.querySelectorAll<HTMLElement>(".qp-heatmap__cell") ?? []);
+  return Array.from(container?.querySelectorAll<HTMLElement>(".at-heatmap__cell") ?? []);
 }
 
 describe("活动热力图卡", () => {
   it("hm21_seven_rows_of_twenty_four_cells_labelled_monday_first", async () => {
     await mount(createElement(HeatmapModule, { state: seeded() }));
-    const days = Array.from(container?.querySelectorAll<HTMLElement>(".qp-heatmap__rows > .qp-heatmap__day") ?? []);
+    const days = Array.from(container?.querySelectorAll<HTMLElement>(".at-heatmap__rows > .at-heatmap__day") ?? []);
     expect(days).toHaveLength(7);
     expect(cells()).toHaveLength(7 * 24);
     /* 第一行是周一：标签走 Intl 的短星期，中文下就是「周一」 */
@@ -82,19 +82,19 @@ describe("活动热力图卡", () => {
 
   it("hm23_no_activity_shows_the_empty_state_and_no_grid", async () => {
     await mount(createElement(HeatmapModule, { state: { model: emptyHeatmapModel(), status: "ready", retry: () => undefined } }));
-    expect(container?.querySelector(".qp-heatmap")).toBeNull();
+    expect(container?.querySelector(".at-heatmap")).toBeNull();
     expect(container?.textContent).toBeTruthy();
   });
 
   it("hm24_the_grid_is_a_single_labelled_image_with_a_legend_of_five_steps", async () => {
     await mount(createElement(HeatmapModule, { state: seeded() }));
-    const grid = container?.querySelector<HTMLElement>(".qp-heatmap");
+    const grid = container?.querySelector<HTMLElement>(".at-heatmap");
     expect(grid?.getAttribute("role")).toBe("img");
     expect(grid?.getAttribute("aria-label") ?? "").toContain("热力图");
-    expect(container?.querySelectorAll(".qp-heatmap__legend i")).toHaveLength(5);
+    expect(container?.querySelectorAll(".at-heatmap__legend i")).toHaveLength(5);
     /* 卡头读数照 exe：只写「近 4 周」（`widgets/mod.rs:159`）。
        平均每周那个数没丢 —— 它挪进了 `aria-label`（上一条断言），读屏仍听得到。 */
-    expect(container?.querySelector(".qp-card-meta")?.textContent ?? "").toContain("近 4 周");
+    expect(container?.querySelector(".at-card-meta")?.textContent ?? "").toContain("近 4 周");
     expect(grid?.getAttribute("aria-label") ?? "").toContain("平均每周");
   });
 });

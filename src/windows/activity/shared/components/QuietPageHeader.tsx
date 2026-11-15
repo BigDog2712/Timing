@@ -16,25 +16,25 @@ export default function QuietPageHeader({
   rightSlot,
 }: Props) {
   return (
-    <header className="qp-panel qp-page-header">
-      <div className="qp-page-header-left">
-        <div className="qp-page-header-icon">
+    <header className="at-panel at-page-header">
+      <div className="at-page-header-left">
+        <div className="at-page-header-icon">
           {icon}
         </div>
-        <div className="qp-page-header-copy">
-          <div className="qp-page-header-title-row">
-            <h1 className="qp-page-header-title">{title}</h1>
+        <div className="at-page-header-copy">
+          <div className="at-page-header-title-row">
+            <h1 className="at-page-header-title">{title}</h1>
             {titleSuffix ? titleSuffix : null}
           </div>
           {subtitle ? (
-            <div className="qp-page-header-subtitle">
+            <div className="at-page-header-subtitle">
               {subtitle}
             </div>
           ) : null}
         </div>
       </div>
       {rightSlot ? (
-        <div className="qp-page-header-right">
+        <div className="at-page-header-right">
           {rightSlot}
         </div>
       ) : null}

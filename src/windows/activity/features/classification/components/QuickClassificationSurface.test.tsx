@@ -265,8 +265,8 @@ describe("弹层：分类子菜单接线", () => {
     const radios = document.body.querySelectorAll("[role='menuitemradio']");
     expect(radios.length).toBeGreaterThan(0);
     /* 新建入口恒在 */
-    expect(document.body.querySelector("[data-qp-create-category]")).not.toBeNull();
+    expect(document.body.querySelector("[data-at-create-category]")).not.toBeNull();
     /* bootstrap 里没有自定义分类 → 一颗删除键都不该有（内置分类不可删） */
-    expect(document.body.querySelectorAll("[data-qp-delete-category]")).toHaveLength(0);
+    expect(document.body.querySelectorAll("[data-at-delete-category]")).toHaveLength(0);
   });
 });

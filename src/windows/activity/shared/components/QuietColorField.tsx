@@ -316,10 +316,10 @@ export default function QuietColorField({
           return true;
         });
       }}
-      className={`qp-color-trigger ${presentation === "swatch" ? "qp-color-trigger-swatch-only" : fixedValueSlot ? "qp-color-trigger-fixed-slot" : ""}`}
+      className={`at-color-trigger ${presentation === "swatch" ? "at-color-trigger-swatch-only" : fixedValueSlot ? "at-color-trigger-fixed-slot" : ""}`}
     >
-      <span className="qp-color-trigger-swatch" style={{ backgroundColor: normalizedColor }} aria-hidden />
-      {presentation === "value" && <span className="qp-color-trigger-value">{normalizedColor}</span>}
+      <span className="at-color-trigger-swatch" style={{ backgroundColor: normalizedColor }} aria-hidden />
+      {presentation === "value" && <span className="at-color-trigger-value">{normalizedColor}</span>}
     </button>
   );
   const eyedropperLabel = supportsEyedropper ? UI_TEXT.accessibility.color.eyedropper : UI_TEXT.accessibility.color.eyedropperUnsupported;
@@ -336,21 +336,21 @@ export default function QuietColorField({
         <div
           ref={popoverRef}
           id={popoverId}
-          className={`qp-color-popover ${position.placement === "top" ? "qp-color-popover-top" : "qp-color-popover-bottom"}`}
+          className={`at-color-popover ${position.placement === "top" ? "at-color-popover-top" : "at-color-popover-bottom"}`}
           role="dialog"
           aria-labelledby={titleId}
           style={{ top: `${position.top}px`, left: `${position.left}px` }}
         >
-          <div className="qp-color-popover-head">
+          <div className="at-color-popover-head">
             <div
               ref={titleRef}
               id={titleId}
               tabIndex={-1}
-              className="qp-color-popover-title"
+              className="at-color-popover-title"
             >
               {UI_TEXT.accessibility.color.color}
             </div>
-            <div className="qp-color-popover-actions">
+            <div className="at-color-popover-actions">
               {resetAction && (
                 <QuietIconAction
                   icon={<RotateCcw size={14} />}
@@ -362,7 +362,7 @@ export default function QuietColorField({
               <QuietTooltip label={eyedropperLabel}>
                 <button
                   type="button"
-                  className="qp-color-eyedropper"
+                  className="at-color-eyedropper"
                   aria-label={eyedropperLabel}
                   onClick={() => void pickByEyedropper()}
                   disabled={!supportsEyedropper}
@@ -376,18 +376,18 @@ export default function QuietColorField({
 
           <div
             ref={svAreaRef}
-            className="qp-color-sv-area"
+            className="at-color-sv-area"
             onPointerDown={handleSvPointerDown}
-            style={{ "--qp-hue": `${hue}` } as CSSProperties}
+            style={{ "--at-hue": `${hue}` } as CSSProperties}
           >
             <span
-              className="qp-color-sv-thumb"
+              className="at-color-sv-thumb"
               style={{ left: `${hsl.s}%`, top: `${100 - hsl.l}%` }}
               aria-hidden
             />
           </div>
 
-          <div className="qp-color-control-row">
+          <div className="at-color-control-row">
             <QuietSegmentedFilter
               value={format}
               options={FORMAT_OPTIONS}
@@ -396,7 +396,7 @@ export default function QuietColorField({
               ariaLabel={UI_TEXT.accessibility.color.colorFormat}
               tabIdPrefix={`${formatPanelId}-tab`}
               tabPanelId={formatPanelId}
-              className="qp-color-format-switch"
+              className="at-color-format-switch"
             />
             <input
               type="range"
@@ -405,8 +405,8 @@ export default function QuietColorField({
               step={1}
               value={hue}
               aria-label={UI_TEXT.accessibility.color.hueSlider}
-              className="qp-color-hue-slider"
-              style={{ "--qp-hue": `${hue}` } as CSSProperties}
+              className="at-color-hue-slider"
+              style={{ "--at-hue": `${hue}` } as CSSProperties}
               onChange={(event) => applyHsl({ h: Number(event.target.value) })}
             />
           </div>
@@ -416,15 +416,15 @@ export default function QuietColorField({
               id={formatPanelId}
               role="tabpanel"
               aria-labelledby={`${formatPanelId}-tab-hex`}
-              className="qp-color-input-row"
+              className="at-color-input-row"
             >
-              <span className="qp-color-row-label">HEX</span>
+              <span className="at-color-row-label">HEX</span>
               <input
                 aria-label={UI_TEXT.accessibility.color.hexValue}
                 value={hexDraft}
                 onChange={(event) => onHexDraftChange(event.target.value)}
                 onBlur={onHexDraftBlur}
-                className="qp-input qp-color-text-input"
+                className="at-input at-color-text-input"
               />
             </div>
           )}
@@ -434,10 +434,10 @@ export default function QuietColorField({
               id={formatPanelId}
               role="tabpanel"
               aria-labelledby={`${formatPanelId}-tab-rgb`}
-              className="qp-color-triplet-row"
+              className="at-color-triplet-row"
             >
-              <span className="qp-color-row-label">RGB</span>
-              <div className="qp-color-triplet-fields">
+              <span className="at-color-row-label">RGB</span>
+              <div className="at-color-triplet-fields">
                 <input
                   aria-label={UI_TEXT.accessibility.color.redChannel}
                   type="number"
@@ -445,7 +445,7 @@ export default function QuietColorField({
                   max={255}
                   value={rgb.r}
                   onChange={(event) => onRgbInput("r", event.target.value)}
-                  className="qp-input qp-color-number-input"
+                  className="at-input at-color-number-input"
                 />
                 <input
                   aria-label={UI_TEXT.accessibility.color.greenChannel}
@@ -454,7 +454,7 @@ export default function QuietColorField({
                   max={255}
                   value={rgb.g}
                   onChange={(event) => onRgbInput("g", event.target.value)}
-                  className="qp-input qp-color-number-input"
+                  className="at-input at-color-number-input"
                 />
                 <input
                   aria-label={UI_TEXT.accessibility.color.blueChannel}
@@ -463,7 +463,7 @@ export default function QuietColorField({
                   max={255}
                   value={rgb.b}
                   onChange={(event) => onRgbInput("b", event.target.value)}
-                  className="qp-input qp-color-number-input"
+                  className="at-input at-color-number-input"
                 />
               </div>
             </div>
@@ -474,10 +474,10 @@ export default function QuietColorField({
               id={formatPanelId}
               role="tabpanel"
               aria-labelledby={`${formatPanelId}-tab-hsl`}
-              className="qp-color-triplet-row"
+              className="at-color-triplet-row"
             >
-              <span className="qp-color-row-label">HSL</span>
-              <div className="qp-color-triplet-fields">
+              <span className="at-color-row-label">HSL</span>
+              <div className="at-color-triplet-fields">
                 <input
                   aria-label={UI_TEXT.accessibility.color.hueChannel}
                   type="number"
@@ -485,7 +485,7 @@ export default function QuietColorField({
                   max={360}
                   value={hsl.h}
                   onChange={(event) => onHslInput("h", event.target.value)}
-                  className="qp-input qp-color-number-input"
+                  className="at-input at-color-number-input"
                 />
                 <input
                   aria-label={UI_TEXT.accessibility.color.saturationChannel}
@@ -494,7 +494,7 @@ export default function QuietColorField({
                   max={100}
                   value={hsl.s}
                   onChange={(event) => onHslInput("s", event.target.value)}
-                  className="qp-input qp-color-number-input"
+                  className="at-input at-color-number-input"
                 />
                 <input
                   aria-label={UI_TEXT.accessibility.color.lightnessChannel}
@@ -503,7 +503,7 @@ export default function QuietColorField({
                   max={100}
                   value={hsl.l}
                   onChange={(event) => onHslInput("l", event.target.value)}
-                  className="qp-input qp-color-number-input"
+                  className="at-input at-color-number-input"
                 />
               </div>
             </div>

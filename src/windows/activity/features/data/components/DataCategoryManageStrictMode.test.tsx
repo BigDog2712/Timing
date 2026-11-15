@@ -52,12 +52,12 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 /**
- * "加载中"那一行：`<p className="qp-app-edit-hint" role="status">`。
- * 同名的 `.qp-app-edit-hint` 还有一条**不带** `role="status"` 的说明文字（加载完才出现），
- * 所以用 `[role='status']` 才能唯一指认加载态 —— 出错那条挂的是 `.qp-app-edit-issue`。
+ * "加载中"那一行：`<p className="at-app-edit-hint" role="status">`。
+ * 同名的 `.at-app-edit-hint` 还有一条**不带** `role="status"` 的说明文字（加载完才出现），
+ * 所以用 `[role='status']` 才能唯一指认加载态 —— 出错那条挂的是 `.at-app-edit-issue`。
  */
 const loadingLine = () =>
-  manageDialog()?.querySelector<HTMLElement>(".qp-app-edit-hint[role='status']") ?? null;
+  manageDialog()?.querySelector<HTMLElement>(".at-app-edit-hint[role='status']") ?? null;
 
 beforeEach(() => {
   h.loadBootstrap.mockReset();

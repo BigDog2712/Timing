@@ -17,7 +17,7 @@ import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
  *
  * Rust 的环不是固定 ⌀132：`d = min(内容高, 0.46×内容宽)` 再 clamp 到 86–158，
  * 描边 `0.135d`（不小于 9），片间缝隙按弧长 1.6px 折算角度。这里保留一套 viewBox
- * （d = 144），把**比例**写死，实际直径交给 CSS 的 `--qp-donut-fit`：
+ * （d = 144），把**比例**写死，实际直径交给 CSS 的 `--at-donut-fit`：
  *   · 描边 19.44 / 144 = 0.135   → 与 Rust 同粗
  *   · 中径 62.28 = 72 − 19.44/2  → 内外缘比例与 Rust 一致
  *   · 缝隙 1.47° ≈ 1.6px 弧长（r=62.28）
@@ -67,7 +67,7 @@ function buildReadouts(
     category: "other" as const,
     name: otherLabel,
     value: restValue,
-    color: "var(--qp-text-tertiary)",
+    color: "var(--at-text-tertiary)",
   }];
 }
 
@@ -113,10 +113,10 @@ export default function TimerModule({
 
   let consumed = 0;
 
-  /* 环抽成变量（[0.13 · F2]）：empty 态也要画底圈 —— 只给一句 `qp-empty` 的话，
+  /* 环抽成变量（[0.13 · F2]）：empty 态也要画底圈 —— 只给一句 `at-empty` 的话，
      "卡是空的还是坏了"分不出来。底环 + 环心读数（0m）说的是"今天真的什么都没记"。 */
   const donut = (
-    <div className="qp-donut">
+    <div className="at-donut">
       <svg viewBox={`0 0 ${DONUT_VIEWBOX} ${DONUT_VIEWBOX}`} aria-hidden="true" focusable="false">
         <AnonymousActivityPattern id={anonymousPatternId} />
         <circle
@@ -124,7 +124,7 @@ export default function TimerModule({
           cy={DONUT_CENTER}
           fill="none"
           r={DONUT_RADIUS}
-          stroke="var(--qp-track-muted)"
+          stroke="var(--at-track-muted)"
           strokeWidth={DONUT_STROKE_WIDTH}
         />
         {total > 0 ? readouts.map((item, index) => {
@@ -142,7 +142,7 @@ export default function TimerModule({
               r={DONUT_RADIUS}
               stroke={item.category === "anonymous"
                 ? `url(#${anonymousPatternId})`
-                : displayColor(item.color) || "var(--qp-accent-default)"}
+                : displayColor(item.color) || "var(--at-accent-default)"}
               strokeDasharray={`${dashLength} ${DONUT_CIRCUMFERENCE - dashLength}`}
               strokeDashoffset={dashOffset}
               strokeOpacity={hovered === null || hovered === index ? 1 : 0.35}
@@ -152,9 +152,9 @@ export default function TimerModule({
           );
         }) : null}
       </svg>
-      <div className="qp-donut-center">
-        <span className="qp-donut-total">{formatDashboardDuration(total)}</span>
-        <span className="qp-donut-cap">{isItemDimension ? copy.timerDonutCapItems : copy.timerDonutCap}</span>
+      <div className="at-donut-center">
+        <span className="at-donut-total">{formatDashboardDuration(total)}</span>
+        <span className="at-donut-cap">{isItemDimension ? copy.timerDonutCapItems : copy.timerDonutCap}</span>
       </div>
     </div>
   );
@@ -165,15 +165,15 @@ export default function TimerModule({
      这一条是被真实使用撞出来的（0.13 的卡就是这么哑的）。
      较昨日读数只在 ready 出现：空态/骨架里那两个数没有意义。 */
   const dimensionBar = (
-    <div className="qp-focus-bar">
-      <div className="qp-focus-dims" role="tablist" aria-label={copy.focusDimensionLabel}>
+    <div className="at-focus-bar">
+      <div className="at-focus-dims" role="tablist" aria-label={copy.focusDimensionLabel}>
         {FOCUS_DIMENSIONS.map((dim) => (
           <button
             key={dim}
             type="button"
             role="tab"
             aria-selected={dim === dimension}
-            className="qp-focus-dim"
+            className="at-focus-dim"
             data-active={dim === dimension || undefined}
             onClick={() => onDimensionChange(dim)}
           >
@@ -186,7 +186,7 @@ export default function TimerModule({
           **事项维度不显示**：`dayDeltaTrackedTime` 是应用活动的今日−昨日，昨天没有
           按事项的读数可比 —— 拿应用活动的差值挂在事项维度上，就是一句看起来像真的假话。 */}
       {isItemDimension || state !== "ready" ? null : (
-        <span className="qp-focus-delta" data-dir={direction}>
+        <span className="at-focus-delta" data-dir={direction}>
           <DeltaIcon size={11} strokeWidth={2} aria-hidden="true" />
           {UI_TEXT.dashboard.comparedWithYesterday(
             formatDashboardDuration(Math.abs(dayDeltaTrackedTime)),
@@ -216,12 +216,12 @@ export default function TimerModule({
       /* [0.13 · F2 / V-1.2b] 空态仍画底圈 + 「今日 0m」 */
       emptyVisual={state === "empty" ? donut : undefined}
     >
-      <div className="qp-donut-body">
+      <div className="at-donut-body">
         {/* 环只是同一份数据的第二表达，读数行才是可读内容 → 环对读屏隐藏，
             否则同一组占比会被读两遍（01 §4.3 骨架里环无 role） */}
         {donut}
 
-        <ul className="qp-readouts">
+        <ul className="at-readouts">
           {readouts.map((item, index) => {
             /* Rust 的图例每行两段：名称（12）与「百分比 · 时长」（10）。百分比在这层算，
              * 用**同一份** readouts 的总量 —— 环、名称、占比三者永远自洽。 */
@@ -229,21 +229,21 @@ export default function TimerModule({
             return (
               <li
                 key={`${item.category}:${index}`}
-                className="qp-readout"
+                className="at-readout"
                 data-hover={hovered === index || undefined}
                 onPointerEnter={() => setHovered(index)}
                 onPointerLeave={() => setHovered(null)}
               >
                 <span
-                  className="qp-readout-dot"
+                  className="at-readout-dot"
                   aria-hidden="true"
                   style={{
-                    backgroundColor: displayColor(item.color) || "var(--qp-accent-default)",
+                    backgroundColor: displayColor(item.color) || "var(--at-accent-default)",
                     ...(item.category === "anonymous" ? ANONYMOUS_ACTIVITY_STYLE : {}),
                   }}
                 />
-                <span className="qp-readout-name" title={item.name}>{item.name}</span>
-                <span className="qp-readout-sub">
+                <span className="at-readout-name" title={item.name}>{item.name}</span>
+                <span className="at-readout-sub">
                   {`${percent}%  ·  ${formatDashboardDuration(item.value)}`}
                 </span>
               </li>

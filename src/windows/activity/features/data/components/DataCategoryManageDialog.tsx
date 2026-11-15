@@ -50,7 +50,7 @@ function DataCategoryManageDialogSurface({
     <QuietDialog
       open
       title={copy.manageAction}
-      surfaceClassName="qp-app-edit-dialog qp-category-manage-dialog"
+      surfaceClassName="at-app-edit-dialog at-category-manage-dialog"
       onClose={() => {
         /* 写库中途不许关：关闭会卸载会话，正在飞的那次提交就没人收尾了 */
         if (!state.managing) onClose();
@@ -61,12 +61,12 @@ function DataCategoryManageDialogSurface({
         </QuietButton>
       )}
     >
-      {state.error ? <p className="qp-app-edit-issue" role="status">{state.error}</p> : null}
+      {state.error ? <p className="at-app-edit-issue" role="status">{state.error}</p> : null}
       {state.loading ? (
-        <p className="qp-app-edit-hint" role="status">{UI_TEXT.common.loading}</p>
+        <p className="at-app-edit-hint" role="status">{UI_TEXT.common.loading}</p>
       ) : (
         <>
-          <p className="qp-app-edit-hint">{copy.manageHint}</p>
+          <p className="at-app-edit-hint">{copy.manageHint}</p>
           <DataCategoryManagePanel
             options={state.options}
             usage={state.usage}

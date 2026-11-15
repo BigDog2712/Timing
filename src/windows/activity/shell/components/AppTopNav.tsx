@@ -23,7 +23,7 @@ export interface AppTopNavProps {
   onPreviewNavigate?: (view: View) => void;
 }
 
-type TabStyle = CSSProperties & { "--qp-tab-i": number };
+type TabStyle = CSSProperties & { "--at-tab-i": number };
 
 /**
  * View → 归属的顶栏区域（01 §6.6 归并表）。
@@ -55,7 +55,7 @@ export default function AppTopNav({
   const activeTab = TAB_BY_VIEW[currentView];
   const activeIndex = tabs.findIndex((tab) => tab.id === activeTab);
   const navigateRequestRef = useRef(0);
-  const indicatorStyle: TabStyle = { "--qp-tab-i": Math.max(0, activeIndex) };
+  const indicatorStyle: TabStyle = { "--at-tab-i": Math.max(0, activeIndex) };
 
   const handleTabClick = (view: View) => {
     navigateRequestRef.current += 1;
@@ -75,7 +75,7 @@ export default function AppTopNav({
 
   return (
     <nav
-      className="qp-topbar-nav"
+      className="at-topbar-nav"
       data-topbar-nav=""
       data-tab-active={activeIndex >= 0 ? "true" : "false"}
     >
@@ -94,7 +94,7 @@ export default function AppTopNav({
             onClick={() => handleTabClick(tab.id)}
             aria-current={isActive ? "page" : undefined}
             data-topbar-tab={tab.id}
-            className="qp-topbar-tab"
+            className="at-topbar-tab"
             /* 文字标签已下线（只留图标）：名字必须留在可访问名里，否则读屏只剩
                "按钮"三个字；`title` 给鼠标用户一条悬停提示，两者都不能省。 */
             aria-label={tab.label}
@@ -104,7 +104,7 @@ export default function AppTopNav({
           </button>
         );
       })}
-      <span className="qp-tab-ind pointer-events-none" style={indicatorStyle} aria-hidden="true" />
+      <span className="at-tab-ind pointer-events-none" style={indicatorStyle} aria-hidden="true" />
     </nav>
   );
 }

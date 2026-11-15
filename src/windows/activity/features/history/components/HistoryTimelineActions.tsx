@@ -106,11 +106,11 @@ export function HistoryMinDurationControl({
         onClick={() => onChange(minutes - 1)}
         disabled={!canDecrease}
         aria-label={decreaseLabel}
-        className="qp-button-secondary inline-flex h-6 w-6 items-center justify-center rounded-[6px] p-0 disabled:cursor-not-allowed disabled:opacity-50"
+        className="at-button-secondary inline-flex h-6 w-6 items-center justify-center rounded-[6px] p-0 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Minus size={11} />
       </button>
-      <span className="min-w-[62px] text-center qp-text-caption qp-weight-medium tabular-nums text-[var(--qp-text-secondary)]">
+      <span className="min-w-[62px] text-center at-text-caption at-weight-medium tabular-nums text-[var(--at-text-secondary)]">
         {valueLabel}
       </span>
       <button
@@ -118,7 +118,7 @@ export function HistoryMinDurationControl({
         onClick={() => onChange(minutes + 1)}
         disabled={!canIncrease}
         aria-label={increaseLabel}
-        className="qp-button-secondary inline-flex h-6 w-6 items-center justify-center rounded-[6px] p-0 disabled:cursor-not-allowed disabled:opacity-50"
+        className="at-button-secondary inline-flex h-6 w-6 items-center justify-center rounded-[6px] p-0 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <Plus size={11} />
       </button>

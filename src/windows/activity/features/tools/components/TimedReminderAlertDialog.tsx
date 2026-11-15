@@ -60,11 +60,11 @@ export default function TimedReminderAlertDialog({ alert, onAction, notification
   >
     <div className="tools-usage-steps">
       <div className="tools-usage-step-limit" inert={snoozing}>
-        <div className="qp-dialog-title">{reminderTitle}</div>
+        <div className="at-dialog-title">{reminderTitle}</div>
         <p className="tools-usage-alert-summary">{text.tools.reminderOccurredAt(occurredAt)}</p>
       </div>
       <div inert={!snoozing}>
-        <div className="qp-dialog-title">{text.tools.reminderSnooze}</div>
+        <div className="at-dialog-title">{text.tools.reminderSnooze}</div>
         <fieldset className="tools-usage-alert-options" aria-label={text.tools.reminderSnooze} disabled={busy}>
           {([5, 15, 30] as const).map(value => <label key={value} className="tools-usage-alert-option">
             <span>{text.tools.reminderSnoozeDelay(formatUsageDuration(value, locale))}</span>

@@ -25,7 +25,7 @@ export default function ActivityReminderDurationPicker({ minutes, onChange, disa
 
   return <>
     <button ref={anchorRef} type="button" disabled={disabled}
-      className="qp-input qp-time-picker-trigger tools-usage-duration-trigger"
+      className="at-input at-time-picker-trigger tools-usage-duration-trigger"
       aria-label={text.tools.activityReminderDurationLabel} aria-expanded={open && !disabled}
       aria-controls={open && !disabled ? id : undefined} onClick={() => setOpen(!open)}>
       {formatUsageDuration(minutes, locale)}

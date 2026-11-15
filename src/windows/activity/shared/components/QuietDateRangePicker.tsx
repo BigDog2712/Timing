@@ -201,12 +201,12 @@ export default function QuietDateRangePicker({
   return createPortal((
     <section
       ref={popoverRef}
-      className={`qp-range-picker ${className ?? ""}`.trim()}
+      className={`at-range-picker ${className ?? ""}`.trim()}
       style={{ left: position.left, top: position.top, width: position.width }}
       role="dialog"
       aria-labelledby={titleId}
     >
-      <header className="qp-range-picker-header">
+      <header className="at-range-picker-header">
         <strong ref={titleRef} id={titleId} tabIndex={-1}>{getDraftSummary(draft, labels)}</strong>
       </header>
 
@@ -245,10 +245,10 @@ export default function QuietDateRangePicker({
       />
 
       {draft.mode === "custom" && draft.range && draft.range.dayCount < 7 && labels.shortRangeHint ? (
-        <p className="qp-range-picker-hint">{labels.shortRangeHint}</p>
+        <p className="at-range-picker-hint">{labels.shortRangeHint}</p>
       ) : null}
 
-      <footer className={`qp-range-picker-footer ${footerClassName ?? ""}`.trim()}>
+      <footer className={`at-range-picker-footer ${footerClassName ?? ""}`.trim()}>
         <QuietButton
           size="compact"
           onClick={closeAndRestoreFocus}

@@ -25,7 +25,7 @@ export function useMappingLinkLayout<T>(
   const capture = (preferred?: string | null) => {
     const nodes = cards();
     const selected = nodes.find(node => identity(node) === preferred) ?? nodes[0];
-    const region = selected?.closest<HTMLElement>(".qp-scroll-region");
+    const region = selected?.closest<HTMLElement>(".at-scroll-region");
     if (!region) return;
     const top = region.getBoundingClientRect().top;
     const preferredTop = selected.getBoundingClientRect().top;
@@ -77,7 +77,7 @@ export function useMappingLinkLayout<T>(
   useLayoutEffect(() => {
     if (session && !active) {
       reset();
-      if (document.activeElement === document.body) root.current?.querySelector<HTMLInputElement>(".qp-category-search input")?.focus({ preventScroll: true });
+      if (document.activeElement === document.body) root.current?.querySelector<HTMLInputElement>(".at-category-search input")?.focus({ preventScroll: true });
       return;
     }
     if (session && busy) { close(); return; }
@@ -94,7 +94,7 @@ export function useMappingLinkLayout<T>(
     reference.region.scrollTop += delta;
     if (reference.focus) {
       const card = nodes.get(reference.focus);
-      (card?.querySelector<HTMLButtonElement>(".qp-app-link-trigger") ?? card?.querySelector<HTMLButtonElement>("button"))?.focus({ preventScroll: true });
+      (card?.querySelector<HTMLButtonElement>(".at-app-link-trigger") ?? card?.querySelector<HTMLButtonElement>("button"))?.focus({ preventScroll: true });
     }
   });
   useLayoutEffect(() => {

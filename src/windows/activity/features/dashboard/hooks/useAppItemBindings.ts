@@ -31,7 +31,7 @@ import {
  * 所以读 `loadAppItemBindingUnions()`，行标记 / 弹层初值都取并集的**主值**：
  * `oneToOne ?? itemIds[0]`（与 `planAppItemBindingWrite` 解绑时摘掉的那一个同一条规则）。
  *
- * 行标记仍然只画**一个**事项名（`qp-app-binding` 是一行 12px 的标记，不是清单）：多事项
+ * 行标记仍然只画**一个**事项名（`at-app-binding` 是一行 12px 的标记，不是清单）：多事项
  * 绑定在事项视角（`useItemAppBindings`）里才是完整清单。这里取主值就够了 —— 用户要的是
  * "这个应用是绑着事的"，不是"绑了几件"。
  *

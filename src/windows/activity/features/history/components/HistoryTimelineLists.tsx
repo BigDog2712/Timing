@@ -60,14 +60,14 @@ export function HistoryTimelineList({
 
   if (timelineSessions.length === 0) {
     return (
-      <div className={`history-timeline-list-empty flex-1 flex items-center justify-center text-[var(--qp-text-tertiary)] qp-text-body ${className}`.trim()}>
+      <div className={`history-timeline-list-empty flex-1 flex items-center justify-center text-[var(--at-text-tertiary)] at-text-body ${className}`.trim()}>
         {UI_TEXT.history.emptyDay}
       </div>
     );
   }
 
   return (
-    <div className={`history-timeline-list flex-1 overflow-y-auto qp-scroll-region space-y-2 pr-1 ${className}`.trim()}>
+    <div className={`history-timeline-list flex-1 overflow-y-auto at-scroll-region space-y-2 pr-1 ${className}`.trim()}>
       {timelineSessions.map((session) => {
           const mapped = AppClassification.mapApp(session.exeName, { appName: session.displayName });
           const displayExe = AppClassification.resolveStatisticalApp(session.exeName);
@@ -90,27 +90,27 @@ export function HistoryTimelineList({
           return (
             <div
               key={session.id}
-              className="qp-workbench-list-card flex items-center gap-3 p-3"
+              className="at-workbench-list-card flex items-center gap-3 p-3"
             >
               <div
                 className="w-1 self-stretch rounded-full flex-shrink-0"
                 style={{ backgroundColor: displayColor(accentColor) }}
               />
-              <div className="w-8 h-8 rounded-[8px] bg-[var(--qp-bg-panel)] border border-[var(--qp-border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden p-1.5">
+              <div className="w-8 h-8 rounded-[8px] bg-[var(--at-bg-panel)] border border-[var(--at-border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden p-1.5">
                 {mapped.category === "anonymous" ? <AnonymousActivityIcon size={18}  /> : icons[displayExe] ? (
                   <img src={icons[displayExe]} className="w-full h-full object-contain" alt="" />
                 ) : (
-                  <div className="qp-text-caption qp-weight-emphasis opacity-35 text-[var(--qp-text-secondary)]">{mapped.category[0].toUpperCase()}</div>
+                  <div className="at-text-caption at-weight-emphasis opacity-35 text-[var(--at-text-secondary)]">{mapped.category[0].toUpperCase()}</div>
                 )}
               </div>
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
                 <div className="flex min-w-0 flex-1 items-end gap-1.5">
-                  <div className="min-w-0 truncate qp-text-body qp-weight-medium text-[var(--qp-text-primary)]">
+                  <div className="min-w-0 truncate at-text-body at-weight-medium text-[var(--at-text-primary)]">
                     {mapped.category === "anonymous" ? (
                       <span role="img" aria-label={UI_TEXT.common.anonymousActivity}><AnonymousActivityName /></span>
                     ) : session.displayName}
                   </div>
-                  {mapped.category !== "anonymous" && <span className="qp-workbench-list-meta">
+                  {mapped.category !== "anonymous" && <span className="at-workbench-list-meta">
                     <span>
                       {UI_TEXT.history.activitySegmentCount(session.mergedCount)}
                     </span>
@@ -134,7 +134,7 @@ export function HistoryTimelineList({
                         isExpanded,
                         session.displayName,
                       )}
-                      className="qp-button-secondary qp-compact-disclosure"
+                      className="at-button-secondary at-compact-disclosure"
                     >
                       {isExpanded
                         ? detailPlacement === "top"
@@ -146,8 +146,8 @@ export function HistoryTimelineList({
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="qp-text-caption qp-weight-medium text-[var(--qp-text-primary)] tabular-nums">{formatDuration(session.duration || 0)}</div>
-                <div className="qp-text-caption text-[var(--qp-text-tertiary)] mt-0.5 tabular-nums">
+                <div className="at-text-caption at-weight-medium text-[var(--at-text-primary)] tabular-nums">{formatDuration(session.duration || 0)}</div>
+                <div className="at-text-caption text-[var(--at-text-tertiary)] mt-0.5 tabular-nums">
                   {formatTime(session.startTime, locale)}
                   {session.endTime ? ` - ${formatTime(session.endTime, locale)}` : ` ${UI_TEXT.history.untilNow}`}
                 </div>
@@ -175,14 +175,14 @@ export function HistoryWebTimelineList({
 
   if (items.length === 0) {
     return (
-      <div className={`history-timeline-list-empty flex-1 flex items-center justify-center text-[var(--qp-text-tertiary)] qp-text-body ${className}`.trim()}>
+      <div className={`history-timeline-list-empty flex-1 flex items-center justify-center text-[var(--at-text-tertiary)] at-text-body ${className}`.trim()}>
         {UI_TEXT.history.emptyDay}
       </div>
     );
   }
 
   return (
-    <div className={`history-timeline-list flex-1 overflow-y-auto qp-scroll-region space-y-2 pr-1 ${className}`.trim()}>
+    <div className={`history-timeline-list flex-1 overflow-y-auto at-scroll-region space-y-2 pr-1 ${className}`.trim()}>
       {items.map((item) => {
           const titleSampleDetails: TimelineDetailTitle[] = item.titleSampleDetails;
           const hasDetails = titleSampleDetails.length > 0;
@@ -193,28 +193,28 @@ export function HistoryWebTimelineList({
           return (
             <div
               key={item.id}
-              className="qp-workbench-list-card flex items-center gap-3 p-3"
+              className="at-workbench-list-card flex items-center gap-3 p-3"
             >
               <div
                 className="w-1 self-stretch rounded-full flex-shrink-0"
                 style={{ backgroundColor: displayColor(item.color) }}
               />
-              <div className="w-8 h-8 rounded-[8px] bg-[var(--qp-bg-panel)] border border-[var(--qp-border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden p-1.5">
+              <div className="w-8 h-8 rounded-[8px] bg-[var(--at-bg-panel)] border border-[var(--at-border-subtle)] flex items-center justify-center flex-shrink-0 overflow-hidden p-1.5">
                 {item.category === "anonymous" ? <AnonymousActivityIcon size={15} /> : item.faviconUrl ? (
                   <img src={item.faviconUrl} className="w-full h-full object-contain" alt="" />
                 ) : (
-                  <Globe2 size={15} className="text-[var(--qp-text-tertiary)]" aria-hidden="true" />
+                  <Globe2 size={15} className="text-[var(--at-text-tertiary)]" aria-hidden="true" />
                 )}
               </div>
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
                 <div className="flex min-w-0 flex-1 items-end gap-1.5">
-                  <div className="min-w-0 truncate qp-text-body qp-weight-medium text-[var(--qp-text-primary)]">
+                  <div className="min-w-0 truncate at-text-body at-weight-medium text-[var(--at-text-primary)]">
                     {item.category === "anonymous" ? (
                       <span role="img" aria-label={UI_TEXT.common.anonymousActivity}><AnonymousActivityName /></span>
                     ) : item.label}
                   </div>
                   {titleCount > 0 && (
-                    <span className="qp-workbench-list-meta">
+                    <span className="at-workbench-list-meta">
                       {UI_TEXT.history.titleRowCount(titleCount)}
                     </span>
                   )}
@@ -233,7 +233,7 @@ export function HistoryWebTimelineList({
                         isExpanded,
                         item.label,
                       )}
-                      className="qp-button-secondary qp-compact-disclosure"
+                      className="at-button-secondary at-compact-disclosure"
                     >
                       {isExpanded
                         ? detailPlacement === "top"
@@ -245,10 +245,10 @@ export function HistoryWebTimelineList({
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <div className="qp-text-caption qp-weight-medium text-[var(--qp-text-primary)] tabular-nums">
+                <div className="at-text-caption at-weight-medium text-[var(--at-text-primary)] tabular-nums">
                   {formatDuration(item.duration || 0)}
                 </div>
-                <div className="qp-text-caption text-[var(--qp-text-tertiary)] mt-0.5 tabular-nums">
+                <div className="at-text-caption text-[var(--at-text-tertiary)] mt-0.5 tabular-nums">
                   {formatTime(item.startTime, locale)}
                   {item.endTime ? ` - ${formatTime(item.endTime, locale)}` : ` ${UI_TEXT.history.untilNow}`}
                 </div>

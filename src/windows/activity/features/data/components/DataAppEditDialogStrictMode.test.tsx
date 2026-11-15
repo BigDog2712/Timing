@@ -93,12 +93,12 @@ function bootstrapFixture() {
 }
 
 /**
- * "加载中"那一行：`<p className="qp-app-edit-hint" role="status">`。
- * 同名的 `.qp-app-edit-hint` 还有一条**不带** `role="status"` 的说明文字（加载完才出现），
- * 所以用 `[role='status']` 才能唯一指认加载态 —— 出错那条挂的是 `.qp-app-edit-issue`。
+ * "加载中"那一行：`<p className="at-app-edit-hint" role="status">`。
+ * 同名的 `.at-app-edit-hint` 还有一条**不带** `role="status"` 的说明文字（加载完才出现），
+ * 所以用 `[role='status']` 才能唯一指认加载态 —— 出错那条挂的是 `.at-app-edit-issue`。
  */
 const loadingLine = () =>
-  document.body.querySelector<HTMLElement>(".qp-app-edit-hint[role='status']") ?? null;
+  document.body.querySelector<HTMLElement>(".at-app-edit-hint[role='status']") ?? null;
 
 beforeEach(() => {
   h.loadBootstrap.mockReset();
@@ -158,7 +158,7 @@ describe("StrictMode 双调用下「应用设置」弹窗必须加载完", () =>
     for (let i = 0; i < 5; i += 1) await act(async () => { await Promise.resolve(); });
 
     const checkbox = document.body.querySelector<HTMLInputElement>(
-      ".qp-app-edit-option[data-category='office'] input[type='checkbox']",
+      ".at-app-edit-option[data-category='office'] input[type='checkbox']",
     );
     expect(checkbox, "加载完却没有分类候选行（说明内容区还停在加载态）").not.toBeNull();
     await act(async () => { checkbox?.click(); });

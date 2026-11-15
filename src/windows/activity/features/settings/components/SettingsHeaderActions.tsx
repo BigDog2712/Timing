@@ -37,25 +37,25 @@ export default function SettingsHeaderActions({
   return (
     <div className="flex flex-wrap items-center justify-end gap-2.5">
       <div
-        className={`qp-status ${
-          !busy && hasUnsavedChanges ? "qp-status-danger" : ""
-        } flex px-3 py-1.5 rounded-[8px] items-center qp-text-caption qp-weight-emphasis`}
+        className={`at-status ${
+          !busy && hasUnsavedChanges ? "at-status-danger" : ""
+        } flex px-3 py-1.5 rounded-[8px] items-center at-text-caption at-weight-emphasis`}
       >
         {busy && (
-          <span className="text-[var(--qp-accent-default)] flex items-center gap-2">
+          <span className="text-[var(--at-accent-default)] flex items-center gap-2">
             <RefreshCw size={12} className="animate-spin" />
             {UI_TEXT.settings.saving}
           </span>
         )}
         {saveStatus === "saved" && !hasUnsavedChanges && (
-          <span className="text-[var(--qp-success)] flex items-center gap-1.5">
+          <span className="text-[var(--at-success)] flex items-center gap-1.5">
             <Save size={14} />
             {UI_TEXT.settings.saved}
           </span>
         )}
         {!busy && hasUnsavedChanges && <span>{UI_TEXT.settings.unsaved}</span>}
         {saveStatus === "idle" && !hasUnsavedChanges && (
-          <span className="text-[var(--qp-text-tertiary)]">{UI_TEXT.settings.idle}</span>
+          <span className="text-[var(--at-text-tertiary)]">{UI_TEXT.settings.idle}</span>
         )}
       </div>
       <QuietButton

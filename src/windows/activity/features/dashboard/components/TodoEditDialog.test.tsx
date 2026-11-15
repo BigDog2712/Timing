@@ -45,8 +45,8 @@ function todo(over: Partial<TodoSummary> = {}): TodoSummary {
   };
 }
 
-const dialog = () => document.body.querySelector<HTMLElement>(".qp-todo-dialog");
-const nameInput = () => dialog()?.querySelector<HTMLInputElement>("input.qp-todo-name-input") ?? null;
+const dialog = () => document.body.querySelector<HTMLElement>(".at-todo-dialog");
+const nameInput = () => dialog()?.querySelector<HTMLInputElement>("input.at-todo-name-input") ?? null;
 const timeInput = () => dialog()?.querySelector<HTMLInputElement>("input[type='datetime-local']") ?? null;
 const remindBox = () => dialog()?.querySelector<HTMLInputElement>("input[type='checkbox']") ?? null;
 const byText = (text: string) =>

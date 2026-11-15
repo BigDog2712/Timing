@@ -109,11 +109,11 @@ function MiniView({ runtime, tracking }: {
         <div className="mini-status-icon" {...dragProps}><AppWindow size={14} aria-hidden="true" /></div>
         <div className="mini-drag-region" {...dragProps} />
         <div className="mini-window-actions">
-        <button type="button" className="qp-icon-action qp-icon-action-neutral" aria-label={text.miniWindow.hold} aria-pressed={snapshot?.held ?? false}
+        <button type="button" className="at-icon-action at-icon-action-neutral" aria-label={text.miniWindow.hold} aria-pressed={snapshot?.held ?? false}
           onClick={() => { void act({ kind: "hold", held: !snapshot?.held }); }}><Pin size={14} /></button>
-        <button type="button" className="qp-icon-action qp-icon-action-neutral" aria-label={text.accessibility.miniWindow.openMainWindow}
+        <button type="button" className="at-icon-action at-icon-action-neutral" aria-label={text.accessibility.miniWindow.openMainWindow}
           onClick={() => { void showMainWindow().then(() => setMainFailed(false)).catch(() => setMainFailed(true)); }}><SquareArrowOutUpRight size={14} /></button>
-        <button type="button" className="qp-icon-action app-titlebar-close" data-mini-close aria-label={text.accessibility.titleBar.close}
+        <button type="button" className="at-icon-action app-titlebar-close" data-mini-close aria-label={text.accessibility.titleBar.close}
           onClick={() => { void act({ kind: "close" }); }}><X size={14} /></button>
         </div>
       </header>

@@ -213,7 +213,7 @@ export function limitHourlyCategoryActivity(
       ...(remainderMinutes > 0 ? [{
         category: null,
         name: uiText.hourlyActivityChart.remainingCategories,
-        color: "var(--qp-text-tertiary)",
+        color: "var(--at-text-tertiary)",
         minutes: remainderMinutes,
         isRemainder: true,
       } satisfies HourlyCategoryActivitySegment] : []),

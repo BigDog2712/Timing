@@ -11,7 +11,7 @@
  *     全部搬进 `LayoutManagerDialog`；
  *   · 好处是工具栏不再随「存过默认版没有」变形（`customDefault` 那条分支删了）。
  *
- * **死锁警戒**：锁定时这三颗键必须仍然可点。`.qp-page-toolbar` 的 `opacity: .45`
+ * **死锁警戒**：锁定时这三颗键必须仍然可点。`.at-page-toolbar` 的 `opacity: .45`
  * 与 `pointer-events` 都归 CSS 管，任何"锁定后藏起来"的实现都会让用户永久解不开锁
  * （只能去删 localStorage）。判据见 `boardLock.test.tsx` 的 V-1.3c。
  */
@@ -93,13 +93,13 @@ export default function DashboardBoard({ layout, copy, labelOf, renderBody, empt
 
   return (
     <>
-      <QuietPageToolbar modifier="qp-dashboard-toolbar" ariaLabel={copy.toolbarLabel}>
-        <button type="button" className="qp-link-btn" data-toolbar-add onClick={() => setAddOpen(true)}>
+      <QuietPageToolbar modifier="at-dashboard-toolbar" ariaLabel={copy.toolbarLabel}>
+        <button type="button" className="at-link-btn" data-toolbar-add onClick={() => setAddOpen(true)}>
           {copy.addCard}
         </button>
         <button
           type="button"
-          className="qp-link-btn"
+          className="at-link-btn"
           data-toolbar-manage
           title={copy.manageHint}
           onClick={() => setManageOpen(true)}
@@ -108,7 +108,7 @@ export default function DashboardBoard({ layout, copy, labelOf, renderBody, empt
         </button>
         <button
           type="button"
-          className="qp-link-btn"
+          className="at-link-btn"
           data-toolbar-lock
           aria-pressed={locked}
           onClick={toggleLock}
@@ -174,7 +174,7 @@ export default function DashboardBoard({ layout, copy, labelOf, renderBody, empt
       ) : null}
 
       {toast ? (
-        <div className="qp-board-toast" role="status">{toast}</div>
+        <div className="at-board-toast" role="status">{toast}</div>
       ) : null}
     </>
   );

@@ -144,12 +144,12 @@ export default function TimelineManage({ mode, onClose, onLocalRename, onLocalCr
       <QuietDialog
         open={mode === "manage"}
         title={copy.timelineManageItems}
-        surfaceClassName="qp-timeline-manage-dialog"
+        surfaceClassName="at-timeline-manage-dialog"
         onClose={onClose}
         actions={(
           <button
             type="button"
-            className="qp-button qp-button-compact qp-button-secondary"
+            className="at-button at-button-compact at-button-secondary"
             onClick={onClose}
           >
             {UI_TEXT.common.close}

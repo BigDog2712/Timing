@@ -12,9 +12,9 @@ export default function SettingsPanelHeader({
   className,
 }: SettingsPanelHeaderProps) {
   return (
-    <div className={`flex items-center gap-2.5 border-b border-[var(--qp-border-subtle)] pb-2 ${className ?? ""}`.trim()}>
+    <div className={`flex items-center gap-2.5 border-b border-[var(--at-border-subtle)] pb-2 ${className ?? ""}`.trim()}>
       {icon}
-      <h2 className="qp-text-section-title qp-weight-emphasis text-[var(--qp-text-primary)]">{title}</h2>
+      <h2 className="at-text-section-title at-weight-emphasis text-[var(--at-text-primary)]">{title}</h2>
     </div>
   );
 }

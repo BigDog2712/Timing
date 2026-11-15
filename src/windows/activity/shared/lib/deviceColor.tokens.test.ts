@@ -12,7 +12,7 @@ import {
 /**
  * 设备色**必须是令牌引用**，而且那 8 个令牌必须真实存在。
  *
- * 为什么要读 CSS 文件断言：`deviceColor()` 返回 `var(--qp-device-3)` 这种字符串，
+ * 为什么要读 CSS 文件断言：`deviceColor()` 返回 `var(--at-device-3)` 这种字符串，
  * 少定义一个令牌**不会报错**——那个圆点会静默变成透明或继承父色，看起来只是"颜色不对"。
  * 这类缺陷在 jsdom 里也测不出来（不做样式计算），所以只能直接查源文件。
  *
@@ -29,16 +29,16 @@ function readCss(rel: string): string {
 const CSS = readCss("../../shell/styles/features/device-lanes.css");
 
 describe("deviceColor 只返回令牌引用", () => {
-  it("非空 id 一律形如 var(--qp-device-N)，N 在 0..7", () => {
+  it("非空 id 一律形如 var(--at-device-N)，N 在 0..7", () => {
     for (const id of ["b265fafdc306", "a1b2c3d4e5f6", "x", "微信", "000000"]) {
       const color = deviceColor(id);
-      expect(color).toMatch(/^var\(--qp-device-[0-7]\)$/);
+      expect(color).toMatch(/^var\(--at-device-[0-7]\)$/);
     }
   });
 
   it("确定性：同一台设备永远同一个令牌，且与哈希取模一致", () => {
     const id = "b265fafdc306";
-    expect(deviceColor(id)).toBe(`var(--qp-device-${fnv1a32(id) % DEVICE_COLOR_TOKENS})`);
+    expect(deviceColor(id)).toBe(`var(--at-device-${fnv1a32(id) % DEVICE_COLOR_TOKENS})`);
     expect(deviceColorIndex(id)).toBe(fnv1a32(id) % DEVICE_COLOR_TOKENS);
   });
 
@@ -48,26 +48,26 @@ describe("deviceColor 只返回令牌引用", () => {
   });
 
   it("空 id 给中性令牌，不占色相槽", () => {
-    expect(deviceColor("   ")).toBe("var(--qp-text-tertiary)");
+    expect(deviceColor("   ")).toBe("var(--at-text-tertiary)");
   });
 });
 
 describe("device-lanes.css 的令牌真的存在（浅/深两套）", () => {
   it("8 个令牌在文件里各定义两次（:root 与 :root[data-theme=\"dark\"]）", () => {
     for (let index = 0; index < DEVICE_COLOR_TOKENS; index += 1) {
-      const defined = CSS.match(new RegExp(`--qp-device-${index}\\s*:`, "g")) ?? [];
-      expect(defined.length, `--qp-device-${index} 的定义次数（浅/深各一次）`).toBe(2);
+      const defined = CSS.match(new RegExp(`--at-device-${index}\\s*:`, "g")) ?? [];
+      expect(defined.length, `--at-device-${index} 的定义次数（浅/深各一次）`).toBe(2);
     }
   });
 
   it("没有任何超出 0..7 的令牌被定义（多定义即浪费且易与色相表错位）", () => {
-    const all = [...CSS.matchAll(/--qp-device-(\d+)\s*:/g)].map((match) => Number(match[1]));
+    const all = [...CSS.matchAll(/--at-device-(\d+)\s*:/g)].map((match) => Number(match[1]));
     expect(new Set(all)).toEqual(new Set([0, 1, 2, 3, 4, 5, 6, 7]));
   });
 
   it("两个色块都在（浅色 :root 与暗色 [data-theme=\"dark\"]）", () => {
     expect(CSS).toContain(':root[data-theme="dark"]');
     /* 暗色块必须排在浅色块之后：同名令牌后者覆盖前者 */
-    expect(CSS.indexOf(':root[data-theme="dark"]')).toBeGreaterThan(CSS.indexOf("--qp-device-0"));
+    expect(CSS.indexOf(':root[data-theme="dark"]')).toBeGreaterThan(CSS.indexOf("--at-device-0"));
   });
 });

@@ -67,9 +67,9 @@ export default function HostHighlightCard({ id }: HostHighlightCardProps) {
   };
 
   return (
-    <section className="qp-panel p-5 md:p-6" id={id}>
+    <section className="at-panel p-5 md:p-6" id={id}>
       <SettingsPanelHeader
-        icon={<Highlighter size={16} strokeWidth={STROKE} className="text-[var(--qp-accent-default)]" />}
+        icon={<Highlighter size={16} strokeWidth={STROKE} className="text-[var(--at-accent-default)]" />}
         title="高亮颜色"
       />
       <div className="mt-4">
@@ -88,13 +88,13 @@ export default function HostHighlightCard({ id }: HostHighlightCardProps) {
               onFormatChange={setFormat}
               resetAction={{ label: "恢复默认", onReset: () => commit(FALLBACK_HIGHLIGHT) }}
             />
-            <span className="qp-text-caption text-[var(--qp-text-tertiary)]">
+            <span className="at-text-caption text-[var(--at-text-tertiary)]">
               {hex ?? FALLBACK_HIGHLIGHT}
             </span>
           </span>
         </SettingsPreferenceRow>
         {error ? (
-          <p className="mt-2 qp-text-caption text-[var(--qp-danger)]" role="alert">{error}</p>
+          <p className="mt-2 at-text-caption text-[var(--at-danger)]" role="alert">{error}</p>
         ) : null}
       </div>
     </section>

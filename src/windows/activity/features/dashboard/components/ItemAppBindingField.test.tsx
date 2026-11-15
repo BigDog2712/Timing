@@ -66,13 +66,13 @@ import ItemAppBindingField from "./ItemAppBindingField.tsx";
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-const field = () => document.body.querySelector<HTMLElement>(".qp-item-app-binding");
+const field = () => document.body.querySelector<HTMLElement>(".at-item-app-binding");
 const boundRows = () =>
-  Array.from(document.body.querySelectorAll<HTMLElement>(".qp-item-app-binding .qp-timeline-edit-choice"))
+  Array.from(document.body.querySelectorAll<HTMLElement>(".at-item-app-binding .at-timeline-edit-choice"))
     .map((node) => node.textContent?.trim() ?? "");
 /** 下拉当前显示的 label（`QuietSelect` 把所有选项渲染进触发键，不能读 textContent） */
 const currentLabel = () =>
-  document.body.querySelector<HTMLElement>(".qp-item-app-binding-select .qp-select-label-current")
+  document.body.querySelector<HTMLElement>(".at-item-app-binding-select .at-select-label-current")
     ?.textContent?.trim() ?? "";
 const menuOptions = () => Array.from(document.body.querySelectorAll<HTMLElement>('[role="option"]'));
 const optionByText = (text: string) =>
@@ -95,7 +95,7 @@ async function mount(itemId: number | null) {
 }
 
 async function pickOption(label: string) {
-  const trigger = document.body.querySelector<HTMLButtonElement>(".qp-item-app-binding-select .qp-select-trigger");
+  const trigger = document.body.querySelector<HTMLButtonElement>(".at-item-app-binding-select .at-select-trigger");
   if (!trigger) throw new Error("找不到应用下拉");
   await act(async () => { trigger.click(); });
   await flush();
@@ -147,7 +147,7 @@ describe("ItemAppBindingField", () => {
     h.loadAppItemBindingUnions.mockResolvedValue({ "yanyun.exe": union([3]) });
     await mount(3);
 
-    const unbind = document.body.querySelector<HTMLButtonElement>(".qp-item-app-binding .qp-timeline-item-action");
+    const unbind = document.body.querySelector<HTMLButtonElement>(".at-item-app-binding .at-timeline-item-action");
     expect(unbind?.getAttribute("aria-label")).toBe("解绑 燕云十六声");
     await act(async () => { unbind?.click(); });
     await flush();
@@ -173,7 +173,7 @@ describe("ItemAppBindingField", () => {
     await mount(9);
 
     await act(async () => {
-      document.body.querySelector<HTMLButtonElement>(".qp-item-app-binding-select .qp-select-trigger")?.click();
+      document.body.querySelector<HTMLButtonElement>(".at-item-app-binding-select .at-select-trigger")?.click();
     });
     await flush();
 

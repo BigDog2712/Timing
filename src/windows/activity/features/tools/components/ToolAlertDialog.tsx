@@ -18,7 +18,7 @@ export default function ToolAlertDialog({ notification = false }: { notification
       frame = requestAnimationFrame(() => {
         const surface = document.querySelector<HTMLElement>(".tools-usage-alert-surface");
         if (!surface) return;
-        const body = surface.querySelector<HTMLElement>(".qp-dialog-body");
+        const body = surface.querySelector<HTMLElement>(".at-dialog-body");
         const height = Math.min(4096, Math.ceil(Math.max(surface.scrollHeight, surface.getBoundingClientRect().height) + (body ? body.scrollHeight - body.clientHeight : 0)));
         const width = Number.parseFloat(getComputedStyle(surface).getPropertyValue("--tools-alert-width")) || Math.ceil(surface.getBoundingClientRect().width);
         let canvasHeight: number | undefined;

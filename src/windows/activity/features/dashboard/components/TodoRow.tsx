@@ -37,7 +37,7 @@ export default function TodoRow({ todo, onToggle, onRemove, onEdit }: Props) {
   const done = todo.doneAt !== null;
   return (
     <li
-      className="qp-todo-row"
+      className="at-todo-row"
       data-done={done || undefined}
       /* 行体单击开独立待办窗（06 T12）。走 patina:host-intent 事件桥
        * （{action:'open_todos'}），不是新 IPC 命令 —— 契约不动、L9 不破。 */
@@ -45,7 +45,7 @@ export default function TodoRow({ todo, onToggle, onRemove, onEdit }: Props) {
     >
       <button
         type="button"
-        className="qp-todo-check"
+        className="at-todo-check"
         role="checkbox"
         aria-checked={done}
         /* label 必须随状态换词：已完成的事再读「完成」会让读屏用户重做一遍（06 A9⑤） */
@@ -55,14 +55,14 @@ export default function TodoRow({ todo, onToggle, onRemove, onEdit }: Props) {
           onToggle(todo.id, !done);
         }}
       >
-        <span className="qp-todo-box" aria-hidden="true" />
+        <span className="at-todo-box" aria-hidden="true" />
       </button>
-      <span className="qp-todo-title" title={todo.title}>{todo.title}</span>
+      <span className="at-todo-title" title={todo.title}>{todo.title}</span>
       {/* [本轮] 提醒标记：`remindAt` 非 null 才画（宿主两级提醒以它为基准）。 */}
-      <span className="qp-todo-when">
+      <span className="at-todo-when">
         {todo.remindAt !== null ? (
           <span
-            className="qp-todo-bell"
+            className="at-todo-bell"
             role="img"
             aria-label={copy.todoRemindAt(reminderClock(todo.remindAt))}
           >
@@ -75,7 +75,7 @@ export default function TodoRow({ todo, onToggle, onRemove, onEdit }: Props) {
           与删除键同款绝对定位区，不参与 grid 列宽。 */}
       <button
         type="button"
-        className="qp-todo-edit"
+        className="at-todo-edit"
         aria-label={`${copy.todoEdit} ${todo.title}`}
         onClick={(event) => {
           event.stopPropagation();
@@ -86,7 +86,7 @@ export default function TodoRow({ todo, onToggle, onRemove, onEdit }: Props) {
       </button>
       <button
         type="button"
-        className="qp-todo-del"
+        className="at-todo-del"
         aria-label={copy.todoDelete(todo.title)}
         onClick={(event) => {
           event.stopPropagation();
@@ -111,14 +111,14 @@ function PlannedChip({ plannedAt, done, locale }: { plannedAt: number | null; do
   const start = dayStart.getTime();
 
   if (done) {
-    return <span className="qp-todo-time" data-state="done">{clockOf(plannedAt)}</span>;
+    return <span className="at-todo-time" data-state="done">{clockOf(plannedAt)}</span>;
   }
   if (plannedAt < start) {
-    return <span className="qp-todo-time" data-state="overdue">{clockOf(plannedAt)}</span>;
+    return <span className="at-todo-time" data-state="overdue">{clockOf(plannedAt)}</span>;
   }
   if (plannedAt < start + DAY_MS) {
-    return <span className="qp-todo-time">{clockOf(plannedAt)}</span>;
+    return <span className="at-todo-time">{clockOf(plannedAt)}</span>;
   }
   const text = new Date(plannedAt).toLocaleDateString(locale, { month: "numeric", day: "numeric" });
-  return <span className="qp-todo-time" data-state="later">{text}</span>;
+  return <span className="at-todo-time" data-state="later">{text}</span>;
 }

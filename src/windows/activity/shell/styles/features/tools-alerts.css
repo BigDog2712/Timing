@@ -12,7 +12,7 @@
  * ========================================================================== */
 
 /* ── ① 到点弹窗族 + tool-notification 窗壳（原 tools.css:998-1191 原样保留） ── */
-.qp-dialog-surface:has(.tools-reminder-editor) {
+.at-dialog-surface:has(.tools-reminder-editor) {
   max-width: 400px;
 }
 
@@ -31,26 +31,26 @@
   width: min(var(--tools-alert-width), calc(100vw - 32px));
 }
 
-.tools-timed-alert-surface .qp-dialog-title {
+.tools-timed-alert-surface .at-dialog-title {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.tools-usage-alert-limit .qp-dialog-header,
+.tools-usage-alert-limit .at-dialog-header,
 .tools-usage-alert-limit .tools-usage-alert-summary {
   text-align: center;
 }
 
-.tools-usage-alert-limit .qp-dialog-heading {
+.tools-usage-alert-limit .at-dialog-heading {
   width: 100%;
 }
 
-.tools-usage-steps-dialog > .qp-dialog-body { margin-top: 0; }
+.tools-usage-steps-dialog > .at-dialog-body { margin-top: 0; }
 .tools-usage-steps { position: relative; display: grid; overflow: clip; }
 .tools-usage-steps > div { grid-area: 1 / 1; min-width: 0; overflow-wrap: anywhere; }
 .tools-usage-steps > [inert] { position: absolute; inset: 0 0 auto; visibility: hidden; opacity: 0; }
 .tools-usage-steps > .tools-usage-step-limit { align-self: center; text-align: center; }
-.tools-usage-steps .qp-dialog-title + :is(.tools-usage-alert-options, .tools-usage-alert-summary) { margin-top: 12px; }
+.tools-usage-steps .at-dialog-title + :is(.tools-usage-alert-options, .tools-usage-alert-summary) { margin-top: 12px; }
 
 .tools-usage-alert-identity {
   display: flex;
@@ -66,7 +66,7 @@
   flex-shrink: 0;
   width: 30px;
   height: 30px;
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
 }
 
 .tools-usage-alert-icon img {
@@ -76,28 +76,28 @@
 }
 
 .tools-usage-alert-name {
-  font-size: var(--qp-font-size-section-title);
-  line-height: var(--qp-line-height-section-title);
-  font-weight: var(--qp-font-weight-medium);
+  font-size: var(--at-font-size-section-title);
+  line-height: var(--at-line-height-section-title);
+  font-weight: var(--at-font-weight-medium);
   overflow-wrap: anywhere;
 }
 
 .tools-usage-alert-summary {
   margin: 0;
-  color: var(--qp-text-secondary);
+  color: var(--at-text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
-.tools-usage-alert-surface .qp-dialog-actions { display: flex; gap: 12px; }
-.tools-usage-alert-surface .qp-dialog-actions > button { flex: 1 1 0; min-width: 0; }
+.tools-usage-alert-surface .at-dialog-actions { display: flex; gap: 12px; }
+.tools-usage-alert-surface .at-dialog-actions > button { flex: 1 1 0; min-width: 0; }
 
 .tools-usage-alert-options {
   min-width: 0;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--qp-border-subtle);
-  border-radius: var(--qp-radius-control);
-  background: var(--qp-bg-panel);
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
+  background: var(--at-bg-panel);
   overflow: hidden;
 }
 
@@ -112,19 +112,19 @@
   cursor: pointer;
 }
 
-.tools-usage-alert-option + .tools-usage-alert-option::before { content: ""; position: absolute; inset: 0 12px auto; border-top: 1px solid var(--qp-border-subtle); }
-.tools-usage-alert-option:has(input:checked) { color: var(--qp-accent-default); }
-.tools-usage-alert-option:has(input:focus-visible) { outline: 2px solid color-mix(in srgb, var(--qp-accent-default) 42%, transparent); outline-offset: -2px; }
+.tools-usage-alert-option + .tools-usage-alert-option::before { content: ""; position: absolute; inset: 0 12px auto; border-top: 1px solid var(--at-border-subtle); }
+.tools-usage-alert-option:has(input:checked) { color: var(--at-accent-default); }
+.tools-usage-alert-option:has(input:focus-visible) { outline: 2px solid color-mix(in srgb, var(--at-accent-default) 42%, transparent); outline-offset: -2px; }
 .tools-usage-alert-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
 .tools-usage-alert-option-check { flex: 0 0 auto; visibility: hidden; }
 .tools-usage-alert-option:has(input:checked) .tools-usage-alert-option-check { visibility: visible; }
 .tools-usage-alert-options:disabled .tools-usage-alert-option { cursor: default; opacity: 0.6; }
 
-.tools-usage-alert-error { color: var(--qp-danger); margin: 12px 0 0; }
+.tools-usage-alert-error { color: var(--at-danger); margin: 12px 0 0; }
 
 /* tool-notification 窗：透明壳，弹窗浮在系统层（本轮一个字节不动，Q4） */
 html[data-window-label="tool-notification"], body[data-window-label="tool-notification"], #root[data-window-label="tool-notification"] { background: transparent; min-width: 0; overflow: hidden; }
-body[data-window-label="tool-notification"] .qp-dialog-backdrop {
+body[data-window-label="tool-notification"] .at-dialog-backdrop {
   background: transparent;
   padding: 2px;
   align-items: flex-start;
@@ -132,13 +132,13 @@ body[data-window-label="tool-notification"] .qp-dialog-backdrop {
   overflow: auto;
   scrollbar-width: none;
 }
-body[data-window-label="tool-notification"] .qp-dialog-surface {
+body[data-window-label="tool-notification"] .at-dialog-surface {
   width: min(var(--tools-alert-width), calc(100vw - 4px));
   margin: 0;
   max-height: none;
   animation: none;
 }
-body[data-window-label="tool-notification"] .qp-dialog-backdrop:has(> .tools-usage-steps-dialog) {
+body[data-window-label="tool-notification"] .at-dialog-backdrop:has(> .tools-usage-steps-dialog) {
   flex-direction: column-reverse;
   align-items: center;
   justify-content: flex-start;

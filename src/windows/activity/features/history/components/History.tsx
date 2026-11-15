@@ -940,7 +940,7 @@ function HistoryDayView({
         rangeBar={rangeBar}
       />
 
-      <div className="qp-panel p-5 history-overview-timeline-card">
+      <div className="at-panel p-5 history-overview-timeline-card">
         <HistoryHorizontalTimeline
           viewModel={visibleHistoryTimelineView}
           mode={effectiveHistoryTimelineMode}
@@ -1003,7 +1003,7 @@ function HistoryDayView({
       >
         <button
           type="button"
-          className="qp-dialog-close-button history-timeline-dialog-close"
+          className="at-dialog-close-button history-timeline-dialog-close"
           aria-label={UI_TEXT.common.close}
           onClick={closeTimelineDialog}
         >

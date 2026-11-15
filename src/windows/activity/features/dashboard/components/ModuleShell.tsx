@@ -12,7 +12,7 @@ import { useBoardInstance, withInstance } from "../layout/instanceContext.ts";
  *
  * 四态口径（`02 §14`）：
  *   · `loading` → 骨架（`aria-busy`，骨架本身 `aria-hidden`，读屏只听到"忙碌"）
- *   · `empty`   → 一句 `emptyText`（`<p>` + `qp-empty`，不是空 div）
+ *   · `empty`   → 一句 `emptyText`（`<p>` + `at-empty`，不是空 div）
  *   · `error`   → **E2**：卡内一块 + 重试键，`data-error-layer="module"`
  *   · `ready`   → `children`
  *
@@ -53,7 +53,7 @@ export function moduleState(status: LoadStatus, refreshError: boolean, isEmpty: 
   return isEmpty ? "empty" : "ready";
 }
 
-/** 骨架条高取哪一条 `--qp-row-*`：不传 = `--qp-row-readout`（计时卡的 5 条读数） */
+/** 骨架条高取哪一条 `--at-row-*`：不传 = `--at-row-readout`（计时卡的 5 条读数） */
 export type SkeletonRow = "items" | "app" | "todo";
 
 interface Props {
@@ -94,7 +94,7 @@ interface Props {
    *  时间线卡 0.13 · 1.6 就踩了这一脚（判据 `TimelineCardEntry.test.tsx`）。 */
   footer?: ReactNode;
   /** [0.13 · F2] 空态里**额外**渲染的视觉锚点（如计时分布卡的环底圈）。
-   *  为什么要有：只渲染一句 `qp-empty` 的话，"卡片是空的还是坏了"分不出来 ——
+   *  为什么要有：只渲染一句 `at-empty` 的话，"卡片是空的还是坏了"分不出来 ——
    *  一圈底环 + 「今日 0m」说的是"今天真的什么都没记"，而不是"卡挂了"。 */
   emptyVisual?: ReactNode;
   children: ReactNode;
@@ -128,35 +128,35 @@ export default function ModuleShell({
   const domId = withInstance(id, instance);
   return (
     <section
-      className={className ? `qp-card ${className}` : "qp-card"}
+      className={className ? `at-card ${className}` : "at-card"}
       aria-labelledby={domId}
       aria-busy={state === "loading" || undefined}
       data-state={state}
     >
-      <div className="qp-card-head">
+      <div className="at-card-head">
         {/* [A 批] grip 是装饰层：pointer-events:none，不参与排版也不可点。
             本批不接 tabIndex/role=button —— 键盘锚点等拖拽批次一起做，
             现在给了就是一颗「能聚焦但按了没反应」的键。 */}
-        <span className="qp-card-grip" aria-hidden="true" />
-        <h2 id={domId} className="qp-card-title">{title}</h2>
+        <span className="at-card-grip" aria-hidden="true" />
+        <h2 id={domId} className="at-card-title">{title}</h2>
         {/* 右槽只在 ready 渲染（R9 收口）：empty 的数是废话（空态文案已经说了）、
          *  error 的数不可信、loading 的数还没有。门控收在这里，四张卡就不可能再
          *  各写一遍然后漏一张（ItemsModule 那次漏掉 empty 印出「今日 0 项」就是
          *  散写守卫的必然结果）。h2 标题保持恒在（M12/M13）。 */}
         {/* [A 批] 右槽顺序 = meta 在前、⋯ 在后：读数贴左、操作贴右，「看」与「动」各占一端 */}
-        <span className="qp-card-head-right">
+        <span className="at-card-head-right">
           {state === "ready" ? (
             <>
               {/* E3 只在这一层出现：条件渲染，不常驻空容器（常驻的 role=alert 挂载时就有内容，
                   读屏不会"出现即播报"）。refreshError 时 moduleState() 恰好返回 ready，所以
                   放进 ready 分支不会漏。 */}
               {refreshErrorText ? (
-                <span className="qp-refresh-error" data-error-layer="refresh" role="alert" title={refreshErrorText}>
+                <span className="at-refresh-error" data-error-layer="refresh" role="alert" title={refreshErrorText}>
                   <AlertCircle size={12} strokeWidth={2} aria-hidden="true" />
                   <span className="sr-only">{refreshErrorText}</span>
                 </span>
               ) : null}
-              {action ?? (meta ? <span className="qp-card-meta">{meta}</span> : null)}
+              {action ?? (meta ? <span className="at-card-meta">{meta}</span> : null)}
             </>
           ) : null}
           {controls}
@@ -166,22 +166,22 @@ export default function ModuleShell({
       {subhead}
       {state === "loading" ? (
         /* `data-row` 只决定条高（CSS）；**条数**由 tiers.css 的档位规则裁，不在这里读断点 */
-        <div className="qp-skeleton" data-row={skeletonRow} aria-hidden="true">
+        <div className="at-skeleton" data-row={skeletonRow} aria-hidden="true">
           {Array.from({ length: skeletonRows }, (_, index) => <span key={index} />)}
         </div>
       ) : state === "error" ? (
         /* E2 同样**条件渲染**：错误块只在 error 时挂上，出现即播报 */
         <div
-          className="qp-module-error"
+          className="at-module-error"
           role="alert"
           data-error-layer="module"
           aria-labelledby={`${domId} ${errorId}`}
         >
-          <p id={errorId} className="qp-module-error-text">{errorText}</p>
+          <p id={errorId} className="at-module-error-text">{errorText}</p>
           {onRetry ? (
             <button
               type="button"
-              className="qp-link-btn"
+              className="at-link-btn"
               aria-disabled={retryBusy || undefined}
               onClick={retryBusy ? undefined : onRetry}
             >
@@ -192,15 +192,15 @@ export default function ModuleShell({
       ) : state === "empty" ? (
         emptyVisual ? (
           /* 有视觉锚点时环与文案**纵排在同一块**里。
-             不能写成「一句 `qp-empty` + 环」两个并列子项：`.qp-empty` 是
+             不能写成「一句 `at-empty` + 环」两个并列子项：`.at-empty` 是
              `flex: 1 1 auto`（它要独占整卡的剩余高度来居中），环跟在后面就只能溢出卡外
              被裁 —— 实际观感是"文字压在环上、环只剩上半截"（0.13 的计时卡）。 */
-          <div className="qp-empty-figure">
+          <div className="at-empty-figure">
             {emptyVisual}
-            <p className="qp-empty">{emptyText}</p>
+            <p className="at-empty">{emptyText}</p>
           </div>
         ) : (
-          <p className="qp-empty">{emptyText}</p>
+          <p className="at-empty">{emptyText}</p>
         )
       ) : children}
       {footer}

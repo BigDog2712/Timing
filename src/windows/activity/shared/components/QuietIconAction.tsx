@@ -53,7 +53,7 @@ export default function QuietIconAction({
       aria-disabled={busy || undefined}
       disabled={disabled}
       onClick={busy ? undefined : onClick}
-      className={`qp-icon-action qp-icon-action-${tone} ${pressed && showPressedStyle ? "qp-icon-action-pressed" : ""} ${className ?? ""}`.trim()}
+      className={`at-icon-action at-icon-action-${tone} ${pressed && showPressedStyle ? "at-icon-action-pressed" : ""} ${className ?? ""}`.trim()}
     >
       {icon}
     </button>

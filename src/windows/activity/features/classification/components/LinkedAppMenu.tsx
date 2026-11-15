@@ -29,7 +29,7 @@ function LinkedAppList({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     if (list.current) list.current.style.height = `${list.current.getBoundingClientRect().height}px`;
   }, []);
-  return <div ref={list} className="qp-app-link-list qp-scroll-region">{children}</div>;
+  return <div ref={list} className="at-app-link-list at-scroll-region">{children}</div>;
 }
 
 export default function LinkedAppMenu(props: Props) {
@@ -57,24 +57,24 @@ export default function LinkedAppMenu(props: Props) {
     if (reason === "escape") trigger.current?.focus({ preventScroll: true });
   };
   return <>
-    <button ref={trigger} type="button" className="qp-app-link-trigger qp-app-mapping-exe"
+    <button ref={trigger} type="button" className="at-app-link-trigger at-app-mapping-exe"
       aria-label={`${text.mapping.linkedApps}: ${props.parent.exeName}`} aria-expanded={open}
       aria-controls={open ? id : undefined} disabled={props.disabled}
       onClick={() => { setAdding(false); setQuery(""); props.onOpenChange(!open); }}>
       <span>{props.parent.exeName}</span>{members.length > 0 && <ChevronDown size={12} aria-hidden />}
     </button>
     <QuietAnchoredPopover open={open && !props.disabled} anchor={trigger.current} id={id}
-      ariaLabel={text.mapping.linkedApps} onClose={close} className="qp-app-link-popover"
+      ariaLabel={text.mapping.linkedApps} onClose={close} className="at-app-link-popover"
       horizontalAlign="start"
       initialFocusRef={adding ? search : add}>
       {adding ? <>
-        <button type="button" className="qp-app-link-action" aria-label={text.mapping.backToLinkedApps}
+        <button type="button" className="at-app-link-action" aria-label={text.mapping.backToLinkedApps}
           onClick={() => setAdding(false)}><ArrowLeft size={14} aria-hidden />{text.mapping.addLinkedApp}</button>
         <QuietSearchField ref={search} value={query} aria-label={text.mapping.addLinkedApp}
           onChange={(event) => setQuery(event.target.value)} />
         <LinkedAppList key="adding">
           {available.length === 0 && <p>{text.mapping.searchNoResults}</p>}
-          {available.map((candidate) => <button type="button" className="qp-app-link-option" key={candidate.exeName}
+          {available.map((candidate) => <button type="button" className="at-app-link-option" key={candidate.exeName}
             disabled={Boolean(props.links[candidate.exeName])} onClick={() => {
               props.onLink(candidate.exeName, props.parent);
               search.current?.focus({ preventScroll: true });
@@ -87,10 +87,10 @@ export default function LinkedAppMenu(props: Props) {
       </> : <>
         <strong>{text.mapping.linkedApps}</strong>
         <LinkedAppList key="members">
-          <div className="qp-app-link-option"><span>{props.parent.exeName}</span><div className="qp-app-link-main-icon"><House size={12} role="img" aria-label={text.mapping.mainApp} /></div></div>
-          {memberRows.map((candidate) => <div key={candidate.exeName} className="qp-app-link-option qp-app-link-member">
+          <div className="at-app-link-option"><span>{props.parent.exeName}</span><div className="at-app-link-main-icon"><House size={12} role="img" aria-label={text.mapping.mainApp} /></div></div>
+          {memberRows.map((candidate) => <div key={candidate.exeName} className="at-app-link-option at-app-link-member">
             <span>{candidate.exeName}</span>
-            <div className="qp-app-link-controls">
+            <div className="at-app-link-controls">
               <QuietIconAction icon={props.titleCapture(candidate) ? <Captions size={12} /> : <CaptionsOff size={12} />}
                 title={text.mapping.titleRecorded} showTooltip={false} pressed={props.titleCapture(candidate)} showPressedStyle={false}
                 disabled={props.disabled || !props.globalTitleEnabled}
@@ -105,7 +105,7 @@ export default function LinkedAppMenu(props: Props) {
             </div>
           </div>)}
         </LinkedAppList>
-        <button ref={add} type="button" className="qp-app-link-action" onClick={() => setAdding(true)}>
+        <button ref={add} type="button" className="at-app-link-action" onClick={() => setAdding(true)}>
           <Plus size={14} aria-hidden />{text.mapping.addLinkedApp}
         </button>
       </>}

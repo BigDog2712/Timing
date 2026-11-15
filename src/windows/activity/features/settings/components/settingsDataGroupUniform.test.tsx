@@ -149,9 +149,9 @@ describe("② 每个可操作项都排在偏好行里（源码）", () => {
 describe("③ 「同步与备份」卡的卡片外壳与宿主变量桥", () => {
   it("g07_host_sync_panel_uses_the_same_card_shell", () => {
     const panel = read(`${DATA_GROUP_DIR}/host/HostSyncPanel.tsx`);
-    /* 同页另外四组都是 `qp-panel` + `SettingsPanelHeader`；这一组原来直接用宿主页签的
+    /* 同页另外四组都是 `at-panel` + `SettingsPanelHeader`；这一组原来直接用宿主页签的
        `.data` + `.data__head`，连标题都是页签名。 */
-    expect(panel).toContain('className="qp-panel p-5 md:p-6 settings-host-sync"');
+    expect(panel).toContain('className="at-panel p-5 md:p-6 settings-host-sync"');
     expect(panel).toContain("<SettingsPanelHeader");
     /* 判据落在 **JSX 属性**上：文件头注释里正当地写着「原来用的是 `.data__head`」这段历史 */
     expect(panel).not.toContain('<header className="data__head"');
@@ -160,7 +160,7 @@ describe("③ 「同步与备份」卡的卡片外壳与宿主变量桥", () => 
   });
 
   it("g08_the_host_token_bridge_maps_the_tokens_those_blocks_actually_use", () => {
-    /* 六块面板的样式只引用宿主语义变量；分析窗只产 `--qp-*`，不桥接就是一片落空。
+    /* 六块面板的样式只引用宿主语义变量；分析窗只产 `--at-*`，不桥接就是一片落空。
        断言「被引用的每一个变量都在桥里」：漏一个 = 那一处又变回裸样式。 */
     const hostCss = [
       "settings-data.css",
@@ -172,12 +172,12 @@ describe("③ 「同步与备份」卡的卡片外壳与宿主变量桥", () => 
       .map((file) => stripCssComments(read(`src/windows/activity/shell/styles/features/host/${file}`)))
       .join("\n");
     /* 这些不归这次桥接管：`--font-mono` 由 `tokens.css` 的 `@theme` 直接给，
-       `--*` 空名与 `--qp-*` 是 patina 自己的。 */
+       `--*` 空名与 `--at-*` 是 patina 自己的。 */
     const infra = new Set(["--font-mono"]);
     const used = new Set(
       [...hostCss.matchAll(/var\((--[a-z0-9-]+)/g)]
         .map((match) => match[1])
-        .filter((name) => !name.startsWith("--qp-") && !infra.has(name)),
+        .filter((name) => !name.startsWith("--at-") && !infra.has(name)),
     );
     const bridge = read("src/windows/activity/shell/styles/features/host/settings-bits.css")
       .slice(read("src/windows/activity/shell/styles/features/host/settings-bits.css").indexOf(".settings-host-sync {"));

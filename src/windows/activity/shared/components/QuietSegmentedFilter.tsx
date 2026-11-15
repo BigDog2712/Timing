@@ -35,8 +35,8 @@ export default function QuietSegmentedFilter<T extends string>({
   selectedOptionRef,
 }: Props<T>) {
   const variantClassName = variant === "separate"
-    ? "qp-segmented-filter-separate"
-    : `qp-segmented-filter-compact${variant === "control" ? " qp-segmented-filter-control" : ""}`;
+    ? "at-segmented-filter-separate"
+    : `at-segmented-filter-compact${variant === "control" ? " at-segmented-filter-control" : ""}`;
   const tabs = semantics === "tabs";
 
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, currentValue: T) => {
@@ -63,7 +63,7 @@ export default function QuietSegmentedFilter<T extends string>({
 
   return (
     <div
-      className={`qp-segmented-filter ${variantClassName} ${className ?? ""}`.trim()}
+      className={`at-segmented-filter ${variantClassName} ${className ?? ""}`.trim()}
       role={tabs ? "tablist" : undefined}
       aria-label={ariaLabel}
     >
@@ -84,7 +84,7 @@ export default function QuietSegmentedFilter<T extends string>({
             tabIndex={tabs ? (selected ? 0 : -1) : undefined}
             onClick={() => onChange(option.value)}
             onKeyDown={tabs ? (event) => handleTabKeyDown(event, option.value) : undefined}
-            className={`qp-segmented-filter-item ${selected ? "qp-segmented-filter-item-selected" : ""}`.trim()}
+            className={`at-segmented-filter-item ${selected ? "at-segmented-filter-item-selected" : ""}`.trim()}
           >
             {option.label}
           </button>

@@ -1,16 +1,16 @@
 /**
- * 宿主四色 → 分析窗 `--qp-*`（P0-01：配色单一来源）
+ * 宿主四色 → 分析窗 `--at-*`（P0-01：配色单一来源）
  * -----------------------------------------------------------------------------
  * 融合后「一套配色」不是再放一个主色控件，而是把**宿主的四色**派生成分析窗的强调/语义
  * 令牌。本文件是全仓唯一做这件事的地方：纯函数，无 IPC、无 DOM。逐项见 ARCH §4.3：
- *   running → `--qp-accent-default` / `-muted` / `--qp-button-primary-bg` / `--qp-chart-cursor`
- *   done    → `--qp-success`；warn → `--qp-warning`
- *   （无来源）`--qp-danger` / `--qp-participation` ← **保持 `deriveTheme` 原值，不覆盖**
+ *   running → `--at-accent-default` / `-muted` / `--at-button-primary-bg` / `--at-chart-cursor`
+ *   done    → `--at-success`；warn → `--at-warning`
+ *   （无来源）`--at-danger` / `--at-participation` ← **保持 `deriveTheme` 原值，不覆盖**
  *             （宿主四色没有这两个键，见 `src/lib/theme.ts` 的 ACCENT_KEYS）
  *   bar     → **不映射**：药丸底板色（`--pill-hover-plate` 消费），分析窗无对应语义
- * 其余 20 个中性键（`--qp-bg-*` / `--qp-border-*` / `--qp-text-*` / `--qp-control-*`
- * / `--qp-track-muted` / `--qp-badge-subtle` / `--qp-scrollbar-*` / `--qp-chart-grid`
- * / `--qp-chart-track`）**一个都不碰**——这就是「中性底色仍由 28 套预设决定」的边界线。
+ * 其余 20 个中性键（`--at-bg-*` / `--at-border-*` / `--at-text-*` / `--at-control-*`
+ * / `--at-track-muted` / `--at-badge-subtle` / `--at-scrollbar-*` / `--at-chart-grid`
+ * / `--at-chart-track`）**一个都不碰**——这就是「中性底色仍由 28 套预设决定」的边界线。
  */
 import { primaryButtonBackground } from "./deriveTheme.ts";
 import type { ThemeVariant } from "./themePresets.ts";
@@ -26,8 +26,8 @@ export interface HostAccentColors {
 
 /** 会被宿主四色覆盖的 6 个键（§4.3 的另外 2 行是「显式不覆盖」）。 */
 export type HostAccentTokenKey =
-  | "--qp-accent-default" | "--qp-accent-muted" | "--qp-button-primary-bg"
-  | "--qp-chart-cursor" | "--qp-success" | "--qp-warning";
+  | "--at-accent-default" | "--at-accent-muted" | "--at-button-primary-bg"
+  | "--at-chart-cursor" | "--at-success" | "--at-warning";
 
 export type HostAccentOverrides = Partial<Record<HostAccentTokenKey, string>>;
 
@@ -122,9 +122,9 @@ function warnInvalid(key: string, value: unknown): void {
 }
 
 /**
- * 把宿主四色派生成 `--qp-*` 覆盖值（§4.3）。`baseTokens` 是 `deriveTheme` **未被覆盖前**
- * 的输出，只读三个中性键：强调弱化档要的 `{surface}` = `--qp-bg-canvas`，浅色达标派生要的
- * `--qp-bg-panel` / `--qp-bg-elevated` 亮度。`accents` 为 `null`（ACL / 宿主库未就绪）时返回
+ * 把宿主四色派生成 `--at-*` 覆盖值（§4.3）。`baseTokens` 是 `deriveTheme` **未被覆盖前**
+ * 的输出，只读三个中性键：强调弱化档要的 `{surface}` = `--at-bg-canvas`，浅色达标派生要的
+ * `--at-bg-panel` / `--at-bg-elevated` 亮度。`accents` 为 `null`（ACL / 宿主库未就绪）时返回
  * 空对象，调用方原样保留预设色——宁可配色是预设的，也不能因为读不到四色而白屏。
  * `variant` 是**实际生效**的深/浅（不是 `themeMode`：`system` 已解析过）。
  * 返回的增量只含 6 个键，`Object.assign` 回 tokens 即可，不含 danger / participation。
@@ -136,12 +136,12 @@ export function applyHostAccents(
 ): HostAccentOverrides {
   if (!accents) return {};
   const dark = variant === "dark";
-  /* 弱化档底色用 `{surface}`（= `--qp-bg-canvas`），与 `deriveTheme.ts:101,120` 同一变量。 */
-  const surface = baseTokens["--qp-bg-canvas"] ?? (dark ? "#262626" : "#fbfbfb");
-  const panelLum = luminanceOf(baseTokens["--qp-bg-panel"], PANEL_LUM_FALLBACK);
-  /* 分析窗没有宿主的 `--bg-plate`；`--qp-bg-elevated` 是同一角色（面板上的卡片底），
+  /* 弱化档底色用 `{surface}`（= `--at-bg-canvas`），与 `deriveTheme.ts:101,120` 同一变量。 */
+  const surface = baseTokens["--at-bg-canvas"] ?? (dark ? "#262626" : "#fbfbfb");
+  const panelLum = luminanceOf(baseTokens["--at-bg-panel"], PANEL_LUM_FALLBACK);
+  /* 分析窗没有宿主的 `--bg-plate`；`--at-bg-elevated` 是同一角色（面板上的卡片底），
      浅色下恒比 panel 暗，作「文字最坏底」只会更保守。 */
-  const plateLum = luminanceOf(baseTokens["--qp-bg-elevated"], PLATE_LUM_FALLBACK);
+  const plateLum = luminanceOf(baseTokens["--at-bg-elevated"], PLATE_LUM_FALLBACK);
 
   const read = (key: "running" | "warn" | "done"): string | null => {
     const raw = accents[key];
@@ -158,22 +158,22 @@ export function applyHostAccents(
   if (running) {
     /* 注 2：浅色下宿主写入 `--color-running` 的是派生值（非文本 ≥3:1），分析窗自己算一遍。 */
     const accent = dark ? running : deepenForNonText(running, panelLum, 3);
-    overrides["--qp-accent-default"] = accent;
-    overrides["--qp-accent-muted"] = `color-mix(in srgb, ${accent} ${dark ? 20 : 14}%, ${surface})`;
-    overrides["--qp-button-primary-bg"] = primaryButtonBackground(accent);
-    overrides["--qp-chart-cursor"] = `color-mix(in srgb, ${accent} ${dark ? 14 : 12}%, transparent)`;
+    overrides["--at-accent-default"] = accent;
+    overrides["--at-accent-muted"] = `color-mix(in srgb, ${accent} ${dark ? 20 : 14}%, ${surface})`;
+    overrides["--at-button-primary-bg"] = primaryButtonBackground(accent);
+    overrides["--at-chart-cursor"] = `color-mix(in srgb, ${accent} ${dark ? 14 : 12}%, transparent)`;
   }
 
   const done = read("done");
   if (done) {
     /* 语义「成功/完成」；勾选/校验图标属非文本，同一档 ≥3:1。 */
-    overrides["--qp-success"] = dark ? done : deepenForNonText(done, panelLum, 3);
+    overrides["--at-success"] = dark ? done : deepenForNonText(done, panelLum, 3);
   }
 
   const warn = read("warn");
   if (warn) {
     /* 语义「提醒」；在分析窗会作**小字**出现（逾期/提醒角标），故按文字口径 ≥4.5:1。 */
-    overrides["--qp-warning"] = dark ? warn : deepenForText(warn, plateLum, 4.5);
+    overrides["--at-warning"] = dark ? warn : deepenForText(warn, plateLum, 4.5);
   }
 
   return overrides;

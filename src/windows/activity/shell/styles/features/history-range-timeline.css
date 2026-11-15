@@ -37,9 +37,9 @@
 .history-range-timeline-ticks {
   display: flex;
   justify-content: space-between;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-tertiary);
   font-variant-numeric: tabular-nums;
 }
 
@@ -49,9 +49,9 @@
   border: 0;
   background: none;
   font-family: inherit;
-  font-size: var(--qp-font-size-caption);
-  line-height: var(--qp-line-height-caption);
-  color: var(--qp-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
   font-variant-numeric: tabular-nums;
   text-align: left;
   cursor: pointer;
@@ -59,7 +59,7 @@
 
 .history-range-timeline-label:hover,
 .history-range-timeline-label:focus-visible {
-  color: var(--qp-text-primary);
+  color: var(--at-text-primary);
 }
 
 .history-range-timeline-track {
@@ -67,7 +67,7 @@
   display: block;
   height: 10px;
   border-radius: 3px;
-  background: var(--qp-chart-track);
+  background: var(--at-chart-track);
   overflow: hidden;
 }
 

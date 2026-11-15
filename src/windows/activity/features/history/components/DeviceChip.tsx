@@ -18,7 +18,7 @@ interface Props {
 export default function DeviceChip({ deviceId, isSelf, selfLabel }: Props) {
   return (
     <span
-      className="qp-badge qp-badge-compact qp-badge-neutral device-chip"
+      className="at-badge at-badge-compact at-badge-neutral device-chip"
       data-testid="device-chip"
       data-device-id={deviceId}
       title={deviceId}

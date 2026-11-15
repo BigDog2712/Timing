@@ -40,44 +40,44 @@ export default function DataAppEditCategoryPicker({
 }: Props) {
   const selectable = options.filter((option) => option.value !== "other");
   return (
-    <section className="qp-app-edit-section" aria-label={labels.title}>
-      <h4 className="qp-app-edit-section-title">{labels.title}</h4>
-      <p className="qp-app-edit-hint">{labels.hint}</p>
+    <section className="at-app-edit-section" aria-label={labels.title}>
+      <h4 className="at-app-edit-section-title">{labels.title}</h4>
+      <p className="at-app-edit-hint">{labels.hint}</p>
       {/* 内置 10 个（11 减去 other）恒在，`selectable` 不可能为空 —— 不留空态分支 */}
-      <ul className="qp-app-edit-picker">
+      <ul className="at-app-edit-picker">
         {selectable.map((option) => {
           const checked = draft.categories.includes(option.value);
           const primary = checked && draft.categories[0] === option.value;
           return (
             <li
               key={option.value}
-              className="qp-app-edit-option"
+              className="at-app-edit-option"
               data-checked={checked ? "" : undefined}
               data-primary={primary ? "" : undefined}
               data-category={option.value}
             >
-              <label className="qp-app-edit-option-label">
+              <label className="at-app-edit-option-label">
                 <input
                   type="checkbox"
-                  className="qp-app-edit-check"
+                  className="at-app-edit-check"
                   checked={checked}
                   disabled={disabled}
                   onChange={() => onToggle(option.value)}
                 />
                 <span
-                  className="qp-app-edit-swatch"
+                  className="at-app-edit-swatch"
                   aria-hidden="true"
                   style={option.color
-                    ? ({ "--qp-app-edit-swatch": option.color } as unknown as CSSProperties)
+                    ? ({ "--at-app-edit-swatch": option.color } as unknown as CSSProperties)
                     : undefined}
                 />
-                <span className="qp-app-edit-option-name">{option.label}</span>
+                <span className="at-app-edit-option-name">{option.label}</span>
               </label>
-              {primary ? <span className="qp-app-edit-badge">{labels.primaryBadge}</span> : null}
+              {primary ? <span className="at-app-edit-badge">{labels.primaryBadge}</span> : null}
               {checked && !primary ? (
                 <button
                   type="button"
-                  className="qp-link-btn qp-app-edit-row-action"
+                  className="at-link-btn at-app-edit-row-action"
                   disabled={disabled}
                   onClick={() => onPromote(option.value)}
                 >

@@ -43,7 +43,7 @@ export default function HistoryTimelineLaneList({
     <section className="history-timeline-lanes" aria-label={title}>
       <h3 className="history-timeline-lanes-title">{title}</h3>
       <div
-        className="history-timeline-lanes-scroll qp-scroll-region"
+        className="history-timeline-lanes-scroll at-scroll-region"
         data-history-timeline-lane-count={viewModel.lanes.length}
       >
         {viewModel.lanes.length === 0 ? (

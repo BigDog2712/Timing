@@ -163,7 +163,7 @@ export default function QuietDialog({
 
   const dialog = open ? (
         <div
-          className="qp-dialog-backdrop qp-motion-overlay-enter"
+          className="at-dialog-backdrop at-motion-overlay-enter"
           onMouseDown={(event) => {
             if (!closeOnBackdrop) return;
             if (event.target === event.currentTarget) {
@@ -177,17 +177,17 @@ export default function QuietDialog({
             aria-modal={autoFocus ? true : undefined}
             aria-labelledby={titleId}
             tabIndex={-1}
-            className={`qp-dialog-surface qp-motion-overlay-enter ${surfaceClassName ?? ""}`}
+            className={`at-dialog-surface at-motion-overlay-enter ${surfaceClassName ?? ""}`}
           >
-            <header className="qp-dialog-header">
-            <div className="qp-dialog-heading">
-              <h3 ref={headingRef} id={titleId} tabIndex={-1} className="qp-dialog-title">{title}</h3>
-              {description && <p className="qp-dialog-description">{description}</p>}
+            <header className="at-dialog-header">
+            <div className="at-dialog-heading">
+              <h3 ref={headingRef} id={titleId} tabIndex={-1} className="at-dialog-title">{title}</h3>
+              {description && <p className="at-dialog-description">{description}</p>}
             </div>
-            {headerAside ? <div className="qp-dialog-header-aside">{headerAside}</div> : null}
+            {headerAside ? <div className="at-dialog-header-aside">{headerAside}</div> : null}
             </header>
-            {children && <div className="qp-dialog-body qp-scroll-region">{children}</div>}
-            {actions && <footer className="qp-dialog-actions">{actions}</footer>}
+            {children && <div className="at-dialog-body at-scroll-region">{children}</div>}
+            {actions && <footer className="at-dialog-actions">{actions}</footer>}
           </div>
         </div>
       ) : null;

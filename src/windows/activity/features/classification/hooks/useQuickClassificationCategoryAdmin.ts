@@ -118,7 +118,7 @@ export function useQuickClassificationCategoryAdmin({
     try {
       const raw = await dialogs.prompt({
         title: UI_TEXT.mapping.createCategoryTitle,
-        surfaceClassName: "qp-category-create-dialog",
+        surfaceClassName: "at-category-create-dialog",
         placeholder: UI_TEXT.mapping.createCategoryPlaceholder,
       });
       if (!raw) return;
