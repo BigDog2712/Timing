@@ -1099,7 +1099,7 @@ Kotlin 自己读那个文件、写进用户选中的 `content://`。过桥要 ba
 | `pending` | `string \| null` | 指针里写的、重启后才生效的新位置 |
 | `previous` | `string \| null` | 「改回旧位置」的目标 |
 | `sizeBytes` | `number` | 六项之和（递归求和） |
-| `entries` | `DataRootEntry[]` | `{ name, isDir, present, bytes }`，顺序固定六项（`timing.db` / `backups` / `logs` / `md` / `patina` / 迁移标记文件；`patina` 实际搬 `patina/data`，`name` 是给人看的短名） |
+| `entries` | `DataRootEntry[]` | `{ name, isDir, present, bytes }`，顺序固定六项（`timing.db` / `backups` / `logs` / `md` / `activity` / 迁移标记文件；`activity` 那一项的**源**按当前布局派生（`activity/data`，T05 迁移 fail-open 时是 `patina/data`）、**目标**恒为 `activity/data`；`name` 是给人看的短名，与目录结构无关） |
 | `affected` | `string[]` | 受 `%APP_DIR%` 影响、会跟着搬的落点**种类名** |
 | `pluginsInDataRoot` | `boolean` | 回退态下插件目录也在数据根里，块②要追加一句说明 |
 

@@ -9,8 +9,8 @@
 //! | 顺序 | 判据 | 挡的是什么 |
 //! |---|---|---|
 //! | ① | 数据根存在指针（`%APPDATA%\Patina` 无关；指针 = `%APPDATA%\<identifier>\data-root.json`） | 这个根是用户**显式选定**的，不是「第一次用 Timing」 |
-//! | ② | 标记 `patina/data/.patina-import-done` 在 | 搬完以后新位置没有活动库的那个洞 |
-//! | ③ | 目标库 `patina/data/patina.db` 已存在 | 兜底：已装用户升级上来时标记可能还没有 |
+//! | ② | 标记 `activity/data/.patina-import-done` 在 | 搬完以后新位置没有活动库的那个洞 |
+//! | ③ | 目标库 `activity/data/activity.db` 已存在 | 兜底：已装用户升级上来时标记可能还没有 |
 //!
 //! **③ 是原来就有的那道闸，保留不动**；①② 是后来加在它前面的，不是替换它。三道的
 //! 关系是「前面的先否掉、后面的再兜底」，删掉任何一道都会重新打开一个已知洞。
@@ -24,7 +24,7 @@
 //! 为什么要有 ②：搬迁（`services::data_root`）会把活动库送到新位置，但用户从来没在这个
 //! 根里留下过活动库时，新位置自然也没有它——此刻「目标不存在」与「第一次启动」长得一
 //! 模一样，于是又从上游导一次，用户看到的活动历史突然变成另一份数据集，零报错。标记放在
-//! `patina/data/` 里而**不是** `patina/` 根下：搬迁只搬 `patina/data`（六项清单里
+//! `activity/data/` 里而**不是** `activity/` 根下：搬迁只搬 `activity/data`（六项清单里
 //! `webview` 是运行中的缓存不搬），标记必须跟着被搬的那份数据走，否则搬完之后新位置
 //! 没有标记，等于把首启导入重新武装一遍。
 //!
@@ -37,7 +37,16 @@
 use crate::infra::activity::{app_paths, storage_paths};
 use std::path::{Path, PathBuf};
 
-/// 「首启导入已处理」标记的文件名（落在 `patina/data/` 里）。
+/// 「首启导入已处理」标记的文件名（落在 `activity/data/` 里）。
+///
+/// **文件名本身是已落盘坐标，永久冻结。** 与 `app_paths::UPSTREAM_PRODUCT_FOLDER` 同性质：
+/// 存量用户的磁盘上已经有这个名字的文件，改名等于「标记不见了」⇒ 闸② 失效 ⇒ 首启导入
+/// 重新武装一遍（用户看到的活动历史突然变成另一份数据集，零报错）。
+///
+/// T05 那次改名**不需要动它**：它不含目录名，跟着 `activity/data` 一起被搬。名字里的
+/// `patina` 是历史，不是坐标——**别做「扫尾式重命名」**，`check:de-patina` 的七条判据
+/// 扫不到这个裸文件名（判据 1 匹配路径片段、判据 7 匹配 `"patina.db"`），唯一拦住它的是
+/// 本文件末尾那条用例。
 pub(crate) const IMPORT_MARKER: &str = ".patina-import-done";
 
 /// 生产入口：`appdata` 是 `%APPDATA%\<identifier>`（指针文件所在目录），
@@ -158,4 +167,23 @@ fn copy_database(source: &Path, target: &Path) -> Result<(), String> {
 fn sqlite_url(path: &Path) -> Result<String, String> {
     let normalized = path.to_string_lossy().replace('\\', "/");
     Ok(format!("sqlite://{normalized}?mode=ro"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 这条钉的是**不许改名**，不是钉常量当天等于什么。
+    ///
+    /// 看起来是一句废话（`assert_eq!(常量, 字面量)`），但它是唯一拦得住「扫尾式重命名」
+    /// 的东西：这个名字全仓只出现在常量定义与本文件头表格里，`check:de-patina` 的七条判据
+    /// 扫不到它（判据 1 只匹配路径片段 `join("patina")` / `"patina/…"`，判据 7 只匹配
+    /// `"patina.db"`，而它是带前导点的裸文件名）。有人把它改成 `.activity-import-done`，
+    /// 七条判据全绿，而存量用户升级后因为「标记不见」会重新触发一次首启导入。
+    ///
+    /// 失败信息就是理由本身，所以断言串里不写别的话。
+    #[test]
+    fn the_import_marker_file_name_is_frozen_because_it_is_already_on_disk() {
+        assert_eq!(IMPORT_MARKER, ".patina-import-done");
+    }
 }
