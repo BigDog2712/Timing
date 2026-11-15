@@ -166,7 +166,12 @@ export function UsagePage() {
     () => (current == null ? null : rangeOf([current])),
     [current],
   );
-  const insights = useMemo(() => buildInsights({ days, keys }), [days, keys]);
+  /* 洞察句以「用户正在看的那一天」为准：看往日时说「比昨天多用」必须指那一天的前一天，
+     否则就是拿今天的趋势去描述 11/12（看着相关、其实无关）。区间态锚在今天。 */
+  const insights = useMemo(
+    () => buildInsights({ days, keys, anchor: mode === 'week' ? today : selectedKey }),
+    [days, keys, mode, today, selectedKey],
+  );
   /* 详情柱与主趋势柱同一口径：没读到的那天是 null，不是 0 */
   const detailPoints = useMemo<UsageTrendPoint[]>(() => {
     if (detailPkg == null) return [];

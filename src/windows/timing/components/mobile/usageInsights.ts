@@ -12,6 +12,7 @@
  */
 import { formatDuration, formatSpanCN, monthDayShort, shortName } from './usageFormat';
 import { percentOf } from '../../services/usageRange';
+import { shiftDayKey } from '../../services/usageActions';
 import type { UsageDayDto } from '../../types/domain/usage';
 
 export type InsightTone = 'up' | 'down' | 'info';
@@ -26,6 +27,14 @@ export interface InsightInput {
   days: Readonly<Record<string, UsageDayDto | undefined>>;
   /** 趋势窗口，从旧到新 —— 最后一个是「今天」 */
   keys: readonly string[];
+  /**
+   * 以哪一天为「今天」说话（默认窗口最后一天）。
+   *
+   * **看往日时必须传那一天**：不传的话「比昨天多用 40 分钟」说的仍是今天比昨天，
+   * 而用户正盯着 11/12 的读数 —— 一句看着相关其实无关的话比不说更坏。
+   * 那一天的前一天若不在已读到的窗口里，对比句自然不产（见 `days[prevKey] == null`）。
+   */
+  anchor?: string;
   /** 最多给几条（默认 2：超过两条就没人看了） */
   limit?: number;
 }
@@ -97,12 +106,14 @@ function longestDay(
 }
 
 /** 生成洞察句（按优先级：昨日对比 → 单应用过半 → 连续上升 → 最久一天）。 */
-export function buildInsights({ days, keys, limit = 2 }: InsightInput): Insight[] {
+export function buildInsights({ days, keys, anchor, limit = 2 }: InsightInput): Insight[] {
   const out: Insight[] = [];
   const lastKey = keys[keys.length - 1];
-  const prevKey = keys[keys.length - 2];
-  const today = lastKey ? days[lastKey] : undefined;
-  const yesterday = prevKey ? days[prevKey] : undefined;
+  const anchorKey = anchor ?? lastKey;
+  const isLatest = anchorKey === lastKey;
+  const prevKey = anchorKey ? shiftDayKey(anchorKey, -1) : '';
+  const today = anchorKey ? days[anchorKey] : undefined;
+  const yesterday = prevKey === '' ? undefined : days[prevKey];
 
   if (today && yesterday) {
     const delta = today.totalSec - yesterday.totalSec;
@@ -123,12 +134,14 @@ export function buildInsights({ days, keys, limit = 2 }: InsightInput): Insight[
     }
   }
 
-  const streak = risingStreak(days, keys);
+  /* 「连续变多」与「最久一天」只在看最新一天时才有意义：看 11/10 说「已连续 3 天变多」
+     是拿今天的趋势去描述那一天，时间线错位。 */
+  const streak = isLatest ? risingStreak(days, keys) : 0;
   if (streak >= 3) {
     out.push({ tone: 'up', text: `已连续 ${streak} 天变多` });
   }
 
-  const longest = longestDay(days, keys);
+  const longest = isLatest ? longestDay(days, keys) : null;
   if (longest != null && longest.key !== lastKey) {
     out.push({
       tone: 'info',

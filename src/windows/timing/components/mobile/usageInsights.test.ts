@@ -132,3 +132,27 @@ describe('连续上升与最久一天', () => {
     expect(buildInsights({ days, keys: KEYS, limit: 2 })).toHaveLength(2);
   });
 });
+
+describe('看往日时要说那一天的话（anchor）', () => {
+  const days = {
+    '2026-11-13': dayOf('2026-11-13', [{ pkg: 'a.b', sec: 600 }]),
+    '2026-11-14': dayOf('2026-11-14', [{ pkg: 'a.b', sec: 1800 }]),
+    '2026-11-15': dayOf('2026-11-15', [{ pkg: 'a.b', sec: 600 }]),
+  };
+
+  it('i06a_comparison_switches_to_the_anchored_day', () => {
+    /* 不传 anchor 时这句是「今天(600) 比昨天(1800) 少用 20 分钟」；
+       锚到 11/14 之后必须变成「11/14(1800) 比 11/13(600) 多用 20 分钟」 */
+    const [first] = buildInsights({ days, keys: KEYS, anchor: '2026-11-14', limit: 1 });
+    expect(first.text).toBe('比昨天多用 20 分钟，主要来自 B（+20 分钟）');
+  });
+
+  it('i06b_trend_sentences_are_silent_when_anchored_to_the_past', () => {
+    /* 「连续变多 / 最久一天」描述的是窗口趋势，看往日时说出来就是时间线错位 */
+    const texts = buildInsights({ days, keys: KEYS, anchor: '2026-11-14', limit: 5 }).map(
+      (item) => item.text,
+    );
+    expect(texts.join('|')).not.toContain('连续');
+    expect(texts.join('|')).not.toContain('最久');
+  });
+});
