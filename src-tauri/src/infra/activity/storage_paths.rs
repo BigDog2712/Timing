@@ -1,4 +1,4 @@
-use crate::infra::activity::{app_paths, storage_control};
+use crate::infra::activity::{activity_layout, app_paths, storage_control};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Runtime};
 
@@ -35,17 +35,11 @@ pub const LEGACY_ACTIVITY_DATA_REL: &str = "patina/data";
 /// 就从代码里消失了，而它正是这次迁移的全部内容。
 pub const LEGACY_ACTIVITY_DB_FILE: &str = "patina.db";
 
-/// 活动库的三个伴生文件：`-wal` / `-shm` / `-journal`。
+/// 活动库的伴生文件：`-wal` / `-shm` / `-journal`。
 ///
-/// **由 `SQLITE_DB_FILE_NAME` 派生，不许再写字面量。** 库名与伴生名一旦分叉，
-/// 数据根搬迁时会把 `-wal` 当成普通文件拷过去（得到撕裂的一页），或反过来漏掉它。
-pub fn sqlite_sidecar_names() -> [String; 3] {
-    sqlite_sidecar_names_of(SQLITE_DB_FILE_NAME)
-}
-
-/// 指定库名的伴生文件。迁移要按**源**库名跳过伴生文件（源叫 `patina.db` 时它的伴生
-/// 是 `patina.db-wal`，不是 `activity.db-wal`）——按目标名跳会漏掉它们，把 `-wal` 当
-/// 普通文件拷进新目录。
+/// **必须带库名进来。** 曾经有一个无参版本（恒按 `SQLITE_DB_FILE_NAME` 派生），已删除：
+/// Old 布局下它会给出 `activity.db-wal` 而磁盘上是 `patina.db-wal`，名字更短、答案更错，
+/// 正是「IDE 补全时最先递到手上」的那一类陷阱。
 pub fn sqlite_sidecar_names_of(file_name: &str) -> [String; 3] {
     ["-wal", "-shm", "-journal"].map(|suffix| format!("{file_name}{suffix}"))
 }
@@ -97,14 +91,23 @@ pub struct StoragePaths {
 }
 
 impl StoragePaths {
-    fn from_roots(
+    /// 由「两个根 + 库名」拼出全套落点。**库名是入参**，不在这里推布局。
+    ///
+    /// 为什么不推：本构造器同时服务三种根——E2E 根、自定义数据根、产品数据根。前两种
+    /// 与产品根的布局互不相干（E2E 恒为本次新建的根，自定义根里可能还是 `patina.db`），
+    /// 在这里读一次 `data_layout()` 等于用产品根的答案回答另外两个。
+    ///
+    /// `db_file_name` 的来源只能是 [`activity_layout::db_file_of`] 或
+    /// [`activity_layout::db_file_in`]——两者都是「已经判过的结论」，本函数只负责拼。
+    pub(crate) fn from_roots(
         data_root: PathBuf,
         webview_root: PathBuf,
         is_custom_data_root: bool,
         is_custom_webview_root: bool,
+        db_file_name: &'static str,
     ) -> Self {
         Self {
-            db_path: data_root.join(SQLITE_DB_FILE_NAME),
+            db_path: data_root.join(db_file_name),
             backup_dir: data_root.join(BACKUP_DIR_NAME),
             remote_backup_temp_dir: data_root.join(REMOTE_BACKUP_TEMP_DIR_NAME),
             data_root,
@@ -125,10 +128,12 @@ pub fn default_storage_paths<R: Runtime>(app: &AppHandle<R>) -> Result<StoragePa
             return Err("PATINA_E2E_DATA_ROOT must be absolute".to_string());
         }
         return Ok(StoragePaths::from_roots(
-            root.join("data"),
-            root.join("webview"),
+            root.join(DATA_SUBDIR),
+            root.join(WEBVIEW_SUBDIR),
             false,
             false,
+            /* E2E 根是本趟新建的临时目录，里面不可能有旧库 ⇒ 恒新布局。 */
+            SQLITE_DB_FILE_NAME,
         ));
     }
 
@@ -137,6 +142,10 @@ pub fn default_storage_paths<R: Runtime>(app: &AppHandle<R>) -> Result<StoragePa
         app_paths::product_webview_data_dir(app)?,
         false,
         false,
+        /* 产品根这两条路径的目录名已经由 `activity_bridge` 按布局定过，库名必须跟着
+        同一个布局走：Old 下目录是 `patina/data`，库是 `patina.db`。接错一个，应用就在
+        用户的历史旁边开一个空库，界面正常、日志干净。 */
+        activity_layout::db_file_of(activity_layout::data_layout()),
     ))
 }
 
@@ -150,11 +159,21 @@ fn resolve_roots(
 ) -> Result<StoragePaths, String> {
     let custom_data = state.data_root.is_some();
     let custom_cache = state.webview_root.is_some();
+    let data_root = state.data_root.unwrap_or(defaults.data_root);
+    /* 自定义数据根的库名只能看**磁盘事实**：迁移例程只跑产品数据根，用户自己挑的那个
+    目录里可能还躺着 T05 之前的 `patina.db`。按进程级 `data_layout()` 取名会让应用在
+    自己的自定义根里开一个空的新库——用户视角是「换了目录之后历史全空了」。 */
+    let db_file_name = if custom_data {
+        activity_layout::db_file_in(&data_root)
+    } else {
+        activity_layout::db_file_of(activity_layout::data_layout())
+    };
     let paths = StoragePaths::from_roots(
-        state.data_root.unwrap_or(defaults.data_root),
+        data_root,
         state.webview_root.unwrap_or(defaults.webview_root),
         custom_data,
         custom_cache,
+        db_file_name,
     );
     if custom_data {
         let metadata = std::fs::metadata(&paths.db_path).map_err(|e| {
@@ -197,8 +216,15 @@ pub fn derive_custom_data_root(selected_root: &Path, product_folder: &str) -> Pa
     selected_root.join(product_folder)
 }
 
-pub fn db_path_for_data_root(data_root: &Path) -> PathBuf {
-    data_root.join(SQLITE_DB_FILE_NAME)
+/// 这个目录里是不是已经装着一份活动库（**两种库名都算**）。
+///
+/// 唯一调用点是自定义数据根那道闸「目标目录不能已经有一份库」
+/// （`services::activity::data::storage_migration`）。只查新库名会让这道闸在 T05 之前的
+/// 目录上恒假——那种目录里是 `patina.db`，于是搬迁会直接盖掉用户在那里的历史。
+pub fn holds_activity_db(data_root: &Path) -> bool {
+    [SQLITE_DB_FILE_NAME, LEGACY_ACTIVITY_DB_FILE]
+        .iter()
+        .any(|name| data_root.join(name).exists())
 }
 
 pub fn backup_dir_for_data_root(data_root: &Path) -> PathBuf {

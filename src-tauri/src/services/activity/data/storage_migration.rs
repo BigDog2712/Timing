@@ -695,10 +695,9 @@ fn validate_target_data_root(
         if !target.is_dir() {
             return Err("target data directory is not a directory".to_string());
         }
-        if matches!(mode, TargetDataRootMode::Custom)
-            && storage_paths::db_path_for_data_root(target).exists()
-        {
-            return Err(format!("target data directory already contains {}", storage_paths::SQLITE_DB_FILE_NAME));
+        /* 两种库名都算：T05 之前的目录里是 `patina.db`，只查新名会让这道闸恒假。 */
+        if matches!(mode, TargetDataRootMode::Custom) && storage_paths::holds_activity_db(target) {
+            return Err("target data directory already contains an activity database".to_string());
         }
     }
 

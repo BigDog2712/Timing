@@ -4,12 +4,20 @@
 
 use super::*;
 
+use crate::infra::activity::activity_layout::{activity_subdir_of, db_file_in, db_file_of, Layout};
+
 #[test]
 fn missing_custom_database_never_uses_existing_default_database() {
     let root = std::env::temp_dir().join(format!("patina-path-resolution-{}", std::process::id()));
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(root.join(SQLITE_DB_FILE_NAME), b"different database").unwrap();
-    let defaults = StoragePaths::from_roots(root.clone(), root.clone(), false, false);
+    let defaults = StoragePaths::from_roots(
+        root.clone(),
+        root.clone(),
+        false,
+        false,
+        SQLITE_DB_FILE_NAME,
+    );
     let state = serde_json::from_value(serde_json::json!({
         "format":"patina.storage-control.v1", "profile":"dev", "dataRoot":root.join("missing"),
         "webviewRoot":null, "pending":null, "cleanupFiles":[],
@@ -73,6 +81,7 @@ fn storage_paths_keep_remote_temp_under_data_root() {
         PathBuf::from("D:\\Patina Data\\webview"),
         true,
         true,
+        SQLITE_DB_FILE_NAME,
     );
 
     /* 用常量拼期望值而不是写字面量：这条测的是「库名只有一个真源」，写死**新库名**就只
@@ -130,4 +139,62 @@ fn activity_data_rel_is_the_concatenation_of_its_two_parts() {
         LEGACY_ACTIVITY_DATA_REL,
         "旧布局的两个名字必须同源"
     );
+}
+
+/// `db_path` 的文件名必须是**调用方给的那个**，`from_roots` 不许自己去猜。
+///
+/// fail-open 到 Old 时 `data_root` 是 `<数据根>/patina/data`；库名若恒用
+/// `SQLITE_DB_FILE_NAME`（= `activity.db`），应用会去开一个**空的新库**，用户历史留在
+/// 同目录的 `patina.db` 里没人读——界面正常、日志干净，只有历史全空。
+///
+/// 传给它的值就是生产侧 `default_storage_paths` 传的同一个来源（`db_file_of(<数据布局>)`）。
+#[test]
+fn db_path_follows_the_layout_file_name_it_is_given() {
+    let root = std::env::temp_dir().join(format!("layout-db-name-{}", std::process::id()));
+    let old_data_root = root.join(LEGACY_ACTIVITY_DATA_REL);
+    let paths = StoragePaths::from_roots(
+        old_data_root.clone(),
+        root.join(activity_subdir_of(Layout::Old)).join(WEBVIEW_SUBDIR),
+        false,
+        false,
+        db_file_of(Layout::Old),
+    );
+    assert_eq!(
+        paths.db_path,
+        old_data_root.join(LEGACY_ACTIVITY_DB_FILE),
+        "Old 布局下 db_path 的文件名必须是 {:?}，实际是 {:?}",
+        LEGACY_ACTIVITY_DB_FILE,
+        paths.db_path
+    );
+}
+
+/// 自定义数据根的库名只能看**磁盘事实**（`db_file_in`），不能借用产品根的 `data_layout()`。
+///
+/// 迁移例程只跑产品数据根，用户自己挑的那个目录里可能还躺着 T05 之前的 `patina.db`。
+/// 按进程级布局取名 ⇒ 应用在自己的自定义根里开一个空的新库 ⇒「换了目录之后历史全空了」。
+#[test]
+fn a_custom_data_root_from_before_t05_keeps_reading_patina_db() {
+    let root = std::env::temp_dir().join(format!("custom-legacy-root-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join(LEGACY_ACTIVITY_DB_FILE), b"legacy database").unwrap();
+
+    assert_eq!(db_file_in(&root), LEGACY_ACTIVITY_DB_FILE);
+    assert_eq!(
+        StoragePaths::from_roots(
+            root.clone(),
+            root.join(WEBVIEW_SUBDIR),
+            true,
+            false,
+            db_file_in(&root),
+        )
+        .db_path,
+        root.join(LEGACY_ACTIVITY_DB_FILE)
+    );
+
+    /* 两份都在时取新库名：T05 之后的写入只会落在 `activity.db` 上，`patina.db` 那份是
+    只读快照。这一句同时证明 `db_file_in` 不会因为旧文件残留而退回去。 */
+    std::fs::write(root.join(SQLITE_DB_FILE_NAME), b"new database").unwrap();
+    assert_eq!(db_file_in(&root), SQLITE_DB_FILE_NAME);
+
+    std::fs::remove_dir_all(&root).unwrap();
 }

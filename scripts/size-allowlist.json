@@ -73,7 +73,7 @@
     "src-tauri/src/services/activity/data/sqlite_pool_upgrade_tests.rs": 799,
     "src-tauri/src/services/activity/data/sqlite_pool.rs": 747,
     "src-tauri/src/services/activity/data/sqlite_pool/restore.rs": 593,
-    "src-tauri/src/services/activity/data/storage_migration.rs": 1732,
+    "src-tauri/src/services/activity/data/storage_migration.rs": 1731,
     "src-tauri/src/services/activity/data/tracking_runtime.rs": 490,
     "src-tauri/src/services/activity/data/tracking_runtime/icon_refresh_tests.rs": 473,
     "src-tauri/src/services/activity/data/user_data_maintenance.rs": 1193,

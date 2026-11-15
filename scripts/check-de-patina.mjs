@@ -23,7 +23,9 @@
  *      == 0（C-2 实测：需要改名的行 = 0，所以这种 SQL 只可能是画蛇添足且不可逆）。
  *   6. fail-open 且**两个开关都接上**：`activity_bridge.rs` 里必须同时出现 `data_layout`
  *      与 `webview_layout`，且不得出现 `.join(ACTIVITY_SUBDIR)` 或任何 `"activity"`
- *      路径字面量。判的是「结构上不可能无视迁移结果」以及「不可能只接一个」。
+ *      路径字面量；`prepare` 必须往**两个不同的槽**里注入各自那一侧、且只从数据侧派生
+ *      要建的目录；`storage_paths::from_roots` 不得自己取库名（库名由调用方按布局传）。
+ *      判的是「结构上不可能无视迁移结果」以及「不可能只接一个」。
  *   7. 防空转：扫描文件数 < 300 ⇒ 红；`ACTIVITY_SUBDIR` / `LEGACY_ACTIVITY_DATA_REL`
  *      的声明行未命中 ⇒ 红（改名后本脚本还在扫一个不存在的符号）；测试面仍能扫到
  *      `patina/` 字面量（> 0）⇒ 否则红（有人把迁移夹具也删了，判据 1 会照样绿）。
@@ -165,12 +167,16 @@ function hits(pattern, files) {
   return found;
 }
 
-/** 函数体内**代码**（去注释）文，用来断言「某调用只在这里出现」。 */
+/** 函数体内**代码**（去注释）文，用来断言「某调用只在这里出现」。
+ *
+ * 用正则找 `fn 名字` 而不是 `fn 名字(`：泛型函数（`fn default_storage_paths<R: Runtime>(…`）
+ * 在这两个 token 之间还有 `<R: Runtime>`，按 `名字(` 找会直接返回 null，然后判据以
+ * 「找不到这个函数」的形式红——那种红是脚本 bug，不是代码问题。 */
 function functionBody(full, name) {
   const source = sources(full).stripped.join('\n');
-  const start = source.indexOf(`fn ${name}(`);
-  if (start < 0) return null;
-  const open = source.indexOf('{', start);
+  const match = new RegExp(`fn\\s+${name}\\b`).exec(source);
+  if (!match) return null;
+  const open = source.indexOf('{', match.index);
   let depth = 0;
   for (let index = open; index < source.length; index += 1) {
     if (source[index] === '{') depth += 1;
@@ -287,7 +293,48 @@ const bridgeLiterals = bridge
 if (bridgeLiterals.length) {
   fail(6, `activity_bridge 里出现 "activity" 路径字面量：${bridgeLiterals.map((h) => h.line).join(', ')}`);
 }
-notes.push('判据 6：data_layout / webview_layout 均已接上，无路径字面量');
+/* 判「接线」而不是「符号出现过」：只要求文件里提到两个开关名，等于允许 `prepare`
+注入**同一个**值（那正是第一版的毛病——一个现值喂两条路径，`data=New / webview=Old`
+结构上无法表达）。这里钉三件事：两个槽都被注入、**各自**注入的是自己那一侧、
+建目录只用数据侧。 */
+const prepBody = functionBody(BRIDGE_MODULE, 'prepare');
+if (!prepBody) {
+  fail(6, 'activity_bridge 里找不到 `prepare`');
+} else {
+  if (!prepBody.includes('set_data_root_override')) fail(6, '`prepare` 没有注入数据落点');
+  if (!prepBody.includes('set_webview_root_override')) fail(6, '`prepare` 没有注入 profile 落点');
+  if (!/set_data_root_override\(\s*data_root\s*\)/.test(prepBody)
+    && !/set_data_root_override\(\s*activity_data_root\(\)/.test(prepBody)) {
+    fail(6, '数据槽注入的不是数据侧落点');
+  }
+  if (!/set_webview_root_override\(\s*activity_webview_root\(\)/.test(prepBody)) {
+    fail(6, 'profile 槽注入的不是 `activity_webview_root()`（两个开关又被合并了）');
+  }
+  /* 目录必须从数据侧派生，而且 `prepare` 里**一个字都不许**出现 `WEBVIEW_SUBDIR`：
+  profile 的尾段由下游 `product_webview_data_dir` 自己补，这里多拼一层就是
+  `<根>/activity/webview/data`，Old 布局下还会顺手把 `activity/` 建出来。 */
+  if (!/\.join\(\s*DATA_SUBDIR\s*\)/.test(prepBody)) {
+    fail(6, '`prepare` 没有拼出 `<数据侧>/data`');
+  }
+  if (prepBody.includes('WEBVIEW_SUBDIR')) {
+    fail(6, '`prepare` 里出现 `WEBVIEW_SUBDIR`（profile 尾段该由下游补，这里拼就是两半搅在一起）');
+  }
+  if (!prepBody.includes('create_dir_all')) fail(6, '`prepare` 里找不到 `create_dir_all`');
+}
+/* 库名必须**一路传下来**：构造器只负责拼，来源由调用方决定。钉这条是因为
+`from_roots` 有两个「永远是新布局」的调用方（E2E 根、自定义根）与一个「跟着产品根
+布局走」的调用方，在构造器里读一次 `data_layout()` 就用产品根的答案回答了另外两个。 */
+const fromRootsBody = functionBody(STORAGE_PATHS, 'from_roots');
+if (!fromRootsBody) fail(6, '`storage_paths` 里找不到 `from_roots`');
+else if (/SQLITE_DB_FILE_NAME|LEGACY_ACTIVITY_DB_FILE/.test(fromRootsBody)) {
+  fail(6, '`from_roots` 里出现库名常量（库名必须由调用方传进来，它不该自己推布局）');
+}
+const defaultsBody = functionBody(STORAGE_PATHS, 'default_storage_paths');
+if (!defaultsBody) fail(6, '`storage_paths` 里找不到 `default_storage_paths`');
+else if (!defaultsBody.includes('db_file_of')) {
+  fail(6, '`default_storage_paths` 没按布局取库名（Old 布局下会去开一个空的新库）');
+}
+notes.push('判据 6：data_layout / webview_layout 均已接上，两槽各自注入，库名一路传下来');
 
 /* ── 判据 7：防空转 ─────────────────────────────────────────────────── */
 const scanned = production.length;

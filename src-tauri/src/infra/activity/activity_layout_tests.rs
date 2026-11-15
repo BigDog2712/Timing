@@ -174,3 +174,53 @@ fn a_corrupt_new_db_newer_than_a_healthy_old_one_still_fails_open_to_old() {
     /* 加闸：新库读不出来 ⇒ 等同于没有新库 ⇒ 回旧布局。 */
     assert_eq!(data_layout_checked_in(&root), Layout::Old);
 }
+
+/// 反向证明：磁盘上只有一份**真的**旧库、里面有一行记录 ⇒ 判据必须指到它，
+/// 而且按判据算出的库路径**确实能读出那一行**。
+///
+/// 这一条走的是生产链上的两步：`data_layout_checked_in` → `db_file_of`。任何一处把库名
+/// 接成新布局（`activity.db`），失败形态都是「读不到那一行」——正是用户那边的
+/// 「升级后历史全空、应用一切正常」。断言写成读值而不是读名字，就是为了让这条判据
+/// 在「编译过、测试绿、历史全空」那个状态下也会红。
+#[test]
+fn a_real_legacy_database_is_the_one_the_layout_points_at() {
+    let root = temp_root("legacy-real");
+    let old_db = root
+        .join(LEGACY_ACTIVITY_DATA_REL)
+        .join(LEGACY_ACTIVITY_DB_FILE);
+    make_valid_db(&old_db);
+    tauri::async_runtime::block_on(async {
+        let options = SqliteConnectOptions::new().filename(&old_db);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO probe (x) VALUES (42)")
+            .execute(&pool)
+            .await
+            .unwrap();
+        pool.close().await;
+    });
+
+    let layout = data_layout_checked_in(&root);
+    assert_eq!(layout, Layout::Old, "磁盘上只有旧库时必须回旧布局");
+    let db = db_path_in(&root, layout);
+    assert_eq!(db, old_db, "库名必须跟着布局走（Old ⇒ 旧库名）");
+
+    let value = tauri::async_runtime::block_on(async {
+        let options = SqliteConnectOptions::new().filename(&db).read_only(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .connect_with(options)
+            .await
+            .unwrap();
+        let value: Option<i64> = sqlx::query_scalar("SELECT x FROM probe")
+            .fetch_optional(&pool)
+            .await
+            .unwrap();
+        pool.close().await;
+        value
+    });
+    assert_eq!(value, Some(42), "按判据算出的库必须能读出历史那一行");
+}

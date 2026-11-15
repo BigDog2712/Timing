@@ -80,11 +80,34 @@ pub fn activity_data_dir() -> PathBuf {
     source_dir(&timing_data_root(), data_layout())
 }
 
-/// 活动 webview profile 目录（当前应当用的那个）的绝对路径。
+/// 活动 **webview profile** 目录（当前应当用的那个）的绝对路径。
 pub fn activity_webview_dir() -> PathBuf {
     timing_data_root()
         .join(activity_subdir_of(webview_layout()))
         .join(WEBVIEW_SUBDIR)
+}
+
+/// 活动**库**在给定数据根下的路径。目录名与库名出自**同一个** `Layout`——分两次取就有
+/// 机会取到两套（`activity/data/patina.db` 这种空库，或反过来），而它不报错。生产口径是
+/// `db_path_in(&timing_data_root(), data_layout())`；判据传临时根来断言它。
+pub fn db_path_in(root: &Path, layout: Layout) -> PathBuf {
+    source_dir(root, layout).join(db_file_of(layout))
+}
+
+/// 某个**数据目录**里实际装着哪一份库（两份都在时取新库名，都不在也取新库名）。
+///
+/// 唯一用途是 `storage_paths::resolve_roots` 给**自定义数据根**定库名：迁移例程只跑
+/// 产品数据根，自定义根里可能还躺着 T05 之前的 `patina.db`，那里只能看磁盘事实——
+/// 拿进程级的 [`data_layout`] 去回答它是「产品根的答案」，会把自定义根判成新库名，
+/// 于是应用在用户自己的目录里开一个空的新库。自定义根里两份都在时取新库名是有意的：
+/// 只有 `activity.db` 会被 T05 之后的写入碰到，`patina.db` 那份是只读快照。
+pub fn db_file_in(dir: &Path) -> &'static str {
+    let new_db = dir.join(SQLITE_DB_FILE_NAME).is_file();
+    let old_db = dir.join(LEGACY_ACTIVITY_DB_FILE).is_file();
+    if old_db && !new_db {
+        return LEGACY_ACTIVITY_DB_FILE;
+    }
+    SQLITE_DB_FILE_NAME
 }
 
 /// 活动子目录名（`activity` / `patina`）。

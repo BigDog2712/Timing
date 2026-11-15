@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use tauri::{AppHandle, Manager, Runtime};
 
-/// 宿主注入的落点（Timing 融合用，上游没有这个入口）。
+/// 宿主注入的**数据**落点（Timing 融合用，上游没有这个入口）。
 ///
 /// 上游按「`app_data_dir()` 的父目录 + `Patina`」反推，即 `%APPDATA%\Patina`——
 /// 那正是**用户已安装的 Patina 的真实数据目录**。融合后若照旧解析，两个应用会
@@ -10,7 +10,10 @@ use tauri::{AppHandle, Manager, Runtime};
 ///
 /// 所以宿主在启动最早处注入自己的数据根，这里优先使用；注入为空时行为与上游一致
 /// （`cargo test` 直接跑本 crate 时不会注入，测试语义不变）。
-static ROOT_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
+///
+/// 名字里的 `DATA` 不是修饰：另外那半（profile）住 [`WEBVIEW_ROOT_OVERRIDE`]。两个槽
+/// 各喂一条路径，是唯一能表达「数据已切到新目录、profile 还在旧目录」的结构。
+static DATA_ROOT_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 
 /// 宿主注入的 **profile** 落点（T05 起与数据落点分开注入）。
 ///
@@ -20,12 +23,12 @@ static ROOT_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 /// 要防的「切到一份冻结在首次复制时刻的副本」那个洞。
 static WEBVIEW_ROOT_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 
-/// 由宿主调用一次（重复调用只生效第一次）。
-pub fn set_root_override(root: PathBuf) {
-    let _ = ROOT_OVERRIDE.set(root);
+/// 由宿主调用一次（重复调用只生效第一次）。只作用于**数据**那半。
+pub fn set_data_root_override(root: PathBuf) {
+    let _ = DATA_ROOT_OVERRIDE.set(root);
 }
 
-/// 由宿主调用一次（重复调用只生效第一次）。语义同 [`set_root_override`]，作用于 profile。
+/// 由宿主调用一次（重复调用只生效第一次）。只作用于 **profile** 那半。
 pub fn set_webview_root_override(root: PathBuf) {
     let _ = WEBVIEW_ROOT_OVERRIDE.set(root);
 }
@@ -104,7 +107,7 @@ pub fn app_profile<R: Runtime>(app: &AppHandle<R>) -> AppProfile {
 }
 
 pub fn product_roaming_data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    if let Some(root) = ROOT_OVERRIDE.get() {
+    if let Some(root) = DATA_ROOT_OVERRIDE.get() {
         return Ok(root.join("data"));
     }
     #[cfg(debug_assertions)]

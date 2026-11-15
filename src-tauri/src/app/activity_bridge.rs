@@ -12,12 +12,45 @@
 //!    后续功能，不在这里做。导入本身（指针闸 / 「已处理过」标记 / 目标库兜底）在
 //!    `legacy_import`。
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use crate::infra::activity::activity_layout;
+use crate::infra::activity::activity_layout::{self, Layout};
+use crate::infra::activity::storage_paths::{timing_data_root, DATA_SUBDIR};
 
-/// 活动**数据**在 Timing 数据根下的落点：`<数据根>/activity` 或 Fail-open 时的
-/// `<数据根>/patina`。
+/// 活动数据与 profile 在 Timing 数据根下的两条落点（`<数据根>/{activity,patina}` 那一层）。
+///
+/// ⚠️ **不含 `data` / `webview` 尾段**：下游的 `product_roaming_data_dir` /
+/// `product_webview_data_dir` 各自会 `join("data")` / `join("webview")`。把尾段也带上，
+/// 拿到的就是 `<数据根>/activity/data/data`——不报错，只是一份空库。
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct ActivityRoots {
+    pub data: PathBuf,
+    pub webview: PathBuf,
+}
+
+/// 由「数据根 + 两份布局决议」算落点。**纯函数**：无 IO、不碰进程级缓存。
+///
+/// 生产入口传 `timing_data_root()` 与两个 `OnceLock` 开关；判据入口可以传任意临时根 +
+/// 任意组合。`data = New` / `webview = Old` 这一组是约束 7 要求**必须能存在**的状态
+/// （`VACUUM INTO` 成功 + `rename` 因 profile 被占用失败），只有这条缝能把它造出来——
+/// 一个 `OnceLock<PathBuf>` 在结构上表达不了它，这就是它非得是两个槽的理由。
+pub(crate) fn roots_in(root: &Path, data: Layout, webview: Layout) -> ActivityRoots {
+    ActivityRoots {
+        data: root.join(activity_layout::activity_subdir_of(data)),
+        webview: root.join(activity_layout::activity_subdir_of(webview)),
+    }
+}
+
+/// 生产口径：两个开关**各读各的**，中间不许有任何合并。
+fn roots() -> ActivityRoots {
+    roots_in(
+        &timing_data_root(),
+        activity_layout::data_layout(),
+        activity_layout::webview_layout(),
+    )
+}
+
+/// 活动**数据**落点：`<数据根>/activity`，fail-open 时是 `<数据根>/patina`。
 ///
 /// 子目录名由 `activity_layout::data_layout()` 决定，**不写字面量**：`activity_dir_migrate`
 /// fail-open 回旧布局时应用必须继续读写旧库，否则它会去开一个空的 `activity/data`，
@@ -25,20 +58,18 @@ use crate::infra::activity::activity_layout;
 ///
 /// ⚠️ 首次调用会做一次 `PRAGMA quick_check`（`block_on`），所以它必须在**同步**启动段
 /// 先被调一次——[`prepare`] 一进门就调它，那就是那次。别在异步命令里首次调它。
-pub fn activity_root() -> PathBuf {
-    let layout = activity_layout::data_layout();
-    crate::platform::app_dir::data_root().join(activity_layout::activity_subdir_of(layout))
+///
+/// [`roots`] 里那两个 `data_layout` / `webview_layout` 的调用，是 `check:de-patina`
+/// 判据 6 的结构检查点：**两个开关都必须接上，且不许只接一个**。
+pub fn activity_data_root() -> PathBuf {
+    roots().data
 }
 
-/// 活动窗 **WebView2 profile** 的落点：`<数据根>/activity/webview` 或
-/// `<数据根>/patina/webview`。
+/// 活动窗 **WebView2 profile** 的落点：`<数据根>/activity`，fail-open 时是 `<数据根>/patina`。
 ///
 /// 与数据那半**各用各的开关**：profile 被占住搬不动，不该把数据也退回去（反之亦然）。
-/// 这个函数名与 [`activity_root`] 里的 `data_layout` 同时出现在本文件，是
-/// `check:de-patina` 判据 6 的结构检查点：**两个开关都必须接上，且不许只接一个**。
 pub fn activity_webview_root() -> PathBuf {
-    let layout = activity_layout::webview_layout();
-    crate::platform::app_dir::data_root().join(activity_layout::activity_subdir_of(layout))
+    roots().webview
 }
 
 /// 启动期一次性准备。返回 `Ok(None)` = 本次没导入（指针在 / 标记已写 / 目标库已在 / 没有源）。
@@ -48,14 +79,18 @@ pub fn activity_webview_root() -> PathBuf {
 ///
 /// 失败**不阻断启动**：Patina 子系统照常跑，只是历史为空——比整个应用起不来好。
 pub fn prepare(identifier: &str) -> Result<Option<PathBuf>, String> {
-    let root = activity_root();
-    let data_dir = root.join("data");
+    /* 建的是**数据侧**那一层。Old 布局下它是 `patina/data`（老用户本来就有）；绝不能
+    在这里建 `activity/`——那会让下一次启动的布局决议看到「新目录已存在」而判成 New，
+    于是空库变永久。整段只碰数据侧，`WEBVIEW_SUBDIR` 一个字都不出现（尾段由下游
+    `product_webview_data_dir` 自己补）。 */
+    let data_root = activity_data_root();
+    let data_dir = data_root.join(DATA_SUBDIR);
     std::fs::create_dir_all(&data_dir)
         .map_err(|err| format!("创建 {} 失败: {err}", data_dir.display()))?;
 
     // 落点在创建之后立刻注入：Patina 的 setup 会拿它建库，晚一步就落到 AppData 去了。
     // 数据与 profile **分别注入**：两个布局各判各的，合并成一个值就等于把两个开关绑在一起。
-    crate::infra::activity::app_paths::set_root_override(root.clone());
+    crate::infra::activity::app_paths::set_data_root_override(data_root);
     crate::infra::activity::app_paths::set_webview_root_override(activity_webview_root());
 
     /* 拿不到 `%APPDATA%` 就当没有指针：那种环境下也不可能读到过指针文件。 */
@@ -80,12 +115,12 @@ static ACTIVITY_POOL: tokio::sync::OnceCell<sqlx::SqlitePool> = tokio::sync::Onc
 
 /// 活动库的绝对路径。
 ///
-/// `"data"` 与 `"patina.db"` 都走 `storage_paths` 的常量，不在这里另写一份：
-/// 库名是**单真源**，任何一处自带字面量都会在改名时与主路径分叉，导致同进程
-/// 开两个库文件（一个新建、一个已存在，WAL 互不锁）。
+/// 目录名与库名**一起**由 `activity_layout::db_path_in` 给：库名是单真源，任何一处自带
+/// 字面量都会在改名/回退时与主路径分叉，导致同进程开两个库文件（一个新建、一个已存在，
+/// WAL 互不锁）。Old 布局下库名是 `patina.db`——这里若还写 `SQLITE_DB_FILE_NAME`，读侧会去
+/// 开 `patina/data/activity.db` 这个空库。
 fn activity_db_path() -> PathBuf {
-    use crate::infra::activity::storage_paths::{DATA_SUBDIR, SQLITE_DB_FILE_NAME};
-    activity_root().join(DATA_SUBDIR).join(SQLITE_DB_FILE_NAME)
+    activity_layout::db_path_in(&timing_data_root(), activity_layout::data_layout())
 }
 
 /// 活动库连接池：只读、单连接、懒建。**导出全额数据包也用它**（`bundle_cmd`），
@@ -169,81 +204,8 @@ pub async fn activity_summary(
     }
 }
 
+/* 本文件已贴着 300 行门禁：用例住到 `activity_bridge_tests.rs`（仓里既有做法，
+见 `storage_paths_tests.rs` / `activity_layout_tests.rs`）。 */
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use sqlx::sqlite::SqlitePoolOptions;
-
-    #[test]
-    fn inverted_range_is_rejected_before_touching_the_database() {
-        /* 前置判断做成纯函数，才能在**不建库**的情况下钉住「空区间不查库」。
-        直接断言 `activity_summary` 返回空是断不出东西的——它对任何错误都返回空。 */
-        assert!(!range_is_queryable(10, 5, 10));
-        assert!(!range_is_queryable(5, 5, 10));
-        assert!(!range_is_queryable(5, 10, 0));
-        assert!(range_is_queryable(5, 10, 10));
-    }
-
-    /* 真正容易写错的是那段 SQL 的裁剪口径：拿 `duration` 直接求和，在整段查询里看起来
-    完全正常，只有**横跨区间边界**的会话会凭空多算。这里用内存库跑同一条语句钉死它：
-    会话 10 分钟，区间只覆盖末尾 2 分钟 → 120 秒，而不是 600。 */
-    #[tokio::test]
-    async fn overlapping_sessions_are_clipped_to_the_range() {
-        let pool = SqlitePoolOptions::new()
-            .max_connections(1)
-            .connect("sqlite::memory:")
-            .await
-            .expect("in-memory sqlite");
-        sqlx::query(
-            "CREATE TABLE sessions (
-                app_name TEXT NOT NULL, exe_name TEXT NOT NULL,
-                start_time INTEGER NOT NULL, end_time INTEGER NOT NULL, duration INTEGER NOT NULL)",
-        )
-        .execute(&pool)
-        .await
-        .expect("create table");
-
-        let start = 1_000_000_i64;
-        // ① 横跨左边界：0-10 分钟，区间从第 8 分钟开始 → 应计 2 分钟
-        insert_session(&pool, "Editor", "editor.exe", start, start + 600_000).await;
-        // ② 完全落在区间内：第 8.3 到第 9.3 分钟 → 应计 60 秒
-        insert_session(&pool, "Browser", "chrome.exe", start + 500_000, start + 560_000).await;
-        // ③ 完全在区间之前：不该出现在结果里
-        insert_session(&pool, "Mail", "mail.exe", start - 900_000, start - 600_000).await;
-
-        let from = start + 480_000;
-        let to = start + 600_000;
-        let rows = sqlx::query_as::<_, crate::models::stats::ActivitySlice>(ACTIVITY_SQL)
-            .bind(from)
-            .bind(to)
-            .bind(10_i64)
-            .fetch_all(&pool)
-            .await
-            .expect("query");
-
-        assert_eq!(rows.len(), 2, "区间外的应用不该出现在结果里");
-        assert_eq!(rows[0].app, "Editor");
-        assert_eq!(rows[0].sec, 120, "跨界会话必须按区间裁剪，不能拿 duration 求和");
-        assert_eq!(rows[0].samples, 1);
-        assert_eq!(rows[1].app, "Browser");
-        assert_eq!(rows[1].sec, 60, "完全落在区间内的会话按原样计入");
-    }
-
-    async fn insert_session(
-        pool: &sqlx::SqlitePool,
-        app: &str,
-        exe: &str,
-        start: i64,
-        end: i64,
-    ) {
-        sqlx::query("INSERT INTO sessions (app_name, exe_name, start_time, end_time, duration) VALUES (?, ?, ?, ?, ?)")
-            .bind(app)
-            .bind(exe)
-            .bind(start)
-            .bind(end)
-            .bind(end - start)
-            .execute(pool)
-            .await
-            .expect("insert session");
-    }
-}
+#[path = "activity_bridge_tests.rs"]
+mod activity_bridge_tests;
