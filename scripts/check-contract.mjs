@@ -427,10 +427,74 @@ if (presentWindowIds.length !== 1) {
   }
 }
 
+/* ── capability 的 `permissions[]` 引用必须在本仓有定义（G6 续）────────────────
+ *
+ * G6 判的是「window-commands.toml 的 allow 与分析窗注册的命令是否相等」，它管的是
+ * **命令**这一层。还有一层完全没人管：capability 说「这扇窗要有这些**权限**」，
+ * 却没人检查「这些权限到底存不存在」。漏一个的症状：
+ *   想让某扇窗多一条命令，写了个不存在的权限名 ⇒ `tauri-build` 编译期报
+ *   `Permission X not found`（**明确报错，好**）—— 但**只有 `cargo build` 会跑它**，
+ *   而 `npm run check` 里没有 cargo ⇒ 纯前端流水线对这件事是**零拦截**。
+ *   改名批次里最常见的形态正是这个：capability 改了、`permissions/*.toml` 没改。
+ *
+ * 判定规则只有一条：**这个 id 是否在本仓 `permissions/*.toml` 的 `identifier` 集合里**。
+ * 含冒号的是插件/内置命名空间（`core:` / `opener:` / `autostart:` / `dialog:` …），
+ * 由插件自己带，不在本仓 —— 跳过。
+ * ⚠️ **不要写成插件前缀白名单**：第一版写 `^(core|opener|dialog|…):` 时，在 `default.json`
+ * 上被 `autostart:allow-enable` / `-disable` / `-is-enabled` **假红 3 条**（它们来自
+ * `tauri-plugin-autostart` 自带的权限集）。白名单会随插件增减而腐烂，而"本仓自己的
+ * identifier 集合"是闭包，不会腐烂。一个会假红的判据最终一定被关掉，那比没有判据更坏。 */
+const capabilityPermissionRefs = () => {
+  const defined = new Set();
+  for (const f of readdirSync(join(root, 'src-tauri/permissions')).filter((n) => n.endsWith('.toml'))) {
+    for (const m of read(`src-tauri/permissions/${f}`).matchAll(/^identifier\s*=\s*"([^"]+)"/gm)) {
+      defined.add(m[1]);
+    }
+  }
+  const refs = [];
+  const undefinedRefs = [];
+  for (const f of readdirSync(join(root, 'src-tauri/capabilities')).filter((n) => n.endsWith('.json'))) {
+    let doc;
+    try {
+      doc = JSON.parse(read(`src-tauri/capabilities/${f}`));
+    } catch (err) {
+      /* 抛异常会让门禁以非 0 退出却没有任何可读信息，所以转成一条 failures。 */
+      undefinedRefs.push(`${f} 不是合法 JSON（${err.message}）`);
+      continue;
+    }
+    for (const perm of doc.permissions ?? []) {
+      const id = typeof perm === 'string' ? perm : perm.identifier;
+      if (id.includes(':')) continue;
+      refs.push(id);
+      if (!defined.has(id)) undefinedRefs.push(`${f} :: ${id}`);
+    }
+  }
+  return { refs, defined, undefinedRefs };
+};
+
+const capPerms = capabilityPermissionRefs();
+
+/* 防空转：一条自定义引用都没扫到，说明目录改名 / 解析失配，判据在空转。 */
+if (capPerms.refs.length === 0) {
+  failures.push({
+    label: 'capabilities 的自定义 permissions 引用集合为空',
+    missing: [],
+    extra: [],
+    hint: '一条非插件的权限引用都没扫到 —— 目录或字段名变了，这条判据在空转',
+  });
+}
+check(
+  'capability 引用的 permission 缺少定义',
+  capPerms.undefinedRefs,
+  [],
+  '引用了不存在的权限名 ⇒ `cargo build` 会报 `Permission X not found`，而 `npm run check` 里没有 cargo ⇒ 纯前端流水线零拦截',
+);
+
 const summary = [
   `命令：Rust ${commands.size}（+Patina ${patinaCmds.size}）/ IpcApi ${api.size} / ipc.ts ${calls.size} / mock ${mocks.size}`,
   `错误码：Rust ${rustCodes.size} / 前端 ${feCodes.size}`,
   `事件：后端 ${rEvents.size} / 前端 ${fEvents.size} / emit 点 ${emitted.size}`,
+  `权限引用：capabilities 自定义 ${capPerms.refs.length} 条 / 本仓已定义 ${capPerms.defined.size} 个`,
 ].join('；');
 
 if (failures.length === 0) {
