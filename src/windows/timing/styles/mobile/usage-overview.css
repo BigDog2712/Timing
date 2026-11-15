@@ -1,0 +1,135 @@
+/* =============================================================================
+ * Timing — 移动端 · 统计页（总览卡 / 洞察句 / 单应用详情）
+ * -----------------------------------------------------------------------------
+ * 与 `usage.css` 分家的唯一理由：一个样式文件不许顶穿 300 行（check:size 也管 CSS）。
+ * 这里只放「读数」与「句子」，排行与日期条仍在 `usage.css`。
+ *
+ * 颜色一律走令牌：涨用 --warn（多了要看一眼）、跌用 --ok（少了是好事），
+ * 与金融行情的红涨绿跌无关 —— 这是屏幕时间，语义是「警示 / 收敛」。
+ * ========================================================================== */
+
+.m-usage-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-3);
+  border-radius: var(--m-radius);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+.m-usage-overview__headline {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
+.m-usage-overview__main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* 主读数用等宽数字：切日期时数字不跳宽度，眼睛不用重新找位置 */
+.m-usage-overview__total {
+  font-family: var(--font-timer);
+  font-size: 26px;
+  font-weight: var(--weight-strong);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-usage-overview__delta {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-usage-overview__delta[data-tone='up'] {
+  color: var(--warn);
+}
+
+.m-usage-overview__delta[data-tone='down'] {
+  color: var(--ok);
+}
+
+/* 副读数最多三个：小屏放四个就开始换行，且没人读 */
+.m-usage-overview__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.m-usage-overview__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.m-usage-overview__cell dt {
+  font-size: 11px;
+  color: var(--ink-4);
+}
+
+.m-usage-overview__cell dd {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------ 洞察句 ------------------------------ */
+.m-usage-insight {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.m-usage-insight li {
+  position: relative;
+  padding-left: 12px;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--ink-3);
+}
+
+/* 圆点用伪元素而不是 ::marker：::marker 拿不到颜色，涨跌两态就分不出来 */
+.m-usage-insight li::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 7px;
+  width: 4px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--ink-4);
+}
+
+.m-usage-insight li[data-tone='up']::before {
+  background: var(--warn);
+}
+
+.m-usage-insight li[data-tone='down']::before {
+  background: var(--ok);
+}
+
+/* ------------------------------ 单应用详情 ------------------------------ */
+.m-usage-detail__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60vw;
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  text-align: center;
+}
+
+/* 详情页左上返回键右边留等宽空位：标题才能真的居中（与日期条同一手法） */
+.m-usage-detail__placeholder {
+  width: var(--m-tap);
+}

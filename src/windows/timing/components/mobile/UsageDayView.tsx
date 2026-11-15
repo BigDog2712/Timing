@@ -1,0 +1,135 @@
+/**
+ * [0.13.2] 统计页的「单日」视图：日期条 + 总览 + 洞察 + 排行。
+ *
+ * 从 `UsagePage` 抽出来的理由只有一个：那个文件已经顶到 300 行上限（`check:size`）。
+ * 抽的时候顺手把「这一天怎么读」全留在这里，页面只负责取数与状态。
+ */
+import { UsageInsightList } from './UsageInsightList';
+import { UsageOverview } from './UsageOverview';
+import { UsageRanking } from './UsageRanking';
+import { clockText, formatSpanCN, monthDayText } from './usageFormat';
+import { topRows, type UsageRange } from '../../services/usageRange';
+import type { Insight } from './usageInsights';
+
+/** 排行最多显示多少行；其余合成「其他 N 个应用」（列表之和仍等于合计）。 */
+export const RANK_LIMIT = 10;
+
+interface Props {
+  selectedKey: string;
+  /** 今天（本地日键）：上界，也是「今日合计」的判据 */
+  today: string;
+  /** 这一天的读数（`rangeOf([dto])`）；没读到传 null */
+  day: UsageRange | null;
+  /** 这一天的失败原因（只影响这一天，不影响整页） */
+  failure?: string;
+  /** 与昨天比（秒）；null = 没读到昨天 */
+  deltaSec: number | null;
+  insights: readonly Insight[];
+  onSelectDay: (key: string) => void;
+  /** 日期条左右箭头：±1 天（日键算术留在页面，视图不认识日期） */
+  onStepDay: (delta: number) => void;
+  onSelectApp: (packageName: string) => void;
+  onRetry: () => void;
+}
+
+export function UsageDayView({
+  selectedKey,
+  today,
+  day,
+  failure,
+  deltaSec,
+  insights,
+  onSelectDay,
+  onStepDay,
+  onSelectApp,
+  onRetry,
+}: Props) {
+  const isToday = selectedKey === today;
+  const rows = day == null ? { top: [], rest: null } : topRows(day.rows, RANK_LIMIT);
+  const firstUse = (day?.rows ?? []).reduce(
+    (min, row) => (row.first > 0 && (min === 0 || row.first < min) ? row.first : min),
+    0,
+  );
+  const lastUse = (day?.rows ?? []).reduce((max, row) => Math.max(max, row.last), 0);
+
+  return (
+    <>
+      <div className="m-usage__daybar">
+        <button
+          type="button"
+          className="m-usage__step"
+          aria-label="前一天"
+          onClick={() => onStepDay(-1)}
+        >
+          ‹
+        </button>
+        <label className="m-usage__datepick">
+          {/* 原生日期控件压在文字上（透明）：点哪都能弹系统选择器，不自己造日历。
+              字号 16px 是为了避开 iOS 聚焦时整页放大。 */}
+          <input
+            type="date"
+            className="m-usage__dateinput"
+            aria-label="选择日期"
+            value={selectedKey}
+            max={today}
+            onChange={(event) => {
+              const next = event.target.value;
+              if (next !== '' && next !== selectedKey) onSelectDay(next);
+            }}
+          />
+          <span className="m-usage__datetext">{monthDayText(selectedKey)}</span>
+        </label>
+        <button
+          type="button"
+          className="m-usage__step"
+          aria-label="后一天"
+          disabled={selectedKey >= today}
+          onClick={() => onStepDay(1)}
+        >
+          ›
+        </button>
+      </div>
+
+      {failure != null ? (
+        <div className="m-usage__card">
+          <p className="m-usage__hint">{failure}</p>
+          <button type="button" className="m-btn" onClick={onRetry}>
+            重试
+          </button>
+        </div>
+      ) : day == null ? (
+        <p className="m-usage__hint">正在读取…</p>
+      ) : day.totalSec === 0 ? (
+        <p className="m-usage__hint">
+          {isToday ? '今天还没有可统计的前台使用记录。' : '这天没有可统计的前台使用记录。'}
+        </p>
+      ) : (
+        <>
+          <UsageOverview
+            headline={isToday ? '今日合计' : '这天合计'}
+            totalSec={day.totalSec}
+            deltaSec={deltaSec}
+            details={[
+              { label: '首次', value: clockText(firstUse) },
+              { label: '最后', value: clockText(lastUse) },
+              { label: '应用', value: `${day.rows.length} 个` },
+            ]}
+          />
+          <UsageInsightList items={insights} />
+          <UsageRanking
+            top={rows.top}
+            rest={rows.rest}
+            totalSec={day.totalSec}
+            meta={(row) =>
+              row.first > 0
+                ? `首次 ${clockText(row.first)} · 最后 ${clockText(row.last)}`
+                : `合计 ${formatSpanCN(row.sec)}`
+            }
+            onSelect={onSelectApp}
+          />
+          <p className="m-usage__note">只统计前台时间，息屏与后台播放不计。数据只留本机。</p>
+        </>
+      )}
+    </>
+  );
+}

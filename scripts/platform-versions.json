@@ -22,7 +22,7 @@
   ],
   "desktop": "0.12.2",
   "mobile": {
-    "versionName": "0.12.0",
-    "versionCode": 12000
+    "versionName": "0.12.1",
+    "versionCode": 12001
   }
 }

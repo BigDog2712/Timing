@@ -1,0 +1,292 @@
+/* =============================================================================
+ * Timing — 移动端 · 统计页（应用使用）
+ * -----------------------------------------------------------------------------
+ * 从 `UsagePage.tsx` 里第一次真正落地样式：0.13.0 的页面只有类名没有规则，
+ * 全仓 `m-usage*` 零命中（统计页此前是裸 HTML）。
+ *
+ * 只写本页自己的块：按钮在 primitives.css，外壳与导航在 shell.css。
+ * 颜色一律走令牌；可点元素高度 >= 44px（`--m-tap`）。
+ * ========================================================================== */
+
+.m-usage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-1);
+}
+
+/* ------------------------------ 日期条 ------------------------------ */
+.m-usage__daybar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.m-usage__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--m-tap);
+  min-height: var(--m-tap);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.m-usage__step:active:not(:disabled) {
+  background: var(--bg-field);
+}
+
+.m-usage__step:disabled {
+  color: var(--ink-4);
+  opacity: 0.5;
+}
+
+/* 原生日期控件透明压在文字上：点哪都能弹系统选择器，不自己造日历。
+   `font-size: 16px` 是硬要求 —— 小于 16px 时 iOS 聚焦会自动放大整页。 */
+.m-usage__datepick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 112px;
+  min-height: var(--m-tap);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-lg);
+}
+
+.m-usage__dateinput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  font-size: 16px;
+  background: transparent;
+}
+
+.m-usage__datetext {
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ------------------------------ 近 7 天趋势 ------------------------------ */
+.m-usage-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  border-radius: var(--m-radius);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+.m-usage-trend__col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+}
+
+/* 轨道给一个**确定高度**：柱子按百分比撑高，百分比必须有参照物 */
+.m-usage-trend__track {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  height: 48px;
+}
+
+.m-usage-trend__bar {
+  display: block;
+  width: 100%;
+  min-height: 2px;
+  border-radius: 3px 3px 1px 1px;
+  background: var(--track);
+  transition: height var(--dur-quick) var(--ease-standard);
+}
+
+.m-usage-trend__bar[data-empty] {
+  min-height: 2px;
+  height: 2px;
+  background: var(--line);
+}
+
+/* 读不到的那天画骨架，**不画零柱** —— 零柱等于告诉用户「那天没用手机」 */
+.m-usage-trend__bar[data-pending] {
+  min-height: 12px;
+  height: 12px;
+  background: var(--track);
+  opacity: 0.35;
+}
+
+.m-usage-trend__col[data-active] .m-usage-trend__bar {
+  background: var(--accent);
+}
+
+.m-usage-trend__label {
+  font-size: 10px;
+  line-height: 1;
+  color: var(--ink-4);
+}
+
+.m-usage-trend__col[data-active] .m-usage-trend__label {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+
+/* ------------------------------ 范围切换 ------------------------------ */
+.m-usage-range {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: var(--bg-field);
+}
+
+.m-usage-range__item {
+  flex: 1 1 0;
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+}
+
+/* 选中态靠底色 + 字重，不靠颜色（深色模式下靠色相区分选中会失效） */
+.m-usage-range__item[data-active] {
+  background: var(--bg-card);
+  color: var(--ink);
+  font-weight: var(--weight-semibold);
+}
+
+/* ------------------------------ 排行 ------------------------------ */
+.m-usage__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* 一行三段：标题行（名字 + 时长）/ 占比条 / 脚注。整行可点，命中区按 --m-tap。 */
+.m-usage__row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--m-tap);
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.m-usage__row:active:not([data-static]) {
+  background: var(--bg-field);
+}
+
+/* 「其他 N 个应用」是聚合体，不是应用：不许有按下反馈，暗示它点得开 */
+.m-usage__row[data-static] {
+  cursor: default;
+}
+
+.m-usage__rowhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.m-usage__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.m-usage__bar {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--track);
+  overflow: hidden;
+}
+
+.m-usage__bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+
+.m-usage__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.m-usage__sec {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------ 卡片 / 提示 / 注脚 ------------------------------ */
+.m-usage__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--m-radius);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+.m-usage__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+
+.m-usage__hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+
+.m-usage__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--ink-4);
+}

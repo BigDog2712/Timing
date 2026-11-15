@@ -268,7 +268,7 @@ restriction lint 在 `Cargo.toml` 里开着（本地看得见），而 `--all-ta
 
 ## 版本
 
-桌面 **0.12.2**，Tauri 移动端 **0.12.0**；`android-app/` 里那份原生 Kotlin 实现已归档，冻结在 **0.3.6**。
+桌面 **0.12.2**，Tauri 移动端 **0.12.1**；`android-app/` 里那份原生 Kotlin 实现已归档，冻结在 **0.3.6**。
 
 版本号是单一真源：`scripts/platform-versions.json` 定义两端号，桌面六处基线
 （`package.json` · `package-lock.json` ×2 · `Cargo.toml` · `Cargo.lock` · `tauri.conf.json`）

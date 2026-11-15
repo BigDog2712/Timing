@@ -1,0 +1,129 @@
+/**
+ * Timing — 统计页的挂载判据（[0.13.2]）
+ * -----------------------------------------------------------------------------
+ * 纯函数判据（`usageRange.test.ts` / `usageInsights.test.ts`）证明算术对，
+ * 但证明不了「页面真的能挂起来」：hooks 顺序、条件分支里读空对象、
+ * 视图与页面之间的 props 名，这些都只有真渲染才看得出来。
+ *
+ * 这里只桩**系统边界**（`usage_stats_get` 那条命令），日键算术、合并、格式化全走真实现 ——
+ * 桩掉 `usageActions` 会让「翻到昨天读的是哪一天」变成自证。
+ *
+ * 三条：单日读数 → 切「近 7 天」合并 → 点排行进详情再返回。
+ */
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+/* 没有它，`act(...)` 只发警告不生效：断言会在 React 还没刷完时就跑，红/绿都不可信。 */
+(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+import { UsagePage } from './UsagePage';
+import type { UsageDayDto } from '../../types/domain/usage';
+
+const h = vi.hoisted(() => ({ usageStatsGet: vi.fn() }));
+
+vi.mock('../../services/ipc', () => ({
+  ipc: {
+    usageStatsGet: h.usageStatsGet,
+    usageStatsSettings: vi.fn(async () => undefined),
+  },
+  errorText: () => '读取失败',
+}));
+
+/** 每天固定的两行：Aweme 1 小时 + Chrome 10 分钟。 */
+function dayOf(date: string): UsageDayDto {
+  return {
+    supported: true,
+    date,
+    totalSec: 4200,
+    rows: [
+      { packageName: 'com.ss.android.ugc.aweme', sec: 3600, first: 0, last: 0 },
+      { packageName: 'com.android.chrome', sec: 600, first: 0, last: 0 },
+    ],
+  };
+}
+
+let container: HTMLDivElement;
+let root: Root;
+
+/** 把微任务队列跑干净：页面 effect 里是 7 次串行 await。 */
+async function settle() {
+  await act(async () => {
+    for (let i = 0; i < 12; i += 1) await Promise.resolve();
+  });
+}
+
+async function mount() {
+  await act(async () => {
+    root.render(createElement(UsagePage));
+  });
+  await settle();
+}
+
+function buttonByText(label: string): HTMLButtonElement {
+  const found = [...container.querySelectorAll('button')].find(
+    (button) => (button.textContent ?? '').trim() === label,
+  );
+  if (found == null) throw new Error(`找不到按钮：${label}`);
+  return found;
+}
+
+async function click(element: Element) {
+  await act(async () => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+  await settle();
+}
+
+beforeEach(() => {
+  h.usageStatsGet.mockReset().mockImplementation(async (date: string) => dayOf(date));
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+});
+
+afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+});
+
+describe('统计页能挂起来并且读数对', () => {
+  it('rd01_today_shows_the_day_total_from_the_same_rows', async () => {
+    await mount();
+    const text = container.textContent ?? '';
+    expect(text).toContain('今日合计');
+    /* 3600 + 600 = 4200s = 1h 10m；行与合计同源（都由 rangeOf 由行求和） */
+    expect(text).toContain('1h 10m');
+    expect(text).toContain('Aweme');
+    expect(text).toContain('Chrome');
+    /* 占比与脚注都在：60m/70m ≈ 86% */
+    expect(text).toContain('86%');
+  });
+
+  it('rd02_switching_to_week_aggregates_seven_days', async () => {
+    await mount();
+    await click(buttonByText('近 7 天'));
+    const text = container.textContent ?? '';
+    expect(text).toContain('近 7 天合计');
+    /* 7 天 × 1h 10m = 8h 10m；日均 1h 10m */
+    expect(text).toContain('8h 10m');
+    expect(text).toContain('出现 7 天');
+  });
+
+  it('rd03_clicking_a_row_opens_detail_and_back_returns', async () => {
+    await mount();
+    const row = [...container.querySelectorAll('button')].find((button) =>
+      (button.getAttribute('aria-label') ?? '').includes('查看每日趋势'),
+    );
+    expect(row, '排行行不是按钮或没有 aria-label，详情入口点不进去').toBeDefined();
+    if (row == null) return;
+    await click(row);
+
+    const detail = container.textContent ?? '';
+    expect(detail).toContain('近 7 天合计');
+    expect(detail).toContain('最久一天');
+
+    await click(buttonByText('‹'));
+    expect(container.textContent ?? '').toContain('今日合计');
+  });
+});

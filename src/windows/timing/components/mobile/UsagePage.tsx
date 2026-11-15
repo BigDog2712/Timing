@@ -1,48 +1,150 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { errorText } from '../../services/ipc';
-import { loadUsageDay, openUsageSettings, todayKey } from '../../services/usageActions';
+import {
+  TREND_DAYS,
+  loadUsageDay,
+  openUsageSettings,
+  recentDayKeys,
+  shiftDayKey,
+  todayKey,
+} from '../../services/usageActions';
+import { appSeries, rangeOf, type UsageRange } from '../../services/usageRange';
+import { buildInsights } from './usageInsights';
+import { UsageAppDetail } from './UsageAppDetail';
+import { UsageDayView } from './UsageDayView';
+import { UsageGate } from './UsageGate';
+import { UsageRangeSwitch, type UsageMode } from './UsageRangeSwitch';
+import { UsageTrend, type UsageTrendPoint } from './UsageTrend';
+import { UsageWeekView } from './UsageWeekView';
 import type { UsageDayDto } from '../../types/domain/usage';
 import { useUiStore } from '../../stores/uiStore';
 
 /**
- * [0.13.0] 应用使用统计（安卓）。
+ * [0.13.2] 应用使用统计（安卓）· 单日 / 近 7 天 + 单应用详情。
  *
- * 三种状态必须长得不一样，这是本页唯一的设计原则：
- * 1. **不支持**（桌面 / 老系统）：一句话说清「手机上才有」，不画空图表。
- * 2. **未授权**（`USAGE_PERMISSION_DENIED`）：讲清为什么、给一个「去授权」按钮。
- *    **绝不显示 0 分钟排行** —— 那会让人以为自己今天什么都没干。
- * 3. **有数据**：按时长降序的排行 + 合计。
+ * 这一页只干三件事：**取数**（补算 7 天窗口）、**管状态**（哪种门禁 / 哪一天失败）、
+ * **分流**（单日 / 区间 / 详情）。排版全在 `UsageDayView` / `UsageWeekView` /
+ * `UsageAppDetail` 三个视图里，页面自身不认识任何一行的样式。
  *
- * 数据口径（与 PC 版一致的部分）：只算前台，息屏不计。页面底部常驻一句说明，
- * 因为「我明明用了两小时」是这类功能最常见的一句反问。
+ * ## 为什么打开页面要先补算整个 7 天窗口
+ * 系统只保留约 7 天明细，而落库（`app_usage`）只在这一页被打开时发生。如果只读今天，
+ * 用户隔一天再进来，昨天就永久没了。所以进页面**从旧到新**串行补算 7 天：既填满趋势柱，
+ * 也把历史落到本机。重复上报取 MAX（见 `services/usage.rs`），补算无害。
+ *
+ * ## 三个不许
+ * - 未读到的一天**不许**画成 0 柱（`totalSec: null` 走骨架，不是空柱）。
+ * - 某一天读失败**不许**整页翻红：只把这一天标成失败，其余照常。
+ * - 合计与排行**必须同一份数**：都走 `rangeOf()`（由行求和），不另读一个总量。
  */
+type Phase = 'loading' | 'ready' | 'denied' | 'unsupported' | 'error';
+
 export function UsagePage() {
-  const [state, setState] = useState<'loading' | 'ready' | 'denied' | 'unsupported' | 'error'>('loading');
-  const [day, setDay] = useState<UsageDayDto | null>(null);
-  const [message, setMessage] = useState<string>('');
+  const today = useMemo(() => todayKey(), []);
+  const keys = useMemo(() => recentDayKeys(today, TREND_DAYS), [today]);
+  const yesterdayKey = useMemo(() => shiftDayKey(today, -1), [today]);
+  const [phase, setPhase] = useState<Phase>('loading');
+  const [message, setMessage] = useState('');
+  const [mode, setMode] = useState<UsageMode>('day');
+  const [selectedKey, setSelectedKey] = useState(today);
+  const [detailPkg, setDetailPkg] = useState<string | null>(null);
+  const [days, setDays] = useState<Record<string, UsageDayDto>>({});
+  const [failed, setFailed] = useState<Record<string, string>>({});
+  const [trend, setTrend] = useState<UsageTrendPoint[]>(() =>
+    recentDayKeys(today, TREND_DAYS).map((key) => ({ key, totalSec: null })),
+  );
+  /* 缓存与 `days` 同步写：`selectDay` 要先判断「这天有没有」，用 state 读会拿到上一次渲染的值 */
+  const cache = useRef<Record<string, UsageDayDto>>({});
+  const mounted = useRef(true);
   const setNotice = useUiStore((s) => s.setNotice);
 
-  const dayKey = useMemo(() => todayKey(), []);
+  /* StrictMode 下 effect 会 unmount 再 mount 一次：标志位必须在 effect 体里**写回 true**，
+     只在 cleanup 里置 false 的话，第二次 mount 之后它就永远是 false（页面永久「加载中」） */
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
-  const load = useCallback(async () => {
-    try {
-      const next = await loadUsageDay(dayKey);
-      setDay(next);
-      setState(next.supported ? 'ready' : 'unsupported');
-    } catch (error) {
-      const text = errorText(error);
-      setMessage(text);
-      /* 只有一条分支能进「未授权」：错误码明确是权限。别的错误一律按错误态显示原文，
-         不许含糊成「今天没有数据」。 */
-      const code = (error as { code?: string })?.code;
-      setState(code === 'USAGE_PERMISSION_DENIED' ? 'denied' : 'error');
-    }
-  }, [dayKey]);
+  const put = useCallback((dto: UsageDayDto) => {
+    cache.current[dto.date] = dto;
+    setDays((prev) => ({ ...prev, [dto.date]: dto }));
+    setTrend((prev) =>
+      prev.map((point) => (point.key === dto.date ? { ...point, totalSec: dto.totalSec } : point)),
+    );
+    setFailed((prev) => {
+      if (!(dto.date in prev)) return prev;
+      const next = { ...prev };
+      delete next[dto.date];
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let alive = true;
+    void (async () => {
+      let filled = 0;
+      for (const key of recentDayKeys(today, TREND_DAYS)) {
+        try {
+          /* 串行：原生桥不并发（同一条 `usageDay` 通道，并行只会让两端都变慢） */
+          const dto = await loadUsageDay(key);
+          if (!alive) return;
+          if (!dto.supported) {
+            setPhase('unsupported');
+            return;
+          }
+          put(dto);
+          filled += 1;
+          if (filled === 1) setPhase('ready');
+        } catch (error) {
+          if (!alive) return;
+          const code = (error as { code?: string })?.code;
+          if (code === 'USAGE_PERMISSION_DENIED') {
+            setMessage(errorText(error));
+            setPhase('denied');
+            return;
+          }
+          if (filled === 0) {
+            setMessage(errorText(error));
+            setPhase('error');
+            return;
+          }
+          /* 已经有数据：这一天记成失败，不打断整页 */
+          setFailed((prev) => ({ ...prev, [key]: errorText(error) }));
+        }
+      }
+      if (alive && filled > 0) setPhase('ready');
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [today, put]);
+
+  const selectDay = useCallback(
+    (key: string) => {
+      setSelectedKey(key);
+      setMode('day');
+      if (cache.current[key]) return;
+      void (async () => {
+        try {
+          const dto = await loadUsageDay(key);
+          if (!mounted.current) return;
+          put(dto);
+        } catch (error) {
+          if (!mounted.current) return;
+          const code = (error as { code?: string })?.code;
+          if (code === 'USAGE_PERMISSION_DENIED') {
+            setMessage(errorText(error));
+            setPhase('denied');
+            return;
+          }
+          setFailed((prev) => ({ ...prev, [key]: errorText(error) }));
+        }
+      })();
+    },
+    [put],
+  );
 
   const grant = useCallback(async () => {
     try {
@@ -54,87 +156,74 @@ export function UsagePage() {
     }
   }, [setNotice]);
 
-  const total = day?.totalSec ?? 0;
-  const max = day?.rows.reduce((peak, row) => Math.max(peak, row.sec), 0) ?? 0;
+  const current = days[selectedKey];
+  const loadedDays = useMemo(
+    () => keys.map((key) => days[key]).filter((day): day is UsageDayDto => day != null),
+    [keys, days],
+  );
+  const week = useMemo(() => rangeOf(loadedDays), [loadedDays]);
+  const day: UsageRange | null = useMemo(
+    () => (current == null ? null : rangeOf([current])),
+    [current],
+  );
+  const insights = useMemo(() => buildInsights({ days, keys }), [days, keys]);
+  /* 详情柱与主趋势柱同一口径：没读到的那天是 null，不是 0 */
+  const detailPoints = useMemo<UsageTrendPoint[]>(() => {
+    if (detailPkg == null) return [];
+    const series = appSeries(days, keys, detailPkg);
+    return keys.map((key, i) => ({ key, totalSec: series[i] ?? null }));
+  }, [days, keys, detailPkg]);
+  const yesterday = days[yesterdayKey];
+
+  if (phase === 'unsupported' || phase === 'denied' || phase === 'error') {
+    return (
+      <UsageGate
+        kind={phase}
+        message={message}
+        onGrant={() => void grant()}
+        onRetry={() => void selectDay(selectedKey)}
+      />
+    );
+  }
+
+  if (detailPkg != null) {
+    const row = current?.rows.find((item) => item.packageName === detailPkg);
+    return (
+      <UsageAppDetail
+        packageName={detailPkg}
+        points={detailPoints}
+        selected={selectedKey}
+        onSelectDay={selectDay}
+        onBack={() => setDetailPkg(null)}
+        firstLast={row == null ? null : { first: row.first, last: row.last }}
+      />
+    );
+  }
 
   return (
     <div className="m-usage">
-      {state === 'loading' ? <p className="m-usage__hint">正在读取…</p> : null}
-
-      {state === 'unsupported' ? (
-        <p className="m-usage__hint">应用使用统计只有安卓版有。电脑上的统计在分析窗里。</p>
-      ) : null}
-
-      {state === 'denied' ? (
-        <div className="m-usage__card">
-          <h2 className="m-usage__title">需要「使用情况访问」权限</h2>
-          <p className="m-usage__hint">
-            安卓只允许在系统设置里单独打开这项权限。打开后，这一页会显示每个应用今天在前台用了多久。
-          </p>
-          <p className="m-usage__hint">记录只留在本机，不上传。只统计前台时间，息屏不计。</p>
-          <button type="button" className="m-btn m-btn--primary" onClick={() => void grant()}>
-            去系统设置打开
-          </button>
-        </div>
-      ) : null}
-
-      {state === 'error' ? (
-        <div className="m-usage__card">
-          <p className="m-usage__hint">{message || '读取失败'}</p>
-          <button type="button" className="m-btn" onClick={() => void load()}>
-            重试
-          </button>
-        </div>
-      ) : null}
-
-      {state === 'ready' ? (
-        total === 0 ? (
-          <p className="m-usage__hint">今天还没有可统计的前台使用记录。</p>
-        ) : (
-          <>
-            <p className="m-usage__total">
-              今日合计 <strong>{formatDuration(total)}</strong>
-            </p>
-            <ul className="m-usage__list">
-              {day?.rows.map((row) => (
-                <li key={row.packageName} className="m-usage__row">
-                  <span className="m-usage__name" title={row.packageName}>{shortName(row.packageName)}</span>
-                  <span className="m-usage__bar" aria-hidden="true">
-                    <span
-                      className="m-usage__bar-fill"
-                      style={{ width: `${max > 0 ? Math.max(2, Math.round((row.sec / max) * 100)) : 0}%` }}
-                    />
-                  </span>
-                  <span className="m-usage__sec">{formatDuration(row.sec)}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="m-usage__note">只统计前台时间，息屏与后台播放不计。数据只留本机。</p>
-          </>
-        )
-      ) : null}
+      <UsageRangeSwitch mode={mode} onChange={setMode} />
+      <UsageTrend points={trend} selected={selectedKey} onSelect={selectDay} />
+      {mode === 'week' ? (
+        <UsageWeekView week={week} insights={insights} onSelectApp={setDetailPkg} />
+      ) : (
+        <UsageDayView
+          selectedKey={selectedKey}
+          today={today}
+          day={day}
+          failure={failed[selectedKey]}
+          deltaSec={
+            selectedKey === today && yesterday != null && day != null
+              ? day.totalSec - yesterday.totalSec
+              : null
+          }
+          insights={insights}
+          onSelectDay={selectDay}
+          onStepDay={(delta) => selectDay(shiftDayKey(selectedKey, delta))}
+          onSelectApp={setDetailPkg}
+          onRetry={() => void selectDay(selectedKey)}
+        />
+      )}
     </div>
   );
-}
-
-/** 秒 → 「1h 05m」/「12m」：与 PC 版 `formatDashboardDuration` 同口径（分钟取整）。 */
-export function formatDuration(sec: number): string {
-  const safe = Math.max(0, Math.floor(sec));
-  const minutes = Math.floor(safe / 60);
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  if (hours > 0) return `${hours}h ${String(rest).padStart(2, '0')}m`;
-  return `${minutes}m`;
-}
-
-/**
- * 包名 → 可读名。
- *
- * 真正的应用名要从 `PackageManager` 取（拿 label 需要原生桥再走一趟）。这一步排在 P2：
- * 先把「哪个包用了多久」显示对，比显示一个漂亮名字更重要。这里取包名最后一段并首字母大写，
- * 至少比 `com.tencent.mm` 这种长串好认。
- */
-export function shortName(packageName: string): string {
-  const tail = packageName.split('.').filter(Boolean).pop() ?? packageName;
-  return tail.charAt(0).toUpperCase() + tail.slice(1);
 }
