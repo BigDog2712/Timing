@@ -104,7 +104,7 @@ SOFTWARE.
 
 | 组件 | 许可 | 用途 |
 | --- | --- | --- |
-| Tailwind CSS v4（`tailwindcss` / `@tailwindcss/vite`） | MIT | 只在 Patina 窗口用；`src/windows/activity/shell/App.css` 的 `@import "tailwindcss" source("../")` 把扫描根定在 `src/`，会连同宿主 `src/` 一起扫（体积略增，不影响正确性） |
+| Tailwind CSS v4（`tailwindcss` / `@tailwindcss/vite`） | MIT | 只在 Patina 窗口用；`src/windows/activity/shell/App.css` 的 `@import "tailwindcss" source("../")` 把扫描根定在 **`src/windows/activity/`**（`source()` 的相对路径按 **CSS 文件自身**解析，不是按项目根），**不再连同宿主 `src/` 一起扫**——`App.css` 从 `src/app/App.css` 搬到了 `src/windows/activity/shell/`，深了两层，`../` 的落点跟着变浅 |
 | `@tauri-apps/plugin-opener` + `tauri-plugin-opener` | MIT OR Apache-2.0 | Patina 打开外部链接（上游用它，宿主原本没有） |
 
 ## 其余依赖
