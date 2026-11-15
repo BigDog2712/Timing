@@ -37,7 +37,7 @@
 2. **历史页（`features/history/**`）不动**。专注历史记录照旧显示（见 §3.4）。
 3. **数据页的图表本体不动**，只删页头那一行（`Data.tsx:1044-1047`）。
 4. **`features/destination/**`（目标详情）不动**。
-5. **不合并两个 SQLite 库**：`timing.db`（宿主：items / time_records / todos / notes / settings）与 `patina.db`（insight：tool_reminders / pomodoro / activity rules / app_usage）保持独立。
+5. **不合并两个 SQLite 库**：`timing.db`（宿主：items / time_records / todos / notes / settings）与 `activity.db`（insight：tool_reminders / pomodoro / activity rules / app_usage）保持独立。
 6. **不新增 Rust 事件**（`scripts/check-contract.mjs:260` 的 `EXPECTED_EMIT_SITES = 18` 是硬编码）。跨窗动作一律走既有的 `patina:host-intent` —— 它是 `window.dispatchEvent` 的**前端**事件，Rust 侧没有对应 `emit`，所以不进那个计数（详见 §3.8 的"用事件不用命令"结论）。
 7. **不改 `tool-notification` 窗与 `mini` 窗的运行时管线**。`mini` 窗**要**补错误边界与灯簇清理（Q3/Q4 裁决，见 §3.6 F1、§4.3），但它的窗口创建 / 尺寸 / 过渡（`useMiniWindow` / `useMiniTransition` / `useMiniTracking`）一行不动。
 8. **`tool-notification` 窗本轮不删**（**Q4 已裁决 = (A) 本轮保留**，下一轮随「提醒投递方式收敛」一起处理）：它不是工具页的产物，而是**活动提醒到点的投递通道**（`app/insight/tool_notifications.rs:71-76` 的 `Delivery::Notification → WINDOW_LABEL`）。工具页下线后 `ToolAlertKind::ActivityReminder` 仍然有效，删窗等于让活动提醒**静默失声**。T04 的「不许碰」清单 + 判据 V-2h 专守这条。
@@ -131,7 +131,7 @@
 
 **删的边界（关键）**：
 - 删 `features/tools/components/ReminderToolPanel.tsx` 的**「定时提醒」分区**（`tool_reminders` 的新建/编辑/取消 UI）与 `TimedReminderEditor.tsx` / `ReminderScheduleFields.tsx`。
-- **保留** `patina.db` 的 `tool_reminders` 表与 engine 的 `fire_due_reminders`（`services/insight/data/tools_store.rs:58`）：已经排定的旧提醒照旧到点响、并可在弹窗上确认/推迟。**绝不静默丢弃**（用户已经答应的提醒必须响完）。CHANGELOG 写明「定时提醒已并入待办；旧的排定提醒仍会响一次，之后不再产生新的」。
+- **保留** `activity.db` 的 `tool_reminders` 表与 engine 的 `fire_due_reminders`（`services/insight/data/tools_store.rs:58`）：已经排定的旧提醒照旧到点响、并可在弹窗上确认/推迟。**绝不静默丢弃**（用户已经答应的提醒必须响完）。CHANGELOG 写明「定时提醒已并入待办；旧的排定提醒仍会响一次，之后不再产生新的」。
 - **待办侧不需要任何迁移**：`remind_at`/`remind_stage`/`auto_start` 全在（`0002_v020.sql:99-114` + `MIGRATE_COLUMNS_V4`）。**本轮不写 `0009`**（理由与判据见 §5.4）。
 - 「是否提醒」的 UI 已在（`TodoComposeDialog.tsx:201-220`），本轮补的是**编辑时也能改**（`todo_update` 的 `remind_at` 三态 `Some(None)` 已能清空并复位 stage）。
 
@@ -143,7 +143,7 @@
 
 | 子问题 | 结论 | 理由 |
 |---|---|---|
-| 番茄会话数据是否保留 | **保留，且不迁移** | `patina.db` 的 `pomodoro_*` / `focus_history_*` 表与 engine tick 全留。合并两张表要重写"倒计时 vs 正计时"两套时长语义，收益只是少一张表，风险是用户历史被改写 |
+| 番茄会话数据是否保留 | **保留，且不迁移** | `activity.db` 的 `pomodoro_*` / `focus_history_*` 表与 engine tick 全留。合并两张表要重写"倒计时 vs 正计时"两套时长语义，收益只是少一张表，风险是用户历史被改写 |
 | 历史里的专注记录怎么显示 | **不动**（`features/history/**` 是本轮非目标） | `focusHistoryGateway` / `focus_history.sql` 的只读视图原样 |
 | `focusDimension.ts` 与计时语义的关系 | **无关，改都不要改** | 它是**计时分布卡的维度枚举**（`category` / `app` / `item`，见 `services/focusDimension.ts:15-17`），只是名字里带 "focus"。与番茄是两件事，误改会打断三张卡的联动 |
 | 要不要保留后端表 | **保留** | 同第一条；另外 `tool-notification` 窗（`shell/tool-notification/ToolNotificationShell.tsx`）依赖 `ToolAlert.kind` 的四类分支，删表会让旧 alert 反序列化失败 |
@@ -1156,7 +1156,7 @@ cargo +1.100.0 test -p timing              # rust-toolchain.toml 钉 1.100.0
 2. 不要为了"少一次查询"把趋势的 `query.endMs` 推到未来（`activity_read_model/mod.rs:189-203` 的边界校验 + 覆盖率会让卡片变空且不报错）。
 3. 不要把 `qp-link-btn` 换成 `QuietButton`（或反向），除非同时改掉 §3.7 那张表的语义定义。
 4. 不要在 `features/dashboard/**` 里 import `features/tools/**` 的 UI 组件（活动提醒三件套要**搬**过来，不是引过来）。
-5. 不要删 `patina.db` 的任何表，也不要跑跨库迁移（两个库物理分离：`timing.db` vs `patina.db`，见 `infra/appdata_migrate/paths.rs:23` 与 `infra/insight/storage_paths.rs:5`）。
+5. 不要删 `activity.db` 的任何表，也不要跑跨库迁移（两个库物理分离：`timing.db` vs `activity.db`，见 `infra/appdata_migrate/paths.rs:23` 与 `infra/insight/storage_paths.rs:5`）。
 6. **不要把「删工具页」外推成「删 `tool-notification` 窗」**（§7 Q4 前置报告）：那是活动提醒的投递通道，删了不报错、只是**不再弹**。等主理人在 (A)/(B) 里选定再动，且选 B 必须同批改 `tool_notifications.rs:71-76` 的 `target()`。
 7. **不要在 T03b 里自己算 `accumulated_sec` 再塞进 patch**（§3.8 B4）：`RecordPatch` 没这个字段，serde 会静默丢弃 → 死代码；Rust 已按 ADR-030 用区间重算。
 8. **不要为了"让数据一致"去新增 Rust `emit`**：`EXPECTED_EMIT_SITES = 18` 是手工常量，改它等于关掉整条事件门禁。跨窗一律走 `patina:host-intent`。
