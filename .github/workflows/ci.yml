@@ -71,6 +71,13 @@ jobs:
       - name: 存储键注册表（patina 字面量只住声明行 + 槽账本双向一致）
         run: npm run check:storage-keys
 
+      # [T05] 活动库与数据目录改名：这一批改的是**已落盘坐标**，改错了不会报错，
+      # 只在用户那边表现为「历史突然空了、应用一切正常」。七条判据全部是结构断言
+      # （旧目录名不再作为路径片段 / `*.db` 不得经 fs::copy / 旧路径永不删 /
+      # 结构上不可能落完成标记 / 不许按字样改写库内数据 / 两个布局开关都接上 / 防空转）。
+      - name: de-Patina 活动库落点（7 条判据：路径片段 / VACUUM INTO / 不删 / 不写标记 / 不 REPLACE / 双开关 / 防空转）
+        run: npm run check:de-patina
+
   frontend:
     name: 前端 · 类型 / Lint / 测试 / 构建
     runs-on: windows-latest

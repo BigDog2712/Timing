@@ -42,6 +42,9 @@ mod data_root_transfer;
    桌面独占：导入走 `app::legacy_import`，那是 WebView2 侧的子系统。 */
 #[cfg(desktop)]
 mod data_root_transfer_activity;
+/* [T05] 迁移**时机**的源码哨兵：`portable_boot::prepare` → 迁移 → `Builder::default()`，
+   顺序反了的症状是「mini 窗偏好回默认一次」+ 一行 warn（M-9）。 */
+mod activity_dir_migrate_order;
 #[cfg(desktop)]
 mod data_root_transfer_patina;
 /* 旧版（五项清单）搬过的用户：`patina/data` 留在旧根，切换时按指针 `previous` 捞回来。 */

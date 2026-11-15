@@ -294,3 +294,7 @@ fn copy_missing(from: &Path, to: &Path) -> Result<u64, String> {
 #[cfg(test)]
 #[path = "activity_dir_migrate_tests.rs"]
 mod activity_dir_migrate_tests;
+
+#[cfg(test)]
+#[path = "activity_dir_migrate_legacy_tests.rs"]
+mod activity_dir_migrate_legacy_tests;
