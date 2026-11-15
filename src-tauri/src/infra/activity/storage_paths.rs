@@ -50,6 +50,24 @@ pub fn sqlite_sidecar_names_of(file_name: &str) -> [String; 3] {
     ["-wal", "-shm", "-journal"].map(|suffix| format!("{file_name}{suffix}"))
 }
 
+/// 这个名字是不是「活动库本身或它的伴生文件」。
+///
+/// 这一类的**唯一**合法产出方式是 `VACUUM INTO`（T05 迁移、数据根搬迁、首启导入三处
+/// 都一样）。任何一个 `fs::copy` 落到它们身上都会得到撕裂的一页或漏掉 `-wal` 里尚未
+/// checkpoint 的数据，所以「判定」只写在这里，调用方不许自己拼名字。
+///
+/// 两个库名都算：旧布局下 `patina.db` 是**真库**（读它是对的），新布局下它是**旧库**
+/// （复制它必须走 `VACUUM INTO`，不能直拷）。
+pub fn is_database_file_name(name: &str) -> bool {
+    if name == SQLITE_DB_FILE_NAME || name == LEGACY_ACTIVITY_DB_FILE {
+        return true;
+    }
+    [SQLITE_DB_FILE_NAME, LEGACY_ACTIVITY_DB_FILE]
+        .iter()
+        .flat_map(|db| sqlite_sidecar_names_of(db))
+        .any(|sidecar| sidecar == name)
+}
+
 const BACKUP_DIR_NAME: &str = "backups";
 const REMOTE_BACKUP_TEMP_DIR_NAME: &str = "remote-backup-temp";
 

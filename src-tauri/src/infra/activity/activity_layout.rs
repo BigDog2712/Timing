@@ -245,7 +245,10 @@ fn mtime_of(path: &Path) -> SystemTime {
 ///
 /// 与 `services::data_root::activity_copy::verify_copy` 同口径（那边查搬过去的副本，
 /// 这边查「能不能拿它当新库」），但**不能复用**它：`infra` 不许依赖 `services`（L4）。
-fn integrity_ok(path: &Path) -> bool {
+///
+/// `pub(crate)` 的唯一外部调用点是 `app::activity_dir_migrate`（迁移产出副本后核对
+/// **副本自身**，约束 2）。它不接受第二个路径参数，结构上就不可能去查源库。
+pub(crate) fn integrity_ok(path: &Path) -> bool {
     let options = SqliteConnectOptions::new().filename(path).read_only(true);
     tauri::async_runtime::block_on(async move {
         let pool = match SqlitePoolOptions::new()

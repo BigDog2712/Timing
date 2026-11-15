@@ -12,9 +12,22 @@ use tauri::{AppHandle, Manager, Runtime};
 /// （`cargo test` 直接跑本 crate 时不会注入，测试语义不变）。
 static ROOT_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 
+/// 宿主注入的 **profile** 落点（T05 起与数据落点分开注入）。
+///
+/// 为什么必须是两个 `OnceLock` 而不是一个：`patina/{data,webview}` → `activity/{data,webview}`
+/// 的两半各自 fail-open（`VACUUM INTO` 成功 + `rename` 失败时，数据必须已经切到新目录，
+/// 而 profile 还留在旧目录）。合成一个值，等于把两个布局绑在一起——那正是约束 7
+/// 要防的「切到一份冻结在首次复制时刻的副本」那个洞。
+static WEBVIEW_ROOT_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
+
 /// 由宿主调用一次（重复调用只生效第一次）。
 pub fn set_root_override(root: PathBuf) {
     let _ = ROOT_OVERRIDE.set(root);
+}
+
+/// 由宿主调用一次（重复调用只生效第一次）。语义同 [`set_root_override`]，作用于 profile。
+pub fn set_webview_root_override(root: PathBuf) {
+    let _ = WEBVIEW_ROOT_OVERRIDE.set(root);
 }
 
 pub const PRODUCT_FOLDER: &str = "Patina";
@@ -100,7 +113,7 @@ pub fn product_roaming_data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBu
 }
 
 pub fn product_webview_data_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    if let Some(root) = ROOT_OVERRIDE.get() {
+    if let Some(root) = WEBVIEW_ROOT_OVERRIDE.get() {
         return Ok(root.join("webview"));
     }
     #[cfg(debug_assertions)]
@@ -182,113 +195,8 @@ fn parent_of_identifier_dir(path: PathBuf) -> Result<PathBuf, String> {
         })
 }
 
+/* 本文件已贴着 300 行门禁：用例住到 `app_paths_tests.rs`（仓里既有做法，
+见 `storage_paths_tests.rs` / `activity_layout_tests.rs`）。 */
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn resolves_profile_from_current_identifiers() {
-        assert_eq!(
-            AppProfile::from_identifier("com.ceceliaee.patina"),
-            AppProfile::Production
-        );
-        assert_eq!(
-            AppProfile::from_identifier("com.ceceliaee.patina.local"),
-            AppProfile::Local
-        );
-        assert_eq!(
-            AppProfile::from_identifier("com.ceceliaee.patina.dev"),
-            AppProfile::Dev
-        );
-    }
-
-    #[test]
-    fn profile_folder_names_are_user_visible() {
-        assert_eq!(AppProfile::Production.product_folder(), "Patina");
-        assert_eq!(AppProfile::Local.product_folder(), "Patina Local");
-        assert_eq!(AppProfile::Dev.product_folder(), "Patina Dev");
-    }
-
-    #[test]
-    fn debug_production_build_uses_dev_webview_folder() {
-        #[cfg(debug_assertions)]
-        assert_eq!(
-            AppProfile::Production.webview_product_folder(),
-            "Patina Dev"
-        );
-
-        #[cfg(not(debug_assertions))]
-        assert_eq!(AppProfile::Production.webview_product_folder(), "Patina");
-    }
-
-    #[test]
-    fn debug_build_requires_an_isolated_persistent_profile() {
-        assert!(!persistent_profile_is_allowed(
-            AppProfile::Production,
-            true,
-            false,
-        ));
-        assert!(persistent_profile_is_allowed(
-            AppProfile::Production,
-            true,
-            true,
-        ));
-        assert!(persistent_profile_is_allowed(AppProfile::Dev, true, false,));
-        assert!(persistent_profile_is_allowed(
-            AppProfile::Local,
-            true,
-            false,
-        ));
-    }
-
-    #[test]
-    fn release_build_can_use_the_production_profile() {
-        assert!(persistent_profile_is_allowed(
-            AppProfile::Production,
-            false,
-            false,
-        ));
-    }
-
-    #[test]
-    fn profile_folder_names_do_not_use_internal_identifiers() {
-        for profile in [AppProfile::Production, AppProfile::Local, AppProfile::Dev] {
-            let folder = profile.product_folder();
-            assert!(!folder.contains("com.ceceliaee.patina"));
-            assert!(!folder.contains("io.github"));
-        }
-    }
-
-    #[test]
-    fn profile_keys_are_stable_anchor_identifiers() {
-        assert_eq!(AppProfile::Production.key(), "production");
-        assert_eq!(AppProfile::Local.key(), "local");
-        assert_eq!(AppProfile::Dev.key(), "dev");
-    }
-
-    #[test]
-    fn product_and_identifier_coordinates_are_frozen() {
-        /* 这 6 个值是**外部坐标**：安装目录 / 注册表键 / 凭证键 / WebView 缓存目录全由
-        它们派生。改动不是「文案变了」，而是老用户的数据与凭证整体失联 —— 且多数路径
-        是静默的（`webview_cache` 直接按目录名定位、凭证 target 由 identifier 拼出来）。
-        字面量就是判据本体：不许推导（`PRODUCT_FOLDER` 与 `PRODUCT_FOLDER_LOCAL` 若按
-        前缀拼出来，两个值一起漂也不会报）。 */
-        assert_eq!(PRODUCT_FOLDER, "Patina");
-        assert_eq!(PRODUCT_FOLDER_LOCAL, "Patina Local");
-        assert_eq!(PRODUCT_FOLDER_DEV, "Patina Dev");
-        assert_eq!(IDENTIFIER_PROD, "com.ceceliaee.patina");
-        assert_eq!(IDENTIFIER_LOCAL, "com.ceceliaee.patina.local");
-        assert_eq!(IDENTIFIER_DEV, "com.ceceliaee.patina.dev");
-    }
-
-    #[test]
-    fn upstream_coordinates_are_frozen() {
-        // 上游源库是**别人的**安装位置（独立安装的 Patina），永久冻结。
-        assert_eq!(UPSTREAM_PRODUCT_FOLDER, "Patina");
-        assert_eq!(UPSTREAM_DB_FILE, "patina.db");
-        // 注：`assert_ne!(UPSTREAM_DB_FILE, SQLITE_DB_FILE_NAME)` 这条**不能**在本批加
-        // —— T02a 阶段两个常量合法地同值（都是 "patina.db"），只有 T05 把
-        // `SQLITE_DB_FILE_NAME` 翻成 "activity.db" 之后它们才分叉。
-        // 那条防「为整洁把两个常量合并」的断言随 T05 一起加，届时才可能为真。
-    }
-}
+#[path = "app_paths_tests.rs"]
+mod app_paths_tests;

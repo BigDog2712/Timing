@@ -14,9 +14,31 @@
 
 use std::path::PathBuf;
 
-/// Patina 子系统在 Timing 数据根下的落点：`<数据根>/patina/{data,webview}`。
+use crate::infra::activity::activity_layout;
+
+/// 活动**数据**在 Timing 数据根下的落点：`<数据根>/activity` 或 Fail-open 时的
+/// `<数据根>/patina`。
+///
+/// 子目录名由 `activity_layout::data_layout()` 决定，**不写字面量**：`activity_dir_migrate`
+/// fail-open 回旧布局时应用必须继续读写旧库，否则它会去开一个空的 `activity/data`，
+/// 用户视角是「历史全没了、应用一切正常」。
+///
+/// ⚠️ 首次调用会做一次 `PRAGMA quick_check`（`block_on`），所以它必须在**同步**启动段
+/// 先被调一次——[`prepare`] 一进门就调它，那就是那次。别在异步命令里首次调它。
 pub fn activity_root() -> PathBuf {
-    crate::platform::app_dir::data_root().join("patina")
+    let layout = activity_layout::data_layout();
+    crate::platform::app_dir::data_root().join(activity_layout::activity_subdir_of(layout))
+}
+
+/// 活动窗 **WebView2 profile** 的落点：`<数据根>/activity/webview` 或
+/// `<数据根>/patina/webview`。
+///
+/// 与数据那半**各用各的开关**：profile 被占住搬不动，不该把数据也退回去（反之亦然）。
+/// 这个函数名与 [`activity_root`] 里的 `data_layout` 同时出现在本文件，是
+/// `check:de-patina` 判据 6 的结构检查点：**两个开关都必须接上，且不许只接一个**。
+pub fn activity_webview_root() -> PathBuf {
+    let layout = activity_layout::webview_layout();
+    crate::platform::app_dir::data_root().join(activity_layout::activity_subdir_of(layout))
 }
 
 /// 启动期一次性准备。返回 `Ok(None)` = 本次没导入（指针在 / 标记已写 / 目标库已在 / 没有源）。
@@ -32,7 +54,9 @@ pub fn prepare(identifier: &str) -> Result<Option<PathBuf>, String> {
         .map_err(|err| format!("创建 {} 失败: {err}", data_dir.display()))?;
 
     // 落点在创建之后立刻注入：Patina 的 setup 会拿它建库，晚一步就落到 AppData 去了。
+    // 数据与 profile **分别注入**：两个布局各判各的，合并成一个值就等于把两个开关绑在一起。
     crate::infra::activity::app_paths::set_root_override(root.clone());
+    crate::infra::activity::app_paths::set_webview_root_override(activity_webview_root());
 
     /* 拿不到 `%APPDATA%` 就当没有指针：那种环境下也不可能读到过指针文件。 */
     let appdata = crate::platform::app_dir::appdata_dir(identifier);

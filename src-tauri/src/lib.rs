@@ -129,6 +129,16 @@ pub fn run() {
             app::portable_boot::BootChoice::Proceed => {}
         }
         platform::boot_timing::mark("portable_boot");
+
+        /* [T05] 活动数据目录去 Patina 化（`patina/` → `activity/`、`patina.db` →
+        `activity.db`）。位置是**唯一**合法的：排在 `portable_boot::prepare` 之后
+        （数据根已由它注入），又必须在 `Builder::default()` **之前**——`mini_window`
+        与 `tool_notifications` 的 `.data_directory()` 一旦先跑，就会在新路径建出一份
+        空 profile，此时 rename 要么失败、要么把老 profile 挤掉（用户偏好丢一次）。
+
+        失败不阻断启动：`prepare` 内部两个开关各自 fail-open，只打 warn。 */
+        app::activity_dir_migrate::prepare(&platform::app_dir::data_root());
+        platform::boot_timing::mark("activity_dir_migrate");
     }
 
     let builder = tauri::Builder::default();

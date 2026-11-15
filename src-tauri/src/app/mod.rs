@@ -42,6 +42,10 @@ pub mod preboot;
 WebView2 / Win32，Android 上根本编不进来。 */
 #[cfg(desktop)]
 pub mod activity_bridge;
+
+/* [T05] 活动数据目录去 Patina 化：`patina/{data,webview}` → `activity/{data,webview}`。
+   由 `lib.rs` 在 `Builder::default()` **之前**调一次（窗口一建起来就晚了）。 */
+pub mod activity_dir_migrate;
 /* [数据根搬迁] Patina 首启导入（含「已处理过」标记，从 `activity_bridge` 拆出：
 那边只该管落点与读侧，导入是带自己状态的一次性写动作）。 */
 #[cfg(desktop)]

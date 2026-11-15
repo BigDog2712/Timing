@@ -88,6 +88,22 @@ fn storage_paths_keep_remote_temp_under_data_root() {
     );
 }
 
+/// 库与伴生文件的识别：这一组的反例（`backups/` `diagnostics/` 标记文件）才是重点——
+/// 判定偏宽会把用户的备份当库跳过，偏窄会把 `-wal` 当普通文件直拷。
+#[test]
+fn only_the_database_and_its_sidecars_are_recognised() {
+    assert!(is_database_file_name(SQLITE_DB_FILE_NAME));
+    assert!(is_database_file_name(LEGACY_ACTIVITY_DB_FILE));
+    for db in [SQLITE_DB_FILE_NAME, LEGACY_ACTIVITY_DB_FILE] {
+        for sidecar in sqlite_sidecar_names_of(db) {
+            assert!(is_database_file_name(&sidecar), "{sidecar} 必须被认出来");
+        }
+    }
+    for other in ["backups", "diagnostics", "data-anchor.json", "activity.db.bak"] {
+        assert!(!is_database_file_name(other), "{other} 不是库文件");
+    }
+}
+
 /// 三个常量之间的**算术关系**：`ACTIVITY_DATA_REL` 必须恒等于
 /// `ACTIVITY_SUBDIR + "/" + DATA_SUBDIR`。
 ///
