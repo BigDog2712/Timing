@@ -41,8 +41,15 @@ pub const IDENTIFIER_DEV: &str = "com.ceceliaee.patina.dev";
 /// **上游**（用户自己独立安装的 Patina）的数据目录名。永久冻结。
 ///
 /// 与 `PRODUCT_FOLDER` 分成两个常量，不是为了整洁能合并的那种重复：`PRODUCT_FOLDER`
-/// 是**我们自己**的坐标（T05 会翻），上游目录是**别人**的坐标（永不翻）。合并成一个，
-/// 首启导入就会去 `%APPDATA%\<新名>` 里找历史——那里什么都没有，导入静默失效。
+/// 是**我们自己**的坐标，上游目录是**别人**的坐标。两者现在**同值**，但不是一回事，
+/// 也不许合并：合并之后首启导入就会去我们自己那个目录里找历史——那里什么都没有，
+/// 导入静默失效。
+///
+/// ⚠️ `PRODUCT_FOLDER` 保持 `Patina`（T05 只翻活动库的文件名与子目录名，不翻产品目录名：
+/// 那是安装/数据目录那一层的外部坐标，改了等于让老用户的目录搬家）。所以这对常量
+/// **不是**「新旧名」的关系，同值会一直是常态——`app_paths_tests` 里那条
+/// `assert_ne!(UPSTREAM_DB_FILE, SQLITE_DB_FILE_NAME)` 钉的是**库名**那一侧的分叉，
+/// 不是这一侧。
 pub const UPSTREAM_PRODUCT_FOLDER: &str = "Patina";
 /// **上游**的库文件名（`%APPDATA%\Patina\patina.db`）。永久冻结，理由同上。
 pub const UPSTREAM_DB_FILE: &str = "patina.db";

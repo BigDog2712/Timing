@@ -92,9 +92,10 @@ pub(crate) fn seed_from(
 /// 独立安装的 Patina 的库文件（认不到就当没有）。
 ///
 /// 两个值走 `app_paths::UPSTREAM_*`，与 `PRODUCT_FOLDER` / `SQLITE_DB_FILE_NAME` **分成
-/// 两套常量**：这里读的是**别人**的数据目录，永远不变；我们自己那两只会被 T05 改掉。
-/// 合并成一套的话，T05 之后首启导入会去 `%APPDATA%\Activity` 里找，那里什么都没有 ——
-/// 导入静默失效，且标记照写。
+/// 两套常量**：这里读的是**别人**的数据目录，永远不变；我们自己的那几个里，被 T05 翻掉的
+/// 只有 `SQLITE_DB_FILE_NAME`（`patina.db` → `activity.db`），产品目录名 `Patina` 按裁决
+/// 不动。合并成一套的话，首启导入会去 `%APPDATA%\Patina\activity.db` 里找——
+/// 那里什么都没有，导入静默失效，且标记照写。
 fn upstream_database() -> Option<PathBuf> {
     let candidate = dirs::data_dir()?
         .join(app_paths::UPSTREAM_PRODUCT_FOLDER)
