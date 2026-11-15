@@ -249,7 +249,7 @@ restriction lint 在 `Cargo.toml` 里开着（本地看得见），而 `--all-ta
 绝大多数在测试与验收支撑里。一次性改成 `?` 不现实，让 CI 长期红着只会训练人忽略整条流水线。
 豁免写在命令里，就是为了让它可见；收敛完删掉即可。
 
-只想看界面、不碰 Rust：`npm run dev` 后打开 <http://localhost:1420>，走 `src/mocks` 的 mock IPC
+只想看界面、不碰 Rust：`npm run dev` 后打开 <http://localhost:1420>，走 `src/windows/timing/mocks/` 的 mock IPC
 （无托盘、无真实窗口）。
 
 ## 文档

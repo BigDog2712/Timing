@@ -38,8 +38,9 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 - IPC 契约：宿主命令 **83** 条 + Patina **117** 条（仅桌面，`#[cfg(desktop)]`），一张表写在 `src-tauri/src/ipc_commands.rs`（`docs/phase2/IPC-CONTRACT-v2.md`）；事件 11 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
 - 插件：`plugins/<id>/plugin.json` 是**启动头**，宿主只读不执行（声明式）。目录三处合并扫描
   （dev → exe → user，同 id 先到先得）。v1 贡献点 `quickTimers`（摸鱼菜单预设）；
-  **v2 新增 `mdSync`**（Markdown 双向同步落点，宿主实现同步，插件只声明）。
-  首个 v2 插件是仓库内 `plugins/md-sync`（设置 → 同步页签）。
+  **v2 曾新增 `mdSync`**（Markdown 双向同步落点），**v3 已下架、同步归内核**
+  （`models/md_sync_config.rs`）。「设置 → 同步」页签由内核实现，不再走插件；
+  仓库内没有 `plugins/md-sync` 这个目录了（它在 `2d5d0b6` 被内核化取代并删除）。
   规格与字段全表 `docs/plugin-spec.md`；改贡献点必须同时升 `apiVersion` 并补该文档一节。
 
 ## 命令
