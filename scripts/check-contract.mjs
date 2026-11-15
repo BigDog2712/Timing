@@ -347,7 +347,7 @@ check(
  *   · Rust 注册了、allow 里没有 ⇒ 该命令在分析窗里调不到。
  *
  * 两条既有事实（T04-1 实测，见 `51` §1.5）：
- *   1. identifier 现在是 `main-window-commands`，T04-2 会改名 `activity-window-commands`。
+ *   1. identifier 在 T04-2 工序 2 已由 `main-window-commands` 改为 `activity-window-commands`。
  *      这里**同时认两个名字并要求恰好存在一个**：改名成功 ⇒ 自动跟随；两个都在 ⇒ 半改；
  *      一个都找不到 ⇒ 段被删了。三种情况只有中间态会红，正好是我们要抓的。
  *   2. 有 9 条命令在**任何** permission 里都没有放行（预存在缺口，其中 8 条前端生产代码

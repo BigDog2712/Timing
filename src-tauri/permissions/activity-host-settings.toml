@@ -19,7 +19,7 @@
 #     → src/features/settings/components/host/HostHighlightCard.tsx（高亮颜色）
 #   get_settings / update_settings / get_autostart / set_autostart / plugin_list / plugin_open_dir
 #     → 同上 Gateway，本批已打通、界面在 T04b 落地（常驻与启动 / 接口面）。
-#   一律**不**进 `main-window-commands`：那条是分析窗自己 117 条命令的整面授权，
+#   一律**不**进 `activity-window-commands`：那条是分析窗自己 117 条命令的整面授权，
 #   把这 12 条宿主的命令混进去，等于让整面都拿到宿主设置写权限（ACL 是攻击面）。
 #
 # 引用处：capabilities/activity.json。

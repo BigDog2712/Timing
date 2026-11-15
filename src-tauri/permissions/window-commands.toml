@@ -1,8 +1,8 @@
 "$schema" = "../gen/schemas/schema.json"
 
 [[permission]]
-identifier = "main-window-commands"
-description = "Allows the main application window to invoke the complete activity application command surface."
+identifier = "activity-window-commands"
+description = "Allows the activity analysis window to invoke the complete activity command surface."
 commands.allow = [
   "cmd_get_tool_presentation",
   "cmd_save_tool_notification_preferences",
@@ -114,20 +114,13 @@ commands.allow = [
   "cmd_get_resource_diagnostics",
 ]
 
-[[permission]]
-identifier = "mini-window-commands"
-description = "Read compact status and control only the independent mini window."
-commands.allow = [
-  "cmd_get_mini_window_snapshot",
-  "cmd_mini_window_action",
-  "cmd_get_tracker_health_snapshot",
-  "cmd_get_mini_bootstrap_snapshot",
-  "cmd_get_mini_presentation_snapshot",
-  "cmd_get_mini_activity_snapshot",
-  "cmd_show_main_window",
-]
+# [T04-2 工序 2] 原有 `identifier = "mini-window-commands"`（7 条命令）已删：它是**死定义**，
+# 全仓无任何 capability 引用（`activity.json` 的 `windows[]` 含 `activity` + `mini`，迷你窗
+# 走的是下面这一整面授权），而那 7 条命令本来就在这一面的 allow 里 —— 删掉不改变任何窗口的
+# 实际权限，只去掉一份会让人误以为「迷你窗另有更窄授权面」的清单。
+
 # 分析窗「今日」视图的待办 / 便利贴面（第四轮 UI 落地·第二批）。
-# 为什么另立一条而不是把这些命令塞进 `main-window-commands`：那条是"整面"授权，
+# 为什么另立一条而不是把这些命令塞进 `activity-window-commands`：那条是"整面"授权，
 # 分析窗实际只用 5 条，塞进去等于把 todo_update / note_create / note_update 也给了它 ——
 # ACL 是攻击面，只给用得到的。
 # 各自唯一调用点（多一条都不许进 allow，写在这里是为了下一个人加命令时先看调用点）：

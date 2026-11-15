@@ -67,9 +67,7 @@ const T04_BASELINE = "fcbbab5";
  * `Delivery` 映射、`require_current` 的拒绝语义）规范化后仍与基线不同 ⇒ 照样红。
  * 重钉 `T04_BASELINE` 不成立：钉到本批之后，这些"本批就该改"的差异会被当成新基线接受。
  *
- * **判据强度不变**：规范化只把新名映射回旧名，任何真实改动规范化后依旧与基线不同，
- * 测试照样红。之所以不直接重钉 `T04_BASELINE`，是因为重钉要等 T02 落地成一个 commit
- * 之后才成立（钉一个还不存在的 sha 没有意义）。
+ * **判据强度不变**：规范化只把新名映射回旧名，任何真实改动规范化后依旧与基线不同，测试照样红。
  */
 
 /** 新名路径 → 旧名路径（用于向改名前的 treeish 取内容）。 */
@@ -242,14 +240,17 @@ describe("[T04] V-2h · tool-notification 投递链守门（Q4 = (A)）", () => 
     expect(drifted).toEqual([]);
   });
 
-  test("V-2h · webview_recovery.rs 的 ToolNotification 行与基线逐字相同", () => {
-    /* 设计允许该文件因别的原因被改，但六个 `WindowKind::ToolNotification` 点
-     *（:21 enum 成员 + :169/:225/:317/:323/:379 五处分支）一个字节不许动 ——
-     * 所以这里不判整文件，只判含该标识符的行集合。 */
+  test("V-2h · webview_recovery.rs 的 ToolNotification 分支行与基线逐字相同", () => {
+    /* enum 成员与 `:317/:323/:379` 三个分支一个字节不许动。基线里第 4 行是 `:225` 那处**内联
+     * label 映射** —— T04-2 搬进了 `window_labels.rs::label()`，故从基线侧剔掉；映射仍在、且
+     * 一一对应，由下面计数判据的「基线 +3」钉住（删任何一个 `=>` 分支都会掉）。另外改判**工作树**
+     * 而不是 `HEAD`：原来比 `at("HEAD")`，在提交之前那次比较是空的（HEAD 里还没变）。 */
     const REL = "src-tauri/src/app/activity/webview_recovery.rs";
-    const at = (treeish: string) => git(["show", `${treeish}:${pathIn(treeish, REL)}`])
-      .split("\n").filter((line) => line.includes("ToolNotification")).join("\n");
-    expect(preRenameSource(at("HEAD"))).toBe(at(T04_BASELINE));
+    const lines = (source: string) => source.split("\n").filter((line) => line.includes("ToolNotification"));
+    const working = lines(readFileSync(join(repoRoot, REL), "utf8"));
+    const baseline = lines(git(["show", `${T04_BASELINE}:${preRenamePath(REL)}`]))
+      .filter((line) => !line.includes("match kind {"));
+    expect(preRenameSource(working.join("\n"))).toBe(baseline.join("\n"));
   });
 
   test("V-2h · window-commands.toml 的 tool-notification-commands 段与基线逐字相同", () => {
@@ -276,16 +277,15 @@ describe("[T04] V-2h · tool-notification 投递链守门（Q4 = (A)）", () => 
   /* [T04 修订] 判据从「与基线相等」改为「等于基线 + 已知偏移」；三处口径变化都不是放宽：
    * 1. **词边界**（`-F` → `-E` + `\b`）：本批新增 `MINI_WINDOW_LABEL`，它包含 `WINDOW_LABEL`
    *    子串 —— 定长子串数会把新常量数进去（实测 21 → 60），判据当场假红。
-   * 2. **`--untracked`**：本批新增映射表 `window_labels.rs`，而 `git grep` 默认只扫已跟踪
-   *    文件 —— 不带则命中数随「有没有 git add」跳变，等于判据的值取决于暂存区状态。
-   *    带上反而**更严**：未跟踪文件同样是源码，不带就能靠"留个未跟踪的新文件"绕过判据。
+   * 2. **`--untracked`**：本批新增映射表 `window_labels.rs`，而 `git grep` 默认只扫已跟踪文件
+   *    —— 不带则命中数随「有没有 git add」跳变。带上反而**更严**：不带就能靠"留个未跟踪的
+   *    新文件"绕过判据。
    * 3. **+3 是已知偏移**：`window_labels.rs` 新增 4 处（`WindowKind::ALL` 1 + `label()` 分支 2
    *    + 文档注释点名 1），`webview_recovery.rs` 少 1 处（`match kind {…}` 内联映射搬走）。
    *    写成常量而非删判据：**再加一个窗类型，偏移就超过 3 ⇒ 照样红**。
    *    （label 值一致性由第 9 步 `check:runtime-ids` 的 a/b/c 覆盖，比词频更准。） */
   test("V-2h · 分析窗后端子树的 WINDOW_LABEL|WindowKind::ToolNotification 计数为基线 +3", () => {
-    /* 目录名在 T02 变了（`app/insight` → `app/activity`），计数口径不变：
-     * 基线那份按旧目录数、工作树按新目录数。 */
+    /* 目录名在 T02 变了（旧 `insight` / 新 `activity`），基线按旧目录数、工作树按新目录数。 */
     const REL_DIR = "src-tauri/src/app/activity";
     const WINDOW_KIND_MAPPING_SITES = 3;
     const count = (treeish: string | null) => {

@@ -27,7 +27,7 @@
     "core:window:allow-inner-size",
     "core:window:allow-scale-factor",
     "opener:default",
-    "main-window-commands",
+    "activity-window-commands",
     "activity-todo-notes",
     "activity-host-bridge",
     "activity-host-settings",

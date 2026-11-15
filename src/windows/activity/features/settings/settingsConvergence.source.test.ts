@@ -102,8 +102,8 @@ describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
     ]);
 
     /* ② capability 面：按 windows 字段挑出覆盖分析窗的那几条 capability，看谁真正授予了
-       `theme_set` / `accent_set`。`host-theme-read` 只有 get，`main-window-commands` 是
-       Patina 自己那 117 条 —— 都不该命中。 */
+       `theme_set` / `accent_set`。`host-theme-read` 只有 get，`activity-window-commands` 是
+       分析窗自己那 117 条 —— 都不该命中。 */
     const grants = permissionGrants();
     const themeCommands = ['theme_set', 'accent_set'];
     const analysisWriters = capabilities()
@@ -138,7 +138,7 @@ describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
     const capability = readRaw('src-tauri/capabilities/activity.json');
     for (const required of [
       'host-theme-read',             /* theme_get / accent_get：读主题与四色 */
-      'main-window-commands',        /* Patina 自己的 117 条命令 */
+      'activity-window-commands',    /* 分析窗自己的 117 条命令 */
       'activity-host-bridge',          /* 5 条只读：list_records / list_items / get_timer_state / note_list / todo_list */
       'activity-host-settings',        /* T04 的写面：设置页整页都在靠它 */
       'core:event:allow-listen',
