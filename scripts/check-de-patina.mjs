@@ -210,21 +210,38 @@ notes.push(`判据 1：声明行命中 ${legacyDeclHits.length} 处 / 其余路�
 
 /* ── 判据 2：`*.db` 不得经 fs::copy ─────────────────────────────────── */
 const migrateSource = readFileSync(MIGRATE_MODULE, 'utf8');
-if (!migrateSource.includes('VACUUM INTO')) {
-  fail(2, '迁移模块里没有 `VACUUM INTO`——库是怎么过去的？');
-}
+/* 判「**调用点**」而不是「字符串存不存在」：第一版只查 `VACUUM INTO` 出现过，于是把调用
+换成 `fs::copy` 之后，那个没人用的 `vacuum_into` 函数定义里的字符串照样让判据绿着
+（V-14 实测）。结构判据必须钉在「谁被调用」上。 */
+const stepBody = functionBody(MIGRATE_MODULE, 'step_data');
+const vacBody = functionBody(MIGRATE_MODULE, 'vacuum_into');
 const copyBody = functionBody(MIGRATE_MODULE, 'copy_missing');
+if (!stepBody) fail(2, '迁移模块里找不到 `step_data`');
+else if (!stepBody.includes('vacuum_into(')) {
+  fail(2, '`step_data` 里没有 `vacuum_into(` —— 库是怎么过去的？');
+} else if (stepBody.includes('fs::copy')) {
+  fail(2, '`step_data` 里出现 `fs::copy` —— 库只能经 `VACUUM INTO`（WAL 下直拷会拿到撕裂的页）');
+}
+if (!vacBody || !vacBody.includes('VACUUM INTO')) {
+  fail(2, '`vacuum_into` 里没有 `VACUUM INTO`');
+}
 if (!copyBody) fail(2, '迁移模块里找不到 `copy_missing`（非库文件的复制出口）');
 else if (!copyBody.includes('fs::copy')) fail(2, '`copy_missing` 里没有 `fs::copy`（备份/诊断文件怎么过去的？）');
 else if (/SQLITE_DB_FILE_NAME|LEGACY_ACTIVITY_DB_FILE/.test(copyBody)) {
   fail(2, '`copy_missing` 里出现了库名 —— 库只能经 `VACUUM INTO`');
+}
+/* `fs::copy` 只准住在 `copy_missing` 里：多一处就说明有一条「非库文件」的路被绕开了。 */
+const copyTotal = countInCode(MIGRATE_MODULE, 'fs::copy');
+const copyInside = copyBody ? copyBody.split('fs::copy').length - 1 : 0;
+if (copyTotal !== copyInside) {
+  fail(2, `fs::copy 出现在 copy_missing 之外（共 ${copyTotal} 处，其中 ${copyInside} 处在 copy_missing）`);
 }
 const activityRelHits = hits(/"activity\/data"/, production).filter((hit) => {
   const [file, line] = hit.split(':');
   return !ACTIVITY_REL_DECL.test(sources(join(root, file)).stripped[Number(line) - 1]);
 });
 if (activityRelHits.length) fail(2, `"activity/data" 字面量跑到声明行之外：${activityRelHits.join(', ')}`);
-notes.push(`判据 2：VACUUM INTO 命中 1 处；"activity/data" 字面量在声明行之外 ${activityRelHits.length} 处`);
+notes.push(`判据 2：step_data 经 vacuum_into 产库；fs::copy ${copyTotal} 处全部在 copy_missing；"activity/data" 字面量在声明行之外 ${activityRelHits.length} 处`);
 
 /* ── 判据 3：旧路径永不删 ───────────────────────────────────────────── */
 const removeDirAll = countInCode(MIGRATE_MODULE, 'remove_dir_all');

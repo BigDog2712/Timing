@@ -94,19 +94,25 @@ fn paths_stored_inside_the_database_are_never_rewritten() {
     let root = temp_root("inside-db-paths");
     let backup = r"\\?\C:\Users\someone\AppData\Roaming\Patina\backups";
     let export = r"\\?\C:\Users\someone\AppData\Roaming\Patina\exports";
+    /* 第三种拼法是**小写**的：真机上两种写法并存（大写来自 `PRODUCT_FOLDER`，小写来自
+    我们自己的旧目录名）。只钉大写的夹具挡不住 `REPLACE(value,'patina','activity')`——
+    大小写敏感替换碰不到大写那份，用例会绿着放过它（V-8 第一次实测就是这样）。 */
+    let remote = "/patina/backups";
     make_settings_db(
         &root.join(LEGACY_ACTIVITY_DATA_REL).join(LEGACY_ACTIVITY_DB_FILE),
         &[
             ("scheduled_backup_config.target_dir", backup),
             ("scheduled_export_config.target_dir", export),
+            ("remote_backup.remote_dir", remote),
         ],
     );
 
     assert_eq!(prepare(&root).data, Step::Done);
     let rows = settings_rows(&root.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME));
-    assert_eq!(rows.len(), 2);
-    assert_eq!(rows[0].1, backup, "库里的旧路径不许被改写");
-    assert_eq!(rows[1].1, export, "库里的旧路径不许被改写");
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[0].1, remote, "库里的旧路径不许被改写（小写形态）");
+    assert_eq!(rows[1].1, backup, "库里的旧路径不许被改写");
+    assert_eq!(rows[2].1, export, "库里的旧路径不许被改写");
 }
 
 /// **M-8（行为级）**：迁移之后首启导入的闸② 仍然是「已处理」——否则搬完一次，下次启动
