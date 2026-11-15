@@ -3,7 +3,7 @@
   "limit": 300,
   "files": {
     "src-tauri/src/app/activity/bootstrap.rs": 305,
-    "src-tauri/src/app/activity/main_window.rs": 778,
+    "src-tauri/src/app/activity/main_window.rs": 777,
     "src-tauri/src/app/activity/mini_window.rs": 468,
     "src-tauri/src/app/activity/state.rs": 1220,
     "src-tauri/src/app/activity/tool_notifications.rs": 546,
@@ -39,7 +39,7 @@
     "src-tauri/src/services/activity/data/activity_read_model/hourly_mod_tests.rs": 372,
     "src-tauri/src/services/activity/data/activity_read_model/hourly.rs": 629,
     "src-tauri/src/services/activity/data/backup/snapshot_mod_tests.rs": 573,
-    "src-tauri/src/services/activity/data/backup/snapshot.rs": 892,
+    "src-tauri/src/services/activity/data/backup/snapshot.rs": 891,
     "src-tauri/src/services/activity/data/backup/snapshot/merge_tests.rs": 395,
     "src-tauri/src/services/activity/data/export/common.rs": 487,
     "src-tauri/src/services/activity/data/export/markdown_exporter.rs": 443,
