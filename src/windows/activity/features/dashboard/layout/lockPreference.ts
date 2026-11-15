@@ -11,33 +11,24 @@
  * 存的是 `"1"` / `"0"`（而不是 JSON 布尔）：存档的可读性优先，且 localStorage 里
  * 一个字符比 `true`/`false` 少一次误读形状的机会。坏值按**未锁定**处理 ——
  * 宁可让用户能拖动，也不要让一个读不懂的字符串把界面永久锁死。
+ *
+ * [T04-4] 存储访问走共享层读写出口（先过迁移闸）；键名来自注册表。
  */
-export const LOCKED_STORAGE_KEY = "patina:dashboard-layout:locked:v1";
+import { activityKeyOf, readActivityKey, writeActivityKey } from "../../../../shared/activityStorageKeys";
 
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    /* 隐私模式 / 被策略禁用：当作未锁定（不可锁定不是故障，锁不上才是）。 */
-    return null;
-  }
-}
+export const LOCKED_STORAGE_KEY = activityKeyOf("boardLocked");
 
 export function readLocked(): boolean {
-  const store = storage();
-  if (!store) return false;
   try {
-    return store.getItem(LOCKED_STORAGE_KEY) === "1";
+    return readActivityKey("boardLocked") === "1";
   } catch {
     return false;
   }
 }
 
 export function writeLocked(locked: boolean): void {
-  const store = storage();
-  if (!store) return;
   try {
-    store.setItem(LOCKED_STORAGE_KEY, locked ? "1" : "0");
+    writeActivityKey("boardLocked", locked ? "1" : "0");
   } catch {
     /* 配额满 / 被拒：锁不落盘不致命（本次会话内仍然生效） */
   }

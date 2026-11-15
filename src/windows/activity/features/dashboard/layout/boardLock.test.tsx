@@ -97,7 +97,7 @@ describe("V-1.3a 锁定后六个动作都不改 layout 引用", () => {
     useBoardStore.getState().moveTo(uid, { x: 104, y: 104, w: 340, h: 304 });
     expect(useBoardStore.getState().layout.cards[0].x).toBe(104);
     /* 解锁状态要落盘：否则下次开窗又变成锁着（用户会以为解锁没生效） */
-    expect(window.localStorage.getItem("patina:dashboard-layout:locked:v1")).toBe("0");
+    expect(window.localStorage.getItem("activity:dashboard-layout:locked:v1")).toBe("0");
   });
 });
 

@@ -1,4 +1,6 @@
-const ICON_THEME_COLOR_STORAGE_KEY = "patina.icon-theme-colors.v2";
+/* [T04-4] 键名从注册表取（老键字面量只住 activityStorageKeys.ts）；
+   读写走出口（先过迁移闸）。点号键（Map 整串序列化，§3.4），迁移整串复制、不解析。 */
+const ICON_THEME_COLOR_STORAGE_KEY = activityKeyOf("iconThemeColors");
 const ICON_THEME_COLOR_CACHE_LIMIT = 512;
 const ICON_SOURCE_FINGERPRINT_CACHE_LIMIT = 256;
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -7,6 +9,13 @@ const iconSourceFingerprintCache = new Map<string, string>();
 let persistedColors: Map<string, string> | null = null;
 let flushScheduled = false;
 let storeGeneration = 0;
+
+import {
+  activityKeyOf,
+  readActivityKey,
+  removeActivityKey,
+  writeActivityKey,
+} from "../../../shared/activityStorageKeys";
 
 function fingerprintIconSource(iconSource: string): string {
   const cached = iconSourceFingerprintCache.get(iconSource);
@@ -40,11 +49,9 @@ function hydratePersistedColors(): Map<string, string> {
   if (persistedColors) return persistedColors;
 
   persistedColors = new Map<string, string>();
-  const storage = getBrowserLocalStorage();
-  if (!storage) return persistedColors;
 
   try {
-    const raw = storage.getItem(ICON_THEME_COLOR_STORAGE_KEY);
+    const raw = readActivityKey("iconThemeColors");
     if (!raw) return persistedColors;
 
     const entries: unknown = JSON.parse(raw);
@@ -77,12 +84,11 @@ function hydratePersistedColors(): Map<string, string> {
 
 function flushPersistedColors(): void {
   flushScheduled = false;
-  const storage = getBrowserLocalStorage();
-  if (!storage || !persistedColors) return;
+  if (!persistedColors) return;
 
   try {
-    storage.setItem(
-      ICON_THEME_COLOR_STORAGE_KEY,
+    writeActivityKey(
+      "iconThemeColors",
       JSON.stringify(Array.from(persistedColors.entries())),
     );
   } catch {
@@ -141,7 +147,7 @@ export const __iconThemeColorStoreInternals = {
     persistedColors = new Map<string, string>();
     iconSourceFingerprintCache.clear();
     try {
-      getBrowserLocalStorage()?.removeItem(ICON_THEME_COLOR_STORAGE_KEY);
+      removeActivityKey("iconThemeColors");
     } catch {
       // Test cleanup is best-effort when storage is unavailable.
     }
@@ -150,4 +156,3 @@ export const __iconThemeColorStoreInternals = {
   flushPersistedColors,
   storageKey: ICON_THEME_COLOR_STORAGE_KEY,
 };
-import { getBrowserLocalStorage } from "../browser/browserStorageGateway.ts";

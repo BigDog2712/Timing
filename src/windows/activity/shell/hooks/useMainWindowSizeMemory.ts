@@ -12,6 +12,11 @@
  */
 import { useEffect, useRef } from "react";
 import {
+  activityKeyOf,
+  readActivityKey,
+  writeActivityKey,
+} from "../../../shared/activityStorageKeys";
+import {
   readCurrentWindowLogicalSize,
   readCurrentWindowMaximized,
   resizeCurrentWindowTo,
@@ -19,7 +24,8 @@ import {
   type LogicalWindowSize,
 } from "../../platform/desktop/windowControlGateway.ts";
 
-export const WINDOW_SIZE_STORAGE_KEY = "patina:window-size:v1";
+/* [T04-4] 键名从注册表取（老键字面量只住 activityStorageKeys.ts）；读写走出口（先过迁移闸）。 */
+export const WINDOW_SIZE_STORAGE_KEY = activityKeyOf("mainWindowSize");
 /** 与 Rust 侧 `MAIN_WINDOW_MIN_WIDTH/HEIGHT`（`insight/main_window.rs`）同值：更小就不是这块板了 */
 export const MIN_WINDOW_WIDTH = 900;
 export const MIN_WINDOW_HEIGHT = 636;
@@ -29,7 +35,7 @@ const RESTORE_GRACE_MS = 700;
 
 export function readStoredWindowSize(): LogicalWindowSize | null {
   try {
-    const raw = window.localStorage.getItem(WINDOW_SIZE_STORAGE_KEY);
+    const raw = readActivityKey("mainWindowSize");
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { width?: unknown; height?: unknown };
     const width = Number(parsed.width);
@@ -44,7 +50,7 @@ export function readStoredWindowSize(): LogicalWindowSize | null {
 
 export function writeStoredWindowSize(size: LogicalWindowSize): void {
   try {
-    window.localStorage.setItem(WINDOW_SIZE_STORAGE_KEY, JSON.stringify(size));
+    writeActivityKey("mainWindowSize", JSON.stringify(size));
   } catch {
     /* 落盘失败不影响本次会话 */
   }

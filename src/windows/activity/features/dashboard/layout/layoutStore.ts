@@ -17,15 +17,22 @@
  * 旧键**不删**——它还在 v2 用户机器上，删了等于替人清数据；新键第一次读不到时会走
  * `normalizeLayout` 的 v2 迁移路径（见 `boardStore` 的 `hydrate`）。
  */
-import { LAYOUT_STORAGE_KEY, LAYOUT_VERSION, type DashboardLayout } from "./contract";
+import { LAYOUT_VERSION, type DashboardLayout } from "./contract";
 import { cloneDefaultLayout } from "./defaultLayout";
 import { normalizeLayout } from "./normalizeLayout";
+import {
+  activityKeyOf,
+  activityLegacyKeyOf,
+  readActivityKey,
+  removeActivityKey,
+  writeActivityKey,
+} from "../../../../shared/activityStorageKeys";
 
-/** v2 的键：迁移时读它一次，之后再不碰。 */
-export const LEGACY_STORAGE_KEY = "patina:dashboard-layout:v2";
+/** v2 的键：迁移时读它一次，之后再不碰。键名来自注册表（T04-4，只读老键槽）。 */
+export const LEGACY_STORAGE_KEY = activityLegacyKeyOf("boardLayoutV2");
 
 /** 主人自己存的默认布局（点「保存布局」写入，点「恢复默认」读回）。 */
-export const DEFAULT_LAYOUT_STORAGE_KEY = "patina:dashboard-layout:default:v1";
+export const DEFAULT_LAYOUT_STORAGE_KEY = activityKeyOf("boardLayoutDefault");
 
 export interface LoadLayoutResult {
   layout: DashboardLayout;
@@ -34,14 +41,12 @@ export interface LoadLayoutResult {
   reason: string | null;
 }
 
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    /* 隐私模式 / 被策略禁用：布局退回默认，**不抛** —— 主界面不能因为读不到偏好就白屏。 */
-    return null;
-  }
-}
+/**
+ * [T04-4] 存储访问全部走共享层读写出口：出口进来第一件事是 `ensureMigrated()`
+ * （惰性闸），所以本文件在 entry import 缺席时也能保证"先迁移再读"——
+ * 这正是 `boardStore.ts:96` 模块求值期读盘的覆盖方式。出口自带存储不可用
+ * 的空值语义（读得 null / 写删不抛），本文件原来的 `storage()` helper 因此删除。
+ */
 
 function parse(raw: string | null): { value: unknown; broken: boolean } {
   if (raw === null) return { value: undefined, broken: false };
@@ -53,15 +58,10 @@ function parse(raw: string | null): { value: unknown; broken: boolean } {
 }
 
 export function loadLayout(): LoadLayoutResult {
-  const store = storage();
-  if (!store) {
-    return { layout: cloneDefaultLayout(), repaired: false, reason: "storage-unavailable" };
-  }
-
   /* 主人存过默认版就以它为「回落的落点」：坏存档不该把人辛苦摆的布局换成出厂那版。 */
   const fallback = loadSavedDefault() ?? cloneDefaultLayout();
 
-  const own = parse(store.getItem(LAYOUT_STORAGE_KEY));
+  const own = parse(readActivityKey("boardLayout"));
   if (own.broken) {
     const result = normalizeLayout(undefined, fallback);
     saveLayout(result.layout);
@@ -78,7 +78,7 @@ export function loadLayout(): LoadLayoutResult {
   }
 
   /* 第一次读 v3：如果有 v2 布局，迁移它（用户的排布不丢），否则默认布局。 */
-  const legacy = parse(store.getItem(LEGACY_STORAGE_KEY));
+  const legacy = parse(readActivityKey("boardLayoutV2"));
   if (legacy.value !== undefined) {
     const migration = normalizeLayout({ ...(legacy.value as object), version: 2 }, fallback);
     saveLayout(migration.layout);
@@ -91,10 +91,8 @@ export function loadLayout(): LoadLayoutResult {
 }
 
 export function saveLayout(layout: DashboardLayout): void {
-  const store = storage();
-  if (!store) return;
   try {
-    store.setItem(LAYOUT_STORAGE_KEY, JSON.stringify({ ...layout, version: LAYOUT_VERSION }));
+    writeActivityKey("boardLayout", JSON.stringify({ ...layout, version: LAYOUT_VERSION }));
   } catch {
     /* 配额满 / 被拒：布局是观感偏好，丢一次不致命，不打断主界面。 */
   }
@@ -102,13 +100,7 @@ export function saveLayout(layout: DashboardLayout): void {
 
 /** 测试与「恢复出厂」共用：清掉这一键，下次读就是出厂布局。 */
 export function resetLayout(): void {
-  const store = storage();
-  if (!store) return;
-  try {
-    store.removeItem(LAYOUT_STORAGE_KEY);
-  } catch {
-    /* 同上，静默 */
-  }
+  removeActivityKey("boardLayout");
 }
 
 /* ── 默认布局：主人用「保存布局」存下来的那一版 ── */
@@ -120,10 +112,7 @@ export function resetLayout(): void {
  * 把一张都没有的板子当成默认布局最恶：主人点一下「恢复默认」，主界面当场变白。
  */
 export function loadSavedDefault(): DashboardLayout | null {
-  const store = storage();
-  if (!store) return null;
-
-  const { value, broken } = parse(store.getItem(DEFAULT_LAYOUT_STORAGE_KEY));
+  const { value, broken } = parse(readActivityKey("boardLayoutDefault"));
   if (broken) {
     console.warn("[dashboard-layout] 保存的默认布局不是合法 JSON，已忽略");
     return null;
@@ -146,10 +135,8 @@ export function hasSavedDefault(): boolean {
 
 /** 存这份快照为默认布局（覆盖旧的默认，不动当前排布那一键）。 */
 export function saveSavedDefault(layout: DashboardLayout): void {
-  const store = storage();
-  if (!store) return;
   try {
-    store.setItem(DEFAULT_LAYOUT_STORAGE_KEY, JSON.stringify({ ...layout, version: LAYOUT_VERSION }));
+    writeActivityKey("boardLayoutDefault", JSON.stringify({ ...layout, version: LAYOUT_VERSION }));
   } catch {
     /* 配额满 / 被拒：同 saveLayout，静默。 */
   }
@@ -157,13 +144,7 @@ export function saveSavedDefault(layout: DashboardLayout): void {
 
 /** 回到「从未存过默认布局」的状态（下次「恢复默认」即出厂布局）。 */
 export function clearSavedDefault(): void {
-  const store = storage();
-  if (!store) return;
-  try {
-    store.removeItem(DEFAULT_LAYOUT_STORAGE_KEY);
-  } catch {
-    /* 静默 */
-  }
+  removeActivityKey("boardLayoutDefault");
 }
 
 /** 当前生效的默认布局：主人存过就是那一版，否则出厂。 */

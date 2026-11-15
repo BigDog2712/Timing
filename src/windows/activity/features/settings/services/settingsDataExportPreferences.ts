@@ -4,10 +4,19 @@ import {
   isDataExportProtocolField,
   type DataExportProtocolField,
 } from "../../../platform/persistence/dataExportGateway.ts";
-import { getBrowserLocalStorage } from "../../../platform/browser/browserStorageGateway.ts";
+import {
+  exportFieldsSlot,
+  readActivityKey,
+  readActivitySlot,
+  writeActivityKey,
+  writeActivitySlot,
+} from "../../../../shared/activityStorageKeys";
 
-const EXPORT_RANGE_MODE_KEY = "patina:export-range-mode";
-const EXPORT_FORMAT_KEY = "patina:export-format";
+/* [T04-4] 键名从注册表取（老键字面量只住 activityStorageKeys.ts）；
+   读写走出口（先过迁移闸）。export-fields 用动态模板槽：注册表建成之后
+   才出现的第 5 个导出格式也天然被覆盖（§3.2）。存储不可用的空值语义
+   （读得 null / 写返回 false）由出口自带，本文件原来的 getBrowserLocalStorage
+   判空因此删除。 */
 
 const DEFAULT_EXPORT_RANGE_MODE: ExportRangeMode = "month";
 const DEFAULT_EXPORT_FORMAT: ExportFormat = "csv";
@@ -20,8 +29,8 @@ function isExportFormat(value: string | null): value is ExportFormat {
   return value === "csv" || value === "sqlite" || value === "parquet" || value === "markdown";
 }
 
-function exportFieldsKey(format: ExportFormat) {
-  return `patina:export-fields:${format}`;
+function exportFieldsSlotOf(format: ExportFormat) {
+  return exportFieldsSlot(format);
 }
 
 export function normalizeExportFields(
@@ -42,10 +51,8 @@ export function readExportFields(
   format: ExportFormat,
   fallback: readonly DataExportProtocolField[],
 ): DataExportProtocolField[] {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return [...fallback];
   try {
-    const raw = storage.getItem(exportFieldsKey(format));
+    const raw = readActivitySlot(exportFieldsSlotOf(format));
     return raw ? normalizeExportFields(JSON.parse(raw), fallback) : [...fallback];
   } catch {
     return [...fallback];
@@ -53,22 +60,17 @@ export function readExportFields(
 }
 
 export function rememberExportFields(format: ExportFormat, fields: readonly string[]) {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return;
   try {
     const normalized = normalizeExportFields(fields, DATA_EXPORT_PROTOCOL_FIELDS);
-    storage.setItem(exportFieldsKey(format), JSON.stringify(normalized));
+    writeActivitySlot(exportFieldsSlotOf(format), JSON.stringify(normalized));
   } catch {
     // Export preferences are best-effort; never block the task flow.
   }
 }
 
 export function readExportRangeMode(): ExportRangeMode {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return DEFAULT_EXPORT_RANGE_MODE;
-
   try {
-    const value = storage.getItem(EXPORT_RANGE_MODE_KEY);
+    const value = readActivityKey("exportRangeMode");
     return isExportRangeMode(value) ? value : DEFAULT_EXPORT_RANGE_MODE;
   } catch {
     return DEFAULT_EXPORT_RANGE_MODE;
@@ -76,22 +78,16 @@ export function readExportRangeMode(): ExportRangeMode {
 }
 
 export function rememberExportRangeMode(mode: ExportRangeMode) {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return;
-
   try {
-    storage.setItem(EXPORT_RANGE_MODE_KEY, mode);
+    writeActivityKey("exportRangeMode", mode);
   } catch {
     // Export preferences are best-effort; never block the task flow.
   }
 }
 
 export function readExportFormat(): ExportFormat {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return DEFAULT_EXPORT_FORMAT;
-
   try {
-    const value = storage.getItem(EXPORT_FORMAT_KEY);
+    const value = readActivityKey("exportFormat");
     return isExportFormat(value) ? value : DEFAULT_EXPORT_FORMAT;
   } catch {
     return DEFAULT_EXPORT_FORMAT;
@@ -99,11 +95,8 @@ export function readExportFormat(): ExportFormat {
 }
 
 export function rememberExportFormat(format: ExportFormat) {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return;
-
   try {
-    storage.setItem(EXPORT_FORMAT_KEY, format);
+    writeActivityKey("exportFormat", format);
   } catch {
     // Export preferences are best-effort; never block the task flow.
   }

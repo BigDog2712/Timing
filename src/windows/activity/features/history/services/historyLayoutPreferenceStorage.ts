@@ -2,10 +2,10 @@ import {
   DEFAULT_HISTORY_TIMELINE_ZOOM_HOURS,
   MAX_HISTORY_TIMELINE_ZOOM_HOURS,
 } from "../../../shared/lib/activityTimelineCompiler.ts";
-import { getBrowserLocalStorage } from "../../../platform/browser/browserStorageGateway.ts";
-
-const HISTORY_DAY_DISTRIBUTION_MODE_KEY = "patina:history-day-distribution-mode";
-const HISTORY_TIMELINE_ZOOM_HOURS_KEY = "patina:history-timeline-zoom-hours";
+import {
+  readActivityKey,
+  writeActivityKey,
+} from "../../../../shared/activityStorageKeys";
 
 export type DayDistributionMode = "app" | "category" | "web";
 
@@ -22,11 +22,8 @@ function parseHistoryTimelineZoomHours(value: string | null): number | null {
 }
 
 export function readHistoryTimelineZoomHours(): number {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return DEFAULT_HISTORY_TIMELINE_ZOOM_HOURS;
-
   try {
-    return parseHistoryTimelineZoomHours(storage.getItem(HISTORY_TIMELINE_ZOOM_HOURS_KEY))
+    return parseHistoryTimelineZoomHours(readActivityKey("historyTimelineZoomHours"))
       ?? DEFAULT_HISTORY_TIMELINE_ZOOM_HOURS;
   } catch {
     return DEFAULT_HISTORY_TIMELINE_ZOOM_HOURS;
@@ -34,22 +31,18 @@ export function readHistoryTimelineZoomHours(): number {
 }
 
 export function rememberHistoryTimelineZoomHours(zoomHours: number) {
-  const storage = getBrowserLocalStorage();
-  if (!storage || !Number.isFinite(zoomHours) || zoomHours < 1 || zoomHours > MAX_HISTORY_TIMELINE_ZOOM_HOURS) return;
+  if (!Number.isFinite(zoomHours) || zoomHours < 1 || zoomHours > MAX_HISTORY_TIMELINE_ZOOM_HOURS) return;
 
   try {
-    storage.setItem(HISTORY_TIMELINE_ZOOM_HOURS_KEY, String(Number(zoomHours.toFixed(4))));
+    writeActivityKey("historyTimelineZoomHours", String(Number(zoomHours.toFixed(4))));
   } catch {
     // History layout preferences are best-effort; never block the interaction.
   }
 }
 
 export function readHistoryDayDistributionMode(): DayDistributionMode {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return "app";
-
   try {
-    const value = storage.getItem(HISTORY_DAY_DISTRIBUTION_MODE_KEY);
+    const value = readActivityKey("historyDayDistributionMode");
     return isDayDistributionMode(value) ? value : "app";
   } catch {
     return "app";
@@ -57,11 +50,8 @@ export function readHistoryDayDistributionMode(): DayDistributionMode {
 }
 
 export function rememberHistoryDayDistributionMode(mode: DayDistributionMode) {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return;
-
   try {
-    storage.setItem(HISTORY_DAY_DISTRIBUTION_MODE_KEY, mode);
+    writeActivityKey("historyDayDistributionMode", mode);
   } catch {
     // History layout preferences are best-effort; never block the interaction.
   }

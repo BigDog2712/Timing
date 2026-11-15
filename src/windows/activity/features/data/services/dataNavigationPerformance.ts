@@ -1,10 +1,11 @@
+/* [T04-4] 仅改名：这些是 performance.mark 名（不是 localStorage 键），前缀统一去 patina。 */
 export const DATA_NAVIGATION_PERFORMANCE_MARKS = {
-  intent: "patina:data-navigation:intent",
-  chunkReady: "patina:data-navigation:chunk-ready",
-  rootMounted: "patina:data-navigation:root-mounted",
-  structureActive: "patina:data-navigation:structure-active",
-  readModelReady: "patina:data-navigation:read-model-ready",
-  complete: "patina:data-navigation:complete",
+  intent: "activity:data-navigation:intent",
+  chunkReady: "activity:data-navigation:chunk-ready",
+  rootMounted: "activity:data-navigation:root-mounted",
+  structureActive: "activity:data-navigation:structure-active",
+  readModelReady: "activity:data-navigation:read-model-ready",
+  complete: "activity:data-navigation:complete",
 } as const;
 
 type DataNavigationPerformanceStage =

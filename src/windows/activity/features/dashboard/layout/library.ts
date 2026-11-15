@@ -4,7 +4,7 @@
  *   · `LAYOUT_STORAGE_KEY`（`contract.ts`）—— 当前排布，每拖一下就写一次；
  *   · `DEFAULT_LAYOUT_STORAGE_KEY`（老「默认布局」，`layoutStore.ts`）—— 只读：迁移来源
  *     与「当前排布键坏了」时的落点；
- *   · **本文件** `patina:dashboard-layout:library:v1` —— 一组快照（`activeId` + `items`）。
+ *   · **本文件** 布局库键（注册表槽 `boardLayoutLibrary`）—— 一组快照（`activeId` + `items`）。
  *
  * 为什么不塞进「当前排布」那一个键：库是一组必须**原子读写**的快照，而当前排布每帧都在变。
  * 混在一个键里，每次拖动都要把整库重写一遍（`layoutStore.ts` 头注释已为同一个理由把默认版
@@ -21,8 +21,10 @@ import type { DashboardLayout } from "./contract";
 import { cloneDefaultLayout, cloneLayout } from "./defaultLayout";
 import { loadSavedDefault } from "./layoutStore";
 import { normalizeLayout } from "./normalizeLayout";
+import { activityKeyOf, readActivityKey, writeActivityKey } from "../../../../shared/activityStorageKeys";
 
-export const LIBRARY_STORAGE_KEY = "patina:dashboard-layout:library:v1";
+/** [T04-4] 键名来自注册表——老键字面量只住 activityStorageKeys.ts（判据 1）。 */
+export const LIBRARY_STORAGE_KEY = activityKeyOf("boardLayoutLibrary");
 export const LIBRARY_VERSION = 1;
 /** 内置的出厂条目 id（保留值，不落库） */
 export const FACTORY_LAYOUT_ID = "factory";
@@ -56,15 +58,7 @@ export interface LoadLibraryResult {
   migrated: boolean;
 }
 
-function storage(): Storage | null {
-  try {
-    return window.localStorage;
-  } catch {
-    /* 隐私模式 / 被策略禁用：库退回空（只剩 factory），**不抛** —— 主界面不能因为
-     * 读不到偏好就白屏（与 `layoutStore` 同一条纪律）。 */
-    return null;
-  }
-}
+/** [T04-4] 存储访问走共享层读写出口（先过迁移闸）；本文件原 storage() helper 删除。 */
 
 /**
  * 新布局 id。
@@ -136,12 +130,9 @@ function parseLibrary(value: unknown): LayoutLibrary | null {
  * 是「当前布局每开一次窗就变成"未选中"」。
  */
 export function loadLibrary(options: { now: number; migratedName: string }): LoadLibraryResult {
-  const store = storage();
-  if (!store) return { library: emptyLibrary(), migrated: false };
-
   let parsed: LayoutLibrary | null = null;
   try {
-    const raw = store.getItem(LIBRARY_STORAGE_KEY);
+    const raw = readActivityKey("boardLayoutLibrary");
     if (raw !== null) parsed = parseLibrary(JSON.parse(raw) as unknown);
   } catch {
     console.warn("[dashboard-layout] 布局库不是合法 JSON，已尝试从默认布局迁移");
@@ -169,10 +160,8 @@ export function loadLibrary(options: { now: number; migratedName: string }): Loa
 }
 
 export function saveLibrary(library: LayoutLibrary): void {
-  const store = storage();
-  if (!store) return;
   try {
-    store.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(library));
+    writeActivityKey("boardLayoutLibrary", JSON.stringify(library));
   } catch {
     /* 配额满 / 被拒：布局是观感偏好，丢一次不致命，不打断主界面。 */
   }

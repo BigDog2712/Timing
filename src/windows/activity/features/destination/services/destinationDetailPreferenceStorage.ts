@@ -1,12 +1,11 @@
 import { DEFAULT_DESTINATION_DETAIL_ZOOM_HOURS } from "./destinationDetailTimelineViewport.ts";
-import { getBrowserLocalStorage } from "../../../platform/browser/browserStorageGateway.ts";
+import {
+  readActivityKey,
+  writeActivityKey,
+} from "../../../../shared/activityStorageKeys";
 
-const DESTINATION_DETAIL_TIMELINE_ZOOM_HOURS_KEY =
-  "patina:destination-detail-timeline-zoom-hours:v1";
-const LEGACY_DETAIL_TIMELINE_ZOOM_HOURS_KEY =
-  "patina:data-destination-detail-timeline-zoom-hours:v1";
-const DETAIL_MIN_SECS_KEY = "patina:destination-detail-min-secs:v1";
-const LEGACY_DETAIL_MIN_SECS_KEY = "patina:data-detail-min-secs";
+/* [T04-4] 键名从注册表取（老键字面量只住 activityStorageKeys.ts）；
+   读写走出口（先过迁移闸）。当前键 + 更早键名（只读回落）的两级读链保持不变。 */
 
 const DEFAULT_DETAIL_MIN_SECS = 60;
 export const DETAIL_MIN_SECS_RANGE = {
@@ -47,29 +46,23 @@ export function clampDetailMinSecs(value: number) {
 }
 
 export function readDestinationDetailTimelineZoomHours(): number {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return DEFAULT_DESTINATION_DETAIL_ZOOM_HOURS;
-
   try {
-    return parseZoomHours(
-      storage.getItem(DESTINATION_DETAIL_TIMELINE_ZOOM_HOURS_KEY),
-    ) ?? parseZoomHours(
-      storage.getItem(LEGACY_DETAIL_TIMELINE_ZOOM_HOURS_KEY),
-    ) ?? DEFAULT_DESTINATION_DETAIL_ZOOM_HOURS;
+    return parseZoomHours(readActivityKey("destinationDetailZoomHours"))
+      ?? parseZoomHours(readActivityKey("destinationDetailZoomHoursLegacy"))
+      ?? DEFAULT_DESTINATION_DETAIL_ZOOM_HOURS;
   } catch {
     return DEFAULT_DESTINATION_DETAIL_ZOOM_HOURS;
   }
 }
 
 export function rememberDestinationDetailTimelineZoomHours(zoomHours: number) {
-  const storage = getBrowserLocalStorage();
-  if (!storage || !Number.isFinite(zoomHours) || zoomHours < 1 || zoomHours > 24) {
+  if (!Number.isFinite(zoomHours) || zoomHours < 1 || zoomHours > 24) {
     return;
   }
 
   try {
-    storage.setItem(
-      DESTINATION_DETAIL_TIMELINE_ZOOM_HOURS_KEY,
+    writeActivityKey(
+      "destinationDetailZoomHours",
       String(Number(zoomHours.toFixed(4))),
     );
   } catch {
@@ -78,12 +71,9 @@ export function rememberDestinationDetailTimelineZoomHours(zoomHours: number) {
 }
 
 export function readDetailMinSecs(): number {
-  const storage = getBrowserLocalStorage();
-  if (!storage) return DEFAULT_DETAIL_MIN_SECS;
-
   try {
-    return parseMinSecs(storage.getItem(DETAIL_MIN_SECS_KEY))
-      ?? parseMinSecs(storage.getItem(LEGACY_DETAIL_MIN_SECS_KEY))
+    return parseMinSecs(readActivityKey("destinationDetailMinSecs"))
+      ?? parseMinSecs(readActivityKey("destinationDetailMinSecsLegacy"))
       ?? DEFAULT_DETAIL_MIN_SECS;
   } catch {
     return DEFAULT_DETAIL_MIN_SECS;
@@ -91,12 +81,11 @@ export function readDetailMinSecs(): number {
 }
 
 export function saveDetailMinSecs(seconds: number) {
-  const storage = getBrowserLocalStorage();
   const normalizedSeconds = parseMinSecs(String(seconds));
-  if (!storage || normalizedSeconds === null) return;
+  if (normalizedSeconds === null) return;
 
   try {
-    storage.setItem(DETAIL_MIN_SECS_KEY, String(normalizedSeconds));
+    writeActivityKey("destinationDetailMinSecs", String(normalizedSeconds));
   } catch {
     // Detail timeline preferences are best-effort; never block the interaction.
   }

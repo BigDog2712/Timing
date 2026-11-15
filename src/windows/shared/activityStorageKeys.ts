@@ -143,6 +143,42 @@ export function activityLegacyKeyOf(name: ActivitySlotName): string {
 }
 
 /**
+ * 动态模板槽（§3.2）：任意导出格式的 `export-fields` 槽。已知 4 个格式有静态槽
+ * （`exportFieldsCsv` 等），第 5 个格式没有——用模板前缀现造一个。前缀字面量
+ * 只住在 ACTIVITY_KEY_TEMPLATES 的声明行，这里**不重复写字面量**。
+ */
+export function exportFieldsSlot(format: string): ActivitySlot {
+  const template = ACTIVITY_KEY_TEMPLATES[0];
+  return {
+    name: `exportFields:${format}`,
+    legacy: `${template.legacy}${format}`,
+    target: `${template.target}${format}`,
+    lifetime: 'preference',
+  };
+}
+
+/** 通用读出口（动态槽用）：语义与 `readActivityKey` 相同——先过迁移闸、只读当前键。 */
+export function readActivitySlot(slot: Pick<ActivitySlot, 'legacy' | 'target'>): string | null {
+  ensureMigrated();
+  try {
+    return localStorage.getItem(slot.target ?? slot.legacy);
+  } catch {
+    return null;
+  }
+}
+
+/** 通用写出口（动态槽用）：语义与 `writeActivityKey` 相同——先过迁移闸。 */
+export function writeActivitySlot(slot: Pick<ActivitySlot, 'legacy' | 'target'>, value: string): boolean {
+  ensureMigrated();
+  try {
+    localStorage.setItem(slot.target ?? slot.legacy, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 读出口。**第一件事是迁移闸**；带 `target` 的槽在迁移完成后**只读新键、不回落老键**
  * （§4.6 / M-15：老键永不删，回落会让"清除"永远失效）。存储不可用 ⇒ null（不抛）。
  */

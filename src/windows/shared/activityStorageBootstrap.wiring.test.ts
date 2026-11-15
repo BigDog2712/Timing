@@ -12,8 +12,12 @@
  *
  * G-4 的机械证明在这里：两处 entry 各一条 M-7；V-5b 会分别只删一处，两次都必须红。
  */
+/* 本项目所有 node: 用法的统一处理：无 @types/node（见 settingsSourceProbe.test-utils.ts）。 */
+// @ts-expect-error 仅测试进程用得到 node:fs。
 import { readFileSync } from 'node:fs';
+// @ts-expect-error 仅测试进程用得到 node:path。
 import { dirname, join } from 'node:path';
+// @ts-expect-error 仅测试进程用得到 node:url。
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

@@ -29,19 +29,21 @@ describe("clampZoom", () => {
 });
 
 describe("readStoredZoom", () => {
+  /* [T04-4] 种子必须用**新键** `activity:`：本文件跑过第一个用例后迁移闸已 done，
+     老键（patina:）的种子不会再被复制——这不是放宽，是迁移"只跑一次"的语义。 */
   it("没存过 → 100%", () => {
     expect(readStoredZoom()).toBe(1);
   });
 
   it("存过的值读回来", () => {
-    window.localStorage.setItem("patina:dashboard-zoom:v1", "1.35");
+    window.localStorage.setItem("activity:dashboard-zoom:v1", "1.35");
     expect(readStoredZoom()).toBe(1.35);
   });
 
   it("存档是坏字符串 / 越界值 → 回默认，不抛错", () => {
-    window.localStorage.setItem("patina:dashboard-zoom:v1", "abc");
+    window.localStorage.setItem("activity:dashboard-zoom:v1", "abc");
     expect(readStoredZoom()).toBe(1);
-    window.localStorage.setItem("patina:dashboard-zoom:v1", "50");
+    window.localStorage.setItem("activity:dashboard-zoom:v1", "50");
     expect(readStoredZoom()).toBe(2);
   });
 });

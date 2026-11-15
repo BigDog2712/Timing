@@ -1,12 +1,12 @@
 import type { View } from "../types/view";
 import {
-  readBrowserStorage,
-  removeBrowserStorage,
-  writeBrowserStorage,
-} from "../../platform/browser/browserStorageGateway.ts";
+  readActivityKey,
+  removeActivityKey,
+  writeActivityKey,
+} from "../../../shared/activityStorageKeys";
 
-const LAST_ACTIVE_VIEW_KEY = "patina:last-active-view";
-const PENDING_UPDATE_RELAUNCH_VIEW_KEY = "patina:pending-update-relaunch-view";
+/* [T04-4] 键名从注册表取（老键字面量只住 activityStorageKeys.ts）；读写走出口（先过迁移闸）。
+   `pendingUpdateRelaunchView` 是唯一 transient 槽：消费即删（只删当前键，老键永不碰）。 */
 
 function isView(value: string | null): value is View {
   /* [T04] "tools" 已从 View 联合移除：旧会话存的 "tools" 在这里自然判非法，
@@ -20,29 +20,29 @@ function isView(value: string | null): value is View {
 }
 
 export function rememberLastActiveView(view: View) {
-  writeBrowserStorage(LAST_ACTIVE_VIEW_KEY, view);
+  writeActivityKey("lastActiveView", view);
 }
 
 export function readLastActiveView(): View | null {
-  const storedView = readBrowserStorage(LAST_ACTIVE_VIEW_KEY);
+  const storedView = readActivityKey("lastActiveView");
   return isView(storedView) ? storedView : null;
 }
 
 export function markPendingUpdateRelaunchViewRestore() {
-  writeBrowserStorage(PENDING_UPDATE_RELAUNCH_VIEW_KEY, "1");
+  writeActivityKey("pendingUpdateRelaunchView", "1");
 }
 
 export function clearPendingUpdateRelaunchViewRestore() {
-  removeBrowserStorage(PENDING_UPDATE_RELAUNCH_VIEW_KEY);
+  removeActivityKey("pendingUpdateRelaunchView");
 }
 
 export function consumePendingUpdateRelaunchView(): View | null {
-  const pendingValue = readBrowserStorage(PENDING_UPDATE_RELAUNCH_VIEW_KEY);
+  const pendingValue = readActivityKey("pendingUpdateRelaunchView");
 
   if (pendingValue !== "1") {
     return null;
   }
 
-  removeBrowserStorage(PENDING_UPDATE_RELAUNCH_VIEW_KEY);
+  removeActivityKey("pendingUpdateRelaunchView");
   return readLastActiveView();
 }

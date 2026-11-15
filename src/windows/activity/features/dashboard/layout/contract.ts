@@ -17,6 +17,8 @@
  * 卡片按 `uid` 标识，不再按「类型唯一」：同一个组件可以放多张，各自有位置/尺寸/标题。
  * 唯一性只剩两条：`uid` 不重复；**同类型可以多张**（加卡弹层不拦重复）。
  */
+import { activityKeyOf } from "../../../../shared/activityStorageKeys";
+
 export const CARD_IDS = [
   "timer",
   "apps",
@@ -176,8 +178,9 @@ export interface DashboardLayout {
 }
 
 export const LAYOUT_VERSION = 3;
-/** v3 换新键：v2 的 `x` 是列号，与 v3 的像素混读会把卡片叠到一起。 */
-export const LAYOUT_STORAGE_KEY = "patina:dashboard-layout:v3";
+/** v3 换新键：v2 的 `x` 是列号，与 v3 的像素混读会把卡片叠到一起。
+ *  [T04-4] 键名来自注册表——老键字面量只住 activityStorageKeys.ts（判据 1）。 */
+export const LAYOUT_STORAGE_KEY = activityKeyOf("boardLayout");
 
 export function specOf(kind: CardKind): KindSpec {
   return KIND_SPECS[kind];

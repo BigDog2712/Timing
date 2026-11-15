@@ -166,7 +166,7 @@ describe('M-4 · 存储抛异常 ⇒ failed 计数、绝不抛出', () => {
       super(seed);
     }
 
-    getItem(key: string): string | null {
+    override getItem(key: string): string | null {
       if (this.failOnGet(key)) throw new Error('storage denied');
       return super.getItem(key);
     }
@@ -177,12 +177,16 @@ describe('M-4 · 存储抛异常 ⇒ failed 计数、绝不抛出', () => {
     const seed: Record<string, string> = {};
     for (let i = 0; i < 5; i += 1) seed[`patina:key-${i}`] = `v${i}`;
     const storage = new ThrowingStorage(seed, (key) => key === 'patina:key-2');
-    let report: ReturnType<typeof migrateActivityStorage> | null = null;
-    expect(() => {
+    /* try/catch 而不是 expect(fn).not.toThrow()：闭包赋值会被 TS 收窄成 never（TS5.5+），
+     * 且异常本身要被显式再抛——迁移吞错绝不等于测试吞错。 */
+    let report: ReturnType<typeof migrateActivityStorage>;
+    try {
       report = migrateActivityStorage(slots, storage as unknown as Storage);
-    }).not.toThrow();
-    expect(report?.failed).toBe(1);
-    expect(report?.copied).toBe(4);
+    } catch (error) {
+      throw new Error(`migrateActivityStorage threw: ${String(error)}`);
+    }
+    expect(report.failed).toBe(1);
+    expect(report.copied).toBe(4);
     expect(storage.getItem('activity:key-2')).toBeNull();
   });
 
@@ -215,7 +219,7 @@ describe('M-10a · 中断安全：任一中断点，有老值的键仍能读出'
       super(seed);
     }
 
-    setItem(key: string, value: string): void {
+    override setItem(key: string, value: string): void {
       this.writes += 1;
       if (this.writes > this.failAfterWrites) throw new Error('interrupted');
       super.setItem(key, value);
@@ -229,11 +233,13 @@ describe('M-10a · 中断安全：任一中断点，有老值的键仍能读出'
       const seed: Record<string, string> = {};
       for (let i = 0; i < 20; i += 1) seed[`patina:key-${i}`] = `v${i}`;
       const storage = new InterruptingStorage(seed, failAfter);
-      let report: ReturnType<typeof migrateActivityStorage> | null = null;
-      expect(() => {
+      let report: ReturnType<typeof migrateActivityStorage>;
+      try {
         report = migrateActivityStorage(slots, storage as unknown as Storage);
-      }).not.toThrow();
-      expect(report?.failed).toBeGreaterThan(0);
+      } catch (error) {
+        throw new Error(`中断点 ${failAfter} · migrateActivityStorage threw: ${String(error)}`);
+      }
+      expect(report.failed).toBeGreaterThan(0);
       for (let i = 0; i < 20; i += 1) {
         const readable = storage.getItem(`activity:key-${i}`) ?? storage.getItem(`patina:key-${i}`);
         expect(readable, `中断点 ${failAfter} · 槽 ${i}`).toBe(`v${i}`);

@@ -22,12 +22,13 @@ import {
   useState,
   type RefObject,
 } from "react";
+/* [T04-4] 存储访问走共享层读写出口（先过迁移闸）；键名在注册表（boardZoom 槽）。 */
+import { readActivityKey, writeActivityKey } from "../../../../shared/activityStorageKeys";
 
 export const MIN_ZOOM = 0.5;
 export const MAX_ZOOM = 2;
 export const DEFAULT_ZOOM = 1;
 
-const ZOOM_STORAGE_KEY = "patina:dashboard-zoom:v1";
 /** 滚轮灵敏度：deltaY 乘上它再取 e 的幂，正负两个方向的手感对称 */
 const WHEEL_SENSITIVITY = 0.0015;
 const KEY_STEP = 0.1;
@@ -43,7 +44,7 @@ export function clampZoom(value: number): number {
 
 export function readStoredZoom(): number {
   try {
-    const raw = window.localStorage.getItem(ZOOM_STORAGE_KEY);
+    const raw = readActivityKey("boardZoom");
     if (!raw) return DEFAULT_ZOOM;
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? clampZoom(parsed) : DEFAULT_ZOOM;
@@ -54,11 +55,7 @@ export function readStoredZoom(): number {
 }
 
 function writeStoredZoom(zoom: number): void {
-  try {
-    window.localStorage.setItem(ZOOM_STORAGE_KEY, String(zoom));
-  } catch {
-    /* 同上：落盘失败不影响当次缩放 */
-  }
+  writeActivityKey("boardZoom", String(zoom));
 }
 
 interface ZoomAnchor {
