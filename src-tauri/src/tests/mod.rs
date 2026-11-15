@@ -39,7 +39,7 @@ mod daily_status;
 mod data_root_pointer;
 mod data_root_transfer;
 /* [数据根搬迁] 活动库必须跟着搬 + 搬完之后不许再导一次（「已处理过」标记 / 指针闸）。
-   桌面独占：导入走 `app::patina_seed`，那是 WebView2 侧的子系统。 */
+   桌面独占：导入走 `app::legacy_import`，那是 WebView2 侧的子系统。 */
 #[cfg(desktop)]
 mod data_root_transfer_activity;
 #[cfg(desktop)]

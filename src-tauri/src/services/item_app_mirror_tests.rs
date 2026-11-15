@@ -41,7 +41,7 @@ pub(super) async fn fixture() -> (SqlitePool, SqlitePool) {
     let business = single().await;
     crate::infra::migrate::migrate(&business).await.unwrap();
     let kv = single().await;
-    crate::services::insight::data::sqlite_pool::prepare_pool_schema(&kv, Path::new(":memory:"))
+    crate::services::activity::data::sqlite_pool::prepare_pool_schema(&kv, Path::new(":memory:"))
         .await
         .unwrap();
     (business, kv)

@@ -5,7 +5,7 @@
  *
  * `app_key` 是活动库的**生成列**（`sessions.app_key`）、也是 `app_category` / `item_app`
  * 两张表的主键之一。Rust 侧唯一实现是
- * `models::insight::activity_read_model::normalize_app_key`；前端若自己"顺手 lowercase 一下"
+ * `models::activity::activity_read_model::normalize_app_key`；前端若自己"顺手 lowercase 一下"
  * 就绑不上库里的行 —— 症状是「我在设置里明明绑了 Chrome，切过去就是不计时」，两端日志干净。
  *
  * 所以这里只有一份实现，并且 `appKey.test.ts` 用 source test 把 Rust 那侧的关键分支逐条

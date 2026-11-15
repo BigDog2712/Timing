@@ -131,7 +131,7 @@ describe("readActiveWindowProcessId", () => {
 
   /* 路径必须走变量（Vite 静态改写字面量 URL，见主判据文件 ab04 的注释） */
   it("bw02_事件载荷字段名对照_Rust_WindowInfo_钉住", () => {
-    const rustRel = "../../../../src-tauri/src/infra/insight/windows/foreground.rs";
+    const rustRel = "../../../../src-tauri/src/infra/activity/windows/foreground.rs";
     const rust = readFileSync(new URL(rustRel, import.meta.url), "utf8");
     expect(rust).toContain("pub struct WindowInfo");
     expect(rust).toContain("pub process_id: u32");

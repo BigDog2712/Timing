@@ -18,11 +18,11 @@
 //! 错误口径沿用 insight 读命令的 `CommandErrorDto`（`SQLITE_UNAVAILABLE` 可重试 /
 //! `SqliteOperationError` 收口），不走 `AppError`：不新增错误码。
 
-use crate::commands::insight::error::CommandErrorDto;
+use crate::commands::activity::error::CommandErrorDto;
 use crate::models::category_catalog::{CategoryCatalogDto, CategorySettingRow};
-use crate::services::insight::data::sqlite_error::SqliteOperationError;
-use crate::services::insight::data::sqlite_pool::wait_for_sqlite_pool;
-use crate::services::insight::data::repositories::settings;
+use crate::services::activity::data::sqlite_error::SqliteOperationError;
+use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
+use crate::services::activity::data::repositories::settings;
 use tauri::{AppHandle, Runtime};
 
 /// 六组前缀。新增前缀必须同批改前端 `categoryCatalog.ts` 的 `CATALOG_PREFIXES`。

@@ -32,8 +32,8 @@ use std::sync::Arc;
 use windows::Win32::Foundation::{HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
 use windows::Win32::System::Threading::{OpenProcess, WaitForSingleObject, PROCESS_SYNCHRONIZE};
 
-use crate::infra::insight::windows::foreground;
-use crate::infra::insight::windows::handles::OwnedHandle;
+use crate::infra::activity::windows::foreground;
+use crate::infra::activity::windows::handles::OwnedHandle;
 
 use super::WatchRegistry;
 

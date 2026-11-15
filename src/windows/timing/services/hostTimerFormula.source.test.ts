@@ -26,8 +26,8 @@ function readSrc(rel: string): string {
 }
 
 const HOST_TICK = readSrc('../hooks/useTimerTick.ts');
-const ANALYSIS_GATEWAY = readSrc('../../patina/platform/runtime/hostTimerGateway.ts');
-const ANALYSIS_HOOK = readSrc('../../patina/shell/hooks/useHostTimerState.ts');
+const ANALYSIS_GATEWAY = readSrc('../../activity/platform/runtime/hostTimerGateway.ts');
+const ANALYSIS_HOOK = readSrc('../../activity/shell/hooks/useHostTimerState.ts');
 
 /** 把两侧的差异（变量名）抹平后应当逐字相等的那一行。 */
 const SHARED_EXPRESSION = 'return base + (deltaMs > 0 ? Math.floor(deltaMs / 1000) : 0);';

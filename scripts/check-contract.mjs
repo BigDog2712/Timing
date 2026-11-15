@@ -50,11 +50,11 @@ function typesSource() {
  * 命令表在 `src-tauri/src/ipc_commands.rs`（V0.12.0 融合 Patina 时从 `lib.rs` 拆出：
  * 宿主 84 条 + insight 118 条，一张 `generate_handler!` 内）。这里只取**宿主**那一段
  * （`crate::commands::…`，且模块名不得是 `insight`）——insight 的命令由
- * `src/windows/patina/shell/**` `src/windows/patina/features/**` 等前端自己调用，不进 `ipc.ts` / `IpcApi` /
+ * `src/windows/activity/shell/**` `src/windows/activity/features/**` 等前端自己调用，不进 `ipc.ts` / `IpcApi` /
  * `browserMock` 这套宿主契约。
  *
- * 负向断言 `(?!insight::)` 是必需的：insight 归一后路径变成
- * `crate::commands::insight::<模块>::<函数>`，没有它就会把模块名当命令名捕获，
+ * 负向断言 `(?!activity::)` 是必需的：insight 归一后路径变成
+ * `crate::commands::activity::<模块>::<函数>`，没有它就会把模块名当命令名捕获，
  * 宿主集合从 80 变成 197 个垃圾项而 `cargo check` 全绿 —— 纯契约层的静默失效。
  */
 function rustCommands() {
@@ -62,15 +62,15 @@ function rustCommands() {
   if (!src.includes('generate_handler![')) {
     throw new Error('ipc_commands.rs 里找不到 generate_handler![...]');
   }
-  return new Set([...src.matchAll(/crate::commands::(?!insight::)(\w+)::(\w+)/g)].map((m) => m[2]));
+  return new Set([...src.matchAll(/crate::commands::(?!activity::)(\w+)::(\w+)/g)].map((m) => m[2]));
 }
 
 /** 分析窗（原 Patina，vendored 子系统）注册的命令，用于「不许与宿主重名」这一条。
- *  归一后多一层嵌套（`commands::insight::<模块>::<函数>`），单独解析。此数只进摘要、不做断言
+ *  归一后多一层嵌套（`commands::activity::<模块>::<函数>`），单独解析。此数只进摘要、不做断言
  *  （V0.12.2 起 118 条：新增 `cmd_get_activity_daily_totals`）；真正的硬断言是「与宿主不重名」。 */
 function patinaCommands() {
   const src = read('src-tauri/src/ipc_commands.rs');
-  return new Set([...src.matchAll(/crate::commands::insight::(\w+)::(\w+)/g)].map((m) => m[2]));
+  return new Set([...src.matchAll(/crate::commands::activity::(\w+)::(\w+)/g)].map((m) => m[2]));
 }
 
 /** 2. IpcApi 接口方法 */
@@ -140,7 +140,7 @@ function feEvents(types) {
  * 常量放 `models/insight/` 而不是文档原写的 `app/insight/`：5 层都有 emit 点，
  * 放装配层会让 infra / services 反向依赖 app，而 `app/mod.rs` 明文禁止。 */
 function insightRustEvents() {
-  const p = 'src-tauri/src/models/insight/events.rs';
+  const p = 'src-tauri/src/models/activity/events.rs';
   if (!existsSync(join(root, p))) return new Map();
   const map = new Map();
   for (const m of read(p).matchAll(/pub const (\w+): &str = "([^"]+)"/g)) map.set(m[1], m[2]);
@@ -255,7 +255,7 @@ const { values: emitted, literals } = emitSites(byName);
 /* emit 点计数期望值。
  * 17 → 18 的唯一原因是 `app/insight/tool_notifications.rs` 的 7 处
  * `.emit(CHANGED, ())` 从 import 别名换成了可解析的
- * `crate::models::insight::events::TOOL_PRESENTATION_CHANGED`：
+ * `crate::models::activity::events::TOOL_PRESENTATION_CHANGED`：
  * `insightRustEvents()` 只解析 `pub const`，别名解析不出来，于是这 7 个发射点
  * 此前对契约不可见。**不是新增事件，只是把原本就存在的发射点重新纳入统计。** */
 const EXPECTED_EMIT_SITES = 18;

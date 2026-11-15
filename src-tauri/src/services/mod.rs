@@ -16,10 +16,10 @@ mod bound_process_watch_win_tests;
 /* [0.13.x] 本机身份（install_id）的落盘读写 + 进程级缓存 + 本地日键。
    跨平台：计时事件流（`repositories::timer_ops`）在两端都要写 `device_id`，
    而原先的实现藏在 `insight`（`#[cfg(desktop)]`）里，手机端够不着。
-   `insight::schema_core::device` 留了转发壳，老调用点不变。 */
+   `activity::schema_core::device` 留了转发壳，老调用点不变。 */
 pub mod identity;
 /* [0.12.2] 设备维度的**启动接线**（认领哨兵行 / 标记本机）。桌面独占 —— 它依赖
-   `services::insight::schema_core`，而 `insight` 整体是 `#[cfg(desktop)]`。 */
+   `services::activity::schema_core`，而 `activity` 整体是 `#[cfg(desktop)]`。 */
 #[cfg(desktop)]
 pub mod device;
 /* 设备维度的启动判据（认领哨兵行 / 发 uid / 四张 uid 表全覆盖）。拆出来是因为
@@ -95,4 +95,4 @@ pub mod todo_start;
    二者互相引用（16 / 32 次），必须同层；详见 docs/refactor/patina-structural-merge.md §1.2。 */
 #[cfg(desktop)]
 #[allow(dead_code)]
-pub mod insight;
+pub mod activity;

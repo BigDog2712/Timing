@@ -41,7 +41,7 @@ pub async fn stats_summary(
     #[cfg(desktop)]
     {
         let (start, end) = activity_window(from, to);
-        summary.activity = crate::app::patina_bridge::activity_summary(start, end, ACTIVITY_LIMIT).await;
+        summary.activity = crate::app::activity_bridge::activity_summary(start, end, ACTIVITY_LIMIT).await;
     }
     Ok(summary)
 }

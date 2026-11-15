@@ -13,7 +13,7 @@
 //!
 //! 真机版本的同一件事在 `tests::bundle_real_data`（`#[ignore]`，本机手动跑）。
 
-use crate::services::insight::data::bundle::{export_full_bundle, import_full_bundle};
+use crate::services::activity::data::bundle::{export_full_bundle, import_full_bundle};
 use crate::tests::bundle::activity_pool;
 use crate::tests::support;
 use std::path::PathBuf;

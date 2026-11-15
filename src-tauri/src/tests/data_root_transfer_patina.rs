@@ -22,7 +22,7 @@ use std::path::Path;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::SqlitePool;
 
-use crate::app::patina_seed;
+use crate::app::legacy_import;
 use crate::infra::db;
 use crate::infra::root_pointer;
 use crate::services::data_root::transfer;
@@ -45,7 +45,7 @@ const INSERT_SESSION: &str =
 /// `wal = true` 时切 WAL 且不 checkpoint：搬迁命令被点下去那一刻，分析窗与活动库的池正
 /// 是这个状态，`-wal` 里躺着还没并进主文件的帧。
 ///
-/// 表结构只留这几列：`patina_bridge::ACTIVITY_SQL` 用到的那几列才是这份数据被读的方式，
+/// 表结构只留这几列：`activity_bridge::ACTIVITY_SQL` 用到的那几列才是这份数据被读的方式，
 /// 这里是**搬迁**用例，不需要复刻上游全表。
 pub(super) async fn open_activity_db(path: &Path, rows: i64, wal: bool) -> SqlitePool {
     let mut options = SqliteConnectOptions::new()
@@ -113,7 +113,7 @@ async fn root_with_activity(tag: &str) -> (std::path::PathBuf, SqlitePool) {
     let activity = dir.join("patina").join("data");
     std::fs::create_dir_all(&activity).expect("建 patina/data");
     write_activity_db(&activity.join("patina.db"), 1).await;
-    std::fs::write(activity.join(patina_seed::IMPORT_MARKER), b"imported\n").expect("写标记");
+    std::fs::write(activity.join(legacy_import::IMPORT_MARKER), b"imported\n").expect("写标记");
     /* WebView2 的用户数据目录：切换时正被窗口占着，搬它只会拿到一批被锁的文件。 */
     let cache = dir.join("patina").join("webview").join("Cache");
     std::fs::create_dir_all(&cache).expect("建缓存目录");
@@ -143,7 +143,7 @@ async fn moving_the_root_carries_the_activity_database() {
         "旧目录不删（用户重启确认没问题之后自己删）"
     );
     assert!(
-        dest.join("patina/data").join(patina_seed::IMPORT_MARKER).is_file(),
+        dest.join("patina/data").join(legacy_import::IMPORT_MARKER).is_file(),
         "「已处理过」标记必须跟着活动数据一起走，否则新位置等于从没导入过"
     );
     assert!(
@@ -164,7 +164,7 @@ fn marker_blocks_the_first_run_import_even_when_the_library_is_missing() {
     let root = support::unique_dir("patina-marker");
     let data_dir = root.join("patina").join("data");
     std::fs::create_dir_all(&data_dir).expect("建 data");
-    std::fs::write(data_dir.join(patina_seed::IMPORT_MARKER), b"imported\n").expect("写标记");
+    std::fs::write(data_dir.join(legacy_import::IMPORT_MARKER), b"imported\n").expect("写标记");
     let upstream = root.join("upstream").join("patina.db");
     std::fs::create_dir_all(root.join("upstream")).expect("建 upstream 目录");
     block_on(write_activity_db(&upstream, 2));
@@ -174,7 +174,7 @@ fn marker_blocks_the_first_run_import_even_when_the_library_is_missing() {
         "源库必须是一份真库：否则「没复制」证明不了是标记拦住的"
     );
 
-    let outcome = patina_seed::seed_from(&data_dir, None, Some(&upstream)).expect("不该失败");
+    let outcome = legacy_import::seed_from(&data_dir, None, Some(&upstream)).expect("不该失败");
 
     assert!(outcome.is_none(), "标记在 = 已处理过，不许再导一次");
     assert!(
@@ -195,7 +195,7 @@ fn first_run_import_copies_the_upstream_database_and_writes_the_marker() {
     std::fs::create_dir_all(root.join("upstream")).expect("建 upstream 目录");
     block_on(write_activity_db(&upstream, 2));
 
-    let target = patina_seed::seed_from(&data_dir, None, Some(&upstream))
+    let target = legacy_import::seed_from(&data_dir, None, Some(&upstream))
         .expect("首启导入应成功")
         .expect("第一次必须要导");
     assert_eq!(target, data_dir.join("patina.db"));
@@ -205,7 +205,7 @@ fn first_run_import_copies_the_upstream_database_and_writes_the_marker() {
         "导过来的是源库那份历史"
     );
     assert!(
-        data_dir.join(patina_seed::IMPORT_MARKER).is_file(),
+        data_dir.join(legacy_import::IMPORT_MARKER).is_file(),
         "导完必须写标记"
     );
     assert!(upstream.is_file(), "源库只读，不许动它");
@@ -213,7 +213,7 @@ fn first_run_import_copies_the_upstream_database_and_writes_the_marker() {
     /* 第二次：源里又多了几行，标记在 → 既不再导，也不许覆盖已经有的那份。 */
     block_on(write_activity_db(&upstream, 3));
     assert!(
-        patina_seed::seed_from(&data_dir, None, Some(&upstream))
+        legacy_import::seed_from(&data_dir, None, Some(&upstream))
             .expect("第二次不该失败")
             .is_none(),
         "标记在时第二次必须是 None"
@@ -228,12 +228,12 @@ fn first_run_import_copies_the_upstream_database_and_writes_the_marker() {
     let fresh = root.join("patina2").join("data");
     std::fs::create_dir_all(&fresh).expect("建 data");
     assert!(
-        patina_seed::seed_from(&fresh, None, None)
+        legacy_import::seed_from(&fresh, None, None)
             .expect("没有源不该失败")
             .is_none()
     );
     assert!(
-        fresh.join(patina_seed::IMPORT_MARKER).is_file(),
+        fresh.join(legacy_import::IMPORT_MARKER).is_file(),
         "没有源也要写标记"
     );
     std::fs::remove_dir_all(&root).ok();
@@ -262,7 +262,7 @@ fn pointer_present_blocks_the_first_run_import_without_writing_the_marker() {
     root_pointer::write(&appdata, "/some/custom/root", None).expect("写指针");
 
     let outcome =
-        patina_seed::seed_from(&data_dir, Some(&appdata), Some(&upstream)).expect("不该失败");
+        legacy_import::seed_from(&data_dir, Some(&appdata), Some(&upstream)).expect("不该失败");
 
     assert!(
         outcome.is_none(),
@@ -273,7 +273,7 @@ fn pointer_present_blocks_the_first_run_import_without_writing_the_marker() {
         "指针在时一个字节都不该落盘"
     );
     assert!(
-        !data_dir.join(patina_seed::IMPORT_MARKER).is_file(),
+        !data_dir.join(legacy_import::IMPORT_MARKER).is_file(),
         "指针闸拉下时连标记都不写：用户把根挪回默认位置后，首启导入该还能正常工作"
     );
     std::fs::remove_dir_all(&root).ok();

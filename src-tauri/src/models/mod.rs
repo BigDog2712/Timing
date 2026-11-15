@@ -51,4 +51,4 @@ pub mod usage;
 /* 分析窗的领域类型（原 patina/domain，出边 0 的纯叶子）。 */
 #[cfg(desktop)]
 #[allow(dead_code)]
-pub mod insight;
+pub mod activity;

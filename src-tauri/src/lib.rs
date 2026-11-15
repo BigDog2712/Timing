@@ -71,7 +71,7 @@ pub fn run() {
     父进程只看到 `last_error=cooldown`，症状是「活动追踪永久 stalled、采样数恒为 0」，
     且全链路无任何报错。上游写在 `lib.rs::run()` 第一行，融合时漏搬了这一条。 */
     #[cfg(desktop)]
-    if let Some(exit_code) = crate::infra::insight::windows::native_probe::run_if_requested() {
+    if let Some(exit_code) = crate::infra::activity::windows::native_probe::run_if_requested() {
         std::process::exit(exit_code);
     }
 
@@ -163,9 +163,9 @@ pub fn run() {
     /* Patina 子系统接入（状态 + 插件）。它自己的自启 / 通知 / 单实例注册已在上游
     `configure` 里摘掉——同一进程只能有一份，宿主的在上面。 */
     #[cfg(desktop)]
-    let builder = crate::app::insight::bootstrap::configure(
+    let builder = crate::app::activity::bootstrap::configure(
         builder,
-        crate::app::insight::bootstrap::BootstrapInput {
+        crate::app::activity::bootstrap::BootstrapInput {
             app_version: ctx.package_info().version.to_string(),
         },
     );
@@ -190,10 +190,10 @@ pub fn run() {
         `identifier` 是给「数据根是不是用户显式选的」那道闸用的（指针文件在
         `%APPDATA%\<identifier>` 下）。 */
         let identifier = app.config().identifier.clone();
-        if let Err(err) = app::patina_bridge::prepare(&identifier) {
+        if let Err(err) = app::activity_bridge::prepare(&identifier) {
             crate::log_warn!("patina: data preparation failed: {err}");
         }
-        crate::app::insight::bootstrap::setup(app, false)?;
+        crate::app::activity::bootstrap::setup(app, false)?;
         Ok(())
     });
 
@@ -205,7 +205,7 @@ pub fn run() {
     顺序无依赖（宿主那条只在 `CloseRequested` 上作动作，Patina 侧不消费该分支）。 */
     #[cfg(desktop)]
     let builder = builder.on_window_event(|window, event| {
-        crate::app::insight::bootstrap::on_window_event(window, event);
+        crate::app::activity::bootstrap::on_window_event(window, event);
         infra::window::on_window_event(window, event);
     });
 
@@ -225,7 +225,7 @@ pub fn run() {
     };
 
     #[cfg(desktop)]
-    application.run(crate::app::insight::bootstrap::handle_run_event);
+    application.run(crate::app::activity::bootstrap::handle_run_event);
     #[cfg(mobile)]
     application.run(|_handle, _event| {});
 }

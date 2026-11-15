@@ -51,7 +51,7 @@ function stripComments(source: string): string {
 }
 
 const DELIVER = sliceBalanced(
-  stripComments(read('src-tauri/src/app/insight/main_window/tools_navigation.rs')),
+  stripComments(read('src-tauri/src/app/activity/main_window/tools_navigation.rs')),
   'fn deliver<R: Runtime>(',
 );
 

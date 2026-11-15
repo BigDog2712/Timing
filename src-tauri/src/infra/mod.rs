@@ -72,4 +72,4 @@ pub mod window_spec;
 /* 分析窗的平台适配（原 patina/platform：路径 / 凭据 / WebDAV / 存储控制 / Win32）。 */
 #[cfg(desktop)]
 #[allow(dead_code)]
-pub mod insight;
+pub mod activity;

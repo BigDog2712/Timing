@@ -47,7 +47,7 @@ describe("normalizeAppKey · 行为", () => {
 });
 
 describe("normalizeAppKey · 与 Rust 实现逐字一致（source test）", () => {
-  const rustPath = "../../../src-tauri/src/models/insight/activity_read_model.rs";
+  const rustPath = "../../../src-tauri/src/models/activity/activity_read_model.rs";
 
   it("ak07_归一函数仍在_documented_位置_且分支与前端一致", () => {
     const source = readFileSync(new URL(rustPath, import.meta.url), "utf8");

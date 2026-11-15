@@ -9,14 +9,14 @@
  * 渲染表单。放在 features 里会让 platform 反向 import features（L10 红），放在 platform 里
  * 则反过来。`shared/` 是唯一两侧都能引、方向一致朝下的位置。
  * `features/settings/services/host/hostTypes.ts` 保留一条 `export *` 转发壳，既有引用零改动。
- * 先例是 `src/windows/patina/shared/theme/hostAccentBridge.ts`：把宿主形状镜像过来，
+ * 先例是 `src/windows/activity/shared/theme/hostAccentBridge.ts`：把宿主形状镜像过来，
  * 注释里写死「改一处两处同改」——本文件同一口径。
  *
  * 与 Rust 的对应关系没有变：`src-tauri/src/models/md_sync*.rs` / `plugin.rs` / `data_root.rs`
  * 仍是唯一真相；本文件只是把**同一份 serde 形状**用 TS 再声明一次。字段名与可空性必须
  * 与 `src/types/domain/` 逐字一致，否则症状是「保存成功但回读缺字段」这类零日志问题。
  *
- * 校验：`grep -rn "from [\"'].*types/domain" src/windows/patina/` 必须 0 命中（本文件是
+ * 校验：`grep -rn "from [\"'].*types/domain" src/windows/activity/` 必须 0 命中（本文件是
  * 唯一豁免，它不 import 任何东西）。
  */
 

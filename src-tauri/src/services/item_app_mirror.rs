@@ -14,7 +14,7 @@
 //!
 //! ## 两个库（这一条写错过一次，别再写错）
 //!
-//! 配置表在**分析窗自己的库**（`patina.db`，见 `infra::insight::storage_paths::
+//! 配置表在**分析窗自己的库**（`patina.db`，见 `infra::activity::storage_paths::
 //! SQLITE_DB_FILE_NAME`），`item_app` 在**业务库**（`timing.db`，`db::init_pool`）。
 //! 两个文件、两个 `SqlitePool`。拿业务池去读配置表的症状是**恒空 + 全绿**：
 //! `get_all` 在 timing.db 的 `settings` 表上查不到任何 `__app_item_binding::%`，
@@ -55,14 +55,14 @@
 //! `commands/`）。代价是 md 同步要等下一次用户写入才看到这批绑定 —— 值得：绑定是派生
 //! 事实，而在启动期打同步信号会让「刚开机就全量重扫」变成常态。
 //!
-//! 桌面独占：`app_key` 的归一实现（`models::insight::activity_read_model::normalize_app_key`）
+//! 桌面独占：`app_key` 的归一实现（`models::activity::activity_read_model::normalize_app_key`）
 //! 与分析窗配置表都只在桌面存在；手机端没有前台窗口这条链路，也没有消费者。
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use sqlx::SqlitePool;
 
-use crate::models::insight::activity_read_model::normalize_app_key;
+use crate::models::activity::activity_read_model::normalize_app_key;
 use crate::repositories::settings as settings_repo;
 use crate::services::item_app;
 
@@ -183,14 +183,14 @@ pub async fn mirror(business: &SqlitePool, kv: &SqlitePool) -> Result<MirrorRepo
 /// 同步等一次库往返没必要，而失败只记日志这条通路也不值得让它挡住窗口创建。
 ///
 /// **为什么分析窗库要 `wait_for_sqlite_pool` 而不是 `app.state()`**：
-/// `app::bootstrap::setup` 先于 `services::insight::bootstrap::setup`（`lib.rs` 的顺序），
+/// `app::bootstrap::setup` 先于 `services::activity::bootstrap::setup`（`lib.rs` 的顺序），
 /// 到这里分析窗的池**通常还没建**。`wait_for_sqlite_pool` 每 100ms 重试、最多 30s
 /// （`sqlite_pool.rs:726`），拿不到就只记一条 warn 放弃 —— 下一次启动还会再来。
 pub fn mirror_on_boot<R: tauri::Runtime>(app: &tauri::AppHandle<R>, business: &SqlitePool) {
     let app = app.clone();
     let business = business.clone();
     tauri::async_runtime::spawn(async move {
-        let kv = match crate::services::insight::data::sqlite_pool::wait_for_sqlite_pool(&app).await {
+        let kv = match crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool(&app).await {
             Ok(pool) => pool,
             Err(err) => {
                 crate::log_warn!("item_app 启动补镜像：分析窗库未就绪（{err}）");

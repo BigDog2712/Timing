@@ -34,7 +34,7 @@ function readCode(rel: string): string {
     .replace(/^\s*\/\/.*$/gm, '');
 }
 
-const SEGMENT = readCode('../../patina/shared/components/QuietTimelineTrack.tsx');
+const SEGMENT = readCode('../../activity/shared/components/QuietTimelineTrack.tsx');
 
 describe('不传 onActivate 时，段仍是纯展示 span（既有三处用法零回归）', () => {
   it('activation_props_are_ternary_on_onActivate_not_unconditional', () => {

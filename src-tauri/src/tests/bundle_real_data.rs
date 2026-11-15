@@ -10,12 +10,12 @@
 //!
 //! 缺库就安静跳过（CI / 新机器没有 `%APPDATA%\com.timing.app`）。
 
-use crate::services::insight::data::bundle::{export_full_bundle, inspect_file};
+use crate::services::activity::data::bundle::{export_full_bundle, inspect_file};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Pool, Sqlite};
 use std::path::{Path, PathBuf};
 
-/// 与 `services::insight::data::bundle` 的两张清单逐字一致（那份是 `pub(crate)`，
+/// 与 `services::activity::data::bundle` 的两张清单逐字一致（那份是 `pub(crate)`，
 /// 这里抄一份是为了让断言「每张表都被处理过」自己就能读，不靠被测代码自证）。
 const BUSINESS_TABLES: &[&str] = &[
     "items",
@@ -152,7 +152,7 @@ async fn a_real_bundle_imports_into_a_fresh_database() {
     let fresh_business = crate::tests::support::fresh_pool("bundle-real-import").await;
     let fresh_activity = crate::tests::bundle::activity_pool("bundle-real-import-act").await.0;
     let result =
-        crate::services::insight::data::bundle::import_full_bundle(&fresh_business, &fresh_activity, &target)
+        crate::services::activity::data::bundle::import_full_bundle(&fresh_business, &fresh_activity, &target)
             .await;
     let result = match result {
         Ok(summary) => summary,
@@ -220,7 +220,7 @@ async fn a_real_bundle_imports_into_a_fresh_database() {
     /* 判据 ②（真机版）：同一份包再导一次 —— 一行不插、**一行不改**。
        「不改」这一半靠 uid 类表的「内容没变就不写」守卫：否则 touch 触发器会把
        每一行的 `updated_at_ms` 推到「现在」，1.5 万行全部变成脏行。 */
-    let second = crate::services::insight::data::bundle::import_full_bundle(
+    let second = crate::services::activity::data::bundle::import_full_bundle(
         &fresh_business,
         &fresh_activity,
         &target,

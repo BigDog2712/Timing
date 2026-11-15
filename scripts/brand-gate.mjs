@@ -59,8 +59,8 @@ const PATTERN = 'tickbar';
  * 范围就这两处：唯一的两张「用户可见文案表」（前端 i18n 资源数组 + Rust 原生文案表）。 */
 const NARROW_PATTERN = 'patina';
 const NARROW_SCOPES = [
-  'src/windows/patina/shared/i18n/generated/',
-  'src-tauri/src/models/insight/localization/generated.rs',
+  'src/windows/activity/shared/i18n/generated/',
+  'src-tauri/src/models/activity/localization/generated.rs',
 ];
 const ARCHIVE_DIRS = ['android-app/'];
 

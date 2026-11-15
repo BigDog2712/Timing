@@ -77,4 +77,4 @@ pub mod window_cmd;
 /* 分析窗的命令面（126 条，桌面独占；与宿主 90 条共用 `ipc_commands.rs` 的一张表）。 */
 #[cfg(desktop)]
 #[allow(dead_code)]
-pub mod insight;
+pub mod activity;

@@ -44,8 +44,8 @@ function sliceBalanced(source: string, marker: string): string {
 }
 
 const BRIDGE = read('src/windows/timing/services/hostIntentBridge.ts');
-const DIALOG = read('src/windows/patina/features/history/components/HistoryActivityActionDialog.tsx');
-const GATEWAY = read('src/windows/patina/platform/runtime/hostIntentGateway.ts');
+const DIALOG = read('src/windows/activity/features/history/components/HistoryActivityActionDialog.tsx');
+const GATEWAY = read('src/windows/activity/platform/runtime/hostIntentGateway.ts');
 const HOST_BRIDGE_ACL = read('src-tauri/permissions/patina-host-bridge.toml');
 
 describe('补记不碰计时状态机（P1-01 判据⑤）', () => {

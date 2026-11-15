@@ -150,7 +150,7 @@ fn on_menu_event(app: &AppHandle, id: &str) {
            （`open_settings` 走的是 pending 落点通道，先写 state 再 show，冷启动也落得对）。
            硬失败（窗口正在重建 / 还没就绪）不算用户操作失败 —— 再点一次托盘即可。 */
         tray_menu::ID_OPEN_SETTINGS => {
-            if let Err(err) = crate::app::insight::main_window::tools_navigation::open_settings(app) {
+            if let Err(err) = crate::app::activity::main_window::tools_navigation::open_settings(app) {
                 crate::log_warn!("open settings view failed: {err}");
             }
         }
@@ -164,9 +164,9 @@ fn on_menu_event(app: &AppHandle, id: &str) {
         show 请求交给它；`show_main_window` 返回 false 表示窗在重建或还没就绪，
         此时再点一次托盘即可，不当作错误上报。 */
         tray_menu::ID_OPEN_STATS => {
-            if !crate::app::insight::tray::show_main_window(
+            if !crate::app::activity::tray::show_main_window(
                 app,
-                crate::app::insight::main_window::MainWindowShowReason::TrayMenu,
+                crate::app::activity::main_window::MainWindowShowReason::TrayMenu,
             ) {
                 crate::log_warn!("patina main window is not ready yet; retry the tray item");
             }

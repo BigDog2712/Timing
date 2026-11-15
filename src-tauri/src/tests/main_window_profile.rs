@@ -13,9 +13,9 @@
 //! ⚠️ 注释里刻意不出现那个调用的完整字样（本项目的门禁/哨兵会扫到注释，`brand-gate` 扫
 //! 旧品牌名就踩过）：改注释时别把带前导点的写法补回去，否则这条哨兵会红在自己身上。
 
-const MAIN_WINDOW_RS: &str = include_str!("../app/insight/main_window.rs");
-const MINI_WINDOW_RS: &str = include_str!("../app/insight/mini_window/native.rs");
-const TOOL_NOTIFICATION_RS: &str = include_str!("../app/insight/tool_notifications/native.rs");
+const MAIN_WINDOW_RS: &str = include_str!("../app/activity/main_window.rs");
+const MINI_WINDOW_RS: &str = include_str!("../app/activity/mini_window/native.rs");
+const TOOL_NOTIFICATION_RS: &str = include_str!("../app/activity/tool_notifications/native.rs");
 const WINDOW_RS: &str = include_str!("../infra/window.rs");
 const TAURI_CONF: &str = include_str!("../../tauri.conf.json");
 

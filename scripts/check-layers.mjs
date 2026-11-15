@@ -7,7 +7,7 @@
  *
  *   L1 组件不得触碰传输层：`ipc.` / `invoke(` 在 src/components、src/app|features|shared
  *      下的 components/ 子目录中 0 命中
- *   L2 状态容器不得触碰传输层：src/stores、src/**\/*Store.ts、src/windows/patina/features/**\/stores 下 0 命中
+ *   L2 状态容器不得触碰传输层：src/stores、src/**\/*Store.ts、src/windows/activity/features/**\/stores 下 0 命中
  *   L3 窗口 API 只能经 `src/windows/shared/windowApi.ts`：全仓只有它 import
  *      `@tauri-apps/api/window` 或 `@tauri-apps/api/webviewWindow`
  *   L4 Rust `infra` 不得依赖 `services`（解环，见 ADR-016）
@@ -81,9 +81,9 @@ const inDirNamed = (rel, segment) => rel.split('/').slice(0, -1).includes(segmen
 /* [0.12.0 T04] 路径豁免已全部撤销：
  * Patina 已归一（T01–T03），没有「门禁不管」的代码。规则回到全仓统一口径。 */
 const L1_ROOTS = ['src/windows/timing/components/'];
-const L1_COMPONENT_ROOTS = ['src/windows/patina/shell/', 'src/windows/patina/features/', 'src/windows/patina/shared/'];
+const L1_COMPONENT_ROOTS = ['src/windows/activity/shell/', 'src/windows/activity/features/', 'src/windows/activity/shared/'];
 const L2_ROOTS = ['src/windows/timing/stores/'];
-const L2_FEATURE_STORES = 'src/windows/patina/features/';
+const L2_FEATURE_STORES = 'src/windows/activity/features/';
 const L2_SUFFIX = /(^|\/)[^/]*Store\.ts$/;
 
 const L3_ALLOWED = new Set(['src/windows/shared/windowApi.ts']);
@@ -105,7 +105,7 @@ const L9_MAIN_ROOTS = [
   'src/windows/timing/styles/',
   'src/windows/timing/types/',
 ];
-const L9_ANALYSIS_ROOTS = ['src/windows/patina/shell/', 'src/windows/patina/features/', 'src/windows/patina/platform/', 'src/windows/patina/shared/'];
+const L9_ANALYSIS_ROOTS = ['src/windows/activity/shell/', 'src/windows/activity/features/', 'src/windows/activity/platform/', 'src/windows/activity/shared/'];
 /* 允许被分析窗 import 的**主窗**模块。
  *
  * [0.12.1 共享层] 本表**已清空**。原来这里有 5 条（windowApi / handleCatalog / handleBindings /
@@ -282,17 +282,17 @@ scanWindowCross(L9_ANALYSIS_FILES, L9_MAIN_ROOTS, R.L9);
 const L10_LAYERS = [
   {
     name: 'platform',
-    roots: ['src/windows/patina/platform/'],
-    forbidden: ['src/windows/patina/features/', 'src/windows/patina/shell/'],
+    roots: ['src/windows/activity/platform/'],
+    forbidden: ['src/windows/activity/features/', 'src/windows/activity/shell/'],
     why: 'platform 是传输/平台能力层，只能依赖 shared 与主窗薄壳，不得反向依赖 features / shell',
   },
   {
     name: 'shared',
-    roots: ['src/windows/patina/shared/'],
+    roots: ['src/windows/activity/shared/'],
     forbidden: [
-      'src/windows/patina/features/',
-      'src/windows/patina/shell/',
-      'src/windows/patina/platform/',
+      'src/windows/activity/features/',
+      'src/windows/activity/shell/',
+      'src/windows/activity/platform/',
     ],
     why: 'shared 是纯数据/纯工具层，不得依赖 features / shell / platform（带上 invoke 就不再共享）',
   },
@@ -302,7 +302,7 @@ const L10_LAYERS = [
        两侧引用它等于隔着一层偷偷耦合。 */
     name: 'windows/shared',
     roots: ['src/windows/shared/'],
-    forbidden: ['src/windows/timing/', 'src/windows/patina/'],
+    forbidden: ['src/windows/timing/', 'src/windows/activity/'],
     why: '跨窗共享层不得反向依赖主窗或分析窗（否则退化成第三个窗，L9 的隔离被绕过）',
   },
 ];

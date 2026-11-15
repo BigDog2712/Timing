@@ -1,0 +1,27 @@
+use crate::infra::activity::windows::power::PowerLifecycleEvent;
+use crate::models::activity::events::POWER_LIFECYCLE_CHANGED;
+use tauri::{App, AppHandle, Listener, Manager, Runtime};
+
+pub(crate) fn register_power_lifecycle_handler<R: Runtime>(app: &App<R>) {
+    let app_handle = app.handle().clone();
+    app.listen(POWER_LIFECYCLE_CHANGED, move |event| {
+        let Ok(event) = serde_json::from_str::<PowerLifecycleEvent>(event.payload()) else {
+            crate::log_warn!("ignored malformed power lifecycle event");
+            return;
+        };
+        app_handle
+            .state::<crate::services::activity::engine::tracking::runtime_snapshot::TrackingRuntimeSnapshotState>()
+            .note_power_event(&event.state, event.timestamp_ms as i64);
+        let app_handle = app_handle.clone();
+        tauri::async_runtime::spawn(async move {
+            if let Err(error) = handle_power_lifecycle_event(app_handle).await {
+                crate::log_error!("power lifecycle handling failed: {error}");
+            }
+        });
+    });
+}
+
+pub async fn handle_power_lifecycle_event<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    let data = crate::services::activity::data::tracking_runtime::shared_from_app(&app).await?;
+    crate::services::activity::engine::tracking::runtime::handle_power_lifecycle_event(app, data.as_ref()).await
+}

@@ -6,7 +6,7 @@
 //!
 //! 不测的东西：UI 的按钮接线（前端 vitest 管）、`rfd` 弹窗（要真人点）。
 
-use crate::services::insight::data::bundle::{export_full_bundle, import_full_bundle, inspect_file};
+use crate::services::activity::data::bundle::{export_full_bundle, import_full_bundle, inspect_file};
 use crate::tests::support;
 use serde_json::Value;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};

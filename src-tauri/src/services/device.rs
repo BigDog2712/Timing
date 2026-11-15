@@ -43,7 +43,7 @@ pub async fn ensure_self(pool: &Pool<Sqlite>, install_id: &str) -> Result<(), St
     if !crate::services::identity::is_valid(install_id) {
         return Err(format!("invalid install id `{install_id}`"));
     }
-    let now_ms = crate::infra::insight::clock::unix_timestamp_millis_i64();
+    let now_ms = crate::infra::activity::clock::unix_timestamp_millis_i64();
     sqlx::query("UPDATE devices SET is_self = 0 WHERE is_self = 1 AND install_id <> ?1")
         .bind(install_id)
         .execute(pool)
@@ -73,7 +73,7 @@ pub async fn startup_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
     let install_id = crate::services::identity::remember_and_lock_install_id(
         crate::services::identity::load_install_id()?,
     );
-    let adopted = crate::services::insight::schema_core::adopt_local_rows(pool, &install_id).await?;
+    let adopted = crate::services::activity::schema_core::adopt_local_rows(pool, &install_id).await?;
     if adopted > 0 {
         crate::log_info!("adopted {adopted} local activity row(s) into device {install_id}");
     }
@@ -98,7 +98,7 @@ pub async fn startup_business_identity(pool: &Pool<Sqlite>) -> Result<String, St
     let install_id = crate::services::identity::remember_and_lock_install_id(
         crate::services::identity::load_install_id()?,
     );
-    let adopted = crate::services::insight::schema_core::adopt_business_rows(pool, &install_id).await?;
+    let adopted = crate::services::activity::schema_core::adopt_business_rows(pool, &install_id).await?;
     if adopted > 0 {
         crate::log_info!("adopted {adopted} local business row(s) into device {install_id}");
     }

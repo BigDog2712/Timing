@@ -6,7 +6,7 @@ use tauri::{AppHandle, State};
 
 use crate::app::events;
 #[cfg(desktop)]
-use crate::app::insight::main_window::tools_navigation::{self as patina_nav, HistoryTarget};
+use crate::app::activity::main_window::tools_navigation::{self as patina_nav, HistoryTarget};
 use crate::error::AppResult;
 use crate::infra::window;
 use crate::models::foreground::ForegroundWindow;
@@ -143,9 +143,9 @@ impl PatinaOpenTarget {
 /// 只把分析窗叫到前台（V0.12.0 原路径）：未就绪不是错误，用户再点一次即可。
 #[cfg(desktop)]
 fn show_patina_window(app: &AppHandle) {
-    if !crate::app::insight::tray::show_main_window(
+    if !crate::app::activity::tray::show_main_window(
         app,
-        crate::app::insight::main_window::MainWindowShowReason::TrayMenu,
+        crate::app::activity::main_window::MainWindowShowReason::TrayMenu,
     ) {
         crate::log_warn!("patina main window is not ready yet; the next request will retry");
     }
@@ -182,12 +182,12 @@ pub async fn open_patina_window(
 /// 那次广播早于药丸的订阅，直接丢了；之后窗口不再变化就永远不会再发 —— 用户看到的是
 /// 「游戏明明在前台，就是不计时」。药丸订阅之后必须能**主动取一次**。
 ///
-/// 实现直接转发 `infra::insight::windows::foreground::get_active_window`：窗口枚举只有那一处
+/// 实现直接转发 `infra::activity::windows::foreground::get_active_window`：窗口枚举只有那一处
 /// （AFK / 宿主应用 / 桌面壳过滤都在里面），这里**不许**重写第二份口径。
 /// `None` 表示「判不出」（前台是桌面壳 / 锁屏 / 空 exe），调用方按"不知道"处理，不是错误。
 #[tauri::command]
 pub fn get_foreground_window() -> Result<Option<ForegroundWindow>, String> {
-    match crate::infra::insight::windows::foreground::get_active_window() {
+    match crate::infra::activity::windows::foreground::get_active_window() {
         Ok(info) if !info.exe_name.trim().is_empty() => Ok(Some(ForegroundWindow {
             exe_name: info.exe_name,
             process_id: info.process_id,

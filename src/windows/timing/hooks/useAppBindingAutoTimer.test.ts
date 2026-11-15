@@ -130,7 +130,7 @@ describe("useAppBindingAutoTimer", () => {
     expect(h.event).toBe("active-window-changed");
     /* 路径必须走变量：`new URL("字面量", import.meta.url)` 会被 Vite 静态改写成 http 地址，
        而 jsdom 里 `readFileSync` 只认 file 协议（报 "The URL must be of scheme file"）。 */
-    const rustRel = "../../../../src-tauri/src/models/insight/events.rs";
+    const rustRel = "../../../../src-tauri/src/models/activity/events.rs";
     const rust = readFileSync(new URL(rustRel, import.meta.url), "utf8");
     expect(rust).toContain('pub const ACTIVE_WINDOW_CHANGED: &str = "active-window-changed"');
   });

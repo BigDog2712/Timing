@@ -1,6 +1,6 @@
 //! 前台窗口的最小对外形状（[0.13] 冷启动自动接管）。
 //!
-//! 为什么不直接回 `infra::insight::windows::foreground::WindowInfo`：
+//! 为什么不直接回 `infra::activity::windows::foreground::WindowInfo`：
 //!   1. 那张结构还带 `hwnd` / `process_path` / `title` / `app_user_model_id` —— 药丸只要
 //!      「哪个 exe」这一个事实，多给的字段就是多一份泄露面；
 //!   2. `infra::insight` 整棵是 `#[cfg(desktop)]`，而这条命令有**移动端桩**

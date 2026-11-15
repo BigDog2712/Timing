@@ -167,7 +167,7 @@ pub fn reclamp_main(app: &AppHandle) -> AppResult<bool> {
 /// 点哪儿都没反应；而 `capabilities/default.json` 的 windows 里已经没有这个 label，
 /// 日志近乎为零。这就是 QA 记的「死代码带枪」：代码没人调，但枪是上膛的。
 pub fn open_settings_window(app: &AppHandle) -> AppResult<()> {
-    crate::app::insight::main_window::tools_navigation::open_settings(app)
+    crate::app::activity::main_window::tools_navigation::open_settings(app)
         .map_err(|err| AppError::new(ErrorCode::IoError, format!("打开设置视图失败: {err}")))
 }
 

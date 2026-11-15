@@ -109,9 +109,9 @@ release/RELEASE-NOTES.md
 # 仓库名，改了就 404，用户点「打开发布页」就装不上扩展。显示名已按拍板全部改成
 # `Timing Web Sync`（明知商店里搜不到，视觉统一优先），但 href 必须留真实地址：
 # **文案是品牌，链接是坐标。** 行级豁免，只放这一串，不放行任何别的旧名。
-src/windows/patina/shared/i18n/generated/locales/*.ts :: patina-web-sync
+src/windows/activity/shared/i18n/generated/locales/*.ts :: patina-web-sync
 #
-# 另：src-tauri/src/models/insight/localization/generated.rs **故意不登记**。
+# 另：src-tauri/src/models/activity/localization/generated.rs **故意不登记**。
 # 它曾经是文案表里的残留大户（15 处 × 4 语言），已全部改成 Timing。正因为如此，
 # 将来上游同步若把它回灌成 Patina，窄扫描必须报红让人重跑一遍替换——
 # 把它登记成整文件豁免，只会让这件事从今往后永久不可见（白名单盖住真实回归的典型）。

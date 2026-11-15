@@ -11,7 +11,7 @@
  * `models::insight/events.rs` 钉住字面值。
  */
 
-/** Rust `models::insight::events::ACTIVE_WINDOW_CHANGED` 的字面值 */
+/** Rust `models::activity::events::ACTIVE_WINDOW_CHANGED` 的字面值 */
 export const ACTIVE_WINDOW_CHANGED_EVENT = "active-window-changed";
 
 /**

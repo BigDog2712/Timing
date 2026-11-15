@@ -10,12 +10,12 @@
 //!
 //! 判据（命令行可复核）：
 //! ```text
-//! git grep -n "repository::load_config" -- src-tauri/src/services/insight/data/scheduled_backup.rs
+//! git grep -n "repository::load_config" -- src-tauri/src/services/activity/data/scheduled_backup.rs
 //! ```
 //! 现在只剩 `refresh_webdav_target_after_settings_change` 那一处 —— 它只改 target/代次，
 //! **不发任何请求**；而它只在 `tick` 已经读到 WebDav 目标时才会被调，而那个目标现在恒为空。
 
-const SCHEDULED_BACKUP_RS: &str = include_str!("../services/insight/data/scheduled_backup.rs");
+const SCHEDULED_BACKUP_RS: &str = include_str!("../services/activity/data/scheduled_backup.rs");
 
 /// 按大括号配对切出函数体（签名必须逐字可 `find`，包含 `(`）。
 fn function_body(source: &str, signature: &str) -> String {
