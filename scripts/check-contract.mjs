@@ -455,11 +455,17 @@ if (presentWindowIds.length !== 1) {
  *
  * 这类拼错只有 `cargo build` 会报 `Permission openope:default not found`，而
  * `npm run check` 里没有 cargo ⇒ 纯前端流水线对它零拦截。
- * L2 的正确做法是拿 `src-tauri/gen/schemas/acl-manifests.json` 的 `__app-acl__` 做闭包
- * （插件 + 本仓全在内，17 个命名空间 / 426 个 id），但那份文件由 `cargo build` 生成、
- * 不随仓提交 ⇒ L2 依赖构建产物存在，形态与 L1 不同，留到 T07（ACL 收口）之前落地。
- * 期间**必须把档位打出来**（见末尾 `mode=`）：否则"跑的是 L1 还是 L2"在输出里不可观测，
- * 判据形态就退化成一句不可验证的口头承诺。
+ *
+ * ## 为什么不做 L2（这一档就是终态，不是过渡态）
+ *
+ * L2 的形态是拿 `src-tauri/gen/schemas/acl-manifests.json` 的 `__app-acl__` 做闭包
+ * （插件 + 本仓全在内，17 个命名空间 / 426 个 id），那份文件由 `cargo build` 生成、
+ * 不随仓提交。评估结论：**边际覆盖为零**——权限名不存在时 `tauri-build` 在编译期就报
+ * `Permission X not found`，而 CI 的 backend job 跑 `cargo test`，构建必经 `build.rs`，
+ * 所以这一族拼错**任何一次 cargo 构建都会明确报错**；L2 只是把同一个结论提前十秒。
+ * 为这十秒去入库一份 426 id 的生成物、再加一条 `git diff --exit-code`，
+ * 是拿「一个新的偶发红来源」换零收益。
+ * ⇒ 所以这里只把边界打出来（见下方 `[mode=L1]` 两行），不做 L2。
  */
 const VALIDATION_MODE = 'L1';
 const capabilityPermissionRefs = () => {
@@ -529,20 +535,23 @@ const summary = [
   `命令：Rust ${commands.size}（+Patina ${patinaCmds.size}）/ IpcApi ${api.size} / ipc.ts ${calls.size} / mock ${mocks.size}`,
   `错误码：Rust ${rustCodes.size} / 前端 ${feCodes.size}`,
   `事件：后端 ${rEvents.size} / 前端 ${fEvents.size} / emit 点 ${emitted.size}`,
-  `权限引用：capability 文件 ${capPerms.capFiles.length} 个 / 本仓 permission 标识符 ${capPerms.defined.size} 个 / ` +
-    `裸标识符引用 ${capPerms.refs.length} 处（跳过插件命名空间 ${capPerms.skipped.length} 处）`,
 ].join('；');
 
-/* **档位必须打出来。** 跑的是 L1 还是 L2，光看"通过"两个字分不出来，而两者的覆盖面
-   差着 8 条插件命名空间引用。判据形态不可观测时，它退化成一个口头承诺。 */
-const skippedNs = new Set(
+/* **档位与盲区必须打出来**，而且命名空间要逐个列名 —— 这是 L1 能达到的上限：
+ * 不红，但在 review 里可见。把 `opener:default` 敲成 `openope:default` 时，
+ * 下面这个清单里会冒出一个从没见过的命名空间。判据形态不可观测时，它退化成一个口头承诺。 */
+const skippedNs = [...new Set(
   capPerms.skipped.map((s) => s.split(' :: ')[1]?.split(':')[0]).filter(Boolean),
+)].sort();
+console.log(
+  `[contract] 权限引用：本仓自定义 ${capPerms.refs.length} 条 / 已定义 ${capPerms.defined.size} 个 / ` +
+    `capability 文件 ${capPerms.capFiles.length} 个 / [mode=${VALIDATION_MODE}] ` +
+    `跳过插件命名空间 ${capPerms.skipped.length} 处（${skippedNs.length} 个）：${skippedNs.join(', ')}`,
 );
 console.log(
-  `[contract] mode=${VALIDATION_MODE} — 权限引用校验只比对「本仓 permissions/*.toml 的 identifier 闭包」；` +
-    `跳过插件命名空间 ${capPerms.skipped.length} 处 / ${skippedNs.size} 个命名空间（${[...skippedNs].sort().join(' ')}）。` +
-    '这一层拼错（opener:default → openope:default）本档**零拦截**，只有 cargo build 会报 Permission not found；' +
-    'L2（__app-acl__ 闭包）排在 T07 之前。',
+  `[contract] [mode=${VALIDATION_MODE}] 只校验「本仓 permissions/*.toml 的 identifier 闭包」；` +
+    '插件命名空间拼错（opener:default → openope:default）本档零拦截 —— 只有 cargo build 会报 ' +
+    'Permission not found。**这是 L1 的上限，不是"以后再补"的过渡态**（L2 边际覆盖为零，不做，理由见脚本头）。',
 );
 
 if (failures.length === 0) {
