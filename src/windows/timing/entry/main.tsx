@@ -3,6 +3,11 @@
  * 样式加载顺序：design-tokens（唯一裸色值来源）-> app -> surfaces -> panels。
  * design-tokens.css 本身是索引，内部按 §1~§6 顺序 @import ./tokens/*.css。
  */
+/* [T04-4] 第 1 条 import 必须是存储迁移自举：模块级副作用（ESM hoist 之下，纯导出模块
+   的 import 什么都不做、import 后再调也必在所有模块求值之后），保证 24 槽在
+   initAppearance() / loadHandleBindings() 这些模块级读盘之前整批搬完。
+   覆盖 profile A 的 timing 窗（profile B 的 mini/通知窗走 activity 入口，见 G-4）。 */
+import '../../shared/activityStorageBootstrap';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '../styles/design-tokens.css';
