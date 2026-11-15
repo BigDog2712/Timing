@@ -93,3 +93,46 @@ describe("HostIntent 两侧镜像", () => {
     expect(bridge).toContain("sync_app_item_bindings{appKey,itemIds,track?}");
   });
 });
+
+/**
+ * [T04-1 · 设计 §1.6 / §6 G3] 事件名**字面量**的跨窗镜像。
+ *
+ * 上面那些用例钉的是 `HostIntent` 联合的 action 与字段名（TS 类型层）。但**事件名本身**
+ * 是字符串，两窗各写一份常量（L9 禁止跨窗 import），此前没有任何断言让它们相等：
+ * 现存的两条断言（`hostIntentBridge.test.ts` / `.itemWrite.test.ts`）**只钉药丸侧**，
+ * 所以只改分析窗那侧 `activityEvents.ts` 的值，全仓没有任何测试会红。
+ *
+ * 症状是纯静默的：`emitTo` 照常发得出去、对侧 `listen` 永远收不到，两端零日志，
+ * 用户看到的是「点了没反应」。
+ *
+ * ②这一条把**命名空间**收敛到本文件唯一一处 `EXPECTED_NAMESPACE`：改名的批次只改那一行，
+ * 两侧实现必须同时跟上——漏改任何一侧，下面两条断言都会红。
+ * （T04-3 把命名空间从 `patina` 改成 `activity` 时，只翻转这个常量，不要改断言。）
+ */
+const EXPECTED_NAMESPACE = "patina";
+const EXPECTED_EVENT = `${EXPECTED_NAMESPACE}:host-intent`;
+const EVENT_LITERAL = /const\s+HOST_INTENT\s*=\s*['"]([^'"]+)['"]/;
+
+function hostIntentLiteral(rel: string, who: string): string {
+  const match = EVENT_LITERAL.exec(read(rel));
+  expect(match, `${who}里找不到 \`const HOST_INTENT = "…"\``).not.toBeNull();
+  return match === null ? "" : match[1];
+}
+
+const gatewayEvent = hostIntentLiteral("../../../platform/runtime/activityEvents.ts", "分析窗 ");
+const bridgeEvent = hostIntentLiteral("../../../../timing/services/hostIntentBridge.ts", "药丸窗 ");
+
+describe("HOST_INTENT 事件名字面量两侧镜像", () => {
+  it("d02g_both_windows_declare_the_identical_event_name_literal", () => {
+    expect(gatewayEvent).not.toBe("");
+    expect(bridgeEvent).not.toBe("");
+    /* 逐字相等：这是本用例存在的全部理由（类型层相等不代表字符串相等）。 */
+    expect(bridgeEvent).toBe(gatewayEvent);
+  });
+
+  it("d02h_the_event_namespace_is_pinned_in_exactly_one_place", () => {
+    /* 命名空间只允许 `EXPECTED_NAMESPACE`，防止三次迁移（patina → 中间态 → activity）中途漂走。 */
+    expect(gatewayEvent).toBe(EXPECTED_EVENT);
+    expect(bridgeEvent).toBe(EXPECTED_EVENT);
+  });
+});

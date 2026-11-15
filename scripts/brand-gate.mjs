@@ -62,6 +62,26 @@ const NARROW_SCOPES = [
   'src/windows/activity/shared/i18n/generated/',
   'src-tauri/src/models/activity/localization/generated.rs',
 ];
+/* ③ 契约面的上游旧名。**为什么单开第三条、且零白名单**：② 扫的是「用户可见文案表」，
+ * 那里的唯一例外是 GitHub 仓库地址这种**真实坐标**；契约面（capability / permission /
+ * 打包入口）不该有任何例外——里面的 `patina` 全都是待改的旧名，留着就是改名漏项。
+ * 两者的**豁免理由完全不同**，所以分开报数，避免一侧的豁免被另一侧误用（设计 §6 G2）。
+ *
+ * **棘轮预算**：只许减不许增。分档目标（改 `BUDGET` 必须同批改这一行注释）：
+ *   · 落地（T04-1）：51 = capabilities 9 + permissions 37 + vite.config.ts 5
+ *   · T04-2 后：5（capability / permission 清零，只剩 vite 的入口名）
+ *   · T04-3 后：0（入口页改名完成）
+ * ⚠️ 入口页改名时 `patina.html` → `activity.html`，本数组里的文件名**必须同批改**，
+ *    否则下面「范围存在性哨兵」会红（这是有意的：scope 静默失效等于关掉这条判据）。 */
+const NARROW_PATTERN_2 = 'patina';
+const NARROW_SCOPES_2 = [
+  'src-tauri/capabilities/',
+  'src-tauri/permissions/',
+  'vite.config.ts',
+  'patina.html',
+  'index.html',
+];
+const NARROW_2_BUDGET = 51;
 const ARCHIVE_DIRS = ['android-app/'];
 
 const allowPath = join(root, 'scripts/brand-allowlist.txt');
@@ -176,6 +196,14 @@ const { archived, allowedFiles, allowedLines, violations } = classify(hits);
 const narrowHits = scan(NARROW_PATTERN, NARROW_SCOPES);
 const narrow = classify(narrowHits);
 
+/* ③ 契约面旧名 patina（零白名单 ⇒ 命中即违规，只受棘轮预算约束） */
+const contractHits = scan(NARROW_PATTERN_2, NARROW_SCOPES_2);
+
+/* ③ 的范围存在性哨兵：`git grep` 对不存在的路径spec 返回「无命中」，
+ * 于是 scope 写错（目录改名了、入口页改名了）会让这条判据**安静地永远绿**。
+ * 所以逐个确认 scope 真的落在磁盘上。 */
+const missingScopes = NARROW_SCOPES_2.filter((p) => !existsSync(join(root, p)));
+
 /* 归档目录必须显式报数：静默跳过等于把「这里还有残留」这件事藏起来。 */
 for (const dir of ARCHIVE_DIRS) {
   const n = archived.get(dir) ?? 0;
@@ -191,19 +219,43 @@ const narrowSummary =
   `窄扫描（文案表 ${NARROW_PATTERN} · ${NARROW_SCOPES.length} 个范围）命中 ${narrowHits.length} 处；` +
   `白名单豁免 ${narrow.allowedFiles.size} 个文件 / ${narrow.allowedLines.length} 行；` +
   `残留 ${narrow.violations.length} 处`;
+const contractSummary =
+  `契约面 ${NARROW_PATTERN_2} 命中 ${contractHits.length} 处（预算 ${NARROW_2_BUDGET}）`;
 
-if (violations.length === 0 && narrow.violations.length === 0) {
+const contractOverBudget = contractHits.length > NARROW_2_BUDGET;
+
+if (
+  violations.length === 0 &&
+  narrow.violations.length === 0 &&
+  !contractOverBudget &&
+  missingScopes.length === 0
+) {
   console.log(`[brand] OK — ${summary}`);
   console.log(`[brand] OK — ${narrowSummary}`);
+  console.log(`[brand] OK — ${contractSummary}`);
   process.exit(0);
 }
 
 console.error(`[brand] FAILED — ${summary}`);
-console.error(`[brand] FAILED — ${narrowSummary}\n`);
+console.error(`[brand] FAILED — ${narrowSummary}`);
+console.error(`[brand] FAILED — ${contractSummary}\n`);
+for (const scope of missingScopes) {
+  console.error(`✗ 契约面扫描范围不存在：${scope}（改名后必须同批改 NARROW_SCOPES_2）`);
+}
+if (contractOverBudget) {
+  console.error(`✗ 契约面 patina 命中 ${contractHits.length} 处，超过预算 ${NARROW_2_BUDGET}（棘轮只许减不许增）`);
+}
 for (const v of [...violations, ...narrow.violations]) {
   const text = v.text.length > 120 ? `${v.text.slice(0, 120)}…` : v.text;
   console.error(`✗ ${v.file}:${v.line}  ${text.trim()}`);
 }
+if (contractOverBudget) {
+  for (const v of contractHits.slice(0, 20)) {
+    const text = v.text.length > 120 ? `${v.text.slice(0, 120)}…` : v.text;
+    console.error(`✗ [契约面] ${v.file}:${v.line}  ${text.trim()}`);
+  }
+}
 console.error('\n规则：品牌已统一为 Timing，残留只允许出现在 scripts/brand-allowlist.txt 里。');
+console.error('契约面（capability / permission / 打包入口）零白名单：命中即待改旧名。');
 console.error('新增白名单条目必须写明理由（注释行），不要用白名单盖住真实回归。');
 process.exit(1);

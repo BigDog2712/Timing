@@ -337,6 +337,96 @@ check(
   '桌面与手机各有一份 capability，两份都要挂 host-commands，否则对应平台上宿主 IPC 全断',
 );
 
+/* ── 分析窗的命令白名单（`window-commands.toml`）──
+ *
+ * 此前这里是**零校验**：`patinaCommands()` 只被用于「与宿主不重名」，从不比对 allow 列表。
+ * 于是漏登记一条的症状是：该命令在分析窗里被 Tauri ACL 静默拒绝
+ * （前端拿到 "<cmd> not allowed. Command not found"），而**八步门禁全绿**。
+ * 本批（T04-1）把它补上，且**双向**比对：
+ *   · allow 里有、Rust 没注册 ⇒ 白名单里有一条不存在的命令（拼错 / 删命令没删白名单）；
+ *   · Rust 注册了、allow 里没有 ⇒ 该命令在分析窗里调不到。
+ *
+ * 两条既有事实（T04-1 实测，见 `51` §1.5）：
+ *   1. identifier 现在是 `main-window-commands`，T04-2 会改名 `activity-window-commands`。
+ *      这里**同时认两个名字并要求恰好存在一个**：改名成功 ⇒ 自动跟随；两个都在 ⇒ 半改；
+ *      一个都找不到 ⇒ 段被删了。三种情况只有中间态会红，正好是我们要抓的。
+ *   2. 有 9 条命令在**任何** permission 里都没有放行（预存在缺口，其中 8 条前端生产代码
+ *      真在调用）。这批不修（不属 T04 的改名范围），但**点名锁死**：新增一条未放行会红；
+ *      这 9 条哪天被放行了也会红（提示把名字从名单里删掉）—— 名单必须与现状精确相等。
+ */
+const WINDOW_PERMISSION_IDS = ['main-window-commands', 'activity-window-commands'];
+const KNOWN_UNGRANTED_ACTIVITY_COMMANDS = [
+  'cmd_get_activity_daily_totals',
+  'cmd_list_app_categories',
+  'cmd_set_app_category',
+  'cmd_remove_app_category',
+  'cmd_backfill_legacy_bindings',
+  'cmd_project_focus_blocks',
+  'cmd_list_focus_blocks',
+  'cmd_get_block_detail',
+  'cmd_get_item_timeline',
+];
+
+/** 取某个 permission 段的 `commands.allow` 集合；段不存在返回 null。 */
+function windowPermissionAllow(id) {
+  const p = 'src-tauri/permissions/window-commands.toml';
+  if (!existsSync(join(root, p))) return null;
+  const lines = read(p).split(/\r?\n/);
+  const start = lines.findIndex((line) => line.trim() === `identifier = "${id}"`);
+  if (start < 0) return null;
+  const allowStart = lines.findIndex((line, i) => i > start && line.includes('commands.allow'));
+  if (allowStart < 0) return null;
+  let end = allowStart;
+  while (end < lines.length && !lines[end].includes(']')) end += 1;
+  const block = lines.slice(allowStart, end + 1).join('\n');
+  return new Set([...block.matchAll(/"([A-Za-z0-9_]+)"/g)].map((m) => m[1]));
+}
+
+const presentWindowIds = WINDOW_PERMISSION_IDS.filter((id) => windowPermissionAllow(id) !== null);
+if (presentWindowIds.length !== 1) {
+  failures.push({
+    label: '分析窗命令白名单的 identifier 不存在或不唯一',
+    missing: presentWindowIds.length === 0 ? WINDOW_PERMISSION_IDS : [],
+    extra: presentWindowIds.length > 1 ? presentWindowIds : [],
+    hint: `permissions/window-commands.toml 里 ${WINDOW_PERMISSION_IDS.join(' / ')} 必须**恰好有一个**（改名中途会出现两个，那就是半改状态）`,
+  });
+} else {
+  const windowAllow = windowPermissionAllow(presentWindowIds[0]);
+  const expectedAllow = new Set(
+    [...patinaCmds].filter((c) => !KNOWN_UNGRANTED_ACTIVITY_COMMANDS.includes(c)),
+  );
+  check(
+    'window-commands 的 allow 与分析窗注册的命令不一致',
+    diff(expectedAllow, windowAllow),
+    diff(windowAllow, expectedAllow),
+    '白名单少一条 ⇒ 该命令在分析窗里被 ACL 静默拒绝；多一条 ⇒ 白名单里有不存在的命令',
+  );
+
+  /* 锁死那 9 条「谁都没放行」的命令：它们必须仍然没人放行，且仍然真的被注册。 */
+  const allPermissionText = readdirSync(join(root, 'src-tauri/permissions'))
+    .filter((f) => f.endsWith('.toml'))
+    .map((f) => read(`src-tauri/permissions/${f}`))
+    .join('\n');
+  const suddenlyGranted = KNOWN_UNGRANTED_ACTIVITY_COMMANDS.filter((c) => allPermissionText.includes(`"${c}"`));
+  if (suddenlyGranted.length > 0) {
+    failures.push({
+      label: 'KNOWN_UNGRANTED 名单已过期',
+      missing: [],
+      extra: suddenlyGranted,
+      hint: '这些命令已经被某个 permission 放行了，请把它们从 KNOWN_UNGRANTED_ACTIVITY_COMMANDS 删掉并收紧判据',
+    });
+  }
+  const vanished = KNOWN_UNGRANTED_ACTIVITY_COMMANDS.filter((c) => !patinaCmds.has(c));
+  if (vanished.length > 0) {
+    failures.push({
+      label: 'KNOWN_UNGRANTED 名单里的命令已不再注册',
+      missing: vanished,
+      extra: [],
+      hint: '命令被删了但名单没跟上，请同步删掉',
+    });
+  }
+}
+
 const summary = [
   `命令：Rust ${commands.size}（+Patina ${patinaCmds.size}）/ IpcApi ${api.size} / ipc.ts ${calls.size} / mock ${mocks.size}`,
   `错误码：Rust ${rustCodes.size} / 前端 ${feCodes.size}`,
