@@ -166,7 +166,7 @@ impl WebviewRecoveryState {
             .iter()
             .enumerate()
             .map(|(index, state)| WebviewRecoverySnapshot {
-                label: ["patina", "mini", "tool-notification"][index],
+                label: WindowKind::ALL[index].label(),
                 registration: state.registration,
                 engine_version: state.engine_version.clone(),
                 last_failure: state.last_failure,
@@ -222,7 +222,7 @@ pub(crate) fn observe<R: Runtime + 'static>(
                     _ = responses.changed() => Signal::Responsive,
                     _ = ticks.tick() => {
                         if app.state::<AppExitState>().is_exit_requested() { break; }
-                        let label = match kind { WindowKind::Main => "patina", WindowKind::Mini => "mini", WindowKind::ToolNotification => "tool-notification" };
+                        let label = kind.label();
                         let Some(window) = app.get_webview_window(label) else { continue; };
                         let visible = window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(true);
                         let action = app.state::<WebviewRecoveryState>().update(kind, |state| {

@@ -11,7 +11,7 @@
  *
  * 本文件五条判据对应 PRD 的验收句：
  *   ① 可改主色的控件**桌面侧** = 1（手机侧那一个是另一扇窗，由 import 图钉住），
- *      且分析窗**唯一**能写主题/主色的 ACL 权限是 `patina-host-settings`，
+ *      且分析窗**唯一**能写主题/主色的 ACL 权限是 `activity-host-settings`，
  *      旧写桥 `host-theme-write` 定义还在但无人引用
  *   ③ 主题模式开关已下线（三个同名入口之一）
  *   ④ 三个同名参数各只有一个可编辑处
@@ -86,7 +86,7 @@ describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
        ① **写主色的控件**：桌面一个（`HostThemeCard`），手机一个（`ThemePicker`，另一扇窗）。
           两个都删不掉：桌面要改主题，Android 没有桌面设置页、必须有自己的入口。
        ② **ACL**：分析窗唯一被授予 `theme_set` / `accent_set` 的权限是
-          `patina-host-settings`（T04 新加的写面）；旧写桥 `host-theme-write` 的定义还在，
+          `activity-host-settings`（T04 新加的写面）；旧写桥 `host-theme-write` 的定义还在，
           但没有任何 capability 引用它。
        ③ **import 图**：`ThemePicker` 只被手机页引用 —— 一旦有人把它接回桌面壳，
           「控件数 = 1」就真的不成立了，这条会先红。
@@ -107,12 +107,12 @@ describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
     const grants = permissionGrants();
     const themeCommands = ['theme_set', 'accent_set'];
     const analysisWriters = capabilities()
-      .filter((cap) => cap.windows.includes('patina') || cap.windows.includes('mini'))
+      .filter((cap) => cap.windows.includes('activity') || cap.windows.includes('mini'))
       .flatMap((cap) => cap.permissions
         .filter((perm) => themeCommands.some((command) => grants.get(perm)?.has(command)))
         .map((perm) => `${cap.id}:${perm}`));
     expect(analysisWriters, '分析窗出现了第二条能写主题/主色的权限面').toEqual([
-      'patina:patina-host-settings',
+      'activity:activity-host-settings',
     ]);
 
     const bridged = capabilities()
@@ -120,7 +120,7 @@ describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
       .map((cap) => cap.id);
     expect(bridged, '有人把 host-theme-write 又授回来了（那是 P0-06 摘掉的那条）').toEqual([]);
     /* 定义必须还在，而且它**确实**还允许 theme_set —— 否则上一条是假绿（空定义谁都不会命中）。 */
-    expect(readRaw('src-tauri/permissions/patina-host-theme.toml'))
+    expect(readRaw('src-tauri/permissions/activity-host-theme.toml'))
       .toContain('identifier = "host-theme-write"');
     expect(grants.get('host-theme-write')?.has('theme_set')).toBe(true);
     /* 宿主命令面仍拥有这两个命令：摘的是「分析窗的引用」，不是宿主自己的能力。 */
@@ -135,12 +135,12 @@ describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
   it('p006_analysis_capability_keeps_its_read_and_core_grants', () => {
     /* 摘一条不能顺带把别的摘掉：分析窗启动后要读主题、要收事件、要调命令。
        少一条的症状是「窗开了、界面全哑、零日志」——所以逐条钉住。 */
-    const capability = readRaw('src-tauri/capabilities/patina.json');
+    const capability = readRaw('src-tauri/capabilities/activity.json');
     for (const required of [
       'host-theme-read',             /* theme_get / accent_get：读主题与四色 */
       'main-window-commands',        /* Patina 自己的 117 条命令 */
-      'patina-host-bridge',          /* 5 条只读：list_records / list_items / get_timer_state / note_list / todo_list */
-      'patina-host-settings',        /* T04 的写面：设置页整页都在靠它 */
+      'activity-host-bridge',          /* 5 条只读：list_records / list_items / get_timer_state / note_list / todo_list */
+      'activity-host-settings',        /* T04 的写面：设置页整页都在靠它 */
       'core:event:allow-listen',
       'core:event:allow-unlisten',
       'core:event:allow-emit',

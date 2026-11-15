@@ -69,8 +69,8 @@ const NARROW_SCOPES = [
  *
  * **棘轮预算**：只许减不许增。分档目标（改 `BUDGET` 必须同批改这一行注释）：
  *   · 落地（T04-1）：51 = capabilities 9 + permissions 37 + vite.config.ts 5
- *   · T04-2 后：5（capability / permission 清零，只剩 vite 的入口名）
- *   · T04-3 后：0（入口页改名完成）
+ *   · T04-2 后：**6** = vite.config.ts 5 + `open_patina_window` 1（命令名，属 T04-3）
+ *   · T04-3 后：0（入口页 + 命令名改名完成）
  * 入口页**不写死文件名**：扫「仓根所有 `*.html`」。写死 `patina.html` 的话，T04-3 改名
  * 时必须同批改这里，而"改名时忘了改门禁"正是 scope 静默失效的来源（`git grep` 对不存在的
  * 路径spec 返回"无命中"，于是判据安静地永远绿）。 */
@@ -82,7 +82,7 @@ const NARROW_SCOPES_2 = [
   'vite.config.ts',
   ...ROOT_HTML_SCOPES,
 ];
-const NARROW_2_BUDGET = 51;
+const NARROW_2_BUDGET = 6;
 const ARCHIVE_DIRS = ['android-app/'];
 
 const allowPath = join(root, 'scripts/brand-allowlist.txt');

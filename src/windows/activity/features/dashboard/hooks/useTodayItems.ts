@@ -16,7 +16,7 @@ import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
  * 一个事项一行：名字、今天累计、今天第一段的开始时刻、段数。按累计降序 ——
  * 「事项分布」维度要的就是占比，而「事项菜单」卡按开始时刻升序另排（同一个数组两种排序）。
  *
- * 三项都只读：`list_items` + `list_records`（ACL 见 `permissions/patina-host-data.toml`）。
+ * 三项都只读：`list_items` + `list_records`（ACL 见 `permissions/activity-host-data.toml`）。
  * 失败降级为空清单 + 一条 warn，不把主界面打红。
  */
 export interface TodayItemRow {

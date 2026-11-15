@@ -4,8 +4,8 @@
  * 只有两条命令，单独成文件是为了不让 `hostSettingsGateway.ts`（120 行贴线）继续长——
  * 插件是「磁盘事实」，与设置/同步是三个域，调用点也各不相同。
  *
- * 宿主端口：`plugin_list` / `plugin_open_dir`（`capabilities/patina.json` 的
- * `patina-host-settings` 授予）。返回形状见 `hostTypes.ts::PluginListResult`。
+ * 宿主端口：`plugin_list` / `plugin_open_dir`（`capabilities/activity.json` 的
+ * `activity-host-settings` 授予）。返回形状见 `hostTypes.ts::PluginListResult`。
  */
 import { invoke } from "@tauri-apps/api/core";
 import type { PluginListResult } from "../../../shared/dto/hostTypes";

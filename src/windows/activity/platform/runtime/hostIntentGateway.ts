@@ -7,7 +7,7 @@ import { HOST_INTENT } from "./activityEvents.ts";
  *
  * ## 为什么是「意图」而不是「命令」
  *
- * `src-tauri/permissions/patina-host-bridge.toml` 的边界是：分析窗只能**读**宿主的账
+ * `src-tauri/permissions/activity-host-bridge.toml` 的边界是：分析窗只能**读**宿主的账
  * （`list_records` / `list_items` / `get_timer_state`），**一条写命令都没有**。所以分析窗
  * 想「开始计时 / 暂停 / 打开设置」时不能自己 `invoke`——它只把「我想干什么」喊出去，
  * 由**药丸前端**（`src/services/hostIntentBridge.ts`）用它自己的 typed IPC 执行并落库。
@@ -58,7 +58,7 @@ export type HostIntent =
    *  靠 `features/dashboard/services/hostIntentMirror.test.ts` 的 source test 钉相等）。 */
   | { action: "delete_note"; noteId: number }
   /* ── [本轮] 「今日时间线」卡上的写动作（新建事项 / 事项管理）──
-   * 分析窗**没有写命令**（`permissions/patina-host-bridge.toml` 只放行三条只读），
+   * 分析窗**没有写命令**（`permissions/activity-host-bridge.toml` 只放行三条只读），
    * 所以这些事也只能是一条意图，由药丸用 `itemApi.create` / `itemApi.update` /
    * `settingsApi.update` 落库。字段名与 `src/services/hostIntentBridge.ts` 的同名类型
    * **逐字一致**（L9 两侧各写一份，靠 `features/dashboard/services/hostIntentMirror.test.ts`

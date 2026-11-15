@@ -10,7 +10,7 @@ import { invokeWithCommandError } from "./commandError.ts";
  * 三条边界（与 `noteReadRepository.ts` 同一套纪律）：
  *   1. 不能 import 主窗的 `src/services/api.ts` / `src/types/domain/...`（L9 双窗隔离）。
  *   2. 本目录出现 `invokeWithCommandError` 是合法的（L1 组件规则不覆盖 persistence）。
- *   3. 命令名 snake_case、入参 camelCase；ACL 由 `permissions/patina-host-data.toml` 放行两条只读命令。
+ *   3. 命令名 snake_case、入参 camelCase；ACL 由 `permissions/activity-host-data.toml` 放行两条只读命令。
  *
  * 只读：创建/改名/删除一律走 `patina:host-intent` 事件桥，药丸侧执行 —— 不扩大这扇门。
  */

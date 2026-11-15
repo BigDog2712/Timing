@@ -2,7 +2,7 @@
 
 [[permission]]
 identifier = "main-window-commands"
-description = "Allows the main application window to invoke the complete Patina application command surface."
+description = "Allows the main application window to invoke the complete activity application command surface."
 commands.allow = [
   "cmd_get_tool_presentation",
   "cmd_save_tool_notification_preferences",
@@ -140,8 +140,8 @@ commands.allow = [
 #   todo_create_batch  → src/platform/persistence/todoRepository.ts:createTodoBatch（[0.13 · 1.7] 批量创建，单事务 1..=60）
 # note_create / note_update **不给**：主界面便利贴条是只读的（01 §4.4.1 末段）。
 [[permission]]
-identifier = "patina-todo-notes"
-description = "Allows the Patina analysis window to read today's notes and read/write the to-do card (list, create, batch-create, update, toggle, delete only)."
+identifier = "activity-todo-notes"
+description = "Allows the activity analysis window to read today's notes and read/write the to-do card (list, create, batch-create, update, toggle, delete only)."
 commands.allow = [
   "note_list",
   "todo_list",

@@ -10,13 +10,13 @@ import type { HostAccentColors } from "../../shared/theme/hostAccentBridge.ts";
  *   `theme_get`     读当前模式；`accent_get` 读当前四色（一次，启动时）
  *   `theme-changed` 宿主改了就广播（K-21，各窗自订阅），载荷本就带 `accents`
  *   `theme_set`     [P0-06] 分析窗那个开关**已下线**：`writeHostThemeMode` 当前零调用，
- *                   且 `capabilities/patina.json` 也不再授予 `host-theme-write`——双保险
+ *                   且 `capabilities/activity.json` 也不再授予 `host-theme-write`——双保险
  * **不新增命令、不新增事件**：`accent_get` 早已存在（`commands/theme_cmd.rs`），
  * `theme-changed` 的载荷 `ThemeChanged { mode, accents }`（`services/theme.rs`）本来就带四色，
  * 只是过去没人订阅。本轮只把 `accent_get` 加进 `host-theme-read` 权限。
  * 每个出入口都包了错误：桌面窗口在宿主库未就绪、或 ACL 未授权时会失败，一律返回 null /
  * false 让调用方回落预设——宁可这扇窗是旧主题，也不能读不到主题就白屏（`panic=abort` 教训）。
- * 权限在 `src-tauri/permissions/patina-host-theme.toml`：只读的 `host-theme-read` 给分析窗
+ * 权限在 `src-tauri/permissions/activity-host-theme.toml`：只读的 `host-theme-read` 给分析窗
  * 与提醒弹窗；`host-theme-write`（`theme_set`）**已不再授予任何 capability**（P0-06 摘除）——
  * 分析窗对宿主的写能力现在是零，不只是「零**计时**写」。
  */

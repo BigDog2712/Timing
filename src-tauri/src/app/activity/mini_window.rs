@@ -23,8 +23,8 @@ pub struct MiniWindowState {
     power_revision: AtomicU64,
 }
 
+pub(crate) use super::window_labels::MINI_WINDOW_LABEL;
 pub(crate) use watcher::register_power_handler;
-
 #[derive(Clone, Debug, Serialize)]
 pub struct Diagnostics {
     pub detector_ticks: u64,
@@ -153,7 +153,7 @@ pub async fn open<R: Runtime + 'static>(app: &AppHandle<R>) -> Result<(), String
     {
         return Err("Application is exiting".into());
     }
-    let new = app.get_webview_window("mini").is_none();
+    let new = app.get_webview_window(MINI_WINDOW_LABEL).is_none();
     if new {
         state.preferences = mini_window_store::load(app).await?;
         let epoch = state.epoch.wrapping_add(1);
@@ -198,7 +198,7 @@ fn layout_on_monitor<R: Runtime>(
     monitor: &tauri::Monitor,
 ) -> Result<(), String> {
     let window = app
-        .get_webview_window("mini")
+        .get_webview_window(MINI_WINDOW_LABEL)
         .ok_or("Mini window is closed")?;
     let affinity = native::affinity(monitor);
     let suppressed = app.state::<MiniWindowState>().power.load(Ordering::Acquire) != 0
@@ -352,7 +352,7 @@ pub async fn action<R: Runtime + 'static>(
         }
         Action::BeginDrag => {
             let window = app
-                .get_webview_window("mini")
+                .get_webview_window(MINI_WINDOW_LABEL)
                 .ok_or("Mini window is closed")?;
             let before = native::rect(&window)?;
             state.interaction.reveal();
@@ -430,9 +430,9 @@ pub(crate) async fn recover_failed_webview<R: Runtime + 'static>(
     {
         return Ok(());
     }
-    if let Some(window) = app.get_webview_window("mini") {
+    if let Some(window) = app.get_webview_window(MINI_WINDOW_LABEL) {
         if let Err(error) = super::webview_recovery::destroy_and_wait(&window).await {
-            state.desired = app.get_webview_window("mini").is_some();
+            state.desired = app.get_webview_window(MINI_WINDOW_LABEL).is_some();
             return Err(error);
         }
     }
@@ -458,9 +458,9 @@ async fn close_session<R: Runtime>(app: &AppHandle<R>, state: &mut Session) -> R
     state.reset_protection();
     state.interaction = Interaction::default();
     state.transition.target(false, false, Instant::now());
-    if let Some(window) = app.get_webview_window("mini") {
+    if let Some(window) = app.get_webview_window(MINI_WINDOW_LABEL) {
         if let Err(error) = super::webview_recovery::destroy_and_wait(&window).await {
-            state.desired = app.get_webview_window("mini").is_some();
+            state.desired = app.get_webview_window(MINI_WINDOW_LABEL).is_some();
             return Err(error);
         }
     }

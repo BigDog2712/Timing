@@ -62,8 +62,8 @@ pub async fn close_note_window(
 
 这条命令是**宿主自己的**命令。为什么不直接让前端 invoke Patina 的
 `cmd_show_main_window`：那条命令写在 `permissions/window-commands.toml` 里，
-ACL 只授权给 `windows: ["patina"]`，从宿主窗口调用会被 Tauri 拒掉
-（`not allowed on window "main" … allowed on: [windows: "patina"]`）。
+ACL 只授权给 `windows: ["activity"]`，从宿主窗口调用会被 Tauri 拒掉
+（`not allowed on window "main" … allowed on: [windows: "activity"]`）。
 宿主自己的命令没有 permission 声明，天然对所有窗口开放，也不必把 Timing 的
 前端绑到 Patina 的命令名上（宿主继续走 `IpcApi` 的 typed 契约）。
 
@@ -73,7 +73,7 @@ show 请求。返回 false = 窗正在重建或还没就绪（点第二次就好
 /// 分析窗历史页落点（[P0-03]，`open_patina_window` 的**可选**参数）。
 ///
 /// 命名口径（硬约定，FUSION-ARCH-v1 §6.6）：宿主`药丸`的窗口 label 是 `main`，
-/// 分析窗的 label 是 `patina`；本结构描述「分析窗该落到哪里」，与窗口名无关。
+/// 分析窗的 label 是 `activity`；本结构描述「分析窗该落到哪里」，与窗口名无关。
 #[cfg(desktop)]
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

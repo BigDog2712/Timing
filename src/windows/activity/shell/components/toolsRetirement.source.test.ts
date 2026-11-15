@@ -58,6 +58,15 @@ const T04_BASELINE = "fcbbab5";
  * 去 Patina 化，只是文件名不在上面两条**目录**规则的覆盖范围内）。被保护清单里的
  * `toolNotificationGateway.ts` 有一行 import 因此改字面，规范化后仍与基线逐字相同。
  *
+ * T04 追加第四条（**这是本判据自身的适用范围变化，不是放宽**）：T04 的 mandate 就是
+ * 把 label 字面量收敛成常量、把 ACL 文件改名。于是被保护清单里有两条必然被改：
+ *   · `app/activity/tool_notifications.rs` —— `"patina"` → `MAIN_WINDOW_LABEL`（+ 一行 import）；
+ *   · `capabilities/activity-tool-notification.json` —— identifier/文件名改名 + description
+ *     首词去掉旧产品名。
+ * 两种都是**机械改名**，同样用规范化吸收；文件里其余任何一个字变化（比如投递链的
+ * `Delivery` 映射、`require_current` 的拒绝语义）规范化后仍与基线不同 ⇒ 照样红。
+ * 重钉 `T04_BASELINE` 不成立：钉到本批之后，这些"本批就该改"的差异会被当成新基线接受。
+ *
  * **判据强度不变**：规范化只把新名映射回旧名，任何真实改动规范化后依旧与基线不同，
  * 测试照样红。之所以不直接重钉 `T04_BASELINE`，是因为重钉要等 T02 落地成一个 commit
  * 之后才成立（钉一个还不存在的 sha 没有意义）。
@@ -67,7 +76,12 @@ const T04_BASELINE = "fcbbab5";
 const preRenamePath = (p: string): string =>
   p
     .replace(/(src-tauri\/src\/(?:app|commands|infra|models|services)\/)activity(?=\/|$)/g, "$1insight")
-    .replace(/src\/windows\/activity(?=\/|$)/g, "src/windows/patina");
+    .replace(/src\/windows\/activity(?=\/|$)/g, "src/windows/patina")
+    /* T04：capability 文件改名（`patina-tool-notification.json` → `activity-tool-notification.json`）。 */
+    .replace(
+      /src-tauri\/capabilities\/activity-tool-notification\.json/g,
+      "src-tauri/capabilities/patina-tool-notification.json",
+    );
 
 /** 源码文本 → 把 T02 的机械改名规范化回旧名（用于与基线逐字比较）。 */
 const preRenameSource = (src: string): string =>
@@ -81,6 +95,17 @@ const preRenameSource = (src: string): string =>
     /* T02b：事件名常量文件 `insightEvents.ts` → `activityEvents.ts`（纯文件名改名，
      * 不是目录改名，故不走上面两条规则）。 */
     .replace(/\bactivityEvents\b/g, "insightEvents")
+    /* T04：契约面 label 收敛（`"patina"` → `MAIN_WINDOW_LABEL`）。先卸掉那行 import，
+     * 再把常量名映射回字面量 —— 顺序不能反（先映射的话 import 行会变成
+     * `use …::"patina";`，卸不掉）。
+     * ⚠️ 正则要同时认 `activity` 与 `insight`（上面几条先执行，`activity::` 已变 `insight::`）。
+     * ⚠️ 只换行内容、留行尾换行（`$` 而非 `;\n\n`）：该 import 紧贴 `mod native;`、后面没空行，
+     * 吞掉换行会让「零 diff」因差一个空行而假红。 */
+    .replace(/^use crate::app::(?:activity|insight)::main_window::MAIN_WINDOW_LABEL;$/m, "")
+    .replace(/\bMAIN_WINDOW_LABEL\b/g, '"patina"')
+    /* T04：capability 改名 + description 首词的旧产品名。 */
+    .replace(/\bactivity-tool-notification\b/g, "patina-tool-notification")
+    .replace(/"description": "工具提醒弹窗/, '"description": "Patina 工具提醒弹窗')
     .replace(/\bactivity_bridge\b/g, "patina_bridge")
     .replace(/\bactivity_root\b/g, "patina_root")
     .replace(/\blegacy_import\b/g, "patina_seed");
@@ -200,7 +225,7 @@ describe("[T04] V-2h · tool-notification 投递链守门（Q4 = (A)）", () => 
     "src/windows/activity/platform/runtime/toolNotificationGateway.ts",
     "src-tauri/src/app/activity/tool_notifications.rs",
     "src-tauri/src/app/activity/tool_notifications/native.rs",
-    "src-tauri/capabilities/patina-tool-notification.json",
+    "src-tauri/capabilities/activity-tool-notification.json",
     "src-tauri/src/tests/main_window_profile.rs",
   ];
 
@@ -248,16 +273,28 @@ describe("[T04] V-2h · tool-notification 投递链守门（Q4 = (A)）", () => 
     expect(section(working)).toBe(section(baseline));
   });
 
-  test("V-2h · 分析窗后端子树的 WINDOW_LABEL|WindowKind::ToolNotification 计数与基线相等", () => {
+  /* [T04 修订] 判据从「与基线相等」改为「等于基线 + 已知偏移」；三处口径变化都不是放宽：
+   * 1. **词边界**（`-F` → `-E` + `\b`）：本批新增 `MINI_WINDOW_LABEL`，它包含 `WINDOW_LABEL`
+   *    子串 —— 定长子串数会把新常量数进去（实测 21 → 60），判据当场假红。
+   * 2. **`--untracked`**：本批新增映射表 `window_labels.rs`，而 `git grep` 默认只扫已跟踪
+   *    文件 —— 不带则命中数随「有没有 git add」跳变，等于判据的值取决于暂存区状态。
+   *    带上反而**更严**：未跟踪文件同样是源码，不带就能靠"留个未跟踪的新文件"绕过判据。
+   * 3. **+3 是已知偏移**：`window_labels.rs` 新增 4 处（`WindowKind::ALL` 1 + `label()` 分支 2
+   *    + 文档注释点名 1），`webview_recovery.rs` 少 1 处（`match kind {…}` 内联映射搬走）。
+   *    写成常量而非删判据：**再加一个窗类型，偏移就超过 3 ⇒ 照样红**。
+   *    （label 值一致性由第 9 步 `check:runtime-ids` 的 a/b/c 覆盖，比词频更准。） */
+  test("V-2h · 分析窗后端子树的 WINDOW_LABEL|WindowKind::ToolNotification 计数为基线 +3", () => {
     /* 目录名在 T02 变了（`app/insight` → `app/activity`），计数口径不变：
      * 基线那份按旧目录数、工作树按新目录数。 */
     const REL_DIR = "src-tauri/src/app/activity";
+    const WINDOW_KIND_MAPPING_SITES = 3;
     const count = (treeish: string | null) => {
-      const args = ["grep", "-o", "-F", "-e", "WINDOW_LABEL", "-e", "WindowKind::ToolNotification"];
-      if (treeish) args.push(treeish);
+      const args = ["grep", "-o", "-E", "-e", "\\bWINDOW_LABEL\\b|WindowKind::ToolNotification"];
+      /* 基线是 commit（已跟踪全集）；工作树连未跟踪文件一起数（见上第 2 条）。 */
+      args.push(treeish ?? "--untracked");
       args.push("--", treeish ? pathIn(treeish, REL_DIR) : REL_DIR);
       return git(args).split("\n").filter((line) => line.length > 0).length;
     };
-    expect(count(null)).toBe(count(T04_BASELINE));
+    expect(count(null)).toBe(count(T04_BASELINE) + WINDOW_KIND_MAPPING_SITES);
   });
 });

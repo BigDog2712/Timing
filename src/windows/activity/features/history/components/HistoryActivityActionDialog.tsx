@@ -109,7 +109,7 @@ export default function HistoryActivityActionDialog({ target, onClose }: Props) 
   const durationMs = Math.max(0, target.endTimeMs - target.startTimeMs);
 
   /* 唯一的写入点。两种情况都只发一条 intent —— 分析窗没有写命令，
-     「切换」与「新建事项」全由宿主用自己的 IPC 做（`patina-host-bridge.toml` 的边界）。 */
+     「切换」与「新建事项」全由宿主用自己的 IPC 做（`activity-host-bridge.toml` 的边界）。 */
   const start = () => {
     if (!appName) return;
     void emitHostIntent({ action: "start_timer_for_activity", itemName: resolvedName });

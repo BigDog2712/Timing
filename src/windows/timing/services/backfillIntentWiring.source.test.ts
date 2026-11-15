@@ -8,7 +8,7 @@
  *  ① 宿主执行端的补记分支只许调 `createRecord`，**不许**出现 `startOrSwitch` / `togglePause`；
  *  ② 分析窗弹卡的补记处理只许发 `backfill_record` 且右端 clamp 到 `Date.now()`；
  *  ③ 两条意图在协议层是**两个** action（合并会让 P0-05「从此刻开始、不回填历史区间」失效）；
- *  ④ 分析窗仍然**一条写命令都没有**：`patina-host-bridge.toml` 里不许出现 `create_record`。
+ *  ④ 分析窗仍然**一条写命令都没有**：`activity-host-bridge.toml` 里不许出现 `create_record`。
  *
  * 路径锚法：`fileURLToPath(import.meta.url)` + 仓库根，**不用** `new URL(rel, import.meta.url)`
  * —— Vite 会把后者改写成 `http://localhost` 形态，`readFileSync` 就找不到文件。
@@ -46,7 +46,7 @@ function sliceBalanced(source: string, marker: string): string {
 const BRIDGE = read('src/windows/timing/services/hostIntentBridge.ts');
 const DIALOG = read('src/windows/activity/features/history/components/HistoryActivityActionDialog.tsx');
 const GATEWAY = read('src/windows/activity/platform/runtime/hostIntentGateway.ts');
-const HOST_BRIDGE_ACL = read('src-tauri/permissions/patina-host-bridge.toml');
+const HOST_BRIDGE_ACL = read('src-tauri/permissions/activity-host-bridge.toml');
 
 describe('补记不碰计时状态机（P1-01 判据⑤）', () => {
   it('p101_bridge_backfill_branch_only_writes_a_record', () => {

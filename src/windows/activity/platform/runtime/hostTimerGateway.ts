@@ -19,7 +19,7 @@ import { addLocalDays, startOfLocalDay } from "../../shared/lib/localDate.ts";
  *
  * `get_timer_state` 只用于**冷启动补一次**：分析窗 WebView 首次创建时，宿主的计时可能早就跑起来了，
  * 那一帧广播已经过去了、且之后不会再发 —— 只靠订阅会让胶囊在「本次会话开始前」永远空白。
- * 它是**只读**命令，不破坏 `patina-host-bridge.toml` 的「不给任何写命令」边界。
+ * 它是**只读**命令，不破坏 `activity-host-bridge.toml` 的「不给任何写命令」边界。
  */
 const TIMER_STATE_CHANGED = "timer:state-changed";
 const GET_TIMER_STATE = "get_timer_state";
@@ -158,7 +158,7 @@ interface RawRecordRow {
  * 重复计了。所以这里只给**已封存**的部分，调用方算 `settledSec + liveSec` 即得今日累计，
  * 并且能跟着每秒 tick 一起长——不会出现「已计时在跳、今日累计冻着」的观感。
  *
- * 为什么不用 `stats_summary`：`patina-host-bridge.toml` 只放行 `list_records` / `list_items`
+ * 为什么不用 `stats_summary`：`activity-host-bridge.toml` 只放行 `list_records` / `list_items`
  * （+ 本轮加的只读 `get_timer_state`），为一行数字去扩权限不值得。
  *
  * 读不到返回 null（胶囊只显示已计时），不抛给界面（§6.5：分析窗不承担宿主错误文案）。

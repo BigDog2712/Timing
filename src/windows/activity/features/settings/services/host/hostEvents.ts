@@ -6,7 +6,7 @@
  * handler 经 ref 转发，订阅只随事件名重建一次（内联 handler 不会导致反复重订阅），
  * unmount 必须在 cleanup 里 unlisten（K-8，漏了就是「关了设置页后台还在收事件」）。
  *
- * 权限：`core:event:allow-listen` / `allow-unlisten` 已在 `capabilities/patina.json` 里
+ * 权限：`core:event:allow-listen` / `allow-unlisten` 已在 `capabilities/activity.json` 里
  * （既有授权，本轮不加）。
  */
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";

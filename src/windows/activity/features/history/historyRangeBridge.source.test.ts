@@ -24,7 +24,7 @@ import { describe, expect, it } from 'vitest';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..', '..');
 const read = (rel: string): string => readFileSync(join(ROOT, rel), 'utf8');
 
-const ACL = read('src-tauri/permissions/patina-host-bridge.toml');
+const ACL = read('src-tauri/permissions/activity-host-bridge.toml');
 const HISTORY = read('src/windows/activity/features/history/components/History.tsx');
 const GATEWAY = read('src/windows/activity/platform/runtime/historyRangeGateway.ts');
 const HOOK = read('src/windows/activity/features/history/hooks/useHistoryRangeData.ts');

@@ -28,7 +28,7 @@ declare global {
   }
 }
 
-const MAIN_WINDOW_LABEL = "patina";
+const MAIN_WINDOW_LABEL = "activity";
 const MAIN_WINDOW_READY_OUTCOMES = new Set<MainWindowReadyOutcome>([
   "stale",
   "duplicate",

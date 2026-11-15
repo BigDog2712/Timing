@@ -1,6 +1,6 @@
-# Patina（分析窗）改宿主设置的写面（[0.12.1] T04 · 设置搬进主界面）
+# 分析窗改宿主设置的写面（[0.12.1] T04 · 设置搬进主界面）
 #
-# 为什么和 `patina-host-bridge` / `host-theme-read` 分开：
+# 为什么和 `activity-host-bridge` / `host-theme-read` 分开：
 # 这两份是**只读桥**（历史页读计时记录、启动时读主题与四色），语义是「分析窗只读宿主的账」。
 # 本轮用户拍板把「外观配色 + 计时记录的同步与备份 + 选项」搬进主界面，分析窗就**必须**有
 # 写面——写面单独成一条，名字把用途说清楚：这是**设置页**的能力，不是「分析窗变全能了」。
@@ -19,13 +19,13 @@
 #     → src/features/settings/components/host/HostHighlightCard.tsx（高亮颜色）
 #   get_settings / update_settings / get_autostart / set_autostart / plugin_list / plugin_open_dir
 #     → 同上 Gateway，本批已打通、界面在 T04b 落地（常驻与启动 / 接口面）。
-#   一律**不**进 `main-window-commands`：那条是 Patina 自己 117 条命令的整面授权，
+#   一律**不**进 `main-window-commands`：那条是分析窗自己 117 条命令的整面授权，
 #   把这 12 条宿主的命令混进去，等于让整面都拿到宿主设置写权限（ACL 是攻击面）。
 #
-# 引用处：capabilities/patina.json。
+# 引用处：capabilities/activity.json。
 [[permission]]
-identifier = "patina-host-settings"
-description = "Allows the Patina analysis window (now hosting the settings page) to read and write the host's theme, accent colors, settings, autostart state, reference settings and plugin directory."
+identifier = "activity-host-settings"
+description = "Allows the activity analysis window (now hosting the settings page) to read and write the host's theme, accent colors, settings, autostart state, reference settings and plugin directory."
 commands.allow = [
   "theme_get",
   "theme_set",

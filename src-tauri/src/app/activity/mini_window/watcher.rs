@@ -1,4 +1,4 @@
-use super::{layout, native, MiniWindowState};
+use super::{layout, native, MiniWindowState, MINI_WINDOW_LABEL};
 use crate::models::activity::events::POWER_LIFECYCLE_CHANGED;
 use crate::models::activity::mini_window::{bounds, near_handle, release_placement, Point};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -46,7 +46,7 @@ pub(super) async fn run<R: Runtime + 'static>(app: AppHandle<R>, epoch: u64) {
             {
                 return;
             }
-            let Some(window) = app.get_webview_window("mini") else {
+            let Some(window) = app.get_webview_window(MINI_WINDOW_LABEL) else {
                 state.desired = false;
                 return;
             };

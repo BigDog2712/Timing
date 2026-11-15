@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
  * 反向数据桥 · 区间版：分析窗读**宿主**的计时记录、便利贴、待办。
  *
  * 与 `timingOverlapGateway.ts` 同一套路（同一个窗口、同一份 ACL 桥
- * `permissions/patina-host-bridge.toml`），区别只有两点：
+ * `permissions/activity-host-bridge.toml`），区别只有两点：
  *   1. `list_records` 要**翻页**：单日几十条够用，30 天可能上千条，
  *      而宿主的 `limit` 上限是 100/页（`types/domain-params.ts`）。
  *   2. 多读两张表：`note_list`（便利贴）与 `todo_list`（待办）。

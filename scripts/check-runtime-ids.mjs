@@ -12,28 +12,22 @@
  *   ① Rust `MAIN_WINDOW_LABEL`（建窗用）；
  *   ② `capabilities/*.json` 的 `windows[]`（ACL 按 label 决定这扇窗能调哪些命令）；
  *   ③ 前端 `windowControlGateway.ts` 的 `MAIN_WINDOW_LABEL`（按 label 认自己是谁）。
- * 三者漂一个的症状**全是静默的**：
- *   · ①② 漂 ⇒ Tauri ACL 判「这扇窗没被授权」⇒ 该窗所有 IPC 返回
- *     "<cmd> not allowed. Command not found"，界面能渲染、数据全空、控制台零日志；
- *   · ①③ 漂 ⇒ 前端认为自己不是分析窗 ⇒ ready 永不回执，浮层永远"未就绪"。
- * `npm run check` 之前对此**完全失明**（连 `cargo test` 都不在八步里）。
+ * 三者漂一个的症状**全是静默的**：①② 漂 ⇒ Tauri ACL 判「这扇窗没被授权」⇒ 该窗所有 IPC 返回
+ * "<cmd> not allowed. Command not found"，界面能渲染、数据全空、控制台零日志；①③ 漂 ⇒ 前端认为
+ * 自己不是分析窗 ⇒ ready 永不回执，浮层永远"未就绪"。`npm run check` 之前对此**完全失明**。
  *
  * ## 七个子判据（a–g）
  *
- * | 子判据 | 内容 |
- * |---|---|
- * | a | Rust 三个 label 常量互不相同（建窗撞 label 会 `Err`） |
- * | b | 前端 `MAIN_WINDOW_LABEL` == Rust `MAIN_WINDOW_LABEL`（逐字） |
- * | c | `capabilities/*.json` 的 `windows[]` ↔ Rust 建窗点**双向包含** |
- * | d | `WebviewUrl::App("x.html")` / dev URL 的每个 `x.html` 存在且是 vite 入口 |
- * | e | `get_webview_window("…")` 裸字面量**只许减**（棘轮，目标 0） |
- * | f | Rust 两个全局属性名必须在前端逐字出现（名字漂 = 桥静默断） |
- * | g | `resolveCurrentAppWindowLabel()` 仍含 `main`/`mini`/`tool-notification` |
+ * a 三个 label 常量互不相同（建窗撞 label 会 `Err`）；b 前端 `MAIN_WINDOW_LABEL` 与 Rust 逐字相等；
+ * c `capabilities/*.json` 的 `windows[]` ↔ Rust 建窗点**双向包含**；d `x.html` 既存在又是 vite 入口；
+ * e `get_webview_window("…")` 裸字面量**只许减**（棘轮，目标 0，0 是合法终态）；f Rust 两个全局属性名
+ * 必须在前端逐字出现（名字漂 = 桥静默断）；g `resolveCurrentAppWindowLabel()` 仍含 `main`/`mini`/`tool-notification`。
  *
- * ## 自我防伪（设计 §6 末 · 同 `check-layers` 哨兵纪律）
+ * ## 自我防伪（同 `check-layers` 哨兵纪律）
  *
- * 末尾打印**每个子判据的实际计数**，任一为 0 即失败。"扫空集合后全绿"是本仓踩过的
- * 坑：正则写错、目录改名、路径调整都会让规则安静地不再命中，而输出仍然是"全部通过"。
+ * 末尾打印每个子判据的**实际计数**，任一为 0 即失败（e 除外——它的目标就是 0，改由「仍能扫到
+ * `get_webview_window(` 调用点」保证没空转）。"扫空集合后全绿"是本仓踩过的坑：正则写错、目录
+ * 改名都会让规则安静地不再命中，而输出仍然是"全部通过"。
  */
 
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
@@ -55,14 +49,14 @@ function walk(dir, ext, out = []) {
   }
   return out;
 }
-
 const RS_FILES = walk('src-tauri/src', '.rs');
 const rsSources = new Map(RS_FILES.map((f) => [f, read(f)]));
 const TS_FILES = walk('src', '.ts').concat(walk('src', '.tsx'));
 
 const failures = [];
+/** `zeroOk`：该子判据的**合法终态就是 0**（目前只有 e）。它的“防空转”改由「能扫到调用点」保证。 */
 const counts = [];
-const record = (key, n) => counts.push(`${key}=${n}`);
+const record = (key, n, zeroOk = false) => counts.push({ key, n, zeroOk });
 
 /** 找 `const NAME: &str = "value";` 的字面值（全 Rust 源）。 */
 function rustConst(name) {
@@ -225,13 +219,20 @@ console.log(`[runtime-ids] d: 入口页 ${[...htmlRefs].join(' / ')} · vite 入
 /* ── e · get_webview_window("…") 裸字面量棘轮（目标 0）────────────────────
  * 裸字面量是「label 改名漏一处」的温床：常量改了、这里还是旧值，表现为「窗开出来了却拿不到」。 */
 const RAW_LITERAL_BUDGET = 10;
+const callSites = [...rsSources.values()].reduce(
+  (n, src) => n + [...src.matchAll(/get_webview_window\s*\(/g)].length,
+  0,
+);
 const rawLiterals = [];
 for (const [file, src] of rsSources) {
   for (const m of src.matchAll(/get_webview_window\(\s*"([^"]*)"/g)) {
     rawLiterals.push({ file, label: m[1] });
   }
 }
-record('e', rawLiterals.length);
+record('e', rawLiterals.length, true);
+if (callSites === 0) {
+  failures.push('e: 一处 `get_webview_window(` 都没扫到 —— 正则失效或调用点全被改走，这条判据在空转');
+}
 console.log(
   `[runtime-ids] e: get_webview_window 裸字面量 ${rawLiterals.length} 处（预算 ${RAW_LITERAL_BUDGET}，目标 0）` +
     (rawLiterals.length ? `：${[...new Set(rawLiterals.map((r) => r.label))].join(' / ')}` : ''),
@@ -283,7 +284,7 @@ if (!resolveFn) {
 }
 
 /* ── 自我防伪 ─────────────────────────────────────────────────────────────── */
-const empty = counts.filter((entry) => entry.endsWith('=0'));
+const empty = counts.filter((entry) => entry.n === 0 && !entry.zeroOk).map((entry) => `${entry.key}=0`);
 if (empty.length > 0) {
   failures.push(`哨兵：这些子判据的计数为 0，说明规则在空转 —— ${empty.join(' ')}`);
 }
@@ -296,4 +297,4 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-console.log(`[runtime-ids] OK — 7 条子判据全部通过（${counts.join(' ')}）`);
+console.log(`[runtime-ids] OK — 7 条子判据全部通过（${counts.map((e) => `${e.key}=${e.n}`).join(' ')}）`);

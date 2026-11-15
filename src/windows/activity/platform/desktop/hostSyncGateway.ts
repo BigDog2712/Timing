@@ -6,7 +6,7 @@
  * 主题与设置留在 `hostSettingsGateway.ts`，插件在 `hostPluginsGateway.ts`。
  *
  * 命令名与宿主 `IpcApi`（`src/types/domain/ipc.ts`）逐字对齐，权限见
- * `src-tauri/permissions/patina-host-settings.toml`。出错一律 throw（带 `message`），
+ * `src-tauri/permissions/activity-host-settings.toml`。出错一律 throw（带 `message`），
  * 由 `features/settings/services/hostApi.ts` 的 `errorText` 转成给用户看的一句话。
  */
 import { invoke } from "@tauri-apps/api/core";

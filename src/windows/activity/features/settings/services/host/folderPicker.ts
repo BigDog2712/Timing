@@ -5,7 +5,7 @@
  * 这里用 `@tauri-apps/plugin-dialog` 的 `open` 直接实现，行为一致：
  *  **用户取消 / 权限不足一律返回 null**，调用方保留原输入值，不把它当错误。
  *
- * 权限：需要在 `capabilities/patina.json` 里授予 `dialog:allow-open`（与宿主 `default.json`
+ * 权限：需要在 `capabilities/activity.json` 里授予 `dialog:allow-open`（与宿主 `default.json`
  * 同一条），否则取消以外的任何点击都会被 ACL 静默拒掉。
  */
 import { open } from "@tauri-apps/plugin-dialog";

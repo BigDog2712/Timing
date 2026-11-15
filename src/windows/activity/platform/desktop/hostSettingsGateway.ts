@@ -7,7 +7,7 @@
  *
  * 与 `platform/runtime/hostThemeGateway.ts` 的分工：那个是**只读**桥（启动时读一次 +
  * 订阅 `theme-changed`）；本文件是**写面 + 设置面**，权限见
- * `src-tauri/permissions/patina-host-settings.toml`。按域拆的三份：本文件（主题/设置）、
+ * `src-tauri/permissions/activity-host-settings.toml`。按域拆的三份：本文件（主题/设置）、
  * `hostSyncGateway.ts`（md_sync / 备份 / 数据根）、`hostPluginsGateway.ts`（插件）。
  *
  * 出错口径：**一律 throw**（消息已是人话），调用方捕获后显示在卡底——安静的失败会让用户

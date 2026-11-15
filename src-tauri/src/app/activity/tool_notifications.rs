@@ -4,7 +4,7 @@ use crate::{services::activity::data::tool_notification_store as store, services
 use serde::Serialize;
 use std::sync::{Mutex, PoisonError};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
-
+use crate::app::activity::main_window::MAIN_WINDOW_LABEL;
 mod native;
 pub const WINDOW_LABEL: &str = "tool-notification";
 
@@ -71,12 +71,12 @@ pub struct State {
 fn target(delivery: Delivery) -> &'static str {
     match delivery {
         Delivery::Notification => WINDOW_LABEL,
-        Delivery::Dialog => "patina",
+        Delivery::Dialog => MAIN_WINDOW_LABEL,
     }
 }
 
 pub fn snapshot<R: Runtime>(app: &AppHandle<R>, label: &str) -> Result<Snapshot, String> {
-    if label != "patina" && label != WINDOW_LABEL {
+    if label != MAIN_WINDOW_LABEL && label != WINDOW_LABEL {
         return Err("Tool presentation access denied".into());
     }
     let state = app.state::<State>();
@@ -343,7 +343,7 @@ pub async fn ready<R: Runtime + 'static>(
     if label == WINDOW_LABEL {
         native::show(app, width, height, canvas_height)?;
     } else if !app
-        .get_webview_window("patina")
+        .get_webview_window(MAIN_WINDOW_LABEL)
         .is_some_and(|w| w.is_visible().unwrap_or(false))
     {
         return Err("Main window is not visible yet".into());
@@ -532,15 +532,15 @@ mod tests {
             activity_reminder: None,
         });
         assert!(require_current(&inner, WINDOW_LABEL, "reminder:1:10").is_ok());
-        for label in ["patina", "mini", "unknown"] {
+        for label in [MAIN_WINDOW_LABEL, "mini", "unknown"] {
             assert!(require_current(&inner, label, "reminder:1:10").is_err());
         }
         assert!(require_current(&inner, WINDOW_LABEL, "reminder:2:10").is_err());
         inner.delivery = Delivery::Dialog;
         assert!(require_current(&inner, WINDOW_LABEL, "reminder:1:10").is_err());
-        assert!(require_current(&inner, "patina", "reminder:1:10").is_ok());
+        assert!(require_current(&inner, MAIN_WINDOW_LABEL, "reminder:1:10").is_ok());
         inner.snapshot.alert = None;
-        assert!(require_current(&inner, "patina", "reminder:1:10").is_err());
+        assert!(require_current(&inner, MAIN_WINDOW_LABEL, "reminder:1:10").is_err());
         assert!(serde_json::from_str::<Action>(r#"{"kind":"delete","id":1}"#).is_err());
     }
 }

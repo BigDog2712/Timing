@@ -12,7 +12,7 @@ import { invoke } from "@tauri-apps/api/core";
  * （`ipc_commands.rs` / `IpcApi` / `ipc.ts` / mock），而 `ipc.ts` 正卡在 300 行门禁上；
  * 这里一天只有几十条记录，两条已有命令足够。
  *
- * 权限在 `src-tauri/permissions/patina-host-bridge.toml`：只放行这两条**只读**命令，
+ * 权限在 `src-tauri/permissions/activity-host-bridge.toml`：只放行这两条**只读**命令，
  * 宿主自己的写命令一条都不给 Patina 窗。
  */
 

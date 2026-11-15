@@ -2,17 +2,17 @@
 
 # 为什么要有这份清单：Tauri 2.12 的 IPC 门禁（tauri/src/webview/mod.rs:2053）是
 #   if (plugin_command.is_some() || has_app_acl_manifest || !is_local) && invoke.acl.is_none()
-# 只要应用里存在任何 app 级 permission（本仓库就是 Patina 的 window-commands.toml），
+# 只要应用里存在任何 app 级 permission（本仓库就是分析窗的 window-commands.toml），
 # 宿主自己的命令也会被要求显式放行，否则前端每条 IPC 都拿到
 #   "<cmd> not allowed. Command not found"
 # 界面表现为「窗口能渲染、数据全空、控制台一句日志都没有」。融合时踩过这个坑：
-# 加上 Patina 的清单后，宿主 79 条命令全部失效。
+# 加上分析窗的清单后，宿主 79 条命令全部失效。
 # 因此宿主这一批必须在这里登记，并由 scripts/check-contract.mjs 断言与
 # src-tauri/src/ipc_commands.rs 的宿主段逐条一致（多一条、少一条都报错）。
 
 [[permission]]
 identifier = "host-commands"
-description = "Timing 宿主应用命令面（92 条）：事项 / 计时 / 记录 / 统计 / 设置 / 主题 / 窗口 / 便利贴 / 待办 / 提醒 / 插件 / Markdown 同步 / 数据根 / 迁移 / 移动端桥 / 分类目录 / 打开时间统计窗口。只授权给宿主自己的窗口，Patina 分析窗口另走 main-window-commands。"
+description = "Timing 宿主应用命令面（92 条）：事项 / 计时 / 记录 / 统计 / 设置 / 主题 / 窗口 / 便利贴 / 待办 / 提醒 / 插件 / Markdown 同步 / 数据根 / 迁移 / 移动端桥 / 分类目录 / 打开时间统计窗口。只授权给宿主自己的窗口，分析窗口另走 main-window-commands。"
 commands.allow = [
   "accent_get",
   "accent_set",

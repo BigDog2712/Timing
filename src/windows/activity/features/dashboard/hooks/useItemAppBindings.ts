@@ -17,7 +17,7 @@ import {
  *
  * ## 为什么读的是配置表的**两份真源并集**，而不是宿主 `item_app`
  *
- * 分析窗没有宿主写命令、也没有 `list_item_apps` 的读权限（`permissions/patina-host-bridge.toml`
+ * 分析窗没有宿主写命令、也没有 `list_item_apps` 的读权限（`permissions/activity-host-bridge.toml`
  * 只放行五条只读，且**不加写面**）。绑定在配置表里有**两份**：排行卡 / 本栏写的 1:1
  * `__app_item_binding::<exe>`，与应用设置弹窗写的 `__app_override::<exe>.itemBindings[]`。
  * 只读 1:1 的后果是用户报的第 6 条：在应用设置里绑了「燕云」，回到事项这边却显示

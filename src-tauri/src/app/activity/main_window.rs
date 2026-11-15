@@ -13,7 +13,7 @@ use tauri::{
 mod recovery;
 pub(crate) mod tools_navigation;
 
-pub(crate) const MAIN_WINDOW_LABEL: &str = "patina";
+pub(crate) const MAIN_WINDOW_LABEL: &str = "activity";
 
 pub(crate) async fn show_desktop() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(crate::infra::activity::windows::desktop::show_desktop)
@@ -587,10 +587,10 @@ pub(crate) fn handle_unexpected_main_window_destroyed<R: Runtime + 'static>(
 }
 
 fn main_window_initialization_script(generation: u64) -> String {
-    let script = format!(
-        "(() => {{ Object.defineProperty(window, '{MAIN_WINDOW_GENERATION_PROPERTY}', {{ value: {generation}, writable: false, configurable: false }}); const applyPatinaMainWindowLabel = () => document.documentElement?.setAttribute('data-window-label', '{MAIN_WINDOW_LABEL}'); applyPatinaMainWindowLabel(); if (!document.documentElement) {{ document.addEventListener('DOMContentLoaded', applyPatinaMainWindowLabel, {{ once: true }}); }} }})();"
-    );
-    script
+    /* [T04] 不再注入 `data-window-label`（写的是原生 label，CSS 只认归一化后的 `main`）；**别**改成写 `main`——那是第二份真相源。 */
+    format!(
+        "(() => {{ Object.defineProperty(window, '{MAIN_WINDOW_GENERATION_PROPERTY}', {{ value: {generation}, writable: false, configurable: false }}); }})();"
+    )
 }
 
 fn main_window_url() -> WebviewUrl {
@@ -758,11 +758,10 @@ mod tests {
         assert!(script.contains("value: 42"));
         assert!(script.contains("writable: false"));
         assert!(script.contains("configurable: false"));
-        assert!(script.contains("document.documentElement?.setAttribute"));
-        assert!(
-            script.find("Object.defineProperty").unwrap()
-                < script.find("document.documentElement").unwrap()
-        );
+        /* [T04] `data-window-label` 注入已删除：它写的是原生 label，而 CSS 只认前端归一化后的
+           `main`。这里反向钉住，防它被"顺手加回来"——加回来不会报错，只会让两份身份并存。 */
+        assert!(!script.contains("data-window-label"));
+        assert!(!script.contains("document.documentElement"));
     }
 
     #[cfg(debug_assertions)]
