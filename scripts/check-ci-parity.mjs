@@ -23,7 +23,7 @@
  *
  *   A `scripts` 里每个 `check:*` 都必须出现在 `check` 命令串里（抓「写了脚本没接进链」）
  *   B `check` 命令串里每个 `npm run X` 都必须在 `scripts` 里有定义（抓「链里引用了不存在的脚本」）
- *   C `verify` 必须同时引用 `check` 与 `test`（防将来把 test 优化掉）
+ *   C `verify` 必须同时引用 `check` / `build` / `test`（防将来把其中一块「优化」掉）
  *   D `ci.yml` 里每个 `npm run X` 都必须在 `scripts` 里有定义（抓「CI 调了不存在的脚本」）
  *   E `scripts` 里每个 `check:*` 都必须在 `ci.yml` 里被执行（或有一个显式登记的等价物）
  *     —— 这条就是「新门禁必须接进 CI 且并集对齐」。没有它，A 只保证本地跑，
@@ -134,13 +134,24 @@ if (missingInScripts.length > 0) {
   });
 }
 
-/* C · verify 必须同时跑门禁与测试 */
-const verifyMissing = ['check', 'test'].filter((name) => !verifyRefs.has(name));
+/* C · verify 必须同时跑门禁、发版构建与测试
+ *
+ * 三项各有各的理由，缺一项都是"名字还在、内容少了一块"：
+ *   · `check`  —— 门禁（类型/契约/体积/分层/品牌/运行时标识符…）
+ *   · `build`  —— **发版命令本身**（`tsc && vite build`），不是 `check:build`。
+ *     `check:build` 只有 `vite build`，故意不含 `tsc`（链里已经跑过一次）。
+ *     差别在于：将来有人在 `build` 里加一个后处理步骤（签名、资源拷贝、产物改名），
+ *     `check` 不会红，只有走发版命令的 `verify` 会红。多花一次 tsc ≈15s，买的是
+ *     「verify 走的就是发版路径」这个语义。
+ *   · `test`   —— vitest。门禁全绿而测试红了，是很容易发生的一种状态。
+ * 常量只列"必须出现"的项，不写顺序：顺序是人的排版自由，缺项才是事实问题。 */
+const REQUIRED_IN_VERIFY = ['check', 'build', 'test'];
+const verifyMissing = REQUIRED_IN_VERIFY.filter((name) => !verifyRefs.has(name));
 if (verifyMissing.length > 0) {
   failures.push({
-    label: '`verify` 没有同时包含 check 与 test',
+    label: '`verify` 没有同时包含 check / build / test',
     items: verifyMissing.map((n) => `缺少 ${n}`),
-    hint: 'verify 的语义是「门禁 + 测试都验过」；少一半而名字不变，等于让这个名字说谎',
+    hint: 'verify 的语义是「门禁 + 发版构建 + 测试都验过」；少一块而名字不变，等于让这个名字说谎',
   });
 }
 

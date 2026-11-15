@@ -18,7 +18,7 @@
     "check:runtime-ids": "node scripts/check-runtime-ids.mjs",
     "check:ci-parity": "node scripts/check-ci-parity.mjs",
     "check": "npm run check:ci-parity && npm run typecheck && npm run check:build && npm run check:contract && npm run check:size && npm run check:version && npm run check:layers && npm run check:brand && npm run lint && npm run check:mutation && npm run check:runtime-ids",
-    "verify": "npm run check && npm run test",
+    "verify": "npm run check && npm run build && npm test",
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint src --max-warnings=0",
