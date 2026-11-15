@@ -94,6 +94,12 @@ clippy 那两条 `-A` 是**存量豁免**，不是抄错命令：`unwrap_used` /
   变异自证（注入一处错误 → 看用例是否红 → 撤销）是本仓验收的固定动作。规矩：**注入那一行必须带 `MUTATION` 字样**（全大写），撤销时连同标记一起删；门禁扫 `src/**` + `src-tauri/src/**` 命中即红并点名 文件:行。
   为什么不能靠自觉：2026-11-14 一个下午出现三次「合法且零告警」的注入残留——`if true ||`（判据恒真）、`&& false`（闸门恒不成立）、`let _ = x;`（消除未使用告警，让整段调用消失）。三者都能编译、`cargo check` 0 warning、都对用例有真实影响，**磁盘状态与正常代码无法区分**。所以约定必须与内容无关。
   报告里「注入期」与「撤销后」要分开写：注入期贴红输出（点名哪条用例），撤销后贴 `grep -rn "MUTATION" src-tauri/src/ src/` 的**空输出** + 全量绿汇总行。三样齐了才算完成。
+- **门禁绿 ≠ 已提交的树绿** → 规矩，无机检（**所有人都踩过，包括写门禁的人**）
+  所有 `check:*` 都跑在**工作树**上，看不见 blob。T05 里出过一次：`npm run check:size` 绿、`git commit`
+  也成功，而**已提交的 blob 是 303 行**（工作树那会儿 300）——差的正是「我以为我删掉了」的那三行。
+  门禁与提交之间存在时间窗，所以两道补手：① 每次 commit 完**立刻在干净树上重跑一次**受影响的门禁；
+  ② 对有硬上限的文件（`check:size` 的 300 行）再补一次**核 blob**：`git show HEAD:<file> | wc -l`。
+  不用「推之前 `git stash -u` 再补跑」那套：它靠人记得 stash 回来，忘了就把在写的改动弄丢，代价比漏检大。
 - CSS 只用 `var(--*)` 令牌，零字面量色值、零 emoji、零紫粉渐变；令牌定义在 `src/windows/timing/styles/design-tokens.css`（索引，实体在 `src/windows/timing/styles/tokens/*.css`，**@import 顺序不可调换**）。
 - 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/windows/timing/types/domain/models.ts::ErrorCode` 与文案 `src/windows/timing/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **18** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
 - 文档目录：现行文档在 `docs/`；`docs/archive/v1/` 只作历史，不作为实现依据。
