@@ -216,9 +216,13 @@ for (const html of htmlRefs) {
 record('d', htmlRefs.size);
 console.log(`[runtime-ids] d: 入口页 ${[...htmlRefs].join(' / ')} · vite 入口 ${[...viteInputs].join(' / ')}`);
 
-/* ── e · get_webview_window("…") 裸字面量棘轮（目标 0）────────────────────
- * 裸字面量是「label 改名漏一处」的温床：常量改了、这里还是旧值，表现为「窗开出来了却拿不到」。 */
-const RAW_LITERAL_BUDGET = 10;
+/* ── e · get_webview_window("…") 裸字面量棘轮（预算 0 = 终态）────────────────
+ * 裸字面量是「label 改名漏一处」的温床：常量改了、这里还是旧值，表现为「窗开出来了却拿不到」。
+ *
+ * [T-5 达成即收棘轮] 实际值已到 0，预算**必须同批收到 0**。留着 10 的后果不是"多给点
+ * 余量"，而是这条棘轮只是个名字：下一次改动悄悄加回 1–10 处裸字面量，门禁仍然是绿的，
+ * 而"棘轮只许收紧"这句话就没人能验证了。收到 0 之后，加回**任何一处**都会红。 */
+const RAW_LITERAL_BUDGET = 0;
 const callSites = [...rsSources.values()].reduce(
   (n, src) => n + [...src.matchAll(/get_webview_window\s*\(/g)].length,
   0,
@@ -234,7 +238,7 @@ if (callSites === 0) {
   failures.push('e: 一处 `get_webview_window(` 都没扫到 —— 正则失效或调用点全被改走，这条判据在空转');
 }
 console.log(
-  `[runtime-ids] e: get_webview_window 裸字面量 ${rawLiterals.length} 处（预算 ${RAW_LITERAL_BUDGET}，目标 0）` +
+  `[runtime-ids] e: get_webview_window 裸字面量 ${rawLiterals.length} 处（预算 ${RAW_LITERAL_BUDGET}，0 是合法终态）` +
     (rawLiterals.length ? `：${[...new Set(rawLiterals.map((r) => r.label))].join(' / ')}` : ''),
 );
 if (rawLiterals.length > RAW_LITERAL_BUDGET) {
