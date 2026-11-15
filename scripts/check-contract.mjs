@@ -443,7 +443,25 @@ if (presentWindowIds.length !== 1) {
  * ⚠️ **不要写成插件前缀白名单**：第一版写 `^(core|opener|dialog|…):` 时，在 `default.json`
  * 上被 `autostart:allow-enable` / `-disable` / `-is-enabled` **假红 3 条**（它们来自
  * `tauri-plugin-autostart` 自带的权限集）。白名单会随插件增减而腐烂，而"本仓自己的
- * identifier 集合"是闭包，不会腐烂。一个会假红的判据最终一定被关掉，那比没有判据更坏。 */
+ * identifier 集合"是闭包，不会腐烂。一个会假红的判据最终一定被关掉，那比没有判据更坏。
+ *
+ * ## 当前档位：L1（结构性盲区写在这里，不是只写在设计文档里）
+ *
+ * L1 = 只拿"本仓 `permissions/*.toml` 的 identifier 闭包"这一份集合去比对。它能抓住
+ * 「capability 里写了个本仓不存在 / 改漏的名字」（`activity-window-commands` 敲错一个字、
+ * 改名只改一边），**但完全看不见插件命名空间的拼写**：
+ *
+ *     "opener:default"  →  "openope:default"      ← L1 零拦截，因为 `:` 一出现就跳过了
+ *
+ * 这类拼错只有 `cargo build` 会报 `Permission openope:default not found`，而
+ * `npm run check` 里没有 cargo ⇒ 纯前端流水线对它零拦截。
+ * L2 的正确做法是拿 `src-tauri/gen/schemas/acl-manifests.json` 的 `__app-acl__` 做闭包
+ * （插件 + 本仓全在内，17 个命名空间 / 426 个 id），但那份文件由 `cargo build` 生成、
+ * 不随仓提交 ⇒ L2 依赖构建产物存在，形态与 L1 不同，留到 T07（ACL 收口）之前落地。
+ * 期间**必须把档位打出来**（见末尾 `mode=`）：否则"跑的是 L1 还是 L2"在输出里不可观测，
+ * 判据形态就退化成一句不可验证的口头承诺。
+ */
+const VALIDATION_MODE = 'L1';
 const capabilityPermissionRefs = () => {
   const defined = new Set();
   for (const f of readdirSync(join(root, 'src-tauri/permissions')).filter((n) => n.endsWith('.toml'))) {
@@ -514,6 +532,18 @@ const summary = [
   `权限引用：capability 文件 ${capPerms.capFiles.length} 个 / 本仓 permission 标识符 ${capPerms.defined.size} 个 / ` +
     `裸标识符引用 ${capPerms.refs.length} 处（跳过插件命名空间 ${capPerms.skipped.length} 处）`,
 ].join('；');
+
+/* **档位必须打出来。** 跑的是 L1 还是 L2，光看"通过"两个字分不出来，而两者的覆盖面
+   差着 8 条插件命名空间引用。判据形态不可观测时，它退化成一个口头承诺。 */
+const skippedNs = new Set(
+  capPerms.skipped.map((s) => s.split(' :: ')[1]?.split(':')[0]).filter(Boolean),
+);
+console.log(
+  `[contract] mode=${VALIDATION_MODE} — 权限引用校验只比对「本仓 permissions/*.toml 的 identifier 闭包」；` +
+    `跳过插件命名空间 ${capPerms.skipped.length} 处 / ${skippedNs.size} 个命名空间（${[...skippedNs].sort().join(' ')}）。` +
+    '这一层拼错（opener:default → openope:default）本档**零拦截**，只有 cargo build 会报 Permission not found；' +
+    'L2（__app-acl__ 闭包）排在 T07 之前。',
+);
 
 if (failures.length === 0) {
   console.log(`[contract] OK — ${summary}`);
