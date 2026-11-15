@@ -52,6 +52,13 @@ jobs:
       - name: 变异注入残留（MUTATION 标记不许留在盘上）
         run: npm run check:mutation
 
+      # 这条从 2026-11 起就在本地链里，却一直没进 CI：窗口 label / 入口页 / 前端常量
+      # 三处漂移的症状全是静默的（IPC 全拒但界面正常、打包后 404），而它纯读文件、
+      # 不依赖编译，放这个 job 里 1 秒内给结论。CI 是唯一在干净环境里跑的判据面，
+      # 「本地跑过」不能当它的验收证据。
+      - name: 运行时标识符（窗口 label / 入口页 / 前端常量三处一致）
+        run: npm run check:runtime-ids
+
   frontend:
     name: 前端 · 类型 / Lint / 测试 / 构建
     runs-on: windows-latest
