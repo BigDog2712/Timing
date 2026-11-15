@@ -88,8 +88,7 @@ pub fn activity_webview_dir() -> PathBuf {
 }
 
 /// 活动**库**在给定数据根下的路径。目录名与库名出自**同一个** `Layout`——分两次取就有
-/// 机会取到两套（`activity/data/patina.db` 这种空库，或反过来），而它不报错。生产口径是
-/// `db_path_in(&timing_data_root(), data_layout())`；判据传临时根来断言它。
+/// 机会取到两套（`activity/data/patina.db` 这种空库），而它不报错。判据传临时根来断言它。
 pub fn db_path_in(root: &Path, layout: Layout) -> PathBuf {
     source_dir(root, layout).join(db_file_of(layout))
 }
@@ -102,10 +101,8 @@ pub fn db_path_in(root: &Path, layout: Layout) -> PathBuf {
 /// 于是应用在用户自己的目录里开一个空的新库。自定义根里两份都在时取新库名是有意的：
 /// 只有 `activity.db` 会被 T05 之后的写入碰到，`patina.db` 那份是只读快照。
 ///
-/// ⚠️ **这里不做完整性判定**，与 `fs_only_layout_in` 是同一类「只看文件在不在」的判定。
-/// 别顺着 [`data_layout`] 那条链以为这里也有 `quick_check`：本函数回答的是「该用哪个
-/// 名字」，不是「哪一份能读」；一份坏掉的 `activity.db` 在这里仍然叫 `activity.db`，
-/// 之后读它失败会以别的形式暴露（自定义根那道 `metadata` 闸只看存在性）。
+/// ⚠️ 不做完整性判定（与 `fs_only_layout_in` 同类，只看文件在不在）：它回答「该用哪个
+/// 名字」而不是「哪一份能读」，别顺着 [`data_layout`] 那条链以为这里也有 `quick_check`。
 pub fn db_file_in(dir: &Path) -> &'static str {
     let new_db = dir.join(SQLITE_DB_FILE_NAME).is_file();
     let old_db = dir.join(LEGACY_ACTIVITY_DB_FILE).is_file();
