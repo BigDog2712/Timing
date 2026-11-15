@@ -31,6 +31,8 @@ export interface AppBindingCopy {
   noBinding: string;
   /** 事项子菜单的 `aria-label` */
   itemMenuLabel: string;
+  /** 「不绑定」下方的禁用说明行（R6-B）：点「不绑定」只解除当前事项，其他绑定不受影响 */
+  unbindOnlyHint: string;
   /** 事项清单读取失败时那一栏的降级文案 */
   itemsLoadFailed: string;
   /** 事项清单为空（用户还没建过事项） */
@@ -66,6 +68,7 @@ export const APP_BINDING_COPY: Record<Locale, AppBindingCopy> = {
     bindItem: "绑定事项",
     noBinding: "不绑定",
     itemMenuLabel: "选择一个事项",
+    unbindOnlyHint: "仅解除当前事项的绑定；应用绑定的其他事项不受影响",
     itemsLoadFailed: "暂时读不到事项",
     itemsEmpty: "还没有事项",
     saveFailed: "保存失败，请重试",
@@ -85,6 +88,7 @@ export const APP_BINDING_COPY: Record<Locale, AppBindingCopy> = {
     bindItem: "Bind an item",
     noBinding: "No binding",
     itemMenuLabel: "Choose an item",
+    unbindOnlyHint: "Only unbinds the current item; other items bound to this app are unaffected.",
     itemsLoadFailed: "Items are unavailable right now",
     itemsEmpty: "No items yet",
     saveFailed: "Could not save, try again",
@@ -104,6 +108,7 @@ export const APP_BINDING_COPY: Record<Locale, AppBindingCopy> = {
     bindItem: "Связать с делом",
     noBinding: "Без связи",
     itemMenuLabel: "Выберите дело",
+    unbindOnlyHint: "Отвязывает только текущее дело; другие дела этого приложения не затрагиваются.",
     itemsLoadFailed: "Дела сейчас недоступны",
     itemsEmpty: "Дел пока нет",
     saveFailed: "Не удалось сохранить, повторите",
@@ -123,6 +128,7 @@ export const APP_BINDING_COPY: Record<Locale, AppBindingCopy> = {
     bindItem: "Vincular un asunto",
     noBinding: "Sin vínculo",
     itemMenuLabel: "Elige un asunto",
+    unbindOnlyHint: "Solo desvincula el asunto actual; los demás asuntos de esta aplicación no se ven afectados.",
     itemsLoadFailed: "Los asuntos no están disponibles ahora",
     itemsEmpty: "Aún no hay asuntos",
     saveFailed: "No se pudo guardar, inténtalo de nuevo",

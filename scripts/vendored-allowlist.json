@@ -1360,7 +1360,31 @@
     {
       "path": "src/windows/patina/features/dashboard/copyAppBinding.ts",
       "change": "modified",
-      "reason": "[0.13 fix] 「绑定应用」一栏的 8 个键 × 四语言（标题/说明/空态/占位/解绑/读失败/无候选/已绑在别处）",
+      "reason": "[0.13 fix] 「绑定应用」一栏的 8 个键 × 四语言（标题/说明/空态/占位/解绑/读失败/无候选/已绑在别处）；[R6-B] 追加 unbindOnlyHint 键 × 四语言（「不绑定」下方的禁用说明行）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/components/QuickClassificationItemBindingMenu.tsx",
+      "change": "modified",
+      "reason": "[R6-B] 「不绑定」与事项清单之间插入禁用说明行（复用 .quick-classification-menu-item:disabled，零 CSS 改动），解释「只解除当前事项」",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/types.ts",
+      "change": "modified",
+      "reason": "[R6-B] QuickClassificationItemBindingLabels 新增必填 unbindOnlyHint（「不绑定」下方的禁用说明行文案，由调用方注入）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/components/AppsModule.tsx",
+      "change": "modified",
+      "reason": "[R6-B] bindingLabels 注入 unbindOnlyHint（来自 copy.unbindOnlyHint）",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/classification/components/QuickClassificationSurface.test.tsx",
+      "change": "modified",
+      "reason": "[R6-B] LABELS mock 补必填 unbindOnlyHint；新增三条判据：逐字原文+位置、禁用态、文案缺失红",
       "owner": "software-engineer"
     },
     {
@@ -1409,6 +1433,12 @@
       "path": "src/windows/patina/features/settings/components/host/MdDataRootChange.tsx",
       "change": "modified",
       "reason": "[数据根搬迁 T01] 清单多了第六项 patina（只搬 patina/data），三处「五项」文案改成按快照项数算（不写字面量，漏改一处就是自己打自己的脸），并补一句「会一并搬到新位置的包括活动数据」——用户是照着这句判断搬得全不全的",
+      "owner": "software-engineer"
+    },
+    {
+      "path": "src/windows/patina/features/dashboard/hooks/categoryCatalogParity.test.ts",
+      "change": "added",
+      "reason": "[0.14] parity 判据：共享 BUILTIN_CATEGORY_LABELS_ZH ↔ patina uiText.categories 十键逐字相等（zh-only 药丸注入表与分析窗展示同词）",
       "owner": "software-engineer"
     }
   ]

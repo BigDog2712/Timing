@@ -75,14 +75,11 @@ import type {
 import type { OverlayStatus, OverlayStyle, SafStatus } from './mobile';
 import type { DataRootInfo } from './dataRoot';
 import type { MigrationInfo } from './migration';
+import type { CategoryCatalogRows } from './categoryCatalog';
 
-/**
- * 事件名常量（供 listen 使用，避免字符串散落）。
- *
- * 每个键都必须有 Rust 侧 emit 来源——`check:contract` 会把「前端声明了、后端
- * 从不 emit」判为死常量（`EVENT_ALLOWLIST` 目前为空；V0.3.3 随全局快捷键下架
- * 清掉了唯一的例外 `shortcut:triggered`）。
- */
+/** 事件名常量（供 listen 使用，避免字符串散落）。每个键都必须有 Rust 侧 emit 来源——
+ * `check:contract` 会把「前端声明了、后端从不 emit」判为死常量（`EVENT_ALLOWLIST` 目前为空；
+ * V0.3.3 随全局快捷键下架清掉了唯一的例外 `shortcut:triggered`）。 */
 export const IPC_EVENTS = {
   timerStateChanged: 'timer:state-changed',
   /* [V0.3.1] 托盘双击：高亮定位小条（颜色取设置里的「高亮颜色」）。
@@ -126,9 +123,7 @@ export interface PatinaOpenWindowParams {
   target?: PatinaOpenTarget | null;
 }
 
-/**
- * 命令 -> Promise<返回值> 映射。实现侧不得在此签名之外新增方法（规格即契约）。
- */
+/** 命令 -> Promise<返回值> 映射。实现侧不得在此签名之外新增方法（规格即契约）。 */
 export interface IpcApi {
   dailyStatusGet(date: string): Promise<Record<number, 'pending' | 'done'>>;
   dailyStatusSet(date: string, itemId: number, status: 'pending' | 'done'): Promise<void>;
@@ -148,6 +143,11 @@ export interface IpcApi {
   listItemsForApp(params: { appKey: string }): Promise<ItemAppBinding[]>;
   bindItemApp(params: ItemAppBindParams): Promise<ItemAppBinding>;
   unbindItemApp(params: ItemAppKeyParams): Promise<boolean>;
+  /* [0.14] 分类目录（两窗「事项分类选用」共用读口；哑管道，合并在前端） */
+  listCategoryCatalog(): Promise<CategoryCatalogRows>;
+  /* [0.13] 进程监视（绑定应用退出→结束这一段自动接管段）；null=清除，前端不主动调。
+     段身份=(itemId, segmentStartedAt)，后者取 TimeRecord.startedAt（暂停/继续不改，switch 开新段）。 */
+  setBoundProcessWatch(watch: { itemId: number; processId: number; segmentStartedAt: number } | null): Promise<void>;
 
   /* 计时域 */
   startTimer(params: StartTimerParams): Promise<TimeRecord>;

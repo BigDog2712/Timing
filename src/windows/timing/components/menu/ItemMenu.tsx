@@ -31,6 +31,7 @@ import { findItem, useItemStore } from '../../stores/itemStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { useUiStore } from '../../stores/uiStore';
 import { GlassMenu, type MenuEntry } from './GlassMenu';
+import { ItemsCascadeDeleteConfirm } from './ItemsCascadeDeleteConfirm';
 
 /** 删除事项的两步确认窗口（与便利贴圆点同口径） */
 const ARM_MS = 3500;
@@ -47,6 +48,10 @@ export function ItemMenu() {
   const name = item?.name ?? '未归类';
   const [armed, setArmed] = useState(false);
   const [hasReminder, setHasReminder] = useState(false);
+  /* [0.14] 有子事项时删除改走确认弹窗（级联软删在后端事务里，弹窗把级联说清） */
+  const [cascadeOpen, setCascadeOpen] = useState(false);
+  /** 直接子数（树硬限 2 层，直接子就是全部子；itemStore 里都是未软删的行） */
+  const childCount = item ? items.filter((candidate) => candidate.parentId === item.id).length : 0;
 
   /* 提醒状态：菜单弹出时问一次后端（reminder_pending），用于「开提醒 / 关提醒」二选一 */
   useEffect(() => {
@@ -151,15 +156,26 @@ export function ItemMenu() {
       {
         type: 'item',
         id: 'delete',
-        label: armed ? `再点一次删除「${name}」` : '删除事项',
+        /* 有子：进确认弹窗（文案里说清级联）；无子：保持两步 arm 原样 */
+        label: childCount > 0
+          ? '删除事项…'
+          : armed
+            ? `再点一次删除「${name}」`
+            : '删除事项',
         icon: TrashIcon,
         danger: true,
         disabled: item.isSystem,
-        onSelect: removeItem,
+        onSelect: () => {
+          if (childCount > 0) {
+            setCascadeOpen(true);
+            return;
+          }
+          removeItem();
+        },
       },
     ];
     /* runningThis 已由 status + sessionItemId 推导，无需再列 status（否则 lint 报多余依赖） */
-  }, [itemMenu, item, name, runningThis, hasReminder, armed, actions, pos, closeItemMenu, removeItem]);
+  }, [itemMenu, item, name, runningThis, hasReminder, armed, childCount, actions, pos, closeItemMenu, removeItem]);
 
   if (!itemMenu) return null;
 
@@ -167,6 +183,17 @@ export function ItemMenu() {
     <>
       <div className="menu-scrim" onMouseDown={closeItemMenu} aria-hidden />
       <GlassMenu entries={entries} anchor={pos} ariaLabel="事项操作" onClose={closeItemMenu} />
+      {/* 弹窗叠在菜单上（后渲染在后）：自己的 scrim 接管点击，确认后 reload 事项表 */}
+      {cascadeOpen && item ? (
+        <ItemsCascadeDeleteConfirm
+          item={item}
+          items={items}
+          onClose={() => {
+            setCascadeOpen(false);
+            closeItemMenu();
+          }}
+        />
+      ) : null}
     </>
   );
 }

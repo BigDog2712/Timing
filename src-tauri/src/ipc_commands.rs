@@ -1,4 +1,4 @@
-//! 应用级 IPC 命令表：宿主 90 条 + Patina 126 条（后者仅桌面）。
+//! 应用级 IPC 命令表：宿主 92 条 + Patina 126 条（后者仅桌面）。
 //!
 //! **为什么只有一张表**：Tauri 的 `invoke_handler` 是替换语义，`Invoke` 又不 `Clone`，
 //! 「宿主表 + Patina 表串成闭包」编不过（E0382）；改用插件注册更糟——插件命令走
@@ -27,6 +27,8 @@ macro_rules! define_invoke_handler {
             crate::commands::item_cmd::archive_item,
             crate::commands::item_cmd::unarchive_item,
             crate::commands::item_cmd::delete_item,
+            /* [0.14] 分类目录读口（两窗「事项分类选用」共用；桌面读活动库，手机回空目录）。 */
+            crate::commands::category_catalog_cmd::list_category_catalog,
             /* [0.13.x] 事项 ↔ 应用绑定（宿主段：业务库 item_app 表）。
                四条都是两端可用的普通命令，不进 Patina 段。 */
             crate::commands::item_app_cmd::list_item_apps,
@@ -78,6 +80,9 @@ macro_rules! define_invoke_handler {
             /* [0.13 fix] 药丸冷启动「主动取一次前台」用：引擎那次广播早于前端订阅，丢了就
                再也不发（详见 `commands/window_cmd.rs` 里那条命令的注释）。 */
             crate::commands::window_cmd::get_foreground_window,
+            /* [0.13] 绑定的应用进程退出时结束这一段自动接管（桌面真实现 / 手机 Ok(())）。
+               注册点无条件写在这里：命令名就是契约面，手机端同名注册。 */
+            crate::commands::bound_process_watch_cmd::set_bound_process_watch,
             crate::commands::todo_cmd::todo_create,
             // [0.13 · 1.7] 批量创建（单事务 1..=60）
             crate::commands::todo_cmd::todo_create_batch,

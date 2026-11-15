@@ -1,5 +1,18 @@
 //! 业务层：计时状态机、事项规则、记录编排、设置读写。所有业务逻辑归属此处。
 pub mod countdown;
+/* [0.13] 「绑定应用的进程退出 → 结束这一段自动接管开出来的计时」。
+   桌面独占：安卓端没有任何前台应用 / 进程枚举能力（`services::insight` 整棵
+   `#[cfg(desktop)]`），这条链路在手机上本来就不存在。 */
+#[cfg(desktop)]
+pub mod bound_process_watch;
+/* 判据矩阵 + 替换不泄漏（纯判据，不碰真进程）；真进程端到端（真 spawn / 真句柄 /
+   真停表）在下面那个文件。两个都不是产品代码，与 `item_app_mirror_tests` 同形。 */
+#[cfg(all(test, desktop))]
+#[path = "bound_process_watch_tests.rs"]
+mod bound_process_watch_tests;
+#[cfg(all(test, desktop))]
+#[path = "bound_process_watch_win_tests.rs"]
+mod bound_process_watch_win_tests;
 /* [0.13.x] 本机身份（install_id）的落盘读写 + 进程级缓存 + 本地日键。
    跨平台：计时事件流（`repositories::timer_ops`）在两端都要写 `device_id`，
    而原先的实现藏在 `insight`（`#[cfg(desktop)]`）里，手机端够不着。
@@ -35,6 +48,9 @@ mod item_app_mirror_track_tests;
    而不是只断言调用返回 Ok（两者不同步时全链路零报错）。 */
 #[cfg(test)]
 mod item_tests;
+/* [0.14] `delete_item` 级联软删的判据（从 item_tests.rs 分出：那边 272 行，加级联四条会顶穿 300）。 */
+#[cfg(test)]
+mod item_cascade_delete_tests;
 pub mod md_backup;
 /* [V0.11.23] 备份导出：名字校验 / 路径闸 / 导出名。放 services 才够得着桌面用例。 */
 pub mod md_backup_export;

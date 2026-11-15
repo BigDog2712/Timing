@@ -26,3 +26,20 @@ export function readActiveWindowExe(payload: unknown): string | null {
   const value = (payload as { exe_name?: unknown }).exe_name;
   return typeof value === "string" ? value : null;
 }
+
+/**
+ * 从事件载荷里取前台进程号。
+ *
+ * 载荷是 `WindowInfo`（snake_case，`process_id: u32`，见
+ * `infra/insight/windows/foreground.rs`）——注意与宿主命令 `get_foreground_window`
+ * 的返回（`ForegroundWindow`，camelCase `processId`）命名不同：事件载荷未经
+ * `rename_all`，这里是历史事实，两个读取函数各自钉住各自的字段名。
+ *
+ * `null` 的语义同 `readActiveWindowExe`：缺字段/非正数都算「不知道」，
+ * 调用方跳过（进程监视注册没有 pid 就是没法做，不是错误）。
+ */
+export function readActiveWindowProcessId(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  const value = (payload as { process_id?: unknown }).process_id;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}

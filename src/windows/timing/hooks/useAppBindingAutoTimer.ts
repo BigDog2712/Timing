@@ -32,6 +32,13 @@
  *   4. **自家窗口不算"离开了应用"**：点药丸时前台会变成 `timing.exe`，随后点回游戏。
  *      若那时清了 `handledKeyRef`，用户刚手动切走的事项就会被"回到游戏"重新拽回去
  *      —— 所以自家进程到前台直接返回，两个 ref 都不动。
+ *   5. **接管成功那一刻注册进程监视**（[0.13]「应用退出进程才结束」）：注册只来自
+ *      自动路径 ——「已经在计这一件」的分支**不注册**（那可能是用户手动开的计时，
+ *      甚至是应用重启前的旧段，碰了就是越权）。段身份 `(itemId, startedAt)` 取自
+ *      接管成功后的 store（`switch` 的 `end_and_start` 开新段；暂停/继续不改
+ *      `started_at`，同一段）；`processId` 从事件载荷 / 冷启动查询一路带进来，
+ *      不许前端自己再查一遍（进程会退出，晚查到的可能是复用后的新 pid）。
+ *      注册失败只 warn：下一次前台变化会重新注册，不影响"已接管"记账。
  *
  * ## 为什么用 `startOrSwitch` 而不是 `stop + start`
  *
@@ -43,7 +50,7 @@
 import { useEffect, useRef } from "react";
 
 import { normalizeAppKey } from "../../shared/appKey.ts";
-import { ACTIVE_WINDOW_CHANGED_EVENT, readActiveWindowExe } from "../../shared/hostEvents.ts";
+import { ACTIVE_WINDOW_CHANGED_EVENT, readActiveWindowExe, readActiveWindowProcessId } from "../../shared/hostEvents.ts";
 import { useTauriEvent } from "./useTauriEvent";
 import { useTimerActions } from "./useTimerActions";
 import { ipc } from "../services/ipc";
@@ -82,6 +89,36 @@ export function pickBoundItemId(bindings: readonly BoundItemRef[]): number | nul
   return picked;
 }
 
+/**
+ * 「盯进程退出」的注册入参（`ipc.setBoundProcessWatch` 的载荷；Rust 侧
+ * `BoundProcessWatchInput` 是 `deny_unknown_fields`，字段漂移会当场报错而不是静默失效）。
+ */
+export interface BoundProcessWatchInput {
+  itemId: number;
+  processId: number;
+  segmentStartedAt: number;
+}
+
+/**
+ * 从「接管成功那一刻」的计时状态里算出注册入参；算不出就返回 `null`（不注册）。
+ *
+ * 判据刻意写成纯函数：三条门
+ *   ① 会话存在且**就是这次接管的事项**（不是 → 什么都不许注册，
+ *      `startOrSwitch` 的回值 `true` 也可能伴随一次本地乐观刷新的竞态，宁可少注册）；
+ *   ② 段起点是整数（`TimeRecord.startedAt`，暂停/继续不改、`switch` 开新段）；
+ *   ③ pid 合法（`readActiveWindowProcessId` 已保证 > 0，这里只兜底）。
+ */
+export function watchInputFromState(
+  itemId: number,
+  processId: number,
+  session: { itemId: number; startedAt: number } | null,
+): BoundProcessWatchInput | null {
+  if (!session || session.itemId !== itemId) return null;
+  if (!Number.isSafeInteger(session.startedAt)) return null;
+  if (!Number.isSafeInteger(processId) || processId <= 0) return null;
+  return { itemId, processId, segmentStartedAt: session.startedAt };
+}
+
 export function useAppBindingAutoTimer(): void {
   const { startOrSwitch } = useTimerActions();
   /** 上一次看到的**前台应用**（含"没绑定→直接返回"的那些：它们也要算"我离开过了"） */
@@ -94,9 +131,10 @@ export function useAppBindingAutoTimer(): void {
    * 一个入口，两个来源：引擎广播（`active-window-changed`）与「挂载后主动查一次」。
    *
    * 必须共用：两条路各自演进一定漂移，而漂移的表现是**冷启动那条悄悄失效**（事件那条还有测试看着）。
-   * 参数是「前台进程名」，`null` / 空串 = 不知道，直接返回。
+   * 参数是「前台进程名 + 进程号」，名字 `null` / 空串 = 不知道，直接返回；
+   * 进程号 `null` 只影响「接管成功后能不能注册监视」，不影响接管本身。
    */
-  const handleForeground = (rawExe: string | null): void => {
+  const handleForeground = (rawExe: string | null, processId: number | null): void => {
     const appKey = normalizeAppKey(rawExe ?? "");
     if (!appKey) return;
     /* 自家窗口（药丸 / 分析窗）到前台 = 用户点了我们，**不是**离开了那个应用。
@@ -134,6 +172,17 @@ export function useAppBindingAutoTimer(): void {
            `silent: true` 保证这条链失败时**不弹 notice**（用户没点任何东西）。 */
         if (!started) return;
         handledKeyRef.current = appKey;
+        /* [0.13] 注册进程监视：只挂在「自动接管真的发生了」这一刻（上面的分支都不注册）。
+           fire-and-forget：注册失败只 warn —— 下一次前台变化会重新注册，
+           而且这条链路用户没点任何东西，不该有任何打扰。 */
+        if (processId !== null) {
+          const watch = watchInputFromState(itemId, processId, useTimerStore.getState().state.session);
+          if (watch) {
+            void ipc.setBoundProcessWatch(watch).catch((error) => {
+              console.warn("bound process watch registration failed", error);
+            });
+          }
+        }
       } catch (error) {
         /* 自动接管失败不打扰用户：没点任何东西却弹一句错误只会让人困惑 */
         console.warn("auto timer for bound app failed", appKey, error);
@@ -148,7 +197,7 @@ export function useAppBindingAutoTimer(): void {
   handlerRef.current = handleForeground;
 
   useTauriEvent<unknown>(ACTIVE_WINDOW_CHANGED_EVENT, (payload) => {
-    handlerRef.current(readActiveWindowExe(payload));
+    handlerRef.current(readActiveWindowExe(payload), readActiveWindowProcessId(payload));
   });
 
   /**
@@ -167,7 +216,9 @@ export function useAppBindingAutoTimer(): void {
     void (async () => {
       try {
         const window = await ipc.getForegroundWindow();
-        if (window?.exeName) handlerRef.current(window.exeName);
+        if (window?.exeName) {
+          handlerRef.current(window.exeName, typeof window.processId === "number" ? window.processId : null);
+        }
       } catch {
         /* 静默：桌面壳 / 锁屏 / 追踪还没起都可能回空或报错，那是启动期的常态，不是错误 */
       }

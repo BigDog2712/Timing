@@ -25,6 +25,8 @@ const h = vi.hoisted(() => ({
   timerState: { status: "idle", session: null } as { status: string; session: { itemId: number } | null },
   /* [0.13 R4] 冷启动那条：挂载后主动取一次当前前台（宿主命令 `get_foreground_window`） */
   getForegroundWindow: vi.fn(async () => null as { exeName: string; processId: number } | null),
+  /* [0.13] 进程监视注册：本文件载荷不带 process_id，这条永远不该被调（判据见 *Watch.test.ts） */
+  setBoundProcessWatch: vi.fn(async () => undefined),
 }));
 
 vi.mock("./useTauriEvent", () => ({
@@ -37,7 +39,7 @@ vi.mock("./useTimerActions", () => ({
   useTimerActions: () => ({ startOrSwitch: h.startOrSwitch }),
 }));
 vi.mock("../services/ipc", () => ({
-  ipc: { listItemsForApp: h.listItemsForApp, getForegroundWindow: h.getForegroundWindow },
+  ipc: { listItemsForApp: h.listItemsForApp, getForegroundWindow: h.getForegroundWindow, setBoundProcessWatch: h.setBoundProcessWatch },
 }));
 vi.mock("../stores/timerStore", () => ({
   useTimerStore: { getState: () => ({ state: h.timerState }) },
@@ -90,6 +92,7 @@ beforeEach(() => {
   h.listItemsForApp.mockResolvedValue([]);
   h.getForegroundWindow.mockClear();
   h.getForegroundWindow.mockResolvedValue(null);
+  h.setBoundProcessWatch.mockClear();
   h.timerState = { status: "idle", session: null };
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -139,6 +142,8 @@ describe("useAppBindingAutoTimer", () => {
     expect(h.listItemsForApp).toHaveBeenCalledWith({ appKey: "code.exe" });
     /* `silent: true`：用户没点任何东西，失败时不许弹 notice（高-1） */
     expect(h.startOrSwitch).toHaveBeenCalledWith(5, { silent: true });
+    /* 载荷没带 `process_id`：接管照常，但注册不了进程监视（判据见 *Watch.test.ts） */
+    expect(h.setBoundProcessWatch).not.toHaveBeenCalled();
   });
 
   it("ab06_没有绑定的应用_一个动作都不做", async () => {

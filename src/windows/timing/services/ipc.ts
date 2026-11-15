@@ -65,6 +65,7 @@ import type {
 } from '../types/domain';
 import { createMockApi } from '../mocks/browserMock';
 import type { DataRootInfo } from '../types/domain/dataRoot';
+import type { CategoryCatalogRows } from '../types/domain/categoryCatalog';
 /* [V0.5.0] 错误类型与规范化搬到 ipcError.ts 腾行数；`errorText()` 留在本文件——check-contract.mjs 从这里内联解析 `case '...'`。 */
 import { IpcError, normalizeError } from './ipcError';
 export { IpcError } from './ipcError';
@@ -114,9 +115,12 @@ export function errorText(err: unknown): string {
     case 'IO_ERROR':
       /* [V0.3.0] 曾漏这一支、静默落到通用兜底；现由 check:contract 的覆盖率规则强制。 */
       return '系统调用失败，请重试';
-    /* [V0.2.0] */
+    /* [0.2.0] */
     case 'NOTE_NOT_FOUND':
       return '便利贴不存在或已删除';
+    /* [0.14] 事项树分层规则被违反（挂到子下 / 有子还挂 / 自己当父） */
+    case 'ITEM_DEPTH_EXCEEDED':
+      return '子事项不能再挂子事项（层级上限 2 层）';
     case 'TODO_NOT_FOUND':
       return '待办不存在或已删除';
     case 'WINDOW_LIMIT_EXCEEDED':
@@ -158,6 +162,12 @@ export const ipc: IpcApi = {
   listItemsForApp: (p: { appKey: string }) => call<ItemAppBinding[]>('list_items_for_app', { appKey: p.appKey }),
   bindItemApp: (p: ItemAppBindParams) => call<ItemAppBinding>('bind_item_app', { input: { itemId: p.itemId, appKey: p.appKey, track: p.track ?? 1 } }),
   unbindItemApp: (p: ItemAppKeyParams) => call<boolean>('unbind_item_app', { itemId: p.itemId, appKey: p.appKey }),
+  /* [0.14] 分类目录读口（两窗共用；手机端桩回空目录） */
+  listCategoryCatalog: () => call<CategoryCatalogRows>('list_category_catalog', {}),
+  /* [0.13] 进程监视注册（自动接管段专用；字段名与 Rust `BoundProcessWatchInput` 的
+     `rename_all = "camelCase"` 对齐，`deny_unknown_fields` 会在字段漂移时当场报错）。 */
+  setBoundProcessWatch: (watch: { itemId: number; processId: number; segmentStartedAt: number } | null) =>
+    call<void>('set_bound_process_watch', { watch: watch ?? null }),
 
   /* ---- 计时域 ---- */
   startTimer: (params: StartTimerParams) => call<TimeRecord>('start_timer', params.itemId != null ? { itemId: params.itemId } : {}),

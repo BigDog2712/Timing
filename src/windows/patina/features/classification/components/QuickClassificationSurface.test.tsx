@@ -39,6 +39,7 @@ import {
 const LABELS: QuickClassificationItemBinding["labels"] = {
   entry: "绑定事项",
   none: "不绑定",
+  unbindOnlyHint: "仅解除当前事项的绑定；应用绑定的其他事项不受影响",
   menuLabel: "选择一个事项",
   loadFailed: "暂时读不到事项",
   empty: "还没有事项",
@@ -179,6 +180,70 @@ describe("弹层：传了 itemBinding", () => {
     expect(document.body.textContent).toContain(LABELS.loadFailed);
     expect(document.body.querySelectorAll("[role='menuitemradio']")).toHaveLength(0);
     expect(onSave).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * [R6-B 方案 B] 「不绑定」只解除**当前这一事项**：应用还绑着其他事项时，行标记会换成
+ * 下一件（拍板保留的现状），但 UI 之前没有解释，用户的误解是「点『不绑定』= 解绑了
+ * 整个应用」。修复 = 菜单内、「不绑定」项与事项清单之间加一行**禁用说明**。
+ * 断言按 QA 口径钉**逐字原文**：少一个字、换一个分号都是红；文案缺失（labels 没带上
+ * `unbindOnlyHint`）时 textContent 为空，同样红。
+ */
+const UNBIND_ONLY_HINT = "仅解除当前事项的绑定；应用绑定的其他事项不受影响";
+
+describe("弹层：「不绑定」下方的禁用说明行（R6-B）", () => {
+  async function openBindingMenu(): Promise<void> {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    await mount({
+      itemId: 2,
+      items: [{ id: 1, name: "写代码" }, { id: 2, name: "开会" }],
+      loadFailed: false,
+      labels: LABELS,
+      onSave,
+    });
+    await act(async () => { buttonByText(LABELS.entry).click(); });
+  }
+
+  it("说明行逐字钉死原文，且落在「不绑定」与事项清单之间", async () => {
+    await openBindingMenu();
+    /* 逐字原文（QA 断言口径）：漂移即红 */
+    expect(document.body.textContent).toContain(UNBIND_ONLY_HINT);
+    /* 位置：子菜单的按钮序列 = 「不绑定」→ 说明行 → 事项清单 */
+    const submenu = document.body.querySelector<HTMLDivElement>(
+      `[role='menu'][aria-label='${LABELS.menuLabel}']`,
+    );
+    expect(submenu).not.toBeNull();
+    const rows = Array.from(submenu?.querySelectorAll("button") ?? []);
+    expect(rows[0]?.textContent).toContain(LABELS.none);
+    expect(rows[1]?.textContent).toContain(UNBIND_ONLY_HINT);
+    expect(rows[2]?.textContent).toContain("写代码");
+    expect(rows[3]?.textContent).toContain("开会");
+  });
+
+  it("说明行是禁用菜单项（复用 .quick-classification-menu-item:disabled 的灰字态，零 CSS 改动）", async () => {
+    await openBindingMenu();
+    const hint = Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
+      .find((button) => button.textContent?.includes(UNBIND_ONLY_HINT));
+    expect(hint).toBeDefined();
+    expect(hint?.disabled).toBe(true);
+    expect(hint?.className).toContain("quick-classification-menu-item");
+    expect(hint?.getAttribute("role")).toBe("menuitem");
+    /* 禁用项不进键盘序（`OPTION_SELECTOR` 的 `:not([disabled])` 跳过它） */
+    expect(hint?.matches("[role='menuitemradio']")).toBe(false);
+  });
+
+  it("文案缺失 → 红：labels 不带 unbindOnlyHint 时说明行不渲染原句", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    await mount({
+      itemId: 2,
+      items: [{ id: 1, name: "写代码" }],
+      loadFailed: false,
+      labels: { ...LABELS, unbindOnlyHint: "" },
+      onSave,
+    });
+    await act(async () => { buttonByText(LABELS.entry).click(); });
+    expect(document.body.textContent).not.toContain(UNBIND_ONLY_HINT);
   });
 });
 

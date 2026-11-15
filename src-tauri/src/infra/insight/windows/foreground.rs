@@ -288,7 +288,7 @@ pub fn get_process_exe_name(process_id: u32) -> String {
     get_process_details(process_id).0
 }
 
-pub(super) fn process_identity(process_id: u32) -> Option<(u64, String)> {
+pub fn process_identity(process_id: u32) -> Option<(u64, String)> {
     let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id) }
         .ok()
         .and_then(OwnedHandle::new)?;

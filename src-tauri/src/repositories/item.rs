@@ -61,6 +61,23 @@ pub async fn count_children(pool: &SqlitePool, parent_id: i64) -> AppResult<i64>
     Ok(value)
 }
 
+/// 直接子事项（排除已软删除）。[0.14] 级联软删用：树硬限 2 层，直接子就是全部子，
+/// 不需要递归；**含 archived**（归档是软态，级联不因归档而跳过）。
+pub async fn list_children<'a, E>(executor: E, parent_id: i64) -> AppResult<Vec<Item>>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Sqlite>,
+{
+    let sql = format!(
+        "SELECT {COLS} FROM items WHERE parent_id = ? AND deleted_at IS NULL \
+         ORDER BY id ASC"
+    );
+    let items = sqlx::query_as::<_, Item>(&sql)
+        .bind(parent_id)
+        .fetch_all(executor)
+        .await?;
+    Ok(items)
+}
+
 /// 当前最大 sort_order（无记录返回 0）。
 pub async fn max_sort_order(pool: &SqlitePool) -> AppResult<i64> {
     let value: i64 = sqlx::query_scalar(
@@ -194,13 +211,17 @@ pub async fn set_status(pool: &SqlitePool, id: i64, status: &str, now: i64) -> A
     Ok(())
 }
 
-/// 软删除。
-pub async fn soft_delete(pool: &SqlitePool, id: i64, now: i64) -> AppResult<()> {
+/// 软删除。泛型执行器：`services::item::delete` 的级联要**在事务内**逐个子删（[0.14]），
+/// 连接池版本与事务版本共用这一条 SQL。
+pub async fn soft_delete<'a, E>(executor: E, id: i64, now: i64) -> AppResult<()>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Sqlite>,
+{
     sqlx::query("UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?")
         .bind(now)
         .bind(now)
         .bind(id)
-        .execute(pool)
+        .execute(executor)
         .await?;
     Ok(())
 }

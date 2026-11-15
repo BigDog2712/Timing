@@ -73,6 +73,7 @@ export default function AppsModule({ controls, applications, icons, status, refr
   const bindingLabels = useMemo<QuickClassificationItemBinding["labels"]>(() => ({
     entry: copy.bindItem,
     none: copy.noBinding,
+    unbindOnlyHint: copy.unbindOnlyHint,
     menuLabel: copy.itemMenuLabel,
     loadFailed: copy.itemsLoadFailed,
     empty: copy.itemsEmpty,

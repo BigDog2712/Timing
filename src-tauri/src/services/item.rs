@@ -92,7 +92,7 @@ async fn resolve_depth(pool: &SqlitePool, parent_id: Option<i64>) -> AppResult<i
         .ok_or_else(AppError::item_not_found)?;
     if parent.depth != 0 {
         // 子事项不能再挂子：拦在写入前，而不是让它长成第 3 层再回头清理。
-        return Err(AppError::invalid_duration());
+        return Err(AppError::item_depth_exceeded());
     }
     Ok(1)
 }
@@ -118,13 +118,13 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: ItemPatch) -> AppResult<I
     let mut depth_to_set: Option<i64> = None;
     if let Some(parent) = patch.parent_id {
         if parent == Some(id) {
-            return Err(AppError::invalid_duration());
+            return Err(AppError::item_depth_exceeded());
         }
         if parent.is_none() {
             depth_to_set = Some(0);
         } else {
             if repo::count_children(pool, id).await? > 0 {
-                return Err(AppError::invalid_duration());
+                return Err(AppError::item_depth_exceeded());
             }
             depth_to_set = Some(resolve_depth(pool, parent).await?);
         }
@@ -178,7 +178,19 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> AppResult<()> {
     if existing.is_system {
         return Err(AppError::item_system_protected());
     }
-    repo::soft_delete(pool, id, now_ms()).await
+    /* [0.14] 级联软删（同一事务）：查直接子 → 逐个软删 → 删父。树硬限 2 层，
+       直接子就是全部子孙（无孙层）；archived 子也级联（归档是软态，不跳过）。
+       事务不可省：删到一半断掉的话，父还在、子已删一半，「父块含子块」的
+       读路径会看到半棵树，且没有任何报错。 */
+    let mut tx = pool.begin().await?;
+    let children = repo::list_children(&mut *tx, id).await?;
+    let now = now_ms();
+    for child in &children {
+        repo::soft_delete(&mut *tx, child.id, now).await?;
+    }
+    repo::soft_delete(&mut *tx, id, now).await?;
+    tx.commit().await?;
+    Ok(())
 }
 
 async fn fetch_or_not_found(pool: &SqlitePool, id: i64) -> AppResult<Item> {

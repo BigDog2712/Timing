@@ -43,13 +43,14 @@
 
 ---
 
-## 2. 错误码清单（共 17 个）
+## 2. 错误码清单（共 19 个）
 
 > 组成：v0.1.0 锁定 11 个 + v0.2.0 新增 5 个 + v0.3.0 新增 1 个 − v0.3.1 下架 1 个
 > （`ITEM_NAME_DUPLICATE`，事项改为允许同名，见 ADR-021）− v0.3.3 下架 1 个
 > （`SHORTCUT_REGISTER_FAILED`，全局快捷键整体下架，见 ADR-022）+ v0.4.0 新增 1 个
 > （`MD_SYNC_CONFIG_INVALID`，见 ADR-033）+ v0.11.13 新增 1 个
-> （`MD_SYNC_REMOTE_ERROR`，见 ADR-061）。
+> （`MD_SYNC_REMOTE_ERROR`，见 ADR-061）+ [0.13.0] 新增 1 个（`USAGE_PERMISSION_DENIED`，ADR-063）
+> + [0.14] 新增 1 个（`ITEM_DEPTH_EXCEEDED`，见 §2.6）。
 > 集合仍为**闭合**：新增与下架都必须同时改 `src-tauri/src/error.rs` 的 `as_str` 与前端
 > `ErrorCode` 联合类型，`npm run check:contract` 会核对两侧逐字一致（ADR-018 / ADR-021 / ADR-022）。
 
@@ -107,6 +108,16 @@
 > 没存下来」，会以为存好了、再去和 401 缠一轮。为什么不用 `MD_SYNC_CONFIG_INVALID`：
 > 它不是配置写错——用户什么都没填错，是系统/远端这一环不通。见 ADR-061 §2.5。
 
+### 2.6 [0.14] 新增（1）
+
+| code | 触发条件 | 前端处理 | 可重试 |
+|---|---|---|---|
+| `ITEM_DEPTH_EXCEEDED` | 事项树分层规则被违反：挂到子事项下面、有子事项还挂到别人下面、自己当自己的父（`create_item` / `update_item`） | `errorText` 给「子事项不能再挂子事项（层级上限 2 层）」 | 否 |
+
+> 为什么不再借 `INVALID_DURATION`：三处分层守卫此前借用「结束时间早于开始时间」，
+> 用户拿到的是「时间不对」的提示去修「挂错层级」，语义错配与 ADR-018 的教训同源。
+> 计时域自身的时长非法仍用 `INVALID_DURATION`，不受影响。
+
 ---
 
 ## 3. 命令清单（总表）
@@ -123,6 +134,7 @@
 | `archive_item` | `{ id: number }` | `Item` | `archiveItem` |
 | `unarchive_item` | `{ id: number }` | `Item` | `unarchiveItem` |
 | `delete_item` | `{ id: number }` | `void` | `deleteItem` |
+| `list_category_catalog` | `{}` | `CategoryCatalogRows` | `listCategoryCatalog` |
 
 ### 3.2 计时域 Timer
 
@@ -178,6 +190,7 @@
 | `save_window_position` | `{ x: number, y: number }` | `void` | `saveWindowPosition` |
 | `quit_app` | `{}` | `void` | `quitApp` |
 | `get_foreground_window` | `{}` | `{ exeName: string, processId: number } \| null` | `getForegroundWindow`（[0.13] 冷启动自动接管主动取一次；`null` = 判不出） |
+| `set_bound_process_watch` | `{ watch: { itemId: number, processId: number, segmentStartedAt: number } \| null }` | `void` | `setBoundProcessWatch`（[0.13] 绑定应用退出→结束这一段自动接管；`null` = 清除，前端不主动调） |
 
 ### 3.8 插件 / Markdown 同步（V0.4.0；V0.11.13 扩云端与备份）
 
@@ -236,8 +249,14 @@
 #### `delete_item`
 - 入参：`{ "id": number }`
 - 出参：`void`
-- 语义：软删除（`deleted_at = now`），**保留其历史记录**（记录 `item_id` 不变，仍归属该事项统计）。系统事项 → `ITEM_SYSTEM_PROTECTED`。若该事项正被 `active` 会话引用，允许删除，活动会话保留原 `item_id`。
+- 语义：软删除（`deleted_at = now`），**保留其历史记录**（记录 `item_id` 不变，仍归属该事项统计）。系统事项 → `ITEM_SYSTEM_PROTECTED`。若该事项正被 `active` 会话引用，允许删除，活动会话保留原 `item_id`。**[0.14] 级联**：目标有直接子事项时在**同一事务内**逐个软删全部直接子（树硬限 2 层，无孙层；archived 子也级联），再删父 —— 前端确认弹窗在删除前列出子事项数。
 - 错误码：`ITEM_NOT_FOUND` / `ITEM_SYSTEM_PROTECTED` / `DB_ERROR`
+
+#### `list_category_catalog`
+- 入参：`{}`
+- 出参：`CategoryCatalogRows`（六组原始 KV 行：`definitions` / `deleted` / `labelOverrides` / `colorOverrides` / `appOverrides` / `webOverrides`，每项 `{ key, value }`，key 带各自前缀）
+- 语义：**哑管道**读活动库 settings KV 的六组分类相关前缀（`__custom_category::` 等）；合并 / 排序 / 标签解析在前端 `src/windows/shared/classification/categoryCatalog.ts` 唯一实现。宿主命令（两窗可调）：药丸窗 capability 只挂 `host-commands` 段，而既有读口 `cmd_get_setting_rows` 带 `require_main_window` 守卫只放行分析窗。手机端桩回全空数组。
+- 错误码：`DB_ERROR`（经 `CommandErrorDto` 收口；池未就绪回 `SQLITE_UNAVAILABLE` 可重试）
 
 ### 4.2 计时域 Timer
 
@@ -833,6 +852,7 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 | `md_backup_list` / `md_backup_restore` | **已实装**（V0.11.22） | 备份的「看」与「覆盖回去」全程在应用内完成，一个字节都不需要用户摸到文件；恢复另受归属限制（只认 `webdav__`） |
 | `md_backup_export` | 手机**已实装**（V0.11.23，系统「保存到…」）；桌面是 `mobile_only` 桩 | 这是唯一一个**反方向**的能力：只有手机需要「把私有目录里的文件拿出来」 |
 | `get_foreground_window` | `Ok(null)`（不报错） | 安卓没有「前台窗口」概念（`infra::insight` 整棵不编进来）；`null` 是契约里的合法值 = 「不知道」，调用方静默跳过 |
+| `set_bound_process_watch` | **`Ok(())`（不报错，也不注册）** | 同一条理由：安卓没有前台应用 / 进程枚举能力，「盯进程退出」这件事在手机上不存在。回错误会让自动接管链路每次都走 catch 分支 |
 | `show_window` / `hide_window` / `toggle_window` / `save_window_position` | **`Ok(())` 幂等空操作**（不报错） | 前端首帧与「拖动结束落盘」会调它们；语义上「已显示 / 位置无处可存」本来就是成功，回错误只会在控制台刷红 |
 | `create_record` | **已实装，与桌面逐字同构**（无 `#[cfg]`） | 补记只写 `time_records`，不碰托盘 / 多窗口 / 文件系统，手机端编的是同一份 `services::record::backfill` |
 | `set_autostart` | 恒返回 `false`（`get_autostart` 同） | `update_settings` 的 `autostartEnabled` 字段**接受但忽略**（不报错），老配置带该字段过来仍成功 |
@@ -1142,6 +1162,46 @@ Kotlin 自己读那个文件、写进用户选中的 `content://`。过桥要 ba
 > 新增的这条是 **Patina 段**命令（`#[cfg(desktop)]` 的 `$extra` 表），宿主 84 条与
 > `check:contract` 的四处（Rust / `IpcApi` / `ipc.ts` / mock）**都不受影响**；
 > 但本文件的 Patina 计数要从 117 改成 118——这一处不会有门禁提醒。
+
+---
+
+### 12.17 [0.13] 契约增量：绑定进程退出 → 结束这一段自动接管
+
+> 背景：绑定应用自动接管开的计时，此前只有「切到另一个应用」才会收尾。用户直接关掉
+> 那个应用（或它自己崩了）时，计时一直跑着 —— 界面上看不出任何异常，是静默错账。
+>
+> **契约四个数**：命令 **91**（+Patina **126**）/ 错误码 18 / 事件 11-11 / emit 18。
+> 新增的是**宿主**命令（两端都注册，手机回 `Ok(())` 幂等空操作），所以四处
+> （Rust / `IpcApi` / `ipc.ts` / mock）都要加，`check:contract` 会当场点名。
+>
+> 1. `set_bound_process_watch(watch)`：注册 / 清除一个「盯这个 pid 退出」的注册。
+>    桌面开 `PROCESS_SYNCHRONIZE` 句柄 + 内核阻塞等待（500ms 一片，同一时刻活着的等待
+>    线程 ≤ 1 个，新注册推进代数让旧线程自行退出）；手机是 `Ok(())` 桩。
+> 2. **段级校验**：注册时记下 `(itemId, segmentStartedAt)`；进程退出时只有「当前仍是
+>    这一段」才停表。用户中途手动切走 / 手动结束的，只清注册表，计时一个字节都不碰。
+> 3. 停止走与 `stop_timer` 逐字同一条收尾（`md_sync::dirty::mark("timer")` +
+>    `emit_timer_state`），少一样就是「停了但界面和同步都不知道」。
+> 4. 打不开句柄（应用已退出 / 权限不足）**不报错、不注册**：这条链路是引擎广播驱动的，
+>    用户没点任何东西，弹「无法监视进程」只会让人困惑；记一行 warn 足够排查。
+
+---
+
+### 12.18 [0.14] 契约增量：分类目录读口 + 级联软删 + 分层错误码
+
+> 背景：两窗「事项分类选用」（药丸常用事项卡设分类 + 分析窗事项管理对齐同一份候选）
+> 与「删父事项级联软删子事项」。
+>
+> **契约四个数**：命令 **92**（+Patina **126**）/ 错误码 **19** / 事件 11-11 / emit 18。
+>
+> 1. 新增**宿主**命令 `list_category_catalog`（91 → 92）：药丸窗 capability 只挂
+>    `host-commands` 段，既有读口 `cmd_get_setting_rows` 带 `require_main_window` 守卫
+>    只放行分析窗，药丸窗 invoke 必被 ACL 静默拒 —— 所以新增读口而不是放宽守卫。
+>    哑管道：六组 KV 原始行原样透传，合并在前端 `categoryCatalog.ts` 唯一实现。
+> 2. `delete_item` 语义升级为**级联软删**（不加命令、不加错误码，仍回 `void`）：
+>    同一事务内先删全部直接子（2 层硬限无孙层），再删父。
+> 3. 新增错误码 `ITEM_DEPTH_EXCEEDED`（18 → 19）：`services/item.rs` 三处分层守卫
+>    不再借用 `INVALID_DURATION`。
+> 4. 宿主 ACL：`host-commands.toml` 加 `list_category_catalog` 一条（91 → 92）。
 
 | 面 | 变更 | 理由 |
 |---|---|---|

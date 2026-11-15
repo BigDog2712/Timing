@@ -50,6 +50,8 @@ export const itemApi = {
   remove: (params: ItemIdParams): Promise<void> => ipc.deleteItem(params),
   archive: (params: ItemIdParams): Promise<Item> => ipc.archiveItem(params),
   unarchive: (params: ItemIdParams): Promise<Item> => ipc.unarchiveItem(params),
+  /* [0.14] 分类目录（哑管道，合并在共享 categoryCatalog.ts） */
+  categoryCatalog: () => ipc.listCategoryCatalog(),
 };
 
 /* ---- 记录 ---- */

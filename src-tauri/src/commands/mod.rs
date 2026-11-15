@@ -6,7 +6,22 @@
 //! 桩只回 `IO_ERROR`（见 `platform::host::desktop_only`），不新增错误码。
 
 pub mod countdown_cmd;
+/* [0.13] 「绑定的应用进程退出 → 结束这一段自动接管开出来的计时」。
+   桌面真实实现（Win32 句柄 + 阻塞等待）／手机桩（`Ok(())`，安卓没有前台应用概念）。
+   同 `window_cmd` 的 `#[cfg] + #[path]` 手法：模块名与函数名一字不变，命令名不变。 */
+#[cfg(desktop)]
+pub mod bound_process_watch_cmd;
+#[cfg(mobile)]
+#[path = "bound_process_watch_cmd_mobile.rs"]
+pub mod bound_process_watch_cmd;
 pub mod daily_status_cmd;
+/* [0.14] 分类目录读口（两窗「事项分类选用」）。桌面读活动库真实现 / 手机桩回空目录，
+同 `window_cmd` 的 `#[cfg] + #[path]` 手法：模块名与函数名一字不变。 */
+#[cfg(desktop)]
+pub mod category_catalog_cmd;
+#[cfg(mobile)]
+#[path = "category_catalog_cmd_mobile.rs"]
+pub mod category_catalog_cmd;
 pub mod item_cmd;
 /* [0.13.x] 事项 ↔ 应用绑定域。 */
 pub mod item_app_cmd;

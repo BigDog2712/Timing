@@ -39,6 +39,8 @@ export interface QuickClassificationItemBindingLabels {
   entry: string;
   /** 事项清单首项（「不绑定」= 清除） */
   none: string;
+  /** 「不绑定」下方的禁用说明行（R6-B）：只解除当前事项，其他绑定不受影响 */
+  unbindOnlyHint: string;
   /** 事项子菜单的 `aria-label` */
   menuLabel: string;
   /** 清单读取失败时的降级文案（**只**降级这一栏） */

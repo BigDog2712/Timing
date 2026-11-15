@@ -1,8 +1,7 @@
 /**
  * Timing — 领域模型（枚举 / 实体 / 统计 / 事件载荷）
  * -----------------------------------------------------------------------------
- * 从 `types/domain.ts` 拆出（ADR-017）。字段名一律 camelCase，与 Rust DTO 的
- * `#[serde(rename_all = "camelCase")]` 严格一一对应；时间戳 epoch 毫秒，时长秒。
+ * 从 `types/domain.ts` 拆出（ADR-017）：字段名 camelCase 对齐 Rust DTO 的 `rename_all`，时间戳 epoch 毫秒，时长秒。
  */
 import type { EpochMs, Seconds } from './constants';
 import type { AccentColors, ThemeMode, ThemeSettings } from '../domain-v020';
@@ -35,7 +34,7 @@ export type SwitchMode =
 /** 崩溃恢复对话框动作 */
 export type ResolveAction = 'resume' | 'close' | 'discard';
 
-/** 统一错误码（17 个；与 Rust `error.rs::as_str` 逐字一致，check:contract 校验） */
+/** 统一错误码（19 个；与 Rust `error.rs::as_str` 逐字一致，check:contract 校验） */
 export type ErrorCode =
   | 'DB_ERROR'
   | 'ITEM_NOT_FOUND'
@@ -58,8 +57,9 @@ export type ErrorCode =
   | 'MD_SYNC_CONFIG_INVALID'
   /* [V0.11.13] 云端通道走不通（网络 / 远端 / 系统凭据），见 ADR-061 */
   | 'MD_SYNC_REMOTE_ERROR'
-  /* [0.13.0] 安卓「使用情况访问」未授权（不是故障，是需要引导的状态） */
-  | 'USAGE_PERMISSION_DENIED';
+  /* [0.13.0] 安卓「使用情况访问」未授权（状态性）；[0.14] 分层规则被违反 */
+  | 'USAGE_PERMISSION_DENIED'
+  | 'ITEM_DEPTH_EXCEEDED';
 
 /* ===========================================================================
  * 核心领域实体

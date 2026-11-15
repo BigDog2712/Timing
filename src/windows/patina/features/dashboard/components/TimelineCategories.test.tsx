@@ -34,7 +34,12 @@ const h = vi.hoisted(() => ({
     itemsRecentCount: 5,
     itemsShowRecent: true,
   })),
-  loadCategoryCatalog: vi.fn(async (): Promise<unknown[]> => []),
+  /* [0.14] 钩子改读共享层口径的六组原始行，这里按前缀路由 mock。
+     labelOverrides 用「键名→覆盖名」描述，beforeEach 展开成带前缀的行。 */
+  labelOverrides: {} as Record<string, string>,
+  definitionKeys: [] as string[],
+  loadSettingRowsByKeyPrefix: vi.fn(async (_prefix: string): Promise<Array<{ key: string; value: string }>> => []),
+  loadSettingKeysByKeyPrefix: vi.fn(async (_prefix: string): Promise<Array<{ key: string }>> => []),
 }));
 
 vi.mock("../../../platform/runtime/hostIntentGateway.ts", () => ({ emitHostIntent: h.emitHostIntent }));
@@ -43,7 +48,14 @@ vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
 }));
 vi.mock("../../../platform/desktop/hostSettingsGateway.ts", () => ({ getSettings: h.getSettings }));
 vi.mock("../../../platform/persistence/activityReminderCatalogGateway.ts", () => ({
-  loadActivityReminderCategoryCatalog: h.loadCategoryCatalog,
+  loadActivityReminderCategoryCatalog: vi.fn(async (): Promise<unknown[]> => {
+    throw new Error("[0.14] 分类候选已改走共享层 + classificationPersistence，不再读这个网关");
+  }),
+}));
+vi.mock("../../../platform/persistence/classificationPersistence.ts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  loadSettingRowsByKeyPrefix: h.loadSettingRowsByKeyPrefix,
+  loadSettingKeysByKeyPrefix: h.loadSettingKeysByKeyPrefix,
 }));
 /* 分类管理弹窗：mock 成一个"打开就能触发 onChanged 的按钮"，把真实会话（一整套网关）挡在门外 */
 vi.mock("../../data/components/DataCategoryManageDialog.tsx", () => ({
@@ -132,15 +144,27 @@ beforeEach(() => {
   h.listTimingItems.mockResolvedValue([]);
   h.getSettings.mockReset();
   h.getSettings.mockResolvedValue({ itemsTimers: {}, itemsRecentCount: 5, itemsShowRecent: true });
-  h.loadCategoryCatalog.mockReset();
-  /* 三档：内置（按内置顺序）、自定义（按名字）、未分类（恒在最后） */
-  h.loadCategoryCatalog.mockResolvedValue([
-    { categoryId: "development", labelOverride: null, colorOverride: null },
-    { categoryId: "office", labelOverride: null, colorOverride: null },
-    { categoryId: "custom:category_b", labelOverride: "写作", colorOverride: null },
-    { categoryId: "custom:category_a", labelOverride: "剪辑", colorOverride: null },
-    { categoryId: "other", labelOverride: null, colorOverride: null },
-  ]);
+  h.labelOverrides = {};
+  h.definitionKeys = [];
+  h.loadSettingRowsByKeyPrefix.mockReset();
+  h.loadSettingKeysByKeyPrefix.mockReset();
+  /* 三档：内置（共享 builder 按固定序全量给出）、自定义（按名字）、未分类（恒在最后）。
+     定义行给两个自定义键，labelOverrides 给显示名。 */
+  h.definitionKeys = ["custom:category_b", "custom:category_a"];
+  h.labelOverrides = { "custom:category_b": "写作", "custom:category_a": "剪辑" };
+  h.loadSettingRowsByKeyPrefix.mockImplementation(async (prefix: string) => {
+    if (prefix === "__category_label_override::") {
+      return Object.entries(h.labelOverrides).map(([key, value]) => ({
+        key: `__category_label_override::${key}`,
+        value,
+      }));
+    }
+    return [];
+  });
+  h.loadSettingKeysByKeyPrefix.mockImplementation(async (prefix: string) => {
+    if (prefix === "__custom_category::") return h.definitionKeys.map((key) => ({ key: `__custom_category::${key}` }));
+    return [];
+  });
   onClose = vi.fn<() => void>();
   onLocalRename = vi.fn<(itemId: number, name: string) => void>();
   onLocalCreate = vi.fn<(name: string) => void>();
@@ -162,7 +186,11 @@ describe("事项分类 · 候选与顺序", () => {
     await mount("create");
     await act(async () => { categoryTrigger()?.click(); });
     await flush();
-    expect(menuOptions().map((node) => node.textContent)).toEqual(["未分类", "开发", "办公", "剪辑", "写作"]);
+    /* [0.14] 候选 = 内置十键（共享 builder 固定序）+ 自定义按显示名 zh-CN 序；
+       未分类哨兵恒在最后由组件补 —— 这里逐键钉序，漂移即红。 */
+    expect(menuOptions().map((node) => node.textContent)).toEqual([
+      "未分类", "AI", "开发", "办公", "浏览", "通讯", "视频", "音乐", "游戏", "设计", "工具", "剪辑", "写作",
+    ]);
   });
 });
 
@@ -203,11 +231,14 @@ describe("事项分类 · 新建事项", () => {
 
     const opened = document.body.querySelector<HTMLButtonElement>("[data-manage-open]");
     expect(opened).not.toBeNull();
-    const before = h.loadCategoryCatalog.mock.calls.length;
+    const before =
+      h.loadSettingRowsByKeyPrefix.mock.calls.length + h.loadSettingKeysByKeyPrefix.mock.calls.length;
     await act(async () => { opened?.click(); });
     await flush();
     /* onChanged → reload：候选必须重取一次，否则刚在管理里建好的分类选不到 */
-    expect(h.loadCategoryCatalog.mock.calls.length).toBe(before + 1);
+    expect(
+      h.loadSettingRowsByKeyPrefix.mock.calls.length + h.loadSettingKeysByKeyPrefix.mock.calls.length,
+    ).toBe(before + 6);
   });
 });
 

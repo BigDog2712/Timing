@@ -9,6 +9,7 @@
  * 这里若比后端宽松，浏览器里试出来的行为就不可信。
  */
 import type {
+  CategoryCatalogRows,
   CreateItemParams,
   Item,
   ItemAppBindParams,
@@ -41,11 +42,12 @@ export function createMockApiItems(s: MockState): Record<string, (args?: any) =>
     create_item: (a) => {
       const p = a as CreateItemParams;
       const name = checkName(p?.name ?? '');
-      /* 2 层硬限与后端同口径：父必须是顶层事项，否则 `INVALID_DURATION`。
+      /* 2 层硬限与后端同口径：父必须是顶层事项，否则 `ITEM_DEPTH_EXCEEDED`（[0.14] 换码：
+         「挂错层级」不是「时间不对」，不再借 `INVALID_DURATION`）。
          mock 比后端宽松的话，浏览器里点出来的树会在真机上建不出来。 */
       const parent = p?.parentId != null ? s.items.find((i) => i.id === p.parentId) : undefined;
       if (p?.parentId != null && (!parent || parent.depth !== 0)) {
-        fail('INVALID_DURATION', '子事项不能再挂子事项（深度上限 2 层）');
+        fail('ITEM_DEPTH_EXCEEDED', '子事项不能再挂子事项（层级上限 2 层）');
       }
       const id = ++s.seq;
       const t = now();
@@ -80,10 +82,10 @@ export function createMockApiItems(s: MockState): Record<string, (args?: any) =>
         if (p.patch.parentId != null) {
           const parent = s.items.find((i) => i.id === p.patch.parentId);
           if (!parent || parent.depth !== 0) {
-            fail('INVALID_DURATION', '子事项不能再挂子事项（深度上限 2 层）');
+            fail('ITEM_DEPTH_EXCEEDED', '子事项不能再挂子事项（层级上限 2 层）');
           }
           if (s.items.some((i) => i.parentId === item.id)) {
-            fail('INVALID_DURATION', '有子事项的事项不能挂到别人下面');
+            fail('ITEM_DEPTH_EXCEEDED', '有子事项的事项不能挂到别人下面');
           }
         }
         item.parentId = p.patch.parentId;
@@ -155,5 +157,20 @@ export function createMockApiItems(s: MockState): Record<string, (args?: any) =>
       s.itemApps.splice(index, 1);
       return true;
     },
+    /* [0.13] 进程监视注册：浏览器 dev 没有进程可盯，契约存在即可，不做任何行为 */
+    set_bound_process_watch: () => undefined,
+
+    /* ---- [0.14] 分类目录（哑管道）：浏览器 dev 从 items 里现有的 categoryKey 凑一份定义，
+       让「事项分类选用」在降级环境里走得出真流程；无覆盖 / 无删除 / 无应用或网页 override。 */
+    list_category_catalog: (): CategoryCatalogRows => ({
+      definitions: [...new Set(s.items.map((i) => i.categoryKey).filter((k): k is string => !!k))]
+        .sort()
+        .map((key) => ({ key: `__custom_category::custom:${encodeURIComponent(key)}`, value: '' })),
+      deleted: [],
+      labelOverrides: [],
+      colorOverrides: [],
+      appOverrides: [],
+      webOverrides: [],
+    }),
   };
 }

@@ -13,6 +13,7 @@
  * 因为意图层的三态语义是 `null` 而不是空串。
  */
 import QuietSelect from "../../../shared/components/QuietSelect.tsx";
+import { withCurrentValueOption } from "../../../../shared/classification/categoryCatalog.ts";
 import type { ItemCategoryOption } from "../hooks/useItemCategoryOptions.ts";
 
 interface Props {
@@ -35,9 +36,15 @@ export default function ItemCategoryField({
   manageAction,
   onChange,
 }: Props) {
+  /* [0.14] selectedOption 兜底：当前值非空且不在候选时追加原键名一项。
+     `.qp-select-label` 默认 hidden、仅当前项可见（quiet-select.css），兜底缺位时
+     触发器整块空白 —— 修在消费侧（共享 `withCurrentValueOption`），不动 QuietSelect 本体。 */
   const selectOptions = [
     { value: "", label: noneLabel },
-    ...options.map((option) => ({ value: option.value, label: option.label })),
+    ...withCurrentValueOption(options, value ?? "").map((option) => ({
+      value: option.value,
+      label: option.label,
+    })),
   ];
 
   return (

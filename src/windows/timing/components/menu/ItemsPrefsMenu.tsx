@@ -12,7 +12,7 @@
  * 时长落 `settings.itemsTimers`（itemId → 分钟），不建表、不动 IPC 契约。
  */
 import { useEffect, useMemo, useState } from 'react';
-import type { FormEvent, KeyboardEvent } from 'react';
+import type { FormEvent } from 'react';
 import {
   ITEM_TIMER_MAX_MINUTES,
   ITEM_TIMER_MIN_MINUTES,
@@ -23,22 +23,22 @@ import {
 import { fitBounds } from '../../lib/fitBounds';
 import { itemApi, settingsApi } from '../../services/api';
 import { errorText } from '../../services/ipc';
+import { useItemCategoryCatalog } from '../../hooks/useItemCategoryCatalog';
 import { useItemStore } from '../../stores/itemStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
 import type { MenuPos } from '../../stores/uiStore';
 import type { Item } from '../../types/domain';
 import { ItemsPrefsForm } from './ItemsPrefsForm';
+import { ItemsPrefsRecentRow } from './ItemsPrefsRecentRow';
 import { ItemsPrefsRow } from './ItemsPrefsRow';
+import { withCurrentValueOption } from '../../../shared/classification/categoryCatalog';
 import '../../styles/common-items.css';
 
 const W = 248;
 const EDGE = 4;
 /** 贴底留高（再小只剩半行表单），超出部分列表内部滚动 */
 const MIN_H = 220;
-const RECENT_DEFAULT = 5;
-const RECENT_MIN = 1;
-const RECENT_MAX = 10;
 
 interface ItemsPrefsMenuProps {
   anchor: MenuPos;
@@ -65,6 +65,11 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
   const [count, setCount] = useState(String(settings.itemsRecentCount));
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
+  /* [0.14] 分类选用三态：touched=false（没动）→ patch 不带 categoryKey 字段；
+     touched=true 时显式带值（null = 清空）——「不改」与「清空」是两件事。 */
+  const [categoryValue, setCategoryValue] = useState<string | null>(null);
+  const [categoryTouched, setCategoryTouched] = useState(false);
+  const { options: rawCategoryOptions, loading: categoryLoading } = useItemCategoryCatalog();
 
   useEffect(() => setCount(String(settings.itemsRecentCount)), [settings.itemsRecentCount]);
 
@@ -86,11 +91,15 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
     setEditingId(null);
     setName('');
     setMinutes('');
+    setCategoryValue(null);
+    setCategoryTouched(false);
   };
 
   const startEdit = (item: Item) => {
     setEditingId(item.id);
     setName(item.name);
+    setCategoryValue(item.categoryKey ?? null);
+    setCategoryTouched(false);
     const current = itemTimerMinutes(timers, item.id);
     setMinutes(current != null ? String(current) : '');
   };
@@ -113,11 +122,19 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
       try {
         const safeMinutes = readMinutes();
         if (editingId != null) {
-          await itemApi.update({ id: editingId, patch: { name: label } });
+          /* 三态（判据必须 `!== undefined`）：没动分类 → 不带字段；动了 → 显式带值（含 null 清空）。 */
+          await itemApi.update({
+            id: editingId,
+            patch: {
+              name: label,
+              ...(categoryTouched ? { categoryKey: categoryValue } : {}),
+            },
+          });
           await patchSettings({ itemsTimers: withItemTimer(timers, editingId, safeMinutes) });
         } else {
           const nextOrder = pinned.reduce((max, item) => Math.max(max, item.sortOrder), 0) + 1;
-          const created = await itemApi.create({ name: label });
+          /* 新建：分类是创建语义的一部分，始终带上（null = 未分类） */
+          const created = await itemApi.create({ name: label, categoryKey: categoryValue ?? undefined });
           await itemApi.update({ id: created.id, patch: { isPinned: true, sortOrder: nextOrder } });
           if (safeMinutes != null) {
             await patchSettings({ itemsTimers: withItemTimer(timers, created.id, safeMinutes) });
@@ -180,20 +197,9 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
     endDrag();
   };
 
-  const commitCount = () => {
-    const parsed = Math.round(Number(count));
-    const clamped = Number.isFinite(parsed)
-      ? Math.min(RECENT_MAX, Math.max(RECENT_MIN, parsed))
-      : RECENT_DEFAULT;
+  const handleCountKey = (clamped: number) => {
     setCount(String(clamped));
     if (clamped !== settings.itemsRecentCount) void patchSettings({ itemsRecentCount: clamped });
-  };
-
-  const handleCountKey = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      commitCount();
-    }
   };
 
   const placement = useMemo(() => {
@@ -260,39 +266,32 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
           editing={editingId != null}
           name={name}
           minutes={minutes}
+          categoryOptions={
+            /* selectedOption 兜底：当前值不在候选（分类刚被删）时追加原键名一项，触发器不空白 */
+            withCurrentValueOption(rawCategoryOptions, categoryValue)
+          }
+          categoryValue={categoryValue}
+          categoryLoading={categoryLoading}
           busy={busy}
           onName={setName}
           onMinutes={setMinutes}
+          onCategoryChange={(next) => {
+            setCategoryValue(next);
+            setCategoryTouched(true);
+          }}
           onSubmit={submit}
           onCancel={editingId != null ? resetForm : onClose}
         />
 
         <div className="menu__sep" />
 
-        <div className="items-prefs__recent">
-          <button
-            type="button"
-            className="items-prefs__toggle"
-            data-on={settings.itemsShowRecent}
-            aria-pressed={settings.itemsShowRecent}
-            onClick={() => void patchSettings({ itemsShowRecent: !settings.itemsShowRecent })}
-          >
-            显示最近事项
-          </button>
-          <input
-            type="number"
-            className="items-prefs__count"
-            aria-label="最近事项条数"
-            min={RECENT_MIN}
-            max={RECENT_MAX}
-            step={1}
-            value={count}
-            disabled={!settings.itemsShowRecent}
-            onChange={(event) => setCount(event.target.value)}
-            onBlur={commitCount}
-            onKeyDown={handleCountKey}
-          />
-        </div>
+        <ItemsPrefsRecentRow
+          showRecent={settings.itemsShowRecent}
+          count={count}
+          onCountChange={setCount}
+          onCommitCount={handleCountKey}
+          onToggle={() => void patchSettings({ itemsShowRecent: !settings.itemsShowRecent })}
+        />
       </div>
     </>
   );

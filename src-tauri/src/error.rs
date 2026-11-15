@@ -5,7 +5,8 @@ use serde::ser::{SerializeStruct, Serializer};
 use serde::Serialize;
 
 /// 统一错误码（V0.1.0 的 11 + V0.2.0 新增 5 + V0.3.0 新增 1 − V0.3.1 下架 1
-/// − V0.3.3 下架 1 + V0.4.0 新增 1 + V0.11.13 新增 1，共 17）。
+/// − V0.3.3 下架 1 + V0.4.0 新增 1 + V0.11.13 新增 1 + [0.13.0] 新增 1
+/// + [0.14] 新增 1，共 19）。
 ///
 /// V0.2.0 五码已全部接线（`TODO_NOT_FOUND` 随待办域；`NOTE_NOT_FOUND` /
 /// `WINDOW_LIMIT_EXCEEDED` / `INVALID_TARGET_SEC` 随批 2 便利贴与倒计时；
@@ -55,6 +56,10 @@ pub enum ErrorCode {
        只豁免这一条死码告警，见 `services::overlay_push` 的同款口径。 */
     #[cfg_attr(desktop, allow(dead_code))]
     UsagePermissionDenied,
+    /* [0.14] 事项树的分层规则被写入侧违反（挂到子事项下面 / 有子还挂 / 自己当自己的爹）。
+       此前三处借用 `INVALID_DURATION`（「结束时间早于开始时间」），用户拿到的是
+       「时间不对」的提示去修「挂错层级」，语义错配同 ADR-018 的教训。 */
+    ItemDepthExceeded,
 }
 
 impl ErrorCode {
@@ -79,6 +84,7 @@ impl ErrorCode {
             ErrorCode::MdSyncConfigInvalid => "MD_SYNC_CONFIG_INVALID",
             ErrorCode::MdSyncRemoteError => "MD_SYNC_REMOTE_ERROR",
             ErrorCode::UsagePermissionDenied => "USAGE_PERMISSION_DENIED",
+            ErrorCode::ItemDepthExceeded => "ITEM_DEPTH_EXCEEDED",
         }
     }
 }
@@ -156,6 +162,15 @@ impl AppError {
 
     pub fn invalid_duration() -> Self {
         Self::new(ErrorCode::InvalidDuration, "结束时间早于开始时间")
+    }
+
+    /// [0.14] 事项树分层规则被违反（`ITEM_DEPTH_EXCEEDED`）。
+    ///
+    /// 三个触发点都在 `services/item.rs`：挂到子事项下面 / 有子还挂到别人下面 /
+    /// 自己当自己的爹。此前借用 `INVALID_DURATION` 属语义错配（用户被告知
+    /// 「时间不对」），与 ADR-018 拆「空/超长」同一个逻辑。
+    pub fn item_depth_exceeded() -> Self {
+        Self::new(ErrorCode::ItemDepthExceeded, "事项层级超限：子事项不能再挂子事项")
     }
 
     /// [V0.2.0] 待办不存在或已软删除（`todo_update` / `todo_toggle`）。

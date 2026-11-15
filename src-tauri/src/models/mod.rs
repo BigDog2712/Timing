@@ -1,6 +1,10 @@
 //! 领域模型 / DTO（字段一律 camelCase，与 `src/types/domain.ts` 严格对齐）。
 
+/* [0.14] 分类目录的对外形状（`list_category_catalog` 的返回；哑管道，合并在前端）。 */
+pub mod category_catalog;
 pub mod common;
+/* [0.13] 「绑定应用进程退出 → 结束自动接管段」的入参（两端都有桩，故不放 insight 子树）。 */
+pub mod bound_process_watch;
 /* [V0.11.15] 数据根落点的对外形状（`dataRootGet` / `dataRootChange` 的返回）。 */
 pub mod data_root;
 pub mod constants;

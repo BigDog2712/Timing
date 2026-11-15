@@ -1,21 +1,25 @@
 /**
- * 「事项分类」的候选集合（[0.13] 主人反馈：新建事项 / 常用事项都要能设分类）。
+ * 「事项分类」的候选集合（[0.13] 主人反馈：新建事项 / 常用事项都要能设分类；[0.14] 接共享层）。
  *
  * ## 为什么不用分类页那份 `classificationStore`
  *
  * 那份 store 是**整页草稿**模型（bootstrap → 本地草稿 → 一次性提交），它服务的是
  * "分类页上的应用映射"。事项在**仪表盘卡**里改分类，是"改一条就落一条"的小动作，
- * 拿整页草稿会在两处之间制造一个从没被提交过的中间态。所以这里只读**定义**这一层：
- * `loadActivityReminderCategoryCatalog()`（`__custom_category::` + 已删除过滤 +
- * label/color 覆盖），与提醒卡用的是同一个读取器 —— 分类候选只有一处口径。
+ * 拿整页草稿会在两处之间制造一个从没被提交过的中间态。所以这里只读**定义**这一层。
+ *
+ * ## [0.14] 合并/排序/标签收敛到共享 `categoryCatalog.ts`
+ *
+ * 药丸窗（常用事项卡）要的是**同一份候选**——两窗各算各的，迟早漂移出
+ * "应用能选到、事项选不到"。本钩子改为：读六组 KV 原始行（哑管道，同
+ * `list_category_catalog` 的口径）→ 注入本窗标签回调（`getCategoryToken`，
+ * 它同时覆盖内置名与自定义解码）→ 共享 builder 出候选。并集从"定义行"扩到
+ * 应用侧四路（定义 ∪ app override 主分类 ∪ web override 主分类 ∪ 颜色覆盖键）。
  *
  * ## 顺序：内置 → 自定义（`other` 不在这里）
  *
- * 内置在前（按 `USER_ASSIGNABLE_CATEGORIES` 的既有顺序），自定义在后并按显示名排
- * （用户新建的那条不会因为 id 是 uuid 而随机插在中间）。
- * **`other` 刻意不在返回值里**：它是"未分类"这一项的落库值（`null`），由
- * `ItemCategoryField` 作为哨兵项补在最前面 —— 候选集合与"清空"是两件事，混在一起会出现
- * 两个「未分类」。
+ * 共享 builder 的唯一实现：内置按固定序在前，自定义按显示名 `zh-CN` 序在后。
+ * **`other` 刻意不在返回值里**：它由 `ItemCategoryField` 作为哨兵项补在最前面
+ * （出口翻 `null`），两边都补会出现两个「未分类」。
  *
  * ## `active` 为 false 时不请求
  *
@@ -24,24 +28,21 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  getCategoryToken,
-  isExtendedCategory,
-  type AppCategory,
-} from "../../../shared/classification/categoryTokens.ts";
+import { getCategoryToken, type AppCategory } from "../../../shared/classification/categoryTokens.ts";
 import { useLocaleText } from "../../../shared/i18n/index.ts";
-import { loadActivityReminderCategoryCatalog } from "../../../platform/persistence/activityReminderCatalogGateway.ts";
+import {
+  loadSettingKeysByKeyPrefix,
+  loadSettingRowsByKeyPrefix,
+} from "../../../platform/persistence/classificationPersistence.ts";
+import {
+  buildCategoryCatalog,
+  CATALOG_PREFIXES,
+  type CategoryCatalogOption,
+  type CategoryCatalogRows,
+} from "../../../../shared/classification/categoryCatalog.ts";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
 
-export interface ItemCategoryOption {
-  value: string;
-  label: string;
-}
-
-interface LoadedCategory {
-  id: AppCategory;
-  labelOverride: string | null;
-}
+export type ItemCategoryOption = CategoryCatalogOption;
 
 export interface ItemCategoryOptionsState {
   options: ItemCategoryOption[];
@@ -50,9 +51,39 @@ export interface ItemCategoryOptionsState {
   reload: () => void;
 }
 
+const EMPTY_CATALOG: CategoryCatalogRows = {
+  definitions: [],
+  deleted: [],
+  labelOverrides: [],
+  colorOverrides: [],
+  appOverrides: [],
+  webOverrides: [],
+};
+
+/** 六组前缀的读取方式：定义 / 删除只要键，其余四组要整行（key+value）。 */
+function loadCatalog(active: boolean): Promise<CategoryCatalogRows> {
+  if (!active) return Promise.resolve(EMPTY_CATALOG);
+  return Promise.all([
+    loadSettingKeysByKeyPrefix(CATALOG_PREFIXES.definitions),
+    loadSettingKeysByKeyPrefix(CATALOG_PREFIXES.deleted),
+    loadSettingRowsByKeyPrefix(CATALOG_PREFIXES.labelOverrides),
+    loadSettingRowsByKeyPrefix(CATALOG_PREFIXES.colorOverrides),
+    loadSettingRowsByKeyPrefix(CATALOG_PREFIXES.appOverrides),
+    loadSettingRowsByKeyPrefix(CATALOG_PREFIXES.webOverrides),
+  ]).then(([definitions, deleted, labelOverrides, colorOverrides, appOverrides, webOverrides]) => ({
+    /* 定义 / 删除两组只读键（value 无用，补空串对齐共享层的行形状） */
+    definitions: definitions.map((r) => ({ key: r.key, value: "" })),
+    deleted: deleted.map((r) => ({ key: r.key, value: "" })),
+    labelOverrides,
+    colorOverrides,
+    appOverrides,
+    webOverrides,
+  }));
+}
+
 export function useItemCategoryOptions(active: boolean): ItemCategoryOptionsState {
   const UI_TEXT = useLocaleText();
-  const [rows, setRows] = useState<LoadedCategory[]>([]);
+  const [catalog, setCatalog] = useState<CategoryCatalogRows>(EMPTY_CATALOG);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [attempt, setAttempt] = useState(0);
   const loadedRef = useRef(false);
@@ -64,11 +95,11 @@ export function useItemCategoryOptions(active: boolean): ItemCategoryOptionsStat
     let cancelled = false;
     if (!loadedRef.current) setStatus("loading");
 
-    void loadActivityReminderCategoryCatalog()
-      .then((catalog) => {
+    loadCatalog(active)
+      .then((rows) => {
         if (cancelled) return;
         loadedRef.current = true;
-        setRows(catalog.map((row) => ({ id: row.categoryId, labelOverride: row.labelOverride })));
+        setCatalog(rows);
         setStatus("ready");
       })
       .catch((error: unknown) => {
@@ -82,19 +113,17 @@ export function useItemCategoryOptions(active: boolean): ItemCategoryOptionsStat
     };
   }, [active, attempt]);
 
-  const options = useMemo<ItemCategoryOption[]>(() => {
-    const label = (row: LoadedCategory): string => (
-      row.labelOverride?.trim() || getCategoryToken(row.id, UI_TEXT).label || row.id
-    );
-    const seeded = rows.filter((row) => !isExtendedCategory(row.id) && row.id !== "other");
-    const extended = rows
-      .filter((row) => isExtendedCategory(row.id))
-      .sort((left, right) => label(left).localeCompare(label(right), "zh-CN"));
-    /* **不列 `other`**：它由 `ItemCategoryField` 自己作为"空串 ∥ 未分类"的那一项补在最前面。
-       两边都补一次会得到两个「未分类」（一个 value=""、一个 value="other"）——
-       用户看到的是同一句话出现两遍，选哪个还决定了落库写的是 `null` 还是 `"other"`。 */
-    return [...seeded, ...extended].map((row) => ({ value: row.id, label: label(row) }));
-  }, [UI_TEXT, rows]);
+  /* 标签由本窗注入（内置 + 自定义解码都在 `getCategoryToken` 里），排序/合并全在共享层 ——
+     本文件不再有自己的 sort 或 filter（那是第二个真源）。 */
+  const options = useMemo<ItemCategoryOption[]>(
+    () =>
+      buildCategoryCatalog({
+        catalog,
+        builtinLabel: (key) => getCategoryToken(key as AppCategory, UI_TEXT).label,
+        customLabel: () => null,
+      }),
+    [UI_TEXT, catalog],
+  );
 
   return { options, status, reload };
 }

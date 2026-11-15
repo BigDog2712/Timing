@@ -180,6 +180,16 @@ export default function QuickClassificationItemBindingMenu({ binding, disabled, 
                 </span>
                 <span>{labels.none}</span>
               </button>
+              {/* [R6-B 方案 B] 禁用说明行，钉在「不绑定」与事项清单之间：点「不绑定」只解除
+                  **当前这一事项**（`onSave(null)` 走 `planAppItemBindingWrite`，只摘当前主值），
+                  应用还绑着其他事项时行标记会换成下一件 —— 这是拍板保留的现状，但 UI 之前
+                  没有任何解释，用户的误解是「点『不绑定』= 解绑了整个应用」。
+                  复用 `.quick-classification-menu-item:disabled`（灰字 + not-allowed，
+                  `shell/styles/features/classification.css:161`），零 CSS 改动；禁用项
+                  也不会被 `OPTION_SELECTOR` 的 `:not([disabled])` 选中，键盘序不受影响。 */}
+              <button type="button" className="quick-classification-menu-item" role="menuitem" disabled>
+                {labels.unbindOnlyHint}
+              </button>
               {items.length === 0 ? (
                 <button type="button" className="quick-classification-menu-item" role="menuitem" disabled>
                   {labels.empty}
