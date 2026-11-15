@@ -212,6 +212,36 @@
 
 ---
 
+### 3.9 应用使用统计（[0.13.0]，**仅安卓**）
+
+| 命令 | 入参 | 出参 | ipc.ts 方法 |
+|---|---|---|---|
+| `usage_stats_get` | `{ date: string }`（本地日 `yyyy-MM-dd`） | `UsageDay` | `usageStatsGet`（[0.13.3] rows 里多了 `label` / `icon`） |
+| `usage_stats_settings` | `{}` | `void` | `usageStatsSettings`（跳系统「使用情况访问」页） |
+
+`UsageDay` 的形状：
+
+```
+{
+  supported: boolean,   // 桌面恒 false —— 页面据此不显示入口，这不是错误
+  date: string,
+  totalSec: number,
+  rows: [{
+    packageName: string,
+    sec: number, first: number, last: number,  // 与 app_usage 逐字对齐的**事实**
+    label: string,   // 系统真名（getApplicationLabel）；空串 = 不知道（包已卸载）
+    icon: string     // 'data:image/webp;base64,…'（64px）；空串 = 没有图标
+  }]
+}
+```
+
+**`label` / `icon` 不落库**（迁移 `0008_v01300.sql` 的「不存会过期的副本」），
+每次查询由原生桥现查、在 `usage_stats_get` 里合并。前端只有一条显示规则
+（`components/mobile/usageFormat.ts:displayName`）：真名为空才回落包名短名。
+
+超 7 天的历史日期：系统明细已过期，但宿主会把**库里该日出现过的包名**一并下传给桥
+（`usageDay` 的 `packages` 参数），所以名字与图标照样解析得出来 —— 与系统明细还在不在无关。
+
 ## 4. 命令详解（入参 / 出参 / 语义 / 错误码 / 事件）
 
 ### 4.1 事项域 Items
@@ -852,6 +882,8 @@ SQLite 无 `ADD COLUMN IF NOT EXISTS`，K-13）。`notes.is_pinned` 默认 1，
 | `md_backup_list` / `md_backup_restore` | **已实装**（V0.11.22） | 备份的「看」与「覆盖回去」全程在应用内完成，一个字节都不需要用户摸到文件；恢复另受归属限制（只认 `webdav__`） |
 | `md_backup_export` | 手机**已实装**（V0.11.23，系统「保存到…」）；桌面是 `mobile_only` 桩 | 这是唯一一个**反方向**的能力：只有手机需要「把私有目录里的文件拿出来」 |
 | `get_foreground_window` | `Ok(null)`（不报错） | 安卓没有「前台窗口」概念（`infra::insight` 整棵不编进来）；`null` 是契约里的合法值 = 「不知道」，调用方静默跳过 |
+| `usage_stats_get` | **已实装**（0.13.0；0.13.3 起 rows 带真名与图标） | 安卓 `UsageStatsManager` + `PackageManager`，桌面没有这两样东西。桌面回 `supported: false` 而不是报错 —— 界面据此不显示入口，红字会让「没这个能力」看着像故障 |
+| `usage_stats_settings` | **已实装**（跳「使用情况访问」）；桌面 `Ok(())` | 桌面没有这个特殊权限，空操作即正确语义 |
 | `set_bound_process_watch` | **`Ok(())`（不报错，也不注册）** | 同一条理由：安卓没有前台应用 / 进程枚举能力，「盯进程退出」这件事在手机上不存在。回错误会让自动接管链路每次都走 catch 分支 |
 | `show_window` / `hide_window` / `toggle_window` / `save_window_position` | **`Ok(())` 幂等空操作**（不报错） | 前端首帧与「拖动结束落盘」会调它们；语义上「已显示 / 位置无处可存」本来就是成功，回错误只会在控制台刷红 |
 | `create_record` | **已实装，与桌面逐字同构**（无 `#[cfg]`） | 补记只写 `time_records`，不碰托盘 / 多窗口 / 文件系统，手机端编的是同一份 `services::record::backfill` |
@@ -1213,6 +1245,45 @@ Kotlin 自己读那个文件、写进用户选中的 `content://`。过桥要 ba
 
 判据：`src-tauri/src/services/insight/data/daily_parity_tests.rs`（逐位相等基线）、
 `daily.rs` 的纯函数用例（两设备完全嵌套 → `union_ms` = 30 分钟、`device_sum_ms` = 60 分钟）。
+
+---
+
+### 12.19 [0.14] 契约增量：日记模板「选择文件…」 + 「活动库备份与恢复」命令整块下线
+
+> 背景：设置页七项改造第一批 —— ③ 日记模板路径给一颗文件选择器；⑤ 「活动库备份与恢复」
+> 整块从界面上拿掉。
+>
+> **契约四个数**：命令 **92**（+Patina **112**）/ 错误码 19 / 事件 11-11 / emit 18。
+> 宿主 92 条与错误码都没动，变的只有 Patina 段：**126 → 112**（−15 备份族 +1 选文件）。
+>
+> 1. 新增**分析窗**命令 `cmd_pick_markdown_file() -> Option<String>`：设置 → 同步 →
+>    日记模板路径右侧的「选择文件…」。与 `cmd_pick_storage_directory` 同形——**只返回路径**，
+>    不读文件、不校验内容；落库与校验都在「保存并同步」那一步。过滤器只放 `md` / `markdown`。
+> 2. 删除**分析窗** 15 条命令（`commands/insight/backup_cmd.rs` 整块下线）：
+>    `cmd_pick_backup_save_file` / `cmd_pick_backup_file` / `cmd_get_scheduled_backup_snapshot` /
+>    `cmd_pick_scheduled_backup_directory` / `cmd_save_scheduled_backup_config` /
+>    `cmd_preview_backup` / `cmd_export_backup` / `cmd_restore_backup` /
+>    `cmd_reveal_webdav_backup_secret` / `cmd_get_remote_backup_config_snapshot` /
+>    `cmd_test_webdav_backup_target` / `cmd_upload_webdav_backup` / `cmd_list_webdav_backups` /
+>    `cmd_download_webdav_backup` / `cmd_delete_remote_backup_temp`。
+> 3. 后端能力**没有**跟着消失，只是不再有 IPC 入口：
+>    `services::insight::data::backup::export_backup` 仍被 `storage_migration` 的迁移前兜底备份
+>    与定时备份使用；`preview_backup` 仍被 `remote_backup` 的定时上传校验使用；
+>    `scheduled_backup` 运行时（`app/insight/scheduled_backup.rs` 的 `run`/`tick`）与
+>    `remote_backup` 的 scheduled 一族原样保留。手机端 `md_backup_export` 是另一件事，未动。
+> 4. ACL：`permissions/window-commands.toml` 同步删上述 15 条、加 `cmd_pick_markdown_file`。
+
+| 面 | 变更 | 理由 |
+|---|---|---|
+| 命令 | **+1**：`cmd_pick_markdown_file() -> Option<String>` | 模板是 Markdown，手打绝对路径既慢又容易错；选完仍写进同一份草稿，取消不清空原值 |
+| 命令 | **−15**：备份 / 远端 WebDAV / 定时备份快照 | 界面上那条功能整块删除了，再留 IPC 就是「没人调但能被调」的攻击面 |
+| 入参 | 无（选择器不接受初始路径） | 模板路径是单值，不需要「上次目录」语义；与 `cmd_pick_storage_directory` 同口径 |
+| 错误码 | **无新增** | 选文件失败/取消一律回 `None`，由调用方保留原值，不产生用户可见错误 |
+| 契约门禁 | `check:contract` 只解析宿主段，Patina 计数仅进摘要 | 本文件的人读计数要手动跟着改（门禁不会提醒这一处） |
+
+判据：`HostSyncPanel.test.tsx`（三档文案与控件可见性）、
+`settingsGroups.source.test.ts`（接口/主界面两条入口不再存在）、
+`SettingsStoragePathCallbacks.test.tsx`（数据目录行不再有第二套搬根入口）。
 
 ---
 

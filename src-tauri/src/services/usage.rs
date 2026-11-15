@@ -12,7 +12,7 @@
 use sqlx::SqlitePool;
 
 use crate::error::AppResult;
-use crate::models::usage::{UsageAggregate, UsageRowDto};
+use crate::models::usage::{UsageAggregate, UsageAppDto, UsageRowDto};
 
 /// 写一天的聚合。`rows` 为空是合法输入（那天一个应用都没用），此时不写任何行。
 ///
@@ -81,6 +81,107 @@ pub async fn read(pool: &SqlitePool, date: &str) -> AppResult<Vec<UsageAggregate
             sec,
             first,
             last,
+            /* 库里不存显示名（迁移 0008 的设计），这里先留空，由 `with_meta` 现查填上。 */
+            label: String::new(),
+            icon: String::new(),
         })
         .collect())
+}
+
+/// 库里某一天出现过的包名。
+///
+/// **这一条是为了老日期**：系统只保留约 7 天明细，更早的日子 `queryDay` 回空，
+/// 但库里那些行还在。把它们一并下传给桥，`PackageManager` 就能照样解析出
+/// 「微信」而不是回落成「Mm」—— 名字与系统明细还在不在无关。
+#[cfg_attr(desktop, allow(dead_code))]
+pub async fn packages(pool: &SqlitePool, date: &str) -> AppResult<Vec<String>> {
+    let rows: Vec<(String,)> = sqlx::query_as(
+        r#"
+        SELECT package_name
+        FROM app_usage
+        WHERE local_date = ?1 AND package_name <> ''
+        ORDER BY foreground_sec DESC
+        "#,
+    )
+    .bind(date)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.into_iter().map(|(name,)| name).collect())
+}
+
+/// 把桥回的展示元数据（名字 / 图标）合并进排行行。
+///
+/// 三条口径：
+/// - **按包名精确匹配**，不做前缀/相似匹配 —— 「找到像的」比「没有」更坏。
+/// - 合并不到（包已卸载、桥没给）留空串，前端只有一条回落规则（包名短名）。
+/// - 只覆盖 `label` / `icon`，**不碰** `sec` / `first` / `last`：事实与展示分开，
+///   这里改错也不会把时长算歪。
+#[cfg_attr(desktop, allow(dead_code))]
+pub fn with_meta(rows: Vec<UsageAggregate>, apps: &[UsageAppDto]) -> Vec<UsageAggregate> {
+    if apps.is_empty() {
+        return rows;
+    }
+    let lookup: std::collections::HashMap<&str, &UsageAppDto> =
+        apps.iter().map(|app| (app.package_name.as_str(), app)).collect();
+    rows.into_iter()
+        .map(|mut row| {
+            if let Some(app) = lookup.get(row.package_name.as_str()) {
+                row.label = app.label.clone();
+                row.icon = app.icon.clone();
+            }
+            row
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn row(package_name: &str, sec: i64) -> UsageAggregate {
+        UsageAggregate {
+            package_name: package_name.to_string(),
+            sec,
+            first: 1,
+            last: 2,
+            label: String::new(),
+            icon: String::new(),
+        }
+    }
+
+    fn app(package_name: &str, label: &str) -> UsageAppDto {
+        UsageAppDto {
+            package_name: package_name.to_string(),
+            label: label.to_string(),
+            icon: format!("data:image/webp;base64,{label}"),
+        }
+    }
+
+    /// 真名合并进来，且时长与首末**一个都没被碰**。
+    #[test]
+    fn with_meta_fills_label_and_icon_only() {
+        let out = with_meta(vec![row("com.tencent.mm", 600)], &[app("com.tencent.mm", "微信")]);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].label, "微信");
+        assert_eq!(out[0].icon, "data:image/webp;base64,微信");
+        assert_eq!(out[0].sec, 600);
+        assert_eq!(out[0].first, 1);
+        assert_eq!(out[0].last, 2);
+    }
+
+    /// 桥没给（包已卸载）⇒ 留空串，不许回落到包名 —— 回落是前端**唯一**一处的事。
+    #[test]
+    fn with_meta_leaves_unknown_packages_blank() {
+        let out = with_meta(vec![row("com.gone.app", 60)], &[app("com.tencent.mm", "微信")]);
+        assert_eq!(out[0].label, "");
+        assert_eq!(out[0].icon, "");
+    }
+
+    /// 空 `apps` 直接原样返回：调用方不必先判空。
+    #[test]
+    fn with_meta_is_a_noop_without_apps() {
+        let out = with_meta(vec![row("a.b", 1)], &[]);
+        assert_eq!(out[0].package_name, "a.b");
+        assert_eq!(out[0].label, "");
+    }
 }

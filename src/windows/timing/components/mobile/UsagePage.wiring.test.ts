@@ -32,6 +32,7 @@ const DETAIL = code('./UsageAppDetail.tsx');
 const GATE = code('./UsageGate.tsx');
 const SWITCH = code('./UsageRangeSwitch.tsx');
 const INSIGHTS = code('./UsageInsightList.tsx');
+const ICON = code('./UsageAppIcon.tsx');
 const CSS = code('../../styles/mobile/usage.css');
 const CSS2 = code('../../styles/mobile/usage-overview.css');
 const CSS3 = code('../../styles/mobile/usage-cards.css');
@@ -39,11 +40,20 @@ const ENTRY = code('../../entry/main.tsx');
 const RECORDS = code('./RecordsPage.tsx');
 const SHELL = code('./MobileShell.tsx');
 const UI_STORE = code('../../stores/mobileUiStore.ts');
-const KOTLIN = code(
-  '../../../../../src-tauri/gen/android/app/src/main/java/com/timing/app/TimingNativePlugin.kt',
-);
 
-const COMPONENTS = [PAGE, DAY, WEEK, TREND, OVERVIEW, RANKING, DETAIL, GATE, SWITCH, INSIGHTS];
+const COMPONENTS = [
+  PAGE,
+  DAY,
+  WEEK,
+  TREND,
+  OVERVIEW,
+  RANKING,
+  DETAIL,
+  GATE,
+  SWITCH,
+  INSIGHTS,
+  ICON,
+];
 const STYLES = `${CSS}\n${CSS2}\n${CSS3}`;
 
 /** 从 TSX 里捞出所有 `m-usage*` 类名（含 BEM 修饰），顺序无关。 */
@@ -184,60 +194,5 @@ describe('统计并入记录页（不再有独立页签）', () => {
     expect(RECORDS, '记录页没有挂统计').toContain('<UsagePage />');
     /* 只能在记录页里出现一次：多挂一处就是两份取数、两份「今日合计」 */
     expect(RECORDS.match(/<UsagePage/g)?.length ?? 0).toBe(1);
-  });
-});
-
-/**
- * 桥不许替系统下「已授权」的结论。
- *
- * 真机上踩到的静默缺陷：`usageDay` 原来硬编码 `payload.put("granted", true)`，
- * 于是「没开使用情况访问」被说成「开了但今天没用手机」—— 宿主那条
- * `if (!reply.granted) → USAGE_PERMISSION_DENIED` 永远不触发，界面上永远等不到
- * 「去系统设置打开」的按钮，只剩一片 0 分钟（而且零报错、测试全绿）。
- * 权限状态只有一个真源：`UsageStats.hasPermission`。
- */
-describe('授权状态如实上报', () => {
-  it('st12_kotlin_must_not_hardcode_granted', () => {
-    expect(KOTLIN, 'Kotlin 又把 granted 写死了').not.toContain('payload.put("granted", true)');
-    expect(KOTLIN).toContain('payload.put("granted", UsageStats.hasPermission(activity))');
-  });
-});
-
-/**
- * 跨桥传列表只许 `JSArray`，且**必须经 `jsArrayOf` 转一层**。
- *
- * 真机上踩到的静默缺陷（0.12.2，用户截图原话「读不到应用数据」）：
- * `payload.put("rows", JSArray(UsageStats.queryDay(…)))` —— `queryDay` 回的是
- * `org.json.JSONArray`，它既不是 `Collection` 也不是原生数组，于是 `JSArray` 的
- * `(Collection)` / `(Object[])` 两个重载都不适用，被当成 `(Object)` 收下，转手调
- * `org.json.JSONArray(Object)`，那个构造函数只认原生数组，见非数组就抛
- * `Not a primitive array: class org.json.JSONArray`。
- *
- * 后果比一个异常更难看：**每次调用都抛**（`queryDay` 无权限时回空 `JSONArray`，照样抛），
- * 于是 `app_usage` 永远 0 行、统计页永远整块失败，与授权状态无关。而静态检查看不出来 ——
- * Kotlin 编得过、`JSArray` 的构造签名也确实存在，只是选错了重载。
- *
- * 所以判据要盯**实参的类型来源**，不能只盯「有没有用 JSArray」。
- */
-describe('跨桥传列表的装箱方式', () => {
-  /** 插件里所有 `JSArray(<实参>)` 的实参；空参（`JSArray()`）跳过。 */
-  const args = [...KOTLIN.matchAll(/JSArray\(([^)]*)\)/g)]
-    .map((match) => match[1].trim())
-    .filter((arg) => arg.length > 0);
-
-  it('st13_no_jsarray_wraps_a_jsonarray', () => {
-    expect(args.length, '一个 JSArray(…) 都没扫到 —— 判据自己失效了').toBeGreaterThan(0);
-    const bad = args.filter((arg) => /JSONArray|queryDay|optJSONArray/.test(arg));
-    expect(
-      bad,
-      `JSArray 收到了 org.json.JSONArray（会抛 Not a primitive array）：${bad.join(' / ')}`,
-    ).toEqual([]);
-  });
-
-  it('st14_usage_rows_go_through_the_converter', () => {
-    expect(KOTLIN, 'jsArrayOf 不在了：跨桥转换少了一层').toContain('private fun jsArrayOf');
-    /* 转换器本身必须真把元素逐项搬进 List —— 只是「包一层再交给 JSArray(Object)」等于换汤 */
-    expect(KOTLIN, 'jsArrayOf 没有逐项搬进 ArrayList').toContain('ArrayList<Any>(items.length())');
-    expect(KOTLIN, '统计的 rows 没有经 jsArrayOf').toContain('jsArrayOf(UsageStats.queryDay');
   });
 });

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React 19 + Rust）· 双轨版号：桌面 0.12.2 / 手机 0.12.3。
+Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React 19 + Rust）· 双轨版号：桌面 0.12.2 / 手机 0.12.4。
 本文件是给编码代理的入口约定。
 
 ## 版本规则（先看这条）

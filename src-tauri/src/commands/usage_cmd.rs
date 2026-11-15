@@ -45,8 +45,17 @@ pub async fn usage_stats_get(
         /* 窗口 = 本地日 [00:00, 次日 00:00)。Rust 侧算好再传下去：Kotlin 不做本地日推算，
            两边各算一次必然在时区/夏令时上分叉（与 md 同步镜像根同一条教训）。 */
         let (from, to) = local_day_bounds(&date)?;
+
+        /* 库里这一天已有的包名也一并下传。**这是老日期能显示真名的唯一办法**：
+           系统只留约 7 天明细，更早的日子桥那边 `queryDay` 回空，但库里的行还在；
+           把包名点名要过去，`PackageManager` 就能解析出「微信」而不是回落成「Mm」。
+           名字与「系统明细还在不在」是两件事，不能捆在一起。 */
+        let known = usage::packages(&state.pool, &date).await?;
         let reply: UsageDayReply = bridge
-            .call("usageDay", serde_json::json!({ "from": from, "to": to }))
+            .call(
+                "usageDay",
+                serde_json::json!({ "from": from, "to": to, "packages": known }),
+            )
             .await?;
 
         if !reply.granted {
@@ -57,6 +66,17 @@ pub async fn usage_stats_get(
         }
 
         usage::rollup(&state.pool, &date, &reply.rows).await?;
+
+        /* 读库 → 用桥回的 `apps` 补上显示名与图标。
+           名字**不进库**（迁移 0008 的「不存过期副本」），每次现查现合并。 */
+        let rows = usage::with_meta(usage::read(&state.pool, &date).await?, &reply.apps);
+        let total_sec = rows.iter().map(|row| row.sec.max(0)).sum();
+        Ok(UsageDay {
+            supported: true,
+            date,
+            total_sec,
+            rows,
+        })
     }
 
     #[cfg(not(mobile))]
@@ -67,18 +87,6 @@ pub async fn usage_stats_get(
             date,
             total_sec: 0,
             rows: Vec::new(),
-        })
-    }
-
-    #[cfg(mobile)]
-    {
-        let rows = usage::read(&state.pool, &date).await?;
-        let total_sec = rows.iter().map(|row| row.sec.max(0)).sum();
-        Ok(UsageDay {
-            supported: true,
-            date,
-            total_sec,
-            rows,
         })
     }
 }

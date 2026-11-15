@@ -213,9 +213,44 @@
 
 .m-usage__rowhead {
   display: flex;
-  align-items: baseline;
+  /* 居中而不是基线对齐：行头左边多了图标，图标没有文字基线，
+     baseline 对齐会让图标往下沉一截，和名字看起来错位。 */
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+}
+
+/* 图标 + 名字。`min-width: 0` 是让右边那块（时长）不被长名字挤走的必要条件。 */
+.m-usage__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* 应用图标：桥回的是 64px data URI，这里按 22px 显示。
+   圆角是必要的 —— 自适应图标取出来是方形（圆形/异形掩码在启动器那侧，不在 drawable 里），
+   不圆一下看着像一张贴纸。`object-fit: cover` 防止个别图标比例不是 1:1 时变形。 */
+.m-usage__icon {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--bg-field);
+}
+
+/* 首字瓦片：取不到图标时的兜底。尺寸与圆角**必须与真图标一致**，
+   否则同一张列表里会一眼看出「这几行矮一点」，而那是因为加载失败、不是设计。 */
+.m-usage__icon--letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  color: var(--ink-3);
+  text-transform: uppercase;
+  user-select: none;
 }
 
 .m-usage__name {

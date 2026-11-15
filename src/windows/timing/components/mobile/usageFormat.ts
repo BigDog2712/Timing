@@ -20,15 +20,31 @@ export function formatDuration(sec: number): string {
 }
 
 /**
- * 包名 → 可读名。
+ * 包名 → 可读名（**兜底用**，不是首选）。
  *
- * 真正的应用名要从 `PackageManager` 取（拿 label 需要原生桥再走一趟）。这一步排在 P2：
- * 先把「哪个包用了多久」显示对，比显示一个漂亮名字更重要。这里取包名最后一段并首字母大写，
- * 至少比 `com.tencent.mm` 这种长串好认。
+ * 真正的应用名由系统给（Kotlin `AppMetadata` 走 `PackageManager.getApplicationLabel`，
+ * 经 `usage_stats_get` 的 `label` 字段上来）。这里只在这种情况被用到：
+ * 包已卸载（系统查不到）、或回值来自浏览器 mock。
+ *
+ * 取包名最后一段并首字母大写，至少比 `com.tencent.mm` 这种长串好认 ——
+ * 但要知道它**是错的**：`com.tencent.mm` 不是「Mm」而是「微信」，
+ * `tv.danmaku.bili` 不是「Bili」而是「哔哩哔哩」。0.13.2 之前整页都是这种名字。
  */
 export function shortName(packageName: string): string {
   const tail = packageName.split('.').filter(Boolean).pop() ?? packageName;
   return tail.charAt(0).toUpperCase() + tail.slice(1);
+}
+
+/**
+ * 一行 → 界面上显示的名字。**全页只有这一条规则**：真名优先，空则回落包名短名。
+ *
+ * 为什么单拎出来：列表、洞察句、详情标题三处都要名字。各自写一遍 `label || shortName(...)`
+ * 迟早有一处写成 `label || packageName`（那就是 `com.tencent.mm` 直接露在标题上），
+ * 或者有一处忘了回落（空名字 = 一整行只剩时长）。判据钉在这里。
+ */
+export function displayName(row: { packageName: string; label?: string }): string {
+  const label = (row.label ?? '').trim();
+  return label === '' ? shortName(row.packageName) : label;
 }
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'] as const;

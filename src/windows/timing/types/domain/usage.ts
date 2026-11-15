@@ -8,6 +8,13 @@ export interface UsageAggregate {
   first: number;
   /** 当天最后一次离开前台的毫秒时刻（0 = 未知） */
   last: number;
+  /**
+   * 系统给的应用显示名（`PackageManager.getApplicationLabel`）。空串 = 不知道（包已卸载）。
+   * **可选**是为了兼容浏览器 mock 与旧回值：调用方一律走 `displayName()`，不自己判空。
+   */
+  label?: string;
+  /** `data:image/webp;base64,…` 的 64px 图标；空串 = 没有（前端画首字瓦片） */
+  icon?: string;
 }
 
 export interface UsageDayDto {

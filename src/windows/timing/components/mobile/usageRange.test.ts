@@ -18,7 +18,17 @@ import {
 } from '../../services/usageRange';
 import type { UsageDayDto } from '../../types/domain/usage';
 
-function dayOf(date: string, rows: { pkg: string; sec: number; first?: number; last?: number }[]): UsageDayDto {
+function dayOf(
+  date: string,
+  rows: {
+    pkg: string;
+    sec: number;
+    first?: number;
+    last?: number;
+    label?: string;
+    icon?: string;
+  }[],
+): UsageDayDto {
   return {
     supported: true,
     date,
@@ -28,6 +38,9 @@ function dayOf(date: string, rows: { pkg: string; sec: number; first?: number; l
       sec: row.sec,
       first: row.first ?? 0,
       last: row.last ?? 0,
+      /* 默认空串 = 「系统没给名字」，与真实回值里「包已卸载」同一种状态 */
+      label: row.label ?? '',
+      icon: row.icon ?? '',
     })),
   };
 }
@@ -55,6 +68,27 @@ describe('mergeRows', () => {
   it('r01c_empty_package_and_non_positive_seconds_are_dropped', () => {
     const rows = mergeRows([dayOf('2026-11-14', [{ pkg: '', sec: 10 }, { pkg: 'x.y', sec: 0 }])]);
     expect(rows).toEqual([]);
+  });
+
+  /**
+   * 名字与图标跨天合并时**只补空位、不覆盖**。
+   *
+   * 真实场景：某个包在 11/13 那天取不到图标（装之前用过、或那次 PackageManager 抽风），
+   * 11/14 取到了。若按「后写覆盖」或「先写死不变」，要么图标永远空白，要么被空串覆盖成空白 ——
+   * 两种都是「看着像没数据」的静默错。
+   */
+  it('r01e_label_and_icon_survive_merging_and_fill_only_blanks', () => {
+    const rows = mergeRows([
+      dayOf('2026-11-13', [{ pkg: 'com.tencent.mm', sec: 60 }]),
+      dayOf('2026-11-14', [
+        { pkg: 'com.tencent.mm', sec: 60, label: '微信', icon: 'data:image/webp;base64,AA' },
+      ]),
+      dayOf('2026-11-15', [
+        { pkg: 'com.tencent.mm', sec: 60, label: '别的名字', icon: 'data:image/webp;base64,BB' },
+      ]),
+    ]);
+    expect(rows[0].label).toBe('微信');
+    expect(rows[0].icon).toBe('data:image/webp;base64,AA');
   });
 
   it('r01d_ties_are_broken_by_package_name_not_insertion_order', () => {
@@ -90,9 +124,9 @@ describe('rangeOf', () => {
 
 describe('topRows', () => {
   const rows = [
-    { packageName: 'a', sec: 100, first: 0, last: 0, days: 3 },
-    { packageName: 'b', sec: 90, first: 0, last: 0, days: 2 },
-    { packageName: 'c', sec: 80, first: 0, last: 0, days: 1 },
+    { packageName: 'a', sec: 100, first: 0, last: 0, days: 3, label: '', icon: '' },
+    { packageName: 'b', sec: 90, first: 0, last: 0, days: 2, label: '', icon: '' },
+    { packageName: 'c', sec: 80, first: 0, last: 0, days: 1, label: '', icon: '' },
   ];
 
   it('r03a_tail_becomes_one_row_so_the_sum_still_matches_the_total', () => {

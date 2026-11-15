@@ -6,7 +6,8 @@
  *   ② 差异不到 1 分钟 → 不产（「比昨天少用 0 分钟」是噪音）；
  *   ③ 主因应用必须与总差值同向，找不到就不编理由；
  *   ④ 单应用占比只在当天用够半小时时才说（总共 3 分钟谈占比毫无意义）；
- *   ⑤ 「连续 N 天变多」必须严格逐日上升，且缺天即断。
+ *   ⑤ 「连续 N 天变多」必须严格逐日上升，且缺天即断；
+ *   ⑥ 句子里点的名字必须是**系统给的真名**，不是包名截出来的尾段（`Mm` / `Bili`）。
  */
 import { describe, expect, it } from 'vitest';
 import { buildInsights } from './usageInsights';
@@ -16,13 +17,19 @@ const KEYS = ['2026-11-13', '2026-11-14', '2026-11-15'];
 
 function dayOf(
   date: string,
-  rows: { pkg: string; sec: number }[],
+  rows: { pkg: string; sec: number; label?: string }[],
 ): UsageDayDto {
   return {
     supported: true,
     date,
     totalSec: rows.reduce((sum, row) => sum + row.sec, 0),
-    rows: rows.map((row) => ({ packageName: row.pkg, sec: row.sec, first: 0, last: 0 })),
+    rows: rows.map((row) => ({
+      packageName: row.pkg,
+      sec: row.sec,
+      first: 0,
+      last: 0,
+      label: row.label ?? '',
+    })),
   };
 }
 
@@ -154,5 +161,36 @@ describe('看往日时要说那一天的话（anchor）', () => {
     );
     expect(texts.join('|')).not.toContain('连续');
     expect(texts.join('|')).not.toContain('最久');
+  });
+});
+
+/**
+ * 句子里点的名字必须是真名。
+ *
+ * 0.13.2 之前这里走的是 `shortName()`，于是「主要来自 Mm」「Bili 占了今天的 61%」——
+ * 每个字都读得通，但没有一个是对的。判据同时钉**正向**（用真名）与**反向**
+ * （不许出现包名尾段），因为只钉正向的话，回落逻辑写反了仍然能过。
+ */
+describe('名字用系统真名', () => {
+  it('i07a_comparison_names_the_app_by_its_real_label', () => {
+    const days = {
+      '2026-11-14': dayOf('2026-11-14', [{ pkg: 'com.tencent.mm', sec: 600, label: '微信' }]),
+      '2026-11-15': dayOf('2026-11-15', [{ pkg: 'com.tencent.mm', sec: 1800, label: '微信' }]),
+    };
+    const [first] = buildInsights({ days, keys: KEYS, limit: 1 });
+    expect(first.text).toBe('比昨天多用 20 分钟，主要来自 微信（+20 分钟）');
+    expect(first.text).not.toContain('Mm');
+  });
+
+  it('i07b_share_sentence_uses_the_real_label', () => {
+    const days = {
+      '2026-11-15': dayOf('2026-11-15', [
+        { pkg: 'tv.danmaku.bili', sec: 1800, label: '哔哩哔哩' },
+        { pkg: 'com.android.chrome', sec: 600 },
+      ]),
+    };
+    const texts = buildInsights({ days, keys: KEYS, limit: 5 }).map((item) => item.text);
+    expect(texts.join('|')).toContain('哔哩哔哩 占了今天的 75%');
+    expect(texts.join('|')).not.toContain('Bili');
   });
 });

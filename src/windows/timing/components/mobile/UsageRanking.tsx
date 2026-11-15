@@ -1,5 +1,5 @@
 /**
- * [0.13.2] 统计页的应用排行：每行 = 一行头（名字 + 时长）+ 一条占比 + 一行脚注。
+ * [0.13.2] 统计页的应用排行：每行 = 一行头（图标 + 名字 + 时长）+ 一条占比 + 一行脚注。
  *
  * ## 为什么条长按「本列表第一条」归一，而占比按合计算
  * 两者回答不同问题：条长让眼睛分辨「谁多谁少」（相对最高那条），占比回答「这一天里它占几成」
@@ -8,8 +8,15 @@
  * ## 「其他 N 个应用」不是应用
  * 超过 10 条时列表尾部合成一行，它**不可点**（点开一个聚合体没有详情可看），
  * 但也必须显示时长 —— 少了它，列表之和就不等于顶部合计，用户对不上账。
+ * 它也没有图标与名字（`label` / `icon` 为空），名字直接用聚合行自带的那句中文。
+ *
+ * ## 名字与图标只有一个来源
+ * 名字一律走 `displayName()`（真名 → 包名短名），图标走 `UsageAppIcon`（真图标 → 首字瓦片）。
+ * 这里**不许**自己写 `row.label || ...`，也不许把 `packageName` 直接当名字渲染 ——
+ * 0.13.2 之前整页显示的就是 `Mm` / `Bili` / `Home` 这种从包名截出来的假名。
  */
-import { formatDuration, shortName } from './usageFormat';
+import { UsageAppIcon } from './UsageAppIcon';
+import { displayName, formatDuration } from './usageFormat';
 import { percentOf, type UsageRow } from '../../services/usageRange';
 
 interface Props {
@@ -29,33 +36,42 @@ export function UsageRanking({ top, rest, totalSec, meta, onSelect }: Props) {
 
   return (
     <ul className="m-usage__list">
-      {top.map((row) => (
-        <li key={row.packageName}>
-          <button
-            type="button"
-            className="m-usage__row"
-            onClick={() => onSelect(row.packageName)}
-            aria-label={`${shortName(row.packageName)} ${formatDuration(row.sec)}，查看每日趋势`}
-          >
-            <span className="m-usage__rowhead">
-              <span className="m-usage__name">{shortName(row.packageName)}</span>
-              <span className="m-usage__sec">{formatDuration(row.sec)}</span>
-            </span>
-            <span className="m-usage__bar" aria-hidden="true">
-              <span className="m-usage__bar-fill" style={{ width: `${widthOf(row.sec)}%` }} />
-            </span>
-            <span className="m-usage__meta">
-              <span>{meta(row)}</span>
-              <span>{percentOf(row.sec, totalSec)}%</span>
-            </span>
-          </button>
-        </li>
-      ))}
+      {top.map((row) => {
+        const name = displayName(row);
+        return (
+          <li key={row.packageName}>
+            <button
+              type="button"
+              className="m-usage__row"
+              onClick={() => onSelect(row.packageName)}
+              aria-label={`${name} ${formatDuration(row.sec)}，查看每日趋势`}
+            >
+              <span className="m-usage__rowhead">
+                <span className="m-usage__title">
+                  <UsageAppIcon label={name} icon={row.icon} />
+                  <span className="m-usage__name">{name}</span>
+                </span>
+                <span className="m-usage__sec">{formatDuration(row.sec)}</span>
+              </span>
+              <span className="m-usage__bar" aria-hidden="true">
+                <span className="m-usage__bar-fill" style={{ width: `${widthOf(row.sec)}%` }} />
+              </span>
+              <span className="m-usage__meta">
+                <span>{meta(row)}</span>
+                <span>{percentOf(row.sec, totalSec)}%</span>
+              </span>
+            </button>
+          </li>
+        );
+      })}
       {rest != null ? (
         <li>
           <div className="m-usage__row" data-static="">
             <span className="m-usage__rowhead">
-              <span className="m-usage__name">{rest.packageName}</span>
+              <span className="m-usage__title">
+                <UsageAppIcon label={rest.packageName} />
+                <span className="m-usage__name">{rest.packageName}</span>
+              </span>
               <span className="m-usage__sec">{formatDuration(rest.sec)}</span>
             </span>
             <span className="m-usage__bar" aria-hidden="true">

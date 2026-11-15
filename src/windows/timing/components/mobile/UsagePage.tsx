@@ -208,9 +208,14 @@ export function UsagePage() {
 
   if (detailPkg != null) {
     const row = current?.rows.find((item) => item.packageName === detailPkg);
+    /* 名字与图标取**整个窗口的合并行**，不取当前这一天：某一天的元数据可能缺
+       （那天包还没装、那天取图标失败），合并后才知道它到底叫什么。 */
+    const meta = week.rows.find((item) => item.packageName === detailPkg);
     return (
       <UsageAppDetail
         packageName={detailPkg}
+        label={meta?.label}
+        icon={meta?.icon}
         points={detailPoints}
         selected={selectedKey}
         onSelectDay={selectDay}

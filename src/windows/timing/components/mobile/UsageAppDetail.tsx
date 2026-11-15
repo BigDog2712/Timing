@@ -10,10 +10,15 @@
 import { useMemo } from 'react';
 
 import { UsageTrend, type UsageTrendPoint } from './UsageTrend';
-import { clockText, formatDuration, monthDayShort, shortName } from './usageFormat';
+import { UsageAppIcon } from './UsageAppIcon';
+import { clockText, displayName, formatDuration, monthDayShort } from './usageFormat';
 
 interface Props {
   packageName: string;
+  /** 系统给的真名；空则回落包名短名（见 `displayName`） */
+  label?: string;
+  /** `data:image/webp;base64,…`；空则画首字瓦片 */
+  icon?: string;
   /** 该应用逐日（从旧到新），`null` = 那天没读到 */
   points: readonly UsageTrendPoint[];
   selected: string;
@@ -25,12 +30,15 @@ interface Props {
 
 export function UsageAppDetail({
   packageName,
+  label,
+  icon,
   points,
   selected,
   onSelectDay,
   onBack,
   firstLast,
 }: Props) {
+  const title = displayName({ packageName, label });
   const stats = useMemo(() => {
     let total = 0;
     let count = 0;
@@ -51,7 +59,8 @@ export function UsageAppDetail({
           ‹
         </button>
         <span className="m-usage-detail__title" title={packageName}>
-          {shortName(packageName)}
+          <UsageAppIcon label={title} icon={icon} />
+          <span className="m-usage-detail__name">{title}</span>
         </span>
         <span className="m-usage-detail__placeholder" aria-hidden="true" />
       </div>

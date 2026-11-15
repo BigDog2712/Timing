@@ -14,6 +14,7 @@ import app.tauri.plugin.Invoke
 import app.tauri.plugin.JSArray
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Plugin
+import com.timing.app.native.AppMetadata
 import com.timing.app.native.Prefs
 import com.timing.app.native.SafVault
 import com.timing.app.native.UsageStats
@@ -354,16 +355,41 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
         val from = args.optLong("from", 0L)
         val to = args.optLong("to", 0L)
         val payload = JSObject()
-        if (from <= 0L || to <= from) {
-            payload.put("rows", JSArray())
-            payload.put("granted", UsageStats.hasPermission(activity))
-            invoke.resolve(payload)
-            return
+
+        /* 参数不合法不是错误：回空数组 + 真实授权状态，宿主那边会落成「这一天没有数据」。 */
+        val rows =
+            if (from <= 0L || to <= from) {
+                org.json.JSONArray()
+            } else {
+                UsageStats.queryDay(activity, from, to)
+            }
+
+        /* 要解析名字与图标的包 = 本次事件里的 ∪ 宿主点名要的。
+           后者的必要性：**系统只留约 7 天明细**，更早的日子 `queryDay` 回空，
+           但库里那些行还在，界面上照样要显示「微信」而不是「Mm」——
+           包名由 Rust 从库里读出来传下来，这里用 PackageManager 解析即可，
+           与系统明细还在不在无关。 */
+        val packages = LinkedHashSet<String>()
+        for (index in 0 until rows.length()) {
+            val pkg = rows.optJSONObject(index)?.optString("packageName", "").orEmpty()
+            if (pkg.isNotEmpty()) packages.add(pkg)
         }
+        val wanted = args.optJSONArray("packages")
+        if (wanted != null) {
+            for (index in 0 until wanted.length()) {
+                val pkg = wanted.optString(index, "")
+                if (pkg.isNotEmpty()) packages.add(pkg)
+            }
+        }
+
         /* ADR-056：跨桥的列表只许 JSArray —— 且必须经 `jsArrayOf`。
            直接写 `JSArray(JSONArray)` 会抛 "Not a primitive array"（0.12.2 真机就是这句），
            与权限无关、每次必抛。见 `jsArrayOf` 的注释。 */
-        payload.put("rows", jsArrayOf(UsageStats.queryDay(activity, from, to)))
+        payload.put("rows", jsArrayOf(rows))
+        /* 名字与图标单独一条 `apps`，不塞进 rows：rows 是与库里逐字对齐的事实
+           （包名/秒/首末），apps 是每次现查的展示元数据，两者生命周期不同。
+           塞在一起会让「rows 的字段名必须与 Rust 一致」这条纪律变模糊。 */
+        payload.put("apps", AppMetadata.describe(activity, packages))
         /* **必须如实回读**（0.13.3 修）：这里原先是硬编码 `true`，于是「没开权限」被说成
            「开了但今天没用手机」—— 宿主那条 `if (!reply.granted) → USAGE_PERMISSION_DENIED`
            永远不触发，界面上永远等不到「去系统设置打开」那个按钮，只剩一片 0 分钟。

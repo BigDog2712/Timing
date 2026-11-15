@@ -4,6 +4,47 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 修复 + 功能 · 应用记录用真名与真图标（`Mm` / `Bili` / `Home` 这些假名下线）— 2026-11-15（未出包）
+
+> 手机版号 0.12.3 → **0.12.4（12004）**。零新命令（仍是 92）、零 schema、零迁移。
+
+真机截图：列表里写着 `Mm`（微信）、`Bili`（哔哩哔哩）、`Home` / `Nova`（桌面启动器）——
+全部是 `shortName()` 从包名尾段首字母大写凑出来的。名字错了比缺名字更坏：每一个字都读得通，
+但没有一个是对的，用户看到「Mm 用了 23 分钟」根本不知道那是什么。
+
+**修法：名字与图标都向系统要，但都不落库。**
+
+- 新增 `gen/android/…/native/AppMetadata.kt`：`PackageManager.getApplicationLabel` 取真名，
+  `getApplicationIcon` 取图标，画到 64px 画布、压成 WebP、转 `data:image/webp;base64,…`。
+  自适应图标（API 26+）把绘制区放大 1.5 倍再居中裁，否则四周一圈透明、在列表里比别人的图标小一圈。
+  进程内 `ConcurrentHashMap` 缓存（统计页一次挂载连发 7 个 `usageDay`，普通 HashMap 会被并发写坏）。
+- `usageDay` 多回一个 `apps: [{packageName, label, icon}]`，多收一个 `packages` 入参。
+  **`packages` 是给老日期的**：系统只留约 7 天明细，更早的日子 `queryDay` 回空，
+  但库里的行还在 —— Rust 把库里该日出现过的包名下传，`PackageManager` 照样能解析出真名。
+  名字与「系统明细还在不在」是两件事，不能捆在一起。
+- Rust：`UsageAppDto` 新 DTO、`services::usage::packages()` / `with_meta()`，
+  `usage_stats_get` 读完库后用桥回的 `apps` 合并 `label` / `icon`，只覆盖这两个字段，
+  绝不碰 `sec` / `first` / `last`（事实与展示分开）。
+- 为什么不给 `app_usage` 加列：迁移 `0008_v01300.sql` 写着「不存应用显示名与分类 ——
+  那两样会变，存进来就成了过期副本」。这条纪律是对的，本轮遵守它，代价只是
+  「包已卸载」时回落成包名短名。
+
+前端：`UsageAggregate` 加 `label?` / `icon?`，`usageRange` 跨天合并**只补空位不覆盖**
+（某天缺图标不该拖累整段），新增 `UsageAppIcon`（真图 → 首字瓦片，尺寸一致不跳动），
+排行行头与详情标题都接上；显示名收敛成 `usageFormat.ts:displayName` **一条规则**，
+排行/详情/洞察句全部走它 —— 洞察句原来也会说「主要来自 Mm」。
+
+**判据 +7**（统计页 151 条）：
+`r01e` 合并保留名字并只补空位 · `i07a`/`i07b` 洞察句用真名且不许出现包名尾段 ·
+`st15` 名字必须来自 `getApplicationLabel`（反向禁止 `.split(".")` 凑名）· `st15b` 图标必须压到 64px 且编 WebP ·
+`st15c` 桥必须回 `apps` 且收 `packages` · `st16` 全页只有 `displayName` 一条名字规则 ·
+`st16b` 每行都有图标兜底 · `rd04` **真挂载**验「渲染出的是抖音 + `<img>`，不是 Aweme」。
+变异自证两段：排行改用 `displayName({packageName})`（忽略 label）⇒ `st16` / `rd01` / `rd04` 三红，
+报错里直接复现 `Aweme`；Kotlin 改回包名派生 ⇒ `st15` 红。撤销后 151 条全绿、`MUTATION` 0 处。
+
+契约文档补了两条**从来没有过条目**的命令（`usage_stats_get` / `usage_stats_settings`，
+0.13.0 只写了代码没写文档）：新增 §3.9 + 安卓降级表两行。
+
 ## 修复 · 「读不到应用数据」：跨桥列表送错了重载（`Not a primitive array`）— 2026-11-15（未出包）
 
 > 手机版号 0.12.2 → **0.12.3（12003）**。零新命令、零 schema、零迁移：契约仍 92/92/92/92。

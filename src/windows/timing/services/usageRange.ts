@@ -24,6 +24,10 @@ export interface UsageRow {
   last: number;
   /** 在几天里出现过（1..dayCount） */
   days: number;
+  /** 系统给的应用显示名（空 = 不知道，渲染走 `displayName` 回落） */
+  label: string;
+  /** `data:image/webp;base64,…` 图标（空 = 没有，渲染走首字瓦片） */
+  icon: string;
 }
 
 /** 一个区间的读数。 */
@@ -50,11 +54,18 @@ export function mergeRows(days: readonly UsageDayDto[]): UsageRow[] {
           first: row.first,
           last: row.last,
           days: 1,
+          label: row.label ?? '',
+          icon: row.icon ?? '',
         });
         continue;
       }
       hit.sec += row.sec;
       hit.days += 1;
+      /* 名字与图标**只补空位，不覆盖已有值**：同一个包的名字是稳定的，但某一天可能查不到
+         （那天包还没装 / 那天取图标失败）。用「先遇到的非空值」，列表就不会因为
+         某一天缺元数据而整行退回包名短名。 */
+      if (hit.label === '') hit.label = row.label ?? '';
+      if (hit.icon === '') hit.icon = row.icon ?? '';
       /* `first` / `last` 的 0 是「不知道」，不是「零点」：拿 0 去比 MIN 会把区间起点
          拉到 1970 年，界面上显示 00:00；所以只让已知值参与比较。 */
       if (row.first > 0 && (hit.first === 0 || row.first < hit.first)) hit.first = row.first;
@@ -100,6 +111,9 @@ export function topRows(
     first: tail.reduce((min, row) => (row.first > 0 && (min === 0 || row.first < min) ? row.first : min), 0),
     last: tail.reduce((max, row) => Math.max(max, row.last), 0),
     days: tail.reduce((max, row) => Math.max(max, row.days), 0),
+    /* 聚合行不是应用：没有名字也没有图标。渲染时直接用它的 `packageName`（那是给用户看的字面量）。 */
+    label: '',
+    icon: '',
   };
   return { top, rest };
 }

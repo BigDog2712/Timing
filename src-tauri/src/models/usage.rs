@@ -26,6 +26,28 @@ pub struct UsageRowDto {
     pub last: i64,
 }
 
+/// Kotlin `usageDay` 回的**展示元数据**一行（JSON: `{packageName, label, icon}`）。
+///
+/// 为什么不并进 `UsageRowDto`：那张表是与 `app_usage` 逐字对齐的**事实**
+/// （包名/秒/首末，见迁移 `0008_v01300.sql` 的「不存显示名」），
+/// 而这里的东西每次现查、不进库、可以变（改名换图标）。混在一起会让
+/// 「rows 字段名必须与 Kotlin 一致」这条纪律失去边界。
+///
+/// `label` 与 `icon` 都允许空串 —— 空是「不知道」（包已卸载 / 取图标失败），
+/// **不是**「没有名字」。前端只有一条回落规则：空就退回包名短名。
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(desktop, allow(dead_code))]
+#[serde(rename_all = "camelCase")]
+pub struct UsageAppDto {
+    pub package_name: String,
+    #[serde(default)]
+    pub label: String,
+    /// `data:image/webp;base64,…`（64px）。**不是文件路径** —— 桥只能传 JSON，
+    /// 写文件再让 WebView 读要开 asset 协议与作用域，配错的表现是满屏空图标。
+    #[serde(default)]
+    pub icon: String,
+}
+
 /// Kotlin `usageDay` 的整包回值。
 ///
 /// `granted` 是 Kotlin 侧**如实回读**的系统状态（`UsageStats.hasPermission`）。
@@ -39,10 +61,11 @@ pub struct UsageRowDto {
 /// 反序列化），桌面只用到它的邻居 `UsageDay`。**不 `cfg` 掉**：它和手机包共用同一份
 /// 定义，`cfg` 掉之后两平台就得各写一份 DTO，字段名迟早分叉。
 ///
-/// **字段名没有自动化判据**：`rows` / `granted` / `first` / `last` 全带 `#[serde(default)]`，
-/// Kotlin 那边改名不会有任何告警，只会静默读成空数组 / 0 —— 编译器看不见 Kotlin。
-/// 对齐全靠人看 `gen/android/…/TimingNativePlugin.kt` 的 `payload.put("rows"/"granted")`
-/// 与 `native/UsageStats.kt` 的 `row.put("packageName"/"sec"/"first"/"last")`。
+/// **字段名没有自动化判据**：`rows` / `apps` / `granted` / `first` / `last` 全带
+/// `#[serde(default)]`，Kotlin 那边改名不会有任何告警，只会静默读成空数组 / 0 ——
+/// 编译器看不见 Kotlin。对齐全靠人看 `gen/android/…/TimingNativePlugin.kt` 的
+/// `payload.put("rows"/"apps"/"granted")` 与 `native/AppMetadata.kt` 的
+/// `row.put("packageName"/"label"/"icon")`。
 /// （0.12.2 那个「读不到应用数据」就是这一层的邻居问题：字段名没错，但 `rows` 的
 /// **装箱方式**错了，抛的是 `Not a primitive array`。跨桥的类型与字段同样没有编译期保护。）
 #[derive(Debug, Clone, Deserialize)]
@@ -52,9 +75,14 @@ pub struct UsageDayReply {
     pub granted: bool,
     #[serde(default)]
     pub rows: Vec<UsageRowDto>,
+    #[serde(default)]
+    pub apps: Vec<UsageAppDto>,
 }
 
 /// 一次查询的聚合结果，直接给界面。
+///
+/// `label` / `icon` 由 `services::usage::with_meta` 从桥回的 `apps` 合并进来；
+/// 合并不到就留空串（前端回落），**不在这里编名字**。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UsageAggregate {
@@ -62,6 +90,8 @@ pub struct UsageAggregate {
     pub sec: i64,
     pub first: i64,
     pub last: i64,
+    pub label: String,
+    pub icon: String,
 }
 
 /// `usage_stats_get` 的回值。

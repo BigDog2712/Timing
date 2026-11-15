@@ -10,7 +10,7 @@
  * - 日均 / 连续天数只按**读到的天**算，缺的天不许当 0 参与。
  * - 占比、差值都取整到分钟/整数百分比；不到 1 分钟的差异不值得说一句。
  */
-import { formatDuration, formatSpanCN, monthDayShort, shortName } from './usageFormat';
+import { displayName, formatDuration, formatSpanCN, monthDayShort } from './usageFormat';
 import { percentOf } from '../../services/usageRange';
 import { shiftDayKey } from '../../services/usageActions';
 import type { UsageDayDto } from '../../types/domain/usage';
@@ -50,6 +50,21 @@ function sumByPackage(day: UsageDayDto): Map<string, number> {
 }
 
 /**
+ * 包名 → 真名。对比句要点名「主要来自谁」，而这个名字**不许**用包名尾段凑
+ * （`com.tencent.mm` 会被说成「Mm」）。缺标签时留空，由 `displayName` 统一回落。
+ */
+function labelMap(...days: UsageDayDto[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const day of days) {
+    for (const row of day.rows) {
+      const label = (row.label ?? '').trim();
+      if (label !== '' && !map.has(row.packageName)) map.set(row.packageName, label);
+    }
+  }
+  return map;
+}
+
+/**
  * 「主要来自 X（+31 分钟）」——差值最大的那个应用，且必须与总差值同向。
  * 找不到同向变化（比如总量涨了但每个 app 都降了，只可能发生在数据不全时）就返回空串，
  * **不编一个理由**。
@@ -68,7 +83,8 @@ function topMover(today: UsageDayDto, yesterday: UsageDayDto): string {
   }
   if (bestPkg === '' || Math.abs(bestDelta) < 60) return '';
   const sign = bestDelta > 0 ? '+' : '-';
-  return `，主要来自 ${shortName(bestPkg)}（${sign}${formatSpanCN(Math.abs(bestDelta))}）`;
+  const name = displayName({ packageName: bestPkg, label: labelMap(today, yesterday).get(bestPkg) });
+  return `，主要来自 ${name}（${sign}${formatSpanCN(Math.abs(bestDelta))}）`;
 }
 
 /** 从窗口末尾（今天）往前数「逐日严格上升」的天数；不足 2 天有数据就回 0。 */
@@ -130,7 +146,7 @@ export function buildInsights({ days, keys, anchor, limit = 2 }: InsightInput): 
     const top = [...today.rows].sort((a, b) => b.sec - a.sec)[0];
     const share = top == null ? 0 : percentOf(top.sec, today.totalSec);
     if (top != null && share >= 50) {
-      out.push({ tone: 'info', text: `${shortName(top.packageName)} 占了今天的 ${share}%` });
+      out.push({ tone: 'info', text: `${displayName(top)} 占了今天的 ${share}%` });
     }
   }
 
