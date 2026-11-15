@@ -45,7 +45,7 @@ pub async fn cmd_export_full_bundle<R: Runtime>(
     /* `device_id` 由这里读：`services::insight` 不依赖宿主的 `services::identity`，
        两边各读一次会出现「包里的 id 与本机 id 不是同一份」。 */
     let device_id = crate::services::identity::install_id().unwrap_or_default();
-    export_full_bundle(&business, activity, Path::new(&output), &device_id).await
+    export_full_bundle(&business, activity, Path::new(&output), device_id).await
 }
 
 /// 选一个 `.json` 数据包来预览 / 导入。
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn blank_paths_are_rejected_before_touching_the_disk() {
-        assert_eq!(require_path("   ", "bundle path").is_err(), true);
+        assert!(require_path("   ", "bundle path").is_err());
         assert_eq!(
             require_path("  D:\\tmp\\a.json  ", "bundle path").unwrap(),
             "D:\\tmp\\a.json".to_string()

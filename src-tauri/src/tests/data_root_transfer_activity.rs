@@ -30,7 +30,7 @@ async fn live_activity_database_is_copied_as_one_consistent_snapshot() {
     let live = open_activity_db(&activity.join("patina.db"), 3, true).await;
     let wal = activity.join("patina.db-wal");
     assert!(
-        std::fs::metadata(&wal).map_or(false, |meta| meta.len() > 0),
+        std::fs::metadata(&wal).is_ok_and(|meta| meta.len() > 0),
         "前提：`-wal` 里必须有没 checkpoint 的帧，否则这条用例什么也证明不了"
     );
 

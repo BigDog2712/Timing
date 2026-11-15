@@ -122,7 +122,7 @@ pub(super) fn upsert_sql(table: &str, columns: &[String], conflict: Conflict) ->
     let key_names = conflict_names(conflict);
     let assignments = columns
         .iter()
-        .filter(|name| !key_names.iter().any(|key| *key == name.as_str()))
+        .filter(|name| !key_names.contains(&name.as_str()))
         .map(|name| format!("\"{name}\"=excluded.\"{name}\""))
         .collect::<Vec<_>>()
         .join(",");
@@ -165,7 +165,7 @@ fn changed_guard(table: &str, columns: &[String], conflict: Conflict) -> String 
     let keys = conflict_names(conflict);
     let diffs = columns
         .iter()
-        .filter(|name| !keys.iter().any(|key| *key == name.as_str()))
+        .filter(|name| !keys.contains(&name.as_str()))
         .map(|name| format!("excluded.\"{name}\" IS NOT \"{table}\".\"{name}\""))
         .collect::<Vec<_>>();
     if diffs.is_empty() {
