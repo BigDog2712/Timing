@@ -234,7 +234,7 @@ function relativeSpecifiers(src) {
  *
  * 理由：CSS（以及 scss/less）**没有模块语义** —— 它不导出符号、不产生调用边，跨窗引一份
  * 样式表不会让两侧 bundle 互相拖进来；真正的耦合判据是 TS 模块 import。
- * 现状：`timing/entry/main.tsx:28-41` 引了 8 份 `patina/shell/styles/features/host/*.css`
+ * 现状：`timing/entry/main.tsx` 引了 8 份 `activity/shell/styles/features/host/*.css`
  * （0.12.1「设置搬进主界面」的产物，主界面要渲染同一套设置面板）。把它算成越窗，
  * 只会逼人放宽整条规则 —— 那是「绿着空转」的另一种写法。若将来真要隔离样式，
  * 应按目录搬迁（样式进共享目录）并另立规则，不在这里悄悄开口子。 */

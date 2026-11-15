@@ -23,15 +23,15 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 - 前端 `src/**`（React + zustand + 自写 CSS，无 UI 框架）。
 - **双窗边界（2026-11-12 重排后）**：`src/windows/` 下两个窗各占一棵子树，互不 import，只经 IPC 命令/事件交互；两窗确实都要用的模块一律放 `src/windows/shared/`（既不属于主窗也不属于分析窗，由 L9 + L10 双向把守），静态资源例外只有 `src-tauri/icons/**`。由 L9 机械执行。
   - 主窗：`src/windows/timing/{entry,components,hooks,lib,mocks,services,stores,styles,types}`
-  - 分析窗：`src/windows/patina/{shell,features,platform,shared}`（`shell` = 原 `src/app`，即 Patina 的壳）
-  - 跨窗共享：`src/windows/shared/`（`windowApi` / `handleCatalog` / `handleBindings` / `pillAppearance` / `storageKeys` / `pillPrefsGateway` / `dto/` / `settings/`）。**它不得 import `timing/**` 或 `patina/**`** —— 一旦反向依赖就退化成"第三个窗"。旧位置上留了 `export *` 转发壳，只为让同窗既有引用零改动；新代码直接引共享层。
-- 入口两个：`index.html` → `windows/timing/entry/main.tsx`；`patina.html` → `windows/patina/shell/main.tsx`。**不要再把 `shell` 当应用入口。**
+  - 分析窗：`src/windows/activity/{shell,features,platform,shared}`（`shell` = 原 `src/app`，即分析窗的壳）
+  - 跨窗共享：`src/windows/shared/`（`windowApi` / `handleCatalog` / `handleBindings` / `pillAppearance` / `storageKeys` / `pillPrefsGateway` / `dto/` / `settings/`）。**它不得 import `timing/**` 或 `activity/**`** —— 一旦反向依赖就退化成"第三个窗"。旧位置上留了 `export *` 转发壳，只为让同窗既有引用零改动；新代码直接引共享层。
+- 入口两个：`index.html` → `windows/timing/entry/main.tsx`；`activity.html` → `windows/activity/shell/main.tsx`。**不要再把 `shell` 当应用入口。**
 - `src/vite-env.d.ts` 留在 `src/` 根，两窗共用。
 - 后端 `src-tauri/src/**` 六层，依赖**只能向下**（ADR-016）：
   `platform`（叶子：clock / log / boot_timing）→ `infra`（窗口 / 托盘菜单 / 通知 / 几何 / 迁移）→ `services`（业务）→ `app`（装配：events / tray / bootstrap / diagnostics）与 `jobs`（调度）→ `commands`（IPC 入口）。
-  其中 `models` / `infra` / `services` / `app` / `commands` 五层各带一个 `insight/` 命名空间（Patina 归一，见 `docs/refactor/patina-structural-merge.md` §2.2）：`models/insight ← infra/insight ← services/insight ← app/insight ← commands/insight`，方向与宿主层序一致。`insight` 是命名空间，不是第 7 层。
+  其中 `models` / `infra` / `services` / `app` / `commands` 五层各带一个 `activity/` 命名空间（子系统归一，见 `docs/refactor/patina-structural-merge.md` §2.2）：`models/activity ← infra/activity ← services/activity ← app/activity ← commands/activity`，方向与宿主层序一致。`activity` 是命名空间，不是第 7 层。
 - 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql` … `0007_v01127.sql` 共七支，当前 **schema v7**，`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。**0007 是重建表，不吃重跑**，必须由版本门 `< 7` 只放行一次（见 `infra/migrate.rs` 注释）。
-- **活动库（`patina.db`）走 sqlx `Migrator`**：正文在 `services/insight/data/sql/00NN_*.sql`，登记在 `data/schema_registry.rs`，账本 `_sqlx_migrations.checksum` 存的是 **sha384(文件字节)**，逐字节比对。
+- **活动库（`patina.db`）走 sqlx `Migrator`**：正文在 `services/activity/data/sql/00NN_*.sql`，登记在 `data/schema_registry.rs`，账本 `_sqlx_migrations.checksum` 存的是 **sha384(文件字节)**，逐字节比对。
   所以**凡是在任何库上跑过的 `.sql` 一个字都不能再改**（改注释、调缩进都算）——改了老库开机即 `数据库里的迁移 N 的校验和与当前版本不一致`（`schema_core/ensure.rs::describe_migration_failure`），而且这条**不自动修账本**（对用户是对的，对开发者是拦路）。
   未出包的迁移确实需要改正文时，本机库必须一起回到「未应用」状态：`DROP` 该迁移建的对象 + `DELETE FROM _sqlx_migrations WHERE version=N`，让 sqlx 自己重跑重算（表为空时最省事；有数据就先 `cp` 一份库）。
 - **数据目录迁移（V0.5.0）**：`infra/appdata_migrate/`（`paths` / `decide` / `copy` / `verify` / `marker` / `mod`）是 **headless** 的——不依赖 services、不依赖 tauri，所以能用两个临时目录直接跑测试（`run_at(&Paths, skip)`）。编排在 `app/preboot.rs`（桌面独占，跑在 `Builder::run` 之前、`log::init` 之前，故模块内不写日志），两条 IPC 命令在 `commands/migration_cmd.rs`。老库名 `tickbar.db` 与新库名 `timing.db` 的映射只认三种后缀（`""` / `-wal` / `-shm`），定义在 `paths.rs`。
@@ -72,10 +72,10 @@ clippy 那两条 `-A` 是**存量豁免**，不是抄错命令：`unwrap_used` /
 ## 硬约束（全部由 CI 机械执行，不靠记性）
 
 - **单文件 ≤300 行**（前后端一致）→ `npm run check:size`
-  超限文件登记在 `scripts/size-allowlist.json` 的**冻结基线**（150 条，由 `--freeze` 扫描生成，禁止手写）。它是**棘轮**：只许减不许增——行数超过冻结值、或出现不在基线里的新超限文件，一律红。拆分后跑 `node scripts/check-size.mjs --freeze` 收紧。
-  **硬目标（2026-11-12 拍板）**：每版至少 **−10 条**，0.15.0 前压到 **100 条以内**；未达标不提交出包。门禁摘要会打印「超限行数 / 总行数」占比，当前 **94,111 / 286,866 = 32.8%**，别只看条数。
+  超限文件登记在 `scripts/size-allowlist.json` 的**冻结基线**（条数看该文件，由 `--freeze` 扫描生成，禁止手写）——**别在这里写死数字**，它每批都在变，写死就是下一次过期。它是**棘轮**：只许减不许增——行数超过冻结值、或出现不在基线里的新超限文件，一律红。拆分后跑 `node scripts/check-size.mjs --freeze` 收紧。
+  **硬目标（2026-11-12 拍板）**：每版至少 **−10 条**，0.15.0 前压到 **100 条以内**；未达标不提交出包。门禁摘要会打印「超限行数 / 总行数」占比 —— 具体数字以 `node scripts/check-size.mjs` 的**输出为准**，别只看条数。
 - **分层只能向下** → `npm run check:layers`（10 条 grep 规则）
-  L1 `components`（含 `patina/{shell,features,shared}` 下的 `components/`）不 `invoke`；L2 `stores`（含 `*Store.ts`、`features/**/stores`）不碰 `ipc.`；L3 只有 `windows/shared/windowApi.ts` 引窗口 API 包（`api/window` 与 `api/webviewWindow`）；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `windows/timing/lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）；L9 双窗隔离——主窗与分析窗不得互相 import，**例外表已清空**：原 5 条共享模块（windowApi / handleCatalog / handleBindings / pillAppearance / pillPrefsGateway）已整体下沉到 `src/windows/shared/`，两侧直接引它，跨窗引用在物理上消失（带哨兵：两条路径集合必须非空；例外表非空时每条必须真实存在，防薄壳改名后绿着空转）；**L10 分层方向**——`patina/platform/**` 不得 import `features/**` 或 `shell/**`，`patina/shared/**` 不得 import `features/**`、`shell/**`、`platform/**`，`windows/shared/**` 不得 import `timing/**` 或 `patina/**`（带哨兵：每层路径集合非空且至少解析出 1 条相对 import，防路径前缀写错后绿着空转；`*.test.*` 不参与——测试站在最上层验收接缝；CSS 等资源说明符不参与——它们没有模块语义）。
+  L1 `components`（含 `activity/{shell,features,shared}` 下的 `components/`）不 `invoke`；L2 `stores`（含 `*Store.ts`、`features/**/stores`）不碰 `ipc.`；L3 只有 `windows/shared/windowApi.ts` 引窗口 API 包（`api/window` 与 `api/webviewWindow`）；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `windows/timing/lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）；L9 双窗隔离——主窗与分析窗不得互相 import，**例外表已清空**：原 5 条共享模块（windowApi / handleCatalog / handleBindings / pillAppearance / pillPrefsGateway）已整体下沉到 `src/windows/shared/`，两侧直接引它，跨窗引用在物理上消失（带哨兵：两条路径集合必须非空；例外表非空时每条必须真实存在，防薄壳改名后绿着空转）；**L10 分层方向**——`activity/platform/**` 不得 import `features/**` 或 `shell/**`，`activity/shared/**` 不得 import `features/**`、`shell/**`、`platform/**`，`windows/shared/**` 不得 import `timing/**` 或 `activity/**`（带哨兵：每层路径集合非空且至少解析出 1 条相对 import，防路径前缀写错后绿着空转；`*.test.*` 不参与——测试站在最上层验收接缝；CSS 等资源说明符不参与——它们没有模块语义）。
 - **IPC 契约** → `npm run check:contract`
   命令 4 处一致（`generate_handler!` / `IpcApi` / `ipc.ts` / `browserMock`）、错误码 2 处一致、事件三方一致（后端常量 / `IPC_EVENTS` / emit 点）、禁止事件名字面量、**每个错误码必须在 `errorText()` 里有 case**（否则静默落到通用兜底）。
 - **代码归属**（无门禁，见 `THIRD-PARTY-NOTICES.md`）
