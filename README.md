@@ -207,10 +207,10 @@ flowchart TB
 │   └── windows/shared/        # 两窗共用载体（不许反向依赖任一窗）
 ├── src-tauri/src/             # Rust 后端：commands / services / repositories / infra / app / jobs / platform
 │   ├── */activity/            # 第二窗后端，按同名层归位
-│   ├── migrations/            # 0001…0008
+│   ├── migrations/            # 业务库迁移（sqlx，版本号递增；改表只新增、不改历史文件）
 │   └── capabilities/          # Tauri 2 权限放行清单（只留实际用到的）
 ├── android-app/               # 已归档的原生 Kotlin 工程（冻结 0.3.6，见 ARCHIVED.md）
-├── plugins/md-sync/           # 首个 v2 插件：计时 / 便利贴 ↔ Markdown 双向同步
+├── plugins/                   # 插件目录（当前只有 .gitkeep：`md-sync` 已在 2d5d0b6 被内核化取代）
 ├── scripts/                   # 门禁脚本 + 出包脚本
 ├── tests/fixtures/            # 双端黄金用例（Rust 与 TS 共用同一份 JSON）
 ├── preview/                   # 静态设计稿（不参与构建）
@@ -228,7 +228,7 @@ Patina 是 vendored 第三方源码，结构已归一：前端四根与宿主窗
 npm install
 npm run dev          # 前端单独跑（浏览器 mock IPC，端口 1420）
 npm run tauri dev    # 完整桌面应用
-npm run check        # 机械门禁：typecheck · build · contract · size · version · layers · brand · lint · mutation · runtime-ids
+npm run check        # 机械门禁（步骤清单以 package.json 的 check 链为准）
 npm test             # vitest（含双端时间公式黄金用例）
 npm run build        # tsc + vite build
 ```
