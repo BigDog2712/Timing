@@ -188,36 +188,37 @@ flowchart TB
   PAT <-->|"IPC 命令 / 事件"| CMD
 ```
 
-- **两窗隔离（L9）**：`src/windows/timing/**` 与 `src/windows/patina/**` 互相 import 即红。
+- **两窗隔离（L9）**：`src/windows/timing/**` 与 `src/windows/activity/**` 互相 import 即红。
   共用载体只能放在 `src/windows/shared/**`，而它不许反向依赖任一窗（L10）。
 - **后端四层（L4 / L5）**：`commands → services → repositories → infra`，`infra` 不许反向依赖
   `services`，`commands` 不许绕过 service 直连 repository。
-- 分层、单文件体积、契约、版本号、第三方改动、变异残留都用 `npm run check` 的九步门禁机械断言，
-  改坏了 CI 就红 —— 不是"建议"。
+- 分层、单文件体积、IPC 契约、版本号、**产物可生成**、变异残留都用 `npm run check` 的机械门禁断言，
+  改坏了 CI 就红 —— 不是"建议"。步骤清单以 `package.json` 的 `check` 链为准，这里**不列计数**
+  （计数词每加一步就过期，且过期时没有任何症状）。
 
 目录：
 
 ```
 .
-├── index.html / patina.html   # 两个入口（同一 bundle / 独立 bundle）
+├── index.html / activity.html # 两个入口（同一 bundle / 独立 bundle）
 ├── src/
 │   ├── windows/timing/        # 宿主窗：entry · components · stores · services · hooks · lib · types · styles
-│   ├── windows/patina/        # 第二窗：shell · features · platform · shared
+│   ├── windows/activity/      # 第二窗（分析窗）：shell · features · platform · shared
 │   └── windows/shared/        # 两窗共用载体（不许反向依赖任一窗）
 ├── src-tauri/src/             # Rust 后端：commands / services / repositories / infra / app / jobs / platform
-│   ├── */insight/             # 第二窗后端，按同名层归位
+│   ├── */activity/            # 第二窗后端，按同名层归位
 │   ├── migrations/            # 0001…0008
 │   └── capabilities/          # Tauri 2 权限放行清单（只留实际用到的）
 ├── android-app/               # 已归档的原生 Kotlin 工程（冻结 0.3.6，见 ARCHIVED.md）
 ├── plugins/md-sync/           # 首个 v2 插件：计时 / 便利贴 ↔ Markdown 双向同步
-├── scripts/                   # 九步门禁 + 出包脚本
+├── scripts/                   # 门禁脚本 + 出包脚本
 ├── tests/fixtures/            # 双端黄金用例（Rust 与 TS 共用同一份 JSON）
 ├── preview/                   # 静态设计稿（不参与构建）
 ├── docs/                      # 规格 / 架构 / 设计 / ADR / QA
 └── release/                   # 构建产物落点（不入库）
 ```
 
-Patina 是 vendored 第三方源码，结构已归一：前端四根与宿主窗并列，后端收进各层的 `insight/` 命名空间。
+Patina 是 vendored 第三方源码，结构已归一：前端四根与宿主窗并列，后端收进各层的 `activity/` 命名空间。
 300 行豁免不是整棵豁免，而是逐文件基线棘轮（`scripts/size-allowlist.json`，只许减不许增）。
 来源与改动清单见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
@@ -227,7 +228,7 @@ Patina 是 vendored 第三方源码，结构已归一：前端四根与宿主窗
 npm install
 npm run dev          # 前端单独跑（浏览器 mock IPC，端口 1420）
 npm run tauri dev    # 完整桌面应用
-npm run check        # 九步门禁：typecheck · contract · size · vendored · version · layers · brand · lint · mutation
+npm run check        # 机械门禁：typecheck · build · contract · size · version · layers · brand · lint · mutation · runtime-ids
 npm test             # vitest（含双端时间公式黄金用例）
 npm run build        # tsc + vite build
 ```
