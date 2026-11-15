@@ -139,3 +139,6 @@ mod window_geometry;
 mod main_window_profile;
 mod window_settings_alias;
 mod window_spec;
+/* [T04-4] M-9：主窗 label 改名后的 window-state 兼容映射（mapper 本体在 `lib.rs`）。 */
+#[cfg(desktop)]
+mod window_state_label;

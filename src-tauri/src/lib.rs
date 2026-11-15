@@ -62,6 +62,15 @@ fn mobile_bridge_plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
         .build()
 }
 
+/// [T04-4] 主窗 label 从 "patina" 改为 "activity"；`.window-state.json` 的顶层键就是 label。
+/// window-state 插件按 label 读写存档 ⇒ 用 map_label 把新 label 映射回旧档位，
+/// 升级首启主窗几何才不会回到默认。其余 label 恒等（main / todos / note-* / settings / mini / ""）。
+/// 具名函数而非闭包：闭包字面量没有名字，M-9 无处落测例（`tests/window_state_label.rs`）。
+#[cfg(desktop)]
+fn window_state_label(label: &str) -> &str {
+    if label == "activity" { "patina" } else { label }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     /* Patina 的原生探针是**独立子进程**：父进程用 `--patina-native-probe <kind>` 拉起
@@ -135,8 +144,19 @@ pub fn run() {
         ))
         // [V0.2.10] 事项窗的默认位置是「主条正下方」，由 `open_panel_window` 每次现算；
         // 不让 window-state 把上次的旧坐标盖回来（它会覆盖 builder 的 position）。
+        // [T04-4] 主窗 label 从 "patina" 改为 "activity"；`.window-state.json` 的顶层键就是 label，
+        // 插件按 label 取值 ⇒ 不改这一行，升级首启主窗几何会回到默认（1247×761 @ 116,177 丢失）。
+        // 用插件自带的 map_label（读写两侧都走 mapper，插件源码 :146 / :186）而不是改文件：
+        // 插件读坏文件时会 unwrap_or_default() 并在退出时用空表整份覆盖 ⇒ 手写文件迁移一旦写错，
+        // 会把 17 个 label 的几何（含 24 个便利贴窗）一次抹掉。
+        // ⚠️ 这是**兼容层，真实边界 = 直到用户卸载或清理 AppData**（`.window-state.json` 在 %APPDATA%，
+        // 卸载随之消失；重装过的用户本来就没有几何数据）。与 LEGACY_STORAGE_KEYS 同性质。
+        // 将来若要"把用户数据也迁到新名"：顺序是「先加文件迁移 → 跑一版 → 再删 mapper」；
+        // 反过来等于让没重装过的老用户的窗口位置一次性丢失。正因卸载会清文件，删 mapper 的代价是有界的。
+        // 具名函数而非闭包：闭包字面量没有名字，M-9 无处落测例。
         .plugin(
             tauri_plugin_window_state::Builder::default()
+                .map_label(window_state_label)
                 .skip_initial_state(infra::window_spec::TODOS.label)
                 .build(),
         )
