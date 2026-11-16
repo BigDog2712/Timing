@@ -4,6 +4,43 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 去 Patina 化收尾（T04-5）— 2026-11-16（未出包）
+
+> 版本不动：桌面 **0.12.3** / 手机 **0.12.9（12009）**，仍是赋号未出包那一档。这批只改名字，不改行为。
+
+### 你可能会看到的一处
+
+定时导出写到一半崩掉时，导出目录里会留一个中转文件。它以前叫 `.patina-scheduled-export-…part`，
+现在叫 `.activity-scheduled-export-…part`。
+
+**旧前缀仍然认。** 理由不是怀旧：升级后第一次清理要能把上个版本留在你导出目录里的那堆 `.part`
+扫掉，否则它们会一直躺在那儿。认旧前缀也不放宽安全边界——它同样是我们自己起的名字，不是通配。
+两条判据钉住这件事（认新旧 / 不认别人的文件），并做了变异自证：把旧前缀分支砍掉 ⇒ 用例红，
+且点名失败在那句 `is_owned(".patina-scheduled-export-abc123.csv.part")` 上。
+
+### 台面下
+
+- 常量 `MAIN_WINDOW_LABEL` → `ACTIVITY_WINDOW_LABEL`（32 处，含前端 4 处）。改完 `check:runtime-ids`
+  **先红了**，报「解析不出 MAIN_WINDOW_LABEL —— 常量可能改名了，先修本脚本的正则」。这不是门禁坏了，
+  是它在提醒「脚本还在扫一个不存在的符号」；修完脚本再绿。
+- Cargo 特性 `patina_coverage` / `patina_local_build` → `activity_coverage` / `activity_local_build`。
+  **仓外的覆盖率 / 本地构建 wrapper 必须同步换名**——传旧名会得到 `error: the package 'timing' does
+  not contain this feature`，是**响的**失败，不会静默失效。这也是它与 `PATINA_E2E` 的区别。
+- 托盘基线图标 `patina-32x32.png` → `activity-32x32.png`（同一份字节，那条「四个托盘态由同一源图标
+  派生」的断言一字未改）。
+- 四个一次性脚本（`patina-gen-ipc` / `merge-ipc` / `restore-split` / `split-tests`）移入
+  `docs/archive/oneoff/`，附一份说明：它们是当时 `src/patina/**` 的坐标，结构归一后已不成立，别再运行。
+- `AGENTS.md` 补齐五条漏登记的门禁（`check:brand` / `runtime-ids` / `storage-keys` / `de-patina` /
+  `ci-parity`）。此前那份清单只列了 6 条，实际链上有 11 条。
+
+### 没动的，以及为什么
+
+- `THIRD-PARTY-NOTICES.md` 里的 Patina 是**上游署名**，MIT 义务靠它，必须留。
+- `PATINA_E2E` / `PATINA_E2E_*` 环境变量（30 行）登记为 T04b，本批不改：它们全在
+  `cfg!(debug_assertions)` 里、release 不编译，而仓内没有任何脚本引用——**存在仓外 QA harness
+  使用它们的可能**，改了而外部没跟就是 E2E 静默失效，且我们无法从这棵树里验证。
+- `docs/reviews/source-snapshot-261111.json` 是历史快照，里面的旧路径不订正。
+
 ## 同步重构第一批 + md 覆盖提醒 — 2026-11-16（未出包）
 
 > 桌面 **0.12.2 → 0.12.3**（六处基线一致）；手机 **0.12.8 → 0.12.9（12009）**。
