@@ -1,8 +1,9 @@
 /**
- * Timing — 移动端外壳（4 Tab + 全局覆盖层）
+ * Timing — 移动端外壳（5 Tab + 全局覆盖层）
  * -----------------------------------------------------------------------------
  * 职责边界（DESIGN-ANDROID-V1 §2.2 / T7）：
- *   - Tab 路由：timer / items / records / settings，**只渲染当前页**（切 Tab 即重挂载，
+ *   - Tab 路由：timer / items / records / notes / settings（`TABS` 是唯一真源），
+ *     **只渲染当前页**（切 Tab 即重挂载，
  *     数据自然刷新，不需要给每页再造一套「激活时重拉」的口令）；
  *   - 全局覆盖层：崩溃恢复（冷启动必弹）、撤销条、提示条、通知降级条、业务 Sheet；
  *   - 返回键层级：Sheet > Tab（见 `useMobileBackSheet`），不杀进程。
