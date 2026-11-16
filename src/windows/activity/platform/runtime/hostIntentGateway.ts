@@ -22,7 +22,7 @@ import { HOST_INTENT } from "./activityEvents.ts";
  * ## 窗口 label 反着写，别记错
  *
  * 药丸的 label 是 `"main"`；分析窗的 label 是 `"patina"`（与 Rust insight 侧
- * `MAIN_WINDOW_LABEL = "patina"` 的语义相反）。所以「发给药丸」= `emitTo("main", …)`。
+ * `ACTIVITY_WINDOW_LABEL = "patina"` 的语义相反）。所以「发给药丸」= `emitTo("main", …)`。
  */
 const PILL_WINDOW_LABEL = "main";
 

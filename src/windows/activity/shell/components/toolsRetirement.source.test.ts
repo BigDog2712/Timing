@@ -60,7 +60,7 @@ const T04_BASELINE = "fcbbab5";
  *
  * T04 追加第四条（**这是本判据自身的适用范围变化，不是放宽**）：T04 的 mandate 就是
  * 把 label 字面量收敛成常量、把 ACL 文件改名。于是被保护清单里有两条必然被改：
- *   · `app/activity/tool_notifications.rs` —— `"patina"` → `MAIN_WINDOW_LABEL`（+ 一行 import）；
+ *   · `app/activity/tool_notifications.rs` —— `"patina"` → `ACTIVITY_WINDOW_LABEL`（+ 一行 import）；
  *   · `capabilities/activity-tool-notification.json` —— identifier/文件名改名 + description
  *     首词去掉旧产品名。
  * 两种都是**机械改名**，同样用规范化吸收；文件里其余任何一个字变化（比如投递链的
@@ -93,14 +93,14 @@ const preRenameSource = (src: string): string =>
     /* T02b：事件名常量文件 `insightEvents.ts` → `activityEvents.ts`（纯文件名改名，
      * 不是目录改名，故不走上面两条规则）。 */
     .replace(/\bactivityEvents\b/g, "insightEvents")
-    /* T04：契约面 label 收敛（`"patina"` → `MAIN_WINDOW_LABEL`）。先卸掉那行 import，
+    /* T04：契约面 label 收敛（`"patina"` → `ACTIVITY_WINDOW_LABEL`）。先卸掉那行 import，
      * 再把常量名映射回字面量 —— 顺序不能反（先映射的话 import 行会变成
      * `use …::"patina";`，卸不掉）。
      * ⚠️ 正则要同时认 `activity` 与 `insight`（上面几条先执行，`activity::` 已变 `insight::`）。
      * ⚠️ 只换行内容、留行尾换行（`$` 而非 `;\n\n`）：该 import 紧贴 `mod native;`、后面没空行，
      * 吞掉换行会让「零 diff」因差一个空行而假红。 */
-    .replace(/^use crate::app::(?:activity|insight)::main_window::MAIN_WINDOW_LABEL;$/m, "")
-    .replace(/\bMAIN_WINDOW_LABEL\b/g, '"patina"')
+    .replace(/^use crate::app::(?:activity|insight)::main_window::ACTIVITY_WINDOW_LABEL;$/m, "")
+    .replace(/\bACTIVITY_WINDOW_LABEL\b/g, '"patina"')
     /* T04：capability / 入口页改名 + description 首词的旧产品名。 */
     .replace(/\bactivity-tool-notification\b/g, "patina-tool-notification")
     .replace(/\bactivity\.html\b/g, "patina.html")

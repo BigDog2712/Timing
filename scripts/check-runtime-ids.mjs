@@ -9,16 +9,16 @@
  * ## 为什么需要它（设计 §1.5 / §3.1）
  *
  * 窗口 label 是**字符串**，它的三处引用互相之间没有任何编译期约束：
- *   ① Rust `MAIN_WINDOW_LABEL`（建窗用）；
+ *   ① Rust `ACTIVITY_WINDOW_LABEL`（建窗用）；
  *   ② `capabilities/*.json` 的 `windows[]`（ACL 按 label 决定这扇窗能调哪些命令）；
- *   ③ 前端 `windowControlGateway.ts` 的 `MAIN_WINDOW_LABEL`（按 label 认自己是谁）。
+ *   ③ 前端 `windowControlGateway.ts` 的 `ACTIVITY_WINDOW_LABEL`（按 label 认自己是谁）。
  * 三者漂一个的症状**全是静默的**：①② 漂 ⇒ Tauri ACL 判「这扇窗没被授权」⇒ 该窗所有 IPC 返回
  * "<cmd> not allowed. Command not found"，界面能渲染、数据全空、控制台零日志；①③ 漂 ⇒ 前端认为
  * 自己不是分析窗 ⇒ ready 永不回执，浮层永远"未就绪"。`npm run check` 之前对此**完全失明**。
  *
  * ## 七个子判据（a–g）
  *
- * a 三个 label 常量互不相同（建窗撞 label 会 `Err`）；b 前端 `MAIN_WINDOW_LABEL` 与 Rust 逐字相等；
+ * a 三个 label 常量互不相同（建窗撞 label 会 `Err`）；b 前端 `ACTIVITY_WINDOW_LABEL` 与 Rust 逐字相等；
  * c `capabilities/*.json` 的 `windows[]` ↔ Rust 建窗点**双向包含**；d `x.html` 既存在又是 vite 入口；
  * e `get_webview_window("…")` 裸字面量**只许减**（棘轮，目标 0，0 是合法终态）；f Rust 两个全局属性名
  * 必须在前端逐字出现（名字漂 = 桥静默断）；g `resolveCurrentAppWindowLabel()` 仍含 `main`/`mini`/`tool-notification`。
@@ -83,14 +83,14 @@ function miniLabel() {
   return m ? { value: m[1], where: 'app/activity/mini_window/native.rs 建窗点', source: 'literal' } : null;
 }
 
-const labelMain = rustConst('MAIN_WINDOW_LABEL');
+const labelMain = rustConst('ACTIVITY_WINDOW_LABEL');
 const labelMini = miniLabel();
 const labelTool = rustConst('WINDOW_LABEL');
 
 const labelsOk = [labelMain, labelMini, labelTool].every(Boolean);
 if (!labelsOk) {
   const missing = [
-    labelMain ? null : 'MAIN_WINDOW_LABEL',
+    labelMain ? null : 'ACTIVITY_WINDOW_LABEL',
     labelMini ? null : 'mini label（常量与建窗点都没有）',
     labelTool ? null : 'tool_notifications::WINDOW_LABEL',
   ].filter(Boolean);
@@ -111,20 +111,20 @@ if (!labelsOk) {
   );
 }
 
-/* ── b · 前端 MAIN_WINDOW_LABEL 逐字等于 Rust ─────────────────────────────── */
+/* ── b · 前端 ACTIVITY_WINDOW_LABEL 逐字等于 Rust ─────────────────────────────── */
 const GATEWAY = 'src/windows/activity/platform/desktop/windowControlGateway.ts';
 const gatewaySrc = read(GATEWAY);
-const feLabel = gatewaySrc.match(/const\s+MAIN_WINDOW_LABEL\s*=\s*"([^"]+)"/);
+const feLabel = gatewaySrc.match(/const\s+ACTIVITY_WINDOW_LABEL\s*=\s*"([^"]+)"/);
 if (!feLabel) {
-  failures.push(`b: ${GATEWAY} 里找不到 \`const MAIN_WINDOW_LABEL = "…"\``);
+  failures.push(`b: ${GATEWAY} 里找不到 \`const ACTIVITY_WINDOW_LABEL = "…"\``);
 } else if (!labelMain) {
-  failures.push('b: Rust 侧 MAIN_WINDOW_LABEL 解析失败（见 a），无法比对');
+  failures.push('b: Rust 侧 ACTIVITY_WINDOW_LABEL 解析失败（见 a），无法比对');
 } else {
   record('b', 1);
   console.log(`[runtime-ids] b: 前端="${feLabel[1]}" · Rust="${labelMain.value}"`);
   if (feLabel[1] !== labelMain.value) {
     failures.push(
-      `b: 前端 MAIN_WINDOW_LABEL="${feLabel[1]}" 与 Rust MAIN_WINDOW_LABEL="${labelMain.value}" 不一致 —— ` +
+      `b: 前端 ACTIVITY_WINDOW_LABEL="${feLabel[1]}" 与 Rust ACTIVITY_WINDOW_LABEL="${labelMain.value}" 不一致 —— ` +
         '前端会认为自己不是分析窗，ready 永不回执（浮层永远"未就绪"）',
     );
   }

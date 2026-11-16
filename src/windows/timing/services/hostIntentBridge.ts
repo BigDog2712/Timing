@@ -4,7 +4,7 @@
  * 分析窗（label = `patina`）没有任何写命令，只 `emitTo("main", …)` 喊一句「我想干什么」；
  * 本模块挂在**药丸**（label = `main`）上，用**宿主的既有 typed IPC** 执行并落库。
  * Rust 对这条通道完全不知情：没有新命令、没有新事件常量。
- * 窗口 label 反着写：Rust insight 的 `MAIN_WINDOW_LABEL` 指的是分析窗，本文件在药丸里。
+ * 窗口 label 反着写：Rust insight 的 `ACTIVITY_WINDOW_LABEL` 指的是分析窗，本文件在药丸里。
  * 错误只在这里提示：分析窗只表达意图、不承诺结果（§6.4），被拒时
  * `setNotice({tone:'danger'})` 出在**药丸**上；分析窗靠 `timer:state-changed`
  * 广播自然收敛（§6.5「跨窗只传意图，不传错误」）。

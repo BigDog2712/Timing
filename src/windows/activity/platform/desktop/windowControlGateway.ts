@@ -28,7 +28,7 @@ declare global {
   }
 }
 
-const MAIN_WINDOW_LABEL = "activity";
+const ACTIVITY_WINDOW_LABEL = "activity";
 const MAIN_WINDOW_READY_OUTCOMES = new Set<MainWindowReadyOutcome>([
   "stale",
   "duplicate",
@@ -90,7 +90,7 @@ function parseMainWindowRenderToken(value: unknown): MainWindowRenderToken {
 }
 
 export function readCurrentMainWindowGeneration(): number | null {
-  if (typeof window === "undefined" || getCurrentWindow().label !== MAIN_WINDOW_LABEL) {
+  if (typeof window === "undefined" || getCurrentWindow().label !== ACTIVITY_WINDOW_LABEL) {
     return null;
   }
 
@@ -105,7 +105,7 @@ export function readCurrentMainWindowGeneration(): number | null {
 export async function markCurrentMainWindowReady(
   token: MainWindowRenderToken,
 ): Promise<MainWindowReadyResult> {
-  if (getCurrentWindow().label !== MAIN_WINDOW_LABEL) {
+  if (getCurrentWindow().label !== ACTIVITY_WINDOW_LABEL) {
     throw new Error("only the main window can report main-window readiness");
   }
 
@@ -116,7 +116,7 @@ export async function markCurrentMainWindowReady(
 }
 
 export async function readCurrentMainWindowRenderToken(): Promise<MainWindowRenderToken> {
-  if (getCurrentWindow().label !== MAIN_WINDOW_LABEL) {
+  if (getCurrentWindow().label !== ACTIVITY_WINDOW_LABEL) {
     throw new Error("only the main window can read main-window render state");
   }
 
