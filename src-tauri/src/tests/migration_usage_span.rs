@@ -54,7 +54,9 @@ async fn usage_span_purge_clears_old_fragments_and_bumps_version() {
     let version = scalar_opt_str(&pool, "SELECT value FROM settings WHERE key = 'schema.version'")
         .await
         .expect("schema.version 应存在");
-    assert_eq!(version, "13", "0013 跑完版本必须推到 13");
+    /* 0013 自己把版本推到 13，0014（同步事件流）再推到 14 —— 这里跑的是**全部**迁移，
+       所以看到的是最终值。要单独验 0013 的推进，得回到只有 0013 的那棵树。 */
+    assert_eq!(version, "14", "全部迁移跑完版本必须推到 14（0013 → 13，0014 → 14）");
 }
 
 /// 反向：聚合表**不许**跟着被清。

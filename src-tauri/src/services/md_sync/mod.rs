@@ -59,15 +59,21 @@ pub async fn get_view(pool: &SqlitePool) -> AppResult<MdSyncView> {
 
 /* [V0.11.21] `poll_secs` 无界面入口，字段保留只为老库原样读回；手机端按三档跑（tier::plan_of）。 */
 
-/// 前台入口：检测到 md 冲突时挂起 `AwaitingDecision`，等用户裁决。
+/// 「只刷 Obsidian 落点、不问人」的一轮同步（老口径：文件侧改过就按 Markdown 赢）。
 ///
-/// 生产调用点走 `md_cloud::round`（它自己也是 `Awaiting`）；本函数保留给
-/// 同步测试与「不经云端、只刷 Obsidian 落点」的调用方——`src/tests/md/**`
-/// 与 `qa_t01_sync_attack.rs` 共 89 处用它，删掉就得让每个用例自己写一遍
-/// `run_with(pool, Awaiting)`，等于把产品口径抄进测试。
+/// **不是**产品入口：产品路径一律走 `md_cloud::round`（前台 `Awaiting`）或
+/// `round_with(.., Pending)`（后台轮）。本函数留给两类调用方：
+/// 1. `src/tests/md/**` 与 `qa_t01_sync_attack.rs` 共 89 处——它们验的是**导入机制**
+///    （md 文本怎么变成 SQL 行），冲突怎么处置不属被测对象；把它们改成 `Awaiting`
+///    等于让每个用例先做一次裁决，测的就不是同一件事了；
+/// 2. 将来「不经云端、只要文件那份」的内部调用。
+///
+/// 之所以把口径写进函数名而不是参数：T03 之前它就是「自动合并」，89 处用例的断言
+/// 全部建立在这个口径上。改成 `Awaiting` 会让 28 条用例当场变红（实测过），
+/// 而红的是它们的前提，不是功能。
 #[cfg_attr(not(test), allow(dead_code))]
 pub async fn run(pool: &SqlitePool) -> AppResult<MdSyncReport> {
-    run_with(pool, ConflictMode::Awaiting).await
+    run_with(pool, ConflictMode::AutoMerge).await
 }
 
 /// 手动「立即同步」。返回本轮报告，不因单个落点失败而整体报错。
