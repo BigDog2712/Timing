@@ -22,6 +22,8 @@ pub mod remote_status_store;
 pub mod repositories;
 pub mod scheduled_backup;
 pub mod scheduled_export;
+/* [P2-3] 定时导出的产物校验：显式 close 连接，Windows 上不再占着文件句柄。 */
+pub mod scheduled_export_validate;
 mod staging_names;
 pub mod schema;
 pub mod schema_contracts;

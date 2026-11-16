@@ -10,8 +10,9 @@ use crate::services::activity::engine::export_scheduler::{decide_action, ExportS
 use chrono::{Local, LocalResult, NaiveDate, NaiveDateTime, TimeZone};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use sha2::{Digest, Sha256};
-use sqlx::sqlite::SqliteConnectOptions;
-use sqlx::{Connection, Pool, Sqlite, SqliteConnection};
+#[cfg(test)]
+use sqlx::{sqlite::SqliteConnectOptions, Connection, SqliteConnection};
+use sqlx::{Pool, Sqlite};
 use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -693,62 +694,8 @@ fn validate_parquet(path: &Path, fields: &[String], expected_rows: u64) -> Resul
     }
 }
 
-async fn validate_sqlite(
-    path: &Path,
-    selected_fields: &[String],
-    expected_rows: u64,
-) -> Result<(), String> {
-    let options = SqliteConnectOptions::new().filename(path).read_only(true);
-    let mut connection = SqliteConnection::connect_with(&options)
-        .await
-        .map_err(|_| "format_validation_failed".to_string())?;
-    let integrity: String = sqlx::query_scalar("PRAGMA integrity_check")
-        .fetch_one(&mut connection)
-        .await
-        .map_err(|_| "format_validation_failed".to_string())?;
-    if integrity != "ok" {
-        return Err("format_validation_failed".to_string());
-    }
-    let (session_fields, web_fields) =
-        crate::services::activity::data::export::sqlite_exporter::resolved_sqlite_column_names(selected_fields)
-            .map_err(|_| "format_validation_failed".to_string())?;
-    validate_sqlite_table_columns(&mut connection, "sessions", &session_fields).await?;
-    validate_sqlite_table_columns(&mut connection, "web_activity_segments", &web_fields).await?;
-    let session_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
-        .fetch_one(&mut connection)
-        .await
-        .map_err(|_| "format_validation_failed".to_string())?;
-    let web_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM web_activity_segments")
-        .fetch_one(&mut connection)
-        .await
-        .map_err(|_| "format_validation_failed".to_string())?;
-    let rows = u64::try_from(session_count.saturating_add(web_count))
-        .map_err(|_| "format_validation_failed".to_string())?;
-    (rows == expected_rows)
-        .then_some(())
-        .ok_or_else(|| "format_validation_failed".to_string())
-}
-
-async fn validate_sqlite_table_columns(
-    connection: &mut SqliteConnection,
-    table: &str,
-    expected_fields: &[String],
-) -> Result<(), String> {
-    let rows = sqlx::query(&format!("PRAGMA table_info({table})"))
-        .fetch_all(&mut *connection)
-        .await
-        .map_err(|_| "format_validation_failed".to_string())?;
-    let actual = rows
-        .into_iter()
-        .map(|row| sqlx::Row::get::<String, _>(&row, "name"))
-        .collect::<Vec<_>>();
-    let expected = std::iter::once("id".to_string())
-        .chain(expected_fields.iter().cloned())
-        .collect::<Vec<_>>();
-    (actual == expected)
-        .then_some(())
-        .ok_or_else(|| "format_validation_failed".to_string())
-}
+/* [P2-3] 产物校验搬到 `scheduled_export_validate`（那里显式 close 连接，Release 句柄）。 */
+use super::scheduled_export_validate::validate_sqlite;
 
 async fn sync_file(path: PathBuf) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {

@@ -4,6 +4,57 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 工程评审修复（同步完整性 · 倒计时暂停 · 隐私口径）— 2026-11-16（未出包）
+
+> 版本不动：桌面 **0.12.3** / 手机 **0.12.9（12009）**。这批对应 `docs/reviews/TIMING-ENGINEERING-REVIEW-2026-11-16.md` 的四条 P1 与两条 P2。四条 P1 里有三条属于同一类：**失败被当成成功**。
+
+### 同步分片：读到「半份文件」不再等于「这份就是这些」
+
+`Transport::Folder::put_if_absent` 原来直接 `std::fs::write` 到最终路径。同步盘的另一端随时可能在读，而 `fs::write` 先创建/截断文件再灌字节 —— 中间那一刻对方读到的就是 0 字节或前 n 行。JSONL 的前 n 行**本身是合法数据**，于是残段被当成完整分段应用、游标推进，剩下的行永久丢失。
+
+- 本地通路改成「临时文件 → `sync_all` 落盘 → 原子发布」：`hard_link`（POSIX / NTFS 上原子且不覆盖），不支持硬链接的文件系统（FAT32、部分 SMB / 网盘挂载）退回 `rename`。
+- 段格式追加一行自描述尾标 `{"integrity":{"count":N,"sha256":"<前面全部字节>"}}`。`decode_segment` 三条硬规则：**没有尾标拒绝**（残段 / 空文件）、**sha256 对不上拒绝**（截断或改写）、**条数与实际不符拒绝**。拒绝的后果是游标不前进、下一轮重试。
+- WebDAV 的 PUT 无法保证服务端原子写入，但同一份尾标在**读回来**时校验，覆盖了「传输端截断」这一半。
+
+### 同步应用：事件、折叠、物化、游标同一事务
+
+`apply_and_fold` 原来每一步各自拿 `&SqlitePool`（各自的自动提交事务）。存在一个致命的中间态：事件已 upsert、物化写了、游标没写 → 下一轮重拉同一段，`ON CONFLICT(uid) DO NOTHING` 让每条事件 `rows_affected = 0`，没有任何会话被标 dirty，折叠整段被跳过，游标却顺利推进 —— 那部分 `time_records` 永远停在半截，且再没有任何一轮会去修。
+
+现在 `apply_and_fold` 收 `&mut SqliteConnection`，`pull` 按「一段一个事务」把事件 upsert、折叠、物化、游标推进包在一起，任何一步失败整体回滚。
+
+### 倒计时：结束时刻按「跑满目标」算，不再按「开始后 N 秒」
+
+到点由 `live_duration` 判定，而它**不计暂停**；落档却用 `started_at + target`（隐含「一直在跑」）。跑 30 秒、暂停一小时、再跑 30 秒的 60 秒倒计时会在恢复后满一分钟才到点，却按「开始后一分钟」落档 —— 比真实结束早一小时，跨零点时连拆分的日期都错。
+
+新增 `timer_time::countdown_end_at`：`now - (live - target)`，等价于「这一段跑满 `target - accumulated` 秒」那一刻（tick 晚到也不漂）。连续运行（无暂停）时与旧口径结果相同。ADR-011 第 5 条已同步修订。
+
+### 隐私：文案改成「默认本地」，并列出全部四条外发通道
+
+README 英文写「no network calls」、中文写「不产生一个网络请求」，同一份文件里又提供了 Markdown / WebDAV 同步 —— 用户会误以为开了同步也不出设备。改成「默认不发任何请求；只有你显式配置的同步 / 备份会发，且只发到你填的落点」，并新增「数据去哪了」表：四条通道（记录快照 / 事件流 / 活动窗备份 / 本地导出）× 五列（何时、传什么、传到哪、怎么关）。
+
+同时写明：没有账号、没有遥测、没有崩溃上报；**WebDAV 的 HTTPS 只是传输加密，不是端到端加密**；应用使用统计与计时记录是两套数据（`activity.db` / `timing.db`），开记录同步不会把使用统计带出去。
+
+### 同步目录：只认合法的设备 id
+
+`sync/events/` 下的子项原来「名字不是本机」就当对端设备，直接拼进 URL / 路径。名字里带 `?` / `#` 的目录会被按 query / fragment 解释，拼出来的地址与真实目录不是同一份，那台设备**永远读不到**，界面上只表现为「同步卡住了」。现在只接受 12 位小写 hex（`identity::is_valid`），非法项记一条可见错误，其它设备照常同步。
+
+### 应用使用统计：截断必须说出来
+
+Android 原生侧一次最多读 2 万条事件，撞上上限后原来照样把聚合返回、把当前区间结到窗口末尾 —— 界面把一份不完整的数当完整的给用户看。现在 `queryDay` 回 `truncated`，宿主看到它**跳过落库**（不拿不完整的聚合覆盖已经完整的那天，`rollup` 是「先删再插」的重扫语义），界面在这一天上标一句「系统一次只能读一部分」。
+
+### 全量 Rust 测试的两处 Windows 竞态
+
+- `scheduled_export` 的 schema-drift 用例：`validate_sqlite` 从不显式 `close()`。sqlx 的 `Drop` 只往连接的后台线程发一条 close、不等它真关掉，于是「校验完立刻删文件」在 Windows 上撞 `os error 32`。校验逻辑搬到 `scheduled_export_validate`，显式 `close().await`。（原文件是冻结基线，不给加行。）
+- `web_activity_bridge` 的重试用例：预算原来是 `10ms × 5 次 = 50ms`，而用例要先观察到 `RetryWait` 再释放端口，满载机器上那一步就超过 50ms —— 重试先走到终态，红在「没恢复」。预算放宽到 2000 次，失败模式只剩「真的恢复不了」。
+
+### 判据
+
+- `sync_stream/tests_integrity.rs` 6 条 → **7 条**：新增「发布不留临时文件」「写完临时文件但未发布 → 最终路径必须不存在」；`failed_apply_leaves_no_half_state_and_retry_converges`（触发器让 `time_records` INSERT ABORT，断言事件 / 记录 / 游标三者都回滚，故障消失后重试收敛）；`non_device_dir_is_reported_without_blocking_real_peers`。
+- `segment.rs` 单测：`incomplete_segments_are_rejected`（空文件 / 缺尾标 / 改动正文 / 条数说谎）。
+- `tests/countdown_pause.rs`（新，2 条）：暂停后到点落在恢复点之后；跨零点按真实到点时刻拆天。
+- 变异自证四段（注入 → 点名红 → 撤销 → 绿 + `MUTATION` 零残留）：绕过原子发布 ⇒ `interrupted_write_…` 红「没发布成功 = 这批事件还不算传上去」；吞掉折叠错误 ⇒ tx 判据红「失败必须说出来」；去掉 peer 校验 ⇒ `non_device_dir_…` 红「只有合法的那台算 peer」；倒计时退回旧口径 ⇒ 两条暂停判据同时红（一条指出「落成 60000 就说明还在用旧口径」）。
+- `npm run check` 全绿（EXIT=0）；`cargo test --lib` **连续两轮** 1987 passed / 1 failed —— 唯一的红是 `registry_access_denial_*`（沙箱拦 `reg.exe`，环境性必红）。评审看到的那两条随机失败两轮都没再出现。
+
 ## 评审修复第二批（R1 · S3 · O3）— 2026-11-16（未出包）
 
 > 版本不动：桌面 **0.12.3** / 手机 **0.12.9（12009）**。这批修的是「一次界面注入就能变成本机任意代码执行」「暂停了但对端还在跑」和一个指向别人仓库的死链。

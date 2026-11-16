@@ -602,9 +602,7 @@ mod tests {
         let port = occupied_listener.local_addr().unwrap().port();
 
         assert!(open_web_activity_bridge_listener(port).is_err());
-
         drop(occupied_listener);
-
         let (_address, recovered_listener) = open_web_activity_bridge_listener(port).unwrap();
         assert_eq!(recovered_listener.local_addr().unwrap().port(), port);
     }
@@ -625,15 +623,17 @@ mod tests {
                     1,
                     &mut shutdown_rx,
                     task_lifecycle,
-                    WebActivityBridgeRetryPolicy::for_tests(10, 5),
+                    /* 预算 2000 次而不是 5 次：观察 RetryWait 在满载机器上会晚于 50ms，
+                       先耗尽次数就只剩「没恢复」这一个假红（评审 P2-3）。 */
+                    WebActivityBridgeRetryPolicy::for_tests(10, 2_000),
                 )
                 .await
             });
 
             wait_for_lifecycle_status(&lifecycle, WebActivityBridgeRuntimeStatus::RetryWait).await;
             drop(occupied_listener);
-
-            let recovered = timeout(Duration::from_millis(500), acquire_task)
+            /* 端口一释放，最多一个重试间隔（10ms）就该绑上；2s 是 200 倍余量。 */
+            let recovered = timeout(Duration::from_millis(2_000), acquire_task)
                 .await
                 .expect("listener retry should finish")
                 .expect("listener retry task should not panic")

@@ -25,7 +25,10 @@ Windows 10 / 11 · Tauri 2 · React 19 · Rust · SQLite
 
 **Timing is an always-on-top timer that lives as a 32 px pill at the edge of your
 screen.** Click it to start tracking; it never covers your working area. It is
-100 % local — SQLite only, no account, no telemetry, no network calls.
+**local-first**: SQLite only, no account, no telemetry, no analytics. Out of the
+box it makes **no network requests at all** — the only networking code in the app
+is the sync/backup you configure yourself, and it never talks to anything except
+the endpoint you typed in. See [Where your data goes](#where-your-data-goes).
 
 Built with Tauri 2 + React 19 + Rust. **Windows 10/11 x64 only**: the tray menu,
 click-through and window geometry are implemented against Win32 APIs, so porting
@@ -39,6 +42,33 @@ two-way Markdown sync into your own notes, and a vendored time-insight window
 
 MIT licensed. Issues and PRs are welcome.
 
+### Where your data goes
+
+"Local-first" does not mean "never leaves the machine" — **if you turn on sync, it
+syncs**. Every outbound path is opt-in and is listed below; none of them is on by
+default.
+
+| Path | When | What | Where | Turn off / clean up |
+|---|---|---|---|---|
+| **Markdown snapshot** | You enabled Markdown sync (local folder or WebDAV); runs on the polling interval or on "Sync now" | That day's records, rendered as plain-text `{date}.md` (only the section under your chosen heading is rewritten) | The folder you picked, or the WebDAV server you entered | Disable sync; delete the file on your own side |
+| **Event stream** | Same toggle, same round: pushes new local events, then pulls peer segments | JSONL segments of timer events (start / pause / resume / stop / drop, with ms timestamps and device id) under `<target>/sync/events/<device-id>/` | Same target | Same as above, plus delete `sync/events/` |
+| **Insight backup** | The time-insight window's own WebDAV backup, or a manual export | A backup bundle of `activity.db` (app-usage statistics etc.) | The WebDAV folder configured there, or a file you pick | Disable backup in that window |
+| **Local export** | You click export / a scheduled export | Records, statistics | A folder you pick | Delete the files |
+
+Three things worth being explicit about:
+
+- **No account, no telemetry, no crash reporting.** Outside these four paths the app
+  sends nothing to anyone; there is no "anonymous usage statistics". Android's
+  `INTERNET` permission exists for the WebView and these sync paths — with sync off
+  it is never used.
+- **WebDAV over HTTPS is transport encryption, not end-to-end encryption.** The
+  content is plaintext on the server, readable by the provider (or anyone holding
+  that app password). For more than that, use a local folder plus your own
+  encrypted cloud drive.
+- **App-usage statistics and time records are two separate datasets** (`activity.db`
+  and `timing.db`, never merged). Turning on record sync does **not** ship app-usage
+  data anywhere; it only travels through the insight-backup path.
+
 ---
 
 ## 为什么是这个形态
@@ -51,7 +81,8 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 - **32 px 药丸，贴边常驻**。不悬停时只留内容、隐藏背板，视觉上就是屏幕边缘的一小段文字；
   鼠标移开它就"消失"，但计时一直在走。窗口把 OS 层的尺寸收缩到内容包围盒，所以空白区域
   真的不接收点击 —— 不是拿透明像素糊弄你的眼睛。
-- **纯本地 SQLite，无账号、无联网**。开机到结束不产生一个网络请求。
+- **纯本地 SQLite，无账号、无遥测**。不配置任何同步时，开机到结束**不产生一个网络请求**；
+  只有你在设置里显式配了同步/备份，记录才会发到你自己填的那个落点（见「数据去哪了」）。
 - **同步用明文 Markdown**，直接写进你已有的日记文件、只改目标标题下的区块。
   哪天不用这个软件了，记录还在你自己的 `{date}.md` 里。
 - **倒计时到点恒结束并保存**，不弹确认框问你要不要留。错过了就是错过了。
@@ -75,6 +106,28 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 
 **设置只有一个家**：主界面 → 设置，五组横排锚点（悬浮条 / 外观 / 计时与记录 / 数据与同步 /
 通用与启动）。独立设置窗与药丸内联设置面板已在 0.12.1 下线。
+
+## 数据去哪了
+
+「本地优先」不等于「永远不出本机」——**你开了同步，它就会发出去**。这张表是完整的清单，
+四条通道全部由你显式开启或触发，没有一条是默认开着的：
+
+| 通道 | 什么时候发生 | 传什么 | 传到哪 | 怎么关 / 怎么删 |
+|---|---|---|---|---|
+| **计时记录快照** | 设置里开了 Markdown 同步（本地目录或 WebDAV），按轮询间隔自动跑，或点「立即同步」 | 当天的计时记录，渲染成明文的 `{date}.md`（只改目标标题下的区块） | 你选的本地目录，或你填的 WebDAV 服务器 | 关掉同步；远端文件在**你自己那边**删 |
+| **计时事件流** | 同上（同一个开关），每轮先传本机新增事件、再拉对端分段 | 计时事件的 JSONL 分段（开始 / 暂停 / 继续 / 结束 / 丢弃，含毫秒时间戳与设备 id），写到 `<落点>/sync/events/<设备id>/` | 同一落点 | 同上；同时删 `sync/events/` 目录 |
+| **活动窗备份** | 活动窗（时间统计）里自己配的 WebDAV 备份，或手动导出 | `activity.db` 的备份包（应用使用统计等） | 活动窗里填的 WebDAV 目录，或你选的文件路径 | 活动窗里关掉备份 |
+| **本地导出** | 你点导出 / 定时导出 | 记录、统计等导出文件 | 你选的本地目录 | 删文件 |
+
+三点必须说清楚的地方：
+
+- **没有账号、没有遥测、没有崩溃上报**。上面四条之外，应用不向任何第三方发请求；也没有
+  「匿名使用统计」这种东西。Android 的 `INTERNET` 权限是为 WebView 与上面这些同步通道
+  申请的 —— 不配同步时它一次都不会用到。
+- **WebDAV 的 HTTPS 只是传输加密，不是端到端加密**。内容在服务端是明文，服务方（或任何
+  拿到那个应用密码的人）读得到。要更强的东西请用本地目录 + 自己加密的网盘。
+- **应用使用统计（活动窗）与计时记录是两套数据**（`activity.db` 与 `timing.db`，互不迁移）。
+  开计时记录同步**不会**把应用使用统计带出去；它只走「活动窗备份」那一条。
 
 ## 界面
 
@@ -101,7 +154,7 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 
 ### 预编译包
 
-Releases 上有**两个早期版本**，都远早于当前主线 0.12.3（宿主命令数 68 → 94，功能差得多）：
+Releases 上有**两个早期版本**，都远早于当前主线 0.12.3（宿主命令数 68 → 95，功能差得多）：
 
 | 版本 | 产物 | 说明 |
 |---|---|---|

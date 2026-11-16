@@ -65,7 +65,7 @@
     "src-tauri/src/services/activity/data/repositories/web_links_mod_tests.rs": 345,
     "src-tauri/src/services/activity/data/repositories/web_links.rs": 364,
     "src-tauri/src/services/activity/data/scheduled_backup.rs": 1202,
-    "src-tauri/src/services/activity/data/scheduled_export.rs": 1096,
+    "src-tauri/src/services/activity/data/scheduled_export.rs": 1043,
     "src-tauri/src/services/activity/data/schema_contracts.rs": 529,
     "src-tauri/src/services/activity/data/schema.rs": 1751,
     "src-tauri/src/services/activity/data/sqlite_pool_mod_tests.rs": 992,
