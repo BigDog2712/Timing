@@ -13,7 +13,7 @@ use tauri::{
 mod recovery;
 pub(crate) mod tools_navigation;
 
-pub(crate) const MAIN_WINDOW_LABEL: &str = "activity";
+pub(crate) const ACTIVITY_WINDOW_LABEL: &str = "activity";
 
 pub(crate) async fn show_desktop() -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(crate::infra::activity::windows::desktop::show_desktop)
@@ -202,7 +202,7 @@ pub(crate) fn mark_main_window_ready<R: Runtime + 'static>(
                 "frontend",
                 "accepted-reveal",
             );
-            let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
+            let Some(window) = app.get_webview_window(ACTIVITY_WINDOW_LABEL) else {
                 lifecycle.finish_reveal(token, false);
                 return Err("main window disappeared before ready reveal".to_string());
             };
@@ -237,7 +237,7 @@ pub(crate) fn destroy_hidden_main_window_for_e2e<R: Runtime>(
     }
 
     let window = app
-        .get_webview_window(MAIN_WINDOW_LABEL)
+        .get_webview_window(ACTIVITY_WINDOW_LABEL)
         .ok_or_else(|| "main window is unavailable".to_string())?;
     if window.is_visible().unwrap_or(false) {
         return Err("refusing to destroy a visible main window".to_string());
@@ -332,7 +332,7 @@ fn reveal_main_window<R: Runtime + 'static>(
 pub(crate) async fn minimize_main_window<R: Runtime + 'static>(
     app: &AppHandle<R>,
 ) -> Result<(), String> {
-    let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
+    let Some(window) = app.get_webview_window(ACTIVITY_WINDOW_LABEL) else {
         return Err("main window is unavailable".to_string());
     };
 
@@ -360,7 +360,7 @@ pub(crate) fn hide_main_window_for_background<R: Runtime + 'static>(
 pub(crate) fn register_hidden_main_window_startup<R: Runtime + 'static>(
     app: &AppHandle<R>,
 ) -> bool {
-    let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
+    let Some(window) = app.get_webview_window(ACTIVITY_WINDOW_LABEL) else {
         crate::log_warn!("hidden registration rejected: window-missing");
         return false;
     };
@@ -412,7 +412,7 @@ enum MainWindowEnsureResult<R: Runtime> {
 fn ensure_main_window_once<R: Runtime + 'static>(
     app: &AppHandle<R>,
 ) -> Result<MainWindowEnsureResult<R>, String> {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+    if let Some(window) = app.get_webview_window(ACTIVITY_WINDOW_LABEL) {
         if window_activation::is_native_window_alive(&window) == Ok(true) {
             return Ok(MainWindowEnsureResult::Existing(window));
         }
@@ -436,7 +436,7 @@ fn ensure_main_window_once<R: Runtime + 'static>(
     );
     let initialization_script = main_window_initialization_script(generation);
 
-    let builder = WebviewWindowBuilder::new(app, MAIN_WINDOW_LABEL, main_window_url())
+    let builder = WebviewWindowBuilder::new(app, ACTIVITY_WINDOW_LABEL, main_window_url())
         .title(MAIN_WINDOW_TITLE)
         .inner_size(MAIN_WINDOW_WIDTH, MAIN_WINDOW_HEIGHT)
         .min_inner_size(MAIN_WINDOW_MIN_WIDTH, MAIN_WINDOW_MIN_HEIGHT)
@@ -640,7 +640,7 @@ fn schedule_main_window_destroy_after_background<R: Runtime + 'static>(
         ))
         .await;
 
-        let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) else {
+        let Some(window) = app.get_webview_window(ACTIVITY_WINDOW_LABEL) else {
             return;
         };
 

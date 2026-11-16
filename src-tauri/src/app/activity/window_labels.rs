@@ -1,6 +1,6 @@
 //! 窗口 label 的**唯一映射表**（去 Patina 化 T04）。
 //!
-//! 三个原生 label 各自的字面值仍在它们各自的模块里（`main_window::MAIN_WINDOW_LABEL` /
+//! 三个原生 label 各自的字面值仍在它们各自的模块里（`main_window::ACTIVITY_WINDOW_LABEL` /
 //! 本模块 `MINI_WINDOW_LABEL` / `tool_notifications::WINDOW_LABEL`），本模块只做两件事：
 //!   1. `WindowKind::ALL` —— 把枚举顺序**显式**写出来。以前是
 //!      `["patina", "mini", "tool-notification"][index]`，与枚举声明顺序隐式耦合：谁往枚举里
@@ -29,7 +29,7 @@ impl WindowKind {
     /// 变体 → 原生 window label。
     pub(crate) fn label(self) -> &'static str {
         match self {
-            WindowKind::Main => super::main_window::MAIN_WINDOW_LABEL,
+            WindowKind::Main => super::main_window::ACTIVITY_WINDOW_LABEL,
             WindowKind::Mini => MINI_WINDOW_LABEL,
             WindowKind::ToolNotification => super::tool_notifications::WINDOW_LABEL,
         }

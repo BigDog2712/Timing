@@ -39,7 +39,7 @@ pub(super) fn monitor<R: Runtime>(
             if placement.monitor.is_some() {
                 return app.primary_monitor().ok().flatten();
             }
-            app.get_webview_window(crate::app::activity::main_window::MAIN_WINDOW_LABEL)
+            app.get_webview_window(crate::app::activity::main_window::ACTIVITY_WINDOW_LABEL)
                 .and_then(|window| window.current_monitor().ok().flatten())
         })
         .or_else(|| app.primary_monitor().ok().flatten())

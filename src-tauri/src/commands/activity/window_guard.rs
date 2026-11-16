@@ -18,7 +18,7 @@ pub fn require_main_window_string<R: Runtime>(window: &WebviewWindow<R>) -> Resu
 }
 
 fn require_main_window_label(label: &str) -> Result<(), CommandErrorDto> {
-    if label == crate::app::activity::tray::MAIN_WINDOW_LABEL {
+    if label == crate::app::activity::tray::ACTIVITY_WINDOW_LABEL {
         return Ok(());
     }
 
@@ -35,7 +35,7 @@ mod tests {
 
     #[test]
     fn main_window_is_allowed() {
-        /* 值锁用**字面量**，不引用 `MAIN_WINDOW_LABEL`（设计 §6 原则）：
+        /* 值锁用**字面量**，不引用 `ACTIVITY_WINDOW_LABEL`（设计 §6 原则）：
            引用常量的话，常量改错值时这条测试会跟着一起错——测试就成了同义反复。 */
         assert_eq!(require_main_window_label("activity"), Ok(()));
     }

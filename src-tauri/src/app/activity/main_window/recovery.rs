@@ -32,7 +32,7 @@ pub(super) async fn remove<R: Runtime + 'static>(
     {
         return Ok(false);
     }
-    let result = match app.get_webview_window(MAIN_WINDOW_LABEL) {
+    let result = match app.get_webview_window(ACTIVITY_WINDOW_LABEL) {
         Some(window) => crate::app::activity::webview_recovery::destroy_and_wait(&window).await,
         None => Ok(()),
     };

@@ -120,7 +120,7 @@ pub async fn cmd_get_focus_history(
     id: i64,
 ) -> Result<Vec<crate::models::activity::focus_history::FocusGroup>, String> {
     use tauri::Manager;
-    if window.label() != crate::app::activity::main_window::MAIN_WINDOW_LABEL {
+    if window.label() != crate::app::activity::main_window::ACTIVITY_WINDOW_LABEL {
         return Err("only the main window can read focus history".into());
     }
     tools::focus_history(window.app_handle(), kind, id).await
@@ -148,7 +148,7 @@ pub async fn cmd_extend_activity_reminder(
     window: tauri::WebviewWindow,
 ) -> Result<ToolsRuntimeSnapshot, String> {
     use tauri::Manager;
-    if window.label() != crate::app::activity::main_window::MAIN_WINDOW_LABEL {
+    if window.label() != crate::app::activity::main_window::ACTIVITY_WINDOW_LABEL {
         return Err("only the main window can extend reminders".into());
     }
     tools::extend_activity_reminder(window.app_handle(), &alert_id, extension).await
@@ -161,7 +161,7 @@ pub async fn cmd_resolve_reminder_alert(
     window: tauri::WebviewWindow,
 ) -> Result<ToolsRuntimeSnapshot, String> {
     use tauri::Manager;
-    if window.label() != crate::app::activity::main_window::MAIN_WINDOW_LABEL {
+    if window.label() != crate::app::activity::main_window::ACTIVITY_WINDOW_LABEL {
         return Err("only the main window can resolve reminders".into());
     }
     tools::resolve_reminder_alert(window.app_handle(), &alert_id, delay_minutes).await

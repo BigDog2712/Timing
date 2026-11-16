@@ -28,7 +28,7 @@ pub async fn cmd_minimize_main_window(app: AppHandle) -> Result<(), CommandError
 
 #[tauri::command]
 pub async fn cmd_show_desktop(window: WebviewWindow) -> Result<(), CommandErrorDto> {
-    if window.label() != main_window::MAIN_WINDOW_LABEL {
+    if window.label() != main_window::ACTIVITY_WINDOW_LABEL {
         return Err(CommandErrorDto::new(
             "SHOW_DESKTOP_INVALID_CALLER",
             "only the main window can show the desktop",
@@ -50,7 +50,7 @@ pub fn cmd_e2e_destroy_hidden_main_window(app: AppHandle) -> Result<(), CommandE
 pub fn cmd_get_main_window_render_token(
     window: WebviewWindow,
 ) -> Result<MainWindowRenderTokenDto, CommandErrorDto> {
-    if window.label() != main_window::MAIN_WINDOW_LABEL {
+    if window.label() != main_window::ACTIVITY_WINDOW_LABEL {
         return Err(CommandErrorDto::new(
             "MAIN_WINDOW_READY_INVALID_CALLER",
             "only the main window can read main-window render state",
@@ -79,7 +79,7 @@ pub fn cmd_mark_main_window_ready(
     generation: u64,
     load_epoch: u64,
 ) -> Result<MainWindowReadyResultDto, CommandErrorDto> {
-    if window.label() != main_window::MAIN_WINDOW_LABEL {
+    if window.label() != main_window::ACTIVITY_WINDOW_LABEL {
         return Err(CommandErrorDto::new(
             "MAIN_WINDOW_READY_INVALID_CALLER",
             "only the main window can report main-window readiness",

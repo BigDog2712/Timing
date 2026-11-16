@@ -19,7 +19,7 @@ use tauri::{
     AppHandle, Emitter, Manager, Runtime, Window, WindowEvent,
 };
 
-pub(crate) use crate::app::activity::main_window::MAIN_WINDOW_LABEL;
+pub(crate) use crate::app::activity::main_window::ACTIVITY_WINDOW_LABEL;
 const TRAY_ID: &str = "main";
 /* [Timing 融合 D5] **Patina 不再有自己的托盘图标**（见方案 §三-4 / D5）。
 同一进程里两个托盘 = 用户眼里两个应用，且菜单项（打开统计 / 番茄 / 设置）与宿主
@@ -441,7 +441,7 @@ pub(crate) fn handle_tray_icon_event<R: Runtime>(app: &AppHandle<R>, event: Tray
 }
 
 pub(crate) fn handle_window_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
-    if window.label() != MAIN_WINDOW_LABEL {
+    if window.label() != ACTIVITY_WINDOW_LABEL {
         return;
     }
 

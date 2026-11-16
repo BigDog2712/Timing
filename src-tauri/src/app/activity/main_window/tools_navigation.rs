@@ -2,9 +2,9 @@
 //! 0.12.1：设置视图落点）。
 //!
 //! **窗口 label 与直觉相反，读代码前先记住这一条**：
-//!   · 本模块所在的 `main_window` 指**分析窗**，`MAIN_WINDOW_LABEL = "activity"`；
+//!   · 本模块所在的 `main_window` 指**分析窗**，`ACTIVITY_WINDOW_LABEL = "activity"`；
 //!   · 宿主`药丸`的 label 是 `main`（`src-tauri/tauri.conf.json` 的 `windows[0].label`）。
-//! 所以「发给药丸」必须 `emit_to("main", …)`，而本模块的 `emit_to(MAIN_WINDOW_LABEL, …)`
+//! 所以「发给药丸」必须 `emit_to("main", …)`，而本模块的 `emit_to(ACTIVITY_WINDOW_LABEL, …)`
 //! 是**发给分析窗**。注释里禁止用裸 `main` 表示药丸，一律写「药丸（label = main）」。
 //!
 //! 生命周期（FUSION-ARCH-v1 §6.3）：
@@ -85,7 +85,7 @@ fn deliver<R: Runtime>(app: &AppHandle<R>, view: PendingView) -> Result<(), Stri
         return Err("Could not open the main window".into());
     }
     // A cold main WebView consumes the pending target after subscribing.
-    let _ = app.emit_to(super::MAIN_WINDOW_LABEL, MAIN_TOOLS_TARGET_CHANGED, ());
+    let _ = app.emit_to(super::ACTIVITY_WINDOW_LABEL, MAIN_TOOLS_TARGET_CHANGED, ());
     Ok(())
 }
 
