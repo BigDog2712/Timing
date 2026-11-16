@@ -79,7 +79,7 @@ impl MdSyncKind {
 
 /// md 覆盖提醒的裁决方向（架构 §1.4 / §3 `MdDecision`）。
 ///
-/// 三态与迁移 `0012_v0143_sync_stream.sql` 的 `direction` 词汇表逐字对应：
+/// 三态与迁移 `0014_v0150_sync_stream.sql` 的 `direction` 词汇表逐字对应：
 /// - A「覆盖 Timing」= `overwrite_timing`（md → SQL）；
 /// - B「保留 Timing」= `keep_timing`（SQL → md）；
 /// - C「暂不处理」= `deferred`（挂回 PendingDecision）。

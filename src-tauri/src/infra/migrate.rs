@@ -230,6 +230,9 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
         run_raw(
             pool,
             include_str!("../migrations/0013_v01280_usage_span_purge.sql"),
+        )
+        .await?;
+    }
     /* 0.14.0（同步重构 T01）：同步事件流基础设施——下载游标 `sync_event_cursor` +
        md 决策审计 `md_decision_audit`。两张纯新表，幂等段不需要 guard；`UPDATE ... ='14'`
        会把更高版本号改写回 14，所以版本推进照样关在版本门里（与 0008/0012 同型）。
@@ -239,9 +242,6 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
         run_raw(
             pool,
             include_str!("../migrations/0014_v0150_sync_stream.sql"),
-        )
-        .await?;
-    }
         )
         .await?;
     }
