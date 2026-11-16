@@ -31,6 +31,7 @@ import { MdBackupSummaryLine } from './MdBackupSummaryLine';
 import { MdDataRootBlock } from './MdDataRootBlock';
 import { MdFormatBlock } from './MdFormatBlock';
 import { MdSyncBackupCard } from './MdSyncBackupCard';
+import { MdSyncDecisionDialog } from './MdSyncDecisionDialog';
 import { MdSyncLocalBlock } from './MdSyncLocalBlock';
 import { MdSyncLocalCard } from './MdSyncLocalCard';
 import { MdSyncWebdavCard } from './MdSyncWebdavCard';
@@ -148,6 +149,9 @@ export function HostSyncPanel() {
           </button>
         </div>
       </div>
+
+      {/* [T03] md 覆盖提醒：前台同步发现冲突时弹裁决窗（组件内订阅事件 + 挂载时回捞） */}
+      <MdSyncDecisionDialog />
     </section>
   );
 }

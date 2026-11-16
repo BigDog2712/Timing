@@ -23,6 +23,8 @@
 @import "./styles/features/host/settings-sync.css";
 @import "./styles/features/host/settings-sync-interval.css";
 @import "./styles/features/host/settings-sync-cloud.css";
+/* md 覆盖提醒弹窗（T03）：`settings-sync.css` 281 行，加不进去，单开一份 */
+@import "./styles/features/host/settings-sync-decision.css";
 @import "./styles/features/host/settings-data.css";
 @import "./styles/features/host/settings-data-slim.css";
 /* 搬家遗留件：宿主 `.btn` / `.btn--danger` / `.inline-error` 三个类的等价定义 */

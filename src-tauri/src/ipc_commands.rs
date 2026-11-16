@@ -110,6 +110,9 @@ macro_rules! define_invoke_handler {
             crate::commands::md_sync_cmd::md_sync_save,
             crate::commands::md_sync_cmd::md_sync_run,
             crate::commands::md_sync_cmd::md_sync_open,
+            /* [T03] md 覆盖提醒：列待裁决冲突 / 执行一次裁决。 */
+            crate::commands::md_sync_cmd::md_sync_decisions,
+            crate::commands::md_sync_cmd::md_sync_resolve,
             /* [V0.11.13] 云端第二落点（ADR-061）：测试连接 / 备份列表 / 备份恢复。
             移动端同名注册，`md_backup_*` 在那里回 `MD_SYNC_CONFIG_INVALID`。 */
             crate::commands::md_sync_cmd::md_sync_test,

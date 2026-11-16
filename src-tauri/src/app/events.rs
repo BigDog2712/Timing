@@ -36,6 +36,9 @@ pub const APP_OPEN_NEW_ITEM: &str = "app:open-new-item";
 /// [V0.4.0] Markdown 同步把文件改动写回 SQL 后广播（载荷 `MdSyncReport`）。
 /// 前端据此刷新事项 / 计时 / 明细 / 便利贴，避免「文件改了但界面还是旧的」。
 pub const MD_SYNC_CHANGED: &str = "md-sync:changed";
+/// [T03] md 覆盖提醒：检测到文件侧冲突、且前台可弹窗时广播（载荷 `Vec<PendingConflict>`）。
+/// 前端据此弹出「覆盖 / 保留 / 暂不处理」的裁决窗。
+pub const MD_SYNC_DECISION_REQUIRED: &str = "md-sync:decision-required";
 
 /// 读取最新 `TimerState` 并 emit 给前端（权威状态）。
 ///
@@ -172,6 +175,19 @@ pub fn emit_todo_nudge(app: &AppHandle, nudge: &crate::models::nudge::TodoNudge)
 pub fn emit_md_sync_changed(app: &AppHandle, report: &crate::models::md_sync::MdSyncReport) {
     if let Err(err) = app.emit(MD_SYNC_CHANGED, report) {
         crate::log_warn!("emit {MD_SYNC_CHANGED} failed: {err}");
+    }
+}
+
+/// 广播 `md-sync:decision-required`（payload 为待裁决冲突列表）。空列表不发。
+pub fn emit_md_sync_decision_required(
+    app: &AppHandle,
+    conflicts: &[crate::services::md_sync::decision::PendingConflict],
+) {
+    if conflicts.is_empty() {
+        return;
+    }
+    if let Err(err) = app.emit(MD_SYNC_DECISION_REQUIRED, conflicts) {
+        crate::log_warn!("emit {MD_SYNC_DECISION_REQUIRED} failed: {err}");
     }
 }
 

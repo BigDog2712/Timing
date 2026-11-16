@@ -77,6 +77,37 @@ impl MdSyncKind {
     }
 }
 
+/// md 覆盖提醒的裁决方向（架构 §1.4 / §3 `MdDecision`）。
+///
+/// 三态与迁移 `0012_v0143_sync_stream.sql` 的 `direction` 词汇表逐字对应：
+/// - A「覆盖 Timing」= `overwrite_timing`（md → SQL）；
+/// - B「保留 Timing」= `keep_timing`（SQL → md）；
+/// - C「暂不处理」= `deferred`（挂回 PendingDecision）。
+///
+/// `overwrite_timing_synth`（坑 1 跨端合成事件）**不在**本枚举里：本任务只留位、
+/// 不实现合成，未来需要时在 audit 方向词汇里另立值，而不是扩这个用户可选的枚举。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Decision {
+    /// A：md → SQL（用户选「覆盖 Timing」）。
+    OverwriteTiming,
+    /// B：SQL → md（用户选「保留 Timing」）。
+    KeepTiming,
+    /// C：暂不处理（挂回 PendingDecision，不静默改写任一端）。
+    Deferred,
+}
+
+impl Decision {
+    /// 审计方向词汇（`md_decision_audit.direction`），与迁移 0012 的词汇表一致。
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::OverwriteTiming => "overwrite_timing",
+            Self::KeepTiming => "keep_timing",
+            Self::Deferred => "deferred",
+        }
+    }
+}
+
 /// 一个落点：把某类数据写进 `root/file` 的 `heading` 标题下。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

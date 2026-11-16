@@ -17,6 +17,7 @@
 use chrono::Local;
 use sqlx::SqlitePool;
 
+use super::decision::ConflictMode;
 use super::{config, sync_all};
 use crate::error::AppResult;
 use crate::infra::md_file;
@@ -58,6 +59,9 @@ pub async fn path_of(pool: &SqlitePool, kind: MdSyncKind) -> AppResult<Option<St
 }
 
 /// 在镜像目录上跑一轮同步（读文件侧改动 → 导入 → 渲染 → 写回镜像）。
+///
+/// 镜像目录是云端落点（内部副本），冲突走 `AutoMerge`：保持「Markdown 赢」现状，
+/// 不在这里挂起等用户裁决（用户面对的是 Obsidian 落点，不是这份传输副本）。
 pub async fn run_in(pool: &SqlitePool, root: &str) -> AppResult<MdSyncReport> {
-    sync_all(pool, Some(root)).await
+    sync_all(pool, Some(root), ConflictMode::AutoMerge).await
 }

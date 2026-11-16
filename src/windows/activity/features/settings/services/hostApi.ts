@@ -45,6 +45,8 @@ import {
   mdSyncRun,
   mdSyncSave,
   mdSyncTest,
+  mdSyncDecisions,
+  mdSyncResolve,
   mdSafPick,
   mdSafStatus,
   openLegacyDir,
@@ -52,6 +54,7 @@ import {
 import { pluginList, pluginOpenDir } from "../../../platform/desktop/hostPluginsGateway";
 import type {
   HostSettings,
+  Decision,
   MdSyncConfig,
   MdSyncKind,
 } from "./host/hostTypes";
@@ -85,6 +88,8 @@ export const mdSyncApi = {
   run: mdSyncRun,
   open: (kind: MdSyncKind): Promise<void> => mdSyncOpen(kind),
   test: (config: MdSyncConfig, secret?: string | null) => mdSyncTest(config, secret),
+  decisions: mdSyncDecisions,
+  resolve: (id: string, decision: Decision) => mdSyncResolve(id, decision),
 };
 
 /** 备份域。`export` 是合法属性名（手机端「保存到…」用，桌面不挂）。 */

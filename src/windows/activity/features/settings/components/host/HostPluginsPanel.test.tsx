@@ -22,6 +22,8 @@ vi.mock('../../../../platform/desktop/hostPluginsGateway', () => ({ ...g }));
 vi.mock('../../../../platform/desktop/hostSyncGateway', () => ({
   mdSyncGet: vi.fn(), mdSyncSave: vi.fn(), mdSyncRun: vi.fn(), mdSyncOpen: vi.fn(),
   mdSyncTest: vi.fn(), mdBackupList: vi.fn(), mdBackupOpen: vi.fn(), mdBackupRestore: vi.fn(),
+  /* [T03] hostApi 的 mdSyncApi 多了这两个方法：mock 少一个，import 期就报 No export。 */
+  mdSyncDecisions: vi.fn(), mdSyncResolve: vi.fn(),
   mdBackupExport: vi.fn(), dataRootGet: vi.fn(), dataRootChange: vi.fn(), dataRootOpen: vi.fn(),
   getMigrationInfo: vi.fn(), openLegacyDir: vi.fn(), dailyStatusGet: vi.fn(),
   dailyStatusSet: vi.fn(), mdSafPick: vi.fn(), mdSafStatus: vi.fn(),

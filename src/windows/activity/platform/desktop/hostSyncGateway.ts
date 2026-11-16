@@ -12,9 +12,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   DataRootInfo,
+  Decision,
   MdBackupExport,
   MdBackupItem,
   MdBackupRestoreResult,
+  MdPendingConflict,
+  MdResolveOutcome,
   MdSyncConfig,
   MdSyncKind,
   MdSyncReport,
@@ -65,6 +68,14 @@ export function mdSyncSave(config: MdSyncConfig, secret?: string | null): Promis
 
 export function mdSyncRun(): Promise<MdSyncReport> {
   return call<MdSyncReport>("md_sync_run");
+}
+
+export function mdSyncDecisions(): Promise<MdPendingConflict[]> {
+  return call<MdPendingConflict[]>("md_sync_decisions");
+}
+
+export function mdSyncResolve(id: string, decision: Decision): Promise<MdResolveOutcome> {
+  return call<MdResolveOutcome>("md_sync_resolve", { id, decision });
 }
 
 export function mdSyncOpen(kind: MdSyncKind): Promise<void> {

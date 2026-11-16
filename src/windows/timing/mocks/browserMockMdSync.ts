@@ -19,6 +19,8 @@
 import type {
   CloudMode,
   MdBackupItem,
+  MdPendingConflict,
+  MdResolveOutcome,
   MdSyncBinding,
   MdSyncCloudChannel,
   MdSyncCloudStatus,
@@ -163,6 +165,13 @@ export function createMockMdSyncApi(): Record<string, (args?: unknown) => unknow
       kinds: [] as MdSyncKind[],
       errors: [],
     }),
+    /* [T03] 浏览器没有真实文件系统，永远没有 md 冲突；裁决只在真机上可走查。
+       回空列表让「有 N 处待确认」入口按 0 渲染（与「从未冲突」的真机同形）。 */
+    md_sync_decisions: (): MdPendingConflict[] => [],
+    /* 真机上没有冲突时 resolve 会回「该冲突已处理或不再存在」；mock 照抄同一句原文。 */
+    md_sync_resolve: (_args): MdResolveOutcome => {
+      fail('MD_SYNC_CONFIG_INVALID', '该冲突已处理或不再存在');
+    },
     md_sync_open: () => undefined,
     /* 测试连接：真机上 `detail` 是人话（不是 HTTP 状态码），mock 照这个口径给。
        [V0.11.26] 载荷仍是 legacy `cloud`（`probe.rs` 零 diff 的前提）：块④ 传

@@ -4,7 +4,6 @@
  *   1. 组件内**禁止**直接 `invoke`；一切经 `ipc.*`。2. 后端 `Err` 序列化为 `{ code, message }`，此处规范化为 IpcError。
  *   3. 事件订阅统一经 `onIpcEvent`，返回的 unlisten 须由调用方在 cleanup 调用（K-8）；非 Tauri 环境（纯浏览器 dev）自动降级到 src/mocks/browserMock，便于 UI 走查。
  */
-import { invoke } from '@tauri-apps/api/core';
 import type {
   AccentColors,
   AccentSetParams,
@@ -53,6 +52,9 @@ import type {
   WindowRectDip,
   WorkAreaDip,
   PluginListResult,
+  Decision,
+  MdPendingConflict,
+  MdResolveOutcome,
   MdSyncConfig,
   MdSyncKind,
   MdSyncReport,
@@ -63,31 +65,16 @@ import type {
   MdBackupRestoreResult,
   MigrationInfo,
 } from '../types/domain';
-import { createMockApi } from '../mocks/browserMock';
 import type { DataRootInfo } from '../types/domain/dataRoot';
 import type { CategoryCatalogRows } from '../types/domain/categoryCatalog';
 /* [V0.5.0] 错误类型与规范化搬到 ipcError.ts 腾行数；`errorText()` 留在本文件——check-contract.mjs 从这里内联解析 `case '...'`。 */
-import { IpcError, normalizeError } from './ipcError';
+import { IpcError } from './ipcError';
 export { IpcError } from './ipcError';
 
-/** 是否运行在 Tauri（WebView2）运行时 */
-export function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
-
-const mockHandlers = createMockApi();
-
-/** 统一命令调用：Tauri invoke 或浏览器 mock，集中错误规范化 */
-async function call<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
-  try {
-    if (isTauri()) return await invoke<T>(cmd, args);
-    const handler = mockHandlers[cmd];
-    if (!handler) throw new IpcError('IO_ERROR', `未实现的命令：${cmd}`);
-    return (await handler(args)) as T;
-  } catch (err) {
-    throw normalizeError(err);
-  }
-}
+/* [T03] `isTauri` / 浏览器 mock 选择 / `call` 三件搬到 `ipcCall.ts`：本文件撞 300 行，
+   而它们与「命令清单」不是一回事（`check:contract` 数的是下面 `ipc` 对象的方法名）。 */
+export { isTauri } from './ipcCall';
+import { call } from './ipcCall';
 
 /* [V0.11.15] 事件订阅搬到 `ipcEvent.ts` 腾行数（`check:contract` 不解析它，见那边头注释）。 */
 export { onIpcEvent } from './ipcEvent';
@@ -276,6 +263,9 @@ export const ipc: IpcApi = {
   mdSyncGet: () => call<MdSyncViewCloud>('md_sync_get'),
   mdSyncSave: (p: { config: MdSyncConfig; secret?: string | null }) => call<MdSyncViewCloud>('md_sync_save', { config: p.config, secret: p.secret ?? null }),
   mdSyncRun: () => call<MdSyncReport>('md_sync_run'),
+  /* [T03] 挂起 / 待裁决的 md 冲突 + 一次裁决 */
+  mdSyncDecisions: () => call<MdPendingConflict[]>('md_sync_decisions'),
+  mdSyncResolve: (p: { id: string; decision: Decision }) => call<MdResolveOutcome>('md_sync_resolve', { id: p.id, decision: p.decision }),
   mdSyncOpen: (p: { kind: MdSyncKind }) => call<void>('md_sync_open', { kind: p.kind }),
   mdSyncTest: (params: { config: MdSyncConfig; secret?: string | null }) => call<MdSyncTestResult>('md_sync_test', { config: params.config, secret: params.secret ?? null }),
   mdBackupList: () => call<MdBackupItem[]>('md_backup_list'),

@@ -17,7 +17,9 @@
 //! 5. 更新基线，供下一轮判定。标题 / 文件不存在时**不导入**，只按 SQL 补写，
 //!    避免用户改标题时误删数据。
 
+pub mod audit;
 pub mod config;
+pub mod decision;
 /* [V0.11.19] 业务写入信号（命令层白名单，jobs 下 0 处）。 */
 pub mod dirty;
 pub mod export;
@@ -26,15 +28,19 @@ pub mod import;
 pub mod mirror;
 pub mod runtime;
 
-use std::path::Path;
+mod binding;
+
+/* `sync_all` 用到的三件落点级动作搬到 `binding.rs`（本文件撞 300 行）：
+   一轮里「读懂一个落点 → 判定 → 写入」的整段逻辑都在那里。 */
+use self::binding::sync_binding;
 
 use chrono::Local;
 use sqlx::SqlitePool;
 
-use self::runtime::Runtime;
+use self::decision::ConflictMode;
 use crate::error::{AppError, AppResult};
 use crate::infra::md_file;
-use crate::infra::md_section::{self, SectionState};
+
 use crate::models::md_sync::{
     MdSyncBinding, MdSyncBindingStatus, MdSyncKind, MdSyncReport, MdSyncStatus, MdSyncView,
 };
@@ -53,14 +59,30 @@ pub async fn get_view(pool: &SqlitePool) -> AppResult<MdSyncView> {
 
 /* [V0.11.21] `poll_secs` 无界面入口，字段保留只为老库原样读回；手机端按三档跑（tier::plan_of）。 */
 
-/// 手动「立即同步」。返回本轮报告，不因单个落点失败而整体报错。
+/// 前台入口：检测到 md 冲突时挂起 `AwaitingDecision`，等用户裁决。
+///
+/// 生产调用点走 `md_cloud::round`（它自己也是 `Awaiting`）；本函数保留给
+/// 同步测试与「不经云端、只刷 Obsidian 落点」的调用方——`src/tests/md/**`
+/// 与 `qa_t01_sync_attack.rs` 共 89 处用它，删掉就得让每个用例自己写一遍
+/// `run_with(pool, Awaiting)`，等于把产品口径抄进测试。
+#[cfg_attr(not(test), allow(dead_code))]
 pub async fn run(pool: &SqlitePool) -> AppResult<MdSyncReport> {
-    sync_all(pool, None).await
+    run_with(pool, ConflictMode::Awaiting).await
+}
+
+/// 手动「立即同步」。返回本轮报告，不因单个落点失败而整体报错。
+///
+/// [`mode`] 决定「文件侧被改过」时怎么处置：前台（能弹窗）传 `Awaiting`、
+/// 后台轮传 `Pending`、云端内部副本传 `AutoMerge`。**没有默认值**——冲突处置
+/// 是产品口径，不该由这个函数的签名替调用方拍板。
+pub async fn run_with(pool: &SqlitePool, mode: ConflictMode) -> AppResult<MdSyncReport> {
+    sync_all(pool, None, mode).await
 }
 
 /// 轮询任务用：只在真的从 Markdown 导入了数据时返回 `Some`，避免空转发事件。
+/// 后台入口：检测到 md 冲突时挂起 `PendingDecision`，不静默改写任一端。
 pub async fn tick(pool: &SqlitePool) -> AppResult<Option<MdSyncReport>> {
-    let report = sync_all(pool, None).await?;
+    let report = sync_all(pool, None, ConflictMode::Pending).await?;
     Ok(report.touched().then_some(report))
 }
 
@@ -88,7 +110,7 @@ pub async fn open(pool: &SqlitePool, kind: MdSyncKind) -> AppResult<()> {
         ));
     }
     /* 先同步一轮：文件存在但标题还没写出来时，也要先补上区块再打开。 */
-    sync_all(pool, None).await?;
+    sync_all(pool, None, ConflictMode::Awaiting).await?;
     if !path.exists() {
         return Err(AppError::io("今日文件尚未生成，请先保存并同步"));
     }
@@ -102,7 +124,11 @@ pub async fn open(pool: &SqlitePool, kind: MdSyncKind) -> AppResult<()> {
 /// 一轮同步。[`root_override`] 只给移动端用：Android 的落点是 SAF 的 `content://`
 /// 目录，Rust 不认，由原生侧把当天文件镜像到沙箱内再交给这里，于是根目录换成镜像目录、
 /// 其余（文件模板 / 标题 / 合并规则）原样来自配置——规则只此一份。
-pub(super) async fn sync_all(pool: &SqlitePool, root_override: Option<&str>) -> AppResult<MdSyncReport> {
+pub(super) async fn sync_all(
+    pool: &SqlitePool,
+    root_override: Option<&str>,
+    mode: ConflictMode,
+) -> AppResult<MdSyncReport> {
     /* 先拿锁再读配置：防止上一轮 tick 的旧配置在新配置保存后又写一次旧落点。 */
     let mut rt = runtime::lock().await;
     let config = config::load(pool).await?;
@@ -153,7 +179,7 @@ pub(super) async fn sync_all(pool: &SqlitePool, root_override: Option<&str>) -> 
             next_status.bindings.push(status);
             continue;
         }
-        match sync_binding(pool, &mut rt, binding, date, &path, &config.diary_template).await {
+        match sync_binding(pool, &mut rt, binding, date, &path, &config.diary_template, mode).await {
             Ok(outcome) => {
                 status.exists = outcome.exists;
                 status.last_direction = Some(outcome.direction.to_string());
@@ -183,117 +209,4 @@ pub(super) async fn sync_all(pool: &SqlitePool, root_override: Option<&str>) -> 
     rt.status = next_status;
     rt.initialized = true;
     Ok(report)
-}
-
-struct BindingOutcome {
-    exported: bool,
-    imported: u32,
-    direction: &'static str,
-    exists: bool,
-    warnings: Vec<String>,
-}
-
-async fn sync_binding(
-    pool: &SqlitePool,
-    rt: &mut Runtime,
-    binding: &MdSyncBinding,
-    date: chrono::NaiveDate,
-    path: &Path,
-    template: &str, /* [V0.11.33] 日记模板路径（全局一份）：经 `sync_all`（持有 config）传下，红线豁免 +2 净 0 已裁决放行 */
-) -> Result<BindingOutcome, String> {
-    let read = md_file::read_section(path, &binding.heading)?;
-    /* 阻断级诊断：本轮既不写也不导入（不写保住手改内容，不导入不触发删除块）。 */
-    let warnings = read.guard(binding.kind.label(), &md_section::heading_text(&binding.heading))?;
-    let section = read.state;
-    let expected = render_expected(pool, binding, date)
-        .await
-        .map_err(|err| err.to_string())?;
-    /* mtime 仍读出来（`SectionState` 的一部分），但冲突判定不再用它：
-    见下面「Markdown 永远赢」的注释。 */
-    let (current, _mtime) = match &section {
-        SectionState::MissingFile => (None, 0),
-        /* 标题缺失按「文件侧没有这一节」处理：只补写，不把空内容当删除。
-        `Blocked` 同档：它在上面已 return，这里只为穷尽 match。 */
-        SectionState::MissingHeading { mtime_ms } | SectionState::Blocked { mtime_ms } => (None, *mtime_ms),
-        SectionState::Present { body, mtime_ms } => (Some(body.clone()), *mtime_ms),
-    };
-
-    let baseline = rt.baseline(binding.kind, path, &binding.heading).cloned();
-    let mut imported = 0;
-    let target = match &current {
-        None => expected.body.clone(),
-        Some(body) if body.trim() == expected.body.trim() => expected.body.clone(),
-        Some(body) => {
-            let file_changed = baseline.as_ref().is_none_or(|base| base.body != *body);
-            /* [V0.11.3] 两边都改过时 **Markdown 赢**。
-            用户口径：「md 文档是第一优先级资料，sql 是第二级」。原先这里是
-            `mtime > expected.latest_update`（最后写入者胜），但两边的时基根本不是一回事：
-            `latest_update` 是应用写库的毫秒墙钟，`mtime` 取决于谁最后碰过文件——
-            Obsidian 关闭时补写、同步盘回写、甚至一次「无改动保存」都会把它推后。
-            结果就是「偶尔 SQL 反向覆盖掉用户手改的日记」，对一份声明为权威的资料不可接受。
-            只有「文件没变、SQL 变了」才导出，其余一律以文件为准。 */
-            if file_changed {
-                let old_body = baseline.as_ref().map_or("", |base| base.body.as_str());
-                let (rendered, count) =
-                    import_and_render(pool, binding, date, old_body, body).await?;
-                imported = count;
-                rendered
-            } else {
-                expected.body.clone()
-            }
-        }
-    };
-
-    let needs_write = match &section {
-        SectionState::MissingFile | SectionState::MissingHeading { .. } => {
-            !target.trim().is_empty()
-        }
-        /* 阻断级诊断已在上面 return，这里只为穷尽 match：写 false 是「宁可少写不多写」。 */
-        SectionState::Blocked { .. } => false,
-        SectionState::Present { body, .. } => body.trim_end() != target.trim_end(),
-    };
-    if needs_write {
-        crate::infra::md_diary::seed_if_missing(path, template); /* [V0.11.33] P16/P17/P18 首次写出套模板：文件已存在时它自己短路，零字节不碰 */
-        md_file::write_section(path, &binding.heading, &target)?;
-    }
-    rt.set_baseline(binding.kind, path, &binding.heading, target);
-
-    Ok(BindingOutcome {
-        exported: needs_write,
-        imported,
-        direction: if imported > 0 {
-            "import"
-        } else if needs_write {
-            "export"
-        } else {
-            "none"
-        },
-        exists: path.exists(),
-        warnings,
-    })
-}
-
-async fn render_expected(
-    pool: &SqlitePool,
-    binding: &MdSyncBinding,
-    date: chrono::NaiveDate,
-) -> AppResult<export::Exported> {
-    /* 分发在 `export::by_kind`：这里长一串 match 会越过 300 行硬约束，而种类只会更多。 */
-    export::by_kind(pool, binding.kind, date).await
-}
-
-async fn import_and_render(
-    pool: &SqlitePool,
-    binding: &MdSyncBinding,
-    date: chrono::NaiveDate,
-    old_body: &str,
-    new_body: &str,
-) -> Result<(String, u32), String> {
-    let stats = import::by_kind(pool, binding.kind, date, old_body, new_body)
-        .await
-        .map_err(|err| err.to_string())?;
-    let rendered = render_expected(pool, binding, date)
-        .await
-        .map_err(|err| err.to_string())?;
-    Ok((rendered.body, stats.total()))
 }

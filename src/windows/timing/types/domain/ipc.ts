@@ -64,7 +64,14 @@ import type {
   WorkAreaDip,
 } from './models';
 import type { PluginListResult } from './plugin';
-import type { MdSyncConfig, MdSyncKind, MdSyncReport } from './mdSync';
+import type {
+  Decision,
+  MdPendingConflict,
+  MdResolveOutcome,
+  MdSyncConfig,
+  MdSyncKind,
+  MdSyncReport,
+} from './mdSync';
 import type {
   MdBackupExport,
   MdBackupItem,
@@ -98,30 +105,15 @@ export const IPC_EVENTS = {
   openNewNote: 'app:open-new-note',
   /* [V0.4.0] Markdown 同步把文件改动写回 SQL 后广播 */
   mdSyncChanged: 'md-sync:changed',
+  /* [T03] md 覆盖提醒：检测到文件侧冲突且前台可弹窗时广播（载荷 `MdPendingConflict[]`） */
+  mdSyncDecisionRequired: 'md-sync:decision-required',
 } as const;
 
-/* ---- [P0-03] 宿主 → 分析窗的一次性落点（`open_activity_window` 的可选参数） ----
-命名口径（FUSION-ARCH-v1 §6.6）：药丸窗口 label 是 `main`，分析窗是 `patina`——与 Rust
-insight 侧的定义相反。本类型描述「分析窗该落到哪里」，不是「哪个窗口」。 */
-export interface ActivityHistoryTarget {
-  /** 本地日 `YYYY-MM-DD`（`src/lib/dateKey.ts` 的 `todayDateKey()`；禁用 UTC 截断） */
-  dateKey: string;
-  /** 可选：想在分析窗里聚焦的应用名（`History` 侧以高亮环消费，不做过滤/不滚动定位）。 */
-  focusApp?: string | null;
-}
-
-export interface PatinaOpenTarget {
-  history?: ActivityHistoryTarget; /* 历史页某天；与 overview 二选一（并存时 history 优先） */
-  overview?: boolean; /* `true` = 分析窗总览页（P1-02：摘要面板页脚「在分析窗看总览」） */
-  /* [V0.12.1][依赖 T03] `true` = 分析窗设置页。三键互斥，判序 history > settings > overview；
-     Rust 侧 `PatinaOpenTarget` 是 deny_unknown_fields，T03 同批补这个字段之前会被拒收。 */
-  settings?: boolean;
-}
-
-export interface ActivityOpenWindowParams {
-  /** 省略 = 只把分析窗叫到前台（V0.12.0 原行为） */
-  target?: PatinaOpenTarget | null;
-}
+/* [P0-03] 分析窗的一次性落点（`ActivityHistoryTarget` / `PatinaOpenTarget` /
+   `ActivityOpenWindowParams`）搬到 `windowTargets.ts`：本文件撞 300 行，
+   而它们与 `IpcApi` 的 94 个方法没有关系，只是被同一条命令用到。 */
+export type { ActivityHistoryTarget, ActivityOpenWindowParams, PatinaOpenTarget } from './windowTargets';
+import type { ActivityOpenWindowParams } from './windowTargets';
 
 /** 命令 -> Promise<返回值> 映射。实现侧不得在此签名之外新增方法（规格即契约）。 */
 export interface IpcApi {
@@ -249,6 +241,10 @@ export interface IpcApi {
    */
   mdSyncSave(params: { config: MdSyncConfig; secret?: string | null }): Promise<MdSyncViewCloud>;
   mdSyncRun(): Promise<MdSyncReport>;
+  /** [T03] 列出挂起 / 待裁决的 md 冲突（弹窗数据源 + 设置页「有 N 处待确认」入口） */
+  mdSyncDecisions(): Promise<MdPendingConflict[]>;
+  /** [T03] 执行一次裁决（A「覆盖 Timing」/ B「保留 Timing」/ C「暂不处理」） */
+  mdSyncResolve(params: { id: string; decision: Decision }): Promise<MdResolveOutcome>;
   mdSyncOpen(params: { kind: MdSyncKind }): Promise<void>;
   /** [V0.11.13] 测试云端连接；`secret` 缺省 = 用已存密文，空串 = 明确「没填密码」 */
   mdSyncTest(params: { config: MdSyncConfig; secret?: string | null }): Promise<MdSyncTestResult>;

@@ -69,6 +69,7 @@ mod qa_t01_sync_attack;
    BOM+CRLF 真实文件走 FileWatch::probe。本轮两条变异自检的靶子都在这里。 */
 #[cfg(desktop)]
 mod qa_batch1_edges;
+mod md_decision_audit;
 mod migration;
 mod migration_usage_span;
 mod migration_v2;

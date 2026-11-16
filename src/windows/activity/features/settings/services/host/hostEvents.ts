@@ -37,3 +37,7 @@ export function useHostEvent<T>(event: string, handler: (payload: T) => void): v
 
 /** `md-sync:changed`：宿主同步完成后广播（载荷 `MdSyncReport`）。 */
 export const MD_SYNC_CHANGED_EVENT = "md-sync:changed";
+
+/** [T03] `md-sync:decision-required`：检测到文件侧冲突且前台可弹窗时广播
+ *  （载荷 `MdPendingConflict[]`）。设置页据此弹「覆盖 / 保留 / 暂不处理」裁决窗。 */
+export const MD_SYNC_DECISION_REQUIRED_EVENT = "md-sync:decision-required";

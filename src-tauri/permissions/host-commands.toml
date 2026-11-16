@@ -55,8 +55,11 @@ commands.allow = [
   "md_backup_restore",
   "md_saf_pick",
   "md_saf_status",
+  # [T03] md 覆盖提醒：列待裁决冲突 / 执行一次裁决
+  "md_sync_decisions",
   "md_sync_get",
   "md_sync_open",
+  "md_sync_resolve",
   "md_sync_run",
   "md_sync_save",
   "md_sync_test",

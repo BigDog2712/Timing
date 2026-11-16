@@ -44,6 +44,7 @@ use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncReport;
 use crate::models::md_sync_channel::MdSyncCloudChannel;
 use crate::platform::clock::now_ms;
+use crate::services::md_sync::decision::ConflictMode;
 use crate::services::md_sync::mirror;
 /* ⑤ 只在桌面存在（见 `run` 里那句 cfg 的说明），手机上这个 import 会变成死码。 */
 #[cfg(not(mobile))]
@@ -58,6 +59,8 @@ pub async fn run(
     channel: &MdSyncCloudChannel,
     today: &str,
     stream_enabled: bool,
+    #[cfg_attr(mobile, allow(unused_variables))]
+    mode: ConflictMode,
 ) -> AppResult<MdSyncReport> {
     let now = now_ms();
     let mut report = MdSyncReport::new(now);
@@ -186,7 +189,7 @@ pub async fn run(
     ⑥ 无条件保留：手机上它是唯一的一轮，云端那份内容全靠它。 */
     #[cfg(not(mobile))]
     {
-        let local = md_sync::run(pool).await?;
+        let local = md_sync::run_with(pool, mode).await?;
         absorb(&mut report, local);
     }
     let cloud_report = mirror::run_in(pool, &cloud_root.to_string_lossy()).await?;

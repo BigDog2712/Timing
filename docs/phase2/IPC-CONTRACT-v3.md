@@ -18,8 +18,8 @@ v2 把「命令」写得极细（60 个函数、15 个错误码），而**事件
 
 | 位置 | 承担什么 |
 | --- | --- |
-| `src-tauri/src/app/events.rs` | 11 个 `pub const` 事件名 + 5 个 emit 辅助函数 |
-| `src/types/domain/ipc.ts` 的 `IPC_EVENTS` | 11 个前端键（V0.3.3 起**零例外**，见 §3） |
+| `src-tauri/src/app/events.rs` | 12 个 `pub const` 事件名 + 6 个 emit 辅助函数 |
+| `src/windows/timing/types/domain/ipc.ts` 的 `IPC_EVENTS` | 12 个前端键（V0.3.3 起**零例外**，见 §3） |
 | `scripts/check-contract.mjs` | 断言两侧集合相等、字面量归零、mock 覆盖 65/65 |
 
 事件名**只能**来自上述常量。后端 `.emit("字面量", ...)` 会被门禁直接判红。
@@ -41,8 +41,9 @@ v2 把「命令」写得极细（60 个函数、15 个错误码），而**事件
 | 9 | `app:open-new-item` | 无 | `app::tray`（「新建事项…」） | main | `uiStore.openPanel('create')` |
 | 10 | `todo-nudge` | `TodoNudge { todoId, title, remindAt, stage }` | `jobs::nudge`（T-15 轻提醒 / T-5 自动开始询问）→ `emit_todo_nudge` | main | `todoNudgeActions.onNudge`（同一张提醒浮出卡，按 `stage` 换正文与动作，ADR-030） |
 | 11 | `md-sync:changed` | `MdSyncReport { at, imported, exported, kinds, errors }` | `jobs::md_sync`（轮询导入写回后）→ `emit_md_sync_changed` | main / todos / note | 按 `kinds` 刷新：`useAppBootstrap`（事项 + 计时）、`useTodayRecords` / `useRecordsData`（记录）、`TodosWindow`（事项 + 待办）、`NoteWindow`（当前便利贴，有未落盘编辑时不覆盖） |
+| 12 | `md-sync:decision-required` | `MdPendingConflict[] { id, kind, heading, path, date, state }` | `commands::md_sync_cmd::announce_decisions`（前台同步跑完后 `promote_all()` + 广播；空列表不发） | 分析窗（设置页 `MdSyncDecisionDialog`） | 弹「覆盖 Timing / 保留 Timing / 暂不处理」裁决窗；`pending_decision` 的行不弹（要等下一次前台同步提升） |
 
-emit 点合计 **11** 处（门禁输出 `emit 点 11` 即此数）。
+emit 点合计 **19** 处（门禁输出 `emit 点 19` 即此数；本行原来写 11，是 emit 辅助函数而不是 emit 调用点的数，V0.12.2 起按门禁实际口径订正）。
 
 > **V0.4.0 增量**：`md-sync:changed` 只在**真的从 Markdown 导入了数据**时发（`MdSyncReport.touched()`），
 > 空轮询不发，避免每 2 秒打扰前端。payload 带 `kinds`，订阅方只刷新受影响的数据（ADR-033）。

@@ -47,7 +47,12 @@ pub(crate) async fn run_before_quit(pool: &SqlitePool) -> bool {
             return false;
         }
     }
-    match services::md_cloud::round(pool).await {
+    match services::md_cloud::round_with(
+        pool,
+        services::md_sync::decision::ConflictMode::Pending,
+    )
+    .await
+    {
         Ok(outcome) => crate::log_info!(
             "quit md sync done: 导入 {} 条 · 导出 {} 处",
             outcome.report.imported,

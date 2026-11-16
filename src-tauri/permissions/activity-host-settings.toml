@@ -44,6 +44,9 @@ commands.allow = [
   "md_sync_run",
   "md_sync_test",
   "md_sync_open",
+  # [T03] md 覆盖提醒：列待裁决冲突 / 执行一次裁决
+  "md_sync_decisions",
+  "md_sync_resolve",
   "md_backup_list",
   "md_backup_restore",
   "md_backup_open",

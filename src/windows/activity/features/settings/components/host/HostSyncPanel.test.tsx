@@ -24,6 +24,8 @@ const g = vi.hoisted(() => ({
   mdSyncRun: vi.fn(),
   mdSyncOpen: vi.fn(),
   mdSyncTest: vi.fn(),
+  mdSyncDecisions: vi.fn(),
+  mdSyncResolve: vi.fn(),
   mdBackupList: vi.fn(),
   mdBackupOpen: vi.fn(),
   mdBackupRestore: vi.fn(),
@@ -45,52 +47,17 @@ vi.mock('../../../../platform/desktop/hostSyncGateway', () => ({ ...g }));
    mock 只会挂在一个没人 import 的模块上，真 hook 照跑并往 stderr 喷一片 subscribe 失败。 */
 vi.mock('../../services/host/hostEvents', () => ({
   MD_SYNC_CHANGED_EVENT: 'md-sync:changed',
+  MD_SYNC_DECISION_REQUIRED_EVENT: 'md-sync:decision-required',
   useHostEvent: () => undefined,
 }));
 
 import { HostSyncPanel } from './HostSyncPanel';
 import { AUTO_COPY } from '../../services/host/mdSyncCopy';
-import type { MdSyncViewCloud } from '../../services/host/hostTypes';
 import { useMdSyncStore } from '../../services/host/mdSyncRuntimeStore';
 
-const BINDING = (kind: 'timers' | 'notes' | 'todos') => ({
-  kind, enabled: true, root: '%APP_DIR%\\md', file: '{today}.md', heading: 'Timing',
-});
-
-/** `md_sync_get` 的最小合法视图（字段严格照 `MdSyncViewCloud`，缺一个就是渲染期崩） */
-function view(): MdSyncViewCloud {
-  return {
-    today: '2026-11-11',
-    config: {
-      enabled: true,
-      pollSecs: 180,
-      bindings: [BINDING('timers'), BINDING('notes'), BINDING('todos')],
-      cloud: null,
-      cloudFolder: null,
-      cloudWebdav: null,
-      diaryTemplate: '',
-    },
-    status: {
-      lastSyncAt: null,
-      lastError: null,
-      bindings: [
-        { kind: 'timers', path: 'C:\\md\\2026-11-11.md', exists: true, lastError: null, lastSyncAt: null, lastDirection: null },
-        { kind: 'notes', path: 'C:\\md\\notes\\2026-11-11.md', exists: true, lastError: null, lastSyncAt: null, lastDirection: null },
-        { kind: 'todos', path: 'C:\\md\\todos\\2026-11-11.md', exists: true, lastError: null, lastSyncAt: null, lastDirection: null },
-      ],
-    },
-    cloud: {
-      enabled: false, mode: 'localfolder', hasSecret: false,
-      todayPushed: false, pendingDates: [], lastError: null,
-    },
-  };
-}
-
-const DATA_ROOT = {
-  current: '<exe>\\data', defaultPath: '<exe>\\data', isDefault: true, writable: true,
-  writableError: null, pending: null, previous: null, sizeBytes: 0,
-  entries: [], affected: [], pluginsInDataRoot: false,
-};
+/* 夹具（`BINDING` / `view()` / `DATA_ROOT`）搬到 `hostSyncPanelFixture.ts`：
+   本文件撞 300 行，夹具与用例比例失衡；新加一条同步卡用例时也不必再抄一份视图。 */
+import { DATA_ROOT, view } from './hostSyncPanelFixture';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -143,6 +110,7 @@ beforeEach(() => {
   useMdSyncStore.setState({ view: null, loaded: false, loading: false, saving: false, error: null });
   g.mdSyncGet.mockResolvedValue(view());
   g.mdSyncSave.mockResolvedValue(view());
+  g.mdSyncDecisions.mockResolvedValue([]);
   g.mdBackupList.mockResolvedValue([]);
   g.dataRootGet.mockResolvedValue(DATA_ROOT);
   container = document.createElement('div');

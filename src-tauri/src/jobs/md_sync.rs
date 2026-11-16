@@ -240,7 +240,12 @@ pub fn spawn_md_sync_watcher(app: AppHandle) {
                    `SEQ` 没推进 → 200ms 后下一圈自然还会看到「还欠一轮」。 */
                 if let Some(_gate) = crate::app::tray_sync::try_acquire() {
                     crate::log_info!("md sync wake: reason={}", reason.label());
-                    match md_sync::run(&pool).await {
+                    match md_sync::run_with(
+                        &pool,
+                        crate::services::md_sync::decision::ConflictMode::Pending,
+                    )
+                    .await
+                    {
                         Ok(report) => {
                             if report.touched() {
                                 events::emit_md_sync_changed(&app, &report);

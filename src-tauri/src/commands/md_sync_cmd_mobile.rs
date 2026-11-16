@@ -23,10 +23,11 @@ use crate::app::md_sync_mobile;
 use crate::commands::md_credential;
 use crate::error::{AppError, AppResult};
 use crate::infra::secret::{self as keychain, KEY_WEBDAV};
-use crate::models::md_sync::{MdSyncConfig, MdSyncKind, MdSyncReport};
+use crate::models::md_sync::{Decision, MdSyncConfig, MdSyncKind, MdSyncReport};
 use crate::models::md_sync_cloud::{
     MdBackupItem, MdBackupRestoreResult, MdSyncTestResult, MdSyncViewCloud,
 };
+use crate::services::md_sync::decision::{self, PendingConflict, ResolveOutcome};
 use crate::services::{md_backup, md_cloud, md_sync};
 use crate::state::AppState;
 
@@ -34,6 +35,12 @@ fn announce(app: &AppHandle, report: &MdSyncReport) {
     if report.touched() {
         events::emit_md_sync_changed(app, report);
     }
+}
+
+/// 前台同步后：把后台挂起的冲突提升为待裁决，并广播弹窗事件。
+fn announce_decisions(app: &AppHandle) {
+    decision::promote_all();
+    events::emit_md_sync_decision_required(app, &decision::awaiting());
 }
 
 /// 手机端能恢复哪些备份：判据在 `services::md_backup::restorable_on_mobile`
@@ -67,6 +74,7 @@ pub async fn md_sync_save(
             announce(&app, &report);
         }
     }
+    announce_decisions(&app);
     md_cloud::view(&pool).await
 }
 
@@ -86,7 +94,24 @@ pub async fn md_sync_run(app: AppHandle) -> AppResult<MdSyncReport> {
     }
     let report = md_cloud::round_manual(&pool).await?.report;
     announce(&app, &report);
+    announce_decisions(&app);
     Ok(report)
+}
+
+/// 列出挂起 / 待裁决的 md 冲突（弹窗数据源 + 设置页「有 N 处待确认」入口）。
+#[tauri::command]
+pub async fn md_sync_decisions() -> AppResult<Vec<PendingConflict>> {
+    Ok(decision::pending())
+}
+
+/// 执行一次裁决（A「覆盖 Timing」/ B「保留 Timing」/ C「暂不处理」），记审计并落实动作。
+#[tauri::command]
+pub async fn md_sync_resolve(
+    app: AppHandle,
+    id: String,
+    decision: Decision,
+) -> AppResult<ResolveOutcome> {
+    decision::resolve(&app.state::<AppState>().pool, &id, decision).await
 }
 
 /// 打开今日目标文件：手机上交给系统（`ACTION_VIEW` + SAF 授权），由用户装着的

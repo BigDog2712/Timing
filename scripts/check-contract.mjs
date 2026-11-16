@@ -258,7 +258,7 @@ const { values: emitted, literals } = emitSites(byName);
  * `crate::models::activity::events::TOOL_PRESENTATION_CHANGED`：
  * `insightRustEvents()` 只解析 `pub const`，别名解析不出来，于是这 7 个发射点
  * 此前对契约不可见。**不是新增事件，只是把原本就存在的发射点重新纳入统计。** */
-const EXPECTED_EMIT_SITES = 18;
+const EXPECTED_EMIT_SITES = 19;
 if (emitted.size !== EXPECTED_EMIT_SITES) {
   failures.push({
     label: `emit 点 ${emitted.size} 个，期望 ${EXPECTED_EMIT_SITES} 个`,

@@ -39,6 +39,12 @@ pub mod round_folder;
 pub mod round_push;
 pub mod round_webdav;
 mod state;
+
+mod util;
+
+/* 判据与纯函数（`usable_*` / `absorb` / `today` / `should_autosync`）在 `util.rs`：
+   它们的调用点遍布托盘标签与调度链，这里原样导出，路径不变。 */
+pub use util::*;
 /* [V0.11.21] 三档的纯判定从 `jobs/md_cloud`（桌面独占）搬到这里：手机端同一条节奏
    也要跑，而手机端引用不到桌面模块。判定不碰 IO / Tauri，两端都编。 */
 pub mod tier;
@@ -46,7 +52,6 @@ pub mod tier;
    `pub(crate)` 是为了让 `tests/md_webdav_text.rs` 能直接断言 `fail_text_at` 的关卡分支。 */
 pub(crate) mod text;
 
-use chrono::Local;
 use sqlx::SqlitePool;
 
 #[cfg(mobile)]
@@ -57,10 +62,10 @@ use crate::models::md_sync::MdSyncReport;
 use crate::models::md_sync_cloud::{
     MdSyncCloudStatus, MdSyncTestResult, MdSyncViewCloud,
 };
-use crate::models::md_sync_channel::MdSyncCloudChannel;
 use crate::models::md_sync_config::MdSyncConfig;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_sync;
+use crate::services::md_sync::decision::ConflictMode;
 
 /// 一轮云端同步的结果。`pending` 只对 `Webdav` 有意义（本地目录通道写进去就算同步完了）。
 pub struct CloudRoundOutcome {
@@ -76,12 +81,22 @@ pub struct CloudRoundOutcome {
 #[cfg(mobile)]
 const NO_LOCAL_FOLDER_ON_MOBILE: &str = "手机端不支持「本地同步」通路：请把云端同步改成 WebDAV（本地目录要靠电脑上的网盘客户端同步，手机上写不进去）";
 
-/// 一轮完整同步（含 Obsidian 落点）。两条通路都不可用时与 `md_sync::run` 等价。
+/// 一轮完整同步（含 Obsidian 落点）。两条通路都不可用时与 `md_sync::run_with` 等价（模式由调用方给）。
+///
+/// 前台入口（保存 / 手动 / 托盘）：Obsidian 落点冲突走 `Awaiting`（能弹窗）。
+pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
+    round_with(pool, ConflictMode::Awaiting).await
+}
+
+/// 由调用方指定 Obsidian 落点冲突处理模式的完整一轮（后台轮用 `Pending`）。
 ///
 /// [V0.11.26] 双通路：folder 在前（零网络、快、失败面小），webdav 在后；
-/// 各自独立判可用、独立记错（`absorb` 合报告）。Obsidian 半轮（`md_sync::run`）
+/// 各自独立判可用、独立记错（`absorb` 合报告）。Obsidian 半轮（`md_sync::run_with`）
 /// 在两条通路各自的 `round_*::run` 内部各跑一次——与设计 §1.3 的分派图一致。
-pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
+pub async fn round_with(
+    pool: &SqlitePool,
+    mode: ConflictMode,
+) -> AppResult<CloudRoundOutcome> {
     let config = md_sync::config::load(pool).await?;
     /* 手机端不支持 folder 通路（[V0.11.14] 修 O12）。那条路假设用户电脑上有个网盘
     客户端在同步一个真实目录，手机上既没有那个目录也没有客户端。读时物化会把老
@@ -102,7 +117,7 @@ pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
     if folder.is_none() && webdav.is_none() {
         /* 老配置这条路**连 pending 表都不读**：它没有云端，`pending` 填空是事实。 */
         let today = today();
-        let report = md_sync::run(pool).await?;
+        let report = md_sync::run_with(pool, mode).await?;
         return Ok(CloudRoundOutcome {
             report,
             pending: Vec::new(),
@@ -113,12 +128,12 @@ pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
     let mut report = MdSyncReport::new(crate::platform::clock::now_ms());
     if let Some(channel) = folder {
         let part =
-            round_folder::run(pool, channel, &config.bindings, &today, config.stream_enabled)
+            round_folder::run(pool, channel, &config.bindings, &today, config.stream_enabled, mode)
                 .await?;
         absorb(&mut report, part);
     }
     if let Some(channel) = webdav {
-        let part = round_webdav::run(pool, channel, &today, config.stream_enabled).await?;
+        let part = round_webdav::run(pool, channel, &today, config.stream_enabled, mode).await?;
         absorb(&mut report, part);
     }
     let pending = md_cloud_pending::pending_dates(pool, PurgeChannel::Webdav)
@@ -147,15 +162,28 @@ pub async fn round_channel(
     match channel {
         PurgeChannel::Folder => {
             if let Some(ch) = usable_folder(&config) {
-                let part =
-                    round_folder::run(pool, ch, &config.bindings, &today, config.stream_enabled)
-                        .await?;
+                let part = round_folder::run(
+                    pool,
+                    ch,
+                    &config.bindings,
+                    &today,
+                    config.stream_enabled,
+                    ConflictMode::Pending,
+                )
+                .await?;
                 absorb(&mut report, part);
             }
         }
         PurgeChannel::Webdav => {
             if let Some(ch) = usable_webdav(&config) {
-                let part = round_webdav::run(pool, ch, &today, config.stream_enabled).await?;
+                let part = round_webdav::run(
+                    pool,
+                    ch,
+                    &today,
+                    config.stream_enabled,
+                    ConflictMode::Pending,
+                )
+                .await?;
                 absorb(&mut report, part);
                 pending = md_cloud_pending::pending_dates(pool, channel)
                     .await
@@ -194,7 +222,7 @@ pub async fn tick(pool: &SqlitePool) -> AppResult<Option<MdSyncReport>> {
     let before = md_cloud_pending::pending_dates(pool, PurgeChannel::Webdav)
         .await
         .unwrap_or_default();
-    let outcome = round(pool).await?;
+    let outcome = round_with(pool, ConflictMode::Pending).await?;
     let changed =
         outcome.report.touched() || !outcome.report.errors.is_empty() || outcome.pending != before;
     Ok(changed.then_some(outcome.report))
@@ -231,54 +259,4 @@ pub async fn test_connection(
     secret: Option<&str>,
 ) -> AppResult<MdSyncTestResult> {
     probe::test_connection(pool, config, secret).await
-}
-
-/// 今天的本地日期。与文件模板的 `{date}`、`md_cloud_pending.date` **同源**：出现 UTC
-/// 日期会让「今天」在晚上 8 点变成明天。
-pub(crate) fn today() -> String {
-    Local::now().format("%Y-%m-%d").to_string()
-}
-
-/// 把两轮 `sync_all` 的报告并进一份。`at` 保留本轮起点：一份报告只有一个「发生在」。
-pub(crate) fn absorb(target: &mut MdSyncReport, extra: MdSyncReport) {
-    target.exported += extra.exported;
-    target.imported += extra.imported;
-    for kind in extra.kinds {
-        if !target.kinds.contains(&kind) {
-            target.kinds.push(kind);
-        }
-    }
-    target.errors.extend(extra.errors);
-}
-
-/// 建落点目录失败的文案：**必须带路径**（[V0.11.26]）。
-pub fn root_dir_error(root: &std::path::Path, err: &std::io::Error) -> String {
-    format!("建不了云端落点目录 {}：{err}", root.display())
-}
-
-/// folder 通路是否「开了且填全了」。托盘标签 / 调度链 / `round` / `plan_of` 共用——
-/// 写第二份必然漂移。总开关**不在**这里判（调用方按自己的语义叠加，与 v0.11.18 的
-/// `usable` 口径一致）。
-pub(crate) fn usable_folder(config: &MdSyncConfig) -> Option<&MdSyncCloudChannel> {
-    config
-        .cloud_folder
-        .as_ref()
-        .filter(|channel| channel.is_usable_folder())
-}
-
-/// webdav 通路是否「开了且填全了」。与 `usable_folder` 同一口径。
-pub(crate) fn usable_webdav(config: &MdSyncConfig) -> Option<&MdSyncCloudChannel> {
-    config
-        .cloud_webdav
-        .as_ref()
-        .filter(|channel| channel.is_usable_webdav())
-}
-
-/// 保存之后要不要顺手跑一轮同步（手机端 `md_sync_save` 的判据，[V0.11.14] 修 N2）。
-///
-/// 1. 总开关关着 → 不跑（`sync_once` 对关闭状态只会返回一份空报告）；
-/// 2. **云端可用 → 跑，不问 SAF 授权**；
-/// 3. 云端不可用 → 才看 SAF：没授权的那一轮只可能回「同步目录未授权」。
-pub fn should_autosync(enabled: bool, cloud_usable: bool, saf_granted: bool) -> bool {
-    enabled && (cloud_usable || saf_granted)
 }

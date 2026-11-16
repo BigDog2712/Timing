@@ -37,6 +37,7 @@ use crate::models::md_sync::{MdSyncBinding, MdSyncReport};
 use crate::models::md_sync_channel::MdSyncCloudChannel;
 use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending;
+use crate::services::md_sync::decision::ConflictMode;
 use crate::services::md_sync::{self, mirror};
 
 /// 一轮：Obsidian 落点 → 本地镜像落点（同一个目录，写进去即同步完）。
@@ -52,6 +53,7 @@ pub async fn run(
     bindings: &[MdSyncBinding],
     today: &str,
     stream_enabled: bool,
+    mode: ConflictMode,
 ) -> AppResult<MdSyncReport> {
     let mut report = MdSyncReport::new(now_ms());
     let root: PathBuf = match channel.resolve_root_folder() {
@@ -110,7 +112,7 @@ pub async fn run(
 
     /* 顺序不可换：Obsidian 那份的用户手改先入库，云端这份再从「已含手改的 SQL」渲染
     出去（设计 §2.1）。反过来会让写出去的副本缺本轮的手改。 */
-    let local = md_sync::run(pool).await?;
+    let local = md_sync::run_with(pool, mode).await?;
     absorb(&mut report, local);
 
     let cloud_report = mirror::run_in(pool, &root.to_string_lossy()).await?;

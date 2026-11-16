@@ -1,0 +1,77 @@
+/* =============================================================================
+ * Timing — settings-sync-decision.css（设置 · 同步 · md 覆盖提醒弹窗，T03）
+ * -----------------------------------------------------------------------------
+ * 为什么单独一份：`settings-sync.css` 281 行，加进来就撞 300 行门禁
+ * （同一页的 `settings-data-slim.css` 当初也是为这个拆的）。
+ *
+ * 消费规则：只引用 var(--*)，无裸色值。这些变量由 `settings-bits.css` 的
+ * `.settings-host-sync` 作用域注入（弹窗挂在那个容器里），所以此处不重复定义。
+ *
+ * 一行 = 一个冲突：左边「哪个落点 / 哪个标题 / 哪个文件」，右边三个按钮。
+ * 三个按钮的先后就是语序 A→B→C，`覆盖 Timing`（主色）在最左，因为它是
+ * 「让文件内容进库」这条最短路径；`暂不处理`（最右）不写任何一端。
+ * ========================================================================== */
+
+.md-sync-decision-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: min(52vh, 420px);
+  overflow-y: auto;
+}
+
+.md-sync-decision-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+/* 三行元信息在窄窗里允许折行；`min-width: 0` 是 `text-overflow` 生效的前置条件，
+   缺了它长路径会把整行撑宽、把按钮挤出可视区。 */
+.md-sync-decision-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.md-sync-decision-kind {
+  font-size: var(--text-cap);
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+.md-sync-decision-heading {
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+
+/* 路径可能很长（`\\?\C:\…`）：单行省略 + title 兜底，绝不让它把布局顶开。 */
+.md-sync-decision-path {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.md-sync-decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* 失败口不润色：原文 + 错误码直接铺在这里，允许长词断行。 */
+.md-sync-decision-error {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-xs);
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}

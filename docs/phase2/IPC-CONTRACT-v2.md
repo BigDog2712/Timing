@@ -202,6 +202,8 @@
 | `md_sync_save` | `{ config: MdSyncConfig, secret?: string \| null }` | `MdSyncViewCloud` | `mdSyncSave` |
 | `md_sync_run` | `{}` | `MdSyncReport` | `mdSyncRun` |
 | `md_sync_open` | `{ kind: MdSyncKind }` | `void` | `mdSyncOpen` |
+| `md_sync_decisions` | `{}` | `MdPendingConflict[]` | `mdSyncDecisions`（[T03] 待裁决冲突；`state` 为 `awaiting_decision` 或 `pending_decision`） |
+| `md_sync_resolve` | `{ id: string, decision: Decision }` | `MdResolveOutcome` | `mdSyncResolve`（[T03] 一次裁决；`decision` 三值见 §12.14） |
 | `md_sync_test` | `{ config: MdSyncConfig, secret?: string \| null }` | `MdSyncTestResult` | `mdSyncTest` |
 | `md_backup_list` | `{}` | `MdBackupItem[]` | `mdBackupList` |
 | `md_backup_restore` | `{ name: string, target?: string \| null }` | `MdBackupRestoreResult` | `mdBackupRestore` |
@@ -562,6 +564,24 @@
 #### `md_sync_open`
 - 入参：`{ kind: MdSyncKind }`，出参：`void`
 - 语义：先同步一轮（补齐标题区块），再打开该 kind 的**今日文件**；文件仍不存在 → `IO_ERROR`。`kind` 未配置 → `MD_SYNC_CONFIG_INVALID`。
+- 错误码：`MD_SYNC_CONFIG_INVALID` / `IO_ERROR` / `DB_ERROR`
+
+#### `md_sync_decisions`（[T03]）
+- 入参：`{}`，出参：`MdPendingConflict[]`（`{ id, kind, heading, path, date, state }`）
+- 语义：列出**进程内挂起**的 md 冲突。`state` 只有两个值：`awaiting_decision`（前台已弹窗，等用户选）
+  与 `pending_decision`（后台轮挂起，还没人问过）。注册表不落库——进程重启后基线重建，挂起冲突自然失效，
+  落库只会留下点不动的死条目（审计表 `md_decision_audit` 才是历史）。
+- `id` = `binding.key()`（`kind|root|file|heading`），同进程内唯一，前端原样回传给 `md_sync_resolve`。
+- 错误码：无（纯内存读，不抛）
+
+#### `md_sync_resolve`（[T03]）
+- 入参：`{ id: string, decision: Decision }`，出参：`MdResolveOutcome`（`{ imported, exported, direction }`）
+- 语义：执行一次裁决。`decision` 三值：`overwrite_timing`（A，md → SQL）/ `keep_timing`（B，SQL → md）/
+  `deferred`（C，回 `pending_decision`，**不改写任何一端**）。
+- **先写审计再动手**：`md_decision_audit` 落一行（`direction` 存上面的词汇值），审计失败则整条裁决中止
+  ——不留「文件改了但没记录」的状态。B 路重渲染后**当场更新基线**，否则下一轮仍判 `file_changed`，
+  用户刚裁完的冲突会立刻再弹一次。
+- `id` 不存在（已裁决 / 进程重启）→ `MD_SYNC_CONFIG_INVALID`（「该冲突已处理或不再存在」），**不静默返 ok**。
 - 错误码：`MD_SYNC_CONFIG_INVALID` / `IO_ERROR` / `DB_ERROR`
 
 #### `md_sync_test`（[V0.11.13]）
@@ -1423,3 +1443,30 @@ Kotlin 自己读那个文件、写进用户选中的 `content://`。过桥要 ba
   （V0.3.3 / ADR-022）。
 - 不引入任何网络类权限（无 HTTP）；CSP 维持 `default-src 'self'`（Spec §10）。
 - 托盘（`tauri::tray`）走 Rust 侧，无需前端 capability。
+
+### 12.21 [0.14 / T03] 契约增量：md 覆盖提醒（待裁决冲突 + 一次裁决）
+
+> **契约四个数**：命令 **92 → 94**（+`md_sync_decisions`、+`md_sync_resolve`）/ 错误码 **19 不变** /
+> 事件 **11 → 12**（+`md-sync:decision-required`）/ emit 点 **18 → 19**。
+> 三个数都由 `npm run check:contract` 自己算出来（`OK — 命令：Rust 94 / IpcApi 94 / ipc.ts 94 / mock 94；
+> 事件：后端 12 / 前端 12 / emit 点 19`），本行只是把它的输出抄下来。
+
+**为什么改**：`file_changed` 原来**静默**按「Markdown 赢」处理。对云端内部副本这是对的（那就是我们的东西），
+但对**用户自己的 md 文件**，等于用户手改的一段被无声覆盖，而界面上没有任何痕迹。
+T03 把它改成「先问一句」：前台弹窗（`awaiting_decision`）、后台挂起（`pending_decision`），
+云端落点仍自动合并（`auto_merge`）——三种模式由调用方**显式**传入，`md_sync::run_with(pool, mode)` 没有默认值。
+
+**新增 DTO**（`src/windows/shared/dto/hostTypes.ts` ↔ `models/md_sync.rs` / `services/md_sync/decision.rs`）：
+
+| 类型 | 字段 | 一致性 |
+|---|---|---|
+| `Decision` | `overwrite_timing` / `keep_timing` / `deferred` | Rust `Decision` 的 `as_str()` 逐字相同（判据 `t02`） |
+| `ConflictState` | `awaiting_decision` / `pending_decision` | Rust `#[serde(rename_all = "snake_case")]`（判据 `t03`） |
+| `MdPendingConflict` | `{ id, kind, heading, path, date, state }` | 前端 `MdPendingConflict` |
+| `MdResolveOutcome` | `{ imported: number, exported: boolean, direction: string }` | 同上 |
+
+**新增事件** `md-sync:decision-required`（载荷 `MdPendingConflict[]`，订阅方 = 分析窗设置页）：
+前台同步（保存 / 手动同步）跑完后 `promote_all()` 把后台挂起的提升为待裁决，再广播。空列表**不发**。
+
+**ACL**：两条命令同时进 `host-commands.toml` 与 `permissions/activity-host-settings.toml`
+（弹窗在分析窗里发起；药丸窗不挂这条链路）。

@@ -123,3 +123,30 @@ export interface MdSyncReport {
 
 /** 事件载荷别名（语义更清楚） */
 export type MdSyncChangedPayload = MdSyncReport;
+
+/** md 覆盖提醒的裁决方向（A「覆盖 Timing」/ B「保留 Timing」/ C「暂不处理」）。
+ * 与 Rust `models/md_sync.rs::Decision`（serde snake_case）逐字对应。 */
+export type Decision = 'overwrite_timing' | 'keep_timing' | 'deferred';
+
+/** 冲突裁决状态。与 Rust `services/md_sync/decision.rs::ConflictState` 逐字对应。 */
+export type ConflictState = 'awaiting_decision' | 'pending_decision';
+
+/** 一个待裁决冲突（`md_sync_decisions` 返回 / `md-sync:decision-required` 载荷行）。 */
+export interface MdPendingConflict {
+  /** 稳定 id（进程内唯一）：`MdSyncBinding::key()`（kind|root|file|heading）。 */
+  id: string;
+  kind: MdSyncKind;
+  heading: string;
+  /** 解析后的文件路径（展示用）。 */
+  path: string;
+  /** 本地日 `YYYY-MM-DD`。 */
+  date: string;
+  state: ConflictState;
+}
+
+/** `md_sync_resolve` 的回执。 */
+export interface MdResolveOutcome {
+  imported: number;
+  exported: boolean;
+  direction: string;
+}

@@ -82,6 +82,29 @@ export interface MdSyncReport {
   errors: string[];
 }
 
+/** md 覆盖提醒的裁决方向（A/B/C）；与 `models/md_sync.rs::Decision` 逐字对应。 */
+export type Decision = 'overwrite_timing' | 'keep_timing' | 'deferred';
+
+/** 冲突裁决状态；与 `services/md_sync/decision.rs::ConflictState` 逐字对应。 */
+export type ConflictState = 'awaiting_decision' | 'pending_decision';
+
+/** 一个待裁决冲突（`md_sync_decisions` / `md-sync:decision-required` 载荷行）。 */
+export interface MdPendingConflict {
+  id: string;
+  kind: MdSyncKind;
+  heading: string;
+  path: string;
+  date: string;
+  state: ConflictState;
+}
+
+/** `md_sync_resolve` 的回执。 */
+export interface MdResolveOutcome {
+  imported: number;
+  exported: boolean;
+  direction: string;
+}
+
 /* ---- 云端第二落点（models/md_sync_cloud.rs） ---- */
 export type CloudMode = 'localfolder' | 'webdav';
 export type CloudSchedule = 'off' | 'interval' | 'smart';
