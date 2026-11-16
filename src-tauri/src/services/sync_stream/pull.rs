@@ -50,16 +50,37 @@ pub async fn pull_segments(
             match transport.get(&rel).await {
                 Ok(Some(bytes)) => {
                     summary.segments += 1;
-                    match decode_segment(&bytes) {
-                        Ok(ops) => {
+                    /* 解码 / 折叠失败**一律不推进游标**，直接结束这台设备的本轮。
+                       一旦把 `max_seq` 推过去，这一段里的事件就再也不会被重拉：对端会话
+                       永久缺一条 `stop`，而本地表现只是「少了几条记录」——没有任何报错。
+                       设计文档 §4.4「永不自动丢弃」落到事件流这条路径，就是这一个 `break`。
+                       重复拉同一分段由 `timer_ops.uid` 唯一索引兜住幂等，所以「原地重试」
+                       不会产生双份数据。 */
+                    let ops = match decode_segment(&bytes) {
+                        Ok(ops) => ops,
+                        Err(err) => {
+                            summary.errors.push(format!(
+                                "分段 {rel} 解析失败（{err}）；游标停在 seq={last_seq}，下一轮重试，不会跳过"
+                            ));
+                            crate::log_warn!("sync stream pull: bad segment {rel}: {err}");
+                            break;
+                        }
+                    };
+                    match apply_and_fold(pool, &ops).await {
+                        Ok(outcome) => {
                             summary.events += ops.len();
-                            let outcome = apply_and_fold(pool, &ops).await?;
                             summary.applied += outcome.applied;
                             for op in &ops {
                                 max_op_id = max_op_id.max(op.op_id);
                             }
                         }
-                        Err(err) => summary.errors.push(format!("分段 {rel} 解析失败：{err}")),
+                        Err(err) => {
+                            summary
+                                .errors
+                                .push(format!("分段 {rel} 折叠失败（{}）；游标停在 seq={last_seq}，下一轮重试", err.message));
+                            crate::log_warn!("sync stream pull: fold failed on {rel}: {}", err.message);
+                            break;
+                        }
                     }
                     max_seq = seq;
                     seq = seq.saturating_add(1);

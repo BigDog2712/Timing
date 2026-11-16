@@ -39,19 +39,46 @@ pub async fn push_new_events(
     let body = encode_segment(&ops);
     let max_op_id = ops.iter().map(|op| op.op_id).max().unwrap_or(last_op_id);
 
-    match transport.put_if_absent(&rel, body.as_bytes()).await {
-        Ok(_) => {
-            /* 无论新写还是「已存在」（重启前写过分段但游标没推进）都推进游标。
-               分段不可变、只写一次，uid 唯一索引在另一端兜底幂等。 */
-            repository::upsert(pool, device_id, max_op_id, seq as i64).await?;
-            summary.segment_seq = seq;
-            summary.events = ops.len();
-            summary.bytes = body.len();
-        }
+    /* 「已存在」**不等于**「这批事件已经在了」。
+     *
+     * seq 是从游标推出来的：进程在 PUT 成功之后、游标落库之前被杀，下一轮会把
+     * `id > 旧游标` 的事件重新取一遍（这一批**更长**），算出同一个 seq。此时
+     * `put_if_absent` 返回「已存在」，若直接推进游标，中间那批事件就永久不会到对端。
+     * 所以只有远端内容与本次批次**逐字节相同**才允许推进；不同就报错重试。 */
+    let committed = match transport.put_if_absent(&rel, body.as_bytes()).await {
+        Ok(true) => true,
+        Ok(false) => match transport.get(&rel).await {
+            Ok(Some(existing)) if existing == body.as_bytes() => true,
+            Ok(Some(_)) => {
+                summary.errors.push(format!(
+                    "分段 {rel} 已存在且内容与本次批次不同：游标不推进，下一轮重试"
+                ));
+                crate::log_warn!("sync stream push: {rel} exists with different content");
+                false
+            }
+            Ok(None) => {
+                summary.errors.push(format!(
+                    "分段 {rel} 报告已存在但读不回来：游标不推进，下一轮重试"
+                ));
+                false
+            }
+            Err(err) => {
+                summary.errors.push(err);
+                false
+            }
+        },
         Err(err) => {
             /* 传不上去只记错误、不折整轮（§7）：游标不动，下一轮重试这批事件。 */
             summary.errors.push(err);
+            false
         }
+    };
+
+    if committed {
+        repository::upsert(pool, device_id, max_op_id, seq as i64).await?;
+        summary.segment_seq = seq;
+        summary.events = ops.len();
+        summary.bytes = body.len();
     }
     Ok(summary)
 }

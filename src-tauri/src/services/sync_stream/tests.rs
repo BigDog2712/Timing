@@ -16,7 +16,7 @@ const B: &str = "bbbbbbbbbbbb";
 const DAY: &str = "2026-11-14";
 
 /// 全新业务库 + 把种子事项「未归类」认领到指定设备（模拟两端各自已持有对方的事项）。
-async fn pool_with_item_claimed_to(device: &str) -> SqlitePool {
+pub(super) async fn pool_with_item_claimed_to(device: &str) -> SqlitePool {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
     crate::infra::migrate::migrate(&pool).await.unwrap();
     sqlx::query("UPDATE items SET device_id = ?1, uid = 'i:' || ?1 || ':' || id WHERE id = 1")
@@ -28,7 +28,7 @@ async fn pool_with_item_claimed_to(device: &str) -> SqlitePool {
 }
 
 /// 每个用例一个独立临时目录，避免并行用例互相读到对方的分段。
-fn temp_root(tag: &str) -> PathBuf {
+pub(super) fn temp_root(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "sync-stream-{tag}-{}-{}",
         std::process::id(),
@@ -39,9 +39,9 @@ fn temp_root(tag: &str) -> PathBuf {
     dir
 }
 
-type Row = (String, i64, Option<i64>, i64);
+pub(super) type Row = (String, i64, Option<i64>, i64);
 
-async fn record_row(pool: &SqlitePool, session_uid: &str) -> Row {
+pub(super) async fn record_row(pool: &SqlitePool, session_uid: &str) -> Row {
     sqlx::query_as(
         "SELECT status, started_at, ended_at, accumulated_sec FROM time_records WHERE uid = ?1",
     )
@@ -52,7 +52,7 @@ async fn record_row(pool: &SqlitePool, session_uid: &str) -> Row {
 }
 
 /// 在设备 A 上造一段「开始→暂停→继续→结束」，返回会话 uid。
-async fn make_session(pool: &SqlitePool, device: &str) -> String {
+pub(super) async fn make_session(pool: &SqlitePool, device: &str) -> String {
     let start = repo::start_session(pool, 1, 1_000, DAY, "countup", None, device)
         .await
         .unwrap();
