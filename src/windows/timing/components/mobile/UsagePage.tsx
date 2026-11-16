@@ -240,6 +240,7 @@ export function UsagePage() {
           today={today}
           day={day}
           failure={failed[selectedKey]}
+          truncated={current?.truncated === true}
           deltaSec={
             selectedKey === today && yesterday != null && day != null
               ? day.totalSec - yesterday.totalSec

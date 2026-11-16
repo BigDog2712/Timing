@@ -41,4 +41,12 @@ export interface UsageDayDto {
   date: string;
   totalSec: number;
   rows: UsageAggregate[];
+  /**
+   * 这一天的事件多到撞上系统读取上限（一次最多 2 万条）：`rows` 只是一部分。
+   *
+   * [评审 P2-2] **可选**：这个键是后加的，浏览器 mock 与旧回值没有它 —— 一律按
+   * 「没截断」处理（`dto.truncated === true` 才算）。宿主在这种情况下**不会**落库，
+   * 所以库里这一天还是上一份完整数据，界面只需要说明「这次没读全」。
+   */
+  truncated?: boolean;
 }

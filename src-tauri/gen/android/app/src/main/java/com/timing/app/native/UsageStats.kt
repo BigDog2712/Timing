@@ -129,7 +129,8 @@ object UsageStats {
             ?: return JSONObject()
         if (!hasPermission(context)) return JSONObject()
 
-        val spans = collectSpans(manager, fromMs, toMs)
+        val collected = collectSpans(manager, fromMs, toMs)
+        val spans = collected.spans
 
         val secMs = HashMap<String, Long>()
         val firstOf = HashMap<String, Long>()
@@ -169,6 +170,11 @@ object UsageStats {
         val out = JSONObject()
         out.put("rows", rows)
         out.put("spans", spansOf(spans))
+        /* [评审 P2-2，2026-11-16] 事件被上限截断时必须说出来。
+           原来读到 2 万条就停，却把当时开着的区间直接结到窗口末尾、聚合照常返回 ——
+           界面拿到的是「看起来完整、其实少了一段」的数。宿主侧看到这个键会**跳过落库**，
+           保住库里已有的权威日数据，同时在界面上标一句「只统计到一部分」。 */
+        out.put("truncated", collected.truncated)
         return out
     }
 
@@ -179,9 +185,9 @@ object UsageStats {
      * 用 `instanceId` 更精细（多窗口下同类 Activity 可能有两份），但它旧版本上没有，
      * 而同类 Activity 同时前台的情况本项目见不到 —— 取简。
      */
-    private fun collectSpans(manager: UsageStatsManager, fromMs: Long, toMs: Long): List<Span> {
+    private fun collectSpans(manager: UsageStatsManager, fromMs: Long, toMs: Long): Collected {
         val events = runCatching { manager.queryEvents(fromMs, toMs) }.getOrNull()
-            ?: return emptyList()
+            ?: return Collected(emptyList(), truncated = false)
         val raw = ArrayList<Span>()
         /** Activity 键 → 进入前台的时刻。同一 Activity 重复 RESUMED 时保留最早那一刻。 */
         val open = HashMap<String, Long>()
@@ -218,8 +224,14 @@ object UsageStats {
         /* 末尾还开着的：算到「现在」与窗口末尾里较小的那个（历史窗口不会超过窗口末尾） */
         closeAll(minOf(toMs, System.currentTimeMillis()))
 
-        return mergeByPackage(raw)
+        /* 循环是因为 `scanned` 撞了上限才退出的 ⇒ 后面还有没读到的事件。
+           `hasNextEvent()` 再问一次：正好读满 2 万条且没有剩余时不算截断。 */
+        val truncated = scanned >= MAX_EVENTS && events.hasNextEvent()
+        return Collected(mergeByPackage(raw), truncated)
     }
+
+    /** [`collectSpans`] 的回值：区间列表 + 是否因事件上限被截断。 */
+    private class Collected(val spans: List<Span>, val truncated: Boolean)
 
     /** `包名#类名`。类名为空时退化成 `包名#` —— 那时只能按包配对，聊胜于无。 */
     private fun keyOf(event: UsageEvents.Event): String? {

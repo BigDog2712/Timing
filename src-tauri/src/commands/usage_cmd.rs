@@ -66,8 +66,19 @@ pub async fn usage_stats_get(
         }
 
         /* 聚合与时段一起落（同一个事务）：只写进聚合、段没写进的话，界面就会
-           「有 40 分钟但一个时段都没有」，且没有任何报错。 */
-        usage::rollup(&state.pool, &date, &reply.rows, &reply.spans).await?;
+           「有 40 分钟但一个时段都没有」，且没有任何报错。
+
+           [评审 P2-2] 但**截断的那一轮不落库**。Kotlin 侧一次最多读 2 万条事件，撞上上限
+           时聚合只是一部分；`rollup` 是「先 DELETE 再 INSERT」的重扫语义，拿一份不完整的
+           结果去写，等于把库里已经完整的那一天改小 —— 而且没有任何地方会再算回来。
+           这里宁可什么都不写（保留上一份），把 `truncated` 如实交给界面标出来。 */
+        if reply.truncated {
+            crate::log_warn!(
+                "usage day {date} hit the event cap: keeping the stored aggregates untouched"
+            );
+        } else {
+            usage::rollup(&state.pool, &date, &reply.rows, &reply.spans).await?;
+        }
 
         /* 读库 → 用桥回的 `apps` 补上显示名与图标。
            名字**不进库**（迁移 0008 的「不存过期副本」），每次现查现合并。
@@ -80,6 +91,7 @@ pub async fn usage_stats_get(
             date,
             total_sec,
             rows,
+            truncated: reply.truncated,
         })
     }
 
@@ -91,6 +103,7 @@ pub async fn usage_stats_get(
             date,
             total_sec: 0,
             rows: Vec::new(),
+            truncated: false,
         })
     }
 }

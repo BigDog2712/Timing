@@ -22,6 +22,13 @@ interface Props {
   day: UsageRange | null;
   /** 这一天的失败原因（只影响这一天，不影响整页） */
   failure?: string;
+  /**
+   * 这一天被系统的事件上限截断了（[评审 P2-2]）：数字只是一部分。
+   *
+   * 单列一个 prop 而不是塞进 `UsageRange`：那个结构是**多天合并**的结果，
+   * 「其中一天读不全」在合并后的对象上无处安放，塞进去只会让人以为整段时间都不完整。
+   */
+  truncated?: boolean;
   /** 与昨天比（秒）；null = 没读到昨天 */
   deltaSec: number | null;
   insights: readonly Insight[];
@@ -37,6 +44,7 @@ export function UsageDayView({
   today,
   day,
   failure,
+  truncated = false,
   deltaSec,
   insights,
   onSelectDay,
@@ -105,6 +113,14 @@ export function UsageDayView({
         </p>
       ) : (
         <>
+          {truncated ? (
+            /* [评审 P2-2] 系统一次最多读 2 万条事件，撞上上限时这一天的数只是一部分。
+               宿主在这种情况下**不落库**（见 `usage_cmd`），所以这里显示的是库里上一份
+               完整数据；用户需要知道的只有一件事：这次没读全，别把这天的数当真。 */
+            <p className="m-usage__hint">
+              这天的事件太多，系统一次只能读一部分：下面的数字不完整。
+            </p>
+          ) : null}
           <UsageOverview
             headline={isToday ? '今日合计' : '这天合计'}
             totalSec={day.totalSec}

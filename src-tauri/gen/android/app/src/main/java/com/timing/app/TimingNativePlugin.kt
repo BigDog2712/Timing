@@ -332,6 +332,9 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
     fun usagePermission(invoke: Invoke) {
         val payload = JSObject()
         payload.put("granted", UsageStats.hasPermission(activity))
+        /* [评审 P2-2] 事件数撞上限时 `queryDay` 会置这个键。宿主据此**跳过落库**（不拿一份
+           不完整聚合覆盖权威日数据）并在界面上标一句；缺键 = `false`（Rust 侧 serde default）。 */
+        payload.put("truncated", day.optBoolean("truncated", false))
         invoke.resolve(payload)
     }
 

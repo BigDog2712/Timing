@@ -34,6 +34,8 @@ mod business_uid_real_data;
 /* [批 2 · 决策 2] 「定时备份」不许再自己跑：两条源码哨兵（配置读取恒未配置）。 */
 mod scheduled_backup_off;
 mod countdown;
+/* [P1-3] 倒计时的暂停语义（跨零点拆天）单独一支：countdown.rs 已贴 300 行门禁。 */
+mod countdown_pause;
 mod daily_status;
 /* [V0.11.15] 数据根指针与搬迁（指针优先于 optout；`VACUUM INTO` 的参数绑定）。 */
 mod data_root_pointer;

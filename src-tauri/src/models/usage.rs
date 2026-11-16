@@ -108,6 +108,13 @@ pub struct UsageDayReply {
     /// 缺这个键会静默读成空 —— 与 `rows` / `apps` 同一条风险，故仍是 `#[serde(default)]`。
     #[serde(default)]
     pub spans: Vec<UsageSpanRowDto>,
+    /// 系统一次最多读 2 万条事件；撞上上限时 Kotlin 置真（评审 P2-2）。
+    ///
+    /// 缺省 `false` 是刻意的：这个键是 2026-11-16 才加的，旧桥不会回它 —— 那时按
+    /// 「没截断」处理，与旧行为一致；而真截断时我们会**跳过落库**，宁可不写也不用
+    /// 一份不完整的聚合覆盖已经完整的那天。
+    #[serde(default)]
+    pub truncated: bool,
 }
 
 /// 一次查询的聚合结果，直接给界面。
@@ -139,4 +146,9 @@ pub struct UsageDay {
     pub date: String,
     pub total_sec: i64,
     pub rows: Vec<UsageAggregate>,
+    /// 这一天的事件多到撞上系统读取上限：`rows` 只是一部分（界面必须标出来）。
+    ///
+    /// [评审 P2-2] 原来这个状态在链路上不存在 —— Kotlin 悄悄截断、聚合照常返回，
+    /// 界面把不完整的数当完整的给用户看。
+    pub truncated: bool,
 }

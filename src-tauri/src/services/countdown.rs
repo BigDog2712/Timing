@@ -73,7 +73,7 @@ pub async fn start(
 /// 1s watcher 调用：若存在「已到点」的倒计时会话则返回其快照（否则 `None`）。
 ///
 /// 到点**一律结束并保存**（V0.3.4 起无开关，ADR-023）：会话转 `saved`，
-/// `accumulated_sec` 钳到 target，`ended_at = started_at + target_sec * 1000`。
+/// `accumulated_sec` 钳到 target，`ended_at` = **语义到点那一刻**（见下）。
 ///
 /// 这里**不**套「最短记录时长」阈值：倒计时时长是用户显式设定的目标（最少 1 秒也是
 /// 用户的意思），到点即应落库；阈值只作用于手动停止（见 `services::timer::stop`）。
@@ -85,7 +85,7 @@ pub async fn tick(pool: &SqlitePool) -> AppResult<Option<CountdownFired>> {
     if active.mode != timer_mode::COUNTDOWN {
         set_hint(false);
         return Ok(None);
-    }
+    };
     let Some(target_sec) = active.target_sec else {
         set_hint(false);
         return Ok(None);
@@ -100,7 +100,12 @@ pub async fn tick(pool: &SqlitePool) -> AppResult<Option<CountdownFired>> {
         .await?
         .map(|item| item.name)
         .unwrap_or_default();
-    let ended_at = active.started_at + target_sec * 1000;
+    /* [评审 P1-3] `ended_at` 必须是**语义到点**那一刻，不是 `started_at + target`。
+       到点由 `live_duration` 判定，而它不计暂停：跑 30 秒、暂停一小时、再跑 30 秒的
+       60 秒倒计时，恢复后才满一分钟 —— 若按 `started_at + target` 落档，记录会写成
+       「开始后一分钟」，比真实结束早了一小时，跨零点时连日期都分错。
+       口径见 `timer_time::countdown_end_at`（`now - 超出量`，tick 晚到也不会漂）。 */
+    let ended_at = crate::services::timer_time::countdown_end_at(&active, target_sec, now);
     /* [V0.11.3] 走分段收尾：23:45 起的 30 分钟倒计时会在零点处拆成两段，
     与手动结束同一口径（否则「倒计时跨天」仍会整条挂在昨天）。
     [S3] 收尾与 `stop` 事件同一事务：到点这件事对端必须知道，否则它只看到一条

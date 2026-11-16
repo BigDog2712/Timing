@@ -15,7 +15,9 @@ use crate::tests::support::{
 };
 
 /// 把会话的 started_at / running_since 同步回拨 ms 毫秒。
-async fn rewind(pool: &SqlitePool, id: i64, ms: i64) {
+///
+/// `pub(super)`：`countdown_pause`（暂停/跨零点那两条）也用它。
+pub(super) async fn rewind(pool: &SqlitePool, id: i64, ms: i64) {
     exec(
         pool,
         &format!(
@@ -109,10 +111,13 @@ async fn tick_always_finalizes_session() {
     assert_eq!(fired.target_sec, 60);
     assert_eq!(fired.record.status, "saved", "会话已落盘");
     assert_eq!(fired.record.accumulated_sec, 60, "时长钳到 target");
-    assert_eq!(
-        fired.record.ended_at.unwrap() - fired.record.started_at,
-        60_000,
-        "ended_at = started_at + target*1000"
+    /* 连续跑（无暂停）时与旧口径等价：`ended_at` 仍是「开始后 target 秒」。
+       容差 2 秒：新口径由「现在的读数」反推，起点是 rewind 出来的整秒、而 now 带着
+       真实毫秒，两者不可能逐毫秒对齐 —— 但也不许偏离更多（那说明在按 tick 的时刻落档）。 */
+    let span = fired.record.ended_at.unwrap() - fired.record.started_at;
+    assert!(
+        (span - 60_000).abs() <= 2_000,
+        "连续跑时 ended_at 应≈ started_at + target（实际 {span}ms）"
     );
     assert_eq!(count_active(&pool).await, 0, "不得留下 active");
     assert_eq!(timer::state(&pool).await.unwrap().status, "idle");
@@ -123,28 +128,6 @@ async fn tick_always_finalizes_session() {
         )
         .await,
         1
-    );
-}
-
-/// [V0.3.4] 倒计时到点**不**受「最短记录时长」约束：目标时长是用户显式设定的。
-#[tokio::test]
-async fn tick_ignores_min_record_seconds() {
-    let pool = fresh_pool("cd-tick-threshold").await;
-    // 阈值调到 300s，远超这次 60s 的目标
-    set_min_record_seconds(&pool, 300).await;
-    let rec = countdown::start(&pool, Some(1), 60).await.unwrap();
-    rewind(&pool, rec.id, 61_000).await;
-
-    let fired = countdown::tick(&pool).await.unwrap().expect("应到点");
-    assert_eq!(fired.record.status, "saved", "到点即保存，与阈值无关");
-    assert_eq!(
-        scalar_i64(
-            &pool,
-            "SELECT COUNT(*) FROM time_records WHERE deleted_at IS NULL"
-        )
-        .await,
-        1,
-        "记录未被软删"
     );
 }
 
@@ -183,4 +166,26 @@ async fn manual_stop_before_target_keeps_actual_live() {
     let stopped = result.record;
     assert_eq!(stopped.status, "saved");
     assert_eq!(stopped.accumulated_sec, 5, "手动提前结束记实际经过时长");
+}
+
+/// [V0.3.4] 倒计时到点**不**受「最短记录时长」约束：目标时长是用户显式设定的。
+#[tokio::test]
+async fn tick_ignores_min_record_seconds() {
+    let pool = fresh_pool("cd-tick-threshold").await;
+    // 阈值调到 300s，远超这次 60s 的目标
+    set_min_record_seconds(&pool, 300).await;
+    let rec = countdown::start(&pool, Some(1), 60).await.unwrap();
+    rewind(&pool, rec.id, 61_000).await;
+
+    let fired = countdown::tick(&pool).await.unwrap().expect("应到点");
+    assert_eq!(fired.record.status, "saved", "到点即保存，与阈值无关");
+    assert_eq!(
+        scalar_i64(
+            &pool,
+            "SELECT COUNT(*) FROM time_records WHERE deleted_at IS NULL"
+        )
+        .await,
+        1,
+        "记录未被软删"
+    );
 }

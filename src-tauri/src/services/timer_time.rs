@@ -33,6 +33,33 @@ pub(crate) fn live_duration(record: &TimeRecord, now: i64) -> i64 {
     }
 }
 
+/// 倒计时「语义到点」的墙钟时刻。
+///
+/// ## 为什么不能用 `started_at + target`
+///
+/// 到点是由 [`live_duration`] 判的，而 `live_duration` **不计暂停**。用
+/// `started_at + target` 当初就默认了「从开始到现在一直在跑」——一旦中途暂停过，
+/// 这两个口径立刻分叉（评审 P1-3）：跑 30 秒、暂停一小时、再跑 30 秒的 60 秒倒计时，
+/// 会在**恢复后**满一分钟才被判到点，落档却写成「开始后一分钟」，比真实结束早了一小时；
+/// 跨零点时还会把记录/分段的日期分错。
+///
+/// ## 现在的口径
+///
+/// 「这一段跑满 `target - accumulated` 秒」那一刻，即
+/// `running_since + (target - accumulated) * 1000`。用当前读数反推等价于
+/// `now - 超出量`（`live - target` 的秒数），这样即使 tick 晚到几秒（被系统挂起、
+/// 上一轮刚好在处理别的会话），落档时刻仍是那一刻而不是「发现时」。
+///
+/// 暂停中（`running_since` 为空）没有流逝可反推：只有「暂停下的那一秒刚好到点」这一种
+/// 情况会走到这里（tick 每秒都在跑），此时用 `now`，误差不超过一个 tick。
+pub(crate) fn countdown_end_at(record: &TimeRecord, target_sec: i64, now: i64) -> i64 {
+    let Some(running_since) = record.running_since else {
+        return now;
+    };
+    let overshoot_ms = (live_duration(record, now) - target_sec).max(0) * 1000;
+    now.saturating_sub(overshoot_ms).max(running_since)
+}
+
 /// 「退出期间」可并入的秒数（V0.4.2，崩溃恢复的可选补时）。
 ///
 /// 口径三前提：`include` 为真、当时**正在跑**（`running_since` 非空）、`until` 晚于它。
