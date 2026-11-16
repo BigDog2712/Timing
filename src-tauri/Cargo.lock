@@ -5726,7 +5726,7 @@ dependencies = [
 
 [[package]]
 name = "timing"
-version = "0.12.2"
+version = "0.12.3"
 dependencies = [
  "arrow",
  "base64 0.22.1",
