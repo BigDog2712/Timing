@@ -16,9 +16,63 @@
 //! `SetForegroundWindow` 受 Windows 前台锁定策略限制，可能被拒；被拒时仍然照发 ——
 //! 猜测前台失败最多是「这次没生效」，而不发一定是没生效。
 
-/// 一次最多发多少个键。`Ctrl+Alt+Shift+Win+F12` 是 5 个，8 是留足余量的硬上限
-/// （防手改配置塞进几百个键把输入队列打满）。
-pub const MAX_KEYS: usize = 8;
+/// 一次最多发多少个键：**3 个修饰（Ctrl / Alt / Shift）+ 1 个主键**。
+///
+/// [R1] 原来是 8。放宽的那几格没有任何合法用途 —— 前端 `hotkeyToVirtualKeys` 产出的
+/// 序列最长为 4（三个修饰 + 一个主键），多出来的空间只够塞「一串任意按键」。
+pub const MAX_KEYS: usize = 4;
+
+/// 修饰键 VK。**`Win` 刻意不在内**，理由见 `validate`。
+const VK_CONTROL: u16 = 0x11;
+const VK_MENU: u16 = 0x12;
+const VK_SHIFT: u16 = 0x10;
+/// `VK_LWIN` / `VK_RWIN`。
+const VK_WIN_KEYS: [u16; 2] = [0x5b, 0x5c];
+
+fn is_modifier(vk: u16) -> bool {
+    matches!(vk, VK_CONTROL | VK_MENU | VK_SHIFT)
+}
+
+/// 载荷校验。**跨平台**（不碰 Win32），因此可以当纯判据在任意平台跑。
+///
+/// ## 为什么后端要自己校验一遍
+///
+/// 前端 `dispatch.ts` / `shared/hotkey.ts` 已经守了同样的规则，但那条链的每一环都是
+/// **可以被绕过的**：IPC 只认载荷形状，谁拿到 `window.__TAURI_INTERNALS__` 谁就能直接
+/// 调这条命令（渲染 markdown 与窗口标题都是攻击者可控的输入面）。所以四条「必须是」
+/// 落在这里，前端那份是提示、这份才是闸门：
+///
+///  - **必须有修饰键**：否则等于「点一下手柄，在别人的输入框里打一个字符」。
+///  - **恰好 1 个主键**：多主键 = 一串任意按键，等价于一个微型键盘宏。
+///  - **禁止 Win 键**：`Win+R` / `Win+X` / `Win+S` 是系统级入口，两个键就能拼出
+///    「打开运行框 → 敲命令」，是本功能唯一的完整 RCE 路径。手柄的用途是「把
+///    `Ctrl+M` 发给目标应用」，不需要 Win。前端同步删了 `Meta` 修饰位，两边一致。
+///  - **不许重复键**：`Ctrl+Ctrl+M` 前端产不出来，手改配置能写出来；`SendInput` 会把
+///    重复的按下当两个独立事件，抬起时也只抬两次，行为不可预测。
+pub fn validate(vks: &[u16]) -> Result<(), String> {
+    if vks.is_empty() {
+        return Err("没有要发送的按键".to_string());
+    }
+    if vks.len() > MAX_KEYS {
+        return Err(format!("一次最多发送 {} 个按键", MAX_KEYS));
+    }
+    if let Some(vk) = vks.iter().find(|vk| VK_WIN_KEYS.contains(vk)) {
+        return Err(format!("不支持 Win 键组合（VK {vk:#04x}）：它会和系统快捷键冲突"));
+    }
+    let modifiers = vks.iter().filter(|vk| is_modifier(**vk)).count();
+    if modifiers == 0 {
+        return Err("快捷键必须包含修饰键（Ctrl / Alt / Shift）".to_string());
+    }
+    if vks.len() - modifiers != 1 {
+        return Err("快捷键必须是「修饰键 + 1 个主键」".to_string());
+    }
+    for (index, vk) in vks.iter().enumerate() {
+        if vks[index + 1..].contains(vk) {
+            return Err(format!("快捷键里有重复的键（VK {vk:#04x}）"));
+        }
+    }
+    Ok(())
+}
 
 #[cfg(target_os = "windows")]
 mod imp {
@@ -96,14 +150,11 @@ mod imp {
     }
 
     pub fn send(vks: &[u16]) -> Result<(), String> {
-        if vks.is_empty() {
-            return Err("没有要发送的按键".to_string());
-        }
-        if vks.len() > super::MAX_KEYS {
-            return Err(format!("一次最多发送 {} 个按键", super::MAX_KEYS));
-        }
+        /* [R1] 闸门在 `super::validate`（跨平台、可单测），不在这里 —— 这里只负责
+           「形状已经合法，把它按下去」。 */
+        super::validate(vks)?;
         // 真正发键（`SendInput`）不写单测：它会往当前前台窗口注入按键，
-        // 在 CI / 开发机上跑等于随机敲别人的窗口。可测的是上面两条拒绝分支。
+        // 在 CI / 开发机上跑等于随机敲别人的窗口。可测的是上面几条拒绝分支。
         ensure_external_foreground();
 
         /* 按下：修饰键在前（前端已排好序）；抬起：**逆序**。反过来会让 Ctrl 先松手，
@@ -135,6 +186,57 @@ mod imp {
 }
 
 pub use imp::{remember_foreign_foreground, send};
+
+#[cfg(test)]
+mod validate_tests {
+    use super::{validate, MAX_KEYS};
+
+    /* 这一组不挂 `target_os = "windows"`：`validate` 是纯判定，不碰 Win32，
+       所以 CI 的 Linux 任务也能替我们守住「Win 组合不许发」这条。 */
+
+    #[test]
+    fn hv01_modifier_plus_one_key_is_accepted() {
+        assert!(validate(&[0x11, 0x4d]).is_ok(), "Ctrl+M 是最典型的合法载荷");
+        assert!(validate(&[0x11, 0x10, 0x7b]).is_ok(), "Ctrl+Shift+F12 也要过");
+    }
+
+    #[test]
+    fn hv02_bare_key_is_rejected() {
+        /* 单键 = 往用户当前前台应用里注入一个字符 */
+        let err = validate(&[0x4d]).err().unwrap_or_default();
+        assert!(err.contains("修饰键"), "提示要说出缺的是什么：{err}");
+    }
+
+    #[test]
+    fn hv03_win_key_is_rejected() {
+        /* [R1] 这是唯一的完整 RCE 路径：Win+R 打开运行框，再敲命令。
+           LWIN 与 RWIN 都要挡住（前端只产出 LWIN，但闸门不能只守一半）。 */
+        for win in [0x5bu16, 0x5c] {
+            let err = validate(&[win, 0x52]).err().unwrap_or_default();
+            assert!(err.contains("Win"), "Win 组合必须点名拒绝：{err}");
+        }
+    }
+
+    #[test]
+    fn hv04_two_main_keys_are_rejected() {
+        /* Ctrl+M+N = 微型键盘宏，不是「一条快捷键」 */
+        let err = validate(&[0x11, 0x4d, 0x4e]).err().unwrap_or_default();
+        assert!(err.contains("1 个主键"), "提示要说出主键必须是 1 个：{err}");
+    }
+
+    #[test]
+    fn hv05_duplicate_modifier_is_rejected() {
+        let err = validate(&[0x11, 0x11, 0x4d]).err().unwrap_or_default();
+        assert!(err.contains("重复"), "重复键要单独点名：{err}");
+    }
+
+    #[test]
+    fn hv06_length_cap_is_four() {
+        assert_eq!(MAX_KEYS, 4, "上限 = 三个修饰 + 一个主键，多一格都是给宏留的门");
+        let too_many = vec![0x11u16; MAX_KEYS + 1];
+        assert!(validate(&too_many).is_err());
+    }
+}
 
 #[cfg(all(test, target_os = "windows"))]
 mod tests {

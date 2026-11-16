@@ -12,12 +12,16 @@
  *   2. `formatHotkey` / `parseHotkey` —— `HotkeySpec` ↔ 落库文本（`Ctrl+Shift+M`）
  *   3. `hotkeyToVirtualKeys` —— `HotkeySpec` → 后端 `SendInput` 吃的 VK 序列
  *
- * ## 为什么必须有修饰键
+ * ## 为什么必须有修饰键，且不认 Win 键
  *
  * 这条链最终会往**用户当前的前台应用**注入按键。允许「单键」就等于允许「点一下手柄，
  * 在别人的输入框里打一个字母」——录错一次就是一次无声的误输入。所以 `specFromKeyboardEvent`
  * 与 `parseHotkey` 都要求至少一个修饰键；`hotkeyToVirtualKeys` 再挡一次（纵深防御：
  * 手改过的配置也要被挡住）。
+ *
+ * `Win` 比单键更危险：`Win+R` 打开运行框、`Win+X` 弹系统菜单，两步就能拼出「执行任意
+ * 命令」。它不是「少写一个修饰键」的程度问题，而是**这个功能的威胁等级会整体变掉**，
+ * 所以修饰位里索性没有它（后端 `hotkey_send::validate` 有同一条判据）。
  *
  * ## 为什么用 `event.code` 而不是 `event.key`
  *
@@ -29,7 +33,6 @@ export interface HotkeySpec {
   ctrl: boolean;
   alt: boolean;
   shift: boolean;
-  meta: boolean;
   /** 主键的显示名（`A` / `1` / `F12` / `Space`），不是 `code` */
   key: string;
 }
@@ -43,27 +46,29 @@ interface HotkeyKey {
   vk: number;
 }
 
-/** 修饰键的 VK。顺序 = 落库文本与发送顺序（**同一条**，两处不同会让日志与行为对不上）。 */
-const MODIFIER_KEYS: readonly { flag: 'ctrl' | 'alt' | 'shift' | 'meta'; name: string; vk: number }[] = [
+/** 修饰键的 VK。顺序 = 落库文本与发送顺序（**同一条**，两处不同会让日志与行为对不上）。
+ *
+ * [R1] 这里**没有 `Meta`（Win 键）**，不是遗漏：`Win+R` / `Win+X` / `Win+S` 是系统级入口，
+ * 两步就能拼出「打开运行框 → 敲命令」，是本功能唯一的完整 RCE 路径。手柄的用途是
+ * 「把 `Ctrl+M` 发给目标应用」，不需要 Win。后端 `infra::hotkey_send::validate` 有同一条
+ * 判据 —— 那里才是闸门，这里是让用户**根本录不进去**，不至于「录成功、发失败」。 */
+const MODIFIER_KEYS: readonly { flag: 'ctrl' | 'alt' | 'shift'; name: string; vk: number }[] = [
   { flag: 'ctrl', name: 'Ctrl', vk: 0x11 },
   { flag: 'alt', name: 'Alt', vk: 0x12 },
   { flag: 'shift', name: 'Shift', vk: 0x10 },
-  { flag: 'meta', name: 'Meta', vk: 0x5b },
 ];
 
-/** 把 `Ctrl` / `Control` / `Ctrl键` 这类写法都收进同一个修饰位。 */
-const MODIFIER_ALIASES: Record<string, 'ctrl' | 'alt' | 'shift' | 'meta'> = {
+/** 把 `Ctrl` / `Control` / `Ctrl键` 这类写法都收进同一个修饰位。
+ *
+ * `win` / `cmd` / `super` 曾经映射到 `meta`，现已删除（见 `MODIFIER_KEYS` 的注释）：
+ * 留着它们的唯一效果是「旧配置能解析、但发不出去」，不如在解析这一步就说「不认识」。 */
+const MODIFIER_ALIASES: Record<string, 'ctrl' | 'alt' | 'shift'> = {
   ctrl: 'ctrl',
   control: 'ctrl',
   alt: 'alt',
   option: 'alt',
   opt: 'alt',
   shift: 'shift',
-  meta: 'meta',
-  win: 'meta',
-  cmd: 'meta',
-  command: 'meta',
-  super: 'meta',
 };
 
 /** 主键表：`code` → 显示名 + VK。字母/数字/功能键用循环生成，其余逐条列（顺序即解析优先级）。 */
@@ -117,25 +122,28 @@ const KEY_BY_CODE = new Map(KEY_TABLE.map((entry) => [entry.code, entry]));
 const KEY_BY_NAME = new Map(KEY_TABLE.map((entry) => [entry.name.toLowerCase(), entry]));
 
 function hasModifier(spec: HotkeySpec): boolean {
-  return spec.ctrl || spec.alt || spec.shift || spec.meta;
+  return spec.ctrl || spec.alt || spec.shift;
 }
 
 /**
  * 一次 keydown → `HotkeySpec`。
  *
- * 返回 `null` 的三种情况都**不是错误**，录制框靠它判断「继续等下一个键」：
+ * 返回 `null` 的四种情况都**不是错误**，录制框靠它判断「继续等下一个键」：
  *  - 按的是修饰键本身（`ShiftLeft` 不在主键表里）
  *  - 按的键不在白名单（媒体键 / IME 键 / 小键盘 —— 它们的 VK 语义随设备变化）
  *  - 没有修饰键（只有主键，见文件头「为什么必须有修饰键」）
+ *  - 按着 Win / Cmd（[R1] 这个修饰位已被移除，见 `MODIFIER_KEYS`）
  */
 export function specFromKeyboardEvent(event: KeyboardEvent): HotkeySpec | null {
+  /* 先挡 Win：`metaKey` 为真时哪怕主键合法也不收 —— 否则会得到一份「有主键、没修饰位」
+     的 spec，`formatHotkey` 输出成 `R`，落库后再也解析不回来。 */
+  if (event.metaKey) return null;
   const hit = KEY_BY_CODE.get(event.code);
   if (!hit) return null;
   const spec: HotkeySpec = {
     ctrl: event.ctrlKey,
     alt: event.altKey,
     shift: event.shiftKey,
-    meta: event.metaKey,
     key: hit.name,
   };
   return hasModifier(spec) ? spec : null;
@@ -148,10 +156,11 @@ export function formatHotkey(spec: HotkeySpec): string {
 }
 
 /**
- * 落库文本 → `HotkeySpec`。不合法（缺修饰键 / 认不出主键 / 空串）一律 `null`。
+ * 落库文本 → `HotkeySpec`。不合法（缺修饰键 / 认不出主键 / 空串 / 含 Win）一律 `null`。
  *
- * 宽容度：分割符两侧空白、修饰键别名（`Control` / `Win` / `Cmd`）、键名大小写。
- * 不宽容的是「没有修饰键」—— 那是危险配置，不能被静默接受。
+ * 宽容度：分割符两侧空白、修饰键别名（`Control` / `Option`）、键名大小写。
+ * 不宽容的是「没有修饰键」与「带 Win」—— 前者是危险配置，后者是更危险的配置，
+ * 都不能被静默接受。
  */
 export function parseHotkey(text: string): HotkeySpec | null {
   const segments = text
@@ -160,7 +169,7 @@ export function parseHotkey(text: string): HotkeySpec | null {
     .filter((segment) => segment.length > 0);
   if (segments.length < 2) return null;
 
-  const spec: HotkeySpec = { ctrl: false, alt: false, shift: false, meta: false, key: '' };
+  const spec: HotkeySpec = { ctrl: false, alt: false, shift: false, key: '' };
   for (let i = 0; i < segments.length; i += 1) {
     const segment = segments[i];
     const modifier = MODIFIER_ALIASES[segment.toLowerCase()];
