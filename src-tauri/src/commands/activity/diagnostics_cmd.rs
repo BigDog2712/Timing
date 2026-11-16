@@ -28,7 +28,7 @@ pub struct ResourceDiagnosticsSnapshot {
 
 #[tauri::command]
 pub fn cmd_get_resource_diagnostics(app: tauri::AppHandle) -> ResourceDiagnosticsSnapshot {
-    #[cfg(feature = "patina_coverage")]
+    #[cfg(feature = "activity_coverage")]
     crate::platform::coverage::flush_coverage();
     let webview_window_labels = app
         .webview_windows()

@@ -5,7 +5,7 @@ use crate::app::activity::tray::setup_tray;
 use crate::models::activity::settings::{DesktopBehaviorSettings, StartupSource};
 use crate::services::activity::engine::tracking::watchdog::RuntimeHealthState;
 use crate::infra::activity::windows::{audio, media, power};
-#[cfg(any(test, all(not(debug_assertions), not(feature = "patina_local_build"))))]
+#[cfg(any(test, all(not(debug_assertions), not(feature = "activity_local_build"))))]
 use std::path::Path;
 use std::sync::Arc;
 
@@ -27,7 +27,7 @@ pub fn was_launched_by_autostart() -> bool {
     std::env::args().any(|arg| arg == AUTOSTART_ARG)
 }
 
-#[cfg(any(test, all(not(debug_assertions), not(feature = "patina_local_build"))))]
+#[cfg(any(test, all(not(debug_assertions), not(feature = "activity_local_build"))))]
 #[cfg_attr(debug_assertions, allow(dead_code))]
 pub fn should_use_local_build_context() -> bool {
     match std::env::current_exe() {
@@ -36,7 +36,7 @@ pub fn should_use_local_build_context() -> bool {
     }
 }
 
-#[cfg(any(test, all(not(debug_assertions), not(feature = "patina_local_build"))))]
+#[cfg(any(test, all(not(debug_assertions), not(feature = "activity_local_build"))))]
 fn is_workspace_target_binary(path: &Path) -> bool {
     let components = path
         .components()

@@ -196,7 +196,7 @@ pub(crate) fn handle_run_event(app: &tauri::AppHandle, event: tauri::RunEvent) {
                 observer.stop();
             }
             crate::infra::activity::windows::native_probe::shutdown();
-            #[cfg(feature = "patina_coverage")]
+            #[cfg(feature = "activity_coverage")]
             crate::platform::coverage::flush_coverage();
         }
         _ => {}

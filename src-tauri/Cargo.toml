@@ -198,10 +198,12 @@ default = []
 # `cargo build --release` 仍会去连 devUrl（http://localhost:1420），脱离 dev server 就是白窗。
 # `tauri build` 会自己带这个特性；直接用 cargo 构建发布版时必须显式打开。
 custom-protocol = ["tauri/custom-protocol"]
-# 上游 Patina 的两个构建标记。只声明不启用：`#[cfg(patina_coverage)]` 那处（覆盖率
-# 检查点）要靠它才能编过；不声明会得到 `unexpected cfg` 警告（本项目 clippy -D warnings）。
-patina_coverage = []
-patina_local_build = []
+# 两个构建标记（去 Patina 化 T04-5 改名；原名 `patina_coverage` / `patina_local_build`）。只声明不启用：
+# `#[cfg(activity_coverage)]` 那处（覆盖率检查点）要靠它才能编过；不声明会得到 `unexpected cfg`
+# 警告（本项目 clippy -D warnings）。**仓外的覆盖率 / 本地构建 wrapper 必须同步换名** ——
+# 传旧名会得到「unknown feature」编译错误，是响的失败，不是静默失效。
+activity_coverage = []
+activity_local_build = []
 
 # QA 测试（仅 dev profile）：提供 #[tokio::test] 异步测试运行时。
 # 不进入发布产物；tokio 及 tokio-macros 已在依赖图中（勿需新增外部 crate）。

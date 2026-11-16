@@ -13,5 +13,5 @@ pub mod host;
 pub mod log;
 
 /* [0.12.0 T02] 覆盖率检查点：原 patina/mod.rs 的 `flush_coverage`，见该文件头注释。 */
-#[cfg(feature = "patina_coverage")]
+#[cfg(feature = "activity_coverage")]
 pub mod coverage;
