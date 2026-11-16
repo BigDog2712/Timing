@@ -133,17 +133,27 @@ pub async fn append(
 }
 
 /// 读一个会话的全部事件（顺序无关：折叠自己排序）。
-pub async fn load_session(pool: &SqlitePool, session_uid: &str) -> AppResult<Vec<TimerOp>> {
+///
+/// 收连接而不是连接池：同步应用（`sync_stream::apply`）要在**同一事务**里读它，
+/// 否则读到的可能是别的连接尚未提交的版本（见该模块头）。
+pub async fn load_session(
+    conn: &mut sqlx::SqliteConnection,
+    session_uid: &str,
+) -> AppResult<Vec<TimerOp>> {
     let sql = format!(
         "SELECT {OP_COLS} FROM timer_ops WHERE session_uid = ?1 ORDER BY at_ms, device_id, id"
     );
-    let rows = sqlx::query(&sql).bind(session_uid).fetch_all(pool).await?;
+    let rows = sqlx::query(&sql)
+        .bind(session_uid)
+        .fetch_all(&mut *conn)
+        .await?;
     Ok(rows.iter().filter_map(to_op).collect())
 }
 
 /// 读事件并折叠。
 pub async fn fold(pool: &SqlitePool, session_uid: &str) -> AppResult<FoldResult> {
-    Ok(fold_session(&load_session(pool, session_uid).await?))
+    let mut conn = pool.acquire().await?;
+    Ok(fold_session(&load_session(&mut conn, session_uid).await?))
 }
 
 /// 把折叠结果写回 `time_records`（物化）。
@@ -151,6 +161,18 @@ pub async fn fold(pool: &SqlitePool, session_uid: &str) -> AppResult<FoldResult>
 /// 判据：**先清空 `time_records` 里这一行再从事件重算，结果必须相同**。做不到就说明
 /// 折叠漏了某个字段，那时 `time_records` 与事件流会各说各话（且没有任何报错）。
 pub async fn materialize(pool: &SqlitePool, block: &FoldedBlock, now: i64) -> AppResult<()> {
+    let mut conn = pool.acquire().await?;
+    materialize_in(&mut conn, block, now).await
+}
+
+/// [`materialize`] 的事务内版本：同步应用要把它和「事件 upsert + 游标推进」放进同一事务
+/// （`sync_stream::apply` / `sync_stream::pull`）。分开写会留下「事件进去了、物化没跟上」
+/// 的半截状态，而重试时 uid 去重让那段再也不会被折叠。
+pub async fn materialize_in(
+    conn: &mut sqlx::SqliteConnection,
+    block: &FoldedBlock,
+    now: i64,
+) -> AppResult<()> {
     let status = if block.ended_at_ms.is_some() {
         "saved"
     } else {
@@ -169,7 +191,7 @@ pub async fn materialize(pool: &SqlitePool, block: &FoldedBlock, now: i64) -> Ap
     .bind(block.accumulated_sec())
     .bind(block.running_since_ms)
     .bind(now)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }

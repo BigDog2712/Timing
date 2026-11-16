@@ -50,6 +50,22 @@ pub async fn upsert(
     last_op_id: i64,
     last_seq: i64,
 ) -> AppResult<()> {
+    let mut conn = pool.acquire().await.map_err(AppError::db)?;
+    upsert_in(&mut conn, device_id, last_op_id, last_seq).await
+}
+
+/// [`upsert`] 的事务内版本：**游标必须和「这一段事件的应用结果」同事务落库**。
+///
+/// 分开写会有一个致命的中间态（评审 P1-2）：事件与物化已经写进去、游标没写 ——
+/// 下一轮重拉同一段，`timer_ops.uid` 唯一索引让每条事件 `rows_affected = 0`，
+/// 于是**谁都不会再被标 dirty**，折叠被跳过、游标却顺利推进：那部分会话的
+/// `time_records` 永远停在半截状态，而且从此没有任何一轮会去修它。
+pub async fn upsert_in(
+    conn: &mut sqlx::SqliteConnection,
+    device_id: &str,
+    last_op_id: i64,
+    last_seq: i64,
+) -> AppResult<()> {
     sqlx::query(
         "INSERT INTO sync_event_cursor (device_id, last_op_id, last_seq)
          VALUES (?, ?, ?)
@@ -60,7 +76,7 @@ pub async fn upsert(
     .bind(device_id)
     .bind(last_op_id)
     .bind(last_seq)
-    .execute(pool)
+    .execute(&mut *conn)
     .await
     .map_err(AppError::db)?;
     Ok(())
