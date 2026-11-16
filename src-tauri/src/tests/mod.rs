@@ -132,6 +132,9 @@ mod todo_list;
 mod todo_nudge;
 mod todo_purge;
 mod todo_start;
+/* [R1] 「启动应用」的授权名单：唯一能把界面注入变成任意代码执行的那条路。 */
+#[cfg(desktop)]
+mod handle_launch_auth;
 mod tray_batch2;
 mod tray_menu;
 mod tray_menu_md_sync;

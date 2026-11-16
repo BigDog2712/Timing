@@ -21,10 +21,10 @@
  */
 import { useState } from "react";
 import { RotateCcw } from "lucide-react";
-import { open } from "@tauri-apps/plugin-dialog";
 import QuietButton from "../../../shared/components/QuietButton";
 import QuietSelect from "../../../shared/components/QuietSelect";
 import QuietSwitch from "../../../shared/components/QuietSwitch";
+import { pickCustomLaunchTarget } from "../../../platform/desktop/hostSettingsGateway";
 import SettingsHotkeyRecorder from "./SettingsHotkeyRecorder";
 import {
   HANDLE_ACTIONS,
@@ -117,20 +117,19 @@ export default function SettingsHandleCard({
   /**
    * 选文件 → 写入 `launch:` 绑定。
    *
-   * 取消（`null`）与失败（ACL / 没有原生对话框）走两个不同出口：取消什么都不做，
-   * 失败必须在卡里说一句 —— 否则用户点了「启动应用…」只看到下拉弹回原值，
-   * 会以为是自己没点中。
+   * [R1] 选路径这件事**交给后端**（`pickLaunchTarget`）：它弹原生对话框、把用户选中的
+   * 路径写进授权名单，再把规范化后的路径返回来。前端自己用 `plugin-dialog` 选也能拿到
+   * 字符串，但那个字符串后端不认识 —— 名单里没有它，按下去就是 `CUSTOM_ACTION_DENIED`，
+   * 用户会以为是「选了个不能启动的程序」。
+   *
+   * 取消（`null`）与失败走两个不同出口：取消什么都不做，失败必须在卡里说一句 ——
+   * 否则用户点了「启动应用…」只看到下拉弹回原值，会以为是自己没点中。
    */
   const pickLaunchTarget = async (slot: HandleSlot) => {
     setError(null);
     let picked: string | null = null;
     try {
-      const selection = await open({
-        multiple: false,
-        directory: false,
-        title: `选择要启动的程序（${formLabel} · ${HANDLE_SLOT_LABELS[slot]}）`,
-      });
-      picked = typeof selection === "string" ? selection : null;
+      picked = await pickCustomLaunchTarget();
     } catch (err) {
       setError(err instanceof Error ? err.message : "打开文件选择器失败");
       return;

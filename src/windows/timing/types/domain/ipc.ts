@@ -285,11 +285,14 @@ export interface IpcApi {
 
   /* [0.13] 手柄自定义动作。`vks` 必须是已排好序的 VK 序列（`shared/hotkey.ts::hotkeyToVirtualKeys`） */
   runHandleCustomAction(params: HandleCustomActionParams): Promise<void>;
+  /** [R1] 弹原生对话框选一个程序并由后端写入授权名单；取消返回 `null`。 */
+  pickCustomLaunchTarget(): Promise<string | null>;
 }
 
 /**
  * 手柄自定义动作的载荷（[0.13]，与 Rust `HandleCustomAction` 逐字对齐）。
- * 判别键 `kind`：`launch` 带 `path`，`hotkey` 带 `vks`（Win32 VK 序列，1..=8 个）。
+ * 判别键 `kind`：`launch` 带 `path`（**必须已在授权名单里**，否则 `CUSTOM_ACTION_DENIED`），
+ * `hotkey` 带 `vks`（VK 序列 1..=4：三修饰 + 一主键；后端另禁 Win 键，见 `hotkey_send`）。
  * 嵌一层 `action` 是必需的：Rust 侧是 `tag = "kind"` 的枚举，摊平会被 `deny_unknown_fields` 拒掉。
  */
 export type HandleCustomActionParams =

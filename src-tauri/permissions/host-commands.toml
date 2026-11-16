@@ -77,6 +77,8 @@ commands.allow = [
   "overlay_set",
   "overlay_status",
   "pause_timer",
+  # [R1] 「启动应用」的授权入口：弹原生对话框 → 写后端授权名单。只读那条在 run_handle_custom_action
+  "pick_custom_launch_target",
   "plugin_list",
   "plugin_open_dir",
   "quit_app",

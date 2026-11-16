@@ -109,3 +109,19 @@ export function getReferenceSettings(): Promise<HostReferenceSettings> {
 export function updateReferenceSettings(patch: HostReferencePatch): Promise<HostReferenceSettings> {
   return call<HostReferenceSettings>("update_reference_settings", { patch });
 }
+
+/**
+ * [R1] 弹宿主原生对话框选一个「要启动的程序」，返回**已授权**的规范化路径。
+ *
+ * 为什么不在这里用 `@tauri-apps/plugin-dialog` 自己选：授权事实必须来自一次原生交互，
+ * 而那个交互得由**后端**完成并顺手写名单。前端自己选的路径后端不认识，按下去会被
+ * `run_handle_custom_action` 拒掉 —— 症状是「选好了，但说没授权」。
+ *
+ * 取消返回 `null`（不是错误）：用户合上对话框是正常操作。
+ */
+export async function pickCustomLaunchTarget(): Promise<string | null> {
+  const picked = await call<unknown>("pick_custom_launch_target", {});
+  /* 形态校验放在这里而不是 `as T`：后端回 `null` 与回 `""` 都表示「没选」，
+     其余类型说明契约已经分叉 —— 那时宁可当作没选，也不要往下传一个假路径。 */
+  return typeof picked === "string" && picked.length > 0 ? picked : null;
+}

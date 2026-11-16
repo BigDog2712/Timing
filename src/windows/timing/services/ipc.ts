@@ -127,6 +127,10 @@ export function errorText(err: unknown): string {
     /* 这条**保留原文**：原文是「还没有『使用情况访问』权限」，就是给用户看的；没带 message 时给一句能照着做的。 */
     case 'USAGE_PERMISSION_DENIED':
       return err instanceof Error && err.message ? err.message : '去系统设置里打开「使用情况访问」后才能统计';
+    /* [R1] 手柄动作被拒：原文说的是「该做什么」（回设置重新选一次 / 换个组合键），
+       比兜底的「操作失败」有用得多，所以保留后端原文。 */
+    case 'CUSTOM_ACTION_DENIED':
+      return err instanceof Error && err.message ? err.message : '这个动作没有被授权，请回设置里重新选一次';
     default:
       return err instanceof Error && err.message ? err.message : '操作失败，请稍后重试';
   }
@@ -286,4 +290,6 @@ export const ipc: IpcApi = {
   getMigrationInfo: () => call<MigrationInfo>('get_migration_info'),
   openLegacyDir: () => call<void>('open_legacy_dir'),
   runHandleCustomAction: (params: HandleCustomActionParams) => call<void>('run_handle_custom_action', params),
+  /* [R1] 选路径这件事必须在后端做：只有「用户在一次原生交互里点了确认」才算授权事实。 */
+  pickCustomLaunchTarget: () => call<string | null>('pick_custom_launch_target', {}),
 };

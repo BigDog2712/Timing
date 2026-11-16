@@ -67,6 +67,10 @@ pub mod md_sync;
 #[allow(dead_code)]
 pub mod sync_stream;
 pub mod note;
+/* [R1] 手柄「启动应用」的授权名单：执行前必须命中，写入只有原生对话框一条路。
+   桌面独占 —— 手机没有「启动一个外部程序」这件事，命令本身也不注册（见 `ipc_commands`）。 */
+#[cfg(desktop)]
+pub mod handle_launch;
 /* [V0.11.27] 悬浮条快照组装（状态机 + 事项名 → 推送载荷）。仅手机端有消费者。 */
 pub mod overlay_push;
 pub mod plugin;

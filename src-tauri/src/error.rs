@@ -6,7 +6,7 @@ use serde::Serialize;
 
 /// 统一错误码（V0.1.0 的 11 + V0.2.0 新增 5 + V0.3.0 新增 1 − V0.3.1 下架 1
 /// − V0.3.3 下架 1 + V0.4.0 新增 1 + V0.11.13 新增 1 + [0.13.0] 新增 1
-/// + [0.14] 新增 1，共 19）。
+/// + [0.14] 新增 1 + [R1] 新增 1，共 20）。
 ///
 /// V0.2.0 五码已全部接线（`TODO_NOT_FOUND` 随待办域；`NOTE_NOT_FOUND` /
 /// `WINDOW_LIMIT_EXCEEDED` / `INVALID_TARGET_SEC` 随批 2 便利贴与倒计时；
@@ -60,6 +60,11 @@ pub enum ErrorCode {
        此前三处借用 `INVALID_DURATION`（「结束时间早于开始时间」），用户拿到的是
        「时间不对」的提示去修「挂错层级」，语义错配同 ADR-018 的教训。 */
     ItemDepthExceeded,
+    /* [R1] 手柄自定义动作被拒绝：要启动的路径不在授权名单里，或者载荷形状不合法
+       （没有修饰键 / 带 Win 键 / 多个主键）。**这不是「系统调用失败」** —— 混进
+       `IO_ERROR` 的话，用户看到的「系统调用失败」会让他去查权限，而真正的原因是他
+       那格手柄绑定指向了一个没被授权过的程序。见 `services::handle_launch`。 */
+    CustomActionDenied,
 }
 
 impl ErrorCode {
@@ -85,6 +90,7 @@ impl ErrorCode {
             ErrorCode::MdSyncRemoteError => "MD_SYNC_REMOTE_ERROR",
             ErrorCode::UsagePermissionDenied => "USAGE_PERMISSION_DENIED",
             ErrorCode::ItemDepthExceeded => "ITEM_DEPTH_EXCEEDED",
+            ErrorCode::CustomActionDenied => "CUSTOM_ACTION_DENIED",
         }
     }
 }
@@ -210,6 +216,15 @@ impl AppError {
             ErrorCode::MdSyncConfigInvalid,
             format!("同步设置不合法：{}", message.into()),
         )
+    }
+
+    /// [R1] 手柄自定义动作被拒绝（未授权的启动路径 / 不合法的按键序列）。
+    ///
+    /// 单独一码而不是借用 `IO_ERROR`：这两类失败**要用户做的事完全不同** ——
+    /// `IO_ERROR` 让人去查系统权限，而这个码要说的是「这格绑定指向的东西我没被授权执行」，
+    /// 用户该做的是回设置里重新选一次。
+    pub fn custom_action_denied(message: impl Into<String>) -> Self {
+        Self::new(ErrorCode::CustomActionDenied, message.into())
     }
 
     /// [V0.11.13] 云端通道走不通（`MD_SYNC_REMOTE_ERROR`，ADR-061）。

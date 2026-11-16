@@ -60,4 +60,9 @@ commands.allow = [
   "open_legacy_dir",
   "daily_status_get",
   "daily_status_set",
+  # [R1] 设置页「启动应用…」下拉：**必须**由后端弹对话框并写授权名单。前端自己用
+  # `dialog:allow-open` 也能拿到路径字符串，但那个路径不在名单里 —— 按下去会被
+  # `run_handle_custom_action` 拒掉（`CUSTOM_ACTION_DENIED`），用户会以为选错了程序。
+  # 注意本文件**不**放 `run_handle_custom_action`：执行面只有主窗（药丸手柄）需要。
+  "pick_custom_launch_target",
 ]

@@ -272,6 +272,10 @@ define_invoke_handler![
     当前前台应用」这件事，也没有可启动的外部程序 —— 前端在手机上不给这两个选项，
     命令也就不注册（注册了只能回 IO_ERROR 的假成功更像缺陷）。 */
     crate::commands::system_cmd::run_handle_custom_action,
+    /* [R1] 「启动应用」的授权入口。单独一条命令的理由不是「拆得干净」，而是**权限来源**：
+       只有这条会弹原生对话框并写授权名单，`run_handle_custom_action` 只读它。
+       两者合一的话，前端传进来的路径就同时承担「申请」与「执行」两个语义。 */
+    crate::commands::system_cmd::pick_custom_launch_target,
 ];
 
 #[cfg(not(desktop))]

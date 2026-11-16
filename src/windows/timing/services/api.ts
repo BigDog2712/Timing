@@ -176,7 +176,12 @@ export const dataRootApi = {
 
 /* ---- [0.13] 手柄自定义动作（启动应用 / 发送快捷键）----
    两个方法只做「把载荷形状拼对」，判定一律在调用方（`handleActions/dispatch.ts`）：
-   那里才知道失败该怎么告诉用户（手柄有一块 notice 区域，别处没有）。 */
+   那里才知道失败该怎么告诉用户（手柄有一块 notice 区域，别处没有）。
+
+   [R1] `launch` 的 `path` 必须是**后端授权过**的路径：授权只能由 `pickLaunchTarget`
+   产生（弹原生对话框 → 用户确认 → 后端写名单）。所以设置页**不能**自己用
+   `@tauri-apps/plugin-dialog` 选路径再拼 `launch:` —— 那样选出来的路径后端不认，
+   表现为「选好了但按下去说未授权」。 */
 export const handleCustomApi = {
   launch: (path: string): Promise<void> =>
     ipc.runHandleCustomAction({ action: { kind: 'launch', path } }),

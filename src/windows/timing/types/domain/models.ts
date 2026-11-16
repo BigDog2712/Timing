@@ -34,7 +34,7 @@ export type SwitchMode =
 /** 崩溃恢复对话框动作 */
 export type ResolveAction = 'resume' | 'close' | 'discard';
 
-/** 统一错误码（19 个；与 Rust `error.rs::as_str` 逐字一致，check:contract 校验） */
+/** 统一错误码（20 个；与 Rust `error.rs::as_str` 逐字一致，check:contract 校验） */
 export type ErrorCode =
   | 'DB_ERROR'
   | 'ITEM_NOT_FOUND'
@@ -53,13 +53,13 @@ export type ErrorCode =
   | 'INVALID_COLOR'
   /* [V0.3.0] */
   | 'ITEM_NAME_TOO_LONG'
-  /* [V0.4.0] */
+  /* [V0.4.0] 配置校验 / [V0.11.13] 云端通道走不通（网络 / 远端 / 系统凭据），见 ADR-061 */
   | 'MD_SYNC_CONFIG_INVALID'
-  /* [V0.11.13] 云端通道走不通（网络 / 远端 / 系统凭据），见 ADR-061 */
   | 'MD_SYNC_REMOTE_ERROR'
-  /* [0.13.0] 安卓「使用情况访问」未授权（状态性）；[0.14] 分层规则被违反 */
+  /* [0.13.0] 使用情况访问未授权（状态性）/ [0.14] 分层规则被违反 / [R1] 手柄动作被拒 */
   | 'USAGE_PERMISSION_DENIED'
-  | 'ITEM_DEPTH_EXCEEDED';
+  | 'ITEM_DEPTH_EXCEEDED'
+  | 'CUSTOM_ACTION_DENIED';
 
 /* ===========================================================================
  * 核心领域实体

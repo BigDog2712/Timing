@@ -22,9 +22,12 @@ import {
 } from '../../../../shared/handleCatalog';
 import SettingsHandleCard from './SettingsHandleCard';
 
-/* 原生文件选择器：判据只关心「选中之后写了什么 / 取消之后有没有写」，不需要真对话框 */
-const { dialogOpen } = vi.hoisted(() => ({ dialogOpen: vi.fn() }));
-vi.mock('@tauri-apps/plugin-dialog', () => ({ open: dialogOpen }));
+/* [R1] 选路径改由**后端**完成（弹对话框 + 写授权名单），所以这里 mock 的是宿主设置网关，
+   不是 `@tauri-apps/plugin-dialog`：判据只关心「选中之后写了什么 / 取消之后有没有写」。 */
+const { pickTarget } = vi.hoisted(() => ({ pickTarget: vi.fn() }));
+vi.mock('../../../platform/desktop/hostSettingsGateway', () => ({
+  pickCustomLaunchTarget: pickTarget,
+}));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -181,7 +184,7 @@ describe('G1 手柄卡', () => {
 
 describe('G1 手柄卡 · [0.13] 自定义绑定', () => {
   beforeEach(() => {
-    dialogOpen.mockReset();
+    pickTarget.mockReset();
   });
 
   it('a08_已配的自定义绑定必须出现在下拉里', () => {
@@ -201,11 +204,11 @@ describe('G1 手柄卡 · [0.13] 自定义绑定', () => {
   });
 
   it('a09_选中文件后写入_launch_绑定', async () => {
-    dialogOpen.mockResolvedValue('C:////Apps////WeChat.exe');
+    pickTarget.mockResolvedValue('C:////Apps////WeChat.exe');
     const { changes } = mount();
     await pickOption(0, '启动应用…');
 
-    expect(dialogOpen).toHaveBeenCalledTimes(1);
+    expect(pickTarget).toHaveBeenCalledTimes(1);
     expect(changes).toHaveLength(1);
     expect(changes[0].slots.left).toBe('launch:C:////Apps////WeChat.exe');
     /* 其它槽位一字不动 */
@@ -214,7 +217,7 @@ describe('G1 手柄卡 · [0.13] 自定义绑定', () => {
 
   it('a10_取消选择时一个字都不写', async () => {
     /* 受控 `value` 一直来自 binding，所以「不写」就是「下拉弹回原值」——不需要额外状态 */
-    dialogOpen.mockResolvedValue(null);
+    pickTarget.mockResolvedValue(null);
     const { changes } = mount();
     await pickOption(0, '启动应用…');
     expect(changes).toHaveLength(0);

@@ -13,5 +13,9 @@ import { fail } from './mockSeed';
 export function createMockApiHandleCustom(): Record<string, (args?: any) => unknown> {
   return {
     run_handle_custom_action: () => fail('IO_ERROR', '浏览器预览模式不执行系统动作（启动应用 / 发送快捷键）'),
+    /* [R1] 选程序这件事**必须**在后端做（授权事实只能来自一次原生交互），浏览器里没有
+       原生对话框，所以只能如实失败 —— 返回一个假路径会让走查以为「选成功了」，而真正
+       装上机器时那格手柄会因为路径没进授权名单而拒绝执行。 */
+    pick_custom_launch_target: () => fail('IO_ERROR', '浏览器预览模式没有原生文件选择器'),
   };
 }

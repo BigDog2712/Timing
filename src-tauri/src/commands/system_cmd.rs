@@ -67,6 +67,17 @@ pub async fn quit_app(app: AppHandle) -> AppResult<()> {
  *
  * `deny_unknown_fields` 不是洁癖：这个载荷直接决定「跑哪个程序」，多出来的字段
  * 意味着前端与本文件对形状的理解已经分叉 —— 宁可拒绝执行，也不要猜着执行。
+ *
+ * ## [R1] 两条分支都是**闸门**，不是「把前端算好的东西执行掉」
+ *
+ * 这个载荷来自 IPC，而 IPC 不是可信输入：markdown 渲染、窗口标题、ingest 进来的
+ * 网页标题都是攻击者可控的字面量。前端 `dispatch.ts` 里的校验只是**提示**，
+ * 绕过它只需要一次直接调用。所以：
+ *
+ *  - `Launch` 只认**用户亲自在原生对话框里确认过**的路径（`services::handle_launch`
+ *    的授权名单），未授权一律 `CUSTOM_ACTION_DENIED`；
+ *  - `Hotkey` 的后端校验在 `infra::hotkey_send::validate`（必须有修饰键 / 恰好 1 个
+ *    主键 / 禁止 Win 键）—— 那是本功能唯一的完整 RCE 路径（`Win+R` → 敲命令）。
  */
 #[derive(serde::Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
@@ -77,13 +88,47 @@ pub enum HandleCustomAction {
     Hotkey { vks: Vec<u16> },
 }
 
+/// 弹原生对话框让用户选一个可执行文件，选中后**由后端**写进授权名单。
+///
+/// 为什么选路径这件事必须发生在后端：只有「用户在一次原生交互里点了确认」才能作为
+/// 授权事实。前端拿到路径后能自由改写（它是普通字符串），后端拿到的就只是「某个
+/// 字符串声称自己是用户选的」—— 那样等于没有名单。
+///
+/// 取消返回 `None`（不是错误）：用户合上对话框是正常操作。
 #[tauri::command]
-pub async fn run_handle_custom_action(action: HandleCustomAction) -> AppResult<()> {
+pub async fn pick_custom_launch_target(state: State<'_, AppState>) -> AppResult<Option<String>> {
+    let picked = tauri::async_runtime::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .set_title("选择要启动的程序")
+            .pick_file()
+            .map(|path| path.to_string_lossy().to_string())
+    })
+    .await
+    .map_err(|err| AppError::io(format!("打开文件选择器失败: {err}")))?;
+    let Some(path) = picked else { return Ok(None) };
+    services::handle_launch::authorize(&state.pool, &path).await.map(Some)
+}
+
+#[tauri::command]
+pub async fn run_handle_custom_action(
+    state: State<'_, AppState>,
+    action: HandleCustomAction,
+) -> AppResult<()> {
     match action {
         HandleCustomAction::Launch { path } => {
+            /* 授权检查在 `launch` 之前：`launch` 会真的 spawn，先检查后执行没有中间态。 */
+            if !services::handle_launch::is_authorized(&state.pool, &path).await? {
+                return Err(AppError::custom_action_denied(
+                    "这个程序没有经过授权，请在设置里重新选择一次",
+                ));
+            }
             crate::infra::shell_open::launch(std::path::Path::new(&path)).map_err(AppError::io)
         }
         HandleCustomAction::Hotkey { vks } => {
+            /* 后端闸门（前端那份只是提示）。校验失败是**载荷不合法**，不是 IO 故障 ——
+               归到 `CUSTOM_ACTION_DENIED`，否则用户会去查系统权限。 */
+            crate::infra::hotkey_send::validate(&vks)
+                .map_err(AppError::custom_action_denied)?;
             crate::infra::hotkey_send::send(&vks).map_err(AppError::io)
         }
     }
