@@ -403,7 +403,7 @@ fn new_run(
         config.format.extension(),
     )?;
     let staging_name = format!(
-        ".patina-scheduled-export-{}.{}.part",
+        ".activity-scheduled-export-{}.{}.part",
         Uuid::new_v4().simple(),
         config.format.extension()
     );
@@ -477,7 +477,7 @@ pub fn normalize_target_directory(path: &str, verify_writable: bool) -> Result<P
     }
     if verify_writable {
         let probe = canonical.join(format!(
-            ".patina-export-write-test-{}",
+            ".activity-export-write-test-{}",
             Uuid::new_v4().simple()
         ));
         let mut file = OpenOptions::new()
@@ -485,7 +485,7 @@ pub fn normalize_target_directory(path: &str, verify_writable: bool) -> Result<P
             .create_new(true)
             .open(&probe)
             .map_err(|error| classify_io_error(&error).to_string())?;
-        let write_result = file.write_all(b"patina").and_then(|_| file.sync_all());
+        let write_result = file.write_all(b"activity").and_then(|_| file.sync_all());
         drop(file);
         let cleanup_result = fs::remove_file(&probe);
         if let Err(error) = write_result {
@@ -546,7 +546,7 @@ fn remove_owned_staging_path(run: &ScheduledExportRun, path: &Path) -> Result<()
         .file_name()
         .and_then(|value| value.to_str())
         .unwrap_or("");
-    if parent != expected_parent || !name.starts_with(".patina-scheduled-export-") {
+    if parent != expected_parent || !super::staging_names::is_owned(name) {
         return Err("scheduled export refused to remove an unowned staging file".to_string());
     }
     match fs::remove_file(path) {
@@ -917,7 +917,7 @@ mod tests {
 
     fn temp_dir(label: &str) -> PathBuf {
         let path = std::env::temp_dir().join(format!(
-            "patina-scheduled-export-{label}-{}-{}",
+            "activity-scheduled-export-{label}-{}-{}",
             std::process::id(),
             Uuid::new_v4().simple()
         ));
@@ -960,7 +960,7 @@ mod tests {
     #[test]
     fn publish_never_overwrites_an_existing_file() {
         let dir = temp_dir("publish");
-        let staging = dir.join(".patina-scheduled-export-owned.csv.part");
+        let staging = dir.join(".activity-scheduled-export-owned.csv.part");
         let target = dir.join("target.csv");
         fs::write(&staging, b"new").unwrap();
         fs::write(&target, b"original").unwrap();

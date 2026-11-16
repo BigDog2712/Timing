@@ -22,6 +22,7 @@ pub mod remote_status_store;
 pub mod repositories;
 pub mod scheduled_backup;
 pub mod scheduled_export;
+mod staging_names;
 pub mod schema;
 pub mod schema_contracts;
 pub mod schema_registry;
