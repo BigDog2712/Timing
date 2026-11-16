@@ -24,7 +24,7 @@ use std::collections::{HashMap, HashSet};
 use chrono::NaiveDate;
 use sqlx::SqlitePool;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::models::constants::{ITEM_NAME_MAX_LEN, NOTE_CONTENT_MAX_LEN};
 use crate::models::md_sync::MdSyncKind;
 use crate::models::note::NoteGeometry;
@@ -53,6 +53,14 @@ pub async fn by_kind(
         MdSyncKind::Timers => apply_timers(pool, date, old_body, new_body).await?,
         MdSyncKind::Notes => apply_notes(pool, old_body, new_body).await?,
         MdSyncKind::Todos => apply_todos(pool, date, old_body, new_body).await?,
+        // P1 五域只挂了枚举、还没写 render/parse（T01「先枚举不实现」）。防御性拦在这里：
+        // 出厂默认不生成这两档落点，手拼配置命中时给明确报错而不是落下缺失的 match 分支。
+        MdSyncKind::AppUsage | MdSyncKind::Items => {
+            return Err(AppError::md_sync_config_invalid(format!(
+                "数据种类「{}」尚未支持（P1 实现）",
+                kind.label()
+            )));
+        }
     };
     /* [V0.4.1] 导入是**唯一会按用户手改删数据**的路径（默认软删）。留一行现场：
     事后能看出「哪次同步删了几条」，而不是只看到记录少了一条。 */

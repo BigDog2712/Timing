@@ -9,7 +9,7 @@
 import type { MdSyncCloud, MdSyncCloudChannel } from './mdCloud';
 
 /** 同步的数据种类 */
-export type MdSyncKind = 'timers' | 'notes' | 'todos';
+export type MdSyncKind = 'timers' | 'notes' | 'todos' | 'app_usage' | 'items';
 
 /**
  * 各数据种类的展示名（与 Rust 侧 `MdSyncKind::label` 逐字一致）。
@@ -21,6 +21,8 @@ export const MD_SYNC_KIND_LABELS: Record<MdSyncKind, string> = {
   timers: '事项计时',
   notes: '便利贴',
   todos: '待办事项',
+  app_usage: '应用计时',
+  items: '事项与分类',
 };
 
 /** 一个落点：根目录 + 相对文件模板 + 目标标题 */
@@ -69,6 +71,17 @@ export interface MdSyncConfig {
    * 后端空串 `skip_serializing_if` 不落盘，未配置用户的存储 JSON 与新装同形（P19）。
    */
   diaryTemplate?: string;
+  /**
+   * [0.14.x] 事件流开关（计时走分段 JSONL 增量传输）。可选：后端 `#[serde(default)]`
+   * 缺键按 false 补、false 又 `skip_serializing_if` 不落盘，故「未配置 / 关闭」都是缺键
+   * （同 `diaryTemplate` / `itemsFile`）。默认 `false`（出厂关）。
+   */
+  streamEnabled?: boolean;
+  /**
+   * [0.14.x] 全局事项文件路径（事项与分类，P1 五域之一）。可选：后端空串
+   * `skip_serializing_if` 不落盘，未配置用户的存储 JSON 与新装同形（同 `diaryTemplate`）。
+   */
+  itemsFile?: string;
 }
 
 /** 单个落点的运行状态 */

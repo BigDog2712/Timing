@@ -32,7 +32,7 @@ fn business_database_stamps_time_records_and_records_tombstones() {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(version, "13");
+        assert_eq!(version, "14");
 
         // items.id = 1 是种子「未归类」（0001 的种子行），外键天然满足。
         //

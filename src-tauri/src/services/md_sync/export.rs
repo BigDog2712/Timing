@@ -29,7 +29,7 @@
 use chrono::NaiveDate;
 use sqlx::SqlitePool;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::models::md_sync::MdSyncKind;
 use crate::platform::clock::now_ms;
 use crate::repositories::md_sync as repo;
@@ -196,5 +196,11 @@ pub async fn by_kind(pool: &SqlitePool, kind: MdSyncKind, date: NaiveDate) -> Ap
         MdSyncKind::Timers => timers(pool, date).await,
         MdSyncKind::Notes => notes(pool, date).await,
         MdSyncKind::Todos => todos(pool, date).await,
+        // P1 五域只挂了枚举、还没写 render/parse（T01「先枚举不实现」）。防御性拦在这里：
+        // 出厂默认不生成这两档落点，手拼配置命中时给明确报错而不是落下缺失的 match 分支。
+        MdSyncKind::AppUsage | MdSyncKind::Items => Err(AppError::md_sync_config_invalid(format!(
+            "数据种类「{}」尚未支持（P1 实现）",
+            kind.label()
+        ))),
     }
 }

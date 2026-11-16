@@ -42,6 +42,16 @@ pub enum MdSyncKind {
     Notes,
     /// `todos` → 待办事项（清单 + 隐藏的行 id），未完成且计划时间不在当天。
     Todos,
+    /// `app_usage` → 应用计时（安卓前台时长，P1 五域之一）。本轮只挂枚举，不写 render/parse。
+    ///
+    /// 单独 `#[serde(rename)]`：`rename_all = "lowercase"` 会把 `AppUsage` 写成
+    /// `"appusage"`，与全仓的 `app_usage`（表名 / 目录名 / 事件 kind）分叉。`as_str()`
+    /// 必须是 `"app_usage"`，而序列化必须与 `as_str()` 逐字一致 —— `MdSyncBinding::key()`
+    /// 与设置页展示都拿 `as_str()` 当稳定身份，分叉等于「同一种类两把钥匙」。
+    #[serde(rename = "app_usage")]
+    AppUsage,
+    /// `items` → 事项与分类（全局事项文件，P1 五域之一）。本轮只挂枚举，不写 render/parse。
+    Items,
 }
 
 impl MdSyncKind {
@@ -50,6 +60,8 @@ impl MdSyncKind {
             Self::Timers => "timers",
             Self::Notes => "notes",
             Self::Todos => "todos",
+            Self::AppUsage => "app_usage",
+            Self::Items => "items",
         }
     }
 
@@ -59,6 +71,8 @@ impl MdSyncKind {
             Self::Timers => "事项计时",
             Self::Notes => "便利贴",
             Self::Todos => "待办事项",
+            Self::AppUsage => "应用计时",
+            Self::Items => "事项与分类",
         }
     }
 }

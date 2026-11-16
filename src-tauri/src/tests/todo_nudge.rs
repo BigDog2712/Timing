@@ -36,7 +36,7 @@ async fn migration_adds_nudge_columns() {
         )
         .await
         .as_deref(),
-        Some("13")
+        Some("14")
     );
 }
 

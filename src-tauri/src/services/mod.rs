@@ -60,6 +60,12 @@ pub mod md_backup;
 pub mod md_backup_export;
 pub mod md_cloud;
 pub mod md_sync;
+/* [0.14.x] 同步事件流：计时事件的跨端增量传输（分段 JSONL + 下载游标）。
+   T01 只落 schema / 类型 / 游标 SQL，编排（push/pull/fold）在 T02 —— 故先
+   `allow(dead_code)` 遮住「类型与 SQL 原语尚无调用方」的告警，与 `activity`
+   模块同款口径；T02 接线后按需摘掉。 */
+#[allow(dead_code)]
+pub mod sync_stream;
 pub mod note;
 /* [V0.11.27] 悬浮条快照组装（状态机 + 事项名 → 推送载荷）。仅手机端有消费者。 */
 pub mod overlay_push;

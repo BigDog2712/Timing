@@ -25,6 +25,14 @@ async fn three_tables_created() {
 }
 
 #[tokio::test]
+async fn sync_stream_tables_created() {
+    let pool = fresh_pool("mig-sync-stream").await;
+    for t in ["sync_event_cursor", "md_decision_audit"] {
+        assert_eq!(table_exists(&pool, t).await, 1, "T01 表 {t} 应存在");
+    }
+}
+
+#[tokio::test]
 async fn seed_system_item_uncategorized() {
     let pool = fresh_pool("mig-seed").await;
     assert_eq!(
@@ -51,10 +59,11 @@ async fn seed_system_item_uncategorized() {
             .as_deref(),
         Some("未归类")
     );
-    // schema 版本登记：全部迁移跑完推进到 12（K-7 / Spec §6 迁移铁律；v3 = 便利贴置顶列，ADR-019；
+    // schema 版本登记：全部迁移跑完推进到 14（K-7 / Spec §6 迁移铁律；v3 = 便利贴置顶列，ADR-019；
     // v4 = 待办提醒链路的 remind_stage / auto_start，ADR-030；v5 = 待办绑定事项 item_id，ADR-042；
     // v6 = 云端待传队列 md_cloud_pending，ADR-061；v7 = 该队列按通路隔离；v8 = app_usage 应用使用统计；
-    // v9 = 设备维度；v10 = 同步簿记；v11 = 事项归属；v12 = app_usage_span 使用时段）
+    // v9 = 设备维度；v10 = 同步簿记；v11 = 事项归属；v12 = app_usage_span 使用时段；
+    // v13 = 清空旧配对口径写下的碎段；v14 = 同步事件流基础设施（游标 + md 决策审计））
     assert_eq!(
         scalar_opt_str(
             &pool,
@@ -62,7 +71,7 @@ async fn seed_system_item_uncategorized() {
         )
         .await
         .as_deref(),
-        Some("13")
+        Some("14")
     );
 }
 
