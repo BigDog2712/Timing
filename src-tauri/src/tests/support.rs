@@ -104,6 +104,23 @@ pub fn safe_rewind_ms(cap_ms: i64) -> Option<i64> {
     Some((since_midnight - 60_000).min(cap_ms))
 }
 
+/// 补记「不跨天」判据共用的安全墙钟基准：**两天前正午**的本地毫秒。
+///
+/// 判据 1 / 4 / 6 / 8 要的是「同一天、且全在过去」的一段区间。用 `now_ms() - 10 分钟`
+/// 当起点时，凌晨 00:00–00:15 跑会跨过本地零点，`split_by_day` 把补记拆成两段，
+/// `rows.len() == 1` 就红（CI run 43777088112 实测撞上）。锚到两天前正午：
+/// - 恒在过去：不触发 `backfill` 的「未来时间必拒」；
+/// - 离任一日界都 ≥ 12 小时：±15 分钟怎么也不会跨零点。
+/// 与运行时刻彻底解耦（判据 5 的「两天前日界」同一思路）。
+pub fn past_day_noon_ms() -> i64 {
+    let base = chrono::Local::now()
+        .date_naive()
+        .checked_sub_days(chrono::Days::new(2))
+        .expect("两天前的日期恒存在");
+    /* `day_bounds(base).0` = base 当天本地 00:00；+12h 落在当天正中，跨零点不可能。 */
+    crate::platform::clock::day_bounds(base).0 + 12 * 60 * 60 * 1000
+}
+
 /// 新建一个普通事项并返回其 id（新库仅有系统事项 id=1，用例按需建 2/3/…）。
 pub async fn new_item(pool: &SqlitePool, name: &str) -> i64 {
     crate::services::item::create(pool, name, None)
