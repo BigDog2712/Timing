@@ -724,12 +724,12 @@ fn rebuild_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 mod tests {
     use super::*;
 
-    /* 基线是 **Patina 自己的源图标**（`icons/patina-32x32.png`），不是宿主的
-    `icons/32x32.png`：融合后宿主品牌图标与这四个托盘态毫无关系（T-形 vs 圆环），
-    拿它当基线等于要求托盘图标长成 Timing 的 logo。
+    /* 基线是 **原 vendored 子树的源图标**（`icons/activity-32x32.png`，去 Patina 化 T04-5
+    改名前叫 `patina-32x32.png`，**同一份字节**），不是宿主的 `icons/32x32.png`：融合后宿主
+    品牌图标与这四个托盘态毫无关系（T-形 vs 圆环），拿它当基线等于要求托盘图标长成 Timing 的 logo。
     这条断言真正要守的是「四个状态由同一个源图标派生、几何形状不许各自漂移」，
     所以基线取 vendored 子树的原图即可。 */
-    const ICON_SOURCE_BASELINE: &[u8] = include_bytes!("../../../icons/patina-32x32.png");
+    const ICON_SOURCE_BASELINE: &[u8] = include_bytes!("../../../icons/activity-32x32.png");
     const TRAY_ICON_ASSETS: &[(TrayIconVariant, &[u8])] = &[
         (
             TrayIconVariant::LightTaskbarActive,
