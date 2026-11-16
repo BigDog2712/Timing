@@ -1,6 +1,6 @@
 import { useLocaleText } from "../../shared/i18n/index.ts";
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { AppWindow, ArrowUpCircle, Maximize2, Minimize2, Minus, X } from "lucide-react";
+import { AppWindow, Maximize2, Minimize2, Minus, X } from "lucide-react";
 import { openMiniWindow } from "../../platform/desktop/miniWindowRuntimeGateway.ts";
 import appIconUrl from "../../../../../src-tauri/icons/128x128@2x.png";
 import {
@@ -12,8 +12,6 @@ const APP_TITLE = "Timing";
 
 type AppTitleBarProps = {
   isMaximized: boolean;
-  showUpdateEntry?: boolean;
-  onOpenUpdateDialog?: () => void;
   /** [P0-04] 「Timing 计时胶囊」槽位。药丸在计时时由 `TimingCapsule` 填，其它时候为 null */
   timingStatusEntry?: ReactNode;
   /** ③ tab 段槽位（01 §3.1）。由 `AppTopNav` 填；本组件只负责给它一个 flex 槽，
@@ -29,8 +27,6 @@ function runWindowAction(action: () => Promise<void>, actionName: string) {
 
 export default function AppTitleBar({
   isMaximized,
-  showUpdateEntry = false,
-  onOpenUpdateDialog,
   timingStatusEntry,
   navigationSlot,
 }: AppTitleBarProps) {
@@ -105,20 +101,11 @@ export default function AppTitleBar({
       {navigationSlot}
 
       <div className="app-titlebar-side app-titlebar-side-right">
-        {/* ④ status 段：在自己的栏内吸收剩余宽度；更新入口留在胶囊旁（01 §3.1） */}
+        {/* ④ status 段：在自己的栏内吸收剩余宽度。
+            [O3 2026-11-16] 这里原本还挂一个「有新版本」按钮（`showUpdateEntry`），随更新通道
+            整批删除 —— 它指向的下载源不是本项目的仓库。 */}
         <div className="at-topbar-status" data-titlebar-status="">
           {timingStatusEntry}
-          {showUpdateEntry ? (
-            <button
-              type="button"
-              className="app-titlebar-update-entry"
-              data-titlebar-update-entry=""
-              onClick={onOpenUpdateDialog}
-            >
-              <ArrowUpCircle size={12} strokeWidth={1.9} aria-hidden="true" />
-              <span>{UI_TEXT.update.sidebarEntry}</span>
-            </button>
-          ) : null}
         </div>
 
         <div className="app-titlebar-controls">

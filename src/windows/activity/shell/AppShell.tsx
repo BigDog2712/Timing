@@ -29,7 +29,6 @@ import {
 import { useQuietDialogs } from "../shared/hooks/useQuietDialogs";
 import { useAppShellNavigation } from "./hooks/useAppShellNavigation";
 import { useAppShellToasts } from "./hooks/useAppShellToasts";
-import { useAppShellUpdateEntry } from "./hooks/useAppShellUpdateEntry";
 import { useMainWindowReady } from "./hooks/useMainWindowReady.ts";
 import { useQuietMotionPreference } from "../shared/motion/useQuietMotionPreference.ts";
 import { useImportClassificationCoordinator } from "./hooks/useImportClassificationCoordinator.ts";
@@ -62,7 +61,6 @@ export default function AppShellContent({
   windowTracking: WindowTrackingState;
 }) {
   const { confirm, dialogs } = useQuietDialogs();
-  const { titleBarUpdateEntry, settingsUpdateEntry } = useAppShellUpdateEntry();
   const {
     currentView,
     prepareNavigate,
@@ -202,7 +200,6 @@ export default function AppShellContent({
         timingStatusEntry={<TimingCapsule />}
         navigationSlot={<AppTopNav currentView={presentedView} onPrepareNavigate={prepareNavigate}
           onNavigate={handleSidebarNavigate} onPreviewNavigate={handleSidebarPreviewNavigate} />}
-        {...titleBarUpdateEntry}
       />
 
       {/* 无 gap：本容器只有 AppViewOutlet 的 <main> 一个在流子元素，其余三个图层都是 fixed */}
@@ -219,7 +216,6 @@ export default function AppShellContent({
           onBackHome={() => { void handleSidebarNavigate("dashboard"); }}
           /* [P0 · 0.12.1] 装配搬到 `components/AppShellViews.tsx`：这里只传状态与回调。 */
           views={buildAppShellViews({
-            aboutUpdateEntry: settingsUpdateEntry,
             appSettings,
             dashboard,
             dashboardReadState,

@@ -124,11 +124,10 @@ pub fn setup(
     ) {
         return Err(std::io::Error::other("failed to establish startup UI recovery path").into());
     }
-    /* [Timing 融合] **不启动更新自检**：Patina 上游的更新端点指向
-    `github.com/Ceceliaee/patina`，而本工程里 `tauri-plugin-updater` 从未注册
-    （见 `app/bootstrap.rs::configure` 的说明），自检只会在启动后拿到 plugin 缺失的
-    错误状态并向前端 emit 一次 `update-snapshot-changed`。发版统一走 Timing 自己的
-    安装包。`tray` / `updater` 的运行时代码保留，将来接上 Timing 的更新通道再启。 */
+    /* [Timing 融合] **没有更新自检**：Patina 上游的更新端点指向
+    `github.com/Ceceliaee/patina`（别人的仓库），那条链连同启动自检、命令、前端入口
+    已整批删除（O3，2026-11-16，判据 `tests/update_channel_removed.rs`）。发版统一走
+    Timing 自己的签名安装包，前端没有任何「检查更新」入口可以点到。 */
     runtime_tasks::spawn_tracking_runtime_restart_loop(
         app.handle().clone(),
         runtime_health.clone(),

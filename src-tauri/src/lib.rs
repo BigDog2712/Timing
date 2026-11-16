@@ -193,12 +193,7 @@ pub fn run() {
     /* Patina 子系统接入（状态 + 插件）。它自己的自启 / 通知 / 单实例注册已在上游
     `configure` 里摘掉——同一进程只能有一份，宿主的在上面。 */
     #[cfg(desktop)]
-    let builder = crate::app::activity::bootstrap::configure(
-        builder,
-        crate::app::activity::bootstrap::BootstrapInput {
-            app_version: ctx.package_info().version.to_string(),
-        },
-    );
+    let builder = crate::app::activity::bootstrap::configure(builder);
 
     /* 命令表两平台共用一份：桌面是「宿主 79 + Patina 118」，手机只有宿主 79
     （`ipc_commands` 里用 `macro_rules!` 拼，Patina 那段带 `#[cfg(desktop)]`）。

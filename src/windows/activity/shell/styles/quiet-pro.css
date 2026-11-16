@@ -60,41 +60,9 @@
   white-space: nowrap;
 }
 
-.app-titlebar-update-entry {
-  display: inline-flex;
-  flex: 0 0 auto;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  border: 1px solid var(--at-border-subtle);
-  border-radius: var(--at-radius-button);
-  background: var(--at-bg-elevated);
-  padding: 0 8px;
-  color: var(--at-text-secondary);
-  font-size: var(--at-font-size-caption);
-  font-weight: var(--at-font-weight-emphasis);
-  line-height: var(--at-line-height-caption);
-  transition:
-    border-color var(--at-motion-fast) var(--at-motion-ease),
-    background-color var(--at-motion-fast) var(--at-motion-ease),
-    color var(--at-motion-fast) var(--at-motion-ease);
-}
-
-.app-titlebar-update-entry:hover {
-  border-color: var(--at-border-strong);
-  background: var(--at-bg-panel);
-  color: var(--at-text-primary);
-}
-
-.app-titlebar-update-entry:active {
-  background: var(--at-bg-canvas);
-}
-
-.app-titlebar-update-entry:focus-visible {
-  outline-offset: 1px;
-}
-
+/* [O3 2026-11-16] 这里原本是标题栏那条「有新版本」按钮的样式（`.app-titlebar-update-entry`）。
+   更新通道整批删除、按钮不再渲染，四条规则一并删掉 —— 留着死样式，下一次做顶栏改版时会
+   以为那是某个还在用的控件。 */
 .app-titlebar-drag-region {
   align-self: stretch;
   flex: 1 1 auto;

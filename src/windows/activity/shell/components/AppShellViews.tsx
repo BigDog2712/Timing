@@ -38,7 +38,6 @@ const AppMapping =
 
 export interface AppShellViewsProps {
   appSettings: AppSettings;
-  aboutUpdateEntry: Omit<ComponentProps<typeof AboutView>, "onToast">;
   dashboard: ComponentProps<typeof Dashboard>["dashboard"];
   dashboardReadState: ComponentProps<typeof Dashboard>["readState"];
   getHistorySeedSnapshot: ComponentProps<typeof HistoryView>["getHistorySeedSnapshot"];
@@ -78,7 +77,6 @@ export interface AppShellViewsProps {
 
 export function buildAppShellViews(props: AppShellViewsProps): Record<View, ReactNode> {
   const {
-    aboutUpdateEntry,
     appSettings,
     dashboard,
     dashboardReadState,
@@ -228,7 +226,6 @@ export function buildAppShellViews(props: AppShellViewsProps): Record<View, Reac
     about: (
       <About
         key="about"
-        {...aboutUpdateEntry}
         onToast={onToast}
       />
     ),

@@ -2,7 +2,6 @@
   "_doc": "单文件 ≤300 行（AGENTS.md）的冻结基线。由 `node scripts/check-size.mjs --freeze` 扫描生成，禁止手写。语义是棘轮：每条的数值只许通过重新 --freeze 下调，不允许调大；不在表里的文件超 300 行直接失败。",
   "limit": 300,
   "files": {
-    "src-tauri/src/app/activity/bootstrap.rs": 305,
     "src-tauri/src/app/activity/main_window.rs": 777,
     "src-tauri/src/app/activity/mini_window.rs": 468,
     "src-tauri/src/app/activity/state.rs": 1220,
@@ -90,7 +89,6 @@
     "src-tauri/src/services/activity/engine/tracking/runtime/window_polling.rs": 370,
     "src-tauri/src/services/activity/engine/tracking/sustained_participation.rs": 984,
     "src-tauri/src/services/activity/engine/tracking/transition.rs": 527,
-    "src-tauri/src/services/activity/engine/updater.rs": 875,
     "src-tauri/src/services/activity/engine/web_activity/mod.rs": 498,
     "src/windows/activity/features/classification/components/AppMapping.tsx": 479,
     "src/windows/activity/features/classification/components/QuickClassificationSurface.tsx": 340,
@@ -120,8 +118,7 @@
     "src/windows/activity/features/settings/components/SettingsDataExportDialog.tsx": 476,
     "src/windows/activity/features/settings/components/SettingsScheduledExportDialog.tsx": 307,
     "src/windows/activity/features/settings/hooks/useSettingsPageState.ts": 564,
-    "src/windows/activity/features/update/services/updateViewModel.ts": 433,
-    "src/windows/activity/platform/desktop/resourceDiagnosticsRuntimeGateway.ts": 340,
+    "src/windows/activity/platform/desktop/resourceDiagnosticsRuntimeGateway.ts": 310,
     "src/windows/activity/platform/runtime/toolsRawDtos.ts": 387,
     "src/windows/activity/platform/runtime/trackingRawDtos.ts": 482,
     "src/windows/activity/shared/charts/HourlyActivityChart.tsx": 354,
@@ -135,11 +132,11 @@
     "src/windows/activity/shared/lib/webActivityViewModel.ts": 434,
     "src/windows/activity/shell/services/startupWarmupService.ts": 560,
     "src/windows/activity/shell/styles/app-shell.css": 321,
-    "src/windows/activity/shell/styles/features/about.css": 482,
+    "src/windows/activity/shell/styles/features/about.css": 428,
     "src/windows/activity/shell/styles/features/classification.css": 404,
     "src/windows/activity/shell/styles/features/destination.css": 450,
     "src/windows/activity/shell/styles/features/history.css": 817,
     "src/windows/activity/shell/styles/features/settings.css": 1275,
-    "src/windows/activity/shell/styles/quiet-pro.css": 1936
+    "src/windows/activity/shell/styles/quiet-pro.css": 1904
   }
 }

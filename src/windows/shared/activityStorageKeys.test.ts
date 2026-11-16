@@ -1,7 +1,7 @@
 /**
  * 注册表一致性 + 出口惰性的单测（施工单 §8 M-13 / M-14 / M-15 与 §2 S1 的账目证明）
  * -----------------------------------------------------------------------------
- * 账目是**写死常量**（不用 `>=`）：24 槽 = 20 个带 `target` + 4 个只读老键。
+ * 账目是**写死常量**（不用 `>=`）：23 槽 = 19 个带 `target` + 4 个只读老键。
  * 用 `>=` 会把"少建一槽"也放过去——账目错位本身就是静默丢数据的前兆。
  *
  * M-13 / M-14 / M-15 是"惰性"唯一的能红证明：每个用例都 `vi.resetModules()` +
@@ -18,8 +18,8 @@ import {
 import type { ActivitySlotName } from './activityStorageKeys';
 
 /** 账目常量（施工单已定 #9：写死，不用 `>=`）。 */
-const TOTAL_SLOTS = 24;
-const COPY_SLOTS = 20;
+const TOTAL_SLOTS = 23;
+const COPY_SLOTS = 19;
 const READ_ONLY_LEGACY_SLOTS = 4;
 
 beforeEach(() => {
@@ -33,12 +33,12 @@ async function freshKeys() {
 }
 
 describe('注册表账目（S1）', () => {
-  it('槽数 == 24（防空转下限 15，但账目是精确相等）', () => {
+  it('槽数 == 23（防空转下限 15，但账目是精确相等）', () => {
     expect(ACTIVITY_SLOTS.length).toBe(TOTAL_SLOTS);
     expect(ACTIVITY_SLOTS.length).toBeGreaterThanOrEqual(15);
   });
 
-  it('带 target 的槽 == 20、只读老键 == 4（写死常量，不用 >=）', () => {
+  it('带 target 的槽 == 19、只读老键 == 4（写死常量，不用 >=）', () => {
     const copySlots = ACTIVITY_SLOTS.filter((slot) => slot.target !== undefined);
     const readOnly = ACTIVITY_SLOTS.filter((slot) => slot.target === undefined);
     expect(copySlots.length).toBe(COPY_SLOTS);
@@ -48,7 +48,7 @@ describe('注册表账目（S1）', () => {
     );
   });
 
-  it('lifetime 由 Record 保证穷尽；transient 只有 pendingUpdateRelaunchView', () => {
+  it('lifetime 由 Record 保证穷尽；当前没有 transient 槽', () => {
     const names = Object.keys(ACTIVITY_SLOT_RECORD) as ActivitySlotName[];
     expect(names.length).toBe(TOTAL_SLOTS);
     for (const name of names) {
@@ -56,8 +56,11 @@ describe('注册表账目（S1）', () => {
       expect(slot.lifetime === 'preference' || slot.lifetime === 'transient', `${name} 的 lifetime`).toBe(true);
       expect(slot.name, 'Record 键与槽的 name 必须一致').toBe(name);
     }
+    /* [O3 2026-11-16] 唯一的 transient 槽 `pendingUpdateRelaunchView`（升级重启后恢复视图）
+       随更新通道删除。**空集也要断言**：它挡的是「有人又加了个 transient 槽却没说清
+       谁来消费」——transient 槽没有消费者就永远读不到，是静默空转的典型形态。 */
     const transient = ACTIVITY_SLOTS.filter((slot) => slot.lifetime === 'transient').map((slot) => slot.name);
-    expect(transient).toEqual(['pendingUpdateRelaunchView']);
+    expect(transient).toEqual([]);
   });
 
   it('每个槽的 legacy 非空且全仓唯一（含动态模板）；命名前缀符合 patina: / patina. 点号键', () => {

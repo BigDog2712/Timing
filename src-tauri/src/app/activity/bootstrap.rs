@@ -16,15 +16,10 @@ use crate::services::activity::engine::{
         pause_state::TrackingPauseRuntimeState, runtime_snapshot::TrackingRuntimeSnapshotState,
         title_state::TitleRecordingRuntimeState, watchdog::RuntimeHealthState,
     },
-    updater::UpdaterRuntimeState,
     web_activity::WebActivityRuntimeState,
 };
 use crate::services::activity::data;
 use tauri::Manager;
-
-pub struct BootstrapInput {
-    pub app_version: String,
-}
 
 /// 把 Patina 的状态与插件挂到**宿主**的 `Builder` 上。
 ///
@@ -34,14 +29,13 @@ pub struct BootstrapInput {
 ///   重复注册会 panic 或双份自启项；
 /// - 不挂 `setup` / `on_window_event` —— Tauri 各只允许一个，由宿主统一编排后调用
 ///   ［`setup`］与 [`on_window_event`］。
-pub fn configure(builder: tauri::Builder<tauri::Wry>, input: BootstrapInput) -> tauri::Builder<tauri::Wry> {
+pub fn configure(builder: tauri::Builder<tauri::Wry>) -> tauri::Builder<tauri::Wry> {
     let runtime_health = Arc::new(RuntimeHealthState::default());
-    register_managed_state_and_plugins(builder, &input.app_version, runtime_health)
+    register_managed_state_and_plugins(builder, runtime_health)
 }
 
 fn register_managed_state_and_plugins(
     builder: tauri::Builder<tauri::Wry>,
-    app_version: &str,
     runtime_health: Arc<RuntimeHealthState>,
 ) -> tauri::Builder<tauri::Wry> {
     builder
@@ -67,20 +61,17 @@ fn register_managed_state_and_plugins(
         .manage(crate::infra::activity::web_activity_bridge::WebActivityBridgeRuntimeState::default())
         .manage(crate::services::activity::engine::remote_status_bridge::RemoteStatusBridgeRuntimeState::default())
         .manage(WebActivityRuntimeState::default())
-        .manage(UpdaterRuntimeState::new(app_version.to_string()))
         .manage(crate::app::activity::scheduled_backup::ScheduledBackupRuntimeState::default())
         .manage(crate::app::activity::scheduled_export::ScheduledExportRuntimeState::default())
         /* autostart / notification 由宿主注册（同一个进程只能有一份）：见 `configure` 的说明。 */
         .manage(crate::services::activity::data::sqlite_pool::AppSqlitePool::default())
         .manage(crate::services::activity::data::activity_read_model::ReadModelWake::default())
         .plugin(tauri_plugin_opener::init())
-        /* 上游还注册了 `tauri-plugin-updater`，但它要求 `tauri.conf.json` 的
-        `plugins.updater` 是一份完整配置（pubkey + endpoints），而 Timing 一直没有自动
-        更新器（发版靠 `release/` 里的签名 NSIS 包手动分发）——配置为 null 时插件初始化
-        直接 panic，整个应用起不来。
-        取舍：**先不注册**。Patina 的「检查更新」入口仍在（`engine::updater`），运行时
-        会拿不到 plugin 而回错误，属于「功能未启用」而不是崩溃。
-        等 Timing 决定做自动更新时，补 `plugins.updater` 配置并把这一行加回来。 */
+        /* 上游这里还注册了 `tauri-plugin-updater`。2026-11-16 整条更新链已删除：它的
+        endpoints 指向 `github.com/Ceceliaee/patina`（别人的仓库），装上不是接到别人的
+        下载页就是永远拿不到包；而它要求的 `plugins.updater` 配置为 null 时插件初始化
+        直接 panic，整个应用起不来。发版统一走 `release/` 里的签名 NSIS 包。
+        **不要加回来**：判据 `tests/update_channel_removed.rs` 会红。 */
 }
 
 /* Patina 的命令表**不在这里**：Tauri 的 `invoke_handler` 只能设一次，而 `Invoke` 不可克隆，
@@ -110,22 +101,13 @@ pub fn setup(
             }
             tauri::async_runtime::block_on(data::app_settings_service::migrate_legacy_web_links(app.handle()))
                 .map_err(std::io::Error::other)?;
-            let mut should_clear_update_reopen_intent = false;
             let startup = match tauri::async_runtime::block_on(
-                data::app_settings_service::load_desktop_behavior_startup_state(app.handle()),
+                data::app_settings_service::load_desktop_behavior_settings(app.handle()),
             ) {
-                Ok(startup_state) => {
-                    should_clear_update_reopen_intent =
-                        startup_state.should_reopen_main_window;
-                    runtime::StartupContext::new(
-                        startup_state.settings,
-                        resolve_startup_source(
-                            launched_by_autostart,
-                            handled_storage_restart,
-                            startup_state.should_reopen_main_window,
-                        ),
-                    )
-                }
+                Ok(settings) => runtime::StartupContext::new(
+                    settings,
+                    resolve_startup_source(launched_by_autostart, handled_storage_restart),
+                ),
                 Err(error) => {
                     crate::log_warn!(
                         "failed to load desktop behavior settings; showing main window: {error}"
@@ -137,15 +119,6 @@ pub fn setup(
                 }
             };
             runtime::setup(app, runtime_health.clone(), startup)?;
-            if should_clear_update_reopen_intent {
-                if let Err(error) = tauri::async_runtime::block_on(
-                    data::app_settings_service::clear_post_install_reopen_main_window(app.handle()),
-                ) {
-                    crate::log_warn!(
-                        "main window reopened but update intent could not be cleared: {error}"
-                    );
-                }
-            }
             Ok(())
     }
 }
@@ -158,12 +131,13 @@ pub fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
 fn resolve_startup_source(
     launched_by_autostart: bool,
     handled_storage_restart: bool,
-    should_reopen_after_update: bool,
 ) -> StartupSource {
+    /* `StartupSource::UpdateRestart` 保留在枚举里，但**没有生产来源**了：它唯一的产出点
+       是「升级安装后要求重新打开主窗口」那条链（`__update_post_install_reopen_main_window`），
+       而那条链的写入口只有已被删除的更新引擎（O3，2026-11-16）。将来接上 Timing 自己的
+       更新通道时，在这里补回一支即可 —— 启动策略表（`startup_ui_strategy`）不用动。 */
     if handled_storage_restart {
         StartupSource::StorageRestart
-    } else if should_reopen_after_update {
-        StartupSource::UpdateRestart
     } else if launched_by_autostart {
         StartupSource::Autostart
     } else {
@@ -244,11 +218,11 @@ mod tests {
     #[test]
     fn ordinary_launch_sources_are_distinguished() {
         assert_eq!(
-            resolve_startup_source(false, false, false),
+            resolve_startup_source(false, false),
             StartupSource::Manual
         );
         assert_eq!(
-            resolve_startup_source(true, false, false),
+            resolve_startup_source(true, false),
             StartupSource::Autostart
         );
     }
@@ -256,15 +230,11 @@ mod tests {
     #[test]
     fn explicit_restarts_override_autostart_arguments() {
         assert_eq!(
-            resolve_startup_source(true, false, true),
-            StartupSource::UpdateRestart
-        );
-        assert_eq!(
-            resolve_startup_source(true, true, true),
+            resolve_startup_source(true, true),
             StartupSource::StorageRestart
         );
         assert_eq!(
-            resolve_startup_source(false, true, false),
+            resolve_startup_source(false, true),
             StartupSource::StorageRestart
         );
     }

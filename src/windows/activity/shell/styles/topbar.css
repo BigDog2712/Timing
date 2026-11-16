@@ -76,15 +76,6 @@
    * 6 字 × 14 = 84 → 被 ellipsis 剪。判据一律按 6 字（84）判，**不按"四个汉字"判**：
    * 后者把门槛降到刚好过线，等于自欺。
    * 不能放进 height 断点：「900 宽 × 736 高」是长档，高度轴不动，但宽度只有 900。 */
-  .at-topbar-status .app-titlebar-update-entry {
-    width: 28px;
-    padding: 0;
-  }
-
-  .at-topbar-status .app-titlebar-update-entry span {
-    display: none;
-  }
-
   /* 先砍冗余项：今日累计在环心 / 工具面 / 历史都有一份，名字是「我在计什么」的唯一处。
    * 省 75.3 → 名字列 111.5（实测），不截断；1100 档完整保留。
    * 钩子是 `data-titlebar-capsule-today`（TimingCapsule.tsx），不是结构选择器。 */

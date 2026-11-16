@@ -5,8 +5,8 @@
  * （判据 1 零白名单）：store 一律引用 `ACTIVITY_SLOT_RECORD` / 读写出口，
  * 不许自己再写一遍老键——否则"注册表 ↔ 代码字面量双向一致"（判据 2）就没有意义。
  *
- * 账目（写死常量，测试锁）：24 = **20 个可迁移**（带 `target`）+ **4 个只读老键**
- * （无 `target`：v2 异 schema / 更早键名 ×2 / 路径 B）。第 25 个成员是动态模板
+ * 账目（写死常量，测试锁）：23 = **19 个可迁移**（带 `target`）+ **4 个只读老键**
+ * （无 `target`：v2 异 schema / 更早键名 ×2 / 路径 B）。第 24 个成员是动态模板
  * `ACTIVITY_KEY_TEMPLATES`——它不是键，是**前缀**，兜注册表建成之后才出现的
  * 第 5 个导出格式（M-3）。
  *
@@ -31,7 +31,7 @@
 import { migrateActivityStorage } from './migrateActivityStorage';
 import type { ActivitySlot } from './migrateActivityStorage';
 
-/** 24 槽的逻辑名。新增槽 = 这里 +1、SLOT_RECORD +1（Record 保证穷尽）、消费方 +1。 */
+/** 23 槽的逻辑名。新增槽 = 这里 +1、SLOT_RECORD +1（Record 保证穷尽）、消费方 +1。 */
 export type ActivitySlotName =
   | 'classificationObjectMode'
   | 'boardLayout'
@@ -54,7 +54,6 @@ export type ActivitySlotName =
   | 'historyTimelineZoomHours'
   | 'historyTimelineMode'
   | 'lastActiveView'
-  | 'pendingUpdateRelaunchView'
   | 'mainWindowSize'
   | 'iconThemeColors';
 
@@ -64,7 +63,7 @@ function slot(name: ActivitySlotName, legacy: string, target?: string, lifetime:
 }
 
 /**
- * 注册表本体。`Record<ActivitySlotName, …>` 让 TS 保证 24 个名字一个不少；
+ * 注册表本体。`Record<ActivitySlotName, …>` 让 TS 保证 23 个名字一个不少；
  * 老键字面量**只出现在这里**（判据 1 的声明行）。
  * 点号键 1 个：`iconThemeColors`（Map 的序列化，迁移整串复制、不解析，§3.4）。
  * `boardLayoutV2`：v2 的 `x` 是列号，异 schema，冻结（契约 6），v2 与 :v3 并存是正常的。
@@ -94,17 +93,15 @@ export const ACTIVITY_SLOT_RECORD: Readonly<Record<ActivitySlotName, ActivitySlo
   historyTimelineZoomHours: slot('historyTimelineZoomHours', 'patina:history-timeline-zoom-hours', 'activity:history-timeline-zoom-hours'),
   historyTimelineMode: slot('historyTimelineMode', 'patina:history-timeline-mode'),
   lastActiveView: slot('lastActiveView', 'patina:last-active-view', 'activity:last-active-view'),
-  /* 唯一 transient：升级重启后消费一次即弃（§5.1 第 3 档的删除放写入成功分支，不进迁移）。 */
-  pendingUpdateRelaunchView: slot('pendingUpdateRelaunchView', 'patina:pending-update-relaunch-view', 'activity:pending-update-relaunch-view', 'transient'),
   mainWindowSize: slot('mainWindowSize', 'patina:window-size:v1', 'activity:window-size:v1'),
   iconThemeColors: slot('iconThemeColors', 'patina.icon-theme-colors.v2', 'activity.icon-theme-colors.v2'),
 };
 
-/** 24 槽平铺（迁移入口吃这个）。 */
+/** 23 槽平铺（迁移入口吃这个）。 */
 export const ACTIVITY_SLOTS: readonly ActivitySlot[] = Object.values(ACTIVITY_SLOT_RECORD);
 
 /**
- * 动态模板（§3.2）：**不是键，是前缀**。不在 24 槽账目里（`ACTIVITY_SLOTS.length === 24`
+ * 动态模板（§3.2）：**不是键，是前缀**。不在 23 槽账目里（`ACTIVITY_SLOTS.length === 23`
  * 是判据），迁移时与槽一起传给 `migrateActivityStorage`，靠 `dynamic: true` 走枚举回退。
  * 前缀字面量按判据 1 只许出现在注册表声明行。
  */

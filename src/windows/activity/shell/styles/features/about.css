@@ -118,53 +118,8 @@
   color: var(--at-danger);
 }
 
-.about-center-update.update-status-compact {
-  width: min(828px, 100%);
-  justify-self: center;
-  margin-top: 2px;
-  padding: 10px 12px;
-}
-
-.update-status-compact-main {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.update-status-compact-copy {
-  min-width: 0;
-  text-align: left;
-}
-
-.update-status-compact-title,
-.update-status-compact-state,
-.update-status-compact-detail {
-  margin: 0;
-}
-
-.update-status-compact-title {
-  color: var(--at-text-primary);
-  font-size: var(--at-font-size-body);
-  font-weight: var(--at-font-weight-emphasis);
-  line-height: var(--at-line-height-body);
-}
-
-.update-status-compact-state {
-  margin-top: 2px;
-  color: var(--at-text-secondary);
-  font-size: var(--at-font-size-caption);
-  font-weight: var(--at-font-weight-medium);
-  line-height: var(--at-line-height-caption);
-}
-
-.update-status-compact-detail {
-  margin-top: 2px;
-  color: var(--at-text-tertiary);
-  font-size: var(--at-font-size-caption);
-  line-height: var(--at-line-height-caption);
-}
+/* [O3 2026-11-16] 这里原本是「检查更新」紧凑面板的样式（`.about-center-update` /
+   `.update-status-compact-*`）。面板随更新通道删除，样式一并删掉。 */
 
 .about-support-dialog-surface {
   position: relative;
@@ -465,15 +420,6 @@
   .about-center-icon-shell img {
     width: 38px;
     height: 38px;
-  }
-
-  .update-status-compact-main {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .update-status-compact-main > .flex {
-    justify-content: flex-start;
   }
 
   .about-support-dialog-body {

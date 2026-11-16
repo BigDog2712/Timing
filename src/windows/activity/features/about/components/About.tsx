@@ -4,7 +4,6 @@ import { Info } from "lucide-react";
 
 import type { QuietToastTone } from "../../../shared/types/toast";
 import QuietPageHeader from "../../../shared/components/QuietPageHeader";
-import type { UpdateSnapshot } from "../../../shared/types/update";
 import AboutPanel from "./AboutPanel";
 import AboutFeedbackDialog from "./AboutFeedbackDialog";
 import {
@@ -13,33 +12,18 @@ import {
 } from "../../settings/services/settingsBootstrapService.ts";
 import { SettingsRuntimeAdapterService } from "../../settings/services/settingsRuntimeAdapterService";
 
+/* [O3 2026-11-16] 这里原本还接 8 个更新相关 prop（`updateSnapshot` / `onCheckForUpdates` /
+   `onOpenUpdateDialog` / `onOpenUpdateReleasePage` / `onOpenUpdateDownload` 与三个忙碌位），
+   来源是 `UpdateDialogProvider` 的上下文。整条更新链已删除：**版本号只从设置页 bootstrap
+   缓存取**，`null` 时显示 `-`（原来会先退回快照里的 `currentVersion`）。 */
 interface Props {
-  onCheckForUpdates?: () => Promise<void>;
-  onOpenUpdateDialog?: () => void;
-  onOpenUpdateReleasePage?: () => Promise<void>;
-  onOpenUpdateDownload?: () => Promise<void>;
-  updateSnapshot?: UpdateSnapshot;
-  updateChecking?: boolean;
-  updateInstalling?: boolean;
-  updateDialogOpen?: boolean;
   onToast?: (message: string, tone?: QuietToastTone) => void;
 }
 
-export default function About({
-  onCheckForUpdates,
-  onOpenUpdateDialog,
-  onOpenUpdateReleasePage,
-  onOpenUpdateDownload,
-  updateSnapshot,
-  updateChecking = false,
-  updateInstalling = false,
-  updateDialogOpen = false,
-  onToast,
-}: Props) {
+export default function About({ onToast }: Props) {
   const UI_TEXT = useLocaleText();
   const cachedBootstrap = getSettingsPageBootstrapCache();
-  const initialVersion = updateSnapshot?.currentVersion ?? cachedBootstrap?.appVersion ?? "-";
-  const [appVersion, setAppVersion] = useState(initialVersion);
+  const [appVersion, setAppVersion] = useState(cachedBootstrap?.appVersion ?? "-");
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -93,20 +77,6 @@ export default function About({
     }
   }, [notify, UI_TEXT]);
 
-  const effectiveUpdateSnapshot = updateSnapshot ?? {
-    currentVersion: appVersion,
-    status: "idle",
-    latestVersion: null,
-    releaseNotes: null,
-    releaseDate: null,
-    errorMessage: null,
-    errorStage: null,
-    downloadedBytes: null,
-    totalBytes: null,
-    releasePageUrl: null,
-    assetDownloadUrl: null,
-  };
-
   return (
     <div className="flex h-full min-w-0 flex-col gap-4 md:gap-5">
       <QuietPageHeader
@@ -117,23 +87,6 @@ export default function About({
       <div className="flex-1 overflow-y-auto at-scroll-region pr-2">
         <AboutPanel
           appVersion={appVersion}
-          effectiveUpdateSnapshot={effectiveUpdateSnapshot}
-          updateChecking={updateChecking}
-          updateInstalling={updateInstalling}
-          updateDialogOpen={updateDialogOpen}
-          onCheckForUpdates={() => {
-            if (!onCheckForUpdates) return;
-            void onCheckForUpdates();
-          }}
-          onOpenUpdateDialog={() => onOpenUpdateDialog?.()}
-          onOpenUpdateReleasePage={() => {
-            if (!onOpenUpdateReleasePage) return;
-            void onOpenUpdateReleasePage();
-          }}
-          onOpenUpdateDownload={() => {
-            if (!onOpenUpdateDownload) return;
-            void onOpenUpdateDownload();
-          }}
           onOpenReleaseNotes={() => {
             void handleOpenReleaseNotes();
           }}

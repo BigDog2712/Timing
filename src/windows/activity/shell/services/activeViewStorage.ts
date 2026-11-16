@@ -1,12 +1,14 @@
 import type { View } from "../types/view";
 import {
   readActivityKey,
-  removeActivityKey,
   writeActivityKey,
 } from "../../../shared/activityStorageKeys";
 
 /* [T04-4] 键名从注册表取（老键字面量只住 activityStorageKeys.ts）；读写走出口（先过迁移闸）。
-   `pendingUpdateRelaunchView` 是唯一 transient 槽：消费即删（只删当前键，老键永不碰）。 */
+   [O3 2026-11-16] 这里原来还住着一个 `pendingUpdateRelaunchView` transient 槽（升级重启后
+   「恢复到升级前那个视图」）。更新通道整批删除后它再没有任何写入方，槽与
+   `mark/clear/consume` 三个函数一并删掉 —— 留一段永远读到 null 的"恢复"逻辑，
+   比没有更容易让人误判「视图记忆坏了」。 */
 
 function isView(value: string | null): value is View {
   /* [T04] "tools" 已从 View 联合移除：旧会话存的 "tools" 在这里自然判非法，
@@ -26,23 +28,4 @@ export function rememberLastActiveView(view: View) {
 export function readLastActiveView(): View | null {
   const storedView = readActivityKey("lastActiveView");
   return isView(storedView) ? storedView : null;
-}
-
-export function markPendingUpdateRelaunchViewRestore() {
-  writeActivityKey("pendingUpdateRelaunchView", "1");
-}
-
-export function clearPendingUpdateRelaunchViewRestore() {
-  removeActivityKey("pendingUpdateRelaunchView");
-}
-
-export function consumePendingUpdateRelaunchView(): View | null {
-  const pendingValue = readActivityKey("pendingUpdateRelaunchView");
-
-  if (pendingValue !== "1") {
-    return null;
-  }
-
-  removeActivityKey("pendingUpdateRelaunchView");
-  return readLastActiveView();
 }

@@ -2,21 +2,13 @@ import { useLocaleText } from "../../../shared/i18n/index.ts";
 import { FileText, MessageSquare } from "lucide-react";
 import type { ReactNode } from "react";
 import appIconUrl from "../../../../../../src-tauri/icons/icon.png";
-import type { UpdateSnapshot } from "../../../shared/types/update";
 import QuietButton from "../../../shared/components/QuietButton";
-import UpdateStatusPanel from "../../update/components/UpdateStatusPanel";
 
-
+/* [O3 2026-11-16] 版本卡片下方原本有一块 `UpdateStatusPanel`（检查更新 / 下载进度 /
+   安装按钮）。整条更新通道已删除，这块随之移除；**保留**的三个入口（GitHub / 更新日志 /
+   反馈）与更新无关，走的是浏览器打开链接。 */
 type AboutPanelProps = {
   appVersion: string;
-  effectiveUpdateSnapshot: UpdateSnapshot;
-  updateChecking: boolean;
-  updateInstalling: boolean;
-  updateDialogOpen: boolean;
-  onCheckForUpdates?: () => void;
-  onOpenUpdateDialog?: () => void;
-  onOpenUpdateReleasePage?: () => void;
-  onOpenUpdateDownload?: () => void;
   onOpenReleaseNotes: () => void;
   onOpenRepository: () => void;
   onOpenFeedback: () => void;
@@ -49,14 +41,6 @@ function AboutLinkButton({
 
 export default function AboutPanel({
   appVersion,
-  effectiveUpdateSnapshot,
-  updateChecking,
-  updateInstalling,
-  updateDialogOpen,
-  onCheckForUpdates,
-  onOpenUpdateDialog,
-  onOpenUpdateReleasePage,
-  onOpenUpdateDownload,
   onOpenReleaseNotes,
   onOpenRepository,
   onOpenFeedback,
@@ -101,21 +85,6 @@ export default function AboutPanel({
           />
         </div>
 
-        <UpdateStatusPanel
-          className="about-center-update"
-          variant="compact"
-          snapshot={effectiveUpdateSnapshot}
-          checking={updateChecking}
-          installing={updateInstalling}
-          suppressProgress={updateDialogOpen}
-          showSupportLinks={false}
-          onCheckUpdates={() => onCheckForUpdates?.()}
-          onOpenConfirmDialog={() => onOpenUpdateDialog?.()}
-          onOpenUpdateReleasePage={() => onOpenUpdateReleasePage?.()}
-          onOpenUpdateDownload={() => onOpenUpdateDownload?.()}
-          onOpenReleaseNotes={onOpenReleaseNotes}
-          onOpenFeedback={onOpenFeedback}
-        />
       </section>
     </div>
   );

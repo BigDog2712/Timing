@@ -15,7 +15,6 @@ pub mod storage_cmd;
 pub mod tool_notifications_cmd;
 pub mod tools_cmd;
 pub mod tracking_cmd;
-pub mod update_cmd;
 pub mod web_activity_cmd;
 pub mod web_activity_analysis_cmd;
 pub mod window_cmd;

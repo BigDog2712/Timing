@@ -3,10 +3,9 @@ import { useLocaleText } from "../../shared/i18n/index.ts";
 
 import type { View } from "../types/view";
 import {
-  consumePendingUpdateRelaunchView,
   readLastActiveView,
   rememberLastActiveView,
-} from "../services/updateRelaunchViewStorage.ts";
+} from "../services/activeViewStorage.ts";
 
 type SaveHandler = (() => Promise<boolean>) | null;
 
@@ -39,7 +38,7 @@ export function useAppShellNavigation({ confirm }: UseAppShellNavigationParams) 
   const settingsSaveHandlerRef = useRef<SaveHandler>(null);
   const mappingSaveHandlerRef = useRef<SaveHandler>(null);
   const [currentView, setCurrentView] = useState<View>(
-    () => consumePendingUpdateRelaunchView() ?? readLastActiveView() ?? "dashboard",
+    () => readLastActiveView() ?? "dashboard",
   );
   const [viewDirtyState, setViewDirtyState] = useState<ViewDirtyState>(INITIAL_DIRTY_STATE);
 
