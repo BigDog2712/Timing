@@ -1,0 +1,92 @@
+/* =============================================================================
+ * Timing — 移动端 · 统计页「用它的时段」
+ * -----------------------------------------------------------------------------
+ * 第三块拆出来的样式表（`usage.css` 295 行、`usage-cards.css` 也已经不宽裕）。
+ * 只管一件事：把 `[{from, to}]` 画成一列「09:00 - 09:30   30 分钟」。
+ *
+ * 布局用 grid 的两列而不是 flex + `margin-left: auto`：时刻那一列等宽（`tabular-nums`）
+ * 才能上下对齐，右边长度右对齐，中间不留缝 —— 375px 上排两列刚好不折行。
+ * ========================================================================== */
+
+.m-usage-spans {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--m-radius);
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+}
+
+.m-usage-spans__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.m-usage-spans__title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-1);
+}
+
+.m-usage-spans__count {
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+}
+
+.m-usage-spans__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.m-usage-spans__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 3px 0;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+
+/* 时刻等宽：`09:00` 与 `10:00` 位数相同才对齐；比例数字会让整列轻微抖动 */
+.m-usage-spans__clock {
+  font-variant-numeric: tabular-nums;
+}
+
+.m-usage-spans__len {
+  font-size: var(--text-xs);
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* 空态与 `__hint` 同色但不带卡片背景：它常常紧跟在「这天合计」下面，
+   再套一层卡片会看起来像又一个读数 */
+.m-usage-spans__empty {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--ink-3);
+}
+
+/* 列表底部的两句补充（另有 N 次不到 1 分钟 / 其余 X 分钟没有逐次记录）。
+   比空态更弱：它是脚注，不是结论；左内缩与时刻列对齐，让人看出它属于这张表。 */
+.m-usage-spans__foot {
+  margin: 0;
+  padding-left: 2px;
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--ink-4);
+}
+
+.m-usage-spans__foot + .m-usage-spans__foot {
+  margin-top: 2px;
+}

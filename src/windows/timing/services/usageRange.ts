@@ -24,6 +24,12 @@ export interface UsageRow {
   last: number;
   /** 在几天里出现过（1..dayCount） */
   days: number;
+  /**
+   * 一共断成几段（跨天累加）。用来在排行行上说「3 段」，让人知道点进去
+   * 有明细可看 —— 但**不在这一层做重叠合并**：后端读出来时已经合并过，
+   * 而多天的段没有共同时间轴，合并它们会把不同日子的两段拼成一条。
+   */
+  spanCount: number;
   /** 系统给的应用显示名（空 = 不知道，渲染走 `displayName` 回落） */
   label: string;
   /** `data:image/webp;base64,…` 图标（空 = 没有，渲染走首字瓦片） */
@@ -54,6 +60,7 @@ export function mergeRows(days: readonly UsageDayDto[]): UsageRow[] {
           first: row.first,
           last: row.last,
           days: 1,
+          spanCount: (row.spans ?? []).length,
           label: row.label ?? '',
           icon: row.icon ?? '',
         });
@@ -61,6 +68,7 @@ export function mergeRows(days: readonly UsageDayDto[]): UsageRow[] {
       }
       hit.sec += row.sec;
       hit.days += 1;
+      hit.spanCount += (row.spans ?? []).length;
       /* 名字与图标**只补空位，不覆盖已有值**：同一个包的名字是稳定的，但某一天可能查不到
          （那天包还没装 / 那天取图标失败）。用「先遇到的非空值」，列表就不会因为
          某一天缺元数据而整行退回包名短名。 */
@@ -111,6 +119,7 @@ export function topRows(
     first: tail.reduce((min, row) => (row.first > 0 && (min === 0 || row.first < min) ? row.first : min), 0),
     last: tail.reduce((max, row) => Math.max(max, row.last), 0),
     days: tail.reduce((max, row) => Math.max(max, row.days), 0),
+    spanCount: tail.reduce((sum, row) => sum + row.spanCount, 0),
     /* 聚合行不是应用：没有名字也没有图标。渲染时直接用它的 `packageName`（那是给用户看的字面量）。 */
     label: '',
     icon: '',

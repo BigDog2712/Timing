@@ -65,10 +65,14 @@ pub async fn usage_stats_get(
             ));
         }
 
-        usage::rollup(&state.pool, &date, &reply.rows).await?;
+        /* 聚合与时段一起落（同一个事务）：只写进聚合、段没写进的话，界面就会
+           「有 40 分钟但一个时段都没有」，且没有任何报错。 */
+        usage::rollup(&state.pool, &date, &reply.rows, &reply.spans).await?;
 
         /* 读库 → 用桥回的 `apps` 补上显示名与图标。
-           名字**不进库**（迁移 0008 的「不存过期副本」），每次现查现合并。 */
+           名字**不进库**（迁移 0008 的「不存过期副本」），每次现查现合并。
+           时段也在这一层从库里读出来挂到每行上（老日期系统已没有任何回值，
+           但库里还留着当时记的段）。 */
         let rows = usage::with_meta(usage::read(&state.pool, &date).await?, &reply.apps);
         let total_sec = rows.iter().map(|row| row.sec.max(0)).sum();
         Ok(UsageDay {

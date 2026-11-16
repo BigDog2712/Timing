@@ -9,9 +9,11 @@
  */
 import { useMemo } from 'react';
 
+import { UsageSpanList } from './UsageSpanList';
 import { UsageTrend, type UsageTrendPoint } from './UsageTrend';
 import { UsageAppIcon } from './UsageAppIcon';
 import { clockText, displayName, formatDuration, monthDayShort } from './usageFormat';
+import type { UsageSpan } from '../../types/domain/usage';
 
 interface Props {
   packageName: string;
@@ -26,6 +28,8 @@ interface Props {
   onBack: () => void;
   /** 选中那天的首末时刻（0 = 未知）；不给就不显示这一行 */
   firstLast?: { first: number; last: number } | null;
+  /** 选中那天的使用时段（后端已合并；这里再归一一次） */
+  spans?: readonly UsageSpan[];
 }
 
 export function UsageAppDetail({
@@ -37,10 +41,21 @@ export function UsageAppDetail({
   onSelectDay,
   onBack,
   firstLast,
+  spans,
 }: Props) {
   const title = displayName({ packageName, label });
-  const stats = useMemo(() => {
-    let total = 0;
+  /* 空态必须分清两种空：老日期系统已回收明细（我们只记得合计），和这天真的没用。
+     判据是「首末时刻有一个还在」—— `last` 来自系统的 `lastTimeUsed`，事件明细没了它也还在；
+     只有两个都是 0 才是「真的没用过」。 */
+  const used = firstLast != null && (firstLast.first > 0 || firstLast.last > 0);
+  const spansHint = used
+    ? '这一天的明细已不在系统里（系统只保留约 7 天），只剩当时记下的合计。'
+    : '这天没有这个应用的前台记录。';
+  /* 选中那天的合计秒数，用来给时段列表算「缺口」。`null` 是「没读到」而不是 0，
+     所以转成 undefined 传给列表 —— 传 0 会让它算出「全部都没有记录」。 */
+  const daySec = points.find((point) => point.key === selected)?.totalSec;
+
+  const stats = useMemo(() => {    let total = 0;
     let count = 0;
     let longest: UsageTrendPoint | null = null;
     for (const point of points) {
@@ -86,11 +101,19 @@ export function UsageAppDetail({
         </div>
       </dl>
 
-      {firstLast != null ? (
+      {/* `clockText(0)` 会画成「08:00」（1970-01-01 UTC），所以两个时刻都在才显示这一行；
+          明细缺失时 `first` 会是 0，那是「不知道」而不是「零点」。 */}
+      {firstLast != null && firstLast.first > 0 && firstLast.last > 0 ? (
         <p className="m-usage__hint">
           当天首次 {clockText(firstLast.first)} · 最后 {clockText(firstLast.last)}
         </p>
       ) : null}
+
+      <UsageSpanList
+        spans={spans ?? []}
+        emptyHint={spansHint}
+        totalSec={daySec ?? undefined}
+      />
 
       <p className="m-usage__note">
         {stats.count === 0

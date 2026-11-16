@@ -221,6 +221,9 @@ export function UsagePage() {
         onSelectDay={selectDay}
         onBack={() => setDetailPkg(null)}
         firstLast={row == null ? null : { first: row.first, last: row.last }}
+        /* 时段取**选中那一天**的行，不从 `week` 合并行取：跨天的段没有共同时间轴，
+           合并出来的「09:00-09:30」会指向某一天，用户没法知道是哪天。 */
+        spans={row?.spans}
       />
     );
   }

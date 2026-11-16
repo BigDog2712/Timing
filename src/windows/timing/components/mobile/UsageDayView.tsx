@@ -120,11 +120,18 @@ export function UsageDayView({
             top={rows.top}
             rest={rows.rest}
             totalSec={day.totalSec}
-            meta={(row) =>
-              row.first > 0
-                ? `首次 ${clockText(row.first)} · 最后 ${clockText(row.last)}`
-                : `合计 ${formatSpanCN(row.sec)}`
-            }
+            meta={(row) => {
+              /* 段数打头：它回答的是「分几次用的」，比首末更能说明「点进去有东西看」。
+                 段数为 0（老日期、系统已回收明细）就不提，免得写成「0 段 · 首次 09:00」。 */
+              const parts: string[] = [];
+              if (row.spanCount > 0) parts.push(`${row.spanCount} 段`);
+              if (row.first > 0) {
+                parts.push(`首次 ${clockText(row.first)} · 最后 ${clockText(row.last)}`);
+              } else {
+                parts.push(`合计 ${formatSpanCN(row.sec)}`);
+              }
+              return parts.join(' · ');
+            }}
             onSelect={onSelectApp}
           />
           <p className="m-usage__note">只统计前台时间，息屏与后台播放不计。数据只留本机。</p>

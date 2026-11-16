@@ -80,6 +80,8 @@ import '../styles/mobile/usage.css';
 import '../styles/mobile/usage-overview.css';
 /* [0.13.3] 统计页第三份：卡片 / 标题 / 提示 / 注脚 / 失败原文（跨视图共用，再拆一次守上限） */
 import '../styles/mobile/usage-cards.css';
+/* [0.12.5] 统计页第四份：「用它的时段」列表（09:00 - 09:30） */
+import '../styles/mobile/usage-spans.css';
 /* [V0.11.0] 便利贴页（第 5 个 Tab） */
 import '../styles/mobile/notes.css';
 /* [V0.11.32] 结束未命名计时后补名字（独立一份，免得 sheets.css 撑破 300 行） */

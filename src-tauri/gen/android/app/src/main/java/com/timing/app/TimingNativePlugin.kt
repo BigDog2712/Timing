@@ -343,7 +343,7 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
-     * 取 [fromMs, toMs) 的前台时长（按包聚合），Rust → Kotlin。
+     * 取 [fromMs, toMs) 的前台时长（按包聚合）**与用它的时段**，Rust → Kotlin。
      *
      * 参数用 `invoke.getArgs()` 的 `org.json` 取值，不用 `@InvokeArg` + `parseArgs(Class)`：
      * 后者走 Jackson 反射，release 包开 R8 时反射链被优化掉会把异常折成一句
@@ -357,12 +357,17 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
         val payload = JSObject()
 
         /* 参数不合法不是错误：回空数组 + 真实授权状态，宿主那边会落成「这一天没有数据」。 */
-        val rows =
+        val day =
             if (from <= 0L || to <= from) {
-                org.json.JSONArray()
+                org.json.JSONObject()
             } else {
                 UsageStats.queryDay(activity, from, to)
             }
+        val rows = day.optJSONArray("rows") ?: org.json.JSONArray()
+        /* 已配对的区间 `[{packageName, from, to}]`。**扁平**，不塞进各自的 row：
+           跨桥只走 `jsArrayOf`，元素是 `JSONObject` 那条路已验证（`apps`），
+           嵌套 `JSONArray` 没有先例。 */
+        val spans = day.optJSONArray("spans") ?: org.json.JSONArray()
 
         /* 要解析名字与图标的包 = 本次事件里的 ∪ 宿主点名要的。
            后者的必要性：**系统只留约 7 天明细**，更早的日子 `queryDay` 回空，
@@ -386,8 +391,12 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
            直接写 `JSArray(JSONArray)` 会抛 "Not a primitive array"（0.12.2 真机就是这句），
            与权限无关、每次必抛。见 `jsArrayOf` 的注释。 */
         payload.put("rows", jsArrayOf(rows))
+        /* 时段与 rows 分开一条：rows 是与库里逐字对齐的事实（包名/秒/首末），
+           spans 是同一批事件配对出来的区间（包名/起/止）。两者都不含展示元数据 ——
+           名字与图标在下面的 `apps` 里。 */
+        payload.put("spans", jsArrayOf(spans))
         /* 名字与图标单独一条 `apps`，不塞进 rows：rows 是与库里逐字对齐的事实
-           （包名/秒/首末），apps 是每次现查的展示元数据，两者生命周期不同。
+           （包名/秒/首末/时段），apps 是每次现查的展示元数据，两者生命周期不同。
            塞在一起会让「rows 的字段名必须与 Rust 一致」这条纪律变模糊。 */
         payload.put("apps", AppMetadata.describe(activity, packages))
         /* **必须如实回读**（0.13.3 修）：这里原先是硬编码 `true`，于是「没开权限」被说成

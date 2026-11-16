@@ -39,7 +39,13 @@ export function UsageWeekView({ week, insights, onSelectApp }: Props) {
         top={rows.top}
         rest={rows.rest}
         totalSec={week.totalSec}
-        meta={(row) => `出现 ${row.days} 天`}
+        meta={(row) =>
+          /* 段数只在有明细时出：同样「出现 3 天」，每天 1 段和每天 5 段完全不是一回事。
+             老日期的明细已被系统回收，那时候写「0 段」反而像在说「没用过」。 */
+          row.spanCount > 0
+            ? `出现 ${row.days} 天 · ${row.spanCount} 段`
+            : `出现 ${row.days} 天`
+        }
         onSelect={onSelectApp}
       />
       <p className="m-usage__note">

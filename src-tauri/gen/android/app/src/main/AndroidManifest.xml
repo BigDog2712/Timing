@@ -7,6 +7,17 @@
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
+    <!-- 应用使用统计要显示「微信」「哔哩哔哩」和它们的图标，就必须能查**任意**包。
+         Android 11（API 30）起有「包可见性」限制（targetSdk 35 落在限制内）：
+         没声明这条时 `PackageManager.getApplicationInfo(第三方包)` 直接抛
+         NameNotFoundException —— 拿不到 ApplicationInfo 就没有名字没有图标，
+         前端只能回落到包名尾段（微信显示成 Mm、哔哩哔哩显示成 Bili）。
+         症状极像「桥没写对」：**自己和少数系统应用（forceQueryable）有真名，
+         第三方一个都没有，零报错零红测试**，0.12.6 真机截图就是这个。
+         这条是普通权限，装上即生效，不弹窗、不需要用户在设置里开。 -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
     <!-- V1-Android：倒计时到点 / 待办提醒走系统通知。API 33+ 属于「运行时权限」，
          需先声明再由前端（@tauri-apps/plugin-notification）发起申请；用户拒绝时
          前端降级为应用内提示条（PRD D7），不静默失败。 -->

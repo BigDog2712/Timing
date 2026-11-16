@@ -31,11 +31,22 @@ vi.mock('../../services/ipc', () => ({
 }));
 
 /**
+ * 本地时刻 → 毫秒。**不要用 `Date.parse('2026-11-15T09:00:00')`**：无时区后缀那串在部分
+ * 引擎里按 UTC 解，判据本身就会跟实现一起错 8 小时（这个坑 `clockText` 的注释里写着）。
+ */
+function at(hour: number, minute = 0): number {
+  return new Date(2026, 10, 15, hour, minute, 0, 0).getTime();
+}
+
+/**
  * 每天固定的两行：抖音 1 小时 + Chrome 10 分钟。
  *
  * 故意一条**带图标**、一条**不带**：带的那条走 `<img>`，不带的那条必须落到首字瓦片 ——
  * 两种状态都要在真渲染里验过，否则「图没了就空一格」这种只在真机才看得见的观感问题
  * 会一路带到包上。
+ *
+ * 抖音还带**两段**（09:00-09:30、10:00-10:10）：这是「分几次用的」在界面上的唯一证据，
+ * 只有 `sec` 一个数的话，断成两次和连着 70 分钟长得一模一样。
  */
 function dayOf(date: string): UsageDayDto {
   return {
@@ -46,10 +57,14 @@ function dayOf(date: string): UsageDayDto {
       {
         packageName: 'com.ss.android.ugc.aweme',
         sec: 3600,
-        first: 0,
-        last: 0,
+        first: at(9, 0),
+        last: at(10, 10),
         label: '抖音',
         icon: 'data:image/webp;base64,AAAA',
+        spans: [
+          { from: at(9, 0), to: at(9, 30) },
+          { from: at(10, 0), to: at(10, 10) },
+        ],
       },
       { packageName: 'com.android.chrome', sec: 600, first: 0, last: 0, label: 'Chrome' },
     ],
@@ -113,6 +128,8 @@ describe('统计页能挂起来并且读数对', () => {
     expect(text).not.toContain('Aweme');
     /* 占比与脚注都在：60m/70m ≈ 86% */
     expect(text).toContain('86%');
+    /* 排行行先说「分几次用的」，再给首末 —— 两段是这一天真实的形状 */
+    expect(text).toContain('2 段');
   });
 
   it('rd02_switching_to_week_aggregates_seven_days', async () => {
@@ -140,6 +157,31 @@ describe('统计页能挂起来并且读数对', () => {
 
     await click(buttonByText('‹'));
     expect(container.textContent ?? '').toContain('今日合计');
+  });
+
+  /**
+   * 详情页必须把「这一天分几次用的」摆出来 —— 这是本轮功能的**唯一**交付点。
+   *
+   * 源码级判据（`st19`）只能证明「写了 `<UsageSpanList`」，证明不了它真被渲染、
+   * 真拿到那一天的数据、时刻真是本机时区。所以这里点进详情，读屏幕上的字。
+   */
+  it('rd05_detail_lists_the_spans_of_the_selected_day', async () => {
+    await mount();
+    const row = [...container.querySelectorAll('button')].find((button) =>
+      (button.getAttribute('aria-label') ?? '').includes('查看每日趋势'),
+    );
+    expect(row, '排行行点不进详情').toBeDefined();
+    if (row == null) return;
+    await click(row);
+
+    const text = container.textContent ?? '';
+    expect(text).toContain('用它的时段');
+    expect(text).toContain('09:00 - 09:30');
+    expect(text).toContain('10:00 - 10:10');
+    expect(text).toContain('30 分钟');
+    /* 两条时段都在，段数也是 2 —— 不是「有列表但只有一条」 */
+    const rows = container.querySelectorAll('.m-usage-spans__row');
+    expect(rows.length, '时段列表渲染出来的条数与数据不符').toBe(2);
   });
 });
 

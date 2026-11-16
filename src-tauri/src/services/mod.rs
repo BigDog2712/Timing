@@ -87,8 +87,14 @@ pub mod timer_time;
 pub mod todo;
 pub mod todo_nudge;
 
-/* 应用使用统计（0.13.0，安卓）：只碰 app_usage 一张表。 */
+/* 应用使用统计（0.13.0，安卓；0.12.5 加使用时段；0.12.8 改成整天重算）：只碰
+   app_usage / app_usage_span 两张表。判据两组：`usage_tests.rs` 管纯函数，
+   `usage_rollup_tests.rs` 管落库与读库（各自都在 `check:size` 的 300 行以内）。 */
 pub mod usage;
+#[cfg(test)]
+mod usage_rollup_tests;
+#[cfg(test)]
+mod usage_tests;
 pub mod todo_start;
 
 /* 分析窗的服务层（原 patina/data + patina/engine：自带 sqlx 池的完整持久化栈 + 调度器）。

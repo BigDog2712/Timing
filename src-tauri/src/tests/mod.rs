@@ -70,6 +70,7 @@ mod qa_t01_sync_attack;
 #[cfg(desktop)]
 mod qa_batch1_edges;
 mod migration;
+mod migration_usage_span;
 mod migration_v2;
 mod moyu_settings;
 mod note;

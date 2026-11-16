@@ -208,6 +208,31 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
         )
         .await?;
     }
+    // ⑯ v12（0.12.5）：应用使用的**时段明细** `app_usage_span`。
+    //
+    // 结构与 0009–0011 同型：幂等段每次启动跑（建表 `IF NOT EXISTS`），版本推进关在
+    // 版本门里。本文件不碰任何老表 —— 老库升级后五张老表行数逐表相等。
+    run_raw(
+        pool,
+        include_str!("../migrations/0012_v01250_usage_span_guard.sql"),
+    )
+    .await?;
+    if schema_version(pool).await? < 12 {
+        run_raw(
+            pool,
+            include_str!("../migrations/0012_v01250_usage_span.sql"),
+        )
+        .await?;
+    }
+    /* 0.12.8：配对口径改了（同包内换 Activity 不再算离开），旧口径写下的碎段必须清掉，
+       否则新旧两批段并存 —— 详见 0013 的注释。没有 guard 段：本迁移不建任何对象。 */
+    if schema_version(pool).await? < 13 {
+        run_raw(
+            pool,
+            include_str!("../migrations/0013_v01280_usage_span_purge.sql"),
+        )
+        .await?;
+    }
     Ok(())
 }
 

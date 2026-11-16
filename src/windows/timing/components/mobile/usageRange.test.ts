@@ -124,9 +124,9 @@ describe('rangeOf', () => {
 
 describe('topRows', () => {
   const rows = [
-    { packageName: 'a', sec: 100, first: 0, last: 0, days: 3, label: '', icon: '' },
-    { packageName: 'b', sec: 90, first: 0, last: 0, days: 2, label: '', icon: '' },
-    { packageName: 'c', sec: 80, first: 0, last: 0, days: 1, label: '', icon: '' },
+    { packageName: 'a', sec: 100, first: 0, last: 0, days: 3, spanCount: 0, label: '', icon: '' },
+    { packageName: 'b', sec: 90, first: 0, last: 0, days: 2, spanCount: 0, label: '', icon: '' },
+    { packageName: 'c', sec: 80, first: 0, last: 0, days: 1, spanCount: 0, label: '', icon: '' },
   ];
 
   it('r03a_tail_becomes_one_row_so_the_sum_still_matches_the_total', () => {

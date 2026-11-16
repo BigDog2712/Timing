@@ -29,7 +29,26 @@ const KOTLIN = code(
 const APP_META = code(
   '../../../../../src-tauri/gen/android/app/src/main/java/com/timing/app/native/AppMetadata.kt',
 );
+/** 事件配对（进入/离开 → 一段）在采集器里，不在插件里。 */
+const SYSTEM = code(
+  '../../../../../src-tauri/gen/android/app/src/main/java/com/timing/app/native/UsageStats.kt',
+);
+/**
+ * 清单文件（XML）也去注释：`<!-- 说明 -->` 里会正当地写出权限全名，
+ * 不剥掉的话「注释里写了」也会算通过 —— 那正是「钉名字 ≠ 钉接线」的反面教材。
+ */
+function manifest(rel: string): string {
+  const url = new URL(rel, import.meta.url);
+  return readFileSync(url, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+}
+
+const MANIFEST = manifest(
+  '../../../../../src-tauri/gen/android/app/src/main/AndroidManifest.xml',
+);
+const GRADLE = manifest('../../../../../src-tauri/gen/android/app/build.gradle.kts');
 const FORMAT = code('./usageFormat.ts');
+const SPANS = code('./usageSpans.ts');
+const SPAN_LIST = code('./UsageSpanList.tsx');
 const RANKING = code('./UsageRanking.tsx');
 const DETAIL = code('./UsageAppDetail.tsx');
 const ICON = code('./UsageAppIcon.tsx');
@@ -118,8 +137,24 @@ describe('应用真名与图标', () => {
     expect(APP_META, '图标没有压到 64px').toContain('ICON_PX = 64');
     expect(APP_META, '图标没有编码').toContain('Bitmap.CompressFormat');
     expect(APP_META, '图标没有以 data URI 回给前端').toContain('data:image/webp;base64,');
-    /* 自适应图标要放大绘制区，否则四周留一圈透明、列表里比其他图标小一圈 */
-    expect(APP_META, '自适应图标没有放大绘制区').toContain('AdaptiveIconDrawable');
+    /* 自适应图标按 108 视口整幅画再裁中间 72，**不许用负坐标放大**：
+       那条路在部分 ROM 上画出来是全透明的，而全透明的图压出来也是合法 WebP，
+       前端只会显示成一块灰底空白（0.12.6 真机现象）。 */
+    expect(APP_META, '自适应图标没有按 108 视口处理').toContain('ADAPTIVE_PX = 108');
+    expect(APP_META, '又用负坐标放大自适应图标了').not.toMatch(/setBounds\(\s*-/);
+  });
+
+  /**
+   * 「画出来了」不等于「看得见」。三道闸缺一条，界面上就是一块灰底空白：
+   *   ① 全透明的位图压出来是合法 WebP ⇒ 必须有 `isBlank` 挡；
+   *   ② `compress` 回 true 不等于字节可用 ⇒ 必须 `decodeByteArray` 验一次；
+   *   ③ `info` 里的图标引用可能是空 ⇒ 必须还能按包名再取一次。
+   */
+  it('st15d_blank_or_undecodable_icons_are_dropped', () => {
+    expect(APP_META, '没有校验「整张图全透明」').toContain('isBlank(');
+    expect(APP_META, '没有校验字节能不能解码').toContain('decodeByteArray');
+    expect(APP_META, '字节数下限不见了（空白图只有几十字节）').toContain('MIN_ICON_BYTES');
+    expect(APP_META, '没有按包名兜底再取一次图标').toContain('getApplicationIcon(pkg)');
   });
 
   it('st15c_bridge_ships_apps_and_receives_packages', () => {
@@ -127,6 +162,35 @@ describe('应用真名与图标', () => {
     expect(KOTLIN, 'usageDay 没收 packages（老日子的名字永远解析不出来）').toContain(
       'args.optJSONArray("packages")',
     );
+  });
+
+  /**
+   * 名字与图标的**前置条件**在清单里，不在代码里。
+   *
+   * 真机截图（0.12.5 之后仍是 `Mm` / `Bili` / `Nova`）：自己和几个系统应用有真名真图标，
+   * 第三方一个都没有。原因不是桥写错，是 Android 11（API 30）起的「包可见性」：
+   * 没声明 `QUERY_ALL_PACKAGES` 时，`getApplicationInfo(第三方包)` 抛
+   * `NameNotFoundException` ⇒ `AppMetadata.resolve` 返回 null ⇒ 这个包连一条 `apps`
+   * 都不出现 ⇒ 前端回落包名尾段。**编译通过、运行不报错、测试全绿**，
+   * 只有真机上看着像「桥没写对」。
+   *
+   * 判据必须查**去掉 XML 注释之后**的清单：注释里写着同一串权限名是常态。
+   */
+  it('st20_manifest_declares_query_all_packages', () => {
+    expect(
+      MANIFEST,
+      '清单没声明 QUERY_ALL_PACKAGES：第三方应用拿不到名字与图标，只会回落包名',
+    ).toContain('android:name="android.permission.QUERY_ALL_PACKAGES"');
+    expect(MANIFEST, '缺 tools:ignore，Android Lint 会报 QueryAllPackagesPermission').toContain(
+      'tools:ignore="QueryAllPackagesPermission"',
+    );
+    /* 这条权限之所以必需，是因为 targetSdk ≥ 30 才启用包可见性过滤。
+       真有人把 targetSdk 降下去，本判据的前提就变了，得回来重看。 */
+    const target = Number(/targetSdk\s*=\s*(\d+)/.exec(GRADLE)?.[1] ?? '0');
+    expect(
+      target,
+      'targetSdk < 30：包可见性限制不生效，这条权限与这段判据都该重新评估',
+    ).toBeGreaterThanOrEqual(30);
   });
 
   it('st16_ui_has_exactly_one_name_rule', () => {
@@ -146,5 +210,48 @@ describe('应用真名与图标', () => {
     /* 图标兜底：没有图标时画首字瓦片，不许留破图 */
     expect(ICON, '图标没有兜底瓦片').toContain('m-usage__icon--letter');
     expect(ICON, '图标 alt 没有清空（读屏会把名字念两遍）').toContain('alt=""');
+    /* `icon` 非空 ≠ 能显示：加载失败要退回瓦片，否则界面上就是一块灰底（0.12.7） */
+    expect(ICON, '图片加载失败没有兜底（会留一块灰底空白）').toContain('onError');
+    expect(ICON, '加载失败没有记下来').toContain('setBroken(true)');
+  });
+});
+
+/**
+ * 「9:00-9:30、10:00-10:10」—— 时段必须真的从系统走到界面。
+ *
+ * 只有 `sec` 一个数的时候，「断成三次、每次十分钟」和「连着三十分钟」在界面上
+ * 长得一模一样。这一组钉整条链路的四个交接点，**任何一处断掉都能正常构建**：
+ *   ① 采集器配对（`ACTIVITY_RESUMED` + `PAUSED` → 一条 `{packageName, from, to}`）；
+ *   ② 桥单独回一条 `spans`（扁平，不塞进 rows —— 嵌套 `JSArray` 没有先例）；
+ *   ③ Rust 落库（`app_usage_span`）并在读时合并；
+ *   ④ 前端渲染前归一去重（`mergeSpans`），空态说清是「系统不保留了」还是「没用过」。
+ */
+describe('使用时段的采集与展示', () => {
+  it('st17_kotlin_pairs_events_into_spans', () => {
+    expect(SYSTEM, '采集器没有产出时段').toContain('item.put("from", span.from)');
+    expect(SYSTEM, '时段没有带包名（回来之后无法归到应用）').toContain(
+      'item.put("packageName", span.pkg)',
+    );
+    /* 不足 1 秒的碎段不记：显示成「09:00-09:00」既是噪声也会把库撑大 */
+    expect(SYSTEM, '没有丢弃 <1s 的碎段').toContain('MIN_SPAN_MS');
+    /* 返回值必须是 {rows, spans} 两段 —— 只回 rows 的话时段永远到不了宿主 */
+    expect(SYSTEM, '采集器没有把 spans 一起回出去').toContain('out.put("spans", spansOf(spans))');
+  });
+
+  it('st18_bridge_ships_spans_as_a_flat_verified_list', () => {
+    expect(KOTLIN, 'usageDay 没有回 spans').toContain('payload.put("spans", jsArrayOf(spans))');
+    /* 反向：直接 JSArray(spans) 就是 0.12.2 那个 Not a primitive array */
+    expect(KOTLIN, 'spans 没有经 jsArrayOf').not.toMatch(/JSArray\(\s*spans\s*\)/);
+    expect(KOTLIN, 'spans 不是从采集器的回值里取的').toContain('day.optJSONArray("spans")');
+  });
+
+  it('st19_ui_merges_before_rendering_and_says_which_empty', () => {
+    expect(SPANS, 'mergeSpans 不见了：重叠段会被算两遍').toContain('export function mergeSpans');
+    expect(SPAN_LIST, '列表没有先合并再渲染').toContain('mergeSpans(spans)');
+    /* 空态必须是一句说清原因的话，不是「暂无数据」 */
+    expect(SPAN_LIST, '空态没有专门的文案入口').toContain('emptyHint');
+    expect(DETAIL, '详情页没有说明「明细已不在系统里」').toContain('系统只保留约 7 天');
+    /* 详情页必须把选中那天的段传下去，否则组件永远空着 */
+    expect(DETAIL, '详情页没有渲染时段列表').toContain('<UsageSpanList');
   });
 });

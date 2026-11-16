@@ -1,9 +1,36 @@
 //! 安卓应用使用统计的 DTO（0.13.0）。
 //!
 //! 两个方向各一套，字段名与 Kotlin 侧 `usageDay` 的回值逐字一致（`packageName` / `sec` /
-//! `first` / `last`）—— 桥那层不做字段重命名，改名必须两边同批改。
+//! `first` / `last` / `spans[].from` / `spans[].to`）—— 桥那层不做字段重命名，
+//! 改名必须两边同批改。
 
 use serde::{Deserialize, Serialize};
+
+/// Kotlin `usageDay` 回的**一段前台区间**（JSON: `{packageName, from, to}`）。
+///
+/// 为什么是扁平的 `[{packageName, from, to}]` 而不是塞进各自的 row：跨桥的列表只走
+/// `jsArrayOf`，元素是 `JSONObject` 这条路已在真机上跑通（`apps`），嵌套 `JSONArray`
+/// 没有先例。少赌一种装法，多在这里分一次组。
+///
+/// `from` / `to` 是毫秒时刻，`[from, to)` 左闭右开；`to <= from` 的段在写库前丢掉。
+#[derive(Debug, Clone, Deserialize)]
+#[cfg_attr(desktop, allow(dead_code))]
+#[serde(rename_all = "camelCase")]
+pub struct UsageSpanRowDto {
+    pub package_name: String,
+    #[serde(default)]
+    pub from: i64,
+    #[serde(default)]
+    pub to: i64,
+}
+
+/// 给界面的一段前台区间。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageSpan {
+    pub from: i64,
+    pub to: i64,
+}
 
 /// Kotlin `usageDay` 回的一行（JSON: `{packageName, sec, first, last}`）。
 ///
@@ -77,12 +104,20 @@ pub struct UsageDayReply {
     pub rows: Vec<UsageRowDto>,
     #[serde(default)]
     pub apps: Vec<UsageAppDto>,
+    /// 已配对的前台区间（扁平，按包分组在 `services::usage::read` 里做）。
+    /// 缺这个键会静默读成空 —— 与 `rows` / `apps` 同一条风险，故仍是 `#[serde(default)]`。
+    #[serde(default)]
+    pub spans: Vec<UsageSpanRowDto>,
 }
 
 /// 一次查询的聚合结果，直接给界面。
 ///
 /// `label` / `icon` 由 `services::usage::with_meta` 从桥回的 `apps` 合并进来；
 /// 合并不到就留空串（前端回落），**不在这里编名字**。
+///
+/// `spans` 是这个应用**这一天**的前台区间，按时间升序、已合并重叠（见
+/// `services::usage::merge_spans`）。空数组是合法的：老日期系统已回收明细、
+/// 或那天全是不足 1 秒的碎段。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UsageAggregate {
@@ -92,6 +127,7 @@ pub struct UsageAggregate {
     pub last: i64,
     pub label: String,
     pub icon: String,
+    pub spans: Vec<UsageSpan>,
 }
 
 /// `usage_stats_get` 的回值。

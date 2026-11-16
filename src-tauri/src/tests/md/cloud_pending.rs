@@ -81,7 +81,7 @@ async fn migration_keeps_existing_rows() {
         )
         .await
         .as_deref(),
-        Some("11")
+        Some("13")
     );
     for (index, table) in TABLES.iter().enumerate() {
         assert_eq!(

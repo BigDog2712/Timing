@@ -33,9 +33,11 @@ const GATE = code('./UsageGate.tsx');
 const SWITCH = code('./UsageRangeSwitch.tsx');
 const INSIGHTS = code('./UsageInsightList.tsx');
 const ICON = code('./UsageAppIcon.tsx');
+const SPANS = code('./UsageSpanList.tsx');
 const CSS = code('../../styles/mobile/usage.css');
 const CSS2 = code('../../styles/mobile/usage-overview.css');
 const CSS3 = code('../../styles/mobile/usage-cards.css');
+const CSS4 = code('../../styles/mobile/usage-spans.css');
 const ENTRY = code('../../entry/main.tsx');
 const RECORDS = code('./RecordsPage.tsx');
 const SHELL = code('./MobileShell.tsx');
@@ -53,8 +55,9 @@ const COMPONENTS = [
   SWITCH,
   INSIGHTS,
   ICON,
+  SPANS,
 ];
-const STYLES = `${CSS}\n${CSS2}\n${CSS3}`;
+const STYLES = `${CSS}\n${CSS2}\n${CSS3}\n${CSS4}`;
 
 /** 从 TSX 里捞出所有 `m-usage*` 类名（含 BEM 修饰），顺序无关。 */
 function usedClasses(source: string): string[] {
@@ -88,6 +91,9 @@ describe('样式必须真的落地', () => {
     expect(ENTRY, 'main.tsx 没有引入 usage-cards.css').toContain(
       "'../styles/mobile/usage-cards.css'",
     );
+    expect(ENTRY, 'main.tsx 没有引入 usage-spans.css').toContain(
+      "'../styles/mobile/usage-spans.css'",
+    );
   });
 
   /** 移动端纪律：无 `:hover`（触摸设备没有悬停态）。 */
@@ -95,6 +101,7 @@ describe('样式必须真的落地', () => {
     expect(CSS).not.toContain(':hover');
     expect(CSS2).not.toContain(':hover');
     expect(CSS3).not.toContain(':hover');
+    expect(CSS4).not.toContain(':hover');
   });
 });
 

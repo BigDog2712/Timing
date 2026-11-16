@@ -51,9 +51,10 @@ async fn seed_system_item_uncategorized() {
             .as_deref(),
         Some("未归类")
     );
-    // schema 版本登记：全部迁移跑完推进到 8（K-7 / Spec §6 迁移铁律；v3 = 便利贴置顶列，ADR-019；
+    // schema 版本登记：全部迁移跑完推进到 12（K-7 / Spec §6 迁移铁律；v3 = 便利贴置顶列，ADR-019；
     // v4 = 待办提醒链路的 remind_stage / auto_start，ADR-030；v5 = 待办绑定事项 item_id，ADR-042；
-    // v6 = 云端待传队列 md_cloud_pending，ADR-061；v7 = 该队列按通路隔离；v8 = app_usage 应用使用统计）
+    // v6 = 云端待传队列 md_cloud_pending，ADR-061；v7 = 该队列按通路隔离；v8 = app_usage 应用使用统计；
+    // v9 = 设备维度；v10 = 同步簿记；v11 = 事项归属；v12 = app_usage_span 使用时段）
     assert_eq!(
         scalar_opt_str(
             &pool,
@@ -61,7 +62,7 @@ async fn seed_system_item_uncategorized() {
         )
         .await
         .as_deref(),
-        Some("11")
+        Some("13")
     );
 }
 
@@ -257,5 +258,38 @@ async fn foreign_key_enforced() {
     assert!(
         bad.is_err(),
         "外键 items(id) 应生效（PRAGMA foreign_keys=ON）"
+    );
+}
+
+/// `app_usage_span` 必须真的建出来，且主键是 `(package_name, local_date, start_ms)`。
+///
+/// 这条钉的是「迁移写了但表没建」——表现是 `usage_stats_get` 每次写库都报
+/// `no such table`（只在手机包里出现，桌面 `cargo test` 编不到那段 cfg 分支），
+/// 而统计页只会变成一句「读不到应用数据」。
+///
+/// 主键含 `start_ms` 是「重复上报取 MAX」的前提：同一段重扫要靠它做 `ON CONFLICT`
+/// 去重，少了它就会插进两条一模一样的区间，界面上「9:00-9:30」出现两遍。
+#[tokio::test]
+async fn usage_span_table_lands_with_expected_primary_key() {
+    let pool = fresh_pool("mig-usage-span").await;
+    let sql = scalar_opt_str(
+        &pool,
+        "SELECT sql FROM sqlite_master WHERE name = 'app_usage_span'",
+    )
+    .await
+    .expect("迁移跑完应有 app_usage_span 表");
+    let normalized = sql.to_lowercase().replace(['"', ' ', '\n', '\t'], "");
+    assert!(
+        normalized.contains("primarykey(package_name,local_date,start_ms)"),
+        "app_usage_span 的主键必须是 (package_name, local_date, start_ms)，实际：{sql}"
+    );
+    assert_eq!(
+        scalar_i64(
+            &pool,
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'idx_app_usage_span_date'"
+        )
+        .await,
+        1,
+        "读法索引 idx_app_usage_span_date 必须存在"
     );
 }
