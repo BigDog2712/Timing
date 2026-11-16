@@ -83,3 +83,42 @@ fn folder_validation_refuses_binding_overlap() {
     assert!(channel.validate_folder(&[binding(r"D:\VAULT")]).is_err());
     assert!(channel.validate_folder(&[binding(r"D:\other")]).is_ok());
 }
+
+/// 与活动库备份侧 `infra::activity::webdav::parse_base_url` 同一套规则：
+/// 内嵌口令一律拒绝，公网 http 一律拒绝，只有字面回环地址可以 http。
+#[test]
+fn webdav_validation_rejects_embedded_credentials_and_public_http() {
+    let channel = |url: &str| MdSyncCloudChannel {
+        enabled: true,
+        base_url: url.into(),
+        base_path: "/Timing/md".into(),
+        user: "me@example.com".into(),
+        ..Default::default()
+    };
+
+    assert!(
+        channel("https://user:secret@dav.example.com/dav").validate_webdav().is_err(),
+        "URL 里带账号密码会把口令明文写进 settings 表"
+    );
+    assert!(
+        channel("http://dav.example.com/dav").validate_webdav().is_err(),
+        "公网 http 会让 Basic 口令与日记标题明文过网"
+    );
+    assert!(
+        channel("http://localhost/dav").validate_webdav().is_err(),
+        "localhost 可能被 hosts/DNS 指到别处，与活动库备份侧口径一致：不放行"
+    );
+    assert!(
+        channel("https://dav.jianguoyun.com/dav/").validate_webdav().is_ok(),
+        "正常云端地址必须通过"
+    );
+    assert!(
+        channel("http://127.0.0.1:8080/dav").validate_webdav().is_ok(),
+        "字面回环地址（本机测试服务器）放行 http"
+    );
+    assert!(
+        channel("http://[::1]:8080/dav").validate_webdav().is_ok(),
+        "IPv6 回环同样放行"
+    );
+}
+

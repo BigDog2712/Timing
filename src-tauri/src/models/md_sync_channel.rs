@@ -96,6 +96,13 @@ impl MdSyncCloudChannel {
     }
 
     /// webdav 通路纯字符串校验（与旧 `validate_webdav` 逐字同口径）。
+    ///
+    /// [P1 · 安全] 在旧口径之上补两条，与活动库备份侧 `infra::activity::webdav::parse_base_url`
+    /// 保持**同一套规则**（同一产品不允许两套相反的安全口径）：
+    ///   1. 拒绝 URL 内嵌账号密码（`https://user:pass@host`）——口令必须走单独的密码栏，
+    ///      否则它会被原样写进 `settings` 表，随导出包与整库备份一起扩散；
+    ///   2. 公网地址必须是 `https://`；只有**字面回环地址**（`127.x.x.x` / `[::1]`）放行
+    ///      `http://`（本机测试服务器）。`http://example.com` 会让 Basic 口令与标题明文过网。
     pub fn validate_webdav(&self) -> Result<(), String> {
         let url = self.base_url.trim();
         if url.is_empty() && self.enabled {
@@ -106,6 +113,18 @@ impl MdSyncCloudChannel {
             let lower = url.to_lowercase();
             if !(lower.starts_with("http://") || lower.starts_with("https://")) {
                 return Err("服务地址要以 http:// 或 https:// 开头".into());
+            }
+            let authority = authority_of(url);
+            if authority.contains('@') {
+                return Err(
+                    "服务地址里不能带账号密码：账号填下面的「账号」栏，密码填「密码」栏".into(),
+                );
+            }
+            if lower.starts_with("http://") && !is_loopback_host(authority) {
+                return Err(
+                    "公网地址必须用 https://（http 会让账号密码与日记标题明文过网）；只有本机地址可以 http"
+                        .into(),
+                );
             }
         }
         if self.base_path.trim().is_empty() && self.enabled {
@@ -181,6 +200,36 @@ pub(crate) fn resolve_template(template: &str) -> Result<PathBuf, String> {
         return Err(format!("云端落点目录必须是绝对路径：{expanded}"));
     }
     Ok(path)
+}
+
+/// `http(s)://` 之后的 authority 段（到第一个 `/` `?` `#` 为止）。
+///
+/// 只做「取一段」这一件事：口令校验只需要判断里面有没有 `@`，不需要完整 URL 解析。
+/// 不引 `url` crate —— 它与 `infra::activity::webdav::parse_base_url` 的判据必须同口径，
+/// 两处各引一个解析器才是真正会漂的地方。
+fn authority_of(url: &str) -> &str {
+    let after_scheme = match url.find("://") {
+        Some(index) => &url[index + 3..],
+        None => url,
+    };
+    after_scheme
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or(after_scheme)
+}
+
+/// authority 是否指向**字面回环地址**（`127.0.0.0/8` 或 `[::1]`）。
+///
+/// 只有这两种放行 `http://`：它们是本机测试服务器，不出网卡。`localhost` 不放行——
+/// 它可能被 hosts / DNS 指到别处，与活动库备份侧的口径一致（那里的用例明确断言
+/// `http://localhost/dav` 必须被拒）。
+fn is_loopback_host(authority: &str) -> bool {
+    let host = if let Some(rest) = authority.strip_prefix('[') {
+        rest.split(']').next().unwrap_or(rest)
+    } else {
+        authority.split(':').next().unwrap_or(authority)
+    };
+    host == "::1" || host.starts_with("127.")
 }
 
 /// 长度与换行的通用校验（`what` 是给人看的字段名）。旧 `md_sync_cloud` 的同名函数搬来。
