@@ -82,6 +82,16 @@ clippy 那两条 `-A` 是**存量豁免**，不是抄错命令：`unwrap_used` /
   L1 `components`（含 `activity/{shell,features,shared}` 下的 `components/`）不 `invoke`；L2 `stores`（含 `*Store.ts`、`features/**/stores`）不碰 `ipc.`；L3 只有 `windows/shared/windowApi.ts` 引窗口 API 包（`api/window` 与 `api/webviewWindow`）；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `windows/timing/lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）；L9 双窗隔离——主窗与分析窗不得互相 import，**例外表已清空**：原 5 条共享模块（windowApi / handleCatalog / handleBindings / pillAppearance / pillPrefsGateway）已整体下沉到 `src/windows/shared/`，两侧直接引它，跨窗引用在物理上消失（带哨兵：两条路径集合必须非空；例外表非空时每条必须真实存在，防薄壳改名后绿着空转）；**L10 分层方向**——`activity/platform/**` 不得 import `features/**` 或 `shell/**`，`activity/shared/**` 不得 import `features/**`、`shell/**`、`platform/**`，`windows/shared/**` 不得 import `timing/**` 或 `activity/**`（带哨兵：每层路径集合非空且至少解析出 1 条相对 import，防路径前缀写错后绿着空转；`*.test.*` 不参与——测试站在最上层验收接缝；CSS 等资源说明符不参与——它们没有模块语义）。
 - **IPC 契约** → `npm run check:contract`
   命令 4 处一致（`generate_handler!` / `IpcApi` / `ipc.ts` / `browserMock`）、错误码 2 处一致、事件三方一致（后端常量 / `IPC_EVENTS` / emit 点）、禁止事件名字面量、**每个错误码必须在 `errorText()` 里有 case**（否则静默落到通用兜底）。
+- **运行时标识符一致** → `npm run check:runtime-ids`
+  判的是**跨文件一致性**（"三处说的是不是同一个名字"），不是"名字必须叫 activity" —— 所以它在改名之前就能落地全绿，只有中间态（Rust 改了、capability 没改）才红。这是本仓唯一「编译通过、运行期零日志」的一类失效：`capabilities/*.json` 的 `windows[]` 与真实 label 对不上 ⇒ 命令全部静默拒绝、界面正常、数据全空。裸字面量（`get_webview_window("x")`）预算 **0**，只准走常量。
+- **存储键只准住注册表** → `npm run check:storage-keys`
+  分析窗那批 localStorage 键的旧前缀字面量只准出现在 `src/windows/shared/activityStorageKeys.ts`，**零白名单**。防的是「改名之后又漂回去」：谁在某个 store 里再写一个字面量，用户那份偏好就读不到，而且**没有任何报错**——界面只是回到默认值。
+- **数据布局去 Patina 化** → `npm run check:de-patina`
+  7 条判据：库文件名、目录段字面量只准出现在声明行、迁移工序的形状（`VACUUM INTO` 产库、`fs::copy` 只在 `copy_missing`、不许 `remove_dir_all`、迁移模块不许 `fs::write`）。扫描根写错会因「生产面文件数低于下限」直接红，不会绿着空转。
+- **品牌与文案** → `npm run check:brand`
+  三档：全仓扫（白名单按**文件 + 行**豁免，不按目录放行）、文案表窄扫、**契约面预算 0**（`vite.config.ts` 与 `host-commands.toml` 里不许再有旧词）。归档件（`android-app/`）整体跳过并在输出里明说，不静默漏。
+- **门禁接线自检** → `npm run check:ci-parity`
+  `scripts` / `check` 链 / `verify` / `ci.yml` 四处的名字不许漂：每个 `check:*` 必须出现在 `check` 串里、链里引用的每个脚本必须存在、`verify` 必须同时含 `check` + `build` + `test`、`ci.yml` 里每个 `npm run X` 必须存在。守的是「写了脚本没接进链」与「门禁被悄悄降级」这两类**沉默的**退化——它们都不会让任何一条已有判据变红。
 - **代码归属**（无门禁，见 `THIRD-PARTY-NOTICES.md`）
   Patina 已按层并入，本项目自 0.12.2 起**完全自主维护**，上游对账门禁已于 2026-11-15 下线：
   `scripts/vendored-baseline.json` / `vendored-allowlist.json` / `check-vendored-diff.mjs` 均已删除，
