@@ -18,7 +18,7 @@
 
 use sqlx::SqlitePool;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult};
 use crate::models::record::TimeRecord;
 use crate::platform::clock::day_bounds;
 use crate::repositories::record_session as session;
@@ -95,9 +95,25 @@ pub async fn finalize(
     ended_at: i64,
     now: i64,
 ) -> AppResult<()> {
+    let mut tx = pool.begin().await.map_err(AppError::db)?;
+    finalize_in(&mut tx, active, accumulated_sec, ended_at, now).await?;
+    tx.commit().await.map_err(AppError::db)?;
+    Ok(())
+}
+
+/// [`finalize`] 的事务内版本（S3：结束会话必须与 `stop` 事件同事务）。
+///
+/// 拆天与否在这里仍然只判一次（`split_by_day` 是纯函数），差别只在「用哪个仓储函数」。
+pub async fn finalize_in(
+    conn: &mut sqlx::SqliteConnection,
+    active: &TimeRecord,
+    accumulated_sec: i64,
+    ended_at: i64,
+    now: i64,
+) -> AppResult<()> {
     let segments = split_by_day(active.started_at, ended_at, accumulated_sec);
     if segments.len() == 1 {
-        return session::finalize(pool, active.id, accumulated_sec, ended_at, now).await;
+        return session::finalize(conn, active.id, accumulated_sec, ended_at, now).await;
     }
     crate::log_info!(
         "timer split across midnight: id={} into {} segments",
@@ -108,7 +124,7 @@ pub async fn finalize(
         .iter()
         .map(|s| (s.started_at, s.ended_at, s.accumulated_sec))
         .collect();
-    session::finalize_split(pool, active, &rows, now).await
+    session::finalize_split(conn, active, &rows, now).await
 }
 
 #[cfg(test)]

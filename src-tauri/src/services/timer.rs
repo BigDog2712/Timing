@@ -103,11 +103,15 @@ pub async fn start(pool: &SqlitePool, item_id: Option<i64>) -> AppResult<TimeRec
         return Err(AppError::invalid_duration());
     }
     let now = clock::now_ms();
-    let id = session::insert_active(pool, item_id, now).await?;
-    /* [0.13.x] 事件流：`start` 必须跟着会话一起落，否则对端只收到后面的 pause/stop，
-       fold 判「没有 start」把它们全忽略 —— 那条会话在另一台上根本不存在。
-       `at_ms` 用 `now`：start 没有「段起点」可参照，它自己就是段起点。 */
-    crate::services::timer_events::record_start(pool, id, now, timer_mode::COUNTUP, None).await;
+    /* [S3] 会话行与 `start` 事件**同一个事务**：分成两次写时，「行落了、事件没落」会让
+       对端只收到后面的 pause/stop，fold 判「没有 start」把它们全忽略 —— 那条会话在
+       另一台上根本不存在，而本机一切正常。 */
+    let mut tx = pool.begin().await.map_err(AppError::db)?;
+    let id = session::insert_active_in(&mut tx, item_id, now).await?;
+    /* `at_ms` 用 `now`：start 没有「段起点」可参照，它自己就是段起点。 */
+    crate::services::timer_events::record_start(&mut tx, id, now, timer_mode::COUNTUP, None)
+        .await?;
+    tx.commit().await.map_err(AppError::db)?;
     // 新会话开始：把墙钟起点钉到单调时刻上，后续「跑了多久」不再看墙钟。
     clock::anchor(now);
     settings::set_last_item_id(pool, item_id).await?;
@@ -128,8 +132,12 @@ pub async fn pause(pool: &SqlitePool) -> AppResult<TimeRecord> {
         /* 语义时刻要在 `clear_anchor` **之前**算：之后单调锚点就没了，`elapsed_ms` 会退回
            墙钟差值，与刚才写进 `accumulated_sec` 的那一份不是同一个来源。 */
         let at_ms = timer_events::end_at(Some(running_since), now);
-        session::set_accum_and_running(pool, active.id, accumulated, None, now).await?;
-        timer_events::record(pool, active.id, TimerOpKind::Pause, at_ms, None).await;
+        /* [S3] 状态与事件同一事务：分开写会出现「本机暂停了、对端还在跑」，
+           而且两边都不报错。锚点在 commit **之后**才清 —— 回滚时那段还在跑。 */
+        let mut tx = pool.begin().await.map_err(AppError::db)?;
+        session::set_accum_and_running_in(&mut tx, active.id, accumulated, None, now).await?;
+        timer_events::record(&mut tx, active.id, TimerOpKind::Pause, at_ms, None).await?;
+        tx.commit().await.map_err(AppError::db)?;
         // 暂停后不再有「运行中区间」，锚点必须清掉，否则下次 resume 会拿旧锚点算差值。
         clock::clear_anchor(running_since);
     }
@@ -143,11 +151,13 @@ pub async fn resume(pool: &SqlitePool) -> AppResult<TimeRecord> {
         .ok_or_else(AppError::timer_not_running)?;
     let now = clock::now_ms();
     if active.running_since.is_none() {
-        session::set_accum_and_running(pool, active.id, active.accumulated_sec, Some(now), now)
+        let mut tx = pool.begin().await.map_err(AppError::db)?;
+        session::set_accum_and_running_in(&mut tx, active.id, active.accumulated_sec, Some(now), now)
             .await?;
         /* `resume` 的 `at_ms` 是**新段的起点**，所以取 `now` 而不是 `elapsed_at`：
            这时还没有流逝可算（段的流逝从此刻开始）。 */
-        timer_events::record(pool, active.id, TimerOpKind::Resume, now, None).await;
+        timer_events::record(&mut tx, active.id, TimerOpKind::Resume, now, None).await?;
+        tx.commit().await.map_err(AppError::db)?;
         clock::anchor(now);
     }
     reload(pool, active.id).await
@@ -161,14 +171,16 @@ pub async fn discard(pool: &SqlitePool) -> AppResult<()> {
     let now = clock::now_ms();
     /* 丢弃也把真实累计写进去：软删除的行不该留 `accumulated_sec=0` 的脏值。 */
     let accumulated = live_duration(&active, now);
-    let out = session::discard(pool, active.id, accumulated, now, now).await;
-    /* `drop` 是一条**事件**（不是删掉旧事件）：对端 fold 到它才知道这段被丢弃，
-       否则它会照着 start 造出一段「还在进行中」的块。 */
-    timer_events::record(pool, active.id, TimerOpKind::Drop, now, None).await;
+    /* [S3] 丢弃 + `drop` 事件同一事务。`drop` 是一条**事件**（不是删掉旧事件）：
+       对端 fold 到它才知道这段被丢弃，否则它会照着 start 造出一段「还在进行中」的块。 */
+    let mut tx = pool.begin().await.map_err(AppError::db)?;
+    session::discard_in(&mut tx, active.id, accumulated, now, now).await?;
+    timer_events::record(&mut tx, active.id, TimerOpKind::Drop, now, None).await?;
+    tx.commit().await.map_err(AppError::db)?;
     if let Some(rs) = active.running_since {
         clock::clear_anchor(rs);
     }
-    out
+    Ok(())
 }
 
 /// 撤销结束：saved 回滚为 active（3s 窗口内，且当前无其他 active）。

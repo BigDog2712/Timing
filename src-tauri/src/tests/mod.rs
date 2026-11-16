@@ -122,6 +122,8 @@ mod timer_formula;
 mod timer_recover_gap;
 /* [V0.11.24 批 2] 异常退出恢复改造：H2 / H3 跨零点 / H5 多 active + 托盘退出 ② 收尾。 */
 mod timer_recover_batch2;
+/* [S3] 状态行与事件流同事务：注入 timer_ops 写失败，断言状态也没落。 */
+mod timer_tx_atomic;
 mod timer_switch;
 mod timer_threshold;
 mod timer_todo_link;

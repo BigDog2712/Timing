@@ -57,23 +57,27 @@ pub async fn stop(pool: &SqlitePool) -> AppResult<StopResult> {
     let at_ms = crate::services::timer_events::end_at(active.running_since, now);
     // 与切换分段同一口径，判定逻辑只在 `should_ignore` 里写一遍（ADR-023）。
     if should_ignore(pool, accumulated).await {
-        session::discard(pool, active.id, accumulated, at_ms, now).await?;
+        /* [S3] 软删 + 两条事件同一事务：分开写时「本机丢了这段、对端还留着」，
+           而两端都不报错 —— 用户永远发现不了时长对不上。 */
+        let mut tx = pool.begin().await.map_err(AppError::db)?;
+        session::discard_in(&mut tx, active.id, accumulated, at_ms, now).await?;
         crate::services::timer_events::record(
-            pool,
+            &mut tx,
             active.id,
             crate::services::timer_ops::TimerOpKind::Stop,
             at_ms,
             None,
         )
-        .await;
+        .await?;
         crate::services::timer_events::record(
-            pool,
+            &mut tx,
             active.id,
             crate::services::timer_ops::TimerOpKind::Drop,
             at_ms,
             None,
         )
-        .await;
+        .await?;
+        tx.commit().await.map_err(AppError::db)?;
         if let Some(rs) = active.running_since {
             clock::clear_anchor(rs);
         }
@@ -97,20 +101,23 @@ pub async fn stop(pool: &SqlitePool) -> AppResult<StopResult> {
             discarded: true,
         });
     }
-    /* [V0.11.3] 跨零点按天拆开落库：一条 23:40→00:20 的会话变成两天各一段，
+    /* [S3] 跨天拆分 + `stop` 事件同一事务。
+    [V0.11.3] 跨零点按天拆开落库：一条 23:40→00:20 的会话变成两天各一段，
     日记里各归各的日期。不跨天时与 `session::finalize` 等价（内部走同一条路径）。 */
-    crate::services::timer_split::finalize(pool, &active, accumulated, at_ms, now).await?;
+    let mut tx = pool.begin().await.map_err(AppError::db)?;
+    crate::services::timer_split::finalize_in(&mut tx, &active, accumulated, at_ms, now).await?;
     /* `stop` 用**原会话**的 uid 记，即使上面把它按天拆成了多行：事件流描述的是
     「用户按了结束」这一件事，拆天是本地展示口径（`timer_split` 的取舍见该文件头）。
     对端 fold 出的是未拆分的单条块，范围与拆开的两段完全一致。 */
     crate::services::timer_events::record(
-        pool,
+        &mut tx,
         active.id,
         crate::services::timer_ops::TimerOpKind::Stop,
         at_ms,
         None,
     )
-    .await;
+    .await?;
+    tx.commit().await.map_err(AppError::db)?;
     if let Some(rs) = active.running_since {
         clock::clear_anchor(rs);
     }

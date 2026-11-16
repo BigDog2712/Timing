@@ -1,17 +1,24 @@
 //! 计时事件接线：把 `services::timer` 的状态变更落成 `timer_ops` 事件。
 //!
-//! ## 只做一件事：把「按了按钮」翻译成一条事件
-//!
-//! 状态机仍在 `services::timer`（谁都不能有第二份）。这里只负责：
+//! ## 只做两件事
 //!
 //! 1. 把墙钟时刻修正成**与累计秒同源**的语义时刻（见 [`elapsed_at`]）；
-//! 2. 追加事件；失败只记 WARN，**不阻断计时**。
+//! 2. 在**调用方的事务里**追加事件。
 //!
-//! ## 为什么事件写失败不报错
+//! ## 为什么必须同事务（S3 定案，2026-11-16）
 //!
-//! 事件的用途是跨端同步，不是本地状态（本地状态仍在 `time_records`，由原逻辑写）。
-//! 让它阻断「暂停」等于为了一个远端副本牺牲本机可用性 —— 用户按下暂停就该暂停。
-//! 但失败必须留日志，否则表现是「这条会话在另一端永远不存在」，而且零报错。
+//! 原先这里的口径是「事件写失败只记 WARN、不阻断计时」，理由是「本地状态在
+//! `time_records`，事件只是远端副本」。那个理由漏了一件事：**状态行与事件流是同一份
+//! 事实的两个投影**。状态写成功、事件写失败之后，本机看到的是一段正常的暂停，
+//! 对端 fold 出来的是「这台设备还在跑」—— 没有报错、没有日志给用户看、两天后时长对不上。
+//! 那不是「牺牲远端换本机可用」，是**两端各自记了一份互相矛盾的账**。
+//!
+//! 所以现在两个写入装进同一个事务：要么都成，要么都不成并向上返回错误。代价是
+//! 磁盘写不进去时「暂停」会失败 —— 这是正确代价，因为它同时也意味着这一段本来也存不下来。
+//!
+//! ⚠️ 允许「不适用」但不允许「静默丢」：设备身份没认领、会话还没有 uid 时
+//! `append_for_record` 返回 `Ok(None)`（见 `repositories::timer_ops_event`），
+//! 那不是失败，不该让用户按不动暂停。
 //!
 //! ## 为什么 `at_ms` 不能用裸 `clock::now_ms()`
 //!
@@ -21,8 +28,9 @@
 //! 「段起点 + 单调流逝」，见 [`elapsed_at`]。这样同一条会话在单设备上 fold 出来的
 //! 秒数与既有实现**逐位相同**（用例 `fold_matches_time_records` 钉住这一点）。
 
-use sqlx::SqlitePool;
+use sqlx::SqliteConnection;
 
+use crate::error::AppResult;
 use crate::services::timer_ops::TimerOpKind;
 
 /// 把墙钟时刻修正成「与 `live_duration` 同源」的语义时刻。
@@ -48,36 +56,33 @@ pub fn end_at(running_since: Option<i64>, wall_now_ms: i64) -> i64 {
     }
 }
 
-/// 追加一条事件；任何失败都只记日志。
+/// 在**调用方的事务**里追加一条事件。
+///
+/// 返回 `Ok(())` 包含「跳过」（设备身份未认领 / 会话没有 uid）：那不是失败。
+/// 真正的写入错误原样向上抛，由调用方的事务回滚 —— 状态行与事件流必须一起落。
 pub async fn record(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     record_id: i64,
     kind: TimerOpKind,
     at_ms: i64,
     payload: Option<&str>,
-) {
-    if let Err(error) =
-        crate::repositories::timer_ops::append_for_record(pool, record_id, kind, at_ms, payload)
-            .await
-    {
-        crate::log_warn!(
-            "timer event `{}` for record {record_id} was not recorded: {error}",
-            kind.as_str()
-        );
-    }
+) -> AppResult<()> {
+    crate::repositories::timer_ops_event::append_for_record(conn, record_id, kind, at_ms, payload)
+        .await?;
+    Ok(())
 }
 
 /// 开新会话后追加 `start`。`mode` / `target_sec` 进 `payload`：折叠端要用它们判定
 /// 倒计时是否已到点，而它们不是「状态」—— 是 `start` 这条事件自带的参数。
 pub async fn record_start(
-    pool: &SqlitePool,
+    conn: &mut SqliteConnection,
     record_id: i64,
     at_ms: i64,
     mode: &str,
     target_sec: Option<i64>,
-) {
+) -> AppResult<()> {
     let payload = crate::repositories::timer_ops::payload_for_start(mode, target_sec);
-    record(pool, record_id, TimerOpKind::Start, at_ms, Some(&payload)).await;
+    record(conn, record_id, TimerOpKind::Start, at_ms, Some(&payload)).await
 }
 
 #[cfg(test)]

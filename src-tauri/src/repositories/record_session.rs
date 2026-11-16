@@ -1,6 +1,6 @@
 //! 计时会话生命周期 SQL（time_records 表）：开始 / 暂停 / 结束 / 撤销 / 恢复 / 分段。
 
-use sqlx::SqlitePool;
+use sqlx::{SqliteConnection, SqlitePool};
 
 use crate::error::{AppError, AppResult};
 use crate::models::record::TimeRecord;
@@ -40,7 +40,20 @@ pub async fn find_all_active(pool: &SqlitePool) -> AppResult<Vec<TimeRecord>> {
 /// ⚠️ `device_id` 必须显式写：`uid` 由 AFTER INSERT 触发器按它拼（`t:<device>:<id>`）。
 /// 漏了 → uid 恒 NULL → 这行永不被同步导出，且零报错（早前这个 INSERT 就没写）。
 /// 取不到身份时退化成哨兵 `''` 而不是报错：按下开始必须能开始，交给下次启动认领。
+/* 生产路径全走 `insert_active_in`（`timer::start` 要同事务写 start 事件）；这个薄封装
+   只剩测试在用（`tests/daily_status.rs` 建一条 active 行），所以只对 lib 豁免死码。 */
+#[cfg_attr(not(test), allow(dead_code))]
 pub async fn insert_active(pool: &SqlitePool, item_id: i64, now: i64) -> AppResult<i64> {
+    let mut conn = pool.acquire().await.map_err(AppError::db)?;
+    insert_active_in(&mut conn, item_id, now).await
+}
+
+/// [`insert_active`] 的事务内版本（S3：状态行与 start 事件必须一起落）。
+pub(crate) async fn insert_active_in(
+    conn: &mut SqliteConnection,
+    item_id: i64,
+    now: i64,
+) -> AppResult<i64> {
     let device_id = crate::services::identity::install_id().unwrap_or_default();
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO time_records \
@@ -53,7 +66,7 @@ pub async fn insert_active(pool: &SqlitePool, item_id: i64, now: i64) -> AppResu
     .bind(now)
     .bind(now)
     .bind(device_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await
     .map_err(active_conflict)?;
     Ok(id)
@@ -62,8 +75,10 @@ pub async fn insert_active(pool: &SqlitePool, item_id: i64, now: i64) -> AppResu
 /// [V0.2.0] 新建 active **倒计时**会话并返回新 id（`mode='countdown'`，`target_sec` 非空）。
 ///
 /// `device_id` 的理由同 [`insert_active`]：uid 靠触发器按它发，漏写就永不同步。
-pub async fn insert_active_countdown(
-    pool: &SqlitePool,
+/// 参数是**调用方的事务**（S3）：倒计时的 start 事件必须与这一行同事务落，
+/// 否则事件流里没有起点、对端 fold 会把后面的 stop 当孤儿丢掉。
+pub(crate) async fn insert_active_countdown(
+    conn: &mut SqliteConnection,
     item_id: i64,
     target_sec: i64,
     now: i64,
@@ -81,7 +96,7 @@ pub async fn insert_active_countdown(
     .bind(now)
     .bind(now)
     .bind(device_id)
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await
     .map_err(active_conflict)?;
     Ok(id)
@@ -95,6 +110,18 @@ pub async fn set_accum_and_running(
     running_since: Option<i64>,
     now: i64,
 ) -> AppResult<()> {
+    let mut conn = pool.acquire().await.map_err(AppError::db)?;
+    set_accum_and_running_in(&mut conn, id, accumulated_sec, running_since, now).await
+}
+
+/// [`set_accum_and_running`] 的事务内版本（S3：暂停/继续必须与事件一起落）。
+pub(crate) async fn set_accum_and_running_in(
+    conn: &mut SqliteConnection,
+    id: i64,
+    accumulated_sec: i64,
+    running_since: Option<i64>,
+    now: i64,
+) -> AppResult<()> {
     sqlx::query(
         "UPDATE time_records SET accumulated_sec = ?, running_since = ?, updated_at = ? \
          WHERE id = ? AND status = 'active'",
@@ -103,7 +130,7 @@ pub async fn set_accum_and_running(
     .bind(running_since)
     .bind(now)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }
@@ -111,7 +138,10 @@ pub async fn set_accum_and_running(
 /* 结束 / 跨天拆分段落库移到 `record_session_split.rs`（本文件压在 300 行硬限上，
    而那一对函数自带 20 行口径说明）。在此 re-export：`record_session::finalize*`
    的调用点写法不变。 */
-pub use crate::repositories::record_session_split::{finalize, finalize_split};
+/* [S3] 这一对改成收**调用方的事务**（原来是 `pool`）：结束会话与 `stop` 事件必须一起落。
+   `pub(crate)` 而不是 `pub`：只在「我已经有事务」时才有意义，对外暴露会诱使调用方
+   先 begin 再忘 commit。 */
+pub(crate) use crate::repositories::record_session_split::{finalize, finalize_split};
 
 /// 撤销结束：saved 回滚为 active（ended_at=NULL，running_since=now）。
 pub async fn reactivate(pool: &SqlitePool, id: i64, running_since: i64, now: i64) -> AppResult<()> {
@@ -154,6 +184,18 @@ pub async fn discard(
     ended_at: i64,
     now: i64,
 ) -> AppResult<()> {
+    let mut conn = pool.acquire().await.map_err(AppError::db)?;
+    discard_in(&mut conn, id, accumulated_sec, ended_at, now).await
+}
+
+/// [`discard`] 的事务内版本（S3：丢弃也要和 `drop` 事件一起落）。
+pub(crate) async fn discard_in(
+    conn: &mut SqliteConnection,
+    id: i64,
+    accumulated_sec: i64,
+    ended_at: i64,
+    now: i64,
+) -> AppResult<()> {
     sqlx::query(
         "UPDATE time_records \
          SET status = 'saved', accumulated_sec = ?, ended_at = ?, running_since = NULL, \
@@ -165,7 +207,7 @@ pub async fn discard(
     .bind(now)
     .bind(now)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
     Ok(())
 }

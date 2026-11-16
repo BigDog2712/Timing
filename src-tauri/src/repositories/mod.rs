@@ -24,6 +24,9 @@ pub mod todo;
    之后立刻删（届时事件流成为计时状态的第二写入方，不再有「无人调用的仓储」）。 */
 #[allow(dead_code)]
 pub mod timer_ops;
+/* [S3] 计时事件的**事务内**写入：状态行与事件流必须一起落，否则「本机暂停了、对端还在跑」
+   而两端都不报错。实现从 `timer_ops.rs` 搬过来（那个文件压在 300 行上）。 */
+pub(crate) mod timer_ops_event;
 #[cfg(test)]
 mod timer_ops_tests;
 pub mod todo_nudge;

@@ -51,7 +51,20 @@ pub async fn start(
         return Err(AppError::item_not_found());
     }
     let now = now_ms();
-    let id = session::insert_active_countdown(pool, item_id, target_sec, now).await?;
+    /* [S3] 倒计时会话原来**完全不写事件**（连 `start` 都没有）：事件流里没有起点，
+       对端 fold 会把后面的 stop 当孤儿丢掉 —— 这台机器上的 25 分钟在另一台上不存在。
+       现在与倒计时同一事务落 start，`mode` 与 `target_sec` 跟着事件走。 */
+    let mut tx = pool.begin().await.map_err(AppError::db)?;
+    let id = session::insert_active_countdown(&mut tx, item_id, target_sec, now).await?;
+    crate::services::timer_events::record_start(
+        &mut tx,
+        id,
+        now,
+        timer_mode::COUNTDOWN,
+        Some(target_sec),
+    )
+    .await?;
+    tx.commit().await.map_err(AppError::db)?;
     set_hint(true);
     settings::set_last_item_id(pool, item_id).await?;
     timer::reload(pool, id).await
@@ -89,8 +102,20 @@ pub async fn tick(pool: &SqlitePool) -> AppResult<Option<CountdownFired>> {
         .unwrap_or_default();
     let ended_at = active.started_at + target_sec * 1000;
     /* [V0.11.3] 走分段收尾：23:45 起的 30 分钟倒计时会在零点处拆成两段，
-    与手动结束同一口径（否则「倒计时跨天」仍会整条挂在昨天）。 */
-    crate::services::timer_split::finalize(pool, &active, target_sec, ended_at, now).await?;
+    与手动结束同一口径（否则「倒计时跨天」仍会整条挂在昨天）。
+    [S3] 收尾与 `stop` 事件同一事务：到点这件事对端必须知道，否则它只看到一条
+    永不结束的 start（本机已经 saved，那边还在跑）。 */
+    let mut tx = pool.begin().await.map_err(AppError::db)?;
+    crate::services::timer_split::finalize_in(&mut tx, &active, target_sec, ended_at, now).await?;
+    crate::services::timer_events::record(
+        &mut tx,
+        active.id,
+        crate::services::timer_ops::TimerOpKind::Stop,
+        ended_at,
+        None,
+    )
+    .await?;
+    tx.commit().await.map_err(AppError::db)?;
     /* [V0.11.2] 到点与手动停止必须同收尾：①清锚点（与 `timer_stop` 一致，
     否则锚点表只增不减，攒满 8 条会把正在用的起点挤掉）；②跑「结束后自动开始」
     （`after_stop`），否则用户答应的「这条结束后开始下一条」只在手动停止时生效。 */
