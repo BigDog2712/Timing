@@ -69,6 +69,11 @@ async fn audit_record_appends_one_row_per_decision() {
     );
 }
 
+/// **刻意持锁跨 await**：这把锁的语义就是「整个用例期间独占全局注册表」，中途放开
+/// 就等于没锁（别的用例会插进 `clear` 与 `resolve` 之间，看到的条目数就随机了）。
+/// `#[tokio::test]` 默认 current_thread，future 不换线程 ⇒ 不存在跨线程解锁；
+/// 持锁期间 await 的只有数据库（在 sqlx 自己的线程上），不会与这把锁互相等待。
+#[allow(clippy::await_holding_lock)]
 #[tokio::test]
 async fn deferred_writes_audit_and_keeps_conflict_pending() {
     /* 注册表是全局单例，与单测共用同一进程 ⇒ 必须拿同一把锁（见 registry::test_guard）。 */
