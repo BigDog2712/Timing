@@ -233,11 +233,9 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
         )
         .await?;
     }
-    /* 0.14.0（同步重构 T01）：同步事件流基础设施——下载游标 `sync_event_cursor` +
-       md 决策审计 `md_decision_audit`。两张纯新表，幂等段不需要 guard；`UPDATE ... ='14'`
-       会把更高版本号改写回 14，所以版本推进照样关在版本门里（与 0008/0012 同型）。
-       编号是 0014 而不是 0012：0.12.5/0.12.8 两条迁移已经占了 12/13，同一版本号出现两份
-       会让「后落地的那张表在存量库上永不创建」——存量库版本已经 13，`<12` 的门永远为假。 */
+    /* 0.14.0（同步重构 T01）：同步事件流基础设施（游标 `sync_event_cursor` + md 决策审计
+       `md_decision_audit`）。纯新表、幂等段不需 guard，版本推进照样关门里（与 0008 同型）。
+       编号是 0014 不是 0012 的原因（撞版本号会让表在存量库上永不创建）见 SQL 文件头。 */
     if schema_version(pool).await? < 14 {
         run_raw(
             pool,

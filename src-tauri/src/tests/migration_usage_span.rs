@@ -11,7 +11,7 @@
 use sqlx::SqlitePool;
 
 use crate::infra::db;
-use crate::tests::support::{scalar_i64, scalar_opt_str, unique_dir};
+use crate::tests::support::{fresh_pool, scalar_i64, scalar_opt_str, unique_dir};
 
 /// 建库 → 退版本号 → 用**同一目录**再 `init_pool` 一次（= 升级场景）→ 返回新池。
 ///
@@ -80,5 +80,39 @@ async fn usage_span_purge_leaves_the_daily_totals_alone() {
         .await,
         3600,
         "app_usage 的合计**不许**被这次清理波及"
+    );
+}
+
+/* 从 `tests/migration.rs` 搬来（那边撞 300 行）：主键与读法索引都属时段表自己的事。 */
+/// `app_usage_span` 必须真的建出来，且主键是 `(package_name, local_date, start_ms)`。
+///
+/// 这条钉的是「迁移写了但表没建」——表现是 `usage_stats_get` 每次写库都报
+/// `no such table`（只在手机包里出现，桌面 `cargo test` 编不到那段 cfg 分支），
+/// 而统计页只会变成一句「读不到应用数据」。
+///
+/// 主键含 `start_ms` 是「重复上报取 MAX」的前提：同一段重扫要靠它做 `ON CONFLICT`
+/// 去重，少了它就会插进两条一模一样的区间，界面上「9:00-9:30」出现两遍。
+#[tokio::test]
+async fn usage_span_table_lands_with_expected_primary_key() {
+    let pool = fresh_pool("mig-usage-span").await;
+    let sql = scalar_opt_str(
+        &pool,
+        "SELECT sql FROM sqlite_master WHERE name = 'app_usage_span'",
+    )
+    .await
+    .expect("迁移跑完应有 app_usage_span 表");
+    let normalized = sql.to_lowercase().replace(['"', ' ', '\n', '\t'], "");
+    assert!(
+        normalized.contains("primarykey(package_name,local_date,start_ms)"),
+        "app_usage_span 的主键必须是 (package_name, local_date, start_ms)，实际：{sql}"
+    );
+    assert_eq!(
+        scalar_i64(
+            &pool,
+            "SELECT COUNT(*) FROM sqlite_master WHERE name = 'idx_app_usage_span_date'"
+        )
+        .await,
+        1,
+        "读法索引 idx_app_usage_span_date 必须存在"
     );
 }
