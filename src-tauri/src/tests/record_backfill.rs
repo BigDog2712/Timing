@@ -14,6 +14,23 @@ async fn total_rows(pool: &sqlx::SqlitePool) -> i64 {
     scalar_i64(pool, "SELECT COUNT(*) FROM time_records").await
 }
 
+/// 补记「不跨天」判据共用的安全墙钟基准：**两天前正午**的本地毫秒。
+///
+/// 判据 1 / 4 / 6 / 8 要的是「同一天、且全在过去」的一段区间。用 `now_ms() - 10 分钟`
+/// 当起点时，凌晨 00:00–00:15 跑会跨过本地零点，`split_by_day` 把补记拆成两段，
+/// `rows.len() == 1` 就红（CI run 43777088112 实测撞上）。锚到两天前正午：
+/// - 恒在过去：不触发 `backfill` 的「未来时间必拒」；
+/// - 离任一日界都 ≥ 12 小时：±15 分钟怎么也不会跨零点。
+/// 与运行时刻彻底解耦（判据 5 的「两天前日界」同一思路）。
+fn past_day_noon_ms() -> i64 {
+    let base = chrono::Local::now()
+        .date_naive()
+        .checked_sub_days(chrono::Days::new(2))
+        .expect("两天前的日期恒存在");
+    /* `day_bounds(base).0` = base 当天本地 00:00；+12h 落在当天正中，跨零点不可能。 */
+    day_bounds(base).0 + 12 * 60 * 60 * 1000
+}
+
 /// 判据 1：不跨天的一段只落一行，且形状与 `record_session::finalize` 完全一致。
 ///
 /// 变异：把 `accumulated_sec` 写成 0（或写成毫秒 `ended - started`）→ 本用例红。
@@ -21,9 +38,8 @@ async fn total_rows(pool: &sqlx::SqlitePool) -> i64 {
 async fn backfill_writes_one_saved_row() {
     let pool = fresh_pool("p1-backfill-row").await;
     let item = new_item(&pool, "写周报").await;
-    let now = now_ms();
-    let started = now - 600_000;
-    let ended = now - 60_000;
+    let started = past_day_noon_ms();
+    let ended = started + 600_000; // 10 分钟，恒同一天、恒过去
 
     let rows = record::backfill(&pool, item, started, ended, None)
         .await
@@ -87,9 +103,8 @@ async fn backfill_rejects_future() {
 async fn backfill_is_idempotent() {
     let pool = fresh_pool("p1-backfill-idem").await;
     let item = new_item(&pool, "写周报").await;
-    let now = now_ms();
-    let started = now - 900_000;
-    let ended = now - 300_000;
+    let started = past_day_noon_ms();
+    let ended = started + 600_000;
 
     let first = record::backfill(&pool, item, started, ended, None)
         .await
@@ -152,8 +167,8 @@ async fn backfill_ignores_min_record_threshold() {
         .min_record_seconds;
     assert!(threshold > 10, "前置：阈值须大于 10 秒，实为 {threshold}");
 
-    let now = now_ms();
-    let rows = record::backfill(&pool, item, now - 20_000, now - 10_000, None)
+    let started = past_day_noon_ms();
+    let rows = record::backfill(&pool, item, started, started + 10_000, None)
         .await
         .unwrap();
     assert_eq!(rows.len(), 1, "10 秒的补记也要落库（显式保存不过阈值）");
@@ -202,8 +217,8 @@ async fn backfill_does_not_disturb_active_session() {
         .unwrap()
         .expect("前置：应有进行中的会话");
 
-    let now = now_ms();
-    record::backfill(&pool, other, now - 600_000, now - 60_000, None)
+    let started = past_day_noon_ms();
+    record::backfill(&pool, other, started, started + 600_000, None)
         .await
         .unwrap();
 

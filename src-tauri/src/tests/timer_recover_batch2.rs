@@ -6,7 +6,7 @@
 use chrono::{Datelike, Local, TimeZone};
 
 use crate::models::enums::ResolveAction;
-use crate::platform::clock::now_ms;
+use crate::platform::clock::{now_ms, start_of_today_ms};
 use crate::repositories::record_session as session;
 use crate::services::{timer, timer_recover};
 use crate::tests::support::{exec, fresh_pool, scalar_i64};
@@ -194,7 +194,21 @@ async fn quit_close_out_lands_ended_at_on_close_time() {
 async fn quit_close_out_paused_keeps_accumulated_and_uses_now() {
     let pool = fresh_pool("recover-b2-quit-paused").await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
-    crash_after(&pool, rec.id, 600_000, false).await;
+    /* 锚定「今天 00:00」，不用 `crash_after(600_000)`：暂停会话没有 running_since，
+       退出收尾的 `close_at_close_time` 用 now 当 ended_at 并走 `split_by_day(started_at, now)`。
+       若 started_at 是 10 分钟前、又恰在凌晨 00:00–00:10，会跨零点被拆成两段，42 秒被按
+       墙钟占比分掉（CI run 43777088112：left 11 / right 42）。今天 00:00 与 now 恒在同一
+       本地日、绝不跨零点，且 now 恒 ≥ started_at，ended_at 仍是 now（本判据要钉的那件事）。 */
+    let started = start_of_today_ms();
+    exec(
+        &pool,
+        &format!(
+            "UPDATE time_records SET accumulated_sec = 42, started_at = {started}, \
+             running_since = NULL WHERE id = {}",
+            rec.id
+        ),
+    )
+    .await;
 
     let closed = timer_recover::close_active_for_quit(&pool).await.unwrap();
     assert_eq!(closed, 1);
