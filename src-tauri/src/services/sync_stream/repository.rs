@@ -4,7 +4,8 @@
 //!
 //! - **只碰 SQL**：这张表是「从对端设备读到哪」的下载游标（架构设计 §1.2）。
 //! - **不做编排**：什么时候读游标、折叠成功后什么时候推进游标，都在 T02 的
-//!   `sync_stream/mod.rs`（`pull_segments` / `apply_and_fold`）——本文件只提供原语。
+//!   `sync_stream/push.rs`（`push_new_events`）/ `pull.rs`（`pull_segments`）——
+//!   本文件只提供原语。
 //!
 //! ## 语义
 //!
