@@ -29,8 +29,11 @@ pub mod probe_file;
 pub mod tls;
 /* [V0.11.19 变更 A] 往期真删的 DELETE：`redirect(none)` + 返回状态码。**不是**探针那个。 */
 pub mod remove;
+/* [V0.14.x] 事件流传输的两个原语（If-None-Match PUT + PROPFIND depth-1 列子项）。 */
+pub mod stream;
 pub(crate) mod tag;
 pub use dir::{probe, ProbeOutcome};
+pub use stream::{list_children, put_new};
 
 /// 服务端日志里能分辨出是谁在写。版本号随 `Cargo.toml` 走，[V0.11.13] 硬编码版本串下次升版必忘。
 /// `pub(super)`：`dir.rs` / `probe_file.rs` 的请求都要带同一个 UA（同一版本串）。
@@ -224,7 +227,7 @@ pub fn redact(url: &str) -> String {
 /// 返回 `Result` 而不是 `&'static Client`：建不出来要能让界面出红字。**不回退**
 /// `Client::new()`——它内部是 `build().expect(..)`，而 `release` 是 `panic = "abort"`，
 /// 一次构造失败就会带走整个进程（手机点「测试连接」闪退的其中一种形状）。
-fn client() -> Result<&'static Client, WebdavError> {
+pub(super) fn client() -> Result<&'static Client, WebdavError> {
     static CLIENT: OnceLock<Result<Client, String>> = OnceLock::new();
     CLIENT
         .get_or_init(|| {
@@ -240,7 +243,7 @@ fn client() -> Result<&'static Client, WebdavError> {
 }
 
 /// 状态码 → 错误。成功 `Ok(())`；表外的 4xx / 5xx 一律 `Server(code)`。
-fn fail_on_status(status: StatusCode) -> Result<(), WebdavError> {
+pub(super) fn fail_on_status(status: StatusCode) -> Result<(), WebdavError> {
     if status.is_success() {
         return Ok(());
     }
@@ -254,7 +257,7 @@ fn fail_on_status(status: StatusCode) -> Result<(), WebdavError> {
     })
 }
 
-fn map_reqwest(err: reqwest::Error) -> WebdavError {
+pub(super) fn map_reqwest(err: reqwest::Error) -> WebdavError {
     if err.is_timeout() {
         return WebdavError::Timeout;
     }
