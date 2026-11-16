@@ -56,6 +56,11 @@ pub const MD_CLOUD_STARTUP_DELAY_SECS: u64 = 60;
 pub const MD_CLOUD_SMART_IDLE_SECS: u64 = 300;
 /// 智能档 30 分钟上限（秒）：连续写库时最坏也要同步一次。
 pub const MD_CLOUD_SMART_MAX_SECS: u64 = 1_800;
+/// [0.14.x] 事件流「流式档」的静默窗口（秒）：事件流单轮 KB 级，压到 1 分钟达标
+/// 「≤5 分钟送达」（架构设计 §1.3 评估 A 结论）。
+pub const MD_CLOUD_STREAM_IDLE_SECS: u64 = 60;
+/// [0.14.x] 事件流「流式档」的上限（秒）：连续写作者最坏 5 分钟同步一次。
+pub const MD_CLOUD_STREAM_MAX_SECS: u64 = 300;
 /// 定时档分钟数下限。
 pub const MD_CLOUD_INTERVAL_MIN_MINUTES: u32 = 5;
 /// 定时档分钟数上限。

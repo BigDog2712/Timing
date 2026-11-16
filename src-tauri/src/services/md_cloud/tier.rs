@@ -7,18 +7,20 @@
 //! `jobs/md_cloud.rs` 用 `pub(crate) use` 把这三个名字转出去，所以
 //! `md_cloud_tier.rs` / `qa_batch1_edges.rs` 那些既有用例的路径**一个字都不用改**。
 //!
-//! ## 三档
+//! ## 四档
 //!
 //! - `关闭`：不装定时器，只剩手动入口；
 //! - `定时`：每 N 分钟一轮，N ∈ [5, 120]，与有无改动无关；
 //! - `智能`：最后一次业务写后静默 300s 一轮、启动后 60s 一轮、
-//!   距上次成功轮 ≥1800s 且期间有写就一轮。
+//!   距上次成功轮 ≥1800s 且期间有写就一轮；
+//! - `流式`（内部档）：事件流专用，静默 60s / 上限 300s（架构设计 §1.3），不进设置页。
 //!
 //! 默认 `智能`，**不从 `pollSecs` 反推档位**（老值语义不同，反推会得到「定时 3 分钟」
 //! 这种谁都没选过的档）。
 
 use crate::models::constants::{
     MD_CLOUD_SMART_IDLE_SECS, MD_CLOUD_SMART_MAX_SECS, MD_CLOUD_STARTUP_DELAY_SECS,
+    MD_CLOUD_STREAM_IDLE_SECS, MD_CLOUD_STREAM_MAX_SECS,
 };
 use crate::models::md_sync_auto::{CloudSchedule, MdCloudAuto};
 use crate::models::md_sync_config::MdSyncConfig;
@@ -105,6 +107,36 @@ pub fn decide(
             }
             None
         }
+        /* 事件流专用档（架构设计 §1.3）：与智能档同一套 idle/max 判定，只把两个窗口压到
+           1 分钟 / 5 分钟。事件流单轮 KB 级，频繁跑不贵；md 快照仍走原三档。 */
+        CloudSchedule::Stream => {
+            let wrote = last_write_ms > 0;
+            let since_attempt =
+                elapsed_since_ms(now, state.last_attempt_ms.unwrap_or(state.startup_ms));
+            let idle = wrote
+                && elapsed_since_ms(now, last_write_ms)
+                    >= (MD_CLOUD_STREAM_IDLE_SECS * 1000) as i64;
+            let covered = state
+                .last_success_ms
+                .is_some_and(|ok| ok >= last_write_ms);
+            if idle
+                && !covered
+                && since_attempt >= (MD_CLOUD_STREAM_IDLE_SECS * 1000) as i64
+            {
+                return Some(TierReason::Idle);
+            }
+            let baseline = state.last_success_ms.unwrap_or(state.startup_ms);
+            let max_due =
+                elapsed_since_ms(now, baseline) >= (MD_CLOUD_STREAM_MAX_SECS * 1000) as i64;
+            let wrote_after_baseline = wrote && last_write_ms > baseline;
+            if max_due
+                && wrote_after_baseline
+                && since_attempt >= (MD_CLOUD_STREAM_MAX_SECS * 1000) as i64
+            {
+                return Some(TierReason::Max);
+            }
+            None
+        }
     }
 }
 
@@ -154,4 +186,57 @@ pub fn plan_of(config: &MdSyncConfig) -> SyncPlan {
 /// `jobs/md_sync_mobile` 是 `#[cfg(mobile)]`，桌面用例够不着；`services` 两端都编。
 pub fn mobile_rounds(plan: &SyncPlan) -> bool {
     matches!(plan, SyncPlan::Cloud { .. })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SEC: i64 = 1_000;
+
+    #[test]
+    fn stream_tier_runs_on_one_and_five_minute_windows() {
+        /* 启动轮与其它档共用：60s 后触发一次。 */
+        let startup = TierState {
+            startup_ms: 0,
+            ..TierState::default()
+        };
+        assert_eq!(
+            decide(&startup, CloudSchedule::Stream, 900, 60 * SEC, 0),
+            Some(TierReason::Startup)
+        );
+
+        /* idle：写后停手满 1 分钟触发；差 1 秒就不触发。 */
+        let wrote_at = 100_000i64;
+        let idle_state = TierState {
+            startup_ms: 0,
+            startup_done: true,
+            last_attempt_ms: Some(wrote_at),
+            last_success_ms: None,
+        };
+        assert_eq!(
+            decide(&idle_state, CloudSchedule::Stream, 900, wrote_at + 59 * SEC, wrote_at),
+            None
+        );
+        assert_eq!(
+            decide(&idle_state, CloudSchedule::Stream, 900, wrote_at + 60 * SEC, wrote_at),
+            Some(TierReason::Idle)
+        );
+
+        /* max：连续写作者最坏 5 分钟同步一次。 */
+        let max_state = TierState {
+            startup_ms: 0,
+            startup_done: true,
+            last_attempt_ms: Some(wrote_at),
+            last_success_ms: Some(wrote_at),
+        };
+        assert_eq!(
+            decide(&max_state, CloudSchedule::Stream, 900, wrote_at + 299 * SEC, wrote_at + 299 * SEC),
+            None
+        );
+        assert_eq!(
+            decide(&max_state, CloudSchedule::Stream, 900, wrote_at + 300 * SEC, wrote_at + 300 * SEC),
+            Some(TierReason::Max)
+        );
+    }
 }

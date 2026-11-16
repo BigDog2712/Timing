@@ -112,11 +112,13 @@ pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
     let today = today();
     let mut report = MdSyncReport::new(crate::platform::clock::now_ms());
     if let Some(channel) = folder {
-        let part = round_folder::run(pool, channel, &config.bindings, &today).await?;
+        let part =
+            round_folder::run(pool, channel, &config.bindings, &today, config.stream_enabled)
+                .await?;
         absorb(&mut report, part);
     }
     if let Some(channel) = webdav {
-        let part = round_webdav::run(pool, channel, &today).await?;
+        let part = round_webdav::run(pool, channel, &today, config.stream_enabled).await?;
         absorb(&mut report, part);
     }
     let pending = md_cloud_pending::pending_dates(pool, PurgeChannel::Webdav)
@@ -145,13 +147,15 @@ pub async fn round_channel(
     match channel {
         PurgeChannel::Folder => {
             if let Some(ch) = usable_folder(&config) {
-                let part = round_folder::run(pool, ch, &config.bindings, &today).await?;
+                let part =
+                    round_folder::run(pool, ch, &config.bindings, &today, config.stream_enabled)
+                        .await?;
                 absorb(&mut report, part);
             }
         }
         PurgeChannel::Webdav => {
             if let Some(ch) = usable_webdav(&config) {
-                let part = round_webdav::run(pool, ch, &today).await?;
+                let part = round_webdav::run(pool, ch, &today, config.stream_enabled).await?;
                 absorb(&mut report, part);
                 pending = md_cloud_pending::pending_dates(pool, channel)
                     .await

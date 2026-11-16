@@ -24,7 +24,11 @@ use crate::models::constants::{
     MD_CLOUD_INTERVAL_MIN_MINUTES,
 };
 
-/// 三档。线缆值由 `rename_all = "lowercase"` 决定：`off` / `interval` / `smart`。
+/// 四档。线缆值由 `rename_all = "lowercase"` 决定：`off` / `interval` / `smart` / `stream`。
+///
+/// `stream` 是**内部档**（不给用户在设置页选）：事件流用它跑更紧的节奏（静默 60s /
+/// 上限 300s），md 快照仍走原三档（架构设计 §1.3）。它不落配置：`MdCloudAuto` 的默认
+/// 仍是 `smart`，任何已保存的配置都不会序列化出 `"stream"`，因此也不影响老配置 round-trip。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CloudSchedule {
@@ -35,6 +39,8 @@ pub enum CloudSchedule {
     /// 停手 5 分钟 / 启动后一次 / 30 分钟上限兜底。
     #[default]
     Smart,
+    /// 事件流专用：停手 1 分钟 / 上限 5 分钟（内部档，不进设置页）。
+    Stream,
 }
 
 impl CloudSchedule {
@@ -44,6 +50,7 @@ impl CloudSchedule {
             Self::Off => "off",
             Self::Interval => "interval",
             Self::Smart => "smart",
+            Self::Stream => "stream",
         }
     }
 }

@@ -57,6 +57,7 @@ pub async fn run(
     pool: &SqlitePool,
     channel: &MdSyncCloudChannel,
     today: &str,
+    stream_enabled: bool,
 ) -> AppResult<MdSyncReport> {
     let now = now_ms();
     let mut report = MdSyncReport::new(now);
@@ -105,6 +106,43 @@ pub async fn run(
             .errors
             .push("云端：上一轮失败，正在退避（稍后自动重试）".into());
         return Ok(report);
+    }
+
+    /* 事件流半轮（架构 §4.1）：先 push 本机新增事件、再 pull 对端分段，然后才走 md 快照。
+       放在退避之后：退避时不发任何网络请求，事件流同样该停。失败只进 report.errors（§7）。 */
+    if stream_enabled {
+        if let Some(device_id) = crate::services::identity::install_id() {
+            let transport = crate::services::sync_stream::transport::Transport::Webdav(target.clone());
+            match crate::services::sync_stream::push_new_events(pool, &transport, device_id).await {
+                Ok(summary) => {
+                    if summary.events > 0 {
+                        crate::log_info!(
+                            "sync stream push: seq={} events={} bytes={}",
+                            summary.segment_seq,
+                            summary.events,
+                            summary.bytes
+                        );
+                    }
+                    report.errors.extend(summary.errors);
+                }
+                Err(err) => report.errors.push(err.message),
+            }
+            match crate::services::sync_stream::pull_segments(pool, &transport, device_id).await {
+                Ok(summary) => {
+                    if summary.applied > 0 {
+                        crate::log_info!(
+                            "sync stream pull: peers={} segments={} events={} applied={}",
+                            summary.peers,
+                            summary.segments,
+                            summary.events,
+                            summary.applied
+                        );
+                    }
+                    report.errors.extend(summary.errors);
+                }
+                Err(err) => report.errors.push(err.message),
+            }
+        }
     }
 
     /* ④ GET 今天。`got_remote` 决定后面「本地为空」能不能当成事实（见模块注释）。 */

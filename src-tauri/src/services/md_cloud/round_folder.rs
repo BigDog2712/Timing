@@ -51,6 +51,7 @@ pub async fn run(
     #[cfg_attr(mobile, allow(unused_variables))]
     bindings: &[MdSyncBinding],
     today: &str,
+    stream_enabled: bool,
 ) -> AppResult<MdSyncReport> {
     let mut report = MdSyncReport::new(now_ms());
     let root: PathBuf = match channel.resolve_root_folder() {
@@ -67,6 +68,44 @@ pub async fn run(
     if let Err(err) = fs::create_dir_all(&root) {
         report.errors.push(super::root_dir_error(&root, &err));
         return Ok(report);
+    }
+
+    /* 事件流半轮（架构 §4.1）：先 push 本机新增事件、再 pull 对端分段，然后才走 md 快照。
+       失败只进 report.errors，不折整轮（§7）。开关关着时整块跳过。 */
+    if stream_enabled {
+        if let Some(device_id) = crate::services::identity::install_id() {
+            let transport =
+                crate::services::sync_stream::transport::Transport::Folder(root.clone());
+            match crate::services::sync_stream::push_new_events(pool, &transport, device_id).await {
+                Ok(summary) => {
+                    if summary.events > 0 {
+                        crate::log_info!(
+                            "sync stream push: seq={} events={} bytes={}",
+                            summary.segment_seq,
+                            summary.events,
+                            summary.bytes
+                        );
+                    }
+                    report.errors.extend(summary.errors);
+                }
+                Err(err) => report.errors.push(err.message),
+            }
+            match crate::services::sync_stream::pull_segments(pool, &transport, device_id).await {
+                Ok(summary) => {
+                    if summary.applied > 0 {
+                        crate::log_info!(
+                            "sync stream pull: peers={} segments={} events={} applied={}",
+                            summary.peers,
+                            summary.segments,
+                            summary.events,
+                            summary.applied
+                        );
+                    }
+                    report.errors.extend(summary.errors);
+                }
+                Err(err) => report.errors.push(err.message),
+            }
+        }
     }
 
     /* 顺序不可换：Obsidian 那份的用户手改先入库，云端这份再从「已含手改的 SQL」渲染
