@@ -30,12 +30,12 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 - 后端 `src-tauri/src/**` 六层，依赖**只能向下**（ADR-016）：
   `platform`（叶子：clock / log / boot_timing）→ `infra`（窗口 / 托盘菜单 / 通知 / 几何 / 迁移）→ `services`（业务）→ `app`（装配：events / tray / bootstrap / diagnostics）与 `jobs`（调度）→ `commands`（IPC 入口）。
   其中 `models` / `infra` / `services` / `app` / `commands` 五层各带一个 `activity/` 命名空间（子系统归一，见 `docs/refactor/patina-structural-merge.md` §2.2）：`models/activity ← infra/activity ← services/activity ← app/activity ← commands/activity`，方向与宿主层序一致。`activity` 是命名空间，不是第 7 层。
-- 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql` … `0007_v01127.sql` 共七支，当前 **schema v7**，`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。**0007 是重建表，不吃重跑**，必须由版本门 `< 7` 只放行一次（见 `infra/migrate.rs` 注释）。
+- 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql` … `0014_v0150_sync_stream.sql`，共 **14** 个版本（18 个 `.sql` 文件——`0012` 自带一份 `_guard`），当前 schema **v14**，`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。**0007 是重建表，不吃重跑**，必须由版本门 `< 7` 只放行一次（见 `infra/migrate.rs` 注释）。**两条迁移撞同一编号时，后落地那张永不执行且零报错**（版本门 `< N` 在存量库上恒假）——合流时先查号。
 - **活动库（`activity.db`）走 sqlx `Migrator`**：正文在 `services/activity/data/sql/00NN_*.sql`，登记在 `data/schema_registry.rs`，账本 `_sqlx_migrations.checksum` 存的是 **sha384(文件字节)**，逐字节比对。
   所以**凡是在任何库上跑过的 `.sql` 一个字都不能再改**（改注释、调缩进都算）——改了老库开机即 `数据库里的迁移 N 的校验和与当前版本不一致`（`schema_core/ensure.rs::describe_migration_failure`），而且这条**不自动修账本**（对用户是对的，对开发者是拦路）。
   未出包的迁移确实需要改正文时，本机库必须一起回到「未应用」状态：`DROP` 该迁移建的对象 + `DELETE FROM _sqlx_migrations WHERE version=N`，让 sqlx 自己重跑重算（表为空时最省事；有数据就先 `cp` 一份库）。
 - **数据目录迁移（V0.5.0）**：`infra/appdata_migrate/`（`paths` / `decide` / `copy` / `verify` / `marker` / `mod`）是 **headless** 的——不依赖 services、不依赖 tauri，所以能用两个临时目录直接跑测试（`run_at(&Paths, skip)`）。编排在 `app/preboot.rs`（桌面独占，跑在 `Builder::run` 之前、`log::init` 之前，故模块内不写日志），两条 IPC 命令在 `commands/migration_cmd.rs`。老库名 `tickbar.db` 与新库名 `timing.db` 的映射只认三种后缀（`""` / `-wal` / `-shm`），定义在 `paths.rs`。
-- IPC 契约：宿主命令 **83** 条 + Patina **117** 条（仅桌面，`#[cfg(desktop)]`），一张表写在 `src-tauri/src/ipc_commands.rs`（`docs/phase2/IPC-CONTRACT-v2.md`）；事件 11 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
+- IPC 契约：宿主命令 **94** 条 + Patina **117** 条（仅桌面，`#[cfg(desktop)]`），一张表写在 `src-tauri/src/ipc_commands.rs`（`docs/phase2/IPC-CONTRACT-v2.md`）；事件 12 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
 - 插件：`plugins/<id>/plugin.json` 是**启动头**，宿主只读不执行（声明式）。目录三处合并扫描
   （dev → exe → user，同 id 先到先得）。v1 贡献点 `quickTimers`（摸鱼菜单预设）；
   **v2 曾新增 `mdSync`**（Markdown 双向同步落点），**v3 已下架、同步归内核**
@@ -111,7 +111,7 @@ clippy 那两条 `-A` 是**存量豁免**，不是抄错命令：`unwrap_used` /
   ② 对有硬上限的文件（`check:size` 的 300 行）再补一次**核 blob**：`git show HEAD:<file> | wc -l`。
   不用「推之前 `git stash -u` 再补跑」那套：它靠人记得 stash 回来，忘了就把在写的改动弄丢，代价比漏检大。
 - CSS 只用 `var(--*)` 令牌，零字面量色值、零 emoji、零紫粉渐变；令牌定义在 `src/windows/timing/styles/design-tokens.css`（索引，实体在 `src/windows/timing/styles/tokens/*.css`，**@import 顺序不可调换**）。
-- 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/windows/timing/types/domain/models.ts::ErrorCode` 与文案 `src/windows/timing/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **18** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
+- 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/windows/timing/types/domain/models.ts::ErrorCode` 与文案 `src/windows/timing/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **19** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
 - 文档目录：现行文档在 `docs/`；`docs/archive/v1/` 只作历史，不作为实现依据。
 
 ## 权限面

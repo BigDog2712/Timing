@@ -19,5 +19,10 @@ export default defineConfig({
     exclude: ['node_modules/**', 'src-tauri/**', 'dist/**'],
     reporters: 'default',
     clearMocks: true,
+    /* 默认 5s 在满载并行下不够：`activityStorageBootstrap.wiring.test.ts` 有两条
+       真 import 整个 entry（React 渲染 + 迁移）的用例，单跑 1.2–1.9s，满载时被 CPU
+       抢占就会越过 5s —— 表现是「本地红、单跑绿」的假失败，最难查。给 3 倍余量，
+       而不是把它拆掉：它钉的是「老存储键在真入口 import 时也被迁移」这条真判据。 */
+    testTimeout: 15_000,
   },
 });

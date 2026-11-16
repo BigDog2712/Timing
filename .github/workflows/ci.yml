@@ -46,6 +46,11 @@ jobs:
       - name: 版本号一致性（6 处）
         run: npm run check:version
 
+      # 漂移的症状是「新人和代理照着过期数字做方案」：不报错、不变红，只在几天后
+      # 表现为「按文档写的做完了，但不对」。数字从源码现算，这里只核文档侧的措辞。
+      - name: 文档数字（版号 / 命令数 / 迁移支数 / 错误码数不许过期）
+        run: npm run check:doc-numbers
+
       - name: IPC 契约（命令 / 错误码 / 事件 / mock 覆盖）
         run: npm run check:contract
 
