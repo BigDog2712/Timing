@@ -21,7 +21,7 @@ use crate::services::timer_ops::{fold_session, FoldResult, FoldedBlock, TimerOp,
 
 const OP_COLS: &str = "id, uid, session_uid, item_uid, kind, at_ms, payload, device_id";
 
-fn to_op(row: &sqlx::sqlite::SqliteRow) -> Option<TimerOp> {
+pub(crate) fn to_op(row: &sqlx::sqlite::SqliteRow) -> Option<TimerOp> {
     Some(TimerOp {
         uid: row.try_get::<Option<String>, _>("uid").ok()??,
         op_id: row.try_get("id").ok()?,
