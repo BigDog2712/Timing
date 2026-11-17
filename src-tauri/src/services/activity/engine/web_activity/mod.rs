@@ -202,7 +202,6 @@ pub async fn record_active_tab<R: Runtime>(
         tracking.anonymize_activity();
         return Ok(WebActivityChange::from_transition(changed));
     }
-    let confirmed_page_title = sanitized.title.clone();
     let global_title_enabled = app
         .try_state::<TitleRecordingRuntimeState>()
         .map(|state| state.is_enabled())
@@ -220,7 +219,7 @@ pub async fn record_active_tab<R: Runtime>(
         return Ok(WebActivityChange::None);
     }
     if let Some(titles) = app.try_state::<TitleRecordingRuntimeState>() {
-        match confirmed_page_title.as_deref() {
+        match sanitized.title.as_deref() {
             Some(title) => {
                 titles.confirm_browser_title(snapshot.source_window(), title, observed_at)
             }

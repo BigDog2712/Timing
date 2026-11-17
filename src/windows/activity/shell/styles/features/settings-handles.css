@@ -21,11 +21,14 @@
   scroll-margin-top: 18px;
 }
 
+/* 三张卡同行三列（`SettingsHandlesPanel` 的 grid 决定列数），这里只把每张卡压紧：
+   五行下拉 + 卡头 + 卡脚原来是 ~250px 高，压到 ~200px 后三列并排才不至于一屏看不全。 */
 .settings-handle-card {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+  align-content: start;
   min-width: 0;
-  padding: 12px 14px 10px;
+  padding: 8px 10px;
   border: 1px solid var(--at-border-subtle);
   border-radius: var(--at-radius-control);
   background: var(--at-bg-elevated);
@@ -64,7 +67,7 @@
 
 .settings-handle-card__rows {
   display: grid;
-  gap: 6px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -72,7 +75,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -97,7 +100,7 @@
 .settings-handle-card__foot {
   display: flex;
   justify-content: flex-end;
-  padding-top: 2px;
+  padding-top: 0;
 }
 
 /* V-05 焦点环：卡内所有可聚焦控件统一 2px accent，四层对比 ≥3.0 */
@@ -109,11 +112,13 @@
   border-radius: 6px;
 }
 
-/* 手柄选择器最多 13 条动作：下拉本身限宽，避免长标签把行撑开 */
+/* 手柄选择器最多 13 条动作：三列并排后每张卡只有 ~300px，选择器按内容取宽
+   （`at-select-trigger-compact` 就是 `width: max-content`），不再钉死 132px 下限 ——
+   钉死会让「当前事项便利贴」这类长标签被截断，而那正是用户最需要看清的一格。 */
 .settings-handle-card__row > :last-child {
-  flex: 0 0 auto;
-  min-width: 132px;
-  max-width: 60%;
+  flex: 0 1 auto;
+  min-width: 96px;
+  max-width: 100%;
 }
 
 @media (max-width: 767px) {

@@ -81,9 +81,7 @@ pub async fn load(pool: &SqlitePool) -> AppResult<MdSyncConfig> {
                 cloud_webdav: webdav,
                 /* [V0.11.33] 模板路径原样带过（serde default 已兜住缺键 = 空串，零迁移）。 */
                 diary_template: saved.diary_template,
-                /* [0.14.x] 事件流开关与全局事项文件原样带过（serde default 兜住缺键：
-                   老 JSON 缺键 → false / 空串，与新装同形，零迁移）。 */
-                stream_enabled: saved.stream_enabled,
+                /* [0.14.x] 全局事项文件原样带过（serde default 兜住缺键 = 空串，与新装同形）。 */
                 items_file: saved.items_file,
             }
         }

@@ -135,13 +135,26 @@ async fn due_excludes_future_and_fired_then_mark_dedupes() {
     assert_eq!(due.len(), 1, "仅到期未触发的命中");
     assert_eq!(due[0].target_id, item);
 
-    // 置位后不再命中（K-19：每 tick 不重复弹）
-    reminder::mark_fired(&pool, &due, 2000).await.unwrap();
+    // 事务派发成功后持久去重；失败则回滚使下一轮可重试。
+    let claimed = reminder::dispatch(&pool, &due, 2000, |_| true).await.unwrap();
+    assert_eq!(claimed.len(), 1);
     assert!(reminder::due(&pool, 2000).await.unwrap().is_empty());
 
-    // 回滚后恢复（通知失败重试路径）
-    reminder::reset_fired(&pool, &due).await.unwrap();
-    assert_eq!(reminder::due(&pool, 2000).await.unwrap().len(), 1);
+    /* 通知失败必须回滚领取：用一个新到点的提醒验证下一轮还能重试。 */
+    reminder::set(&pool, ReminderTarget::Item, item, 2500)
+        .await
+        .unwrap();
+    let retry = reminder::due(&pool, 3000).await.unwrap();
+    assert_eq!(retry.len(), 1);
+    let failed = reminder::dispatch(&pool, &retry, 3000, |_| false)
+        .await
+        .unwrap();
+    assert!(failed.is_empty());
+    assert_eq!(
+        reminder::due(&pool, 3000).await.unwrap().len(),
+        1,
+        "通知失败后必须保留待发状态"
+    );
 }
 
 #[tokio::test]

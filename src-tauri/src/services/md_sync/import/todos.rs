@@ -15,6 +15,8 @@
 //!
 //! 删待办请回 Timing 的待办窗口——那里是明确的删除动作，这里不是。
 
+use std::collections::HashSet;
+
 use chrono::NaiveDate;
 use sqlx::SqlitePool;
 
@@ -43,6 +45,7 @@ pub async fn apply_todos(
 
     let now = now_ms();
     let mut stats = ImportStats::default();
+    let old_ids: HashSet<i64> = old.iter().filter_map(|row| row.id).collect();
 
     for row in &new {
         let title = truncate_chars(row.title.trim(), TODO_TITLE_MAX_LEN);
@@ -56,6 +59,16 @@ pub async fn apply_todos(
             None => None,
         };
 
+        /* 与便利贴同一判据：基线外的标记撞上本机 id ⇒ 来自另一台设备，跳过不覆盖。 */
+        let collides_with_local = existing.as_ref().is_some_and(|todo| {
+            row.id.is_some_and(|id| !old_ids.contains(&id))
+                && (todo.title != title
+                    || todo.planned_at != row.planned_ms
+                    || todo.done_at.is_some() != row.done)
+        });
+        if collides_with_local {
+            continue;
+        }
         match existing {
             Some(todo) => {
                 /* 勾选即「完成于此刻」；取消勾选清空完成时刻。已经完成的保留原完成时间，

@@ -113,6 +113,7 @@ pub async fn resolve_open_record(
     let record =
         services::timer::resolve_open(&state.pool, action, end_at, include_gap.unwrap_or(false))
             .await?;
+    state.timer_recovery_pending.store(false, std::sync::atomic::Ordering::Release);
     services::md_sync::dirty::mark("timer");
     events::emit_timer_state(&app, &state.pool).await;
     Ok(record)

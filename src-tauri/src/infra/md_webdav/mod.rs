@@ -15,7 +15,7 @@ use std::fmt;
 use std::sync::OnceLock;
 use std::time::Duration;
 
-use reqwest::header::{ETAG, IF_MATCH};
+use reqwest::header::{ETAG, IF_MATCH, IF_NONE_MATCH};
 use reqwest::{Client, StatusCode};
 
 use crate::models::constants::{MD_CLOUD_CONNECT_SECS, MD_CLOUD_READ_SECS};
@@ -24,6 +24,8 @@ use crate::models::constants::{MD_CLOUD_CONNECT_SECS, MD_CLOUD_READ_SECS};
 判定表只有一张（见 `dir.rs` 头注释）；`probe` / `ProbeOutcome` re-export 出来，调用点不必知道拆过。 */
 pub mod dir;
 pub mod probe_file;
+mod limits;
+pub use limits::MAX_MARKDOWN_BYTES;
 
 /// TLS 后端（[V0.11.25]）：内置根证书，不依赖运行时的平台验证器。见本模块文件头。
 pub mod tls;
@@ -52,6 +54,7 @@ pub struct WebdavTarget {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WebdavError {
     Auth,
+    TooLarge,
     Forbidden,
     RateLimited,
     Precondition,
@@ -144,13 +147,12 @@ pub async fn get(target: &WebdavTarget, rel: &str) -> Result<GetOutcome, WebdavE
         .await
         .map_err(map_reqwest)?;
     fail_on_status(response.status())?;
+    limits::check_content_length(&response, MAX_MARKDOWN_BYTES)?;
     let etag = etag_of(&response);
-    let bytes = response.bytes().await.map_err(map_reqwest)?.to_vec();
+    let bytes = limits::read_limited(response, MAX_MARKDOWN_BYTES).await?;
     Ok(GetOutcome { bytes, etag })
 }
 
-/// 写远端一份文件。`if_match = Some(etag)` 时发 `If-Match`；`None` 就是无条件 PUT——
-/// **不发** `If-None-Match: *`：那会把「覆盖已存在文件」变成 412，而覆盖是常态。
 ///
 /// ## 409 补建目录内建于本层（设计 §1.1）
 ///
@@ -199,9 +201,10 @@ async fn send_put(
         .put(&url)
         .basic_auth(&target.user, Some(&target.password))
         .body(bytes.to_vec());
-    if let Some(etag) = if_match {
-        request = request.header(IF_MATCH, etag);
-    }
+    request = match if_match {
+        Some(etag) => request.header(IF_MATCH, etag),
+        None => request.header(IF_NONE_MATCH, "*"),
+    };
     let response = request.send().await.map_err(map_reqwest)?;
     fail_on_status(response.status())?;
     Ok(PutOutcome {

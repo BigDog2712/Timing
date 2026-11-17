@@ -44,6 +44,8 @@ export default function SettingsHandlesPanel({ id }: SettingsHandlesPanelProps) 
   const [error, setError] = useState<string | null>(null);
   /** 用户已经动过控件 → 进门那次读库的结果不许再盖回去（见下面的挂载效应）。 */
   const touched = useRef(false);
+  const latestBindings = useRef(bindings);
+  latestBindings.current = bindings;
 
   /**
    * 挂载时去**真源**读一次。
@@ -75,7 +77,8 @@ export default function SettingsHandlesPanel({ id }: SettingsHandlesPanelProps) 
    */
   const commit = async (form: HandleForm, next: HandleFormBinding) => {
     touched.current = true;
-    const merged: HandleBindings = { ...bindings, [form]: next };
+    const merged: HandleBindings = { ...latestBindings.current, [form]: next };
+    latestBindings.current = merged;
     try {
       await savePillPrefs({ handles: merged });
     } catch (err) {
@@ -104,7 +107,7 @@ export default function SettingsHandlesPanel({ id }: SettingsHandlesPanelProps) 
         每个形态可以单独启用；同一形态里「左键 / 右键」是单击，「左双击 / 右双击」是同键双击。
         双击与单击落在同一颗键上时，单击要等一次双击判定窗才派发 —— 这是双击能生效的代价。
       </p>
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 grid gap-2 md:grid-cols-3">
         {HANDLE_FORMS.map((form) => (
           <SettingsHandleCard
             key={form}

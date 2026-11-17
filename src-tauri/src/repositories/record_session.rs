@@ -102,18 +102,6 @@ pub(crate) async fn insert_active_countdown(
     Ok(id)
 }
 
-/// 更新累计秒数与当前段起点（running_since=None 表示暂停）。
-pub async fn set_accum_and_running(
-    pool: &SqlitePool,
-    id: i64,
-    accumulated_sec: i64,
-    running_since: Option<i64>,
-    now: i64,
-) -> AppResult<()> {
-    let mut conn = pool.acquire().await.map_err(AppError::db)?;
-    set_accum_and_running_in(&mut conn, id, accumulated_sec, running_since, now).await
-}
-
 /// [`set_accum_and_running`] 的事务内版本（S3：暂停/继续必须与事件一起落）。
 pub(crate) async fn set_accum_and_running_in(
     conn: &mut SqliteConnection,
@@ -135,6 +123,31 @@ pub(crate) async fn set_accum_and_running_in(
     Ok(())
 }
 
+/// Flush only if the active snapshot has not been changed by pause/resume or another flush.
+pub async fn flush_snapshot(
+    pool: &SqlitePool,
+    id: i64,
+    expected_accumulated_sec: i64,
+    expected_running_since: i64,
+    accumulated_sec: i64,
+    running_since: i64,
+    now: i64,
+) -> AppResult<bool> {
+    let affected = sqlx::query(
+        "UPDATE time_records SET accumulated_sec = ?, running_since = ?, updated_at = ? WHERE id = ? AND status = 'active' AND accumulated_sec = ? AND running_since = ?",
+    )
+    .bind(accumulated_sec)
+    .bind(running_since)
+    .bind(now)
+    .bind(id)
+    .bind(expected_accumulated_sec)
+    .bind(expected_running_since)
+    .execute(pool)
+    .await?
+    .rows_affected();
+    Ok(affected == 1)
+}
+
 /* 结束 / 跨天拆分段落库移到 `record_session_split.rs`（本文件压在 300 行硬限上，
    而那一对函数自带 20 行口径说明）。在此 re-export：`record_session::finalize*`
    的调用点写法不变。 */
@@ -143,9 +156,9 @@ pub(crate) async fn set_accum_and_running_in(
    先 begin 再忘 commit。 */
 pub(crate) use crate::repositories::record_session_split::{finalize, finalize_split};
 
-/// 撤销结束：saved 回滚为 active（ended_at=NULL，running_since=now）。
-pub async fn reactivate(pool: &SqlitePool, id: i64, running_since: i64, now: i64) -> AppResult<()> {
-    sqlx::query(
+/// 撤销结束：saved 回滚为 active，并让调用方在同一事务里补记 `resume`。
+pub(crate) async fn reactivate_in(conn: &mut SqliteConnection, id: i64, running_since: i64, now: i64) -> AppResult<bool> {
+    let changed = sqlx::query(
         "UPDATE time_records \
          SET status = 'active', ended_at = NULL, running_since = ?, updated_at = ? \
          WHERE id = ? AND status = 'saved' AND deleted_at IS NULL",
@@ -153,39 +166,31 @@ pub async fn reactivate(pool: &SqlitePool, id: i64, running_since: i64, now: i64
     .bind(running_since)
     .bind(now)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
-    Ok(())
+    Ok(changed.rows_affected() == 1)
 }
 
-/// 仅更改 active 会话归属事项（时长连续）。
-pub async fn set_item_id(pool: &SqlitePool, id: i64, item_id: i64, now: i64) -> AppResult<()> {
+/// 仅更改 active 会话归属事项（时长连续）。返回新事项的 `uid`（没认领身份时为 `None`）。
+pub(crate) async fn set_item_id_in(
+    conn: &mut SqliteConnection,
+    id: i64,
+    item_id: i64,
+    now: i64,
+) -> AppResult<Option<String>> {
     sqlx::query(
         "UPDATE time_records SET item_id = ?, updated_at = ? WHERE id = ? AND status = 'active'",
     )
     .bind(item_id)
     .bind(now)
     .bind(id)
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
-    Ok(())
-}
-
-/// 丢弃 active 会话：置 saved + 折入累计 + ended_at + 软删除（释放单 active 唯一槽，R-5）。
-///
-/// `accumulated_sec` 必须由调用方给出真实值（`live_duration`）：早先这里不写这一列，
-/// 被丢弃的行会留下「`accumulated_sec=0` 却 `ended_at - started_at = 12 分钟`」的脏数据。
-/// 当前所有查询都过滤 `deleted_at`，所以它暂时不可见——但一旦有人写"回收站 / 统计全量"
-/// 就会读到假数据。软删不等于可以留脏值。
-pub async fn discard(
-    pool: &SqlitePool,
-    id: i64,
-    accumulated_sec: i64,
-    ended_at: i64,
-    now: i64,
-) -> AppResult<()> {
-    let mut conn = pool.acquire().await.map_err(AppError::db)?;
-    discard_in(&mut conn, id, accumulated_sec, ended_at, now).await
+    let uid: Option<Option<String>> = sqlx::query_scalar("SELECT uid FROM items WHERE id = ?")
+        .bind(item_id)
+        .fetch_optional(&mut *conn)
+        .await?;
+    Ok(uid.flatten())
 }
 
 /// [`discard`] 的事务内版本（S3：丢弃也要和 `drop` 事件一起落）。
@@ -212,57 +217,9 @@ pub(crate) async fn discard_in(
     Ok(())
 }
 
-/// 分段换事项：事务内结束旧会话并新开一条 active，返回新 id。
-///
-/// `discard_old = true` 时旧会话按**软删**处理（`deleted_at` 落盘、不联动待办）：
-/// 调用方判定旧段短于「最短记录时长」，这段不该出现在记录列表里（ADR-023）。
-/// 两条路径都写真实的 `accumulated_sec`——软删不等于可以留脏值。
-///
-/// 无论旧段留下还是被丢弃，新会话都照常创建：切换事项不能因为旧段太短而中断。
-pub async fn end_and_start(
-    pool: &SqlitePool,
-    old_id: i64,
-    new_item_id: i64,
-    accumulated_sec: i64,
-    ended_at: i64,
-    now: i64,
-    discard_old: bool,
-) -> AppResult<i64> {
-    let mut tx = pool.begin().await?;
-    let deleted_at: Option<i64> = if discard_old { Some(now) } else { None };
-    let saved = sqlx::query(
-        "UPDATE time_records \
-         SET status = 'saved', ended_at = ?, accumulated_sec = ?, running_since = NULL, \
-             deleted_at = ?, updated_at = ? \
-         WHERE id = ? AND status = 'active' AND deleted_at IS NULL",
-    )
-    .bind(ended_at)
-    .bind(accumulated_sec)
-    .bind(deleted_at)
-    .bind(now)
-    .bind(old_id)
-    .execute(&mut *tx)
-    .await?;
-    if saved.rows_affected() != 1 {
-        // 旧会话已不在 active（并发结束）：不要用新分段掩盖掉这次失败
-        return Err(AppError::timer_not_running());
-    }
-    if !discard_old {
-        super::todo::soft_delete_for_saved_record(&mut tx, old_id, now).await?;
-    }
-    let new_id: i64 = sqlx::query_scalar(
-        "INSERT INTO time_records \
-         (item_id, status, started_at, ended_at, accumulated_sec, running_since, created_at, updated_at, device_id) \
-         VALUES (?, 'active', ?, NULL, 0, ?, ?, ?, ?) RETURNING id",
-    )
-    .bind(new_item_id)
-    .bind(now)
-    .bind(now)
-    .bind(now)
-    .bind(now)
-    .bind(crate::services::identity::install_id().unwrap_or_default())
-    .fetch_one(&mut *tx)
-    .await?;
-    tx.commit().await?;
-    Ok(new_id)
-}
+/* 分段换事项移到 `record_session_switch.rs`（本文件贴着 300 行硬限）。
+   池版本与事务内版本都在那边，这里 re-export 让既有调用点写法不变。 */
+#[cfg(test)]
+pub use crate::repositories::record_session_switch::end_and_start;
+pub(crate) use crate::repositories::record_session_switch::end_and_start_in;
+

@@ -100,11 +100,6 @@ impl WallAnchor {
             mono: Instant::now(),
         }
     }
-
-    /// 自锚点以来经过的毫秒数（单调，不受校时影响）。
-    pub fn elapsed_ms(&self) -> i64 {
-        self.mono.elapsed().as_millis().min(i64::MAX as u128) as i64
-    }
 }
 
 /// 进程级锚点表：`wall_ms -> 单调时刻`。
@@ -118,9 +113,13 @@ const MAX_ANCHORS: usize = 8;
 
 /// 设置锚点（会话开始 / 恢复 / 折账后重新锚定时调用）。
 pub fn anchor(wall_ms: i64) {
+    set_anchor(WallAnchor::new(wall_ms));
+}
+
+pub fn set_anchor(anchor: WallAnchor) {
     if let Ok(mut anchors) = ANCHORS.lock() {
-        anchors.retain(|a| a.wall_ms != wall_ms);
-        anchors.push(WallAnchor::new(wall_ms));
+        anchors.retain(|a| a.wall_ms != anchor.wall_ms);
+        anchors.push(anchor);
         if anchors.len() > MAX_ANCHORS {
             anchors.remove(0);
         }
@@ -146,9 +145,13 @@ pub fn clear_all_anchors() {
 /// 自锚点以来的单调毫秒；找不到对应起点返回 `None`
 /// （说明锚点缺失：进程刚重启或该记录由测试直接构造，调用方应回落到墙钟差值）。
 pub fn anchored_elapsed_ms(running_since: i64) -> Option<i64> {
+    anchored_elapsed_ms_at(running_since, Instant::now())
+}
+
+pub fn anchored_elapsed_ms_at(running_since: i64, sampled_at: Instant) -> Option<i64> {
     let anchors = ANCHORS.lock().ok()?;
     anchors
         .iter()
         .find(|a| a.wall_ms == running_since)
-        .map(|a| a.elapsed_ms())
+        .map(|a| sampled_at.saturating_duration_since(a.mono).as_millis().min(i64::MAX as u128) as i64)
 }

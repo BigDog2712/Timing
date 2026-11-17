@@ -43,6 +43,17 @@ const DAILY_TOTAL: &str =
      VALUES ('com.tencent.mm', '2026-11-15', 3600, 1000, 2000, 0)";
 
 #[tokio::test]
+async fn current_schema_restart_preserves_usage_spans() {
+    let pool = fresh_pool("mig-restart-keeps-spans").await;
+    sqlx::query(OLD_FRAGMENT).execute(&pool).await.unwrap();
+    for _ in 0..2 {
+        crate::infra::migrate::migrate(&pool).await.unwrap();
+        assert_eq!(scalar_i64(&pool, "SELECT COUNT(*) FROM app_usage_span").await, 1);
+        assert_eq!(scalar_opt_str(&pool, "SELECT value FROM settings WHERE key = 'schema.version'").await.as_deref(), Some("16"));
+    }
+}
+
+#[tokio::test]
 async fn usage_span_purge_clears_old_fragments_and_bumps_version() {
     let pool = upgrade_with("mig-usage-purge", &[OLD_FRAGMENT]).await;
 
@@ -56,7 +67,7 @@ async fn usage_span_purge_clears_old_fragments_and_bumps_version() {
         .expect("schema.version 应存在");
     /* 0013 自己把版本推到 13，0014（同步事件流）再推到 14 —— 这里跑的是**全部**迁移，
        所以看到的是最终值。要单独验 0013 的推进，得回到只有 0013 的那棵树。 */
-    assert_eq!(version, "14", "全部迁移跑完版本必须推到 14（0013 → 13，0014 → 14）");
+    assert_eq!(version, "16", "全部迁移跑完应包含目标隔离账本");
 }
 
 /// 反向：聚合表**不许**跟着被清。

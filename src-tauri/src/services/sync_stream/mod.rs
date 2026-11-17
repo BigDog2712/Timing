@@ -7,17 +7,7 @@
 //! - 下载（[`pull_segments`]）：读「序号 > 我的游标」的分段，uid 唯一索引 upsert 去重后折叠；
 //! - 折叠（[`apply::apply_and_fold`]）：复用 `fold_session`，把事件物化回 `time_records`。
 //!
-//! ## 双游标共用一张 `sync_event_cursor`
-//!
-//! 架构 §1.2 说「两张游标」：上传游标（本机 `op_id` 已传上界）与下载游标（从对端读到哪）。
-//! T01 只建了一张 `sync_event_cursor(device_id PK, last_op_id, last_seq)`。这里**复用同一张表**，
-//! 用 key 区分方向：
-//!
-//! - key = **本机** device_id → 上传游标（`last_op_id`=本机已传最大 op_id，`last_seq`=本机最后分段号）；
-//! - key = **对端** device_id → 下载游标（`last_op_id`=对端已读最大 op_id，`last_seq`=对端最后分段号）。
-//!
-//! `device_id` 是 12 位小写 hex、全局唯一，本机与任何对端都不会撞 key，所以一张表两用
-//! 不会串。这样避免了为上传游标再开一张表（T01 已把表建好，直接可用）。
+//! 游标与待确认批次按 `(scope, device_id)` 隔离，scope 来自实际传输目标；旧的无目标账本不作确认依据。
 //!
 //! ## 为什么下载用 GET 顺号探测而不是 LIST 分段
 //!
@@ -27,12 +17,16 @@
 //! 而那个目录数量 = 设备数（个位数），远在坚果云 750 条上限之内。
 
 pub mod apply;
+pub mod progress;
 pub mod pull;
 pub mod push;
 pub mod repository;
+mod recover_cursor;
+pub mod scope;
 pub mod segment;
 pub mod transport;
 
+pub use progress::progress;
 pub use pull::pull_segments;
 pub use push::push_new_events;
 
@@ -62,6 +56,12 @@ pub struct PullSummary {
     pub applied: usize,
     /// 传输层失败。
     pub errors: Vec<String>,
+    /// **可见但不构成失败**的异常：本轮照常同步，只是有需要人看一眼的东西。
+    ///
+    /// 与 `errors` 分开是 0.12.11 真机逼出来的：`round_stream::run` 拿「`errors` 是否为空」
+    /// 判整轮成败，一个与同步无关的远端条目（坚果云在 `sync/events/` 下稳定返回的
+    /// `unix-directory`）就让每轮都判失败并触发退避，退避时间一路翻倍，同步几乎跑不动。
+    pub warnings: Vec<String>,
 }
 
 /// 折叠 + 物化一轮的结果。
@@ -83,3 +83,15 @@ pub struct FoldOutcome {
 mod tests;
 #[cfg(test)]
 mod tests_integrity;
+#[cfg(test)]
+mod tests_targets;
+#[cfg(test)]
+mod tests_target_upgrade;
+#[cfg(test)]
+mod tests_target_webdav;
+#[cfg(test)]
+mod tests_target_recovery;
+#[cfg(test)]
+mod tests_open_session;
+#[cfg(all(test, desktop))]
+mod tests_record_revision;

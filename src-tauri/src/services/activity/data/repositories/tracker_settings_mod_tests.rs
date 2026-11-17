@@ -134,3 +134,27 @@ fn global_title_recording_defaults_on_and_reads_explicit_value() {
         assert!(!load_title_recording_enabled(&pool).await.unwrap());
     });
 }
+
+#[test]
+fn domain_title_opt_out_counts_as_anonymous_web_rule() {
+    tauri::async_runtime::block_on(async {
+        let pool = setup_test_db().await;
+        assert!(!has_anonymous_web_rules(&pool).await.unwrap());
+
+        let key = "__web_domain_override::bank.example";
+        save_setting_value(&pool, key, r#"{"enabled":true,"captureTitle":true}"#)
+            .await
+            .unwrap();
+        assert!(!has_anonymous_web_rules(&pool).await.unwrap());
+
+        save_setting_value(&pool, key, r#"{"enabled":true,"captureTitle":false}"#)
+            .await
+            .unwrap();
+        assert!(has_anonymous_web_rules(&pool).await.unwrap());
+
+        save_setting_value(&pool, key, r#"{"enabled":false,"captureTitle":true}"#)
+            .await
+            .unwrap();
+        assert!(has_anonymous_web_rules(&pool).await.unwrap());
+    });
+}

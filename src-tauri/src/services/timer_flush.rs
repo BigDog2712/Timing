@@ -7,12 +7,13 @@
 //! `running_since` 推到当前墙钟并**重新锚定**，保证下一段继续单调计量。
 
 use sqlx::SqlitePool;
+use std::time::Duration;
 
 use crate::error::AppResult;
 use crate::models::constants::FLUSH_INTERVAL_SECS;
 use crate::platform::clock;
 use crate::repositories::record_session as session;
-use crate::services::timer_time::{elapsed_ms, floor_sec};
+use crate::services::timer_time::floor_sec;
 
 /// 周期落盘：把已计秒数折入 `accumulated_sec` 并推进 `running_since`。
 pub async fn flush_active(pool: &SqlitePool) -> AppResult<()> {
@@ -29,20 +30,40 @@ pub async fn flush_active(pool: &SqlitePool) -> AppResult<()> {
         crate::log_info!("flush_active deferred: cross-process session");
         return Ok(());
     }
-    let delta = floor_sec(elapsed_ms(running_since, now));
+    let sampled = clock::WallAnchor::new(now);
+    let elapsed = clock::anchored_elapsed_ms_at(running_since, sampled.mono)
+        .unwrap_or_else(|| now.saturating_sub(running_since)).max(0);
+    let delta = floor_sec(elapsed);
     if delta <= 0 {
         return Ok(());
     }
-    session::set_accum_and_running(
+    let checkpoint = carry_remainder(sampled, elapsed);
+    let flushed = session::flush_snapshot(
         pool,
         active.id,
+        active.accumulated_sec,
+        running_since,
         active.accumulated_sec + delta,
-        Some(now),
+        checkpoint.wall_ms,
         now,
     )
     .await?;
-    clock::anchor(now);
+    if flushed {
+        clock::set_anchor(checkpoint);
+    }
     Ok(())
+}
+
+fn carry_remainder(sampled: clock::WallAnchor, elapsed_ms: i64) -> clock::WallAnchor {
+    let remainder = elapsed_ms % 1000;
+    clock::WallAnchor {
+        wall_ms: sampled.wall_ms - remainder,
+        // 保留亚秒余量，且数据库等待时间仍归下一段。
+        mono: sampled
+            .mono
+            .checked_sub(Duration::from_millis(remainder as u64))
+            .unwrap_or(sampled.mono),
+    }
 }
 
 /// 本次折账是否必须让路（跨进程遗留的会话）。
@@ -62,7 +83,37 @@ fn should_defer(running_since: i64, now: i64) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::should_defer;
+    use super::{carry_remainder, should_defer};
+    use crate::platform::clock::WallAnchor;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn repeated_flushes_preserve_fractional_seconds() {
+        let origin = Instant::now();
+        let mut checkpoint = WallAnchor { wall_ms: 0, mono: origin };
+        let mut elapsed = 0u64;
+        let mut accumulated = 0;
+        for index in 0..120 {
+            elapsed += if index % 2 == 0 { 15_001 } else { 14_999 };
+            let sampled = WallAnchor { wall_ms: elapsed as i64, mono: origin + Duration::from_millis(elapsed) };
+            let delta = sampled.mono.duration_since(checkpoint.mono).as_millis() as i64;
+            accumulated += delta / 1000;
+            checkpoint = carry_remainder(sampled, delta);
+            assert_eq!(accumulated * 1000 + elapsed as i64 - checkpoint.wall_ms, elapsed as i64);
+        }
+        assert_eq!(accumulated, 1_800);
+    }
+
+    #[test]
+    fn checkpoint_retains_remainder_and_database_wait_across_wall_clock_jumps() {
+        let mono = Instant::now();
+        for wall_ms in [1_000, 9_000_000] {
+            let checkpoint = carry_remainder(WallAnchor { wall_ms, mono }, 15_750);
+            assert_eq!(checkpoint.wall_ms, wall_ms - 750);
+            let after_write = mono + Duration::from_millis(250);
+            assert_eq!(after_write.duration_since(checkpoint.mono).as_millis(), 1_000);
+        }
+    }
 
     #[test]
     fn fresh_session_without_anchor_is_not_deferred() {
@@ -74,5 +125,37 @@ mod tests {
     fn cross_process_session_is_deferred() {
         /* 上个进程留下的 running_since，隔了 15 小时：绝不能由 flusher 折账 */
         assert!(should_defer(1_000_000, 1_000_000 + 15 * 3600 * 1000));
+    }
+
+    #[tokio::test]
+    async fn stale_flush_snapshot_cannot_resume_a_paused_session() {
+        let pool = crate::tests::support::fresh_pool("timer-flush-cas").await;
+        let record = crate::services::timer::start(&pool, Some(1)).await.unwrap();
+        let snapshot = crate::repositories::record_session::find_active(&pool)
+            .await
+            .unwrap()
+            .unwrap();
+        let running_since = snapshot.running_since.unwrap();
+        crate::services::timer::pause(&pool).await.unwrap();
+
+        let wrote = crate::repositories::record_session::flush_snapshot(
+            &pool,
+            record.id,
+            snapshot.accumulated_sec,
+            running_since,
+            snapshot.accumulated_sec + 1,
+            running_since + 1_000,
+            running_since + 1_000,
+        )
+        .await
+        .unwrap();
+
+        assert!(!wrote);
+        let after = crate::repositories::record_session::find_active(&pool)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(after.running_since, None);
+        assert_eq!(after.accumulated_sec, 0);
     }
 }

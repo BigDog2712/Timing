@@ -86,6 +86,8 @@ pub(super) async fn prepare_snapshot_restore(
     exported_at_ms: u64,
     strategy: RestoreStrategy,
 ) -> Result<(), String> {
+    // Old archives may contain credentials; only the extracted candidate is scrubbed.
+    super::secrets::scrub_snapshot_secrets_from_pool(candidate_pool).await?;
     let cutoff = (exported_at_ms.min(i64::MAX as u64) as i64)
         .min(crate::infra::activity::clock::unix_timestamp_millis_i64());
     let sealed = async {
@@ -122,6 +124,11 @@ pub(super) async fn merge_snapshot_backup(
     candidate_pool: sqlx::SqlitePool,
     pool: &sqlx::SqlitePool,
 ) -> Result<(), String> {
+    // Also protect callers that bypass preparation. Never scrub the destination.
+    if let Err(error) = super::secrets::scrub_snapshot_secrets_from_pool(&candidate_pool).await {
+        candidate_pool.close().await;
+        return Err(error);
+    }
     let records_result = load_backup_records(&candidate_pool).await;
     let activity_rules_result =
         crate::services::activity::data::repositories::tools::fetch_all_activity_reminder_rules(&candidate_pool).await;

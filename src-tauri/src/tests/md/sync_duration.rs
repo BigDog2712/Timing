@@ -133,6 +133,36 @@ async fn editing_the_duration_line_alone_changes_nothing() {
     assert_eq!(accumulated_of(&env, id).await, 1_800);
 }
 
+/// ⑤ Editing another interval must not replace an unchanged record's real accumulated duration.
+#[tokio::test]
+async fn changing_another_interval_preserves_existing_real_duration() {
+    let env = env("md-duration-preserve").await;
+    let item = new_item(&env.pool, "测试2").await;
+    let id = insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 12, 0),
+        2_766,
+    )
+    .await;
+    let baseline = export::timers_at(&env.pool, env.date, at(env.date, 15, 0))
+        .await
+        .unwrap()
+        .body;
+    let mut entries = format::parse_timers(&baseline);
+    entries[0].intervals.push(TimerInterval::saved(at(env.date, 14, 0), at(env.date, 14, 30)));
+    let edited = format::render_timers(&entries);
+
+    let stats = import::apply_timers(&env.pool, env.date, &baseline, &edited)
+        .await
+        .unwrap();
+
+    assert_eq!(stats.created, 1);
+    assert_eq!(stats.updated, 0);
+    assert_eq!(accumulated_of(&env, id).await, 2_766);
+}
+
 /// ④-b 文件里的 `duration` 改了时间也不采信：落库值仍由 `(start, end)` 反推。
 #[tokio::test]
 async fn a_dishonest_duration_never_becomes_the_accumulated_value() {

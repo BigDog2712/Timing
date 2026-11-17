@@ -238,6 +238,31 @@ fn close_old_and_open_new_in_the_same_segment_does_not_collide() {
 }
 
 #[test]
+fn staged_batch_survives_success_before_cursor_commit() {
+    tauri::async_runtime::block_on(async {
+        let pool = pool_with_item_claimed_to(A).await;
+        let start = repo::start_session(&pool, 1, 1_000, DAY, "countup", None, A).await.unwrap();
+        let root = temp_root("crash_after_put");
+        let transport = Transport::Folder(root);
+        super::transport::fail_after_put();
+        let failed = push_new_events(&pool, &transport, A).await.unwrap();
+        assert_eq!(failed.segment_seq, 0, "注入崩溃时游标不能提交");
+        let first = super::repository::pending_upload(&pool, &transport.scope().unwrap(), A).await.unwrap().unwrap();
+        assert_eq!(transport.get(&super::segment::segment_path(A, first.seq as u32)).await.unwrap().unwrap(), first.body);
+        repo::append(&pool, &start.session_uid, TimerOpKind::Stop, 2_000, DAY, None, A).await.unwrap();
+
+        let retry = super::repository::pending_upload(&pool, &transport.scope().unwrap(), A).await.unwrap().unwrap();
+        assert_eq!(retry, first, "重试必须使用持久化的 seq、边界和完全相同字节");
+        let push = super::push_new_events(&pool, &transport, A).await.unwrap();
+        assert_eq!(push.segment_seq, 1);
+        assert_eq!(push.events, 1);
+        assert!(super::repository::pending_upload(&pool, &transport.scope().unwrap(), A).await.unwrap().is_none());
+        let next = super::push_new_events(&pool, &transport, A).await.unwrap();
+        assert_eq!(next.segment_seq, 2, "确认后新增事件使用下一个 seq");
+    });
+}
+
+#[test]
 fn empty_push_and_pull_are_noops() {
     tauri::async_runtime::block_on(async {
         let pool = pool_with_item_claimed_to(A).await;

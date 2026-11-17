@@ -47,8 +47,6 @@ export interface MdSyncConfig {
   cloudFolder?: MdSyncCloudChannel | null;
   cloudWebdav?: MdSyncCloudChannel | null;
   diaryTemplate?: string;
-  /** [0.14.x] 事件流开关（计时走分段 JSONL 增量传输）。可选：缺键按 false 补，false 不落盘。 */
-  streamEnabled?: boolean;
   /** [0.14.x] 全局事项文件路径（事项与分类，P1）。可选：后端空串不落盘。 */
   itemsFile?: string;
 }

@@ -15,6 +15,8 @@ use crate::models::record::TimeRecord;
 use crate::platform::clock;
 use crate::repositories::record as repo;
 use crate::repositories::record_session as session;
+use crate::services::timer_events;
+use crate::services::timer_ops::TimerOpKind;
 use crate::services::timer_split;
 use crate::services::timer_time::gap_sec;
 
@@ -52,7 +54,14 @@ pub async fn resolve_open(
         ResolveAction::Resume => {
             // 空档并入（include_gap）后 running_since 重置为 now：继续计时不重复计停机段。
             let base = active.accumulated_sec + gap_sec(&active, now, include_gap);
-            session::set_accum_and_running(pool, active.id, base, Some(now), now).await?;
+            /* 恢复选择也是状态迁移：行与事件同事务，否则对端仍以为这段在跑。 */
+            let mut tx = pool.begin().await.map_err(AppError::db)?;
+            if !include_gap {
+                record_gap_pause(&mut tx, &active, now).await?;
+            }
+            session::set_accum_and_running_in(&mut tx, active.id, base, Some(now), now).await?;
+            timer_events::record(&mut tx, active.id, TimerOpKind::Resume, now, None).await?;
+            tx.commit().await.map_err(AppError::db)?;
             clock::anchor(now);
             repo::find_by_id(pool, active.id).await
         }
@@ -64,7 +73,13 @@ pub async fn resolve_open(
             // 以最后落盘 accumulated_sec 为准；include_gap 才补算停机间隙（R-2）。
             let base = active.accumulated_sec + gap_sec(&active, ended, include_gap);
             // 跨零点分段：崩溃跨夜的会话常常是昨天开始、今天才收尾（V0.11.3）。
-            timer_split::finalize(pool, &active, base, ended, now).await?;
+            let mut tx = pool.begin().await.map_err(AppError::db)?;
+            if !include_gap {
+                record_gap_pause(&mut tx, &active, ended).await?;
+            }
+            timer_split::finalize_in(&mut tx, &active, base, ended, now).await?;
+            timer_events::record(&mut tx, active.id, TimerOpKind::Stop, ended, None).await?;
+            tx.commit().await.map_err(AppError::db)?;
             if let Some(rs) = active.running_since {
                 clock::clear_anchor(rs);
             }
@@ -73,13 +88,30 @@ pub async fn resolve_open(
         ResolveAction::Discard => {
             // 必须置 saved + 软删除，释放 uq_records_open 唯一槽（R-5）。
             // 累计以最后落盘值为准（不补崩溃间隙，R-2）；记录都不要了，gap 更无从谈起。
-            session::discard(pool, active.id, active.accumulated_sec, now, now).await?;
+            let mut tx = pool.begin().await.map_err(AppError::db)?;
+            session::discard_in(&mut tx, active.id, active.accumulated_sec, now, now).await?;
+            timer_events::record(&mut tx, active.id, TimerOpKind::Drop, now, None).await?;
+            tx.commit().await.map_err(AppError::db)?;
             if let Some(rs) = active.running_since {
                 clock::clear_anchor(rs);
             }
             Ok(None)
         }
     }
+}
+
+/// 不计退出空档时，在最后落盘锚点补一条 `pause`：对端按事件折叠也会停在那一刻。
+async fn record_gap_pause(
+    conn: &mut sqlx::SqliteConnection,
+    active: &TimeRecord,
+    cut: i64,
+) -> AppResult<()> {
+    if let Some(anchor) = active.running_since {
+        if anchor < cut {
+            timer_events::record(conn, active.id, TimerOpKind::Pause, anchor, None).await?;
+        }
+    }
+    Ok(())
 }
 
 /// 按「关闭时间」结束一条 active 会话：`ended_at = running_since`（缺失则 now），
@@ -89,7 +121,10 @@ pub async fn resolve_open(
 /// 避免撞上 DB CHECK（`ended_at >= started_at`）让整次收尾失败。
 async fn close_at_close_time(pool: &SqlitePool, record: &TimeRecord, now: i64) -> AppResult<()> {
     let ended = record.running_since.unwrap_or(now).max(record.started_at);
-    timer_split::finalize(pool, record, record.accumulated_sec, ended, now).await?;
+    let mut tx = pool.begin().await.map_err(AppError::db)?;
+    timer_split::finalize_in(&mut tx, record, record.accumulated_sec, ended, now).await?;
+    timer_events::record(&mut tx, record.id, TimerOpKind::Stop, ended, None).await?;
+    tx.commit().await.map_err(AppError::db)?;
     if let Some(rs) = record.running_since {
         clock::clear_anchor(rs);
     }

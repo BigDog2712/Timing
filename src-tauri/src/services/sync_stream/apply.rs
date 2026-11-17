@@ -80,7 +80,11 @@ pub async fn apply_and_fold(conn: &mut SqliteConnection, ops: &[TimerOp]) -> App
     for block in blocks {
         outcome.sessions += 1;
         if block.dropped {
-            soft_delete_by_uid(&mut *conn, &block).await?;
+            if block.record.as_ref().is_some_and(|record| record.deleted_at.is_some()) {
+                apply_block(&mut *conn, &block).await?;
+            } else {
+                soft_delete_by_uid(&mut *conn, &block).await?;
+            }
             outcome.dropped += 1;
         } else {
             apply_block(&mut *conn, &block).await?;
@@ -132,6 +136,14 @@ async fn day_key_for_non_start(conn: &mut SqliteConnection, op: &TimerOp) -> App
 /// 物化一个折叠块：已有 `time_records` 行则复用 [`repo::materialize_in`]（UPDATE），
 /// 没有则 INSERT（对端发起的会话本机没有行）。
 async fn apply_block(conn: &mut SqliteConnection, block: &FoldedBlock) -> AppResult<()> {
+    /* 同一设备只许一条 active（`uq_records_open_per_device`）。对端崩过（强杀、断电、dev
+       重建）会留下**多条**「start 了但没 stop」的会话，逐条物化时第 2 条的 active 必撞唯一
+       索引 ⇒ 整段折叠回滚、游标停住、每轮重试同一个死法，且没有任何自愈路径
+       （0.12.10 真机实测：桌面 7 个分段里 6 条未结束会话）。先补收尾，再物化本条。 */
+    if block.ended_at_ms.is_none() && !block.dropped {
+        seal_earlier_active_on_same_device(conn, block).await?;
+    }
+
     let exists: bool = sqlx::query_scalar::<_, i64>(
         "SELECT EXISTS(SELECT 1 FROM time_records WHERE uid = ?1)",
     )
@@ -148,6 +160,43 @@ async fn apply_block(conn: &mut SqliteConnection, block: &FoldedBlock) -> AppRes
     }
 }
 
+/// 把「同一设备、更早开始、仍然 active」的行就地收尾。
+///
+/// 「后一条 start 发生」就是「前一条已经结束」的事实上界 —— 一台设备不可能同时计时两个
+/// 事项。判定用 `(started_at, uid)` 全序，与 [`apply_and_fold`] 里 blocks 的排序同源：
+/// 若两者只按 `started_at` 走，同一毫秒开始的两条会话在排序上是并列的，先物化谁不确定，
+/// 收尾条件也会互相打空，于是又撞回唯一索引。
+///
+/// 时长按「已积累 + 从 `running_since` 到收尾点」算，`running_since` 为空的老行退化成从
+/// `started_at` 起算；`MAX(0, ..)` 与 `ended_at = ?3` 同时满足表上
+/// `accumulated_sec >= 0`、`ended_at >= started_at` 两条 CHECK。
+async fn seal_earlier_active_on_same_device(
+    conn: &mut SqliteConnection,
+    block: &FoldedBlock,
+) -> AppResult<()> {
+    sqlx::query(
+        "UPDATE time_records
+            SET status = 'saved',
+                ended_at = ?3,
+                running_since = NULL,
+                accumulated_sec = accumulated_sec
+                    + MAX(0, (?3 - COALESCE(running_since, started_at)) / 1000),
+                updated_at = ?4
+          WHERE device_id = ?1
+            AND status = 'active'
+            AND uid IS NOT ?2
+            AND (started_at < ?3 OR (started_at = ?3 AND uid < ?2))",
+    )
+    .bind(&block.device_id)
+    .bind(&block.session_uid)
+    .bind(block.started_at_ms)
+    .bind(now_ms())
+    .execute(&mut *conn)
+    .await
+    .map_err(AppError::db)?;
+    Ok(())
+}
+
 /// 给对端发起的会话新建 `time_records` 行。`uid` **显式写**（保留对端发的 `t:<device>:<id>`，
 /// 触发器见 `uid` 非空不再重发）；`item_id` 按 `item_uid` 反查，查不到退回「未归类」。
 async fn insert_record(conn: &mut SqliteConnection, block: &FoldedBlock) -> AppResult<()> {
@@ -159,8 +208,9 @@ async fn insert_record(conn: &mut SqliteConnection, block: &FoldedBlock) -> AppR
     };
     sqlx::query(
         "INSERT INTO time_records(uid, device_id, item_id, status, started_at, ended_at,
-                                  accumulated_sec, running_since, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?5, ?9)
+                                  accumulated_sec, running_since, created_at, updated_at,
+                                  note, mode, target_sec, deleted_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?5, ?9, ?10, ?11, ?12, ?13)
          ON CONFLICT(uid) WHERE uid IS NOT NULL DO NOTHING",
     )
     .bind(&block.session_uid)
@@ -172,6 +222,10 @@ async fn insert_record(conn: &mut SqliteConnection, block: &FoldedBlock) -> AppR
     .bind(block.accumulated_sec())
     .bind(block.running_since_ms)
     .bind(now_ms())
+    .bind(block.record.as_ref().and_then(|record| record.note.as_deref()))
+    .bind(block.record.as_ref().map_or("countup", |record| record.mode.as_str()))
+    .bind(block.record.as_ref().and_then(|record| record.target_sec))
+    .bind(block.record.as_ref().and_then(|record| record.deleted_at))
     .execute(&mut *conn)
     .await
     .map_err(AppError::db)?;

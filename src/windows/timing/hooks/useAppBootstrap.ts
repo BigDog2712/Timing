@@ -182,26 +182,7 @@ export function useAppBootstrap(): void {
         ]);
         if (cancelled) return;
         if (state.session) {
-          /* 误触不打扰（0.12.8）。主界面上那个大按钮是「点一下就开始了」，很多人点一下就走，
-             留下的是一条 0 秒的残留记录；下次进来看见「上次计时没有正常结束」，
-             用户的结论是「软件出错了」，而他压根没打算计时（原话：每次进入软件都会弹出一个
-             提醒，但我未开始计时）。不足 1 分钟的残留直接静默丢弃，不占用户一次决策；
-             真计过时的才值得让他选继续 / 结束 / 丢弃。 */
-          if (state.session.accumulatedSec < 60) {
-            await ipc
-              .resolveOpenRecord({ action: 'discard', includeGap: false })
-              .catch(() => undefined);
-            const fresh = await useTimerStore
-              .getState()
-              .refresh()
-              .catch(() => undefined);
-            /* 丢弃失败（比如后端拒绝）就退回弹层，总比让用户对着 0 秒的框发愣好。 */
-            if (!cancelled && (fresh?.session ?? null) != null) {
-              useUiStore.getState().setRecover(fresh?.session ?? null);
-            }
-          } else {
-            useUiStore.getState().setRecover(state.session);
-          }
+          useUiStore.getState().setRecover(state.session);
         }
       } catch {
         if (!cancelled) {

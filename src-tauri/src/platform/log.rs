@@ -5,7 +5,7 @@
 //! 这个项目的发布配置是 `panic = "abort"` + `strip = true`：崩溃时既没有栈也没有符号。
 //! 首要诉求不是「结构化查询」，而是**崩溃后能留下一条人可读的记录**。为此引入一整套
 //! subscriber 生态收益很小，代价是多 3~5 个 crate 与一份需要持续跟的配置。
-//! 自带的这 90 行只做四件事：分级、按天分文件、保留 7 天、panic 落盘。
+//! 自带模块只做四件事：分级、按天分文件、保留 7 天、panic 落盘。
 //! 将来真要做结构化检索，把 `log()` 的下游换掉即可，调用点不用动。
 //!
 //! ## 用法
@@ -50,7 +50,12 @@ impl Level {
 const KEEP_DAYS: i64 = 7;
 
 static LEVEL: AtomicU8 = AtomicU8::new(Level::Info as u8);
-static SINK: OnceLock<Mutex<Option<File>>> = OnceLock::new();
+struct SinkState {
+    day: String,
+    file: Option<File>,
+}
+
+static SINK: OnceLock<Mutex<SinkState>> = OnceLock::new();
 static LOG_DIR: OnceLock<PathBuf> = OnceLock::new();
 
 fn parse_level(raw: &str) -> Level {
@@ -66,13 +71,16 @@ fn today() -> String {
     chrono::Local::now().format("%Y-%m-%d").to_string()
 }
 
-/// 删除超过 `KEEP_DAYS` 的日志文件（按文件修改时间，不解析文件名，避免格式变更后失效）。
+/// 删除超过 `KEEP_DAYS` 的日志文件（按修改时间）。
 fn prune(dir: &Path) {
+    prune_before(dir, std::time::SystemTime::now());
+}
+
+fn prune_before(dir: &Path, now: std::time::SystemTime) {
     let Ok(entries) = fs::read_dir(dir) else {
         return;
     };
-    let cutoff =
-        std::time::SystemTime::now() - std::time::Duration::from_secs(KEEP_DAYS as u64 * 86_400);
+    let cutoff = now - std::time::Duration::from_secs(KEEP_DAYS as u64 * 86_400);
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("log") {
@@ -97,13 +105,10 @@ pub fn init(app_data_dir: &Path) {
     let _ = fs::create_dir_all(&dir);
     prune(&dir);
     let path = dir.join(format!("timing-{}.log", today()));
-    let file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-        .ok();
+    let file = OpenOptions::new().create(true).append(true).open(&path).ok();
+    let day = today();
     let _ = LOG_DIR.set(dir);
-    let _ = SINK.set(Mutex::new(file));
+    let _ = SINK.set(Mutex::new(SinkState { day, file }));
     LEVEL.store(parse_level(&level_from_env()) as u8, Ordering::Relaxed);
     /* 旧环境变量只在「新名缺失」时生效，并且必须让用户知道要改：静默兼容会让
     `TICKBAR_LOG` 永远活着（PRD §5 的「旧名保留一个版本」不是保留到永远）。 */
@@ -156,16 +161,23 @@ pub fn log(level: Level, target: &str, message: &str) {
     if level > current_level() {
         return;
     }
-    let line = format!(
-        "{} {} [{}] {}\n",
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f"),
-        level.tag(),
-        target,
-        message
-    );
+    let now = chrono::Local::now();
+    let day = now.format("%Y-%m-%d").to_string();
+    let line = format!("{} {} [{}] {}\n", now.format("%Y-%m-%d %H:%M:%S%.3f"), level.tag(), target, message);
     if let Some(sink) = SINK.get() {
         if let Ok(mut guard) = sink.lock() {
-            if let Some(file) = guard.as_mut() {
+            if guard.day != day {
+                guard.file = LOG_DIR.get().and_then(|dir| {
+                    prune(dir);
+                    OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(dir.join(format!("timing-{day}.log")))
+                        .ok()
+                });
+                guard.day = day;
+            }
+            if let Some(file) = guard.file.as_mut() {
                 let _ = file.write_all(line.as_bytes());
                 let _ = file.flush();
             }

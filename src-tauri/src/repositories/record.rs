@@ -64,7 +64,11 @@ pub async fn update_saved(
     qb.push(" WHERE id = ")
         .push_bind(id)
         .push(" AND status = 'saved' AND deleted_at IS NULL");
-    qb.build().execute(pool).await?;
+    let mut tx = pool.begin().await?;
+    let changed = qb.build().execute(&mut *tx).await?.rows_affected();
+    if changed != 1 { return Err(crate::error::AppError::item_not_found()); }
+    super::record_revision::append_in(&mut tx, id, now).await?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -75,15 +79,18 @@ pub async fn update_saved(
 /// `WHERE status='active'` 的部分唯一索引，不过滤 `deleted_at`，于是
 /// `find_active` 返回空（用户看到空闲）却再也起不了新计时（唯一冲突）。
 pub async fn soft_delete(pool: &SqlitePool, id: i64, now: i64) -> AppResult<()> {
-    sqlx::query(
+    let mut tx = pool.begin().await?;
+    let changed = sqlx::query(
         "UPDATE time_records SET deleted_at = ?, updated_at = ? \
          WHERE id = ? AND status = 'saved' AND deleted_at IS NULL",
     )
     .bind(now)
     .bind(now)
     .bind(id)
-    .execute(pool)
-    .await?;
+    .execute(&mut *tx)
+    .await?.rows_affected();
+    if changed > 0 { super::record_revision::append_in(&mut tx, id, now).await?; }
+    tx.commit().await?;
     Ok(())
 }
 
@@ -205,6 +212,7 @@ pub async fn insert_saved(
     .bind(crate::services::identity::install_id().unwrap_or_default())
     .fetch_one(&mut *conn)
     .await?;
+    super::record_revision::append_in(conn, id, now).await?;
     Ok(id)
 }
 

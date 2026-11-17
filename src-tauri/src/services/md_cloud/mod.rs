@@ -37,6 +37,8 @@ pub mod purge;
 pub mod round_conflict;
 pub mod round_folder;
 pub mod round_push;
+/* [0.14.x] 事件流半轮：两条通路共用，只差一个 `Transport`（见文件头）。 */
+mod round_stream;
 pub mod round_webdav;
 mod state;
 
@@ -127,13 +129,11 @@ pub async fn round_with(
     let today = today();
     let mut report = MdSyncReport::new(crate::platform::clock::now_ms());
     if let Some(channel) = folder {
-        let part =
-            round_folder::run(pool, channel, &config.bindings, &today, config.stream_enabled, mode)
-                .await?;
+        let part = round_folder::run(pool, channel, mode).await?;
         absorb(&mut report, part);
     }
     if let Some(channel) = webdav {
-        let part = round_webdav::run(pool, channel, &today, config.stream_enabled, mode).await?;
+        let part = round_webdav::run(pool, channel, mode).await?;
         absorb(&mut report, part);
     }
     let pending = md_cloud_pending::pending_dates(pool, PurgeChannel::Webdav)
@@ -162,28 +162,13 @@ pub async fn round_channel(
     match channel {
         PurgeChannel::Folder => {
             if let Some(ch) = usable_folder(&config) {
-                let part = round_folder::run(
-                    pool,
-                    ch,
-                    &config.bindings,
-                    &today,
-                    config.stream_enabled,
-                    ConflictMode::Pending,
-                )
-                .await?;
+                let part = round_folder::run(pool, ch, ConflictMode::Pending).await?;
                 absorb(&mut report, part);
             }
         }
         PurgeChannel::Webdav => {
             if let Some(ch) = usable_webdav(&config) {
-                let part = round_webdav::run(
-                    pool,
-                    ch,
-                    &today,
-                    config.stream_enabled,
-                    ConflictMode::Pending,
-                )
-                .await?;
+                let part = round_webdav::run(pool, ch, ConflictMode::Pending).await?;
                 absorb(&mut report, part);
                 pending = md_cloud_pending::pending_dates(pool, channel)
                     .await

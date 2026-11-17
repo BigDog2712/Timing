@@ -30,9 +30,24 @@ pub async fn read(pool: &SqlitePool) -> AppResult<Option<PillPrefs>> {
 /// 写全量而不是「只更新 patch 里给的字段」：前端两个卡各自只发一半，只写一半会让另半份
 /// 回默认（用户调一次不透明度就丢手柄绑定）。合并与归一的唯一实现在 `merge_pill_prefs`。
 pub async fn write(pool: &SqlitePool, patch: &PillPrefsPatch, now: i64) -> AppResult<()> {
-    let merged = merge_pill_prefs(read(pool).await?, patch);
+    let mut tx = pool.begin().await?;
+    let current: Option<String> = sqlx::query_scalar("SELECT value FROM settings WHERE key = ?")
+        .bind(KEY_PILL_PREFS)
+        .fetch_optional(&mut *tx)
+        .await?;
+    let old = current.and_then(|value| serde_json::from_str::<PillPrefs>(&value).ok());
+    let merged = merge_pill_prefs(old, patch);
     let encoded = encode(&merged)?;
-    repo::set_value(pool, KEY_PILL_PREFS, &encoded, now).await
+    sqlx::query(
+        "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+    )
+    .bind(KEY_PILL_PREFS)
+    .bind(encoded)
+    .bind(now)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(())
 }
 
 fn encode<T: Serialize>(value: &T) -> AppResult<String> {

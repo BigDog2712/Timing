@@ -65,6 +65,7 @@ pub async fn start(
     )
     .await?;
     tx.commit().await.map_err(AppError::db)?;
+    clock::anchor(now);
     set_hint(true);
     settings::set_last_item_id(pool, item_id).await?;
     timer::reload(pool, id).await

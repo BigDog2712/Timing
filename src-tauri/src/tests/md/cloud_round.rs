@@ -15,8 +15,10 @@ use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncReport;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::repositories::md_cloud_pending;
+use crate::repositories::timer_ops as op_repo;
 use crate::services::md_cloud::{self, pending};
 use crate::services::md_sync::{self, config};
+use crate::services::timer_ops::TimerOpKind;
 use super::sync::{binding, env, TIMERS_HEADING};
 use crate::tests::support::{insert_saved, new_item, unique_dir};
 use crate::{platform::clock::now_ms, services::md_sync::config::load};
@@ -96,14 +98,23 @@ fn fnv1a64_vectors_are_pinned() {
     assert!(hash.chars().all(|ch| ch.is_ascii_hexdigit() && !ch.is_uppercase()));
 }
 
-/// LocalFolder：跑一轮之后目标目录里真的出现今日文件，且内容含区块标题。
+/// LocalFolder：跑一轮之后目标目录里出现的是**事件分段**，md 快照不再写进落点。
 #[tokio::test]
-async fn local_folder_round_writes_todays_file() {
+async fn local_folder_round_writes_todays_segment() {
     let fixture = env("cloud-folder").await;
     let cloud_dir = unique_dir("cloud-folder-target");
     let item = new_item(&fixture.pool, "读书").await;
+    /* 必须有真事件可传：分段的内容就是 `timer_ops`，一条记录不带事件的话这一轮没东西可写。 */
+    let device = crate::services::identity::install_id().expect("测试环境应能生成 install_id");
+    let today = md_cloud::today();
     let now = now_ms();
-    insert_saved(&fixture.pool, item, now - 300_000, now, 300).await;
+    let start =
+        op_repo::start_session(&fixture.pool, item, now - 300_000, &today, "countup", None, device)
+            .await
+            .expect("造开始事件应成功");
+    op_repo::append(&fixture.pool, &start.session_uid, TimerOpKind::Stop, now, &today, None, device)
+        .await
+        .expect("造结束事件应成功");
 
     let mut stored = load(&fixture.pool).await.expect("读配置应成功");
     stored.cloud = Some(MdSyncCloud {
@@ -120,16 +131,23 @@ async fn local_folder_round_writes_todays_file() {
     assert!(outcome.report.errors.is_empty(), "{:?}", outcome.report.errors);
     assert!(outcome.pending.is_empty(), "LocalFolder 没有待传概念");
 
-    let target = vault_file(&cloud_dir, fixture.date);
-    let text = fs::read_to_string(&target).expect("云端目录里应出现今日文件");
+    /* ① 落点里是分段：`sync/events/<设备>/00000001.jsonl`（8 位零填充），能解码出这两条事件。 */
+    let segment = cloud_dir.join("sync/events").join(device).join("00000001.jsonl");
+    let bytes = fs::read(&segment).expect("落点里应出现今日的第一段事件分段");
+    let ops = crate::services::sync_stream::segment::decode_segment(&bytes)
+        .expect("分段必须能解码（含完整性尾标）");
+    assert_eq!(ops.len(), 2, "一段里应有开始与结束两条事件");
+
+    /* ② 落点里**不该**再有 md：这条是「落档格式换成事件流」的正面判据。 */
     assert!(
-        text.contains(TIMERS_HEADING),
-        "云端那份必须带区块标题（与 Obsidian 那份结构相同）:\n{text}"
+        !vault_file(&cloud_dir, fixture.date).exists(),
+        "落点里不许再出现 md 快照"
     );
-    assert!(text.contains("读书"), "记录要出现在云端那份里");
-    /* 两个落点各写一份：Obsidian 与云端目录都不该被对方顶掉。 */
+
+    /* ③ 用户自己的笔记目录照旧渲染 md（那是本地功能，不是传输落点）。 */
     let vault_text = fs::read_to_string(vault_file(&fixture.vault, fixture.date)).unwrap();
     assert!(vault_text.contains(TIMERS_HEADING));
+    assert!(vault_text.contains("读书"), "笔记那份仍要有这条记录");
 }
 
 /// 队列三态（真编排里的第 ⑦ 步）：内容变 → 有欠账；再跑一次内容没变 → 欠账时间不刷新。

@@ -44,6 +44,8 @@ export default function HostPillLookCard({ id }: HostPillLookCardProps) {
   const [error, setError] = useState<string | null>(null);
   /** 用户已经动过控件 → 进门那次读库的结果不许再盖回去。 */
   const touched = useRef(false);
+  const latestAppearance = useRef(appearance);
+  latestAppearance.current = appearance;
 
   /**
    * 挂载时去**真源**读一次。
@@ -89,7 +91,9 @@ export default function HostPillLookCard({ id }: HostPillLookCardProps) {
 
   const patch = (next: Partial<Appearance>) => {
     touched.current = true;
-    void apply(normalizeAppearance(next, appearance));
+    const merged = normalizeAppearance(next, latestAppearance.current);
+    latestAppearance.current = merged;
+    void apply(merged);
   };
 
   const opacitySlider = (

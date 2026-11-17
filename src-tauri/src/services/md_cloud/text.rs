@@ -31,6 +31,7 @@ use crate::infra::md_webdav::WebdavError;
 pub(crate) fn fail_tag(err: &WebdavError) -> Cow<'static, str> {
     match err {
         WebdavError::Auth => Cow::Borrowed("Auth"),
+        WebdavError::TooLarge => Cow::Borrowed("TooLarge"),
         WebdavError::Forbidden => Cow::Borrowed("Forbidden"),
         WebdavError::RateLimited => Cow::Borrowed("RateLimited"),
         WebdavError::Precondition => Cow::Borrowed("Precondition"),
@@ -83,6 +84,7 @@ pub(crate) fn fail_text_at(stage: FailStage<'_>, err: &WebdavError, remote_dir: 
         WebdavError::Auth => {
             "账号或应用密码不对（坚果云要用应用密码，在网页版 → 账户信息 → 安全选项里添加）".into()
         }
+        WebdavError::TooLarge => "WebDAV 返回的数据超过安全上限，本轮已停止读取".into(),
         WebdavError::Forbidden => forbidden_text(stage, &label, remote_dir),
         WebdavError::RateLimited => "坚果云限流了，稍后会自动重试".into(),
         WebdavError::Precondition => "远端这份在你上传前被改过，本轮没有覆盖".into(),

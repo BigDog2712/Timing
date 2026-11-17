@@ -86,14 +86,6 @@ pub struct MdSyncConfig {
     /// 不进 `validate()`：路径无效是运行期降级（P18），不是保存期错误。
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub diary_template: String,
-    /// [0.14.x] 事件流开关（计时走分段 JSONL 增量传输，架构设计 §1.2）。出厂默认**关**：
-    /// 事件流是新的传输通路，不该在一次升级后自己开始往远端写分段文件。
-    ///
-    /// 与 `cloud_folder` / `diary_template` 同口径（新增可选字段走「未配置 = 缺键」）：
-    /// `#[serde(default)]` 让老 JSON 缺键按 false 补，`skip_serializing_if` 让 false 不落盘，
-    /// 守住「no-op 保存不多写一个键」的既有判据（`tests/qa_batch1_edges.rs`）。
-    #[serde(default, skip_serializing_if = "skip_if_false")]
-    pub stream_enabled: bool,
     /// [0.14.x] 全局事项文件路径（事项与分类，P1 五域之一）。空 = 未配置。
     /// 与 `diary_template` 同口径：不进 `validate()`（路径无效是运行期降级，P18），
     /// `skip_serializing_if` 让未配置用户的存储 JSON 与新装同形。
@@ -106,11 +98,6 @@ fn default_poll_secs() -> u64 {
     MD_SYNC_POLL_SECS
 }
 
-/// `skip_serializing_if`：事件流开关为 false 时不落盘（新增字段不破坏老配置的 round-trip）。
-fn skip_if_false(value: &bool) -> bool {
-    !*value
-}
-
 impl Default for MdSyncConfig {
     fn default() -> Self {
         Self {
@@ -121,7 +108,6 @@ impl Default for MdSyncConfig {
             cloud_folder: None,
             cloud_webdav: None,
             diary_template: String::new(),
-            stream_enabled: false,
             items_file: String::new(),
         }
     }

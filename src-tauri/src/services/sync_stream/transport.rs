@@ -42,12 +42,23 @@ static TMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64:
 #[cfg(test)]
 thread_local! {
     static FAIL_BEFORE_PUBLISH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static FAIL_AFTER_PUT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// 置位本线程的注入点（见上）。
 #[cfg(test)]
 pub(crate) fn fail_before_publish() {
     FAIL_BEFORE_PUBLISH.with(|flag| flag.set(true));
+}
+
+#[cfg(test)]
+pub(crate) fn fail_after_put() {
+    FAIL_AFTER_PUT.with(|flag| flag.set(true));
+}
+
+#[cfg(test)]
+pub(crate) fn consume_fail_after_put() -> bool {
+    FAIL_AFTER_PUT.with(|flag| flag.replace(false))
 }
 
 /// 事件流传输落点。
@@ -201,6 +212,7 @@ fn join(root: &Path, rel: &str) -> Result<PathBuf, String> {
 fn webdav_error_text(err: &WebdavError) -> String {
     match err {
         WebdavError::Auth => "云端：登录失败（应用密码不对）".to_string(),
+        WebdavError::TooLarge => "云端：响应超过安全大小上限".to_string(),
         WebdavError::Forbidden => "云端：没有写权限".to_string(),
         WebdavError::RateLimited => "云端：请求太频繁，稍后自动重试".to_string(),
         WebdavError::Precondition => "云端：目标已存在".to_string(),

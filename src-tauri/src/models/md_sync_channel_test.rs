@@ -120,5 +120,15 @@ fn webdav_validation_rejects_embedded_credentials_and_public_http() {
         channel("http://[::1]:8080/dav").validate_webdav().is_ok(),
         "IPv6 回环同样放行"
     );
+    /* 伪回环：字符串前缀判据会把它当成本机，实际是公网域名。 */
+    for url in [
+        "http://127.attacker.example/dav",
+        "http://127.0.0.1.evil.example/dav",
+    ] {
+        assert!(
+            channel(url).validate_webdav().is_err(),
+            "伪 127 域名必须按公网处理：{url}"
+        );
+    }
 }
 

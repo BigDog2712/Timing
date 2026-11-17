@@ -53,7 +53,7 @@ fn corrupt_segment_is_retried_instead_of_being_skipped() {
             !first.errors.is_empty(),
             "坏分段必须报错（否则用户完全看不到同步卡住了）"
         );
-        let cursor = repository::get(&pool_b, A).await.unwrap();
+        let cursor = repository::get(&pool_b, &transport.scope().unwrap(), A).await.unwrap();
         assert_eq!(
             cursor.map(|c| c.last_seq).unwrap_or(0),
             0,
@@ -91,7 +91,7 @@ fn push_does_not_advance_cursor_when_existing_segment_differs() {
         assert_eq!(first.events, 0, "内容不同 = 没确认写入，不许当成已上传");
         assert!(!first.errors.is_empty(), "必须报错，下一轮重试");
         assert!(
-            repository::get(&pool_a, A).await.unwrap().is_none(),
+            repository::get(&pool_a, &transport.scope().unwrap(), A).await.unwrap().is_none(),
             "游标不许推进：推进就是中间那批事件永久不对端可见"
         );
 
@@ -100,7 +100,7 @@ fn push_does_not_advance_cursor_when_existing_segment_differs() {
         let second = push_new_events(&pool_a, &transport, A).await.unwrap();
         assert_eq!(second.events, 4);
         assert_eq!(second.segment_seq, 1, "重试用的是同一个 seq，不跳号");
-        let cursor = repository::get(&pool_a, A).await.unwrap().expect("游标必须落库");
+        let cursor = repository::get(&pool_a, &transport.scope().unwrap(), A).await.unwrap().expect("游标必须落库");
         assert_eq!(cursor.last_seq, 1);
         assert!(cursor.last_op_id > 0, "上传游标要记到已传的最大 op_id");
     });
@@ -118,12 +118,12 @@ fn repushing_an_identical_segment_is_treated_as_success() {
         assert_eq!(first.segment_seq, 1);
 
         /* 把游标退回去，模拟「PUT 成功、游标没落库」。 */
-        repository::upsert(&pool_a, A, 0, 0).await.unwrap();
+        repository::upsert(&pool_a, &transport.scope().unwrap(), A, 0, 0).await.unwrap();
 
         let second = push_new_events(&pool_a, &transport, A).await.unwrap();
         assert!(second.errors.is_empty(), "内容逐字节相同 ⇒ 就是已上传：{:?}", second.errors);
-        assert_eq!(second.segment_seq, 1);
-        assert_eq!(repository::get(&pool_a, A).await.unwrap().unwrap().last_seq, 1);
+        assert_eq!(second.segment_seq, 0, "核验已存在分段后不再重复发布");
+        assert_eq!(repository::get(&pool_a, &transport.scope().unwrap(), A).await.unwrap().unwrap().last_seq, 1);
     });
 }
 
@@ -177,7 +177,7 @@ fn interrupted_write_never_publishes_a_partial_segment() {
             "最终路径上不许出现半份文件：出现了就会被另一端当成完整分段"
         );
         assert!(
-            repository::get(&pool_a, A).await.unwrap().is_none(),
+            repository::get(&pool_a, &transport.scope().unwrap(), A).await.unwrap().is_none(),
             "上传游标不许推进"
         );
 
@@ -232,7 +232,7 @@ fn failed_apply_leaves_no_half_state_and_retry_converges() {
             .unwrap();
         assert_eq!(records, 0, "物化也必须回滚");
         assert!(
-            repository::get(&pool_b, A).await.unwrap().is_none(),
+            repository::get(&pool_b, &transport.scope().unwrap(), A).await.unwrap().is_none(),
             "游标不许前进：前进就是这一段永久丢失"
         );
 
@@ -250,7 +250,7 @@ fn failed_apply_leaves_no_half_state_and_retry_converges() {
             "补上之后两端必须逐位一致"
         );
         assert_eq!(
-            repository::get(&pool_b, A).await.unwrap().map(|c| c.last_seq),
+            repository::get(&pool_b, &transport.scope().unwrap(), A).await.unwrap().map(|c| c.last_seq),
             Some(1),
             "成功之后游标才前进"
         );
@@ -281,10 +281,18 @@ fn non_device_dir_is_reported_without_blocking_real_peers() {
         let summary = pull_segments(&pool_b, &transport, B).await.unwrap();
         assert_eq!(summary.peers, 1, "只有合法的那台算 peer");
         assert_eq!(summary.applied, 4, "合法设备的同步不受影响");
+        /* 0.12.11 真机改判据：杂项曾记进 `errors`，而 `round_stream::run` 用「errors 是否
+           为空」判整轮成败 —— 坚果云稳定返回的 `unix-directory` 让每轮都退避、同步几乎
+           跑不动。「有个杂项」要看得见，但不是失败。 */
         assert!(
-            summary.errors.iter().any(|err| err.contains("not-a-device")),
-            "非法目录必须点名报出来，用户才能去清掉它：{:?}",
+            summary.errors.is_empty(),
+            "非设备目录不能让整轮判失败（会触发退避）：{:?}",
             summary.errors
+        );
+        assert!(
+            summary.warnings.iter().any(|err| err.contains("not-a-device")),
+            "非法目录必须点名报出来，用户才能去清掉它：{:?}",
+            summary.warnings
         );
     });
 }

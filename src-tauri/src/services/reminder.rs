@@ -43,13 +43,28 @@ pub async fn due(pool: &SqlitePool, now: i64) -> AppResult<Vec<Reminder>> {
 }
 
 /// 批量置位 `reminded_at`（先置位再去重，K-19）。
-pub async fn mark_fired(pool: &SqlitePool, rows: &[Reminder], now: i64) -> AppResult<()> {
-    repo::mark_fired(pool, rows, now).await
-}
-
-/// 批量回滚 `reminded_at`（通知失败时保留待重试，绝不静默丢提醒）。
-pub async fn reset_fired(pool: &SqlitePool, rows: &[Reminder]) -> AppResult<()> {
-    repo::reset_fired(pool, rows).await
+/// 在数据库事务中领取并通知：失败/进程崩溃会回滚，成功才持久标记。
+pub async fn dispatch<F>(
+    pool: &SqlitePool,
+    rows: &[Reminder],
+    now: i64,
+    notify: F,
+) -> AppResult<Vec<Reminder>>
+where
+    F: FnOnce(&[Reminder]) -> bool,
+{
+    let mut tx = pool.begin().await?;
+    let claimed = repo::mark_fired(&mut tx, rows, now).await?;
+    if claimed.is_empty() {
+        tx.rollback().await?;
+        return Ok(Vec::new());
+    }
+    if !notify(&claimed) {
+        tx.rollback().await?;
+        return Ok(Vec::new());
+    }
+    tx.commit().await?;
+    Ok(claimed)
 }
 
 /// 校验目标存在并返回其标题（事项名 / 待办标题）。

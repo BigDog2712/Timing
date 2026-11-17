@@ -9,12 +9,12 @@
  * 视图的参数形状由本文件对着各视图自己的 `ComponentProps` 派生，避免第二处手写类型漂移。
  */
 import type { ComponentProps, Dispatch, ReactNode, SetStateAction } from "react";
-import AboutView from "../../features/about/components/About.tsx";
-import AppMappingView from "../../features/classification/components/AppMapping.tsx";
-import DataView from "../../features/data/components/Data.tsx";
+import type AboutView from "../../features/about/components/About.tsx";
+import type AppMappingView from "../../features/classification/components/AppMapping.tsx";
+import type DataView from "../../features/data/components/Data.tsx";
 import Dashboard from "../../features/dashboard/components/Dashboard.tsx";
-import HistoryView from "../../features/history/components/History.tsx";
-import SettingsView from "../../features/settings/components/Settings.tsx";
+import type HistoryView from "../../features/history/components/History.tsx";
+import type SettingsView from "../../features/settings/components/Settings.tsx";
 import { clearDataBootstrapCache } from "../../features/data/services/dataCacheLifecycle.ts";
 import type { ColorSchemePreview } from "../../features/settings/types.ts";
 import type {

@@ -269,15 +269,14 @@ async fn three_failed_days_pause_the_channel() {
     let _ = fs::remove_dir_all(&root);
 }
 
-/// 接线本身要有一条机器判据（本项目已经栽过两次「写了、接线没接」：`mark_tray_quitting`
-/// 的调用点没人看着、`md_section_fence` 的测试没注册）。
+/// 0.14.x：md 落档停写后，「往期真删」不再有自动挂点 —— 判据从「必须接线」翻成
+/// **「必须没有接线」**（理由与后果见 `更新日志.md` 2026-11-16）：落点不再产生
+/// `{date}.md`，两套候选集（本地镜像目录 / `md_cloud_pending` 行）都失去了生产者，
+/// 留着挂点只会「每轮跑一遍、永远删 0 个」。远端旧 md **不会**被自动删，要清就手动。
 ///
-/// `round_webdav` 的 ⑩ 与 `round_folder` 的 ⑩' 都需要真凭据 + 真落点根，做不出稳定的
-/// 端到端夹具；但「挂点被注释掉 / 删掉」这件事完全可以机验，而且**必须**机验 ——
-/// 那正是「绿着但什么都没跑」的形状。这里只数**非注释行**里的调用。
-
+/// 防空转：先让同一个扫描器在已知存在的串上命中一次，再断言 0。
 #[test]
-fn purge_is_wired_into_both_rounds() {
+fn purge_is_retired_from_both_rounds() {
     fn calls(source: &str, needle: &str) -> usize {
         source
             .lines()
@@ -287,9 +286,9 @@ fn purge_is_wired_into_both_rounds() {
     }
     let webdav = include_str!("../../services/md_cloud/round_webdav.rs");
     let folder = include_str!("../../services/md_cloud/round_folder.rs");
-    assert_eq!(calls(webdav, "purge::run_webdav("), 1, "⑩ 的调用行必须存在且只有一处");
-    assert_eq!(calls(folder, "purge::run_folder("), 1, "⑩' 的调用行必须存在且只有一处");
-    /* 前置条件也要在：⑩ 只能进「⑧ 成功」那一支，⑩' 只能进 `wrote_ok` 那一支。 */
-    assert_eq!(calls(webdav, "if push_ok"), 1, "⑩ 必须挂在 push_ok 之下");
-    assert_eq!(calls(folder, "if hash.is_some()"), 1, "⑩' 必须挂在 hash.is_some() 之下");
+    /* 正向对照：扫描器必须先证明它读得到文件、数得出来。 */
+    assert_eq!(calls(webdav, "pub async fn run("), 1, "扫描器没读到 round_webdav");
+    assert_eq!(calls(folder, "pub async fn run("), 1, "扫描器没读到 round_folder");
+    assert_eq!(calls(webdav, "purge::run_webdav("), 0, "md 停写后 webdav 轮不许再有自动清理挂点");
+    assert_eq!(calls(folder, "purge::run_folder("), 0, "md 停写后 folder 轮不许再有自动清理挂点");
 }

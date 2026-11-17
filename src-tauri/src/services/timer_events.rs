@@ -156,11 +156,11 @@ mod wiring_tests {
 
             let rows = kinds(&pool).await;
             let sequence: Vec<&str> = rows.iter().map(|row| row.0.as_str()).collect();
-            /* 真实时钟下这段会话只跑了毫秒级，`should_ignore` 会把它判成「太短」，
-               于是 `stop` 之后再补一条 `drop`。序列里两条都接受，但**必须都在**。 */
+            /* 真实时钟下这段会话只跑了毫秒级，`should_ignore` 会把它判成「太短」：
+               终止事件只发 `drop`（Stop 后再发 Drop 会被折叠器按 AfterStop 忽略）。 */
             assert_eq!(
                 sequence,
-                ["start", "pause", "resume", "stop", "drop"],
+                ["start", "pause", "resume", "drop"],
                 "每个计时动作都要留下一条事件，实际 {sequence:?}"
             );
 
@@ -191,6 +191,7 @@ mod wiring_tests {
     fn folded_block_agrees_with_time_records() {
         tauri::async_runtime::block_on(async {
             let (pool, _) = fixture().await;
+            crate::tests::support::allow_short_records(&pool).await;
             crate::services::timer::start(&pool, Some(1)).await.unwrap();
             crate::services::timer::stop(&pool).await.unwrap();
 
@@ -223,6 +224,72 @@ mod wiring_tests {
                 accumulated_sec,
                 "累计秒（向下取整）必须一致"
             );
+        });
+    }
+
+    #[test]
+    fn undo_is_synced_as_a_resume_that_reopens_the_session() {
+        tauri::async_runtime::block_on(async {
+            let (pool, _) = fixture().await;
+            crate::tests::support::allow_short_records(&pool).await;
+            crate::services::timer::start(&pool, Some(1)).await.unwrap();
+            let stopped = crate::services::timer::stop(&pool).await.unwrap().record;
+            crate::services::timer::undo(&pool, stopped.id).await.unwrap();
+
+            let sequence: Vec<String> = kinds(&pool).await.into_iter().map(|row| row.0).collect();
+            assert_eq!(sequence, ["start", "stop", "resume"]);
+            let session_uid: String =
+                sqlx::query_scalar("SELECT session_uid FROM timer_ops ORDER BY id LIMIT 1")
+                    .fetch_one(&pool)
+                    .await
+                    .unwrap();
+            let reopened = crate::repositories::timer_ops::fold(&pool, &session_uid)
+                .await
+                .unwrap()
+                .block
+                .unwrap();
+            assert_eq!(reopened.ended_at_ms, None, "对端必须看到撤销后的计时中状态");
+
+            let final_record = crate::services::timer::stop(&pool).await.unwrap().record;
+            let block = crate::repositories::timer_ops::fold(&pool, &session_uid)
+                .await
+                .unwrap()
+                .block
+                .unwrap();
+            assert_eq!(block.ended_at_ms, final_record.ended_at, "第二次结束才是最终结果");
+        });
+    }
+
+    #[test]
+    fn just_switch_is_synced_as_an_item_adjust() {
+        tauri::async_runtime::block_on(async {
+            let (pool, _) = fixture().await;
+            let other = crate::services::item::create(&pool, "换过去", None)
+                .await
+                .unwrap();
+            crate::services::timer::start(&pool, Some(1)).await.unwrap();
+            crate::services::timer::switch(
+                &pool,
+                other.id,
+                crate::models::enums::SwitchMode::JustSwitch,
+            )
+            .await
+            .unwrap();
+
+            let sequence: Vec<String> = kinds(&pool).await.into_iter().map(|row| row.0).collect();
+            assert_eq!(sequence, ["start", "adjust"]);
+            let (session_uid, item_uid): (String, String) = sqlx::query_as(
+                "SELECT r.uid, i.uid FROM time_records r JOIN items i ON i.id = r.item_id",
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+            let block = crate::repositories::timer_ops::fold(&pool, &session_uid)
+                .await
+                .unwrap()
+                .block
+                .unwrap();
+            assert_eq!(block.item_uid, item_uid, "对端必须看到换过之后的事项");
         });
     }
 }

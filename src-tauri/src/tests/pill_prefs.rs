@@ -155,6 +155,33 @@ fn p4_partial_patch_keeps_the_other_half() {
 }
 
 #[tokio::test]
+async fn p6_parallel_partial_writes_preserve_both_fields() {
+    let pool = fresh_pool("pill-prefs-parallel").await;
+    let handles = handles_with_full_enabled();
+    let appearance_patch = PillPrefsPatch {
+        appearance: Some(appearance(0.7, 0.8, "dot")),
+        handles: None,
+    };
+    let handles_patch = PillPrefsPatch {
+        appearance: None,
+        handles: Some(handles.clone()),
+    };
+    let (a, b) = tokio::join!(
+        crate::services::pill_prefs::write(&pool, &appearance_patch, 10),
+        crate::services::pill_prefs::write(&pool, &handles_patch, 11),
+    );
+    a.unwrap();
+    b.unwrap();
+    let saved = crate::services::pill_prefs::read(&pool)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(saved.appearance.float_form, "dot");
+    assert_eq!(saved.appearance.text_opacity, 0.7);
+    assert_eq!(saved.handles, handles);
+}
+
+#[tokio::test]
 async fn p5_update_then_get_round_trips_the_whole_snapshot() {
     let pool = fresh_pool("pill-prefs").await;
 

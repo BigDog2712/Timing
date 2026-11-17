@@ -2,7 +2,7 @@
 //!
 //! 表名与标题列由 `ReminderTarget`（枚举，非用户输入）决定；值一律参数化绑定。
 
-use sqlx::{QueryBuilder, Sqlite, SqlitePool};
+use sqlx::SqlitePool;
 
 use crate::error::AppResult;
 use crate::models::reminder::{Reminder, ReminderTarget};
@@ -115,45 +115,28 @@ pub async fn due(pool: &SqlitePool, now: i64) -> AppResult<Vec<Reminder>> {
     fetch_reminders(pool, &sql, Some(now)).await
 }
 
-/// 批量置位 `reminded_at`（先置位再去重，K-19）。
-pub async fn mark_fired(pool: &SqlitePool, rows: &[Reminder], now: i64) -> AppResult<()> {
-    mark(pool, rows, ReminderTarget::Item, Some(now)).await?;
-    mark(pool, rows, ReminderTarget::Todo, Some(now)).await
-}
-
-/// 批量回滚 `reminded_at`（通知失败时保留下次重试）。
-pub async fn reset_fired(pool: &SqlitePool, rows: &[Reminder]) -> AppResult<()> {
-    mark(pool, rows, ReminderTarget::Item, None).await?;
-    mark(pool, rows, ReminderTarget::Todo, None).await
-}
-
-async fn mark(
-    pool: &SqlitePool,
+/// 事务内原子领取：调用方必须在通知成功后提交，崩溃/失败则回滚领取。
+pub async fn mark_fired(
+    conn: &mut sqlx::SqliteConnection,
     rows: &[Reminder],
-    target: ReminderTarget,
-    value: Option<i64>,
-) -> AppResult<()> {
-    let ids: Vec<i64> = rows
-        .iter()
-        .filter(|r| r.target == target)
-        .map(|r| r.target_id)
-        .collect();
-    if ids.is_empty() {
-        return Ok(());
-    }
-    let mut qb =
-        QueryBuilder::<Sqlite>::new(format!("UPDATE {} SET reminded_at = ", target.table()));
-    qb.push_bind(value);
-    qb.push(" WHERE id IN (");
-    {
-        let mut sep = qb.separated(", ");
-        for id in &ids {
-            sep.push_bind(*id);
+    now: i64,
+) -> AppResult<Vec<Reminder>> {
+    let mut claimed = Vec::new();
+    for row in rows {
+        let result = sqlx::query(&format!(
+            "UPDATE {} SET reminded_at = ? WHERE id = ? AND remind_at = ? AND reminded_at IS NULL AND deleted_at IS NULL",
+            row.target.table()
+        ))
+        .bind(now)
+        .bind(row.target_id)
+        .bind(row.remind_at)
+        .execute(&mut *conn)
+        .await?;
+        if result.rows_affected() == 1 {
+            claimed.push(row.clone());
         }
     }
-    qb.push(")");
-    qb.build().execute(pool).await?;
-    Ok(())
+    Ok(claimed)
 }
 
 /// 执行 UNION 查询并把行映射为 `Reminder`。

@@ -12,9 +12,12 @@ pub mod md_sync;
 pub mod md_sync_todo;
 pub mod note;
 pub mod record;
+pub(crate) mod record_revision;
 pub mod record_session;
 /* [0.13.x] 结束 / 跨天拆分段落库： 在此 re-export。 */
 pub mod record_session_split;
+/* 分段换事项（事务内版本供 timer::switch 与事件同事务）。 */
+pub(crate) mod record_session_switch;
 pub mod reminder;
 pub mod settings;
 pub mod todo;

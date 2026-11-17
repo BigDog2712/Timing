@@ -24,9 +24,12 @@ use super::timer_ops_event as event;
 pub(crate) const OP_COLS: &str = "id, uid, session_uid, item_uid, kind, at_ms, payload, device_id";
 
 pub(crate) fn to_op(row: &sqlx::sqlite::SqliteRow) -> Option<TimerOp> {
+    let uid = row.try_get::<Option<String>, _>("uid").ok()??;
+    // 拉取后的本地主键不再是源设备序号，排序必须使用不可变 uid 中的序号。
+    let op_id = uid.rsplit(':').next()?.parse().ok()?;
     Some(TimerOp {
-        uid: row.try_get::<Option<String>, _>("uid").ok()??,
-        op_id: row.try_get("id").ok()?,
+        uid,
+        op_id,
         device_id: row.try_get("device_id").ok()?,
         session_uid: row.try_get("session_uid").ok()?,
         item_uid: row.try_get("item_uid").ok()?,
@@ -178,10 +181,19 @@ pub async fn materialize_in(
     } else {
         "active"
     };
+    /* 事项只在折叠里出现过「换事项」时才改写：升级前就在跑的会话、本机手工改过事项的
+       已保存记录，都不能被 `start` 上那份旧事项覆盖回去。 */
     sqlx::query(
         "UPDATE time_records
             SET status = ?2, started_at = ?3, ended_at = ?4, accumulated_sec = ?5,
-                running_since = ?6, updated_at = ?7
+                running_since = ?6, updated_at = ?7,
+                item_id = CASE WHEN ?8
+                               THEN COALESCE((SELECT id FROM items WHERE uid = ?9), item_id)
+                               ELSE item_id END,
+                note = CASE WHEN ?10 THEN ?11 ELSE note END,
+                mode = CASE WHEN ?10 THEN ?12 ELSE mode END,
+                target_sec = CASE WHEN ?10 THEN ?13 ELSE target_sec END,
+                deleted_at = COALESCE(?14, deleted_at)
           WHERE uid = ?1",
     )
     .bind(&block.session_uid)
@@ -191,6 +203,13 @@ pub async fn materialize_in(
     .bind(block.accumulated_sec())
     .bind(block.running_since_ms)
     .bind(now)
+    .bind(block.item_switched)
+    .bind(&block.item_uid)
+    .bind(block.record.is_some())
+    .bind(block.record.as_ref().and_then(|record| record.note.as_deref()))
+    .bind(block.record.as_ref().map(|record| record.mode.as_str()))
+    .bind(block.record.as_ref().and_then(|record| record.target_sec))
+    .bind(block.record.as_ref().and_then(|record| record.deleted_at))
     .execute(&mut *conn)
     .await?;
     Ok(())

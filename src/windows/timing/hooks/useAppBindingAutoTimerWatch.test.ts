@@ -174,15 +174,20 @@ describe("接管成功后注册进程监视", () => {
     expect(h.setBoundProcessWatch).toHaveBeenCalledWith({ itemId: 5, processId: 4242, segmentStartedAt: 1111 });
   });
 
-  /* 红线①④：手动开的计时（已在计这一件）连接管都不发生，注册更无从谈起。
-     变异自证：把注册挪到「已经在计这一件」分支（或在它之前）→ 本用例红（多出一次注册）。 */
-  it("bw07_已经在计这一件_不接管也不注册_手动开的计时绝不被盯", async () => {
+  /* [2026-11-16 口径翻转] 「已在计这一件」**也要注册**：注册表是 Timing 进程内存里的
+     临时事实，而计时会话跨进程存活——重启（或恢复对话框续段）之后，这条分支是唯一能
+     重建监视的入口。不注册的症状正是主人报的「应用退出了，绑定事项还在计时」。
+     段身份取当前 store 的会话；「用户手动切走绝不误停」由 Rust 侧段级校验兜底
+     （SegmentMismatch 只清注册表、不碰计时），不再是「不注册」的理由。
+     变异自证：把 registerWatch 调用从本分支删掉 → 本用例红（零调用）。 */
+  it("bw07_已经在计这一件_不接管但注册监视_重启后存活的会话也能被盯住", async () => {
     h.listItemsForApp.mockResolvedValue([{ itemId: 5, appKey: "code.exe", track: 1 }]);
     h.timerState = { status: "running", session: { itemId: 5, startedAt: 999 } };
     await activeWindow("code.exe", 4242);
 
     expect(h.startOrSwitch).not.toHaveBeenCalled();
-    expect(h.setBoundProcessWatch).not.toHaveBeenCalled();
+    expect(h.setBoundProcessWatch).toHaveBeenCalledTimes(1);
+    expect(h.setBoundProcessWatch).toHaveBeenCalledWith({ itemId: 5, processId: 4242, segmentStartedAt: 999 });
   });
 
   /* 变异自证：删掉 `if (processId !== null)` 守卫 → 本用例红（`watchInputFromState`

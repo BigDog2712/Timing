@@ -59,11 +59,11 @@ pub(crate) async fn finalize_split(
        漏写就是「这一段永远不同步」，而且零报错。 */
     let device_id = crate::services::identity::install_id().unwrap_or_default();
     for (start, end, accum) in &segments[..segments.len() - 1] {
-        sqlx::query(
+        let id: i64 = sqlx::query_scalar(
             "INSERT INTO time_records \
              (item_id, status, started_at, ended_at, accumulated_sec, running_since, \
               mode, target_sec, created_at, updated_at, device_id) \
-             VALUES (?, 'saved', ?, ?, ?, NULL, ?, NULL, ?, ?, ?)",
+             VALUES (?, 'saved', ?, ?, ?, NULL, ?, NULL, ?, ?, ?) RETURNING id",
         )
         .bind(active.item_id)
         .bind(start)
@@ -73,8 +73,9 @@ pub(crate) async fn finalize_split(
         .bind(now)
         .bind(now)
         .bind(device_id)
-        .execute(&mut *conn)
+        .fetch_one(&mut *conn)
         .await?;
+        super::record_revision::append_in(conn, id, now).await?;
     }
     let saved = sqlx::query(
         "UPDATE time_records \
@@ -94,5 +95,6 @@ pub(crate) async fn finalize_split(
         return Err(AppError::timer_not_running());
     }
     super::todo::soft_delete_for_saved_record(conn, active.id, now).await?;
+    super::record_revision::append_in(conn, active.id, now).await?;
     Ok(())
 }

@@ -14,8 +14,8 @@
 //! 1. **排序键是 `(at_ms, device_id, op_id)`**，不是本地时钟单排。时钟回拨会让
 //!    `at_ms` 乱序，同毫秒并列时若没有确定性 tiebreak，两端会 fold 出不同结果 ——
 //!    而这类不一致只在两端都同步过完整历史后才显形，最难查。
-//! 2. **`stop` 之后再来 `resume` 一律忽略**。对端不知道已结束还会操作，复活会话会
-//!    造出一段无主时间（块在跑、用户已经走了）。
+//! 2. **`stop` 之后再来 `resume` 默认忽略**。对端不知道已结束还会操作，复活会话会
+//!    造出一段无主时间；唯一例外是同一设备在撤销窗口内撤销自己的 `stop`。
 //! 3. **同一会话出现两次 `stop` 取排序键最小的那条**。两端同时结束时它是收敛的：
 //!    先到的那条定局，后到的只是重复信息。
 
@@ -46,7 +46,7 @@ pub enum TimerOpKind {
     Pause,
     Resume,
     Stop,
-    /// 改起点（用户手工修正）。`payload` 为 `{"started_at": <ms>}`。
+    /// 改起点 `started_at`、换事项 `item_uid`，或保存记录修订 `record_v1`。
     Adjust,
     /// 作废整个会话：折叠后不产出块，但事件本身留在流里。
     Drop,
@@ -92,6 +92,10 @@ pub struct FoldedBlock {
     /// 正在跑时非空：从这一刻起累计。
     pub running_since_ms: Option<i64>,
     pub dropped: bool,
+    /// 折叠中出现过换事项的 `adjust`：只有这时物化才改写已有行的事项。
+    #[serde(default)]
+    pub item_switched: bool,
+    pub record: Option<RecordRevision>,
 }
 
 impl FoldedBlock {
@@ -129,7 +133,7 @@ pub struct Ignored {
 pub enum IgnoreReason {
     /// 该会话还没出现过 `start`（事件缺失，或拉到了不完整的分片）。
     NoStart,
-    /// 会话已 `stop`，之后的操作全部无效。
+    /// 会话已 `stop`，该计时操作不再生效。
     AfterStop,
     /// 重复的 `start`（同一会话只开一次）。
     DuplicateStart,
@@ -159,12 +163,7 @@ pub fn fold_session(ops: &[TimerOp]) -> FoldResult {
     let mut ordered: Vec<&TimerOp> = ops.iter().collect();
     ordered.sort_by(compare_events);
 
-    /* ① 先把 `start` 摘出来：它必须最先应用，否则后面的时间戳无处安放。
-       同一会话若有多条 start（重复开始），取排序键最小的那条，其余算重复。 */
-    let Some(start_index) = ordered
-        .iter()
-        .position(|op| op.kind == TimerOpKind::Start)
-    else {
+    let Some((mut block, mut stopped_by)) = revision::initial_block(&mut ordered) else {
         /* 分片不完整：只拉到了 stop/pause。忽略而不是造一条零长块 —— 造出来的块
            会进时间轴，看起来像「用户在一个瞬间完成了一次计时」。 */
         let ignored = ordered
@@ -179,17 +178,6 @@ pub fn fold_session(ops: &[TimerOp]) -> FoldResult {
             ignored,
         };
     };
-    let start = ordered.remove(start_index);
-    let mut block = FoldedBlock {
-        session_uid: start.session_uid.clone(),
-        item_uid: start.item_uid.clone(),
-        device_id: start.device_id.clone(),
-        started_at_ms: start.at_ms,
-        ended_at_ms: None,
-        accumulated_ms: 0,
-        running_since_ms: Some(start.at_ms),
-        dropped: false,
-    };
 
     /* ② 单调钳制：每条事件的生效时刻不得早于「上一条已应用事件」。
        没有它，时钟回拨会造出负区间 —— 更糟的是 `stop` 的 `at_ms` 落在 `start` 之前时，
@@ -198,6 +186,16 @@ pub fn fold_session(ops: &[TimerOp]) -> FoldResult {
     let mut last_applied = block.started_at_ms;
 
     for op in ordered {
+        if let Some(valid) = revision::apply(&mut block, op) {
+            if !valid {
+                ignored.push(Ignored { uid: op.uid.clone(), reason: IgnoreReason::MalformedAdjust });
+            }
+            continue;
+        }
+        if block.record.as_ref().is_some_and(|record| record.deleted_at.is_some()) {
+            ignored.push(Ignored { uid: op.uid.clone(), reason: IgnoreReason::AfterStop });
+            continue;
+        }
         if op.kind == TimerOpKind::Start {
             ignored.push(Ignored {
                 uid: op.uid.clone(),
@@ -205,8 +203,14 @@ pub fn fold_session(ops: &[TimerOp]) -> FoldResult {
             });
             continue;
         }
-        if block.ended_at_ms.is_some() {
-            /* 已结束：不再接受任何事件，尤其是 resume（复活 = 制造无主时间）。 */
+        if let Some(ended_at) = block.ended_at_ms {
+            if reopens_own_stop(op, stopped_by, ended_at) {
+                last_applied = op.at_ms.max(last_applied);
+                block.ended_at_ms = None;
+                block.accumulated_ms = block.accumulated_sec() * 1000;
+                block.running_since_ms = Some(last_applied);
+                continue;
+            }
             ignored.push(Ignored {
                 uid: op.uid.clone(),
                 reason: IgnoreReason::AfterStop,
@@ -225,7 +229,8 @@ pub fn fold_session(ops: &[TimerOp]) -> FoldResult {
                 /* 累加「正在跑的这一段」并停表。已经是暂停态时重复 pause 是无操作，
                    不要把它算成一次结算（否则同一段会被累加两次）。 */
                 if let Some(since) = block.running_since_ms.take() {
-                    block.accumulated_ms += (at_ms - since).max(0);
+                    // 本地暂停按段截到整秒，余毫秒不能跨暂停累加。
+                    block.accumulated_ms += ((at_ms - since).max(0) / 1000) * 1000;
                 }
             }
             TimerOpKind::Resume => {
@@ -238,17 +243,16 @@ pub fn fold_session(ops: &[TimerOp]) -> FoldResult {
                     block.accumulated_ms += (at_ms - since).max(0);
                 }
                 block.ended_at_ms = Some(at_ms);
+                stopped_by = Some(op.device_id.as_str());
             }
-            TimerOpKind::Adjust => match parse_adjust_started_at(op.payload.as_deref()) {
-                Some(started_at) if started_at <= block.ended_at_ms.unwrap_or(i64::MAX) => {
-                    block.started_at_ms = started_at;
-                    last_applied = last_applied.max(started_at);
+            TimerOpKind::Adjust => {
+                if !adjust::apply(&mut block, op, &mut last_applied) {
+                    ignored.push(Ignored {
+                        uid: op.uid.clone(),
+                        reason: IgnoreReason::MalformedAdjust,
+                    });
                 }
-                _ => ignored.push(Ignored {
-                    uid: op.uid.clone(),
-                    reason: IgnoreReason::MalformedAdjust,
-                }),
-            },
+            }
             TimerOpKind::Drop => block.dropped = true,
         }
     }
@@ -257,6 +261,13 @@ pub fn fold_session(ops: &[TimerOp]) -> FoldResult {
         block: Some(block),
         ignored,
     }
+}
+
+fn reopens_own_stop(op: &TimerOp, stopped_by: Option<&str>, ended_at: i64) -> bool {
+    use crate::models::constants::{UNDO_TOLERANCE_MS, UNDO_WINDOW_MS};
+    op.kind == TimerOpKind::Resume
+        && stopped_by == Some(op.device_id.as_str())
+        && op.at_ms.saturating_sub(ended_at) <= UNDO_WINDOW_MS + UNDO_TOLERANCE_MS
 }
 
 /// 事件的确定性全序：`(at_ms, device_id, op_id)`。
@@ -271,14 +282,12 @@ fn compare_events(left: &&TimerOp, right: &&TimerOp) -> std::cmp::Ordering {
         .then_with(|| left.op_id.cmp(&right.op_id))
 }
 
-/// `{"started_at": 1700000000000}` → `1700000000000`。
-///
-/// 解析失败一律返回 `None` 而不是兜底成 0：把起点折成 1970 会造出一条横跨半个世纪的块，
-/// 而那条块会污染所在那一整天的读模型 —— 宁可忽略这条 adjust 并上报。
-fn parse_adjust_started_at(payload: Option<&str>) -> Option<i64> {
-    let value: serde_json::Value = serde_json::from_str(payload?).ok()?;
-    value.get("started_at")?.as_i64()
-}
+mod adjust;
+mod revision;
+pub use adjust::item_switch_payload;
+pub use revision::RecordRevision;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod revision_tests;

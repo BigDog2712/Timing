@@ -19,7 +19,7 @@ use crate::services::md_cloud;
 use crate::services::md_sync::config;
 use super::sync::env;
 use crate::platform::clock::now_ms;
-use crate::tests::support::{fresh_pool, insert_saved, new_item, unique_dir};
+use crate::tests::support::{fresh_pool, new_item, unique_dir};
 
 /// 账本隔离：同一天、两条通路各一行，谁清谁都不许动对面。
 #[tokio::test]
@@ -124,10 +124,27 @@ async fn round_channel_runs_only_the_asked_channel() {
     let fixture = env("dual-round-channel").await;
     let folder_root = unique_dir("dual-folder-root");
     fs::create_dir_all(&folder_root).expect("建本地落点");
-    /* 有一条已保存记录，镜像那一步才会真的写出文件（空库时三档都「没什么可写」）。 */
+    /* 要有真事件可传：分段的内容来自 `timer_ops`，一条记录不带事件时这一轮没东西可写。 */
     let item = new_item(&fixture.pool, "写作").await;
     let now = now_ms();
-    insert_saved(&fixture.pool, item, now - 600_000, now, 600).await;
+    let device = crate::services::identity::install_id().expect("测试环境应能生成 install_id");
+    let today = md_cloud::today();
+    let start = crate::repositories::timer_ops::start_session(
+        &fixture.pool, item, now - 600_000, &today, "countup", None, device,
+    )
+    .await
+    .expect("造开始事件应成功");
+    crate::repositories::timer_ops::append(
+        &fixture.pool,
+        &start.session_uid,
+        crate::services::timer_ops::TimerOpKind::Stop,
+        now,
+        &today,
+        None,
+        device,
+    )
+    .await
+    .expect("造结束事件应成功");
 
     let mut cfg = config::load(&fixture.pool).await.expect("读配置");
     cfg.cloud_folder = Some(MdSyncCloudChannel {
@@ -156,8 +173,17 @@ async fn round_channel_runs_only_the_asked_channel() {
     );
     let today = md_cloud::today();
     assert!(
-        folder_root.join(format!("{today}.md")).exists(),
-        "folder 轮必须把今天的文件写进本地落点"
+        folder_root
+            .join("sync/events")
+            .join(device)
+            .join("00000001.jsonl")
+            .exists(),
+        "folder 轮必须把本机第一段事件写进本地落点"
+    );
+    /* 落档格式已经是事件分段：md 快照不该出现在落点里（否则「只跑了一半」看不出来）。 */
+    assert!(
+        !folder_root.join(format!("{today}.md")).exists(),
+        "落点里不许再出现 md 快照"
     );
 
     /* ② 点名 webdav：本地那一半一次都不许跑，云端那份错照报。 */

@@ -24,6 +24,10 @@ pub async fn pull_segments(
         return Ok(summary);
     }
 
+    let scope = match transport.scope() {
+        Ok(scope) => scope,
+        Err(err) => { summary.errors.push(err); return Ok(summary); }
+    };
     let children = match transport.list_children("sync/events").await {
         Ok(names) => names,
         Err(err) => {
@@ -35,7 +39,7 @@ pub async fn pull_segments(
     summary.peers = peers.len();
 
     for peer in peers {
-        pull_one_peer(pool, transport, &peer, &mut summary).await?;
+        pull_one_peer(pool, transport, &scope, &peer, &mut summary).await?;
     }
     Ok(summary)
 }
@@ -45,8 +49,19 @@ pub async fn pull_segments(
 /// 只收 [`identity::is_valid`] 认得的 12 位小写 hex（评审 P2-1）。原文直接把「名字不是
 /// 本机」的项当 peer，再拿它拼 URL —— 名字里带 `?` / `#` 的目录会被按 query / fragment
 /// 解释，拼出来的地址与真实目录不是同一份，于是那台设备**永远读不到**，而界面上只
-/// 表现为「同步卡住了」。非法的项要记一条可见错误（用户能去清理那个目录），
-/// 但**不能**影响其它设备继续同步。
+/// 表现为「同步卡住了」。非法的项要能看见（用户能去清理那个目录），但**不能**影响其它
+/// 设备继续同步。
+///
+/// ## 为什么记 `warnings` 而不是 `errors`（2026-11-16 真机）
+///
+/// `round_stream::run` 用「`errors` 是否为空」判整轮成败。原文把非法项推进 `errors`，
+/// 于是**一个与同步无关的条目让整轮判失败**：坚果云的 PROPFIND 在该目录下稳定回一个
+/// `unix-directory` 条目，实测每跑一轮就触发一次退避、退避时长翻倍，22:45 之后日志里
+/// 只剩 `skip=backoff`，同步基本跑不动（0.12.11 真机）。
+///
+/// 「目录里有个杂项」是**看得见就行**的事，「本轮同步失败」是**要退避**的事，两者不能共用
+/// 一个字段。杂项落 `warnings`，照旧点名，并且带上完整子项列表 —— 下次再冒出别的怪名字，
+/// 日志里能直接看出它是从哪来的。
 fn peers_of(children: &[String], device_id: &str, summary: &mut PullSummary) -> Vec<String> {
     let mut peers = Vec::new();
     for name in children {
@@ -54,10 +69,12 @@ fn peers_of(children: &[String], device_id: &str, summary: &mut PullSummary) -> 
             continue;
         }
         if !identity::is_valid(name) {
-            summary.errors.push(format!(
+            summary.warnings.push(format!(
                 "同步目录 sync/events/ 里有一项不是设备 id（{name}）：已跳过，其它设备照常同步"
             ));
-            crate::log_warn!("sync stream pull: skip non-device dir {name}");
+            crate::log_warn!(
+                "sync stream pull: skip non-device dir {name}（全部子项 {children:?}）"
+            );
             continue;
         }
         peers.push(name.clone());
@@ -69,10 +86,11 @@ fn peers_of(children: &[String], device_id: &str, summary: &mut PullSummary) -> 
 async fn pull_one_peer(
     pool: &SqlitePool,
     transport: &Transport,
+    scope: &str,
     peer: &str,
     summary: &mut PullSummary,
 ) -> AppResult<()> {
-    let cursor = repository::get(pool, peer).await?;
+    let cursor = repository::get(pool, scope, peer).await?;
     let last_op_id = cursor.as_ref().map(|c| c.last_op_id).unwrap_or(0);
     let last_seq = cursor.as_ref().map(|c| c.last_seq).unwrap_or(0);
     let mut seq = last_seq.saturating_add(1);
@@ -98,7 +116,7 @@ async fn pull_one_peer(
                         break;
                     }
                 };
-                match apply_segment(pool, &rel, &ops, peer, seq, last_op_id).await {
+                match apply_segment(pool, scope, &rel, &ops, peer, seq, last_op_id).await {
                     Ok(applied) => {
                         summary.events += ops.len();
                         summary.applied += applied;
@@ -135,6 +153,7 @@ async fn pull_one_peer(
 /// 返回这一段**新插入**的事件数。
 async fn apply_segment(
     pool: &SqlitePool,
+    scope: &str,
     rel: &str,
     ops: &[crate::services::timer_ops::TimerOp],
     peer: &str,
@@ -147,7 +166,7 @@ async fn apply_segment(
         .iter()
         .map(|op| op.op_id)
         .fold(last_op_id, |acc, op_id| acc.max(op_id));
-    repository::upsert_in(&mut tx, peer, max_op_id, seq).await?;
+    repository::upsert_in(&mut tx, scope, peer, max_op_id, seq).await?;
     tx.commit().await.map_err(AppError::db)?;
     crate::log_debug!("sync stream pull: {rel} committed with cursor seq={seq}");
     Ok(outcome.applied)

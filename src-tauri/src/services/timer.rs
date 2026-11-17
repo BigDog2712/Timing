@@ -14,8 +14,8 @@
 use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
-use crate::models::constants::{SYSTEM_ITEM_ID, UNDO_TOLERANCE_MS, UNDO_WINDOW_MS};
-use crate::models::enums::{record_status, timer_mode, timer_status, SwitchMode};
+use crate::models::constants::SYSTEM_ITEM_ID;
+use crate::models::enums::{timer_mode, timer_status, SwitchMode};
 // 托盘快照相关类型仅桌面用（移动端没有菜单可填），故只进桌面编译。
 #[cfg(desktop)]
 use crate::models::enums::TrayStatus;
@@ -183,26 +183,6 @@ pub async fn discard(pool: &SqlitePool) -> AppResult<()> {
     Ok(())
 }
 
-/// 撤销结束：saved 回滚为 active（3s 窗口内，且当前无其他 active）。
-pub async fn undo(pool: &SqlitePool, record_id: i64) -> AppResult<TimeRecord> {
-    let record = repo::find_by_id(pool, record_id)
-        .await?
-        .ok_or_else(AppError::timer_no_undo)?;
-    if record.status != record_status::SAVED {
-        return Err(AppError::timer_no_undo());
-    }
-    let ended_at = record.ended_at.ok_or_else(AppError::timer_no_undo)?;
-    let now = clock::now_ms();
-    if now - ended_at > UNDO_WINDOW_MS + UNDO_TOLERANCE_MS {
-        return Err(AppError::timer_no_undo());
-    }
-    if session::find_active(pool).await?.is_some() {
-        return Err(AppError::timer_already_running());
-    }
-    session::reactivate(pool, record_id, now, now).await?;
-    reload(pool, record_id).await
-}
-
 /// 计时中换事项：分段（end_and_start）或仅改归属（just_switch）。
 ///
 /// [V0.3.4] 分段同样过「最短记录时长」：换事项是顺手动作，旧段只有几秒就是误触级的，
@@ -221,7 +201,16 @@ pub async fn switch(pool: &SqlitePool, item_id: i64, mode: SwitchMode) -> AppRes
     let now = clock::now_ms();
     match mode {
         SwitchMode::JustSwitch => {
-            session::set_item_id(pool, active.id, item_id, now).await?;
+            /* 换事项也是事件（`adjust` 带 `item_uid`）：只改本地行时对端 fold 只认 `start`
+               上的事项，整段时长会一直记在旧事项名下。 */
+            let mut tx = pool.begin().await.map_err(AppError::db)?;
+            if let Some(uid) = session::set_item_id_in(&mut tx, active.id, item_id, now).await? {
+                let at = timer_events::end_at(active.running_since, now);
+                let payload = crate::services::timer_ops::item_switch_payload(&uid);
+                timer_events::record(&mut tx, active.id, TimerOpKind::Adjust, at, Some(&payload))
+                    .await?;
+            }
+            tx.commit().await.map_err(AppError::db)?;
         }
         SwitchMode::EndAndStart => {
             if now < active.started_at {
@@ -230,22 +219,20 @@ pub async fn switch(pool: &SqlitePool, item_id: i64, mode: SwitchMode) -> AppRes
             let accumulated = live_duration(&active, now);
             // 与手动结束同一口径，见 ADR-023。
             let discard_old = should_ignore(pool, accumulated).await;
-            /* [V0.11.3] 旧段跨了零点：先按天拆成多条保存，再开新会话。
-            拆开保存与「开会话」是两次写，不是同一个事务——但顺序是安全的：
-            旧段先老实落库，新会话失败也只是「切换没成功」，用户再点一次即可，
-            不会出现「旧段没了、新段也没开」的半截状态。 */
-            if !discard_old
+            /* 旧段收尾、新会话、两条事件全在一个事务里：
+               分开写时「旧段落了、stop 事件没落」会让对端仍以为旧会话在跑。 */
+            let mut tx = pool.begin().await.map_err(AppError::db)?;
+            let crosses_midnight = !discard_old
                 && crate::services::timer_split::split_by_day(active.started_at, now, accumulated)
                     .len()
-                    > 1
-            {
-                crate::services::timer_split::finalize(pool, &active, accumulated, now, now)
+                    > 1;
+            let new_id = if crosses_midnight {
+                crate::services::timer_split::finalize_in(&mut tx, &active, accumulated, now, now)
                     .await?;
-                start(pool, Some(item_id)).await?;
-                clock::anchor(now);
+                session::insert_active_in(&mut tx, item_id, now).await?
             } else {
-                session::end_and_start(
-                    pool,
+                session::end_and_start_in(
+                    &mut tx,
                     active.id,
                     item_id,
                     accumulated,
@@ -253,10 +240,18 @@ pub async fn switch(pool: &SqlitePool, item_id: i64, mode: SwitchMode) -> AppRes
                     now,
                     discard_old,
                 )
-                .await?;
-                // 新会话的墙钟起点是 now，重新锚定（旧锚点属于上一段会话）。
-                clock::anchor(now);
-            }
+                .await?
+            };
+            let old_kind = if discard_old {
+                TimerOpKind::Drop
+            } else {
+                TimerOpKind::Stop
+            };
+            timer_events::record(&mut tx, active.id, old_kind, now, None).await?;
+            timer_events::record_start(&mut tx, new_id, now, timer_mode::COUNTUP, None).await?;
+            tx.commit().await.map_err(AppError::db)?;
+            // 新会话的墙钟起点是 now，重新锚定（旧锚点属于上一段会话）。
+            clock::anchor(now);
         }
     }
     settings::set_last_item_id(pool, item_id).await?;
@@ -282,7 +277,7 @@ pub(crate) use crate::services::timer_time::{elapsed_ms, floor_sec, live_duratio
 /* [V0.3.4] 手动结束（含「最短记录时长」判定）移到 `services/timer_stop.rs`，同样在此
 re-export：`services::timer::stop` 的对外路径不变。`should_ignore` 是阈值判定的唯一入口，
 `switch` 的分段也用它（ADR-023）。 */
-pub use crate::services::timer_stop::{should_ignore, stop};
+pub use crate::services::timer_stop::{should_ignore, stop, undo};
 
 pub(crate) async fn reload(pool: &SqlitePool, id: i64) -> AppResult<TimeRecord> {
     repo::find_by_id(pool, id)

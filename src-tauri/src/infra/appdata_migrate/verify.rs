@@ -120,10 +120,24 @@ fn shadow_facts(src_db: &Path, temp: &Path) -> Result<DbFacts, String> {
     let result = fill_shadow(src_db, &dir);
     /* 出口清理失败**不改变校验结论**（副本已经读完），但必须留痕：残留的影子目录正是
     下一次「读到脏目录」的源头，`let _ =` 静默吞掉等于把问题藏起来。 */
-    if let Err(err) = std::fs::remove_dir_all(&dir) {
+    if let Err(err) = remove_dir_with_retry(&dir) {
         crate::log_warn!("shadow: 清理影子目录 {} 失败：{err}", dir.display());
     }
     result
+}
+
+/// Windows 上连接池关闭后库文件句柄会晚一拍释放（杀软/索引器也会短暂持有），
+/// 首次删除常报「另一个程序正在使用」；稍等重试，避免在数据盘上留下影子目录。
+fn remove_dir_with_retry(dir: &Path) -> std::io::Result<()> {
+    let mut last = Ok(());
+    for attempt in 0..5u64 {
+        last = std::fs::remove_dir_all(dir);
+        if last.is_ok() || !dir.exists() {
+            return Ok(());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50 * (attempt + 1)));
+    }
+    last
 }
 
 /// 把源库（含 `-wal` / `-shm`）复制进影子目录并开库读事实。

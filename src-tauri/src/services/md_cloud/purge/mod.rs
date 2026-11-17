@@ -239,6 +239,7 @@ async fn begin(
 fn abort_tag(err: &WebdavError) -> Option<&'static str> {
     match err {
         WebdavError::Auth => Some("auth"),
+        WebdavError::TooLarge => Some("too-large"),
         WebdavError::Forbidden => Some("forbidden"),
         WebdavError::RateLimited => Some("rate"),
         _ => None,

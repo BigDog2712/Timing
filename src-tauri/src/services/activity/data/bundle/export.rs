@@ -21,6 +21,7 @@
 use super::{row_to_value, BundleWriter, ACTIVITY_TABLES, BUSINESS_TABLES, FORMAT, TableSpec};
 use futures_util::TryStreamExt;
 use serde::Serialize;
+use serde_json::Value;
 use sqlx::{Pool, Sqlite, SqliteConnection};
 use std::fs;
 use std::io::{BufWriter, Write};
@@ -102,8 +103,15 @@ async fn write_section<W: Write>(
                 .await
                 .map_err(|error| format!("failed to read {}: {error}", spec.name))?
             {
-                writer.row(&row_to_value(&row)).map_err(io_error)?;
-                *row_count += 1;
+                let value = row_to_value(&row);
+                let private_setting = spec.name == "settings"
+                    && value.get("key").and_then(Value::as_str).is_some_and(|key| {
+                        matches!(key, "web_activity_token" | "remote_status_bridge_token")
+                    });
+                if !private_setting {
+                    writer.row(&value).map_err(io_error)?;
+                    *row_count += 1;
+                }
             }
         }
         writer.close_table().map_err(io_error)?;

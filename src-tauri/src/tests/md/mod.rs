@@ -66,6 +66,7 @@ mod sync_conflict_semantics;
 mod sync_conflict_merge_rules;
 mod sync_disabled_gate;
 mod sync_duration;
+mod sync_timer_delta;
 mod sync_edges;
 mod sync_format;
 mod sync_legacy_config;

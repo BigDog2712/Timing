@@ -61,14 +61,8 @@ pub async fn stop(pool: &SqlitePool) -> AppResult<StopResult> {
            而两端都不报错 —— 用户永远发现不了时长对不上。 */
         let mut tx = pool.begin().await.map_err(AppError::db)?;
         session::discard_in(&mut tx, active.id, accumulated, at_ms, now).await?;
-        crate::services::timer_events::record(
-            &mut tx,
-            active.id,
-            crate::services::timer_ops::TimerOpKind::Stop,
-            at_ms,
-            None,
-        )
-        .await?;
+        /* A discarded session has one terminal event. Emitting Stop before Drop at the same
+           timestamp made the fold reject Drop as an after-stop operation. */
         crate::services::timer_events::record(
             &mut tx,
             active.id,
@@ -106,9 +100,7 @@ pub async fn stop(pool: &SqlitePool) -> AppResult<StopResult> {
     日记里各归各的日期。不跨天时与 `session::finalize` 等价（内部走同一条路径）。 */
     let mut tx = pool.begin().await.map_err(AppError::db)?;
     crate::services::timer_split::finalize_in(&mut tx, &active, accumulated, at_ms, now).await?;
-    /* `stop` 用**原会话**的 uid 记，即使上面把它按天拆成了多行：事件流描述的是
-    「用户按了结束」这一件事，拆天是本地展示口径（`timer_split` 的取舍见该文件头）。
-    对端 fold 出的是未拆分的单条块，范围与拆开的两段完全一致。 */
+    // stop 保留会话身份，分段修订将其投影为末段；其余各段独立同步。
     crate::services::timer_events::record(
         &mut tx,
         active.id,
@@ -133,4 +125,40 @@ pub async fn stop(pool: &SqlitePool) -> AppResult<StopResult> {
         record,
         discarded: false,
     })
+}
+
+/// 撤销结束：3s 窗口内把 saved 回滚为 active，并同步一条可被对端折叠的 `resume`。
+pub async fn undo(pool: &SqlitePool, record_id: i64) -> AppResult<TimeRecord> {
+    use crate::models::constants::{UNDO_TOLERANCE_MS, UNDO_WINDOW_MS};
+    let record = crate::repositories::record::find_by_id(pool, record_id)
+        .await?
+        .ok_or_else(AppError::timer_no_undo)?;
+    if record.status != record_status::SAVED {
+        return Err(AppError::timer_no_undo());
+    }
+    let ended_at = record.ended_at.ok_or_else(AppError::timer_no_undo)?;
+    let now = clock::now_ms();
+    if now - ended_at > UNDO_WINDOW_MS + UNDO_TOLERANCE_MS {
+        return Err(AppError::timer_no_undo());
+    }
+    if session::find_active(pool).await?.is_some() {
+        return Err(AppError::timer_already_running());
+    }
+    let mut tx = pool.begin().await.map_err(AppError::db)?;
+    // 撤销必须排在 stop 及跨天分段修订之后。
+    let resume_at = crate::repositories::record_revision::next_at(&mut tx, record_id, now.max(ended_at)).await?;
+    if !session::reactivate_in(&mut tx, record_id, resume_at, now).await? {
+        return Err(AppError::timer_no_undo());
+    }
+    crate::services::timer_events::record(
+        &mut tx,
+        record_id,
+        crate::services::timer_ops::TimerOpKind::Resume,
+        resume_at,
+        None,
+    )
+    .await?;
+    tx.commit().await.map_err(AppError::db)?;
+    clock::anchor(resume_at);
+    crate::services::timer::reload(pool, record_id).await
 }

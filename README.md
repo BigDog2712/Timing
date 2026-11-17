@@ -50,8 +50,8 @@ default.
 
 | Path | When | What | Where | Turn off / clean up |
 |---|---|---|---|---|
-| **Markdown snapshot** | You enabled Markdown sync (local folder or WebDAV); runs on the polling interval or on "Sync now" | That day's records, rendered as plain-text `{date}.md` (only the section under your chosen heading is rewritten) | The folder you picked, or the WebDAV server you entered | Disable sync; delete the file on your own side |
-| **Event stream** | Same toggle, same round: pushes new local events, then pulls peer segments | JSONL segments of timer events (start / pause / resume / stop / drop, with ms timestamps and device id) under `<target>/sync/events/<device-id>/` | Same target | Same as above, plus delete `sync/events/` |
+| **Event stream** | You enabled sync (local folder or WebDAV); runs on the polling interval or on "Sync now" | Immutable JSONL segments of timer events (start / pause / resume / stop / drop, with ms timestamps and device id) under `<target>/sync/events/<device-id>/` | The folder you picked, or the WebDAV server you entered | Disable sync; delete `sync/events/` |
+| **Markdown notes** | Same switch, strictly local: renders the day's records into your own notes folder | Plain-text `{date}.md` (only the section under your chosen heading is rewritten) | **Never leaves the machine** — it is not uploaded, not even to the WebDAV target | Disable sync; delete the file yourself |
 | **Insight backup** | The time-insight window's own WebDAV backup, or a manual export | A backup bundle of `activity.db` (app-usage statistics etc.) | The WebDAV folder configured there, or a file you pick | Disable backup in that window |
 | **Local export** | You click export / a scheduled export | Records, statistics | A folder you pick | Delete the files |
 
@@ -114,8 +114,8 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 
 | 通道 | 什么时候发生 | 传什么 | 传到哪 | 怎么关 / 怎么删 |
 |---|---|---|---|---|
-| **计时记录快照** | 设置里开了 Markdown 同步（本地目录或 WebDAV），按轮询间隔自动跑，或点「立即同步」 | 当天的计时记录，渲染成明文的 `{date}.md`（只改目标标题下的区块） | 你选的本地目录，或你填的 WebDAV 服务器 | 关掉同步；远端文件在**你自己那边**删 |
-| **计时事件流** | 同上（同一个开关），每轮先传本机新增事件、再拉对端分段 | 计时事件的 JSONL 分段（开始 / 暂停 / 继续 / 结束 / 丢弃，含毫秒时间戳与设备 id），写到 `<落点>/sync/events/<设备id>/` | 同一落点 | 同上；同时删 `sync/events/` 目录 |
+| **计时事件流** | 设置里开了同步（本地目录或 WebDAV），按轮询间隔自动跑，或点「立即同步」 | 计时事件的 JSONL 分段（开始 / 暂停 / 继续 / 结束 / 丢弃，含毫秒时间戳与设备 id），写到 `<落点>/sync/events/<设备id>/` | 你选的本地目录，或你填的 WebDAV 服务器 | 关掉同步；同时删 `sync/events/` 目录 |
+| **Markdown 笔记** | 同一个开关，但**只写本机**：把当天的记录渲染进你自己的笔记目录 | 明文的 `{date}.md`（只改目标标题下的区块） | **不出本机** —— 不上传，也不会传到你填的 WebDAV 落点 | 关掉同步；文件在**你自己那边**删 |
 | **活动窗备份** | 活动窗（时间统计）里自己配的 WebDAV 备份，或手动导出 | `activity.db` 的备份包（应用使用统计等） | 活动窗里填的 WebDAV 目录，或你选的文件路径 | 活动窗里关掉备份 |
 | **本地导出** | 你点导出 / 定时导出 | 记录、统计等导出文件 | 你选的本地目录 | 删文件 |
 
@@ -322,7 +322,7 @@ restriction lint 在 `Cargo.toml` 里开着（本地看得见），而 `--all-ta
 
 ## 版本
 
-桌面 **0.12.3**，Tauri 移动端 **0.12.9**；`android-app/` 里那份原生 Kotlin 实现已归档，冻结在 **0.3.6**。
+桌面 **0.12.3**，Tauri 移动端 **0.12.13**；`android-app/` 里那份原生 Kotlin 实现已归档，冻结在 **0.3.6**。
 
 版本号是单一真源：`scripts/platform-versions.json` 定义两端号，桌面六处基线
 （`package.json` · `package-lock.json` ×2 · `Cargo.toml` · `Cargo.lock` · `tauri.conf.json`）

@@ -13,15 +13,14 @@
 //   keyPassword=...
 //
 // 用法：
-//   node scripts/android-sign.mjs                       # 签最新 release 产物 → release\ 下
-//   node scripts/android-sign.mjs --apk <路径>           # 签指定 APK
-//   node scripts/android-sign.mjs --debug-key           # 用本机调试证书签（自用/侧载）
+//   node scripts/android-sign.mjs --apk <路径>            # 签指定 APK → release\ 下
+//   node scripts/android-sign.mjs --apk <路径> --debug-key # 用本机调试证书签（自用/侧载）
 //
 // 注意：证书一旦被装过的手机认下，换证书必须**先卸载**再装（签名不一致的系统级限制）。
 // 所以 `--debug-key` 只适合「先在自己机器上跑起来看看」，正式分发要用自己的 keystore。
 
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -43,6 +42,7 @@ function parseArgs(argv) {
       process.exit(1);
     }
   }
+  if (!out.apk) throw new Error('--apk 必填；请传入本次构建的精确 APK 路径');
   return out;
 }
 
@@ -97,44 +97,55 @@ function readKeystoreProps() {
   };
 }
 
-/** 最新的 release 产物（Gradle 每次覆盖同一个文件名，取 mtime 最新即可） */
-function latestUnsignedApk() {
-  const dir = join(GEN_ANDROID, 'app', 'build', 'outputs', 'apk');
-  if (!existsSync(dir)) throw new Error(`还没有产物：${dir}（先跑 node scripts/android-apk.mjs）`);
-  const found = [];
-  const walk = (d) => {
-    for (const e of readdirSync(d, { withFileTypes: true })) {
-      const full = join(d, e.name);
-      if (e.isDirectory()) walk(full);
-      else if (e.name.endsWith('.apk')) found.push(full);
-    }
-  };
-  walk(dir);
-  if (!found.length) throw new Error(`${dir} 下没有 .apk`);
-  // 优先 release，其次最新写的
-  found.sort((a, b) => {
-    const ar = /release/.test(a) ? 1 : 0;
-    const br = /release/.test(b) ? 1 : 0;
-    return ar - br;
-  });
-  return found[found.length - 1];
+export function expectedApkName(abi, variant) {
+  const flavors = { 'arm64-v8a': 'arm64', 'armeabi-v7a': 'arm', x86_64: 'x86_64', x86: 'x86' };
+  const flavor = flavors[abi];
+  if (!flavor || !['release', 'debug'].includes(variant)) throw new Error(`不支持 APK 变体：${abi}/${variant}`);
+  return `app-${flavor.toLowerCase()}-${variant}.apk`;
 }
 
-function run(cmd, args, opts = {}) {
+export function archiveApkName(version, abi, variant, tag) {
+  if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(version)) throw new Error(`无效 versionName: ${version}`);
+  const flavor = { 'arm64-v8a': 'arm64', 'armeabi-v7a': 'arm', x86_64: 'x86_64', x86: 'x86' }[abi];
+  if (!flavor || !['release', 'debug'].includes(variant)) throw new Error(`不支持 APK 变体：${abi}/${variant}`);
+  return `Timing-android-${version}-${variant}-${flavor}-${tag}.apk`;
+}
+
+export function run(cmd, args, opts = {}) {
   const r = spawnSync(cmd, args, { stdio: 'inherit', ...opts });
   if (r.error) throw r.error;
-  if (r.status !== 0) throw new Error(`命令失败（exit ${r.status}）：${[cmd, ...args].join(' ')}`);
+  if (r.status !== 0) throw new Error(`命令失败（exit ${r.status}）：${cmd}`);
+}
+
+export function signingCommand(jar, keystore, input, output) {
+  return {
+    args: [
+      '-jar', jar, 'sign', '--ks', keystore.storeFile,
+      '--ks-pass', 'env:TIMING_APK_STORE_PASSWORD',
+      '--key-pass', 'env:TIMING_APK_KEY_PASSWORD',
+      '--ks-key-alias', keystore.keyAlias, '--out', output, input,
+    ],
+    options: {
+      env: {
+        ...process.env,
+        TIMING_APK_STORE_PASSWORD: keystore.storePassword,
+        TIMING_APK_KEY_PASSWORD: keystore.keyPassword,
+      },
+    },
+  };
 }
 
 function main() {
   const { apk, debugKey } = parseArgs(process.argv.slice(2));
+  if (debugKey && !apk) throw new Error('--debug-key 需要配合 --apk 使用');
   const sdk = findSdk();
   const bt = findBuildTools(sdk);
 
   const javaHome = process.env.JAVA_HOME ?? process.env.JDK_HOME;
   const java = javaHome ? join(javaHome, 'bin', IS_WIN ? 'java.exe' : 'java') : IS_WIN ? 'java.exe' : 'java';
 
-  const input = apk ? resolve(apk) : latestUnsignedApk();
+  const input = resolve(apk);
+  if (!input.toLowerCase().endsWith('.apk')) throw new Error(`输入不是 APK：${input}`);
   if (!existsSync(input)) throw new Error(`APK 不存在：${input}`);
 
   const ks = debugKey
@@ -162,26 +173,8 @@ function main() {
   console.log(`证书   ${ks.storeFile}   alias=${ks.keyAlias}`);
 
   run(join(bt, IS_WIN ? 'zipalign.exe' : 'zipalign'), ['-p', '-f', '4', input, aligned]);
-  run(
-    java,
-    [
-      '-jar',
-      join(bt, 'lib', 'apksigner.jar'),
-      'sign',
-      '--ks',
-      ks.storeFile,
-      '--ks-pass',
-      `pass:${ks.storePassword}`,
-      '--key-pass',
-      `pass:${ks.keyPassword}`,
-      '--ks-key-alias',
-      ks.keyAlias,
-      '--out',
-      signed,
-      aligned,
-    ],
-    { stdio: 'inherit' },
-  );
+  const signing = signingCommand(join(bt, 'lib', 'apksigner.jar'), ks, aligned, signed);
+  run(java, signing.args, signing.options);
   run(java, ['-jar', join(bt, 'lib', 'apksigner.jar'), 'verify', signed]);
 
   // 归档到 release\，文件名带上签名来源，免得以后分不清哪个能装
@@ -201,9 +194,20 @@ function main() {
         '（手机版号在 V0.11.33 起独立，不再跟 tauri.conf.json 的桌面号走）',
     );
   }
-  const destName = input.includes('debug')
-    ? `Timing-android-${version}-debug-arm64-${tag}.apk`
-    : `Timing-android-${version}-release-arm64-${tag}.apk`;
+  const variant = /(?:^|[-\\/])debug(?:[-\\/]|$)/i.test(input) ? 'debug' : 'release';
+  const abi = /armeabi-v7a|app-arm-/i.test(input) ? 'armeabi-v7a'
+    : /x86_64|app-x86_64-/i.test(input) ? 'x86_64'
+      : /(?:^|[-\\/])x86(?:[-\\/]|$)|app-x86-/i.test(input) ? 'x86'
+        : 'arm64-v8a';
+  const expectedSource = expectedApkName(abi, variant);
+  /* Gradle 的 release 产物恒带 `-unsigned` 后缀（assembleRelease 从不签名）；
+     比对时剥掉它，调用方传的正是 android-apk.mjs 打出来的那个文件名。 */
+  const sourceStem =
+    input.split(/[\\/]/).at(-1)?.toLowerCase().replace(/-unsigned\.apk$/, '.apk') ?? '';
+  if (sourceStem !== expectedSource.toLowerCase()) {
+    throw new Error(`APK 名称与 ABI/变体不符，应为 ${expectedSource}：${input}`);
+  }
+  const destName = archiveApkName(version, abi, variant, tag);
   const outDir = join(ROOT, 'release');
   mkdirSync(outDir, { recursive: true });
   const dest = join(outDir, destName);
@@ -215,9 +219,11 @@ function main() {
   console.log('可直接拷到手机上安装（arm64）。');
 }
 
-try {
-  main();
-} catch (e) {
-  console.error(`\n失败：${e.message}`);
-  process.exit(1);
+if (!process.env.NODE_TEST_CONTEXT) {
+  try {
+    main();
+  } catch (e) {
+    console.error(`\n失败：${e.message}`);
+    process.exit(1);
+  }
 }

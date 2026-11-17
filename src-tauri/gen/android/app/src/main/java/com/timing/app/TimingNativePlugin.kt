@@ -332,9 +332,6 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
     fun usagePermission(invoke: Invoke) {
         val payload = JSObject()
         payload.put("granted", UsageStats.hasPermission(activity))
-        /* [评审 P2-2] 事件数撞上限时 `queryDay` 会置这个键。宿主据此**跳过落库**（不拿一份
-           不完整聚合覆盖权威日数据）并在界面上标一句；缺键 = `false`（Rust 侧 serde default）。 */
-        payload.put("truncated", day.optBoolean("truncated", false))
         invoke.resolve(payload)
     }
 
@@ -407,6 +404,10 @@ class TimingNativePlugin(private val activity: Activity) : Plugin(activity) {
            永远不触发，界面上永远等不到「去系统设置打开」那个按钮，只剩一片 0 分钟。
            权限状态只有一个真源，即 `UsageStats.hasPermission`，桥不许替它下结论。 */
         payload.put("granted", UsageStats.hasPermission(activity))
+        /* [评审 P2-2] 事件数撞上限时 `UsageStats.queryDay` 会在日包里置这个键；原样透传。
+           宿主据此**跳过落库**（不拿一份不完整聚合覆盖权威日数据）并在界面上标一句；
+           缺键 = `false`（Rust 侧 serde default）。 */
+        payload.put("truncated", day.optBoolean("truncated", false))
         invoke.resolve(payload)
     }
 

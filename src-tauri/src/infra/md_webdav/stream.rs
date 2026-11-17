@@ -35,7 +35,14 @@ pub async fn put_new(
         /* 已存在 = 别人的分段已经占了这个名字。不覆盖：分段是只写一次的不可变文件。 */
         Err(WebdavError::Precondition) => Ok(false),
         Err(WebdavError::Server(409)) => match dir::ensure_base_dir_err(target).await? {
-            dir::EnsureOutcome::Ready { .. } => send_put_new(target, rel, bytes).await.map(|_| true),
+            dir::EnsureOutcome::Ready { .. } => {
+                /* 409 = 父集合不存在。`ensure_base_dir` 只补到 `basePath` 那几级，而分段的
+                   落点还在 `sync/events/<设备 id>/` 下面 —— 那几级它不认识，从来没人建过，
+                   于是重试一次还是同一个 409，手机首次上传**恒失败**（0.12.12 真机实测，
+                   远端始终只有桌面那一个设备目录）。先把 `rel` 的父目录逐级建出来再重试。 */
+                ensure_parent_dirs(target, rel).await?;
+                send_put_new(target, rel, bytes).await.map(|_| true)
+            }
             dir::EnsureOutcome::TooDeep { levels } => {
                 crate::log_warn!(
                     "md cloud mkcol: {} levels={levels} skip=too-deep",
@@ -67,6 +74,41 @@ async fn send_put_new(
     fail_on_status(response.status())
 }
 
+/// 把 `rel` 的父目录**逐级**建出来（浅 → 深）。PUT 收 409 之后才调。
+///
+/// 「逐级」不能省：坚果云对「父集合不存在」的 MKCOL 也回 409，跳级建等于白建。
+/// 已存在的级别 `mkcol_url` 判 405/3xx 当「已存在」，所以整条链是幂等的。
+async fn ensure_parent_dirs(target: &WebdavTarget, rel: &str) -> Result<(), WebdavError> {
+    for prefix in parent_prefixes(rel) {
+        let url = target.url_for(&format!("{prefix}/"))?;
+        dir::mkcol_url(target, &url, &prefix).await?;
+    }
+    Ok(())
+}
+
+/// `rel` 的父目录各「逐级前缀」：`"sync/events/abc/1.jsonl"` → `["sync", "sync/events",
+/// "sync/events/abc"]`。
+///
+/// 纯函数（不拼 URL、不发请求），所以能单测 —— 这是本文件里唯一不依赖服务端的判据面。
+/// 没有 `/` 的 `rel`（直接落在 base 下）返回空：那说明父目录就是 base，已经在
+/// `ensure_base_dir` 里建过了。
+fn parent_prefixes(rel: &str) -> Vec<String> {
+    let rel = rel.trim().trim_matches('/');
+    let Some((dir, _file)) = rel.rsplit_once('/') else {
+        return Vec::new();
+    };
+    let mut prefixes: Vec<String> = Vec::new();
+    let mut current = String::new();
+    for segment in dir.split('/').filter(|segment| !segment.is_empty()) {
+        if !current.is_empty() {
+            current.push('/');
+        }
+        current.push_str(segment);
+        prefixes.push(current.clone());
+    }
+    prefixes
+}
+
 /// 列 `rel` 目录下的**直接子项名**（不含父路径、去尾斜杠、已百分号解码）。
 ///
 /// 只对 `sync/events/` 这类「数量 = 设备数」的小目录发；分段文件枚举请用 GET 顺号探测。
@@ -84,7 +126,10 @@ pub async fn list_children(target: &WebdavTarget, rel: &str) -> Result<Vec<Strin
         .await
         .map_err(map_reqwest)?;
     fail_on_status(response.status())?;
-    let text = response.text().await.map_err(map_reqwest)?;
+    const MAX_DIRECTORY_BYTES: usize = 2 * 1024 * 1024;
+    super::limits::check_content_length(&response, MAX_DIRECTORY_BYTES)?;
+    let bytes = super::limits::read_limited(response, MAX_DIRECTORY_BYTES).await?;
+    let text = String::from_utf8(bytes).map_err(|_| WebdavError::Network("WebDAV 目录响应不是 UTF-8".into()))?;
     Ok(children_of(&text, rel))
 }
 
@@ -171,13 +216,52 @@ fn propfind_method() -> Method {
         .clone()
 }
 
+/// `Depth: 1` 的头名，**必须全小写**。
+///
+/// `http` crate 的 `HeaderName::from_static` 只收小写字面量（它把名字当 `'static`
+/// 做 H2 风格的静态优化），传大写会在**运行期** panic 而不是编译期报错，报
+/// `HeaderName::from_static with invalid bytes`。线上后果实测过：Android 侧
+/// `panic = "abort"`，这个 panic 落在 `tokio-rt-worker` 上 ⇒ 整进程 SIGABRT，
+/// 表现为「一同步就闪退」（0.12.9 真机 tombstone，2026-11-16 21:45:50）。
+///
+/// HTTP 头名本身大小写不敏感，发 `depth` 与 `Depth` 语义完全一致；`mod.rs` 那侧用
+/// `.header("Depth", ..)` 字符串形式是安全的（走 `from_bytes`，内部会小写化），
+/// 只有 `from_static` 这条快路径有这个陷阱。
 fn depth_header() -> HeaderName {
-    HeaderName::from_static("Depth")
+    HeaderName::from_static("depth")
 }
 
 #[cfg(test)]
 mod tests {
     use super::{children_of, percent_decode};
+
+    /// 0.12.9 真机闪退的回归判据。
+    ///
+    /// `HeaderName::from_static` 只收小写：写回 `"Depth"` 时本用例会在**调用那一刻**
+    /// panic（不是断言失败），Android `panic = "abort"` 下就是整进程 SIGABRT。
+    /// 断言的是**精确字面量**而不只是「没 panic」——头名大小写不敏感，落小写不损语义，
+    /// 但一旦有人改回大写，这里必须立刻红。
+    #[test]
+    fn parent_prefixes_walks_every_level_below_base() {
+        assert_eq!(
+            super::parent_prefixes("sync/events/b265fafdc306/00000007.jsonl"),
+            vec![
+                "sync".to_string(),
+                "sync/events".to_string(),
+                "sync/events/b265fafdc306".to_string()
+            ],
+            "409 补建要按浅→深逐级来，跳级建会被服务端同样回 409"
+        );
+        assert!(
+            super::parent_prefixes("00000001.jsonl").is_empty(),
+            "直接落在 base 下时父目录就是 base，不该再建"
+        );
+    }
+
+    #[test]
+    fn depth_header_name_stays_lowercase() {
+        assert_eq!(super::depth_header().as_str(), "depth");
+    }
 
     #[test]
     fn decodes_percent_encoded_hrefs() {

@@ -1,11 +1,6 @@
-//! `snapshot.rs` 的测试（从原文件抽出，仅为守住单文件 ≤300 行）。
-//!
-//! `mod tests` 仍声明在原模块内（`#[path]` 指向本文件），`super::` 语义不变。
-
+//! `snapshot.rs` 的测试（`#[path]` 挂回原模块，`super::` 语义不变）。
 use super::*;
-use futures_util::FutureExt;
-use sqlx::Executor;
-use std::panic::AssertUnwindSafe;
+use futures_util::FutureExt; use sqlx::Executor; use std::panic::AssertUnwindSafe;
 
 pub(super) struct SnapshotTestDirectory(pub(super) PathBuf);
 
@@ -47,6 +42,7 @@ fn snapshot_format_is_explicit_and_not_the_legacy_format() {
     assert_eq!(SNAPSHOT_FORMAT, "PatinaSQLiteSnapshot-1");
     assert_ne!(SNAPSHOT_FORMAT, "PatinaBackup");
 }
+
 
 #[tokio::test]
 async fn snapshot_replace_preparation_rejects_failed_schedule_reset() {

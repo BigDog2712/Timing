@@ -43,15 +43,12 @@ async fn scan_once(app: &AppHandle, pool: &SqlitePool) -> AppResult<()> {
     if due.is_empty() {
         return Ok(());
     }
-    // ① 先置位：保证一条提醒只弹一次、崩溃重启不重弹（K-19）。
-    services::reminder::mark_fired(pool, &due, now).await?;
-    // ② 系统通知（多条聚合为一条，AC-61）。
-    if !send_notification(app, &due) {
-        // 通知失败回滚，保留下次重试；应用内事件仍照常发（可视兜底不依赖系统通知）。
-        services::reminder::reset_fired(pool, &due).await?;
-    }
-    // ③ 应用内事件（前端高亮对应行 / 刷新铃铛态）。
-    for reminder in &due {
+    // 领取和通知处于同一 SQLite 事务；失败或崩溃会回滚，防止持久标记吞掉提醒。
+    let claimed = services::reminder::dispatch(pool, &due, now, |claimed| {
+        send_notification(app, claimed)
+    })
+    .await?;
+    for reminder in &claimed {
         events::emit_reminder_fired(app, reminder);
     }
     Ok(())

@@ -36,6 +36,7 @@ pub(crate) fn level_path(target: &WebdavTarget, level: usize) -> String {
 pub(crate) fn fail_tag(err: &WebdavError) -> Cow<'static, str> {
     match err {
         WebdavError::Auth => Cow::Borrowed("Auth"),
+        WebdavError::TooLarge => Cow::Borrowed("TooLarge"),
         WebdavError::Forbidden => Cow::Borrowed("Forbidden"),
         WebdavError::RateLimited => Cow::Borrowed("RateLimited"),
         WebdavError::Precondition => Cow::Borrowed("Precondition"),

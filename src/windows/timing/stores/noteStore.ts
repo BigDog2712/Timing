@@ -28,6 +28,11 @@ function clearGeomTimer(): void {
   }
 }
 
+function mergeNoteResponse(note: Note, current: Note | null, contentAtRequest: string): Note | null {
+  if (!current || current.id !== note.id) return current;
+  return current.content !== contentAtRequest ? { ...note, content: current.content } : note;
+}
+
 interface NoteStore {
   note: Note | null;
   /** 最近一次**落盘**的正文（note.content 为本地即时值；二者比对判定「无变化」） */
@@ -126,7 +131,11 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     if (!patch || !current) return;
     try {
       const note = await noteApi.update({ id: current.id, patch });
-      set({ note, savedContent: note.content, error: null });
+      set((state) => ({
+        note: mergeNoteResponse(note, state.note, current.content),
+        savedContent: note.content,
+        error: null,
+      }));
     } catch (err) {
       set({ error: errorText(err) });
     }
@@ -141,7 +150,11 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     pendingGeom = null;
     try {
       const note = await noteApi.update({ id: current.id, patch: merged });
-      set({ note, savedContent: note.content, error: null });
+      set((state) => ({
+        note: mergeNoteResponse(note, state.note, current.content),
+        savedContent: note.content,
+        error: null,
+      }));
     } catch (err) {
       set({ error: errorText(err) });
     }
@@ -158,7 +171,11 @@ export const useNoteStore = create<NoteStore>((set, get) => ({
     pendingGeom = null;
     try {
       const note = await noteApi.update({ id: current.id, patch: merged });
-      set({ note, savedContent: note.content, error: null });
+      set((state) => ({
+        note: mergeNoteResponse(note, state.note, current.content),
+        savedContent: note.content,
+        error: null,
+      }));
     } catch (err) {
       set({ note: current, error: errorText(err) });
     }

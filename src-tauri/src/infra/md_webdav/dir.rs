@@ -207,8 +207,24 @@ pub async fn ensure_base_dir_err(target: &WebdavTarget) -> Result<EnsureOutcome,
 /// 建一级目录。`Ok(true)` = 建成了，`Ok(false)` = 已经存在（幂等）。
 async fn mkcol(target: &WebdavTarget, level: usize) -> Result<bool, WebdavError> {
     let url = target.dir_url(level)?;
+    mkcol_url(target, &url, &level_path(target, level)).await
+}
+
+/// 对**任意**目录 URL 发 MKCOL，判定表与逐级补建共用一份（`Ok(true)` = 本次建成）。
+///
+/// 为什么要一个「按 URL」而不是「按 level」的入口：事件流的落点在
+/// `base/sync/events/<设备 id>/` 下，那几级**不在** [`super::dir_levels`] 的层级概念里
+/// （`level_path` 拼不出来），而 `put_new` 的 409 补建必须能把它们建出来 —— 否则手机
+/// 首次上传恒 409：父目录从来没被创建过，重试多少次都还是同一个 409（0.12.12 真机）。
+///
+/// `label` 只进日志。
+pub(super) async fn mkcol_url(
+    target: &WebdavTarget,
+    url: &str,
+    label: &str,
+) -> Result<bool, WebdavError> {
     let response = mkcol_client()?
-        .request(mkcol_method(), &url)
+        .request(mkcol_method(), url)
         .basic_auth(&target.user, Some(&target.password))
         /* 空 body，且**显式**写 `Content-Length: 0`：部分服务端要求 MKCOL 带一个长度 0
         的实体；而 reqwest 对非 PUT/POST 方法不会自己补这个头（实测就是不发）。 */
@@ -225,18 +241,12 @@ async fn mkcol(target: &WebdavTarget, level: usize) -> Result<bool, WebdavError>
     }
     /* 405 = Method Not Allowed：RFC 4918 里它的含义就是「集合已存在」。 */
     if code == 405 {
-        crate::log_debug!(
-            "md cloud mkcol: {} status=405 assume=existing",
-            level_path(target, level)
-        );
+        crate::log_debug!("md cloud mkcol: {label} status=405 assume=existing");
         return Ok(false);
     }
     /* 3xx：要求补尾斜杠 / 已改名。**不跟随**（见模块头的 Client 说明），当已存在。 */
     if (300..400).contains(&code) {
-        crate::log_info!(
-            "md cloud mkcol: {} status={code} assume=existing",
-            level_path(target, level)
-        );
+        crate::log_info!("md cloud mkcol: {label} status={code} assume=existing");
         return Ok(false);
     }
     /* 其余一律停：401 Auth / 403 Forbidden / 409 Server(409) / 400 / 423 / 5xx。
@@ -244,11 +254,7 @@ async fn mkcol(target: &WebdavTarget, level: usize) -> Result<bool, WebdavError>
     match fail_on_status(status) {
         Ok(()) => Ok(true),
         Err(err) => {
-            crate::log_warn!(
-                "md cloud mkcol: {} fail={}",
-                level_path(target, level),
-                fail_tag(&err)
-            );
+            crate::log_warn!("md cloud mkcol: {label} fail={}", fail_tag(&err));
             Err(err)
         }
     }

@@ -131,3 +131,30 @@ describe('noteStore.saveContent', () => {
     expect(updateMock).not.toHaveBeenCalled();
   });
 });
+
+describe('noteStore geometric and association updates', () => {
+  it('keeps local content typed while a geometry request is in flight', async () => {
+    let resolveUpdate: (n: Note) => void = () => {};
+    updateMock.mockReturnValue(new Promise<Note>((resolve) => { resolveUpdate = resolve; }));
+    useNoteStore.getState().patchGeom({ posX: 220 });
+    const pending = useNoteStore.getState().flush();
+    useNoteStore.getState().setLocalContent('IPC 期间的新正文');
+    resolveUpdate({ ...baseNote, posX: 220, content: '服务端旧正文' });
+
+    await pending;
+
+    expect(useNoteStore.getState().note).toMatchObject({ posX: 220, content: 'IPC 期间的新正文' });
+  });
+
+  it('keeps local content typed while an association request is in flight', async () => {
+    let resolveUpdate: (n: Note) => void = () => {};
+    updateMock.mockReturnValue(new Promise<Note>((resolve) => { resolveUpdate = resolve; }));
+    const pending = useNoteStore.getState().setItemId(42);
+    useNoteStore.getState().setLocalContent('关联期间的新正文');
+    resolveUpdate({ ...baseNote, itemId: 42, content: '服务端旧正文' });
+
+    await pending;
+
+    expect(useNoteStore.getState().note).toMatchObject({ itemId: 42, content: '关联期间的新正文' });
+  });
+});

@@ -17,13 +17,11 @@ use zip::read::ZipReadOptions;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
-#[cfg(test)]
-mod merge_tests;
-#[cfg(test)]
-mod legacy_format_tests;
+#[cfg(test)] mod merge_tests;
+#[cfg(test)] mod legacy_format_tests;
 mod restore;
-#[cfg(test)]
-mod widget_retirement_tests;
+mod secrets;
+#[cfg(test)] mod widget_retirement_tests;
 
 pub(super) use restore::{prepare_snapshot_backup, restore_snapshot_backup};
 
@@ -657,6 +655,7 @@ async fn write_snapshot_archive_internal(
             .await
             .map_err(|error| format!("failed to create consistent sqlite snapshot: {error}"))?;
 
+        secrets::scrub_snapshot_secrets(&db_path).await?;
         let (migration_head, migration_fingerprint, counts) =
             inspect_current_database(&db_path, true).await?;
         let size_bytes = fs::metadata(&db_path)
@@ -886,6 +885,4 @@ pub(super) async fn extract_snapshot_archive(
     result
 }
 
-#[cfg(test)]
-#[path = "snapshot_mod_tests.rs"]
-mod tests;
+#[cfg(test)] #[path = "snapshot_mod_tests.rs"] mod tests;

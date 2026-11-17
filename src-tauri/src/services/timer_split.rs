@@ -16,9 +16,7 @@
 //! 以及「挂机过夜的会话不会把 8 小时全算进某一天」。真要精确到暂停点，得在每次
 //! 暂停时也落一条分段——那会让暂停变成写库操作，得不偿失。
 
-use sqlx::SqlitePool;
-
-use crate::error::{AppError, AppResult};
+use crate::error::AppResult;
 use crate::models::record::TimeRecord;
 use crate::platform::clock::day_bounds;
 use crate::repositories::record_session as session;
@@ -83,22 +81,6 @@ fn bounds_of(ms: i64) -> (i64, i64) {
         Some(dt) => day_bounds(dt.date_naive()),
         None => (ms, ms),
     }
-}
-
-/// 结束会话：跨天就拆成多条落库，不跨天等价于普通 `finalize`。
-///
-/// `ended_at` 由调用方给（倒计时到点用「计划结束时刻」，手动结束用「现在」）。
-pub async fn finalize(
-    pool: &SqlitePool,
-    active: &TimeRecord,
-    accumulated_sec: i64,
-    ended_at: i64,
-    now: i64,
-) -> AppResult<()> {
-    let mut tx = pool.begin().await.map_err(AppError::db)?;
-    finalize_in(&mut tx, active, accumulated_sec, ended_at, now).await?;
-    tx.commit().await.map_err(AppError::db)?;
-    Ok(())
 }
 
 /// [`finalize`] 的事务内版本（S3：结束会话必须与 `stop` 事件同事务）。

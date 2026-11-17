@@ -30,6 +30,9 @@
 /* `super::*` 已经把 `snapshot` 的私有项（manifest 结构、各 helper、`fs` / `File` /
    `BTreeMap` / zip 类型）一并带进来 —— 子模块可见父模块私有项。 */
 use super::*;
+use crate::services::activity::data::sqlite_pool::{
+    open_single_connection_sqlite_pool, prepare_pool_schema,
+};
 
 /// 独占的临时目录（`ExtractedSnapshot` 自己有 Drop，这里只兜住本文件的中间产物）。
 struct LegacyTestDir(PathBuf);
@@ -48,15 +51,8 @@ impl Drop for LegacyTestDir {
     }
 }
 
-/// 按**线上存量存档的形状**手搓一份备份，然后走两条真实入口：
-/// ① `is_snapshot_archive`（备份列表的嗅探）；② `extract_snapshot_archive`（恢复）。
-#[tokio::test]
-async fn legacy_snapshot_archive_stays_recognised_and_restorable() {
-    use crate::services::activity::data::sqlite_pool::{
-        open_single_connection_sqlite_pool, prepare_pool_schema,
-    };
-
-    let work = LegacyTestDir::new("timing-legacy-snapshot");
+/// 手写旧包，刻意绕过当前导出的脱敏逻辑，以覆盖已落盘的含凭据快照。
+async fn write_legacy_snapshot_archive(work: &LegacyTestDir) -> PathBuf {
     let db_path = work.0.join("source.db");
     let archive_path = work.0.join("legacy-backup.zip");
 
@@ -66,10 +62,17 @@ async fn legacy_snapshot_archive_stays_recognised_and_restorable() {
     prepare_pool_schema(&pool, &db_path)
         .await
         .expect("prepare source schema");
-    sqlx::query("INSERT INTO settings (key, value) VALUES ('legacy-format-test', 'kept')")
+    sqlx::query("INSERT INTO settings (key, value) VALUES ('legacy-format-test', 'kept'),
+        ('web_activity_token', 'snapshot-web-secret'),
+        ('remote_status_bridge_token', 'snapshot-remote-secret')")
         .execute(&pool)
         .await
-        .expect("insert marker row");
+        .expect("insert marker and legacy credentials");
+    sqlx::query("INSERT INTO sessions(app_name,exe_name,start_time,end_time,duration)
+        VALUES('Source','source.exe',1000,2000,1000)")
+        .execute(&pool)
+        .await
+        .expect("insert source activity");
     let counts = read_counts(&pool).await.expect("read source counts");
     pool.close().await;
 
@@ -122,6 +125,14 @@ async fn legacy_snapshot_archive_stays_recognised_and_restorable() {
     drop(source);
     write_zip_entry(&mut zip, "checksums.json", &checksum_bytes).expect("write checksums entry");
     zip.finish().expect("finish archive");
+    archive_path
+}
+
+/// 旧格式仍可被备份列表识别、解包，且保留数据。
+#[tokio::test]
+async fn legacy_snapshot_archive_stays_recognised_and_restorable() {
+    let work = LegacyTestDir::new("timing-legacy-snapshot");
+    let archive_path = write_legacy_snapshot_archive(&work).await;
 
     /* ① 备份列表的嗅探：老格式必须仍被认成「本应用的快照」。
        这里一旦变成 false，那批备份就从列表里静默消失。 */
@@ -171,4 +182,66 @@ fn manifest_format_constants_are_frozen() {
         "写入侧条目名 {DATABASE_ENTRY} 不在读取侧允许集合里 —— 新备份写出去就没人读得回"
     );
     assert_eq!(supported_database_entries().len(), 1, "今天的允许集合只该有当前条目");
+}
+
+#[path = "restore_secrets_tests.rs"]
+mod restore_secrets_tests;
+
+/// 导出快照会把整库复制出去，复制件里不能留着仍有效的本机桥接令牌。
+#[tokio::test]
+async fn exported_snapshot_scrubs_local_bridge_tokens_without_mutating_source() {
+    let dir = std::env::temp_dir().join(format!(
+        "timing-snapshot-scrub-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|value| value.as_nanos())
+            .unwrap_or(0)
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let source = dir.join("source.db");
+    let copy_path = dir.join("activity.db");
+    let options = sqlx::sqlite::SqliteConnectOptions::new()
+        .filename(&source)
+        .create_if_missing(true);
+    let pool = sqlx::sqlite::SqlitePoolOptions::new()
+        .max_connections(1)
+        .connect_with(options)
+        .await
+        .unwrap();
+    sqlx::query("CREATE TABLE settings(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO settings VALUES('web_activity_token','local-secret'),('remote_status_bridge_token','remote-secret')")
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("VACUUM INTO ?")
+        .bind(copy_path.to_string_lossy().to_string())
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    super::secrets::scrub_snapshot_secrets(&copy_path).await.unwrap();
+    let copy = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&copy_path, false)
+        .await
+        .unwrap();
+    let remaining: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM settings WHERE key IN ('web_activity_token','remote_status_bridge_token')",
+    )
+    .fetch_one(&copy)
+    .await
+    .unwrap();
+    let original: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM settings WHERE value IN ('local-secret','remote-secret')",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert_eq!(remaining, 0, "导出件不得含桥接令牌");
+    assert_eq!(original, 2, "正在使用的库一个字都不许改");
+    copy.close().await;
+    pool.close().await;
+    let _ = std::fs::remove_dir_all(&dir);
 }

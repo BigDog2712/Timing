@@ -139,6 +139,33 @@ fn resume_after_stop_is_ignored() {
     assert_eq!(result.ignored[0].reason, IgnoreReason::AfterStop);
 }
 
+#[test]
+fn same_device_undo_reopens_and_the_next_stop_wins() {
+    let ops = [
+        op(TimerOpKind::Start, 0, PC, 1),
+        op(TimerOpKind::Stop, 60_000, PC, 2),
+        op(TimerOpKind::Resume, 62_000, PC, 3),
+        op(TimerOpKind::Stop, 90_000, PC, 4),
+    ];
+    let reopened = block(&ops[..3]);
+    assert_eq!(reopened.ended_at_ms, None);
+    assert_eq!(reopened.running_since_ms, Some(62_000));
+    let folded = block(&ops);
+    assert_eq!(folded.ended_at_ms, Some(90_000));
+    assert_eq!(folded.accumulated_sec(), 88);
+}
+
+#[test]
+fn late_resume_after_own_stop_stays_ignored() {
+    let result = fold_session(&[
+        op(TimerOpKind::Start, 0, PC, 1),
+        op(TimerOpKind::Stop, 60_000, PC, 2),
+        op(TimerOpKind::Resume, 63_201, PC, 3),
+    ]);
+    assert_eq!(result.block.expect("block").ended_at_ms, Some(60_000));
+    assert_eq!(result.ignored[0].reason, IgnoreReason::AfterStop);
+}
+
 /// 分片不完整时可能只拉到 stop（start 在另一天的文件里）：必须忽略而不是造一条零长块。
 #[test]
 fn ops_without_start_are_ignored() {
@@ -176,6 +203,31 @@ fn adjust_moves_the_start_and_bad_payload_is_ignored() {
     assert_eq!(result.ignored[0].reason, IgnoreReason::MalformedAdjust);
 }
 
+/// 计时中换事项：改坏的样子是 fold 只认 `start` 的事项 —— 对端整段记在旧事项名下。
+#[test]
+fn item_switch_adjust_moves_the_item_but_not_the_time() {
+    let mut switch = op(TimerOpKind::Adjust, 5_000, PC, 2);
+    switch.payload = Some(super::item_switch_payload("i:aaaaaaaaaaaa:9"));
+    let folded = block(&[
+        op(TimerOpKind::Start, 0, PC, 1),
+        switch,
+        op(TimerOpKind::Stop, 60_000, PC, 3),
+    ]);
+    assert_eq!(folded.item_uid, "i:aaaaaaaaaaaa:9");
+    assert!(folded.item_switched);
+    assert_eq!(folded.started_at_ms, 0);
+    assert_eq!(folded.accumulated_sec(), 60);
+
+    let untouched = block(&[op(TimerOpKind::Start, 0, PC, 1)]);
+    assert_eq!(untouched.item_uid, ITEM);
+    assert!(!untouched.item_switched, "没换过事项时物化不得改写本机事项");
+
+    let mut empty = op(TimerOpKind::Adjust, 5_000, PC, 2);
+    empty.payload = Some(r#"{"item_uid":""}"#.to_string());
+    let result = fold_session(&[op(TimerOpKind::Start, 0, PC, 1), empty]);
+    assert_eq!(result.ignored[0].reason, IgnoreReason::MalformedAdjust);
+}
+
 /// `drop` 只打标记：事件本身不能删（删了就对端重推时又活了）。
 #[test]
 fn drop_marks_the_block_without_removing_events() {
@@ -184,6 +236,23 @@ fn drop_marks_the_block_without_removing_events() {
         op(TimerOpKind::Drop, 10_000, PC, 2),
     ]);
     assert!(folded.dropped);
+}
+
+#[test]
+fn discarded_short_session_is_not_resurrected_by_a_stop_event() {
+    let dropped = block(&[
+        op(TimerOpKind::Start, 0, PC, 1),
+        op(TimerOpKind::Drop, 10_000, PC, 2),
+    ]);
+    assert!(dropped.dropped);
+    assert_eq!(dropped.ended_at_ms, None);
+
+    let legacy_pair = fold_session(&[
+        op(TimerOpKind::Start, 0, PC, 1),
+        op(TimerOpKind::Stop, 10_000, PC, 2),
+        op(TimerOpKind::Drop, 10_000, PC, 3),
+    ]);
+    assert!(!legacy_pair.block.expect("legacy block").dropped);
 }
 
 /// 落 `accumulated_sec` 是整秒（向下取整）：1500ms 记 1 秒，不能四舍五入成 2。

@@ -223,13 +223,20 @@ fn authority_of(url: &str) -> &str {
 /// 只有这两种放行 `http://`：它们是本机测试服务器，不出网卡。`localhost` 不放行——
 /// 它可能被 hosts / DNS 指到别处，与活动库备份侧的口径一致（那里的用例明确断言
 /// `http://localhost/dav` 必须被拒）。
+///
+/// 必须解析成 `IpAddr` 再判 `is_loopback()`：`starts_with("127.")` 会把
+/// `http://127.attacker.example/` 这种公网域名当成回环放行，Basic 口令与日记随即明文出网。
 fn is_loopback_host(authority: &str) -> bool {
-    let host = if let Some(rest) = authority.strip_prefix('[') {
-        rest.split(']').next().unwrap_or(rest)
-    } else {
-        authority.split(':').next().unwrap_or(authority)
+    let Ok(parsed) = url::Url::parse(&format!("http://{authority}")) else {
+        return false;
     };
-    host == "::1" || host.starts_with("127.")
+    /* `host_str()` 对 IPv6 会带方括号（`[::1]`），所以按 `Host` 枚举判，
+       不拿字符串再 parse。 */
+    match parsed.host() {
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        _ => false,
+    }
 }
 
 /// 长度与换行的通用校验（`what` 是给人看的字段名）。旧 `md_sync_cloud` 的同名函数搬来。

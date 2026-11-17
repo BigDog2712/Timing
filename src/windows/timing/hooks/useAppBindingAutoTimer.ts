@@ -32,13 +32,18 @@
  *   4. **自家窗口不算"离开了应用"**：点药丸时前台会变成 `timing.exe`，随后点回游戏。
  *      若那时清了 `handledKeyRef`，用户刚手动切走的事项就会被"回到游戏"重新拽回去
  *      —— 所以自家进程到前台直接返回，两个 ref 都不动。
- *   5. **接管成功那一刻注册进程监视**（[0.13]「应用退出进程才结束」）：注册只来自
- *      自动路径 ——「已经在计这一件」的分支**不注册**（那可能是用户手动开的计时，
- *      甚至是应用重启前的旧段，碰了就是越权）。段身份 `(itemId, startedAt)` 取自
- *      接管成功后的 store（`switch` 的 `end_and_start` 开新段；暂停/继续不改
- *      `started_at`，同一段）；`processId` 从事件载荷 / 冷启动查询一路带进来，
- *      不许前端自己再查一遍（进程会退出，晚查到的可能是复用后的新 pid）。
- *      注册失败只 warn：下一次前台变化会重新注册，不影响"已接管"记账。
+ *   5. **到过绑定的应用且这一件正在计，就要有进程监视**（[0.13]「应用退出进程才结束」）。
+ *      注册表是**进程内存里的临时事实**（Rust 侧不落库），Timing 自己一重启就没了；
+ *      而计时会话是**跨进程存活**的（重启后由恢复对话框接管，`timer_flush` 的
+ *      「cross-process session」让路就是为它设计的）。于是「已在计这一件」这个分支
+ *      成了重启后**唯一**能重建监视的入口——不注册的话，症状正是「应用退出了，
+ *      绑定事项还在计时」（2026-11-16 实测复现：重启后 app 退出，段一直挂着）。
+ *      段身份 `(itemId, startedAt)` 取自当前 store；段级校验在 Rust 侧兜底：
+ *      用户中途手动切走 / 手动结束 → `SegmentMismatch`，只清注册表、绝不碰计时——
+ *      所以「手动开的段也被盯」是安全且符合口径的（绑定的应用退出 → 绑定事项结束）。
+ *      `processId` 从事件载荷 / 冷启动查询一路带进来，不许前端自己再查一遍
+ *      （进程会退出，晚查到的可能是复用后的新 pid）。注册失败只 warn：
+ *      下一次前台变化会重新注册，不影响「已接管」记账。
  *
  * ## 为什么用 `startOrSwitch` 而不是 `stop + start`
  *
@@ -128,6 +133,24 @@ export function useAppBindingAutoTimer(): void {
   const inFlightRef = useRef(false);
 
   /**
+   * 注册（或替换）进程监视。两个入口共用：接管成功的新段、以及「已在计这一件」的
+   * 现段（重启后存活的跨进程会话只有这条路能重新被盯上，见文件头边界 5）。
+   *
+   * fire-and-forget：注册失败只 warn——下一次前台变化会重新注册，且这条链路
+   * 用户没点任何东西，不该有任何打扰。`processId === null` 时直接跳过
+   * （没有 pid 就没法盯，不是错误，`watchInputFromState` 的 pid 三门是第二道保险）。
+   */
+  const registerWatch = (itemId: number, processId: number | null, session: { itemId: number; startedAt: number } | null): void => {
+    if (processId === null) return;
+    const watch = watchInputFromState(itemId, processId, session);
+    if (watch) {
+      void ipc.setBoundProcessWatch(watch).catch((error) => {
+        console.warn("bound process watch registration failed", error);
+      });
+    }
+  };
+
+  /**
    * 一个入口，两个来源：引擎广播（`active-window-changed`）与「挂载后主动查一次」。
    *
    * 必须共用：两条路各自演进一定漂移，而漂移的表现是**冷启动那条悄悄失效**（事件那条还有测试看着）。
@@ -163,8 +186,13 @@ export function useAppBindingAutoTimer(): void {
         if (itemId === null) return;
         const current = useTimerStore.getState().state;
         if (current.status !== "idle" && current.session?.itemId === itemId) {
-          /* 已经在计这一件：记下键，省掉同一应用后续每一次无意义的查询 */
+          /* 已经在计这一件：记下键，省掉同一应用后续每一次无意义的查询。
+             [2026-11-16] **也要注册监视**——注册表随 Timing 进程死，而这条会话跨进程
+             存活（重启 / 恢复对话框续段之后都在这里经过）；不注册就是「Timing 重启过
+             一次之后，应用退出永远不再结束计时」。段身份用当前 store 的会话，
+             段级校验兜住「用户手动切走」的旧顾虑（见文件头边界 5）。 */
           handledKeyRef.current = appKey;
+          registerWatch(itemId, processId, current.session);
           return;
         }
         const started = await startOrSwitch(itemId, { silent: true });
@@ -172,17 +200,8 @@ export function useAppBindingAutoTimer(): void {
            `silent: true` 保证这条链失败时**不弹 notice**（用户没点任何东西）。 */
         if (!started) return;
         handledKeyRef.current = appKey;
-        /* [0.13] 注册进程监视：只挂在「自动接管真的发生了」这一刻（上面的分支都不注册）。
-           fire-and-forget：注册失败只 warn —— 下一次前台变化会重新注册，
-           而且这条链路用户没点任何东西，不该有任何打扰。 */
-        if (processId !== null) {
-          const watch = watchInputFromState(itemId, processId, useTimerStore.getState().state.session);
-          if (watch) {
-            void ipc.setBoundProcessWatch(watch).catch((error) => {
-              console.warn("bound process watch registration failed", error);
-            });
-          }
-        }
+        /* [0.13] 注册进程监视：挂在「自动接管真的发生了」这一刻。 */
+        registerWatch(itemId, processId, useTimerStore.getState().state.session);
       } catch (error) {
         /* 自动接管失败不打扰用户：没点任何东西却弹一句错误只会让人困惑 */
         console.warn("auto timer for bound app failed", appKey, error);

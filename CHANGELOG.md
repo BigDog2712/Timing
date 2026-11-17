@@ -4,6 +4,170 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 修复：手机同步必闪退 + 折叠撞唯一索引 + 退避空转 + push 恒 409（四处）— 2026-11-16
+
+> 桌面 **0.12.3** 不动 / 手机 **0.12.13（12013）**。
+>
+> 四处是同一条链上的四层，前面挡住后面：闪退修好才看得见折叠失败，折叠修好才看得见退避，
+> 退避修好才看得见 push 从来没成功过。
+
+### 一、一同步就整进程消失：PROPFIND 的 `Depth` 头写成了大写
+
+真机 tombstone 给出唯一线索：
+
+```
+signal 6 (SIGABRT), tid: tokio-rt-worker
+Abort message: 'HeaderName::from_static with invalid bytes'
+```
+
+`infra/md_webdav/stream.rs` 的 `depth_header()` 写的是 `HeaderName::from_static("Depth")`。
+`http` crate 接受**全小写**字面量（它把名字当 `'static` 做静态优化），大写会在**运行期**
+panic，报的就是上面那句 —— 编译器不拦。踩中的调用点是事件流 pull 的第一步
+`list_children("sync/events")`，它在 `tokio-rt-worker` 上跑，而 Android 是
+`panic = "abort"` ⇒ panic 直接变 SIGABRT，进程整体退出，日志都来不及落。
+
+真机日志把这条链走得清清楚楚（0.12.9，21:45 装机后第一次同步）：
+
+```
+22:25:10  md sync (mobile) tier: schedule=smart reason=Startup
+22:25:12  md cloud mkcol: /我的坚果云/Timing levels=2 created=2   ← 凭据和网络都通
+22:25:12  ERROR [panic] panic at http-1.5.0/src/header/name.rs:1254:
+          HeaderName::from_static with invalid bytes               ← 就在这一步炸
+```
+
+**为什么桌面全绿也发现不了**：桌面这六轮同步全走 folder transport（本地坚果云目录），
+`Transport::Webdav` 那条分支一次都没被真实执行过；`cargo test` 的假服务端也只到
+「发了什么请求」。手机只走 WebDAV，所以第一个请求就炸。
+
+同 crate 的 `infra/activity/webdav.rs` 用 `.header("Depth", "0")` 字符串形式是安全的
+（走 `from_bytes`，内部会小写化），**只有 `from_static` 这条快路径有坑**。
+
+- 改：`from_static("depth")`，函数头补注释说明陷阱与线上后果。
+- 判据：`depth_header_name_stays_lowercase` 断言精确字面量；写回大写时该用例在**调用那
+  一刻 panic**，本地复现出的 panic 文案与真机 tombstone 一字不差。
+
+### 二、闪退挡住的那个：孤儿 active 会话把折叠卡死
+
+闪退修好后，同一个真机立刻暴露第二层：同步**不崩了但也同步不动**。
+
+```
+WARN sync stream pull: fold failed on sync/events/b265fafdc306/00000001.jsonl:
+     数据库操作失败: error returned from database: (code: 2067)
+     UNIQUE constraint failed: time_records.device_id
+WARN md sync (mobile) 本轮错误：…；游标停在 seq=0，下一轮重试
+```
+
+`uq_records_open_per_device` 是「每设备一条 active」。折叠时对端发来的**未结束**会话会被
+插成 `status='active'`；而桌面被强杀过 17 次，7 个分段里留下了 **6 条**「start 了没 stop」
+的孤儿会话 —— 第 2 条插进去就撞唯一索引，整段事务回滚、游标不推进、**每轮重试同一个死法，
+没有任何一轮会修它**。用户侧只看到「同步一直不成功」，手机连提示都没有。
+
+- 改：`apply_block` 物化前先 `seal_earlier_active_on_same_device` —— 按
+  `(started_at, uid)` 全序（与 blocks 排序同源）把「同设备、更早开始、仍 active」的行就地
+  收尾，`ended_at` 取下一条的 `started_at`（一台设备不可能同时计时两个事项，这是唯一可推导
+  的事实上界），已积累时长按 `running_since` 补算。
+- 判据：`two_orphan_open_sessions_on_one_device_still_fold`。摘掉收尾调用即红，且本地打印
+  的 `fold failed … (code: 2067) UNIQUE constraint failed: time_records.device_id` 与真机
+  逐字相同。
+- **副作用需知**：这是对历史脏数据**一次性补收尾**，被补收尾的会话会按「跑到下一条开始」
+  计入时长（本次真机上最长的约 15 小时）。这是强杀留下的信息缺口，数据本身无法还原更准的
+  值；想清掉的话手动删掉那些会话即可。
+
+### 三、修完前两层才露头的：一个无关条目让同步每轮都退避
+
+折叠修好后，真机日志变成这样（0.12.11，22:45）：
+
+```
+22:44:25  sync stream pull: peers=1 segments=10 events=42 applied=42   ← 折叠全过
+22:45:01  md cloud: skip=backoff
+22:45:01  md sync (mobile) 本轮错误：云端：上一轮失败，正在退避（稍后自动重试）
+22:45:48  md cloud: skip=backoff
+22:45:50  md cloud: skip=backoff
+…（之后几乎只剩 skip=backoff）
+```
+
+坚果云的 PROPFIND 在 `sync/events/` 下**稳定返回一个 `unix-directory` 条目**。
+`pull::peers_of` 把「不是设备 id 的条目」记进 `summary.errors`，而
+`round_stream::run` 的返回值就是「`errors` 是否为空」—— 于是一个与同步无关的杂项让
+**整轮判失败**、触发指数退避，退避时长一路翻倍，同步几乎再跑不动，手机侧数据也一直没
+传上去（远端始终只有桌面那一个设备目录）。
+
+- 改：`PullSummary` 新增 `warnings` 字段。「本条要看得见」与「本轮失败了」拆成两件事 ——
+  杂项落 `warnings`（`round_stream` 打成 WARN 日志，**不改** `ok`），编排层不再因此退避。
+  日志同时带上完整子项列表，下次冒出别的怪名字能直接看出它从哪来。
+- 判据：`non_device_dir_is_reported_without_blocking_real_peers` 改判「`errors` 为空 +
+  `warnings` 点名」。这条判据**跟着行为一起改**，理由写在用例注释里：可见性靠 `warnings`
+  保留，冒充失败才是 bug。摘掉修复（把 push 改回 `errors`）即红。
+
+### 四、退避修好才看见的：手机上传**从来没成功过**（PUT 恒 409）
+
+0.12.12 真机上 pull 持续成功，但每轮都跟着一句 `本轮错误：云端：服务端错误 409`，
+远端 `sync/events/` 下**始终只有桌面那一个设备目录** —— 手机的事件一个都没上去。
+
+成因是补建只补了一半：`put_new` 收到 409（= 父集合不存在）后调 `ensure_base_dir`，而它补的
+是 `basePath` 那几级（`我的坚果云/Timing`，日志里的 `levels=2 created=2`）。分段的真正落点是
+`base/sync/events/<设备 id>/<seq>.jsonl` —— **`sync`、`sync/events`、`sync/events/<设备>`
+这三级谁都没建过**，也没人打算建，所以重试一次还是同一个 409，永远。
+
+桌面走 folder transport，`create_dir_all` 顺手把整条路径建了，所以桌面一次都没露过这个洞。
+
+- 改：`dir.rs` 把 MKCOL 的请求体抽成 `mkcol_url(target, url, label)`（判定表仍只有一份），
+  `stream.rs` 新增 `ensure_parent_dirs`，409 分支先按 `rel` 的父路径**浅→深逐级**建再重试。
+  逐级不能省：跳级 MKCOL 在坚果云上同样是 409。
+- 判据：`parent_prefixes_walks_every_level_below_base` 钉「要建哪几级」。改成只建最深一级
+  即红（`left: ["sync/events/b265fafdc306"]` vs 三级）。
+
+## 同步落档换成事件流（Markdown 退回本地笔记）— 2026-11-16（未出包）
+
+## 同步落档换成事件流（Markdown 退回本地笔记）— 2026-11-16（未出包）
+
+> 版本不动：桌面 **0.12.3** / 手机 **0.12.9（12009）**。
+
+### 落点里写的是 `sync/events/<设备>/<seq>.jsonl`，不再是 `{date}.md`
+
+事件流的代码（不可变分段、完整性尾标、一段一事务、折叠物化）早就整套落地，但它挂在
+`MdSyncConfig.stream_enabled` 后面：出厂 `false`，而且**设置界面上从来没有这个开关的入口**。
+于是真实用户那一侧永远是「先跑半轮事件流（跳过）→ 再走 md 快照」：落点里只有 `{date}.md`，
+事件流一次都没跑过。这一批把这个开关删掉，事件流成为**唯一**的落档格式：
+
+- `round_webdav`：① 应用密码 → ② 远端目录 → ③ 退避 → ④ push + pull 事件流 → ⑤ 本地
+  Obsidian 渲染。删掉的是 GET/PUT `{date}.md`、本地镜像落点、指纹记账、历史补传与自动清理。
+- `round_folder`：同样的形状，transport 换成本地文件系统。
+- 两条通路共用新模块 `md_cloud/round_stream.rs`（只差一个 transport，其余必须逐字一致）。
+- `stream_enabled` 从 Rust 配置、前端 DTO、领域类型三处一起删（它从未被存成过 `true`,
+  删除不涉及配置迁移）。
+
+**停写 md 不等于删 md**：远端已有的 `{date}.md` 原地留着，**不会**被自动删除；本地 Obsidian
+落点照旧渲染（那是用户自己的笔记目录，只是它不再充当跨设备传输的载体）。手写 md 的导入也
+照旧，但只发生在笔记目录一侧。
+
+### 「今天已上传」改由上传游标回答
+
+`md_cloud_pending` 的那一行是「今天那份 md 写出去并记了指纹」。md 不再写之后它不再产生新行，
+照旧读它会让设置页永远显示「今天还没上传」——一个看着像网络故障的假象。新增
+`sync_stream::progress`：今天的本机事件是否存在、`timer_ops.id` 是否都已越过
+`sync_event_cursor[本机].last_op_id`。`pending_dates` 同源（未上传事件所在日期）。
+
+### 判据
+
+- `tests/md/cloud_folder.rs` 整份重写为事件流口径（分段落盘 + 落点无 md + 游标判「已上传」+
+  根目录建不出来时报错且状态仍为假 + 笔记目录手写仍能导入）。
+- `cloud_round` / `cloud_dual` 两条「落点里出现今日文件」的断言换成「出现 `00000001.jsonl`
+  且**没有** `{date}.md`」；文件名用字面量钉住，不用生产函数算路径。
+- `purge_is_wired_into_both_rounds` 翻成 `purge_is_retired_from_both_rounds`：落点不再产生
+  md，清理的两套候选集都失去生产者，挂点留着只会「每轮删 0 个」；防空转的正向对照保留。
+
+### 已知残留（明确没做）
+
+- `md_cloud/purge/**` 与 `md_cloud_pending` 仍编译在树里，但已**没有自动挂点**：唯一的调用方
+  是它们自己的用例。是否整批拆除（连带 `MdSyncCloudStatus.purge` 这个线缆字段与设置页那句
+  清理提示）需要单独一次决定，不塞进本批。
+- **双通路同时开启**时，事件流的上传游标只有一份（`sync_event_cursor` 以 `device_id` 为主键），
+  先跑的那条通路会把事件传走，另一条这一轮什么都不会拿到。这是事件流设计里既有的缺口，
+  在 md 时代被「两条各写一份 md」掩盖着；现在会变成「用户以为两条都在同步」。修法是把游标
+  按通路分开（迁移 + push/pull/progress 全部带 channel），属于下一批。
+- 把 md 备份恢复进云端落点这条通路（`md_backup::restore(target = webdav)`）不再有 md 可写。
+
 ## 工程评审修复（同步完整性 · 倒计时暂停 · 隐私口径）— 2026-11-16（未出包）
 
 > 版本不动：桌面 **0.12.3** / 手机 **0.12.9（12009）**。这批对应 `docs/reviews/TIMING-ENGINEERING-REVIEW-2026-11-16.md` 的四条 P1 与两条 P2。四条 P1 里有三条属于同一类：**失败被当成成功**。

@@ -14,6 +14,7 @@
 use sqlx::{Row, SqlitePool};
 
 mod tombstone;
+mod outbox;
 
 use crate::error::{AppError, AppResult};
 
@@ -90,40 +91,41 @@ const MIGRATE_COLUMNS_V11: &[(&str, &str, &str)] = &[
 
 /// 执行全部迁移（幂等）。由 `infra::db::init_pool` 调用。
 pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
-    // ① 3 张基表（IF NOT EXISTS，幂等）
-    run_raw(pool, include_str!("../migrations/0001_init.sql")).await?;
+    // 旧迁移会重建全局唯一索引并回写版本号，不能在新版本库上重放。
+    if schema_version(pool).await? < 1 {
+        run_raw(pool, include_str!("../migrations/0001_init.sql")).await?;
+    }
     // ② 补 v2 列（必须早于建索引，K-13）
     for (table, column, def) in MIGRATE_COLUMNS {
         ensure_column(pool, table, column, def).await?;
     }
-    // ③ 建 notes/todos + 全部 V0.2.0 索引 + settings 种子 + schema.version=2（幂等）
-    run_raw(pool, include_str!("../migrations/0002_v020.sql")).await?;
+    if schema_version(pool).await? < 2 {
+        run_raw(pool, include_str!("../migrations/0002_v020.sql")).await?;
+    }
     // ④ 补 v3 列（必须在 notes 建好之后）
     for (table, column, def) in MIGRATE_COLUMNS_V3 {
         ensure_column(pool, table, column, def).await?;
     }
-    // ⑤ v3 版本推进（schema.version=3）
-    run_raw(pool, include_str!("../migrations/0003_v030.sql")).await?;
+    if schema_version(pool).await? < 3 {
+        run_raw(pool, include_str!("../migrations/0003_v030.sql")).await?;
+    }
     // ⑥ 补 v4 列（待办提醒链路）
     for (table, column, def) in MIGRATE_COLUMNS_V4 {
         ensure_column(pool, table, column, def).await?;
     }
-    // ⑦ v4 版本推进（schema.version=4）
-    run_raw(pool, include_str!("../migrations/0004_v0312.sql")).await?;
+    if schema_version(pool).await? < 4 {
+        run_raw(pool, include_str!("../migrations/0004_v0312.sql")).await?;
+    }
     // ⑧ 补 v5 列（待办绑定事项；必须在 todos 表建好之后）
     for (table, column, def) in MIGRATE_COLUMNS_V5 {
         ensure_column(pool, table, column, def).await?;
     }
-    // ⑨ v5 版本推进（schema.version=5）+ 索引
-    run_raw(pool, include_str!("../migrations/0005_v0113.sql")).await?;
-    // ⑩ v6 版本推进（schema.version=6）+ 云端待传队列表 `md_cloud_pending`
-    //
-    // 只建新表、不动既有表，所以没有「补列」这一步，也就不会撞 K-13。
-    // 语句顺序是「先建表、后推版本」：中途失败时库仍停在 v5 且表已存在，
-    // 下一次启动重跑本文件即可（建表带 IF NOT EXISTS），不会留下「版本说 6、
-    // 表却不在」这种只有人工 SQL 才能修的残局。错误一律向上抛给 `init_pool`，
-    // 由启动期决定是回滚还是弹迁移失败框——这里不吞、不降级。
-    run_raw(pool, include_str!("../migrations/0006_v0113.sql")).await?;
+    if schema_version(pool).await? < 5 {
+        run_raw(pool, include_str!("../migrations/0005_v0113.sql")).await?;
+    }
+    if schema_version(pool).await? < 6 {
+        run_raw(pool, include_str!("../migrations/0006_v0113.sql")).await?;
+    }
     // ⑪ v7（V0.11.26）：`md_cloud_pending` 按通路隔离（加 `channel` 列、改主键）。
     //
     // 0007 是**重建表**（CREATE + INSERT SELECT + DROP + RENAME），不像前面的迁移
@@ -141,14 +143,7 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
     if schema_version(pool).await? < 8 {
         run_raw(pool, include_str!("../migrations/0008_v01300.sql")).await?;
     }
-    // ⑬ v9（0.12.2）：设备维度。
-    //
-    // 三步，顺序不可换：
-    //   ① 补列 —— 幂等守卫（PRAGMA），每次启动都跑，顺带修复"被人手工删过列"的库；
-    //   ② 抵消段 —— **每次启动无条件跑**：`0002_v020.sql` 每次启动都会把
-    //      `uq_records_open`（全库单活跃）建回来，这里 DROP 是唯一抵消点。
-    //      加了版本门 = 第二次启动退化回单设备；
-    //   ③ 版本推进 —— 必须在版本门里：`UPDATE … value='9'` 会把更高的版本号改写回 9。
+    // 设备维度先补列和索引，再推进版本。
     for (table, column, def) in MIGRATE_COLUMNS_V9 {
         ensure_column(pool, table, column, def).await?;
     }
@@ -243,13 +238,17 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
         )
         .await?;
     }
+    outbox::run(pool).await?;
     Ok(())
 }
 
-
-
-/// 读 `settings.schema.version`（缺失按 0：全新库的种子在 0002 里写入）。
 async fn schema_version(pool: &SqlitePool) -> AppResult<i64> {
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'settings')",
+    ).fetch_one(pool).await.map_err(AppError::db)?;
+    if !exists {
+        return Ok(0);
+    }
     let value: Option<String> =
         sqlx::query_scalar("SELECT value FROM settings WHERE key = 'schema.version'")
             .fetch_optional(pool)

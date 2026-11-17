@@ -22,7 +22,8 @@ mod appdata_migrate;
 mod appdata_migrate_edges;
 mod boot_timing;
 /* [批 2 · 第 5 项] 全额数据包（单个 JSON）：schema 往返 / 幂等 / 无 uid 表走 skipped。 */
-mod bundle;
+pub(crate) mod bundle;
+mod bundle_md_config;
 /* [批 2] 真机数据上的导出往返（`#[ignore]`：只在本机跑，只读打开两个库）。 */
 mod bundle_real_data;
 /* [批 2 · 返工] uid 为空的行：合成 uid 后非空且稳定 / 无 id 的退化路径。 */

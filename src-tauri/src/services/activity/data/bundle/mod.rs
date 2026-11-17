@@ -163,9 +163,9 @@ pub(crate) const ACTIVITY_TABLES: &[TableSpec] = &[
 
 /// **不跨设备**搬的 `settings` 键（导入时跳过并按 `skipped` 计数）。
 ///
-/// 两类：① 本机身份/凭据（`remote_status_bridge_token` 之类，搬到另一台机器等于
-/// 冒用别人的推送凭据 + 心跳时刻还是旧的）；② 指向本地自增 id 或 schema 版本的键
-/// （`ui.last_item_id` / `schema.version`——后者被旧包覆盖会让迁移逻辑判错版本）。
+/// 三类：① 本机身份/凭据（搬到另一台机器等于冒用别人的凭据）；② 指向本地自增 id
+/// 或 schema 版本的键（旧包覆盖 `schema.version` 会让迁移逻辑判错版本）；③ MD 同步
+/// 端点配置（导入后可能让本机已有凭据发往包指定的服务器）。
 /// 导出**照常全导**：包里留着才能看出「当时是什么配置」，只是不往本地写。
 pub(crate) const NON_PORTABLE_SETTING_KEYS: &[&str] = &[
     "schema.version",
@@ -173,6 +173,7 @@ pub(crate) const NON_PORTABLE_SETTING_KEYS: &[&str] = &[
     "remote_status_bridge_machine_id",
     "remote_status_bridge_token",
     "web_activity_token",
+    "plugin.md-sync.config",
     "__tracker_last_heartbeat_ms",
     "__tracker_last_successful_sample_ms",
     "__tracker_last_startup_self_heal_at_ms",

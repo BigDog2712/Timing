@@ -40,14 +40,18 @@ pub async fn load_title_recording_enabled(pool: &Pool<Sqlite>) -> Result<bool, s
 }
 
 pub async fn has_anonymous_web_rules(pool: &Pool<Sqlite>) -> Result<bool, sqlx::Error> {
+    use crate::models::activity::web_activity::{
+        parse_domain_override_capture_title, parse_domain_override_enabled,
+    };
     let values: Vec<String> = sqlx::query_scalar(
         "SELECT value FROM settings WHERE substr(key, 1, 23) = '__web_domain_override::'",
     )
     .fetch_all(pool)
     .await?;
-    Ok(values
-        .iter()
-        .any(|value| !crate::models::activity::web_activity::parse_domain_override_enabled(value)))
+    // 只关标题的域名也算：原生窗口标题里就是页面标题，必须等扩展确认后才放行。
+    Ok(values.iter().any(|value| {
+        !parse_domain_override_enabled(value) || !parse_domain_override_capture_title(value)
+    }))
 }
 
 pub async fn load_capture_window_title_setting_for_app(

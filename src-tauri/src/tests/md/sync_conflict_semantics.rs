@@ -86,11 +86,10 @@ pub(super) async fn live_records(pool: &SqlitePool) -> Vec<(i64, i64)> {
 /// 时间线：库里先有一段 09:00–09:30；PC 端又加了一段 11:00–11:30（只进库）；
 /// 同一时刻 MD 端在文件里加了一段 14:00–14:30（只进文件）。
 ///
-/// **现状**：`claim_rows` 第 1 轮精确匹配把 09:00 认回自己那行；14:00 那一段在第 2 轮
-/// 「顺序兜底」里认领了 11:00 那行 —— 于是 **PC 加的那段被 md 加的段改写掉**，两段并成
-/// 一段，总条数不增加。这正是主人反馈的「两端各加一段会互相覆盖」。
+/// **约定**：14:00 在基线里不存在，说明不是「用户改了某段的开始时间」，而是一条新增。
+/// 顺序兜底只允许认领**基线里出现过**的行，于是 PC 的 11:00 原样保留，14:00 另插一条。
 #[tokio::test]
-async fn timers_two_sided_insert_keeps_only_one_segment() {
+async fn timers_two_sided_insert_keeps_both_sides() {
     let env = env("conflict-timers").await;
     let item = new_item(&env.pool, "写代码").await;
     let nine = insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
@@ -102,9 +101,7 @@ async fn timers_two_sided_insert_keeps_only_one_segment() {
     /* PC 端加一段：只进库，文件不动 */
     let eleven = insert_saved(&env.pool, item, at(env.date, 11, 0), at(env.date, 11, 30), 1800).await;
 
-    /* MD 端加一段：只进文件（同一事项的 `log:` 列表里再追加一段）。
-       整段重写而不是对现有文本做字符串替换：「  ```」这个片段在 `  ```yaml` 里也出现一次，
-       替换会把围栏标记一起吃掉，用例就变成在测别的形状了。 */
+    /* MD 端加一段：只进文件（同一事项的 `log:` 列表里再追加一段）。 */
     rewrite(
         &env,
         TIMERS_HEADING,
@@ -121,22 +118,23 @@ async fn timers_two_sided_insert_keeps_only_one_segment() {
     assert!(report.errors.is_empty(), "{:?}", report.errors);
 
     let live = live_records(&env.pool).await;
-    // 实测 v0.11.17: 2 段（不是 3 段——PC 加的那段没有被保留成第三条记录）
-    assert_eq!(live.len(), 2, "{KNOWN}：两端各加一段不会得到三段");
-    // 实测 v0.11.17: 存活的是 09:00 与 14:00
+    assert_eq!(live.len(), 3, "两端各加一段应得到三段：{live:?}");
     assert_eq!(
         live.iter().map(|(_, start)| *start).collect::<Vec<_>>(),
-        vec![at(env.date, 9, 0), at(env.date, 14, 0)],
-        "{KNOWN}：11:00 那段被 md 的 14:00 改写掉了"
+        vec![at(env.date, 9, 0), at(env.date, 11, 0), at(env.date, 14, 0)],
+        "09:00 与 11:00 必须原样保留，14:00 另插一条"
     );
-    // 实测 v0.11.17: 14:00 那段的 id == PC 那段（11:00）的 id —— 「吸收」而不是「新建」
-    assert_eq!(live[1].0, eleven, "{KNOWN}：md 那段落在 PC 那行上（同一行 id）");
-    assert_ne!(live[0].0, live[1].0);
-    assert_ne!(live[1].0, nine);
-    // 文件侧已被重渲染成规范化结果：只剩库里那两段
+    assert!(
+        live.iter().any(|(id, _)| *id == nine),
+        "基线里的 09:00 不能被换成新行"
+    );
+    assert!(
+        live.iter().any(|(id, _)| *id == eleven),
+        "本机新增的 11:00 不能被对端那条改写"
+    );
     let rendered = body_of(&env, TIMERS_HEADING);
     assert!(rendered.contains("14:00:00"), "重渲染应写出 14:00");
-    assert!(!rendered.contains("11:00:00"), "{KNOWN}：11:00 从文件里也消失了");
+    assert!(rendered.contains("11:00:00"), "本机那段也必须仍在文件里");
 }
 
 /// 场景 2：待办从文件里删掉 → **SQL 里仍在**，下一轮导出又出现。

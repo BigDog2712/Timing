@@ -10,7 +10,6 @@ use crate::error::AppResult;
 use crate::infra::secret as secret_store;
 use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloudStatus};
-use crate::repositories::md_cloud_pending;
 use crate::services::md_sync;
 
 /// 某一条通路的状态（[V0.11.26] `status` → `status_for(pool, channel)`）。
@@ -33,12 +32,14 @@ pub(super) async fn status_for(
         .ok()
         .flatten()
         .is_some();
-    /* 已上传 = 行存在、无欠账、指纹已记。只看 `pending_since` 会把「远端有 etag 但
-    本地又改过」也报成已上传。记账按通路隔离（[V0.11.26]）。 */
-    let today_pushed = md_cloud_pending::get(pool, channel, &today)
-        .await?
-        .is_some_and(|row| row.pending_since == 0 && row.last_hash.is_some());
-    let pending_dates = md_cloud_pending::pending_dates(pool, channel).await?;
+    let scope = channel_cfg.and_then(|cfg| crate::services::sync_stream::scope::for_channel(cfg, channel).ok());
+    let progress = crate::services::sync_stream::progress(
+        pool,
+        scope.as_deref().unwrap_or(""),
+        crate::services::identity::install_id(),
+        &today,
+    )
+    .await?;
     let last_error = md_sync::get_view(pool).await?.status.last_error;
     let purge = super::purge::status(pool, channel).await?;
     Ok(MdSyncCloudStatus {
@@ -48,8 +49,9 @@ pub(super) async fn status_for(
             PurgeChannel::Webdav => CloudMode::Webdav,
         },
         has_secret,
-        today_pushed,
-        pending_dates,
+        /* 「今天已上传」= 今天有事件、且今天的事件都已写进落点（见 `sync_stream::progress`）。 */
+        today_pushed: progress.pushed_today,
+        pending_dates: progress.pending_days,
         /* 闸③ 拒绝时的逐字红字走 `last_error` 这个既有出口：`MdCloudPurgeStatus` 不进
            线缆（`#[serde(skip)]`），而块④ 的红字位就是 `status.lastError`。 */
         last_error: purge.overlap_note.clone().or(last_error),

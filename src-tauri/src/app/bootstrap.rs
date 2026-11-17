@@ -4,7 +4,7 @@
 //! 1. 日志：必须最先，后面任何一步失败才有记录可查；
 //! 2. 建库 + 迁移：读 `settings.schema.version` 决定要不要跑 `0002`；
 //! 3. 默认设置：`ensure_defaults` 只在缺行时写，幂等；
-//! 4. 注入 `AppState`（只有 SqlitePool）；
+//! 4. 注入共享状态（`timer_recovery::manage`：SqlitePool + 恢复闸门）；
 //! 5. 托盘：菜单内容依赖状态快照，先建出来；
 //! 6. 窗口钳制：window-state 插件已在窗口创建时回填过位置，此刻纠正越界；
 //! 7. 诊断快照：落一份启动现场，出问题时让用户直接发文件；
@@ -14,7 +14,11 @@
 //! 每一步都打一条 `boot_timing::mark`：启动慢的时候能直接看出卡在第几步
 //! （见 `platform/boot_timing.rs` 的口径说明）。
 
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
+
+/* 移动端 `app.path()` 需要 `Manager` trait 在作用域里；桌面这条路不走（别处不用）。 */
+#[cfg(mobile)]
+use tauri::Manager;
 
 // `app::tray` / `app::diagnostics` 都是桌面独占模块，移动端这个叶子导入会空着。
 #[cfg(desktop)]
@@ -25,7 +29,6 @@ use crate::infra::window;
 use crate::jobs;
 use crate::platform::boot_timing;
 use crate::services;
-use crate::state::AppState;
 
 /// 应用启动流程（供 `Builder::setup` 调用）。
 pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
@@ -60,11 +63,7 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     {
         record_migration(&app);
         boot_timing::mark("migrate_recorded");
-    }
-
-    // ①'' [V0.11.6] 落点搬运的结果与回退原因（同一条链路：启动期只缓存，这里补记）。
-    #[cfg(desktop)]
-    {
+        // ①'' [V0.11.6] 落点搬运的结果与回退原因（同一条链路：启动期只缓存，这里补记）。
         record_portable();
         boot_timing::mark("portable_recorded");
     }
@@ -82,7 +81,7 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(desktop)]
     tauri::async_runtime::block_on(services::device::startup_business_identity(&pool))?;
     tauri::async_runtime::block_on(services::settings::ensure_defaults(&pool))?;
-    app.manage(AppState::new(pool.clone()));
+    crate::app::timer_recovery::manage(&app, &pool);
     boot_timing::mark("defaults_ready");
     crate::app::overlay_push::push_on_boot(&app, &pool); // [V0.11.27] 冷启动补推悬浮条快照（必须 spawn 的理由见该函数）
     // [0.13 fix] 存量「事项↔应用」绑定补镜像（两个库的口径见 services/item_app_mirror.rs）

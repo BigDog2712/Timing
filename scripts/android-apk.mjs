@@ -239,7 +239,9 @@ function main() {
   }
   if (existsSync(join(GEN_ANDROID, 'keystore.properties'))) {
     console.log('\n检测到 keystore.properties，开始签名…');
-    run(process.execPath, [join(ROOT, 'scripts', 'android-sign.mjs')], { cwd: ROOT, env });
+    const apk = join(apkDir, `app-${cfg.flavor.toLowerCase()}-release-unsigned.apk`);
+    if (!existsSync(apk)) throw new Error(`Gradle 产物不存在：${apk}`);
+    run(process.execPath, [join(ROOT, 'scripts', 'android-sign.mjs'), '--apk', apk], { cwd: ROOT, env });
   } else {
     console.log(
       '\n[注意] release 产物未签名，直接装会报「解析软件包时出现问题」。\n' +

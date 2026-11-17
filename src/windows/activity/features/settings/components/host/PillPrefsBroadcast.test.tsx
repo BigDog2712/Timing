@@ -147,6 +147,20 @@ describe("设置页 → 悬浮条 的偏好搬运", () => {
     expect(cached).toContain('"textOpacity":0.6');
   });
 
+  it("b05_rapid_appearance_patches_merge_from_the_latest_value", async () => {
+    await mount(createElement(HostPillLookCard));
+    const buttons = Array.from(container!.querySelectorAll("button"));
+    const dot = buttons.find((node) => node.textContent?.trim() === "小圆点");
+    if (!dot) throw new Error("找不到小圆点按钮");
+    await act(async () => {
+      dot.click();
+      const slider = container!.querySelector('[aria-label="文字不透明度"] input') as HTMLInputElement | null;
+      slider?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(saveMock).toHaveBeenCalled();
+    expect(saveMock.mock.calls[0][0].appearance?.floatForm).toBe("dot");
+  });
+
   it("b04_failed_save_keeps_the_ui_and_shows_a_red_line", async () => {
     saveMock.mockRejectedValue(new Error("数据保存失败，已保留在本地"));
     await mount(createElement(SettingsHandlesPanel));
