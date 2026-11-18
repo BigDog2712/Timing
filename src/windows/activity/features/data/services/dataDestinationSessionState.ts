@@ -3,10 +3,11 @@ import type { DataDestinationTrendOption } from "./dataDestinationState.ts";
 interface DataDestinationSessionSelectionState {
   appKeys: string[];
   categoryKeys: string[];
+  tagKeys: string[];
   webKeys: string[];
 }
 
-type DataDestinationSessionMode = "app" | "category" | "web";
+type DataDestinationSessionMode = "app" | "category" | "tag" | "web";
 
 function cloneOption(option: DataDestinationTrendOption): DataDestinationTrendOption {
   return {
@@ -18,11 +19,13 @@ function cloneOption(option: DataDestinationTrendOption): DataDestinationTrendOp
 const sessionSelectionState: DataDestinationSessionSelectionState = {
   appKeys: [],
   categoryKeys: [],
+  tagKeys: [],
   webKeys: [],
 };
 const sessionSelectionRevisions: Record<DataDestinationSessionMode, number | null> = {
   app: null,
   category: null,
+  tag: null,
   web: null,
 };
 const sessionOptionRegistry: Record<
@@ -31,6 +34,7 @@ const sessionOptionRegistry: Record<
 > = {
   app: new Map(),
   category: new Map(),
+  tag: new Map(),
   web: new Map(),
 };
 
@@ -38,6 +42,7 @@ export function getDataDestinationSessionSelectionState(): DataDestinationSessio
   return {
     appKeys: [...sessionSelectionState.appKeys],
     categoryKeys: [...sessionSelectionState.categoryKeys],
+    tagKeys: [...sessionSelectionState.tagKeys],
     webKeys: [...sessionSelectionState.webKeys],
   };
 }
@@ -47,6 +52,7 @@ export function rememberDataDestinationSessionSelectionState(
 ): void {
   sessionSelectionState.appKeys = [...nextState.appKeys];
   sessionSelectionState.categoryKeys = [...nextState.categoryKeys];
+  sessionSelectionState.tagKeys = [...nextState.tagKeys];
   sessionSelectionState.webKeys = [...nextState.webKeys];
 }
 
@@ -104,11 +110,14 @@ export function resolveDataDestinationSessionOptions(
 export function resetDataDestinationSessionSelectionStateForTests(): void {
   sessionSelectionState.appKeys = [];
   sessionSelectionState.categoryKeys = [];
+  sessionSelectionState.tagKeys = [];
   sessionSelectionState.webKeys = [];
   sessionSelectionRevisions.app = null;
   sessionSelectionRevisions.category = null;
+  sessionSelectionRevisions.tag = null;
   sessionSelectionRevisions.web = null;
   sessionOptionRegistry.app.clear();
   sessionOptionRegistry.category.clear();
+  sessionOptionRegistry.tag.clear();
   sessionOptionRegistry.web.clear();
 }

@@ -1,8 +1,8 @@
 import { OTHER_CATEGORY_FIXED_COLOR, type AppCategory } from "../../../shared/classification/categoryTokens.ts";
 import { isAnonymousActivity } from "../../../shared/classification/anonymousActivity.ts";
 
-export type DataDestinationMode = "app" | "category" | "web";
-export type DataDestinationDetailMode = Exclude<DataDestinationMode, "category">;
+export type DataDestinationMode = "app" | "category" | "tag" | "web";
+export type DataDestinationDetailMode = Exclude<DataDestinationMode, "category" | "tag">;
 
 export const DATA_DESTINATION_SELECTION_LIMIT = 7;
 

@@ -151,10 +151,17 @@ export function buildDeleteCategoryBatchMutations(
   }
   return [
     ...buildCategoryMemberFallbackMutations(category, appOverrides, webDomainOverrides),
-    ...(isExtendedCategory(category)
-      ? buildDeleteCategoryDefinitionMutations(category)
-      : buildHideBuiltinCategoryMutations(category)),
+    ...buildDeleteCategoryMetadataMutations(category),
   ];
+}
+
+export function buildDeleteCategoryMetadataMutations(
+  category: AppCategory,
+): ClassificationSettingMutation[] {
+  if (!isDeletableCategory(category)) return [];
+  return isExtendedCategory(category)
+    ? buildDeleteCategoryDefinitionMutations(category)
+    : buildHideBuiltinCategoryMutations(category);
 }
 
 /**

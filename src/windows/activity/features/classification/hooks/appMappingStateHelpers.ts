@@ -7,38 +7,8 @@ import {
 import type { AppOverride } from "../services/classificationService.ts";
 import type { WebDomainOverride } from "../../../shared/types/webActivity.ts";
 import { webLinkParent } from "../../../shared/classification/webLinks.ts";
-import {
-  cloneClassificationDraftState,
-  type ClassificationDraftState,
-} from "../services/classificationDraftState.ts";
-
-type AppMappingOverrideParams = {
-  category?: UserAssignableAppCategory;
-  displayName?: string;
-  color?: string;
-  track?: boolean;
-  captureTitle?: boolean;
-  updatedAt?: number;
-};
-
-type WebDomainOverrideParams = {
-  category?: UserAssignableAppCategory;
-  displayName?: string;
-  color?: string;
-  enabled?: boolean;
-  captureTitle?: boolean;
-  updatedAt?: number;
-};
-
-type ClassificationBootstrapSnapshot = {
-  loadedAppLinks?: ClassificationDraftState["appLinks"];
-  loadedOverrides: ClassificationDraftState["overrides"];
-  loadedWebDomainOverrides: ClassificationDraftState["webDomainOverrides"];
-  loadedCategoryColorOverrides: ClassificationDraftState["categoryColorOverrides"];
-  loadedCategoryLabelOverrides: ClassificationDraftState["categoryLabelOverrides"];
-  loadedPersistedCategoryIds: ClassificationDraftState["persistedCategoryIds"];
-  loadedDeletedCategories: ClassificationDraftState["deletedCategories"];
-};
+import { cloneClassificationDraftState, type ClassificationDraftState } from "../services/classificationDraftState.ts";
+import type { AppMappingOverrideParams, ClassificationBootstrapSnapshot, WebDomainOverrideParams } from "./appMappingStateHelpersTypes.ts";
 
 function normalizeHexColor(colorValue: string | undefined): string | undefined {
   const raw = (colorValue ?? "").trim();
@@ -50,13 +20,15 @@ function normalizeHexColor(colorValue: string | undefined): string | undefined {
 
 export function buildAppMappingOverride(params: AppMappingOverrideParams): AppOverride | null {
   const category = params.category;
+  const categories = params.categories;
   const displayName = params.displayName?.trim();
   const color = normalizeHexColor(params.color);
   const track = params.track;
   const captureTitle = params.captureTitle;
-  if (!category && !displayName && !color && track !== false && captureTitle !== false) return null;
+  if (!category && !categories?.length && !displayName && !color && track !== false && captureTitle !== false) return null;
   const next: AppOverride = { enabled: true, updatedAt: params.updatedAt ?? Date.now() };
   if (category) next.category = category;
+  if (categories?.length) next.categories = [...new Set(categories)];
   if (displayName) next.displayName = displayName;
   if (color) next.color = color;
   if (track === false) next.track = false;
@@ -68,8 +40,17 @@ export function buildAppMappingCategoryOverride(
   current: AppOverride | null,
   categoryValue: string,
 ): AppOverride | null {
+  return buildAppMappingCategoriesOverride(current, [categoryValue]);
+}
+
+export function buildAppMappingCategoriesOverride(
+  current: AppOverride | null,
+  categoryValues: readonly string[],
+): AppOverride | null {
+  const categories = categoryValues.filter((value): value is UserAssignableAppCategory => value !== "other");
   return buildAppMappingOverride({
-    category: categoryValue === "other" ? undefined : categoryValue as UserAssignableAppCategory,
+    category: categories[0],
+    categories,
     color: current?.color,
     displayName: current?.displayName,
     track: current?.track !== false,

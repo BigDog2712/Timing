@@ -29,6 +29,7 @@ import {
 } from "../services/classificationIconService.ts";
 import type { CandidateFilter, ObservedAppCandidate } from "../types";
 import {
+  buildAppMappingCategoriesOverride,
   buildAppMappingCategoryOverride,
   buildAppMappingOverride,
   buildWebDomainCategoryOverride,
@@ -425,6 +426,12 @@ export function useAppMappingState({
   const handleCategoryAssign = useCallback((candidate: ObservedAppCandidate, categoryValue: string) => {
     const current = draftOverrides[candidate.exeName] ?? null;
     const nextOverride = buildAppMappingCategoryOverride(current, categoryValue);
+    updateOverride(candidate.exeName, nextOverride);
+  }, [draftOverrides, updateOverride]);
+
+  const handleCategoriesAssign = useCallback((candidate: ObservedAppCandidate, categories: readonly string[]) => {
+    const current = draftOverrides[candidate.exeName] ?? null;
+    const nextOverride = buildAppMappingCategoriesOverride(current, categories);
     updateOverride(candidate.exeName, nextOverride);
   }, [draftOverrides, updateOverride]);
 
@@ -836,6 +843,7 @@ export function useAppMappingState({
     startWebNameEdit,
     handleColorAssign,
     handleCategoryAssign,
+    handleCategoriesAssign,
     handleWebDomainColorAssign,
     handleWebDomainCategoryAssign,
     handleTitleCaptureToggle,

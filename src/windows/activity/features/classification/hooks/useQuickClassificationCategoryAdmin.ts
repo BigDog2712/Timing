@@ -2,6 +2,10 @@ import { useCallback, useRef, useState } from "react";
 
 import { commitClassificationSettingMutations } from "../../../platform/persistence/classificationSettingsGateway.ts";
 import {
+  CategoryPropagationConflictError,
+  propagateCategoryMapping,
+} from "../../../platform/persistence/categoryPropagationGateway.ts";
+import {
   createCategoryId,
   isExtendedCategory,
   normalizeCategoryLabelInput,
@@ -12,12 +16,8 @@ import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { CATEGORY_ADMIN_COPY } from "../categoryAdminCopy.ts";
 import { ClassificationService } from "../services/classificationService.ts";
 import {
-  loadAppOverrides,
-  loadWebDomainOverrides,
-} from "../services/classificationStore.ts";
-import {
   buildCreateCategoryDefinitionMutations,
-  buildDeleteCategoryBatchMutations,
+  buildDeleteCategoryMetadataMutations,
 } from "../services/categoryDefinitionMutations.ts";
 import {
   buildQuickClassificationCategoryOptions,
@@ -39,9 +39,8 @@ import type { QuickClassificationTarget } from "../types.ts";
  *
  * ## 权限：为什么这里可以写
  *
- * 分类的写走 `platform/persistence/classificationSettingsGateway`（`cmd_commit_classification_settings`），
- * 分析窗**有这条命令的权限**，映射页一直就是这么写的。事项的写没有这条通道，
- * 所以那一边只能走 `activity:host-intent` —— 两个领域的边界不一样，别照抄。
+ * 元数据写走 classification settings gateway；删除成员走独立的可恢复 propagation IPC，
+ * 两条路径分别维护配置元数据与跨库分类引用。事项的写仍通过 activity host intent。
  *
  * ## 两件事的收尾不一样（有意的）
  *
@@ -169,31 +168,26 @@ export function useQuickClassificationCategoryAdmin({
     busyRef.current = true;
     setBusy(true);
     try {
-      const [appOverrides, webDomainOverrides] = await Promise.all([
-        loadAppOverrides(),
-        loadWebDomainOverrides(),
-      ]);
-      /* **一批**提交：成员回落与四条定义清理在同一个事务里，
-         否则中间那一瞬会出现"分类没了、应用还指着它"。 */
+      await propagateCategoryMapping({ [category]: null });
       await commitClassificationSettingMutations(
-        buildDeleteCategoryBatchMutations(category, appOverrides, webDomainOverrides),
+        buildDeleteCategoryMetadataMutations(category),
       );
       await refreshOptions();
       if (currentOverride?.category === category) {
-        /* 当前这个应用正属于被删分类 → 回落到「其他」（= 把 category 从 override 里去掉），
-           否则行上会继续显示一个已经不存在的分类。 */
+        /* 当前应用正属于被删分类，传播已经更新持久化状态；这里仅同步菜单内存态。 */
         const fallback = buildQuickClassificationOverride(target, currentOverride, { category: null });
-        await saveQuickClassificationOverride(target, fallback);
         onAssigned(fallback, "other");
       }
-    } catch {
-      onError(UI_TEXT.mapping.quickSaveFailed);
+    } catch (error) {
+      onError(error instanceof CategoryPropagationConflictError
+        ? copy.propagationConflict
+        : UI_TEXT.mapping.quickSaveFailed);
     } finally {
       busyRef.current = false;
       setBusy(false);
     }
   }, [
-    copy.deleteFallback, currentOverride, dialogs, onAssigned, onError, options,
+    copy.deleteFallback, copy.propagationConflict, currentOverride, dialogs, onAssigned, onError, options,
     refreshOptions, target, UI_TEXT,
   ]);
 

@@ -32,6 +32,8 @@ commands.allow = [
   "cmd_commit_app_settings",
   "cmd_migrate_history_timeline_mode",
   "cmd_commit_classification_settings",
+  "preview_category_propagation",
+  "apply_category_propagation",
   "cmd_get_web_links",
   "cmd_get_legacy_classification_apps",
   "cmd_pick_export_save_file",

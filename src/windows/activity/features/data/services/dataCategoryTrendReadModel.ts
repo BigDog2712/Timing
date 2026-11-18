@@ -6,7 +6,6 @@ import {
   buildDataChartAxis,
   mergeDataAppDurationBuckets,
   type DataAppDayRow,
-  type DataAppTrendViewModel,
   type DataDestinationTrendChartRow,
   type DataTrendAggregateContext,
   type MergedDataAppDurationBucket,
@@ -17,38 +16,13 @@ import {
   resolveDataAllTimePresentationRange,
 } from "./dataTrendRange.ts";
 import { resolveStatisticalDataAppKey } from "./dataHeatmapReadModel.ts";
+import type {
+  DataCategoryOption,
+  DataCategoryTrendBucket,
+  DataCategoryTrendViewModel,
+} from "./dataCategoryTrendReadModelTypes.ts";
 
-interface DataCategoryOption {
-  category: AppCategory;
-  sourceAppKeys: string[];
-  displayName: string;
-  color: string;
-  appCount: number;
-  totalDuration: number;
-  percentage: number;
-  averageDuration: number;
-  activeDayCount: number;
-}
-
-export interface DataCategoryTrendViewModel {
-  range: DataAppTrendViewModel["range"];
-  rangeLabel: string;
-  granularity: "day" | "month";
-  categoryOptions: DataCategoryOption[];
-  selectedCategories: DataCategoryOption[];
-  selectedSourceAppKeys: string[];
-  chartSeries: DataAppTrendViewModel["chartSeries"];
-  chartRows: DataDestinationTrendChartRow[];
-  summary: DataAppTrendViewModel["summary"];
-  chartAxis: DataAppTrendViewModel["chartAxis"];
-  peakDay: DataAppDayRow | null;
-  activeDateKeys: string[];
-}
-
-interface DataCategoryTrendBucket extends DataCategoryOption {
-  dayDurations: Map<string, number>;
-  monthDurations: Map<string, number>;
-}
+export type { DataCategoryTrendViewModel };
 
 function addDuration(target: Map<string, number>, key: string, duration: number) {
   target.set(key, (target.get(key) ?? 0) + duration);

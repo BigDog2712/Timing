@@ -8,17 +8,19 @@ import {
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { useQuietDialogs } from "../../../shared/hooks/useQuietDialogs.tsx";
 import { commitClassificationSettingMutations } from "../../../platform/persistence/classificationSettingsGateway.ts";
+import {
+  CategoryPropagationConflictError,
+  propagateCategoryMapping,
+} from "../../../platform/persistence/categoryPropagationGateway.ts";
 import { CATEGORY_ADMIN_COPY } from "../../classification/categoryAdminCopy.ts";
 import {
   buildCreateCategoryDefinitionMutations,
-  buildDeleteCategoryBatchMutations,
+  buildDeleteCategoryMetadataMutations,
   buildUnhideCategoryMutations,
 } from "../../classification/services/categoryDefinitionMutations.ts";
 import {
   buildSaveCategoryColorOverrideMutations,
   buildSaveCategoryLabelOverrideMutations,
-  loadAppOverrides,
-  loadWebDomainOverrides,
 } from "../../classification/services/classificationStore.ts";
 import type { QuickClassificationCategoryOption } from "../../classification/services/quickClassification.ts";
 import { APP_EDIT_COPY } from "../appEditCopy.ts";
@@ -32,16 +34,15 @@ import { APP_EDIT_COPY } from "../appEditCopy.ts";
  * 增：`buildCreateCategoryDefinitionMutations`（定义 + 标签两条，一次提交）。
  * 改：`buildSaveCategoryLabelOverrideMutations` / `buildSaveCategoryColorOverrideMutations`
  *     （映射页写分类色/名用的就是这两个，本轮只把它们从 `classificationStore` 导出）。
- * 删：`buildDeleteCategoryBatchMutations` —— **一定要用整批**：成员回落（含 web 域回落）
- *     与定义清理必须在同一个事务里。只清定义不清成员的下场，是本仓踩过的坑：
- *     被删的分类会因为"某个域名还指着它"在下一次 bootstrap 里**原地复活**。
+ * 删：先由可恢复 propagation 处理跨库事项与 Activity 引用，再清理分类元数据；
+ *     单库调用分别提交，若元数据清理失败，分类定义仍在且可安全重试。
  *     自定义分类删的是**定义**（`__custom_category::`），内置分类只是"从可选项里移除"
  *     （`__deleted_category::`），历史记录一条都不动。
  *
  * ## 权限
  *
- * 写走 `platform/persistence/classificationSettingsGateway`（`cmd_commit_classification_settings`），
- * 分析窗一直有这条命令的权限。**不新增 IPC 命令**（insight 命令数被 contract 门禁钉着）。
+ * 元数据仍走 `classificationSettingsGateway`；删除的成员传播走独立的可恢复 propagation IPC，
+ * 冲突与过期预览由后端原子拒绝。
  */
 /** 带颜色的分类候选（分类管理区要画色块，`buildQuickClassificationCategoryOptions` 不带色） */
 export interface AppEditCategoryOption extends QuickClassificationCategoryOption {
@@ -92,13 +93,15 @@ export function useAppEditCategoryAdmin({
     onError(null);
     try {
       await action();
-    } catch {
-      onError(UI_TEXT.mapping.quickSaveFailed);
+    } catch (error) {
+      onError(error instanceof CategoryPropagationConflictError
+        ? adminCopy.propagationConflict
+        : UI_TEXT.mapping.quickSaveFailed);
     } finally {
       busyRef.current = false;
       onManagingChange(false);
     }
-  }, [UI_TEXT.mapping.quickSaveFailed, onError, onManagingChange]);
+  }, [adminCopy.propagationConflict, UI_TEXT.mapping.quickSaveFailed, onError, onManagingChange]);
 
   /* [本轮] 名字与颜色由**表单**收（不再弹 `prompt`）：`prompt` 只能收一行文字，
      分类颜色就没有地方选，用户建完还得再点一次色块。空名 / 重名一律不提交但要说一句。 */
@@ -148,13 +151,9 @@ export function useAppEditCategoryAdmin({
       danger: true,
     });
     if (!confirmed) return;
-    const [appOverrides, webDomainOverrides] = await Promise.all([
-      loadAppOverrides(),
-      loadWebDomainOverrides(),
-    ]);
-    /* 整批提交：成员回落 + 定义清理同一事务（web 域回落也在里面） */
+    await propagateCategoryMapping({ [category]: null });
     await commitClassificationSettingMutations(
-      buildDeleteCategoryBatchMutations(category, appOverrides, webDomainOverrides),
+      buildDeleteCategoryMetadataMutations(category),
     );
     await refreshBootstrap();
   }), [

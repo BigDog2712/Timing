@@ -46,6 +46,10 @@ import {
   resolveDataCategorySourceAppKeys,
   type DataCategoryTrendViewModel,
 } from "../services/dataCategoryTrendReadModel.ts";
+import { buildDataTagReadModel, type DataTagReadModel } from "../services/dataTagReadModel.ts";
+import DataTagAssociationPanel from "./DataTagAssociationPanel.tsx";
+import { ClassificationService } from "../../classification/services/classificationService.ts";
+import { listTimingItemTags, listTimingItems } from "../../../platform/persistence/timingReadRepository.ts";
 import {
   getCachedDataBootstrapSnapshot,
   loadPersistedDataBootstrapSnapshot,
@@ -184,6 +188,7 @@ export default function Data({
     useState<DataDestinationMode>("app");
   const [freshReadModelsReady, setFreshReadModelsReady] = useState(false);
   const [destinationPanelCommitted, setDestinationPanelCommitted] = useState(false);
+  const [tagReadModel, setTagReadModel] = useState<DataTagReadModel | null>(null);
   const handleDestinationPanelCommitted = useCallback(() => {
     setDestinationPanelCommitted(true);
   }, []);
@@ -297,6 +302,7 @@ export default function Data({
     rememberDataDestinationSessionSelectionState({
       appKeys: selectedAppKeys,
       categoryKeys: selectedCategoryKeys,
+      tagKeys: [],
       webKeys: selectedWebKeys,
     });
   }, [selectedAppKeys, selectedCategoryKeys, selectedWebKeys]);
@@ -419,6 +425,26 @@ export default function Data({
     ? matchingBootstrapSnapshot.appTrendViewModel
     : null;
   const visibleAppTrendViewModel = appTrendViewModel ?? bootstrapAppTrendViewModel;
+  useEffect(() => {
+    let active = true;
+    void Promise.all([
+      listTimingItems(),
+      listTimingItemTags(),
+      ClassificationService.loadClassificationBootstrap(),
+    ]).then(([items, itemTags, bootstrap]) => {
+      if (!active || !visibleAppTrendViewModel) return;
+      setTagReadModel(buildDataTagReadModel({
+        appOptions: visibleAppTrendViewModel.appOptions,
+        items,
+        itemTags,
+        appOverrides: bootstrap.loadedOverrides,
+        resolveCategoryLabel: (category) => AppClassification.getCategoryLabel(category as never, UI_TEXT),
+      }));
+    }).catch(() => {
+      if (active) setTagReadModel({ tagOptions: [], appOptions: [] });
+    });
+    return () => { active = false; };
+  }, [UI_TEXT, mappingVersion, refreshKey, visibleAppTrendViewModel]);
   const visibleCategoryTrendViewModel = useMemo(() => {
     return appTrendAggregateContext
       ? buildDataCategoryTrendViewModelFromAggregate(appTrendAggregateContext, selectedCategoryKeys)
@@ -646,9 +672,10 @@ export default function Data({
   ]);
 
   const isWebDestination = presentedDestinationMode === "web";
+  const isTagDestination = presentedDestinationMode === "tag";
   const isCategoryDestination = presentedDestinationMode === "category";
   const availableDestinationModes = useMemo<DataDestinationMode[]>(() => (
-    webActivityEnabled ? ["app", "category", "web"] : ["app", "category"]
+    webActivityEnabled ? ["app", "tag", "web"] : ["app", "tag"]
   ), [webActivityEnabled]);
   const destinationModeSwitchPending = destinationMode !== presentedDestinationMode;
   const destinationViewModel = isWebDestination
@@ -666,7 +693,9 @@ export default function Data({
     [destinationViewModel],
   );
   const resolveDestinationOptionColor = useCallback((option: DataDestinationTrendOption, mode: DataDestinationMode = presentedDestinationMode) => {
-    if (mode === "category") return option.accentColor ?? AppClassification.getCategoryColor(option.classificationCategory ?? "other");
+    if (mode === "category" || mode === "tag") {
+      return option.accentColor ?? AppClassification.getCategoryColor(option.classificationCategory ?? "other");
+    }
     const category = option.classificationCategory ?? "other";
     return objectColor(mode, option.exeName ?? option.normalizedDomain ?? option.key, option.overrideColor,
       destinationIconColors[mode + ":" + option.key], category, AppClassification.getCategoryColor(category));
@@ -1077,7 +1106,25 @@ export default function Data({
             />
           </div>
 
-          <DataAppTrendPanel
+            {isTagDestination ? (
+              <DataTagAssociationPanel
+                model={tagReadModel}
+                destinationMode={destinationMode}
+                availableDestinationModes={availableDestinationModes}
+                onDestinationModeChange={setDestinationMode}
+                labels={{
+                  title: "标签关联",
+                  empty: "暂无标签关联",
+                  applications: (count) => `${count} 个应用`,
+                  items: (count) => `${count} 个事项`,
+                  noApplications: "暂无应用",
+                  noItems: "暂无事项",
+                  duration: (milliseconds) => `${Math.round(milliseconds / 3_600_000 * 10) / 10} 小时`,
+                  loading: UI_TEXT.common.loading,
+                }}
+              />
+            ) : null}
+            {!isTagDestination ? <DataAppTrendPanel
             allTimeEndDateKey={allTimeEndDateKey}
             allTimeStartDateKey={allTimeStartDateKey}
             onContentCommitted={handleDestinationPanelCommitted}
@@ -1167,7 +1214,7 @@ export default function Data({
             onDoubleClickCapture={handleAppTrendDoubleClickCapture}
             onMouseMove={handleAppTrendMouseMove}
             onMouseLeave={handleAppTrendMouseLeave}
-          />
+          /> : null}
         </div>
       </div>
       {destinationDetail ? (

@@ -202,6 +202,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
   const modeLabels: Record<DataDestinationMode, string> = {
     app: UI_TEXT.data.destinationApp,
     category: UI_TEXT.data.destinationCategory,
+    tag: UI_TEXT.data.destinationCategory,
     web: UI_TEXT.data.destinationWeb,
   };
   const modeOptions = availableDestinationModes.map((value) => ({ value, label: modeLabels[value] }));

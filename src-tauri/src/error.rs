@@ -4,9 +4,7 @@
 use serde::ser::{SerializeStruct, Serializer};
 use serde::Serialize;
 
-/// 统一错误码（V0.1.0 的 11 + V0.2.0 新增 5 + V0.3.0 新增 1 − V0.3.1 下架 1
-/// − V0.3.3 下架 1 + V0.4.0 新增 1 + V0.11.13 新增 1 + [0.13.0] 新增 1
-/// + [0.14] 新增 1 + [R1] 新增 1，共 20）。
+/// 统一错误码闭集。新增项同步 IPC 契约与前端文案。
 ///
 /// V0.2.0 五码已全部接线（`TODO_NOT_FOUND` 随待办域；`NOTE_NOT_FOUND` /
 /// `WINDOW_LIMIT_EXCEEDED` / `INVALID_TARGET_SEC` 随批 2 便利贴与倒计时；
@@ -57,14 +55,27 @@ pub enum ErrorCode {
     #[cfg_attr(desktop, allow(dead_code))]
     UsagePermissionDenied,
     /* [0.14] 事项树的分层规则被写入侧违反（挂到子事项下面 / 有子还挂 / 自己当自己的爹）。
-       此前三处借用 `INVALID_DURATION`（「结束时间早于开始时间」），用户拿到的是
-       「时间不对」的提示去修「挂错层级」，语义错配同 ADR-018 的教训。 */
+    此前三处借用 `INVALID_DURATION`（「结束时间早于开始时间」），用户拿到的是
+    「时间不对」的提示去修「挂错层级」，语义错配同 ADR-018 的教训。 */
     ItemDepthExceeded,
     /* [R1] 手柄自定义动作被拒绝：要启动的路径不在授权名单里，或者载荷形状不合法
-       （没有修饰键 / 带 Win 键 / 多个主键）。**这不是「系统调用失败」** —— 混进
-       `IO_ERROR` 的话，用户看到的「系统调用失败」会让他去查权限，而真正的原因是他
-       那格手柄绑定指向了一个没被授权过的程序。见 `services::handle_launch`。 */
+    （没有修饰键 / 带 Win 键 / 多个主键）。**这不是「系统调用失败」** —— 混进
+    `IO_ERROR` 的话，用户看到的「系统调用失败」会让他去查权限，而真正的原因是他
+    那格手柄绑定指向了一个没被授权过的程序。见 `services::handle_launch`。 */
     CustomActionDenied,
+    InvalidTagPath,
+    AiNotConfigured,
+    AiDisabled,
+    AiAuth,
+    AiRateLimited,
+    AiNetwork,
+    AiTimeout,
+    AiUpstream,
+    AiBadRequest,
+    AiParse,
+    /* 保留给后续取消令牌接入；错误码集合与前端 IPC 契约必须稳定。 */
+    #[allow(dead_code)]
+    AiCancelled,
 }
 
 impl ErrorCode {
@@ -91,6 +102,17 @@ impl ErrorCode {
             ErrorCode::UsagePermissionDenied => "USAGE_PERMISSION_DENIED",
             ErrorCode::ItemDepthExceeded => "ITEM_DEPTH_EXCEEDED",
             ErrorCode::CustomActionDenied => "CUSTOM_ACTION_DENIED",
+            ErrorCode::InvalidTagPath => "INVALID_TAG_PATH",
+            ErrorCode::AiNotConfigured => "AI_NOT_CONFIGURED",
+            ErrorCode::AiDisabled => "AI_DISABLED",
+            ErrorCode::AiAuth => "AI_AUTH",
+            ErrorCode::AiRateLimited => "AI_RATE_LIMITED",
+            ErrorCode::AiNetwork => "AI_NETWORK",
+            ErrorCode::AiTimeout => "AI_TIMEOUT",
+            ErrorCode::AiUpstream => "AI_UPSTREAM",
+            ErrorCode::AiBadRequest => "AI_BAD_REQUEST",
+            ErrorCode::AiParse => "AI_PARSE",
+            ErrorCode::AiCancelled => "AI_CANCELLED",
         }
     }
 }
@@ -176,7 +198,10 @@ impl AppError {
     /// 自己当自己的爹。此前借用 `INVALID_DURATION` 属语义错配（用户被告知
     /// 「时间不对」），与 ADR-018 拆「空/超长」同一个逻辑。
     pub fn item_depth_exceeded() -> Self {
-        Self::new(ErrorCode::ItemDepthExceeded, "事项层级超限：子事项不能再挂子事项")
+        Self::new(
+            ErrorCode::ItemDepthExceeded,
+            "事项层级超限：子事项不能再挂子事项",
+        )
     }
 
     /// [V0.2.0] 待办不存在或已软删除（`todo_update` / `todo_toggle`）。

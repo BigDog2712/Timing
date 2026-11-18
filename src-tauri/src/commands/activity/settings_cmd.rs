@@ -1,12 +1,12 @@
 use crate::app::activity::state::{AppSettingsCommitState, DesktopBehaviorState};
 use crate::app::activity::{desktop_behavior, tray};
 use crate::commands::activity::error::CommandErrorDto;
+use crate::models::activity::events::APP_SETTINGS_CHANGED;
+use crate::models::activity::settings::parse_boolean_setting;
 use crate::services::activity::data::app_settings_service::commit_app_setting_mutations_with_recovery;
 use crate::services::activity::data::classification_service::commit_classification_setting_mutations_with_recovery;
 use crate::services::activity::data::repositories::app_settings::AppSettingMutation;
 use crate::services::activity::data::repositories::classification_settings::ClassificationSettingMutation;
-use crate::models::activity::events::APP_SETTINGS_CHANGED;
-use crate::models::activity::settings::parse_boolean_setting;
 use crate::services::activity::engine::tracking::title_state::TitleRecordingRuntimeState;
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -23,17 +23,19 @@ pub async fn cmd_get_legacy_classification_apps(
     app: AppHandle,
     now_ms: i64,
 ) -> Result<Vec<LegacyClassificationAppDto>, CommandErrorDto> {
-    crate::services::activity::data::classification_service::load_legacy_classification_apps(&app, now_ms)
-        .await
-        .map(|apps| {
-            apps.into_iter()
-                .map(|app| LegacyClassificationAppDto {
-                    exe_name: app.exe_name,
-                    app_name: app.app_name,
-                })
-                .collect()
-        })
-        .map_err(|error| CommandErrorDto::new("CLASSIFICATION_READ_FAILED", error, true))
+    crate::services::activity::data::classification_service::load_legacy_classification_apps(
+        &app, now_ms,
+    )
+    .await
+    .map(|apps| {
+        apps.into_iter()
+            .map(|app| LegacyClassificationAppDto {
+                exe_name: app.exe_name,
+                app_name: app.app_name,
+            })
+            .collect()
+    })
+    .map_err(|error| CommandErrorDto::new("CLASSIFICATION_READ_FAILED", error, true))
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
@@ -168,14 +170,13 @@ pub async fn cmd_commit_app_settings(
             .await
             .map_err(|error| CommandErrorDto::new("SETTINGS_APPLY_FAILED", error, false))?;
     }
-    app.emit(APP_SETTINGS_CHANGED, json!({}))
-        .map_err(|error| {
-            CommandErrorDto::new(
-                "SETTINGS_EVENT_FAILED",
-                format!("failed to emit settings refresh event: {error}"),
-                false,
-            )
-        })?;
+    app.emit(APP_SETTINGS_CHANGED, json!({})).map_err(|error| {
+        CommandErrorDto::new(
+            "SETTINGS_EVENT_FAILED",
+            format!("failed to emit settings refresh event: {error}"),
+            false,
+        )
+    })?;
     Ok(())
 }
 
@@ -188,7 +189,11 @@ pub async fn cmd_migrate_history_timeline_mode(
     super::window_guard::require_main_window_string(&window)?;
     let state = app.state::<AppSettingsCommitState>();
     let _guard = state.lock().await;
-    let mode = crate::services::activity::data::app_settings_service::migrate_history_timeline_mode(&app, &legacy_mode)
+    let mode =
+        crate::services::activity::data::app_settings_service::migrate_history_timeline_mode(
+            &app,
+            &legacy_mode,
+        )
         .await?;
     let _ = app.emit(APP_SETTINGS_CHANGED, json!({}));
     Ok(mode)
@@ -212,7 +217,9 @@ pub async fn cmd_commit_classification_settings(
         .map_err(CommandErrorDto::from)?;
     crate::app::activity::classification::apply_recording_policy_changes(&app, &outcome)
         .await
-        .map_err(|error| CommandErrorDto::new("CLASSIFICATION_APPLY_FAILED", error, false))
+        .map_err(|error| CommandErrorDto::new("CLASSIFICATION_APPLY_FAILED", error, false))?;
+    crate::app::events::emit_category_catalog_changed(&app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -224,7 +231,9 @@ pub async fn cmd_get_web_links(
 ) -> Result<crate::services::activity::data::repositories::web_links::WebLinksSnapshot, String> {
     let pool = crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool(&app).await?;
     match (start_ms, end_ms) {
-        (None, None) => crate::services::activity::data::repositories::web_links::snapshot(&pool).await,
+        (None, None) => {
+            crate::services::activity::data::repositories::web_links::snapshot(&pool).await
+        }
         (Some(start), Some(end)) => {
             crate::services::activity::data::repositories::web_links::snapshot_range(
                 &pool,

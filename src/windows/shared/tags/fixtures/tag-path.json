@@ -1,0 +1,18 @@
+{
+  "cases": [
+    { "name": "trim hash backslash and empty segments", "input": "  ##Study \\Work//Deep/ ", "expected": "Study/Work/Deep" },
+    { "name": "empty input", "input": "  ##  ", "expected": "" },
+    { "name": "four levels", "input": "a/b/c/d", "expected": "a/b/c/d" },
+    { "name": "five levels", "input": "a/b/c/d/e", "error": "depth" },
+    { "name": "64 scalar path", "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+    { "name": "65 scalar path", "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "error": "path" },
+    { "name": "32 scalar segment", "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀", "expected": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀" },
+    { "name": "33 scalar segment", "input": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀a", "error": "segment" },
+    { "name": "control character", "input": "line\u0001break", "error": "control" },
+    { "name": "hash inside path", "input": "a/#b", "error": "segment" }
+  ],
+  "listCases": [
+    { "name": "case dedupe and preserve first spelling", "input": ["Study", "study", "ΟΣ", "ος", "İ", "i̇", "É", "É"], "expected": ["Study", "ΟΣ", "İ", "É", "É"] },
+    { "name": "empty entries are omitted", "input": ["", "  ", "#", "a"], "expected": ["a"] }
+  ]
+}

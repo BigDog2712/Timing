@@ -10,6 +10,7 @@ import CategoryColorControls from "./CategoryColorControls";
 import CategorySearchField from "./CategorySearchField.tsx";
 import AppMappingCandidateCard from "./AppMappingCandidateCard";
 import LinkedAppMenu from "./LinkedAppMenu.tsx";
+import AiCategorySuggestButton from "./AiCategorySuggestButton.tsx";
 import WebDomainMappingCard from "./WebDomainMappingCard";
 import { useAppMappingState } from "../hooks/useAppMappingState";
 import { useMappingLinkLayout } from "../hooks/useMappingLinkLayout.ts";
@@ -47,79 +48,23 @@ export default function AppMapping(props: Props) {
     },
   ];
   const {
-    allAppCandidates,
-    handleAppLink,
-    dialogs,
-    icons,
-    loading,
-    loadError,
-    retryLoading,
-    draftState,
-    savedState,
-    filter,
-    setFilter,
-    categorySearchOptions,
-    searchQuery,
-    setSearchQuery,
-    counts,
-    webDomainCounts,
-    saveStatus,
-    actionError,
-    saving,
-    hasUnsavedChanges,
-    handleCancel,
-    handleSave,
-    filteredCandidates,
-    appCatalogHasSnapshot,
-    appCatalogLoading,
-    appCatalogError,
-    appCatalogRefreshError,
-    appCatalogRetry,
-    filteredWebDomainCandidates,
-    draftWebDomainOverrides,
-    updateWebDomainOverride,
-    updateWebDomainMembers,
-    showCategoryDialog,
-    setShowCategoryDialog,
-    colorFormat,
-    setColorFormat,
-    categoryControlCategories,
-    candidateCategoryOptions,
-    resolveCategoryColor,
-    resolveCategoryLabel,
-    handleCreateCategory,
-    handleDeleteCategory,
-    handleRenameCategory,
-    resolveEffectiveDisplayName,
-    resolveCandidateColor,
-    resolveMappedCategory,
-    resolveTrackingEnabled,
-    resolveTitleCaptureEnabled,
-    resolveWebDomainDisplayName,
-    resolveWebDomainColor,
-    resolveWebDomainCategory,
-    deletingSessionsExe,
-    editingNameExe,
-    nameDrafts,
-    editingWebDomain,
-    webNameDrafts,
-    syncNameDraftToPageDraft,
-    handleNameBlur,
-    handleNameEditCancel,
-    startNameEdit,
-    syncWebNameDraftToPageDraft,
-    handleWebNameBlur,
-    handleWebNameEditCancel,
-    startWebNameEdit,
-    handleColorAssign,
-    handleCategoryAssign,
-    handleWebDomainColorAssign,
-    handleWebDomainCategoryAssign,
-    handleTitleCaptureToggle,
-    handleTrackingToggle,
-    handleDeleteAllSessions,
-    handleDeleteWebDomainHistory,
-    applyCategoryColor,
+    allAppCandidates, handleAppLink, dialogs, icons, loading, loadError, retryLoading,
+    draftState, savedState, filter, setFilter, categorySearchOptions, searchQuery, setSearchQuery,
+    counts, webDomainCounts, saveStatus, actionError, saving, hasUnsavedChanges,
+    handleCancel, handleSave, filteredCandidates, appCatalogHasSnapshot, appCatalogLoading,
+    appCatalogError, appCatalogRefreshError, appCatalogRetry, filteredWebDomainCandidates,
+    draftWebDomainOverrides, updateWebDomainOverride, updateWebDomainMembers,
+    showCategoryDialog, setShowCategoryDialog, colorFormat, setColorFormat,
+    categoryControlCategories, candidateCategoryOptions, resolveCategoryColor,
+    resolveCategoryLabel, handleCreateCategory, handleDeleteCategory, handleRenameCategory,
+    resolveEffectiveDisplayName, resolveCandidateColor, resolveMappedCategory,
+    resolveTrackingEnabled, resolveTitleCaptureEnabled, resolveWebDomainDisplayName,
+    resolveWebDomainColor, resolveWebDomainCategory, deletingSessionsExe, editingNameExe,
+    nameDrafts, editingWebDomain, webNameDrafts, syncNameDraftToPageDraft, handleNameBlur,
+    handleNameEditCancel, startNameEdit, syncWebNameDraftToPageDraft, handleWebNameBlur,
+    handleWebNameEditCancel, startWebNameEdit, handleColorAssign, handleCategoryAssign,
+    handleCategoriesAssign, handleWebDomainColorAssign, handleWebDomainCategoryAssign, handleTitleCaptureToggle,
+    handleTrackingToggle, handleDeleteAllSessions, handleDeleteWebDomainHistory, applyCategoryColor,
   } = useAppMappingState({ ...props, objectMode: webActivityEnabled ? objectMode : "app" });
 
   useEffect(() => {
@@ -173,6 +118,21 @@ export default function AppMapping(props: Props) {
         title={UI_TEXT.mapping.title}
         rightSlot={(
           <div className="flex items-center gap-2.5">
+            {effectiveObjectMode === "app" && (
+              <AiCategorySuggestButton
+                apps={filteredCandidates.map((candidate) => ({
+                  id: candidate.exeName,
+                  text: `${resolveEffectiveDisplayName(candidate)} / ${candidate.exeName}`,
+                }))}
+                categories={candidateCategoryOptions.map((option) => ({ key: option.value, label: option.label }))}
+                onApply={(assignments) => {
+                  for (const row of assignments) {
+                    const candidate = filteredCandidates.find((entry) => entry.exeName === row.id);
+                    if (candidate) handleCategoriesAssign(candidate, row.categories);
+                  }
+                }}
+              />
+            )}
             <div
               className={`at-status ${
                 saveStatus !== "saving" && hasUnsavedChanges ? "at-status-danger" : ""

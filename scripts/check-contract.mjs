@@ -253,12 +253,9 @@ const fEvents = feEvents(types);
 const { values: emitted, literals } = emitSites(byName);
 
 /* emit 点计数期望值。
- * 17 → 18 的唯一原因是 `app/insight/tool_notifications.rs` 的 7 处
- * `.emit(CHANGED, ())` 从 import 别名换成了可解析的
- * `crate::models::activity::events::TOOL_PRESENTATION_CHANGED`：
- * `insightRustEvents()` 只解析 `pub const`，别名解析不出来，于是这 7 个发射点
- * 此前对契约不可见。**不是新增事件，只是把原本就存在的发射点重新纳入统计。** */
-const EXPECTED_EMIT_SITES = 19;
+ * 本轮新增 `ITEM_TAGS_CHANGED` 与 `CATEGORY_CATALOG_CHANGED` 的真实 emit 来源，
+ * 宿主事件可见站点由 19 增至 21。新增或删除事件时同步调整，避免事件发射契约静默漂移。 */
+const EXPECTED_EMIT_SITES = 21;
 if (emitted.size !== EXPECTED_EMIT_SITES) {
   failures.push({
     label: `emit 点 ${emitted.size} 个，期望 ${EXPECTED_EMIT_SITES} 个`,
@@ -366,6 +363,10 @@ const KNOWN_UNGRANTED_ACTIVITY_COMMANDS = [
   'cmd_get_block_detail',
   'cmd_get_item_timeline',
 ];
+const ACTIVITY_HOST_COMMAND_GRANTS = [
+  'preview_category_propagation',
+  'apply_category_propagation',
+];
 
 /** 取某个 permission 段的 `commands.allow` 集合；段不存在返回 null。 */
 function windowPermissionAllow(id) {
@@ -392,9 +393,10 @@ if (presentWindowIds.length !== 1) {
   });
 } else {
   const windowAllow = windowPermissionAllow(presentWindowIds[0]);
-  const expectedAllow = new Set(
-    [...patinaCmds].filter((c) => !KNOWN_UNGRANTED_ACTIVITY_COMMANDS.includes(c)),
-  );
+  const expectedAllow = new Set([
+    ...[...patinaCmds].filter((c) => !KNOWN_UNGRANTED_ACTIVITY_COMMANDS.includes(c)),
+    ...ACTIVITY_HOST_COMMAND_GRANTS,
+  ]);
   check(
     'window-commands 的 allow 与分析窗注册的命令不一致',
     diff(expectedAllow, windowAllow),
