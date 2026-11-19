@@ -101,6 +101,9 @@
   --at-motion-base: 180ms;
   --at-motion-ease: cubic-bezier(0.2, 0, 0, 1);
 
+  /* GitHub 星标金（固定装饰色，非主题语义；两套主题同值）。收口 about.css 的裸 hex。 */
+  --at-star-gold: #EAC54F;
+
   /* ── 跨窗语义桥（--sem-*，B1 令牌合一；P1 §2.2 的 8 组）──────────────────
    * 加法别名层：`--sem-*` 读分析窗原生的 `--at-*`（由 deriveTheme / applyHostAccents
    * 写成 :root 行内样式，随主题/宿主取色实时变化），组件在后续批次迁到 `--sem-*`。

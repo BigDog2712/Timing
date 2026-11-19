@@ -86,6 +86,11 @@ jobs:
       - name: de-Patina 活动库落点（7 条判据：路径片段 / VACUUM INTO / 不删 / 不写标记 / 不 REPLACE / 双开关 / 防空转）
         run: npm run check:de-patina
 
+      # [B2] 组件 CSS 禁裸 hex：裸 hex 只许住颜色真源层（主窗 tokens/01-04 + compat、
+      # 分析窗 tokens.css），组件 CSS 一律引用 var(--*)。P1 §2.4。
+      - name: 组件 CSS 禁裸 hex（真源层豁免 + 防空转）
+        run: npm run check:css-hex
+
   frontend:
     name: 前端 · 类型 / Lint / 测试 / 构建
     runs-on: windows-latest

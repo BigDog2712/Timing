@@ -107,7 +107,7 @@
 }
 
 .about-github-star-label {
-  color: #EAC54F;
+  color: var(--at-star-gold);
 }
 
 .about-support-pill-icon {

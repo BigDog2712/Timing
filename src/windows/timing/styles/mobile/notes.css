@@ -160,7 +160,7 @@
    底色用 --danger-solid（两套主题都按白字校准过对比度：浅 5.13:1 / 深 4.61:1）。 */
 .m-btn--danger[data-armed="true"] {
   background: var(--danger-solid);
-  color: #fff;
+  color: var(--btn-danger-ink);
   box-shadow: 0 0 0 2px var(--danger-wash);
 }
 

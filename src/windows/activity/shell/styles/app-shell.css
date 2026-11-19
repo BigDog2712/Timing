@@ -186,15 +186,15 @@ html[data-window-label="main"] #root {
   border: 1px solid var(--at-border-subtle);
   cursor: crosshair;
   background:
-    linear-gradient(to top, #000, transparent),
-    linear-gradient(to right, #fff, hsl(var(--at-hue) 100% 50%));
+    linear-gradient(to top, black, transparent),
+    linear-gradient(to right, white, hsl(var(--at-hue) 100% 50%));
 }
 
 .at-color-sv-thumb {
   position: absolute;
   width: 10px;
   height: 10px;
-  border: 2px solid #fff;
+  border: 2px solid white;
   border-radius: 999px;
   box-shadow: 0 0 0 1px rgba(18, 24, 35, 0.35);
   transform: translate(-50%, -50%);
@@ -225,13 +225,13 @@ html[data-window-label="main"] #root {
   border-radius: var(--at-radius-control);
   background: linear-gradient(
     to right,
-    #f00 0%,
-    #ff0 16.67%,
-    #0f0 33.33%,
-    #0ff 50%,
-    #00f 66.67%,
-    #f0f 83.33%,
-    #f00 100%
+    red 0%,
+    yellow 16.67%,
+    lime 33.33%,
+    aqua 50%,
+    blue 66.67%,
+    magenta 83.33%,
+    red 100%
   );
 }
 
@@ -240,7 +240,7 @@ html[data-window-label="main"] #root {
   height: 14px;
   margin-top: -3px;
   appearance: none;
-  border: 2px solid #fff;
+  border: 2px solid white;
   border-radius: 50%;
   background: hsl(var(--at-hue) 100% 50%);
   box-shadow: none;
@@ -252,20 +252,20 @@ html[data-window-label="main"] #root {
   border-radius: var(--at-radius-control);
   background: linear-gradient(
     to right,
-    #f00 0%,
-    #ff0 16.67%,
-    #0f0 33.33%,
-    #0ff 50%,
-    #00f 66.67%,
-    #f0f 83.33%,
-    #f00 100%
+    red 0%,
+    yellow 16.67%,
+    lime 33.33%,
+    aqua 50%,
+    blue 66.67%,
+    magenta 83.33%,
+    red 100%
   );
 }
 
 .at-color-hue-slider::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  border: 2px solid #fff;
+  border: 2px solid white;
   border-radius: 50%;
   background: hsl(var(--at-hue) 100% 50%);
   box-shadow: none;
