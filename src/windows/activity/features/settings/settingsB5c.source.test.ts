@@ -88,6 +88,14 @@ describe('[B5c] ② 开机自启只剩一个入口（D5）', () => {
     expect(RESIDENT).toContain('toggleCloseToTray');
     expect(RESIDENT).toContain('toggleShowTrayIcon');
     expect(RESIDENT).toContain('toggleStartMinimized');
+    /* [B5c 补] 三行并成**一组**「运行行为」：只留 `runtimeBehaviorTitle` 一个组标题。
+       留「运行行为」不留「窗口行为」是因为静默启动是**启动**策略，只有前者能伞住三行。
+       `windowBehaviorTitle` 这个 key 从此未使用（与 `launchAtLoginLabel` 同类），
+       但绝不等于可以把它接回来当第二个组标题。 */
+    expect(RESIDENT).not.toContain('windowBehaviorTitle');
+    expect(RESIDENT).toContain('runtimeBehaviorTitle');
+    /* 三条一起排时用单列（3 是奇数，两列会在第二行留半格空位） */
+    expect(RESIDENT).not.toContain('settings-preference-pair');
   });
 
   it('b5c05_the_settings_page_does_not_wire_the_removed_switch', () => {

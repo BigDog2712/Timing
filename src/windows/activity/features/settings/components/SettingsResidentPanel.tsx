@@ -16,7 +16,7 @@ type SettingsResidentPanelProps = {
 };
 
 /**
- * 「常驻与启动」卡（[B5c] D5 去重后）
+ * 「常驻与启动」卡（[B5c] D5 去重后 · [B5c 补] 两组并为「运行行为」一组）
  * -----------------------------------------------------------------------------
  * **「开机自启动」这一行在这里被移除了**，不是漏了：同一件事原来有两个开关 ——
  *   (a) 本卡这一行 → 写草稿 `launchAtLogin` → 按保存才 `cmd_commit_app_settings`；
@@ -27,6 +27,19 @@ type SettingsResidentPanelProps = {
  * 保留的是 (b)：开机自启是系统级动作，需要即时反馈；草稿式开关用户不按保存就等于没设。
  * 现在由「通用」卡那一个开关**双写**两份持久化（见 `HostGeneralPanel` 的注释），
  * 本卡只留真正属于"常驻"的三件事：关闭到后台 / 显示托盘图标 / 静默启动。
+ *
+ * ## [B5c 补] 为什么并成一组叫「运行行为」
+ *
+ * 原来这三行分在「窗口行为」（两个托盘开关）与「运行行为」（静默启动）两组里，第二组
+ * 只剩一行 —— 一个标题伞着一行，扫读时反而多了个假的分区感。并成一组后**留「运行行为」
+ * 这个名字**而不是「窗口行为」：`closeToTray` / `showTrayIcon` 是窗口策略，`startMinimized`
+ * 是**启动**策略，只有「运行行为」能伞住三者。这是本页自己立的原则：不为省一个标题而让
+ * 名字与内容错位。
+ *
+ * 三条一起排时用**单列**（`settings-preference-list`，不带 `-pair`）：3 是奇数，两列会在
+ * 第二行留半格空位；分隔线由 `.settings-preference-list > .settings-preference-row +
+ * .settings-preference-row` 给，三行两段线，不新增样式。行序沿用既有 DOM 顺序
+ * （关闭到后台最高频，不重排）。
  */
 export default function SettingsResidentPanel({
   showTrayIconChecked,
@@ -44,9 +57,9 @@ export default function SettingsResidentPanel({
         title={UI_TEXT.settings.residentTitle}
       />
 
-      <div className="mt-5 space-y-5">
-        <SettingsPreferenceGroup title={UI_TEXT.settings.windowBehaviorTitle}>
-          <QuietActionRow className="settings-preference-list settings-preference-pair">
+      <div className="mt-5">
+        <SettingsPreferenceGroup title={UI_TEXT.settings.runtimeBehaviorTitle}>
+          <QuietActionRow className="settings-preference-list">
             <SettingsPreferenceRow title={UI_TEXT.settings.closeToTrayLabel}>
               <QuietSwitch
                 checked={closeToTrayChecked}
@@ -61,13 +74,6 @@ export default function SettingsResidentPanel({
                 ariaLabel={UI_TEXT.accessibility.settings.toggleShowTrayIcon}
               />
             </SettingsPreferenceRow>
-          </QuietActionRow>
-        </SettingsPreferenceGroup>
-        <SettingsPreferenceGroup title={UI_TEXT.settings.runtimeBehaviorTitle}>
-          {/* 只剩「静默启动」一行 → 去掉 `settings-preference-pair`：那条两列网格把竖分隔线
-              画在 `:last-child` 的左侧，单行时会在组左缘留一道悬空竖线（数据卡的同款毛病
-              在 `settings.css` 里是给成对行用的）。 */}
-          <QuietActionRow className="settings-preference-list">
             <SettingsPreferenceRow title={UI_TEXT.settings.startMinimizedLabel}>
               <QuietSwitch
                 checked={startMinimizedChecked}
