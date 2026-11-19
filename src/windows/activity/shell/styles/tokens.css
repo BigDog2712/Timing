@@ -101,6 +101,25 @@
   --at-motion-base: 180ms;
   --at-motion-ease: cubic-bezier(0.2, 0, 0, 1);
 
+  /* ── 跨窗语义桥（--sem-*，B1 令牌合一；P1 §2.2 的 8 组）──────────────────
+   * 加法别名层：`--sem-*` 读分析窗原生的 `--at-*`（由 deriveTheme / applyHostAccents
+   * 写成 :root 行内样式，随主题/宿主取色实时变化），组件在后续批次迁到 `--sem-*`。
+   * 命名与主窗 06-bridge.css 逐字一致 ⇒ 两窗同名；纯 var() 引用 ⇒ 渲染值不变（零像素）。
+   * 不放进 @theme（那层给 Tailwind 的 --color-*）；这里是通用语义桥，组件直接 var() 用。 */
+  --sem-bg-app:        var(--at-bg-app);
+  --sem-bg-panel:      var(--at-bg-panel);
+  --sem-bg-elevated:   var(--at-bg-elevated);
+  --sem-text-primary:   var(--at-text-primary);
+  --sem-text-secondary: var(--at-text-secondary);
+  --sem-text-tertiary:  var(--at-text-tertiary);
+  --sem-border-subtle: var(--at-border-subtle);
+  --sem-border-strong: var(--at-border-strong);
+  --sem-accent:        var(--at-accent-default);
+  --sem-accent-muted:  var(--at-accent-muted);
+  --sem-success:       var(--at-success);
+  --sem-warning:       var(--at-warning);
+  --sem-danger:        var(--at-danger);
+  --sem-participation: var(--at-participation);
 
   background-color: transparent;
   color: var(--at-text-primary);

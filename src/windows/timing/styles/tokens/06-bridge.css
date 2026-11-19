@@ -1,0 +1,44 @@
+/* =============================================================================
+ * Timing — 06-bridge.css（跨窗语义桥 · 主窗侧）
+ * -----------------------------------------------------------------------------
+ * B1 令牌合一：建立两窗共用的语义名（P1 §2.2 的 8 组），**零像素变化**。
+ *
+ * 做法（为什么是「别名」而非「替换真源」）：
+ *   分析窗的 `--at-*` 由 JS（deriveTheme / applyHostAccents）写成 `:root` 行内样式，
+ *   行内特异性高于任何样式表 `:root` 规则，CSS 层**无法**把 `--at-*` 反向指到桥上
+ *   （那需要改主题 JS，超出纯 CSS 范围且会动到动态换肤/逐像素保证）。
+ *   因此两窗对称地把桥做成**加法别名层**：`--sem-*` 读各窗原生、随主题变化的令牌，
+ *   组件在后续批次迁移到 `--sem-*`。纯 var() 间接引用 ⇒ 渲染值不变。
+ *
+ * 主窗侧：`--sem-*` ← 主窗现有语义令牌（随 02/03 主题切换，桥本身主题无关）。
+ * 命名骨架对齐分析窗 `--color-*`（P1 §2.2 以其为基准）。
+ * 本文件只出现 var() 引用，不含任何裸色值。
+ * @import 顺序：置于 04-aliases 之后（见 design-tokens.css 索引；新增属性名，无层叠冲突）。
+ * ========================================================================== */
+:root {
+  /* 背景三层 */
+  --sem-bg-app:        var(--bg-plate);
+  --sem-bg-panel:      var(--bg-panel);
+  --sem-bg-elevated:   var(--bg-field-hi);
+
+  /* 文字三级 */
+  --sem-text-primary:   var(--ink);
+  --sem-text-secondary: var(--ink-2);
+  --sem-text-tertiary:  var(--ink-3);
+
+  /* 描边 */
+  --sem-border-subtle: var(--line);
+  --sem-border-strong: var(--line-3);
+
+  /* 强调 */
+  --sem-accent:        var(--accent);
+  --sem-accent-muted:  var(--accent-wash);
+
+  /* 语义状态 */
+  --sem-success:       var(--ok);
+  --sem-warning:       var(--warn);
+  --sem-danger:        var(--danger);
+
+  /* 参与度 / 热力（主窗以 --violet 近似，见 P1 §2.2） */
+  --sem-participation: var(--violet);
+}

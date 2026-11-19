@@ -8,6 +8,7 @@
  *   03-theme-light       §2 浅色主题
  *   04-aliases           §3 四色可配 + §4 B-slot 组件别名
  *   05-typography-rules  §5 计时数字规则 + §6 focus-visible / reduced-motion
+ *   06-bridge            跨窗语义桥（--sem-*，B1 令牌合一；加法别名层，零像素）
  *
  * 消费规则（P0，全文仍适用于 tokens/*）：
  *   1. 组件 CSS 只允许引用 var(--*)，禁止出现任何裸 hex / rgb。
@@ -27,3 +28,4 @@
 @import './tokens/03-theme-light.css';
 @import './tokens/04-aliases.css';
 @import './tokens/05-typography-rules.css';
+@import './tokens/06-bridge.css';
