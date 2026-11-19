@@ -146,12 +146,16 @@ B1 的铁律是**先统一命名、不动渲染值**，截图逐像素 diff 必�
 ```
 --z-base     0    药丸 / 圆点本体
 --z-handles  10   把手簇 / 滚轮提示（= 现 --z-pill）
---z-popover  20   右键菜单 / 摸鱼菜单 / tooltip
---z-panel    30   事项 / 设置 / 面板（= 现 --z-settings）
---z-toast    40   撤销条 / 提醒 / NoticeBar（= 现 --z-undo）
---z-drag     50   拖动中浮层
+--z-popover  20   右键菜单遮罩 / 提示条 / tooltip
+--z-panel    30   右键菜单本体 / 事项 / 设置 / 面板（= 现 --z-settings）
+--z-toast    40   撤销条（= 现 --z-undo）
+--z-drag     50   对话框 / 提醒卡 / 拖动中浮层
 ```
 归档现状 9 名：`--z-pill 10→handles`、`--z-panel/note 20→popover 或 panel`（note 若为独立窗不进刻度，见 PLAN A3）、`--z-settings 30→panel`、`--z-undo 40→toast`、`--z-tooltip 50 / --z-menu 60 / --z-dialog 70 → popover/panel/drag 就近归并`。15 种裸 z 字面量全部映射进这 6 档。
+
+> **[B3 实测修正 · 已定案，覆盖上表原稿]** 原稿把 NoticeBar / 提醒卡一并归 `toast(40)` 是未核对消费点的语义猜测，落地时按真实阶梯否决。原序：`base0 / pill10 / panel20 / note20 / settings30 / undo40 / tooltip50 / menu60 / dialog70`，其中 `.notice` 与 `.menu-scrim` **同用 `--z-tooltip(50)`**（靠 DOM 次序分层），菜单本体 60，提醒卡 70。实际落库映射：`.notice → popover(20)`、`.menu-scrim → popover(20)`、`.menu → panel(30)`、`.reminder → drag(50)`，与原序 `notice=scrim(50) < menu(60) < reminder(70)` 严格同构。**结论：保序优先于字面语义**——`toast(40)` 在本项目实指"撤销条"（压在面板之上的即时反馈），而提示条是被动常驻提示，抬到 40 会盖住右键菜单首项，属真回退；提醒卡必须压过对话框遮罩，留最高档 `drag(50)`。
+>
+> **分析窗 z 刻意不并入 6 档**：分析窗是 0–170 细粒度阶梯（34 处声明 / 20 个不同值，含看板缩放手柄 `44/45` 保序对与浮层梯 `110/120/130/140/170`），压 6 档必然翻序、会坏功能。本轮零改动，也不建 `--at-z-*` 值不变别名（无收益、徒增间接、易被误读为已统一），仅在 `activity/shell/styles/tokens.css` 加头注声明"刻意不并"。
 
 
 ---
