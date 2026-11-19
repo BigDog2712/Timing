@@ -7,6 +7,11 @@
  *
  * 与 HostSyncPanel.test.tsx 同一手法：mock 网关（`platform/desktop/hostSettingsGateway`），
  * 让 `settingsApi` 门面、`settingsRuntimeStore`、面板三层都跑真代码。
+ *
+ * [B5d] 「最短记录时长」已**行级搬迁**到 `SettingsMinRecordRow`（「计时行为」组的计时规则
+ * 里），它的读写判据跟着搬到 `SettingsMinRecordRow.test.tsx`（m01–m06），本文件只留
+ * 「开机自启」这一行 —— 所以下面还会断言 `getReferenceSettings` **不再**被这张卡拉取，
+ * 那正是"搬干净了"的可验证形态。
  * 仓库未装 @testing-library，用 `react-dom/client` + `act`（仓内既有写法）。
  */
 import { act, createElement } from 'react';
@@ -79,24 +84,6 @@ function switchOf(label: string): HTMLButtonElement {
   return el;
 }
 
-function secondsInput(): HTMLInputElement {
-  const el = container.querySelector<HTMLInputElement>('input[aria-label="最短记录时长（秒）"]');
-  if (!el) throw new Error('找不到最短记录时长输入框');
-  return el;
-}
-
-/** 受控 input：React 19 只认原生 setter + `input` 事件 */
-function typeInto(input: HTMLInputElement, value: string): void {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
-  if (!setter) throw new Error('拿不到原生 value setter');
-  setter.call(input, value);
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-function pressEnter(input: HTMLInputElement): void {
-  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-}
-
 beforeEach(() => {
   (globalThis as unknown as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
   useSettingsStore.setState({ settings: null, referenceSettings: null, loaded: false });
@@ -120,21 +107,22 @@ afterEach(() => {
 });
 
 describe('挂载与读回', () => {
-  it('g01_mounts_and_shows_autostart_plus_min_record_seconds', async () => {
+  it('g01_mounts_and_shows_only_the_autostart_row', async () => {
     await mount();
     expect(text()).toContain('开机自启');
-    expect(text()).toContain('最短记录时长');
-    /* 值来自 `get_reference_settings`，不是写死的 30 */
-    expect(secondsInput().value).toBe('45');
     expect(g.getSettings).toHaveBeenCalled();
-    expect(g.getReferenceSettings).toHaveBeenCalled();
+    /* [B5d] 这张卡现在只有一行：最短记录时长已搬到 `SettingsMinRecordRow`。
+       它顺带读的参考设置也应当跟着走 —— 留在这里就是"搬了一半"。 */
+    expect(text(), '最短记录时长还留在这张卡里（应当只剩开机自启）').not.toContain('最短记录时长');
+    expect(g.getReferenceSettings, '这张卡还在拉参考设置（唯一消费者已经搬走了）')
+      .not.toHaveBeenCalled();
   });
 
   it('g02_autostart_row_can_be_hidden_for_mobile', async () => {
     await mount({ showAutostart: false });
     expect(container.querySelector('[role="switch"][aria-label="开机自启"]')).toBeNull();
-    /* 只是藏起那一行，最短记录时长照旧 */
-    expect(secondsInput()).toBeTruthy();
+    /* 移动端：这张卡什么都不显示（最短记录时长不在这一组了，不受这个开关影响） */
+    expect(text().trim()).toBe('');
   });
 });
 
@@ -191,40 +179,6 @@ describe('写路径：宿主命令的入参键名', () => {
     expect(container.querySelector('[role="alert"]')?.textContent).toContain('设置保存失败：写入被拒绝');
   });
 
-  it('g04_committing_a_new_duration_patches_only_min_record_seconds', async () => {
-    await mount();
-    const input = secondsInput();
-    act(() => typeInto(input, '120'));
-    act(() => pressEnter(input));
-    await flush();
-
-    expect(g.updateReferenceSettings).toHaveBeenCalledTimes(1);
-    const patch = g.updateReferenceSettings.mock.calls[0][0] as Record<string, unknown>;
-    /* 只带被改的那一个键；多带一个键就是把别的偏好一起覆盖掉 */
-    expect(Object.keys(patch)).toEqual(['minRecordSeconds']);
-    expect(patch.minRecordSeconds).toBe(120);
-  });
-
-  it('g05_out_of_range_values_are_clamped_before_hitting_the_host', async () => {
-    await mount();
-    const input = secondsInput();
-    act(() => typeInto(input, '9999'));
-    act(() => pressEnter(input));
-    await flush();
-    expect((g.updateReferenceSettings.mock.calls[0][0] as { minRecordSeconds: number }).minRecordSeconds).toBe(300);
-  });
-
-  it('g06_an_unchanged_or_empty_value_writes_nothing', async () => {
-    await mount();
-    const input = secondsInput();
-    act(() => typeInto(input, '45')); /* 与已存值相同 */
-    act(() => pressEnter(input));
-    act(() => typeInto(input, '')); /* 清空 */
-    act(() => pressEnter(input));
-    await flush();
-    expect(g.updateReferenceSettings).not.toHaveBeenCalled();
-    expect(secondsInput().value).toBe('45'); /* 回退到当前值，不留空框 */
-  });
 });
 
 describe('失败面：出错误文案，不静默', () => {
@@ -236,19 +190,5 @@ describe('失败面：出错误文案，不静默', () => {
 
     const alert = container.querySelector('[role="alert"]');
     expect(alert?.textContent).toContain('写入注册表被拒绝（拒绝访问）');
-  });
-
-  it('g08_update_reference_failure_renders_an_alert', async () => {
-    g.updateReferenceSettings.mockRejectedValueOnce(new Error('设置保存失败：参数越界'));
-    await mount();
-    const input = secondsInput();
-    act(() => typeInto(input, '90'));
-    act(() => pressEnter(input));
-    await flush();
-
-    const alert = container.querySelector('[role="alert"]');
-    expect(alert?.textContent).toContain('设置保存失败：参数越界');
-    /* 空值回退：写失败后输入框不能停在一个「看起来生效了」的数字上 */
-    expect(secondsInput().value).toBe('45');
   });
 });

@@ -176,9 +176,7 @@
 .settings-local-paths-panel .at-icon-action-neutral:hover:not(:disabled),
 .settings-local-paths-panel .at-icon-action-neutral:active:not(:disabled),
 .settings-backup-schedule-action:hover:not(:disabled),
-.settings-backup-schedule-action:active:not(:disabled),
-.settings-data-export-schedule-action:hover:not(:disabled),
-.settings-data-export-schedule-action:active:not(:disabled) {
+.settings-backup-schedule-action:active:not(:disabled) {
   background: color-mix(in srgb, var(--at-text-primary) 10%, var(--at-bg-elevated));
   color: var(--at-text-primary);
 }

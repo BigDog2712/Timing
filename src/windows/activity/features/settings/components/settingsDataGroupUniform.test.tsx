@@ -221,20 +221,22 @@ describe("④ 渲染级：行是真的（不是源码看着像）", () => {
     const buttons = Array.from(
       container.querySelectorAll<HTMLButtonElement>(".settings-preference-control button"),
     );
-    /* 三行：数据导出 / 数据导入 / 完整数据包（JSON，[批 2] 新增）。 */
-    expect(buttons).toHaveLength(3);
+    /* 四行：数据导出 / 数据导入 / 定时导出（[B5d] 从导出弹窗的头部图标搬来）/ 完整数据包（JSON）。
+       数的是**行**而不是"能点到的东西"：定时导出也是一个按钮，所以它必须和另外三颗同形状。 */
+    expect(buttons).toHaveLength(4);
     for (const button of buttons) {
       expect(button.closest(".settings-preference-row"), "按钮掉到偏好行外面了").not.toBeNull();
       expect(button.closest(".settings-preference-control"), "按钮没落在行的右侧控件区").not.toBeNull();
     }
     /* 两个动作各在自己的行里（不是两行并成一行） */
     const rows = new Set(buttons.map((button) => button.closest(".settings-preference-row")));
-    expect(rows.size).toBe(3);
+    expect(rows.size).toBe(4);
     /* 旧类名的节点一个都不许有 */
     expect(container.querySelector(".settings-data-action-row, .settings-storage-path-row")).toBeNull();
     /* 回调仍然各接各的（换行排法不改行为）。
-       第三颗（完整数据包）自己走命令，接线另有 `SettingsFullBundle.test.tsx` 管，
-       这里不点它——本文件不 mock 那个口岸，点了只会拿到 jsdom 里没有的 IPC。 */
+       第三颗（定时导出）点下去会懒加载 + 读快照、第四颗（完整数据包）自己走命令，
+       两者各有专门的用例（`SettingsScheduledExportRow.test.tsx` / `SettingsFullBundle.test.tsx`），
+       这里不点——本文件不 mock 那些口岸，点了只会拿到 jsdom 里没有的 IPC。 */
     buttons[0].click();
     buttons[1].click();
     expect(calls).toEqual(["export", "import"]);

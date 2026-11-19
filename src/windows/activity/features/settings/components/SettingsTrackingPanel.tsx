@@ -5,6 +5,7 @@ import QuietActionRow from "../../../shared/components/QuietActionRow";
 
 import QuietStepperSlider from "../../../shared/components/QuietStepperSlider.tsx";
 import SettingsPanelHeader from "./SettingsPanelHeader";
+import SettingsMinRecordRow from "./SettingsMinRecordRow";
 import { SettingsPreferenceGroup, SettingsPreferenceRow } from "./SettingsPreferenceLayout";
 
 type MinuteControlProps = {
@@ -100,6 +101,11 @@ export default function SettingsTrackingPanel({
           <QuietActionRow className="settings-preference-list">
             <TrackingMinuteField {...timelineMergeGapControl} />
             <TrackingMinuteField {...idleTimeoutControl} />
+            {/* [B5d] 「最短记录时长」从 `s-general` 搬到这里：它决定**记录粒度**，与上面两项
+                同族。三行单列（不是 `-pair`）：3 是奇数，两列会在第二行留半格。
+                这一行自带数据读写（读宿主参考设置、写 `min_record_seconds`），所以是
+                自包含组件，本面板的 props 不变。 */}
+            <SettingsMinRecordRow />
           </QuietActionRow>
         </SettingsPreferenceGroup>
         <SettingsPreferenceGroup title={UI_TEXT.settings.recordingOptionsTitle}>

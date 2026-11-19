@@ -2,6 +2,7 @@ import { useLocaleText } from "../../../shared/i18n/index.ts";
 import QuietActionRow from "../../../shared/components/QuietActionRow";
 import QuietButton from "../../../shared/components/QuietButton";
 import SettingsFullBundleExportRow from "./SettingsFullBundleExportRow";
+import SettingsScheduledExportRow from "./SettingsScheduledExportRow";
 import { ACTIVITY_ONLY_NOTE } from "./fullBundleCopy.ts";
 import { SettingsPreferenceGroup, SettingsPreferenceRow } from "./SettingsPreferenceLayout";
 
@@ -44,6 +45,12 @@ export default function SettingsDataExportGroup({
             {UI_TEXT.settings.dataImportAction}
           </QuietButton>
         </SettingsPreferenceRow>
+        {/* [B5d] 「定时导出」原来埋在导出弹窗的头部图标里（四级深度），现在与另外三行并排。
+            为什么放这组而不是 `s-sync`：定时导出与导出/导入/完整数据包是同一个主体
+            —— 「活动库的进出」；`s-sync` 管的是「计时记录 ↔ Markdown 同步」，另一件事。
+            放在「数据导入」之后、完整数据包之前：顺序按「单次动作 → 定时动作 → 全量动作」，
+            用户从上往下读就是"导一次 / 定时导 / 全量导"。 */}
+        <SettingsScheduledExportRow disabled={busy} />
         {/* [批 2] 全额数据包：事项 + 计时 + 便利贴 + 待办 + 应用活动 + 手机端数据，一个 JSON。 */}
         <SettingsFullBundleExportRow disabled={busy} />
       </QuietActionRow>

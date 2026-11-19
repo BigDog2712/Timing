@@ -1,12 +1,11 @@
 import { useLocaleText } from "../../../shared/i18n/index.ts";
 import type { UiText } from "../../../shared/i18n/index.ts";
-import { CalendarClock, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import QuietDateRangePicker, {
   type QuietDateRangePickerSelection, } from "../../../shared/components/QuietDateRangePicker.tsx";
 import QuietDialog from "../../../shared/components/QuietDialog.tsx";
 import QuietButton from "../../../shared/components/QuietButton.tsx";
-import QuietIconAction from "../../../shared/components/QuietIconAction.tsx";
 import QuietRangeControl from "../../../shared/components/QuietRangeControl.tsx";
 import type { QuietToastTone } from "../../../shared/types/toast.ts";
 
@@ -15,7 +14,6 @@ import { ACTIVITY_ONLY_NOTE } from "./fullBundleCopy.ts";
 import {
   SETTINGS_DATA_EXPORT_DEFAULT_FIELDS_BY_FORMAT,
   SETTINGS_DATA_EXPORT_FIELD_KEYS,
-  isSettingsDataExportField,
 } from "../services/settingsDataExportFields.ts";
 import {
   buildExportRangeSelection,
@@ -32,7 +30,6 @@ import {
   exportData,
   pickExportSaveFile,
 } from "../services/settingsDataExportService.ts";
-import type { ScheduledExportSnapshot } from "../services/scheduledExportService.ts";
 import {
   readExportFormat,
   readExportFields,
@@ -42,8 +39,6 @@ import {
   rememberExportRangeMode,
 } from "../services/settingsDataExportPreferences.ts";
 import SettingsDataExportFieldConfigDialog from "./SettingsDataExportFieldConfigDialog.tsx";
-
-type ScheduledExportDialogComponent = typeof import("./SettingsScheduledExportDialog.tsx")["default"];
 
 interface Props {
   open: boolean;
@@ -169,24 +164,7 @@ export default function SettingsDataExportDialog({ open, onClose, onToast }: Pro
     SETTINGS_DATA_EXPORT_DEFAULT_FIELDS_BY_FORMAT[initialFormat],
   ));
   const [showFieldConfig, setShowFieldConfig] = useState(false);
-  const [scheduledExportOpen, setScheduledExportOpen] = useState(false);
-  const [scheduledExportOpening, setScheduledExportOpening] = useState(false);
-  const [scheduledExportSnapshot, setScheduledExportSnapshot] = useState<ScheduledExportSnapshot | null>(null);
-  const [ScheduledExportDialog, setScheduledExportDialog] = useState<ScheduledExportDialogComponent | null>(null);
   const rangeAnchorRef = useRef<HTMLButtonElement | null>(null);
-  const scheduledExportAnchorRef = useRef<HTMLSpanElement | null>(null);
-  const scheduledExportFields = useMemo(
-    () => selectedFields.filter(isSettingsDataExportField),
-    [selectedFields],
-  );
-
-  useEffect(() => {
-    if (!open) {
-      setScheduledExportOpen(false);
-      setScheduledExportSnapshot(null);
-      setScheduledExportDialog(null);
-    }
-  }, [open]);
 
   const resolvedTimeRange = useMemo(
     () => resolveExportRangeSelection(rangeSelection),
@@ -288,53 +266,14 @@ export default function SettingsDataExportDialog({ open, onClose, onToast }: Pro
     UI_TEXT,
   ]);
 
-  const openScheduledExport = useCallback(async () => {
-    if (selectedFields.length === 0) {
-      onToast?.(UI_TEXT.export.configFieldsEmpty, "warning");
-      return;
-    }
-    setScheduledExportOpening(true);
-    try {
-      const dialogModule = await import("./SettingsScheduledExportDialog.tsx");
-      const next = await dialogModule.loadScheduledExportSnapshot();
-      setScheduledExportDialog(() => dialogModule.default);
-      setScheduledExportSnapshot(next);
-      setScheduledExportOpen(true);
-    } catch (error) {
-      console.error("scheduled export snapshot load failed", error);
-      onToast?.(UI_TEXT.settings.loadFailed, "error");
-    } finally {
-      setScheduledExportOpening(false);
-    }
-  }, [onToast, selectedFields.length, UI_TEXT.export.configFieldsEmpty, UI_TEXT.settings.loadFailed]);
-
-  const closeScheduledExport = useCallback(() => {
-    setScheduledExportOpen(false);
-    window.requestAnimationFrame(() => {
-      scheduledExportAnchorRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    });
-  }, []);
-
   return (
     <>
       <QuietDialog
         open={open}
         title={UI_TEXT.export.title}
-        onClose={showFieldConfig || scheduledExportOpen ? () => undefined : onClose}
+        onClose={showFieldConfig ? () => undefined : onClose}
         closeOnBackdrop={!exporting}
         surfaceClassName="settings-data-export-dialog-surface"
-        headerAside={(
-          <span ref={scheduledExportAnchorRef} className="inline-flex">
-            <QuietIconAction
-              icon={<CalendarClock size={16} aria-hidden="true" />}
-              title={UI_TEXT.export.scheduledTitle}
-              ariaLabel={UI_TEXT.export.scheduledTitle}
-              className="settings-data-export-schedule-action"
-              disabled={exporting || scheduledExportOpening || selectedFields.length === 0}
-              onClick={() => void openScheduledExport()}
-            />
-          </span>
-        )}
         actions={(
           <>
             <QuietButton size="large" onClick={onClose} disabled={exporting}>
@@ -461,16 +400,6 @@ export default function SettingsDataExportDialog({ open, onClose, onToast }: Pro
           setShowFieldConfig(false);
         }}
       />
-
-      {scheduledExportSnapshot && ScheduledExportDialog ? (
-        <ScheduledExportDialog
-          open={open && scheduledExportOpen}
-          initialSnapshot={scheduledExportSnapshot}
-          currentFormat={format}
-          currentFields={scheduledExportFields}
-          onClose={closeScheduledExport}
-        />
-      ) : null}
     </>
   );
 }

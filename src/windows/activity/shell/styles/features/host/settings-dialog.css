@@ -22,6 +22,12 @@
   color: var(--fg);
 }
 
+/* [B5d] `.setting-group` / `.setting-row` / `.num-field*` 现在也用在**分析窗**的设置页里
+   （「开机自启」在 `s-general`、「最短记录时长」搬进「计时行为」的计时规则组）。
+   分析窗的样式表不引 `timing/styles/tokens/*`，这几个令牌的取值按
+   `settings-data.css` 文件头写的规矩给 fallback：桥内取值一字不变，桥外立刻可用。
+   本文件其余部分（`.dialog*` / `.shortcut-row` / `.settings__*`）本轮不动 —— 它们只在
+   主窗（有时序令牌）与弹窗里用，属另一批。 */
 .setting-group {
   display: flex;
   flex-direction: column;
@@ -31,13 +37,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-5);
+  gap: var(--space-5, 20px);
   height: 40px;
 }
 
 .setting-row__label {
-  font-size: var(--text-base);
-  color: var(--text-secondary);
+  font-size: var(--text-base, 13px);
+  color: var(--text-secondary, var(--at-text-secondary));
 }
 
 /* [V0.3.5] 最短记录时长：数字输入框 + 单位。
@@ -50,15 +56,15 @@
   gap: 2px;
   height: 26px;
   padding: 0 10px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-field);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--bg-field, var(--at-bg-elevated));
+  border: 1px solid var(--line, var(--at-border-subtle));
 }
 
 /* [V0.3.9] 用户口径：「调整最短记录时长时的高亮效果取消」——
    聚焦不再给外壳描边染色，控件保持常态底色，调数时不闪一块高亮。 */
 .num-field:focus-within {
-  border-color: var(--line);
+  border-color: var(--line, var(--at-border-subtle));
 }
 
 .num-field__input {
@@ -68,8 +74,8 @@
   border: 0;
   background: transparent;
   font-family: var(--font-mono);
-  font-size: var(--text-mono);
-  color: var(--ink);
+  font-size: var(--text-mono, 11px);
+  color: var(--ink, var(--at-text-primary));
   text-align: right;
   -webkit-appearance: none;
   appearance: textfield;
@@ -93,8 +99,8 @@
 }
 
 .num-field__unit {
-  font-size: var(--text-xs);
-  color: var(--ink-4);
+  font-size: var(--text-xs, 11.5px);
+  color: var(--ink-4, var(--at-text-disabled));
 }
 
 .settings__divider {
