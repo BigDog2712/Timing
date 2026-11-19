@@ -14,7 +14,7 @@ import { useCallback } from 'react';
 import { useTauriEvent } from '../hooks/useTauriEvent';
 import { useTimerActions } from '../hooks/useTimerActions';
 import { errorText, ipc } from './ipc';
-import { itemApi, recordApi } from './api';
+import { itemApi, recordApi, tagApi } from './api';
 import { highlightPill } from './highlightActions';
 import { openSettings } from './settingsActions';
 import { openTodosWindow } from './todosActions';
@@ -59,7 +59,12 @@ type HostIntent =
   /** [0.13 fix] 事项 ↔ 应用绑定：字段名与 `hostIntentGateway.ts` 逐字一致（L9 两侧各写一份）。
    *  分析窗的「绑定事项」只写它自己的配置表，自动接管读的是宿主 `item_app` 表，
    *  这条意图把后者拉成同一份事实（执行体见 `hostIntentItemAppWrite.ts`）。 */
-  | { action: 'sync_app_item_bindings'; appKey: string; itemIds: readonly number[]; track?: number };
+  | { action: 'sync_app_item_bindings'; appKey: string; itemIds: readonly number[]; track?: number }
+  /** [0.12.5] AI 自动打标签：逐条写事项标签。字段名与 `hostIntentGateway.ts` 逐字一致
+   *  （L9 两侧各写一份，靠 `hostIntentMirror.test.ts` 钉集合与字段）。
+   *  分析窗没有 `set_item_tags` 写命令，只能喊意图、由这里用 `tagApi.set` 落库。
+   *  `tags` 是全量覆盖（与命令语义一致）。 */
+  | { action: 'set_item_tags'; itemId: number; tags: readonly string[] };
 
 /** 菜单在药丸内容区里的固定锚点（见 gateway 侧「锚点口径」注释）。 */
 const PILL_ANCHOR = { x: 12, y: 12 } as const;
@@ -230,6 +235,19 @@ export function useHostIntentBridge(): void {
         /* 分析窗的绑定配置 → 宿主 `item_app`（自动接管只认这张表）。
            幂等：载荷是该应用的事项全集，执行端做三向 diff。 */
         void applySyncAppItemBindingsIntent(intent);
+        return;
+      case 'set_item_tags':
+        /* [0.12.5] AI 自动打标签的落点：与事项编辑里手填标签完全同一条命令
+           （`set_item_tags`，全量覆盖 + 后端归一）。分析窗没有这条写命令，
+           所以批量动作的编排在分析窗、落库在这里。
+           失败**必须**提示：批量里某一条写不进去，用户不会去数哪一条少了标签，
+           只能靠药丸上这一句（跨窗只传意图，不传错误 —— §6.5）。 */
+        void tagApi.set(intent.itemId, [...intent.tags]).catch((error) => {
+          useUiStore.getState().setNotice({
+            text: `标签没写进去：${errorText(error)}`,
+            tone: 'danger',
+          });
+        });
         return;
       default:
         /* 分析窗版本比药丸新时可能发来不认识的动作：忽略，不抛、不提示 */

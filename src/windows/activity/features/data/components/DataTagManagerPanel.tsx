@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { filterTagTree, flattenTagTree } from "../../../../shared/tags/tagTree.ts";
 import type { TagAdminState } from "../hooks/useTagAdmin.ts";
+import AiAutoTagButton from "./AiAutoTagButton.tsx";
 import DataTagManagerRow from "./DataTagManagerRow.tsx";
 
 /**
@@ -28,11 +29,19 @@ import DataTagManagerRow from "./DataTagManagerRow.tsx";
 interface Props {
   state: TagAdminState;
   onError?: (message: string) => void;
+  /**
+   * [0.12.5] AI 自动打标签写完之后的**页面级**重读。
+   *
+   * 与 `state.reload()` 分开：那个只重读标签树与走量，而批量打标签还会改应用排行上的
+   * 标签 chip（读的是 override，不是标签树）。少这一个回调的症状是"标签树变了、排行没变"，
+   * 用户会以为没生效再点一次。
+   */
+  onAfterBulkApply?: () => void;
 }
 
 type Notice = { text: string; tone: "ok" | "error" };
 
-export default function DataTagManagerPanel({ state, onError }: Props) {
+export default function DataTagManagerPanel({ state, onError, onAfterBulkApply }: Props) {
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -93,16 +102,27 @@ export default function DataTagManagerPanel({ state, onError }: Props) {
             {state.paths.length} 个标签 · {state.tree.length} 个一级
           </span>
         </div>
-        <button
-          type="button"
-          className="dtm-action flex items-center gap-1 at-text-caption text-[var(--at-text-secondary)]"
-          aria-label="刷新标签列表"
-          disabled={busy}
-          onClick={() => void run(state.reload, "列表已刷新")}
-        >
-          <RefreshCw size={11} strokeWidth={2} className={busy ? "animate-spin" : undefined} />
-          刷新
-        </button>
+        <div className="flex items-center gap-2">
+          {/* [0.12.5] AI 批量打标签：放在这里而不是数据页页头，是因为它改的是**标签**
+              本身（应用的 override.tags、事项的 items.tags），用户此刻正在看这棵树。 */}
+          <AiAutoTagButton
+            onApplied={() => {
+              void state.reload();
+              onAfterBulkApply?.();
+            }}
+            onNotice={(text, tone) => setNotice({ text, tone })}
+          />
+          <button
+            type="button"
+            className="dtm-action flex items-center gap-1 at-text-caption text-[var(--at-text-secondary)]"
+            aria-label="刷新标签列表"
+            disabled={busy}
+            onClick={() => void run(state.reload, "列表已刷新")}
+          >
+            <RefreshCw size={11} strokeWidth={2} className={busy ? "animate-spin" : undefined} />
+            刷新
+          </button>
+        </div>
       </div>
 
       <form

@@ -97,7 +97,20 @@ export type HostIntent =
    * 载荷是**该应用的事项全集**（空数组 = 全部解绑）：执行端做三向 diff，幂等。
    * 发信方必须持有全集才许发 —— 只有一个事项视角的调用方不能发这条（会误删同一应用
    * 在别的事项上的绑定）。字段名与 `src/services/hostIntentBridge.ts` 逐字一致（L9）。 */
-  | { action: "sync_app_item_bindings"; appKey: string; itemIds: readonly number[]; track?: number };
+  | { action: "sync_app_item_bindings"; appKey: string; itemIds: readonly number[]; track?: number }
+  /* ── [0.12.5] AI 自动打标签：逐条写事项标签 ──
+   * 为什么必须是意图：`permissions/activity-host-tags.toml` 只放行标签**目录**的四条
+   * 管理动作（list / create / rename / delete），`set_item_tags` 明确不在其中 ——
+   * 事项标签的逐条写入一直由药丸用它自己的 typed IPC 落库。
+   *
+   * 为什么是「一条意图一个事项」而不是一次发一批：这条通道**没有回执**，批量载荷里的
+   * 某一条失败不会有任何痕迹；逐条发至少让宿主侧的 `setNotice`（若有）指得出是哪一条，
+   * 也避免把一条上百项的事件载荷塞进 `emitTo`。批量编排留在发信侧
+   *（`features/data/services/aiAutoTagApply.ts`）。
+   *
+   * `tags` 是**全量覆盖**（与 `set_item_tags` 一致，不是增量）。字段名与
+   * `src/services/hostIntentBridge.ts` 逐字一致（L9 两侧各写一份，靠镜像用例钉相等）。 */
+  | { action: "set_item_tags"; itemId: number; tags: readonly string[] };
 
 /**
  * 发一条意图。返回「有没有发出去」——**不是**「宿主做成了没有」。

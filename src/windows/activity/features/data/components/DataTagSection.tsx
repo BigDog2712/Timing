@@ -40,7 +40,12 @@ export default function DataTagSection({
     <>
       {/* 数据区域下方的独立区块：层级 / 增删改 / 搜索 */}
       <div className="mt-4">
-        <DataTagManagerPanel state={state} onError={(message) => onToast?.(message, "error")} />
+        <DataTagManagerPanel
+          state={state}
+          onError={(message) => onToast?.(message, "error")}
+          /* 批量打标签会改 override → 排行上的标签 chip 也要重读（同一个 onSaved） */
+          onAfterBulkApply={onSaved}
+        />
       </div>
       {target ? (
         <AppTagDialog

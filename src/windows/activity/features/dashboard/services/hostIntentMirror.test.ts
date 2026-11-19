@@ -92,6 +92,17 @@ describe("HostIntent 两侧镜像", () => {
     expect(gateway).toContain("sync_app_item_bindings{appKey,itemIds,track?}");
     expect(bridge).toContain("sync_app_item_bindings{appKey,itemIds,track?}");
   });
+
+  /* [0.12.5] AI 自动打标签：分析窗没有 `set_item_tags` 写命令（ACL 只给标签目录的四条
+     管理动作），所以逐条写事项标签也只能是一条意图。三条静默失败路径与上面同族：
+     ① 字段名漂（`itemId` 写成 `id`）→ 药丸侧 `tagApi.set(undefined, …)` 报在药丸上；
+     ② `tags` 写成增量语义（`addTags`）→ 用户原有的手填标签被悄悄换掉；
+     ③ 只改一侧。所以字段名逐字钉，且**只允许 `itemId` + `tags` 两个字段** ——
+     多一个字段就意味着这条意图开始承担"全量覆盖"以外的语义，那时应当另开动作而不是加字段。 */
+  it("d02g_set_item_tags_carries_only_itemId_and_tags_on_both_sides", () => {
+    expect(gateway).toContain("set_item_tags{itemId,tags}");
+    expect(bridge).toContain("set_item_tags{itemId,tags}");
+  });
 });
 
 /**

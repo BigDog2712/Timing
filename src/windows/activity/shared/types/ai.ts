@@ -65,6 +65,13 @@ export interface AiSuggestResponse {
     batches?: number;
     failedBatches?: number;
   };
+  /**
+   * 模型新建的标签路径（候选表里没有、按「一级白名单 + 最多两级」过了守门的那些）。
+   * 它们**已经**在 `suggestions[].tags` 里，这里单列一份是为了让调用方在写库之前
+   * 补一条定义行（`tag.def.*`）—— 否则标签只跟着这一条记录存在，改完就散。
+   * 0.12.5 起分析窗侧也读它（`Ai 自动打标签`）。
+   */
+  created?: string[];
 }
 
 export interface AiDailySummary {
