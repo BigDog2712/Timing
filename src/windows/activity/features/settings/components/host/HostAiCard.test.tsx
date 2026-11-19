@@ -133,4 +133,32 @@ describe('AI 设置卡', () => {
     });
     expect(h.aiApi.save).not.toHaveBeenCalled();
   });
+
+  it('ai05_拉到目录后仍能手动输入目录外的型号_并提示可能被拒', async () => {
+    await act(async () => { button('获取可用模型')?.click(); });
+    await flush();
+    const modelSelect = document.getElementById('ai-model') as HTMLSelectElement | null;
+    expect(modelSelect).not.toBeNull();
+    /* 「手动输入…」以前是死选项：选中后什么都不发生，输入框永远不出现。 */
+    await act(async () => {
+      if (!modelSelect) return;
+      modelSelect.value = '__manual__';
+      modelSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    const manualInput = document.body.querySelector<HTMLInputElement>('input[aria-label="手动输入模型名称"]');
+    expect(manualInput).not.toBeNull();
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    await act(async () => {
+      setter?.call(manualInput, 'deepseek-v4.1-flash');
+      manualInput?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(document.body.textContent).toContain('「deepseek-v4.1-flash」不在服务商返回的列表里');
+    /* 提示归提示，仍然允许保存 —— 目录不是全集，拦下来会锁死自建网关。 */
+    await act(async () => { button('保存')?.click(); });
+    await flush();
+    expect(h.aiApi.save).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'deepseek-v4.1-flash' }),
+      undefined,
+    );
+  });
 });
