@@ -113,7 +113,8 @@ interface MainButtonProps {
   warn?: boolean;
   /**
    * [V0.2.6] 右键（对齐 Timing v1.7.3 的 Zone.Ring / OnRingRight）：
-   * 计时中 = 结束并保存；空闲 = 主菜单。按下/抬起都不往上传，避免再被 PillBar 的空白区逻辑接管。
+   * 通用右键入口。按定时器状态绑定动作——但**不能再绑 `timer.stop`**：
+   * [B4 · P2 §1.2 / A4] 不可逆动作不许有本体层直达入口，结束只在计时小面板里。
    */
   onMenu?: (pos: { x: number; y: number }) => void;
 }
@@ -167,7 +168,7 @@ export function MainButton({
             }
           : undefined
       }
-      aria-label={onMenu ? `${label}（右键结束或菜单）` : label}
+      aria-label={onMenu ? `${label}（右键可打开菜单）` : label}
     >
       <svg className="ring__arc" viewBox="0 0 16 16" aria-hidden>
         {arc.track && <path className="ring__arc-track" d={ARC_PATH} />}

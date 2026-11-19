@@ -186,7 +186,7 @@ describe('交互契约不因改结构而回退', () => {
   it('onClick 仍挂在环上；带 onMenu 时 aria-label 追加右键提示', () => {
     let clicked = 0;
     const r = render({ onClick: () => { clicked += 1; }, onMenu: () => undefined });
-    expect(r.ring.getAttribute('aria-label')).toBe('测试环（右键结束或菜单）');
+    expect(r.ring.getAttribute('aria-label')).toBe('测试环（右键可打开菜单）');
     act(() => {
       r.ring.click();
     });

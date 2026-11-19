@@ -165,11 +165,13 @@ export function PillBar() {
     pauseAndOpenMoyu();
   }, [armedSec, currentItemId, status, beginCreate, pauseAndOpenMoyu]);
 
-  /* [V0.2.6] Zone.Time 左键：计时中/暂停 = 与圆环相同；空闲 = 正计时 ⇄ 倒计时切换
-     （对齐 ToggleCountdownMode：切到倒计时用「默认倒计时时长」，再点回正计时） */
+  /* [V0.2.6] Zone.Time 左键：
+     · 计时中 / 暂停 = **展开计时小面板**（[B4 · P2 §1.2 / A4]「结束并保存」只在那里面）；
+     · 空闲 = 正计时 ⇄ 倒计时切换（对齐 ToggleCountdownMode：切到倒计时用「默认倒计时时长」，再点回正计时）。
+     原先计时中点数字=暂停、右键圆环/Enter=直接结束，都属于「不可逆动作放在本体层单击直达」，已按 A4 撤掉。 */
   const onTimeClick = useCallback(() => {
     if (status !== 'idle') {
-      onRingClick();
+      openPanel('timer');
       return;
     }
     if (armedSec != null) {
@@ -182,7 +184,7 @@ export function PillBar() {
     const duration = readCountdownDuration(defaultSec);
     arm(duration);
     useUiStore.getState().openCountdownCard(posBelowBar({ x: 32, y: 56 }));
-  }, [status, onRingClick, armedSec, clearArm, arm, defaultSec, posBelowBar]);
+  }, [status, openPanel, armedSec, clearArm, arm, defaultSec, posBelowBar]);
   // 注：`openCountdownMenu` / `currentItemId` 曾列在依赖里但函数体内未使用（lint 已报
   // unnecessary-dependencies）。去掉不改变行为——两者都不是这里的闭包读取项。
 
@@ -242,15 +244,18 @@ export function PillBar() {
         countdown={isCountdown || armedIdle}
         progress={isCountdown && session?.targetSec ? remaining / session.targetSec : 1}
         warn={nearEnd}
-        /* [V0.3.1] 右键主菜单删除后：空闲右键什么也不弹；计时中右键仍 = 结束并保存 */
-        onMenu={status === 'idle' ? undefined : () => void actions.stop()}
+        /* [B4 · P2 §1.2 / A4] 原先「计时中右键圆环 = 结束并保存」在这里。
+           它是最不可逆的动作（`timer.stop` 标了 irreversible）却占本体层单击直达，
+           已撤掉：结束只剩面板内带确认的按钮；右键圆环现在什么也不做。 */
       />
       <TimerDisplay
         seconds={displaySec}
         mode={isCountdown || armedIdle ? 'countdown' : 'countup'}
         tone={nearEnd ? 'warn' : 'default'}
-        /* [V0.2.6] Zone.Time 左键：计时中 = 与圆环相同（暂停/继续）；空闲 = 正计时 ⇄ 倒计时切换 */
+        /* [V0.2.6] Zone.Time 左键：计时中/暂停 = 展开计时小面板（A4）；
+           空闲 = 正计时 ⇄ 倒计时切换 */
         onActivate={onTimeClick}
+        opensPanel={status !== 'idle'}
         /* [P2] 对齐 Timing v1.7.3 的 Zone.Time 右键（MainForm.cs OnMouseUp → ToggleCountdownMode）：
            空闲时右键数字**直接切倒计时**——一次给齐九档预设 / 输入分秒 / 改为正计时 / 开始倒计时。
            [V0.3.2] 暂停态右键数字改开**摸鱼菜单**（快捷换件事 + 定长）；计时中仍不弹菜单。 */

@@ -9,6 +9,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { usePillKeyboard } from './usePillKeyboard';
+import { useUiStore } from '../stores/uiStore';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -102,16 +103,30 @@ describe('Space（焦点在圆环上）', () => {
 });
 
 describe('Enter / 焦点不在圆环（回归）', () => {
-  it('paused + Enter → stop 一次', () => {
+  /* [B4 · P2 §1.2 / A4] Enter 的语义从「一键结束并保存」改成「展开计时小面板」：
+     不可逆动作不许有本体层直达入口，必须先看到面板再确认。 */
+  it('paused + Enter → 展开计时面板，且不直接 stop', () => {
+    useUiStore.setState({ panel: 'none' });
     const h = mount('paused');
     h.press('Enter');
-    expect(h.stop).toHaveBeenCalledTimes(1);
+    expect(useUiStore.getState().panel).toBe('timer');
+    expect(h.stop).not.toHaveBeenCalled();
     expect(h.togglePause).not.toHaveBeenCalled();
   });
 
-  it('idle + Enter → 不 stop（空闲无计时可结束）', () => {
+  it('running + Enter → 同样只展开面板（不结束）', () => {
+    useUiStore.setState({ panel: 'none' });
+    const h = mount('running');
+    h.press('Enter');
+    expect(useUiStore.getState().panel).toBe('timer');
+    expect(h.stop).not.toHaveBeenCalled();
+  });
+
+  it('idle + Enter → 什么都不做（空闲无会话可结束，也没有面板可开）', () => {
+    useUiStore.setState({ panel: 'none' });
     const h = mount('idle');
     h.press('Enter');
     expect(h.stop).not.toHaveBeenCalled();
+    expect(useUiStore.getState().panel).toBe('none');
   });
 });

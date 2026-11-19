@@ -256,3 +256,55 @@
 .state-block p {
   margin: 0;
 }
+
+/* =============================================================================
+ * 计时小面板（[B4] P2 §1.2 / A4）
+ * -----------------------------------------------------------------------------
+ * 「结束并保存」的唯一入口。与 `.records` / `.today-digest` 共用 `.panel` 基类
+ * （宽度 / 底 / 描边 / 投影 / 入场动画），这里只补它自己的排版。
+ * 一处强调色规则（P1 §4.4：面板同屏 ≤2 处）：平时只有计时数字带状态色，
+ * 按钮走中性 secondary；只有在**确认步**才让 danger 出现一次。
+ * ========================================================================== */
+.timer-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.timer-panel__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.timer-panel__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-strong);
+  color: var(--ink);
+}
+
+.timer-panel__meta {
+  flex: 0 0 auto;
+  font-size: var(--text-cap);
+  letter-spacing: var(--tracking-caps);
+  color: var(--muted);
+}
+
+/* 数字：`.timer-digits[data-size="lg"]` 已由 05-typography-rules 给到 28px，
+   这里只管它在面板里的对齐（右侧贴齐，跟药丸上的基线观感一致） */
+.timer-panel .timer-digits {
+  align-self: flex-end;
+}
+
+.timer-panel__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}

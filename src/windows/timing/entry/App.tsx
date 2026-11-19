@@ -21,6 +21,7 @@ import { NoteWindow } from '../components/note/NoteWindow';
 import { NotesListPopover } from '../components/note/NotesListPopover';
 import { ItemPicker } from '../components/panel/ItemPicker';
 import { PillBar } from '../components/pill/PillBar';
+import { TimerPanel } from '../components/pill/TimerPanel';
 import { RecordsPanel } from '../components/records/RecordsPanel';
 import { RecoverDialog } from '../components/recover/RecoverDialog';
 import { TodayDigest } from '../components/todos/TodayDigest';
@@ -205,6 +206,7 @@ function MainWindow() {
         {collapsed ? <CollapsedDot /> : <PillBar />}
         {!collapsed && <UndoBar />}
         {!collapsed && panel === 'create' && <ItemPicker />}
+        {!collapsed && panel === 'timer' && <TimerPanel />}
         {!collapsed && panel === 'records' && <RecordsPanel />}
         {!collapsed && panel === 'digest' && <TodayDigest onClose={() => useUiStore.getState().closePanel()} onViewRecords={() => { useUiStore.getState().closePanel(); void openTodosWindow(); }} />}
       </div>

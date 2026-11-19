@@ -8,9 +8,11 @@ import { create } from 'zustand';
 import { UNDO_WINDOW_MS } from '../types/domain';
 import type { ReminderTarget, TimeRecord, TodoNudge } from '../types/domain';
 
-export type PanelKind = 'none' | 'create' | 'records' | 'digest';
+export type PanelKind = 'none' | 'create' | 'records' | 'digest' | 'timer';
 /* [0.12.1 T04b] 原 `'settings'` 已从联合类型里删掉：药丸内联设置面板下线后，药丸里
    再没有任何一支渲染它（设置只有一个家 = 分析窗的 settings 视图）。 */
+/* [B4 · P2 §1.2 / A4] `'timer'` = 计时小面板：点计时数字（或圆环上按 Enter）展开，
+   **「结束并保存」只在这里**——不可逆动作从本体层的单击直达降级为面板内带确认的按钮。 */
 
 export interface Notice {
   text: string;
