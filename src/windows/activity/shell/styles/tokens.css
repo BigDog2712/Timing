@@ -87,7 +87,9 @@
 
   --at-space-page: 24px;
   --at-space-section: 20px;
-  --at-space-group: 14px;
+  /* [B3 刻度统一刻意变更] --at-space-group 14→12：14 不在 4px 栅格（P1 §3.1），
+     取近档 12=--space-3。消费点见 settings/dashboard 分组间距，整体收紧 2px。 */
+  --at-space-group: 12px;
   --at-row-height: 42px;
   /* 顶栏 52 = 长档基准（1100×736）。短档 44 的覆盖只写在 topbar.css 的
    * @media (max-height: 735.98px) 里，不在这里重复定义第二个真相源。全仓消费点只有
