@@ -137,7 +137,7 @@
   align-items: center;
   justify-content: center;
   border: 1.3px solid var(--at-border-strong);
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   background: none;
   color: var(--at-bg-panel);
 }
@@ -172,7 +172,7 @@
 .at-todo-title {
   min-width: 0;
   overflow: hidden;
-  font-size: 12.5px;
+  font-size: var(--at-font-size-caption);
   line-height: 19px;
   color: var(--at-text-primary);
   text-overflow: ellipsis;
@@ -191,10 +191,10 @@
   height: 18px;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: var(--at-radius-chip);
   background: color-mix(in srgb, var(--at-accent-default) 9%, transparent);
   text-align: center;
-  font-size: 10.5px;
+  font-size: var(--at-font-size-compact);
   font-variant-numeric: tabular-nums;
   line-height: 18px;
   color: var(--at-text-secondary);

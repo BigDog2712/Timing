@@ -145,7 +145,7 @@
   width: 10px;
   height: 10px;
   border: 1px solid var(--at-border-subtle);
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   background: var(--at-app-edit-swatch, transparent);
 }
 

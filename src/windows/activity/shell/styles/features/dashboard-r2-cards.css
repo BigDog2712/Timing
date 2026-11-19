@@ -289,7 +289,7 @@
 
 /* 设备角标：只在同一事项行出现 ≥2 台设备时渲染（`buildDeviceLanes` 决定），单设备零元素。 */
 .at-timeline-child-device {
-  padding: 0 4px; border: 1px solid var(--at-border-subtle); border-radius: 999px;
-  color: var(--at-text-tertiary); font-size: 10px; font-variant-numeric: tabular-nums;
+  padding: 0 4px; border: 1px solid var(--at-border-subtle); border-radius: var(--at-radius-full);
+  color: var(--at-text-tertiary); font-size: var(--at-font-size-compact); font-variant-numeric: tabular-nums;
   line-height: 14px; white-space: nowrap;
 }

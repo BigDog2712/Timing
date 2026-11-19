@@ -134,7 +134,7 @@
   align-items: center;
   gap: 3px;
   min-width: 0;
-  font-size: 10.5px;
+  font-size: var(--at-font-size-compact);
   font-variant-numeric: tabular-nums;
   line-height: 14px;
   color: var(--at-text-tertiary);
@@ -150,10 +150,10 @@
   height: 24px;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--at-radius-chip);
   background: transparent;
   color: var(--at-text-tertiary);
-  font-size: 11.5px;
+  font-size: var(--at-font-size-caption);
   line-height: 24px;
   text-align: center;
   cursor: pointer;
@@ -213,19 +213,19 @@
    * 挤成 26 / 15 那种高度 —— 结果是"看起来没坏、行高却不是 30 了"，而不是出滚动条
    * （`.at-readout` 那次踩的就是这个）。放不下就由上面那条 `overflow-y: auto` 兜。 */
   flex: 0 0 auto;
-  font-size: 11.5px;
+  font-size: var(--at-font-size-caption);
   line-height: 15px;
 }
 
 .at-timeline-time {
   color: var(--at-text-tertiary);
-  font-size: 11.5px;
+  font-size: var(--at-font-size-caption);
   font-variant-numeric: tabular-nums;
 }
 
 .at-timeline-label {
   color: var(--at-text-primary);
-  font-size: 12.5px;
+  font-size: var(--at-font-size-caption);
   line-height: 19px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -234,7 +234,7 @@
 
 .at-timeline-duration {
   color: var(--at-text-secondary);
-  font-size: 11.5px;
+  font-size: var(--at-font-size-caption);
   font-variant-numeric: tabular-nums;
 }
 
@@ -245,6 +245,6 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--at-font-size-caption);
   line-height: 15px;
 }

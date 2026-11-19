@@ -116,7 +116,7 @@
 /* 标题 13.5（Rust `app.rs:422` 的 `text_b(..., 13.5, th.text)`） */
 .at-card-title {
   margin: 0;
-  font-size: 13.5px;
+  font-size: var(--at-font-size-body);
   font-weight: var(--at-font-weight-emphasis);
   line-height: 18px;
   color: var(--at-text-primary);
@@ -135,7 +135,7 @@
    * 也就是读数右端离卡右缘 74 —— 中间那 34 是给 `⋯` 让的位（`⋯` 占 right−40..−16）。
    * 不写这条，读数会紧贴 `⋯`，卡头看着就"挤"。 */
   margin-right: 30px;
-  font-size: 11px;
+  font-size: var(--at-font-size-caption);
   font-variant-numeric: tabular-nums;
   line-height: 15px;
   color: var(--at-text-secondary);
@@ -195,7 +195,7 @@
   border: 0;
   background: none;
   text-align: left;
-  font-size: 10.5px;
+  font-size: var(--at-font-size-compact);
   font-weight: var(--at-font-weight-medium);
   line-height: var(--at-card-foot-h);
   color: var(--at-text-secondary);
@@ -241,7 +241,7 @@
   min-height: 0;
   align-items: center;
   justify-content: center;
-  font-size: 12.5px;
+  font-size: var(--at-font-size-caption);
   line-height: 18px;
   color: var(--at-text-tertiary);
   text-align: center;

@@ -290,7 +290,7 @@
   outline-offset: 2px;
 }
 .items-prefs__tag-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
-.items-prefs__tag-chip { max-width: 100%; padding: 1px 6px; border: 1px solid var(--line, rgba(128,128,128,.35)); border-radius: 999px; background: transparent; color: var(--ink-2); font-size: var(--text-xs); line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.items-prefs__tag-chip { max-width: 100%; padding: 1px 6px; border: 1px solid var(--line, rgba(128,128,128,.35)); border-radius: var(--radius-full); background: transparent; color: var(--ink-2); font-size: var(--text-xs); line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .items-prefs__tag-chip:hover:not(:disabled) { color: var(--ink-1, var(--ink-2)); border-color: currentColor; }
 .items-prefs__tag-hint { margin: 0; color: var(--ink-3); font-size: var(--text-caption); }
 .cascade-delete { width: 236px; }

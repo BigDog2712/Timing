@@ -16,7 +16,7 @@ html[data-window-label="main"] #root {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--at-font-size-caption);
   font-weight: var(--at-font-weight-medium);
   color: var(--at-text-secondary);
 }
@@ -52,7 +52,7 @@ html[data-window-label="main"] #root {
   gap: 7px;
   min-height: 28px;
   max-width: 230px;
-  border-radius: 8px;
+  border-radius: var(--at-radius-control);
   border: 1px solid var(--at-border-subtle);
   background: var(--at-bg-panel);
   padding: 3px 6px;
@@ -90,7 +90,7 @@ html[data-window-label="main"] #root {
 .at-color-trigger-swatch {
   width: 14px;
   height: 14px;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   border: 1px solid var(--at-border-subtle);
   flex-shrink: 0;
 }
@@ -100,7 +100,7 @@ html[data-window-label="main"] #root {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  border-radius: 6px;
+  border-radius: var(--at-radius-chip);
   border: 1px solid var(--at-border-subtle);
   background: var(--at-bg-elevated);
   padding: 1px 6px;
@@ -120,7 +120,7 @@ html[data-window-label="main"] #root {
   position: fixed;
   z-index: 120;
   width: 288px;
-  border-radius: 12px;
+  border-radius: var(--at-radius-panel);
   border: 1px solid var(--at-border-subtle);
   background: var(--at-bg-panel);
   box-shadow: var(--at-shadow-overlay);
@@ -162,7 +162,7 @@ html[data-window-label="main"] #root {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 7px;
+  border-radius: var(--at-radius-chip);
   border: 1px solid var(--at-border-subtle);
   background: var(--at-bg-panel);
   color: var(--at-text-tertiary);
@@ -182,7 +182,7 @@ html[data-window-label="main"] #root {
   position: relative;
   width: 100%;
   aspect-ratio: 1.35 / 1;
-  border-radius: 9px;
+  border-radius: var(--at-radius-control);
   border: 1px solid var(--at-border-subtle);
   cursor: crosshair;
   background:
@@ -195,7 +195,7 @@ html[data-window-label="main"] #root {
   width: 10px;
   height: 10px;
   border: 2px solid white;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   box-shadow: 0 0 0 1px rgba(18, 24, 35, 0.35);
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -288,7 +288,7 @@ html[data-window-label="main"] #root {
 .at-color-text-input,
 .at-color-number-input {
   min-height: 30px;
-  border-radius: 8px;
+  border-radius: var(--at-radius-control);
   border: 1px solid var(--at-border-subtle);
   background: var(--at-bg-panel);
   color: var(--at-text-primary);

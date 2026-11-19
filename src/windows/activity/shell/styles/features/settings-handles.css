@@ -109,7 +109,7 @@
 .settings-handle-card__foot :focus-visible {
   outline: 2px solid var(--at-accent-default);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--at-radius-chip);
 }
 
 /* 手柄选择器最多 13 条动作：三列并排后每张卡只有 ~300px，选择器按内容取宽

@@ -43,7 +43,7 @@
   display: block;
   width: 2px;
   height: 2px;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   background: currentColor;
   box-shadow:
     4px 0 currentColor,
@@ -71,7 +71,7 @@
   height: 24px;
   padding: 0;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--at-radius-chip);
   background: none;
   color: var(--at-text-tertiary);
   cursor: pointer;

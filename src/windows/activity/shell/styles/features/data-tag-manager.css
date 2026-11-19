@@ -9,7 +9,7 @@
  * 且换宿主色时自动跟随（不写死 hex，理由同 tokens.css 的派生色一节）。
  */
 .dtm-row {
-  border-radius: 8px;
+  border-radius: var(--at-radius-control);
   transition: background-color var(--at-motion-fast) var(--at-motion-ease);
 }
 
@@ -140,7 +140,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   color: var(--at-text-tertiary);
   transition:
     color var(--at-motion-fast) var(--at-motion-ease),

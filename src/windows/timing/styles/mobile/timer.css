@@ -158,7 +158,7 @@
   background: var(--bg-card);
   border: 1px solid var(--line);
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--text-title);
 }
 
 .m-timer__hint {

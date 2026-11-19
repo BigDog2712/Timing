@@ -187,7 +187,7 @@
   width: 7px;
   height: 7px;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
 }
 
 .history-horizontal-timeline-legend-label {
@@ -251,7 +251,7 @@
   width: 7px;
   height: 7px;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
 }
 
 .history-horizontal-timeline-legend-more-tooltip-label {
@@ -314,7 +314,7 @@
   width: 7px;
   height: 7px;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   background: var(--tooltip-color);
 }
 
@@ -600,7 +600,7 @@
   width: 8px;
   height: 8px;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
 }
 
 .history-timeline-lane-label {
@@ -770,7 +770,7 @@
   align-items: start;
   min-width: 0;
   border: 1px solid var(--at-border-subtle);
-  border-radius: 7px;
+  border-radius: var(--at-radius-chip);
   background: var(--at-bg-panel);
   color: var(--at-text-secondary);
   font-size: var(--at-font-size-caption);

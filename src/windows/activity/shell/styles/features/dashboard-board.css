@@ -103,7 +103,7 @@
 .at-board-handle::after {
   content: "";
   position: absolute;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   background: var(--at-border-strong, rgb(0 0 0 / 18%));
 }
 .at-board-handle-e {
@@ -182,7 +182,7 @@
 .at-board-hint {
   margin: 8px 0 4px;
   text-align: center;
-  font-size: 11px;
+  font-size: var(--at-font-size-caption);
   line-height: 15px;
   color: var(--at-text-tertiary);
 }
@@ -194,7 +194,7 @@
   z-index: 45;
   transform: translateX(-50%);
   padding: 7px 14px;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   background: var(--at-bg-elevated);
   outline: 1px solid var(--at-border-subtle);
   font-size: var(--at-font-size-caption);
@@ -208,7 +208,7 @@
 .at-add-card__count {
   margin-left: auto;
   flex: 0 0 auto;
-  font-size: 11px;
+  font-size: var(--at-font-size-caption);
   color: var(--at-text-tertiary);
   white-space: nowrap;
 }
@@ -223,7 +223,7 @@
   padding: 4px 6px 2px;
 }
 .at-card-menu-label {
-  font-size: 11px;
+  font-size: var(--at-font-size-caption);
   line-height: 15px;
   color: var(--at-text-tertiary);
 }

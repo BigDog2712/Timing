@@ -228,7 +228,7 @@
   align-items: flex-start;
   justify-content: center;
   gap: 7px;
-  border-radius: 8px;
+  border-radius: var(--at-radius-control);
   border: 1px solid var(--at-border-subtle);
   background: var(--at-bg-panel);
   padding: 8px 10px;
@@ -282,7 +282,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border-radius: 7px;
+  border-radius: var(--at-radius-chip);
   border: 1px solid var(--at-border-subtle);
   background: var(--at-bg-panel);
   padding: 5px 8px;
@@ -363,7 +363,7 @@
   justify-content: space-between;
   gap: 12px;
   border: 1px solid var(--at-border-subtle);
-  border-radius: 8px;
+  border-radius: var(--at-radius-control);
   background: var(--at-bg-panel);
   padding: 8px 10px 8px 12px;
 }

@@ -55,7 +55,7 @@
 
 /* 「今日合计」10（`focus.rs:121`） */
 .at-donut-cap {
-  font-size: 10px;
+  font-size: var(--at-font-size-compact);
   line-height: 13px;
   color: var(--at-text-tertiary);
 }
@@ -82,7 +82,7 @@
   grid-template-rows: 15px 13px;
   align-content: center;
   height: 30px;
-  border-radius: 6px;
+  border-radius: var(--at-radius-chip);
   color: var(--at-text-secondary);
 }
 
@@ -96,14 +96,14 @@
   width: 7px;
   height: 7px;
   margin-left: 5.5px;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
 }
 
 /* 名称 12 / 15（Rust `focus.rs:161` 的 `label(..., 12.0, th.text, ...)`） */
 .at-readout-name {
   min-width: 0;
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--at-font-size-caption);
   line-height: 15px;
   color: var(--at-text-primary);
   text-overflow: ellipsis;
@@ -115,7 +115,7 @@
   grid-column: 2;
   min-width: 0;
   overflow: hidden;
-  font-size: 10px;
+  font-size: var(--at-font-size-compact);
   font-variant-numeric: tabular-nums;
   line-height: 13px;
   color: var(--at-text-tertiary);
@@ -152,7 +152,7 @@
   align-items: center;
   gap: 8px;
   height: var(--at-row-items);
-  border-radius: 8px;
+  border-radius: var(--at-radius-control);
 }
 
 .at-item-row:hover { background: var(--at-surface-raise); }
@@ -170,7 +170,7 @@
 /* 裸条 4 → 6：行高 30 里 4px 的条太细，6px 才在 13px 名字旁边立得住 */
 .at-item-bar {
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   background: var(--at-chart-track);
   overflow: hidden;
 }
@@ -178,7 +178,7 @@
 .at-item-bar > span {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--at-radius-full);
   background: currentColor;
 }
 

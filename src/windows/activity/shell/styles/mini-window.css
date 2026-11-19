@@ -22,7 +22,7 @@ html[data-window-label="mini"] #root {
   overflow: hidden;
   box-sizing: border-box;
   color: var(--at-text-primary);
-  font-size: 12px;
+  font-size: var(--at-font-size-caption);
 }
 
 .mini-shell:focus { outline: none; }
@@ -97,7 +97,7 @@ html[data-window-label="mini"] #root {
 .mini-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; }
 .mini-daily-summary { height: 36px; align-items: flex-start; padding-top: 2px; border-bottom: 1px solid var(--at-border-subtle); }
 .mini-daily-total { min-width: 0; white-space: nowrap; }
-.mini-daily-total .mini-duration { font-size: 14px; font-weight: 500; color: var(--at-text-primary); }
+.mini-daily-total .mini-duration { font-size: var(--at-font-size-body); font-weight: 500; color: var(--at-text-primary); }
 .mini-daily-range { padding-top: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--at-text-tertiary); }
 .mini-duration { flex-shrink: 0; color: var(--at-text-secondary); font-variant-numeric: tabular-nums; }
 .mini-activity-content { display: flex; flex-direction: column; }
@@ -147,7 +147,7 @@ html[data-window-label="mini"] #root {
 .mini-handle > span { width: 38px; height: 4px; background: var(--mini-status-color); border-radius: var(--at-radius-control); }
 .mini-shell[data-edge="left"] .mini-handle > span,
 .mini-shell[data-edge="right"] .mini-handle > span { width: 4px; height: 32px; }
-.mini-error { position: absolute; bottom: 5px; left: 5px; right: 5px; padding: 5px 8px; background: var(--at-bg-panel); color: var(--at-danger); font-size: 11px; }
+.mini-error { position: absolute; bottom: 5px; left: 5px; right: 5px; padding: 5px 8px; background: var(--at-bg-panel); color: var(--at-danger); font-size: var(--at-font-size-caption); }
 .app-titlebar-mini-error { position: absolute; top: 40px; right: 12px; z-index: 10; padding: 8px 12px; color: var(--at-danger); background: var(--at-bg-panel); border: 1px solid var(--at-border-subtle); border-radius: var(--at-radius-control); }
 
 @media (forced-colors: active) {

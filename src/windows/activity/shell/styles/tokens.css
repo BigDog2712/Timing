@@ -76,11 +76,18 @@
    * 系的数据管理/设置两视图），改它等于改那些视图的排版；卡片层单独一条。
    * `-drag` 留给下一批的拖拽态（本批无消费者，见 dashboard-surface.css 顶部）。 */
   --at-radius-card: 18px;
-  --at-radius-card-drag: 22px;
+  /* [B3 刻度统一刻意变更 · P1 §3.2 五档 6/10/14/18/9999]
+   *   card-drag 22→18（并入大卡档，拖拽态不再比静态更圆）、button 8→10（并入控件档）、
+   *   chip 8→6（并入小控件档，与主窗 sm 对齐）。panel 14 / card 18 本就在档，不动。
+   *   timeline-segment 2 / window-corner 8 属几何专用值，不并档、单列保留。 */
+  --at-radius-card-drag: 18px;
   --at-radius-control: 10px;
-  --at-radius-button: 8px;
-  --at-radius-chip: 8px;
+  --at-radius-button: 10px;
+  --at-radius-chip: 6px;
   --at-radius-timeline-segment: 2px;
+  /* 全圆：分析窗此前无此令牌，30 处写 999px 裸值；999 与 9999 对任意实际元素都夹到 h/2，
+   * 渲染完全等价（零像素），收口为单一令牌，与主窗 --radius-full 对齐。 */
+  --at-radius-full: 9999px;
 
   --at-shadow-overlay: 0 10px 24px rgba(17, 24, 39, 0.08);
   --at-shadow-toast: 0 8px 20px rgba(17, 24, 39, 0.1);

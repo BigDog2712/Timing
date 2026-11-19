@@ -55,7 +55,7 @@
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 2px;
-  font-size: 10px;
+  font-size: var(--at-font-size-compact);
   font-variant-numeric: tabular-nums;
   line-height: 14px;
   color: var(--at-text-tertiary);
@@ -109,7 +109,7 @@
 
 /* 轴标签 9.5（Rust `trend.rs:124`） */
 .at-trend__label {
-  font-size: 9.5px;
+  font-size: var(--at-font-size-compact);
   line-height: 13px;
   color: var(--at-text-tertiary);
   font-variant-numeric: tabular-nums;

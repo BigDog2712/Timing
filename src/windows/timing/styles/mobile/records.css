@@ -58,7 +58,7 @@
 }
 
 .m-dist__name {
-  font-size: 14px;
+  font-size: var(--text-title);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

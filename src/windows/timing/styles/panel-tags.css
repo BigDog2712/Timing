@@ -6,7 +6,7 @@
  */
 .panel__tags { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-top: var(--space-1); }
 .panel__tag-label { color: var(--ink-3); font-size: var(--text-caption); }
-.panel__tag-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px; border: 1px solid var(--line, rgba(128, 128, 128, 0.35)); border-radius: 999px; background: transparent; color: var(--ink-2); font-size: var(--text-xs); line-height: 1.6; cursor: pointer; }
+.panel__tag-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 6px; border: 1px solid var(--line, rgba(128, 128, 128, 0.35)); border-radius: var(--radius-full); background: transparent; color: var(--ink-2); font-size: var(--text-xs); line-height: 1.6; cursor: pointer; }
 .panel__tag-chip:hover:not(:disabled) { color: var(--ink-1, var(--ink-2)); border-color: currentColor; }
 .panel__tag-chip:focus-visible,
 .panel__tag-input:focus-visible { outline: 2px solid var(--focus-ring, var(--accent)); outline-offset: 2px; }
