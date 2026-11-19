@@ -131,19 +131,24 @@
   gap: var(--space-2);
 }
 
+/* [B5c 修复] 折叠按钮现在被桥外的 `FoldBlock`（「把手绑定」）复用，所以这三个
+   宿主遗留令牌必须带 fallback —— 否则桥外 `border-radius`/`color`/`background` 整条失效
+   （变量解析不到 = computed-value 阶段无效 = 取初始值，不是"继承父级"）。
+   fallback 与 `.settings-host-sync { }` 桥里的值同值，桥内视觉零变化。详见
+   `settings-data.css` 文件头的「为什么每个宿主遗留令牌都带 fallback」。 */
 .sync__fold-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 26px;
   height: 26px;
-  border-radius: var(--radius-sm);
-  color: var(--ink-3);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--ink-3, var(--at-text-tertiary));
 }
 
 .sync__fold-btn:hover {
-  background: var(--bg-seg);
-  color: var(--ink);
+  background: var(--bg-seg, var(--at-bg-elevated));
+  color: var(--ink, var(--at-text-primary));
 }
 
 .sync__grid {

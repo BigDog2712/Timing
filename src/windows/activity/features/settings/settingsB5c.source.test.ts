@@ -62,6 +62,21 @@ describe('[B5c] ① 把手绑定折进折叠块，且锚点在可见头部', () 
     expect(maxScrollAt, '找不到可滚量那行（改了写法要同批改本条）').toBeGreaterThan(-1);
     expect(revealAt).toBeLessThan(maxScrollAt);
   });
+
+  it('b5c08_the_fold_title_level_is_configurable_and_the_handles_card_uses_h2', () => {
+    /* 「把手绑定」折进第 3 组后直接挂在页级 `<h1>设置` 下面（同页其它卡由
+       `SettingsPanelHeader` 画 `h2`）。壳默认 `h4` 是给嵌在 `h2` 卡里的六块数据卡用的，
+       直接复用到这里是 `h1 → h4` 跳两级 —— 读屏大纲断档，而这条在类型检查和用例里都
+       看不出来，只能靠结构判据钉住。 */
+    /* 壳：层级可配、默认 `h4`（六个既有调用点一个字不用改） */
+    expect(FOLD).toContain("titleAs?: 'h2' | 'h3' | 'h4';");
+    expect(FOLD).toContain("titleAs = 'h4'");
+    /* 壳：标题走变量，没有把标签名写死在 JSX 里 */
+    expect(FOLD).toContain('<TitleTag className="data__block-title">');
+    expect(FOLD).not.toContain('<h4 className=');
+    /* 调用点：这张卡传 `h2`，与 `SettingsPanelHeader` 的卡片平级 */
+    expect(HANDLES).toContain('titleAs="h2"');
+  });
 });
 
 describe('[B5c] ② 开机自启只剩一个入口（D5）', () => {

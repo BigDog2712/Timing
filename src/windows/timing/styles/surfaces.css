@@ -180,9 +180,14 @@
 }
 
 /* [B4 · P2 §2.3] 把手露出时机：
-   · 露出（hover / 键盘聚焦 / 有浮层展开）→ 立即，150ms 淡入；
-   · 收起 → **延迟 200ms（--dur-base）再淡出**，给鼠标从药丸移向把手的缓冲，
-     否则手一抖把手刚露就消失、够不着（验收口径「延迟淡出不小于 150ms」）。
+   · 露出（hover / 键盘聚焦 / 有浮层展开）→ **立即**淡入（`transition-delay: 0ms`），
+     时长与淡出同一个 duration = 180ms（`--dur-exit`）；
+   · 收起 → **延迟 200ms（`--dur-base`）再淡出**，给鼠标从药丸移向把手的缓冲，
+     否则手一抖把手刚露就消失、够不着。
+   → 验收口径：**鼠标离开后延迟 200ms 再淡出**（原写「不小于 150ms」与实现不符，已按
+     P2 §5.2 第 10 条实测校正）。两个数别混：**延迟 200ms（`--dur-base`）+ 淡出本身
+     180ms（`--dur-exit`）**，落地形状就是下面这行 `transition: opacity var(--dur-exit)
+     var(--ease-standard) var(--dur-base)`；令牌值见 `tokens/01-primitives.css`。
    实现方式：把 delay 写进「隐藏」这一侧的 transition，露出那一侧再把它归零——
    同一个 opacity 过渡，进/出两侧拿不同 delay，纯 CSS 即可，不需要 JS 定时器。 */
 .pill__handle svg {

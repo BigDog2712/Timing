@@ -114,6 +114,10 @@ export default function SettingsHandlesPanel({ id = "s-pill-handles" }: Settings
       id={id}
       title="把手绑定"
       hint="三形态 × 5 槽，改完即生效"
+      /* [B5c] 这张卡直接挂在页级 `<h1>设置` 下面（第 3 组没有 h2 外壳），而数据卡六块嵌在
+         「数据与同步」的 `h2` 卡里。所以同一套 `FoldBlock` 壳在这里要用 `h2`，与
+         `SettingsPanelHeader` 的 `h2` 平级 —— 否则 `h1 → h4` 跳两级，读屏大纲断档。 */
+      titleAs="h2"
     >
       <p className="at-text-caption text-[var(--at-text-tertiary)]">
         每个形态可以单独启用；同一形态里「左键 / 右键」是单击，「左双击 / 右双击」是同键双击。

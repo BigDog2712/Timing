@@ -16,6 +16,10 @@
  * 参数默认值改掉（不是每个调用点传 `false`）是为了防下一个调用点不小心拿到 true。
  * 「晚到的值修正一次」那个 effect **保留不动**：`defaultOpen` 恒 false 后它无事可做，
  * 但删它属于顺手重构，本轮不做（PRD §3.2）。
+ *
+ * [B5c] **`titleAs`：标题层级可配**（默认 `h4`）。同一个壳跨组复用时，块在页面标题大纲里的
+ * 层级得跟着父级走 —— 数据卡嵌在 `h2` 卡里用 `h4`，「把手绑定」直接挂在页级 `h1` 下用 `h2`。
+ * 详见 prop 注释里的「为什么不用 sr-only 补一个 h2」。
  */
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -50,6 +54,19 @@ interface FoldBlockProps {
   /** 这一块被改过（标题旁显示「未保存」） */
   dirty?: boolean;
   defaultOpen?: boolean;
+  /**
+   * 标题的标签层级，默认 `'h4'`。
+   *
+   * 为什么可配：六块数据卡的父级是「数据与同步」那张 `h2` 卡，标题用 `h4` 在它下面是顺的；
+   * 但「把手绑定」折进第 3 组后直接挂在页级 `<h1>` 下面（设置页没有 `h2` 包着它），
+   * `h1 → h4` 跳了两级，读屏的标题大纲会断档。给它 `'h2'` 就与同页其它卡片平级。
+   *
+   * 为什么不用 `sr-only` 补一个 `h2`：那会让**同一张卡出现两个标题**，正是 B5c 换成
+   * `FoldBlock` 时要避开的那个问题（一张卡两个标题比跳级更糟）。
+   *
+   * 默认值取 `'h4'` 而不是必填：六个既有调用点一个字不用改，行为与之前完全一致。
+   */
+  titleAs?: 'h2' | 'h3' | 'h4';
   children: ReactNode;
 }
 
@@ -61,11 +78,14 @@ export function FoldBlock({
   summary,
   dirty = false,
   defaultOpen = false,
+  titleAs = 'h4',
   children,
 }: FoldBlockProps) {
   const [open, setOpen] = useState(defaultOpen);
   const touched = useRef(false);
   const bodyId = `${id}-body`;
+  /* 动态标签：`'h2' | 'h3' | 'h4'` 全是内建标签名，React 直接按名字渲染，不需要一张映射表 */
+  const TitleTag = titleAs;
 
   /* 只修正「用户还没点过」的那一段：先收起（视图未加载），加载完发现已配置就展开 */
   useEffect(() => {
@@ -98,7 +118,7 @@ export function FoldBlock({
       <header className="data__block-head">
         <div className="data__block-main">
           <div className="data__block-title-row">
-            <h4 className="data__block-title">{title}</h4>
+            <TitleTag className="data__block-title">{title}</TitleTag>
             {dirty && <span className="data__dirty">未保存</span>}
           </div>
           {hint && <p className="data__block-hint">{hint}</p>}

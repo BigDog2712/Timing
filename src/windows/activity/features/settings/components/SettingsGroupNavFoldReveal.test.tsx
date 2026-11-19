@@ -33,14 +33,31 @@ import {
  * 键盘：导航按钮是原生 `<button type="button" onClick>`，浏览器会把 `Enter` / `Space`
  * 转成 click，走的是**同一条** `jump()`（jsdom 不会替我们合成 click，所以下面的键盘用例
  * 断言的是"原生按钮 + 同一条点击通路"，而不是伪造一个 keydown 去等一个永不发生的 click）。
+ *
+ * ## 夹具的关键：`scrollHeight` 必须是**派生**的
+ *
+ * 这一条曾经是假的：`scrollHeight` 恒等于 `CONTENT_HEIGHT`（1200），可滚量 800，而落点 542
+ * 永远小于 800 —— 于是「先测落点还是先展开」**读数完全一样**，把 `flushSync` 换成
+ * `queueMicrotask`（或直接删掉）照样全绿。夹具本身把被测的顺序抹平了。
+ *
+ * 修法：`scrollHeight = contentHeight + (折叠体可见 ? FOLD_BODY_HEIGHT : 0)`。展开会**真的**
+ * 改变可滚量，顺序才可观测。`bf02` 再把 `contentHeight` 局部压到 800，让落点**越过**展开前的
+ * 上限（400），于是：
+ *   · 先展开再测 → maxScroll = 720 → 落点 542（原样）
+ *   · 先测再展开 → maxScroll = 400 → 落点被夹到 400
+ * 断言 542 就只有前者能过。`bf02` 里那两行 `expect` 是这条不变量的自检：几何一旦被改回
+ * "落点够不着夹取"的形状，它会先于任何实现改动红掉，并直接说明原因。
  */
 
 const CONTENT_HEIGHT = 1200;
 const VIEWPORT_HEIGHT = 400;
+/** 折叠体展开后贡献的高度；要大于落点与展开前上限的差值，保证展开后一定够滚 */
+const FOLD_BODY_HEIGHT = 320;
 const FOLD_ANCHOR_ID = "s-pill-handles";
 
 let scrollTop = 0;
-let scrollHeight = CONTENT_HEIGHT;
+/** 内容总高（不含折叠体）。`bf02` 会局部改小它来制造"展开前不够滚"的夹取 */
+let contentHeight = CONTENT_HEIGHT;
 let clientHeight = VIEWPORT_HEIGHT;
 
 let container: HTMLDivElement | null = null;
@@ -66,6 +83,15 @@ function pinTop(element: HTMLElement, absoluteTop: number) {
 }
 
 /**
+ * 折叠体现在有多高：可见就贡献 `FOLD_BODY_HEIGHT`，收起（或还没挂载）就是 0。
+ * 这就是"展开真的会改变可滚量"的唯一来源，见文件头「夹具的关键」。
+ */
+function foldBodyHeight(): number {
+  const body = document.getElementById(`${FOLD_ANCHOR_ID}-body`);
+  return body && !(body as HTMLElement).hidden ? FOLD_BODY_HEIGHT : 0;
+}
+
+/**
  * 滚动区：除了 `s-pill-handles`（由 `FoldBlock` 自己提供）之外，按页序铺普通 `section`。
  * 折叠块不在这个容器里 —— 它在 React 树里跟导航一起渲染，但**几何**照样按 `ANCHOR_TOPS`
  * 钉住，`document.getElementById` 也是全文档查找，与真实页面同构。
@@ -78,7 +104,11 @@ function buildScrollHost() {
     get: () => scrollTop,
     set: (next: number) => { scrollTop = next; },
   });
-  Object.defineProperty(host, "scrollHeight", { configurable: true, get: () => scrollHeight });
+  /* **派生 getter**：折叠体一展开，`scrollHeight` 立刻长大（见文件头「夹具的关键」） */
+  Object.defineProperty(host, "scrollHeight", {
+    configurable: true,
+    get: () => contentHeight + foldBodyHeight(),
+  });
   Object.defineProperty(host, "clientHeight", { configurable: true, get: () => clientHeight });
   Object.defineProperty(host, "getBoundingClientRect", {
     configurable: true,
@@ -168,7 +198,7 @@ async function mount() {
 
 beforeEach(() => {
   scrollTop = 0;
-  scrollHeight = CONTENT_HEIGHT;
+  contentHeight = CONTENT_HEIGHT;
   clientHeight = VIEWPORT_HEIGHT;
   window.getComputedStyle = ((element: Element) => (
     (element as HTMLElement).id === FIRST_ANCHOR_ID
@@ -203,8 +233,22 @@ describe("[B5c] 折叠块（把手绑定）与导航的联动", () => {
   });
 
   it("bf02_clicking_the_group_title_expands_the_fold_then_scrolls_to_the_landing", async () => {
-    await mount();
+    /* **本用例专属的几何**（别的用例仍用 1200，别跟着改）：内容压到 800，让落点**越过**
+       展开前的可滚上限 —— 于是"先测后展开"与"先展开再测"读数不同，顺序才可观测。
+         · 展开前：maxScroll = 800 − 400 = 400 → 542 被夹到 400
+         · 展开后：scrollHeight = 800 + 320 = 1120 → maxScroll = 720 → 542 原样
+       下面两行是这条不变量的**自检**：谁把几何改回"落点够不着夹取"的形状，这里先红，
+       而且红的原因直接写在断言里，不用再猜。 */
+    contentHeight = 800;
     const expectedLanding = ANCHOR_TOPS[FOLD_ANCHOR_ID] - CSS_ACTIVE_OFFSET;
+    const maxScrollBeforeExpand = contentHeight - VIEWPORT_HEIGHT;
+    expect(maxScrollBeforeExpand, "夹具自检：展开前的可滚量").toBe(400);
+    expect(
+      expectedLanding,
+      "夹具自检：落点必须**大于**展开前的可滚量，否则夹取永不发生，本用例测不到顺序",
+    ).toBeGreaterThan(maxScrollBeforeExpand);
+
+    await mount();
 
     act(() => { titleButton("悬浮条与把手")?.click(); });
     await settle();
@@ -212,8 +256,11 @@ describe("[B5c] 折叠块（把手绑定）与导航的联动", () => {
     /* ① 块先展开：导航点的是标题，用户滚过去必须看得见里面的三张卡 */
     expect(foldExpanded(), "点导航没有展开折叠块").toBe(true);
     expect(foldBodyHidden(), "展开了但折叠体仍是 hidden").toBe(false);
-    /* ② 再滚到「锚点顶到判定线」的落点（用展开后的可滚量算） */
-    expect(scrollTop, "落点不是 锚点顶 − 判定线偏移").toBe(expectedLanding);
+    /* ② 再滚到「锚点顶到判定线」的落点（用**展开后**的可滚量算）。
+       这一条是 `flushSync` 存在的唯一理由：展开若是异步的，`maxScroll` 会读到 400，
+       落点被夹成 400 —— 下面这个 542 就会变成 400 而红。 */
+    expect(scrollTop, `落点不是 锚点顶 − 判定线偏移（先测后展开会被夹到 ${maxScrollBeforeExpand}）`)
+      .toBe(expectedLanding);
     /* ③ 高亮是被点的那一组 */
     expect(activeTitle()).toBe("悬浮条与把手");
   });
