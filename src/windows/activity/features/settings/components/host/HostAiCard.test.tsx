@@ -161,4 +161,15 @@ describe('AI 设置卡', () => {
       undefined,
     );
   });
+
+  it('ai06_拉目录失败要说出原因_并指明可以手填', async () => {
+    h.aiApi.listModels.mockRejectedValueOnce(
+      new Error('AI 服务响应格式异常（详情：unexpected body shape）'),
+    );
+    await act(async () => { button('获取可用模型')?.click(); });
+    await flush();
+    /* 关键：原因不能丢。丢原因的那一版这里只会剩「操作失败，请重试」。 */
+    expect(document.body.textContent).toContain('AI 服务响应格式异常');
+    expect(document.body.textContent).toContain('可以直接在模型框里手填');
+  });
 });

@@ -13,8 +13,12 @@
  * 「后端没注册命令」。
  *
  * 出错口径与隔壁一致：**一律 throw**，message 已是中文人话，调用方显示在卡底。
+ * 拒绝值必须过 `asHostError`：宿主抛的是 `{ code, message }` 对象，不是 `Error`；
+ * 不收口的话 `errorText` 只认得 `Error`，界面上就只剩「操作失败，请重试」——
+ * 见 `hostCommandError.ts` 的文件头。
  */
 import { invoke } from "@tauri-apps/api/core";
+import { asHostError } from "./hostCommandError.ts";
 import type {
   AiConfig,
   AiConfigView,
@@ -30,7 +34,11 @@ const isTauriRuntime = (): boolean =>
 
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauriRuntime()) throw new Error("当前不在桌面宿主里，AI 设置不可用");
-  return invoke<T>(command, args);
+  try {
+    return await invoke<T>(command, args);
+  } catch (raw) {
+    throw asHostError(raw, "AI 设置命令执行失败");
+  }
 }
 
 export function aiConfigGet(): Promise<AiConfigView> {

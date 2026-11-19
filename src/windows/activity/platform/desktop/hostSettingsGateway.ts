@@ -14,6 +14,7 @@
  * 以为「点了没反应」，那正是本批要消灭的症状。
  */
 import { invoke } from "@tauri-apps/api/core";
+import { asHostError } from "./hostCommandError.ts";
 import type { ThemeMode } from "../../shared/settings/appSettings.ts";
 
 /** 四色键（与宿主 `AccentKey` 同名，4 个）。 */
@@ -55,7 +56,12 @@ const isTauriRuntime = (): boolean =>
 /** 统一入口：浏览器（单测 / vite 单跑）直接抛人话，别让 `invoke` 抛内部错误 */
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauriRuntime()) throw new Error("当前不在桌面宿主里，这条设置命令不可用");
-  return invoke<T>(command, args);
+  try {
+    return await invoke<T>(command, args);
+  } catch (raw) {
+    /* 宿主抛 `{ code, message }`，不认它的话设置页只会显示「操作失败，请重试」。 */
+    throw asHostError(raw, "设置命令执行失败");
+  }
 }
 
 /** 四色载荷校验：三个主色必须是字符串，`bar` 可空。形状不对就抛（不猜）。 */

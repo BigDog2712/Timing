@@ -8,6 +8,7 @@
  * `activity-host-settings` 授予）。返回形状见 `hostTypes.ts::PluginListResult`。
  */
 import { invoke } from "@tauri-apps/api/core";
+import { asHostError } from "./hostCommandError.ts";
 import type { PluginListResult } from "../../../shared/dto/hostTypes";
 
 export type { PluginInfo, PluginListResult, PluginSource, QuickTimer } from
@@ -21,12 +22,8 @@ async function call<T>(command: string): Promise<T> {
   try {
     return await invoke<T>(command);
   } catch (raw) {
-    const message = typeof raw === "object" && raw !== null && typeof (raw as { message?: unknown }).message === "string"
-      ? (raw as { message: string }).message
-      : "插件目录读取失败";
-    /* `cause` 必须带上：`preserve-caught-error` 要的就是原始 payload（排查「为什么目录读不到」
-       时要能看到宿主的 code，而不是只剩一句人话）。 */
-    throw new Error(message, { cause: raw });
+    /* 与另外三个网关共用一份收口：`cause` 带上原始 payload，排查时能看到宿主的 code。 */
+    throw asHostError(raw, "插件目录读取失败");
   }
 }
 

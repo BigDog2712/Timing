@@ -59,7 +59,10 @@ export default function HostAiModelField({
         setManual(false);
         onNotice(`已获取 ${list.length} 个模型${keep ? "" : `，已填入 ${list[0]}`}`);
       })
-      .catch((err: unknown) => onError(errorText(err)))
+      .catch((err: unknown) => {
+        /* 目录只是省得记型号，拉不到不该变成拦路：宿主给的原文照旧透出，后面补一句出路。 */
+        onError(`${errorText(err)}；拉不到目录不影响使用，可以直接在模型框里手填`);
+      })
       .finally(() => setLoading(false));
   };
 

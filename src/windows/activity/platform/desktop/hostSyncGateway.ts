@@ -10,6 +10,7 @@
  * 由 `features/settings/services/hostApi.ts` 的 `errorText` 转成给用户看的一句话。
  */
 import { invoke } from "@tauri-apps/api/core";
+import { asHostError } from "./hostCommandError.ts";
 import type {
   DataRootInfo,
   Decision,
@@ -29,31 +30,17 @@ import type {
 const isTauriRuntime = (): boolean =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
-/** 宿主 `AppError` 序列化形状 `{ code, message }` → 带 `message` 的 Error（码挂在 `code` 上）。 */
-export interface HostCommandError extends Error {
-  code?: string;
-}
-
-function toHostError(raw: unknown): HostCommandError {
-  if (typeof raw === "object" && raw !== null) {
-    const payload = raw as { code?: unknown; message?: unknown };
-    const message = typeof payload.message === "string" && payload.message.length > 0
-      ? payload.message
-      : "宿主命令执行失败";
-    const error: HostCommandError = new Error(message);
-    if (typeof payload.code === "string") error.code = payload.code;
-    return error;
-  }
-  const error: HostCommandError = new Error(typeof raw === "string" ? raw : "宿主命令执行失败");
-  return error;
-}
+/** 宿主 `AppError` 序列化形状 `{ code, message }` → 带 `message` 的 Error（码挂在 `code` 上）。
+ *  实现已收口到 `hostCommandError.ts`：四个网关共用一份，别再复制第五份——0.12.5 的
+ *  「操作失败，请重试」就是这么来的（两个网关认这个形状，另外两个没认）。 */
+export type { HostCommandError } from "./hostCommandError.ts";
 
 async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauriRuntime()) throw new Error("当前不在桌面宿主里，这条同步命令不可用");
   try {
     return await invoke<T>(command, args);
   } catch (raw) {
-    throw toHostError(raw);
+    throw asHostError(raw);
   }
 }
 
