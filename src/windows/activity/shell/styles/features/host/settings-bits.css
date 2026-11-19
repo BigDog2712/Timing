@@ -127,8 +127,8 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   /* [B5f] 桥缺的两个值（**补在桥里，不补在规则上**）：
-     `--btn-sm-h` 原来只定义在主窗 `01-primitives.css:151`（24px），`--bg-field-hi` 原来只
-     定义在主题层（`02-theme-dark.css:19` / `03-theme-light.css:17`），分析窗闭包里都没有。
+     `--btn-sm-h` 原来只定义在主窗 primitives（搜 `--btn-sm-h: 24px`），`--bg-field-hi` 原来
+     只定义在主题层（搜 `--bg-field-hi:`），分析窗闭包里都没有。
      插件卡挂进桥之后，`.plg__btn` 的 height 与 `.btn--neutral:hover` 的底色才拿得到值。
      为什么不给 `.plg__btn` / `.btn--neutral` 每条规则加 fallback：那是把同一份真值抄第二遍，
      桥和 fallback 迟早各长各的（这正是 `settingsDataCssFallback` 的 fc02 在防的漂移）。
