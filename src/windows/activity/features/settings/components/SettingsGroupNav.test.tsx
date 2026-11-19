@@ -20,12 +20,17 @@ import {
  * 原来这条文件是围着「锚点物理位置早于表里登记位置」那个串组缺陷写的，靶点已经消失；
  * 但判定算法本身（取最后一个越线锚点 / 到底规则 / CSS 判定线）仍在服役，所以保留结构、
  * 更新判据：
- *   第一条：分组表里不再有那两个锚点，滚到原「主界面」区间只亮一组（唯一性）；
+ *   第一条：分组表里不再有那两个锚点，滚到某处只亮一组（唯一性）；
  *   第二条：滚到容器底部必须亮最后一组；
  *   第三条：中间某组正常（防止"永远亮第一组/最后一组"也能过前两条）；
  *   第四条：内容一屏放得下时不许直接跳到最后一组（到底规则的 `canScroll` 前置条件）；
  *   第五条：判定线**真的**取自 CSS 的 `scroll-margin-top`（改成 4px 结论就变），
  *          防止有人把 `readActiveOffset()` 退回写死常量。
+ *
+ * [B5b] IA 按使用场景重排（计时行为 → 外观与主题 → 悬浮条与把手 → 数据与同步 →
+ * 通用与启动），所以下面每条用例的**落点与期望组名都跟着换了**。落点一律用
+ * `ANCHOR_TOPS[id] ± 常量` 表达，不写裸数字：阶梯再调一次时，只有真正依赖具体几何的
+ * 用例该红，而不是整片重抄数字。
  *
  * 布局全靠 mock `getBoundingClientRect` + 自定义 `scrollTop/clientHeight/scrollHeight`：
  * jsdom 没有排版，真读 DOM 只会得到一堆 0，什么也证明不了。
@@ -157,7 +162,7 @@ afterEach(() => {
 
 describe("SettingsGroupNav · 滚动高亮判定", () => {
   it("sg01_deleted_entries_are_gone_and_every_anchor_lights_exactly_one_group", async () => {
-    /* [设置页七项改造·批 1/2] 两个入口下线后，页面上只剩 11 个锚点，且表与页面逐条一致。
+    /* [设置页七项改造·批 1/2] 两个入口下线后，页面上只剩 12 个锚点，且表与页面逐条一致。
        这里既钉「入口不再存在」（改回来的话第一步就红），也钉「一个锚点只亮一组」——
        原来的串组缺陷靠的就是这条唯一性断言。 */
     expect(SETTINGS_GROUPS.flatMap((group) => group.anchors.map((anchor) => anchor.id)))
@@ -166,15 +171,16 @@ describe("SettingsGroupNav · 滚动高亮判定", () => {
       .not.toContain("s-board-widgets");
     expect(SETTINGS_GROUPS.map((group) => group.id)).not.toContain("board");
     await mount();
-    /* 原「主界面」区间（520）现在落在「外观与配色」里：s-display(top = −200) 是最后一个越线锚点 */
-    await scrollTo(520);
-    expect(activeTitle()).toBe("外观与配色");
+    /* 停在「显示与语言」上方 10px：s-display 刚越过判定线（10 ≤ 18 + 2），是同组里最靠下的
+       越线锚点 → 亮「外观与主题」；再往下 320px 的空档后才是「悬浮条与把手」。 */
+    await scrollTo(ANCHOR_TOPS["s-display"] - 10);
+    expect(activeTitle()).toBe("外观与主题");
   });
 
   it("sg02_reaching_the_bottom_lights_the_last_group", async () => {
     await mount();
     /* 滚到底：scrollTop(800) + clientHeight(400) === scrollHeight(1200)。
-       这一刻按纯几何算"最靠下的越线锚点"还是 s-tracking（top = −100），
+       这一刻按纯几何算"最靠下的越线锚点"是 s-backup（data 组，top = 800 − 800 = 0），
        只有到底规则能把「通用与启动」点亮。 */
     await scrollTo(CONTENT_HEIGHT - VIEWPORT_HEIGHT);
     expect(activeTitle()).toBe("通用与启动");
@@ -182,9 +188,12 @@ describe("SettingsGroupNav · 滚动高亮判定", () => {
 
   it("sg03_a_middle_group_lights_up_normally", async () => {
     await mount();
-    /* s-tracking(top = 700 − 690 = 10) 越过判定线，s-sync(130) 还在下面 */
-    await scrollTo(690);
-    expect(activeTitle()).toBe("计时与记录");
+    /* 停在「同步与备份」上方 10px：s-sync(top = 720 − 710 = 10) 越过判定线，
+       s-backup(90) / s-pill-look(−70) 分别还在下方和更上方 —— 亮的是中间的 data 组。
+       这条同时是 `readActiveOffset()` 的变异靶点：判定线若被写死成 0，s-sync 的 10 > 0 + 2
+       就不再越线，结论退到上一个已越线锚点 s-pill-look（「悬浮条与把手」）。 */
+    await scrollTo(ANCHOR_TOPS["s-sync"] - 10);
+    expect(activeTitle()).toBe("数据与同步");
   });
 
   it("sg04_content_that_fits_never_jumps_to_the_last_group", async () => {
@@ -192,16 +201,17 @@ describe("SettingsGroupNav · 滚动高亮判定", () => {
        到底规则必须被 canScroll 挡住，否则一进设置页就停在最后一组。 */
     scrollHeight = VIEWPORT_HEIGHT;
     await mount();
-    expect(activeTitle()).toBe("悬浮条与手柄");
+    expect(activeTitle()).toBe("计时行为");
   });
 
   it("sg05_the_threshold_really_comes_from_css_scroll_margin_top", async () => {
-    /* 判定线缩到 4px：s-tracking(top = 10) 不再越线，「计时与记录」区间里最靠下的越线锚点
-       只剩 s-display(−370) → 亮「外观与配色」。结论跟着 CSS 走，说明判定线没被写死。 */
+    /* 判定线缩到 4px：s-sync(top = 10) 不再越线，「数据与同步」区间里最靠下的越线锚点
+       只剩 s-pill-look(−70) → 亮「悬浮条与把手」。与 sg03 同一个落点、只改 CSS 值，
+       结论就翻面 —— 说明判定线没被写死。 */
     activeOffset = 4;
     await mount();
-    await scrollTo(690);
-    expect(activeTitle()).toBe("外观与配色");
+    await scrollTo(ANCHOR_TOPS["s-sync"] - 10);
+    expect(activeTitle()).toBe("悬浮条与把手");
   });
 });
 
@@ -211,11 +221,14 @@ describe("SettingsGroupNav · 滚动高亮判定", () => {
  * 根因不是"点错了锚点"，而是**落点恰好压在判定线上**：`jump()` 的偏移与判定线读同一个
  * `scroll-margin-top`，理想落点是 `锚点 top === 判定线`（差值 0）。零容差下设备像素取整
  * 把落点推高 0.4px（`top = 判定线 + 0.4`）就判成"还没越线"，循环回落到上一个已越线锚点：
- * 点「计时与记录」→ 亮「外观与配色」，完全对称地错位。
+ * 点「数据与同步」→ 亮「悬浮条与把手」，完全对称地错位。
  *
- * 两条判据都用**点击**驱动、偏差 ±0.4px：`+0.4` 是变异靶点（去掉 `LINE_TOLERANCE` 必红），
- * `−0.4` 在零容差实现下本来就绿，留着证明容差没把结论推向另一边。第三条盯「点击即钉住」的
- * **位置**语义（停在落点上不被抢、离开落点立刻交回几何）。
+ * 两条判据都用**点击**驱动、偏差 ±0.4px：`+0.4` 是"还没越线"的那一半，`−0.4` 是"已越线"
+ * 的那一半（零容差实现下本来就绿，留着证明容差没把结论推向另一边）。第三条盯「点击即钉住」
+ * 的**位置**语义（停在落点上不被抢、离开落点立刻交回几何）。
+ *
+ * 实现里对 ±0.4 有两道独立的防线（钉子的位置语义 + `LINE_TOLERANCE`），所以单拆一道
+ * 这里仍是绿的 —— 变异自证必须两道一起拆（见 sg06 的注释）。
  */
 describe("SettingsGroupNav · 点击跳转（落点压线 + 点击即钉住）", () => {
   /** 落点相对判定线的偏差（px）= `锚点 top − 判定线`；正 = 停在判定线下方 0.4px 那一半 */
@@ -249,19 +262,20 @@ describe("SettingsGroupNav · 点击跳转（落点压线 + 点击即钉住）",
   }
 
   it("sg06_a_landing_point_04px_below_the_line_still_lights_the_clicked_group", async () => {
-    /* 变异靶点：把 `top <= line + LINE_TOLERANCE` 改回 `top <= line`，这一条必红
-       （实测红：亮的是「计时与记录」，见交付说明里的原始输出）。 */
+    /* 落点 0.4px **低于**判定线：几何上 s-sync 差 0.4px 没越线，会退到「悬浮条与把手」。
+       变异靶点：把 `jump()` 里的 `pinnedLanding.current = landing` 删掉**并且**把
+       `LINE_TOLERANCE` 改回 0 —— 两条防线都拆掉才红（实测亮「悬浮条与把手」）。 */
     landingDrift = 0.4;
     await mount();
-    await clickGroup("计时与记录");
-    expect(activeTitle()).toBe("计时与记录");
+    await clickGroup("数据与同步");
+    expect(activeTitle()).toBe("数据与同步");
   });
 
   it("sg07_a_landing_point_04px_above_the_line_also_lights_the_clicked_group", async () => {
     landingDrift = -0.4;
     await mount();
-    await clickGroup("计时与记录");
-    expect(activeTitle()).toBe("计时与记录");
+    await clickGroup("数据与同步");
+    expect(activeTitle()).toBe("数据与同步");
   });
 
   it("sg08_a_click_lights_the_group_and_the_pin_holds_only_while_it_sits_on_the_landing", async () => {
@@ -271,14 +285,14 @@ describe("SettingsGroupNav · 点击跳转（落点压线 + 点击即钉住）",
     act(() => { titleButton("数据与同步")?.click(); });
     /* ① 点击**立刻**亮目标组：用户在等的是这个反馈，不是"滚完再看运气" */
     expect(activeTitle()).toBe("数据与同步");
-    /* ② 还停在落点上（`jump()` 自己写下去的 802）→ 钉子有效，几何派生不许抢走高亮 */
+    /* ② 还停在落点上（`jump()` 自己写下去的 702）→ 钉子有效，几何派生不许抢走高亮 */
     await scrollTo((ANCHOR_TOPS["s-sync"] ?? 0) - CSS_ACTIVE_OFFSET);
     expect(activeTitle()).toBe("数据与同步");
-    /* ③ 离开落点 → 解钉，高亮按几何走（钉子不常驻） */
-    await scrollTo(690);
-    expect(activeTitle()).toBe("计时与记录");
-    /* ④ 再滚回上面也一样跟着位置走 */
-    await scrollTo(200);
-    expect(activeTitle()).toBe("外观与配色");
+    /* ③ 离开落点 → 解钉，高亮按几何走（钉子不常驻）：630 上最靠下的越线锚点是 s-pill-look */
+    await scrollTo((ANCHOR_TOPS["s-pill-look"] ?? 0) - 10);
+    expect(activeTitle()).toBe("悬浮条与把手");
+    /* ④ 再滚回上面也一样跟着位置走：150 上最靠下的越线锚点是 s-highlight */
+    await scrollTo((ANCHOR_TOPS["s-highlight"] ?? 0) - 10);
+    expect(activeTitle()).toBe("外观与主题");
   });
 });

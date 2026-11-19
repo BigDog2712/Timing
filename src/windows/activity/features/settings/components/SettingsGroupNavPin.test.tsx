@@ -18,14 +18,14 @@ import {
  * 与 `SettingsGroupNav.test.tsx` / `SettingsGroupNavClickFollow.test.tsx` 的差别只有两条，
  * 也正是缺陷的入口：
  *   ① `scrollTop` 的 setter **像浏览器一样夹到 `[0, maxScroll]`** —— 页尾那几个锚点
- *      （`s-sync` 820 / `s-general` 1000）算出来的落点（约 800–980）**超过**
+ *      （`s-general` 880 / `s-sync` 720）算出来的落点（862 / 702）**超过**
  *      `scrollHeight - clientHeight`（1200 − 700 = 500），写入会被夹到 500；
  *   ② 一次「离散」滚动只发**一个** `scroll` 事件 —— 用户按一次 `End` / `Home`、或者
  *      把滚动条直接拖到位，就是这样。滚动是瞬时的（设置页没有 `scroll-behavior: smooth`），
  *      所以这条路径是用户实际走的那条，而不是"连续抖 16 帧"。
  *
- * 旧实现把这两件事同时踩了：`pin.landing` 记的是**未夹**的原值（982），解钉条件是
- * `|scrollTop − pinned.landing| <= 2`，而 500 永远不等于 982 → 按位置**永远**解不了钉，
+ * 旧实现把这两件事同时踩了：`pin.landing` 记的是**未夹**的原值（862），解钉条件是
+ * `|scrollTop − pinned.landing| <= 2`，而 500 永远不等于 862 → 按位置**永远**解不了钉，
  * 只能等 `frames` 逐次扣完；`frames` 又按 `scroll` 事件数扣、不按时间，于是一次 `Home`
  * 只扣 1 帧，钉子还在，高亮仍停在"上一次点的那组"（pin01/pin02）。抖满 13 帧把钉子耗光之后，
  * `suppressBottomAt` 也因为同一个未夹取值早已被判"离开落点"清掉 → 到底规则接管 → 改判末组（pin05）。
@@ -157,47 +157,47 @@ function activeTitle(): string {
 
 describe("SettingsGroupNav · 点击后的钉住语义（落点被夹 + 单次滚动事件）", () => {
   it("pin01_a_tail_group_click_then_one_home_key_lights_the_first_group", async () => {
-    /* 落点 = 1000 − 18 = 982 > maxScroll 500 → 浏览器夹到 500。旧实现的 `pin.landing`
-       记 982，与实际的 500 差 482px → 解钉条件永不成立。 */
+    /* 落点 = 880 − 18 = 862 > maxScroll 500 → 浏览器夹到 500。旧实现的 `pin.landing`
+       记 862，与实际的 500 差 362px → 解钉条件永不成立。 */
     await mount();
     await clickGroup("通用与启动");
     await oneScroll(MAX_SCROLL);
     expect(activeTitle(), "落点被夹到底之后，用户点的组必须还亮着").toBe("通用与启动");
     /* 用户按一次 Home 回顶部：只发一个 scroll 事件 */
     await oneScroll(0);
-    expect(activeTitle(), "回到顶部后仍亮着上一次点的组").toBe("悬浮条与手柄");
+    expect(activeTitle(), "回到顶部后仍亮着上一次点的组").toBe("计时行为");
   });
 
   it("pin02_a_data_group_click_then_one_home_key_lights_the_first_group", async () => {
-    /* 与 pin01 同一条机制，落点 820 − 18 = 802（夹到 500），换了组名以便区分 */
+    /* 与 pin01 同一条机制，落点 720 − 18 = 702（夹到 500），换了组名以便区分 */
     await mount();
     await clickGroup("数据与同步");
     await oneScroll(MAX_SCROLL);
     expect(activeTitle()).toBe("数据与同步");
     await oneScroll(0);
-    expect(activeTitle(), "回到顶部后仍亮着「数据与同步」").toBe("悬浮条与手柄");
+    expect(activeTitle(), "回到顶部后仍亮着「数据与同步」").toBe("计时行为");
   });
 
   it("pin03_two_consecutive_clicks_on_different_groups_do_not_interfere", async () => {
     /* 回归（修复前后都绿）：第一次的钉子不许把第二次的高亮拉回去 */
     await mount();
-    await clickGroup("计时与记录");
+    await clickGroup("计时行为");
     await oneScroll(ANCHOR_TOPS["s-tracking"]! - CSS_ACTIVE_OFFSET);
-    expect(activeTitle()).toBe("计时与记录");
-    await clickGroup("外观与配色");
+    expect(activeTitle()).toBe("计时行为");
+    await clickGroup("外观与主题");
     await oneScroll(ANCHOR_TOPS["s-theme"]! - CSS_ACTIVE_OFFSET);
-    expect(activeTitle()).toBe("外观与配色");
+    expect(activeTitle()).toBe("外观与主题");
   });
 
   it("pin04_a_click_on_a_group_whose_landing_is_unreachable_still_lights_it", async () => {
-    /* 回归（修复前后都绿）：「计时与记录」的落点 700 − 18 = 682 也被夹到 500，
+    /* 回归（修复前后都绿）：「悬浮条与把手」的落点 560 − 18 = 542 也被夹到 500，
        到底规则在此处本来会改判 —— 点击路径不许被它改判。 */
     await mount();
-    await clickGroup("计时与记录");
-    expect(activeTitle()).toBe("计时与记录");
+    await clickGroup("悬浮条与把手");
+    expect(activeTitle()).toBe("悬浮条与把手");
     /* 抵达（被夹的）落点那一帧也只认用户点的组 */
     await oneScroll(MAX_SCROLL);
-    expect(activeTitle(), "落点那一帧被到底规则改判").toBe("计时与记录");
+    expect(activeTitle(), "落点那一帧被到底规则改判").toBe("悬浮条与把手");
   });
 
   it("pin05_jittering_at_the_landing_never_rejudges_to_the_last_group", async () => {
@@ -219,7 +219,7 @@ describe("SettingsGroupNav · 点击后的钉住语义（落点被夹 + 单次�
     await mount();
     await clickGroup("通用与启动");
     await oneScroll(0);
-    expect(activeTitle(), "点末尾组后单次回顶部：首组必须亮").toBe("悬浮条与手柄");
+    expect(activeTitle(), "点末尾组后单次回顶部：首组必须亮").toBe("计时行为");
     await oneScroll(MAX_SCROLL);
     expect(activeTitle(), "再单次回底部：末组必须亮").toBe("通用与启动");
   });

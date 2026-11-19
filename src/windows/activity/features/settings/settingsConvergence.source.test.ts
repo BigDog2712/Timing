@@ -206,7 +206,7 @@ describe('① 主题/主色只有一个入口（P0-06 判据 1）', () => {
 
 describe('④ 三个同名参数各一个可编辑处（判据 3）', () => {
   it('p006_one_editor_per_parameter', () => {
-    /* `timelineMergeGapSecs`：唯一可编辑处是分析窗设置「计时与记录」那一组。 */
+    /* `timelineMergeGapSecs`：唯一可编辑处是分析窗设置「计时行为」那一组。 */
     const tracking = code('src/windows/activity/features/settings/components/SettingsTrackingPanel.tsx');
     expect(tracking).toContain('timelineMergeGapControl');
     expect(SETTINGS).toContain('handleChange("timelineMergeGapSecs"');

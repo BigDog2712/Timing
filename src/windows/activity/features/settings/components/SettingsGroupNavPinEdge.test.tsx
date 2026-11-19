@@ -152,32 +152,33 @@ describe("SettingsGroupNav · 钉住语义的边界", () => {
     await clickGroup("通用与启动");
     expect(scrollTop, "落点应为夹过的 500，不许写越界值").toBe(maxScroll());
     expect(activeTitle(), "点自己那一组不该换高亮").toBe("通用与启动");
-    /* 随后滚开 → 立刻按几何走（钉子没黏住）：400 上最后一个越线锚点是 s-display */
-    await oneScroll(400);
-    expect(activeTitle(), "离开落点后高亮仍停在末组").toBe("外观与配色");
+    /* 随后滚开 → 立刻按几何走（钉子没黏住）：340 上最后一个越线锚点是 s-display */
+    await oneScroll(ANCHOR_TOPS["s-display"] + 100);
+    expect(activeTitle(), "离开落点后高亮仍停在末组").toBe("外观与主题");
   });
 
   it("pe02_a_clamped_click_holds_on_one_scroll_event_and_releases_on_the_next", async () => {
-    /* 「数据与同步」的落点 802 被夹到 500：**一个** scroll 事件就该让钉子生效 */
+    /* 「数据与同步」的落点 702 被夹到 500：**一个** scroll 事件就该让钉子生效 */
     await mount();
     await clickGroup("数据与同步");
     await oneScroll(maxScroll());
     expect(activeTitle(), "单次到底的 scroll 把钉子打掉了").toBe("数据与同步");
-    /* 再一次滚到中途 → 立刻按几何派生（s-display 顶到判定线 → 外观与配色） */
-    await oneScroll(300);
-    expect(activeTitle(), "离开落点后没有立刻交回几何").toBe("外观与配色");
+    /* 再一次滚到中途 → 立刻按几何派生（s-display 顶到判定线上方 → 外观与主题） */
+    await oneScroll(ANCHOR_TOPS["s-display"] + 60);
+    expect(activeTitle(), "离开落点后没有立刻交回几何").toBe("外观与主题");
   });
 
   it("pe03_the_pin_releases_exactly_outside_the_two_px_tolerance", async () => {
     /* 落点被夹在 500（可滚量的上界，往下够不着），所以容差只能从**上面**探：
-       498 在 ±2 内 → 保持用户点的组；497 出界 1px → 立刻交回几何（s-tracking 的 top = 203
-       远在判定线外，最靠下的越线锚点是 s-display(−177) → 外观与配色）。 */
+       498 在 ±2 内 → 保持用户点的组；497 出界 1px → 立刻交回几何（s-pill-handles 的
+       top = 560 − 497 = 63 远在判定线 18 + 2 之外，最靠下的越线锚点是 s-display(−257)
+       → 外观与主题）。 */
     await mount();
     await clickGroup("数据与同步");
     await oneScroll(maxScroll() - TOLERANCE);
     expect(activeTitle(), "±2 内的抖动不该解钉").toBe("数据与同步");
     await oneScroll(maxScroll() - TOLERANCE - 1);
-    expect(activeTitle(), "超出容差 1px 仍未解钉（容差被放大或被改成常量以外的东西）").toBe("外观与配色");
+    expect(activeTitle(), "超出容差 1px 仍未解钉（容差被放大或被改成常量以外的东西）").toBe("外观与主题");
   });
 
   it("pe04_content_that_fits_lights_the_clicked_group_and_pins_nothing", async () => {
@@ -187,10 +188,10 @@ describe("SettingsGroupNav · 钉住语义的边界", () => {
        `setActiveGroup(目标组)` 照旧（点了就亮），但**不写 `scrollTop`、不设 `pinnedLanding`**。
        判据是"点了就亮 + 不设钉"，**不是**几何派生（那条写法下点击完全没有反应）。
        变异靶点：把 `maxScroll === 0` 那条分支整段删掉（回到"照旧 setActiveGroup + 设钉"），
-       最后一条 `toBe("悬浮条与手柄")` 立刻变成「通用与启动」（钉子钉死在 0 上，永不解开）。 */
+       最后一条 `toBe("计时行为")` 立刻变成「通用与启动」（钉子钉死在 0 上，永不解开）。 */
     contentHeight = viewportHeight;
     await mount();
-    expect(activeTitle()).toBe("悬浮条与手柄");
+    expect(activeTitle()).toBe("计时行为");
     await clickGroup("数据与同步");
     expect(scrollTop, "无滚动空间时写出了非 0 的 scrollTop").toBe(0);
     expect(activeTitle(), "一屏装得下时点击没有反馈（点了就亮是这条路的唯一判据）").toBe("数据与同步");
@@ -200,42 +201,42 @@ describe("SettingsGroupNav · 钉住语义的边界", () => {
     /* 不设钉的那一半：来一个 `scroll`（缩放后浏览器补发 / 内容变高）必须立刻按几何派生。
        有钉的话这里会停在「通用与启动」上 —— 那正是"钉子永不解开"的形状。 */
     await oneScroll(0);
-    expect(activeTitle(), "一屏装得下的点击留下了钉子：此后再也没有事件能解开它").toBe("悬浮条与手柄");
+    expect(activeTitle(), "一屏装得下的点击留下了钉子：此后再也没有事件能解开它").toBe("计时行为");
   });
 
   it("pe05_three_rapid_clicks_leave_the_third_group_and_no_residue_pin", async () => {
-    /* 1600 − 400 = 1200 可滚：三个落点（982 / 142 / 802）都可达，互不相同 */
+    /* 1600 − 400 = 1200 可滚：三个落点（862 / 62 / 702）都可达，互不相同 */
     contentHeight = 1600;
     viewportHeight = 400;
     await mount();
     await clickGroup("通用与启动");
-    await clickGroup("外观与配色");
+    await clickGroup("外观与主题");
     await clickGroup("数据与同步");
-    expect(scrollTop, "最终落点必须是第三组的 802").toBe(802);
+    expect(scrollTop, "最终落点必须是第三组的 702").toBe(702);
     expect(activeTitle()).toBe("数据与同步");
     /* 第三组的落点仍然钉得住（前两次的落点没有抢走钉子） */
-    await oneScroll(802);
+    await oneScroll(702);
     expect(activeTitle(), "第三个落点没钉住（钉子被前两次残留污染）").toBe("数据与同步");
-    /* 滚到 700（计时与记录区间）→ 没有任何钉子残留 */
-    await oneScroll(700);
-    expect(activeTitle(), "第 1/2 次的钉子还在生效").toBe("计时与记录");
+    /* 滚到 630（「悬浮条与把手」区间，距落点 72px）→ 没有任何钉子残留 */
+    await oneScroll(ANCHOR_TOPS["s-pill-look"] - 10);
+    expect(activeTitle(), "第 1/2 次的钉子还在生效").toBe("悬浮条与把手");
   });
 
   it("pe06_a_click_on_a_group_whose_anchor_is_missing_changes_nothing", async () => {
     /* `s-theme` / `s-highlight` / `s-display` 都不在 DOM 里（卡片没渲染）：
-       点「外观与配色」→ `jump()` 取不到锚点节点。这种点击**什么也不该发生**
+       点「外观与主题」→ `jump()` 取不到锚点节点。这种点击**什么也不该发生**
        （见 `SettingsGroupNav.tsx` 文件头 [复核修复] ②）：不改高亮、不写 `scrollTop`、不设钉。
        变异靶点：把 `setActiveGroup(groupId)` 挪回节点检查**之前** —— 第二条断言立刻红
        （旧现状就是"亮到点的那一组、页面没动"）。 */
     await mount({ skip: ["s-theme", "s-highlight", "s-display"] });
     const before = scrollTop;
     const beforeTitle = activeTitle();
-    await clickGroup("外观与配色");
+    await clickGroup("外观与主题");
     expect(scrollTop, "找不到锚点却写了 scrollTop").toBe(before);
     expect(activeTitle(), "锚点节点缺失时高亮跳走了（亮了但页面没动）").toBe(beforeTitle);
     /* 关键：也没有留下钉子 —— 随便一次 scroll 立刻按几何派生回真实位置 */
     await oneScroll(0);
-    expect(activeTitle(), "锚点缺失的点击留下了钉子").toBe("悬浮条与手柄");
+    expect(activeTitle(), "锚点缺失的点击留下了钉子").toBe("计时行为");
   });
 
   it("pe07_the_bottom_rule_fires_at_max_scroll_minus_two_not_earlier", async () => {
@@ -244,13 +245,14 @@ describe("SettingsGroupNav · 钉住语义的边界", () => {
        `scrollTop + clientHeight >= scrollHeight - BOTTOM_TOLERANCE(2)`：
          · 500（真正的底）→ 500 + 700 = 1200 >= 1198 → 末组
          · 498（差 2）→ 1198 >= 1198 → 末组（容差正好用满）
-         · 497（差 3）→ 1197 < 1198 → 交回几何：s-tracking 的 top = 700 − 497 = 203，
-           远在判定线 18 + LINE_TOLERANCE 2 = 20 之外 → 最靠下的越线锚点是 s-display → 外观与配色
-       这一档同时钉住两件事：到底规则不会被 `LINE_TOLERANCE` 提前触发（497 上离 s-tracking
-       还差 183px，两道容差都够不着），容差也不会多给一格（498 就到底）。 */
+         · 497（差 3）→ 1197 < 1198 → 交回几何：s-pill-handles 的 top = 560 − 497 = 63，
+           远在判定线 18 + LINE_TOLERANCE 2 = 20 之外 → 最靠下的越线锚点是 s-display
+           (240 − 497 = −257) → 外观与主题
+       这一档同时钉住两件事：到底规则不会被 `LINE_TOLERANCE` 提前触发（497 上离 s-pill-handles
+       还差 43px，两道容差都够不着），容差也不会多给一格（498 就到底）。 */
     await mount();
     await oneScroll(497);
-    expect(activeTitle(), "到底规则提前 3px 触发（容差被放大）").toBe("外观与配色");
+    expect(activeTitle(), "到底规则提前 3px 触发（容差被放大）").toBe("外观与主题");
     await oneScroll(498);
     expect(activeTitle(), "差 2px 时到底规则该生效（`>= scrollHeight - 2`）").toBe("通用与启动");
     await oneScroll(500);

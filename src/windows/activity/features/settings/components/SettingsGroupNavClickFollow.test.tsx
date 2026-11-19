@@ -144,22 +144,22 @@ function activeTitle(): string {
 describe("点击之后的后续交互（钉子与到底规则）", () => {
   it("qn01_two_consecutive_clicks_on_different_groups_do_not_interfere", async () => {
     await mount();
-    act(() => { titleButton("计时与记录")?.click(); });
+    act(() => { titleButton("计时行为")?.click(); });
     await oneScroll(ANCHOR_TOPS["s-tracking"] - CSS_ACTIVE_OFFSET);
-    expect(activeTitle()).toBe("计时与记录");
+    expect(activeTitle()).toBe("计时行为");
 
     /* 第二次点击另一个组：第一次的钉子不许把高亮拉回去 */
-    act(() => { titleButton("外观与配色")?.click(); });
-    expect(activeTitle(), "第二次点击没有立刻生效").toBe("外观与配色");
+    act(() => { titleButton("外观与主题")?.click(); });
+    expect(activeTitle(), "第二次点击没有立刻生效").toBe("外观与主题");
     await oneScroll(ANCHOR_TOPS["s-theme"] - CSS_ACTIVE_OFFSET);
-    expect(activeTitle(), "落定之后被上一组的钉子串掉").toBe("外观与配色");
+    expect(activeTitle(), "落定之后被上一组的钉子串掉").toBe("外观与主题");
   });
 
   it("qn02_scrolling_to_the_bottom_after_a_click_still_lights_the_last_group", async () => {
     await mount();
-    act(() => { titleButton("计时与记录")?.click(); });
+    act(() => { titleButton("计时行为")?.click(); });
     await oneScroll(ANCHOR_TOPS["s-tracking"] - CSS_ACTIVE_OFFSET);
-    expect(activeTitle()).toBe("计时与记录");
+    expect(activeTitle()).toBe("计时行为");
 
     await continuousScrollTo(maxScroll());
     expect(activeTitle(), "一路滚到底之后钉子仍占着高亮").toBe("通用与启动");
@@ -170,38 +170,40 @@ describe("点击之后的后续交互（钉子与到底规则）", () => {
        而这条路上**不许设钉**（[复核修复] ①：没有可滚空间、也不会再有 `scroll` 事件，
        设钉等于永久钉死）。判据是"点了就亮 + 不设钉"，**不是**几何派生 —— 后者会让点击
        完全没有反应。变异靶点：把 `maxScroll === 0` 那条分支整段删掉，最后一条断言立刻
-       变成「计时与记录」（钉在 0 上，永不解开）。 */
+       变成「数据与同步」（钉在 0 上，永不解开）。
+       ⚠️ 第一次点击必须点**非首组**：几何派生在 `scrollTop = 0` 上给的正是首组
+       「计时行为」，拿它当"第二组"会让最后一条断言变成同义反复。 */
     contentHeight = viewportHeight;
     await mount();
     act(() => { titleButton("通用与启动")?.click(); });
     await settle();
     expect(activeTitle(), "内容一屏装得下时点击被改判成末组").toBe("通用与启动");
     /* 反馈跟着点击走：再点另一组 → 亮第二组 */
-    act(() => { titleButton("计时与记录")?.click(); });
+    act(() => { titleButton("数据与同步")?.click(); });
     await settle();
-    expect(activeTitle(), "反馈没跟着第二次点击走").toBe("计时与记录");
-    /* 不设钉：来一个 `scroll` 必须立刻按几何派生（有钉的话这里停在「计时与记录」） */
+    expect(activeTitle(), "反馈没跟着第二次点击走").toBe("数据与同步");
+    /* 不设钉：来一个 `scroll` 必须立刻按几何派生（有钉的话这里停在「数据与同步」） */
     await oneScroll(0);
-    expect(activeTitle(), "一屏装得下的点击留下了永不解开的钉子").toBe("悬浮条与手柄");
+    expect(activeTitle(), "一屏装得下的点击留下了永不解开的钉子").toBe("计时行为");
   });
 
   it("qn04_a_click_whose_landing_is_reachable_releases_the_pin_on_landing", async () => {
-    /* 对照组：落点**可达**（`计时与记录` 的 landing = 682 <= maxScroll 1200）时，钉子必须在落定那一帧
-       就解掉 —— 否则用户接着往上滚，高亮会黏在「计时与记录」上。 */
+    /* 对照组：落点**可达**（`外观与主题` 的 landing = 80 − 18 = 62，远小于 maxScroll 1200）
+       时，钉子必须在落定那一帧就解掉 —— 否则用户接着往上滚，高亮会黏在「外观与主题」上。 */
     await mount();
-    act(() => { titleButton("计时与记录")?.click(); });
-    expect(activeTitle(), "点击瞬间就该亮目标组").toBe("计时与记录");
-    await oneScroll(ANCHOR_TOPS["s-tracking"] - CSS_ACTIVE_OFFSET);
-    expect(activeTitle()).toBe("计时与记录");
+    act(() => { titleButton("外观与主题")?.click(); });
+    expect(activeTitle(), "点击瞬间就该亮目标组").toBe("外观与主题");
     await oneScroll(ANCHOR_TOPS["s-theme"] - CSS_ACTIVE_OFFSET);
-    expect(activeTitle(), "落定后钉子未解，往上滚高亮不跟").toBe("外观与配色");
+    expect(activeTitle()).toBe("外观与主题");
+    await oneScroll(0);
+    expect(activeTitle(), "落定后钉子未解，往上滚高亮不跟").toBe("计时行为");
   });
 
   it("qn05_the_group_table_matches_the_page_after_the_entries_were_removed", () => {
     /* 判据算法整套都建立在"表顺序 = 页面顺序"上。[设置页七项改造·批 1/2] 两个入口下线后，
-       表里只剩 5 组；「计时与记录」组也回到只有一个锚点。 */
+       表里只剩 5 组；[B5b] 五组按使用场景重排（计时行为在最前），「计时行为」组仍只有一个锚点。 */
     expect(SETTINGS_GROUPS.map((group) => group.id)).toEqual([
-      "pill", "appearance", "tracking", "data", "general",
+      "tracking", "appearance", "pill", "data", "general",
     ]);
     expect(SETTINGS_GROUPS.find((group) => group.id === "tracking")?.anchors.map((anchor) => anchor.id))
       .toEqual(["s-tracking"]);

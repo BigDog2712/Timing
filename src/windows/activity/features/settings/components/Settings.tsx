@@ -163,32 +163,10 @@ export default function Settings({
       <SettingsGroupNav />
 
       <div className="flex-1 overflow-y-auto at-scroll-region pr-2" id="settings-scroll">
-        {/* 网格顺序 = `settingsGroups.ts` 的五组顺序：挪卡片必须同批改那张表，否则导航跳到空处。 */}
+        {/* 网格顺序 = `settingsGroups.ts` 的五组顺序（按使用场景、高频组在前）：挪卡片必须
+            同批改那张表，否则导航跳到空处 —— `settingsGroups.source.test` 的 DOM_ORDER 就钉这条。 */}
         <div className="grid grid-cols-1 gap-4 md:gap-5">
-          {/* 第 1 组「悬浮条与手柄」：必须落在第一屏，进设置页第一眼就能看到手柄绑定。 */}
-          <SettingsHandlesPanel id="s-pill-handles" />
-          <HostPillLookCard id="s-pill-look" />
-
-          {/* 第 2 组「外观与配色」：全应用可写主色的控件只剩 `HostThemeCard` 这一处。 */}
-          <HostThemeCard id="s-theme" />
-          <HostHighlightCard id="s-highlight" />
-          <div id="s-display">
-            <SettingsAppearancePanel
-              language={draftSettings.language}
-              onLanguageChange={(nextLanguage) => { void handleLanguageChange(nextLanguage); }}
-              languageDisabled={languageSelectionPending}
-              colorSchemeLight={draftSettings.colorSchemeLight}
-              onColorSchemeLightChange={(nextColorScheme) => handleChange("colorSchemeLight", nextColorScheme)}
-              colorSchemeDark={draftSettings.colorSchemeDark}
-              onColorSchemeDarkChange={(nextColorScheme) => handleChange("colorSchemeDark", nextColorScheme)}
-              dynamicEffects={draftSettings.dynamicEffects}
-              onDynamicEffectsChange={(nextChecked) => handleChange("dynamicEffects", nextChecked)}
-              onConfirmColorSchemeChange={handleSaveColorScheme}
-              colorSchemeConfirming={saveStatus === "saving"}
-            />
-          </div>
-
-          {/* 第 3 组「计时与记录」：`timelineMergeGapSecs` 全应用只有这一处可编辑。 */}
+          {/* 第 1 组「计时行为」：调时长最先碰的就是这里，`timelineMergeGapSecs` 全应用只有这一处可编辑。 */}
           <div id="s-tracking">
             <SettingsTrackingPanel
               timelineMergeGapControl={{
@@ -213,6 +191,30 @@ export default function Settings({
               onTitleRecordingEnabledChange={(nextChecked) => handleChange("titleRecordingEnabled", nextChecked)}
             />
           </div>
+
+          {/* 第 2 组「外观与主题」：全应用可写主色的控件只剩 `HostThemeCard` 这一处。 */}
+          <HostThemeCard id="s-theme" />
+          <HostHighlightCard id="s-highlight" />
+          <div id="s-display">
+            <SettingsAppearancePanel
+              language={draftSettings.language}
+              onLanguageChange={(nextLanguage) => { void handleLanguageChange(nextLanguage); }}
+              languageDisabled={languageSelectionPending}
+              colorSchemeLight={draftSettings.colorSchemeLight}
+              onColorSchemeLightChange={(nextColorScheme) => handleChange("colorSchemeLight", nextColorScheme)}
+              colorSchemeDark={draftSettings.colorSchemeDark}
+              onColorSchemeDarkChange={(nextColorScheme) => handleChange("colorSchemeDark", nextColorScheme)}
+              dynamicEffects={draftSettings.dynamicEffects}
+              onDynamicEffectsChange={(nextChecked) => handleChange("dynamicEffects", nextChecked)}
+              onConfirmColorSchemeChange={handleSaveColorScheme}
+              colorSchemeConfirming={saveStatus === "saving"}
+            />
+          </div>
+
+          {/* 第 3 组「悬浮条与把手」：设置一次就不再动的项，降到第一屏之后（B5b 的口径见分组表）。 */}
+          <SettingsHandlesPanel id="s-pill-handles" />
+          <HostPillLookCard id="s-pill-look" />
+
           {/* 第 4 组「数据与同步」：宿主的 md_sync（计时记录）在前，活动库备份在后。 */}
           <div id="s-sync"><HostSyncPanel /></div>
           <div id="s-backup">

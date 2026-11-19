@@ -9,8 +9,12 @@
  *   A. 五组、五个标题，且不再有独立的「外观」分区标题
  *   B. 表里每一个锚点 id 在页面上**恰好出现一次**（拼错 = 点了不滚也不报错）
  *   C. 锚点在页面里的**出现顺序** = 导航顺序（本文末尾的 `DOM_ORDER` 是唯一口径）
- *   D. 第一组是「悬浮条与手柄」，且它的第一张卡紧贴网格开头（第一屏可达）
+ *   D. 第一组是「计时行为」，且它的第一张卡紧贴网格开头（第一屏可达）
  *   E. 「接口」那一族入口**不再存在**（[设置页七项改造·批 1] 整卡下线后的反向回归）
+ *
+ * [B5b] D 的口径换过一次：原先是「第一组是悬浮条与手柄」（0.12.1 给新功能配的
+ * 可发现性口径），现在按使用场景重排、高频组进第一屏，第一组是「计时行为」。
+ * 判据形状没变（仍是「第一组 + 第一张卡」两个条件），换了主语而已。
  */
 import { describe, expect, it } from 'vitest';
 import { code } from './settingsSourceProbe.test-utils';
@@ -26,9 +30,9 @@ const APPEARANCE = code('src/windows/activity/features/settings/components/Setti
  * 挪卡片的人必须同时改表与页面，改一半就红。
  */
 const DOM_ORDER = [
-  's-pill-handles', 's-pill-look',
-  's-theme', 's-highlight', 's-display',
   's-tracking',
+  's-theme', 's-highlight', 's-display',
+  's-pill-handles', 's-pill-look',
   's-sync', 's-backup',
   's-general', 's-resident', 's-plugins', 's-ai',
 ];
@@ -47,11 +51,13 @@ describe('② 五组锚点（P0-06 判据 2 的替代口径）', () => {
     /* [设置页七项改造·批 2] 「主界面」组随「主界面组件」卡一起下线：分组 6 → 5。
        这张表仍是「表 = 页面 = 导航」三者的唯一口径。 */
     expect(SETTINGS_GROUPS.map((group) => group.id))
-      .toEqual(['pill', 'appearance', 'tracking', 'data', 'general']);
+      .toEqual(['tracking', 'appearance', 'pill', 'data', 'general']);
     /* 标题是中文常量、不进 i18n（`contract.ts` 本轮零行余量）：所以文案本身要钉住，
-       不然「改一个字」这种改动会静默溜过去。 */
+       不然「改一个字」这种改动会静默溜过去。[B5b] 三个组名按使用场景重命名：
+       计时与记录 → 计时行为、外观与配色 → 外观与主题、悬浮条与手柄 → 悬浮条与把手
+       （术语跟着锚点 title「把手绑定」走，别在同一页混用「手柄/把手」）。 */
     expect(SETTINGS_GROUPS.map((group) => group.title))
-      .toEqual(['悬浮条与手柄', '外观与配色', '计时与记录', '数据与同步', '通用与启动']);
+      .toEqual(['计时行为', '外观与主题', '悬浮条与把手', '数据与同步', '通用与启动']);
     for (const group of SETTINGS_GROUPS) {
       expect(group.anchors.length, `${group.id} 组没有锚点`).toBeGreaterThan(0);
       for (const anchor of group.anchors) {
@@ -79,16 +85,17 @@ describe('② 五组锚点（P0-06 判据 2 的替代口径）', () => {
     expect(anchorsInSourceOrder()).toEqual(DOM_ORDER);
   });
 
-  it('p006_first_group_is_handles_and_reachable_on_first_screen', () => {
-    /* PRD A-01 的可发现性：用户进设置页第一眼要能看到手柄绑定，而不是先滚三屏。
-       「第一组 + 第一张卡」两个条件同时成立才算第一屏可达。 */
-    expect(SETTINGS_GROUPS[0]?.id).toBe('pill');
-    expect(SETTINGS_GROUPS[0]?.anchors[0]?.id).toBe('s-pill-handles');
+  it('p006_first_group_is_tracking_and_reachable_on_first_screen', () => {
+    /* [B5b] 可发现性的主语换了：进设置页第一屏要看到的是**计时规则**（高频，每次调时长
+       都碰），不是「把手绑定」（设置一次就不再动）。判据形状没变 —— 「第一组 + 第一张卡」
+       两个条件同时成立才算第一屏可达。 */
+    expect(SETTINGS_GROUPS[0]?.id).toBe('tracking');
+    expect(SETTINGS_GROUPS[0]?.anchors[0]?.id).toBe('s-tracking');
     const gridAt = SETTINGS.indexOf('grid grid-cols-1 gap-4 md:gap-5');
-    const firstCardAt = SETTINGS.indexOf('<SettingsHandlesPanel');
+    /* 第一张卡是包着 `SettingsTrackingPanel` 的 `div#s-tracking`（它不是组件，是锚点容器） */
+    const firstCardAt = SETTINGS.indexOf('<div id="s-tracking"');
     expect(gridAt, '找不到卡片网格（选择器改了要同批改本条）').toBeGreaterThan(-1);
-    expect(firstCardAt).toBeGreaterThan(gridAt);
-    expect(SETTINGS.indexOf('id="s-pill-handles"')).toBeGreaterThan(firstCardAt);
+    expect(firstCardAt, '找不到第一张卡（锚点容器的写法改了要同批改本条）').toBeGreaterThan(gridAt);
     /* 网格开头到第一张卡之间不许夹别的卡片标签（否则「第一张」就不是它了）。 */
     expect(SETTINGS.slice(gridAt, firstCardAt)).not.toContain('<Host');
     expect(SETTINGS.slice(gridAt, firstCardAt)).not.toContain('<Settings');
