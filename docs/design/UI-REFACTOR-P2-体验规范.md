@@ -10,10 +10,12 @@
 ## 0. 现状盘点（证据）
 
 **桌面设置的真实归属**（澄清 team-lead 简报里"两处散落"的具体形态）：
-- 桌面端设置实际由**分析窗**承载：`activity/features/settings/components/Settings.tsx` 已是一张五组网格（见 `settingsGroups.ts`：悬浮条与手柄 / 外观与配色 / 计时与记录 / 数据与同步 / 通用与启动），带左侧 `SettingsGroupNav` 锚点导航。
+- 桌面端设置实际由**分析窗**承载：`activity/features/settings/components/Settings.tsx` 已是一张五组网格（见 `settingsGroups.ts`：计时行为 / 外观与主题 / 悬浮条与把手 / 数据与同步 / 通用与启动；组名已于 B5b `5a4cd29` 按新口径重命名），带左侧 `SettingsGroupNav` 锚点导航。
 - `timing/components/settings/*`（GeneralTab / AppearanceCard / ThemePicker / PluginsTab / SwatchRow / HighlightColorRow）当前**只被移动端** `mobile/SettingsPage.tsx` 复用（4 tab：计时/外观/插件/通用）。桌面主窗自己不再直开这组卡。
 
 > 结论修正：设置并非"主窗面板 + 分析窗两套并行"，而是**桌面=分析窗五组、移动端=主窗四 tab 两套实现**，文案/分组口径不一致、且分析窗五组内部仍有深层嵌套与高级/基础混排。P2 的设置重组以**统一这两套的分组心智**为目标，不强行把移动端塞进桌面布局（A6：移动端只继承令牌与分组语义，不做布局重排）。
+
+> **[实测修正 2026-11-19]** 上面两条已逐行核过、成立。补两点：① 五组标题在 B5b（`5a4cd29`，已提交）已改为「计时行为 / 外观与主题 / 悬浮条与把手 / 数据与同步 / 通用与启动」，前三组与 §3.1 提案同序；② "桌面=分析窗"要读成**桌面只有这一套**——`timing/components/settings/*` 在编译期被 `__TIMING_MOBILE__` 分叉掉，桌面产物里不含这组组件（详见 §3.5(3)），所以在桌面设置页里"发现另一份同名实现"时不要急着合并。
 
 ## 1. 功能入口信息架构重构
 
@@ -135,34 +137,47 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 沿用分析窗已有的五组骨架（已验证合理），但**统一命名、明确每组内的基础区/高级区分界**，并把移动端四 tab 的语义映射到同一棵树。
 
 ```
-设置
-├─ 1. 计时行为            （最常改，置顶）
-│   ├─ [基础] 最短记录时长
-│   ├─ [基础] 记录规则（时间线合并间隔、空闲超时）
-│   └─ [基础] 标题记录开关 / 暂停追踪
+设置（5 组 / 12 个锚点；**锚点总数与归属不改动**）
+├─ 1. 计时行为                                                  [s-tracking]
+│   └─ 记录规则（时间线合并间隔 / 空闲超时）· 暂停追踪 · 标题记录
 │
-├─ 2. 外观主题
-│   ├─ [基础] 主题与主色（ThemePicker / HostThemeCard）
-│   ├─ [基础] 高亮颜色（HighlightColorRow / HostHighlightCard）
-│   ├─ [基础] 悬浮条外观（文字/背景不透明度、常驻形态 dot/pill）
-│   └─ [基础] 显示与语言
+├─ 2. 外观与主题                      [s-theme / s-highlight / s-display]
+│   ├─ 主题与主色（含四色 running / warn / done / bar）
+│   ├─ 高亮颜色（独立于四色，见 §3.3 D3）
+│   └─ 显示与语言（配色预设 / 语言 / 灵动视效）
 │
-├─ 3. 悬浮条与把手
-│   ├─ [基础] 常驻形态（与"外观主题"联动，呈现一次即可，见 3.3 去重）
-│   └─ [高级·默认折叠] 把手绑定（三形态 × 五槽位 × 13 动作）
+├─ 3. 悬浮条与把手                      [s-pill-handles / s-pill-look]
+│   ├─ 把手绑定（三形态 × 五槽位 × 13 动作）        [高级·默认折叠]
+│   └─ 悬浮条外观（文字/背景不透明度 + 常驻形态 bar/dot）
 │
-├─ 4. 同步与数据
-│   ├─ [基础] Markdown 同步（md.sync）
-│   ├─ [基础] 数据安全 / 备份 / 导入导出
-│   └─ [高级·默认折叠] 存储路径 / 缓存清理 / 定时导出
+├─ 4. 数据与同步                                  [s-sync / s-backup]
+│   ├─ 同步与备份（md_sync：Markdown 落点 / 本地 / WebDAV / 备份）
+│   └─ 数据安全（导出 / 导入 / 全额数据包 · 本机目录 · 清理）
+│       └─ [高级·默认折叠] 存储路径 / 缓存清理 / 定时导出
 │
-└─ 5. 插件与关于
-    ├─ [基础] 插件（PluginsTab / HostPluginsPanel）
-    ├─ [高级·默认折叠] AI 与标签
-    └─ [基础] 关于 / 第三方声明 / 版本
+└─ 5. 通用与启动              [s-general / s-resident / s-plugins / s-ai]
+    ├─ 通用（开机自启、最短记录时长）
+    ├─ 常驻与启动（关闭到后台 / 显示托盘图标 / 静默启动）
+    ├─ 插件（默认展示磁盘事实，无启停开关）
+    └─ AI 配置
 ```
 
-分组顺序理由：计时行为是产品主职能、改得最勤 → 置顶；外观与悬浮条/把手视觉相邻 → 2、3 相连；同步数据偏运维 → 靠后；插件与关于最低频 → 收尾。相比现状把"悬浮条与手柄"强置第一组（为本轮主功能的可发现性），本规范建议**把高频的"计时行为"提到第一组**，把手绑定作为高级项收进第 3 组折叠区——可发现性由 3.4 的首次引导承担，而非靠占据第一屏。
+> **[实测修正 2026-11-19 · 口径已与代码层对齐]** 与原树的五处差异，都是"照原树写会做错事"的地方：
+>
+> 1. **常驻形态不并组**：`HostPillLookCard`（内容 = 文字/背景不透明度 + 常驻形态 `floatForm`）**整张卡留在第 3 组 `s-pill-look`**，第 2 组不拆出第二个锚点。原树一边把"悬浮条外观（不透明度+常驻形态）"列进第 2 组、一边又把"常驻形态"列进第 3 组并要求按 D1 只保留一处，**自相矛盾**。三条理由：① 拆成两处锚点会新增第 13 个锚点，`TOP_LADDER`（`settingsNavAnchors.test-utils.ts:47`，12 项、长度必须等于锚点数）与四个导航用例的落点要全部重算，而收益只是分组语义更"纯"；② D1 已核实桌面**只有一处**入口，本来就没有重复要消，这一项没有需要解决的问题；③ 把不透明度与常驻形态拆到两个锚点，会让"改悬浮条外观"变成两次跳转。
+> 2. **常驻形态的值域是 `bar` / `dot`**，没有第三个值；`dot / half / full` 是**手柄三形态**（`HANDLE_FORMS`），属第 3 组「把手绑定」的内容（§3.3 D1-b）。
+> 3. **第 2 组只有三个锚点**（`s-theme` / `s-highlight` / `s-display`），与代码一致；第 3 组两个锚点（`s-pill-handles` 先、`s-pill-look` 后——顺序即 DOM 顺序，别按"基础在前"重排）。
+> 4. **第 5 组保留「通用」与「常驻与启动」**：原树只写了 插件 / AI / 关于，**漏掉了 `s-general`（开机自启、最短记录时长）与 `s-resident`（关闭到后台 / 托盘图标 / 静默启动）**——照原树落地会把这两个锚点从页面上删掉，属功能回退。
+> 5. **「关于 / 第三方声明 / 版本」不属于设置页**：它是分析窗的**壳级独立视图**（`activity/features/about/components/About.tsx`，由 `AppShellViews.tsx:35,227` 路由），设置页内不提供「关于」入口，故从第 5 组移除。
+> 6. **`s-ai` 的锚点标题「AI 与标签」是空挂**：设置页里没有任何标签管理项（仓中无 `features/tags/`），该锚点打开只有 AI 配置。建议把锚点 title 改成「AI」——属**只改文案、不改 id/归属**的动作（与 B5b 把「手柄绑定」改成「把手绑定」同类），代价是同步改导航用例里的期望文案；本轮可不做，但不要把它当成"标签设置已存在"。
+>
+> **组名结论（`通用与启动`）：保持现名，不改。** 理由一句：左侧导航**逐条渲染锚点标题**（`SettingsGroupNav.tsx:251-262`），用户找"插件"是扫锚点名而不是组名，组名不承担索引职责；而改名要再动一次刚被 B5b 改过的分组表标题与 4 个导航用例的期望组名，收益只是标签精确度。**触发条件**（将来再改的两条）：把 `s-general` 的最短记录时长迁走后「通用」只剩一行开机自启；或分组名纳入 i18n 时。两条都没发生前，本组名作为**历史命名**沿用，文档在此注明它只覆盖前两个锚点。
+>
+> **另有一条本轮不做的提案**：原树把「最短记录时长」列在第 1 组，但它长在 `HostGeneralPanel`（`s-general`，第 5 组），要迁成第 1 组必须**跨卡搬迁并改锚点归属**——与"锚点归属不改动"冲突，本轮不做；§5.3 的验收也不按此判。
+
+分组顺序理由：计时行为是产品主职能、改得最勤 → 置顶；外观与悬浮条/把手视觉相邻 → 2、3 相连；同步数据偏运维 → 靠后；通用、插件与 AI 最低频 → 收尾。相比 0.12.1 把"悬浮条与手柄"强置第一组（那是为"手柄绑定"这个新功能配的可发现性口径，PRD A-01），本规范建议**把高频的"计时行为"提到第一组**，把手绑定作为高级项收进第 3 组折叠区——可发现性由 3.4 的首次引导承担，而非靠占据第一屏。
+
+> **[实测修正 2026-11-19]** "提到第一组"这一项**已在 B5b 落地**（`5a4cd29`：`settingsGroups.ts` 已把 `tracking` 排到首位，`Settings.tsx` 网格同批调整，DOM 顺序与表严格一致）。剩余动作只有"把手绑定默认折叠"（B5c）与 §3.4 的首次引导。
 
 ### 3.2 基础区 / 高级区分界规则
 
@@ -172,16 +187,48 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 
 ### 3.3 重复项与深层嵌套清理（逐条迁移映射）
 
-| # | 现状位置 | 问题 | 迁移到 | 动作 |
-|---|---|---|---|---|
-| D1 | 常驻形态（dot/pill）同时出现在 `AppearanceCard`（移动"显示"）与 `HostPillLookCard`（桌面"悬浮条外观"） | 同一设置两处入口、两套文案 | 统一进"外观主题 > 悬浮条外观"一处；"悬浮条与把手"组只引用、不再重复控件 | 去重：保留 HostPillLookCard 实现口径，移动端 AppearanceCard 对齐同文案。**措辞用"收起为圆点"而非"切换到圆点模式"**——dot 是 `floatForm='dot'+collapsed=true` 的精修，不是独立第三形态（P1 §4.1 形变即状态） |
-| D2 | 文字/背景不透明度在 `AppearanceCard` 与 `HostPillLookCard` 各一份 | 同上 | 同 D1，归"外观主题 > 悬浮条外观" | 文案统一为"只影响悬浮条，不影响本页"。两端统一入口**只改根变量** `--ui-bg-opacity` / `--ui-text-opacity`（appearanceStore 写 `<html>` 行内），组件层不得各写一份 |
-| D3 | 高亮颜色：`HighlightColorRow`（主窗）与 `HostHighlightCard`（分析窗）分列 | 双实现 | "外观主题 > 高亮颜色"一处 | 对应 P1 `--highlight-color`（出厂 #4DA3E8，用户可改，托盘双击行内覆盖），**独立于 `accent`，不与"四色可配"混为一条**；两端共用同一语义，移动端复用主窗卡 |
-| D4 | 主题四色取色：`ThemePicker` / `SwatchRow`（主窗）与 `HostThemeCard`（分析窗） | 双实现 | "外观主题 > 主题与主色" | 对应主窗 `--color-running/danger/warn/done` 四可配槽（默认回落 `--accent/--danger/--warn/--ok`）；统一入口写入后两端读同一组语义令牌，渲染值不变（符合 B1 零像素） |
-| D5 | "开机自启"（GeneralTab）与"常驻与启动"（SettingsResidentPanel 的 launchAtLogin） | 语义重叠、两处开机项 | 合并进"计时行为"？否——归第 5 组相邻的"常驻与启动"，但与自启去重为一个真源 | 消除两个开机自启开关 |
-| D6 | 把手绑定卡（`SettingsHandlesPanel`/`SettingsHandleCard`）当前是分析窗设置**第一组、平铺** | 高级项与"开机自启"等基础项平级、占第一屏 | "悬浮条与把手 > 把手绑定（高级·折叠）" | 降级为折叠高级区 |
-| D7 | 时间统计/Patina 入口在 `GeneralTab` 里（"打开"按钮） | 入口埋在"通用"深处 | 保留一处即可（托盘已有等价入口）；设置内归"关于/通用" | 不重复，标注与托盘等价 |
-| D8 | `settings.css` 1275 行、`settings-dialog.css`、`settings-sync.css`、`settings-groups.css`、`settings-handles.css` 多文件补丁叠加 | 深层覆盖、层叠难推理 | 不属 IA 范畴，交 fe 在 B6 拆分；本规范只要求分组树落地后**每组一文件、折叠区独立** | 结构约束见 §6 |
+> **[实测修正 2026-11-19] 本节已按源码实测整表重写**（基线：`5a4cd29` B5b 已落地后的工作区 + HEAD 历史；行号以当前提交为准）。
+> 原表把 D1–D4 列为"待去重"待办，**实测结论是这四项都不需要去重**：桌面端每项本就只有一个可编辑入口，
+> 第二处全部落在 **Android 包**（`timing/components/settings/*`，编译期 `IS_MOBILE` 分叉，桌面产物里被整块摇掉）。
+> 只有 **D5 是桌面真实重复**。照原表执行会做出 3 处无谓改动，且 D1/D3/D4 的"合并入口"会动到 Android 唯一的设置入口——
+> 所以下面每条的「动作」列写的是**该做什么 / 不该做什么**，不是待办编号。
+
+| # | 实测结论 | 证据（文件:行号） | 动作 |
+|---|---|---|---|
+| **D1** 常驻形态 `floatForm` | **不需去重**。桌面只有一处，且在「悬浮条与把手」组、不在「外观与主题」组；第二处是 Android 专用 | 桌面 `activity/features/settings/components/host/HostPillLookCard.tsx:132-153`（写入 `:141`）；Android `timing/components/settings/AppearanceCard.tsx:32-50`（写入 `:43`）。Android 侧三重隔离：`!IS_MOBILE`（`:32`）、`ThemePicker` 唯一消费者 `mobile/SettingsPage.tsx:185`、`MobileShell` 由编译期常量分叉（`timing/lib/platform.ts:19`、`entry/App.tsx:49`） | **不动代码，也不并组**：`HostPillLookCard` 整张卡（不透明度 + 常驻形态）留在第 3 组 `s-pill-look`，第 2 组不拆第二个锚点（理由见 §3.1 注 1）。原表"移动端 AppearanceCard 对齐同文案"降级为**跨端一致性待办（非本轮）**：它在桌面不可达，改它只影响 Android 包 |
+| **D1-b** 概念澄清（新增行） | `floatForm` 值域只有 `'bar' \| 'dot'`；`dot / half / full` 是**手柄三形态** `HANDLE_FORMS`，编辑点在 `SettingsHandlesPanel` 一张卡内三行 | `shared/pillAppearance.ts:31-36`（类型）、`:91-93`（归一化）；`shared/handleCatalog.ts:16-17,52` | 文档与文案**禁止用 dot/half/full 描述常驻形态**。"收起为圆点"= `floatForm='dot'`，不是第三形态（该口径原表已正确，此处只补证据） |
+| **D2** 文字/背景不透明度 | **不需去重**，且不存在"组件层各写一份"：控件实现只有一份，根变量写入点全仓只有一个 | 控件：`HostPillLookCard.tsx:99-122` 的局部 `opacitySlider()`，`:154` / `:155` 两次调用分别渲染**两个不同字段**（`textOpacity` / `bgOpacity`），不是同一字段写两遍。唯一 `setProperty`：`timing/stores/appearanceStore.ts:45-49`（`--ui-text-opacity` / `--ui-bg-opacity`）。CSS 全部经令牌消费：`tokens/01-primitives.css:23-26`、`02-theme-dark.css:69-70`、`03-theme-light.css:59-60`、`04-aliases.css:26,86`、`overlays.css:15,155`、`panels.css:16`、`surfaces.css:58`、`note.css:192`。分析窗自身 0 处消费（activity 目录 grep 命中 0） | **不动代码**。原表「组件层不得各写一份」这句话作为**长期规约保留**（它已经是事实）；文案「只影响悬浮条，不影响本页」保留——实测准确（`HostPillLookCard.tsx:105`） |
+| **D3** 高亮颜色 | **不需去重**。数据层本就是两条独立设置（不同字段、不同命令），桌面分两张卡、两个锚点、两个标题 | `ReferenceSettings.highlightColor`：`host/HostHighlightCard.tsx:76-95`（写入 `:63`）→ `platform/desktop/hostSettingsGateway.ts:41-44`；Android `settings/HighlightColorRow.tsx:40-61`（挂在 `ThemePicker.tsx:125`）。无联动代码：`applyAccents` 只写 `--color-*`（`timing/lib/theme.ts:153-181`），`--highlight-color` 只由 `timing/services/highlightActions.ts:29` 写 | 不动代码。**唯一真动作是防歧义文案**：两者出厂值相同（`02-theme-dark.css:43` `--accent:#4DA3E8` 与 `:48` `--highlight-color:#4DA3E8`）且互不联动，这是"看起来像同一条设置"的根源 → 两张卡各加一句短注（"改这里不影响主色/高亮"） |
+| **D4** 主题四色 | **不需去重**；已回落语义令牌，但"两端读同一组"对**分析窗不成立** | 回落：`tokens/04-aliases.css:10-17`（`--color-running/-danger/-warn/-done` → `--accent/--danger/--warn/--ok`）；运行时不硬写：`timing/lib/theme.ts:153-181`（等于出厂默认即 `removeProperty`，只有用户改过才内联）。**四色实际是 running / warn / done / `bar`**：`theme.ts:25,28-33`、`host/HostThemeCard.tsx:40-45`；`--color-danger` 只是别名、**没有可配键**。**分析窗 0 处使用 `--color-*`**（grep 计数 0），它用 `--at-*`（`shared/theme/deriveTheme.ts`） | 不动代码；**修正文档写法**（原表"running/danger/warn/done"→ running/warn/done/bar）。另需接受一个交互事实：**改四色在设置页自身零可见反馈**，只有悬浮条会变→ 不做"本页预览控件"（那会制造第二处看起来的入口），验证途径只能是悬浮条 |
+| **D5** 开机自启 | **唯一的桌面真重复**。但性质不是"同一设置两份 UI"，而是**两个字段驱动同一 OS 状态**、持久化两份、且会互相覆盖 | 见下方「D5 详述」 | 按已定方案：**保留 `HostGeneralPanel` 的即改即存开关、移除 `SettingsResidentPanel` 的 `launchAtLogin` 行、切换时双写同步两字段**（不新增 IPC、不改 Rust、不改表结构） |
+| **D6** 把手绑定卡降级 | **已在 B5b 落地**（`5a4cd29`：`s-pill-handles` 从第 1 组挪到第 3 组，`settingsGroups.ts` 与 `Settings.tsx` 同批改，DOM 顺序与表一致） | `settingsGroups.ts` 当前 group 顺序：tracking → appearance → pill → data → general；卡头已同步为「把手绑定」（`SettingsHandlesPanel.tsx:110`），与锚点标题一致 | 剩余仅"默认折叠"（B5c）。**卡头与锚点已对齐，不要再用旧名「悬浮条与手柄」**——改组名/锚点名时该卡 `title` 必须同批改（`5a4cd29` 已把这条规矩写进该文件头注释） |
+| **D7** 时间统计/Patina 入口 | **[实测修正] 桌面根本不存在这个入口**，不是"埋在深处" | 该入口在 `timing/components/settings/GeneralTab.tsx:139-157`，而 `GeneralTab` 桌面不可达（`MobileShell` 编译期分叉；唯一调用点 `mobile/SettingsPage.tsx:190` 还带 `showAutostart={false}`）。桌面侧等价入口只有托盘「时间统计…」（`infra/tray_menu.rs:131`） | **无需动作**。原表"保留一处即可"自动成立（桌面本来只有托盘一处）；不要为了"归组"去把 GeneralTab 接回桌面 |
+| **D8** 设置 CSS 多文件叠加 | 与 IA 无关，仍是 fe 的 B6 职责 | `settings.css` 1275 行 + `settings-dialog.css` / `settings-sync.css` / `settings-groups.css` / `settings-handles.css` | 维持原样：分组树落地后每组一文件、折叠区独立，见 §6 |
+
+#### D5 详述：两个开机自启开关的真实链路
+
+桌面有 **两个开关、都在「通用与启动」组内相邻**，写的是**两个不同字段**、走两条不同后端链路，最终打到**同一个 OS 注册表值**：
+
+| 位置 | 字段 | 生效方式 | 链路 |
+|---|---|---|---|
+| `host/HostGeneralPanel.tsx:98-110`（标签硬编码「开机自启」） | `autostartEnabled`（timing 设置表） | **即改即存**，不等页头保存 | `set_autostart`（`src-tauri/src/commands/settings_cmd.rs:81-91`）→ 注册表 + 回写 `autostart_enabled`。注意 `update_settings` 带该字段时也会落系统侧（同文件 `:66-70`） |
+| `SettingsResidentPanel.tsx:59-65` + `Settings.tsx:250-251`（标签取 i18n `settings.launchAtLoginLabel`「开机自启动」） | `launchAtLogin`（activity app settings 表） | 进草稿，要点页头「保存」 | `cmd_commit_app_settings`（`settingsRuntimeAdapterService.ts:56-60,180`）→ 随后 `useDesktopLaunchBehaviorSync.ts:14-20` 在 `launchAtLogin` 变化时调 `cmd_set_launch_behavior` → `src-tauri/src/app/activity/desktop_behavior.rs:48-59` → 同一个 tauri-plugin-autostart |
+| `timing/components/settings/GeneralTab.tsx:100-109` | 同上（宿主版） | — | **当前不可达**：唯一生产调用点 `mobile/SettingsPage.tsx:190` 传 `showAutostart={false}` |
+
+**为什么会互相覆盖（这是真正的隐患，不只是 UI 重复）**：
+
+- OS 层只有一个真源：`src-tauri/src/infra/autostart.rs:33-41` 与 `desktop_behavior.rs` 的 `app.autolaunch()` 是**同一个插件、同一个 HKCU Run 值名**（值名 = `productName`，见 `infra/autostart.rs:1-16`）。
+- 但**持久化是两份**：`autostart_enabled` 在 timing 设置表，`launch_at_login` 在 activity app settings 表。
+- 而 `launch_at_login` 出厂是 `true`（`shared/settings/releaseDefaultProfile.ts:88`）。于是：用户在 (a) 关掉自启 → 注册表变 false；下次启动 `useDesktopLaunchBehaviorSync` 按 `launchAtLogin=true` 再写一次 → 自启被重新打开，且用户不知道自己点过两次。
+
+**已定处理方案（本轮执行口径）**：
+
+1. **保留** `HostGeneralPanel` 的「开机自启」即改即存开关，作为**唯一 UI 入口**（它是唯一能立刻读回注册表实际状态的路径：`set_autostart` 返回 `actual`）。
+2. **移除** `SettingsResidentPanel` 的 `launchAtLogin` 行（连同 `Settings.tsx:250-251` 的接线与 `SettingsResidentPanelProps` 的对应两个 prop）。`SettingsResidentPanel` 保留其余三行（关闭到后台 / 显示托盘图标 / 静默启动）。
+3. **切换时双写**：一次用户操作同时写 `autostartEnabled`（`set_autostart`，权威、回读实际值）与 `launchAtLogin`（app settings，让 `useDesktopLaunchBehaviorSync` 不再拿旧值回写注册表）。两字段在 UI 上只出现一次，物理上永远同值。
+4. **约束**：不新增 IPC 命令、不改 Rust、不改表结构、不改 `launchAtLogin` 的出厂值（改出厂值会影响未打开过设置页的用户，属于另一个决策）。
+
+> 验收时不要用"桌面只剩一个 `setAutostart(` 调用"来判 D5——真正的判据是 **UI 上只有一个开机自启开关** + **两个字段在切一次之后同值**（grep 只能挡回归，挡不住"字段漂移"）。
 
 ### 3.4 可发现性补偿（把手绑定降级后）
 
@@ -189,6 +236,31 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 - 首次进入设置页，第 3 组"把手绑定"折叠块标题旁给一枚"新"标记（一次性，点开即消）。
 - 悬浮条首次 hover 露出把手时，给一次性 tooltip「可在 设置 > 悬浮条与把手 自定义这些按钮」。
 - 两处引导都只出现一次，写入本机偏好标志，不打扰老用户。
+
+### 3.5 落地时会踩到的三条现状（实测，非提案）
+
+改设置页的人（含以后的自己）在动任何一张卡之前必须先知道这三条。它们的共同点是：**不在分组表里，也不在任何一张卡内部，所以既不会被 grep 到，也不会被现有测试挡住。**
+
+**(1) 同一个设置页里有三种保存范式并存，页头「保存 / 取消」只管其中一种。**
+
+| 范式 | 卡片 | 生效时机 |
+|---|---|---|
+| 页头草稿 + 保存 | `SettingsTrackingPanel`（记录规则 / 暂停追踪 / 标题记录）、`SettingsResidentPanel`（窗口与托盘四条，D5 移除「开机自启动」后剩三条）、`SettingsAppearancePanel`（配色预设 / 语言 / 灵动视效） | 点页头「保存」，走 `saveSettingsPageStateWithDeps` |
+| 卡内自带保存条 | `HostSyncPanel`（md 同步六块折叠） | 卡底自己的保存，与页头无关（`useMdSyncDraft`） |
+| 即改即存 | `HostPillLookCard`、`HostThemeCard`、`HostHighlightCard`、`HostGeneralPanel`、`SettingsHandlesPanel`、`HostAiCard` | 控件一动就落库，没有草稿 |
+
+后果：页头「保存 / 取消」由 `SettingsHeaderActions.tsx:33` 按 `hasUnsavedChanges` 决定禁用，**对后两类完全无效**。用户在即改即存卡上改了东西，页头仍然显示「无未保存更改」、「保存」是灰的——他会以为没保存成功。任何"合并卡片 / 挪组 / 加折叠"动作都会把这三种范式搅在一起，**动结构时必须同时决定该卡沿用哪种范式，不能只改 DOM 位置**。
+
+**(2) 活动库备份 / 恢复已整块下线，「数据与同步」组的实际内容比文档写的少。**
+
+`SettingsDataSafetyPanel.tsx:19-37` 的注释记录了这次下线：`SettingsDataBackupGroup` / `SettingsBackupDialog` / `SettingsRemoteBackupPanel` / `SettingsRemoteUploadDialog` / `useRemoteBackupState` / `remoteBackup*` 服务与 `platform/backup/*` 全部删除，理由是"两份不同的备份语义、两套恢复策略、一条会覆盖整库的远端还原"。
+
+该组现在实际只有：**md_sync 同步与备份**（`HostSyncPanel`，含 `MdSyncBackupCard`）+ **数据导出 / 导入 / 全额数据包**（`SettingsDataExportGroup`）+ **本机目录**（`SettingsStoragePathsGroup`）+ **清理**（`SettingsDataCleanupGroup`）。**另注**：`定时导出` 并不在设置页面上，它嵌在「数据导出」对话框里（`SettingsDataExportDialog.tsx:291-311` → `SettingsScheduledExportDialog.tsx`），到位深度是 **设置页 → 数据安全卡 → 导出对话框 → 定时导出 四级**。§3.1 把它列进「高级·默认折叠」时，折叠块需要把它从对话框里提出来，否则"折叠"只是换了个地方藏。
+
+**(3) `timing/components/settings/*` 只被移动端复用；该目录下的 `mdSync*.ts` 是转发壳，不是第二份实现。**
+
+- 桌面药丸的内联设置面板（`SettingsPanel → ThemePicker`）已删；`ThemePicker` / `GeneralTab` / `PluginsTab` / `AppearanceCard` / `HighlightColorRow` / `SwatchRow` 的唯一生产消费者是 `mobile/SettingsPage.tsx`，而 `MobileShell` 由编译期 `__TIMING_MOBILE__` 分叉（`timing/lib/platform.ts:19`、`entry/App.tsx:49`）。**桌面产物里这一整组组件不存在**——所以在桌面设置页里 grep 到"同名同功能"的实现时，先确认它是不是只服务 Android，不要急着合并。
+- 该目录下 `mdSyncAuto.ts` / `mdSyncConfig.ts` / `mdSyncCopy.ts` 都是 **6 行 re-export 壳**（如 `mdSyncCopy.ts` 只有一行注释 + `export * from '../../../../../shared/settings/mdSyncCopy'`），真源已合并到 `shared/settings/mdSync*`；`features/settings/services/host/mdSync*.ts` 也是同样的壳。三处 **不是三份实现**，`mdSyncCopies.drift.test.ts` 专门盯着不许分叉——拆分或搬移这些文件时不要"顺手合并"，会把壳变回副本。
 
 ## 4. 键盘与无障碍
 
@@ -250,11 +322,14 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 - [ ] 倒计时告警是唯一数字变色场景，其余态数字不变色。
 
 ### 5.3 设置重组
-- [ ] 设置为五组（计时行为/外观主题/悬浮条与把手/同步与数据/插件与关于），顺序与 §3.1 一致。
-- [ ] 把手绑定、存储路径、定时导出、AI 配置均在默认折叠的高级区。
-- [ ] 常驻形态、不透明度、高亮色、主题四色各只有一处可编辑入口（D1–D4 去重生效）。
-- [ ] 开机自启只有一个真源开关（D5 生效）。
-- [ ] 任一设置项到达路径 ≤ 2 层（组 → 卡/折叠块），无三级以上嵌套。
+
+> **[实测修正 2026-11-19]** 本节第 3、4 条按 §3.3 的口径改写：D1–D4 **本来就各只有一处入口**，"去重生效"这个措辞会让人误以为需要改动；第 5 条与「定时导出」的实际深度冲突（§3.5(2)），据此拆条。
+
+- [ ] 设置为五组（计时行为 / 外观与主题 / 悬浮条与把手 / 数据与同步 / 通用与启动），顺序与 §3.1 一致；第 5 组沿用现名但**不把「关于」塞进去**（关于不在设置页）。
+- [ ] 把手绑定、存储路径、定时导出、AI 配置均在默认折叠的高级区；**定时导出需先从「数据导出」对话框提到折叠块内**，否则仍停在四级深度（§3.5(2)）。
+- [ ] 常驻形态、不透明度、高亮色、主题四色**在桌面各只有一处可编辑入口**——这是**现状已成立**的判据（grep 基线：`HostPillLookCard` / `HostThemeCard` / `HostHighlightCard` 各一处；不透明度只有一个 `setProperty` 写入点），验收目的是**防回归**而非推动改动；若发现第二处，先确认它是否只服务 Android（`IS_MOBILE`）。
+- [ ] 开机自启在 UI 上只有一个开关（D5）；且切换一次之后 `autostartEnabled` 与 `launchAtLogin` 同值（判据见 §3.3 D5 详述，不要只用 grep 判定）。
+- [ ] 任一设置项到达路径 ≤ 2 层（组 → 卡/折叠块）——**唯一已知例外是定时导出**，按上一条处理；其余不得新增三级嵌套。
 
 ### 5.4 键盘与无障碍
 - [ ] Space/Enter/Esc/Menu/F2/↑↓ 按 §4.1 可用，Esc 逐层退出且焦点归还触发元素。
@@ -271,7 +346,7 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 - **分层 L1–L10**：把手目录 `handleCatalog.ts` 必须保持零 import（唯一跨窗共享载体在 `src/lib/`/`src/windows/shared/`）；设置重组不得让分析窗把主窗 stores/services 拖入包。
 - **单文件 ≤600 行**：设置五组落地时每组独立文件，高级折叠块单独成文件；`settings.css` 1275 行须随分组拆分（B6），每版 size-allowlist 只减不增。
 - **IPC 不碰**：本规范全部为前端交互/呈现层改动，默认绑定调整只改 `DEFAULT_HANDLE_BINDINGS` 常量，不新增命令、不改契约。
-- **功能不可回退**：去重（D1–D5）是"合并入口"不是"删功能"；迁移后每个原功能仍可达，验收按 §5.3 逐条核对。
+- **功能不可回退**：去重是"合并入口"不是"删功能"；迁移后每个原功能仍可达，验收按 §5.3 逐条核对。**[实测修正]** 本轮去重只剩 D5，且它删掉的是"重复的第二个开关"，不是能力本身——`launchAtLogin` 行移除后"开机自启"仍可在 `HostGeneralPanel` 一处开关完成（§3.3 D5 详述）。
 - **只调默认与呈现**：把手 id、slot 枚举、三形态枚举均不可改；label 可改（会反映到 aria 名）。
 - **视觉以 P1 为准**：本文不定任何像素/色值；morph 时长 280ms、dot ⌀32、一处强调等数值均引自 P1，fe 以 P1 令牌为准。
 
@@ -282,7 +357,7 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 1. **三层展开心智**：本体（开始/暂停/名/数字）→ 把手（切事项/便利贴/今日/主界面）→ 浮层（菜单/设置/面板）。每动作只属一层，消除"结束"的本体层误触。
 2. **默认绑定重排**：高频（切事项、今日）提到单击，便利贴降中键，唤出主界面进双击；仅改默认值，13 个 id 不改名。
 3. **最短路径**：开始/暂停保持 1 次；切事项、看今日各 −1 次；结束 +1 次换防误触。
-4. **设置五组树**：计时行为 / 外观主题 / 悬浮条与把手 / 同步与数据 / 插件与关于；把手绑定、存储路径、AI 等降为折叠高级区；D1–D5 去重。
+4. **设置五组树**：计时行为 / 外观与主题 / 悬浮条与把手 / 数据与同步 / 通用与启动（**[实测修正] 第 5 组沿用现名、不改**：导航逐条渲染锚点名，组名不承担索引职责；「关于」不在设置页，它是壳级独立视图）；把手绑定、存储路径、AI 等降为折叠高级区；**[实测修正] 去重只剩 D5 一处**——D1–D4 经源码实测各只有一处入口、无需改动（§3.3）。
 5. **无障碍**：快捷键归纳、焦点归还、aria 不靠颜色、aria-live 按分钟、reduced-motion 全退化。
 6. 验收清单四节共 30 条，均可被路径点击数 / grep id / 像素 diff / 读屏判定。
 
