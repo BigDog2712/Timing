@@ -121,8 +121,13 @@ describe('挂载与读回', () => {
   it('g02_autostart_row_can_be_hidden_for_mobile', async () => {
     await mount({ showAutostart: false });
     expect(container.querySelector('[role="switch"][aria-label="开机自启"]')).toBeNull();
-    /* 移动端：这张卡什么都不显示（最短记录时长不在这一组了，不受这个开关影响） */
-    expect(text().trim()).toBe('');
+    /* 移动端：这张卡**没有行**（最短记录时长不在这一组了，不受这个开关影响）。
+       [B5g] 判据从"整张卡一个字都没有"改成"没有行"：卡现在自带卡头（标题「通用」），
+       卡头的存在是**规则**（锚点 s-general 的 title 与卡片标题逐字一致），
+       而 `showAutostart={false}` 要关掉的是**行**，不是标题 —— 两者不是一回事。 */
+    expect(container.querySelector('.setting-row')).toBeNull();
+    expect(text()).not.toContain('开机自启');
+    expect(text()).toContain('通用');
   });
 });
 

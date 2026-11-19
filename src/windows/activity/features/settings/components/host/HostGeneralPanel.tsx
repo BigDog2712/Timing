@@ -20,10 +20,15 @@
  * 见 `SettingsMinRecordRow` 的头注。
  */
 import { useEffect, useState } from 'react';
+import { Settings2 } from 'lucide-react';
+import SettingsPanelHeader from '../SettingsPanelHeader';
 import { errorText, settingsApi } from '../../services/hostApi';
 import { useSettingsStore } from '../../services/host/settingsRuntimeStore';
 import { SettingsRuntimeAdapterService } from '../../services/settingsRuntimeAdapterService';
 import QuietSwitch from '../../../../shared/components/QuietSwitch';
+
+/** 与同页其它卡同一档线宽（`HostAiCard` / `HostPluginsPanel` 也是 1.6） */
+const STROKE = 1.6;
 
 interface HostGeneralPanelProps {
   /**
@@ -54,35 +59,49 @@ export function HostGeneralPanel({ showAutostart = true }: HostGeneralPanelProps
   };
 
   return (
-    <div className="setting-group">
-      {showAutostart && (
-        <div className="setting-row">
-          <span className="setting-row__label">开机自启</span>
-          <QuietSwitch
-            ariaLabel="开机自启"
-            checked={settings?.autostartEnabled ?? false}
-            onChange={(v) => void run(async () => {
-              /* [B5c] D5：这一行现在是「开机自启」的**唯一入口**（「常驻与启动」卡里那个
-                 写草稿的开关已移除）。它是即改即存，两条写必须同时落：
-                   ① `set_autostart` → 写注册表 + 回写宿主设置的 `autostart_enabled`；
-                   ② 同一份值再写进 `AppSettings.launchAtLogin`（`cmd_commit_app_settings`，
-                      走 `commitSettingsPatch` = 落库 + 广播 `app-settings-changed`）。
-                 只做①的话两份持久化会分叉：`useDesktopLaunchBehaviorSync` 监听
-                 `appSettings.launchAtLogin`，下次它因任何依赖变化重跑时会把**旧值**打到 OS，
-                 把用户刚关掉的自启又打开（出厂值就是 true）。所以②不是顺手，是必需。 */
-              await settingsApi.setAutostart(v);
-              await useSettingsStore.getState().reload();
-              await SettingsRuntimeAdapterService.commitSettingsPatch({ launchAtLogin: v });
-            })}
-          />
-        </div>
-      )}
+    /* [B5g] 卡壳必须由自己带：这一块原先是照**主窗**形状写的（主窗的「通用」页签由
+       `mobile/SettingsPage` 的容器给外壳），搬到分析窗后那层父级外壳没跟过来 ——
+       根上只有一个 `.setting-group`（`display:flex; flex-direction:column`），于是它在
+       设置页网格里成了一个**悬空的 40px 行 + 一个开关**，四周全是卡。
+       这里补 `at-panel` + 卡头，与同页另外十块卡同形。
+       **不需要** `settings-host-sync`：`.setting-row` / `.setting-row__label` 用到的令牌
+       在 B5d 已经补过 fallback（桥内取值一字不变），加桥反而让"桥内/桥外"的账更难算。
+       标题取「通用」，与导航锚点 `s-general` 逐字一致（锚点 title 必须等于卡片 title）。 */
+    <section className="at-panel p-5 md:p-6">
+      <SettingsPanelHeader
+        icon={<Settings2 size={16} strokeWidth={STROKE} className="text-[var(--at-accent-default)]" />}
+        title="通用"
+      />
+      <div className="setting-group">
+        {showAutostart && (
+          <div className="setting-row">
+            <span className="setting-row__label">开机自启</span>
+            <QuietSwitch
+              ariaLabel="开机自启"
+              checked={settings?.autostartEnabled ?? false}
+              onChange={(v) => void run(async () => {
+                /* [B5c] D5：这一行现在是「开机自启」的**唯一入口**（「常驻与启动」卡里那个
+                   写草稿的开关已移除）。它是即改即存，两条写必须同时落：
+                     ① `set_autostart` → 写注册表 + 回写宿主设置的 `autostart_enabled`；
+                     ② 同一份值再写进 `AppSettings.launchAtLogin`（`cmd_commit_app_settings`，
+                        走 `commitSettingsPatch` = 落库 + 广播 `app-settings-changed`）。
+                   只做①的话两份持久化会分叉：`useDesktopLaunchBehaviorSync` 监听
+                   `appSettings.launchAtLogin`，下次它因任何依赖变化重跑时会把**旧值**打到 OS，
+                   把用户刚关掉的自启又打开（出厂值就是 true）。所以②不是顺手，是必需。 */
+                await settingsApi.setAutostart(v);
+                await useSettingsStore.getState().reload();
+                await SettingsRuntimeAdapterService.commitSettingsPatch({ launchAtLogin: v });
+              })}
+            />
+          </div>
+        )}
 
-      {error && (
-        <p className="inline-error" role="alert">
-          {error}
-        </p>
-      )}
-    </div>
+        {error && (
+          <p className="inline-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    </section>
   );
 }
