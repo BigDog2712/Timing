@@ -50,11 +50,39 @@
 
 .data__hint { margin: var(--space-1, 4px) 0 0; font-size: var(--text-xs, 11.5px); line-height: 1.5; color: var(--ink-3, var(--at-text-tertiary)); }
 
-/* ---- 折叠块（FoldBlock） ---- */
+/* ---- 折叠块（FoldBlock） ----
+   两种用量，材质不同（[B5d] 立的规矩）：
+   · **默认（嵌套）**：折叠块长在一张卡**里面**（`.data__block`，见下），次级材质 ——
+     半径 10px（`--radius-md`）、底色 `--at-bg-elevated`、块头/折叠体自带 12px 内边距。
+     六块数据卡走这条。
+   · **独立（顶层）**：折叠块**自己就是那张卡**（`.data__block--standalone`），与同页
+     `at-panel` 平级 —— 半径 14px（`--at-radius-panel`）、底色 `--at-bg-panel`、
+     内边距 20px（≥md 24px，对齐 `at-panel` 的 `p-5 md:p-6`）。「把手绑定」走这条。
+   为什么用修饰类而不是直接把 `.data__block` 改成卡片材质：**材质表达的是嵌套层级，
+   不是某个组件**。改了基础类，六块数据卡会跟着变成"卡中卡套卡"，层级就消失了。 */
 .data__block {
   border: 1px solid var(--line, var(--at-border-subtle));
   border-radius: var(--radius-md, 10px);
   background: var(--bg-field, var(--at-bg-elevated));
+}
+
+/* 顶层折叠块 = 一张卡。值全部取自 `.at-panel`（`quiet-pro.css`）+ `p-5 md:p-6`，
+   换主题时跟着变，不写死色值。 */
+.data__block--standalone {
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-panel);
+  background: var(--at-bg-panel);
+  padding: 20px;
+}
+
+/* 内边距搬到块上之后，块头与折叠体自己的水平内边距必须归零 —— 否则两处 inset 会叠加
+   （20 + 12 = 32px），比同页的卡缩进一档。折叠体的上内边距留下，那 12px 是块头与
+   展开内容之间的呼吸，与原来的观感一致。 */
+.data__block--standalone > .data__block-head { padding: 0; }
+.data__block--standalone > .data__body { padding: 12px 0 0; }
+
+@media (min-width: 768px) {
+  .data__block--standalone { padding: 24px; }
 }
 
 .data__block-head {

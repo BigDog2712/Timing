@@ -42,13 +42,29 @@ const STYLE_ROOT = resolve(PROJECT_ROOT, 'src/windows/activity/shell/styles');
 /** 分析窗里恒有定义、不需要 fallback 的令牌：patina 设计令牌 + 字体栈。 */
 const ALWAYS_DEFINED = /^--(at-|font-mono$|font-sans$|font-display$)/;
 
+/**
+ * 引号里的 BEM 类名 —— 覆盖 `className={blockClass}` 那种由常量拼出来的修饰类
+ * （`'data__block data__block--standalone'`）。不抓这一条，`--standalone` 的规则就落在
+ * 判据视野外，等于给它开了个后门：它将来引个裸令牌也没人拦。
+ */
+function quotedBemTokens(source: string): string[] {
+  const found: string[] = [];
+  for (const match of source.matchAll(/'([^']*)'/g)) {
+    for (const token of match[1].split(/\s+/)) {
+      if (/^[a-z][a-z0-9]*(__[a-z0-9-]+)+$/.test(token)) found.push(token);
+    }
+  }
+  return found;
+}
+
 /** `FoldBlock` 真正会命中的类名（从组件源码推，不手抄）。 */
 const FOLD_CLASSES: string[] = [
-  ...new Set(
-    [...FOLD.matchAll(/className="([^"]+)"/g)]
+  ...new Set([
+    ...[...FOLD.matchAll(/className="([^"]+)"/g)]
       .flatMap((match) => match[1].split(/\s+/))
       .filter(Boolean),
-  ),
+    ...quotedBemTokens(FOLD),
+  ]),
 ];
 
 interface Rule {
@@ -125,9 +141,9 @@ const BRIDGE = bridgeTokens();
 
 describe('[B5c 修复] FoldBlock 的样式在令牌桥外也必须完整', () => {
   it('fc00_the_class_list_really_comes_from_the_component', () => {
-    /* 前提自检：从组件里推断不出类名，下面两条就变成空转的绿。 */
+    /* 前提自检：从组件里推断不出类名，下面几条就变成空转的绿。 */
     expect(FOLD_CLASSES.length, 'FoldBlock 的 className 一个都没抓到').toBeGreaterThan(4);
-    for (const expected of ['data__block', 'data__body', 'sync__fold-btn']) {
+    for (const expected of ['data__block', 'data__body', 'sync__fold-btn', 'data__block--standalone']) {
       expect(FOLD_CLASSES, `FoldBlock 的类名清单里少了 ${expected}（判据会漏掉它的样式）`)
         .toContain(expected);
     }
@@ -184,5 +200,58 @@ describe('[B5c 修复] FoldBlock 的样式在令牌桥外也必须完整', () =>
     expect(shell?.body).toContain('background: var(--bg-field, var(--at-bg-elevated))');
     const head = RULES.find((rule) => rule.selector === '.data__block-head');
     expect(head?.body, '块头的内边距在桥外失效会让整块贴边').toContain('padding: var(--space-3, 12px)');
+  });
+
+  it('fc04_standalone_blocks_get_card_material_and_nested_ones_keep_the_secondary_one', () => {
+    /* [B5d] 材质表达**嵌套层级**：顶层折叠块（「把手绑定」）自己就是一张卡，与 `at-panel`
+       平级；卡内的六块数据卡是次级材质。这条钉住"两者不能长成一样"，也就是钉住
+       "别图省事直接把 `.data__block` 改成卡片材质"。 */
+    const standalone = RULES.find((rule) => rule.selector === '.data__block--standalone');
+    expect(standalone, '找不到 `.data__block--standalone` 规则').toBeTruthy();
+    expect(standalone?.body, '顶层折叠块的半径要与 at-panel 一致').toContain('border-radius: var(--at-radius-panel)');
+    expect(standalone?.body, '底色要与 at-panel 一致，不是次级面').toContain('background: var(--at-bg-panel)');
+    expect(standalone?.body, '内边距对齐 at-panel 的 p-5（20px）').toContain('padding: 20px');
+    expect(standalone?.body).toContain('border: 1px solid var(--at-border-subtle)');
+    /* ≥md 与 `p-5 md:p-6` 同步：24px */
+    expect(
+      RULES.some((rule) => rule.selector.includes('data__block--standalone')
+        && rule.body.includes('padding: 24px')),
+      '缺少 ≥768px 的 24px 内边距（at-panel 是 md:p-6）',
+    ).toBe(true);
+    /* 内边距搬到块上之后，块头/折叠体必须归零，否则两处 inset 叠加 */
+    for (const [child, expected] of [
+      ['.data__block--standalone > .data__block-head', 'padding: 0'],
+      ['.data__block--standalone > .data__body', 'padding: 12px 0 0'],
+    ] as const) {
+      const rule = RULES.find((item) => item.selector === child);
+      expect(rule?.body, `${child} 没有把自带内边距让出来`).toContain(expected);
+    }
+    /* 反向：嵌套的基础类仍是次级材质（六块数据卡视觉零变化） */
+    const nested = RULES.find((rule) => rule.selector === '.data__block');
+    expect(nested?.body, '嵌套折叠块被改成了卡片材质，层级就消失了').toContain('border-radius: var(--radius-md, 10px)');
+    expect(nested?.body).toContain('background: var(--bg-field, var(--at-bg-elevated))');
+  });
+
+  it('fc05_no_bare_at_class_rules_across_the_four_settings_stylesheets', () => {
+    /* [B5d] `settings.css` 拆成四份后多了一个新的坏形状：某个文件里出现**裸 `.at-*` 定义**
+       （选择器主体就是 `.at-xxx`，没有 `.settings-*` 限定）。那等于改写设计系统组件在设置页
+       的表现 —— 会和别处、或另一份拆出来的文件打架，而且没人知道该去哪一份改。
+       四份里凡以裸 `.at-*` 类为主体的规则，一律不认；要写就加 `.settings-*` 限定。 */
+    const SPLIT = [
+      'settings.css',
+      'settings-data-export.css',
+      'settings-data-import.css',
+      'settings-scheduled.css',
+    ].map((name) => `src/windows/activity/shell/styles/features/${name}`);
+    const bare = RULES.filter((rule) => SPLIT.includes(rule.file)).flatMap((rule) => (
+      rule.selector.split(',')
+        .map((item) => item.trim())
+        .filter((item) => /^\.at-[a-z0-9-]+$/.test(item))
+        .map((item) => `${rule.file} → ${item}`)
+    ));
+    expect(bare, '裸 `.at-*` 定义会改写设计系统组件；加 `.settings-*` 限定，或别在这里写').toEqual([]);
+    /* 自检：四份文件真的被读进来了（否则上面是个空转的绿） */
+    const seen = new Set(RULES.filter((rule) => SPLIT.includes(rule.file)).map((rule) => rule.file));
+    expect(seen.size, '四份设置样式没有全部读到').toBe(SPLIT.length);
   });
 });

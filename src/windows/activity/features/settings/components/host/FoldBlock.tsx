@@ -67,6 +67,16 @@ interface FoldBlockProps {
    * 默认值取 `'h4'` 而不是必填：六个既有调用点一个字不用改，行为与之前完全一致。
    */
   titleAs?: 'h2' | 'h3' | 'h4';
+  /**
+   * 这是**一张独立的卡**（不是长在别的卡里的一折）。
+   *
+   * 两种用量的材质不同，见 `settings-data.css` 的「折叠块（FoldBlock）」段：
+   *   · 嵌套（默认）：半径 10px / 底色 `--at-bg-elevated` / 自带 12px 内边距；
+   *   · 独立（本开关）：半径 14px（`--at-radius-panel`）/ 底色 `--at-bg-panel` /
+   *     内边距 20px（≥md 24px）—— 与同页 `at-panel` 平级，看起来才像"一张卡"。
+   * 材质表达的是**嵌套层级**，所以由调用方声明"我在第几层"，壳不猜。
+   */
+  standalone?: boolean;
   children: ReactNode;
 }
 
@@ -79,6 +89,7 @@ export function FoldBlock({
   dirty = false,
   defaultOpen = false,
   titleAs = 'h4',
+  standalone = false,
   children,
 }: FoldBlockProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -86,6 +97,8 @@ export function FoldBlock({
   const bodyId = `${id}-body`;
   /* 动态标签：`'h2' | 'h3' | 'h4'` 全是内建标签名，React 直接按名字渲染，不需要一张映射表 */
   const TitleTag = titleAs;
+  /* [B5d] 顶层当卡用时的材质修饰类，定义在 `settings-data.css` */
+  const blockClass = standalone ? 'data__block data__block--standalone' : 'data__block';
 
   /* 只修正「用户还没点过」的那一段：先收起（视图未加载），加载完发现已配置就展开 */
   useEffect(() => {
@@ -114,7 +127,7 @@ export function FoldBlock({
   };
 
   return (
-    <section className="data__block" data-block={id} id={id}>
+    <section className={blockClass} data-block={id} id={id}>
       <header className="data__block-head">
         <div className="data__block-main">
           <div className="data__block-title-row">

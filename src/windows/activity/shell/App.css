@@ -13,6 +13,12 @@
 @import "./styles/app-shell.css";
 @import "./styles/mini-window.css";
 @import "./styles/features/settings.css";
+/* [B5d] `settings.css` 原先 1275 行（1063 有效行），按**责任**拆成四份：
+ * 共享排版原语留在 `settings.css`，三个对话框族各一份。顺序与拆分前的相对顺序一致
+ * （选择器基本不重叠，保持原序 = 保持旧的层叠结果）。拆完仍每份 ≤600 有效行。 */
+@import "./styles/features/settings-data-export.css";
+@import "./styles/features/settings-data-import.css";
+@import "./styles/features/settings-scheduled.css";
 @import "./styles/features/settings-handles.css";
 /* [0.12.1 T04b] 设置页从「药丸内联面板」搬进分析窗：原来只被宿主窗加载的 8 份
    settings-*.css 一并搬到这里（`features/host/`）。className 一个字都没改，所以样式

@@ -1,0 +1,237 @@
+/* =============================================================================
+ * Timing — 设置页样式 · 导入对话框（[B5d] 从 settings.css 拆出）
+ * -----------------------------------------------------------------------------
+ * 归属：`.settings-data-action-dialog` / `.settings-import-*` / `.settings-dialog-action-*`
+ * 一族 —— 导入批次列表、预览区、备注与错误行。
+ *
+ * 与导出的分界：导出是"选字段 + 选范围 + 生成"，导入是"选文件 + 看批次 + 确认"，
+ * 两套结构没有共用的类；`settings-data-action-dialog` 这个外壳虽然两边名字相近，
+ * 但只有导入在用它，所以跟着导入走。
+ *
+ * 共享原语（偏好行、分隔线、按钮）在 `settings.css`，**别在这里重新定义**。
+ * ========================================================================== */
+
+.settings-data-action-dialog {
+  width: min(600px, calc(100vw - 32px));
+}
+
+.settings-import-action-list,
+.settings-import-batch-list {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-import-action-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-import-action-list .at-action-row {
+  min-width: 0;
+  height: 100%;
+}
+
+.settings-dialog-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.at-dialog-header-aside:has(> .settings-dialog-header-actions) {
+  align-self: flex-start;
+}
+
+.settings-dialog-action-card {
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.settings-dialog-action-composite {
+  position: relative;
+  min-height: 100%;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
+  background: var(--at-bg-panel);
+  padding: 12px;
+  color: inherit;
+  text-align: left;
+  transition:
+    border-color var(--at-motion-fast) var(--at-motion-ease),
+    background-color var(--at-motion-fast) var(--at-motion-ease),
+    color var(--at-motion-fast) var(--at-motion-ease),
+    opacity var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.settings-dialog-action-composite:has(.settings-dialog-action-hit-target:hover:not(:disabled)) {
+  border-color: var(--at-border-strong);
+  background: var(--at-bg-elevated);
+}
+
+.settings-dialog-action-composite:has(.settings-dialog-action-hit-target:active:not(:disabled)) {
+  border-color: var(--at-border-strong);
+  background: var(--at-bg-panel);
+}
+
+.settings-dialog-action-composite:has(.settings-dialog-action-hit-target:focus-visible) {
+  outline: 2px solid color-mix(in srgb, var(--at-accent-default) 42%, transparent);
+  outline-offset: 1px;
+}
+
+.settings-dialog-action-composite[data-disabled="true"] {
+  opacity: 0.5;
+}
+
+.settings-dialog-action-hit-target {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.settings-dialog-action-hit-target:focus-visible {
+  outline: 0;
+}
+
+.settings-dialog-action-hit-target:disabled {
+  cursor: not-allowed;
+}
+
+.settings-dialog-action-copy {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.settings-import-action-heading {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.settings-import-action-heading .at-tooltip-anchor {
+  pointer-events: auto;
+}
+
+.settings-import-batch-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) auto;
+  min-width: 0;
+  align-items: start;
+  column-gap: 14px;
+}
+
+.settings-import-batch-copy {
+  min-width: 0;
+}
+
+.settings-import-batch-title {
+  align-self: center;
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-group-title);
+  font-weight: var(--at-font-weight-emphasis);
+  line-height: var(--at-line-height-group-title);
+  white-space: nowrap;
+}
+
+.settings-import-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-data-action-dialog:has(.settings-import-preview) .at-dialog-body {
+  margin-top: 6px;
+}
+
+.settings-import-preview-details {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-import-preview-detail-group {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+
+.settings-import-preview-detail-group > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+.settings-import-preview-detail-group dt {
+  flex: 0 0 auto;
+}
+
+.settings-import-preview-detail-group dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-import-note,
+.settings-import-errors {
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+.settings-import-notes {
+  padding-top: 2px;
+}
+
+.settings-import-notes > div {
+  display: grid;
+  gap: 5px;
+}
+
+.settings-import-errors {
+  max-height: 120px;
+  overflow-y: auto;
+  padding-left: 18px;
+}
+
+.settings-import-batch-row {
+  border-bottom: 1px solid var(--at-border-subtle);
+  padding: 4px 0 12px;
+}
+
+.settings-import-batch-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 4px;
+}
+
+.settings-import-batch-copy {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+}
+
+.settings-import-batch-row > .at-tooltip-anchor {
+  align-self: center;
+}
+
+.settings-import-batch-copy span,
+.settings-import-batch-copy small {
+  overflow: hidden;
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .settings-import-action-list {
+    grid-template-columns: 1fr;
+  }
+}

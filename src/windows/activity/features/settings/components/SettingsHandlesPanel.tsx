@@ -117,7 +117,11 @@ export default function SettingsHandlesPanel({ id = "s-pill-handles" }: Settings
       /* [B5c] 这张卡直接挂在页级 `<h1>设置` 下面（第 3 组没有 h2 外壳），而数据卡六块嵌在
          「数据与同步」的 `h2` 卡里。所以同一套 `FoldBlock` 壳在这里要用 `h2`，与
          `SettingsPanelHeader` 的 `h2` 平级 —— 否则 `h1 → h4` 跳两级，读屏大纲断档。 */
+      /* [B5d] `standalone`：这张折叠块**自己就是那张卡**（与同页 `at-panel` 平级），
+         所以走卡片材质（半径 14px / 底色 `--at-bg-panel` / 内边距 20–24px），
+         而不是卡内折叠块的次级材质（10px / `--at-bg-elevated` / 12px）。 */
       titleAs="h2"
+      standalone
     >
       <p className="at-text-caption text-[var(--at-text-tertiary)]">
         每个形态可以单独启用；同一形态里「左键 / 右键」是单击，「左双击 / 右双击」是同键双击。

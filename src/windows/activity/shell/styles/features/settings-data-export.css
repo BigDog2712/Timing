@@ -1,0 +1,371 @@
+/* =============================================================================
+ * Timing — 设置页样式 · 导出对话框（[B5d] 从 settings.css 拆出）
+ * -----------------------------------------------------------------------------
+ * 归属：`.settings-data-export-*`（含 `-field-*` 字段选择器）与 `.settings-local-paths-panel`
+ * 一族的悬停/聚焦态。这一族只被「数据与同步 → 导出」用。
+ *
+ * 共享原语（偏好行、分隔线、按钮）在 `settings.css`，**别在这里重新定义**。
+ * ========================================================================== */
+
+.settings-data-export-dialog-surface {
+  width: min(760px, calc(100vw - 40px));
+}
+
+.settings-data-export-dialog-surface .at-dialog-body {
+  max-height: min(560px, calc(100vh - 176px));
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.settings-data-export-dialog-body {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-data-export-section {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-chip);
+  background: var(--at-bg-panel);
+  padding: 12px;
+}
+
+.settings-data-export-section-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-data-export-section-title {
+  margin: 0;
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-group-title);
+  font-weight: var(--at-font-weight-emphasis);
+  line-height: var(--at-line-height-group-title);
+}
+
+.settings-data-export-section-hint {
+  margin: 2px 0 0;
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+.settings-data-export-format-section .settings-data-export-section-header {
+  align-items: center;
+}
+
+.settings-data-export-range-section .settings-data-export-section-header {
+  align-items: center;
+}
+
+.settings-data-export-format-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.settings-data-export-format-option {
+  display: grid;
+  min-width: 0;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
+  background: var(--at-bg-panel);
+  padding: 9px 4px;
+  color: var(--at-text-secondary);
+  text-align: center;
+  transition: border-color var(--at-motion-fast), background-color var(--at-motion-fast), color var(--at-motion-fast);
+}
+
+.settings-data-export-format-option strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-body);
+  line-height: var(--at-line-height-body);
+}
+
+.settings-data-export-format-option:hover:not(:disabled) {
+  border-color: var(--at-border-strong);
+  background: var(--at-bg-elevated);
+}
+
+.settings-data-export-format-option-selected {
+  border-color: var(--at-accent-default);
+  background: var(--at-accent-muted);
+  color: var(--at-text-primary);
+}
+
+.settings-data-export-format-option:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--at-accent-default) 42%, transparent);
+  outline-offset: 1px;
+}
+
+.settings-data-export-format-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.settings-data-export-result {
+  margin: 0;
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+.settings-data-export-result-danger {
+  color: var(--at-danger);
+}
+
+.settings-data-export-field-dialog {
+  width: min(760px, calc(100vw - 40px));
+}
+
+.settings-data-export-field-dialog .at-dialog-body {
+  height: min(332px, calc(100vh - 260px));
+  max-height: min(332px, calc(100vh - 260px));
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.settings-data-export-field-dialog .at-dialog-actions {
+  align-items: center;
+}
+
+.settings-data-export-field-dialog .at-dialog-header-aside {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-data-export-field-dialog-actions-spacer {
+  flex: 1 1 auto;
+}
+
+.settings-data-export-field-dialog-body {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-data-export-field-empty-warning {
+  color: var(--at-danger);
+}
+
+.settings-data-export-field-empty-warning {
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  font-weight: var(--at-font-weight-emphasis);
+}
+
+.settings-data-export-field-header-action {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--at-radius-control);
+  background: transparent;
+  color: var(--at-text-tertiary);
+}
+
+.settings-data-export-field-header-action:hover,
+.settings-local-paths-panel .at-icon-action-neutral:hover:not(:disabled),
+.settings-local-paths-panel .at-icon-action-neutral:active:not(:disabled),
+.settings-backup-schedule-action:hover:not(:disabled),
+.settings-backup-schedule-action:active:not(:disabled),
+.settings-data-export-schedule-action:hover:not(:disabled),
+.settings-data-export-schedule-action:active:not(:disabled) {
+  background: color-mix(in srgb, var(--at-text-primary) 10%, var(--at-bg-elevated));
+  color: var(--at-text-primary);
+}
+
+.settings-data-export-field-header-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--at-accent-default) 42%, transparent);
+  outline-offset: 1px;
+}
+
+.settings-data-export-field-group {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-chip);
+  background: var(--at-bg-panel);
+  padding: 9px 10px 10px;
+}
+
+.settings-data-export-field-group-collapsed {
+  gap: 0;
+}
+
+.settings-data-export-field-group-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-data-export-field-group-header p {
+  margin: 0;
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-group-title);
+  font-weight: var(--at-font-weight-emphasis);
+  line-height: var(--at-line-height-group-title);
+}
+
+.settings-data-export-field-group-header span {
+  display: block;
+  margin-top: 2px;
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+.settings-data-export-field-group-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.settings-data-export-field-group-header .settings-data-export-field-group-count {
+  display: inline-flex;
+  min-width: 38px;
+  height: 26px;
+  min-height: 26px;
+  max-height: 26px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
+  background: var(--at-bg-elevated);
+  padding: 0 7px;
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--at-font-weight-regular);
+  line-height: var(--at-line-height-caption);
+}
+
+.settings-data-export-field-group-actions .at-tooltip-anchor {
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  margin-top: 0;
+}
+
+.settings-data-export-field-group-action {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  max-height: 26px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
+  background: var(--at-bg-elevated);
+  color: var(--at-text-secondary);
+  transition:
+    border-color var(--at-motion-fast) var(--at-motion-ease),
+    background-color var(--at-motion-fast) var(--at-motion-ease),
+    color var(--at-motion-fast) var(--at-motion-ease),
+    opacity var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.settings-data-export-field-group-action:hover:not(:disabled) {
+  border-color: var(--at-border-strong);
+  background: var(--at-bg-panel);
+  color: var(--at-text-primary);
+}
+
+.settings-data-export-field-group-action:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--at-accent-default) 42%, transparent);
+  outline-offset: 1px;
+}
+
+.settings-data-export-field-group-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.settings-data-export-field-list {
+  display: grid;
+  gap: 5px;
+}
+
+.settings-data-export-field-row {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 36px;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-chip);
+  background: var(--at-bg-elevated);
+  padding: 5px 9px;
+  transition:
+    border-color var(--at-motion-fast) var(--at-motion-ease),
+    background-color var(--at-motion-fast) var(--at-motion-ease),
+    opacity var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.settings-data-export-field-row-selected {
+  border-color: color-mix(in srgb, var(--at-accent-default) 24%, var(--at-border-subtle));
+  background: color-mix(in srgb, var(--at-accent-muted) 46%, var(--at-bg-elevated));
+}
+
+.settings-data-export-field-copy {
+  display: block;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-data-export-field-line {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.settings-data-export-field-line strong {
+  flex: 0 0 auto;
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-body);
+  font-weight: var(--at-font-weight-medium);
+  line-height: var(--at-line-height-body);
+}
+
+.settings-data-export-field-line span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  text-overflow: ellipsis;
+}
+
+.settings-data-export-field-check-input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--at-accent-default);
+  justify-self: center;
+}
+
+.settings-data-export-field-check-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--at-accent-default) 42%, transparent);
+  outline-offset: 1px;
+}

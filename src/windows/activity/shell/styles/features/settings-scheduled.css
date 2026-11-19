@@ -1,0 +1,307 @@
+/* =============================================================================
+ * Timing — 设置页样式 · 定时导出与定时备份（[B5d] 从 settings.css 拆出）
+ * -----------------------------------------------------------------------------
+ * 归属：`.settings-scheduled-export-*` / `.settings-backup-*` / `.settings-scheduled-backup-*`
+ * —— 两个"定时"对话框的结构、状态行（加载/错误/警告/上次运行）与窄屏折行。
+ *
+ * 两者放一份的理由：它们的版式是同一套（标题 + 频率两列 + 目录值 + 状态 dl），
+ * 拆开就得把 `-status` / `-directory-value` 那几族各写一遍。批量上限 600 有效行还有
+ * 充裕余量（本份 248），合并比拆散更好维护。
+ *
+ * 共享原语（偏好行、分隔线、按钮）在 `settings.css`，**别在这里重新定义**。
+ * ========================================================================== */
+
+.settings-scheduled-export-dialog {
+  width: min(600px, calc(100vw - 32px));
+}
+
+.settings-scheduled-export {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-scheduled-export-schedule {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-scheduled-export-schedule[data-cadence="weekly"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-scheduled-export-control {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.settings-form-label,
+.settings-scheduled-export-control > span,
+.settings-scheduled-export-directory-label,
+.settings-scheduled-backup-setting-label {
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-medium);
+  line-height: var(--at-line-height-caption);
+}
+
+.settings-scheduled-export-control .at-select-root,
+.settings-scheduled-export-control .at-time-picker,
+.settings-scheduled-export-control .at-select-trigger,
+.settings-scheduled-export-control .at-time-picker-trigger {
+  width: 100%;
+}
+
+.settings-scheduled-export-directory {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-scheduled-export-directory-value {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  user-select: text;
+}
+
+.settings-scheduled-export-directory-value > svg {
+  flex: 0 0 auto;
+  color: var(--at-text-tertiary);
+}
+
+.settings-scheduled-export-directory-value > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-scheduled-export-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 0;
+  border-top: 1px solid var(--at-border-subtle);
+  padding-top: 10px;
+}
+
+.settings-scheduled-export-status > div {
+  display: inline-flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+.settings-scheduled-export-status dt {
+  color: var(--at-text-tertiary);
+}
+
+.settings-scheduled-export-status dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--at-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-scheduled-export-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--at-danger);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+@media (max-width: 640px) {
+  .settings-scheduled-export-schedule,
+  .settings-scheduled-export-schedule[data-cadence="weekly"] {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-scheduled-export-directory {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .settings-scheduled-export-status > div {
+    flex-basis: 100%;
+  }
+}
+
+.settings-backup-dialog {
+  width: min(600px, calc(100vw - 32px));
+}
+
+.settings-backup-target-card {
+  position: relative;
+}
+
+.settings-backup-local-trigger {
+  padding-right: 52px;
+}
+
+.settings-backup-schedule-anchor {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 12px;
+  display: flex;
+  transform: translateY(-50%);
+}
+
+.settings-scheduled-backup-dialog {
+  width: min(600px, calc(100vw - 32px));
+}
+
+.settings-scheduled-backup-dialog .at-dialog-body {
+  max-height: min(68vh, 660px);
+  overflow-y: auto;
+}
+
+.settings-scheduled-backup {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-scheduled-backup-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-scheduled-backup-setting-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-scheduled-backup-schedule-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-scheduled-backup-fields[data-cadence="weekly"] .settings-scheduled-backup-schedule-controls {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-scheduled-backup-fields .at-select-root,
+.settings-scheduled-backup-fields .at-time-picker,
+.settings-scheduled-backup-fields .at-select-trigger,
+.settings-scheduled-backup-fields .at-time-picker-trigger {
+  width: 100%;
+}
+
+.settings-scheduled-backup-directory-field > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.settings-scheduled-backup-directory-value {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  user-select: text;
+}
+
+.settings-scheduled-backup-directory-value > svg {
+  flex: 0 0 auto;
+  color: var(--at-text-tertiary);
+}
+
+.settings-scheduled-backup-directory-value > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-scheduled-backup-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 0;
+  border-top: 1px solid var(--at-border-subtle);
+  padding-top: 10px;
+}
+
+.settings-scheduled-backup-status > div {
+  display: inline-flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+.settings-scheduled-backup-status > .settings-scheduled-backup-active-run {
+  flex-basis: 100%;
+}
+
+.settings-scheduled-backup-status dt {
+  color: var(--at-text-tertiary);
+}
+
+.settings-scheduled-backup-status dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--at-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-scheduled-backup-loading,
+.settings-scheduled-backup-error,
+.settings-scheduled-backup-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+.settings-scheduled-backup-loading {
+  color: var(--at-text-tertiary);
+}
+
+.settings-scheduled-backup-error {
+  justify-content: space-between;
+  color: var(--at-danger);
+}
+
+.settings-scheduled-backup-warning {
+  color: var(--at-text-secondary);
+}
+
+@media (max-width: 640px) {
+  .settings-scheduled-backup-setting-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .settings-scheduled-backup-directory-field > div {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-scheduled-backup-status > div {
+    flex-basis: 100%;
+  }
+}
