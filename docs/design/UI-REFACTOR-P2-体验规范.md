@@ -99,9 +99,9 @@ L-浮层（popover / panel / 独立窗，1 次点击弹出）—— 低频、信
 
 | 触发 | 行为 | 约束 |
 |---|---|---|
-| 静息 | 显一个随状态着色的 ⌀32 正圆点，不显文字/把手 | 最低视觉重量终态 |
+| 静息 | 显一个随状态着色的 ⌀33 正圆点，不显文字/把手 | 最低视觉重量终态（**[实测修正]** 原写 ⌀32 是错的：实测 `--dot-size: 33px`，见 `styles/design-tokens-compat.css:70`、`styles/dot.css:11` 的「22px → 33px」记录；32 是**条高** `--pill-h`（`styles/tokens/01-primitives.css:91`），两个数不要混） |
 | hover 进入 | ① 浮出 tooltip「事项名 · 已计 mm:ss」opacity 150ms 淡入；② 点周围 1px `border-strong` 微亮一档 | 点本体**不放大**、不加投影（P1 硬约束） |
-| hover 停留（按 A1）/ 单击 | morph 回 pill：width 280ms `--ease-morph`，内部单色点平滑扩成环 | 只动 width+opacity；reduced-motion 下瞬切 |
+| hover 停留（按 A1）/ 单击 | morph 回 pill：窗口几何切到药丸尺寸，内部单色点扩成环 | **[实测修正]** 原写「width 280ms / 只动 width+opacity」不成立：morph 是**窗口尺寸变化**，由前端 `useWindowAutoFit` 调 `win.setSize`（`timing/hooks/useWindowAutoFit.ts:175`）完成，不是 CSS 宽度动画；`--dur-morph: 280ms` 实测只被浮层/移动端纸张消费。前端**不得为形态切换新增 `width` / `height` / `border-radius` 过渡**（判据见 §5.2） |
 | 绑定了把手动作的键（dot 形态可独立绑定）| 执行对应 `handleCatalog` 动作 | dot 形态把手默认：左=唤出主界面、右=今日摘要 |
 | hover 离开 | tooltip 150ms 淡出，微亮回落 | — |
 
@@ -308,7 +308,7 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 
 ### 4.4 prefers-reduced-motion
 
-- morph（width）、把手淡入滑出、秒进位淡入、paused 呼吸、ended 闪烁——**全部退化为瞬切或静态**（P1 已定）。
+- morph（**窗口尺寸变化**，非 width 过渡，见 §2.2 与 §5.2）、把手淡入滑出、秒进位淡入、paused 呼吸、ended 闪烁——**全部退化为瞬切或静态**（P1 已定）。
 - ended 在 reduced-motion 下用一次性静态高亮 900ms 后撤除（保留"结束了"的结果反馈），不做渐变。
 - 退化后信息不丢：靠颜色静态值 + 可访问名，不依赖动画表达状态。
 
@@ -324,8 +324,9 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 
 ### 5.2 形态与状态
 - [ ] dot hover 时点本体尺寸不变（像素级），仅出 tooltip + 1px 微亮。
-- [ ] dot↔pill morph 仅动 width/opacity，条高与数字基线不变。
-- [ ] 把手仅在 hover 药丸 / 键盘聚焦时可见；鼠标离开后延迟淡出不小于 150ms。
+- [ ] **形态切换不得引入布局类过渡**（**[实测修正]** 取代原判据「仅动 width/opacity」——那条依赖一个不存在的 CSS 宽度动画）：`dot.css:44` 的 `transition` 只允许 `color` 与 `transform`；`transform` 只允许按压反馈 `scale(0.94)`（`.dot:active`，`styles/dot.css:54`，B4 明确保留），**`:hover` 下不得出现任何 `scale`**（B4c 已删掉 `scale(1.04)`，见 `dot.css:47-49`）；前端不得为形态切换新增 `width` / `height` / `border-radius` 过渡（尺寸变化走 `useWindowAutoFit` → `win.setSize`，`timing/hooks/useWindowAutoFit.ts:175`）。改法：grep `dot.css` / `pill*.css` 的 `transition` 声明 + 手测 hover 前后 `offsetWidth` 相等。
+- [ ] 形态切换后条高与数字基线不变（像素级；这是「布局类过渡」判据的另一半，`height`/`line-height` 不得参与过渡）。
+- [ ] 把手仅在 hover 药丸 / 键盘聚焦 / 有浮层展开时可见；**鼠标离开后延迟 200ms 再淡出**（**[实测修正]** 原写「不小于 150ms」与实现不符：隐藏侧 `transition: opacity var(--dur-exit) `**`var(--dur-base)`**``，`--dur-base` = 200ms，`--dur-exit` = 180ms，见 `styles/surfaces.css:188-190` 与 `tokens/01-primitives.css:175-176`；露出侧 `transition-delay: 0ms`，见 `surfaces.css:193-198`）。判据：hover 移出后 200ms 内把手仍可点。
 - [ ] 四态每态仅一处主信号；running 同屏强调色 ≤1 处。
 - [ ] 倒计时告警是唯一数字变色场景，其余态数字不变色。
 
@@ -336,8 +337,10 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 - [ ] 设置为五组（计时行为 / 外观与主题 / 悬浮条与把手 / 数据与同步 / 通用与启动），顺序与 §3.1 一致；第 5 组沿用现名但**不把「关于」塞进去**（关于不在设置页）。
 - [ ] 把手绑定、存储路径、定时导出、AI 配置均在默认折叠的高级区；**定时导出需先从「数据导出」对话框提到折叠块内**，否则仍停在四级深度（§3.5(2)）。**[已裁决：要做，但单列 B5c 之后的小批]**——它是"从对话框里搬一个入口到折叠块"，跨组件且要接导出状态，不并入 B5c 的折叠收敛。
 - [ ] 常驻形态、不透明度、高亮色、主题四色**在桌面各只有一处可编辑入口**——这是**现状已成立**的判据（grep 基线：`HostPillLookCard` / `HostThemeCard` / `HostHighlightCard` 各一处；不透明度只有一个 `setProperty` 写入点），验收目的是**防回归**而非推动改动；若发现第二处，先确认它是否只服务 Android（`IS_MOBILE`）。
-- [ ] 开机自启在 UI 上只有一个开关（D5）；且**切换一次之后** `autostartEnabled` 与 `launchAtLogin` 同值（判据见 §3.3 D5 详述）。**进 B6 验收清单，且必须是一次真实切换——不是 grep**。
+- [ ] 开机自启在 UI 上只有一个开关（D5）：全文 grep「开机自启」「开机自启动」在设置页内只命中 `HostGeneralPanel` 一处（`HostGeneralPanel.tsx:98-110`）；`SettingsResidentPanel` 里不再有该行。
+- [ ] **D5 双写同值（必须是一次真实切换，不是 grep）**：① 打开设置，在「通用」卡把「开机自启」**关**一次 → ② 同时核对 `timing` 设置表 `autostart_enabled` 与 app settings `launch_at_login` **都是 false**（并确认 OS 侧 HKCU Run 项已消失）→ ③ **重启应用**后回来看「开机自启」仍是关、系统没有自启 → ④ 再打开一次、重启，确认仍为开。**为什么不能 grep**：`launchAtLogin` 出厂 `true`（`activity/shared/settings/releaseDefaultProfile.ts:88`），两份表在"没动过"时天然同值，grep 会误判通过；只有真的切换一次才能暴露"只写了 ① `set_autostart`、漏了 ② `commitSettingsPatch`"这个半写状态。判据口径见 §3.3 D5 详述。
 - [ ] 任一设置项到达路径 ≤ 2 层（组 → 卡/折叠块）——**唯一已知例外是定时导出**，按上一条处理；其余不得新增三级嵌套。
+- [ ] **点导航能到达折叠块里的内容**：点「把手绑定」时折叠块**先展开再滚**（顺序不能反，展开会改 `scrollHeight`）；锚点 `#s-pill-handles` 落在折叠块的**可见头部**（`FoldBlock` 的 `id` 在 `<section>` 根节点、折叠体是 `${id}-body`），不得落在 `hidden` 的折叠体里（那样点了既不滚也不报错）。**键盘同路径**：导航是原生 `<button type="button">` + `onClick`（`SettingsGroupNav.tsx:277-291`），`Enter` / `Space` 由浏览器原生派发 click，与鼠标走同一个 `jump()`，`flushSync(requestFoldReveal)` 一样会跑——此项要**手测一次键盘**（Tab 到「把手绑定」→ Enter → 块展开且滚到位），不要只测鼠标。
 
 ### 5.4 键盘与无障碍
 - [ ] Space/Enter/Esc/Menu/F2/↑↓ 按 §4.1 可用，Esc 逐层退出且焦点归还触发元素。
@@ -356,7 +359,7 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 - **IPC 不碰**：本规范全部为前端交互/呈现层改动，默认绑定调整只改 `DEFAULT_HANDLE_BINDINGS` 常量，不新增命令、不改契约。
 - **功能不可回退**：去重是"合并入口"不是"删功能"；迁移后每个原功能仍可达，验收按 §5.3 逐条核对。**[实测修正]** 本轮去重只剩 D5，且它删掉的是"重复的第二个开关"，不是能力本身——`launchAtLogin` 行移除后"开机自启"仍可在 `HostGeneralPanel` 一处开关完成（§3.3 D5 详述）。
 - **只调默认与呈现**：把手 id、slot 枚举、三形态枚举均不可改；label 可改（会反映到 aria 名）。
-- **视觉以 P1 为准**：本文不定任何像素/色值；morph 时长 280ms、dot ⌀32、一处强调等数值均引自 P1，fe 以 P1 令牌为准。
+- **视觉以 P1 为准**：本文不定任何像素/色值；morph 时长 280ms、dot ⌀33、一处强调等数值均引自 P1，fe 以 P1 令牌为准。**[实测修正]** dot 直径统一为 **⌀33**（`--dot-size: 33px`，`styles/design-tokens-compat.css:70`；P1 §4.2 已按实测重写为 ⌀33 开口进度环 + 环身黄点，初稿 ⌀32 作废）；**⌀32 是 `--pill-h` 条高**（`styles/tokens/01-primitives.css:91`），两个数不要混——B6 判像素按 33。
 
 ---
 
