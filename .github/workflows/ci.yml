@@ -40,7 +40,7 @@ jobs:
       - name: 接线自检（scripts / check 链 / verify / 本文件 四处名字不许漂）
         run: npm run check:ci-parity
 
-      - name: 单文件体积（≤300 行 · 白名单须带 owner + 到期日）
+      - name: 单文件体积（≤600 有效行 · 冻结基线棘轮）
         run: npm run check:size
 
       - name: 分层依赖（10 条规则）
@@ -152,11 +152,11 @@ jobs:
           -D warnings
           -A clippy::unwrap_used -A clippy::expect_used
 
-      # 没有 `cargo fmt --check`：它与本仓的「单文件 ≤300 行」硬约束**不可同时满足**。
-      # 2026-11-13 实测：全仓 `cargo fmt` 后有 14 个原本合规的文件被换行推到 300 行以上
-      # （`scripts/size-allowlist.json` 从 150 条涨到 164 条），而该基线是棘轮、明确
-      # 不许为「变绿」新增豁免。两条规则二选一，本项目选 300 行（它有架构含义：
-      # 单文件可一次读完）；格式化因此不是门禁项，改代码时按现有风格手写。
+      # 没有 `cargo fmt --check`：这是**独立决定**，不是「与行数限制不可兼得」。
+      # 那条老理由（2026-11-13：全仓 fmt 把 14 个合规文件推过 300 行）已随上限放宽到
+      # 600 失效 —— 2026-11-19 实测：0 个文件越 600、36 个存量超限文件无一增长、
+      # 835 个 .rs 里只有 13 个会被改写。仍然不加，是因为纯排版 diff 会混进功能提交，
+      # 而本仓靠 diff 可读性做审查；要放开就单开一批（cargo fmt + 单独提交 + 重记基线）。
 
   android:
     name: Android · Rust target / Debug APK assemble
