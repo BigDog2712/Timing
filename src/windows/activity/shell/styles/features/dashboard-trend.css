@@ -119,7 +119,7 @@
 /* 当前这一小时那格：字色抬一档 + 加粗（Rust center_text 的 strong 位） */
 .at-trend__day.is-today .at-trend__label {
   color: var(--at-text-secondary);
-  font-weight: 600;
+  font-weight: var(--at-font-weight-emphasis);
 }
 
 /* ── 首 / 末两处轴文字钉到图表左右边缘 ──

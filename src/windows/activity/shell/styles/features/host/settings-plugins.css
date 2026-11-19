@@ -73,7 +73,7 @@
 
 .plg__name {
   font-size: var(--text-body);
-  font-weight: 600;
+  font-weight: var(--at-font-weight-emphasis);
   color: var(--ink);
 }
 

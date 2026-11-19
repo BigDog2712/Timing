@@ -27,7 +27,7 @@
 .sync__title {
   margin: 0;
   font-size: var(--text-body);
-  font-weight: 600;
+  font-weight: var(--at-font-weight-emphasis);
   color: var(--ink);
 }
 
@@ -71,7 +71,7 @@
 .sync__kind {
   margin: 0;
   font-size: var(--text-body);
-  font-weight: 600;
+  font-weight: var(--at-font-weight-emphasis);
   color: var(--ink);
 }
 

@@ -260,7 +260,7 @@
 
 .at-item-app-binding-title {
   color: var(--at-text-primary);
-  font-weight: 600;
+  font-weight: var(--at-font-weight-emphasis);
 }
 
 .at-item-app-binding-select {

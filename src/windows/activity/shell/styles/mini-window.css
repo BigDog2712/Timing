@@ -97,7 +97,7 @@ html[data-window-label="mini"] #root {
 .mini-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; }
 .mini-daily-summary { height: 36px; align-items: flex-start; padding-top: 2px; border-bottom: 1px solid var(--at-border-subtle); }
 .mini-daily-total { min-width: 0; white-space: nowrap; }
-.mini-daily-total .mini-duration { font-size: var(--at-font-size-body); font-weight: 500; color: var(--at-text-primary); }
+.mini-daily-total .mini-duration { font-size: var(--at-font-size-body); font-weight: var(--at-font-weight-medium); color: var(--at-text-primary); }
 .mini-daily-range { padding-top: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--at-text-tertiary); }
 .mini-duration { flex-shrink: 0; color: var(--at-text-secondary); font-variant-numeric: tabular-nums; }
 .mini-activity-content { display: flex; flex-direction: column; }

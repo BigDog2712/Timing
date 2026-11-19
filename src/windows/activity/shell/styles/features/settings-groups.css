@@ -45,7 +45,7 @@
   background: none;
   color: var(--at-text-secondary);
   font-size: var(--at-font-size-caption);
-  font-weight: 600;
+  font-weight: var(--at-font-weight-emphasis);
   letter-spacing: 0.01em;
   line-height: 18px;
   text-align: left;
