@@ -126,6 +126,16 @@
   --weight-medium: 500;
   --radius-sm: 6px;
   --radius-md: 10px;
+  /* [B5f] 桥缺的两个值（**补在桥里，不补在规则上**）：
+     `--btn-sm-h` 原来只定义在主窗 `01-primitives.css:151`（24px），`--bg-field-hi` 原来只
+     定义在主题层（`02-theme-dark.css:19` / `03-theme-light.css:17`），分析窗闭包里都没有。
+     插件卡挂进桥之后，`.plg__btn` 的 height 与 `.btn--neutral:hover` 的底色才拿得到值。
+     为什么不给 `.plg__btn` / `.btn--neutral` 每条规则加 fallback：那是把同一份真值抄第二遍，
+     桥和 fallback 迟早各长各的（这正是 `settingsDataCssFallback` 的 fc02 在防的漂移）。
+     `--bg-field-hi` 的语义是"比 field 浮起一档"，桥里 `--bg-seg-on` 就是同一个意思
+     （elevated + 10% ink），转发过去即可，不写第二种配方。 */
+  --btn-sm-h: 24px;
+  --bg-field-hi: var(--bg-seg-on);
 }
 
 /* 六块折叠面板竖排：原来这条排版职责由外层 `.data`（`display:flex` + `gap`）提供，

@@ -16,10 +16,15 @@
  * 启用/停用开关：`enabled` 写在启动头里，改文件 + 重新加载即可。
  */
 import { useEffect } from 'react';
+import { Puzzle } from 'lucide-react';
+import SettingsPanelHeader from '../SettingsPanelHeader';
 import { formatMinutes } from '../../services/host/format';
 import { pluginApi } from '../../services/hostApi';
 import { usePluginStore } from '../../services/host/pluginRuntimeStore';
 import type { PluginInfo, PluginSource } from '../../services/host/hostTypes';
+
+/** 与同页其它卡同一档线宽（`HostAiCard` 也是 1.6） */
+const STROKE = 1.6;
 
 const SOURCE_LABEL: Record<PluginSource, string> = {
   dev: '开发',
@@ -65,72 +70,84 @@ export function HostPluginsPanel({ showOpenDir = true }: HostPluginsPanelProps) 
   const isEmpty = loaded && plugins.length === 0 && !error;
 
   return (
-    <div className="plg">
-      {/* 顶部路径栏 + 打开目录 + 重新加载必须保留：没有它们用户无法把插件放进目录。 */}
-      <div className="plg__bar">
-        <span className="plg__path" title={dir}>
-          {dir || '正在定位插件目录…'}
-        </span>
-        {showOpenDir && (
-          <button type="button" className="btn btn--ghost plg__btn" onClick={() => void pluginApi.openDir()}>
-            打开目录
+    /* [B5f] 卡壳必须由自己带：这一块原先是照**主窗**形状写的（主窗 `PluginsTab` 也只有
+       `<div className="plg">`，卡片外壳由 `mobile/SettingsPage` 的页签容器提供），搬到分析窗
+       后那层父级外壳没跟过来 —— 于是它既不是卡（没有底色 / 圆角 / 内边距），也拿不到宿主令牌
+       （`.settings-host-sync` 是分析窗里唯一提供 --line、--ink、--space-N、--radius-N 的地方）。
+       根上加 `at-panel` + `settings-host-sync` 一次补齐这两件事，`.plg` 里的标记一个字没改。
+       标题取「插件」，与导航锚点 `s-plugins` 逐字一致（锚点 title 必须等于卡片 title）。 */
+    <section className="at-panel p-5 md:p-6 settings-host-sync">
+      <SettingsPanelHeader
+        icon={<Puzzle size={16} strokeWidth={STROKE} className="text-[var(--at-accent-default)]" />}
+        title="插件"
+      />
+      <div className="plg">
+        {/* 顶部路径栏 + 打开目录 + 重新加载必须保留：没有它们用户无法把插件放进目录。 */}
+        <div className="plg__bar">
+          <span className="plg__path" title={dir}>
+            {dir || '正在定位插件目录…'}
+          </span>
+          {showOpenDir && (
+            <button type="button" className="btn btn--ghost plg__btn" onClick={() => void pluginApi.openDir()}>
+              打开目录
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn btn--neutral plg__btn"
+            disabled={loading}
+            onClick={() => void load()}
+          >
+            {loading ? '加载中…' : '重新加载'}
           </button>
+        </div>
+
+        {error && <p className="plg__error">{error}</p>}
+
+        {isEmpty ? (
+          <p className="plg__empty">还没有安装插件。把插件文件夹放进上面的目录，点「重新加载」即可。</p>
+        ) : (
+          <ul className="plg__list">
+            {plugins.map((plugin) => {
+              const broken = plugin.error != null;
+              return (
+                <li key={plugin.id} className="plg__item" data-broken={broken ? 'true' : 'false'}>
+                  <div className="plg__head">
+                    <span className="plg__name">{plugin.name}</span>
+                    <span className="plg__tag" data-source={plugin.source}>
+                      {SOURCE_LABEL[plugin.source] ?? plugin.source}
+                    </span>
+                    {plugin.version && <span className="plg__ver">v{plugin.version}</span>}
+                    {!plugin.enabled && !broken && <span className="plg__ver">已停用</span>}
+                  </div>
+                  {plugin.description && <p className="plg__desc">{plugin.description}</p>}
+                  <p className="plg__meta">{contributions(plugin)}</p>
+                  {/* 同 id 可能同时躺在 dev / exe / user 三处：把这份到底从哪读来的写出来，
+                      否则「我改的文件没生效」只能靠猜（先到先得规则在 plugin.rs）。 */}
+                  {plugin.dir && (
+                    <p className="plg__dir" title={plugin.dir}>
+                      {plugin.dir}
+                    </p>
+                  )}
+                  {/* [v3] 黄字 ≠ 红字：warnings 是「生效但有东西被忽略」，
+                      与下面 error 的「没生效」必须一眼分开。 */}
+                  {plugin.warnings.map((note) => (
+                    <p key={note} className="plg__warn">
+                      {note}
+                    </p>
+                  ))}
+                  {broken && <p className="plg__error">未能载入：{plugin.error}</p>}
+                </li>
+              );
+            })}
+          </ul>
         )}
-        <button
-          type="button"
-          className="btn btn--neutral plg__btn"
-          disabled={loading}
-          onClick={() => void load()}
-        >
-          {loading ? '加载中…' : '重新加载'}
-        </button>
+
+        <p className="plg__hint">
+          plugins 目录下每个文件夹是一个插件，必须有启动头 <code>plugin.json</code>。
+          改动后点「重新加载」即可生效，无需重启。
+        </p>
       </div>
-
-      {error && <p className="plg__error">{error}</p>}
-
-      {isEmpty ? (
-        <p className="plg__empty">还没有安装插件。把插件文件夹放进上面的目录，点「重新加载」即可。</p>
-      ) : (
-        <ul className="plg__list">
-          {plugins.map((plugin) => {
-            const broken = plugin.error != null;
-            return (
-              <li key={plugin.id} className="plg__item" data-broken={broken ? 'true' : 'false'}>
-                <div className="plg__head">
-                  <span className="plg__name">{plugin.name}</span>
-                  <span className="plg__tag" data-source={plugin.source}>
-                    {SOURCE_LABEL[plugin.source] ?? plugin.source}
-                  </span>
-                  {plugin.version && <span className="plg__ver">v{plugin.version}</span>}
-                  {!plugin.enabled && !broken && <span className="plg__ver">已停用</span>}
-                </div>
-                {plugin.description && <p className="plg__desc">{plugin.description}</p>}
-                <p className="plg__meta">{contributions(plugin)}</p>
-                {/* 同 id 可能同时躺在 dev / exe / user 三处：把这份到底从哪读来的写出来，
-                    否则「我改的文件没生效」只能靠猜（先到先得规则在 plugin.rs）。 */}
-                {plugin.dir && (
-                  <p className="plg__dir" title={plugin.dir}>
-                    {plugin.dir}
-                  </p>
-                )}
-                {/* [v3] 黄字 ≠ 红字：warnings 是「生效但有东西被忽略」，
-                    与下面 error 的「没生效」必须一眼分开。 */}
-                {plugin.warnings.map((note) => (
-                  <p key={note} className="plg__warn">
-                    {note}
-                  </p>
-                ))}
-                {broken && <p className="plg__error">未能载入：{plugin.error}</p>}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      <p className="plg__hint">
-        plugins 目录下每个文件夹是一个插件，必须有启动头 <code>plugin.json</code>。
-        改动后点「重新加载」即可生效，无需重启。
-      </p>
-    </div>
+    </section>
   );
 }
