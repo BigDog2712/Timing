@@ -326,7 +326,7 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 - [ ] dot hover 时点本体尺寸不变（像素级），仅出 tooltip + 1px 微亮。
 - [ ] **形态切换不得引入布局类过渡**（**[实测修正]** 取代原判据「仅动 width/opacity」——那条依赖一个不存在的 CSS 宽度动画）：`dot.css:44` 的 `transition` 只允许 `color` 与 `transform`；`transform` 只允许按压反馈 `scale(0.94)`（`.dot:active`，`styles/dot.css:54`，B4 明确保留），**`:hover` 下不得出现任何 `scale`**（B4c 已删掉 `scale(1.04)`，见 `dot.css:47-49`）；前端不得为形态切换新增 `width` / `height` / `border-radius` 过渡（尺寸变化走 `useWindowAutoFit` → `win.setSize`，`timing/hooks/useWindowAutoFit.ts:175`）。改法：grep `dot.css` / `pill*.css` 的 `transition` 声明 + 手测 hover 前后 `offsetWidth` 相等。
 - [ ] 形态切换后条高与数字基线不变（像素级；这是「布局类过渡」判据的另一半，`height`/`line-height` 不得参与过渡）。
-- [ ] 把手仅在 hover 药丸 / 键盘聚焦 / 有浮层展开时可见；**鼠标离开后延迟 200ms 再淡出**（**[实测修正]** 原写「不小于 150ms」与实现不符：隐藏侧 `transition: opacity var(--dur-exit) `**`var(--dur-base)`**``，`--dur-base` = 200ms，`--dur-exit` = 180ms，见 `styles/surfaces.css:188-190` 与 `tokens/01-primitives.css:175-176`；露出侧 `transition-delay: 0ms`，见 `surfaces.css:193-198`）。判据：hover 移出后 200ms 内把手仍可点。
+- [ ] 把手仅在 hover 药丸 / 键盘聚焦 / 有浮层展开时可见；**鼠标离开后延迟 200ms 再淡出**（**[实测修正]** 原写「不小于 150ms」与实现不符：隐藏侧的 transition 是「`opacity` 180ms + **`transition-delay` 200ms**」，即 `transition: opacity var(--dur-exit) var(--ease-standard) var(--dur-base)`，见 `styles/surfaces.css:188-190`，令牌值 `--dur-exit: 180ms` / `--dur-base: 200ms` 见 `tokens/01-primitives.css:175-176`；露出侧 `transition-delay: 0ms`，见 `surfaces.css:193-198`）。判据：hover 移出后 200ms 内把手仍可点。
 - [ ] 四态每态仅一处主信号；running 同屏强调色 ≤1 处。
 - [ ] 倒计时告警是唯一数字变色场景，其余态数字不变色。
 
@@ -370,5 +370,5 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 3. **最短路径**：开始/暂停保持 1 次；切事项、看今日各 −1 次；结束 +1 次换防误触。
 4. **设置五组树**：计时行为 / 外观与主题 / 悬浮条与把手 / 数据与同步 / 通用与启动（**[实测修正] 第 5 组沿用现名、不改**：导航逐条渲染锚点名，组名不承担索引职责；「关于」不在设置页，它是壳级独立视图）；把手绑定、存储路径、AI 等降为折叠高级区；**[实测修正] 去重只剩 D5 一处**——D1–D4 经源码实测各只有一处入口、无需改动（§3.3）。
 5. **无障碍**：快捷键归纳、焦点归还、aria 不靠颜色、aria-live 按分钟、reduced-motion 全退化。
-6. 验收清单四节共 30 条，均可被路径点击数 / grep id / 像素 diff / 读屏判定。
+6. 验收清单四节共 27 条（§5.1 六条 / §5.2 六条 / §5.3 七条 / §5.4 八条），均可被路径点击数 / grep id / 像素 diff / 读屏判定。**[实测修正]** 原写"共 30 条"是估算，与逐条数不符，已按实际条数改正。
 
