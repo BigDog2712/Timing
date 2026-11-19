@@ -1,10 +1,15 @@
 /**
  * 主界面设置 · 「悬浮条与把手」组的绑定面板（[0.12.1] T04 · [0.12.1 归一] 真源搬到设置表
- * · [B5b] 卡片标题对齐导航锚点）
+ * · [B5b] 卡片标题对齐导航锚点 · [B5c] 折进高级区）
  * -----------------------------------------------------------------------------
  * **卡片标题 = 导航锚点标题**（「把手绑定」）：导航点的是哪个名字，滚过来看到的卡就得叫哪个
  * 名字。两者分家会让用户以为点错了（同页 `HostSyncPanel` 的卡头也是这么对齐的，
  * 见 `HostSyncPanel.test.tsx` 的 s01）。改组名/锚点名时这张卡的 `title` 要同批改。
+ *
+ * [B5c] 这张卡现在是**默认折叠**的 `FoldBlock`：把手绑定属于「设置一次就不再动」的高级项，
+ * 常驻占据第一屏是在挤计时规则。折叠块自己就是卡片（`data__block` 提供边框与底色），
+ * `id` 落在块根节点上 → 锚点 `#s-pill-handles` 在**可见头部**，不在 `hidden` 的折叠体里。
+ * 点导航时由 `settingsFoldReveal` 先展开再滚（见 `SettingsGroupNav.jump()`）。
  *
  * 三张卡（圆点 / 半手柄 / 手柄）由 `HANDLE_FORMS` 的顺序生成 —— 顺序即药丸上的顺序，
  * 不要在 JSX 里手写三遍。⚠️「手柄」在这里是**形态名**（`full`），不是绑定名：
@@ -34,18 +39,15 @@ import {
   nudgePillPrefs,
   savePillPrefs,
 } from "../../../../shared/pillPrefsGateway";
-import SettingsPanelHeader from "./SettingsPanelHeader";
+import { FoldBlock } from "./host/FoldBlock";
 import SettingsHandleCard from "./SettingsHandleCard";
-import { MousePointerClick } from "lucide-react";
-
-const STROKE = 1.6;
 
 interface SettingsHandlesPanelProps {
-  /** 锚点 id（G1 的 `#s-pill-handles`） */
+  /** 锚点 id（「悬浮条与把手」组的 `#s-pill-handles`），同时是折叠块根节点的 DOM id */
   id?: string;
 }
 
-export default function SettingsHandlesPanel({ id }: SettingsHandlesPanelProps) {
+export default function SettingsHandlesPanel({ id = "s-pill-handles" }: SettingsHandlesPanelProps) {
   const [bindings, setBindings] = useState<HandleBindings>(() => loadHandleBindings());
   const [error, setError] = useState<string | null>(null);
   /** 用户已经动过控件 → 进门那次读库的结果不许再盖回去（见下面的挂载效应）。 */
@@ -104,16 +106,20 @@ export default function SettingsHandlesPanel({ id }: SettingsHandlesPanelProps) 
   };
 
   return (
-    <section className="at-panel p-5 md:p-6" id={id}>
-      <SettingsPanelHeader
-        icon={<MousePointerClick size={16} strokeWidth={STROKE} className="text-[var(--at-accent-default)]" />}
-        title="把手绑定"
-      />
-      <p className="mt-3 at-text-caption text-[var(--at-text-tertiary)]">
+    /* [B5c] **卡片即折叠块**：`FoldBlock` 的 `id` 直接落在它的根节点上，所以
+       `#s-pill-handles` = 折叠块的可见头部（不是 `hidden` 的折叠体）—— 导航点「把手绑定」
+       滚到这里就能看见标题，折叠体展开由导航派发的信号触发（见 `services/settingsFoldReveal`）。
+       默认折叠、不记忆（与数据卡六块同一口径）；标题与移动方式对齐导航锚点标题。 */
+    <FoldBlock
+      id={id}
+      title="把手绑定"
+      hint="三形态 × 5 槽，改完即生效"
+    >
+      <p className="at-text-caption text-[var(--at-text-tertiary)]">
         每个形态可以单独启用；同一形态里「左键 / 右键」是单击，「左双击 / 右双击」是同键双击。
         双击与单击落在同一颗键上时，单击要等一次双击判定窗才派发 —— 这是双击能生效的代价。
       </p>
-      <div className="mt-4 grid gap-2 md:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-3">
         {HANDLE_FORMS.map((form) => (
           <SettingsHandleCard
             key={form}
@@ -125,10 +131,10 @@ export default function SettingsHandlesPanel({ id }: SettingsHandlesPanelProps) 
         ))}
       </div>
       {error && (
-        <p className="inline-error mt-3" role="alert">
+        <p className="inline-error" role="alert">
           {error}
         </p>
       )}
-    </section>
+    </FoldBlock>
   );
 }

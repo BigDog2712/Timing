@@ -249,8 +249,6 @@ export default function Settings({
                   nextChecked ? "tray" : "exit",
                 );
               }}
-              launchAtLoginChecked={draftSettings.launchAtLogin}
-              onLaunchAtLoginChange={(nextChecked) => handleChange("launchAtLogin", nextChecked)}
               startMinimizedChecked={draftSettings.startMinimized}
               onStartMinimizedChange={(nextChecked) => handleChange("startMinimized", nextChecked)}
             />

@@ -21,9 +21,17 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 /* [T04b] 图标从 lucide-react 取（`lib/icons` 属主窗，L9 禁跨窗 import）：\\n   宿主 `iconStroke(16)` 恒为 1.6，这里直接写字面量。 */
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { onFoldRevealRequested } from '../../services/settingsFoldReveal';
 
 interface FoldBlockProps {
-  /** 块标识；折叠体 id 由它派生（`${id}-body`），页签与测试都按它定位 */
+  /**
+   * 块标识；折叠体 id 由它派生（`${id}-body`），页签与测试都按它定位。
+   *
+   * [B5c] 它同时是**块根节点的 DOM id**：`s-pill-handles` 这种分组锚点直接挂在这里，
+   * 于是「锚点在折叠块的可见头部上」这件事由结构保证 —— 折叠体是 `hidden` 的，锚点要是
+   * 落在体里，导航点上去既不滚也不报错。六块数据卡的 id（`data-*`）顺带也成了 DOM id，
+   * 全仓无重名（与 `s-*` 锚点、`data-block` 属性均不冲突）。
+   */
   id: string;
   title: string;
   /** 标题下方那句「这一块管什么」 */
@@ -64,13 +72,29 @@ export function FoldBlock({
     if (!touched.current) setOpen(defaultOpen);
   }, [defaultOpen]);
 
+  /**
+   * [B5c] 导航点了「我这个块」→ 展开。
+   *
+   * 两条与 `defaultOpen` 的边界：
+   *  ① 先把 `touched` 置真再展开 —— 否则 `defaultOpen` 恒 false 的那个 effect 会在下一次
+   *     依赖变化时把块重新收回去，用户点了导航却看到块又合上。
+   *  ② 不看当前值、直接置 true（幂等）：已经展开时再点导航不该反而收起。
+   * 用户手动收起之后，再点导航**仍然能**再展开 —— 因为 `touched` 只挡 `defaultOpen`，
+   * 不挡这条信号。
+   */
+  useEffect(() => onFoldRevealRequested((anchorId) => {
+    if (anchorId !== id) return;
+    touched.current = true;
+    setOpen(true);
+  }), [id]);
+
   const toggle = () => {
     touched.current = true;
     setOpen((value) => !value);
   };
 
   return (
-    <section className="data__block" data-block={id}>
+    <section className="data__block" data-block={id} id={id}>
       <header className="data__block-head">
         <div className="data__block-main">
           <div className="data__block-title-row">

@@ -76,6 +76,16 @@
  *    直接 `return` —— 于是高亮跳了、页面没动、也没钉子，用户看到的是"点了一下，亮到
  *    别处去了"。这种点击**什么也不该发生**：不改高亮、不写 `scrollTop`、不设钉。
  *
+ * ## [B5c] 折叠块：跳转前先展开
+ *
+ * 「把手绑定」从 B5c 起是**默认折叠**的块，它的锚点 `s-pill-handles` 挂在折叠块的**可见头部**
+ * （不是被 `hidden` 的折叠体里）。点这一组时，`jump()` 先 `requestFoldReveal(anchorId)`
+ * 派发一句「我要去 X」，托管 X 的那个 `FoldBlock` 自己展开；随后才测落点。
+ *
+ * 顺序不能反：展开会改变 `scrollHeight`，先测后展开会读到展开前的可滚量，页尾锚点被夹到
+ * 偏小的落点上。所以那句派发包在 `flushSync` 里（见 `jump()` 内注释）。没有折叠块托管这个
+ * 锚点时它是空转 —— 其余四组的行为一个字节没变。
+ *
  * ## 为什么不用 `scrollIntoView`
  *
  * 它会把**所有可滚祖先**一起滚（设置页外面还有页面级滚动区），落点由浏览器说了算、
@@ -83,7 +93,9 @@
  * 自己写下去的数，判定线与落点天然同源，误差只剩设备像素取整那一档（即上面 ① 的容差）。
  */
 import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { SETTINGS_GROUPS } from "../settingsGroups";
+import { requestFoldReveal } from "../services/settingsFoldReveal";
 
 const SCROLL_CONTAINER_ID = "settings-scroll";
 /** CSS 读不到时的兜底（如无头环境）；正常路径永远走 `scroll-margin-top`。 */
@@ -202,6 +214,14 @@ export default function SettingsGroupNav() {
   /** 跳到某个组的某个锚点，并**立刻**把该组点亮、钉住到离开落点为止（见文件头 ②③） */
   const jump = (groupId: string, anchorId: string) => {
     if (!SETTINGS_GROUPS.some((item) => item.id === groupId)) return;
+
+    /* [B5c] **先展开托管这个锚点的折叠块**（「把手绑定」是默认折叠的），再滚。
+       为什么必须 `flushSync`：展开会改变 `scrollHeight`（折叠体有高度），而下面要读
+       `container.scrollHeight` 算可滚量与落点上限。异步展开的话读到的是**展开前**的数，
+       页尾锚点会被夹到一个偏小的落点上（少滚一截）；同时折叠体本身也在锚点下方，
+       展开越晚，落点的偏差越大。`flushSync` 让展开在同一次点击内进 DOM，测量与落点同源。
+       没有监听者时它是纯空转（导航用例的夹具里没有折叠块）。 */
+    flushSync(() => requestFoldReveal(anchorId));
 
     /* **先取节点、再动高亮**（见文件头 [复核修复] ②）：锚点节点不存在时这次点击
        什么也不该发生 —— 不改高亮、不写 `scrollTop`、不设钉。先 `setActiveGroup` 再检查

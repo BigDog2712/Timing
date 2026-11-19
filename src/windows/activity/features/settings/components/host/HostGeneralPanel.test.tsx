@@ -42,6 +42,7 @@ vi.mock('../../../../platform/desktop/hostPluginsGateway', () => ({
 
 import { HostGeneralPanel } from './HostGeneralPanel';
 import { useSettingsStore } from '../../services/host/settingsRuntimeStore';
+import { SettingsRuntimeAdapterService } from '../../services/settingsRuntimeAdapterService';
 
 const SETTINGS = { autostartEnabled: false };
 const REFERENCE = { highlightColor: '#4DA3E8', minRecordSeconds: 45 };
@@ -49,6 +50,12 @@ const REFERENCE = { highlightColor: '#4DA3E8', minRecordSeconds: 45 };
 let container: HTMLDivElement;
 let root: Root;
 let mounted: boolean;
+/**
+ * [B5c] D5 双写的观察点：面板必须走 `commitSettingsPatch({ launchAtLogin })` 这条**既有**
+ * 通路（落库 + 广播 `app-settings-changed`），不是新造一条命令。这里把它换成 spy，
+ * 免得测试去碰真的 IPC；真正的落库/广播由 `settingsD5DoubleWrite.test.ts` 钉。
+ */
+let commitSpy: ReturnType<typeof vi.spyOn>;
 
 async function mount(props: { showAutostart?: boolean } = {}): Promise<void> {
   await act(async () => {
@@ -101,9 +108,13 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   mounted = true;
+  commitSpy = vi
+    .spyOn(SettingsRuntimeAdapterService, 'commitSettingsPatch')
+    .mockResolvedValue({ persisted: true, runtimeSync: 'not-needed', runtimeSyncErrors: [] });
 });
 
 afterEach(() => {
+  commitSpy.mockRestore();
   if (mounted) act(() => root.unmount());
   container.remove();
 });
@@ -138,6 +149,46 @@ describe('写路径：宿主命令的入参键名', () => {
     expect(g.setAutostart).toHaveBeenCalledWith(true);
     /* 写完必须回读：勾选状态以后端实际生效值为准（写注册表可能失败） */
     expect(g.getSettings.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('g09_toggling_autostart_also_writes_the_same_value_into_launch_at_login', async () => {
+    /* [B5c] D5：两份持久化必须**同值**，否则 `useDesktopLaunchBehaviorSync` 会用旧的
+       `appSettings.launchAtLogin` 把 OS 状态翻回去（出厂就是 true）。 */
+    await mount();
+    act(() => switchOf('开机自启').click());
+    await flush();
+
+    expect(commitSpy, '双写没有发生：launchAtLogin 会分叉').toHaveBeenCalledTimes(1);
+    expect(commitSpy).toHaveBeenCalledWith({ launchAtLogin: true });
+    /* 只带一个键：顺手把别的设置一起覆盖掉是另一类事故 */
+    expect(Object.keys(commitSpy.mock.calls[0][0] as Record<string, unknown>)).toEqual(['launchAtLogin']);
+    /* 顺序：先让 OS 真的开起来（用户的即时反馈），再落库+广播 */
+    expect(g.setAutostart.mock.invocationCallOrder[0])
+      .toBeLessThan(commitSpy.mock.invocationCallOrder[0]);
+  });
+
+  it('g10_turning_autostart_off_writes_false_into_both_sides', async () => {
+    /* 关掉这一半最容易分叉：出厂 `launchAtLogin = true`，只写 autostart 侧的话
+       下次启动会按旧值把自启重新打开。这里是「已经是开 → 点成关」。 */
+    g.getSettings.mockResolvedValue({ autostartEnabled: true });
+    commitSpy.mockClear();
+    await mount();
+    expect(switchOf('开机自启').getAttribute('aria-checked')).toBe('true');
+    act(() => switchOf('开机自启').click());
+    await flush();
+
+    expect(g.setAutostart).toHaveBeenCalledWith(false);
+    expect(commitSpy).toHaveBeenCalledTimes(1);
+    expect(commitSpy).toHaveBeenCalledWith({ launchAtLogin: false });
+  });
+
+  it('g11_a_failed_double_write_is_reported_not_swallowed', async () => {
+    commitSpy.mockRejectedValueOnce(new Error('设置保存失败：写入被拒绝'));
+    await mount();
+    act(() => switchOf('开机自启').click());
+    await flush();
+
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain('设置保存失败：写入被拒绝');
   });
 
   it('g04_committing_a_new_duration_patches_only_min_record_seconds', async () => {
