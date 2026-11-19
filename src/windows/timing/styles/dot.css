@@ -44,10 +44,10 @@
   transition: transform var(--dur-quick) var(--ease-standard), color var(--dur-base) var(--ease-standard);
 }
 
-.dot:hover {
-  transform: scale(1.04);
-}
-
+/* [B4 · P1 §4.2 ③ / 验收 P2 §5.2「dot hover 时点本体尺寸不变（像素级）」]
+   原先这里有一条 `.dot:hover { transform: scale(1.04) }`——悬停放大是 size 动画，
+   P1 明确禁止（「点本体不放大（禁 size 动画）」）。已删：悬停只出 tooltip（native
+   `title`）与高亮，不改尺寸。按下反馈 `:active` 保留（那是按压确认，不是悬停长出）。 */
 .dot:active {
   /* [V0.11.2] 圆点可拖（收起后主窗唯一的抓手） */
   cursor: grabbing;

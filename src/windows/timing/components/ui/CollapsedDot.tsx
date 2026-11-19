@@ -195,6 +195,8 @@ export function CollapsedDot() {
   /* 倒计时剩最后 60s：环切红（与小条同一阈值，令牌 --color-danger） */
   const nearEnd = isCountdown && remaining > 0 && remaining <= COUNTDOWN_WARN_SEC;
   const text = formatDuration(displaySec);
+  /* [B4 · P2 §4.3] tooltip / 可访问名的读数前缀：三种模式语义不同，不能一律写「已计」 */
+  const dotText = isCountdown ? `剩余 ${text}` : armedIdle ? `预设 ${text}` : `已计 ${text}`;
 
   /* 遮罩的相位：环口中心 = 黄点角度（时钟角 θ），换算到 SVG 角再让环口中心
      落在 dash 的缺口正中：θ−90 + 82/2 = θ−49。**UI 图形起点随黄点绕圈**。 */
@@ -235,8 +237,11 @@ export function CollapsedDot() {
       /* 小时档位：0 = 不足 1 小时（不画中心点）；1..4 由 CSS 换色 */
       data-hours={hourTier}
       data-highlight={highlighting ? 'true' : 'false'}
-      title={`${text} · ${name}`}
-      aria-label={`收起状态：${text} · ${name}，单击展开，拖动可移动`}
+      /* [B4 · P2 §4.3] 可访问名 = 「{事项名} · {读数}」，与 tooltip 文本同源
+         （tooltip 不许只是视觉，读屏必须听到同一句话）。读数前缀按模式区分，
+         否则倒计时/待命时会被念成「已计」——那是错的语义。 */
+      title={`${name} · ${dotText}`}
+      aria-label={`收起状态：${name} · ${dotText}，单击展开，拖动可移动`}
       onPointerDown={drag.onDown}
       onPointerMove={drag.onMove}
       onPointerUp={drag.onUp}
