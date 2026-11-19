@@ -111,6 +111,11 @@ export default function HostAiCard() {
     <section className="at-panel p-5 md:p-6 settings-host-sync">
       <SettingsPanelHeader
         icon={<Sparkles size={16} strokeWidth={STROKE} className="text-[var(--at-accent-default)]" />}
+        /* 与导航锚点标题（`settingsGroups.ts` 的 `s-ai`）逐字一致 =「AI 与标签」——
+           锚点 `title` 必须等于卡片标题，要改就两处同批改。
+           「标签」**不是空挂**：本卡第二个内容块「建议范围」（下方 `h3`）管的就是 AI 的
+           标签建议，`启用 AI` 的 hint 也写着「关着时标签建议…会拒绝执行」。判断一个词是否
+           空挂，标准是**卡内有没有对应实体**，不是仓里有没有同名目录。 */
         title="AI 与标签"
       />
       <div className="mt-4 flex flex-col gap-6">

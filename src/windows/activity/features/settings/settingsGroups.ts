@@ -69,6 +69,13 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
       { id: "s-general", title: "通用" },
       { id: "s-resident", title: "常驻与启动" },
       { id: "s-plugins", title: "插件" },
+      /* `s-ai` 沿用「AI 与标签」，**不要改成「AI」**。通用规则：锚点 `title` 必须与
+         该卡 `SettingsPanelHeader` 的 `title` 逐字一致，要改就两处同批改（B5b 的
+         「手柄绑定 → 把手绑定」即此）。
+         「标签」**不是空挂**：`HostAiCard` 的第二个内容块「建议范围」管的就是 AI 的
+         标签建议，`启用 AI` 的 hint 也写着「关着时标签建议…会拒绝执行」。判断一个词
+         是否空挂，标准是**卡内有没有对应实体**，不是仓里有没有同名目录 —— 别再照
+         "仓里没有 `features/tags/`" 把它删掉。 */
       { id: "s-ai", title: "AI 与标签" },
     ],
   },

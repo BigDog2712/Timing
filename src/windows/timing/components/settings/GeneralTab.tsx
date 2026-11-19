@@ -103,6 +103,15 @@ export function GeneralTab({ showAutostart = true }: GeneralTabProps) {
           <Switch
             label="开机自启"
             checked={settings.autostartEnabled}
+            /* ⚠️ 这里**只写一处**，没有活动窗那条 D5 双写。现在无害是因为唯一调用点
+               `src/windows/timing/components/mobile/SettingsPage.tsx` 传了
+               `showAutostart={false}`，本分支在桌面与
+               Android 都**不可达**。开启它之前必须先补第二写
+               `commitSettingsPatch({ launchAtLogin: v })`，否则会原样复现两份持久化分叉
+               （`set_autostart` 成功、`AppSettings.launchAtLogin` 仍是旧值，
+               `useDesktopLaunchBehaviorSync` 会把旧值打回 OS）。详见 P2 文档技术债 T2。
+               注意：`GeneralTab.test.tsx` 不传 props，`showAutostart` 取默认 true，
+               所以这条分支**有测试且是绿的** —— 测试覆盖不等于可达，判断可达只能看调用点。 */
             onChange={(v) => void run(() => settingsActions.setAutostart(v))}
           />
         </div>
