@@ -31,8 +31,8 @@ pub mod backoff;
 pub mod pending;
 pub mod probe;
 /* [V0.11.19 变更 A] 往期真删：骨架（`purge/mod.rs`）+ 两路互不合并的取证。
-   手机端不装挂点（`round_webdav` / `round_folder` 的 ⑩ 都是 `#[cfg(not(mobile))]`），
-   但模块本身编译到两端：`purge::status` 是设置页共用的只读投影，且这里没有平台 API。 */
+手机端不装挂点（`round_webdav` / `round_folder` 的 ⑩ 都是 `#[cfg(not(mobile))]`），
+但模块本身编译到两端：`purge::status` 是设置页共用的只读投影，且这里没有平台 API。 */
 pub mod purge;
 pub mod round_conflict;
 pub mod round_folder;
@@ -45,13 +45,13 @@ mod state;
 mod util;
 
 /* 判据与纯函数（`usable_*` / `absorb` / `today` / `should_autosync`）在 `util.rs`：
-   它们的调用点遍布托盘标签与调度链，这里原样导出，路径不变。 */
+它们的调用点遍布托盘标签与调度链，这里原样导出，路径不变。 */
 pub use util::*;
 /* [V0.11.21] 三档的纯判定从 `jobs/md_cloud`（桌面独占）搬到这里：手机端同一条节奏
-   也要跑，而手机端引用不到桌面模块。判定不碰 IO / Tauri，两端都编。 */
+也要跑，而手机端引用不到桌面模块。判定不碰 IO / Tauri，两端都编。 */
 pub mod tier;
 /* [V0.11.16] 远端错误的文案表（从 `round_push` 搬出）：「测试连接」的三关也要用同一张。
-   `pub(crate)` 是为了让 `tests/md_webdav_text.rs` 能直接断言 `fail_text_at` 的关卡分支。 */
+`pub(crate)` 是为了让 `tests/md_webdav_text.rs` 能直接断言 `fail_text_at` 的关卡分支。 */
 pub(crate) mod text;
 
 use sqlx::SqlitePool;
@@ -61,9 +61,7 @@ use crate::error::AppError;
 use crate::error::AppResult;
 use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncReport;
-use crate::models::md_sync_cloud::{
-    MdSyncCloudStatus, MdSyncTestResult, MdSyncViewCloud,
-};
+use crate::models::md_sync_cloud::{MdSyncCloudStatus, MdSyncTestResult, MdSyncViewCloud};
 use crate::models::md_sync_config::MdSyncConfig;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_sync;
@@ -95,10 +93,7 @@ pub async fn round(pool: &SqlitePool) -> AppResult<CloudRoundOutcome> {
 /// [V0.11.26] 双通路：folder 在前（零网络、快、失败面小），webdav 在后；
 /// 各自独立判可用、独立记错（`absorb` 合报告）。Obsidian 半轮（`md_sync::run_with`）
 /// 在两条通路各自的 `round_*::run` 内部各跑一次——与设计 §1.3 的分派图一致。
-pub async fn round_with(
-    pool: &SqlitePool,
-    mode: ConflictMode,
-) -> AppResult<CloudRoundOutcome> {
+pub async fn round_with(pool: &SqlitePool, mode: ConflictMode) -> AppResult<CloudRoundOutcome> {
     let config = md_sync::config::load(pool).await?;
     /* 手机端不支持 folder 通路（[V0.11.14] 修 O12）。那条路假设用户电脑上有个网盘
     客户端在同步一个真实目录，手机上既没有那个目录也没有客户端。读时物化会把老
@@ -110,9 +105,7 @@ pub async fn round_with(
         .as_ref()
         .is_some_and(|channel| channel.enabled)
     {
-        return Err(AppError::md_sync_config_invalid(
-            NO_LOCAL_FOLDER_ON_MOBILE,
-        ));
+        return Err(AppError::md_sync_config_invalid(NO_LOCAL_FOLDER_ON_MOBILE));
     }
     let folder = usable_folder(&config);
     let webdav = usable_webdav(&config);

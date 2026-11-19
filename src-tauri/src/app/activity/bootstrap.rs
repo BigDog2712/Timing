@@ -10,6 +10,7 @@ use crate::app::activity::{
 };
 use crate::models::activity::lifecycle::AppRestartState;
 use crate::models::activity::settings::{DesktopBehaviorSettings, StartupSource};
+use crate::services::activity::data;
 use crate::services::activity::engine::{
     tools::{ToolsRuntimeState, ToolsRuntimeWakeState},
     tracking::{
@@ -18,7 +19,6 @@ use crate::services::activity::engine::{
     },
     web_activity::WebActivityRuntimeState,
 };
-use crate::services::activity::data;
 use tauri::Manager;
 
 /// 把 Patina 的状态与插件挂到**宿主**的 `Builder` 上。
@@ -67,11 +67,11 @@ fn register_managed_state_and_plugins(
         .manage(crate::services::activity::data::sqlite_pool::AppSqlitePool::default())
         .manage(crate::services::activity::data::activity_read_model::ReadModelWake::default())
         .plugin(tauri_plugin_opener::init())
-        /* 上游这里还注册了 `tauri-plugin-updater`。2026-11-16 整条更新链已删除：它的
-        endpoints 指向 `github.com/Ceceliaee/patina`（别人的仓库），装上不是接到别人的
-        下载页就是永远拿不到包；而它要求的 `plugins.updater` 配置为 null 时插件初始化
-        直接 panic，整个应用起不来。发版统一走 `release/` 里的签名 NSIS 包。
-        **不要加回来**：判据 `tests/update_channel_removed.rs` 会红。 */
+    /* 上游这里还注册了 `tauri-plugin-updater`。2026-11-16 整条更新链已删除：它的
+    endpoints 指向 `github.com/Ceceliaee/patina`（别人的仓库），装上不是接到别人的
+    下载页就是永远拿不到包；而它要求的 `plugins.updater` 配置为 null 时插件初始化
+    直接 panic，整个应用起不来。发版统一走 `release/` 里的签名 NSIS 包。
+    **不要加回来**：判据 `tests/update_channel_removed.rs` 会红。 */
 }
 
 /* Patina 的命令表**不在这里**：Tauri 的 `invoke_handler` 只能设一次，而 `Invoke` 不可克隆，
@@ -87,39 +87,57 @@ pub fn setup(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let runtime_health = app.state::<Arc<RuntimeHealthState>>().inner().clone();
     {
-            crate::infra::activity::storage_control::initialize(app.handle()).map_err(storage_startup_error)?;
-            let handled_storage_restart = tauri::async_runtime::block_on(
-                data::storage_migration::run_pending_storage_migration(app.handle()),
-            )
+        crate::infra::activity::storage_control::initialize(app.handle())
             .map_err(storage_startup_error)?;
-            crate::infra::activity::storage_paths::resolve_storage_paths(app.handle()).map_err(storage_startup_error)?;
-            tauri::async_runtime::block_on(data::sqlite_pool::initialize_app_sqlite(app.handle()))
-                .map_err(std::io::Error::other)?;
-            // Resolve interrupted credential saves before backup schedulers start.
-            if let Err(error) = tauri::async_runtime::block_on(data::remote_backup_config::snapshot(app.handle())) {
-                crate::log_warn!("credential recovery unavailable: {error}");
-            }
-            tauri::async_runtime::block_on(data::app_settings_service::migrate_legacy_web_links(app.handle()))
-                .map_err(std::io::Error::other)?;
-            let startup = match tauri::async_runtime::block_on(
-                data::app_settings_service::load_desktop_behavior_settings(app.handle()),
-            ) {
-                Ok(settings) => runtime::StartupContext::new(
-                    settings,
-                    resolve_startup_source(launched_by_autostart, handled_storage_restart),
-                ),
+        let handled_storage_restart = tauri::async_runtime::block_on(
+            data::storage_migration::run_pending_storage_migration(app.handle()),
+        )
+        .map_err(storage_startup_error)?;
+        crate::infra::activity::storage_paths::resolve_storage_paths(app.handle())
+            .map_err(storage_startup_error)?;
+        tauri::async_runtime::block_on(data::sqlite_pool::initialize_app_sqlite(app.handle()))
+            .map_err(std::io::Error::other)?;
+        if let Some(host_state) = app.try_state::<crate::state::AppState>() {
+            match tauri::async_runtime::block_on(crate::services::category_propagation::recover(
+                app.handle(),
+                &host_state.pool,
+            )) {
+                Ok(true) => crate::app::events::emit_category_catalog_changed(app.handle()),
+                Ok(false) => {}
                 Err(error) => {
-                    crate::log_warn!(
-                        "failed to load desktop behavior settings; showing main window: {error}"
-                    );
-                    runtime::StartupContext::new(
-                        DesktopBehaviorSettings::default(),
-                        StartupSource::SettingsRecovery,
-                    )
+                    crate::log_warn!("category propagation recovery deferred: {error}");
                 }
-            };
-            runtime::setup(app, runtime_health.clone(), startup)?;
-            Ok(())
+            }
+        }
+        // Resolve interrupted credential saves before backup schedulers start.
+        if let Err(error) =
+            tauri::async_runtime::block_on(data::remote_backup_config::snapshot(app.handle()))
+        {
+            crate::log_warn!("credential recovery unavailable: {error}");
+        }
+        tauri::async_runtime::block_on(data::app_settings_service::migrate_legacy_web_links(
+            app.handle(),
+        ))
+        .map_err(std::io::Error::other)?;
+        let startup = match tauri::async_runtime::block_on(
+            data::app_settings_service::load_desktop_behavior_settings(app.handle()),
+        ) {
+            Ok(settings) => runtime::StartupContext::new(
+                settings,
+                resolve_startup_source(launched_by_autostart, handled_storage_restart),
+            ),
+            Err(error) => {
+                crate::log_warn!(
+                    "failed to load desktop behavior settings; showing main window: {error}"
+                );
+                runtime::StartupContext::new(
+                    DesktopBehaviorSettings::default(),
+                    StartupSource::SettingsRecovery,
+                )
+            }
+        };
+        runtime::setup(app, runtime_health.clone(), startup)?;
+        Ok(())
     }
 }
 
@@ -133,9 +151,9 @@ fn resolve_startup_source(
     handled_storage_restart: bool,
 ) -> StartupSource {
     /* `StartupSource::UpdateRestart` 保留在枚举里，但**没有生产来源**了：它唯一的产出点
-       是「升级安装后要求重新打开主窗口」那条链（`__update_post_install_reopen_main_window`），
-       而那条链的写入口只有已被删除的更新引擎（O3，2026-11-16）。将来接上 Timing 自己的
-       更新通道时，在这里补回一支即可 —— 启动策略表（`startup_ui_strategy`）不用动。 */
+    是「升级安装后要求重新打开主窗口」那条链（`__update_post_install_reopen_main_window`），
+    而那条链的写入口只有已被删除的更新引擎（O3，2026-11-16）。将来接上 Timing 自己的
+    更新通道时，在这里补回一支即可 —— 启动策略表（`startup_ui_strategy`）不用动。 */
     if handled_storage_restart {
         StartupSource::StorageRestart
     } else if launched_by_autostart {
@@ -217,10 +235,7 @@ mod tests {
 
     #[test]
     fn ordinary_launch_sources_are_distinguished() {
-        assert_eq!(
-            resolve_startup_source(false, false),
-            StartupSource::Manual
-        );
+        assert_eq!(resolve_startup_source(false, false), StartupSource::Manual);
         assert_eq!(
             resolve_startup_source(true, false),
             StartupSource::Autostart

@@ -9,11 +9,11 @@
 use sqlx::{Pool, Row, Sqlite};
 use std::collections::BTreeMap;
 
+use super::{to_block_dto, FocusBlockDto};
 use crate::services::activity::data::attribution::slice::{
     slice_block, summarize_by_category, BlockSpan, ChildSegment, FactSpan, SegmentOverride,
 };
 use crate::services::activity::data::attribution::AppCategory;
-use super::{to_block_dto, FocusBlockDto};
 
 /// 一个块的详情：块本身 + 切出来的子记录 + 按分类汇总。
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -161,7 +161,7 @@ pub(super) async fn load_categories(
         return Ok(map);
     }
     /* 逐个应用查而不是拼 `IN (…)`：绑定表很小（一个应用几条），而拼 SQL 要处理
-       参数个数上限与注入面；逐查的代价在这个规模上量不出来。 */
+    参数个数上限与注入面；逐查的代价在这个规模上量不出来。 */
     for key in keys {
         let rows = sqlx::query(
             "SELECT category_key, priority FROM app_category

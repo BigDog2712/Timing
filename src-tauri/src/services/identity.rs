@@ -181,10 +181,17 @@ pub fn ensure_install_id(config_dir: &Path) -> Result<String, String> {
         return Ok(existing);
     }
     let generated = generate()?;
-    std::fs::create_dir_all(config_dir)
-        .map_err(|error| format!("failed to create config dir `{}`: {error}", config_dir.display()))?;
+    std::fs::create_dir_all(config_dir).map_err(|error| {
+        format!(
+            "failed to create config dir `{}`: {error}",
+            config_dir.display()
+        )
+    })?;
     let seq = TEMP_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-    let temp = config_dir.join(format!("{INSTALL_ID_FILE}.{}.{seq}.tmp", std::process::id()));
+    let temp = config_dir.join(format!(
+        "{INSTALL_ID_FILE}.{}.{seq}.tmp",
+        std::process::id()
+    ));
     {
         let mut file = std::fs::File::create(&temp)
             .map_err(|error| format!("failed to create install id file: {error}"))?;
@@ -243,7 +250,8 @@ mod tests {
     use super::*;
 
     fn temp_dir(label: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("timing-install-id-{label}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("timing-install-id-{label}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir
     }

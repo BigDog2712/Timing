@@ -92,21 +92,25 @@ pub(super) fn create<R: Runtime + 'static>(
         monitor.scale_factor(),
     );
     let root = crate::infra::activity::storage_paths::resolve_storage_paths(app)?.webview_root;
-    let builder = WebviewWindowBuilder::new(app, MINI_WINDOW_LABEL, WebviewUrl::App("activity.html".into()))
-        .title("Timing Mini")
-        .inner_size(PANEL_WIDTH, PANEL_HEIGHT)
-        .resizable(false)
-        .maximizable(false)
-        .minimizable(false)
-        .decorations(false)
-        .shadow(false)
-        .transparent(true)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .focusable(true)
-        .focused(false)
-        .visible(false)
-        .data_directory(root);
+    let builder = WebviewWindowBuilder::new(
+        app,
+        MINI_WINDOW_LABEL,
+        WebviewUrl::App("activity.html".into()),
+    )
+    .title("Timing Mini")
+    .inner_size(PANEL_WIDTH, PANEL_HEIGHT)
+    .resizable(false)
+    .maximizable(false)
+    .minimizable(false)
+    .decorations(false)
+    .shadow(false)
+    .transparent(true)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .focusable(true)
+    .focused(false)
+    .visible(false)
+    .data_directory(root);
     #[cfg(debug_assertions)]
     let builder = if std::env::var("PATINA_E2E").as_deref() == Ok("1") {
         let port = std::env::var("PATINA_E2E_DEVTOOLS_PORT")
@@ -154,5 +158,6 @@ pub(super) fn fullscreen<R: Runtime>(window: &WebviewWindow<R>, monitor: &Monito
         monitor.size().width,
         monitor.size().height,
     );
-    crate::infra::activity::windows::fullscreen::foreground_fullscreen_monitor(excluded) == Some(rect)
+    crate::infra::activity::windows::fullscreen::foreground_fullscreen_monitor(excluded)
+        == Some(rect)
 }

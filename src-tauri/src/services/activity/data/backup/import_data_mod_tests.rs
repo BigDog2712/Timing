@@ -3,14 +3,13 @@
 //! `mod tests` 仍声明在原模块内（`#[path]` 指向本文件），`super::` 语义不变。
 
 use super::{load_external_import_backup_from_pool, merge_external_import_backup_in_tx};
+use crate::models::activity::backup::{BackupRecords, BackupSession};
 use crate::services::activity::data::backup::merge::merge_backup_records_in_tx;
 use crate::services::activity::data::schema::{
     ACTIVITY_REMINDER_RULES_SCHEMA_SQL, CURRENT_BASELINE_SCHEMA_SQL,
-    IMPORT_DATA_ISOLATION_SCHEMA_SQL, IMPORT_DATA_SCHEMA_SQL,
-    SOFTWARE_REMINDER_RULES_SCHEMA_SQL, TOOLS_TABLES_SCHEMA_SQL, WEB_ACTIVITY_SCHEMA_SQL,
-    WEB_FAVICON_CACHE_SCHEMA_SQL,
+    IMPORT_DATA_ISOLATION_SCHEMA_SQL, IMPORT_DATA_SCHEMA_SQL, SOFTWARE_REMINDER_RULES_SCHEMA_SQL,
+    TOOLS_TABLES_SCHEMA_SQL, WEB_ACTIVITY_SCHEMA_SQL, WEB_FAVICON_CACHE_SCHEMA_SQL,
 };
-use crate::models::activity::backup::{BackupRecords, BackupSession};
 use sqlx::{Executor, Pool, Row, Sqlite};
 
 async fn setup_pool() -> Pool<Sqlite> {
@@ -194,11 +193,10 @@ async fn merge_remaps_a_conflicting_batch_id_without_overwriting() {
         .unwrap();
     tx.commit().await.unwrap();
 
-    let batch_ids: Vec<String> =
-        sqlx::query_scalar("SELECT id FROM import_batches ORDER BY id")
-            .fetch_all(&target)
-            .await
-            .unwrap();
+    let batch_ids: Vec<String> = sqlx::query_scalar("SELECT id FROM import_batches ORDER BY id")
+        .fetch_all(&target)
+        .await
+        .unwrap();
     assert_eq!(batch_ids.len(), 2);
     assert!(batch_ids.iter().any(|id| id == "shared-id"));
     assert!(batch_ids.iter().any(|id| id.starts_with("restore-")));

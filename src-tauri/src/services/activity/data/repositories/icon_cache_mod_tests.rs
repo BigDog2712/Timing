@@ -168,11 +168,10 @@ fn write_failure_does_not_advance_confirmation_time() {
             .confirm("new", 100)
             .await
             .is_err());
-        let row: (String, i64) =
-            sqlx::query_as("SELECT icon_base64, last_updated FROM icon_cache")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let row: (String, i64) = sqlx::query_as("SELECT icon_base64, last_updated FROM icon_cache")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(row, ("old".into(), 1));
         pool.close().await;
     });

@@ -50,21 +50,51 @@ fn events_fold_and_materialize_to_the_same_numbers() {
         );
 
         let session = start.session_uid.clone();
-        timer_ops::append(&pool, &session, TimerOpKind::Pause, 11_000, DAY, None, DEVICE)
-            .await
-            .unwrap();
-        timer_ops::append(&pool, &session, TimerOpKind::Resume, 31_000, DAY, None, DEVICE)
-            .await
-            .unwrap();
-        timer_ops::append(&pool, &session, TimerOpKind::Stop, 41_000, DAY, None, DEVICE)
-            .await
-            .unwrap();
+        timer_ops::append(
+            &pool,
+            &session,
+            TimerOpKind::Pause,
+            11_000,
+            DAY,
+            None,
+            DEVICE,
+        )
+        .await
+        .unwrap();
+        timer_ops::append(
+            &pool,
+            &session,
+            TimerOpKind::Resume,
+            31_000,
+            DAY,
+            None,
+            DEVICE,
+        )
+        .await
+        .unwrap();
+        timer_ops::append(
+            &pool,
+            &session,
+            TimerOpKind::Stop,
+            41_000,
+            DAY,
+            None,
+            DEVICE,
+        )
+        .await
+        .unwrap();
 
-        let folded = timer_ops::fold(&pool, &session).await.unwrap().block.unwrap();
+        let folded = timer_ops::fold(&pool, &session)
+            .await
+            .unwrap()
+            .block
+            .unwrap();
         assert_eq!(folded.accumulated_ms, 20_000, "暂停的 20s 不算进时长");
         assert_eq!(folded.ended_at_ms, Some(41_000));
 
-        timer_ops::materialize(&pool, &folded, 50_000).await.unwrap();
+        timer_ops::materialize(&pool, &folded, 50_000)
+            .await
+            .unwrap();
         let (status, accumulated, started, ended) = row_of(&pool, &session).await;
         assert_eq!(status, "saved");
         assert_eq!(accumulated, 20);
@@ -83,12 +113,26 @@ fn paused_session_materializes_without_running_since() {
             .await
             .unwrap();
         let session = start.session_uid.clone();
-        timer_ops::append(&pool, &session, TimerOpKind::Pause, 10_000, DAY, None, DEVICE)
+        timer_ops::append(
+            &pool,
+            &session,
+            TimerOpKind::Pause,
+            10_000,
+            DAY,
+            None,
+            DEVICE,
+        )
+        .await
+        .unwrap();
+
+        let folded = timer_ops::fold(&pool, &session)
+            .await
+            .unwrap()
+            .block
+            .unwrap();
+        timer_ops::materialize(&pool, &folded, 20_000)
             .await
             .unwrap();
-
-        let folded = timer_ops::fold(&pool, &session).await.unwrap().block.unwrap();
-        timer_ops::materialize(&pool, &folded, 20_000).await.unwrap();
 
         let running: Option<i64> =
             sqlx::query_scalar("SELECT running_since FROM time_records WHERE uid = ?1")
@@ -153,11 +197,23 @@ fn remote_stop_wins_over_the_local_later_stop() {
         .await
         .unwrap();
         /* 本机随后自己也结束了一次（用户当时还在本机操作）。 */
-        timer_ops::append(&pool, &session, TimerOpKind::Stop, 59_000, DAY, None, DEVICE)
-            .await
-            .unwrap();
+        timer_ops::append(
+            &pool,
+            &session,
+            TimerOpKind::Stop,
+            59_000,
+            DAY,
+            None,
+            DEVICE,
+        )
+        .await
+        .unwrap();
 
-        let folded = timer_ops::fold(&pool, &session).await.unwrap().block.unwrap();
+        let folded = timer_ops::fold(&pool, &session)
+            .await
+            .unwrap()
+            .block
+            .unwrap();
         assert_eq!(
             folded.ended_at_ms,
             Some(50_000),
@@ -188,10 +244,6 @@ fn starting_without_item_uid_is_rejected() {
         let error = timer_ops::start_session(&pool, unclaimed, 0, DAY, "countup", None, DEVICE)
             .await
             .unwrap_err();
-        assert!(
-            error.message.contains("has no uid"),
-            "{}",
-            error.message
-        );
+        assert!(error.message.contains("has no uid"), "{}", error.message);
     });
 }

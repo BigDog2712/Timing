@@ -43,8 +43,8 @@ const REMOVED_COMMANDS: [&str; 4] = [
 #[test]
 fn o3_01_removed_update_commands_are_gone_from_both_ipc_surfaces() {
     /* 两处必须同时消失：注册表（`generate_handler!`）与 ACL 白名单（`commands.allow`）。
-       只删一处时 `check:contract` 也会红，但那是「脚本红」；本条钉的是**语义**：
-       这四个名字一个都不许回来，无论写在哪一侧。 */
+    只删一处时 `check:contract` 也会红，但那是「脚本红」；本条钉的是**语义**：
+    这四个名字一个都不许回来，无论写在哪一侧。 */
     for (name, src) in [
         ("ipc_commands.rs", IPC_COMMANDS),
         ("permissions/window-commands.toml", WINDOW_PERMS),
@@ -75,7 +75,7 @@ fn toml_without_comments(src: &str) -> String {
 #[test]
 fn o3_02_updater_plugin_is_not_a_dependency() {
     /* 依赖在 `[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]`。
-       加回来就会在 `cargo build` 时把 `tauri-plugin-updater` 编进桌面包——即使没人注册它。 */
+    加回来就会在 `cargo build` 时把 `tauri-plugin-updater` 编进桌面包——即使没人注册它。 */
     assert!(
         !toml_without_comments(CARGO_MANIFEST).contains("tauri-plugin-updater"),
         "Cargo.toml 又把 `tauri-plugin-updater` 加回来了。\n\
@@ -88,7 +88,7 @@ fn o3_02_updater_plugin_is_not_a_dependency() {
 #[test]
 fn o3_03_update_runtime_state_is_no_longer_managed() {
     /* 状态与自检任务：删了命令但状态还 `.manage(...)` 着，`diagnostics_cmd` 的
-       `try_state` 就会拿到一个永不更新的快照——症状是「诊断面板里有一格永远是 0」。 */
+    `try_state` 就会拿到一个永不更新的快照——症状是「诊断面板里有一格永远是 0」。 */
     for (name, src) in [
         ("app/activity/bootstrap.rs", BOOTSTRAP),
         ("app/activity/runtime_tasks.rs", RUNTIME_TASKS),
@@ -107,8 +107,8 @@ fn o3_03_update_runtime_state_is_no_longer_managed() {
 #[test]
 fn o3_04_diagnostics_no_longer_reports_updater_packages() {
     /* `updater_retained_package` 是「下载完待安装的包」的统计口径。它整条命都是更新的：
-       没有下载就没有包。前端 `resourceDiagnosticsRuntimeGateway` 里的同名解析已同批删除，
-       两侧任一处单独回来 ⇒ 解析器校验失败 ⇒ 诊断快照整份被判非法（面板空白、零日志）。 */
+    没有下载就没有包。前端 `resourceDiagnosticsRuntimeGateway` 里的同名解析已同批删除，
+    两侧任一处单独回来 ⇒ 解析器校验失败 ⇒ 诊断快照整份被判非法（面板空白、零日志）。 */
     assert!(
         !DIAGNOSTICS.contains("updater_retained_package"),
         "diagnostics_cmd.rs 又输出了 `updater_retained_package`。\n\
@@ -121,7 +121,7 @@ fn o3_04_diagnostics_no_longer_reports_updater_packages() {
 #[test]
 fn o3_05_sentinels_are_not_vacuous() {
     /* 正向对照：上面四条都是 `!contains(...)`，扫描面一旦漂移（文件被拆、标记被改名），
-       它们全部「恰好通过」——绿着空转。这里逐条确认每个 haystack 仍然是它声称的那个文件。 */
+    它们全部「恰好通过」——绿着空转。这里逐条确认每个 haystack 仍然是它声称的那个文件。 */
     assert!(
         CARGO_MANIFEST.contains("tauri-plugin-opener")
             && CARGO_MANIFEST.contains("[dependencies]"),

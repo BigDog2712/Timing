@@ -1,11 +1,11 @@
 use super::ports::{TrackingDataError, TrackingDataStore};
 use super::transition;
+use crate::infra::activity::windows::foreground as tracker;
 use crate::models::activity::tracking::{
     SustainedParticipationState, TrackingStatusSnapshot, WindowSessionIdentity,
     TRACKING_REASON_CONTINUITY_WINDOW_SEALED, TRACKING_REASON_PASSIVE_PARTICIPATION_SEALED,
     TRACKING_REASON_TRACKING_PAUSED_SEALED,
 };
-use crate::infra::activity::windows::foreground as tracker;
 
 pub(super) async fn seal_active_sessions_for_tracking_pause(
     data: &dyn TrackingDataStore,

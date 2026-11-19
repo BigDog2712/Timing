@@ -193,12 +193,11 @@ fn deleting_one_import_batch_preserves_other_external_batches() {
         let batches = list(&pool).await.unwrap();
         assert_eq!(batches.len(), 1);
         assert_eq!(batches[0].id, second.batch_id.unwrap());
-        let remaining_starts: Vec<i64> = sqlx::query_scalar(
-            "SELECT start_time FROM import_exact_sessions ORDER BY start_time",
-        )
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+        let remaining_starts: Vec<i64> =
+            sqlx::query_scalar("SELECT start_time FROM import_exact_sessions ORDER BY start_time")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
         assert_eq!(remaining_starts, vec![3_000]);
         let native_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sessions")
             .fetch_one(&pool)

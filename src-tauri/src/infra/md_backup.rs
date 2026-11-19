@@ -278,7 +278,10 @@ mod tests {
         save_to(&root, Path::new("y.md"), "新内容");
 
         let count = fs::read_dir(&root).expect("读目录").flatten().count();
-        assert_eq!(count, KEEP, "带前缀的备份超过 {KEEP} 份时要淘汰到上限，实际 {count}");
+        assert_eq!(
+            count, KEEP,
+            "带前缀的备份超过 {KEEP} 份时要淘汰到上限，实际 {count}"
+        );
         let _ = fs::remove_dir_all(&root);
     }
 

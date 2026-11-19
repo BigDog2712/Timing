@@ -37,7 +37,10 @@ fn split_legacy_localfolder_hands_everything_to_folder() {
     assert_eq!(folder.local_root, r"D:\Nutstore");
     let webdav = webdav.expect("非活跃侧也物化（字段留原值）");
     assert!(!webdav.enabled && !webdav.is_usable_webdav());
-    assert_eq!(webdav.base_url, "https://dav.jianguoyun.com/dav/", "三件套留原值");
+    assert_eq!(
+        webdav.base_url, "https://dav.jianguoyun.com/dav/",
+        "三件套留原值"
+    );
     assert_eq!(webdav.auto, None, "非活跃通路 auto 承接为 None");
 }
 
@@ -45,7 +48,10 @@ fn split_legacy_localfolder_hands_everything_to_folder() {
 fn split_legacy_webdav_is_symmetric() {
     let (folder, webdav) = split_legacy(Some(&legacy(CloudMode::Webdav)));
     assert!(!folder.as_ref().is_some_and(|c| c.enabled));
-    assert_eq!(folder.as_ref().map(|c| c.local_root.as_str()), Some(r"D:\Nutstore"));
+    assert_eq!(
+        folder.as_ref().map(|c| c.local_root.as_str()),
+        Some(r"D:\Nutstore")
+    );
     let webdav = webdav.expect("活跃侧必须物化出来");
     assert!(webdav.is_usable_webdav());
 }
@@ -67,19 +73,29 @@ fn webdav_channel_root_is_the_factory_default() {
 
 #[test]
 fn remote_dir_rejects_parent_segments() {
-    let channel = MdSyncCloudChannel { base_path: "/a/../b".into(), ..Default::default() };
+    let channel = MdSyncCloudChannel {
+        base_path: "/a/../b".into(),
+        ..Default::default()
+    };
     assert!(channel.remote_dir().is_err());
     assert_eq!(
-        MdSyncCloudChannel { base_path: "/a//b/".into(), ..Default::default() }
-            .remote_dir()
-            .expect("规范化应成功"),
+        MdSyncCloudChannel {
+            base_path: "/a//b/".into(),
+            ..Default::default()
+        }
+        .remote_dir()
+        .expect("规范化应成功"),
         "/a/b"
     );
 }
 
 #[test]
 fn folder_validation_refuses_binding_overlap() {
-    let channel = MdSyncCloudChannel { enabled: true, local_root: r"D:\vault".into(), ..Default::default() };
+    let channel = MdSyncCloudChannel {
+        enabled: true,
+        local_root: r"D:\vault".into(),
+        ..Default::default()
+    };
     assert!(channel.validate_folder(&[binding(r"D:\VAULT")]).is_err());
     assert!(channel.validate_folder(&[binding(r"D:\other")]).is_ok());
 }
@@ -97,11 +113,15 @@ fn webdav_validation_rejects_embedded_credentials_and_public_http() {
     };
 
     assert!(
-        channel("https://user:secret@dav.example.com/dav").validate_webdav().is_err(),
+        channel("https://user:secret@dav.example.com/dav")
+            .validate_webdav()
+            .is_err(),
         "URL 里带账号密码会把口令明文写进 settings 表"
     );
     assert!(
-        channel("http://dav.example.com/dav").validate_webdav().is_err(),
+        channel("http://dav.example.com/dav")
+            .validate_webdav()
+            .is_err(),
         "公网 http 会让 Basic 口令与日记标题明文过网"
     );
     assert!(
@@ -109,11 +129,15 @@ fn webdav_validation_rejects_embedded_credentials_and_public_http() {
         "localhost 可能被 hosts/DNS 指到别处，与活动库备份侧口径一致：不放行"
     );
     assert!(
-        channel("https://dav.jianguoyun.com/dav/").validate_webdav().is_ok(),
+        channel("https://dav.jianguoyun.com/dav/")
+            .validate_webdav()
+            .is_ok(),
         "正常云端地址必须通过"
     );
     assert!(
-        channel("http://127.0.0.1:8080/dav").validate_webdav().is_ok(),
+        channel("http://127.0.0.1:8080/dav")
+            .validate_webdav()
+            .is_ok(),
         "字面回环地址（本机测试服务器）放行 http"
     );
     assert!(
@@ -131,4 +155,3 @@ fn webdav_validation_rejects_embedded_credentials_and_public_http() {
         );
     }
 }
-

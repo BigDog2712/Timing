@@ -48,6 +48,8 @@ import '../../activity/shell/styles/features/host/settings-data-slim.css';
 import '../styles/error-boundary.css';
 import '../styles/theme-picker.css';
 import '../styles/slider.css';
+/* [0.12.4] 快捷添加面板的标签行（panels.css 已到 258 行，单开一份守住 300 上限） */
+import '../styles/panel-tags.css';
 import '../styles/todos-panel.css';
 import '../styles/todos-pending.css';
 import '../styles/todos-inline.css';

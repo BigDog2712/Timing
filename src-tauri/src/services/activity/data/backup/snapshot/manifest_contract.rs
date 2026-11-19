@@ -57,7 +57,10 @@ pub(crate) fn supported_database_entries() -> BTreeSet<String> {
 /// 集中在一处，是因为这里每一条都写进了用户已有的备份文件：下次加恢复策略、换摘要
 /// 算法、或者动条目名，同一个坑会换个形式再来一遍。散在解析流程里就等于让人去猜
 /// 「还有哪几条算契约」。
-pub(crate) fn supported_manifest(manifest: &SnapshotManifest, checksums: &SnapshotChecksums) -> bool {
+pub(crate) fn supported_manifest(
+    manifest: &SnapshotManifest,
+    checksums: &SnapshotChecksums,
+) -> bool {
     manifest.format == SNAPSHOT_FORMAT
         && manifest.product == SNAPSHOT_PRODUCT
         && supported_database_entries().contains(&manifest.database.path)

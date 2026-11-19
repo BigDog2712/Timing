@@ -35,11 +35,10 @@ async fn migration_triggers_mark_fact_changes_in_the_same_transaction() {
             .await
             .unwrap();
     assert_eq!(revision, 0);
-    let dirty_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM activity_summary_dirty_ranges")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let dirty_count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM activity_summary_dirty_ranges")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(dirty_count, 0);
 }
 
@@ -168,19 +167,17 @@ async fn dirty_rebuild_drains_a_bounded_bulk_write_batch_per_worker_turn() {
     .unwrap();
 
     maintain_once(&pool).await.unwrap();
-    let remaining: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM activity_summary_dirty_ranges")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let remaining: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM activity_summary_dirty_ranges")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(remaining, 200 - DIRTY_REBUILD_BATCH_SIZE);
 
     maintain_once(&pool).await.unwrap();
-    let remaining: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM activity_summary_dirty_ranges")
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+    let remaining: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM activity_summary_dirty_ranges")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
     assert_eq!(remaining, 0);
 }
 

@@ -95,8 +95,7 @@ pub fn restorable_on_mobile(name: &str) -> Result<(), String> {
 /// 是三句完全不同的行动指令，不能被润色成同一句「系统调用失败，请重试」。
 pub fn open(name: &str) -> AppResult<()> {
     let path = store::path_of(name).map_err(|err| AppError::new(ErrorCode::IoError, err))?;
-    crate::infra::shell_open::open_file(&path)
-        .map_err(|err| AppError::new(ErrorCode::IoError, err))
+    crate::infra::shell_open::open_file(&path).map_err(|err| AppError::new(ErrorCode::IoError, err))
 }
 
 /// 用一份备份覆盖回去：文件、SQL、基线三者一起回到备份那一刻。
@@ -151,7 +150,10 @@ pub async fn restore(
             let Some(body_backup) = md_file::body_in_text(&text, &binding.heading) else {
                 /* 备份里没有这个标题 = 这份备份本来就不含该种类的数据。此时「写入」只会
                 追加一个空区块，导入则会按「文件侧删光了」处理——两件事都是坏结果。 */
-                crate::log_warn!("md backup restore: {name} 里没有「{}」，跳过", binding.heading);
+                crate::log_warn!(
+                    "md backup restore: {name} 里没有「{}」，跳过",
+                    binding.heading
+                );
                 continue;
             };
             /* 恢复是用户明确要求覆盖，诊断不阻断（阻断的语义是「本轮不写」，与恢复相反）。
@@ -259,7 +261,6 @@ fn root_of(
             ))
         })
 }
-
 
 /// 按解析后的绝对路径分组（保序）。相对路径直接拒绝：`create_dir_all` 会写到进程 CWD。
 fn group_by_path(

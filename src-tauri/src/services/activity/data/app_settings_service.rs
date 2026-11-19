@@ -1,10 +1,12 @@
-pub use crate::services::activity::data::repositories::app_settings::AppSettingMutation;
-use crate::services::activity::data::repositories::app_settings::{self, commit_app_setting_mutations};
-use crate::services::activity::data::sqlite_error::SqliteOperationError;
-use crate::services::activity::data::sqlite_pool::{reopen_sqlite_pool, wait_for_sqlite_pool};
 use crate::models::activity::settings::{
     DesktopBehaviorSettings, WebActivityBridgeSettings, WebActivitySettings,
 };
+pub use crate::services::activity::data::repositories::app_settings::AppSettingMutation;
+use crate::services::activity::data::repositories::app_settings::{
+    self, commit_app_setting_mutations,
+};
+use crate::services::activity::data::sqlite_error::SqliteOperationError;
+use crate::services::activity::data::sqlite_pool::{reopen_sqlite_pool, wait_for_sqlite_pool};
 use tauri::{AppHandle, Runtime};
 
 pub async fn migrate_history_timeline_mode(
@@ -70,9 +72,11 @@ pub async fn load_web_activity_settings<R: Runtime>(
 
 pub async fn load_title_recording_enabled<R: Runtime>(app: &AppHandle<R>) -> Result<bool, String> {
     let pool = wait_for_sqlite_pool(app).await?;
-    crate::services::activity::data::repositories::tracker_settings::load_title_recording_enabled(&pool)
-        .await
-        .map_err(|error| format!("failed to load title recording setting: {error}"))
+    crate::services::activity::data::repositories::tracker_settings::load_title_recording_enabled(
+        &pool,
+    )
+    .await
+    .map_err(|error| format!("failed to load title recording setting: {error}"))
 }
 
 pub async fn disable_active_app_title<R: Runtime>(
@@ -80,9 +84,12 @@ pub async fn disable_active_app_title<R: Runtime>(
     timestamp_ms: i64,
 ) -> Result<bool, String> {
     let pool = wait_for_sqlite_pool(app).await?;
-    crate::services::activity::data::repositories::sessions::disable_active_title(&pool, timestamp_ms)
-        .await
-        .map_err(|error| format!("failed to close active app title: {error}"))
+    crate::services::activity::data::repositories::sessions::disable_active_title(
+        &pool,
+        timestamp_ms,
+    )
+    .await
+    .map_err(|error| format!("failed to close active app title: {error}"))
 }
 
 pub async fn load_web_activity_bridge_settings<R: Runtime>(

@@ -6,8 +6,8 @@
 //! `auth_header_uses_raw_utf8_bytes` 是唯一证明「非 ASCII 账号密码能连上坚果云」的证据。
 //! MKCOL 与「409 补建重试」的判据在 `md_webdav_dir.rs`。
 
-use crate::infra::md_webdav::{get, probe, put, redact, ProbeOutcome, WebdavError, WebdavTarget};
 use super::fake_webdav::{header_value, serve, Fake};
+use crate::infra::md_webdav::{get, probe, put, redact, ProbeOutcome, WebdavError, WebdavTarget};
 
 /// 落点固定为 `/Timing/md/`（带首尾斜杠）：顺带钉住 `normalize_path`。
 fn target(fake: &Fake, user: &str, password: &str) -> WebdavTarget {
@@ -36,7 +36,11 @@ async fn get_404_is_not_found() {
     let err = get(&target(&fake, "u", "p"), "2026-11-06.md")
         .await
         .expect_err("404 应失败");
-    assert_eq!(err, WebdavError::NotFound, "404 是「今天没记」，不是网络错误");
+    assert_eq!(
+        err,
+        WebdavError::NotFound,
+        "404 是「今天没记」，不是网络错误"
+    );
 }
 
 #[tokio::test]
@@ -47,7 +51,11 @@ async fn put_412_is_precondition_and_sends_if_match() {
         .expect_err("412 应失败");
     assert_eq!(err, WebdavError::Precondition);
     let raw = fake.request(0);
-    assert_eq!(header_value(&raw, "if-match").as_deref(), Some("W/\"abc\""), "If-Match 要真发出去");
+    assert_eq!(
+        header_value(&raw, "if-match").as_deref(),
+        Some("W/\"abc\""),
+        "If-Match 要真发出去"
+    );
 }
 
 #[tokio::test]
@@ -116,7 +124,9 @@ async fn auth_header_uses_raw_utf8_bytes() {
 async fn probe_200_and_404_are_reachable() {
     let found = serve("200 OK", "", "# 日记".as_bytes());
     assert_eq!(
-        probe(&target(&found, "u", "p"), "").await.expect("200 必须算通"),
+        probe(&target(&found, "u", "p"), "")
+            .await
+            .expect("200 必须算通"),
         ProbeOutcome::Reachable
     );
     let missing = serve("404 Not Found", "", b"");
@@ -170,4 +180,3 @@ fn redact_masks_userinfo() {
     let plain = "https://dav.jianguoyun.com/dav";
     assert_eq!(redact(plain), plain, "没有 userinfo 时不许动");
 }
-

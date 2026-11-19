@@ -11,6 +11,14 @@ export interface ItemTags {
   tags: string[];
 }
 
+/** 改名 / 删除标签后的结果（与 `models/item_tags.rs::TagMutation` 逐字对齐）。 */
+export interface TagMutation {
+  /** 被改到（或被删到）的未删除事项条数 */
+  items: number;
+  /** 操作后的全部标签定义 */
+  definitions: string[];
+}
+
 export interface AiConfig {
   enabled: boolean;
   baseUrl: string;
@@ -72,6 +80,8 @@ export interface AiTagSuggestion {
 export interface AiSuggestResponse {
   suggestions: AiTagSuggestion[];
   stats: { parsed: number; dropped: number; attempts: number; batches?: number; failedBatches?: number };
+  /** 模型**新建**的标签路径（不在候选表里的那些）。老后端不返回，按空数组处理。 */
+  created?: string[];
 }
 
 export interface AiDailySummary {

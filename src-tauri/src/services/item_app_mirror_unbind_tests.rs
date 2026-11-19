@@ -16,8 +16,8 @@
 use sqlx::SqlitePool;
 
 use super::item_app_mirror_tests::{fixture, new_item, put, rows_for};
-use crate::services::item_app_mirror::mirror;
 use crate::services::item_app::{bind, unbind};
+use crate::services::item_app_mirror::mirror;
 
 /// 重写 override 的那一行（模拟 `saveAppItemBinding` 的第二半：摘掉 itemId）。
 async fn rewrite_override(kv: &SqlitePool, exe: &str, item_ids: &[i64]) {
@@ -50,9 +50,11 @@ fn unbind_is_final_only_when_both_sources_are_cleaned() {
         let code = new_item(&business, "写代码").await;
 
         /* 现场：弹窗保存把两条都镜像进了 item_app（发的是并集），排行卡又绑过 1:1（指向燕云）。
-           注意不能靠 `mirror` 自己造出现场：口径 3「单事项键优先」下它只补 1:1 那一条
-           （只少补、不删 —— 那是另一条已记账的口径，不是本用例的主题）。 */
-        bind(&business, yanyun, "yanyun.exe", Some(1)).await.unwrap();
+        注意不能靠 `mirror` 自己造出现场：口径 3「单事项键优先」下它只补 1:1 那一条
+        （只少补、不删 —— 那是另一条已记账的口径，不是本用例的主题）。 */
+        bind(&business, yanyun, "yanyun.exe", Some(1))
+            .await
+            .unwrap();
         bind(&business, code, "yanyun.exe", Some(1)).await.unwrap();
         rewrite_override(&kv, "yanyun.exe", &[yanyun, code]).await;
         put(

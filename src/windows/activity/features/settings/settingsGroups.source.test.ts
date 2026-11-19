@@ -30,7 +30,7 @@ const DOM_ORDER = [
   's-theme', 's-highlight', 's-display',
   's-tracking',
   's-sync', 's-backup',
-  's-general', 's-resident', 's-plugins',
+  's-general', 's-resident', 's-plugins', 's-ai',
 ];
 
 /** 按出现下标抠出 `id="s-…"`，得到页面上的锚点顺序。 */

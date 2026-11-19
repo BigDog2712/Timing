@@ -1,5 +1,5 @@
-use crate::repositories::md_sync::RecordWithItem;
 use super::super::format::TimerInterval;
+use crate::repositories::md_sync::RecordWithItem;
 
 type Span = (i64, Option<i64>);
 
@@ -29,7 +29,12 @@ fn pair(left: &[Span], right: &[Span], match_start: bool, fallback: bool) -> Vec
                 continue;
             }
             if let Some(row) = right.iter().enumerate().position(|(row, candidate)| {
-                !taken[row] && if exact { span == candidate } else { span.0 == candidate.0 }
+                !taken[row]
+                    && if exact {
+                        span == candidate
+                    } else {
+                        span.0 == candidate.0
+                    }
             }) {
                 claims[slot] = Some(row);
                 taken[row] = true;
@@ -37,7 +42,10 @@ fn pair(left: &[Span], right: &[Span], match_start: bool, fallback: bool) -> Vec
         }
     }
     if fallback {
-        let mut remaining = taken.iter().enumerate().filter_map(|(row, taken)| (!taken).then_some(row));
+        let mut remaining = taken
+            .iter()
+            .enumerate()
+            .filter_map(|(row, taken)| (!taken).then_some(row));
         for claim in &mut claims {
             if claim.is_none() {
                 *claim = remaining.next();
@@ -54,7 +62,10 @@ pub(super) fn changes(
 ) -> TimerChanges {
     let baseline: Vec<_> = old.iter().map(coordinates).collect();
     let current: Vec<_> = new.iter().map(coordinates).collect();
-    let stored: Vec<_> = db.iter().map(|row| (second(row.started_at), row.ended_at.map(second))).collect();
+    let stored: Vec<_> = db
+        .iter()
+        .map(|row| (second(row.started_at), row.ended_at.map(second)))
+        .collect();
     let new_to_old = pair(&current, &baseline, true, true);
     let mut old_to_db = pair(&baseline, &stored, false, false);
     let mut used_old = vec![false; old.len()];
@@ -65,10 +76,16 @@ pub(super) fn changes(
     // 重试时完整的新坐标比旧 start 更可靠，先锁住已应用的编辑。
     let mut edited_old = vec![false; old.len()];
     for (slot, old_slot) in new_to_old.iter().enumerate() {
-        let Some(old_slot) = old_slot else { continue; };
+        let Some(old_slot) = old_slot else {
+            continue;
+        };
         edited_old[*old_slot] = current[slot] != baseline[*old_slot];
         if old_to_db[*old_slot].is_none() && edited_old[*old_slot] {
-            if let Some(row) = stored.iter().enumerate().position(|(row, span)| !used_db[row] && *span == current[slot]) {
+            if let Some(row) = stored
+                .iter()
+                .enumerate()
+                .position(|(row, span)| !used_db[row] && *span == current[slot])
+            {
                 old_to_db[*old_slot] = Some(row);
                 used_db[row] = true;
             }
@@ -79,7 +96,11 @@ pub(super) fn changes(
             if old_to_db[slot].is_some() || edited_old[slot] != edited {
                 continue;
             }
-            if let Some(row) = stored.iter().enumerate().position(|(row, candidate)| !used_db[row] && span.0 == candidate.0) {
+            if let Some(row) = stored
+                .iter()
+                .enumerate()
+                .position(|(row, candidate)| !used_db[row] && span.0 == candidate.0)
+            {
                 old_to_db[slot] = Some(row);
                 used_db[row] = true;
             }
@@ -105,7 +126,12 @@ pub(super) fn changes(
                 continue;
             }
             if let Some(row) = stored.iter().enumerate().position(|(row, candidate)| {
-                !used_db[row] && if exact { span == candidate } else { span.0 == candidate.0 }
+                !used_db[row]
+                    && if exact {
+                        span == candidate
+                    } else {
+                        span.0 == candidate.0
+                    }
             }) {
                 claims[slot] = Some(row);
                 used_db[row] = true;
@@ -113,7 +139,10 @@ pub(super) fn changes(
         }
     }
 
-    let mut result = TimerChanges { write: Vec::new(), delete: Vec::new() };
+    let mut result = TimerChanges {
+        write: Vec::new(),
+        delete: Vec::new(),
+    };
     for (slot, interval) in new.iter().enumerate() {
         if unchanged[slot] {
             continue;

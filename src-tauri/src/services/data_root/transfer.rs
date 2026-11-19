@@ -158,7 +158,8 @@ async fn counts_of(pool: &SqlitePool) -> AppResult<Vec<(String, i64)>> {
 /// `pub(super)`：`activity_copy` 要用它搬活动库目录里除库文件之外的条目（`diagnostics/`）。
 pub(super) fn copy_tree(source: &Path, dest: &Path) -> Result<u64, String> {
     fs::create_dir_all(dest).map_err(|err| format!("建不了 {}：{err}", dest.display()))?;
-    let items = fs::read_dir(source).map_err(|err| format!("读不了 {}：{err}", source.display()))?;
+    let items =
+        fs::read_dir(source).map_err(|err| format!("读不了 {}：{err}", source.display()))?;
     let mut total = 0u64;
     for item in items.flatten() {
         let from = item.path();

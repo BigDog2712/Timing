@@ -1,8 +1,8 @@
 use super::*;
-use crate::services::activity::data::schema;
 use crate::models::activity::tools::{
     ActivityReminderCheck, ActivityReminderExtension, ActivityReminderTarget,
 };
+use crate::services::activity::data::schema;
 use sqlx::{Executor, SqlitePool};
 
 async fn database() -> SqlitePool {
@@ -832,7 +832,9 @@ async fn extension_failure_rolls_back_and_snapshot_merge_keeps_the_grant() {
 
 #[tokio::test]
 async fn version_seventeen_upgrade_and_reopen_preserve_rules_and_extensions() {
-    use crate::services::activity::data::sqlite_pool::{open_single_connection_sqlite_pool, prepare_pool_schema};
+    use crate::services::activity::data::sqlite_pool::{
+        open_single_connection_sqlite_pool, prepare_pool_schema,
+    };
     let path = std::env::temp_dir().join(format!(
         "patina-usage-extension-{}.db",
         uuid::Uuid::new_v4()

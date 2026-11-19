@@ -62,8 +62,8 @@ pub fn decide(
         return None;
     }
     /* 启动轮：避开启动期托盘 / 配置 / 网络的竞态。档位 ≠ 关闭都有一次。
-       跑完之后 `last_attempt_ms` 会被记为这一轮，定时档的 N 分钟从此处起算 —— 这样
-       「相邻两次上传 ≈ N 分钟」仍然成立，不会变成 60s + N 分钟两段。 */
+    跑完之后 `last_attempt_ms` 会被记为这一轮，定时档的 N 分钟从此处起算 —— 这样
+    「相邻两次上传 ≈ N 分钟」仍然成立，不会变成 60s + N 分钟两段。 */
     if !state.startup_done
         && elapsed_since_ms(now, state.startup_ms) >= (MD_CLOUD_STARTUP_DELAY_SECS * 1000) as i64
     {
@@ -80,21 +80,19 @@ pub fn decide(
         CloudSchedule::Smart => {
             let wrote = last_write_ms > 0;
             /* 失败节流：**任何一轮**（成功或失败）都把下一次尝试推后自己的窗口。
-               没有这一条，云端 401 时 `covered` 永远为假，idle 会每秒重发一次网络请求，
-               正好撞上「不做重试风暴」那条边界。`last_attempt_ms` 由调用方每轮更新。 */
+            没有这一条，云端 401 时 `covered` 永远为假，idle 会每秒重发一次网络请求，
+            正好撞上「不做重试风暴」那条边界。`last_attempt_ms` 由调用方每轮更新。 */
             let since_attempt =
                 elapsed_since_ms(now, state.last_attempt_ms.unwrap_or(state.startup_ms));
             /* ① 停手 5 分钟。`covered` 挡住「这一串写已经由上一次成功轮传过了」。 */
             let idle = wrote
                 && elapsed_since_ms(now, last_write_ms) >= (MD_CLOUD_SMART_IDLE_SECS * 1000) as i64;
-            let covered = state
-                .last_success_ms
-                .is_some_and(|ok| ok >= last_write_ms);
+            let covered = state.last_success_ms.is_some_and(|ok| ok >= last_write_ms);
             if idle && !covered && since_attempt >= (MD_CLOUD_SMART_IDLE_SECS * 1000) as i64 {
                 return Some(TierReason::Idle);
             }
             /* ③ 30 分钟上限：连续工作、每 4 分钟写一次时「5 分钟静默」永远不到达，
-               不加这一条云端会一整天不同步。还没成功过就以启动时刻为基准。 */
+            不加这一条云端会一整天不同步。还没成功过就以启动时刻为基准。 */
             let baseline = state.last_success_ms.unwrap_or(state.startup_ms);
             let max_due =
                 elapsed_since_ms(now, baseline) >= (MD_CLOUD_SMART_MAX_SECS * 1000) as i64;
@@ -108,7 +106,7 @@ pub fn decide(
             None
         }
         /* 事件流专用档（架构设计 §1.3）：与智能档同一套 idle/max 判定，只把两个窗口压到
-           1 分钟 / 5 分钟。事件流单轮 KB 级，频繁跑不贵；md 快照仍走原三档。 */
+        1 分钟 / 5 分钟。事件流单轮 KB 级，频繁跑不贵；md 快照仍走原三档。 */
         CloudSchedule::Stream => {
             let wrote = last_write_ms > 0;
             let since_attempt =
@@ -116,13 +114,8 @@ pub fn decide(
             let idle = wrote
                 && elapsed_since_ms(now, last_write_ms)
                     >= (MD_CLOUD_STREAM_IDLE_SECS * 1000) as i64;
-            let covered = state
-                .last_success_ms
-                .is_some_and(|ok| ok >= last_write_ms);
-            if idle
-                && !covered
-                && since_attempt >= (MD_CLOUD_STREAM_IDLE_SECS * 1000) as i64
-            {
+            let covered = state.last_success_ms.is_some_and(|ok| ok >= last_write_ms);
+            if idle && !covered && since_attempt >= (MD_CLOUD_STREAM_IDLE_SECS * 1000) as i64 {
                 return Some(TierReason::Idle);
             }
             let baseline = state.last_success_ms.unwrap_or(state.startup_ms);
@@ -215,11 +208,23 @@ mod tests {
             last_success_ms: None,
         };
         assert_eq!(
-            decide(&idle_state, CloudSchedule::Stream, 900, wrote_at + 59 * SEC, wrote_at),
+            decide(
+                &idle_state,
+                CloudSchedule::Stream,
+                900,
+                wrote_at + 59 * SEC,
+                wrote_at
+            ),
             None
         );
         assert_eq!(
-            decide(&idle_state, CloudSchedule::Stream, 900, wrote_at + 60 * SEC, wrote_at),
+            decide(
+                &idle_state,
+                CloudSchedule::Stream,
+                900,
+                wrote_at + 60 * SEC,
+                wrote_at
+            ),
             Some(TierReason::Idle)
         );
 
@@ -231,11 +236,23 @@ mod tests {
             last_success_ms: Some(wrote_at),
         };
         assert_eq!(
-            decide(&max_state, CloudSchedule::Stream, 900, wrote_at + 299 * SEC, wrote_at + 299 * SEC),
+            decide(
+                &max_state,
+                CloudSchedule::Stream,
+                900,
+                wrote_at + 299 * SEC,
+                wrote_at + 299 * SEC
+            ),
             None
         );
         assert_eq!(
-            decide(&max_state, CloudSchedule::Stream, 900, wrote_at + 300 * SEC, wrote_at + 300 * SEC),
+            decide(
+                &max_state,
+                CloudSchedule::Stream,
+                900,
+                wrote_at + 300 * SEC,
+                wrote_at + 300 * SEC
+            ),
             Some(TierReason::Max)
         );
     }

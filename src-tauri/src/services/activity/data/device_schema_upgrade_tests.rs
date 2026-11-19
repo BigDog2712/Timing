@@ -25,7 +25,7 @@ fn registered_head_matches_the_sync_bookkeeping_version() {
         .max()
         .unwrap_or_default();
     assert_eq!(head, schema_registry::head_version());
-    assert_eq!(head, 30, "这一轮把 head 抬到了事项归属（30）");
+    assert_eq!(head, 31, "这一轮把 head 抬到了媒体播放采样（31）");
 }
 
 /// 生成列的 DDL 依赖 SQLite ≥ 3.31；sqlx 带的是 bundled 版本，这里钉一次实际值。
@@ -55,11 +55,16 @@ fn bundled_sqlite_supports_generated_columns() {
 fn fresh_database_reaches_device_dimension_head() {
     tauri::async_runtime::block_on(async {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-        prepare_pool_schema(&pool, Path::new(":memory:")).await.unwrap();
+        prepare_pool_schema(&pool, Path::new(":memory:"))
+            .await
+            .unwrap();
 
         let columns = session_columns(&pool).await;
         for required in ["device_id", "uid", "app_key", "updated_at_ms", "synced_seq"] {
-            assert!(columns.iter().any(|c| c == required), "missing sessions.{required}");
+            assert!(
+                columns.iter().any(|c| c == required),
+                "missing sessions.{required}"
+            );
         }
         assert!(has_index(&pool, "uq_sessions_open_per_device").await);
         assert!(!has_index(&pool, "idx_sessions_single_active").await);
@@ -67,7 +72,7 @@ fn fresh_database_reaches_device_dimension_head() {
         assert!(has_index(&pool, "idx_sessions_pending").await);
         assert!(table_exists(&pool, "devices").await);
         assert!(table_exists(&pool, "activity_daily_totals").await);
-        assert_eq!(applied_head(&pool).await, 30);
+        assert_eq!(applied_head(&pool).await, 31);
         // 本机身份写进 devices 且恰好一行 is_self=1。
         let self_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM devices WHERE is_self = 1")
             .fetch_one(&pool)
@@ -89,7 +94,9 @@ fn fresh_database_reaches_device_dimension_head() {
 fn open_sessions_are_unique_per_device_and_uid_is_issued_by_the_database() {
     tauri::async_runtime::block_on(async {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-        prepare_pool_schema(&pool, Path::new(":memory:")).await.unwrap();
+        prepare_pool_schema(&pool, Path::new(":memory:"))
+            .await
+            .unwrap();
         let device_id = self_device_id(&pool).await;
 
         insert_session(&pool, &device_id, 1_000, None).await;
@@ -106,7 +113,9 @@ fn open_sessions_are_unique_per_device_and_uid_is_issued_by_the_database() {
         );
 
         // 同一设备第二条 open：必须失败。
-        let error = insert_session_raw(&pool, &device_id, 3_000).await.unwrap_err();
+        let error = insert_session_raw(&pool, &device_id, 3_000)
+            .await
+            .unwrap_err();
         // SQLite 报的是表与列，不是索引名。
         assert!(
             error.to_string().contains("sessions.device_id"),
@@ -145,7 +154,7 @@ fn prepare_pool_schema_twice_preserves_migration_28_and_open_sessions() {
             .unwrap();
         prepare_pool_schema(&second, &db_path).await.unwrap();
 
-        assert_eq!(applied_head(&second).await, 30);
+        assert_eq!(applied_head(&second).await, 31);
         let open_rows: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM sessions WHERE end_time IS NULL")
                 .fetch_one(&second)
@@ -161,11 +170,10 @@ fn prepare_pool_schema_twice_preserves_migration_28_and_open_sessions() {
                 .await
                 .unwrap();
         assert_eq!(sentinel, 0);
-        let self_rows: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM devices WHERE is_self = 1")
-                .fetch_one(&second)
-                .await
-                .unwrap();
+        let self_rows: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM devices WHERE is_self = 1")
+            .fetch_one(&second)
+            .await
+            .unwrap();
         assert_eq!(self_rows, 1);
         second.close().await;
         let _ = std::fs::remove_dir_all(&dir);
@@ -211,14 +219,22 @@ fn device_schema_upgrade() {
             .unwrap();
         println!("migration elapsed: {elapsed:?}");
         println!("sessions before={before} after={after} sentinel={sentinel} null_uid={null_uid}");
-        assert_eq!(sentinel, 0, "every row must be adopted into a real device id");
+        assert_eq!(
+            sentinel, 0,
+            "every row must be adopted into a real device id"
+        );
         assert_eq!(after, before, "migration must not add or drop rows");
-        assert_eq!(applied_head(&pool).await, 30);
+        assert_eq!(applied_head(&pool).await, 31);
         pool.close().await;
     });
 }
 
-async fn insert_session(pool: &SqlitePool, device_id: &str, start_time: i64, end_time: Option<i64>) {
+async fn insert_session(
+    pool: &SqlitePool,
+    device_id: &str,
+    start_time: i64,
+    end_time: Option<i64>,
+) {
     sqlx::query(
         "INSERT INTO sessions(app_name, exe_name, window_title, start_time, end_time, duration, device_id)
          VALUES ('App', 'app.exe', '', ?1, ?2, ?3, ?4)",

@@ -6,6 +6,7 @@ pub mod classification_settings;
 pub mod icon_cache;
 pub(crate) mod icon_retention;
 pub mod import_batches;
+pub mod media_playback;
 pub mod mini_activity;
 pub mod mini_window;
 pub mod remote_backup_settings;

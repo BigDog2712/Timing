@@ -20,9 +20,9 @@
 
 use crate::commands::activity::error::CommandErrorDto;
 use crate::models::category_catalog::{CategoryCatalogDto, CategorySettingRow};
+use crate::services::activity::data::repositories::settings;
 use crate::services::activity::data::sqlite_error::SqliteOperationError;
 use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
-use crate::services::activity::data::repositories::settings;
 use tauri::{AppHandle, Runtime};
 
 /// 六组前缀。新增前缀必须同批改前端 `categoryCatalog.ts` 的 `CATALOG_PREFIXES`。
@@ -49,7 +49,10 @@ pub async fn list_category_catalog<R: Runtime>(
             .map_err(|error| SqliteOperationError::from_sqlx("reading category catalog", error))?;
         let mapped: Vec<CategorySettingRow> = rows
             .into_iter()
-            .map(|row| CategorySettingRow { key: row.key, value: row.value })
+            .map(|row| CategorySettingRow {
+                key: row.key,
+                value: row.value,
+            })
             .collect();
         match field {
             "definitions" => dto.definitions = mapped,

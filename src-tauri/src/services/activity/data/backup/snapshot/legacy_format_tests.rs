@@ -28,7 +28,7 @@
 //! 而不是来改这里。
 
 /* `super::*` 已经把 `snapshot` 的私有项（manifest 结构、各 helper、`fs` / `File` /
-   `BTreeMap` / zip 类型）一并带进来 —— 子模块可见父模块私有项。 */
+`BTreeMap` / zip 类型）一并带进来 —— 子模块可见父模块私有项。 */
 use super::*;
 use crate::services::activity::data::sqlite_pool::{
     open_single_connection_sqlite_pool, prepare_pool_schema,
@@ -62,17 +62,21 @@ async fn write_legacy_snapshot_archive(work: &LegacyTestDir) -> PathBuf {
     prepare_pool_schema(&pool, &db_path)
         .await
         .expect("prepare source schema");
-    sqlx::query("INSERT INTO settings (key, value) VALUES ('legacy-format-test', 'kept'),
+    sqlx::query(
+        "INSERT INTO settings (key, value) VALUES ('legacy-format-test', 'kept'),
         ('web_activity_token', 'snapshot-web-secret'),
-        ('remote_status_bridge_token', 'snapshot-remote-secret')")
-        .execute(&pool)
-        .await
-        .expect("insert marker and legacy credentials");
-    sqlx::query("INSERT INTO sessions(app_name,exe_name,start_time,end_time,duration)
-        VALUES('Source','source.exe',1000,2000,1000)")
-        .execute(&pool)
-        .await
-        .expect("insert source activity");
+        ('remote_status_bridge_token', 'snapshot-remote-secret')",
+    )
+    .execute(&pool)
+    .await
+    .expect("insert marker and legacy credentials");
+    sqlx::query(
+        "INSERT INTO sessions(app_name,exe_name,start_time,end_time,duration)
+        VALUES('Source','source.exe',1000,2000,1000)",
+    )
+    .execute(&pool)
+    .await
+    .expect("insert source activity");
     let counts = read_counts(&pool).await.expect("read source counts");
     pool.close().await;
 
@@ -80,9 +84,7 @@ async fn write_legacy_snapshot_archive(work: &LegacyTestDir) -> PathBuf {
         .await
         .expect("inspect source identity");
     let database_sha256 = sha256_file(&db_path).expect("hash source database");
-    let size_bytes = fs::metadata(&db_path)
-        .expect("read source metadata")
-        .len();
+    let size_bytes = fs::metadata(&db_path).expect("read source metadata").len();
 
     /* ★ 以下四个字符串是**已发出去的线上格式**，故意逐字写死、不引用任何生产常量。 */
     let manifest = SnapshotManifest {
@@ -135,7 +137,7 @@ async fn legacy_snapshot_archive_stays_recognised_and_restorable() {
     let archive_path = write_legacy_snapshot_archive(&work).await;
 
     /* ① 备份列表的嗅探：老格式必须仍被认成「本应用的快照」。
-       这里一旦变成 false，那批备份就从列表里静默消失。 */
+    这里一旦变成 false，那批备份就从列表里静默消失。 */
     assert!(
         is_snapshot_archive(&archive_path).expect("sniff legacy archive"),
         "老格式备份必须仍被 is_snapshot_archive 认出"
@@ -158,14 +160,14 @@ async fn legacy_snapshot_archive_stays_recognised_and_restorable() {
 }
 
 /* ── 值锁：常量 → 字面量 ────────────────────────────────────────────────────────
-   方向与上面那条**相反**：这里必须引用常量，锁的正是「常量本身不许动」。
-   `assert_eq!(SNAPSHOT_FORMAT, "…")` 不是恒真——常量一改它就红。
+方向与上面那条**相反**：这里必须引用常量，锁的正是「常量本身不许动」。
+`assert_eq!(SNAPSHOT_FORMAT, "…")` 不是恒真——常量一改它就红。
 
-   为什么值锁和行为锁都要（只做一半都会漏）：
-   · 只有行为测试：写入侧悄悄漂到新格式没人发现——读取侧新旧都收，测试照样绿，
-     而新写出去的备份只有新版本能打开。
-   · 只有值锁：读取侧的兼容集合被误删（比如把 `supported_database_entries()` 改窄）
-     也照样绿，因为值锁只看常量值。 */
+为什么值锁和行为锁都要（只做一半都会漏）：
+· 只有行为测试：写入侧悄悄漂到新格式没人发现——读取侧新旧都收，测试照样绿，
+  而新写出去的备份只有新版本能打开。
+· 只有值锁：读取侧的兼容集合被误删（比如把 `supported_database_entries()` 改窄）
+  也照样绿，因为值锁只看常量值。 */
 #[test]
 fn manifest_format_constants_are_frozen() {
     assert_eq!(SNAPSHOT_FORMAT, "PatinaSQLiteSnapshot-1");
@@ -176,12 +178,16 @@ fn manifest_format_constants_are_frozen() {
     assert_eq!(SUPPORTED_RESTORE_STRATEGIES, ["replace", "merge"]);
 
     /* 写入侧的条目名必须落在读取侧的允许集合里。这条把「写一个、收另一个」这个
-       只在 T05 才会暴露的形状提前钉死在这里。 */
+    只在 T05 才会暴露的形状提前钉死在这里。 */
     assert!(
         supported_database_entries().contains(DATABASE_ENTRY),
         "写入侧条目名 {DATABASE_ENTRY} 不在读取侧允许集合里 —— 新备份写出去就没人读得回"
     );
-    assert_eq!(supported_database_entries().len(), 1, "今天的允许集合只该有当前条目");
+    assert_eq!(
+        supported_database_entries().len(),
+        1,
+        "今天的允许集合只该有当前条目"
+    );
 }
 
 #[path = "restore_secrets_tests.rs"]
@@ -223,10 +229,14 @@ async fn exported_snapshot_scrubs_local_bridge_tokens_without_mutating_source() 
         .await
         .unwrap();
 
-    super::secrets::scrub_snapshot_secrets(&copy_path).await.unwrap();
-    let copy = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&copy_path, false)
+    super::secrets::scrub_snapshot_secrets(&copy_path)
         .await
         .unwrap();
+    let copy = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+        &copy_path, false,
+    )
+    .await
+    .unwrap();
     let remaining: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM settings WHERE key IN ('web_activity_token','remote_status_bridge_token')",
     )

@@ -1,5 +1,5 @@
-use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
 use crate::models::activity::mini_window::Preferences;
+use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
 use tauri::{AppHandle, Runtime};
 
 pub async fn load_activity<R: Runtime>(

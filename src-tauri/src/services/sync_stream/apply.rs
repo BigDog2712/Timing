@@ -28,7 +28,10 @@ use super::FoldOutcome;
 ///
 /// 只折叠「本轮真正插进新事件」的会话；重复拉同一分段时全部被 uid 唯一索引去重
 /// （`rows_affected = 0`），于是**不产生重复 fold**（验收口径之一）。
-pub async fn apply_and_fold(conn: &mut SqliteConnection, ops: &[TimerOp]) -> AppResult<FoldOutcome> {
+pub async fn apply_and_fold(
+    conn: &mut SqliteConnection,
+    ops: &[TimerOp],
+) -> AppResult<FoldOutcome> {
     let mut outcome = FoldOutcome::default();
     if ops.is_empty() {
         return Ok(outcome);
@@ -60,8 +63,8 @@ pub async fn apply_and_fold(conn: &mut SqliteConnection, ops: &[TimerOp]) -> App
     }
 
     /* 先折叠、收集块，再按 `started_at_ms` 排序后物化。顺序不能省：`uq_records_open_per_device`
-       是「每设备一条 active」，同一设备「先结束/丢弃旧会话、再开新会话」的两条事件若落在
-       同一分段，必须先收口旧块、再插新块，否则新块的 active 会撞唯一索引。 */
+    是「每设备一条 active」，同一设备「先结束/丢弃旧会话、再开新会话」的两条事件若落在
+    同一分段，必须先收口旧块、再插新块，否则新块的 active 会撞唯一索引。 */
     let mut blocks: Vec<FoldedBlock> = Vec::new();
     for session in &dirty {
         let all = repo::load_session(&mut *conn, session).await?;
@@ -80,7 +83,11 @@ pub async fn apply_and_fold(conn: &mut SqliteConnection, ops: &[TimerOp]) -> App
     for block in blocks {
         outcome.sessions += 1;
         if block.dropped {
-            if block.record.as_ref().is_some_and(|record| record.deleted_at.is_some()) {
+            if block
+                .record
+                .as_ref()
+                .is_some_and(|record| record.deleted_at.is_some())
+            {
                 apply_block(&mut *conn, &block).await?;
             } else {
                 soft_delete_by_uid(&mut *conn, &block).await?;
@@ -137,21 +144,20 @@ async fn day_key_for_non_start(conn: &mut SqliteConnection, op: &TimerOp) -> App
 /// 没有则 INSERT（对端发起的会话本机没有行）。
 async fn apply_block(conn: &mut SqliteConnection, block: &FoldedBlock) -> AppResult<()> {
     /* 同一设备只许一条 active（`uq_records_open_per_device`）。对端崩过（强杀、断电、dev
-       重建）会留下**多条**「start 了但没 stop」的会话，逐条物化时第 2 条的 active 必撞唯一
-       索引 ⇒ 整段折叠回滚、游标停住、每轮重试同一个死法，且没有任何自愈路径
-       （0.12.10 真机实测：桌面 7 个分段里 6 条未结束会话）。先补收尾，再物化本条。 */
+    重建）会留下**多条**「start 了但没 stop」的会话，逐条物化时第 2 条的 active 必撞唯一
+    索引 ⇒ 整段折叠回滚、游标停住、每轮重试同一个死法，且没有任何自愈路径
+    （0.12.10 真机实测：桌面 7 个分段里 6 条未结束会话）。先补收尾，再物化本条。 */
     if block.ended_at_ms.is_none() && !block.dropped {
         seal_earlier_active_on_same_device(conn, block).await?;
     }
 
-    let exists: bool = sqlx::query_scalar::<_, i64>(
-        "SELECT EXISTS(SELECT 1 FROM time_records WHERE uid = ?1)",
-    )
-    .bind(&block.session_uid)
-    .fetch_one(&mut *conn)
-    .await
-    .map_err(AppError::db)?
-        != 0;
+    let exists: bool =
+        sqlx::query_scalar::<_, i64>("SELECT EXISTS(SELECT 1 FROM time_records WHERE uid = ?1)")
+            .bind(&block.session_uid)
+            .fetch_one(&mut *conn)
+            .await
+            .map_err(AppError::db)?
+            != 0;
 
     if exists {
         repo::materialize_in(&mut *conn, block, now_ms()).await
@@ -222,8 +228,18 @@ async fn insert_record(conn: &mut SqliteConnection, block: &FoldedBlock) -> AppR
     .bind(block.accumulated_sec())
     .bind(block.running_since_ms)
     .bind(now_ms())
-    .bind(block.record.as_ref().and_then(|record| record.note.as_deref()))
-    .bind(block.record.as_ref().map_or("countup", |record| record.mode.as_str()))
+    .bind(
+        block
+            .record
+            .as_ref()
+            .and_then(|record| record.note.as_deref()),
+    )
+    .bind(
+        block
+            .record
+            .as_ref()
+            .map_or("countup", |record| record.mode.as_str()),
+    )
     .bind(block.record.as_ref().and_then(|record| record.target_sec))
     .bind(block.record.as_ref().and_then(|record| record.deleted_at))
     .execute(&mut *conn)

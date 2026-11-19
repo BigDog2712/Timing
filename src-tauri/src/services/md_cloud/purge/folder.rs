@@ -93,9 +93,11 @@ pub(crate) async fn candidates(
         return Ok(Vec::new());
     };
     /* 闸⑤(a) 的查询形状：候选枚举完调一次 `list()` 建映射，循环里只查内存。
-       单批 20 条 × 每轮一次，若循环里查库，首轮大扫（200 天 / 10 批）会白打 200 次。
-       读不到就当「没有任何证据」→ 一条都不删（安全的一侧）。 */
-    let rows = md_cloud_pending::list(pool, PurgeChannel::Folder).await.unwrap_or_default();
+    单批 20 条 × 每轮一次，若循环里查库，首轮大扫（200 天 / 10 批）会白打 200 次。
+    读不到就当「没有任何证据」→ 一条都不删（安全的一侧）。 */
+    let rows = md_cloud_pending::list(pool, PurgeChannel::Folder)
+        .await
+        .unwrap_or_default();
     let index: HashMap<&str, &CloudPendingRow> =
         rows.iter().map(|row| (row.date.as_str(), row)).collect();
 
@@ -123,8 +125,8 @@ pub(crate) async fn candidates(
         }
         let key = date.format("%Y-%m-%d").to_string();
         /* 闸⑤(a)：行存在且 `last_hash` 非空。不加 `pending_since == 0`（产品经理已裁，
-           设计 §3.4 闸⑤ 下面那段）：folder 轮只给 `today` 调 `mark_synced`，历史日期的
-           `pending_since` 永远清不了，加了就是永久漏删。 */
+        设计 §3.4 闸⑤ 下面那段）：folder 轮只给 `today` 调 `mark_synced`，历史日期的
+        `pending_since` 永远清不了，加了就是永久漏删。 */
         let Some(row) = index.get(key.as_str()) else {
             continue;
         };
@@ -135,7 +137,7 @@ pub(crate) async fn candidates(
             continue;
         };
         /* 闸⑤(b)：它还是我们写的那份吗。改过一个字节就不删（I13c），
-           **那行也不 clear** —— 证据要留到下一轮，否则这一天永远进不了候选。 */
+         **那行也不 clear** —— 证据要留到下一轮，否则这一天永远进不了候选。 */
         if pending::fingerprint(&bytes) != last_hash {
             crate::log_info!("md cloud purge: {name} skip=changed");
             continue;
@@ -162,7 +164,7 @@ pub(crate) fn remove_one(
     save: impl Fn(&Path, &str) -> bool,
 ) -> Result<(), RemoveErr> {
     /* 文本必须严格 UTF-8：`from_utf8_lossy` 会把坏字节换成 `�`，那样存进备份的那份
-       已经与原文件不同 —— 留了一份「看起来有、其实对不上」的底，比没有更糟。 */
+    已经与原文件不同 —— 留了一份「看起来有、其实对不上」的底，比没有更糟。 */
     let Ok(text) = String::from_utf8(bytes.to_vec()) else {
         return Err(RemoveErr::NoBackup);
     };
@@ -204,15 +206,21 @@ mod tests {
     }
 
     fn temp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("timing-purge-folder-{tag}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("timing-purge-folder-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("建临时目录");
         dir
     }
 
     fn binding(root: &Path) -> MdSyncBinding {
-        MdSyncBinding { kind: MdSyncKind::Timers, enabled: true, file: "{date}.md".into(),
-            root: root.display().to_string(), heading: "#### 事项计时".into() }
+        MdSyncBinding {
+            kind: MdSyncKind::Timers,
+            enabled: true,
+            file: "{date}.md".into(),
+            root: root.display().to_string(),
+            heading: "#### 事项计时".into(),
+        }
     }
 
     /// 写一份文件；给了 `key` 就再记一行 pending（指纹与文件一致），`key` 是「宽松解析会把它读成哪一天」。
@@ -220,8 +228,15 @@ mod tests {
         let body = format!("body {name}");
         fs::write(root.join(name), &body).expect("写样本");
         let Some(key) = key else { return };
-        md_cloud_pending::mark_synced(pool, PurgeChannel::Folder, key, None,
-            &pending::fingerprint(body.as_bytes())).await.expect("记 pending 行");
+        md_cloud_pending::mark_synced(
+            pool,
+            PurgeChannel::Folder,
+            key,
+            None,
+            &pending::fingerprint(body.as_bytes()),
+        )
+        .await
+        .expect("记 pending 行");
     }
 
     /// 日期名形状边界，**经 `candidates` 这个真实入口**验（不直呼 `gate.rs` 那个函数：全库它只许
@@ -239,8 +254,8 @@ mod tests {
             ("2026-13-45.md", Some("2026-13-45")),
             ("2026-02-30.md", Some("2026-02-30")),
             /* 后缀那条不造 pending 行：它早在日期逻辑之前就出局，硬造一行只会和
-               `2026-2-3.md` 争同一个 key（后写的那行把指纹盖掉，前一档就被闸⑤ 挡住、
-               「看起来没红」，等于白测）。 */
+            `2026-2-3.md` 争同一个 key（后写的那行把指纹盖掉，前一档就被闸⑤ 挡住、
+            「看起来没红」，等于白测）。 */
             ("2026-02-03.md.bak", None),
         ] {
             seed(&pool, &root, name, loose_key).await;
@@ -253,7 +268,11 @@ mod tests {
             .into_iter()
             .map(|candidate| candidate.name)
             .collect();
-        assert_eq!(found, vec!["2026-02-04.md".to_string()], "只该有那一个严格日期名");
+        assert_eq!(
+            found,
+            vec!["2026-02-04.md".to_string()],
+            "只该有那一个严格日期名"
+        );
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -275,7 +294,11 @@ mod tests {
 
         ENUMERATIONS.with(|count| count.set(0));
         let outcome = guarded_entries(&root, &[binding(&root)]);
-        assert_eq!(outcome.err(), Some(OVERLAP_TEXT.to_string()), "必须是逐字红字");
+        assert_eq!(
+            outcome.err(),
+            Some(OVERLAP_TEXT.to_string()),
+            "必须是逐字红字"
+        );
         assert_eq!(enumerations(), 0, "拒绝时一次枚举都不许发生");
         let _ = fs::remove_dir_all(&root);
     }

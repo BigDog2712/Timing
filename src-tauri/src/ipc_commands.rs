@@ -27,8 +27,26 @@ macro_rules! define_invoke_handler {
             crate::commands::item_cmd::archive_item,
             crate::commands::item_cmd::unarchive_item,
             crate::commands::item_cmd::delete_item,
+            /* [0.12.3] 事项多标签（`items.tags` 单列 JSON；全量读 + 覆盖写）。 */
+            crate::commands::item_tag_cmd::list_item_tags,
+            crate::commands::item_tag_cmd::set_item_tags,
+            /* [0.12.4] 标签目录（定义行 + 跨事项改名 / 删除）：管理页与 AI 建标签用。 */
+            crate::commands::item_tag_cmd::list_tag_catalog,
+            crate::commands::item_tag_cmd::create_tag_definition,
+            crate::commands::item_tag_cmd::rename_tag,
+            crate::commands::item_tag_cmd::delete_tag,
+            /* [0.12.3] AI（OpenAI 兼容）：配置 / 测试 / 模型目录 / 建议 / 今日汇总。
+               手机端同名注册、内部回 IO_ERROR。 */
+            crate::commands::ai_cmd::ai_config_get,
+            crate::commands::ai_cmd::ai_config_save,
+            crate::commands::ai_cmd::ai_test,
+            crate::commands::ai_cmd::ai_list_models,
+            crate::commands::ai_cmd::ai_suggest_tags,
+            crate::commands::ai_cmd::ai_daily_summary,
             /* [0.14] 分类目录读口（两窗「事项分类选用」共用；桌面读活动库，手机回空目录）。 */
             crate::commands::category_catalog_cmd::list_category_catalog,
+            crate::commands::category_propagation_cmd::preview_category_propagation,
+            crate::commands::category_propagation_cmd::apply_category_propagation,
             /* [0.13.x] 事项 ↔ 应用绑定（宿主段：业务库 item_app 表）。
                四条都是两端可用的普通命令，不进 Patina 段。 */
             crate::commands::item_app_cmd::list_item_apps,
@@ -259,6 +277,7 @@ define_invoke_handler![
     crate::commands::activity::persistence_cmd::cmd_save_history_bootstrap_snapshot_payload,
     crate::commands::activity::persistence_cmd::cmd_clear_history_bootstrap_snapshot_payload,
     crate::commands::activity::diagnostics_cmd::cmd_get_resource_diagnostics,
+    crate::commands::activity::media_cmd::cmd_get_media_playback_samples,
     /* [V0.12.0 Patina 融合] 打开时间统计窗口的**宿主侧**入口（设置页用）。放在这一段
     只是因为它必须 `#[cfg(desktop)]`（Patina 子系统只在桌面上编进来）；它走的是宿主
     `IpcApi` 契约，不带 patina 前缀，也不受 window-commands 的 ACL 限制。

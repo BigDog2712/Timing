@@ -26,7 +26,12 @@ fn opening_a_newer_database_with_an_older_build_explains_itself() {
             .unwrap();
         ensure_schema_at(&pool, &db_path).await.unwrap();
 
-        let error = migrator_up_to(27).await.unwrap().run(&pool).await.unwrap_err();
+        let error = migrator_up_to(27)
+            .await
+            .unwrap()
+            .run(&pool)
+            .await
+            .unwrap_err();
         let message = describe_migration_failure(&error, &db_path);
         println!("{message}");
 

@@ -30,7 +30,7 @@ pub(crate) fn parse_strict_date_file(name: &str) -> Option<NaiveDate> {
         return None;
     }
     /* 逐字比「四位年-两位月-两位日」还不够：`2026-13-45` 形状对但不是日期。
-       用 chrono 的日历校验收口，顺便拒绝 2 月 30 日。 */
+    用 chrono 的日历校验收口，顺便拒绝 2 月 30 日。 */
     NaiveDate::parse_from_str(stem, "%Y-%m-%d").ok()
 }
 
@@ -64,7 +64,7 @@ mod tests {
     #[test]
     fn keep_window_is_anchored_on_local_today_not_utc() {
         /* 传进来的 `today` 由 `md_cloud::today()`（`chrono::Local`）算好；这里只证明
-           窗口是「相对于入参」而不是自己再取一次时钟，避免晚上 8 点跨日。 */
+        窗口是「相对于入参」而不是自己再取一次时钟，避免晚上 8 点跨日。 */
         let today = day("2026-01-01");
         assert!(past_keep_window(day("2025-12-31"), today, 0));
         assert!(!past_keep_window(day("2026-01-01"), today, 0));

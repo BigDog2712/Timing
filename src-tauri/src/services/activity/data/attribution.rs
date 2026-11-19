@@ -64,13 +64,11 @@ pub fn resolve_child_category(
         }
     }
 
-    let first = app_categories
-        .iter()
-        .min_by(|left, right| {
-            left.priority
-                .cmp(&right.priority)
-                .then_with(|| left.category_key.cmp(&right.category_key))
-        });
+    let first = app_categories.iter().min_by(|left, right| {
+        left.priority
+            .cmp(&right.priority)
+            .then_with(|| left.category_key.cmp(&right.category_key))
+    });
     match first {
         Some(entry) => entry.category_key.clone(),
         None => FALLBACK_CATEGORY.to_string(),
@@ -78,8 +76,8 @@ pub fn resolve_child_category(
 }
 
 /* [0.13.x] 子记录切片：块 ∩ 事实 → 按应用分段并解析分类。
-   与  分开文件：那一个是「一条规则」，这一层是「怎么把
-   时间轴切出来」，两者的判据完全不相干。 */
+与  分开文件：那一个是「一条规则」，这一层是「怎么把
+时间轴切出来」，两者的判据完全不相干。 */
 pub mod slice;
 
 #[cfg(test)]

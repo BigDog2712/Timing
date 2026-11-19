@@ -47,6 +47,7 @@
   --danger-wash: color-mix(in srgb, #D02C33 12%, transparent);
   --ok:          #0C7E47;   /* 对 plate 4.62:1 / 卡 4.83（原 #0C834A 仅 4.34）*/
   --ok-ink:      #FFFFFF;
+  --violet:      #6D3BD1;   /* 收起圆点 ≥2h 档色；对 plate 约 6:1 */
 
   --solid-bg:  #1A1D24;
   --solid-ink: #FFFFFF;

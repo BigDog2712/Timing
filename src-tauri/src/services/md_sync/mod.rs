@@ -31,7 +31,7 @@ pub mod runtime;
 mod binding;
 
 /* `sync_all` 用到的三件落点级动作搬到 `binding.rs`（本文件撞 300 行）：
-   一轮里「读懂一个落点 → 判定 → 写入」的整段逻辑都在那里。 */
+一轮里「读懂一个落点 → 判定 → 写入」的整段逻辑都在那里。 */
 use self::binding::sync_binding;
 
 use chrono::Local;
@@ -185,7 +185,17 @@ pub(super) async fn sync_all(
             next_status.bindings.push(status);
             continue;
         }
-        match sync_binding(pool, &mut rt, binding, date, &path, &config.diary_template, mode).await {
+        match sync_binding(
+            pool,
+            &mut rt,
+            binding,
+            date,
+            &path,
+            &config.diary_template,
+            mode,
+        )
+        .await
+        {
             Ok(outcome) => {
                 status.exists = outcome.exists;
                 status.last_direction = Some(outcome.direction.to_string());
@@ -195,15 +205,28 @@ pub(super) async fn sync_all(
                 /* 非阻断诊断：落点行显示逐字原文，完成通知里带种类前缀。 */
                 let label = binding.kind.label();
                 status.last_error = outcome.warnings.first().cloned();
-                outcome.warnings.iter().for_each(|warn| report.errors.push(format!("「{label}」{warn}")));
+                outcome
+                    .warnings
+                    .iter()
+                    .for_each(|warn| report.errors.push(format!("「{label}」{warn}")));
                 /* [V0.11.11] 真机排查的唯一现场：`adb logcat -s Timing` 能分清「没找到文件」
                 「文件没变」「导入 0 条」——三者在界面上都是同一句「已写入文件」。 */
-                crate::log_info!("md sync {}: {} exists={} dir={} imported={} exported={}", binding.kind.label(), status.path, outcome.exists, outcome.direction, outcome.imported, outcome.exported);
+                crate::log_info!(
+                    "md sync {}: {} exists={} dir={} imported={} exported={}",
+                    binding.kind.label(),
+                    status.path,
+                    outcome.exists,
+                    outcome.direction,
+                    outcome.imported,
+                    outcome.exported
+                );
             }
             Err(err) => {
                 crate::log_warn!("md sync {} 失败：{err}", binding.kind.label());
                 status.last_error = Some(err.clone());
-                report.errors.push(format!("「{}」{err}", binding.kind.label()));
+                report
+                    .errors
+                    .push(format!("「{}」{err}", binding.kind.label()));
             }
         }
         next_status.bindings.push(status);

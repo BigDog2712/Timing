@@ -24,7 +24,7 @@
 //!     复用的新进程**不会**把等待解除。`creation_token` 是第二道闸（见下）。
 
 /* 只有 `#[cfg(test)]` 的 `drop_marker` 用得到：生产构建里没有这个字段。
-   不加 cfg 就是「lib 编译报未使用、test 编译报找不到」两头挨打。 */
+不加 cfg 就是「lib 编译报未使用、test 编译报找不到」两头挨打。 */
 #[cfg(test)]
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
@@ -72,8 +72,7 @@ impl ProcessHandle {
         if process_id == 0 {
             return None;
         }
-        let raw: HANDLE =
-            unsafe { OpenProcess(PROCESS_SYNCHRONIZE, false, process_id) }.ok()?;
+        let raw: HANDLE = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, false, process_id) }.ok()?;
         Some(Self {
             handle: OwnedHandle::new(raw)?,
             #[cfg(test)]
@@ -95,7 +94,7 @@ impl ProcessHandle {
 impl Drop for ProcessHandle {
     fn drop(&mut self) {
         /* 字段的 `Drop`（`OwnedHandle` → `CloseHandle`）在本体之后由 drop glue 执行，
-           所以计数的含义是「本次析构真的发生」，关闭紧随其后、同一个析构里完成。 */
+        所以计数的含义是「本次析构真的发生」，关闭紧随其后、同一个析构里完成。 */
         #[cfg(test)]
         if let Some(marker) = self.drop_marker.as_ref() {
             marker.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -104,9 +103,9 @@ impl Drop for ProcessHandle {
 }
 
 /* SAFETY: `HANDLE` 是内核句柄，Win32 语义下**全进程有效**：句柄值不含线程亲和性，
-   `CloseHandle` 可以在任意线程调用。搬运到等待线程（`std::thread::spawn` /
-   `spawn_blocking`）正是这条链路的设计 —— 「返回即析构，线程退出与句柄回收是同一件事」。
-   字段里没有别的裸指针（`drop_marker` 是 `Arc<AtomicUsize>`，本身 `Send`）。 */
+`CloseHandle` 可以在任意线程调用。搬运到等待线程（`std::thread::spawn` /
+`spawn_blocking`）正是这条链路的设计 —— 「返回即析构，线程退出与句柄回收是同一件事」。
+字段里没有别的裸指针（`drop_marker` 是 `Arc<AtomicUsize>`，本身 `Send`）。 */
 unsafe impl Send for ProcessHandle {}
 
 /// 进程创建时刻（100ns 单位的 FILETIME 原值）。

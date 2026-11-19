@@ -41,11 +41,41 @@ pub(super) struct Entry {
 /// 前五项（顺序固定，与 PRD 4.2 / 设计 §3.6 一致）。第六项「活动数据」是运行期派生的，
 /// 见 [`layout_entries`]。
 const FIXED: [Entry; 5] = [
-    Entry { path: "timing.db", dest_path: "timing.db", label: "timing.db", is_dir: false, activity_source_db: None },
-    Entry { path: "backups", dest_path: "backups", label: "backups", is_dir: true, activity_source_db: None },
-    Entry { path: "logs", dest_path: "logs", label: "logs", is_dir: true, activity_source_db: None },
-    Entry { path: "md", dest_path: "md", label: "md", is_dir: true, activity_source_db: None },
-    Entry { path: MARKER_FILE, dest_path: MARKER_FILE, label: MARKER_FILE, is_dir: false, activity_source_db: None },
+    Entry {
+        path: "timing.db",
+        dest_path: "timing.db",
+        label: "timing.db",
+        is_dir: false,
+        activity_source_db: None,
+    },
+    Entry {
+        path: "backups",
+        dest_path: "backups",
+        label: "backups",
+        is_dir: true,
+        activity_source_db: None,
+    },
+    Entry {
+        path: "logs",
+        dest_path: "logs",
+        label: "logs",
+        is_dir: true,
+        activity_source_db: None,
+    },
+    Entry {
+        path: "md",
+        dest_path: "md",
+        label: "md",
+        is_dir: true,
+        activity_source_db: None,
+    },
+    Entry {
+        path: MARKER_FILE,
+        dest_path: MARKER_FILE,
+        label: MARKER_FILE,
+        is_dir: false,
+        activity_source_db: None,
+    },
 ];
 
 /// 活动数据在确认对话框里的名字。
@@ -100,7 +130,9 @@ pub fn total_bytes(root: &Path) -> u64 {
 
 /// 递归体积（文件取 `len`，目录递归求和）。
 fn measure(path: &Path) -> u64 {
-    let Ok(meta) = fs::metadata(path) else { return 0 };
+    let Ok(meta) = fs::metadata(path) else {
+        return 0;
+    };
     if meta.is_file() {
         return meta.len();
     }

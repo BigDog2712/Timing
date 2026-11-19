@@ -118,6 +118,24 @@
 > 用户拿到的是「时间不对」的提示去修「挂错层级」，语义错配与 ADR-018 的教训同源。
 > 计时域自身的时长非法仍用 `INVALID_DURATION`，不受影响。
 
+### 2.7 标签与 AI（当前契约增量）
+
+当前 `npm run check:contract` 实际输出：**命令 Rust 103 / IpcApi 103 / ipc.ts 103 / mock 103；错误码 Rust 31 / 前端 31**。其中新增标签校验错误 `INVALID_TAG_PATH`，以及以下 10 个 AI 错误码：
+
+| code | 触发条件 | 前端处理 | 可重试 |
+|---|---|---|---|
+| `AI_NOT_CONFIGURED` | AI 配置或密钥缺失 | 引导至设置 → AI 配置 | 否 |
+| `AI_DISABLED` | 对应 AI 能力未启用 | 引导至设置 → AI 开启能力 | 否 |
+| `AI_AUTH` | 服务商认证失败 | 检查密钥与权限 | 否 |
+| `AI_RATE_LIMITED` | 服务商限流或额度不足 | 检查额度后稍后重试 | 是 |
+| `AI_NETWORK` | 网络或服务地址不可达 | 检查网络、代理和地址 | 是 |
+| `AI_TIMEOUT` | 请求超时 | 稍后重试或缩小范围 | 是 |
+| `AI_UPSTREAM` | 服务商暂时不可用 | 稍后重试 | 是 |
+| `AI_BAD_REQUEST` | 服务商拒绝请求参数 | 检查模型或输入内容 | 否 |
+| `AI_PARSE` | AI 响应无法解析 | 重试 | 是 |
+| `AI_CANCELLED` | 请求被取消 | 无需处理 | 否 |
+| `INVALID_TAG_PATH` | 标签路径包含非法字符或超过层级、长度、数量限制 | 标签编辑处展示后端原因 | 否 |
+
 ---
 
 ## 3. 命令清单（总表）
@@ -135,6 +153,38 @@
 | `unarchive_item` | `{ id: number }` | `Item` | `unarchiveItem` |
 | `delete_item` | `{ id: number }` | `void` | `deleteItem` |
 | `list_category_catalog` | `{}` | `CategoryCatalogRows` | `listCategoryCatalog` |
+| `preview_category_propagation` | `{ request: CategoryPropagationRequest }` | `CategoryPropagationPreview` | `previewCategoryPropagation` |
+| `apply_category_propagation` | `{ request: CategoryPropagationRequest, expectedFingerprint: string }` | `void` | `applyCategoryPropagation` |
+
+### 3.1.1 事项标签 Tags
+
+| 命令 | 入参 | 出参 | ipc.ts 方法 |
+|---|---|---|---|
+| `list_item_tags` | `{}` | `ItemTags[]` | `listItemTags` |
+| `set_item_tags` | `{ itemId: number, tags: string[] }` | `string[]` | `setItemTags` |
+| `list_tag_catalog` | `{}` | `string[]` | `listTagCatalog` |
+| `create_tag_definition` | `{ path: string }` | `string[]` | `createTagDefinition` |
+| `rename_tag` | `{ from: string, to: string }` | `TagMutation` | `renameTag` |
+| `delete_tag` | `{ path: string }` | `TagMutation` | `deleteTag` |
+
+`TagMutation` 为 `{ items: number, definitions: string[] }`：`items` = 被改到 / 被删到的未删除事项条数，`definitions` = 操作后的全部标签定义。`rename_tag` / `delete_tag` 都作用于**整棵子树**（`学习` 连同 `学习/**` 一起），在宿主的一个事务里改完事项路径与定义行；定义行落在业务库 `settings` 的 `tag.def.<路径>`（随业务库同步，所以空标签也能跨设备存在）。改名后前端广播 `item-tags-changed`，`itemId = 0` 表示「批量改动，重拉全量」。
+
+`CategoryPropagationRequest` 为 `{ operationId: string, mapping: Record<string, string | null> }`。preview 返回 `fingerprint`、受影响事项 / 应用绑定 / 分段改判计数及结构化 `conflicts`（含唯一键占用行快照）；当前 category mapping 可能产生的数据库唯一冲突仅指 `app_category(app_key, category_key)`，`block_segment_override(block_uid, app_key, seg_start)` 唯一键不含 `category_key`，不因该 mapping 产生冲突。apply 必须回传 preview fingerprint，执行时重算影响面。fingerprint 过期或任一 `app_category` 唯一键冲突都必须在 journal 写入前整笔拒绝，不能部分成功、自动覆盖或静默合并。业务 `items.category_key` 按 mapping 写入目标键或 `NULL`；`focus_blocks.category_key` 只是 Activity 投影快照，由 projector 重建，不是传播服务第二个真源。两库不承诺跨库 SQLite 原子事务，失败通过可恢复 journal 重放。
+
+`ItemTags` DTO 为 `{ itemId: number, tags: string[] }`。路径以 `/` 分层；归一化时去除首尾空白、开头 `#`、反斜线转斜线及空路径段，保留首个大小写拼写并按大小写不敏感去重。上限为 4 级、每段 32 个 Unicode scalar、路径 64 个 Unicode scalar；集合最多 32 项。NFC/NFD 不折叠。
+
+### 3.1.2 AI
+
+| 命令 | 入参 | 出参 | ipc.ts 方法 |
+|---|---|---|---|
+| `ai_config_get` | `{}` | `AiConfigView` | `aiConfigGet` |
+| `ai_config_save` | `{ config: AiConfig, apiKey?: string \| null }` | `AiConfigView` | `aiConfigSave` |
+| `ai_test` | `{}` | `AiTestResult` | `aiTest` |
+| `ai_list_models` | `{ request: AiListModelsRequest }` | `string[]` | `aiListModels` |
+| `ai_suggest_tags` | `{ request: AiSuggestRequest }` | `AiSuggestResponse` | `aiSuggestTags` |
+| `ai_daily_summary` | `{}` | `AiDailySummary` | `aiDailySummary` |
+
+`ai_config_save.apiKey` 三态：省略表示保留已有密钥；`null` 表示保留已有密钥；非空字符串设置密钥，空字符串清除密钥。`AiConfigView` 只返回 `hasKey`，不返回明文密钥。
 
 ### 3.2 计时域 Timer
 

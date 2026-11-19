@@ -47,14 +47,14 @@ pub(crate) fn candidates(
             continue;
         };
         /* 闸⑥：路径深度恰为落点根下一层。`read_dir` 天然只有一层，但目录也可能叫
-           `2025-01-01.md` —— 显式判成文件，顺手把「不递归」写成代码。
-           这一句同时就是闸③（本地镜像里有同名文件）：`entry.path()` 正是
-           `root.join(name)`，对 WebDAV 恒真，照写不省（见模块头）。 */
+        `2025-01-01.md` —— 显式判成文件，顺手把「不递归」写成代码。
+        这一句同时就是闸③（本地镜像里有同名文件）：`entry.path()` 正是
+        `root.join(name)`，对 WebDAV 恒真，照写不省（见模块头）。 */
         if !entry.path().is_file() {
             continue;
         }
         /* 闸④：`date < today - keep`。**必须早于比水位**：水位是持久状态，可能被写成
-           未来日期，先比水位就会让今天那份进候选 —— 而它是唯一还在被读写的那一份。 */
+        未来日期，先比水位就会让今天那份进候选 —— 而它是唯一还在被读写的那一份。 */
         if !past_keep_window(date, today, keep) {
             continue;
         }
@@ -83,7 +83,8 @@ mod tests {
 
     /// 每个用例一个按名字 + 进程号唯一的目录（并行跑也不撞）。
     fn temp_dir(tag: &str) -> std::path::PathBuf {
-        let dir = std::env::temp_dir().join(format!("timing-purge-webdav-{tag}-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("timing-purge-webdav-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("建临时目录");
         dir
@@ -102,7 +103,7 @@ mod tests {
             "timing-write-test.txt",
             "2025-1-5.md",
             /* 五个坏名字各挡一类放宽：非补零（`chrono::NaiveDate::from_str` 认它）、
-               两位年（会被读成公元 26 年）、月份越界、日历里没有的日子、后缀挂尾巴。 */
+            两位年（会被读成公元 26 年）、月份越界、日历里没有的日子、后缀挂尾巴。 */
             "2026-2-3.md",
             "26-02-03.md",
             "2026-13-45.md",
@@ -122,7 +123,11 @@ mod tests {
             .into_iter()
             .map(|(_, name)| name)
             .collect();
-        assert_eq!(names, vec!["2026-11-04.md".to_string()], "只该有那一个严格日期文件");
+        assert_eq!(
+            names,
+            vec!["2026-11-04.md".to_string()],
+            "只该有那一个严格日期文件"
+        );
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -138,7 +143,10 @@ mod tests {
             fs::write(root.join(name), "x").expect("写样本");
         }
         let found = candidates(&root, today, 0, Some(day("2099-01-01")));
-        assert!(found.is_empty(), "今天 / 未来 / 水位之前都不进候选，实际 {found:?}");
+        assert!(
+            found.is_empty(),
+            "今天 / 未来 / 水位之前都不进候选，实际 {found:?}"
+        );
 
         /* 对照：水位在昨天时，昨天那份照删 —— 证明上一条不是因为候选集恒空。 */
         fs::write(root.join("2026-11-06.md"), "x").expect("写样本");
@@ -162,7 +170,11 @@ mod tests {
             .into_iter()
             .map(|(_, name)| name)
             .collect();
-        assert_eq!(found, vec!["2026-11-03.md".to_string()], "水位及更早的都不再进候选");
+        assert_eq!(
+            found,
+            vec!["2026-11-03.md".to_string()],
+            "水位及更早的都不再进候选"
+        );
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -177,7 +189,11 @@ mod tests {
             .into_iter()
             .map(|(_, name)| name)
             .collect();
-        assert_eq!(found, vec!["2026-11-05.md".to_string()], "留 1 天时昨天那份不动");
+        assert_eq!(
+            found,
+            vec!["2026-11-05.md".to_string()],
+            "留 1 天时昨天那份不动"
+        );
         let _ = fs::remove_dir_all(&root);
     }
 
@@ -192,7 +208,10 @@ mod tests {
             .into_iter()
             .map(|(date, _)| date)
             .collect();
-        assert_eq!(dates, vec![day("2026-11-01"), day("2026-11-02"), day("2026-11-03")]);
+        assert_eq!(
+            dates,
+            vec![day("2026-11-01"), day("2026-11-02"), day("2026-11-03")]
+        );
         let _ = fs::remove_dir_all(&root);
     }
 }

@@ -21,14 +21,20 @@ const STATES: [TrayStatus; 3] = [TrayStatus::Idle, TrayStatus::Running, TrayStat
 
 fn label_of(nodes: &[TrayNode], id: &str) -> Option<String> {
     nodes.iter().find_map(|node| match node {
-        TrayNode::Item { id: node_id, label, .. } if *node_id == id => Some(label.clone()),
+        TrayNode::Item {
+            id: node_id, label, ..
+        } if *node_id == id => Some(label.clone()),
         _ => None,
     })
 }
 
 fn enabled_of(nodes: &[TrayNode], id: &str) -> Option<bool> {
     nodes.iter().find_map(|node| match node {
-        TrayNode::Item { id: node_id, enabled, .. } if *node_id == id => Some(*enabled),
+        TrayNode::Item {
+            id: node_id,
+            enabled,
+            ..
+        } if *node_id == id => Some(*enabled),
         _ => None,
     })
 }
@@ -58,7 +64,11 @@ fn quitting_quit_item_is_labelled_with_a_single_ellipsis() {
         assert_eq!(label.chars().count(), 5, "{status:?}：省略号不是单个字符");
         assert_eq!(label.chars().last(), Some('\u{2026}'), "必须是 U+2026");
         assert!(!label.contains("..."), "不许用三个 ASCII 点");
-        assert_eq!(enabled_of(&nodes, ID_QUIT), Some(false), "{status:?}：退出项必须不可点");
+        assert_eq!(
+            enabled_of(&nodes, ID_QUIT),
+            Some(false),
+            "{status:?}：退出项必须不可点"
+        );
     }
 }
 
@@ -67,7 +77,11 @@ fn quitting_quit_item_is_labelled_with_a_single_ellipsis() {
 fn normal_quit_item_stays_plain_and_clickable() {
     for status in STATES {
         let nodes = build_nodes(status, "空闲 · 点开始正计时", "Markdown 同步", false);
-        assert_eq!(label_of(&nodes, ID_QUIT).as_deref(), Some("退出"), "{status:?}");
+        assert_eq!(
+            label_of(&nodes, ID_QUIT).as_deref(),
+            Some("退出"),
+            "{status:?}"
+        );
         assert_eq!(enabled_of(&nodes, ID_QUIT), Some(true), "{status:?}");
     }
 }
@@ -80,24 +94,32 @@ fn quitting_changes_nothing_but_the_quit_item() {
         let quitting = build_nodes(status, "空闲 · 点开始正计时", "Markdown 同步", true);
 
         assert_eq!(normal.len(), quitting.len(), "{status:?}：菜单项数量变了");
-        assert_eq!(others(&normal), others(&quitting), "{status:?}：退出项以外的项被改动了");
+        assert_eq!(
+            others(&normal),
+            others(&quitting),
+            "{status:?}：退出项以外的项被改动了"
+        );
         /* 防空转：如果 `build_nodes` 干脆忽略 `quitting`，上面两条断言会**恒真**通过。
-           这一条要求退出项确实被改过，变异（忽略 quitting）才会把这条打红。 */
+        这一条要求退出项确实被改过，变异（忽略 quitting）才会把这条打红。 */
         assert_ne!(
             label_of(&normal, ID_QUIT),
             label_of(&quitting, ID_QUIT),
             "{status:?}：quitting 必须真的改了退出项，否则本测试是空转"
         );
         /* 文件 `tray_menu.rs` 的注释承诺「通道切换只换那一项的文字」；这里把 `quitting`
-           的那一项也一起钉住：同步项（`md_sync`）**不在**被改之列。 */
+        的那一项也一起钉住：同步项（`md_sync`）**不在**被改之列。 */
         assert_eq!(
             label_of(&normal, ID_MD_SYNC),
             label_of(&quitting, ID_MD_SYNC),
             "{status:?}：同步项文案不该随 quitting 变"
         );
         /* 退出项仍是最后一个可点位置，位置不变 */
-        let pos_normal = normal.iter().position(|node| matches!(node, TrayNode::Item { id, .. } if *id == ID_QUIT));
-        let pos_quitting = quitting.iter().position(|node| matches!(node, TrayNode::Item { id, .. } if *id == ID_QUIT));
+        let pos_normal = normal
+            .iter()
+            .position(|node| matches!(node, TrayNode::Item { id, .. } if *id == ID_QUIT));
+        let pos_quitting = quitting
+            .iter()
+            .position(|node| matches!(node, TrayNode::Item { id, .. } if *id == ID_QUIT));
         assert_eq!(pos_normal, pos_quitting, "{status:?}：退出项位置变了");
     }
 }

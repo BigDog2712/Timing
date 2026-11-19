@@ -184,7 +184,7 @@ export default function HostAiCard() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="at-text-body at-weight-emphasis text-[var(--at-text-primary)]">建议范围</h3>
-              <p className="sync-cloud__hint">AI 只会从已有标签和分类里挑，不会创造新标签。</p>
+              <p className="sync-cloud__hint">AI 先匹配你已有的标签；实在没有合适的，才会按「生活 / 工作 / 学习 / 娱乐 / 复盘」下最多两级新建。</p>
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 at-text-caption">

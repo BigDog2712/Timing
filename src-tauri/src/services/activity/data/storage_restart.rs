@@ -1,5 +1,7 @@
-use crate::services::activity::data::storage_migration::{checkpoint_current_database, timestamp_for_file};
 use crate::infra::activity::{storage_control, storage_paths};
+use crate::services::activity::data::storage_migration::{
+    checkpoint_current_database, timestamp_for_file,
+};
 use tauri::{AppHandle, Runtime};
 
 const RESTART_OPERATION_PREPARED: &str = "pending-restart";

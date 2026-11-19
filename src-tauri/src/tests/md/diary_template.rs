@@ -9,10 +9,10 @@
 
 use std::path::{Path, PathBuf};
 
+use super::sync::{at, env, file_for, Env};
 use crate::infra::md_diary::seed_if_missing;
 use crate::services;
 use crate::services::md_sync::config;
-use super::sync::{at, env, file_for, Env};
 use crate::tests::support::{insert_saved, new_item, unique_dir};
 
 const TEMPLATE: &str = "# 我的日记\n\n- 今日待办：\n";
@@ -35,7 +35,14 @@ fn write_template(env: &Env) -> PathBuf {
 /// 只有它的落点文件会因 `needs_write` 被创建）。
 async fn seed_record(env: &Env) {
     let item = new_item(&env.pool, "喝水").await;
-    insert_saved(&env.pool, item, at(env.date, 10, 0), at(env.date, 10, 5), 300).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 10, 0),
+        at(env.date, 10, 5),
+        300,
+    )
+    .await;
 }
 
 /// P16：模板打底 + 区块在后；再跑一轮文件已存在，模板不参与（一个字节不碰）。
@@ -74,7 +81,7 @@ async fn p17_empty_template_keeps_head_behavior_byte_for_byte() {
     assert!(report.errors.is_empty(), "{:?}", report.errors);
 
     /* 与 HEAD 既有用例 `missing_file_is_created_with_heading_only_when_there_is_data`
-       同一口径：无模板时首写仍以标题开头，模板内容零命中。 */
+    同一口径：无模板时首写仍以标题开头，模板内容零命中。 */
     let text = std::fs::read_to_string(file_for(&env)).unwrap();
     assert!(text.starts_with("#### 事项计时\n- [ ] 喝水"), "{text}");
     assert!(!text.contains("我的日记"), "{text}");

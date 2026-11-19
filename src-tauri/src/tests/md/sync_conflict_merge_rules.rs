@@ -41,17 +41,31 @@ use crate::tests::support::{insert_saved, new_item, scalar_i64};
 async fn md_edit_of_existing_segment_wins_over_sql() {
     let env = env("conflict-edit-one").await;
     let item = new_item(&env.pool, "写代码").await;
-    let nine = insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    let nine = insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
 
     /* 第一轮：建立基线（文件 = 09:00–09:30） */
     services::md_sync::run(&env.pool).await.unwrap();
     assert!(body_of(&env, TIMERS_HEADING).contains("09:30:00"));
 
     /* PC 端新增一段：只进库，文件不动 */
-    let eleven = insert_saved(&env.pool, item, at(env.date, 11, 0), at(env.date, 11, 30), 1800).await;
+    let eleven = insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 11, 0),
+        at(env.date, 11, 30),
+        1800,
+    )
+    .await;
 
     /* MD 端改**已有那段**的结束时刻（`start` 不动 → 精确匹配会认回同一行）。
-       整段重写而不是字符串替换：`  ```」这个片段在 `  ```yaml` 里也出现一次。 */
+    整段重写而不是字符串替换：`  ```」这个片段在 `  ```yaml` 里也出现一次。 */
     rewrite(
         &env,
         TIMERS_HEADING,
@@ -93,7 +107,10 @@ async fn md_edit_of_existing_segment_wins_over_sql() {
     assert_eq!(rendered.matches("- start:").count(), 2, "{rendered}");
     assert!(rendered.contains("10:00:00"), "{rendered}");
     assert!(rendered.contains("11:00:00"), "{rendered}");
-    assert!(!rendered.contains("09:30:00"), "{KNOWN}：旧结束时刻不该留痕");
+    assert!(
+        !rendered.contains("09:30:00"),
+        "{KNOWN}：旧结束时刻不该留痕"
+    );
 }
 
 /// 场景 7（PRD C9 第 3 条）：**同一天、同事项、两段计时的累加口径**（ADR-043 拆分口径）。
@@ -112,8 +129,22 @@ async fn md_edit_of_existing_segment_wins_over_sql() {
 async fn same_item_two_segments_same_day_stay_additive() {
     let env = env("conflict-two-segments").await;
     let item = new_item(&env.pool, "写代码").await;
-    let first = insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
-    let second = insert_saved(&env.pool, item, at(env.date, 11, 0), at(env.date, 11, 30), 1800).await;
+    let first = insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
+    let second = insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 11, 0),
+        at(env.date, 11, 30),
+        1800,
+    )
+    .await;
 
     services::md_sync::run(&env.pool).await.unwrap();
 

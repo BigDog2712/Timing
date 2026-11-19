@@ -9,15 +9,15 @@
 
 use std::fs;
 
+use super::fake_webdav::{header_value, serve_412_on_put};
+use super::sync::{env, TIMERS_HEADING};
 use crate::infra::md_webdav::WebdavTarget;
 use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncReport;
+use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_cloud::{pending, round_push};
-use super::sync::{env, TIMERS_HEADING};
-use super::fake_webdav::{header_value, serve_412_on_put};
 use crate::tests::support::{insert_saved, new_item, unique_dir};
-use crate::platform::clock::now_ms;
 
 /// 任务书 §4.5 的机器证据。四条断言各有分工——
 /// ① 请求序列恰为 PUT/GET/PUT（多一次少一次都违反「只重试一次」）；

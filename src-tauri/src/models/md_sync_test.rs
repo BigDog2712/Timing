@@ -32,8 +32,8 @@ fn rejects_absolute_or_escaping_file() {
             poll_secs: 900,
             enabled: true,
             bindings: vec![binding(MdSyncKind::Timers, file, "#### 事项计时")],
-        ..MdSyncConfig::default()
-    };
+            ..MdSyncConfig::default()
+        };
         assert!(config.validate().is_err(), "{file} 应被拒绝");
     }
 }
@@ -46,8 +46,8 @@ fn rejects_heading_without_text() {
             poll_secs: 900,
             enabled: true,
             bindings: vec![binding(MdSyncKind::Timers, "{date}.md", heading)],
-        ..MdSyncConfig::default()
-    };
+            ..MdSyncConfig::default()
+        };
         assert!(config.validate().is_err(), "{heading} 应被拒绝");
     }
 }

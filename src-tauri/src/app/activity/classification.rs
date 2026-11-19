@@ -1,9 +1,9 @@
+use crate::models::activity::tracking::{
+    TRACKING_REASON_APP_EXCLUDED_SEALED, TRACKING_REASON_WEB_DOMAIN_EXCLUDED_SEALED,
+};
 use crate::services::activity::data::classification_service::{
     apply_recording_policy_changes as apply_recording_policy_changes_in_data,
     ClassificationCommitOutcome,
-};
-use crate::models::activity::tracking::{
-    TRACKING_REASON_APP_EXCLUDED_SEALED, TRACKING_REASON_WEB_DOMAIN_EXCLUDED_SEALED,
 };
 use crate::services::activity::engine::tracking::runtime::emit_tracking_data_changed;
 use tauri::{AppHandle, Manager, Runtime};

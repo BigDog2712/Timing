@@ -111,8 +111,8 @@ pub async fn has_pomodoro_completions_schema(pool: &Pool<Sqlite>) -> Result<bool
 
 pub async fn has_retired_widget_preferences(pool: &Pool<Sqlite>) -> Result<bool, String> {
     // Reuse the migration predicate so history repair and execution share the same data contract.
-    let query =
-        crate::services::activity::data::schema::WIDGET_RETIREMENT_SQL.replace("DELETE FROM", "SELECT COUNT(*) FROM");
+    let query = crate::services::activity::data::schema::WIDGET_RETIREMENT_SQL
+        .replace("DELETE FROM", "SELECT COUNT(*) FROM");
     let count: i64 = sqlx::query_scalar(&query)
         .fetch_one(pool)
         .await
@@ -384,24 +384,29 @@ pub(super) async fn schema_revision_limit(pool: &Pool<Sqlite>) -> Result<usize, 
     } else {
         0
     };
-    let revision_limit = crate::services::activity::data::schema::ACTIVITY_READ_MODELS_MIGRATION_VERSION as usize
-        + usize::from(has_web_activity_revision_schema(pool).await?)
-        + scheduled_backup_migration_count
-        + usize::from(has_scheduled_export_schema(pool).await?)
-        + usize::from(has_activity_reminder_rules_schema(pool).await?)
-        + usize::from(has_web_activity_session_schema(pool).await?)
-        + usize::from(has_session_range_index(pool).await?)
-        + usize::from(has_anonymous_activity_schema(pool).await?);
+    let revision_limit =
+        crate::services::activity::data::schema::ACTIVITY_READ_MODELS_MIGRATION_VERSION as usize
+            + usize::from(has_web_activity_revision_schema(pool).await?)
+            + scheduled_backup_migration_count
+            + usize::from(has_scheduled_export_schema(pool).await?)
+            + usize::from(has_activity_reminder_rules_schema(pool).await?)
+            + usize::from(has_web_activity_session_schema(pool).await?)
+            + usize::from(has_session_range_index(pool).await?)
+            + usize::from(has_anonymous_activity_schema(pool).await?);
     // A data migration cannot be inferred from table layout. Never mark it applied
     // while its removed preferences remain in the database.
     let revision_limit = revision_limit
         + usize::from(
-            revision_limit == crate::services::activity::data::schema::ANONYMOUS_ACTIVITY_MIGRATION_VERSION as usize
+            revision_limit
+                == crate::services::activity::data::schema::ANONYMOUS_ACTIVITY_MIGRATION_VERSION
+                    as usize
                 && has_retired_widget_preferences(pool).await?,
         );
     let revision_limit = revision_limit
         + usize::from(
-            revision_limit == crate::services::activity::data::schema::WIDGET_RETIREMENT_MIGRATION_VERSION as usize
+            revision_limit
+                == crate::services::activity::data::schema::WIDGET_RETIREMENT_MIGRATION_VERSION
+                    as usize
                 && has_activity_reminder_extensions_schema(pool).await?,
         );
     let revision_limit = revision_limit
@@ -418,7 +423,9 @@ pub(super) async fn schema_revision_limit(pool: &Pool<Sqlite>) -> Result<usize, 
         );
     let revision_limit = revision_limit
         + usize::from(
-            revision_limit == crate::services::activity::data::schema::REMINDER_RECURRENCE_MIGRATION_VERSION as usize
+            revision_limit
+                == crate::services::activity::data::schema::REMINDER_RECURRENCE_MIGRATION_VERSION
+                    as usize
                 && has_unique_activity_reminder_targets(pool).await?,
         );
     let revision_limit = revision_limit
@@ -429,27 +436,36 @@ pub(super) async fn schema_revision_limit(pool: &Pool<Sqlite>) -> Result<usize, 
         );
     let revision_limit = revision_limit
         + usize::from(
-            revision_limit == crate::services::activity::data::schema::TIMER_RETIREMENT_MIGRATION_VERSION as usize
+            revision_limit
+                == crate::services::activity::data::schema::TIMER_RETIREMENT_MIGRATION_VERSION
+                    as usize
                 && has_pomodoro_tasks_schema(pool).await?,
         );
     let revision_limit = revision_limit
         + usize::from(
-            revision_limit == crate::services::activity::data::schema::POMODORO_TASKS_MIGRATION_VERSION as usize
+            revision_limit
+                == crate::services::activity::data::schema::POMODORO_TASKS_MIGRATION_VERSION
+                    as usize
                 && has_pomodoro_completions_schema(pool).await?,
         );
     let revision_limit = revision_limit
         + usize::from(
-            revision_limit == crate::services::activity::data::schema::POMODORO_COMPLETIONS_MIGRATION_VERSION as usize
+            revision_limit
+                == crate::services::activity::data::schema::POMODORO_COMPLETIONS_MIGRATION_VERSION
+                    as usize
                 && has_free_focus_schema(pool).await?,
         );
     let revision_limit = revision_limit
         + usize::from(
-            revision_limit == crate::services::activity::data::schema::FREE_FOCUS_MIGRATION_VERSION as usize
+            revision_limit
+                == crate::services::activity::data::schema::FREE_FOCUS_MIGRATION_VERSION as usize
                 && has_reminder_identity_schema(pool).await?,
         );
     Ok(revision_limit
         + usize::from(
-            revision_limit == crate::services::activity::data::schema::REMINDER_IDENTITY_MIGRATION_VERSION as usize
+            revision_limit
+                == crate::services::activity::data::schema::REMINDER_IDENTITY_MIGRATION_VERSION
+                    as usize
                 && has_focus_history(pool).await?,
         ))
 }
@@ -457,7 +473,9 @@ pub(super) async fn schema_revision_limit(pool: &Pool<Sqlite>) -> Result<usize, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::activity::data::schema::{SCHEDULED_BACKUP_SCHEMA_SQL, SCHEDULED_BACKUP_TARGETS_SCHEMA_SQL};
+    use crate::services::activity::data::schema::{
+        SCHEDULED_BACKUP_SCHEMA_SQL, SCHEDULED_BACKUP_TARGETS_SCHEMA_SQL,
+    };
     use sqlx::{Executor, SqlitePool};
 
     #[test]

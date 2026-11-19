@@ -159,7 +159,9 @@ fn build_commit_outcome(
                 );
             }
         } else if let Some(raw_domain) = mutation.key.strip_prefix(WEB_DOMAIN_OVERRIDE_KEY_PREFIX) {
-            if let Some(domain) = crate::models::activity::web_activity::normalize_domain(raw_domain) {
+            if let Some(domain) =
+                crate::models::activity::web_activity::normalize_domain(raw_domain)
+            {
                 domains.insert(
                     domain.clone(),
                     parse_enabled_field(mutation.value.as_deref(), "enabled"),

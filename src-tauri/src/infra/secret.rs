@@ -34,10 +34,10 @@ use std::sync::OnceLock;
 #[cfg(target_os = "windows")]
 use std::path::PathBuf;
 
-#[cfg(target_os = "windows")]
-use crate::infra::secret_dpapi;
 #[cfg(mobile)]
 use crate::infra::secret_bridge;
+#[cfg(target_os = "windows")]
+use crate::infra::secret_dpapi;
 
 #[cfg(mobile)]
 use tauri::plugin::PluginHandle;
@@ -60,7 +60,9 @@ pub(crate) const MISSING: &str = "当前平台不支持凭据存储";
 enum Backend {
     Unavailable,
     #[cfg(target_os = "windows")]
-    Dpapi { path: PathBuf },
+    Dpapi {
+        path: PathBuf,
+    },
     #[cfg(mobile)]
     Bridge {
         app: AppHandle,

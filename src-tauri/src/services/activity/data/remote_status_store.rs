@@ -1,9 +1,11 @@
+use crate::models::activity::settings::RemoteStatusBridgeSettings;
 use crate::services::activity::data::app_settings_service::commit_app_setting_mutations_with_recovery;
 use crate::services::activity::data::icon_cache_service;
 use crate::services::activity::data::repositories::app_settings::{self, AppSettingMutation};
 use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
-use crate::models::activity::settings::RemoteStatusBridgeSettings;
-use crate::services::activity::engine::remote_status_bridge::{RemoteStatusBridgeStore, RemoteStatusStoreFuture};
+use crate::services::activity::engine::remote_status_bridge::{
+    RemoteStatusBridgeStore, RemoteStatusStoreFuture,
+};
 use tauri::{AppHandle, Runtime};
 
 pub struct SqliteRemoteStatusBridgeStore<R: Runtime> {

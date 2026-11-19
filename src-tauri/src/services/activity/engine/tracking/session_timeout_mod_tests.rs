@@ -3,9 +3,9 @@
 //! `mod tests` 仍声明在原模块内（`#[path]` 指向本文件），`super::` 语义不变。
 
 use super::*;
+use crate::models::activity::tracking::SustainedParticipationStatusReason;
 use crate::services::activity::data::schema as db_schema;
 use crate::services::activity::data::tracking_runtime::TrackingRuntimeDataStore;
-use crate::models::activity::tracking::SustainedParticipationStatusReason;
 use crate::services::activity::engine::tracking::active_session;
 use sqlx::{Executor, SqlitePool};
 
@@ -181,11 +181,10 @@ fn sustained_participation_timeout_seals_session_at_sustained_boundary() {
         ));
 
         let data = data_store(&pool);
-        let reason = seal_active_sessions_for_passive_participation_timeout(
-            &data, &timed_out, 700_000, 600,
-        )
-        .await
-        .unwrap();
+        let reason =
+            seal_active_sessions_for_passive_participation_timeout(&data, &timed_out, 700_000, 600)
+                .await
+                .unwrap();
 
         let ended: Option<(i64, i64)> = sqlx::query_as(
             "SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL LIMIT 1",
@@ -220,8 +219,7 @@ fn sustained_participation_timeout_supports_unknown_audio_signal_matches() {
     ]);
     let expired_status = TrackingStatusSnapshot {
         sustained_participation_state: SustainedParticipationState::Expired,
-        sustained_participation_reason:
-            SustainedParticipationStatusReason::SustainedWindowExpired,
+        sustained_participation_reason: SustainedParticipationStatusReason::SustainedWindowExpired,
         ..TrackingStatusSnapshot::default()
     };
     let previous_status = TrackingStatusSnapshot {

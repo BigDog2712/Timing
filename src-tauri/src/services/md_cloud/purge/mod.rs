@@ -91,7 +91,7 @@ pub(crate) async fn run_webdav(
                 crate::log_info!("md cloud purge: {name} status={code}");
                 purge_log::append(&key, &format!("status={code}"), "");
                 /* 先删成功再清账（PRD §2.6）：先清后删，一旦 DELETE 失败，那天的欠账信息
-                   就没了，而远端文件还在。最坏结果只剩「清账失败」→ 下一轮重传（§3.8-4）。 */
+                就没了，而远端文件还在。最坏结果只剩「清账失败」→ 下一轮重传（§3.8-4）。 */
                 md_cloud_pending::clear(pool, channel, &key).await?;
                 outcome.deleted += 1;
                 if !failed_before {
@@ -104,7 +104,7 @@ pub(crate) async fn run_webdav(
                 failed_before = true;
                 if let Some(tag) = abort_tag(&err) {
                     /* 401 / 403 / 429 一出现就整批停：逐个试只会把日志刷满、把限流烧掉，
-                       而这三档在「同一份凭据 / 同一个配额」下不会因为换一个文件就好。 */
+                    而这三档在「同一份凭据 / 同一个配额」下不会因为换一个文件就好。 */
                     crate::log_warn!("md cloud purge: abort={tag}");
                     outcome.aborted = Some(tag);
                     break;
@@ -113,7 +113,10 @@ pub(crate) async fn run_webdav(
         }
     }
     advance(pool, channel, &outcome).await?;
-    finish(pool, channel, today, today_date, plan.state, &outcome, truncated).await
+    finish(
+        pool, channel, today, today_date, plan.state, &outcome, truncated,
+    )
+    .await
 }
 
 /// LocalFolder 那一轮的 ⑩'（六道闸在 `folder.rs`，这里只是骨架）。
@@ -144,7 +147,7 @@ pub(crate) async fn run_folder(
         Ok(list) => list,
         Err(note) => {
             /* 闸③ 重合：**一个文件都不删**（枚举一次都没发生），水位不动，今天不再试。
-               红字进块④，日志逐字一行 —— 两处都不是 `report.errors`（见模块头）。 */
+            红字进块④，日志逐字一行 —— 两处都不是 `report.errors`（见模块头）。 */
             crate::log_warn!("md cloud purge: refused overlap");
             let mut state = plan.state;
             state.overlap_note = note;
@@ -163,12 +166,16 @@ pub(crate) async fn run_folder(
     let mut failed_before = false;
     for cand in &batch {
         let key = cand.date.to_string();
-        match folder::remove_one(&cand.path, &cand.bytes, crate::infra::md_backup::save_checked) {
+        match folder::remove_one(
+            &cand.path,
+            &cand.bytes,
+            crate::infra::md_backup::save_checked,
+        ) {
             Ok(()) => {
                 let abs = cand.path.display();
                 /* 一行里同时含 `<date>.md removed` 与绝对路径：I13a 与 I16 两条断言
-                   都要在这一行上成立。`(had_unpaid_debt)` 是可见性标记（§3.4-闸⑤），
-                   不改变「删不删」。 */
+                都要在这一行上成立。`(had_unpaid_debt)` 是可见性标记（§3.4-闸⑤），
+                不改变「删不删」。 */
                 if cand.had_debt {
                     crate::log_info!(
                         "md cloud purge: {} removed path={abs} (had_unpaid_debt)",
@@ -179,7 +186,7 @@ pub(crate) async fn run_folder(
                 }
                 purge_log::append(&key, "removed", &abs.to_string());
                 /* 留底 → 删 → 再清账（§3.4.2）：那行 `last_hash` 是闸⑤ 的取证依据，
-                   先清后删且删失败，这一天就永远进不了候选。 */
+                先清后删且删失败，这一天就永远进不了候选。 */
                 md_cloud_pending::clear(pool, channel, &key).await?;
                 outcome.deleted += 1;
                 if !failed_before {
@@ -205,7 +212,10 @@ pub(crate) async fn run_folder(
         }
     }
     advance(pool, channel, &outcome).await?;
-    finish(pool, channel, today, today_date, plan.state, &outcome, truncated).await
+    finish(
+        pool, channel, today, today_date, plan.state, &outcome, truncated,
+    )
+    .await
 }
 
 /// ② day 已扫过 → 返回；③ paused → 返回；否则把现场交出去。
@@ -227,8 +237,8 @@ async fn begin(
     let upto = read_upto(pool, channel).await;
     if upto.is_some_and(|upto| upto >= today_date) {
         /* 水位落在今天或未来（被别的设备写脏 / 被手工改成 2099）。今天那份恒不进候选，
-           这一轮不可能删掉任何东西；打一行 DEBUG 让排障时看得见，但不刷 INFO 日志
-           （I3 / I9b 的判据都是「0 条 purge: 行」）。 */
+        这一轮不可能删掉任何东西；打一行 DEBUG 让排障时看得见，但不刷 INFO 日志
+        （I3 / I9b 的判据都是「0 条 purge: 行」）。 */
         crate::log_debug!("md cloud purge: skip=watermark day={today}");
         return Ok(None);
     }

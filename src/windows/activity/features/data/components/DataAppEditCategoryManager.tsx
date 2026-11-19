@@ -6,7 +6,7 @@ import { useLocaleText } from "../../../shared/i18n/index.ts";
 import QuietColorField from "../../../shared/components/QuietColorField.tsx";
 import QuietIconAction from "../../../shared/components/QuietIconAction.tsx";
 import type { ColorDisplayFormat } from "../../../shared/lib/colorFormatting.ts";
-import type { AppEditCategoryOption } from "../hooks/useAppEditDialog.ts";
+import type { AppEditCategoryOption } from "../hooks/useAppEditCategoryAdmin.ts";
 
 /**
  * 「分类管理」区：增 / 删 / 改 / 查 四件事的入口。

@@ -40,7 +40,7 @@ pub async fn push(app: &AppHandle, pool: &SqlitePool) {
     };
 
     /* 桥不在 = 原生插件还没注册完（冷启动时 `bootstrap` 可能早于插件 `setup`）。
-       不重试、不排队：下一条状态迁移自然会再进来一次，那一次桥一定在。 */
+    不重试、不排队：下一条状态迁移自然会再进来一次，那一次桥一定在。 */
     let Some(bridge) = app.try_state::<crate::infra::native_bridge::NativeBridge<tauri::Wry>>()
     else {
         crate::log_warn!("overlay push skipped: 原生桥未就绪");

@@ -2,7 +2,7 @@
 //!
 //! ## 落档格式：不可变事件分段，不再是 `{date}.md`
 //!
-//! 远端现在是 `<落点>/sync/events/<设备id>/<seq>.jsonl`（见 [`super::round_stream`] 与
+//! 远端现在是 `<落点>/sync/streams/<设备id>/<目标指纹>/<seq>.jsonl`（见 [`super::round_stream`] 与
 //! `services::sync_stream`）。这一版**停写 md 快照**，三条理由缺一条都不该停：
 //!
 //! 1. **md 是「当天全量状态」的投影**：两台设备同时改一天，谁后 PUT 谁覆盖，中间那次
@@ -67,7 +67,9 @@ pub async fn run(
     let password = match secret::get(secret::KEY_WEBDAV).await {
         Ok(Some(value)) if !value.trim().is_empty() => value,
         Ok(Some(_)) => {
-            report.errors.push("应用密码是空的：请到设置页重新填写".into());
+            report
+                .errors
+                .push("应用密码是空的：请到设置页重新填写".into());
             return Ok(report);
         }
         Ok(None) => {
@@ -83,7 +85,7 @@ pub async fn run(
         }
     };
 
-    /* ② 远端目录。分段路径 `sync/events/<设备>/<seq>.jsonl` 拼在它下面。 */
+    /* ② 远端目录。分段路径 `sync/streams/<设备>/<目标指纹>/<seq>.jsonl` 拼在它下面。 */
     let dir = match channel.remote_dir() {
         Ok(dir) => dir,
         Err(err) => {
@@ -94,7 +96,7 @@ pub async fn run(
     let target = WebdavTarget::new(&channel.base_url, &dir, &channel.user, &password);
 
     /* 退避放在取密码之后：退避是「别把限流烧掉」，而「没密码」这一轮根本不出网，
-       不该被上一轮的失败拖住。 */
+    不该被上一轮的失败拖住。 */
     if backoff::should_skip(now).await {
         crate::log_info!("md cloud: skip=backoff");
         report

@@ -21,9 +21,7 @@ use std::collections::BTreeMap;
 
 use sqlx::{Pool, Sqlite};
 
-use super::read::{
-    load_categories, load_facts, load_overrides, list_blocks, ChildSegmentDto,
-};
+use super::read::{list_blocks, load_categories, load_facts, load_overrides, ChildSegmentDto};
 use super::FocusBlockDto;
 use crate::services::activity::data::attribution::slice::{
     gaps_within, slice_block, summarize_by_category, union_ranges, BlockSpan, ChildSegment,
@@ -83,25 +81,39 @@ pub async fn item_timeline(
     }
 
     /* 事实与分类**按整个区间取一次**：逐个块取会让「一个块一个事实区间」变成 N 次
-       全表扫。分类更贵（每个应用一条 SQL），所以先去重再查。 */
+    全表扫。分类更贵（每个应用一条 SQL），所以先去重再查。 */
     let facts = load_facts(activity, from_ms, to_ms).await?;
     let categories = load_categories(activity, &facts).await?;
 
     /* 按 `item_uid` 分组，保持「块按起点升序」的输入顺序（`BTreeMap` 会按 uid 重排，
-       所以另存一份首次出现的次序）。 */
+    所以另存一份首次出现的次序）。 */
     let mut order: Vec<String> = Vec::new();
     let mut grouped: BTreeMap<String, Vec<FocusBlockDto>> = BTreeMap::new();
     for block in blocks {
         if !grouped.contains_key(&block.item_uid) {
             order.push(block.item_uid.clone());
         }
-        grouped.entry(block.item_uid.clone()).or_default().push(block);
+        grouped
+            .entry(block.item_uid.clone())
+            .or_default()
+            .push(block);
     }
 
     let mut timeline: Vec<ItemTimelineDto> = Vec::with_capacity(order.len());
     for item_uid in order {
         let item_blocks = grouped.remove(&item_uid).unwrap_or_default();
-        timeline.push(build_item_row(activity, &item_blocks, &facts, &categories, from_ms, to_ms, now_ms).await?);
+        timeline.push(
+            build_item_row(
+                activity,
+                &item_blocks,
+                &facts,
+                &categories,
+                from_ms,
+                to_ms,
+                now_ms,
+            )
+            .await?,
+        );
     }
     /* 上层按「最早起点」升序：分组是按 `BTreeMap` 的键取的，而键是 uid 不是时间。 */
     timeline.sort_by(|left, right| {
@@ -130,7 +142,7 @@ async fn build_item_row(
 
     for block in blocks {
         /* 进行中的块收到「此刻」，且整体夹进请求区间：时间轴请求的是 [from, to]，
-           把界外的部分画进来会让上层时长与下层对不上。 */
+        把界外的部分画进来会让上层时长与下层对不上。 */
         let raw_end = block.end_time.unwrap_or(now_ms);
         let start = block.start_time.max(from_ms);
         let end = raw_end.min(to_ms).max(start);
@@ -176,7 +188,7 @@ async fn build_item_row(
         item_uid: first.item_uid.clone(),
         item_name: first.item_name.clone(),
         /* 分类取**第一个块**的快照：同一事项中途改过分类时，历史块各自保留当时的快照，
-           上层这一行显示的是这段区间里最早那条记录的分类。 */
+        上层这一行显示的是这段区间里最早那条记录的分类。 */
         category_key: first.category_key.clone(),
         start_ms: union.first().map(|(start, _)| *start).unwrap_or(from_ms),
         /* `running` 优先：还有一块在跑就显示「进行中」，哪怕别的块早就结束了。 */
@@ -188,7 +200,7 @@ async fn build_item_row(
         gaps,
         totals_by_category: totals,
         /* 取一次 `install_id()`（`OnceLock` 缓存），每行都带：前端按行判断要不要渲染
-           设备元素，不需要再发一次取本机 id 的命令。 */
+        设备元素，不需要再发一次取本机 id 的命令。 */
         self_device_id: crate::services::identity::install_id().map(str::to_string),
     })
 }

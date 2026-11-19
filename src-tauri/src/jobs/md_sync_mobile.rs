@@ -98,7 +98,7 @@ pub fn spawn_md_sync_watcher(app: AppHandle) {
                 }
                 SyncPlan::Cloud { auto } => {
                     /* 切档时计时器从「现在」起算（与桌面 `jobs::md_cloud` 同口径）：
-                       只记一次锚点，不动 `interval_minutes` —— 切档不重置用户填过的分钟数。 */
+                    只记一次锚点，不动 `interval_minutes` —— 切档不重置用户填过的分钟数。 */
                     if prev_schedule != Some(auto.schedule) {
                         if prev_schedule.is_some() {
                             tier.last_attempt_ms = Some(now);

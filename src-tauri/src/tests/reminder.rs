@@ -136,7 +136,9 @@ async fn due_excludes_future_and_fired_then_mark_dedupes() {
     assert_eq!(due[0].target_id, item);
 
     // 事务派发成功后持久去重；失败则回滚使下一轮可重试。
-    let claimed = reminder::dispatch(&pool, &due, 2000, |_| true).await.unwrap();
+    let claimed = reminder::dispatch(&pool, &due, 2000, |_| true)
+        .await
+        .unwrap();
     assert_eq!(claimed.len(), 1);
     assert!(reminder::due(&pool, 2000).await.unwrap().is_empty());
 

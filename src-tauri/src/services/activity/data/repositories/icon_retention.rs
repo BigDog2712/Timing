@@ -1,4 +1,6 @@
-use crate::models::activity::{tracking::resolve_app_override_executable, web_links::registrable_domain};
+use crate::models::activity::{
+    tracking::resolve_app_override_executable, web_links::registrable_domain,
+};
 use sqlx::{Sqlite, Transaction};
 use std::collections::HashSet;
 

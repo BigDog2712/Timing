@@ -383,7 +383,9 @@ pub(super) fn map_reminder_row(row: sqlx::sqlite::SqliteRow) -> Result<ToolRemin
     let recurrence = row
         .get::<Option<String>, _>("recurrence")
         .map(|value| {
-            serde_json::from_str::<crate::models::activity::reminder_schedule::ReminderRecurrence>(&value)
+            serde_json::from_str::<crate::models::activity::reminder_schedule::ReminderRecurrence>(
+                &value,
+            )
         })
         .transpose()
         .map_err(|error| format!("invalid stored reminder recurrence: {error}"))?;

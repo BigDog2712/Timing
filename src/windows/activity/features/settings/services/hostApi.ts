@@ -52,6 +52,15 @@ import {
   openLegacyDir,
 } from "../../../platform/desktop/hostSyncGateway";
 import { pluginList, pluginOpenDir } from "../../../platform/desktop/hostPluginsGateway";
+import {
+  aiConfigGet,
+  aiConfigSave,
+  aiDailySummary,
+  aiListModels,
+  aiSuggestTags,
+  aiTest,
+} from "../../../platform/desktop/hostAiGateway";
+import type { AiConfig, AiListModelsRequest, AiSuggestRequest } from "../../../shared/types/ai.ts";
 import type {
   HostSettings,
   Decision,
@@ -79,6 +88,16 @@ export const settingsApi = {
 export const pluginApi = {
   list: pluginList,
   openDir: pluginOpenDir,
+};
+
+/** AI 域（[0.12.3]）：配置读写 / 连接测试 / 模型目录 / 标签建议 / 今日汇总。 */
+export const aiApi = {
+  get: aiConfigGet,
+  save: (config: AiConfig, apiKey?: string | null) => aiConfigSave(config, apiKey),
+  test: aiTest,
+  listModels: (request: AiListModelsRequest) => aiListModels(request),
+  suggestTags: (request: AiSuggestRequest) => aiSuggestTags(request),
+  dailySummary: aiDailySummary,
 };
 
 /** Markdown 同步域（执行在 Rust，前端只配置与看状态）。 */

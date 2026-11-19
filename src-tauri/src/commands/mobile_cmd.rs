@@ -14,17 +14,13 @@ use crate::models::native::{OverlayStatus, SafStatus};
 /// 弹系统目录选择器。用户取消时 `granted = false`，不是错误——
 /// 取消是正常操作，报错会让设置页弹出无意义的红字。
 #[tauri::command]
-pub async fn md_saf_pick(
-    bridge: State<'_, NativeBridge<tauri::Wry>>,
-) -> AppResult<SafStatus> {
+pub async fn md_saf_pick(bridge: State<'_, NativeBridge<tauri::Wry>>) -> AppResult<SafStatus> {
     bridge.call("safPickFolder", serde_json::json!({})).await
 }
 
 /// 当前授权是否仍然有效。用户可能去系统设置里撤销，也可能把目录删了。
 #[tauri::command]
-pub async fn md_saf_status(
-    bridge: State<'_, NativeBridge<tauri::Wry>>,
-) -> AppResult<SafStatus> {
+pub async fn md_saf_status(bridge: State<'_, NativeBridge<tauri::Wry>>) -> AppResult<SafStatus> {
     bridge.call("safStatus", serde_json::json!({})).await
 }
 

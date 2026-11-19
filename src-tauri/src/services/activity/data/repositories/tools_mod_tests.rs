@@ -4,16 +4,13 @@
 
 use super::timed_reminders::*;
 use super::*;
-use crate::services::activity::data::schema as db_schema;
 use crate::models::activity::tools::{
     ActivityReminderSuspensionReason, ActivityReminderTarget, ReminderStatus, ToolReminder,
 };
+use crate::services::activity::data::schema as db_schema;
 use sqlx::{Executor, SqlitePool};
 
-async fn fire_due_reminders(
-    pool: &Pool<Sqlite>,
-    now_ms: i64,
-) -> Result<Vec<ToolReminder>, String> {
+async fn fire_due_reminders(pool: &Pool<Sqlite>, now_ms: i64) -> Result<Vec<ToolReminder>, String> {
     let mut tx = pool.begin().await.map_err(|error| error.to_string())?;
     let result = super::timed_reminders::fire_due_reminders(&mut tx, now_ms).await?;
     tx.commit().await.map_err(|error| error.to_string())?;
@@ -199,10 +196,9 @@ fn paused_reminders_are_not_truncated_to_recent_history() {
     tauri::async_runtime::block_on(async {
         let pool = setup_test_db().await;
         for index in 0..30 {
-            let reminder =
-                create_reminder(&pool, &format!("Reminder {index}"), 2_000, None, 1_000)
-                    .await
-                    .unwrap();
+            let reminder = create_reminder(&pool, &format!("Reminder {index}"), 2_000, None, 1_000)
+                .await
+                .unwrap();
             update_reminder(
                 &pool,
                 reminder.id,
@@ -428,12 +424,10 @@ fn app_activity_reminder_counts_today_usage_and_active_session_once() {
 fn activity_usage_clips_cross_midnight_active_and_future_segments() {
     tauri::async_runtime::block_on(async {
         let pool = setup_test_db().await;
-        sqlx::query(
-            "INSERT INTO settings (key, value) VALUES ('web_activity_enabled', 'true')",
-        )
-        .execute(&pool)
-        .await
-        .unwrap();
+        sqlx::query("INSERT INTO settings (key, value) VALUES ('web_activity_enabled', 'true')")
+            .execute(&pool)
+            .await
+            .unwrap();
         sqlx::query(
             "INSERT INTO sessions (
                 app_name, exe_name, window_title, start_time, end_time, duration,
@@ -552,10 +546,9 @@ fn web_activity_rules_reject_unobserved_or_excluded_domains() {
         let target = ActivityReminderTarget::Web {
             normalized_domain: "example.com".to_string(),
         };
-        let unobserved =
-            create_activity_reminder_rule(&pool, &target, "Example", 60_000, "", 1)
-                .await
-                .unwrap_err();
+        let unobserved = create_activity_reminder_rule(&pool, &target, "Example", 60_000, "", 1)
+            .await
+            .unwrap_err();
         assert!(unobserved.contains("has not been observed"));
 
         sqlx::query(

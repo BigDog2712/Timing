@@ -92,14 +92,28 @@ pub(super) async fn live_records(pool: &SqlitePool) -> Vec<(i64, i64)> {
 async fn timers_two_sided_insert_keeps_both_sides() {
     let env = env("conflict-timers").await;
     let item = new_item(&env.pool, "写代码").await;
-    let nine = insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    let nine = insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
 
     /* 第一轮：建立基线（文件 = 一段） */
     services::md_sync::run(&env.pool).await.unwrap();
     assert!(body_of(&env, TIMERS_HEADING).contains("09:00:00"));
 
     /* PC 端加一段：只进库，文件不动 */
-    let eleven = insert_saved(&env.pool, item, at(env.date, 11, 0), at(env.date, 11, 30), 1800).await;
+    let eleven = insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 11, 0),
+        at(env.date, 11, 30),
+        1800,
+    )
+    .await;
 
     /* MD 端加一段：只进文件（同一事项的 `log:` 列表里再追加一段）。 */
     rewrite(
@@ -147,9 +161,17 @@ async fn todo_removed_from_file_survives_in_sql() {
     let env = env("conflict-todos").await;
     let tomorrow = env.date.succ_opt().unwrap();
     let now = at(env.date, 8, 0);
-    let todo = todo_repo::insert(&env.pool, "写季度总结", None, Some(at(tomorrow, 9, 0)), None, 0, now)
-        .await
-        .unwrap();
+    let todo = todo_repo::insert(
+        &env.pool,
+        "写季度总结",
+        None,
+        Some(at(tomorrow, 9, 0)),
+        None,
+        0,
+        now,
+    )
+    .await
+    .unwrap();
 
     services::md_sync::run(&env.pool).await.unwrap();
     assert!(body_of(&env, TODOS_HEADING).contains("写季度总结"));
@@ -183,7 +205,12 @@ async fn note_deleted_then_readded_comes_back_with_new_id() {
         &env.pool,
         None,
         "买牛奶",
-        crate::models::note::NoteGeometry { pos_x: 160.0, pos_y: 160.0, width: 280.0, height: 200.0 },
+        crate::models::note::NoteGeometry {
+            pos_x: 160.0,
+            pos_y: 160.0,
+            width: 280.0,
+            height: 200.0,
+        },
         at(env.date, 9, 0),
     )
     .await
@@ -207,13 +234,23 @@ async fn note_deleted_then_readded_comes_back_with_new_id() {
     rewrite(
         &env,
         NOTES_HEADING,
-        &format!("| 更新时间 | 事项 | 内容 |\n|---|---|---|\n| {} | — | 买牛奶 |", ts(env.date, 9, 0)),
+        &format!(
+            "| 更新时间 | 事项 | 内容 |\n|---|---|---|\n| {} | — | 买牛奶 |",
+            ts(env.date, 9, 0)
+        ),
     );
     services::md_sync::run(&env.pool).await.unwrap();
 
-    let fresh = scalar_i64(&env.pool, "SELECT MAX(id) FROM notes WHERE deleted_at IS NULL").await;
+    let fresh = scalar_i64(
+        &env.pool,
+        "SELECT MAX(id) FROM notes WHERE deleted_at IS NULL",
+    )
+    .await;
     // 实测 v0.11.17: 新 id = 旧 id + 1（复活成新行，不是把旧行救回来）
-    assert!(fresh > note, "{KNOWN}：同文本回填会得到新 id（实测 max 存活 id = {fresh}，原 {note}）");
+    assert!(
+        fresh > note,
+        "{KNOWN}：同文本回填会得到新 id（实测 max 存活 id = {fresh}，原 {note}）"
+    );
     assert_eq!(fresh, note + 1, "{KNOWN}：实测就是「紧接一条新行」");
     let old_still_deleted = scalar_i64(
         &env.pool,
@@ -235,9 +272,23 @@ async fn first_round_after_restart_deletes_nothing() {
     let item = new_item(&env.pool, "写代码").await;
 
     /* 库里两段，文件里只有一段 —— 正是「关着软件时在编辑器里删掉一段」的形状。
-       注意这里**没有先跑一轮**，所以本进程对这个路径还没有基线（= 刚重启）。 */
-    let nine = insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
-    let eleven = insert_saved(&env.pool, item, at(env.date, 11, 0), at(env.date, 11, 30), 1800).await;
+    注意这里**没有先跑一轮**，所以本进程对这个路径还没有基线（= 刚重启）。 */
+    let nine = insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
+    let eleven = insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 11, 0),
+        at(env.date, 11, 30),
+        1800,
+    )
+    .await;
     rewrite(
         &env,
         TIMERS_HEADING,
@@ -270,7 +321,14 @@ async fn first_round_after_restart_deletes_nothing() {
 async fn write_section_keeps_free_text_outside_the_heading_block() {
     let env = env("conflict-section").await;
     let item = new_item(&env.pool, "写代码").await;
-    insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
 
     let before = "手写段落甲\n\n#### 备忘\n\n手写段落乙\n";
     let path = file_for(&env);
@@ -280,8 +338,14 @@ async fn write_section_keeps_free_text_outside_the_heading_block() {
 
     let text = std::fs::read_to_string(&path).unwrap();
     // 实测 v0.11.17: 两段手写文字都在，顺序不变
-    assert!(text.contains("手写段落甲"), "{KNOWN}：区块外的手写内容必须保留");
-    assert!(text.contains("手写段落乙"), "{KNOWN}：区块外的手写内容必须保留");
+    assert!(
+        text.contains("手写段落甲"),
+        "{KNOWN}：区块外的手写内容必须保留"
+    );
+    assert!(
+        text.contains("手写段落乙"),
+        "{KNOWN}：区块外的手写内容必须保留"
+    );
     assert!(text.contains(TIMERS_HEADING), "区块应被追加到文件末尾");
     assert!(text.contains("写代码"));
     assert!(

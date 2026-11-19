@@ -27,7 +27,7 @@ pub const ID_OPEN_SETTINGS: &str = "open_settings";
 pub const ID_OPEN_TODOS: &str = "open_todos";
 pub const ID_OPEN_NOTE: &str = "open_note";
 /* [V0.12.0 Patina 融合] 打开时间统计窗口（label `patina`）。与「便利贴…」同性质：
-   只 emit / 路由，真正的窗由 app 层开。位置贴着「打开事项」——统计的对象就是事项计时。 */
+只 emit / 路由，真正的窗由 app 层开。位置贴着「打开事项」——统计的对象就是事项计时。 */
 pub const ID_OPEN_STATS: &str = "open_stats";
 /* [V0.11.7] 一次双向 Markdown 同步（用户口径：不想为了一次同步专门开设置页） */
 pub const ID_MD_SYNC: &str = "md_sync";

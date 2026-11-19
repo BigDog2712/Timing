@@ -6,7 +6,9 @@
 //! （调用点 `app::activity::runtime` 与本文件的用例都走原路径，零改动）。
 
 use super::{maintain_once, now_ms};
-use crate::services::activity::data::sqlite_pool::{optimize_query_statistics, wait_for_sqlite_pool};
+use crate::services::activity::data::sqlite_pool::{
+    optimize_query_statistics, wait_for_sqlite_pool,
+};
 use sqlx::{Pool, Sqlite};
 use std::sync::{Arc, Weak};
 use std::time::Instant;

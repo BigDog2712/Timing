@@ -97,15 +97,15 @@ pub async fn start(pool: &SqlitePool, item_id: Option<i64>) -> AppResult<TimeRec
         return Err(AppError::item_not_found());
     }
     /* 块只挂叶子（设计文档 §3.2）。有子事项的事项再自己计时，父的时长会和**全部**子事项
-       并行重复计时，而「父块该不该含子块」这件事在任何一条读路径上都没有答案。
-       拦在写入前：`services::item::resolve_depth` 保证树只有 2 层，这里保证第 0 层不落块。 */
+    并行重复计时，而「父块该不该含子块」这件事在任何一条读路径上都没有答案。
+    拦在写入前：`services::item::resolve_depth` 保证树只有 2 层，这里保证第 0 层不落块。 */
     if item_repo::count_children(pool, item_id).await? > 0 {
         return Err(AppError::invalid_duration());
     }
     let now = clock::now_ms();
     /* [S3] 会话行与 `start` 事件**同一个事务**：分成两次写时，「行落了、事件没落」会让
-       对端只收到后面的 pause/stop，fold 判「没有 start」把它们全忽略 —— 那条会话在
-       另一台上根本不存在，而本机一切正常。 */
+    对端只收到后面的 pause/stop，fold 判「没有 start」把它们全忽略 —— 那条会话在
+    另一台上根本不存在，而本机一切正常。 */
     let mut tx = pool.begin().await.map_err(AppError::db)?;
     let id = session::insert_active_in(&mut tx, item_id, now).await?;
     /* `at_ms` 用 `now`：start 没有「段起点」可参照，它自己就是段起点。 */
@@ -130,10 +130,10 @@ pub async fn pause(pool: &SqlitePool) -> AppResult<TimeRecord> {
     if let Some(running_since) = active.running_since {
         let accumulated = active.accumulated_sec + floor_sec(elapsed_ms(running_since, now));
         /* 语义时刻要在 `clear_anchor` **之前**算：之后单调锚点就没了，`elapsed_ms` 会退回
-           墙钟差值，与刚才写进 `accumulated_sec` 的那一份不是同一个来源。 */
+        墙钟差值，与刚才写进 `accumulated_sec` 的那一份不是同一个来源。 */
         let at_ms = timer_events::end_at(Some(running_since), now);
         /* [S3] 状态与事件同一事务：分开写会出现「本机暂停了、对端还在跑」，
-           而且两边都不报错。锚点在 commit **之后**才清 —— 回滚时那段还在跑。 */
+        而且两边都不报错。锚点在 commit **之后**才清 —— 回滚时那段还在跑。 */
         let mut tx = pool.begin().await.map_err(AppError::db)?;
         session::set_accum_and_running_in(&mut tx, active.id, accumulated, None, now).await?;
         timer_events::record(&mut tx, active.id, TimerOpKind::Pause, at_ms, None).await?;
@@ -152,10 +152,16 @@ pub async fn resume(pool: &SqlitePool) -> AppResult<TimeRecord> {
     let now = clock::now_ms();
     if active.running_since.is_none() {
         let mut tx = pool.begin().await.map_err(AppError::db)?;
-        session::set_accum_and_running_in(&mut tx, active.id, active.accumulated_sec, Some(now), now)
-            .await?;
+        session::set_accum_and_running_in(
+            &mut tx,
+            active.id,
+            active.accumulated_sec,
+            Some(now),
+            now,
+        )
+        .await?;
         /* `resume` 的 `at_ms` 是**新段的起点**，所以取 `now` 而不是 `elapsed_at`：
-           这时还没有流逝可算（段的流逝从此刻开始）。 */
+        这时还没有流逝可算（段的流逝从此刻开始）。 */
         timer_events::record(&mut tx, active.id, TimerOpKind::Resume, now, None).await?;
         tx.commit().await.map_err(AppError::db)?;
         clock::anchor(now);
@@ -172,7 +178,7 @@ pub async fn discard(pool: &SqlitePool) -> AppResult<()> {
     /* 丢弃也把真实累计写进去：软删除的行不该留 `accumulated_sec=0` 的脏值。 */
     let accumulated = live_duration(&active, now);
     /* [S3] 丢弃 + `drop` 事件同一事务。`drop` 是一条**事件**（不是删掉旧事件）：
-       对端 fold 到它才知道这段被丢弃，否则它会照着 start 造出一段「还在进行中」的块。 */
+    对端 fold 到它才知道这段被丢弃，否则它会照着 start 造出一段「还在进行中」的块。 */
     let mut tx = pool.begin().await.map_err(AppError::db)?;
     session::discard_in(&mut tx, active.id, accumulated, now, now).await?;
     timer_events::record(&mut tx, active.id, TimerOpKind::Drop, now, None).await?;
@@ -202,7 +208,7 @@ pub async fn switch(pool: &SqlitePool, item_id: i64, mode: SwitchMode) -> AppRes
     match mode {
         SwitchMode::JustSwitch => {
             /* 换事项也是事件（`adjust` 带 `item_uid`）：只改本地行时对端 fold 只认 `start`
-               上的事项，整段时长会一直记在旧事项名下。 */
+            上的事项，整段时长会一直记在旧事项名下。 */
             let mut tx = pool.begin().await.map_err(AppError::db)?;
             if let Some(uid) = session::set_item_id_in(&mut tx, active.id, item_id, now).await? {
                 let at = timer_events::end_at(active.running_since, now);
@@ -220,7 +226,7 @@ pub async fn switch(pool: &SqlitePool, item_id: i64, mode: SwitchMode) -> AppRes
             // 与手动结束同一口径，见 ADR-023。
             let discard_old = should_ignore(pool, accumulated).await;
             /* 旧段收尾、新会话、两条事件全在一个事务里：
-               分开写时「旧段落了、stop 事件没落」会让对端仍以为旧会话在跑。 */
+            分开写时「旧段落了、stop 事件没落」会让对端仍以为旧会话在跑。 */
             let mut tx = pool.begin().await.map_err(AppError::db)?;
             let crosses_midnight = !discard_old
                 && crate::services::timer_split::split_by_day(active.started_at, now, accumulated)

@@ -56,7 +56,9 @@ pub(super) async fn flush_pending_power_stop_and_publish<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::activity::data::{repositories::sessions, schema, tracking_runtime::TrackingRuntimeDataStore};
+    use crate::services::activity::data::{
+        repositories::sessions, schema, tracking_runtime::TrackingRuntimeDataStore,
+    };
     use sqlx::{Executor, SqlitePool};
 
     #[test]

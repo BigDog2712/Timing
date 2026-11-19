@@ -6,7 +6,9 @@
 //!
 //! 不测的东西：UI 的按钮接线（前端 vitest 管）、`rfd` 弹窗（要真人点）。
 
-use crate::services::activity::data::bundle::{export_full_bundle, import_full_bundle, inspect_file};
+use crate::services::activity::data::bundle::{
+    export_full_bundle, import_full_bundle, inspect_file,
+};
 use crate::tests::support;
 use serde_json::Value;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -96,11 +98,17 @@ async fn exported_bundle_round_trips_through_inspect() {
     /* 导出是全量（含软删）：行数必须与 `COUNT(*)` 逐字相等。 */
     let items_total = support::scalar_i64(&business, "SELECT COUNT(*) FROM items").await;
     assert_eq!(
-        parsed["business"]["items"].as_array().expect("items 数组").len() as i64,
+        parsed["business"]["items"]
+            .as_array()
+            .expect("items 数组")
+            .len() as i64,
         items_total,
     );
     assert_eq!(
-        parsed["activity"]["sessions"].as_array().expect("sessions 数组").len(),
+        parsed["activity"]["sessions"]
+            .as_array()
+            .expect("sessions 数组")
+            .len(),
         1,
     );
     /* 生成列也在包里（导入时按 `table_xinfo` 跳过，不写回去）。 */
@@ -108,8 +116,14 @@ async fn exported_bundle_round_trips_through_inspect() {
 
     let preview = inspect_file(&path).expect("预览应成功");
     assert!(preview.compatible, "同一版本导出的包必须兼容");
-    assert_eq!(preview.total_rows, summary.row_count, "预览总行数应等于导出行数");
-    assert!(preview.tables.iter().any(|t| t.name == "activity.sessions" && t.rows == 1));
+    assert_eq!(
+        preview.total_rows, summary.row_count,
+        "预览总行数应等于导出行数"
+    );
+    assert!(preview
+        .tables
+        .iter()
+        .any(|t| t.name == "activity.sessions" && t.rows == 1));
 }
 
 /// 判据 3 的前半：导入到空库后各表行数与包内一致（含活动库的生成列表）。
@@ -145,7 +159,10 @@ async fn importing_into_a_fresh_database_reproduces_the_counts() {
         .expect("导入应成功");
     assert!(result.total_inserted > 0, "空库里应有新增");
     assert!(
-        result.tables.iter().any(|stat| stat.name == "activity.sessions" && stat.inserted == 1),
+        result
+            .tables
+            .iter()
+            .any(|stat| stat.name == "activity.sessions" && stat.inserted == 1),
         "活动行的统计缺失：{:?}",
         result.tables
     );
@@ -156,7 +173,7 @@ async fn importing_into_a_fresh_database_reproduces_the_counts() {
         "待办行数应与源库一致",
     );
     /* 源库那条种子事项（`uid` 空、`device_id` 空）现在被**合成 uid** 后照常导入，
-       目标库自己还有一条种子 ⇒ 行数 = 源 + 1。从前的「按 id 忽略」会静默少一行。 */
+    目标库自己还有一条种子 ⇒ 行数 = 源 + 1。从前的「按 id 忽略」会静默少一行。 */
     assert_eq!(
         support::scalar_i64(&target, "SELECT COUNT(*) FROM items").await,
         source_items + 1,
@@ -220,8 +237,8 @@ async fn importing_the_same_bundle_twice_inserts_nothing_new() {
         second.tables
     );
     /* 判据 ②：连「更新」也得是 0 —— uid 类表的守卫是「内容没变就不写」，
-       否则 `AFTER UPDATE OF ...` 的 touch 触发器会把每一行的 `updated_at_ms` 推到
-       「现在」，重复导入变成一次全库写风暴。 */
+    否则 `AFTER UPDATE OF ...` 的 touch 触发器会把每一行的 `updated_at_ms` 推到
+    「现在」，重复导入变成一次全库写风暴。 */
     assert_eq!(
         second.total_updated, 0,
         "第二次不应再改任何行：{:?}",
@@ -278,7 +295,10 @@ async fn tables_without_uid_report_skipped_instead_of_failing() {
         .find(|stat| stat.name == "activity.settings")
         .expect("应回报活动库 settings 统计");
     assert_eq!(activity_settings.inserted, 0);
-    assert!(activity_settings.skipped > 0, "本地已有则跳过：{activity_settings:?}");
+    assert!(
+        activity_settings.skipped > 0,
+        "本地已有则跳过：{activity_settings:?}"
+    );
     /* 机器身份类键**永不**跨设备搬。 */
     let token: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM settings WHERE key IN \

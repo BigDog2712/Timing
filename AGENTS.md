@@ -30,12 +30,12 @@ Timing（Windows 桌面悬浮计时条 + 安卓同一份源码，Tauri 2 + React
 - 后端 `src-tauri/src/**` 六层，依赖**只能向下**（ADR-016）：
   `platform`（叶子：clock / log / boot_timing）→ `infra`（窗口 / 托盘菜单 / 通知 / 几何 / 迁移）→ `services`（业务）→ `app`（装配：events / tray / bootstrap / diagnostics）与 `jobs`（调度）→ `commands`（IPC 入口）。
   其中 `models` / `infra` / `services` / `app` / `commands` 五层各带一个 `activity/` 命名空间（子系统归一，见 `docs/refactor/patina-structural-merge.md` §2.2）：`models/activity ← infra/activity ← services/activity ← app/activity ← commands/activity`，方向与宿主层序一致。`activity` 是命名空间，不是第 7 层。
-- 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql` … `0016_sync_targets.sql`，共 **16** 个版本（20 个 `.sql` 文件——`0012` 自带一份 `_guard`），当前 schema **v16**，`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。**0007 是重建表，不吃重跑**，必须由版本门 `< 7` 只放行一次（见 `infra/migrate.rs` 注释）。**两条迁移撞同一编号时，后落地那张永不执行且零报错**（版本门 `< N` 在存量库上恒假）——合流时先查号。
+- 数据库 SQLite：`src-tauri/src/migrations/0001_init.sql` … `0017_v01231_item_tags.sql`，共 **17** 个版本（21 个 `.sql` 文件——`0012` 自带一份 `_guard`），当前 schema **v17**，`settings.schema.version` 记录迁移版本；改表必须新增迁移，不改历史文件。**0007 是重建表，不吃重跑**，必须由版本门 `< 7` 只放行一次（见 `infra/migrate.rs` 注释）。**两条迁移撞同一编号时，后落地那张永不执行且零报错**（版本门 `< N` 在存量库上恒假）——合流时先查号。
 - **活动库（`activity.db`）走 sqlx `Migrator`**：正文在 `services/activity/data/sql/00NN_*.sql`，登记在 `data/schema_registry.rs`，账本 `_sqlx_migrations.checksum` 存的是 **sha384(文件字节)**，逐字节比对。
   所以**凡是在任何库上跑过的 `.sql` 一个字都不能再改**（改注释、调缩进都算）——改了老库开机即 `数据库里的迁移 N 的校验和与当前版本不一致`（`schema_core/ensure.rs::describe_migration_failure`），而且这条**不自动修账本**（对用户是对的，对开发者是拦路）。
   未出包的迁移确实需要改正文时，本机库必须一起回到「未应用」状态：`DROP` 该迁移建的对象 + `DELETE FROM _sqlx_migrations WHERE version=N`，让 sqlx 自己重跑重算（表为空时最省事；有数据就先 `cp` 一份库）。
 - **数据目录迁移（V0.5.0）**：`infra/appdata_migrate/`（`paths` / `decide` / `copy` / `verify` / `marker` / `mod`）是 **headless** 的——不依赖 services、不依赖 tauri，所以能用两个临时目录直接跑测试（`run_at(&Paths, skip)`）。编排在 `app/preboot.rs`（桌面独占，跑在 `Builder::run` 之前、`log::init` 之前，故模块内不写日志），两条 IPC 命令在 `commands/migration_cmd.rs`。老库名 `tickbar.db` 与新库名 `timing.db` 的映射只认三种后缀（`""` / `-wal` / `-shm`），定义在 `paths.rs`。
-- IPC 契约：宿主命令 **95** 条 + Patina **113** 条（仅桌面，`#[cfg(desktop)]`），一张表写在 `src-tauri/src/ipc_commands.rs`（`docs/phase2/IPC-CONTRACT-v2.md`）；事件 12 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
+- IPC 契约：宿主命令 **109** 条 + Patina **114** 条（仅桌面，`#[cfg(desktop)]`），一张表写在 `src-tauri/src/ipc_commands.rs`（`docs/phase2/IPC-CONTRACT-v2.md`）；事件 12 个（`docs/phase2/IPC-CONTRACT-v3.md`）。
 - 插件：`plugins/<id>/plugin.json` 是**启动头**，宿主只读不执行（声明式）。目录三处合并扫描
   （dev → exe → user，同 id 先到先得）。v1 贡献点 `quickTimers`（摸鱼菜单预设）；
   **v2 曾新增 `mdSync`**（Markdown 双向同步落点），**v3 已下架、同步归内核**
@@ -57,10 +57,17 @@ cd src-tauri && cargo test                 # 后端测试，必须全绿
 cd src-tauri && cargo clippy --all-targets -- -D warnings -A clippy::unwrap_used -A clippy::expect_used
 ```
 
-**没有 `cargo fmt`**（`cargo fmt --check` 也不是门禁，别加回来）：它与「单文件 ≤300 行」不可
-同时满足 —— 全仓 fmt 会把 14 个原本合规的文件换行推过 300 行，`size-allowlist.json` 从 150 条
-涨到 164 条，而基线是只许减的棘轮（实测记录见 `CHANGELOG.md` 的 2026-11-13 一节）。二选一，
-本项目选 300 行；改代码按现有风格手写。
+**没有 `cargo fmt`**（`cargo fmt --check` 也不是门禁，别加回来）。理由在 2026-11-19 换过一次，
+现在是**一条独立决定**，不再是「与行数限制冲突」：
+
+> **旧理由（已作废，别再用）**：2026-11-13 实测全仓 fmt 把 14 个原本合规的文件换行推过
+> 当时的 300 行线，基线从 150 条涨到 164 条 —— 冲突确实存在过。上限改 600 后同日实测：
+> 全仓 `cargo fmt`（edition 2021）**0 个文件越 600**、36 个存量超限文件**无一增长**、
+> 835 个 `.rs` 里只有 **13 个（2%）** 会被改写 —— 在 600 下两者可以并存。
+> （另：计数改「有效行」时这条也没变过 —— fmt 加的是换行，落在代码行上，有效行照样涨。）
+>
+> **现在的理由**：那 13 个文件的纯排版差异会混进每个功能 diff，而本仓的审查靠 diff 可读性。
+> 要放开就单开一批（`cargo fmt` + 单独提交 + 重记基线），不许顺手夹在功能提交里。
 
 clippy 那两条 `-A` 是**存量豁免**，不是抄错命令：`unwrap_used` / `expect_used` 是 `Cargo.toml`
 里我们自己开的 restriction lint，`--all-targets` 下约 5,900 处（绝大多数在测试与验收支撑）。
@@ -75,9 +82,11 @@ clippy 那两条 `-A` 是**存量豁免**，不是抄错命令：`unwrap_used` /
 - **产物必须能生成** → `npm run check:build`（就是 `vite build`）
   T02 把分析窗子树改成 `activity/` 之后，`src/windows/timing/entry/main.tsx` 还留着 8 行 `../../patina/shell/styles/…css`，**整包构建不出来，而当时九步门禁 + 1844 个测试全绿**。原因有两层：`vitest` 根本不解析 CSS 说明符；`tsc` 也拦不住 —— `vite/client` 把 `*.css` 声明成**通配模块**，任何路径都算「解析成功」。所以这一类错只有真的打包一次才看得见。
   没有这一步，前面所有判据守的是**一个构建不出来的包**。
-- **单文件 ≤300 行**（前后端一致）→ `npm run check:size`
-  超限文件登记在 `scripts/size-allowlist.json` 的**冻结基线**（条数看该文件，由 `--freeze` 扫描生成，禁止手写）——**别在这里写死数字**，它每批都在变，写死就是下一次过期。它是**棘轮**：只许减不许增——行数超过冻结值、或出现不在基线里的新超限文件，一律红。拆分后跑 `node scripts/check-size.mjs --freeze` 收紧。
+- **单文件 ≤600 有效行**（前后端一致）→ `npm run check:size`
+  口径：**有效行 = 物理行去掉整行注释与空行**（行尾注释不剥，那一行本来就有代码）。词法扫描在 `scripts/size-measure.mjs`：字符串里的 `//`、Rust 的 `r#"..."#`、CSS 的 `content:"/*"` 都不会被误当注释；**字符串内容算代码行**（一段 30 行 SQL 是真实体积，按注释扣掉会让文件虚低 = 假绿）。改测量口径必须同时 `--freeze` 重记基线 —— `size-allowlist.json` 里存了 `mode` 字段，口径与脚本对不上时直接拒绝运行，不会静默错位。
+  超限文件登记在 `scripts/size-allowlist.json` 的**冻结基线**（条数看该文件，由 `--freeze` 扫描生成，禁止手写）——**别在这里写死数字**，它每批都在变，写死就是下一次过期。它是**棘轮**：只许减不许增——有效行超过冻结值、或出现不在基线里的新超限文件，一律红。拆分后跑 `node scripts/check-size.mjs --freeze` 收紧。
   **硬目标（2026-11-12 拍板）**：每版至少 **−10 条**，0.15.0 前压到 **100 条以内**；未达标不提交出包。门禁摘要会打印「超限行数 / 总行数」占比 —— 具体数字以 `node scripts/check-size.mjs` 的**输出为准**，别只看条数。
+  [2026-11-19] 上限 300 → 600 之后**条数不可跨口径比**：118 → 45 是尺子变了，不是债务少了一半（落到 300–600 的文件从此能一路涨到 600 才报警）。门禁已把 100 条标为「名义目标」，跨版本真正可比的指标是占比：300 口径 27.1% → 600 口径 15.1%。**别把 45 条当达标庆祝**。
 - **分层只能向下** → `npm run check:layers`（10 条 grep 规则）
   L1 `components`（含 `activity/{shell,features,shared}` 下的 `components/`）不 `invoke`；L2 `stores`（含 `*Store.ts`、`features/**/stores`）不碰 `ipc.`；L3 只有 `windows/shared/windowApi.ts` 引窗口 API 包（`api/window` 与 `api/webviewWindow`）；L4 `infra` 不 `use crate::services`；L5 `commands` 不 `use crate::repositories`；L6 无 `eprintln!`（走 `log_*!`）；L7 编译期平台常量 `__TIMING_MOBILE__` 只许出现在 `windows/timing/lib/platform.ts`（带哨兵，防「绿着空转」）；L8 业务写入信号 `dirty::mark(` 只许出现在 `src-tauri/src/commands/`，`jobs/` 与 `services/` 0 命中（带 `pub fn mark(` 定义哨兵，防改名后绿着空转）；L9 双窗隔离——主窗与分析窗不得互相 import，**例外表已清空**：原 5 条共享模块（windowApi / handleCatalog / handleBindings / pillAppearance / pillPrefsGateway）已整体下沉到 `src/windows/shared/`，两侧直接引它，跨窗引用在物理上消失（带哨兵：两条路径集合必须非空；例外表非空时每条必须真实存在，防薄壳改名后绿着空转）；**L10 分层方向**——`activity/platform/**` 不得 import `features/**` 或 `shell/**`，`activity/shared/**` 不得 import `features/**`、`shell/**`、`platform/**`，`windows/shared/**` 不得 import `timing/**` 或 `activity/**`（带哨兵：每层路径集合非空且至少解析出 1 条相对 import，防路径前缀写错后绿着空转；`*.test.*` 不参与——测试站在最上层验收接缝；CSS 等资源说明符不参与——它们没有模块语义）。
 - **IPC 契约** → `npm run check:contract`
@@ -108,10 +117,10 @@ clippy 那两条 `-A` 是**存量豁免**，不是抄错命令：`unwrap_used` /
   所有 `check:*` 都跑在**工作树**上，看不见 blob。T05 里出过一次：`npm run check:size` 绿、`git commit`
   也成功，而**已提交的 blob 是 303 行**（工作树那会儿 300）——差的正是「我以为我删掉了」的那三行。
   门禁与提交之间存在时间窗，所以两道补手：① 每次 commit 完**立刻在干净树上重跑一次**受影响的门禁；
-  ② 对有硬上限的文件（`check:size` 的 300 行）再补一次**核 blob**：`git show HEAD:<file> | wc -l`。
+  ② 对有硬上限的文件（`check:size` 的 600 有效行）再补一次**核 blob**：`git show HEAD:<file> | node scripts/size-measure.mjs --ext .rs`（`wc -l` 量的是物理行，口径已经不对了）。
   不用「推之前 `git stash -u` 再补跑」那套：它靠人记得 stash 回来，忘了就把在写的改动弄丢，代价比漏检大。
 - CSS 只用 `var(--*)` 令牌，零字面量色值、零 emoji、零紫粉渐变；令牌定义在 `src/windows/timing/styles/design-tokens.css`（索引，实体在 `src/windows/timing/styles/tokens/*.css`，**@import 顺序不可调换**）。
-- 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/windows/timing/types/domain/models.ts::ErrorCode` 与文案 `src/windows/timing/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **20** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
+- 错误码只在 `src-tauri/src/error.rs` 定义（`as_str`），前端镜像**两处**：联合类型 `src/windows/timing/types/domain/models.ts::ErrorCode` 与文案 `src/windows/timing/services/ipc.ts::errorText()`。三者逐字一致，由 `check:contract` 断言。当前 **31** 个；**加码与下架都必须走契约评审**（同步改 union / 文案 / 契约文档 §2，并写一份 ADR 说明为什么现有码表达不了——或为什么该码不再有触发点，见 ADR-018 / ADR-021 / ADR-022）。
 - 文档目录：现行文档在 `docs/`；`docs/archive/v1/` 只作历史，不作为实现依据。
 
 ## 权限面

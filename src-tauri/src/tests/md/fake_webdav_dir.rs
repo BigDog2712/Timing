@@ -172,7 +172,7 @@ fn request_line(raw: &str) -> (String, String) {
     let mut parts = raw.lines().next().unwrap_or("").split_whitespace();
     let method = parts.next().unwrap_or("").to_string();
     /* 记**原样**（可能带百分号编码）：`non_ascii_base_path_builds_the_same_url_as_put`
-       正是靠读这份原文来证明「没有二次编码」。 */
+    正是靠读这份原文来证明「没有二次编码」。 */
     let path = parts.next().unwrap_or("").to_string();
     (method, path)
 }
@@ -247,10 +247,7 @@ fn route(
             (code, extra)
         }
         "PUT" => {
-            let exists = dirs
-                .lock()
-                .expect("假服务器状态锁")
-                .contains(&parent(path));
+            let exists = dirs.lock().expect("假服务器状态锁").contains(&parent(path));
             if !exists {
                 return (409, String::new());
             }
@@ -262,7 +259,7 @@ fn route(
             }
         }
         /* `GET` 只用于 `md_webdav::probe`（第 1 关）。默认 404 = 「今天还没记」，
-           `probe` 判成通；要制造「账号/凭据不对」必须显式 `fail_get_with(401)`。 */
+        `probe` 判成通；要制造「账号/凭据不对」必须显式 `fail_get_with(401)`。 */
         "GET" => (*get_status.lock().expect("假服务器状态锁"), String::new()),
         _ => (404, String::new()),
     }

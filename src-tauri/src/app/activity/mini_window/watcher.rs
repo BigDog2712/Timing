@@ -8,13 +8,25 @@ use tauri::{App, AppHandle, Listener, Manager, Runtime};
 pub(crate) fn register_power_handler<R: Runtime>(app: &App<R>) {
     let handle = app.handle().clone();
     app.listen(POWER_LIFECYCLE_CHANGED, move |event| {
-        let Ok(event) = serde_json::from_str::<crate::infra::activity::windows::power::PowerLifecycleEvent>(event.payload()) else { return; };
+        let Ok(event) = serde_json::from_str::<
+            crate::infra::activity::windows::power::PowerLifecycleEvent,
+        >(event.payload()) else {
+            return;
+        };
         let owner = handle.state::<MiniWindowState>();
         match event.state.as_str() {
-            "lock" => { owner.power.fetch_or(1, Ordering::AcqRel); }
-            "unlock" => { owner.power.fetch_and(!1, Ordering::AcqRel); }
-            "suspend" => { owner.power.fetch_or(2, Ordering::AcqRel); }
-            "resume" => { owner.power.fetch_and(!2, Ordering::AcqRel); }
+            "lock" => {
+                owner.power.fetch_or(1, Ordering::AcqRel);
+            }
+            "unlock" => {
+                owner.power.fetch_and(!1, Ordering::AcqRel);
+            }
+            "suspend" => {
+                owner.power.fetch_or(2, Ordering::AcqRel);
+            }
+            "resume" => {
+                owner.power.fetch_and(!2, Ordering::AcqRel);
+            }
             _ => return,
         }
         owner.power_revision.fetch_add(1, Ordering::Release);
@@ -114,7 +126,12 @@ pub(super) async fn run<R: Runtime + 'static>(app: AppHandle<R>, epoch: u64) {
                         placement.monitor = Some(affinity);
                         let mut preferences = state.preferences.clone();
                         preferences.placement = placement;
-                        match crate::services::activity::data::mini_window_store::save(&app, &preferences).await {
+                        match crate::services::activity::data::mini_window_store::save(
+                            &app,
+                            &preferences,
+                        )
+                        .await
+                        {
                             Ok(()) => {
                                 state.preferences = preferences;
                                 state.failed = false;

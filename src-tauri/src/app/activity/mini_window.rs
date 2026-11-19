@@ -2,10 +2,12 @@ pub(crate) mod content;
 mod native;
 mod watcher;
 
-use crate::services::activity::data::mini_window_store;
 use crate::models::activity::events::MINI_WINDOW_STATE;
-use crate::models::activity::mini_window::transition::{visual_geometry, Transition, VisualGeometry};
+use crate::models::activity::mini_window::transition::{
+    visual_geometry, Transition, VisualGeometry,
+};
 use crate::models::activity::mini_window::{bounds, Edge, Interaction, Page, Preferences};
+use crate::services::activity::data::mini_window_store;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::time::Instant;

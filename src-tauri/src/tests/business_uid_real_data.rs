@@ -73,7 +73,9 @@ async fn a_real_business_database_gets_its_item_uids_backfilled() {
         .expect("打开副本");
 
     /* 表的形状因库而异（很老的库可能还缺 items.uid），先把库带到 head。 */
-    crate::infra::migrate::migrate(&pool).await.expect("迁移副本");
+    crate::infra::migrate::migrate(&pool)
+        .await
+        .expect("迁移副本");
 
     const TABLES: &[(&str, &str)] = &[
         ("items", "i:"),

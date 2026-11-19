@@ -104,6 +104,7 @@
   --bg-panel: var(--at-bg-panel);
   --bg-field: var(--at-bg-elevated);
   --bg-seg: var(--at-bg-elevated);
+  --bg-seg-on: color-mix(in srgb, var(--at-text-primary) 10%, var(--at-bg-elevated));
   --line: var(--at-border-subtle);
   --line-3: var(--at-border-strong);
   --ink: var(--at-text-primary);
@@ -120,7 +121,9 @@
   --space-4: 16px;
   --text-xs: 11.5px;
   --text-cap: 11px;
+  --text-sm: 12.5px;
   --text-body: 13px;
+  --weight-medium: 500;
   --radius-sm: 6px;
   --radius-md: 10px;
 }

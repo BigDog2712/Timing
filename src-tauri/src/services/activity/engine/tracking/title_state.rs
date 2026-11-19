@@ -1,6 +1,8 @@
 use super::ports::{TrackingDataError, TrackingDataStore};
-use crate::models::activity::browser_title_privacy::{matches_observed_page_title, ConfirmedBrowserTitle};
 use crate::infra::activity::windows::foreground::WindowInfo;
+use crate::models::activity::browser_title_privacy::{
+    matches_observed_page_title, ConfirmedBrowserTitle,
+};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tokio::sync::{Mutex, MutexGuard};
 
@@ -118,11 +120,9 @@ impl TitleRecordingRuntimeState {
         ) {
             return None;
         }
-        let cutoff = now_ms.min(
-            grant
-                .observed_at_ms
-                .saturating_add(crate::models::activity::web_activity::WEB_ACTIVITY_OBSERVATION_TTL_MS),
-        );
+        let cutoff = now_ms.min(grant.observed_at_ms.saturating_add(
+            crate::models::activity::web_activity::WEB_ACTIVITY_OBSERVATION_TTL_MS,
+        ));
         *guard = None;
         Some(cutoff)
     }

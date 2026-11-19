@@ -7,6 +7,8 @@ pub mod handles;
 pub mod icon;
 pub mod input;
 pub mod media;
+mod media_properties;
+mod media_sink;
 pub(crate) mod native_probe;
 pub mod packaged_app;
 pub mod power;

@@ -14,11 +14,15 @@ impl Transport {
                 let mut normalized = PathBuf::new();
                 for component in absolute.components() {
                     match component {
-                        Component::ParentDir => { normalized.pop(); }
+                        Component::ParentDir => {
+                            normalized.pop();
+                        }
                         Component::CurDir => {}
                         Component::Prefix(prefix) => match prefix.kind() {
-                            std::path::Prefix::Disk(disk) | std::path::Prefix::VerbatimDisk(disk) => {
-                                normalized.push(format!("{}:\\", char::from(disk.to_ascii_uppercase())));
+                            std::path::Prefix::Disk(disk)
+                            | std::path::Prefix::VerbatimDisk(disk) => {
+                                normalized
+                                    .push(format!("{}:\\", char::from(disk.to_ascii_uppercase())));
                             }
                             std::path::Prefix::VerbatimUNC(server, share) => {
                                 normalized.push(PathBuf::from("\\\\").join(server).join(share));
@@ -28,10 +32,15 @@ impl Transport {
                         other => normalized.push(other.as_os_str()),
                     }
                 }
-                vec!["folder".to_string(), normalized.to_string_lossy().into_owned()]
+                vec![
+                    "folder".to_string(),
+                    normalized.to_string_lossy().into_owned(),
+                ]
             }
             Self::Webdav(target) => {
-                let raw = target.url_for("").map_err(|_| "WebDAV 地址无效".to_string())?;
+                let raw = target
+                    .url_for("")
+                    .map_err(|_| "WebDAV 地址无效".to_string())?;
                 let url = reqwest::Url::parse(&raw).map_err(|_| "WebDAV 地址无效".to_string())?;
                 vec!["webdav".to_string(), url.to_string(), target.user.clone()]
             }
@@ -45,11 +54,23 @@ impl Transport {
     }
 }
 
+pub fn upload(target: &str) -> String {
+    format!("streams-v2:upload:{target}")
+}
+
+pub fn download(target: &str, writer: &str) -> String {
+    format!("streams-v2:download:{target}:{writer}")
+}
+
 pub fn for_channel(channel: &MdSyncCloudChannel, kind: PurgeChannel) -> Result<String, String> {
     match kind {
         PurgeChannel::Folder => Transport::Folder(channel.resolve_root_folder()?).scope(),
         PurgeChannel::Webdav => Transport::Webdav(WebdavTarget::new(
-            &channel.base_url, &channel.remote_dir()?, &channel.user, "",
-        )).scope(),
+            &channel.base_url,
+            &channel.remote_dir()?,
+            &channel.user,
+            "",
+        ))
+        .scope(),
     }
 }

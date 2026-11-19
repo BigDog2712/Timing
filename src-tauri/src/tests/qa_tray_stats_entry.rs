@@ -12,10 +12,7 @@ fn items(nodes: &[TrayNode]) -> Vec<(&'static str, String, bool)> {
     nodes
         .iter()
         .filter_map(|n| match n {
-            TrayNode::Item {
-                id,
-                label, enabled,
-            } => Some((*id, label.clone(), *enabled)),
+            TrayNode::Item { id, label, enabled } => Some((*id, label.clone(), *enabled)),
             TrayNode::Separator => None,
         })
         .collect()
@@ -23,7 +20,12 @@ fn items(nodes: &[TrayNode]) -> Vec<(&'static str, String, bool)> {
 
 #[test]
 fn tray_has_stats_entry_right_after_todos() {
-    let nodes = build_nodes(TrayStatus::Idle, "空闲 · 点开始正计时", "Markdown 同步", false);
+    let nodes = build_nodes(
+        TrayStatus::Idle,
+        "空闲 · 点开始正计时",
+        "Markdown 同步",
+        false,
+    );
     let list = items(&nodes);
     let pos = list
         .iter()

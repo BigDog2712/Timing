@@ -1,5 +1,5 @@
-use crate::services::activity::data::repositories;
 use crate::models::activity::backup::BackupRecords;
+use crate::services::activity::data::repositories;
 use serde::Deserialize;
 use sqlx::{Pool, Sqlite};
 
@@ -24,11 +24,14 @@ pub(super) async fn load_backup_records(pool: &Pool<Sqlite>) -> Result<BackupRec
     let tool_daily_stats = repositories::tools::fetch_all_daily_stats_for_backup(pool).await?;
 
     Ok(BackupRecords {
-        free_focus_tasks: if crate::services::activity::data::schema_contracts::has_free_focus_schema(pool).await? {
-            repositories::tools::free_focus::fetch(pool).await?
-        } else {
-            vec![]
-        },
+        free_focus_tasks:
+            if crate::services::activity::data::schema_contracts::has_free_focus_schema(pool)
+                .await?
+            {
+                repositories::tools::free_focus::fetch(pool).await?
+            } else {
+                vec![]
+            },
         sessions,
         title_samples,
         settings,

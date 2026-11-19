@@ -193,10 +193,18 @@ def make(size):
 
 
 def tray_icon(size):
-    """托盘图标：无底板，只留环（开口即身份，刻度点在 16px 会糊成一个脏点）。"""
+    """托盘图标：无底板，只留环（开口即身份）。
+
+    [0.13.x] 按用户口径「PC 图标统一到 APP 图标」补回开口里的琥珀色 12 点刻度：
+    应用图标一直是「环 + 黄点」，托盘版原来只有环，通知区里看着像另一个应用。
+    托盘只有 16–24px，点半径取环粗的 0.34（比图标里的 0.32 略大一档）才不至于
+    在缩放后糊成一个脏点；位置仍在缺口中心，与图标同源。
+    """
     s = size * SS
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    img.alpha_composite(_arc(s, s * 0.445, s * 0.158, 316, TRAY_TOP, TRAY_BOT))
+    r_out, stroke = s * 0.445, s * 0.158
+    img.alpha_composite(_arc(s, r_out, stroke, 316, TRAY_TOP, TRAY_BOT))
+    img.alpha_composite(_disc(s, s / 2, s / 2 - (r_out - stroke / 2), stroke * 0.34, TICK))
     return img.resize((size, size), Image.LANCZOS)
 
 

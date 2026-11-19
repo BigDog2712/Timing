@@ -13,7 +13,8 @@ use crate::tests::support::{exec, fresh_pool, scalar_i64};
 
 /// 本地 `y-m-d h:min` 的毫秒时间戳（测试只在自己的时区里跑，不假设 UTC）。
 fn at(y: i32, m: u32, d: u32, h: u32, min: u32) -> i64 {
-    Local.with_ymd_and_hms(y, m, d, h, min, 0)
+    Local
+        .with_ymd_and_hms(y, m, d, h, min, 0)
         .earliest()
         .expect("合法本地时刻")
         .timestamp_millis()
@@ -105,7 +106,7 @@ async fn h5_extra_actives_closed_and_zero_left_after_resolve() {
     let rec = timer::start(&pool, Some(1)).await.unwrap();
     crash_after(&pool, rec.id, 600_000, true).await;
     /* 造第二条脏 active：唯一索引会拦，先摘掉（现实中的脏数据正是索引缺位年代的遗留）。
-       它比 rec 晚开始——弹框只该针对最早的 rec。 */
+    它比 rec 晚开始——弹框只该针对最早的 rec。 */
     exec(&pool, "DROP INDEX uq_records_open_per_device").await;
     let extra_start = now_ms() - 300_000;
     let now = now_ms();
@@ -130,21 +131,31 @@ async fn h5_extra_actives_closed_and_zero_left_after_resolve() {
         .unwrap();
     assert_eq!(out.id, rec.id, "用户的选择作用在最早那条上");
     assert_eq!(
-        scalar_i64(&pool, "SELECT COUNT(*) FROM time_records WHERE status = 'active'").await,
+        scalar_i64(
+            &pool,
+            "SELECT COUNT(*) FROM time_records WHERE status = 'active'"
+        )
+        .await,
         0,
         "选完 active 必须为 0（H5）"
     );
     /* 第二条被按它自己的关闭时间结束（extra 的 running_since = extra_start）。 */
     let extra_ended = scalar_i64(
         &pool,
-        &format!("SELECT ended_at FROM time_records WHERE id = {}", rec.id + 1),
+        &format!(
+            "SELECT ended_at FROM time_records WHERE id = {}",
+            rec.id + 1
+        ),
     )
     .await;
     assert_eq!(extra_ended, extra_start, "多余的 active 按关闭时间结束");
     assert_eq!(
         scalar_i64(
             &pool,
-            &format!("SELECT accumulated_sec FROM time_records WHERE id = {}", rec.id + 1)
+            &format!(
+                "SELECT accumulated_sec FROM time_records WHERE id = {}",
+                rec.id + 1
+            )
         )
         .await,
         7,
@@ -174,8 +185,11 @@ async fn quit_close_out_lands_ended_at_on_close_time() {
     assert_eq!(closed, 1, "退出时收尾 1 条 active");
     let out = timer::state(&pool).await.unwrap();
     assert_eq!(out.status, "idle", "收尾后没有 active 会话");
-    let ended_at =
-        scalar_i64(&pool, &format!("SELECT ended_at FROM time_records WHERE id = {}", rec.id)).await;
+    let ended_at = scalar_i64(
+        &pool,
+        &format!("SELECT ended_at FROM time_records WHERE id = {}", rec.id),
+    )
+    .await;
     assert_eq!(
         ended_at, close_at,
         "退出收尾的 ended_at = 关闭时间（running_since），不是退出那一刻的 now"
@@ -183,7 +197,10 @@ async fn quit_close_out_lands_ended_at_on_close_time() {
     assert_eq!(
         scalar_i64(
             &pool,
-            &format!("SELECT accumulated_sec FROM time_records WHERE id = {}", rec.id)
+            &format!(
+                "SELECT accumulated_sec FROM time_records WHERE id = {}",
+                rec.id
+            )
         )
         .await,
         42
@@ -195,10 +212,10 @@ async fn quit_close_out_paused_keeps_accumulated_and_uses_now() {
     let pool = fresh_pool("recover-b2-quit-paused").await;
     let rec = timer::start(&pool, Some(1)).await.unwrap();
     /* 锚定「今天 00:00」，不用 `crash_after(600_000)`：暂停会话没有 running_since，
-       退出收尾的 `close_at_close_time` 用 now 当 ended_at 并走 `split_by_day(started_at, now)`。
-       若 started_at 是 10 分钟前、又恰在凌晨 00:00–00:10，会跨零点被拆成两段，42 秒被按
-       墙钟占比分掉（CI run 43777088112：left 11 / right 42）。今天 00:00 与 now 恒在同一
-       本地日、绝不跨零点，且 now 恒 ≥ started_at，ended_at 仍是 now（本判据要钉的那件事）。 */
+    退出收尾的 `close_at_close_time` 用 now 当 ended_at 并走 `split_by_day(started_at, now)`。
+    若 started_at 是 10 分钟前、又恰在凌晨 00:00–00:10，会跨零点被拆成两段，42 秒被按
+    墙钟占比分掉（CI run 43777088112：left 11 / right 42）。今天 00:00 与 now 恒在同一
+    本地日、绝不跨零点，且 now 恒 ≥ started_at，ended_at 仍是 now（本判据要钉的那件事）。 */
     let started = start_of_today_ms();
     exec(
         &pool,
@@ -212,13 +229,24 @@ async fn quit_close_out_paused_keeps_accumulated_and_uses_now() {
 
     let closed = timer_recover::close_active_for_quit(&pool).await.unwrap();
     assert_eq!(closed, 1);
-    let ended_at = scalar_i64(&pool, &format!("SELECT ended_at FROM time_records WHERE id = {}", rec.id)).await;
+    let ended_at = scalar_i64(
+        &pool,
+        &format!("SELECT ended_at FROM time_records WHERE id = {}", rec.id),
+    )
+    .await;
     assert!(
         ended_at >= now_ms() - 2_000,
         "暂停中没有关闭时刻可考，ended_at 取 now（不编造）"
     );
     assert_eq!(
-        scalar_i64(&pool, &format!("SELECT accumulated_sec FROM time_records WHERE id = {}", rec.id)).await,
+        scalar_i64(
+            &pool,
+            &format!(
+                "SELECT accumulated_sec FROM time_records WHERE id = {}",
+                rec.id
+            )
+        )
+        .await,
         42,
         "暂停中收尾不改动累计"
     );

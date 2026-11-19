@@ -53,8 +53,10 @@ async fn validate_open(
         return Err("format_validation_failed".to_string());
     }
     let (session_fields, web_fields) =
-        crate::services::activity::data::export::sqlite_exporter::resolved_sqlite_column_names(selected_fields)
-            .map_err(|_| "format_validation_failed".to_string())?;
+        crate::services::activity::data::export::sqlite_exporter::resolved_sqlite_column_names(
+            selected_fields,
+        )
+        .map_err(|_| "format_validation_failed".to_string())?;
     let per_table = [session_fields, web_fields];
     let mut rows: u64 = 0;
     for (table, expected) in EXPORT_TABLES.iter().zip(per_table.iter()) {

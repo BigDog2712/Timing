@@ -25,8 +25,8 @@ mod tests;
 
 use sqlx::SqlitePool;
 
-use super::binding::{import_and_render, render_expected};
 use super::audit;
+use super::binding::{import_and_render, render_expected};
 use crate::error::{AppError, AppResult};
 use crate::infra::md_file;
 use crate::models::md_sync::{Decision, MdSyncKind};

@@ -70,8 +70,14 @@ fn deleting_a_parent_cascades_to_all_direct_children() {
         item::delete(&pool, parent).await.unwrap();
 
         assert!(deleted_at(&pool, parent).await.is_some(), "父必须被软删");
-        assert!(deleted_at(&pool, child_a).await.is_some(), "直接子 A 必须被级联软删");
-        assert!(deleted_at(&pool, child_b).await.is_some(), "直接子 B 必须被级联软删");
+        assert!(
+            deleted_at(&pool, child_a).await.is_some(),
+            "直接子 A 必须被级联软删"
+        );
+        assert!(
+            deleted_at(&pool, child_b).await.is_some(),
+            "直接子 B 必须被级联软删"
+        );
     });
 }
 
@@ -104,7 +110,10 @@ fn system_item_is_rejected_before_any_cascade() {
         let result = item::delete(&pool, 1).await;
 
         assert!(result.is_err(), "系统事项必须先被拒");
-        assert!(deleted_at(&pool, child).await.is_none(), "拒绝时子不得被顺带删掉");
+        assert!(
+            deleted_at(&pool, child).await.is_none(),
+            "拒绝时子不得被顺带删掉"
+        );
         assert!(deleted_at(&pool, parent).await.is_none());
     });
 }

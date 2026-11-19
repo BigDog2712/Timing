@@ -47,7 +47,9 @@ import {
   type DataCategoryTrendViewModel,
 } from "../services/dataCategoryTrendReadModel.ts";
 import { buildDataTagReadModel, type DataTagReadModel } from "../services/dataTagReadModel.ts";
+import { destinationCopy } from "../dataDestinationCopy.ts";
 import DataTagAssociationPanel from "./DataTagAssociationPanel.tsx";
+import DataTagSection, { type AppTagTarget } from "./DataTagSection.tsx";
 import { ClassificationService } from "../../classification/services/classificationService.ts";
 import { listTimingItemTags, listTimingItems } from "../../../platform/persistence/timingReadRepository.ts";
 import {
@@ -81,13 +83,6 @@ import DataTrendPanel from "./DataTrendPanel.tsx";
 import DataHeatmapPanel, { type HeatmapGranularity } from "./DataHeatmapPanel.tsx";
 import { useDataNavigationReadiness } from "../hooks/useDataNavigationReadiness.ts";
 import { AppClassification } from "../../../shared/classification/appClassification.ts";
-import QuickClassificationEntry from "../../classification/components/QuickClassificationEntry.tsx";
-import { useQuickClassificationLauncher } from "../../classification/hooks/useQuickClassificationLauncher.ts";
-import {
-  createQuickAppClassificationTarget,
-  createQuickWebClassificationTarget,
-  getQuickClassificationTargetKey,
-} from "../../classification/types.ts";
 
 interface Props {
   onInitialContentReady?: () => void;
@@ -155,8 +150,8 @@ export default function Data({
   onInitialContentReady,
 }: Props) {
   const UI_TEXT = useLocaleText();
-  const quickClassification = useQuickClassificationLauncher();
-  const { openAtPointer: openQuickClassificationAtPointer } = quickClassification;
+  /* [0.12.4] 双击应用行打开的是**标签编辑**（与主界面应用排行同一套），不再是分类设置 */
+  const [tagTarget, setTagTarget] = useState<AppTagTarget | null>(null);
   const dataRootRef = useRef<HTMLDivElement | null>(null);
   useDataStackedLayout(dataRootRef);
   const today = new Date();
@@ -711,48 +706,14 @@ export default function Data({
   const destinationCanOpenHistory = destinationGranularity === "day"
     && destinationPanelSelectedOptions.length > 0
     && Boolean(onOpenHistoryDate);
-  const destinationTitle = isWebDestination
-    ? UI_TEXT.data.webTrend
-    : isCategoryDestination ? UI_TEXT.data.categoryTrend : UI_TEXT.data.appTrend;
-  const destinationRangeAriaLabel = isWebDestination
-    ? UI_TEXT.accessibility.data.webTrendRange
-    : isCategoryDestination
-      ? UI_TEXT.accessibility.data.categoryTrendRange
-      : UI_TEXT.accessibility.data.appTrendRange;
+  /* 三种目的地共用一个面板，只有文案不同：一张表（`dataDestinationCopy`）比 46 行嵌套三元好读 */
+  const copy = destinationCopy(UI_TEXT, isWebDestination, isCategoryDestination);
   const destinationSearchQuery = isWebDestination
     ? webSearchQuery
     : isCategoryDestination ? categorySearchQuery : appSearchQuery;
   const destinationHasSearchQuery = isWebDestination
     ? hasWebSearchQuery
     : isCategoryDestination ? hasCategorySearchQuery : hasAppSearchQuery;
-  const destinationSearchPlaceholder = isWebDestination
-    ? UI_TEXT.data.webSearchPlaceholder
-    : isCategoryDestination
-      ? UI_TEXT.data.categorySearchPlaceholder
-      : UI_TEXT.data.appSearchPlaceholder;
-  const destinationListAriaLabel = isWebDestination
-    ? UI_TEXT.data.webTrendDomainList
-    : isCategoryDestination
-      ? UI_TEXT.data.categoryTrendCategoryList
-      : UI_TEXT.data.appTrendAppList;
-  const destinationEmptyLabel = isWebDestination
-    ? UI_TEXT.data.webTrendEmpty
-    : isCategoryDestination ? UI_TEXT.data.categoryTrendEmpty : UI_TEXT.data.appTrendEmpty;
-  const destinationNoMatchLabel = isWebDestination
-    ? UI_TEXT.data.webTrendNoMatch
-    : isCategoryDestination ? UI_TEXT.data.categoryTrendNoMatch : UI_TEXT.data.appTrendNoMatch;
-  const destinationTotalMetricLabel = isWebDestination
-    ? UI_TEXT.data.webTrendTotal
-    : UI_TEXT.data.appTrendTotal;
-  const destinationUsageMetricLabel = isWebDestination
-    ? UI_TEXT.data.webTrendUsage
-    : isCategoryDestination ? UI_TEXT.data.categoryTrend : UI_TEXT.data.appTrendUsage;
-  const destinationInteractionHint = isCategoryDestination
-    ? UI_TEXT.data.categoryInteractionHint
-    : UI_TEXT.data.interactionHint;
-  const destinationHeatmapTitle = isWebDestination
-    ? UI_TEXT.data.webHeatmap
-    : isCategoryDestination ? UI_TEXT.data.categoryHeatmap : UI_TEXT.data.appHeatmap;
   const destinationSelectionKeys = isWebDestination
     ? selectedWebKeys
     : isCategoryDestination ? selectedCategoryKeys : selectedAppKeys;
@@ -813,32 +774,15 @@ export default function Data({
   ) => {
     openDestinationDetail(option);
   }, [openDestinationDetail]);
-  const handleOpenQuickClassification = useCallback((
+  /* 只有**应用**有标签编辑：网页维度没有对应的标签存储，双击保持原样（进详情）。
+     锚点 / 键盘焦点交给 `AppTagDialog`（`QuietDialog` 自己有焦点陷阱与返回）。 */
+  /* [0.12.4] 右键 / Shift+F10 / 双击，三条入口都落到同一个标签弹层：这一页不再有分类入口 */
+  const handleOpenAppTagEditor = useCallback((
     option: DataDestinationTrendOption,
-    anchor: { clientX: number; clientY: number },
-    trigger: HTMLButtonElement,
   ) => {
-    if (!option.classificationCategory) return;
-    const target = option.exeName
-      ? createQuickAppClassificationTarget({
-        exeName: option.exeName,
-        displayName: option.displayName,
-        category: option.classificationCategory,
-      })
-      : option.normalizedDomain
-        ? createQuickWebClassificationTarget({
-          normalizedDomain: option.normalizedDomain,
-          displayName: option.displayName,
-          category: option.classificationCategory,
-        })
-        : null;
-    if (!target) return;
-    openQuickClassificationAtPointer(
-      target,
-      anchor,
-      trigger,
-    );
-  }, [openQuickClassificationAtPointer]);
+    if (!option.exeName) return;
+    setTagTarget({ exeName: option.exeName, name: option.displayName });
+  }, []);
 
   const shouldDeferHeatmapRows = Boolean(
     hasInitialBootstrapSnapshotRef.current
@@ -1130,8 +1074,8 @@ export default function Data({
             onContentCommitted={handleDestinationPanelCommitted}
             destinationMode={destinationMode}
             availableDestinationModes={availableDestinationModes}
-            title={destinationTitle}
-            rangeAriaLabel={destinationRangeAriaLabel}
+            title={copy.title}
+            rangeAriaLabel={copy.rangeAriaLabel}
             selection={destinationTrendSelection}
             ready={destinationPanelReady}
             selectedOptions={destinationPanelSelectedOptions}
@@ -1140,20 +1084,20 @@ export default function Data({
             filteredOptions={destinationPanelOptions}
             searchQuery={destinationSearchQuery}
             hasSearchQuery={destinationHasSearchQuery}
-            searchPlaceholder={destinationSearchPlaceholder}
-            listAriaLabel={destinationListAriaLabel}
-            emptyLabel={destinationEmptyLabel}
-            noMatchLabel={destinationNoMatchLabel}
-            totalMetricLabel={destinationTotalMetricLabel}
-            usageMetricLabel={destinationUsageMetricLabel}
-            interactionHint={destinationInteractionHint}
+            searchPlaceholder={copy.searchPlaceholder}
+            listAriaLabel={copy.listAriaLabel}
+            emptyLabel={copy.emptyLabel}
+            noMatchLabel={copy.noMatchLabel}
+            totalMetricLabel={copy.totalMetricLabel}
+            usageMetricLabel={copy.usageMetricLabel}
+            interactionHint={copy.interactionHint}
             supportsDestinationDetails={destinationSupportsObjectActions}
             supportsQuickClassification={destinationSupportsObjectActions}
             granularity={destinationGranularity}
             chartData={destinationChartData}
             heatmapContent={(
               <DataHeatmapPanel
-                title={destinationHeatmapTitle}
+                title={copy.heatmapTitle}
                 compact
                 selectedHeatmapView={selectedDestinationHeatmapView}
                 selectedHeatmapViewKey={`${presentedDestinationMode}:${encodeDataDestinationSelectionKey(
@@ -1205,17 +1149,24 @@ export default function Data({
             onRestoreSelection={handleDestinationSelectionRestore}
             onOptionIntentStart={captureDestinationDetailIntent}
             onOptionOpenDetails={handleOpenDestinationDetail}
-            activeQuickClassificationTargetKey={quickClassification.request
-              ? getQuickClassificationTargetKey(quickClassification.request.target)
-              : null}
-            onQuickClassificationPreload={quickClassification.preload}
-            onQuickClassificationOpen={handleOpenQuickClassification}
+            activeQuickClassificationTargetKey={tagTarget?.exeName ?? null}
+            onQuickClassificationOpen={handleOpenAppTagEditor}
+            onOptionEdit={handleOpenAppTagEditor}
             onMouseDownCapture={handleAppTrendMouseDownCapture}
             onDoubleClickCapture={handleAppTrendDoubleClickCapture}
             onMouseMove={handleAppTrendMouseMove}
             onMouseLeave={handleAppTrendMouseLeave}
           /> : null}
         </div>
+
+        {/* [0.12.4] 标签面：管理区块 + 应用标签编辑（两者共用一份标签数据源） */}
+        <DataTagSection
+          target={tagTarget}
+          onClose={() => setTagTarget(null)}
+          onSaved={onOverridesChanged}
+          onError={onQuickActionError}
+          onToast={onToast}
+        />
       </div>
       {destinationDetail ? (
         <DestinationDetailDialogEntry
@@ -1224,15 +1175,6 @@ export default function Data({
           initialDateKey={destinationDetail.initialDateKey}
           runtime={{ refreshKey, mappingVersion, mergeThresholdSecs, trackerHealth }}
           onClose={closeDestinationDetail}
-        />
-      ) : null}
-      {quickClassification.request ? (
-        <QuickClassificationEntry
-          key={`${getQuickClassificationTargetKey(quickClassification.request.target)}:${quickClassification.request.anchor.clientX}:${quickClassification.request.anchor.clientY}`}
-          request={quickClassification.request}
-          onClose={quickClassification.close}
-          onSaved={onOverridesChanged}
-          onError={onQuickActionError}
         />
       ) : null}
     </div>

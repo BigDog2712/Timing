@@ -1,9 +1,11 @@
+use crate::infra::activity::windows::foreground::WindowInfo;
 use crate::models::activity::tracking::TrackingStatusSnapshot;
 use crate::services::activity::engine::tracking::runtime_snapshot::{
     TrackingRuntimeProbeDiagnostics, TrackingRuntimeProbeStatus, TrackingRuntimeSnapshotState,
 };
-use crate::services::activity::engine::tracking::watchdog::{RuntimeHealthSnapshot, RuntimeHealthState};
-use crate::infra::activity::windows::foreground::WindowInfo;
+use crate::services::activity::engine::tracking::watchdog::{
+    RuntimeHealthSnapshot, RuntimeHealthState,
+};
 use serde::Serialize;
 use std::sync::Arc;
 use tauri::Manager;
@@ -21,7 +23,8 @@ pub struct CurrentTrackingSnapshot {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct TrackerHealthRuntimeSnapshot {
-    pub(crate) progress: crate::services::activity::engine::tracking::watchdog::progress::TrackingProgressSnapshot,
+    pub(crate) progress:
+        crate::services::activity::engine::tracking::watchdog::progress::TrackingProgressSnapshot,
     pub last_heartbeat_ms: Option<i64>,
     pub last_successful_sample_ms: Option<i64>,
     pub last_watchdog_seal_sample_ms: Option<i64>,
@@ -53,7 +56,8 @@ pub async fn get_current_tracking_snapshot(
     let state = app.state::<TrackingRuntimeSnapshotState>();
     let _transition = state.transition.lock().await;
     let tracking_paused =
-        crate::services::activity::data::tracking_pause_service::load_tracking_pause_setting(&app).await?;
+        crate::services::activity::data::tracking_pause_service::load_tracking_pause_setting(&app)
+            .await?;
     let snapshot = state
         .snapshot()
         .ok_or_else(|| "tracking runtime snapshot is not ready".to_string())?;

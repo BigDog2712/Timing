@@ -19,6 +19,9 @@ const h = vi.hoisted(() => ({
   saveAppOverride: vi.fn(async (): Promise<void> => undefined),
   saveWebDomainOverride: vi.fn(async (): Promise<void> => undefined),
   commitMutations: vi.fn(async (_mutations: unknown): Promise<void> => undefined),
+  /* 删除的成员回落走可恢复 propagation（真 IPC）：测试里必须替掉，否则 jsdom 没有
+     `__TAURI_INTERNALS__`，调用直接抛错 → 整批提交根本走不到（曾表现为 cm12/cm13 假红）。 */
+  propagate: vi.fn(async (_mapping: Record<string, string | null>) => ({ conflicts: [] })),
   loadAppOverrides: vi.fn(),
   loadWebDomainOverrides: vi.fn(),
 }));
@@ -33,6 +36,10 @@ vi.mock("../../classification/services/classificationService.ts", () => ({
 }));
 vi.mock("../../../platform/persistence/classificationSettingsGateway.ts", () => ({
   commitClassificationSettingMutations: h.commitMutations,
+}));
+vi.mock("../../../platform/persistence/categoryPropagationGateway.ts", () => ({
+  propagateCategoryMapping: h.propagate,
+  CategoryPropagationConflictError: class extends Error {},
 }));
 /* 只替掉两条**读**：builder 全走真实现，否则"写了哪几条键"就成了我在测试里自己编的 */
 vi.mock("../../classification/services/classificationStore.ts", async (importOriginal) => {
@@ -66,6 +73,8 @@ beforeEach(() => {
   h.invalidateBootstrapCache.mockReset();
   h.commitMutations.mockReset();
   h.commitMutations.mockResolvedValue(undefined);
+  h.propagate.mockReset();
+  h.propagate.mockResolvedValue({ conflicts: [] });
   h.loadAppOverrides.mockReset();
   /* code.exe 同时属于 development 与待删的自定义分类：删完之后它必须只剩 development */
   h.loadAppOverrides.mockResolvedValue({
@@ -160,11 +169,12 @@ describe("③ 改名 / 改色 / 删除", () => {
     expect(written).toContain(`__custom_category::${CUSTOM}=null`);
     expect(written).toContain(`__deleted_category::${CUSTOM}=null`);
     expect(written).toContain(`__category_label_override::${CUSTOM}=null`);
-    /* 成员回落：code.exe 还属于 development，所以它不该被整条删掉，而是重算成只剩 development */
-    const fallback = committedRows(h.commitMutations).find((row) => row.key.includes("code.exe"));
-    expect(fallback, `成员没有回落：${written}`).toBeDefined();
-    expect(String(fallback?.value)).not.toContain(CUSTOM);
-    expect(String(fallback?.value)).toContain("development");
+    /* 成员回落**不在这批**里：`propagateCategoryMapping` 是一个可恢复的后端事务（跨库事项 /
+       Activity 引用 / override 一起算，冲突时原子拒绝），代码里先它、后元数据清理。所以这里
+       钉的是"回落确实发出去了、且一次发完"，而不是"回落写进了同一批 mutation"。
+       少了这一刻，被删分类会因为「还有应用指着它」在下次 bootstrap 原地复活。 */
+    expect(h.propagate, "成员没有走 propagation").toHaveBeenCalledTimes(1);
+    expect(h.propagate, "回落映射不对（应当只有待删分类 → null）").toHaveBeenCalledWith({ [CUSTOM]: null });
     expect(h.invalidateBootstrapCache).toHaveBeenCalled();
   });
 
@@ -193,10 +203,9 @@ describe("③ 改名 / 改色 / 删除", () => {
     /* 名字 / 颜色覆盖一起清：日后恢复出来的是原厂分类，不是半套残留 */
     expect(rows.find((row) => row.key === "__category_label_override::design")?.value).toBeNull();
     expect(rows.find((row) => row.key === "__category_color_override::design")?.value).toBeNull();
-    /* 成员回落：figma.exe 只有这一条分类信息，重算之后不能再提到 design */
-    const fallback = rows.find((row) => row.key.includes("figma.exe"));
-    expect(fallback, `成员没有回落：${typedValue(h.commitMutations)}`).toBeDefined();
-    expect(String(fallback?.value)).not.toContain("design");
+    /* 成员回落（figma.exe 不能再提到 design）由 propagation 收口，理由同 cm12 */
+    expect(h.propagate, "成员没有走 propagation").toHaveBeenCalledTimes(1);
+    expect(h.propagate).toHaveBeenCalledWith({ design: null });
     expect(h.invalidateBootstrapCache).toHaveBeenCalled();
   });
 

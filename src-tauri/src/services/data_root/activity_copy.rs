@@ -22,9 +22,9 @@ use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 
 /* 活动库的文件名与伴生文件都**从 `storage_paths` 取**，本模块不再自带字面量。
 
-   为什么重要：这个文件是搬迁的**写侧**，而 `storage_paths` 是读侧的基准。两边各写
-   一份库名时今天恰好一致，改名的那个提交里就会分叉 —— 搬迁把新库写到 `activity.db`、
-   核对却盯着旧名，表现为「切过去了但历史是空的」。 */
+为什么重要：这个文件是搬迁的**写侧**，而 `storage_paths` 是读侧的基准。两边各写
+一份库名时今天恰好一致，改名的那个提交里就会分叉 —— 搬迁把新库写到 `activity.db`、
+核对却盯着旧名，表现为「切过去了但历史是空的」。 */
 use crate::infra::activity::activity_layout;
 use crate::infra::activity::storage_paths::{
     sqlite_sidecar_names_of, ACTIVITY_DATA_REL, SQLITE_DB_FILE_NAME,

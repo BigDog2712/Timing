@@ -28,9 +28,10 @@ pub async fn list_items_for_app(
 
 #[tauri::command]
 pub async fn bind_item_app(state: State<'_, AppState>, input: ItemAppBind) -> AppResult<ItemApp> {
-    let bound = services::item_app::bind(&state.pool, input.item_id, &input.app_key, input.track).await?;
+    let bound =
+        services::item_app::bind(&state.pool, input.item_id, &input.app_key, input.track).await?;
     /* 绑定的变动对 md 同步来说是「事实变了」：绑定会影响子记录归属，
-       不打断同步的话 md 侧看到的分类会与界面不一致。 */
+    不打断同步的话 md 侧看到的分类会与界面不一致。 */
     services::md_sync::dirty::mark("item");
     Ok(bound)
 }

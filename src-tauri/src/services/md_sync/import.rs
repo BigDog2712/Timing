@@ -123,13 +123,13 @@ pub async fn apply_notes(
         };
 
         /* 标记只有在本机上一版基线里出现过，才能证明这一行是我们写的。
-           基线里没有、却撞上本机 id 的新行来自另一台设备：跳过它，不覆盖本地便利贴。 */
+        基线里没有、却撞上本机 id 的新行来自另一台设备：跳过它，不覆盖本地便利贴。 */
         let collides_with_local = existing.as_ref().is_some_and(|note| {
             row.id.is_some_and(|id| !old_ids.contains(&id))
                 && (note.content != content || note.item_id != item_id)
         });
         /* 不覆盖也不另建：另建会在每一轮同步都复制一行（标记仍指向本地那行）。
-           另一台设备的内容留在它自己的库里，等 UID 协议落地再做真正的合并。 */
+        另一台设备的内容留在它自己的库里，等 UID 协议落地再做真正的合并。 */
         if collides_with_local {
             continue;
         }

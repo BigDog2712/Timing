@@ -52,8 +52,8 @@ pub async fn start(
     }
     let now = now_ms();
     /* [S3] 倒计时会话原来**完全不写事件**（连 `start` 都没有）：事件流里没有起点，
-       对端 fold 会把后面的 stop 当孤儿丢掉 —— 这台机器上的 25 分钟在另一台上不存在。
-       现在与倒计时同一事务落 start，`mode` 与 `target_sec` 跟着事件走。 */
+    对端 fold 会把后面的 stop 当孤儿丢掉 —— 这台机器上的 25 分钟在另一台上不存在。
+    现在与倒计时同一事务落 start，`mode` 与 `target_sec` 跟着事件走。 */
     let mut tx = pool.begin().await.map_err(AppError::db)?;
     let id = session::insert_active_countdown(&mut tx, item_id, target_sec, now).await?;
     crate::services::timer_events::record_start(
@@ -102,10 +102,10 @@ pub async fn tick(pool: &SqlitePool) -> AppResult<Option<CountdownFired>> {
         .map(|item| item.name)
         .unwrap_or_default();
     /* [评审 P1-3] `ended_at` 必须是**语义到点**那一刻，不是 `started_at + target`。
-       到点由 `live_duration` 判定，而它不计暂停：跑 30 秒、暂停一小时、再跑 30 秒的
-       60 秒倒计时，恢复后才满一分钟 —— 若按 `started_at + target` 落档，记录会写成
-       「开始后一分钟」，比真实结束早了一小时，跨零点时连日期都分错。
-       口径见 `timer_time::countdown_end_at`（`now - 超出量`，tick 晚到也不会漂）。 */
+    到点由 `live_duration` 判定，而它不计暂停：跑 30 秒、暂停一小时、再跑 30 秒的
+    60 秒倒计时，恢复后才满一分钟 —— 若按 `started_at + target` 落档，记录会写成
+    「开始后一分钟」，比真实结束早了一小时，跨零点时连日期都分错。
+    口径见 `timer_time::countdown_end_at`（`now - 超出量`，tick 晚到也不会漂）。 */
     let ended_at = crate::services::timer_time::countdown_end_at(&active, target_sec, now);
     /* [V0.11.3] 走分段收尾：23:45 起的 30 分钟倒计时会在零点处拆成两段，
     与手动结束同一口径（否则「倒计时跨天」仍会整条挂在昨天）。

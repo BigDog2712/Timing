@@ -26,8 +26,15 @@ fn write_read_roundtrip_keeps_previous() {
     let back = root_pointer::read(&dir).expect("刚写的指针读得回来");
     assert_eq!(back.data_dir, r"D:\TimingData");
     assert_eq!(back.previous.as_deref(), Some(r"C:\Tools\Timing\data"));
-    assert_eq!(back.schema, 1, "schema 是给未来的自己看的，不能被写成别的值");
-    assert!(back.at.contains('T'), "时刻要带时区（RFC 3339）：{}", back.at);
+    assert_eq!(
+        back.schema, 1,
+        "schema 是给未来的自己看的，不能被写成别的值"
+    );
+    assert!(
+        back.at.contains('T'),
+        "时刻要带时区（RFC 3339）：{}",
+        back.at
+    );
     assert_eq!(back.app_version, env!("CARGO_PKG_VERSION"));
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -85,6 +92,10 @@ fn pointer_beats_optout() {
         "有指针时 optout 一律不参与判定"
     );
     assert_eq!(decide(Some(&pointer), false), PointerChoice::UsePointer);
-    assert_eq!(decide(None, true), PointerChoice::Default, "没指针才轮到 optout");
+    assert_eq!(
+        decide(None, true),
+        PointerChoice::Default,
+        "没指针才轮到 optout"
+    );
     assert_eq!(decide(None, false), PointerChoice::Default);
 }

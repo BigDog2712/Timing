@@ -250,7 +250,9 @@ async fn recurring_reminder_upgrade_and_legacy_backup_keep_one_time_rows_and_rej
 
 #[tokio::test]
 async fn recurring_reminder_reopen_recovers_pending_confirmation_and_backup_keeps_target_rule() {
-    use crate::services::activity::data::sqlite_pool::{open_single_connection_sqlite_pool, prepare_pool_schema};
+    use crate::services::activity::data::sqlite_pool::{
+        open_single_connection_sqlite_pool, prepare_pool_schema,
+    };
     let path = std::env::temp_dir().join(format!("patina-recurring-{}.db", uuid::Uuid::new_v4()));
     let pool = open_single_connection_sqlite_pool(&path, true)
         .await

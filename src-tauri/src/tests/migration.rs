@@ -70,7 +70,7 @@ async fn seed_system_item_uncategorized() {
         )
         .await
         .as_deref(),
-        Some("16")
+        Some("17")
     );
 }
 
@@ -188,9 +188,26 @@ async fn unique_active_session_is_per_device_not_global() {
         .await
         .expect("device b 的 active 应成功（全库唯一会在这里红）");
     for _ in 0..2 {
-        crate::infra::migrate::migrate(&pool).await.expect("多设备计时重启不能重建全局唯一索引");
-        assert_eq!(scalar_opt_str(&pool, "SELECT value FROM settings WHERE key = 'schema.version'").await.as_deref(), Some("16"));
-        assert_eq!(scalar_i64(&pool, "SELECT COUNT(*) FROM sqlite_master WHERE name = 'uq_records_open'").await, 0);
+        crate::infra::migrate::migrate(&pool)
+            .await
+            .expect("多设备计时重启不能重建全局唯一索引");
+        assert_eq!(
+            scalar_opt_str(
+                &pool,
+                "SELECT value FROM settings WHERE key = 'schema.version'"
+            )
+            .await
+            .as_deref(),
+            Some("17")
+        );
+        assert_eq!(
+            scalar_i64(
+                &pool,
+                "SELECT COUNT(*) FROM sqlite_master WHERE name = 'uq_records_open'"
+            )
+            .await,
+            0
+        );
     }
     assert_eq!(
         scalar_i64(

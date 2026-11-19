@@ -80,7 +80,8 @@ fn daily_parity_verify() {
     tauri::async_runtime::block_on(async {
         let out = std::env::var("TIMING_PARITY_OUT").expect("TIMING_PARITY_OUT must be set");
         let baseline: Baseline =
-            serde_json::from_slice(&std::fs::read(&out).expect("baseline file is missing")).unwrap();
+            serde_json::from_slice(&std::fs::read(&out).expect("baseline file is missing"))
+                .unwrap();
         let pool = open_parity_pool().await;
         // 基线库的投影是 capture 那次建的，日表当时还不存在。这里把小时模型置回 invalid
         // 强制**全量重建**：既填出日表，又顺手证明「同一份事实重算一遍，小时读数逐位不变」。
@@ -107,8 +108,14 @@ fn daily_parity_verify() {
         .unwrap();
         let closed: Vec<&DayBaseline> = baseline.days.iter().filter(|day| day.closed).collect();
         assert_eq!(
-            stored.iter().map(|(key, ..)| key.clone()).collect::<Vec<_>>(),
-            closed.iter().map(|day| day.day_key.clone()).collect::<Vec<_>>(),
+            stored
+                .iter()
+                .map(|(key, ..)| key.clone())
+                .collect::<Vec<_>>(),
+            closed
+                .iter()
+                .map(|day| day.day_key.clone())
+                .collect::<Vec<_>>(),
             "closed-day set in activity_daily_totals must match the baseline exactly"
         );
         for (index, (day_key, union_ms, device_sum_ms)) in stored.iter().enumerate() {
@@ -151,10 +158,11 @@ async fn drain(pool: &Pool<Sqlite>) {
 
 async fn measure(pool: &Pool<Sqlite>) -> Baseline {
     let mut days: BTreeMap<String, DayBaseline> = BTreeMap::new();
-    let rows = sqlx::query("SELECT bucket_start_ms, effective_duration_ms FROM activity_hourly_effective")
-        .fetch_all(pool)
-        .await
-        .unwrap();
+    let rows =
+        sqlx::query("SELECT bucket_start_ms, effective_duration_ms FROM activity_hourly_effective")
+            .fetch_all(pool)
+            .await
+            .unwrap();
     for row in &rows {
         let bucket_start_ms: i64 = row.get("bucket_start_ms");
         let duration_ms: i64 = row.get("effective_duration_ms");
@@ -179,14 +187,13 @@ async fn measure(pool: &Pool<Sqlite>) -> Baseline {
 fn day_entry(days: &mut BTreeMap<String, DayBaseline>, at_ms: i64) -> &mut DayBaseline {
     let (day_start_ms, day_end_ms) = local_day_range_at(at_ms).unwrap();
     let day_key = day_key_of(day_start_ms).unwrap();
-    days.entry(day_key.clone())
-        .or_insert_with(|| DayBaseline {
-            day_key,
-            hourly_sum_ms: 0,
-            hourly_row_count: 0,
-            session_count: 0,
-            closed: day_end_ms <= now_ms(),
-        })
+    days.entry(day_key.clone()).or_insert_with(|| DayBaseline {
+        day_key,
+        hourly_sum_ms: 0,
+        hourly_row_count: 0,
+        session_count: 0,
+        closed: day_end_ms <= now_ms(),
+    })
 }
 
 fn day_key_of(at_ms: i64) -> Result<String, String> {

@@ -25,7 +25,7 @@
 
 use sqlx::SqlitePool;
 
-use super::text::{FailStage, dir_label, fail_text_at};
+use super::text::{dir_label, fail_text_at, FailStage};
 use crate::error::AppResult;
 use crate::infra::md_webdav;
 use crate::infra::secret as secret_store;
@@ -216,7 +216,7 @@ async fn test_webdav(cloud: &MdSyncCloud, secret: Option<&str>) -> MdSyncTestRes
     }
     if let Some(code) = listing {
         /* 状态码只进日志（全项目同一条纪律）：绿字里带 `405` / `403` 对用户零信息量，
-           而排障时「服务端到底回了什么」恰恰是第一条要看的线索。 */
+        而排障时「服务端到底回了什么」恰恰是第一条要看的线索。 */
         crate::log_info!("md cloud test: dir listing unsupported code={code}");
         detail.push_str("（服务端不支持直接读目录，已按正常处理）");
     }

@@ -60,6 +60,7 @@ async fn suggest_in_batches(
     let mut merged = AiSuggestResponse {
         suggestions: Vec::new(),
         stats: Default::default(),
+        created: Vec::new(),
     };
     let mut first_error: Option<(ErrorCode, String)> = None;
 
@@ -211,6 +212,7 @@ mod tests {
         let mut merged = AiSuggestResponse {
             suggestions: Vec::new(),
             stats: Default::default(),
+            created: Vec::new(),
         };
         merge_batch_response(
             &mut merged,
@@ -226,6 +228,7 @@ mod tests {
                     batches: 1,
                     failed_batches: 0,
                 },
+                created: Vec::new(),
             },
         );
         merge_batch_failure(&mut merged, 1);

@@ -36,3 +36,27 @@ pub async fn get_all(pool: &SqlitePool) -> AppResult<HashMap<String, String>> {
         .await?;
     Ok(rows.into_iter().collect())
 }
+
+/// 按**键前缀**列出键（标签定义这类「成组 KV」用）。
+///
+/// 用 `substr(key, 1, length(?)) = ?` 而不是 `LIKE ?%`：标签路径里出现 `_` / `%`
+/// 时 LIKE 的转义规则会静默匹配到别的键，而这里要的是逐字节前缀。
+pub async fn list_keys_with_prefix(pool: &SqlitePool, prefix: &str) -> AppResult<Vec<String>> {
+    let rows: Vec<String> = sqlx::query_scalar(
+        "SELECT key FROM settings WHERE substr(key, 1, length(?)) = ? ORDER BY key ASC",
+    )
+    .bind(prefix)
+    .bind(prefix)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows)
+}
+
+/// 删除单键（幂等：不存在不报错）。
+pub async fn delete_key(pool: &SqlitePool, key: &str) -> AppResult<u64> {
+    let result = sqlx::query("DELETE FROM settings WHERE key = ?")
+        .bind(key)
+        .execute(pool)
+        .await?;
+    Ok(result.rows_affected())
+}

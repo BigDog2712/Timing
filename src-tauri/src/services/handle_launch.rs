@@ -46,14 +46,16 @@ pub fn canonical_target(raw: &str) -> AppResult<String> {
     }
     let path = Path::new(trimmed);
     /* 必须是绝对路径：相对路径按**当前工作目录**解析，而那个目录在便携版里可能跟着
-       用户走 —— 同一个绑定在不同次启动会指向不同文件。 */
+    用户走 —— 同一个绑定在不同次启动会指向不同文件。 */
     if !path.is_absolute() {
         return Err(AppError::custom_action_denied("只接受绝对路径"));
     }
     let canonical = std::fs::canonicalize(path)
         .map_err(|_| AppError::custom_action_denied("这个路径不存在或无法访问"))?;
     if !canonical.is_file() {
-        return Err(AppError::custom_action_denied("只能启动文件，不能启动文件夹"));
+        return Err(AppError::custom_action_denied(
+            "只能启动文件，不能启动文件夹",
+        ));
     }
     Ok(canonical.to_string_lossy().to_string())
 }

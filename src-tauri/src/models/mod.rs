@@ -2,18 +2,23 @@
 
 /* [0.14] 分类目录的对外形状（`list_category_catalog` 的返回；哑管道，合并在前端）。 */
 pub mod category_catalog;
+pub mod tag_path;
+/* [0.12.3] AI：OpenAI 兼容配置 / 建议 / 今日汇总的 IPC 形状。 */
+pub mod ai;
 pub mod common;
 /* [0.13] 「绑定应用进程退出 → 结束自动接管段」的入参（两端都有桩，故不放 insight 子树）。 */
 pub mod bound_process_watch;
 /* [V0.11.15] 数据根落点的对外形状（`dataRootGet` / `dataRootChange` 的返回）。 */
-pub mod data_root;
 pub mod constants;
+pub mod data_root;
 pub mod enums;
 /* [0.13 fix] 前台窗口的最小对外形状（`get_foreground_window` 的返回；两端都有桩，故不放 insight 子树）。 */
 pub mod foreground;
 pub mod item;
 /* [0.13.x] 事项 ↔ 应用绑定（`item_app`）。 */
 pub mod item_app;
+/* [0.12.3] 事项多标签的 IPC 形状（命令层不得引用仓库，见 L5）。 */
+pub mod item_tags;
 /* [V0.11.23] 备份导出的返回形状（`md_sync_cloud.rs` 已顶到 300 行门禁）。 */
 pub mod md_backup_export;
 pub mod md_sync;

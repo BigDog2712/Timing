@@ -9,12 +9,12 @@ use std::fs;
 
 use chrono::NaiveDate;
 
+use super::cloud_purge::{kv, list_names, seed_past, state_of};
+use super::sync::env;
 use crate::models::constants::MD_CLOUD_PURGE_BATCH;
 use crate::models::md_cloud_purge::{channel_key, PurgeChannel, PurgeKey, PurgeState};
 use crate::repositories::settings;
 use crate::services::md_cloud::{self, purge};
-use super::cloud_purge::{kv, list_names, seed_past, state_of};
-use super::sync::env;
 use crate::tests::support::unique_dir;
 
 #[tokio::test]
@@ -53,7 +53,10 @@ async fn folder_round_converges_at_the_batch_limit() {
     purge::run_folder(&fixture.pool, &root, &[], &today)
         .await
         .expect("第二轮");
-    assert!(list_names(&root).is_empty(), "23 份往期在两轮里删完（目录里没有当天那份）");
+    assert!(
+        list_names(&root).is_empty(),
+        "23 份往期在两轮里删完（目录里没有当天那份）"
+    );
     assert_eq!(
         kv(&fixture.pool, PurgeChannel::Folder, PurgeKey::Day)
             .await
@@ -116,6 +119,9 @@ async fn paused_channel_is_skipped_until_resume() {
     purge::run_folder(&fixture.pool, &root, &[], &md_cloud::today())
         .await
         .expect("解除后恢复清理");
-    assert!(list_names(&root).is_empty(), "恢复后两份往期都被删（这个目录里没有当天那份）");
+    assert!(
+        list_names(&root).is_empty(),
+        "恢复后两份往期都被删（这个目录里没有当天那份）"
+    );
     let _ = fs::remove_dir_all(&root);
 }

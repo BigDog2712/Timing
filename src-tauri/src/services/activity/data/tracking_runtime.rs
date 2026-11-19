@@ -1,7 +1,7 @@
-use crate::services::activity::data::repositories::{icon_cache, sessions, tracker_settings};
-use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
 use crate::models::activity::events::APP_ICON_CHANGED;
 use crate::models::activity::tracking::ActiveSessionSnapshot;
+use crate::services::activity::data::repositories::{icon_cache, sessions, tracker_settings};
+use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
 use crate::services::activity::engine::tracking::ports::{
     IconCacheRead, SessionNameWrite, SharedTrackingDataStore, TrackingDataError,
     TrackingDataFuture, TrackingDataStore,
@@ -164,11 +164,16 @@ impl TrackingRuntimeDataStore {
     ) -> Result<bool, TrackingRuntimeDataError> {
         let pool = self.pool().await?;
         let has_anonymous =
-            crate::services::activity::data::repositories::anonymous_activity::is_available(&pool).await?;
+            crate::services::activity::data::repositories::anonymous_activity::is_available(&pool)
+                .await?;
         let mut tx = pool.begin().await?;
         let named = sessions::end_active_sessions_tx(&mut tx, raw_end_time).await?;
         let anonymous = if has_anonymous {
-            crate::services::activity::data::repositories::anonymous_activity::seal_tx(&mut tx, raw_end_time).await?
+            crate::services::activity::data::repositories::anonymous_activity::seal_tx(
+                &mut tx,
+                raw_end_time,
+            )
+            .await?
         } else {
             false
         };
@@ -239,18 +244,22 @@ impl TrackingDataStore for TrackingRuntimeDataStore {
     ) -> TrackingDataFuture<'_, bool> {
         Box::pin(async move {
             let pool = self.pool().await.map_err(tracking_data_error)?;
-            crate::services::activity::data::repositories::anonymous_activity::observe(&pool, now_ms, is_web)
-                .await
-                .map_err(tracking_data_error)
+            crate::services::activity::data::repositories::anonymous_activity::observe(
+                &pool, now_ms, is_web,
+            )
+            .await
+            .map_err(tracking_data_error)
         })
     }
 
     fn seal_anonymous_activity(&self, cutoff_ms: i64) -> TrackingDataFuture<'_, bool> {
         Box::pin(async move {
             let pool = self.pool().await.map_err(tracking_data_error)?;
-            crate::services::activity::data::repositories::anonymous_activity::seal(&pool, cutoff_ms)
-                .await
-                .map_err(tracking_data_error)
+            crate::services::activity::data::repositories::anonymous_activity::seal(
+                &pool, cutoff_ms,
+            )
+            .await
+            .map_err(tracking_data_error)
         })
     }
     fn has_anonymous_web_rules(&self) -> TrackingDataFuture<'_, bool> {
@@ -264,20 +273,25 @@ impl TrackingDataStore for TrackingRuntimeDataStore {
     fn seal_interrupted_web_activity(&self, now_ms: i64) -> TrackingDataFuture<'_, bool> {
         Box::pin(async move {
             let pool = self.pool().await.map_err(tracking_data_error)?;
-            let anonymous = if crate::services::activity::data::repositories::anonymous_activity::is_available(&pool)
+            let anonymous =
+                if crate::services::activity::data::repositories::anonymous_activity::is_available(
+                    &pool,
+                )
                 .await
                 .map_err(tracking_data_error)?
-            {
-                crate::services::activity::data::repositories::anonymous_activity::seal_interrupted(&pool, now_ms)
+                {
+                    crate::services::activity::data::repositories::anonymous_activity::seal_interrupted(&pool, now_ms)
                     .await
                     .map_err(tracking_data_error)?
-            } else {
-                false
-            };
-            crate::services::activity::data::repositories::web_activity::seal_interrupted_segments(&pool, now_ms)
-                .await
-                .map(|changed| changed || anonymous)
-                .map_err(tracking_data_error)
+                } else {
+                    false
+                };
+            crate::services::activity::data::repositories::web_activity::seal_interrupted_segments(
+                &pool, now_ms,
+            )
+            .await
+            .map(|changed| changed || anonymous)
+            .map_err(tracking_data_error)
         })
     }
     fn clone_store(&self) -> SharedTrackingDataStore {

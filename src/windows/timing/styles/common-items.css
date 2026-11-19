@@ -278,11 +278,21 @@
   cursor: not-allowed;
 }
 
-/* ---------------------- [0.14] 表单分类选用 + 级联确认弹窗 ---------------------- */
-/* 分类选用：label + 原生 select 一行；复用 .common-items__input 的输入框外观。
-   级联确认弹窗沿用 .menu / .btn 语言，这里只补几何与层级。 */
-.items-prefs__category { display: flex; align-items: center; gap: var(--space-2); color: var(--ink-2); font-size: var(--text-body); }
-.items-prefs__category-select { flex: 1 1 auto; min-width: 0; }
+/* ---------------------- 级联确认弹窗 ---------------------- */
+.items-prefs__tags { display: flex; flex-direction: column; gap: var(--space-1); }
+.items-prefs__tags-head { display: flex; align-items: center; justify-content: space-between; color: var(--ink-2); font-size: var(--text-body); }
+.items-prefs__ai { padding: 0; border: 0; background: none; color: var(--accent, var(--ink-2)); font-size: var(--text-xs); cursor: pointer; }
+.items-prefs__ai:disabled { color: var(--ink-3); cursor: default; }
+.items-prefs__ai:focus-visible,
+.items-prefs__tag-chip:focus-visible,
+.common-items__input:focus-visible {
+  outline: 2px solid var(--focus-ring, var(--accent));
+  outline-offset: 2px;
+}
+.items-prefs__tag-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.items-prefs__tag-chip { max-width: 100%; padding: 1px 6px; border: 1px solid var(--line, rgba(128,128,128,.35)); border-radius: 999px; background: transparent; color: var(--ink-2); font-size: var(--text-xs); line-height: 1.6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.items-prefs__tag-chip:hover:not(:disabled) { color: var(--ink-1, var(--ink-2)); border-color: currentColor; }
+.items-prefs__tag-hint { margin: 0; color: var(--ink-3); font-size: var(--text-caption); }
 .cascade-delete { width: 236px; }
 .cascade-delete__hint { margin: var(--space-1) 0 var(--space-2); color: var(--ink-3); font-size: var(--text-caption); }
 .cascade-delete__list { max-height: 120px; margin: 0 0 var(--space-2); padding-left: var(--space-4); overflow-y: auto; color: var(--ink-2); font-size: var(--text-caption); }

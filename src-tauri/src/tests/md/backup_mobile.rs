@@ -29,10 +29,13 @@ fn obsidian_backup_is_refused() {
 #[test]
 fn legacy_backup_without_tag_is_refused() {
     /* 老备份也不是裸文件名：落点前缀是 v0.11.13 才加的，时间戳一直都在
-       （`<原文件名>-<yyyyMMdd-HHmmss>.md`）。 */
+    （`<原文件名>-<yyyyMMdd-HHmmss>.md`）。 */
     let err = restorable_on_mobile("2026-11-06-20261101-093000.md")
         .expect_err("无前缀的老备份归属不明，不能猜");
-    assert!(err.contains("老格式") || err.contains("电脑"), "实得：{err}");
+    assert!(
+        err.contains("老格式") || err.contains("电脑"),
+        "实得：{err}"
+    );
 }
 
 /// 名字不是 Timing 的备份：拒绝，且把名字回显出来（用户能看出点的是哪一条）。
@@ -48,5 +51,8 @@ fn garbage_name_is_refused_with_echo() {
 fn folder_backup_is_refused_as_unsupported() {
     let err = restorable_on_mobile("folder__2026-11-06-20261108-120000.md")
         .expect_err("folder 落点在手机上不存在");
-    assert!(err.contains("WebDAV") || err.contains("电脑"), "实得：{err}");
+    assert!(
+        err.contains("WebDAV") || err.contains("电脑"),
+        "实得：{err}"
+    );
 }

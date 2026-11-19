@@ -28,7 +28,11 @@ fn fully_nested_intervals_do_not_shrink_the_union() {
     let totals = compute_day(&[
         ("device-a", nine, nine + HOUR_MS),
         ("device-b", nine + 30 * MINUTE_MS, nine + 50 * MINUTE_MS),
-        ("device-b", nine + 55 * MINUTE_MS, nine + HOUR_MS + 10 * MINUTE_MS),
+        (
+            "device-b",
+            nine + 55 * MINUTE_MS,
+            nine + HOUR_MS + 10 * MINUTE_MS,
+        ),
     ]);
     assert_eq!(totals.union_ms, 70 * MINUTE_MS);
     assert_eq!(totals.device_sum_ms, 95 * MINUTE_MS);
@@ -64,7 +68,10 @@ fn zero_length_and_inverted_intervals_contribute_nothing() {
     ]);
     assert_eq!(totals.union_ms, 5 * MINUTE_MS);
     assert_eq!(totals.device_sum_ms, 5 * MINUTE_MS);
-    assert_eq!(totals.devices, vec![("device-a".to_string(), 5 * MINUTE_MS)]);
+    assert_eq!(
+        totals.devices,
+        vec![("device-a".to_string(), 5 * MINUTE_MS)]
+    );
 }
 
 /// 同一台设备的重叠区间是**并集**，不是加总：这不影响 `device_sum_ms` 的定义，

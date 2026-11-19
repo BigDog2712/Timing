@@ -12,6 +12,7 @@
   --color-danger:  var(--danger);   /* [Timing 对齐 D3] 急迫态 = RingUrgent，与 running/warn/done 同构 */
   --color-warn:  var(--warn);
   --color-done:    var(--ok);
+  --color-violet:  var(--violet);   /* 收起圆点 ≥2h 档色（非四色可配） */
   --color-bar:     var(--bg-plate);
 }
 

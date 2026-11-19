@@ -6,22 +6,28 @@
 //! 三条断言照 PRD §3.5：围栏那段 `cmp` 逐字节不变；我们的区块仍在原位被更新；
 //! 文件里仍只有 1 个真标题（不因为「找不到」就在末尾补第二节）。
 
+use super::sync::{at, env, file_for, NOTES_HEADING, TIMERS_HEADING};
 use crate::infra::{md_fence, md_file, md_section};
 use crate::services;
-use super::sync::{at, env, file_for, NOTES_HEADING, TIMERS_HEADING};
 use crate::tests::support::{insert_saved, new_item};
 
 #[tokio::test]
 async fn j15_foreign_fence_is_byte_identical_after_a_round() {
     let env = env("md-fence-j15").await;
     let item = new_item(&env.pool, "写代码").await;
-    insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
 
     /* 围栏放在我方区块**之前**：只有这样「第一个命中」才会落在别人的围栏里。 */
     let prefix = format!("顶部说明段：Timing 会写下面这个区块。\n\n```\n{TIMERS_HEADING}\n```\n");
-    let before = format!(
-        "{prefix}\n别人的区块，一个字都不许动\n\n{TIMERS_HEADING}\n\n{NOTES_HEADING}\n"
-    );
+    let before =
+        format!("{prefix}\n别人的区块，一个字都不许动\n\n{TIMERS_HEADING}\n\n{NOTES_HEADING}\n");
     let path = file_for(&env);
     std::fs::write(&path, &before).unwrap();
 

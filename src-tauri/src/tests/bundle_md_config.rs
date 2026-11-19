@@ -52,11 +52,10 @@ async fn imported_md_sync_config_is_ignored_even_with_newer_timestamp() {
     import_full_bundle(&empty, &empty_activity, &path)
         .await
         .expect("import into empty config database");
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM settings WHERE key = 'plugin.md-sync.config'",
-    )
-    .fetch_one(&empty)
-    .await
-    .expect("check local config key");
+    let count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM settings WHERE key = 'plugin.md-sync.config'")
+            .fetch_one(&empty)
+            .await
+            .expect("check local config key");
     assert_eq!(count, 0);
 }

@@ -1,15 +1,15 @@
 use super::*;
+use crate::models::activity::tools::ActivityReminderTarget;
 use crate::services::activity::data::backup::RestoreStrategy;
 use crate::services::activity::data::repositories::{anonymous_activity, tools};
-use crate::models::activity::tools::ActivityReminderTarget;
 use futures_util::FutureExt;
 use sqlx::Executor;
 use std::panic::AssertUnwindSafe;
 
 #[tokio::test]
 async fn snapshot_restore_tolerates_retired_background_preferences() {
-    use crate::services::activity::data::repositories::app_settings::load_desktop_behavior_settings;
     use crate::models::activity::settings::{StartupSource, StartupUiStrategy};
+    use crate::services::activity::data::repositories::app_settings::load_desktop_behavior_settings;
     let dir = tests::SnapshotTestDirectory::new("snapshot-retired-background");
     let mut pools = Vec::new();
     let mut prepared_sources = Vec::new();
@@ -99,16 +99,22 @@ async fn snapshot_preparation_seals_open_activity_using_source_evidence() {
 async fn snapshot_merge_preserves_all_record_domains_and_rolls_back_late_failure() {
     let dir = tests::SnapshotTestDirectory::new("snapshot-merge");
     let source_path = dir.0.join("source.db");
-    let source = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&source_path, true)
-        .await
-        .unwrap();
+    let source = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+        &source_path,
+        true,
+    )
+    .await
+    .unwrap();
     crate::services::activity::data::sqlite_pool::prepare_pool_schema(&source, &source_path)
         .await
         .unwrap();
     let target_path = dir.0.join("target.db");
-    let target = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&target_path, true)
-        .await
-        .unwrap();
+    let target = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+        &target_path,
+        true,
+    )
+    .await
+    .unwrap();
     crate::services::activity::data::sqlite_pool::prepare_pool_schema(&target, &target_path)
         .await
         .unwrap();
@@ -257,12 +263,18 @@ async fn running_focus_merge_seals_elapsed_at_backup_without_displacing_target()
     let dir = tests::SnapshotTestDirectory::new("focus-progress-merge");
     let source_path = dir.0.join("source.db");
     let target_path = dir.0.join("target.db");
-    let source = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&source_path, true)
-        .await
-        .unwrap();
-    let target = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&target_path, true)
-        .await
-        .unwrap();
+    let source = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+        &source_path,
+        true,
+    )
+    .await
+    .unwrap();
+    let target = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+        &target_path,
+        true,
+    )
+    .await
+    .unwrap();
     for (pool, path) in [(&source, &source_path), (&target, &target_path)] {
         crate::services::activity::data::sqlite_pool::prepare_pool_schema(pool, path)
             .await
@@ -277,7 +289,9 @@ async fn running_focus_merge_seals_elapsed_at_backup_without_displacing_target()
     target.execute("INSERT INTO tool_free_focus(label,rest_mode,rest_minutes,rest_ratio,phase,status,started_at,created_at,updated_at)
         VALUES ('Local','fixed',1,2,'focus','running',10,200,200)").await.unwrap();
     let archive = dir.0.join("focus.zip");
-    write_snapshot_archive(&source, &archive, "test").await.unwrap();
+    write_snapshot_archive(&source, &archive, "test")
+        .await
+        .unwrap();
     source.close().await;
     // Use a deterministic export time on the extracted candidate.
     for strategy in [RestoreStrategy::Replace, RestoreStrategy::Merge] {
@@ -347,23 +361,32 @@ async fn running_focus_merge_seals_elapsed_at_backup_without_displacing_target()
 async fn pre_identity_snapshot_replay_preserves_independent_reminders() {
     let dir = tests::SnapshotTestDirectory::new("legacy-reminder-identity");
     let path = dir.0.join("legacy.db");
-    let source = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&path, true)
-        .await
-        .unwrap();
+    let source = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+        &path, true,
+    )
+    .await
+    .unwrap();
     crate::services::activity::data::sqlite_pool::prepare_pool_schema(&source, &path)
         .await
         .unwrap();
     // 造「迁移 26 之前」的快照：账本截到 25，且 28 加的东西真的拆回去（见 legacy_schema_fixture）。
-    crate::services::activity::data::rewind_to_pre_device_dimension(&source).await.unwrap();
+    crate::services::activity::data::rewind_to_pre_device_dimension(&source)
+        .await
+        .unwrap();
     source.execute("DROP TRIGGER trg_tool_reminder_identity; DROP TABLE tool_reminder_identities; DELETE FROM _sqlx_migrations WHERE version>=26;
         INSERT INTO tool_reminders(label,scheduled_at,created_at,status) VALUES ('A',60000,1000,'scheduled'),('A',60000,1000,'scheduled');").await.unwrap();
     let archive = dir.0.join("old.zip");
-    write_snapshot_archive(&source, &archive, "test").await.unwrap();
-    source.close().await;
-    let target = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
-    crate::services::activity::data::sqlite_pool::prepare_pool_schema(&target, Path::new(":memory:"))
+    write_snapshot_archive(&source, &archive, "test")
         .await
         .unwrap();
+    source.close().await;
+    let target = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+    crate::services::activity::data::sqlite_pool::prepare_pool_schema(
+        &target,
+        Path::new(":memory:"),
+    )
+    .await
+    .unwrap();
     target.execute("INSERT INTO tool_reminders(label,scheduled_at,created_at,status) VALUES('A',60000,1000,'scheduled')").await.unwrap();
     for _ in 0..2 {
         let candidate = prepare_snapshot_backup(&archive, RestoreStrategy::Merge)

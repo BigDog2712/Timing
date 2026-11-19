@@ -44,6 +44,8 @@
 /* [0.12.1] 应用排行卡（`.at-app-*`）从 modules 拆出来单独成文件（那张表顶穿了 300 行）。
    必须紧跟 modules：它只覆盖 `.at-app-*` 一族，与 `dashboard-todos.css` 同一层级口径。 */
 @import "./styles/features/dashboard-apps.css";
+/* [0.12.4] 应用标签弹窗（`.at-tag-*`）：已选一行 + 底部「所有标签」选择器。 */
+@import "./styles/features/dashboard-app-tag-dialog.css";
 /* [v3.1 卡内自适应] 容器查询锚点 + 计时卡在小尺寸下的环收缩 / 读数滚动。
  * 必须在 modules 之后：它覆盖 `.at-donut-body` / `.at-donut` / `.at-readouts` 的既有值。 */
 @import "./styles/features/dashboard-card-fit.css";
@@ -78,9 +80,13 @@
    单开一份是为了不动 tokens.css 的 298/298 冻结线，理由见该文件头注释。 */
 @import "./styles/features/device-lanes.css";
 @import "./styles/features/data.css";
+@import "./styles/features/data-trend-tags.css";
 /* [本轮] 「应用设置」弹窗（双击应用趋势的一行打开）：独立文件，避让 data.css 与
    quiet-pro.css 的行数棘轮（后者冻在 1936 行、加不进任何一行）。 */
 @import "./styles/features/data-app-edit.css";
+/* [0.12.4] 数据页「标签管理」（`.dtm-*`）：行悬停 / 折叠箭头 / 行内操作。
+   只新增自己的类，覆盖不到 data.css 与 quiet-pro.css 的既有规则。 */
+@import "./styles/features/data-tag-manager.css";
 @import "./styles/features/destination.css";
 @import "./styles/features/about.css";
 @import "./styles/features/tools-alerts.css";

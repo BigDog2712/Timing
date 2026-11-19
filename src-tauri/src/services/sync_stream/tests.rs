@@ -7,7 +7,7 @@ use std::path::PathBuf;
 
 use sqlx::SqlitePool;
 
-use super::{push_new_events, pull_segments, transport::Transport};
+use super::{pull_segments, push_new_events, transport::Transport};
 use crate::repositories::timer_ops as repo;
 use crate::services::timer_ops::TimerOpKind;
 
@@ -32,7 +32,10 @@ pub(super) fn temp_root(tag: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!(
         "sync-stream-{tag}-{}-{}",
         std::process::id(),
-        std::thread::current().name().unwrap_or("t").replace(':', "_")
+        std::thread::current()
+            .name()
+            .unwrap_or("t")
+            .replace(':', "_")
     ));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -57,12 +60,28 @@ pub(super) async fn make_session(pool: &SqlitePool, device: &str) -> String {
         .await
         .unwrap();
     let session = start.session_uid.clone();
-    repo::append(pool, &session, TimerOpKind::Pause, 11_000, DAY, None, device)
-        .await
-        .unwrap();
-    repo::append(pool, &session, TimerOpKind::Resume, 31_000, DAY, None, device)
-        .await
-        .unwrap();
+    repo::append(
+        pool,
+        &session,
+        TimerOpKind::Pause,
+        11_000,
+        DAY,
+        None,
+        device,
+    )
+    .await
+    .unwrap();
+    repo::append(
+        pool,
+        &session,
+        TimerOpKind::Resume,
+        31_000,
+        DAY,
+        None,
+        device,
+    )
+    .await
+    .unwrap();
     repo::append(pool, &session, TimerOpKind::Stop, 41_000, DAY, None, device)
         .await
         .unwrap();
@@ -141,9 +160,17 @@ fn push_only_transfers_new_events() {
         let start = repo::start_session(&pool_a, 1, 50_000, DAY, "countup", None, A)
             .await
             .unwrap();
-        repo::append(&pool_a, &start.session_uid, TimerOpKind::Stop, 51_000, DAY, None, A)
-            .await
-            .unwrap();
+        repo::append(
+            &pool_a,
+            &start.session_uid,
+            TimerOpKind::Stop,
+            51_000,
+            DAY,
+            None,
+            A,
+        )
+        .await
+        .unwrap();
 
         let second = push_new_events(&pool_a, &transport, A).await.unwrap();
         assert_eq!(second.events, 2, "第二轮只传新增事件");
@@ -167,11 +194,12 @@ fn dropped_session_is_soft_deleted_on_the_peer() {
         /* 先让 B 拿到「进行中」的会话。 */
         push_new_events(&pool_a, &transport, A).await.unwrap();
         pull_segments(&pool_b, &transport, B).await.unwrap();
-        let active: Option<i64> = sqlx::query_scalar("SELECT deleted_at FROM time_records WHERE uid = ?1")
-            .bind(&session)
-            .fetch_one(&pool_b)
-            .await
-            .unwrap();
+        let active: Option<i64> =
+            sqlx::query_scalar("SELECT deleted_at FROM time_records WHERE uid = ?1")
+                .bind(&session)
+                .fetch_one(&pool_b)
+                .await
+                .unwrap();
         assert!(active.is_none(), "同步后先是一段进行中/未删除的会话");
 
         /* A 丢弃该会话（drop 是一条事件，不是删旧事件）。 */
@@ -181,11 +209,12 @@ fn dropped_session_is_soft_deleted_on_the_peer() {
         push_new_events(&pool_a, &transport, A).await.unwrap();
         pull_segments(&pool_b, &transport, B).await.unwrap();
 
-        let deleted: Option<i64> = sqlx::query_scalar("SELECT deleted_at FROM time_records WHERE uid = ?1")
-            .bind(&session)
-            .fetch_one(&pool_b)
-            .await
-            .unwrap();
+        let deleted: Option<i64> =
+            sqlx::query_scalar("SELECT deleted_at FROM time_records WHERE uid = ?1")
+                .bind(&session)
+                .fetch_one(&pool_b)
+                .await
+                .unwrap();
         assert!(deleted.is_some(), "drop 事件必须在另一端软删该会话");
     });
 }
@@ -220,19 +249,25 @@ fn close_old_and_open_new_in_the_same_segment_does_not_collide() {
 
         push_new_events(&pool_a, &transport, A).await.unwrap();
         let pull = pull_segments(&pool_b, &transport, B).await.unwrap();
-        assert!(pull.errors.is_empty(), "同段「收旧开新」不得报错：{:?}", pull.errors);
+        assert!(
+            pull.errors.is_empty(),
+            "同段「收旧开新」不得报错：{:?}",
+            pull.errors
+        );
 
-        let s1_status: String = sqlx::query_scalar("SELECT status FROM time_records WHERE uid = ?1")
-            .bind(&s1_uid)
-            .fetch_one(&pool_b)
-            .await
-            .unwrap();
+        let s1_status: String =
+            sqlx::query_scalar("SELECT status FROM time_records WHERE uid = ?1")
+                .bind(&s1_uid)
+                .fetch_one(&pool_b)
+                .await
+                .unwrap();
         assert_eq!(s1_status, "saved", "旧会话要收口");
-        let s2_status: String = sqlx::query_scalar("SELECT status FROM time_records WHERE uid = ?1")
-            .bind(&s2_uid)
-            .fetch_one(&pool_b)
-            .await
-            .unwrap();
+        let s2_status: String =
+            sqlx::query_scalar("SELECT status FROM time_records WHERE uid = ?1")
+                .bind(&s2_uid)
+                .fetch_one(&pool_b)
+                .await
+                .unwrap();
         assert_eq!(s2_status, "active", "新会话要进入计时中");
     });
 }
@@ -241,22 +276,52 @@ fn close_old_and_open_new_in_the_same_segment_does_not_collide() {
 fn staged_batch_survives_success_before_cursor_commit() {
     tauri::async_runtime::block_on(async {
         let pool = pool_with_item_claimed_to(A).await;
-        let start = repo::start_session(&pool, 1, 1_000, DAY, "countup", None, A).await.unwrap();
+        let start = repo::start_session(&pool, 1, 1_000, DAY, "countup", None, A)
+            .await
+            .unwrap();
         let root = temp_root("crash_after_put");
         let transport = Transport::Folder(root);
+        let source_scope = transport.scope().unwrap();
+        let upload_scope = super::scope::upload(&source_scope);
         super::transport::fail_after_put();
         let failed = push_new_events(&pool, &transport, A).await.unwrap();
         assert_eq!(failed.segment_seq, 0, "注入崩溃时游标不能提交");
-        let first = super::repository::pending_upload(&pool, &transport.scope().unwrap(), A).await.unwrap().unwrap();
-        assert_eq!(transport.get(&super::segment::segment_path(A, first.seq as u32)).await.unwrap().unwrap(), first.body);
-        repo::append(&pool, &start.session_uid, TimerOpKind::Stop, 2_000, DAY, None, A).await.unwrap();
+        let first = super::repository::pending_upload(&pool, &upload_scope, A)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            transport
+                .get(&super::streams::path(A, &source_scope, first.seq as u32))
+                .await
+                .unwrap()
+                .unwrap(),
+            first.body
+        );
+        repo::append(
+            &pool,
+            &start.session_uid,
+            TimerOpKind::Stop,
+            2_000,
+            DAY,
+            None,
+            A,
+        )
+        .await
+        .unwrap();
 
-        let retry = super::repository::pending_upload(&pool, &transport.scope().unwrap(), A).await.unwrap().unwrap();
+        let retry = super::repository::pending_upload(&pool, &upload_scope, A)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(retry, first, "重试必须使用持久化的 seq、边界和完全相同字节");
         let push = super::push_new_events(&pool, &transport, A).await.unwrap();
         assert_eq!(push.segment_seq, 1);
         assert_eq!(push.events, 1);
-        assert!(super::repository::pending_upload(&pool, &transport.scope().unwrap(), A).await.unwrap().is_none());
+        assert!(super::repository::pending_upload(&pool, &upload_scope, A)
+            .await
+            .unwrap()
+            .is_none());
         let next = super::push_new_events(&pool, &transport, A).await.unwrap();
         assert_eq!(next.segment_seq, 2, "确认后新增事件使用下一个 seq");
     });

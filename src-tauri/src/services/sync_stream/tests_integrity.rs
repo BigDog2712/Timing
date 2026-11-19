@@ -17,6 +17,7 @@
 use super::pull_segments;
 use super::push_new_events;
 use super::repository;
+use super::scope::{download, upload};
 use super::tests::{make_session, pool_with_item_claimed_to, record_row, temp_root};
 use super::transport::Transport;
 
@@ -24,11 +25,13 @@ const A: &str = "aaaaaaaaaaaa";
 const B: &str = "bbbbbbbbbbbb";
 
 /// 分段在本地目录通路下的绝对路径。
-fn segment_file(root: &std::path::Path, device: &str, seq: u32) -> std::path::PathBuf {
-    root.join("sync")
-        .join("events")
-        .join(device)
-        .join(format!("{seq:08}.jsonl"))
+fn segment_file(
+    root: &std::path::Path,
+    device: &str,
+    source_scope: &str,
+    seq: u32,
+) -> std::path::PathBuf {
+    root.join(super::streams::path(device, source_scope, seq))
 }
 
 #[test]
@@ -43,17 +46,18 @@ fn corrupt_segment_is_retried_instead_of_being_skipped() {
         push_new_events(&pool_a, &transport, A).await.unwrap();
 
         /* 把分段改成半截（模拟写到一半被读、或网盘截断）：解析必然失败。 */
-        let file = segment_file(&root, A, 1);
+        let file = segment_file(&root, A, &transport.scope().unwrap(), 1);
         let good = std::fs::read(&file).unwrap();
         std::fs::write(&file, &good[..good.len() / 2]).unwrap();
 
+        let download_scope = download(&transport.scope().unwrap(), &transport.scope().unwrap());
         let first = pull_segments(&pool_b, &transport, B).await.unwrap();
         assert_eq!(first.applied, 0, "坏分段里的任何事件都不许被应用");
         assert!(
             !first.errors.is_empty(),
             "坏分段必须报错（否则用户完全看不到同步卡住了）"
         );
-        let cursor = repository::get(&pool_b, &transport.scope().unwrap(), A).await.unwrap();
+        let cursor = repository::get(&pool_b, &download_scope, A).await.unwrap();
         assert_eq!(
             cursor.map(|c| c.last_seq).unwrap_or(0),
             0,
@@ -64,6 +68,14 @@ fn corrupt_segment_is_retried_instead_of_being_skipped() {
         std::fs::write(&file, &good).unwrap();
         let second = pull_segments(&pool_b, &transport, B).await.unwrap();
         assert_eq!(second.applied, 4, "修好之后要原样补上，不能永久跳过");
+        assert_eq!(
+            repository::get(&pool_b, &download_scope, A)
+                .await
+                .unwrap()
+                .unwrap()
+                .last_seq,
+            1
+        );
         assert_eq!(
             record_row(&pool_b, &session).await,
             record_row(&pool_a, &session).await,
@@ -82,8 +94,8 @@ fn push_does_not_advance_cursor_when_existing_segment_differs() {
         let transport = Transport::Folder(root.clone());
 
         /* 模拟「上一轮 PUT 成功了、游标没落库，且这一轮批次更长」：
-           同一个 seq 上已经躺着一份**不同内容**的分段。 */
-        let file = segment_file(&root, A, 1);
+        同一个 seq 上已经躺着一份**不同内容**的分段。 */
+        let file = segment_file(&root, A, &transport.scope().unwrap(), 1);
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
         std::fs::write(&file, b"{\"uid\":\"p:aaaaaaaaaaaa:1\"}\n").unwrap();
 
@@ -91,7 +103,10 @@ fn push_does_not_advance_cursor_when_existing_segment_differs() {
         assert_eq!(first.events, 0, "内容不同 = 没确认写入，不许当成已上传");
         assert!(!first.errors.is_empty(), "必须报错，下一轮重试");
         assert!(
-            repository::get(&pool_a, &transport.scope().unwrap(), A).await.unwrap().is_none(),
+            repository::get(&pool_a, &upload(&transport.scope().unwrap()), A)
+                .await
+                .unwrap()
+                .is_none(),
             "游标不许推进：推进就是中间那批事件永久不对端可见"
         );
 
@@ -100,7 +115,10 @@ fn push_does_not_advance_cursor_when_existing_segment_differs() {
         let second = push_new_events(&pool_a, &transport, A).await.unwrap();
         assert_eq!(second.events, 4);
         assert_eq!(second.segment_seq, 1, "重试用的是同一个 seq，不跳号");
-        let cursor = repository::get(&pool_a, &transport.scope().unwrap(), A).await.unwrap().expect("游标必须落库");
+        let cursor = repository::get(&pool_a, &upload(&transport.scope().unwrap()), A)
+            .await
+            .unwrap()
+            .expect("游标必须落库");
         assert_eq!(cursor.last_seq, 1);
         assert!(cursor.last_op_id > 0, "上传游标要记到已传的最大 op_id");
     });
@@ -118,12 +136,25 @@ fn repushing_an_identical_segment_is_treated_as_success() {
         assert_eq!(first.segment_seq, 1);
 
         /* 把游标退回去，模拟「PUT 成功、游标没落库」。 */
-        repository::upsert(&pool_a, &transport.scope().unwrap(), A, 0, 0).await.unwrap();
+        repository::upsert(&pool_a, &upload(&transport.scope().unwrap()), A, 0, 0)
+            .await
+            .unwrap();
 
         let second = push_new_events(&pool_a, &transport, A).await.unwrap();
-        assert!(second.errors.is_empty(), "内容逐字节相同 ⇒ 就是已上传：{:?}", second.errors);
+        assert!(
+            second.errors.is_empty(),
+            "内容逐字节相同 ⇒ 就是已上传：{:?}",
+            second.errors
+        );
         assert_eq!(second.segment_seq, 0, "核验已存在分段后不再重复发布");
-        assert_eq!(repository::get(&pool_a, &transport.scope().unwrap(), A).await.unwrap().unwrap().last_seq, 1);
+        assert_eq!(
+            repository::get(&pool_a, &upload(&transport.scope().unwrap()), A)
+                .await
+                .unwrap()
+                .unwrap()
+                .last_seq,
+            1
+        );
     });
 }
 
@@ -140,7 +171,7 @@ fn published_segment_leaves_no_temp_files() {
         let transport = Transport::Folder(root.clone());
         push_new_events(&pool_a, &transport, A).await.unwrap();
 
-        let dir = root.join("sync").join("events").join(A);
+        let dir = root.join(super::streams::dir(A, &transport.scope().unwrap()));
         let mut names: Vec<String> = std::fs::read_dir(&dir)
             .unwrap()
             .map(|entry| entry.unwrap().file_name().to_string_lossy().to_string())
@@ -173,11 +204,14 @@ fn interrupted_write_never_publishes_a_partial_segment() {
         assert_eq!(summary.events, 0, "没发布成功 = 这批事件还不算传上去");
         assert!(!summary.errors.is_empty(), "必须报错，下一轮重试");
         assert!(
-            !segment_file(&root, A, 1).exists(),
+            !segment_file(&root, A, &transport.scope().unwrap(), 1).exists(),
             "最终路径上不许出现半份文件：出现了就会被另一端当成完整分段"
         );
         assert!(
-            repository::get(&pool_a, &transport.scope().unwrap(), A).await.unwrap().is_none(),
+            repository::get(&pool_a, &upload(&transport.scope().unwrap()), A)
+                .await
+                .unwrap()
+                .is_none(),
             "上传游标不许推进"
         );
 
@@ -185,7 +219,15 @@ fn interrupted_write_never_publishes_a_partial_segment() {
         let retry = push_new_events(&pool_a, &transport, A).await.unwrap();
         assert_eq!(retry.segment_seq, 1, "重试用同一个 seq");
         assert_eq!(retry.events, 4);
-        assert!(segment_file(&root, A, 1).exists());
+        assert!(segment_file(&root, A, &transport.scope().unwrap(), 1).exists());
+        assert_eq!(
+            repository::get(&pool_a, &upload(&transport.scope().unwrap()), A)
+                .await
+                .unwrap()
+                .unwrap()
+                .last_seq,
+            1
+        );
     });
 }
 
@@ -216,23 +258,33 @@ fn failed_apply_leaves_no_half_state_and_retry_converges() {
         .await
         .unwrap();
 
+        let download_scope = download(&transport.scope().unwrap(), &transport.scope().unwrap());
         let failed = pull_segments(&pool_b, &transport, B).await.unwrap();
         assert_eq!(failed.applied, 0, "失败的那一段不许有任何事件被算作已应用");
-        assert!(!failed.errors.is_empty(), "失败必须说出来（否则用户只看到「同步卡住」）");
+        assert!(
+            !failed.errors.is_empty(),
+            "失败必须说出来（否则用户只看到「同步卡住」）"
+        );
 
         /* 三条断言合起来才是「没有半截状态」：事件、记录、游标必须都停在段前。 */
         let ops: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM timer_ops")
             .fetch_one(&pool_b)
             .await
             .unwrap();
-        assert_eq!(ops, 0, "事件 upsert 必须随事务回滚（否则重试会因 uid 去重而跳过折叠）");
+        assert_eq!(
+            ops, 0,
+            "事件 upsert 必须随事务回滚（否则重试会因 uid 去重而跳过折叠）"
+        );
         let records: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM time_records")
             .fetch_one(&pool_b)
             .await
             .unwrap();
         assert_eq!(records, 0, "物化也必须回滚");
         assert!(
-            repository::get(&pool_b, &transport.scope().unwrap(), A).await.unwrap().is_none(),
+            repository::get(&pool_b, &download_scope, A)
+                .await
+                .unwrap()
+                .is_none(),
             "游标不许前进：前进就是这一段永久丢失"
         );
 
@@ -242,7 +294,11 @@ fn failed_apply_leaves_no_half_state_and_retry_converges() {
             .await
             .unwrap();
         let second = pull_segments(&pool_b, &transport, B).await.unwrap();
-        assert!(second.errors.is_empty(), "修好之后不该再报错：{:?}", second.errors);
+        assert!(
+            second.errors.is_empty(),
+            "修好之后不该再报错：{:?}",
+            second.errors
+        );
         assert_eq!(second.applied, 4, "重试要把这一段完整补上");
         assert_eq!(
             record_row(&pool_b, &session).await,
@@ -250,7 +306,10 @@ fn failed_apply_leaves_no_half_state_and_retry_converges() {
             "补上之后两端必须逐位一致"
         );
         assert_eq!(
-            repository::get(&pool_b, &transport.scope().unwrap(), A).await.unwrap().map(|c| c.last_seq),
+            repository::get(&pool_b, &download_scope, A)
+                .await
+                .unwrap()
+                .map(|c| c.last_seq),
             Some(1),
             "成功之后游标才前进"
         );
@@ -282,15 +341,18 @@ fn non_device_dir_is_reported_without_blocking_real_peers() {
         assert_eq!(summary.peers, 1, "只有合法的那台算 peer");
         assert_eq!(summary.applied, 4, "合法设备的同步不受影响");
         /* 0.12.11 真机改判据：杂项曾记进 `errors`，而 `round_stream::run` 用「errors 是否
-           为空」判整轮成败 —— 坚果云稳定返回的 `unix-directory` 让每轮都退避、同步几乎
-           跑不动。「有个杂项」要看得见，但不是失败。 */
+        为空」判整轮成败 —— 坚果云稳定返回的 `unix-directory` 让每轮都退避、同步几乎
+        跑不动。「有个杂项」要看得见，但不是失败。 */
         assert!(
             summary.errors.is_empty(),
             "非设备目录不能让整轮判失败（会触发退避）：{:?}",
             summary.errors
         );
         assert!(
-            summary.warnings.iter().any(|err| err.contains("not-a-device")),
+            summary
+                .warnings
+                .iter()
+                .any(|err| err.contains("not-a-device")),
             "非法目录必须点名报出来，用户才能去清掉它：{:?}",
             summary.warnings
         );

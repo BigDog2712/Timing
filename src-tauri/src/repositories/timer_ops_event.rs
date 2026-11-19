@@ -50,11 +50,9 @@ pub(crate) async fn insert_op(conn: &mut SqliteConnection, op: &NewOp<'_>) -> Ap
     .bind(op.device_id)
     .execute(&mut *conn)
     .await?;
-    Ok(
-        sqlx::query_scalar("SELECT last_insert_rowid()")
-            .fetch_one(&mut *conn)
-            .await?,
-    )
+    Ok(sqlx::query_scalar("SELECT last_insert_rowid()")
+        .fetch_one(&mut *conn)
+        .await?)
 }
 
 /// 读回刚写的那一行（同事务内可见）。
@@ -77,8 +75,8 @@ pub(crate) async fn append(
     device_id: &str,
 ) -> AppResult<TimerOp> {
     /* `item_uid` 从**会话当前的**事项取，不从「第一条事件」复制：第一条事件（`start`）
-       没有前驱可抄（按前驱取会让起点永远写不进去，实测报错 `... has no start event`），
-       而事项还可以被 `switch` 改判。冗余存一份是为了按事项查事件时不必回连会话表。 */
+    没有前驱可抄（按前驱取会让起点永远写不进去，实测报错 `... has no start event`），
+    而事项还可以被 `switch` 改判。冗余存一份是为了按事项查事件时不必回连会话表。 */
     let item_uid: Option<String> = sqlx::query_scalar(
         "SELECT i.uid FROM time_records r JOIN items i ON i.id = r.item_id WHERE r.uid = ?1",
     )
@@ -136,9 +134,18 @@ pub(crate) async fn append_for_record(
         );
         return Ok(None);
     };
-    let day_key = crate::services::identity::local_day_key(started_at)
-        .map_err(crate::error::AppError::db)?;
+    let day_key =
+        crate::services::identity::local_day_key(started_at).map_err(crate::error::AppError::db)?;
     Ok(Some(
-        append(conn, &session_uid, kind, at_ms, &day_key, payload, device_id).await?,
+        append(
+            conn,
+            &session_uid,
+            kind,
+            at_ms,
+            &day_key,
+            payload,
+            device_id,
+        )
+        .await?,
     ))
 }

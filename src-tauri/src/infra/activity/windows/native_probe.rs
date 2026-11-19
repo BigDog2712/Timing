@@ -8,7 +8,7 @@ mod protocol;
 mod worker;
 
 use super::foreground::WindowInfo;
-use crate::models::activity::tracking::{AudioSnapshot, SustainedParticipationSignalSnapshot};
+use crate::models::activity::tracking::{AudioSnapshot, MediaProbePayload};
 pub use fault::NativeProbeFault;
 use process::ProbeProcess;
 pub(crate) use protocol::IconRequest;
@@ -451,7 +451,7 @@ pub(crate) fn icon(request: IconRequest) -> Option<String> {
         .flatten()
 }
 
-pub(crate) fn media() -> Result<Option<SustainedParticipationSignalSnapshot>, String> {
+pub(crate) fn media() -> Result<Option<MediaProbePayload>, String> {
     call(ProbeKind::Media, RequestBody::Media)
 }
 

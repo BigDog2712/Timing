@@ -31,8 +31,10 @@ async fn poison_events(pool: &SqlitePool) {
 async fn event_count(pool: &SqlitePool, record_id: i64) -> i64 {
     scalar_i64(
         pool,
-        &format!("SELECT COUNT(*) FROM timer_ops WHERE session_uid = \
-                  (SELECT uid FROM time_records WHERE id = {record_id})"),
+        &format!(
+            "SELECT COUNT(*) FROM timer_ops WHERE session_uid = \
+                  (SELECT uid FROM time_records WHERE id = {record_id})"
+        ),
     )
     .await
 }
@@ -76,7 +78,10 @@ async fn s3_02_stop_rolls_back_when_event_cannot_be_written() {
         .expect("查询应成功")
         .expect("会话必须仍是 active");
     assert_eq!(active.id, rec.id);
-    assert_eq!(active.status, "active", "结束没有落库，一条记录都不该被保存");
+    assert_eq!(
+        active.status, "active",
+        "结束没有落库，一条记录都不该被保存"
+    );
 }
 
 #[tokio::test]

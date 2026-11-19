@@ -94,9 +94,6 @@ pub fn apply(identifier: &str) -> Option<BootChoice> {
 
 fn remember_skipped(target: &Path, reason: &str) {
     if let Ok(mut guard) = SKIPPED.lock() {
-        *guard = Some(format!(
-            "{}（不可写：{reason}）",
-            target.display()
-        ));
+        *guard = Some(format!("{}（不可写：{reason}）", target.display()));
     }
 }

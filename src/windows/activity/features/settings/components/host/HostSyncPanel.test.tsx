@@ -223,12 +223,13 @@ describe('失败面：出错误文案，不静默', () => {
 });
 
 /**
- * [设置页七项改造·批 4] 自动同步三档：标签逐字 + 每档只出现自己那句说明。
- * 「关闭 / 自动 / 智能」读不出差别（整块本来就叫「自动同步」），故第二档改回「定时」；
- * 智能档见 `smartNote`、关闭档见 `offNote`、只有定时档出现分钟框（min/max 仍是 5/120，
- * 夹值在 `clampAutoMinutes`）—— 前两档挂个灰框会被读成「选了却没生效」。
+ * [0.13.x] 自动同步三档：标签逐字 + 每档只出现自己那句说明。
+ * 三档改成完整动作名「手动同步 / 定时同步 / 智能同步」，本地目录与云端两条通路
+ * 共用同一份组件与文案；智能档见 `smartNote`、手动档见 `offNote`、只有定时档出现
+ * 分钟框（min/max 仍是 5/120，夹值在 `clampAutoMinutes`）——前两档挂个灰框会被
+ * 读成「选了却没生效」。
  */
-describe('[批 4] 自动同步三档的文案与控件可见性', () => {
+describe('[0.13.x] 自动同步三档的文案与控件可见性', () => {
   it('t01_each_tier_shows_only_its_own_note_and_minutes_field_is_interval_only', async () => {
     const webdavView = view();
     webdavView.config.cloudWebdav = {
@@ -247,11 +248,11 @@ describe('[批 4] 自动同步三档的文案与控件可见性', () => {
     if (!auto) throw new Error('找不到可用的「自动同步」三档控件');
     const labels = Array.from(auto.querySelectorAll('.sync-cloud__auto-item'), (el) => el.textContent?.trim());
     expect(labels).toEqual([AUTO_COPY.off, AUTO_COPY.interval, AUTO_COPY.smart]);
-    expect(labels).toEqual(['关闭', '定时', '智能']);
+    expect(labels).toEqual(['手动同步', '定时同步', '智能同步']);
     /* 默认档是智能：只有那句行为说明，没有分钟框 */
     expect(auto.textContent).toContain(AUTO_COPY.smartNote);
     expect(auto.querySelector('input[type="number"]')).toBeNull();
-    /* 关闭档：一句「只在手动同步时上传」，仍然没有分钟框 */
+    /* 手动档：一句「只在点立即同步时同步」，仍然没有分钟框 */
     act(() => (auto.querySelector('[data-tier="off"]') as HTMLButtonElement).click());
     await flush();
     expect(auto.textContent).toContain(AUTO_COPY.offNote);

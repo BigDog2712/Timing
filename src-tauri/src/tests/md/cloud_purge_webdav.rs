@@ -9,14 +9,14 @@ use std::fs;
 
 use chrono::NaiveDate;
 
+use super::cloud_purge::{kv, list_names, seed_past, state_of};
+use super::sync::env;
 use crate::infra::md_webdav::WebdavTarget;
 use crate::models::md_cloud_purge::{channel_key, PurgeChannel, PurgeKey};
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::repositories::{md_cloud_pending, settings};
 use crate::services::md_cloud::{self, purge};
 use crate::services::md_sync::config;
-use super::cloud_purge::{kv, list_names, seed_past, state_of};
-use super::sync::env;
 use crate::tests::support::unique_dir;
 
 #[tokio::test]
@@ -34,7 +34,11 @@ async fn webdav_round_never_touches_the_local_mirror() {
         .await
         .expect("远端连不上是「本轮失败」，不是「整轮出错」");
 
-    assert_eq!(list_names(&root), before, "这条路只删远端，镜像留作止损（I5）");
+    assert_eq!(
+        list_names(&root),
+        before,
+        "这条路只删远端，镜像留作止损（I5）"
+    );
     assert_eq!(
         kv(&fixture.pool, PurgeChannel::Webdav, PurgeKey::Upto).await,
         None,
@@ -49,7 +53,10 @@ async fn webdav_round_never_touches_the_local_mirror() {
     assert_eq!(state.last_failed, 2, "两个都记账");
     assert_eq!(state.last_deleted, 0);
     assert_eq!(state.fail_days, 1, "失败按自然日记一天");
-    assert!(!state.paused, "第一天失败不该暂停（要连续 3 个自然日，I12）");
+    assert!(
+        !state.paused,
+        "第一天失败不该暂停（要连续 3 个自然日，I12）"
+    );
     let _ = fs::remove_dir_all(&root);
 }
 
@@ -60,9 +67,14 @@ async fn the_two_channels_never_share_accounting() {
     let fixture = env("purge-channels").await;
     let root = unique_dir("purge-channels-target");
     let today = md_cloud::today();
-    settings::set_value(&fixture.pool, channel_key(PurgeChannel::Webdav, PurgeKey::Day), &today, 0)
-        .await
-        .expect("写 day");
+    settings::set_value(
+        &fixture.pool,
+        channel_key(PurgeChannel::Webdav, PurgeKey::Day),
+        &today,
+        0,
+    )
+    .await
+    .expect("写 day");
     settings::set_value(
         &fixture.pool,
         channel_key(PurgeChannel::Webdav, PurgeKey::Upto),
@@ -73,14 +85,23 @@ async fn the_two_channels_never_share_accounting() {
     .expect("写水位");
 
     /* folder 通道的现场必须是空的：共用一份的话，这里会读到 webdav 的「今天已扫」。 */
-    assert_eq!(kv(&fixture.pool, PurgeChannel::Folder, PurgeKey::Day).await, None);
-    assert_eq!(kv(&fixture.pool, PurgeChannel::Folder, PurgeKey::Upto).await, None);
+    assert_eq!(
+        kv(&fixture.pool, PurgeChannel::Folder, PurgeKey::Day).await,
+        None
+    );
+    assert_eq!(
+        kv(&fixture.pool, PurgeChannel::Folder, PurgeKey::Upto).await,
+        None
+    );
 
     seed_past(&fixture.pool, &root, "2019-08-05").await;
     purge::run_folder(&fixture.pool, &root, &[], &today)
         .await
         .expect("folder 通道该照常清理");
-    assert!(!root.join("2019-08-05.md").exists(), "webdav 的水位不该挡住 folder");
+    assert!(
+        !root.join("2019-08-05.md").exists(),
+        "webdav 的水位不该挡住 folder"
+    );
     let _ = fs::remove_dir_all(&root);
 }
 
@@ -113,12 +134,19 @@ async fn status_reports_only_the_active_channel() {
     });
     config::save(&fixture.pool, &stored).await.expect("存配置");
 
-    let status = md_cloud::status(&fixture.pool, PurgeChannel::Webdav).await.expect("status");
-    assert!(!status.purge.paused, "webdav 那一栏不该读出 folder 的暂停位");
+    let status = md_cloud::status(&fixture.pool, PurgeChannel::Webdav)
+        .await
+        .expect("status");
+    assert!(
+        !status.purge.paused,
+        "webdav 那一栏不该读出 folder 的暂停位"
+    );
     assert_eq!(status.purge.failed, 0);
 
     /* 问 folder 那条，同一份 state 就该看见了。 */
-    let status = md_cloud::status(&fixture.pool, PurgeChannel::Folder).await.expect("status");
+    let status = md_cloud::status(&fixture.pool, PurgeChannel::Folder)
+        .await
+        .expect("status");
     assert!(status.purge.paused);
     assert_eq!(status.purge.failed, 2);
 }
@@ -176,7 +204,9 @@ async fn webdav_purge_deletes_the_date_file_by_its_exact_name() {
         "扫完一整遍 → 写 day"
     );
     assert_eq!(
-        state_of(&fixture.pool, PurgeChannel::Webdav).await.last_deleted,
+        state_of(&fixture.pool, PurgeChannel::Webdav)
+            .await
+            .last_deleted,
         2
     );
     assert_eq!(list_names(&root).len(), 2, "这条路只删远端（I5）");
@@ -287,8 +317,24 @@ fn purge_is_retired_from_both_rounds() {
     let webdav = include_str!("../../services/md_cloud/round_webdav.rs");
     let folder = include_str!("../../services/md_cloud/round_folder.rs");
     /* 正向对照：扫描器必须先证明它读得到文件、数得出来。 */
-    assert_eq!(calls(webdav, "pub async fn run("), 1, "扫描器没读到 round_webdav");
-    assert_eq!(calls(folder, "pub async fn run("), 1, "扫描器没读到 round_folder");
-    assert_eq!(calls(webdav, "purge::run_webdav("), 0, "md 停写后 webdav 轮不许再有自动清理挂点");
-    assert_eq!(calls(folder, "purge::run_folder("), 0, "md 停写后 folder 轮不许再有自动清理挂点");
+    assert_eq!(
+        calls(webdav, "pub async fn run("),
+        1,
+        "扫描器没读到 round_webdav"
+    );
+    assert_eq!(
+        calls(folder, "pub async fn run("),
+        1,
+        "扫描器没读到 round_folder"
+    );
+    assert_eq!(
+        calls(webdav, "purge::run_webdav("),
+        0,
+        "md 停写后 webdav 轮不许再有自动清理挂点"
+    );
+    assert_eq!(
+        calls(folder, "purge::run_folder("),
+        0,
+        "md 停写后 folder 轮不许再有自动清理挂点"
+    );
 }

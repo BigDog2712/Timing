@@ -68,7 +68,9 @@ impl ToolsRuntimeState {
         self.alerts
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .retain(|alert| crate::models::activity::tool_notifications::is_current(alert, &snapshot));
+            .retain(|alert| {
+                crate::models::activity::tool_notifications::is_current(alert, &snapshot)
+            });
         *self.inner.lock().unwrap_or_else(PoisonError::into_inner) = snapshot;
     }
 
@@ -1061,17 +1063,19 @@ mod tests {
         let state = ToolsRuntimeState::default();
         let store = ControlledToolsStore::default();
         let alert = activity_reminders::build_activity_reminder_alerts(
-            vec![crate::models::activity::tools::ActivityReminderNotification {
-                rule_id: 7,
-                target: ActivityReminderTarget::App {
-                    app_name: "Editor".into(),
-                    exe_name: Some("editor.exe".into()),
+            vec![
+                crate::models::activity::tools::ActivityReminderNotification {
+                    rule_id: 7,
+                    target: ActivityReminderTarget::App {
+                        app_name: "Editor".into(),
+                        exe_name: Some("editor.exe".into()),
+                    },
+                    target_label: "Editor".into(),
+                    usage_ms: 120_000,
+                    limit_ms: 60_000,
+                    message: String::new(),
                 },
-                target_label: "Editor".into(),
-                usage_ms: 120_000,
-                limit_ms: 60_000,
-                message: String::new(),
-            }],
+            ],
             crate::models::activity::localization::Locale::ZhCn,
             "2026-10-30",
             1_000,
@@ -1097,17 +1101,19 @@ mod tests {
         let state = ToolsRuntimeState::default();
         let mut snapshot = ToolsRuntimeSnapshot::default();
         for id in 0..40 {
-            snapshot.reminders.push(crate::models::activity::tools::ToolReminder {
-                id,
-                label: String::new(),
-                scheduled_at: 1000,
-                created_at: 0,
-                status: crate::models::activity::tools::ReminderStatus::PendingConfirmation,
-                fired_at: Some(1000),
-                cancelled_at: None,
-                recurrence: None,
-                recurrence_anchor_at: None,
-            });
+            snapshot
+                .reminders
+                .push(crate::models::activity::tools::ToolReminder {
+                    id,
+                    label: String::new(),
+                    scheduled_at: 1000,
+                    created_at: 0,
+                    status: crate::models::activity::tools::ReminderStatus::PendingConfirmation,
+                    fired_at: Some(1000),
+                    cancelled_at: None,
+                    recurrence: None,
+                    recurrence_anchor_at: None,
+                });
         }
         state.replace(snapshot.clone());
 
@@ -1240,14 +1246,16 @@ mod tests {
         state.activity_schedule.complete(
             &ActivityReminderCheck::All,
             crate::models::activity::tools::ActivityReminderWatch {
-                rules: vec![crate::models::activity::tools::ActivityReminderWatchedRule {
-                    id: 1,
-                    target: ActivityReminderTarget::Web {
-                        normalized_domain: "limited.test".into(),
+                rules: vec![
+                    crate::models::activity::tools::ActivityReminderWatchedRule {
+                        id: 1,
+                        target: ActivityReminderTarget::Web {
+                            normalized_domain: "limited.test".into(),
+                        },
+                        active: false,
+                        next_check_at: None,
                     },
-                    active: false,
-                    next_check_at: None,
-                }],
+                ],
                 ..Default::default()
             },
         );

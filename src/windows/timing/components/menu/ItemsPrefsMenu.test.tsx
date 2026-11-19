@@ -1,13 +1,11 @@
 /**
- * Timing — 常用事项管理卡 · 分类选用三态与最近事项回归（[0.14]）
+ * Timing — 常用事项管理卡 · 多标签与最近事项回归（[0.12.3]）
  * -----------------------------------------------------------------------------
  * 判据钉三件事：
- *   ① **三态载荷**：编辑时没动分类 → patch **不带** `categoryKey` 字段；动了 → 显式带值；
- *      选「未分类」→ 显式 `null`。判据写成 `!== undefined` 的反面：「不改」与「清空」
- *      是两件事，合并成 `!= null` 会把「清空」整个吞掉（变异点）。
- *   ② 新建：分类是创建语义的一部分，`create_item` 载荷始终带 `categoryKey`。
+ *   ① **标签落库**：编辑保存时把草稿整组写给 `set_item_tags`；事项名不再冒充分类键。
+ *   ② **AI 只填草稿**：建议按下后只改编辑区，仍要用户点保存才落库。
  *   ③ 最近事项回归：toggle 与条数钳位 1..10 的行为拆文件后不变。
- * 落库经 `itemApi` / `settingsApi`（mock）；分类目录走 mock 的哑管道行。
+ * 落库经 `itemApi` / `settingsApi` / `tagApi`（mock）；AI 走 `aiApi`（mock）。
  */
 import { act } from 'react';
 import { createElement } from 'react';
@@ -32,9 +30,20 @@ const h = vi.hoisted(() => ({
     })),
   },
   settingsApi: { update: vi.fn() },
+  tagApi: {
+    list: vi.fn(async (): Promise<unknown[]> => []),
+    set: vi.fn(async (_itemId: number, tags: string[]): Promise<string[]> => tags),
+  },
+  aiApi: { suggestTags: vi.fn(async (): Promise<unknown> => ({ suggestions: [], stats: { parsed: 0, dropped: 0, attempts: 0 } })) },
 }));
 
-vi.mock('../../services/api', () => ({ itemApi: h.itemApi, settingsApi: h.settingsApi }));
+vi.mock('../../services/api', () => ({
+  itemApi: h.itemApi,
+  settingsApi: h.settingsApi,
+  tagApi: h.tagApi,
+  aiApi: h.aiApi,
+  rawIpcText: (err: unknown) => (err instanceof Error ? err.message : String(err)),
+}));
 
 import { useItemStore } from '../../stores/itemStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -73,20 +82,22 @@ async function mount() {
 }
 
 const nameInput = () => document.body.querySelector<HTMLInputElement>('.items-prefs__form input[type="text"]');
-const categorySelect = () => document.body.querySelector<HTMLSelectElement>('.items-prefs__category-select');
+const tagInput = () => document.body.querySelector<HTMLInputElement>('.items-prefs__tags input');
+const tagChips = () => Array.from(document.body.querySelectorAll<HTMLButtonElement>('.items-prefs__tag-chip'));
+const aiButton = () => document.body.querySelector<HTMLButtonElement>('.items-prefs__ai');
 const editButton = (name: string) =>
   Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
     (button) => (button.getAttribute('aria-label') ?? button.textContent ?? '').includes(`编辑`) && (button.getAttribute('aria-label') ?? '').includes(name) || button.textContent === name,
   );
 
-async function selectCategory(label: string) {
-  const select = categorySelect();
-  if (!select) throw new Error('找不到分类下拉');
-  const option = Array.from(select.options).find((candidate) => candidate.text === label);
-  if (!option) throw new Error(`下拉里没有「${label}」：${Array.from(select.options).map((o) => o.text).join('/')}`);
+async function typeTag(text: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
   await act(async () => {
-    select.value = option.value;
-    select.dispatchEvent(new Event('change', { bubbles: true }));
+    setter?.call(tagInput(), text);
+    tagInput()?.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => {
+    tagInput()?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   });
 }
 
@@ -103,6 +114,15 @@ beforeEach(async () => {
   h.itemApi.list.mockReset().mockResolvedValue([]);
   h.itemApi.create.mockReset().mockImplementation(async (params: { name: string }) => item(90, params.name, { isPinned: false }));
   h.itemApi.update.mockReset().mockImplementation(async (params: { id: number }) => item(params.id, 'x'));
+  h.tagApi.list.mockReset().mockResolvedValue([{ itemId: 7, tags: ['娱乐'] }]);
+  h.tagApi.set.mockReset().mockImplementation(async (_itemId: number, tags: string[]) => tags);
+  /* 组件读的是 `AiSuggestResponse`（`{suggestions, stats}`），不是裸数组：
+     mock 还按旧形状给数组时，`.suggestions[0]` 恒为 undefined，AI 建议这条路
+     会"点了没反应"却零报错 —— 这条 mock 的形状本身就是判据的一部分。 */
+  h.aiApi.suggestTags.mockReset().mockResolvedValue({
+    suggestions: [{ id: 'current', tags: ['娱乐'] }],
+    stats: { parsed: 1, dropped: 0, attempts: 1 },
+  });
   h.settingsApi.update.mockReset().mockImplementation(async (patch: Record<string, unknown>) => ({
     ...useSettingsStore.getState().settings,
     ...patch,
@@ -128,52 +148,64 @@ afterEach(() => {
   useUiStore.setState({ notice: null });
 });
 
-describe('常用事项 · 分类选用三态', () => {
-  it('ip01_没动分类时_patch_不带_categoryKey_字段（三态之「不改」）', async () => {
+describe('常用事项 · 多标签编辑', () => {
+  it('ip01_编辑时回填已存标签_保存整组写回', async () => {
     await act(async () => { editButton('写周报')?.click(); });
+    expect(tagChips().map((chip) => chip.textContent ?? '').join(' ')).toContain('#娱乐');
     await submit();
+    expect(h.tagApi.set).toHaveBeenCalledWith(7, ['娱乐']);
     const patch = h.itemApi.update.mock.calls[0][0].patch as Record<string, unknown>;
     expect('categoryKey' in patch).toBe(false);
   });
 
-  it('ip02_改成游戏时_patch_显式带_categoryKey', async () => {
+  it('ip02_回车添加嵌套标签_本次保存带上', async () => {
     await act(async () => { editButton('写周报')?.click(); });
-    await selectCategory('游戏');
+    await typeTag('学习/考公');
     await submit();
-    const patch = h.itemApi.update.mock.calls[0][0].patch as Record<string, unknown>;
-    expect(patch.categoryKey).toBe('game');
+    expect(h.tagApi.set).toHaveBeenCalledWith(7, ['娱乐', '学习/考公']);
   });
 
-  it('ip03_选未分类时_patch_显式带_null（不是不带字段——变异点）', async () => {
+  it('ip03_点标签移除_保存写空数组', async () => {
     await act(async () => { editButton('写周报')?.click(); });
-    await selectCategory('未分类');
+    await act(async () => { tagChips()[0]?.click(); });
     await submit();
-    const patch = h.itemApi.update.mock.calls[0][0].patch as Record<string, unknown>;
-    expect('categoryKey' in patch).toBe(true);
-    expect(patch.categoryKey).toBeNull();
+    expect(h.tagApi.set).toHaveBeenCalledWith(7, []);
   });
 
-  it('ip04_新建时_create_载荷带当前分类', async () => {
+  it('ip04_新建时只带名称_标签另走_set_item_tags', async () => {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     await act(async () => {
       setter?.call(nameInput(), '喝茶');
       nameInput()?.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    await selectCategory('写作');
+    await typeTag('娱乐');
     await submit();
-    expect(h.itemApi.create).toHaveBeenCalledWith(expect.objectContaining({ name: '喝茶', categoryKey: 'custom:%E5%86%99%E4%BD%9C' }));
+    expect(h.itemApi.create).toHaveBeenCalledWith({ name: '喝茶' });
+    expect(h.tagApi.set).toHaveBeenCalledWith(90, ['娱乐']);
   });
 
-  it('ip05_当前值不在候选时_兜底项出现在下拉里', async () => {
-    /* 目录 mock 只有「写作」；把事项改成目录里没有的键，模拟「分类刚被删」 */
-    useItemStore.setState({
-      items: [item(7, '写周报', { categoryKey: 'custom:%E5%B7%B2%E5%88%A0%E5%88%86%E7%B1%BB' }), item(9, '摸鱼')],
-    });
+  it('ip05_AI_建议只填编辑区_保存才落库', async () => {
     await act(async () => { editButton('写周报')?.click(); });
-    await selectCategory('未分类');
-    const options = Array.from(categorySelect()?.options ?? []).map((option) => option.text);
-    expect(options).toContain('写作');
-    expect(categorySelect()?.value).toBe('');
+    await act(async () => { tagChips()[0]?.click(); });
+    await act(async () => { aiButton()?.click(); });
+    for (let i = 0; i < 3; i += 1) {
+      await act(async () => { await Promise.resolve(); });
+    }
+    expect(h.aiApi.suggestTags).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'item', targets: [{ id: 'current', text: '写周报' }] }),
+    );
+    expect(h.tagApi.set).not.toHaveBeenCalled();
+    expect(tagChips().map((chip) => chip.textContent ?? '').join(' ')).toContain('#娱乐');
+  });
+
+  it('ip08_AI_失败透出宿主原文_不压成通用系统错误', async () => {
+    h.aiApi.suggestTags.mockRejectedValueOnce(new Error('AI 未启用：请先在「设置 → AI」打开总开关'));
+    await act(async () => { editButton('写周报')?.click(); });
+    await act(async () => { aiButton()?.click(); });
+    for (let i = 0; i < 3; i += 1) {
+      await act(async () => { await Promise.resolve(); });
+    }
+    expect(useUiStore.getState().notice?.text).toContain('AI 未启用');
   });
 });
 

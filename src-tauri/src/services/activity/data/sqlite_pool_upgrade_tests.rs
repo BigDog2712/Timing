@@ -71,7 +71,11 @@ async fn legacy_activity_reminder_index_upgrade_preserves_data_and_is_repeatable
         prepare_pool_schema(&pool, Path::new("legacy-activity-targets.db"))
             .await
             .unwrap();
-        assert!(super::schema_contracts::has_unique_activity_reminder_targets(&pool).await.unwrap());
+        assert!(
+            super::schema_contracts::has_unique_activity_reminder_targets(&pool)
+                .await
+                .unwrap()
+        );
         let rows: Vec<ReminderRuleRow> = sqlx::query_as(
             "SELECT r.id,r.label_snapshot,r.limit_ms,r.message,r.updated_at,r.disabled_at,s.enabled,e.extension_limit_ms
              FROM tool_activity_reminder_rules r JOIN tool_activity_reminder_states s ON s.rule_id=r.id

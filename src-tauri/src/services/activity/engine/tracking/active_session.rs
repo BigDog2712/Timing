@@ -82,7 +82,9 @@ pub(crate) async fn start_session(
     window: &tracker::WindowInfo,
     start_time: i64,
 ) -> Result<bool, TrackingDataError> {
-    let data = crate::services::activity::data::tracking_runtime::TrackingRuntimeDataStore::new(pool.clone());
+    let data = crate::services::activity::data::tracking_runtime::TrackingRuntimeDataStore::new(
+        pool.clone(),
+    );
     start_session_with_continuity_group_start_time(&data, window, start_time, start_time).await
 }
 

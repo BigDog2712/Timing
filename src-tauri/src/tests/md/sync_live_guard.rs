@@ -8,11 +8,11 @@
 //! 这些用例直接调 `import::apply_timers` 并显式给出基线 / 新体：与 `run()` 走的是同一个
 //! 函数，但不依赖系统时钟，断言能落到具体时刻。
 
+use super::sync::{at, env, Env};
+use super::sync_live::{day, pin_start};
 use crate::services;
 use crate::services::md_sync::format::{self, TimerEntry, TimerInterval};
 use crate::services::md_sync::{export, import};
-use super::sync::{at, env, Env};
-use super::sync_live::{day, pin_start};
 use crate::tests::support::{insert_saved, new_item, scalar_i64};
 
 /// 某条记录的 `(status, ended_at, deleted_at)`，用来确认「被改 / 没被动过」。

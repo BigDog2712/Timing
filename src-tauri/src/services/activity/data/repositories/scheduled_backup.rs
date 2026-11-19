@@ -660,9 +660,11 @@ fn run_from_row(row: sqlx::sqlite::SqliteRow) -> Result<ScheduledBackupRun, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::services::activity::data::schema::{SCHEDULED_BACKUP_SCHEMA_SQL, SCHEDULED_BACKUP_TARGETS_SCHEMA_SQL};
     use crate::models::activity::backup_schedule::{
         ScheduledBackupCadence, ScheduledBackupConfig, ScheduledBackupTarget,
+    };
+    use crate::services::activity::data::schema::{
+        SCHEDULED_BACKUP_SCHEMA_SQL, SCHEDULED_BACKUP_TARGETS_SCHEMA_SQL,
     };
     use sqlx::{Executor, SqlitePool};
 

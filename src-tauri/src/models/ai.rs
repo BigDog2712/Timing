@@ -154,6 +154,10 @@ pub struct AiSuggestStats {
 pub struct AiSuggestResponse {
     pub suggestions: Vec<AiTagSuggestion>,
     pub stats: AiSuggestStats,
+    /// 本次由模型**新建**的标签路径（不是候选表里的那些）。
+    /// 空数组不序列化：老客户端的形状保持不变，UI 只在真有新建时提示。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub created: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -196,6 +200,7 @@ mod tests {
                 batches: 2,
                 failed_batches: 1,
             },
+            created: Vec::new(),
         };
         let encoded = serde_json::to_string(&response).expect("response serializes");
         let legacy: LegacyResponse =

@@ -55,7 +55,11 @@ pub(super) fn localfolder_filled() -> MdSyncCloud {
 }
 
 /// `(档名, 配置, 期望)`；`期望 == None` = 不该插话、这一下会真的跑。
-type Tier = (&'static str, MdSyncConfig, Option<(&'static str, &'static str)>);
+type Tier = (
+    &'static str,
+    MdSyncConfig,
+    Option<(&'static str, &'static str)>,
+);
 
 /// 老形状（`cloud` 单键）→ 新双通路配置。
 ///
@@ -225,13 +229,16 @@ fn qa_blocked_notice_two_bodies_never_swap() {
         }),
     ))
     .expect("未填全必须有话说");
-    assert_eq!(not_filled.1, V0118_BODY, "② 的正文必须与 PRD §14.2 逐字一致");
+    assert_eq!(
+        not_filled.1, V0118_BODY,
+        "② 的正文必须与 PRD §14.2 逐字一致"
+    );
 
     assert_ne!(off.1, not_filled.1, "两档必须给不同的去处");
 
     /* [V0.11.18 裁决后] 两档的**标题相同**（都是 `LOCAL_LABEL`）：这两档下菜单项都写着
-       「Markdown 同步」，通知标题必须与用户刚点的那一项逐字相同。区分靠正文，不靠标题。
-       这里改成断言「相等」，就是为了让将来有人把某一档标题改回 `CLOUD_LABEL` 时当场变红。 */
+    「Markdown 同步」，通知标题必须与用户刚点的那一项逐字相同。区分靠正文，不靠标题。
+    这里改成断言「相等」，就是为了让将来有人把某一档标题改回 `CLOUD_LABEL` 时当场变红。 */
     assert_eq!(off.0, not_filled.0, "两档标题都该是用户刚点的那一项的文字");
     assert_eq!(off.0, LOCAL_LABEL);
 }
@@ -257,12 +264,20 @@ fn qa_notice_title_is_the_same_constant_as_the_menu_item() {
             .expect("菜单里必须有 md_sync 这一项")
     };
 
-    assert_eq!(md_sync_label(&nodes_local), LOCAL_LABEL, "本地档菜单项文字 ≠ LOCAL_LABEL");
-    assert_eq!(md_sync_label(&nodes_cloud), CLOUD_LABEL, "云端档菜单项文字 ≠ CLOUD_LABEL");
+    assert_eq!(
+        md_sync_label(&nodes_local),
+        LOCAL_LABEL,
+        "本地档菜单项文字 ≠ LOCAL_LABEL"
+    );
+    assert_eq!(
+        md_sync_label(&nodes_cloud),
+        CLOUD_LABEL,
+        "云端档菜单项文字 ≠ CLOUD_LABEL"
+    );
     assert_ne!(LOCAL_LABEL, CLOUD_LABEL, "两个通道的菜单文字必须能区分");
 
     /* 标题必须取自这两个常量之一（不许另抄字面量）；哪一档用哪个，由下面那条
-       「通知标题 == 同一份配置下菜单项此刻的文字」整体钉住。 */
+    「通知标题 == 同一份配置下菜单项此刻的文字」整体钉住。 */
     for (name, config, expected) in tiers() {
         if let Some((title, _)) = expected {
             assert!(

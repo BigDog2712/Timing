@@ -32,7 +32,10 @@ use crate::infra::md_backup_store as store;
 #[cfg_attr(desktop, allow(dead_code))]
 pub fn source(name: &str) -> AppResult<(PathBuf, String)> {
     let root = backup_root().ok_or_else(|| {
-        AppError::new(ErrorCode::IoError, "备份目录还没准备好，等首次同步写盘之后再试")
+        AppError::new(
+            ErrorCode::IoError,
+            "备份目录还没准备好，等首次同步写盘之后再试",
+        )
     })?;
     resolve_in(root, name).map_err(|err| AppError::new(ErrorCode::IoError, err))
 }
@@ -49,9 +52,8 @@ pub(crate) fn resolve_in(root: &Path, name: &str) -> Result<(PathBuf, String), S
         .ok_or_else(|| format!("「{name}」不是 Timing 的备份文件名，无法导出"))?;
 
     let real_root = fs::canonicalize(root).map_err(|err| format!("备份目录读不到：{err}"))?;
-    let real = fs::canonicalize(root.join(name)).map_err(|_| {
-        format!("这份备份已经不在了（备份只保留最近 30 份）：{name}")
-    })?;
+    let real = fs::canonicalize(root.join(name))
+        .map_err(|_| format!("这份备份已经不在了（备份只保留最近 30 份）：{name}"))?;
     if !real.starts_with(&real_root) {
         return Err(format!("「{name}」的路径跑到备份目录外面了，已拒绝导出"));
     }

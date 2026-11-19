@@ -12,7 +12,7 @@
 
 [[permission]]
 identifier = "host-commands"
-description = "Timing 宿主应用命令面（92 条）：事项 / 计时 / 记录 / 统计 / 设置 / 主题 / 窗口 / 便利贴 / 待办 / 提醒 / 插件 / Markdown 同步 / 数据根 / 迁移 / 移动端桥 / 分类目录 / 打开时间统计窗口。只授权给宿主自己的窗口，分析窗口另走 activity-window-commands。"
+description = "Timing 宿主应用命令面（106 条）：事项 / 计时 / 记录 / 统计 / 设置 / 主题 / 窗口 / 便利贴 / 待办 / 提醒 / 插件 / Markdown 同步 / 数据根 / 迁移 / 移动端桥 / 分类目录 / 事项标签 / AI / 打开时间统计窗口。只授权给宿主自己的窗口，分析窗口另走 activity-window-commands。"
 commands.allow = [
   "accent_get",
   "accent_set",
@@ -26,6 +26,8 @@ commands.allow = [
   "daily_status_set",
   # [0.14] 分类目录读口（两窗「事项分类选用」共用；桌面读活动库，手机回空目录）
   "list_category_catalog",
+  "preview_category_propagation",
+  "apply_category_propagation",
   # [0.13.0] 安卓应用使用统计（两条）
   "usage_stats_get",
   "usage_stats_settings",
@@ -46,6 +48,21 @@ commands.allow = [
   "list_item_apps",
   "list_items",
   "list_items_for_app",
+  # [0.12.3] 事项多标签（读全量 / 覆盖写一条）
+  "list_item_tags",
+  "set_item_tags",
+  # [0.12.4] 标签目录：定义行 + 跨事项改名 / 删除（管理页与 AI 建标签）
+  "list_tag_catalog",
+  "create_tag_definition",
+  "rename_tag",
+  "delete_tag",
+  # [0.12.3] AI（配置 / 测试连接 / 模型目录 / 标签建议 / 今日汇总）
+  "ai_config_get",
+  "ai_config_save",
+  "ai_test",
+  "ai_list_models",
+  "ai_suggest_tags",
+  "ai_daily_summary",
   "list_records",
   "main_window_rect",
   "main_work_area",

@@ -117,7 +117,7 @@ pub(crate) fn serve_redirect_once(location_path: &'static str) -> Fake {
             log.lock().expect("假服务器记录锁").push(raw);
             let head = if index == 0 {
                 /* `Connection: close` 是必须的：复用同一条连接的话，即便实现跟随了
-                   重定向，这里也只看到一次连接建立，命中次数就分不清了。 */
+                重定向，这里也只看到一次连接建立，命中次数就分不清了。 */
                 format!(
                     "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                 )

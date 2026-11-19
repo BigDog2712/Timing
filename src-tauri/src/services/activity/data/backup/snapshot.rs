@@ -1,8 +1,8 @@
+use crate::models::activity::backup::{BackupPreview, CURRENT_BACKUP_VERSION};
 use crate::services::activity::data::schema;
 use crate::services::activity::data::sqlite_pool::{
     acquire_sqlite_maintenance, expected_migration_metadata, wait_for_sqlite_pool,
 };
-use crate::models::activity::backup::{BackupPreview, CURRENT_BACKUP_VERSION};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -17,18 +17,21 @@ use zip::read::ZipReadOptions;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
-#[cfg(test)] mod merge_tests;
-#[cfg(test)] mod legacy_format_tests;
+#[cfg(test)]
+mod legacy_format_tests;
+#[cfg(test)]
+mod merge_tests;
 mod restore;
 mod secrets;
-#[cfg(test)] mod widget_retirement_tests;
+#[cfg(test)]
+mod widget_retirement_tests;
 
 pub(super) use restore::{prepare_snapshot_backup, restore_snapshot_backup};
 
 /* 存档的格式契约（条目名 / format / product / 摘要算法 / 回滚策略）全部住在
-   `snapshot/manifest_contract.rs`：那几个字面量已写进用户已有的备份文件里，
-   放在单独文件里才写清「为什么不能改」。这里只做再导出，让既有调用点
-   （`prepared_source` 的 `is_snapshot_archive`、本文件与测试里的条目名）不变。 */
+`snapshot/manifest_contract.rs`：那几个字面量已写进用户已有的备份文件里，
+放在单独文件里才写清「为什么不能改」。这里只做再导出，让既有调用点
+（`prepared_source` 的 `is_snapshot_archive`、本文件与测试里的条目名）不变。 */
 mod manifest_contract;
 pub(super) use manifest_contract::{
     is_snapshot_archive, CHECKSUMS_ENTRY, DATABASE_ENTRY, MANIFEST_ENTRY, SNAPSHOT_FORMAT,
@@ -399,7 +402,8 @@ pub(super) async fn validate_current_schema(pool: &Pool<Sqlite>) -> Result<(), S
         return Err("restored timed reminder is missing its identity".into());
     }
     crate::services::activity::data::repositories::app_links::validate_in_tx(&mut tx).await?;
-    crate::services::activity::data::repositories::web_links::migrate_legacy_web_grouping(&mut tx).await?;
+    crate::services::activity::data::repositories::web_links::migrate_legacy_web_grouping(&mut tx)
+        .await?;
     tx.commit()
         .await
         .map_err(|e| format!("finish restored association validation: {e}"))?;
@@ -799,8 +803,8 @@ pub(super) async fn extract_snapshot_archive(
             }
         }
         /* 这一步发生在 manifest 解析**之前**，拿不到声明值，所以只能验「集合形状」：
-           必须含 `manifest.json` 与 `checksums.json`，第三项必须是**允许的**库条目名。
-           真值以 manifest 里声明的那个为准（见下面 `database_entry` 的复核）。 */
+        必须含 `manifest.json` 与 `checksums.json`，第三项必须是**允许的**库条目名。
+        真值以 manifest 里声明的那个为准（见下面 `database_entry` 的复核）。 */
         if !names.contains(MANIFEST_ENTRY) || !names.contains(CHECKSUMS_ENTRY) {
             return Err("snapshot archive has an unexpected file set".to_string());
         }
@@ -822,12 +826,12 @@ pub(super) async fn extract_snapshot_archive(
             return Err("snapshot manifest is not supported".to_string());
         }
         /* manifest 声明的条目名必须**就是**刚在 zip 里看到的那个：否则集合判定
-           与声明值会各走各的，后面查表该用哪个都说不清（而且是静默的）。 */
+        与声明值会各走各的，后面查表该用哪个都说不清（而且是静默的）。 */
         if manifest.database.path != database_name {
             return Err("snapshot manifest is not supported".to_string());
         }
         /* 以下一律用已解析出的 `database_entry`，不再用 `DATABASE_ENTRY` 常量：
-           它是查表键，必须与 manifest 声明一致；常量只是「今天唯一的合法值」。 */
+        它是查表键，必须与 manifest 声明一致；常量只是「今天唯一的合法值」。 */
         let database_entry = database_name.as_str();
         let checksum_names = checksums.files.keys().cloned().collect::<BTreeSet<_>>();
         let expected_checksum_names =
@@ -885,4 +889,6 @@ pub(super) async fn extract_snapshot_archive(
     result
 }
 
-#[cfg(test)] #[path = "snapshot_mod_tests.rs"] mod tests;
+#[cfg(test)]
+#[path = "snapshot_mod_tests.rs"]
+mod tests;

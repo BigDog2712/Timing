@@ -59,8 +59,12 @@ import { resolveTimelineFocusAtReferenceLocalTime } from "../../../shared/lib/ti
 import HistoryTimelineDetailsPopover, {
   resolveTimelineDetailsPopoverPosition,
   type HistoryTimelineDetailsPopoverState,
-  type TimelineDetailTitle,
 } from "./HistoryTimelineDetailsPopover.tsx";
+import {
+  cleanTimelineDetailTitles,
+  type TimelineDetailTitle,
+} from "./historyTitleCleanup.ts";
+import { enrichTimelineDetailsWithMedia } from "./historyMediaDetails.ts";
 import {
   HistoryTimelineList,
   HistoryWebTimelineList,
@@ -126,29 +130,6 @@ const getHourlyActivityModeActionLabel = (mode: HourlyActivityChartMode, text: U
     : text.showHourlyActivityByCategory
 );
 type TimelineDialogMode = "app" | "web";
-function cleanTimelineDetailTitle(sample: TimelineDetailTitle, appName: string): TimelineDetailTitle {
-  if (sample.isUntitled) {
-    return sample;
-  }
-
-  const normalizedTitle = sample.title.trim();
-  const normalizedAppName = appName.trim();
-  if (!normalizedTitle || !normalizedAppName) {
-    return { ...sample, title: normalizedTitle };
-  }
-
-  const suffixPattern = new RegExp(`\\s+-\\s+${normalizedAppName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
-  return {
-    ...sample,
-    title: normalizedTitle.replace(suffixPattern, "").trim(),
-  };
-}
-
-function cleanTimelineDetailTitles(samples: TimelineDetailTitle[], appName: string) {
-  return samples
-    .map((sample) => cleanTimelineDetailTitle(sample, appName))
-    .filter((sample) => sample.isUntitled || sample.title);
-}
 
 const MILLISECONDS_PER_HOUR = 60 * 60_000;
 
@@ -422,6 +403,9 @@ function HistoryDayView({
     trigger: HTMLElement,
   ) => {
     timelineDetailsTriggerRef.current = trigger;
+    /* 标题行先渲染，媒体行稍后并入：弹窗开启不等数据库。
+       关闭时也会走一次查询，但 apply 里对 sessionId 的校验会把它丢掉。 */
+    const openedTitles = cleanTimelineDetailTitles(titleSamples, appName);
     setTimelineDetailsPopover((current) => {
       if (current?.sessionId === sessionId) {
         timelineDetailsTriggerRef.current = null;
@@ -429,17 +413,16 @@ function HistoryDayView({
       }
 
       const triggerRect = trigger.getBoundingClientRect();
-      const cleanedTitles = cleanTimelineDetailTitles(titleSamples, appName);
       const anchor = {
         top: triggerRect.top,
         bottom: triggerRect.bottom,
         centerX: triggerRect.left + triggerRect.width / 2,
       };
-      const position = resolveTimelineDetailsPopoverPosition(anchor, cleanedTitles.length);
+      const position = resolveTimelineDetailsPopoverPosition(anchor, openedTitles.length);
 
       return {
         sessionId,
-        titleSamples: cleanedTitles,
+        titleSamples: openedTitles,
         left: position.left,
         top: position.top,
         anchorTop: anchor.top,
@@ -447,6 +430,11 @@ function HistoryDayView({
         anchorCenterX: anchor.centerX,
         placement: position.placement,
       };
+    });
+    void enrichTimelineDetailsWithMedia(openedTitles, Date.now(), (rows) => {
+      setTimelineDetailsPopover((current) => (
+        current?.sessionId === sessionId ? { ...current, titleSamples: rows } : current
+      ));
     });
   }, []);
 

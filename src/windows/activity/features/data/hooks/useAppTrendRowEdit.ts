@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { isAnonymousActivity } from "../../../shared/classification/anonymousActivity.ts";
 import type { AppCategory } from "../../../shared/classification/categoryTokens.ts";
 import type { DataDestinationTrendOption } from "../services/dataDestinationState.ts";
-import type { DataAppEditDialogApp } from "../components/DataAppEditDialog.tsx";
 
 /**
  * 应用趋势列表行的「单击选中 / 双击编辑」共存（[本轮]）。
@@ -96,11 +95,31 @@ interface Params {
    */
   onRestoreSelection?: (keys: readonly string[]) => void;
   onOptionOpenDetails: (option: DataDestinationTrendOption) => void;
+  /**
+   * [0.12.4] 双击的"编辑"要落到哪里。传了它就不再往内建弹窗里塞 target ——
+   * 应用趋势现在双击改**标签**（走 `Data.tsx` 的标签弹层），分类那套弹窗已从本页下线。
+   * 不传时保留旧行为（`editing`），只为既有判据与"没有标签入口"的宿主兜底。
+   */
+  onEditOption?: (option: DataDestinationTrendOption) => void;
+}
+
+/**
+ * 双击时要"编辑"的目标（[0.12.4] 起只在没有 `onEditOption` 的宿主上用到）。
+ *
+ * 以前这个形状定义在 `DataAppEditDialog` 里；那个弹窗（分类 + 应用设置）已经从应用趋势
+ * 下线 —— 双击现在开标签弹窗（`Data.tsx` 的 `tagTarget`）。类型留在这里，是因为本 hook
+ * 的 `editing` 仍是"没接 `onEditOption` 时"的兜底，判据也还在跑这条分支。
+ */
+export interface AppTrendEditTarget {
+  exeName: string;
+  displayName: string;
+  category: AppCategory;
+  iconUrl?: string;
 }
 
 export interface AppTrendRowEditState {
   /** 打开中的编辑弹窗目标（`null` = 关着） */
-  editing: DataAppEditDialogApp | null;
+  editing: AppTrendEditTarget | null;
   closeEditor: () => void;
   /** 打开中的「分类管理」弹窗（分类 tab 的「管理分类」与双击分类行共用这一个开关） */
   categoryManageOpen: boolean;
@@ -121,8 +140,9 @@ export function useAppTrendRowEdit({
   onOptionSelect,
   onRestoreSelection,
   onOptionOpenDetails,
+  onEditOption,
 }: Params): AppTrendRowEditState {
-  const [editing, setEditing] = useState<DataAppEditDialogApp | null>(null);
+  const [editing, setEditing] = useState<AppTrendEditTarget | null>(null);
   const [categoryManageOpen, setCategoryManageOpen] = useState(false);
   const timerRef = useRef<number | null>(null);
   const pendingRef = useRef<{ key: string; multi: boolean } | null>(null);
@@ -236,6 +256,11 @@ export function useAppTrendRowEdit({
         return;
       }
       if (!canEdit(option) || !option.exeName) return;
+      /* [0.12.4] 宿主提供了编辑落点（= 标签弹层）就交给它，别再开内建弹窗 */
+      if (onEditOption) {
+        onEditOption(option);
+        return;
+      }
       setEditing({
         exeName: option.exeName,
         displayName: option.displayName,
@@ -245,7 +270,7 @@ export function useAppTrendRowEdit({
     },
   }), [
     applySelect, canEdit, cancelPending, flushPending, manageableCategories,
-    restoreAfterSlowDoubleClick, supportsDestinationDetails,
+    onEditOption, restoreAfterSlowDoubleClick, supportsDestinationDetails,
   ]);
 
   const closeEditor = useCallback(() => setEditing(null), []);

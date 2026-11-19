@@ -29,7 +29,13 @@ const BUSINESS_TABLES: &[&str] = &[
     "app_usage",
     "settings",
 ];
-const ACTIVITY_TABLES: &[&str] = &["app_category", "focus_blocks", "sessions", "icon_cache", "settings"];
+const ACTIVITY_TABLES: &[&str] = &[
+    "app_category",
+    "focus_blocks",
+    "sessions",
+    "icon_cache",
+    "settings",
+];
 
 fn data_root() -> Option<PathBuf> {
     let appdata = std::env::var_os("APPDATA")?;
@@ -162,10 +168,15 @@ async fn a_real_bundle_imports_into_a_fresh_database() {
         serde_json::from_slice(&std::fs::read(&target).expect("读包")).expect("包必须是合法 JSON");
 
     let fresh_business = crate::tests::support::fresh_pool("bundle-real-import").await;
-    let fresh_activity = crate::tests::bundle::activity_pool("bundle-real-import-act").await.0;
-    let result =
-        crate::services::activity::data::bundle::import_full_bundle(&fresh_business, &fresh_activity, &target)
-            .await;
+    let fresh_activity = crate::tests::bundle::activity_pool("bundle-real-import-act")
+        .await
+        .0;
+    let result = crate::services::activity::data::bundle::import_full_bundle(
+        &fresh_business,
+        &fresh_activity,
+        &target,
+    )
+    .await;
     let result = match result {
         Ok(summary) => summary,
         Err(error) => panic!("真机包导入失败：{error}"),
@@ -193,20 +204,24 @@ async fn a_real_bundle_imports_into_a_fresh_database() {
     }
 
     /* 判据 ①（原话是「导入后 `SELECT COUNT(*) FROM items WHERE uid IS NULL` = 0」，实现
-       口径要说清楚）：新装库自带一条种子事项（`id=1`、`uid` 空、`device_id` 空串），
-       它不是导入产生的 —— 所以「= 0」唯一能成立的形态是**除种子外为 0**。
-       种子这一行为什么至今仍空：这条用例的库来自 `support::fresh_pool`，它**只跑迁移**，
-       而认领（`services::device::startup_business_identity` → `adopt_business_rows`）挂在
-       `app::bootstrap` 上，本用例没有走那条路。注意认领现已覆盖 `items`
-       （`BUSINESS_UID_ADOPTIONS`）：一旦这里接上启动流程，「= 1」就得改成「= 0」。
-       合成 uid 上线后，包里的每一行都拿到了 `i:<包里 deviceId>:<包里的原始 id>`
-       （真机那批事项的 uid 在修好写入点之前全是 NULL）。 */
+    口径要说清楚）：新装库自带一条种子事项（`id=1`、`uid` 空、`device_id` 空串），
+    它不是导入产生的 —— 所以「= 0」唯一能成立的形态是**除种子外为 0**。
+    种子这一行为什么至今仍空：这条用例的库来自 `support::fresh_pool`，它**只跑迁移**，
+    而认领（`services::device::startup_business_identity` → `adopt_business_rows`）挂在
+    `app::bootstrap` 上，本用例没有走那条路。注意认领现已覆盖 `items`
+    （`BUSINESS_UID_ADOPTIONS`）：一旦这里接上启动流程，「= 1」就得改成「= 0」。
+    合成 uid 上线后，包里的每一行都拿到了 `i:<包里 deviceId>:<包里的原始 id>`
+    （真机那批事项的 uid 在修好写入点之前全是 NULL）。 */
     let packed_items = package["business"]["items"]
         .as_array()
         .map(|rows| rows.len() as i64)
         .unwrap_or(0);
     assert_eq!(
-        count(&fresh_business, "SELECT COUNT(*) FROM items WHERE uid IS NULL").await,
+        count(
+            &fresh_business,
+            "SELECT COUNT(*) FROM items WHERE uid IS NULL"
+        )
+        .await,
         1,
         "导入产生了 uid 为空的事项（除本机种子外应为 0）",
     );
@@ -230,8 +245,8 @@ async fn a_real_bundle_imports_into_a_fresh_database() {
         "包里 {packed_items} 条事项都该拿到合成 uid",
     );
     /* 判据 ②（真机版）：同一份包再导一次 —— 一行不插、**一行不改**。
-       「不改」这一半靠 uid 类表的「内容没变就不写」守卫：否则 touch 触发器会把
-       每一行的 `updated_at_ms` 推到「现在」，1.5 万行全部变成脏行。 */
+    「不改」这一半靠 uid 类表的「内容没变就不写」守卫：否则 touch 触发器会把
+    每一行的 `updated_at_ms` 推到「现在」，1.5 万行全部变成脏行。 */
     let second = crate::services::activity::data::bundle::import_full_bundle(
         &fresh_business,
         &fresh_activity,
@@ -255,7 +270,10 @@ async fn a_real_bundle_imports_into_a_fresh_database() {
         .expect("数导入后的活动行");
     assert_eq!(
         sessions as u64,
-        package["activity"]["sessions"].as_array().map(|r| r.len() as u64).unwrap_or(0),
+        package["activity"]["sessions"]
+            .as_array()
+            .map(|r| r.len() as u64)
+            .unwrap_or(0),
     );
     println!(
         "真机导入：新增 {} 行 / 更新 {} 行",

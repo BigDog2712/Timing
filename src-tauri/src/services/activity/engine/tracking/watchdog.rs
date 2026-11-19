@@ -1,5 +1,7 @@
 use crate::models::activity::tracking::TRACKING_REASON_WATCHDOG_SEALED;
-use crate::services::activity::engine::tracking::ports::{SharedTrackingDataStore, TrackingDataStore};
+use crate::services::activity::engine::tracking::ports::{
+    SharedTrackingDataStore, TrackingDataStore,
+};
 use std::sync::{
     atomic::{AtomicI64, Ordering},
     Arc,

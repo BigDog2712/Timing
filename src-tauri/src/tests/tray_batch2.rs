@@ -34,7 +34,12 @@ fn countdown_status_line_format() {
 
 #[test]
 fn countdown_control_group_shows_pause_stop_discard() {
-    let nodes = build_nodes(TrayStatus::Countdown, "摸鱼 · 倒计时 剩 07:26", LOCAL, false);
+    let nodes = build_nodes(
+        TrayStatus::Countdown,
+        "摸鱼 · 倒计时 剩 07:26",
+        LOCAL,
+        false,
+    );
     let ids = ids(&nodes);
     assert!(ids.contains(&ID_TIMER_PAUSE));
     assert!(ids.contains(&ID_TIMER_STOP));

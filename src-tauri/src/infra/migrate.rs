@@ -13,81 +13,15 @@
 
 use sqlx::{Row, SqlitePool};
 
-mod tombstone;
+mod columns;
 mod outbox;
+mod tombstone;
 
 use crate::error::{AppError, AppResult};
-
-/// V0.2.0 加列清单 `(表, 列, 定义)`。定义与 `schema-V0.2.0.sql` 目标 DDL 对齐；
-/// 旧库经 `ALTER` 补齐后**不带 CHECK**（SQLite 限制），取值由应用层保证（架构 §4.3）。
-const MIGRATE_COLUMNS: &[(&str, &str, &str)] = &[
-    ("items", "remind_at", "INTEGER"),
-    ("items", "reminded_at", "INTEGER"),
-    ("items", "is_pinned", "INTEGER NOT NULL DEFAULT 0"),
-    ("time_records", "mode", "TEXT NOT NULL DEFAULT 'countup'"),
-    ("time_records", "target_sec", "INTEGER"),
-];
-
-/// V0.3.0 加列清单。**必须晚于 `0002_v020.sql`**（`notes` 表由它创建）。
-///
-/// `DEFAULT 1` = 置顶：V0.2.x 的便利贴窗口硬编码 `always_on_top=true`，默认 1 让
-/// 老数据升级后行为不变（ADR-019）。
-const MIGRATE_COLUMNS_V3: &[(&str, &str, &str)] =
-    &[("notes", "is_pinned", "INTEGER NOT NULL DEFAULT 1")];
-
-/// V0.3.12 加列清单（待办提醒链路，ADR-030）。**必须晚于 `0002_v020.sql`**（`todos` 由它创建）。
-///
-/// - `remind_stage`：0 未提醒 / 1 轻提醒已弹 / 2 五分钟询问已弹（单调递进，替代单次 `reminded_at`）；
-/// - `auto_start`：1 = 用户答应「当前事项结束后自动开始」。
-const MIGRATE_COLUMNS_V4: &[(&str, &str, &str)] = &[
-    ("todos", "remind_stage", "INTEGER NOT NULL DEFAULT 0"),
-    ("todos", "auto_start", "INTEGER NOT NULL DEFAULT 0"),
-];
-
-/// V0.11.3 加列清单：待办绑定事项。
-///
-/// 可空 —— 老数据不回填（回填等于重跑一次标题匹配，同名待办会被绑成一条），
-/// 新建时也不强制选事项。空值由 `todo_start` 兜底并回填，见 `services::todo_start`。
-const MIGRATE_COLUMNS_V5: &[(&str, &str, &str)] = &[("todos", "item_id", "INTEGER")];
-
-/// 0.12.2 加列清单（设备维度）。
-///
-/// `device_id` 的 `DEFAULT ''` 是**迁移期哨兵**，由 `services::device` 在启动时改写成
-/// 真实 `install_id`。用 `''` 而不是方案书写的 `'local'`：`'local'` 会与「本机 id 就叫
-/// local」混淆，而空串在所有 `CHECK(TRIM(device_id) <> '')` 之外的地方都能被自然忽略。
-///
-/// 走 `ensure_column`（`PRAGMA table_info` 守卫）而不是裸 `ALTER`：SQLite 没有
-/// `ADD COLUMN IF NOT EXISTS`，而本函数每次启动都会跑（K-13）。
-const MIGRATE_COLUMNS_V9: &[(&str, &str, &str)] = &[
-    ("time_records", "device_id", "TEXT NOT NULL DEFAULT ''"),
-    ("time_records", "uid", "TEXT"),
-    ("time_records", "merged_into_uid", "TEXT"),
-];
-
-/// 0.12.2 加列清单（同步簿记）。
-///
-/// 只负责「列在不在」：盖戳由 `0010_v0141_sync_bookkeeping_guard.sql` 里的触发器做
-/// （不能依赖调用点记得写——写入口有四个，漏一个就是「那批行永远不会被导出且零报错」）。
-const MIGRATE_COLUMNS_V10: &[(&str, &str, &str)] =
-    &[("time_records", "updated_at_ms", "INTEGER NOT NULL DEFAULT 0")];
-
-/// 0.13.x 加列清单（事项归属）。
-///
-/// `parent_id` / `depth` / `category_key` 是「事项升为主数据」的三件：树、深度、分类。
-/// 深度硬限 2 层由应用层守（`depth <= 1`），不写成 CHECK：ALTER 加的列在 SQLite 上
-/// 带不了 CHECK，而新库的 DDL 与旧库的列定义一旦不一致，就会出现「新库拦得住、
-/// 旧库拦不住」的分裂——取值合法性统一由 `services::item` 保证。
-///
-/// `device_id` 的 `DEFAULT ''` 与 `time_records` 同义（迁移期哨兵），由
-/// `services::device::startup_business_identity` 认领。
-const MIGRATE_COLUMNS_V11: &[(&str, &str, &str)] = &[
-    ("items", "parent_id", "INTEGER"),
-    ("items", "depth", "INTEGER NOT NULL DEFAULT 0"),
-    ("items", "category_key", "TEXT"),
-    ("items", "device_id", "TEXT NOT NULL DEFAULT ''"),
-    ("items", "uid", "TEXT"),
-    ("items", "updated_at_ms", "INTEGER NOT NULL DEFAULT 0"),
-];
+use columns::{
+    MIGRATE_COLUMNS, MIGRATE_COLUMNS_V10, MIGRATE_COLUMNS_V11, MIGRATE_COLUMNS_V17,
+    MIGRATE_COLUMNS_V3, MIGRATE_COLUMNS_V4, MIGRATE_COLUMNS_V5, MIGRATE_COLUMNS_V9,
+};
 
 /// 执行全部迁移（幂等）。由 `infra::db::init_pool` 调用。
 pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
@@ -220,7 +154,7 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
         .await?;
     }
     /* 0.12.8：配对口径改了（同包内换 Activity 不再算离开），旧口径写下的碎段必须清掉，
-       否则新旧两批段并存 —— 详见 0013 的注释。没有 guard 段：本迁移不建任何对象。 */
+    否则新旧两批段并存 —— 详见 0013 的注释。没有 guard 段：本迁移不建任何对象。 */
     if schema_version(pool).await? < 13 {
         run_raw(
             pool,
@@ -229,8 +163,8 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
         .await?;
     }
     /* 0.14.0（同步重构 T01）：同步事件流基础设施（游标 `sync_event_cursor` + md 决策审计
-       `md_decision_audit`）。纯新表、幂等段不需 guard，版本推进照样关门里（与 0008 同型）。
-       编号是 0014 不是 0012 的原因（撞版本号会让表在存量库上永不创建）见 SQL 文件头。 */
+    `md_decision_audit`）。纯新表、幂等段不需 guard，版本推进照样关门里（与 0008 同型）。
+    编号是 0014 不是 0012 的原因（撞版本号会让表在存量库上永不创建）见 SQL 文件头。 */
     if schema_version(pool).await? < 14 {
         run_raw(
             pool,
@@ -239,13 +173,28 @@ pub async fn migrate(pool: &SqlitePool) -> AppResult<()> {
         .await?;
     }
     outbox::run(pool).await?;
+    // ⑰ v17（0.12.3）：事项多标签。补列必须在触发器之前（触发器写 tags 列，但建触发器
+    // 本身不引用列）；版本门只包 SQL，`ensure_column` 照例每次启动跑（K-13）。
+    for (table, column, def) in MIGRATE_COLUMNS_V17 {
+        ensure_column(pool, table, column, def).await?;
+    }
+    if schema_version(pool).await? < 17 {
+        run_raw(
+            pool,
+            include_str!("../migrations/0017_v01231_item_tags.sql"),
+        )
+        .await?;
+    }
     Ok(())
 }
 
 async fn schema_version(pool: &SqlitePool) -> AppResult<i64> {
     let exists: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'settings')",
-    ).fetch_one(pool).await.map_err(AppError::db)?;
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(AppError::db)?;
     if !exists {
         return Ok(0);
     }

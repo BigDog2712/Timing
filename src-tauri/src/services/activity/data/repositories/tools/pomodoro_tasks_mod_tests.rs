@@ -71,7 +71,10 @@ async fn pomodoro_task_rename_preserves_progress_and_settings_changes_reset_only
         let tasks = fetch_tasks(&pool).await.unwrap();
         let run = &tasks[0].run;
         assert_eq!(run.status, PomodoroStatus::Idle);
-        assert_eq!(run.phase, crate::models::activity::tools::PomodoroPhase::Focus);
+        assert_eq!(
+            run.phase,
+            crate::models::activity::tools::PomodoroPhase::Focus
+        );
         assert_eq!(run.cycle_index, 1);
         assert_eq!(run.phase_remaining_ms, Some(values[0]));
         assert_eq!(run.phase_paused_at, None);
@@ -232,7 +235,12 @@ async fn pomodoro_tasks_backup_preserves_labels_deletions_and_single_active_reco
     )
     .await
     .unwrap();
-    source.execute("UPDATE tool_pomodoro_runs SET status='running',phase_started_at=2000 WHERE id IN(1,2)").await.unwrap();
+    source
+        .execute(
+            "UPDATE tool_pomodoro_runs SET status='running',phase_started_at=2000 WHERE id IN(1,2)",
+        )
+        .await
+        .unwrap();
     let backup = super::super::fetch_all_pomodoro_runs_for_backup(&source)
         .await
         .unwrap();
@@ -249,7 +257,12 @@ async fn pomodoro_tasks_backup_preserves_labels_deletions_and_single_active_reco
         .unwrap()
         .iter()
         .all(|task| task.run.status == PomodoroStatus::Paused));
-    target.execute("UPDATE tool_pomodoro_runs SET status='running',phase_started_at=2000 WHERE id IN(1,2)").await.unwrap();
+    target
+        .execute(
+            "UPDATE tool_pomodoro_runs SET status='running',phase_started_at=2000 WHERE id IN(1,2)",
+        )
+        .await
+        .unwrap();
     recover_single_active(&target, 12_000).await.unwrap();
     let tasks = fetch_tasks(&target).await.unwrap();
     assert_eq!(

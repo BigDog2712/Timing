@@ -19,10 +19,7 @@ async fn database() -> sqlx::Pool<Sqlite> {
         .unwrap();
     pool
 }
-fn change(
-    next: serde_json::Value,
-    previous: serde_json::Value,
-) -> ClassificationSettingMutation {
+fn change(next: serde_json::Value, previous: serde_json::Value) -> ClassificationSettingMutation {
     ClassificationSettingMutation {
         key: "__web_site::example.com".into(),
         value: Some(json!({"next":next,"previous":previous}).to_string()),
@@ -152,8 +149,13 @@ async fn bad_domain_override_rolls_back_legacy_rule_conversion() {
         .await
         .unwrap();
     for invalid in ["broken-json", "[]"] {
-        sqlx::query("INSERT OR REPLACE INTO settings VALUES('__web_domain_override::chat.example.com',?)")
-            .bind(invalid).execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT OR REPLACE INTO settings VALUES('__web_domain_override::chat.example.com',?)",
+        )
+        .bind(invalid)
+        .execute(&pool)
+        .await
+        .unwrap();
         let mut tx = pool.begin().await.unwrap();
         assert!(migrate_legacy_web_grouping(&mut tx).await.is_err());
         tx.rollback().await.unwrap();
@@ -296,11 +298,10 @@ async fn lifetime_icon_totals_union_same_source_and_keep_independent_sources() {
 
 #[tokio::test]
 async fn merge_restore_preserves_new_exceptions_and_rejects_unknown_versions() {
-    use crate::services::activity::data::repositories::settings::insert_missing_for_restore;
     use crate::models::activity::backup::BackupSetting;
+    use crate::services::activity::data::repositories::settings::insert_missing_for_restore;
     let pool = database().await;
-    let current =
-        json!({"version":2,"exceptions":["keep.example.com"],"displayName":"Current"});
+    let current = json!({"version":2,"exceptions":["keep.example.com"],"displayName":"Current"});
     commit_classification_setting_mutations(&pool, &[change(current.clone(), json!(null))])
         .await
         .unwrap();
@@ -314,8 +315,7 @@ async fn merge_restore_preserves_new_exceptions_and_rejects_unknown_versions() {
             },
             BackupSetting {
                 key: "__web_site::chat.example.com".into(),
-                value: json!({"enabled":true,"exceptions":["old.chat.example.com"]})
-                    .to_string(),
+                value: json!({"enabled":true,"exceptions":["old.chat.example.com"]}).to_string(),
             },
         ],
     )

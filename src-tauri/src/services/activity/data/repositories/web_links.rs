@@ -2,8 +2,10 @@ mod compact;
 mod totals;
 pub(crate) use compact::recent_snapshot_in_tx;
 
+use crate::models::activity::web_links::{
+    validate_rule, WebLinkRule, WebLinkRules, SETTING_PREFIX,
+};
 use crate::services::activity::data::sqlite_error::SqliteOperationError;
-use crate::models::activity::web_links::{validate_rule, WebLinkRule, WebLinkRules, SETTING_PREFIX};
 use serde::{Deserialize, Serialize};
 use sqlx::{Sqlite, Transaction};
 use std::collections::BTreeMap;
@@ -15,7 +17,6 @@ fn invalid(message: impl Into<String>) -> SqliteOperationError {
 #[cfg(test)]
 #[path = "web_links_mod_tests.rs"]
 mod tests;
-
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -272,7 +273,8 @@ pub async fn snapshot_in_tx(tx: &mut Transaction<'_, Sqlite>) -> Result<WebLinks
         .iter()
         .chain(overrides.keys())
         .filter_map(|domain| {
-            crate::models::activity::web_links::registrable_domain(domain).map(|root| (domain.clone(), root))
+            crate::models::activity::web_links::registrable_domain(domain)
+                .map(|root| (domain.clone(), root))
         })
         .collect();
     let favicons: Vec<(String, String)> = sqlx::query_as(

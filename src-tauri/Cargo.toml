@@ -1,6 +1,6 @@
 [package]
 name = "timing"
-version = "0.12.3"
+version = "0.12.4"
 description = "Timing — 常驻悬浮计时条（Windows 桌面，纯本地）"
 authors = ["Timing Team"]
 edition = "2021"
@@ -144,6 +144,12 @@ dirs = "7"
 # 迁移失败时的三按钮原生对话框：`blocking_show` 禁止主线程调用（见 app/preboot.rs），
 # 用 rfd 的同步 `show()`；事件循环尚未启动，主线程阻塞安全。
 rfd = { version = "0.16", default-features = false, features = ["common-controls-v6"] }
+# [0.12.3] AI：OpenAI 兼容协议的传输层。**不自己拼 HTTP**（用户要求用成熟库），
+# `async-openai` 是 MIT、reqwest 0.13、它的 reqwest 是 `default-features = false`
+# （无 TLS 特性）—— TLS 由我们用 `md_webdav::tls::builder()` 注入的客户端决定
+# （ring + webpki-roots）。`byot` = 「自带客户端 / token」那条路径。
+# 放桌面段而不是通用段：AI 命令在手机上是桩，没理由让 NDK 多编一棵 HTTP 树。
+async-openai = { version = "0.43", default-features = false, features = ["chat-completion", "model", "byot"] }
 
 # 自启旧值清理（HKCU\...\Run 与 StartupApproved\Run 两处）。只在 Windows 上编译：
 # 该 crate 本身依赖 windows API，声明进跨平台段会让 macOS / Linux 构建失败。

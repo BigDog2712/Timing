@@ -1,11 +1,11 @@
-use crate::services::activity::data::export::{self, ExportDataRequest};
-use crate::services::activity::data::repositories::scheduled_export as repository;
 use crate::models::activity::export_schedule::{
     latest_due_slot, next_slot_after, period_for_slot, LogicalExportPeriod, LogicalExportSlot,
     ScheduledExportCadence, ScheduledExportConfig, ScheduledExportConfigInput,
     ScheduledExportFormat, ScheduledExportRun, ScheduledExportSnapshot,
     DEFAULT_EXPORT_LOCAL_TIME_MINUTES,
 };
+use crate::services::activity::data::export::{self, ExportDataRequest};
+use crate::services::activity::data::repositories::scheduled_export as repository;
 use crate::services::activity::engine::export_scheduler::{decide_action, ExportSchedulerAction};
 use chrono::{Local, LocalResult, NaiveDate, NaiveDateTime, TimeZone};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
@@ -303,7 +303,8 @@ async fn load_or_create_config(
         validate_fields(&config.selected_fields)?;
         return Ok(config);
     }
-    let default_dir = crate::infra::activity::app_paths::product_roaming_data_dir(app)?.join("exports");
+    let default_dir =
+        crate::infra::activity::app_paths::product_roaming_data_dir(app)?.join("exports");
     fs::create_dir_all(&default_dir)
         .map_err(|error| format!("failed to create scheduled export directory: {error}"))?;
     let default_dir = normalize_target_directory(&default_dir.to_string_lossy(), true)?;
@@ -341,7 +342,8 @@ async fn migrate_legacy_default_directory(
         return Ok(config);
     }
 
-    let product_dir = crate::infra::activity::app_paths::product_roaming_data_dir(app)?.join("exports");
+    let product_dir =
+        crate::infra::activity::app_paths::product_roaming_data_dir(app)?.join("exports");
     fs::create_dir_all(&product_dir)
         .map_err(|error| format!("failed to create scheduled export directory: {error}"))?;
     let product_dir = normalize_target_directory(&product_dir.to_string_lossy(), true)?;
@@ -458,7 +460,8 @@ fn first_available_export_target_path(
 }
 
 fn validate_fields(fields: &[String]) -> Result<Vec<String>, String> {
-    let resolved = crate::services::activity::data::export::common::resolve_export_fields(Some(fields))?;
+    let resolved =
+        crate::services::activity::data::export::common::resolve_export_fields(Some(fields))?;
     if resolved.len() != fields.len() {
         return Err("scheduled export fields must be unique".to_string());
     }
@@ -672,8 +675,9 @@ fn validate_parquet(path: &Path, fields: &[String], expected_rows: u64) -> Resul
         .iter()
         .map(|field| field.name().to_string())
         .collect::<Vec<_>>();
-    let expected_schema = crate::services::activity::data::export::parquet_exporter::resolved_parquet_schema(fields)
-        .map_err(|_| "format_validation_failed".to_string())?;
+    let expected_schema =
+        crate::services::activity::data::export::parquet_exporter::resolved_parquet_schema(fields)
+            .map_err(|_| "format_validation_failed".to_string())?;
     if names != fields || schema.as_ref() != &expected_schema {
         return Err("format_validation_failed".to_string());
     }

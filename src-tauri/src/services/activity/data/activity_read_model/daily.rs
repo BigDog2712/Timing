@@ -54,7 +54,10 @@ pub(super) fn compute_day<S: AsRef<str>>(intervals: &[(S, i64, i64)]) -> DayTota
         .map(|(_, start_ms, end_ms)| (*start_ms, *end_ms))
         .collect();
     let union_total_ms = union_span_ms(&mut all);
-    let mut device_ids: Vec<&str> = intervals.iter().map(|(device, ..)| device.as_ref()).collect();
+    let mut device_ids: Vec<&str> = intervals
+        .iter()
+        .map(|(device, ..)| device.as_ref())
+        .collect();
     device_ids.sort_unstable();
     device_ids.dedup();
     let mut devices: Vec<(String, i64)> = Vec::with_capacity(device_ids.len());
@@ -215,7 +218,9 @@ pub(super) async fn load_range(
         .fetch_all(pool)
         .await
         .map_err(|error| format!("failed to read daily totals for {day_key}: {error}"))?;
-        let Some(overall) = rows.iter().find(|row| row.get::<String, _>("device_scope") == "*")
+        let Some(overall) = rows
+            .iter()
+            .find(|row| row.get::<String, _>("device_scope") == "*")
         else {
             continue;
         };

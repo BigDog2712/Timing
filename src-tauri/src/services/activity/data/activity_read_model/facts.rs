@@ -72,9 +72,13 @@ pub(super) async fn local_device_id(tx: &mut Transaction<'_, Sqlite>) -> Result<
     )
     .fetch_optional(&mut **tx)
     .await
-    .map_err(|error| format!("failed to read the local device id for the hourly projection: {error}"))?
+    .map_err(|error| {
+        format!("failed to read the local device id for the hourly projection: {error}")
+    })?
     .filter(|install_id| !install_id.trim().is_empty())
-    .ok_or_else(|| "the local device row is missing, so the hourly projection cannot be attributed".to_string())
+    .ok_or_else(|| {
+        "the local device row is missing, so the hourly projection cannot be attributed".to_string()
+    })
 }
 
 /// 把 `FACT_CANDIDATES_SQL` 的 13 个占位符按顺序绑好。
@@ -188,7 +192,9 @@ pub(super) async fn load_fact_candidates(
 
 /// 读一遍事实表里最宽的边界（`initialize_backfill` 用）。放在这里是为了让
 /// `hourly.rs` 的 SQL 都集中在同一处。
-pub(super) async fn fact_bounds(tx: &mut Transaction<'_, Sqlite>) -> Result<(Option<i64>, Option<i64>), String> {
+pub(super) async fn fact_bounds(
+    tx: &mut Transaction<'_, Sqlite>,
+) -> Result<(Option<i64>, Option<i64>), String> {
     let bounds = sqlx::query(
         "SELECT MIN(start_ms) start_ms, MAX(end_ms) end_ms
          FROM (

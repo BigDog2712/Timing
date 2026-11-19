@@ -47,11 +47,8 @@ pub(crate) async fn run_before_quit(pool: &SqlitePool) -> bool {
             return false;
         }
     }
-    match services::md_cloud::round_with(
-        pool,
-        services::md_sync::decision::ConflictMode::Pending,
-    )
-    .await
+    match services::md_cloud::round_with(pool, services::md_sync::decision::ConflictMode::Pending)
+        .await
     {
         Ok(outcome) => crate::log_info!(
             "quit md sync done: 导入 {} 条 · 导出 {} 处",
@@ -108,7 +105,7 @@ pub(crate) fn quit_after_sync(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         /* ① 抢闸：`try_acquire` 抢不到时**没有**构造 `Gate`，所以不会把别人那一轮的闸
-           复位掉（见函数头的「正确形状」）。抢不到 → 只给一个固定等待窗口，不抢它的闸。 */
+        复位掉（见函数头的「正确形状」）。抢不到 → 只给一个固定等待窗口，不抢它的闸。 */
         let Some(_gate) = try_acquire() else {
             crate::log_warn!("quit: md sync already in flight, waiting up to 3s");
             tokio::time::sleep(QUIT_SYNC_BUDGET).await;
@@ -118,12 +115,12 @@ pub(crate) fn quit_after_sync(app: &AppHandle) {
         let pool = app.state::<AppState>().pool.clone();
 
         /* ② 按 running_since 收尾并保存，必须在同步之前（[批 2 · V0.11.24] 落地，
-           PRD §13.3.2-②：托盘退出时若有 active 记录，按「关闭时间」结束）。
-           顺序反过来（先同步、后收尾）会永久丢一段：③ 那一轮导出的是**收尾前**的秒数，
-           而 `round_webdav` 的 `last_hash` 会把「少了最后那一段」的版本记成已同步 →
-           下次启动 `pending_since == 0` 判为已上传 → 那一段永远补不回来。
-           收尾是纯本机写库（毫秒级），套 `timeout` 反而会在慢盘上被整体放弃——
-           那一放弃丢的是用户刚计的那一段（见 QUIT_SYNC_BUDGET 的注释）。 */
+        PRD §13.3.2-②：托盘退出时若有 active 记录，按「关闭时间」结束）。
+        顺序反过来（先同步、后收尾）会永久丢一段：③ 那一轮导出的是**收尾前**的秒数，
+        而 `round_webdav` 的 `last_hash` 会把「少了最后那一段」的版本记成已同步 →
+        下次启动 `pending_since == 0` 判为已上传 → 那一段永远补不回来。
+        收尾是纯本机写库（毫秒级），套 `timeout` 反而会在慢盘上被整体放弃——
+        那一放弃丢的是用户刚计的那一段（见 QUIT_SYNC_BUDGET 的注释）。 */
         match services::timer_recover::close_active_for_quit(&pool).await {
             Ok(0) => {}
             Ok(n) => crate::log_info!("quit: closed {n} active record(s) at close time"),

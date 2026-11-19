@@ -115,6 +115,9 @@ mod tests {
         }
         assert_eq!(json["depth"], 0);
         assert_eq!(json["categoryKey"], "study");
-        assert!(json["parentId"].is_null(), "顶层事项的 parentId 必须是 null");
+        assert!(
+            json["parentId"].is_null(),
+            "顶层事项的 parentId 必须是 null"
+        );
     }
 }

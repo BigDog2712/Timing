@@ -1,9 +1,12 @@
-use crate::models::activity::tracking::{
-    evaluate_sustained_participation_signal, source_app_id_identity,
-    SustainedParticipationSignalMatchResult, SustainedParticipationSignalSnapshot,
-    SustainedParticipationSignalSource, SystemMediaPlaybackType,
-};
+use super::media_properties::{map_playback_type, read_active_media, MediaApartment};
+use super::media_sink::{sink_sample, MEDIA_SAMPLE_SINK};
 use crate::infra::activity::windows::foreground::WindowInfo;
+use crate::models::activity::tracking::{
+    evaluate_sustained_participation_signal, source_app_id_identity, MediaProbePayload,
+    SustainedParticipationSignalMatchResult, SustainedParticipationSignalSnapshot,
+    SustainedParticipationSignalSource,
+};
+pub use super::media_sink::MediaSampleSink;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex, OnceLock,
@@ -15,8 +18,6 @@ use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession, GlobalSystemMediaTransportControlsSessionManager,
     GlobalSystemMediaTransportControlsSessionPlaybackStatus,
 };
-use windows::Media::MediaPlaybackType;
-use windows::Win32::System::WinRT::{RoInitialize, RoUninitialize, RO_INIT_MULTITHREADED};
 
 const MEDIA_SESSION_QUERY_TIMEOUT_SECS: u64 = 2;
 const MEDIA_SNAPSHOT_TTL_MS: i64 = 15_000;
@@ -45,7 +46,8 @@ struct MediaProbeInFlightGuard {
     probe_in_flight: Arc<AtomicBool>,
 }
 
-pub fn start_signal_source(paused: tokio::sync::watch::Receiver<bool>) {
+pub fn start_signal_source(paused: tokio::sync::watch::Receiver<bool>, sink: MediaSampleSink) {
+    let _ = MEDIA_SAMPLE_SINK.set(sink);
     if MEDIA_SIGNAL_SOURCE
         .set((
             MediaSignalSourceState::new(),
@@ -102,11 +104,9 @@ impl MediaSignalSourceState {
         .await;
     }
 
-    async fn reconcile_with_probe<F>(&self, query_timeout: Duration, probe: F)
+    async     fn reconcile_with_probe<F>(&self, query_timeout: Duration, probe: F)
     where
-        F: FnOnce() -> Result<Option<SustainedParticipationSignalSnapshot>, String>
-            + Send
-            + 'static,
+        F: FnOnce() -> Result<Option<MediaProbePayload>, String> + Send + 'static,
     {
         let now_ms = now_ms();
         if self.probe_in_flight.swap(true, Ordering::AcqRel) {
@@ -126,32 +126,44 @@ impl MediaSignalSourceState {
             probe()
         });
 
-        let signal = match timeout(query_timeout, query).await {
-            Ok(Ok(Ok(Some(signal)))) => signal,
-            Ok(Ok(Ok(None))) => SustainedParticipationSignalSnapshot::default(),
-            Ok(Ok(Err(error))) => {
-                log_media_probe_error(format!(
-                    "failed to reconcile system media sessions: {error}"
-                ));
-                SustainedParticipationSignalSnapshot::default()
-            }
-            Ok(Err(error)) => {
-                log_media_probe_error(format!("system media query task failed: {error}"));
-                SustainedParticipationSignalSnapshot::default()
-            }
-            Err(_) => {
-                log_media_probe_error(format!(
-                    "timed out reconciling system media sessions after {MEDIA_SESSION_QUERY_TIMEOUT_SECS}s"
-                ));
-                SustainedParticipationSignalSnapshot::default()
-            }
-        };
+        /* 三态必须分清：`Ok(Some(_))` 有会话、`Ok(None)` 真的没有媒体会话、`Err(())`
+           探测失败（超时 / WinRT 报错）。前两者可以改时间线的开合，失败不行 —— 把失败
+           当成「没在播放」会把一段连续播放切成一堆碎段。 */
+        let probe_result: Result<Option<MediaProbePayload>, ()> =
+            match timeout(query_timeout, query).await {
+                Ok(Ok(Ok(payload))) => Ok(payload),
+                Ok(Ok(Err(error))) => {
+                    log_media_probe_error(format!(
+                        "failed to reconcile system media sessions: {error}"
+                    ));
+                    Err(())
+                }
+                Ok(Err(error)) => {
+                    log_media_probe_error(format!("system media query task failed: {error}"));
+                    Err(())
+                }
+                Err(_) => {
+                    log_media_probe_error(format!(
+                        "timed out reconciling system media sessions after {MEDIA_SESSION_QUERY_TIMEOUT_SECS}s"
+                    ));
+                    Err(())
+                }
+            };
 
         self.replace_snapshot(MediaSnapshot {
             generated_at_ms: now_ms,
             freshness_deadline_ms: now_ms.saturating_add(MEDIA_SNAPSHOT_TTL_MS),
-            signal,
+            signal: probe_result
+                .as_ref()
+                .ok()
+                .and_then(|payload| payload.as_ref())
+                .and_then(|payload| payload.signal.clone())
+                .unwrap_or_default(),
         });
+
+        if let (Some(media), Some(sink)) = (sink_sample(&probe_result), MEDIA_SAMPLE_SINK.get()) {
+            sink(media, now_ms);
+        }
     }
 
     fn replace_snapshot(&self, snapshot: MediaSnapshot) {
@@ -199,7 +211,7 @@ impl Drop for MediaProbeInFlightGuard {
     }
 }
 
-fn query_media_session_signal() -> Result<Option<SustainedParticipationSignalSnapshot>, String> {
+fn query_media_session_signal() -> Result<Option<MediaProbePayload>, String> {
     super::native_probe::media()
 }
 
@@ -222,7 +234,7 @@ impl MediaSessionProbe {
         })
     }
 
-    pub(super) fn query(&self) -> Result<Option<SustainedParticipationSignalSnapshot>, String> {
+    pub(super) fn query(&self) -> Result<Option<MediaProbePayload>, String> {
         // RequestAsync activation grows native allocations when repeated. Retain
         // one manager per helper, but fetch current sessions and playback each time.
         query_media_session_signal_native(&self.manager)
@@ -231,7 +243,7 @@ impl MediaSessionProbe {
 
 fn query_media_session_signal_native(
     manager: &GlobalSystemMediaTransportControlsSessionManager,
-) -> Result<Option<SustainedParticipationSignalSnapshot>, String> {
+) -> Result<Option<MediaProbePayload>, String> {
     let sessions = manager
         .GetSessions()
         .map_err(|error| format!("loading media sessions failed: {error}"))?;
@@ -256,23 +268,10 @@ fn query_media_session_signal_native(
         }
     }
 
-    Ok(fallback_active.or(fallback_available))
-}
-
-struct MediaApartment(std::marker::PhantomData<std::rc::Rc<()>>);
-
-impl MediaApartment {
-    fn initialize() -> Result<Self, String> {
-        unsafe { RoInitialize(RO_INIT_MULTITHREADED) }
-            .map_err(|error| format!("initializing media WinRT apartment failed: {error}"))?;
-        Ok(Self(std::marker::PhantomData))
-    }
-}
-
-impl Drop for MediaApartment {
-    fn drop(&mut self) {
-        unsafe { RoUninitialize() };
-    }
+    Ok(fallback_active.or(fallback_available).map(|signal| MediaProbePayload {
+        signal: Some(signal),
+        media: read_active_media(manager),
+    }))
 }
 
 fn build_signal_snapshot(
@@ -306,22 +305,6 @@ fn build_signal_snapshot(
     };
 
     Ok(signal)
-}
-
-fn map_playback_type(value: MediaPlaybackType) -> SystemMediaPlaybackType {
-    if value == MediaPlaybackType::Video {
-        return SystemMediaPlaybackType::Video;
-    }
-
-    if value == MediaPlaybackType::Music {
-        return SystemMediaPlaybackType::Audio;
-    }
-
-    if value == MediaPlaybackType::Image {
-        return SystemMediaPlaybackType::Image;
-    }
-
-    SystemMediaPlaybackType::Unknown
 }
 
 fn now_ms() -> i64 {

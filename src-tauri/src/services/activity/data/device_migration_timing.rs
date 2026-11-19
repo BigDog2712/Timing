@@ -34,12 +34,16 @@ fn device_dimension_migration_duration_on_an_old_database() {
         let path = dir.join("patina.db");
 
         // ① 造一个真的「停在 27」的库。
-        let pool = open_single_connection_sqlite_pool(&path, true).await.unwrap();
+        let pool = open_single_connection_sqlite_pool(&path, true)
+            .await
+            .unwrap();
         let mut connection = pool.acquire().await.unwrap();
         connection.ensure_migrations_table().await.unwrap();
         for migration in schema_registry::tracker_migrations()
             .into_iter()
-            .filter(|migration| migration.version < schema_registry::DEVICE_DIMENSION_MIGRATION_VERSION)
+            .filter(|migration| {
+                migration.version < schema_registry::DEVICE_DIMENSION_MIGRATION_VERSION
+            })
         {
             connection
                 .apply(&SqlxMigration::new(
@@ -66,16 +70,19 @@ fn device_dimension_migration_duration_on_an_old_database() {
         pool.close().await;
 
         // ② 像真正的冷启动那样重开，两段分开计时。
-        let pool = open_single_connection_sqlite_pool(&path, false).await.unwrap();
+        let pool = open_single_connection_sqlite_pool(&path, false)
+            .await
+            .unwrap();
         let started = Instant::now();
         crate::services::activity::schema_core::ensure_schema_at(&pool, &path)
             .await
             .unwrap();
         let migration = started.elapsed();
         let started = Instant::now();
-        let adopted = crate::services::activity::schema_core::adopt_local_rows(&pool, "0123456789ab")
-            .await
-            .unwrap();
+        let adopted =
+            crate::services::activity::schema_core::adopt_local_rows(&pool, "0123456789ab")
+                .await
+                .unwrap();
         let adopt = started.elapsed();
 
         let sentinel: i64 =
@@ -88,7 +95,9 @@ fn device_dimension_migration_duration_on_an_old_database() {
             .await
             .unwrap();
         println!("rows = {rows}");
-        println!("migration 28 = {migration:?}（sqlx 把它包在**一个**事务里，所以独占写锁就持这么久）");
+        println!(
+            "migration 28 = {migration:?}（sqlx 把它包在**一个**事务里，所以独占写锁就持这么久）"
+        );
         println!("adopt_local_rows = {adopt:?}（rows_affected = {adopted}）");
         println!("sentinel rows left = {sentinel}, null uid left = {null_uid}");
         assert_eq!(sentinel, 0);

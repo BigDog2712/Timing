@@ -53,7 +53,10 @@ fn with_meta_fills_label_and_icon_only() {
 /// 桥没给（包已卸载）⇒ 留空串，不许回落到包名 —— 回落是前端**唯一**一处的事。
 #[test]
 fn with_meta_leaves_unknown_packages_blank() {
-    let out = with_meta(vec![row("com.gone.app", 60)], &[app("com.tencent.mm", "微信")]);
+    let out = with_meta(
+        vec![row("com.gone.app", 60)],
+        &[app("com.tencent.mm", "微信")],
+    );
     assert_eq!(out[0].label, "");
     assert_eq!(out[0].icon, "");
 }

@@ -14,10 +14,8 @@ fn automatic_groups_without_configuration_and_respects_exact_exceptions() {
     assert_eq!(resolve_owner("127.0.0.1", &rules), "127.0.0.1");
     let rules = BTreeMap::from([(
         "deepseek.com".into(),
-        serde_json::from_str::<WebLinkRule>(
-            r#"{"version":2,"exceptions":["chat.deepseek.com"]}"#,
-        )
-        .unwrap(),
+        serde_json::from_str::<WebLinkRule>(r#"{"version":2,"exceptions":["chat.deepseek.com"]}"#)
+            .unwrap(),
     )]);
     assert_eq!(
         resolve_owner("chat.deepseek.com", &rules),

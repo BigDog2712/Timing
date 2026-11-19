@@ -42,9 +42,7 @@ fn bridge(app: &AppHandle) -> AppResult<tauri::State<'_, NativeBridge<tauri::Wry
 /// [V0.11.22] 界面已无入口，但 `md_saf_status` 命令仍在契约面上（78 条之一），
 /// 这条能力必须还能回答「授权还在不在」——排查「为什么手机不同步了」时它是第一句话。
 pub async fn saf_status(app: &AppHandle) -> AppResult<SafStatus> {
-    bridge(app)?
-        .call("safStatus", serde_json::json!({}))
-        .await
+    bridge(app)?.call("safStatus", serde_json::json!({})).await
 }
 
 /// 用系统里装着的那款编辑器打开指定文件（通常是 Obsidian）。
@@ -86,8 +84,16 @@ pub async fn sync_once(app: &AppHandle) -> AppResult<MdSyncReport> {
                 "{}:enabled={},file={},heading={}",
                 b.kind.label(),
                 b.enabled,
-                if b.file.trim().is_empty() { "<空>" } else { b.file.trim() },
-                if b.heading.trim().is_empty() { "<空>" } else { b.heading.trim() }
+                if b.file.trim().is_empty() {
+                    "<空>"
+                } else {
+                    b.file.trim()
+                },
+                if b.heading.trim().is_empty() {
+                    "<空>"
+                } else {
+                    b.heading.trim()
+                }
             ))
             .collect::<Vec<_>>()
             .join(" | ")

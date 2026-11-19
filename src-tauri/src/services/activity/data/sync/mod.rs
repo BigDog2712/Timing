@@ -55,14 +55,18 @@ mod local_day_key_tests {
         assert_eq!(key.len(), 10, "{key}");
         assert_eq!(&key[4..5], "-");
         assert_eq!(&key[7..8], "-");
-        assert!(key.chars().filter(char::is_ascii_digit).count() == 8, "{key}");
+        assert!(
+            key.chars().filter(char::is_ascii_digit).count() == 8,
+            "{key}"
+        );
     }
 
     /// 跨本地日界前后必须落在不同的天（用 `local_day_range_at` 反查，避免写死时区）。
     #[test]
     fn day_key_flips_at_the_local_midnight() {
         let at = 1_700_000_000_000;
-        let (day_start_ms, _) = crate::infra::activity::clock::local_day_range_at(at).expect("range");
+        let (day_start_ms, _) =
+            crate::infra::activity::clock::local_day_range_at(at).expect("range");
         let before = local_day_key(day_start_ms - 1).expect("previous day");
         let on = local_day_key(day_start_ms).expect("day start");
         assert_ne!(before, on, "local midnight must start a new day key");

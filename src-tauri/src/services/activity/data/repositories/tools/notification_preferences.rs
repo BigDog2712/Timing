@@ -101,9 +101,10 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![("language".into(), "es".into())]
         );
-        let backup = crate::services::activity::data::repositories::settings::fetch_all_for_backup(&pool)
-            .await
-            .unwrap();
+        let backup =
+            crate::services::activity::data::repositories::settings::fetch_all_for_backup(&pool)
+                .await
+                .unwrap();
         let item = backup.iter().find(|s| s.key == KEY).unwrap();
         assert_eq!(
             serde_json::from_str::<Preferences>(&item.value).unwrap(),
@@ -114,9 +115,11 @@ mod tests {
             .await
             .unwrap();
         let mut tx = pool.begin().await.unwrap();
-        crate::services::activity::data::repositories::settings::insert_missing_for_restore(&mut tx, &backup)
-            .await
-            .unwrap();
+        crate::services::activity::data::repositories::settings::insert_missing_for_restore(
+            &mut tx, &backup,
+        )
+        .await
+        .unwrap();
         tx.commit().await.unwrap();
         assert_eq!(load(&pool).await.unwrap(), saved);
         sqlx::query("CREATE TRIGGER reject_preferences BEFORE UPDATE ON settings BEGIN SELECT RAISE(ABORT, 'injected'); END").execute(&pool).await.unwrap();

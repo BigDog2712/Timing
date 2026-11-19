@@ -1,7 +1,9 @@
-use crate::services::activity::data::repositories::remote_backup_settings::{self as repository, StoredConfig};
-use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
 use crate::infra::activity::credentials::{CredentialStore, WebDavCredentialStore};
 use crate::infra::activity::webdav::WebDavConfig;
+use crate::services::activity::data::repositories::remote_backup_settings::{
+    self as repository, StoredConfig,
+};
+use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use tauri::{AppHandle, Runtime};

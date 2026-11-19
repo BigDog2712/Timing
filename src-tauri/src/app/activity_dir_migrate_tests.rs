@@ -88,7 +88,11 @@ fn legacy_root(tag: &str, rows: i64) -> PathBuf {
     std::fs::write(old.join("backups").join("b.zip"), b"zip").unwrap();
     std::fs::create_dir_all(old.join("diagnostics")).unwrap();
     std::fs::write(old.join("diagnostics").join("d.jsonl"), b"{}\n").unwrap();
-    std::fs::write(old.join(crate::app::legacy_import::IMPORT_MARKER), b"imported\n").unwrap();
+    std::fs::write(
+        old.join(crate::app::legacy_import::IMPORT_MARKER),
+        b"imported\n",
+    )
+    .unwrap();
     root
 }
 
@@ -120,12 +124,12 @@ fn the_data_step_copies_the_database_its_companions_and_keeps_the_old_one() {
     }
     assert!(new.join("backups").join("b.zip").is_file());
     assert!(new.join("diagnostics").join("d.jsonl").is_file());
-    assert!(new
-        .join(crate::app::legacy_import::IMPORT_MARKER)
-        .is_file());
+    assert!(new.join(crate::app::legacy_import::IMPORT_MARKER).is_file());
 
     /* M-14：新库在 ⇒ 旧库必须在（迁移模块没有删除旧路径的代码）。 */
-    let old_db = root.join(LEGACY_ACTIVITY_DATA_REL).join(LEGACY_ACTIVITY_DB_FILE);
+    let old_db = root
+        .join(LEGACY_ACTIVITY_DATA_REL)
+        .join(LEGACY_ACTIVITY_DB_FILE);
     assert!(old_db.is_file());
     assert_eq!(row_count(&old_db), 3);
 }
@@ -140,7 +144,10 @@ fn a_second_run_changes_nothing() {
     let before = std::fs::metadata(&new_db).unwrap().modified().unwrap();
     let second = prepare(&root);
     assert_eq!(second.data, Step::Nothing);
-    assert_eq!(std::fs::metadata(&new_db).unwrap().modified().unwrap(), before);
+    assert_eq!(
+        std::fs::metadata(&new_db).unwrap().modified().unwrap(),
+        before
+    );
 }
 
 /// **M-5**：源库读不出来 ⇒ 这趟失败、**不产出任何文件**、旧库原样保留 ⇒ 下次启动重试。
@@ -173,15 +180,16 @@ fn a_crash_between_the_two_steps_is_repaired_on_the_next_run() {
         1,
     );
     /* 上一趟已经把库和伴生文件都复制完了（两步之间进程被杀），只剩 rename 没做。 */
-    make_db(
-        &root.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME),
-        1,
-    );
+    make_db(&root.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME), 1);
     std::fs::create_dir_all(old_webview(&root)).unwrap();
     std::fs::write(old_webview(&root).join("Cookies"), b"cookie").unwrap();
 
     let report = prepare(&root);
-    assert_eq!(report.data, Step::Nothing, "已经复制过的库不该再 VACUUM 一遍");
+    assert_eq!(
+        report.data,
+        Step::Nothing,
+        "已经复制过的库不该再 VACUUM 一遍"
+    );
     assert_eq!(report.webview, Step::Done);
     assert!(root
         .join(ACTIVITY_SUBDIR)
@@ -242,7 +250,9 @@ fn a_blocked_profile_target_fails_open_per_switch() {
 fn the_rollback_window_leaves_the_decision_on_the_old_name() {
     let root = legacy_root("rollback", 2);
     assert_eq!(prepare(&root).data, Step::Done);
-    let old_db = root.join(LEGACY_ACTIVITY_DATA_REL).join(LEGACY_ACTIVITY_DB_FILE);
+    let old_db = root
+        .join(LEGACY_ACTIVITY_DATA_REL)
+        .join(LEGACY_ACTIVITY_DB_FILE);
     let new_db = root.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME);
     /* 回滚到旧版本写了一段时间：旧库 mtime 比副本新。 */
     let later = std::time::SystemTime::now() + std::time::Duration::from_secs(5);
@@ -265,7 +275,11 @@ fn the_plain_copier_never_touches_the_database_or_its_sidecars() {
     let to = temp_root("skip-to");
     make_db(&from.join(LEGACY_ACTIVITY_DB_FILE), 1);
     for suffix in ["-wal", "-shm", "-journal"] {
-        std::fs::write(from.join(format!("{LEGACY_ACTIVITY_DB_FILE}{suffix}")), b"x").unwrap();
+        std::fs::write(
+            from.join(format!("{LEGACY_ACTIVITY_DB_FILE}{suffix}")),
+            b"x",
+        )
+        .unwrap();
     }
     std::fs::write(from.join("keep.txt"), b"keep").unwrap();
 
@@ -292,5 +306,8 @@ fn copy_missing_never_overwrites_an_existing_target() {
     std::fs::write(to.join("backups").join("b.zip"), b"old").unwrap();
 
     copy_missing(&from, &to).unwrap();
-    assert_eq!(std::fs::read(to.join("backups").join("b.zip")).unwrap(), b"old");
+    assert_eq!(
+        std::fs::read(to.join("backups").join("b.zip")).unwrap(),
+        b"old"
+    );
 }

@@ -17,7 +17,9 @@
 
 use std::fs;
 
-use crate::models::md_cloud_purge::{channel_key, PurgeChannel, PurgeKey, OVERLAP_TEXT, PurgeState};
+use crate::models::md_cloud_purge::{
+    channel_key, PurgeChannel, PurgeKey, PurgeState, OVERLAP_TEXT,
+};
 use crate::repositories::settings;
 use crate::services::md_cloud::{self, purge};
 use crate::tests::md_cloud_purge::{binding_of, kv, list_names, seed_past, state_of};
@@ -25,12 +27,11 @@ use crate::tests::md_sync::env;
 use crate::tests::qa_t04_audit_log::{audit_dir, audit_lines};
 use crate::tests::support::unique_dir;
 
-
 /// I9b（验收方自造）：手工把水位改成 `2099-01-01` —— 今天那份**仍然不删**。
 #[tokio::test]
 async fn i9b_a_watermark_poisoned_to_2099_never_removes_today() {
     /* 同 i9a：先注入日志目录。否则下面那条「日志 0 条 purge:」是**空断言** ——
-       `log_dir()` 为 None 时 `append` 本来就什么都不写，绿了也证明不了任何事。 */
+    `log_dir()` 为 None 时 `append` 本来就什么都不写，绿了也证明不了任何事。 */
     let _ = audit_dir();
     let fixture = env("qa-t04-i9b").await;
     let root = unique_dir("qa-t04-i9b");
@@ -74,8 +75,8 @@ async fn i9b_a_watermark_poisoned_to_2099_never_removes_today() {
     );
 
     /* **对照**：把水位清掉再跑一轮 —— 同一份往期立刻被删、追责面真的多出一行。
-       没有这一段，上面那条「0 行」可能只是「这个夹具本来就删不掉」（闸⑤ 没证据之类），
-       整条用例就是空跑。 */
+    没有这一段，上面那条「0 行」可能只是「这个夹具本来就删不掉」（闸⑤ 没证据之类），
+    整条用例就是空跑。 */
     settings::set_value(
         &fixture.pool,
         channel_key(PurgeChannel::Folder, PurgeKey::Upto),
@@ -140,9 +141,14 @@ async fn gate3_a_child_directory_binding_refuses_the_whole_round() {
     }
     let before = list_names(&root);
 
-    purge::run_folder(&fixture.pool, &root, &[binding_of(&child)], &md_cloud::today())
-        .await
-        .expect("闸③ 拒绝不是错误，是一条记账");
+    purge::run_folder(
+        &fixture.pool,
+        &root,
+        &[binding_of(&child)],
+        &md_cloud::today(),
+    )
+    .await
+    .expect("闸③ 拒绝不是错误，是一条记账");
 
     assert_eq!(list_names(&root), before, "互为父子时一个文件都不许删");
     assert_eq!(

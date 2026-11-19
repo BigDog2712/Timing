@@ -1,0 +1,148 @@
+classDiagram
+    class TagPathRules {
+      +normalize(raw: string) Result~TagPath, ValidationError~
+      +validate(path: TagPath) Result~void, ValidationError~
+      +buildTree(paths: TagPath[]) TagNode[]
+      +sort(nodes: TagNode[]) TagNode[]
+      +resolveCategoryKey(path: TagPath) Option~string~
+    }
+    class TagNode {
+      +path: string
+      +segment: string
+      +parentPath: string
+      +depth: number
+      +key: string
+      +color: string
+      +isBuiltin: boolean
+      +isDeleted: boolean
+      +usage: TagUsage
+    }
+    class TagUsage {
+      +apps: number
+      +websites: number
+      +items: number
+    }
+    class TagAssignment {
+      +target: TagTarget
+      +tags: string[]
+      +primary: string
+    }
+    class TagTarget {
+      +kind: string
+      +id: string
+    }
+    class TagMutationPreview {
+      +operation: string
+      +sourcePaths: string[]
+      +destinationPath: string
+      +impact: TagImpact[]
+      +counts: TagUsage
+      +fingerprint: string
+      +conflicts: CategoryPropagationConflict[]
+    }
+    class CategoryPropagationConflict {
+      +table: string
+      +sourceId: number
+      +occupantId: number
+      +targetValue: string
+    }
+    class TagCatalogService {
+      +list() Result~TagNode[]~
+      +getAssignment(target: TagTarget) Result~TagAssignment~
+      +setAssignment(input: TagAssignment) Result~TagAssignment~
+      +preview(operation, path, destination) Result~TagMutationPreview~
+      +rename(path, destination, expectedFingerprint) Result~TagNode[]~
+      +delete(path, cascade, confirmed) Result~TagNode[]~
+      +restore(path) Result~TagNode[]~
+      +recoverPendingMutations() Result~void~
+    }
+    class TagRepository {
+      +readCatalog() Result~CatalogRows~
+      +readAssignments(target) Result~TagAssignment[]~
+      +writeAssignments(assignments, transaction) Result~void~
+      +writeCatalog(rows, transaction) Result~void~
+      +writeMutationJournal(operation) Result~void~
+      +commitMutationJournal(id) Result~void~
+    }
+    class TagIpcCommands {
+      +tag_catalog_list() Result~TagNode[]~
+      +tag_assignment_get(target) Result~TagAssignment~
+      +tag_assignment_set(input) Result~TagAssignment~
+      +tag_mutation_preview(operation, path, destination) Result~TagMutationPreview~
+      +tag_rename(path, destination, expectedFingerprint) Result~TagNode[]~
+      +tag_delete(path, cascade, confirmed) Result~TagNode[]~
+      +tag_restore(path) Result~TagNode[]~
+    }
+    class TagChangeEvent {
+      +revision: string
+      +affectedTargets: TagTarget[]
+      +emit()
+    }
+    class AiClient {
+      +chat(config, prompt, timeout, cancelToken) Result~string~
+      +listModels(config) Result~string[]~
+      +testConnection(config) AiTestResult
+    }
+    class AiRetryPolicy {
+      +classify(error) AiErrorCode
+      +shouldRetry(code, attempt) boolean
+      +delay(attempt, retryAfter) Duration
+      +redact(text, secret) string
+      +remainingBudget(startedAt, totalBudget) Duration
+    }
+    class AiSuggestionParser {
+      +extractJson(raw) Result~JsonValue~
+      +parse(raw, targets, candidates, maxTags) AiSuggestResponse
+      +sanitizeMarkdown(raw) string
+    }
+    class AiSuggestResponse {
+      +suggestions: AiTagSuggestion[]
+      +stats: AiParseStats
+    }
+    class AiParseStats {
+      +parsed: number
+      +dropped: number
+      +attempts: number
+      +batches: number
+      +failedBatches: number
+    }
+    class TagGateway {
+      +listCatalog() Promise~TagNode[]~
+      +setAssignment(input) Promise~TagAssignment~
+      +previewMutation(input) Promise~TagMutationPreview~
+      +mutate(input) Promise~TagNode[]~
+    }
+    class TagPicker {
+      +target: TagTarget
+      +selected: string[]
+      +save(tags, primary) Promise~void~
+      +cancelRequest(requestId) Promise~void~
+    }
+    class TagManager {
+      +selectedPath: string
+      +loadCatalog() Promise~void~
+      +previewMutation(input) Promise~TagMutationPreview~
+      +confirmMutation(input) Promise~void~
+    }
+    class TagChangeSubscriber {
+      +subscribe(listener) Unlisten
+      +reloadAffected(targets)
+      +dispose()
+    }
+
+    TagNode *-- TagUsage : usage
+    TagAssignment *-- TagTarget : target
+    TagMutationPreview *-- TagUsage : counts
+    TagCatalogService --> TagPathRules : normalizes and validates
+    TagCatalogService --> TagRepository : persists and queries
+    TagIpcCommands --> TagCatalogService : delegates
+    TagCatalogService --> TagChangeEvent : emits after commit
+    TagRepository --> TagAssignment : reads and writes
+    AiClient --> AiRetryPolicy : classifies transport outcomes
+    AiClient --> AiSuggestionParser : parses successful content
+    AiSuggestionParser --> AiSuggestResponse : builds
+    AiSuggestResponse *-- AiParseStats : statistics
+    TagPicker --> TagGateway : writes only after confirmation
+    TagManager --> TagGateway : previews and mutates
+    TagGateway --> TagIpcCommands : invokes via window IPC
+    TagChangeSubscriber --> TagChangeEvent : listens

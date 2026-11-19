@@ -46,7 +46,6 @@ pub struct FocusBlockDto {
     pub end_time: Option<i64>,
 }
 
-
 /// 从业务库把会话投影进活动库的 `focus_blocks`。
 ///
 /// `since_ms` 之前的块不动（增量）；传 `None` 表示全量重推（修复用，数据量大时慢）。
@@ -86,7 +85,7 @@ pub async fn project(
         let device_id: String = row.get("device_id");
         let item_uid: String = row.get("item_uid");
         /* `device_id` 是哨兵 `''` 的行跳过：它还没被认领，uid 里也没有真实属主，
-           投影过来只会让「按设备筛选」多出一个空设备。启动认领之后重推即可。 */
+        投影过来只会让「按设备筛选」多出一个空设备。启动认领之后重推即可。 */
         if device_id.trim().is_empty() {
             report.skipped += 1;
             continue;

@@ -15,6 +15,7 @@ import SettingsTrackingPanel from "./SettingsTrackingPanel";import { HostGeneral
 import HostHighlightCard from "./host/HostHighlightCard";
 import HostPillLookCard from "./host/HostPillLookCard";
 import { HostPluginsPanel } from "./host/HostPluginsPanel";
+import HostAiCard from "./host/HostAiCard";
 import { HostSyncPanel } from "./host/HostSyncPanel";
 import HostThemeCard from "./host/HostThemeCard";
 import { useSettingsPageState } from "../hooks/useSettingsPageState";
@@ -253,6 +254,8 @@ export default function Settings({
             />
           </div>
           <div id="s-plugins"><HostPluginsPanel /></div>
+          {/* [0.12.3] AI 卡放在「通用与启动」组末位：它是全局能力，不属于任一已有面板。 */}
+          <div id="s-ai"><HostAiCard /></div>
         </div>
       </div>
 

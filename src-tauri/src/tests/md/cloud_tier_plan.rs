@@ -114,7 +114,10 @@ fn off_schedule_never_fires_even_when_cloud_is_ready() {
         startup_ms: 0,
         ..TierState::default()
     };
-    assert_eq!(decide(&state, CloudSchedule::Off, 900, 60 * 60 * 1_000, 0), None);
+    assert_eq!(
+        decide(&state, CloudSchedule::Off, 900, 60 * 60 * 1_000, 0),
+        None
+    );
 }
 
 /* ============================================================ [V0.11.22] 手机端只走云端 */

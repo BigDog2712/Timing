@@ -63,6 +63,105 @@ pub async fn set(
     Ok(normalized)
 }
 
+/// 把一个标签**连同其子树**改名（`学习` → `学业` 同时把 `学习/考公` 变成 `学业/考公`）。
+///
+/// 返回被改到的事项条数。改名后的路径仍然要过一遍归一：`to` 本身合法并不代表
+/// `to + 子段` 还在 4 级 / 64 字以内（把 `a` 改成 `a/b/c` 时，`a/x/y` 会变成 5 级）。
+/// 越界的那一条**保持原样**——改名宁可漏掉一条，也不能把用户的标签截断或清空。
+pub async fn rename_path(
+    pool: &SqlitePool,
+    from: &str,
+    to: &str,
+    now: i64,
+) -> AppResult<usize> {
+    let rows: Vec<(i64, String)> =
+        sqlx::query_as("SELECT id, tags FROM items WHERE deleted_at IS NULL ORDER BY id ASC")
+            .fetch_all(pool)
+            .await?;
+    let mut tx = pool.begin().await?;
+    let mut changed = 0_usize;
+    for (item_id, raw) in rows {
+        let Some(next) = rename_in(&decode(&raw), from, to) else {
+            continue;
+        };
+        write_tags(&mut tx, item_id, &next, now).await?;
+        changed += 1;
+    }
+    tx.commit().await?;
+    Ok(changed)
+}
+
+/// 删除一个标签**及其子树**，返回被改到的事项条数。
+pub async fn delete_path(pool: &SqlitePool, path: &str, now: i64) -> AppResult<usize> {
+    let rows: Vec<(i64, String)> =
+        sqlx::query_as("SELECT id, tags FROM items WHERE deleted_at IS NULL ORDER BY id ASC")
+            .fetch_all(pool)
+            .await?;
+    let mut tx = pool.begin().await?;
+    let mut changed = 0_usize;
+    for (item_id, raw) in rows {
+        let tags = decode(&raw);
+        let kept: Vec<String> = tags
+            .iter()
+            .filter(|tag| !is_same_or_child(tag, path))
+            .cloned()
+            .collect();
+        if kept.len() == tags.len() {
+            continue;
+        }
+        write_tags(&mut tx, item_id, &kept, now).await?;
+        changed += 1;
+    }
+    tx.commit().await?;
+    Ok(changed)
+}
+
+/// `tag` 是否就是 `path` 或它的子路径（大小写不敏感，与写入侧去重口径一致）。
+fn is_same_or_child(tag: &str, path: &str) -> bool {
+    let tag = tag.to_lowercase();
+    let path = path.to_lowercase();
+    tag == path || tag.starts_with(&format!("{path}/"))
+}
+
+fn rename_in(tags: &[String], from: &str, to: &str) -> Option<Vec<String>> {
+    let prefix = format!("{from}/");
+    let mut changed = false;
+    let mut out: Vec<String> = Vec::with_capacity(tags.len());
+    for tag in tags {
+        let mapped = if tag == from {
+            Some(to.to_string())
+        } else {
+            tag.strip_prefix(&prefix)
+                .map(|rest| format!("{to}/{rest}"))
+        };
+        match mapped {
+            Some(path) if crate::models::tag_path::normalize_tag_path(&path).is_ok() => {
+                changed = true;
+                out.push(path);
+            }
+            _ => out.push(tag.clone()),
+        }
+    }
+    changed.then(|| normalize_tag_paths(&out, MAX_TAGS).unwrap_or(out))
+}
+
+/// 批量写回（同一事务内），`updated_at` 推进由 `trg_items_touch_tags` 负责另一半。
+async fn write_tags(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    item_id: i64,
+    tags: &[String],
+    now: i64,
+) -> AppResult<()> {
+    let raw = serde_json::to_string(tags).map_err(AppError::db)?;
+    sqlx::query("UPDATE items SET tags = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+        .bind(raw)
+        .bind(now)
+        .bind(item_id)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
 /// 读库：坏 JSON 按「没有标签」处理。
 ///
 /// 一行坏数据不该让整个事项管理弹层打不开，也不该把其它事项的标签一起吞掉；
@@ -118,7 +217,7 @@ mod tests {
             format!("{}/x", "a".repeat(33)),
         ];
         for invalid in invalid_paths {
-            let result = set(&pool, id, &[invalid.clone()], 1).await;
+            let result = set(&pool, id, std::slice::from_ref(&invalid), 1).await;
             assert!(result.is_err(), "应拒绝超限标签: {invalid}");
         }
         let too_many = (0..MAX_TAGS + 1)

@@ -23,8 +23,8 @@ use crate::models::constants::{MD_CLOUD_CONNECT_SECS, MD_CLOUD_READ_SECS};
 /* 对**目录**发请求的那一半（`probe` / MKCOL），加探针 `probe_file` 与日志词表 `tag`（[QA G2] 从 `dir.rs` 搬出）：
 判定表只有一张（见 `dir.rs` 头注释）；`probe` / `ProbeOutcome` re-export 出来，调用点不必知道拆过。 */
 pub mod dir;
-pub mod probe_file;
 mod limits;
+pub mod probe_file;
 pub use limits::MAX_MARKDOWN_BYTES;
 
 /// TLS 后端（[V0.11.25]）：内置根证书，不依赖运行时的平台验证器。见本模块文件头。
@@ -278,7 +278,11 @@ fn etag_of(response: &reqwest::Response) -> Option<String> {
 fn normalize_path(raw: &str) -> String {
     let trimmed = raw.trim().replace('\\', "/");
     let trimmed = trimmed.trim_matches('/').to_string();
-    if trimmed.is_empty() { trimmed } else { format!("/{trimmed}") }
+    if trimmed.is_empty() {
+        trimmed
+    } else {
+        format!("/{trimmed}")
+    }
 }
 
 /// RFC 3986 百分号编码：非保留字符与 `/` 原样，其余按 UTF-8 字节逐字节编码。

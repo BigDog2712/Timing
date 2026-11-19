@@ -10,6 +10,8 @@ use crate::models::category_catalog::CategoryCatalogDto;
 use tauri::{AppHandle, Runtime};
 
 #[tauri::command]
-pub async fn list_category_catalog<R: Runtime>(_app: AppHandle<R>) -> AppResult<CategoryCatalogDto> {
+pub async fn list_category_catalog<R: Runtime>(
+    _app: AppHandle<R>,
+) -> AppResult<CategoryCatalogDto> {
     Ok(CategoryCatalogDto::empty())
 }

@@ -44,10 +44,9 @@ async fn scan_once(app: &AppHandle, pool: &SqlitePool) -> AppResult<()> {
         return Ok(());
     }
     // 领取和通知处于同一 SQLite 事务；失败或崩溃会回滚，防止持久标记吞掉提醒。
-    let claimed = services::reminder::dispatch(pool, &due, now, |claimed| {
-        send_notification(app, claimed)
-    })
-    .await?;
+    let claimed =
+        services::reminder::dispatch(pool, &due, now, |claimed| send_notification(app, claimed))
+            .await?;
     for reminder in &claimed {
         events::emit_reminder_fired(app, reminder);
     }

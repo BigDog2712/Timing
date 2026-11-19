@@ -32,7 +32,8 @@ pub async fn flush_active(pool: &SqlitePool) -> AppResult<()> {
     }
     let sampled = clock::WallAnchor::new(now);
     let elapsed = clock::anchored_elapsed_ms_at(running_since, sampled.mono)
-        .unwrap_or_else(|| now.saturating_sub(running_since)).max(0);
+        .unwrap_or_else(|| now.saturating_sub(running_since))
+        .max(0);
     let delta = floor_sec(elapsed);
     if delta <= 0 {
         return Ok(());
@@ -90,16 +91,25 @@ mod tests {
     #[test]
     fn repeated_flushes_preserve_fractional_seconds() {
         let origin = Instant::now();
-        let mut checkpoint = WallAnchor { wall_ms: 0, mono: origin };
+        let mut checkpoint = WallAnchor {
+            wall_ms: 0,
+            mono: origin,
+        };
         let mut elapsed = 0u64;
         let mut accumulated = 0;
         for index in 0..120 {
             elapsed += if index % 2 == 0 { 15_001 } else { 14_999 };
-            let sampled = WallAnchor { wall_ms: elapsed as i64, mono: origin + Duration::from_millis(elapsed) };
+            let sampled = WallAnchor {
+                wall_ms: elapsed as i64,
+                mono: origin + Duration::from_millis(elapsed),
+            };
             let delta = sampled.mono.duration_since(checkpoint.mono).as_millis() as i64;
             accumulated += delta / 1000;
             checkpoint = carry_remainder(sampled, delta);
-            assert_eq!(accumulated * 1000 + elapsed as i64 - checkpoint.wall_ms, elapsed as i64);
+            assert_eq!(
+                accumulated * 1000 + elapsed as i64 - checkpoint.wall_ms,
+                elapsed as i64
+            );
         }
         assert_eq!(accumulated, 1_800);
     }
@@ -111,7 +121,10 @@ mod tests {
             let checkpoint = carry_remainder(WallAnchor { wall_ms, mono }, 15_750);
             assert_eq!(checkpoint.wall_ms, wall_ms - 750);
             let after_write = mono + Duration::from_millis(250);
-            assert_eq!(after_write.duration_since(checkpoint.mono).as_millis(), 1_000);
+            assert_eq!(
+                after_write.duration_since(checkpoint.mono).as_millis(),
+                1_000
+            );
         }
     }
 

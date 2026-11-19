@@ -26,7 +26,7 @@ use sqlx::SqlitePool;
 
 use crate::error::{AppError, AppResult};
 /* [V0.11.19] 桌面已改事件驱动，运行时不再读「同步间隔」；只有手机端轮询还用它。
-   `#[cfg(mobile)]` 让这两个常量在非手机产物里连 import 都不留（clippy 零告警）。 */
+`#[cfg(mobile)]` 让这两个常量在非手机产物里连 import 都不留（clippy 零告警）。 */
 #[cfg(mobile)]
 use crate::models::constants::{MD_SYNC_POLL_MIN_SECS, MD_SYNC_POLL_SECS};
 use crate::models::md_sync::MdSyncBinding;
@@ -54,16 +54,16 @@ pub async fn load(pool: &SqlitePool) -> AppResult<MdSyncConfig> {
     Ok(match saved {
         Some(saved) => {
             /* 老键在 → 折算；新键在（或都在）→ 原样。两路互不覆盖：
-               已落新结构的配置 `cloud` 恒为 `None`（`skip_serializing_if`）。 */
+            已落新结构的配置 `cloud` 恒为 `None`（`skip_serializing_if`）。 */
             let (folder, webdav) = if saved.cloud.is_some() {
                 split_legacy(saved.cloud.as_ref())
             } else {
                 (saved.cloud_folder, saved.cloud_webdav)
             };
             /* [V0.11.26] 手机端兼容：`components/mobile` 全目录是零 diff 红线，两个面板仍读
-               legacy `cloud` 键（`SyncCloudPane` 拿它当草稿、`SyncPane` 拿它判「能不能同步」）。
-               桌面产物 `cloud` 恒 `None`（设计 §1.2 / O11–O13 不受影响），
-               手机产物把 webdav 通路投影回去——手机上本来也只有这一条通路（R7）。 */
+            legacy `cloud` 键（`SyncCloudPane` 拿它当草稿、`SyncPane` 拿它判「能不能同步」）。
+            桌面产物 `cloud` 恒 `None`（设计 §1.2 / O11–O13 不受影响），
+            手机产物把 webdav 通路投影回去——手机上本来也只有这一条通路（R7）。 */
             #[cfg(not(mobile))]
             let cloud = None;
             #[cfg(mobile)]
@@ -130,8 +130,8 @@ pub async fn save(pool: &SqlitePool, config: &MdSyncConfig) -> AppResult<()> {
             normalized.cloud_webdav = normalized.cloud_webdav.or(webdav);
         }
         /* [V0.11.26] 手机端兼容：手机面板只发 legacy `cloud`（红线文件零 diff），
-           它在手机上就是 webdav 那一条通路的草稿——必须以它为准，否则用户在手机上
-           改的地址/账号落不了库。folder 通路原样保留（手机不跑它）。 */
+        它在手机上就是 webdav 那一条通路的草稿——必须以它为准，否则用户在手机上
+        改的地址/账号落不了库。folder 通路原样保留（手机不跑它）。 */
         #[cfg(mobile)]
         {
             normalized.cloud_webdav = split_legacy(Some(&legacy)).1;
@@ -200,16 +200,28 @@ mod tests {
             "活跃通路 auto 原样承接"
         );
         let webdav = config.cloud_webdav.as_ref().expect("webdav 侧必须物化");
-        assert!(!webdav.enabled && !webdav.is_usable_webdav(), "非活跃侧关着");
-        assert_eq!(webdav.base_url, "https://old.example/dav/", "三件套留原值不丢");
+        assert!(
+            !webdav.enabled && !webdav.is_usable_webdav(),
+            "非活跃侧关着"
+        );
+        assert_eq!(
+            webdav.base_url, "https://old.example/dav/",
+            "三件套留原值不丢"
+        );
         assert_eq!(webdav.auto, None, "非活跃通路 auto 承接为 None");
         /* 磁盘零写：读两次，原始 JSON 一个字节没变。 */
         let raw = settings::get_value(&pool, CONFIG_KEY)
             .await
             .expect("读回应成功")
             .expect("键应仍在");
-        assert!(raw.contains(r#""mode":"localfolder""#), "磁盘上仍是老结构：{raw}");
-        assert!(!raw.contains("cloudFolder"), "读不改盘：新键不许落盘：{raw}");
+        assert!(
+            raw.contains(r#""mode":"localfolder""#),
+            "磁盘上仍是老结构：{raw}"
+        );
+        assert!(
+            !raw.contains("cloudFolder"),
+            "读不改盘：新键不许落盘：{raw}"
+        );
     }
 
     /// [V0.11.26] 保存兜底：只发 legacy `cloud` 的载荷也能落新结构，`cloud` 键不再出现。
@@ -235,7 +247,10 @@ mod tests {
             .await
             .expect("读回应成功")
             .expect("键应仍在");
-        assert!(!raw.contains(r#""cloud":"#), "新保存形不许出现 legacy 键：{raw}");
+        assert!(
+            !raw.contains(r#""cloud":"#),
+            "新保存形不许出现 legacy 键：{raw}"
+        );
         let parsed: MdSyncConfig = serde_json::from_str(&raw).expect("落库值必须能读回");
         assert!(parsed.cloud_webdav.as_ref().is_some_and(|w| w.enabled));
         assert!(parsed.cloud_folder.as_ref().is_some_and(|f| !f.enabled));

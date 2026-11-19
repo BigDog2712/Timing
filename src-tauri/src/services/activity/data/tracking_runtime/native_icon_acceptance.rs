@@ -1,5 +1,7 @@
 use crate::services::activity::data::{schema, tracking_runtime::TrackingRuntimeDataStore};
-use crate::services::activity::engine::tracking::metadata::{ensure_icon_cache_with, IconMetadataSource};
+use crate::services::activity::engine::tracking::metadata::{
+    ensure_icon_cache_with, IconMetadataSource,
+};
 use sqlx::{Executor, SqlitePool};
 use std::sync::Arc;
 use tokio::sync::Semaphore;

@@ -2,7 +2,7 @@
 //!
 //! 这一份盯三件事，每件都必须是「行为」而不是「调了一下函数」：
 //!
-//! 1. **落点里出现的是分段，不是 md**：一轮跑完 `sync/events/<设备id>/1.jsonl` 存在、
+//! 1. **落点里出现的是分段，不是 md**：一轮跑完 `sync/streams/<设备id>/<目标指纹>/00000001.jsonl` 存在、
 //!    能解码出本轮的事件，而且同一个目录里**没有** `{date}.md`（旧格式必须消失，
 //!    否则「换成事件流」只是多写了一份）；
 //! 2. **「今天已上传」由游标回答**：跑完一轮，设置页那栏（`status.today_pushed`）必须是
@@ -59,9 +59,17 @@ async fn make_events(pool: &sqlx::SqlitePool, item: i64) -> String {
     let start = op_repo::start_session(pool, item, now - 300_000, &today, "countup", None, dev)
         .await
         .expect("造开始事件应成功");
-    op_repo::append(pool, &start.session_uid, TimerOpKind::Stop, now, &today, None, dev)
-        .await
-        .expect("造结束事件应成功");
+    op_repo::append(
+        pool,
+        &start.session_uid,
+        TimerOpKind::Stop,
+        now,
+        &today,
+        None,
+        dev,
+    )
+    .await
+    .expect("造结束事件应成功");
     start.session_uid
 }
 
@@ -76,15 +84,23 @@ async fn folder_round_writes_segments_and_marks_today_pushed() {
     let session = make_events(&fixture.pool, item).await;
 
     let outcome = md_cloud::round(&fixture.pool).await.expect("round 应成功");
-    assert!(outcome.report.errors.is_empty(), "{:?}", outcome.report.errors);
+    assert!(
+        outcome.report.errors.is_empty(),
+        "{:?}",
+        outcome.report.errors
+    );
 
     /* ① 分段：第一段、能解码、装的就是这两个事件。
-       文件名是 8 位零填充（`%08d`）—— 这里**写死**字面量，不用 `segment_path()`：
-       用生产函数算路径等于拿被测代码证被测代码，落盘契约必须由判据自己钉住。 */
+    文件名是 8 位零填充（`%08d`）—— 这里**写死**字面量，不用 `segment_path()`：
+    用生产函数算路径等于拿被测代码证被测代码，落盘契约必须由判据自己钉住。 */
+    let writer = crate::services::sync_stream::transport::Transport::Folder(cloud_dir.clone())
+        .scope()
+        .unwrap();
     let segment = cloud_dir
         .join("sync")
-        .join("events")
+        .join("streams")
         .join(device())
+        .join(writer)
         .join("00000001.jsonl");
     let bytes = fs::read(&segment).expect("落点里应出现第一段事件分段");
     let ops = decode_segment(&bytes).expect("分段必须能解码（含完整性尾标）");
@@ -125,7 +141,9 @@ async fn folder_round_failure_records_error_and_keeps_status_false() {
     let item = new_item(&fixture.pool, "读书").await;
     make_events(&fixture.pool, item).await;
 
-    let outcome = md_cloud::round(&fixture.pool).await.expect("round 不该折成 Err");
+    let outcome = md_cloud::round(&fixture.pool)
+        .await
+        .expect("round 不该折成 Err");
     assert!(
         !outcome.report.errors.is_empty(),
         "落点建不出来必须有错误：{:?}",
@@ -174,15 +192,21 @@ async fn folder_round_imports_handwritten_md_from_the_vault() {
     let handwritten = "笔记里手写的这一段";
     let row = format!("| {today} 09:00:00 | 生活 | {handwritten} |\n");
     let mut body = fs::read_to_string(&file).expect("首轮之后当日文件应已存在");
-    body.push_str(&format!("\n{NOTES_HEADING}\n| 更新时间 | 事项 | 内容 |\n|---|---|---|\n{row}"));
+    body.push_str(&format!(
+        "\n{NOTES_HEADING}\n| 更新时间 | 事项 | 内容 |\n|---|---|---|\n{row}"
+    ));
     fs::write(&file, body).expect("写手写日记应成功");
 
     /* AutoMerge：手写段落在「文件有、SQL 无」这一侧，`Awaiting` 会把它挂成待决策
-       （`dir=pending`）而不是直接入库。这条用例要证的是「导入这条链没断」，用能落库的模式。 */
+    （`dir=pending`）而不是直接入库。这条用例要证的是「导入这条链没断」，用能落库的模式。 */
     let outcome = md_cloud::round_with(&fixture.pool, ConflictMode::AutoMerge)
         .await
         .expect("第二轮应成功");
-    assert!(outcome.report.errors.is_empty(), "{:?}", outcome.report.errors);
+    assert!(
+        outcome.report.errors.is_empty(),
+        "{:?}",
+        outcome.report.errors
+    );
 
     let contents: Vec<String> =
         sqlx::query_scalar("SELECT content FROM notes WHERE deleted_at IS NULL")

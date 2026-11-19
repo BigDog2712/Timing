@@ -58,7 +58,11 @@ pub(crate) async fn read_day(pool: &SqlitePool, channel: PurgeChannel) -> Option
     read_kv(pool, channel_key(channel, PurgeKey::Day)).await
 }
 
-pub(crate) async fn write_day(pool: &SqlitePool, channel: PurgeChannel, today: &str) -> AppResult<()> {
+pub(crate) async fn write_day(
+    pool: &SqlitePool,
+    channel: PurgeChannel,
+    today: &str,
+) -> AppResult<()> {
     set_kv(pool, channel_key(channel, PurgeKey::Day), today).await
 }
 
@@ -74,13 +78,15 @@ pub(crate) async fn write_upto(
     channel: PurgeChannel,
     date: NaiveDate,
 ) -> AppResult<()> {
-    set_kv(pool, channel_key(channel, PurgeKey::Upto), &date.to_string()).await
+    set_kv(
+        pool,
+        channel_key(channel, PurgeKey::Upto),
+        &date.to_string(),
+    )
+    .await
 }
 
-pub(crate) async fn read_state(
-    pool: &SqlitePool,
-    channel: PurgeChannel,
-) -> AppResult<PurgeState> {
+pub(crate) async fn read_state(pool: &SqlitePool, channel: PurgeChannel) -> AppResult<PurgeState> {
     let raw = read_kv(pool, channel_key(channel, PurgeKey::State)).await;
     Ok(raw
         .as_deref()

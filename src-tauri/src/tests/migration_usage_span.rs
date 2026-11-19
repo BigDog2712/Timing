@@ -21,10 +21,7 @@ async fn upgrade_with(tag: &str, seed: &[&str]) -> SqlitePool {
     let dir = unique_dir(tag);
     let pool = db::init_pool(&dir).await.expect("首次建库应成功");
     for sql in seed {
-        sqlx::query(sql)
-            .execute(&pool)
-            .await
-            .expect("造数据应成功");
+        sqlx::query(sql).execute(&pool).await.expect("造数据应成功");
     }
     /* 退回 12 = 模拟「0.12.7 的库刚升到 0.12.8」 */
     sqlx::query("UPDATE settings SET value = '12' WHERE key = 'schema.version'")
@@ -48,8 +45,19 @@ async fn current_schema_restart_preserves_usage_spans() {
     sqlx::query(OLD_FRAGMENT).execute(&pool).await.unwrap();
     for _ in 0..2 {
         crate::infra::migrate::migrate(&pool).await.unwrap();
-        assert_eq!(scalar_i64(&pool, "SELECT COUNT(*) FROM app_usage_span").await, 1);
-        assert_eq!(scalar_opt_str(&pool, "SELECT value FROM settings WHERE key = 'schema.version'").await.as_deref(), Some("16"));
+        assert_eq!(
+            scalar_i64(&pool, "SELECT COUNT(*) FROM app_usage_span").await,
+            1
+        );
+        assert_eq!(
+            scalar_opt_str(
+                &pool,
+                "SELECT value FROM settings WHERE key = 'schema.version'"
+            )
+            .await
+            .as_deref(),
+            Some("17")
+        );
     }
 }
 
@@ -62,12 +70,15 @@ async fn usage_span_purge_clears_old_fragments_and_bumps_version() {
         0,
         "0013 必须清空 app_usage_span（旧碎段与新段起点不同，会并存成一张更乱的时间轴）"
     );
-    let version = scalar_opt_str(&pool, "SELECT value FROM settings WHERE key = 'schema.version'")
-        .await
-        .expect("schema.version 应存在");
+    let version = scalar_opt_str(
+        &pool,
+        "SELECT value FROM settings WHERE key = 'schema.version'",
+    )
+    .await
+    .expect("schema.version 应存在");
     /* 0013 自己把版本推到 13，0014（同步事件流）再推到 14 —— 这里跑的是**全部**迁移，
-       所以看到的是最终值。要单独验 0013 的推进，得回到只有 0013 的那棵树。 */
-    assert_eq!(version, "16", "全部迁移跑完应包含目标隔离账本");
+    所以看到的是最终值。要单独验 0013 的推进，得回到只有 0013 的那棵树。 */
+    assert_eq!(version, "17", "全部迁移跑完应包含目标隔离账本");
 }
 
 /// 反向：聚合表**不许**跟着被清。

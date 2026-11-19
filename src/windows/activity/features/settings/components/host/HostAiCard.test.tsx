@@ -124,12 +124,13 @@ describe('AI 设置卡', () => {
     const modelSelect = document.getElementById('ai-model') as HTMLSelectElement | null;
     expect(modelSelect?.value).toBe('deepseek-reasoner');
     expect(Array.from(modelSelect?.options ?? []).map((option) => option.value)).toContain('deepseek-coder');
+    /* 提示要在「用户还没改选」时断言：改选模型会走 patch()，那条「已填入 X」就地失效必须让位。 */
+    expect(document.body.textContent).toContain('已获取 2 个模型，已填入 deepseek-reasoner');
     await act(async () => {
       if (!modelSelect) return;
       modelSelect.value = 'deepseek-coder';
       modelSelect.dispatchEvent(new Event('change', { bubbles: true }));
     });
     expect(h.aiApi.save).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain('已获取 2 个模型，已填入 deepseek-reasoner');
   });
 });

@@ -1,5 +1,7 @@
 use super::*;
-use crate::services::activity::data::sqlite_pool::{prepare_pool_schema, register_sqlite_pool, AppSqlitePool};
+use crate::services::activity::data::sqlite_pool::{
+    prepare_pool_schema, register_sqlite_pool, AppSqlitePool,
+};
 use crate::services::activity::engine::tracking::ports::{
     TRACKER_LAST_HEARTBEAT_KEY, TRACKER_LAST_SUCCESSFUL_SAMPLE_KEY,
 };

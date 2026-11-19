@@ -14,5 +14,6 @@ identifier = "activity-host-data"
 description = "Allows the activity analysis window to read the host's items and time records (read-only)."
 commands.allow = [
   "list_items",
+  "list_item_tags",
   "list_records",
 ]

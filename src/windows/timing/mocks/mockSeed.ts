@@ -104,6 +104,10 @@ export interface MockState {
   reference: ReferenceSettings;
   /* [0.13.x] 事项 ↔ 应用绑定（`item_app` 的内存态） */
   itemApps: ItemAppBinding[];
+  /* [0.12.3] 事项多标签（`items.tags` 的内存态） */
+  itemTags: Record<number, string[]>;
+  /* [0.12.4] 标签定义行（`settings` 的 `tag.def.*` 内存态）：没有事项引用的空标签 */
+  tagDefinitions: string[];
 }
 
 /** 构造初始状态（含「未归类」系统事项与示例记录） */
@@ -129,6 +133,8 @@ export function seed(): MockState {
     reminders: [],
     dailyStatus: {},
     itemApps: [],
+    itemTags: { 2: ['设计/品牌'], 3: ['工作/客户'], 4: ['工作/接口'] },
+    tagDefinitions: ['工作', '设计', '学习/考公'],
     reference: { ...REFERENCE_DEFAULTS },
   };
 }

@@ -42,6 +42,10 @@ export function normalizeTagPaths(values: string[], maximum = 32): string[] {
   const seen = new Set<string>();
   for (const value of values) {
     const path = normalizeTagPath(value);
+    /* 与 Rust `normalize_tag_paths` 对齐：空路径（`""` / `"#"` / `" / "`）直接跳过，
+       不写进结果。漏了这一步，前端会把一条空标签发给后端 / 存进草稿，
+       表现为「保存后多出一个看不见的 #」。 */
+    if (path === '') continue;
     // Match Rust's context-free Unicode lowercase behavior for final sigma.
     const key = path.toLocaleLowerCase('en-US').replace(/\u03c2/gu, '\u03c3');
     if (!seen.has(key)) {

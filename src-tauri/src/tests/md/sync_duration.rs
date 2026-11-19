@@ -12,11 +12,11 @@
 //! ③`duration` 能往返（render → parse 不失真）；
 //! ④**导入完全无视它**：改这一行不触发落库，也不能拿它当累计值。
 
+use super::sync::{at, env, Env};
+use super::sync_live::{day, pin_start};
 use crate::services;
 use crate::services::md_sync::format::{self, TimerEntry, TimerInterval};
 use crate::services::md_sync::{export, import};
-use super::sync::{at, env, Env};
-use super::sync_live::{day, pin_start};
 use crate::tests::support::{insert_saved, new_item, scalar_i64};
 
 async fn accumulated_of(env: &Env, id: i64) -> i64 {
@@ -151,7 +151,10 @@ async fn changing_another_interval_preserves_existing_real_duration() {
         .unwrap()
         .body;
     let mut entries = format::parse_timers(&baseline);
-    entries[0].intervals.push(TimerInterval::saved(at(env.date, 14, 0), at(env.date, 14, 30)));
+    entries[0].intervals.push(TimerInterval::saved(
+        at(env.date, 14, 0),
+        at(env.date, 14, 30),
+    ));
     let edited = format::render_timers(&entries);
 
     let stats = import::apply_timers(&env.pool, env.date, &baseline, &edited)

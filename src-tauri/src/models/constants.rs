@@ -41,7 +41,7 @@ pub const MD_SYNC_POLL_MIN_SECS: u64 = 60;
 pub const MD_SYNC_POLL_MAX_SECS: u64 = 86_400;
 
 /* [V0.11.19 批 1] 事件驱动 md 同步与云端三档的全部时间/数量常量（设计 §8.1）。
-   唯一出处：改这里的数字，不要到 job 里写第二份字面量；单测与变异自检也读这一份。 */
+唯一出处：改这里的数字，不要到 job 里写第二份字面量；单测与变异自检也读这一份。 */
 /// job 的观察周期（毫秒）。**不是同步周期**：它只决定「多久看一眼 SEQ / 文件」。
 pub const MD_SYNC_WAKE_TICK_MS: u64 = 200;
 /// SQL 业务写入的去抖窗口（毫秒）：窗口内多次写只跑一轮。
@@ -68,8 +68,8 @@ pub const MD_CLOUD_INTERVAL_MAX_MINUTES: u32 = 120;
 /// 定时档默认分钟数（新装与老用户首次看到都是它）；`None` 的老配置按此解释。
 pub const MD_CLOUD_INTERVAL_DEFAULT_MINUTES: u32 = 15;
 /* 下面四个是变更 A（T04）的常量。本批先在这里登记**唯一出处**（§11.2），T02/T03
-   不读写它们；`allow(dead_code)` 是刻意的——与其让 T04 在自己的文件里再写一份字面量，
-   不如先把名字钉在这里、暂时没人调用。T04 接上 `purge/` 后逐个删掉这个属性。 */
+不读写它们；`allow(dead_code)` 是刻意的——与其让 T04 在自己的文件里再写一份字面量，
+不如先把名字钉在这里、暂时没人调用。T04 接上 `purge/` 后逐个删掉这个属性。 */
 /// 「只留今天」的保留窗口（天）：0 = 只保留当天。
 #[allow(dead_code)]
 pub const MD_CLOUD_PURGE_KEEP_DAYS: i64 = 0;

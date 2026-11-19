@@ -1,14 +1,16 @@
-use crate::services::activity::data::app_settings_service;
-use crate::services::activity::data::web_activity_store::SqliteWebActivityStore;
+use crate::infra::activity::web_activity_bridge::{
+    WebActivityBridgeHttpRequest, WebActivityBridgeHttpResponse, WebActivityBridgeRuntimeState,
+};
 use crate::models::activity::events::TRACKING_DATA_CHANGED;
 use crate::models::activity::settings::WebActivitySettings;
 use crate::models::activity::tracking::TrackingDataChangedPayload;
 use crate::models::activity::web_activity::{
     BrowserActiveTabPayload, WebActivityChange, WEB_ACTIVITY_CHANGED_REASON,
 };
-use crate::services::activity::engine::web_activity::{self as web_activity_engine, WebActivityRuntimeState};
-use crate::infra::activity::web_activity_bridge::{
-    WebActivityBridgeHttpRequest, WebActivityBridgeHttpResponse, WebActivityBridgeRuntimeState,
+use crate::services::activity::data::app_settings_service;
+use crate::services::activity::data::web_activity_store::SqliteWebActivityStore;
+use crate::services::activity::engine::web_activity::{
+    self as web_activity_engine, WebActivityRuntimeState,
 };
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
@@ -178,7 +180,9 @@ async fn next_expiry_delay<R: Runtime>(app: &AppHandle<R>) -> Result<std::time::
     }
     if web_activity_engine::expire_active_segment(&store, now_ms).await? {
         emit_web_activity_changed(app, now_ms);
-        crate::services::activity::engine::tools::notify_activity_reminder_web_transition(app, None);
+        crate::services::activity::engine::tools::notify_activity_reminder_web_transition(
+            app, None,
+        );
     }
     Ok(Duration::ZERO)
 }
@@ -196,14 +200,16 @@ pub async fn get_bridge_snapshot<R: Runtime>(
         .try_state::<WebActivityBridgeRuntimeState>()
         .map(|bridge_state| bridge_state.current_settings());
     if bridge_runtime_current.as_ref() != Some(&bridge_settings) {
-        return Ok(crate::models::activity::web_activity::WebActivityBridgeSnapshot {
-            enabled: settings.enabled,
-            connected: false,
-            browser_client_id: None,
-            browser_kind: None,
-            extension_version: None,
-            last_activity_at_ms: None,
-        });
+        return Ok(
+            crate::models::activity::web_activity::WebActivityBridgeSnapshot {
+                enabled: settings.enabled,
+                connected: false,
+                browser_client_id: None,
+                browser_kind: None,
+                extension_version: None,
+                last_activity_at_ms: None,
+            },
+        );
     }
 
     Ok(state.snapshot(&settings, crate::app::activity::runtime::now_ms() as i64))

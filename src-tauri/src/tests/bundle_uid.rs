@@ -62,7 +62,9 @@ async fn an_item_without_uid_gets_a_stable_synthetic_uid() {
     assert_eq!(
         support::scalar_i64(
             &target,
-            &format!("SELECT COUNT(*) FROM items WHERE uid = '{expected}' AND device_id = '{DEVICE}'"),
+            &format!(
+                "SELECT COUNT(*) FROM items WHERE uid = '{expected}' AND device_id = '{DEVICE}'"
+            ),
         )
         .await,
         1,
@@ -80,16 +82,27 @@ async fn an_item_without_uid_gets_a_stable_synthetic_uid() {
     let second = import_full_bundle(&target, &target_activity, &path)
         .await
         .expect("第二次导入应成功");
-    assert_eq!(second.total_inserted, 0, "第二次不应再插行：{:?}", second.tables);
-    assert_eq!(second.total_updated, 0, "第二次不应再改行：{:?}", second.tables);
+    assert_eq!(
+        second.total_inserted, 0,
+        "第二次不应再插行：{:?}",
+        second.tables
+    );
+    assert_eq!(
+        second.total_updated, 0,
+        "第二次不应再改行：{:?}",
+        second.tables
+    );
     assert_eq!(
         support::scalar_i64(&target, "SELECT COUNT(*) FROM items").await,
         rows_before,
         "重复导入不许长出新事项"
     );
     assert_eq!(
-        support::scalar_i64(&target, &format!("SELECT COUNT(*) FROM items WHERE uid = '{expected}'"))
-            .await,
+        support::scalar_i64(
+            &target,
+            &format!("SELECT COUNT(*) FROM items WHERE uid = '{expected}'")
+        )
+        .await,
         1,
         "合成 uid 必须是确定值（重复导入不变）"
     );
@@ -131,7 +144,7 @@ async fn a_row_without_a_surrogate_id_degrades_to_insert_or_ignore() {
         "那一行必须被处理过：{stat:?}"
     );
     /* 没有 id 就没有确定性的合成输入 ⇒ uid 仍然是空（本机 device_id 也是空串，
-       连触发器都不会发放 uid）。**这是已知退化**：真实包不会走到这里。 */
+    连触发器都不会发放 uid）。**这是已知退化**：真实包不会走到这里。 */
     assert_eq!(
         support::scalar_i64(
             &target,

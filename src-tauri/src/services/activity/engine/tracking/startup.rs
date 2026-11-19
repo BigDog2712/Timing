@@ -1,8 +1,10 @@
 use super::ports::{TrackingDataError, TrackingDataStore};
+use crate::infra::activity::windows::foreground as tracker;
 use crate::models::activity::events::TRACKING_DATA_CHANGED;
 use crate::models::activity::tracking::resolve_interrupted_session_end;
-use crate::models::activity::tracking::{TrackingDataChangedPayload, TRACKING_REASON_STARTUP_SEALED};
-use crate::infra::activity::windows::foreground as tracker;
+use crate::models::activity::tracking::{
+    TrackingDataChangedPayload, TRACKING_REASON_STARTUP_SEALED,
+};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 const DEFAULT_AFK_THRESHOLD_SECS: u64 = 180;

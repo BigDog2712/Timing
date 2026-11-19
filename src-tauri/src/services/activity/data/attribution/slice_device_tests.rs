@@ -65,7 +65,12 @@ fn an_override_changes_the_category_but_not_the_device() {
         category_key: Some("moyu".to_string()),
         excluded: false,
     }];
-    let segments = slice_block(&block, &facts, &categories(&[("chrome", &["game"])]), &overrides);
+    let segments = slice_block(
+        &block,
+        &facts,
+        &categories(&[("chrome", &["game"])]),
+        &overrides,
+    );
     assert_eq!(segments[0].category_key, "moyu");
     assert_eq!(segments[0].device_id, "phone-2");
 }

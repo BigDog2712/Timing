@@ -1,5 +1,5 @@
-use crate::services::activity::data::repositories::classification_settings::load_classification_snapshot;
 use crate::models::activity::classification::ClassificationSnapshot;
+use crate::services::activity::data::repositories::classification_settings::load_classification_snapshot;
 use chrono::{DateTime, Datelike, Timelike};
 use sqlx::{Pool, Row, Sqlite};
 use std::collections::HashSet;
@@ -162,7 +162,9 @@ pub fn anonymous_field_value(
         .into(),
         "category_id" | "source_key" => "anonymous".into(),
         "category" | "source_name" => crate::models::activity::localization::text(
-            crate::models::activity::localization::Locale::from_tag(Some(classification.language())),
+            crate::models::activity::localization::Locale::from_tag(Some(
+                classification.language(),
+            )),
             "native.export.anonymousActivity",
         ),
         "category_color" => "#8F98A8".into(),

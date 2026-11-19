@@ -65,4 +65,12 @@ commands.allow = [
   # `run_handle_custom_action` 拒掉（`CUSTOM_ACTION_DENIED`），用户会以为选错了程序。
   # 注意本文件**不**放 `run_handle_custom_action`：执行面只有主窗（药丸手柄）需要。
   "pick_custom_launch_target",
+  # [0.12.3] AI 设置卡（地址/模型/密钥/今日汇总）。密钥只在宿主侧落 DPAPI/Keystore，
+  # 分析窗拿到的永远只是 `hasKey` 布尔；这六条只服务设置页，不进 `activity-window-commands`。
+  "ai_config_get",
+  "ai_config_save",
+  "ai_test",
+  "ai_list_models",
+  "ai_suggest_tags",
+  "ai_daily_summary",
 ]

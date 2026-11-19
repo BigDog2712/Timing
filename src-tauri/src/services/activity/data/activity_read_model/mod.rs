@@ -8,19 +8,19 @@ mod worker;
 pub(crate) use hourly::load_range_in_tx;
 pub(crate) use worker::{spawn_background_worker, wake_worker, ReadModelWake};
 /* 后台维护的调度器只被用例实例化（生产侧由 `spawn_background_worker` 自己持有），
-   所以回挂成 `#[cfg(test)]`，否则 lib 构建会报 unused import。 */
+所以回挂成 `#[cfg(test)]`，否则 lib 构建会报 unused import。 */
+use buckets::{aggregate_records_into_boundaries, validate_aggregate_boundaries};
 #[cfg(test)]
 pub(crate) use worker::{record_maintenance_failure, MaintenanceSchedule};
-use buckets::{aggregate_records_into_boundaries, validate_aggregate_boundaries};
 
 #[cfg(test)]
 mod app_key_equivalence_tests;
 #[cfg(test)]
 mod bucket_union_tests;
 #[cfg(test)]
-mod daily_tests;
-#[cfg(test)]
 mod contention_tests;
+#[cfg(test)]
+mod daily_tests;
 #[cfg(test)]
 mod name_enrichment_tests;
 
@@ -30,15 +30,15 @@ use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
 use crate::services::activity::data::sqlite_pool::optimize_query_statistics;
 use serde::{Deserialize, Serialize};
 /* 只给 `mod_mod_tests` 用（它经 `use super::*` 取）：测试文件已冻结在行数上，
-   搬出去的桶裁剪函数不再需要它，但用例里还在用它做对照表。 */
+搬出去的桶裁剪函数不再需要它，但用例里还在用它做对照表。 */
 #[cfg(test)]
 use std::collections::BTreeMap;
 /* 只给 `contention_tests` 用（它经 `use super::*` 取）：`Duration` 原本是 `mod.rs`
-   自己的导入，后台维护搬走之后 lib 构建不需要它了。 */
-#[cfg(test)]
-use tokio::time::Duration;
+自己的导入，后台维护搬走之后 lib 构建不需要它了。 */
 use sqlx::{Pool, Row, Sqlite};
 use tauri::{AppHandle, Runtime};
+#[cfg(test)]
+use tokio::time::Duration;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -182,7 +182,7 @@ pub async fn load_activity_aggregate_range<R: Runtime>(
     }
     if let Some(boundaries) = bucket_boundaries_ms {
         /* 并集要在**未聚合**的 records 上算：`aggregate_records_into_boundaries` 把每条
-           压成「起点 = 桶起点」，位置一丢就再也分不清「两台机器各 30 分钟」与「叠着 30 分钟」。 */
+        压成「起点 = 桶起点」，位置一丢就再也分不清「两台机器各 30 分钟」与「叠着 30 分钟」。 */
         response.bucket_union_ms =
             facts::bucket_unions(&pool, start_ms, end_ms, &boundaries, &response.records).await?;
         response.records =

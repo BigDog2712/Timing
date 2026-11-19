@@ -7,13 +7,15 @@ use crate::services::identity;
 
 use super::apply::apply_and_fold;
 use super::repository;
-use super::segment::{decode_segment, segment_path};
+use super::segment::{decode_segment, format_seq, segment_dir};
 use super::transport::Transport;
 use super::PullSummary;
+use super::{scope, streams};
+use std::collections::BTreeSet;
 
 /// 下载：发现对端设备 → 逐台 GET 顺号探测分段 → 解析 → [`apply_and_fold`] → 推进游标。
 ///
-/// `device_id` 是本机身份：列举 `sync/events/` 时把自己的目录跳过（自己不 pull 自己）。
+/// `device_id` 是本机身份：列举旧 `sync/events/` 与新 `sync/streams/` 时都跳过自己的目录。
 pub async fn pull_segments(
     pool: &SqlitePool,
     transport: &Transport,
@@ -26,25 +28,66 @@ pub async fn pull_segments(
 
     let scope = match transport.scope() {
         Ok(scope) => scope,
-        Err(err) => { summary.errors.push(err); return Ok(summary); }
-    };
-    let children = match transport.list_children("sync/events").await {
-        Ok(names) => names,
         Err(err) => {
             summary.errors.push(err);
             return Ok(summary);
         }
     };
-    let peers = peers_of(&children, device_id, &mut summary);
-    summary.peers = peers.len();
-
-    for peer in peers {
-        pull_one_peer(pool, transport, &scope, &peer, &mut summary).await?;
+    let mut seen = BTreeSet::new();
+    for root in ["sync/events", streams::ROOT] {
+        let children = match transport.list_children(root).await {
+            Ok(names) => names,
+            Err(err) => {
+                summary.errors.push(err);
+                continue;
+            }
+        };
+        for peer in peers_of(&children, device_id, root, &mut summary) {
+            seen.insert(peer.clone());
+            if root == "sync/events" {
+                pull_one_peer(
+                    pool,
+                    transport,
+                    &scope,
+                    &peer,
+                    &segment_dir(&peer),
+                    &mut summary,
+                )
+                .await?;
+                continue;
+            }
+            let writers = match transport.list_children(&format!("{root}/{peer}")).await {
+                Ok(names) => names,
+                Err(err) => {
+                    summary.errors.push(err);
+                    continue;
+                }
+            };
+            for writer in writers {
+                if !streams::valid_writer(&writer) {
+                    summary.warnings.push(format!(
+                        "同步目录 {root}/{peer} 里有无效写入流 {writer}：已跳过"
+                    ));
+                    continue;
+                }
+                let ledger = scope::download(&scope, &writer);
+                pull_one_peer(
+                    pool,
+                    transport,
+                    &ledger,
+                    &peer,
+                    &streams::dir(&peer, &writer),
+                    &mut summary,
+                )
+                .await?;
+            }
+        }
     }
+    summary.peers = seen.len();
     Ok(summary)
 }
 
-/// 从 `sync/events/` 的子项里挑出**合法**的对端设备目录。
+/// 从同步根目录的子项里挑出**合法**的对端设备目录。
 ///
 /// 只收 [`identity::is_valid`] 认得的 12 位小写 hex（评审 P2-1）。原文直接把「名字不是
 /// 本机」的项当 peer，再拿它拼 URL —— 名字里带 `?` / `#` 的目录会被按 query / fragment
@@ -62,7 +105,12 @@ pub async fn pull_segments(
 /// 「目录里有个杂项」是**看得见就行**的事，「本轮同步失败」是**要退避**的事，两者不能共用
 /// 一个字段。杂项落 `warnings`，照旧点名，并且带上完整子项列表 —— 下次再冒出别的怪名字，
 /// 日志里能直接看出它是从哪来的。
-fn peers_of(children: &[String], device_id: &str, summary: &mut PullSummary) -> Vec<String> {
+fn peers_of(
+    children: &[String],
+    device_id: &str,
+    root: &str,
+    summary: &mut PullSummary,
+) -> Vec<String> {
     let mut peers = Vec::new();
     for name in children {
         if name == device_id {
@@ -70,7 +118,7 @@ fn peers_of(children: &[String], device_id: &str, summary: &mut PullSummary) -> 
         }
         if !identity::is_valid(name) {
             summary.warnings.push(format!(
-                "同步目录 sync/events/ 里有一项不是设备 id（{name}）：已跳过，其它设备照常同步"
+                "同步目录 {root}/ 里有一项不是设备 id（{name}）：已跳过，其它设备照常同步"
             ));
             crate::log_warn!(
                 "sync stream pull: skip non-device dir {name}（全部子项 {children:?}）"
@@ -88,6 +136,7 @@ async fn pull_one_peer(
     transport: &Transport,
     scope: &str,
     peer: &str,
+    dir: &str,
     summary: &mut PullSummary,
 ) -> AppResult<()> {
     let cursor = repository::get(pool, scope, peer).await?;
@@ -97,14 +146,18 @@ async fn pull_one_peer(
 
     /* GET 顺号探测：seq 稠密单调，读到 404 即追平（见模块头）。 */
     loop {
-        let rel = segment_path(peer, seq as u32);
+        let Ok(sequence) = u32::try_from(seq) else {
+            summary.errors.push(format!("写入流 {dir} 分段序号已用尽"));
+            break;
+        };
+        let rel = format!("{dir}/{}.jsonl", format_seq(sequence));
         match transport.get(&rel).await {
             Ok(Some(bytes)) => {
                 summary.segments += 1;
                 /* 解码 / 折叠失败**一律不推进游标**，直接结束这台设备的本轮。
-                   一旦把游标推过去，这一段里的事件就再也不会被重拉：对端会话永久缺一条
-                   `stop`，而本地表现只是「少了几条记录」——没有任何报错。
-                   设计文档 §4.4「永不自动丢弃」落到事件流这条路径，就是这一个 `break`。 */
+                一旦把游标推过去，这一段里的事件就再也不会被重拉：对端会话永久缺一条
+                `stop`，而本地表现只是「少了几条记录」——没有任何报错。
+                设计文档 §4.4「永不自动丢弃」落到事件流这条路径，就是这一个 `break`。 */
                 let ops = match decode_segment(&bytes) {
                     Ok(ops) => ops,
                     Err(err) => {
@@ -116,6 +169,12 @@ async fn pull_one_peer(
                         break;
                     }
                 };
+                if ops.is_empty() || ops.iter().any(|op| op.device_id != peer) {
+                    summary
+                        .errors
+                        .push(format!("分段 {rel} 为空或包含其它设备事件，游标不推进"));
+                    break;
+                }
                 match apply_segment(pool, scope, &rel, &ops, peer, seq, last_op_id).await {
                     Ok(applied) => {
                         summary.events += ops.len();

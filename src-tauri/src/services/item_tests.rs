@@ -203,11 +203,12 @@ fn a_blank_category_is_stored_as_null() {
         .await
         .unwrap()
         .id;
-        let stored: Option<String> = sqlx::query_scalar("SELECT category_key FROM items WHERE id = ?1")
-            .bind(id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+        let stored: Option<String> =
+            sqlx::query_scalar("SELECT category_key FROM items WHERE id = ?1")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(stored, None);
     });
 }

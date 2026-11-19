@@ -6,9 +6,16 @@
 //! 桩只回 `IO_ERROR`（见 `platform::host::desktop_only`），不新增错误码。
 
 pub mod countdown_cmd;
+/* [0.12.3] AI（配置 / 测试 / 标签建议 / 今日汇总）。桌面真实实现 / 手机桩：
+传输库只在桌面依赖段，命令名与注册点两平台一致。 */
+#[cfg(desktop)]
+pub mod ai_cmd;
+#[cfg(mobile)]
+#[path = "ai_cmd_mobile.rs"]
+pub mod ai_cmd;
 /* [0.13] 「绑定的应用进程退出 → 结束这一段自动接管开出来的计时」。
-   桌面真实实现（Win32 句柄 + 阻塞等待）／手机桩（`Ok(())`，安卓没有前台应用概念）。
-   同 `window_cmd` 的 `#[cfg] + #[path]` 手法：模块名与函数名一字不变，命令名不变。 */
+桌面真实实现（Win32 句柄 + 阻塞等待）／手机桩（`Ok(())`，安卓没有前台应用概念）。
+同 `window_cmd` 的 `#[cfg] + #[path]` 手法：模块名与函数名一字不变，命令名不变。 */
 #[cfg(desktop)]
 pub mod bound_process_watch_cmd;
 #[cfg(mobile)]
@@ -22,7 +29,15 @@ pub mod category_catalog_cmd;
 #[cfg(mobile)]
 #[path = "category_catalog_cmd_mobile.rs"]
 pub mod category_catalog_cmd;
+#[cfg(desktop)]
+#[path = "category_propagation_cmd.rs"]
+pub mod category_propagation_cmd;
+#[cfg(mobile)]
+#[path = "category_propagation_cmd_mobile.rs"]
+pub mod category_propagation_cmd;
 pub mod item_cmd;
+/* [0.12.3] 事项多标签（`items.tags`）。两端都有：标签列在业务库里，手机也读得到。 */
+pub mod item_tag_cmd;
 /* [0.13.x] 事项 ↔ 应用绑定域。 */
 pub mod item_app_cmd;
 pub mod migration_cmd;
@@ -63,10 +78,10 @@ pub mod mobile_cmd;
 
 #[cfg(desktop)]
 pub mod system_cmd;
-pub mod usage_cmd;
 #[cfg(mobile)]
 #[path = "system_cmd_mobile.rs"]
 pub mod system_cmd;
+pub mod usage_cmd;
 
 #[cfg(desktop)]
 pub mod window_cmd;

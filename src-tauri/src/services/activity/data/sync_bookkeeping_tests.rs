@@ -30,7 +30,7 @@ fn registered_head_is_the_sync_bookkeeping_version() {
         .max()
         .unwrap_or_default();
     assert_eq!(head, schema_registry::head_version());
-    assert_eq!(head, 30, "这一轮把 head 抬到了事项归属（30）");
+    assert_eq!(head, 31, "这一轮把 head 抬到了媒体播放采样（31）");
 }
 
 /// 本轮**不同步** `time_records`（`items` 未过桥 ⇒ `itemId` 跨设备悬空）。
@@ -62,10 +62,13 @@ fn fresh_database_reaches_sync_bookkeeping_head() {
             "trg_sessions_touch_update",
             "trg_sessions_tombstone",
         ] {
-            assert!(trigger_exists(&pool, trigger).await, "missing trigger {trigger}");
+            assert!(
+                trigger_exists(&pool, trigger).await,
+                "missing trigger {trigger}"
+            );
         }
         assert!(index_exists(&pool, "idx_sessions_updated").await);
-        assert_eq!(applied_head(&pool).await, 30);
+        assert_eq!(applied_head(&pool).await, 31);
     });
 }
 
@@ -77,11 +80,17 @@ fn inserting_and_updating_a_session_stamps_updated_at_ms() {
         let id = insert_session(&pool, &self_device_id(&pool).await, 1_000).await;
 
         let stamped = updated_at(&pool, id).await;
-        assert!(stamped > 0, "insert trigger must stamp updated_at_ms, got {stamped}");
+        assert!(
+            stamped > 0,
+            "insert trigger must stamp updated_at_ms, got {stamped}"
+        );
 
         set_updated_at(&pool, id, 0).await;
         touch_title(&pool, id, "changed").await;
-        assert!(updated_at(&pool, id).await > 0, "update trigger must re-stamp");
+        assert!(
+            updated_at(&pool, id).await > 0,
+            "update trigger must re-stamp"
+        );
     });
 }
 
@@ -160,7 +169,11 @@ fn re_deleting_the_same_uid_updates_the_existing_tombstone() {
             .unwrap();
         delete_session(&pool, again).await;
 
-        assert_eq!(tombstone_count(&pool).await, 1, "conflict must not add a row");
+        assert_eq!(
+            tombstone_count(&pool).await,
+            1,
+            "conflict must not add a row"
+        );
         assert!(
             tombstone_deleted_at(&pool, &uid).await >= first_deleted_at,
             "deleted_at_ms must not go backwards"
@@ -186,7 +199,11 @@ fn suppressed_deletes_do_not_write_tombstones() {
             .await
             .unwrap();
         delete_session(&pool, suppressed).await;
-        assert_eq!(tombstone_count(&pool).await, 0, "suppressed delete must stay silent");
+        assert_eq!(
+            tombstone_count(&pool).await,
+            0,
+            "suppressed delete must stay silent"
+        );
 
         sqlx::query("DELETE FROM sync_suppress WHERE uid = ?1")
             .bind(&suppressed_uid)
@@ -195,7 +212,11 @@ fn suppressed_deletes_do_not_write_tombstones() {
             .unwrap();
         let local = insert_session(&pool, &device_id, 3_000).await;
         delete_session(&pool, local).await;
-        assert_eq!(tombstone_count(&pool).await, 1, "local delete must record again");
+        assert_eq!(
+            tombstone_count(&pool).await,
+            1,
+            "local delete must record again"
+        );
     });
 }
 
@@ -219,7 +240,10 @@ fn deleting_a_session_still_marks_the_read_model_dirty() {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert!(dirty >= 1, "read model must stay dirty after a delete, got {dirty}");
+        assert!(
+            dirty >= 1,
+            "read model must stay dirty after a delete, got {dirty}"
+        );
     });
 }
 
@@ -240,7 +264,7 @@ fn file_backed_pool_reaches_the_same_head() {
             .await
             .unwrap();
         prepare_pool_schema(&pool, &db_path).await.unwrap();
-        assert_eq!(applied_head(&pool).await, 30);
+        assert_eq!(applied_head(&pool).await, 31);
         assert_eq!(sync_tombstone_rows(&pool).await, 0);
         pool.close().await;
         let _ = std::fs::remove_dir_all(&dir);

@@ -8,15 +8,15 @@ use super::startup;
 use super::sustained_participation::SustainedParticipationRuntimeState;
 use super::title_state::TitleRecordingRuntimeState;
 use super::{active_session, continuity, transition, watchdog};
-#[cfg(test)]
-use crate::services::activity::data::repositories::{sessions, tracker_settings};
+use crate::infra::activity::windows::foreground as tracker;
+use crate::models::activity::events::ACTIVE_WINDOW_CHANGED;
 #[cfg(test)]
 use crate::models::activity::tracking::TrackingDataChangedPayload;
-use crate::models::activity::events::ACTIVE_WINDOW_CHANGED;
 use crate::models::activity::tracking::TrackingStatusSnapshot;
 #[cfg(test)]
 use crate::models::activity::tracking::TRACKING_REASON_TRACKING_PAUSED_SEALED;
-use crate::infra::activity::windows::foreground as tracker;
+#[cfg(test)]
+use crate::services::activity::data::repositories::{sessions, tracker_settings};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tokio::time::{sleep, Duration};
@@ -317,7 +317,10 @@ pub async fn run<R: Runtime>(
         if did_change_active_window {
             /* 快照未发布时**不推进** `last_emitted_window`：推进了这次变化就永久丢（下一轮判否不再发） */
             if let Some(snapshot) = snapshot_state.snapshot() {
-                if support::should_emit_active_window(snapshot.window.process_id, std::process::id()) {
+                if support::should_emit_active_window(
+                    snapshot.window.process_id,
+                    std::process::id(),
+                ) {
                     let _ = app.emit(ACTIVE_WINDOW_CHANGED, &snapshot.window);
                 }
                 last_emitted_window = Some(window_info.clone());

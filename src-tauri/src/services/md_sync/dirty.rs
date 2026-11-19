@@ -39,7 +39,7 @@ fn code_of(reason: &str) -> u8 {
         "note" => 2,
         "item" => 3,
         /* `record` 与未知值都归到记录域：恢复备份（`md_backup_restore`）写的也是
-           `time_records` / `todos` / `notes`，用记录域的口径不会撒谎。 */
+        `time_records` / `todos` / `notes`，用记录域的口径不会撒谎。 */
         _ => 4,
     }
 }
@@ -74,9 +74,9 @@ mod tests {
     use super::{last_reason, last_write_ms, mark, seq};
 
     /* 这两条用例读写的是进程级全局原子量（SEQ / LAST_REASON），而 cargo test 默认把
-       同一模块内的用例放到多线程并行跑。不加锁时 A 的 `mark → assert` 之间会插进 B 的
-       `mark`，偶发出现「序号 +3」或「reason 串台」的红。生产代码是刻意的全局单例，
-       语义不能改，只在测试侧串行化这两段；持锁跨整个「写 + 读」序列才有效。 */
+    同一模块内的用例放到多线程并行跑。不加锁时 A 的 `mark → assert` 之间会插进 B 的
+    `mark`，偶发出现「序号 +3」或「reason 串台」的红。生产代码是刻意的全局单例，
+    语义不能改，只在测试侧串行化这两段；持锁跨整个「写 + 读」序列才有效。 */
     static GLOBAL_STATE_LOCK: Mutex<()> = Mutex::new(());
 
     fn lock() -> MutexGuard<'static, ()> {

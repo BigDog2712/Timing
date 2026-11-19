@@ -1,8 +1,18 @@
-use crate::services::activity::data::repositories::{icon_cache::acquire_icon_cache_maintenance, icon_retention};
+use crate::services::activity::data::repositories::{
+    icon_cache::acquire_icon_cache_maintenance, icon_retention,
+};
 use crate::services::activity::data::sqlite_error::SqliteOperationError;
 use crate::services::activity::data::sqlite_pool::run_recoverable_sqlite_write;
 use sqlx::{Pool, Sqlite};
 use tauri::{AppHandle, Runtime};
+
+#[path = "user_data_maintenance_support.rs"]
+mod support;
+
+use support::{
+    apps_in_deletion, cache_error, delete_app_samples_by_exe_names, in_clause_placeholders,
+    non_empty_values,
+};
 
 pub async fn delete_sessions_before<R: Runtime>(
     app: &AppHandle<R>,
@@ -121,7 +131,9 @@ async fn delete_web_activity_by_domain_in_pool(
         let key = crate::models::activity::web_links::group_key(&target.domain);
         let current: std::collections::BTreeSet<_> = domains
             .into_iter()
-            .filter(|domain| crate::models::activity::web_links::resolve_owner(domain, &rules) == key)
+            .filter(|domain| {
+                crate::models::activity::web_links::resolve_owner(domain, &rules) == key
+            })
             .collect();
         let expected: std::collections::BTreeSet<_> = target.members.iter().cloned().collect();
         if current != expected || expected.len() != target.members.len() {
@@ -151,37 +163,6 @@ async fn delete_web_activity_by_domain_in_pool(
             .map_err(cache_error)?;
     }
     tx.commit().await.map_err(cache_error)
-}
-
-fn non_empty_values(values: Vec<String>) -> Vec<String> {
-    values
-        .into_iter()
-        .filter(|value| !value.trim().is_empty())
-        .collect()
-}
-
-fn in_clause_placeholders(value_count: usize) -> String {
-    std::iter::repeat_n("?", value_count)
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
-fn cache_error(error: sqlx::Error) -> SqliteOperationError {
-    SqliteOperationError::from_sqlx("clean unreferenced activity icons", error)
-}
-
-async fn apps_in_deletion(
-    tx: &mut sqlx::Transaction<'_, Sqlite>,
-    names: &[String],
-    range: Option<(i64, i64)>,
-) -> Result<Vec<String>, SqliteOperationError> {
-    sqlx::query_scalar(
-        "WITH target AS (SELECT value FROM json_each(?1))
-         SELECT exe_name FROM sessions WHERE exe_name IN target AND (?2 IS NULL OR start_time >= ?2 AND start_time < ?3)
-         UNION SELECT exe_name FROM import_exact_sessions WHERE exe_name IN target AND (?2 IS NULL OR start_time >= ?2 AND start_time < ?3)
-         UNION SELECT exe_name FROM import_time_buckets WHERE exe_name IN target AND (?2 IS NULL OR bucket_start_time >= ?2 AND bucket_start_time < ?3)",
-    ).bind(serde_json::json!(names).to_string()).bind(range.map(|r| r.0)).bind(range.map(|r| r.1))
-     .fetch_all(&mut **tx).await.map_err(cache_error)
 }
 
 async fn delete_sessions_before_in_pool(
@@ -225,6 +206,15 @@ async fn delete_sessions_before_in_pool(
         .execute(&mut *tx)
         .await
         .map_err(|error| SqliteOperationError::from_sqlx("delete historical sessions", error))?;
+    /* 媒体时间线不挂 session_id（一次播放可以跨多个前台会话），所以只能按自己的时间列
+       清理。留在这里等于：用户设了「保留 30 天」，播放过的标题却永久留在库里。 */
+    sqlx::query("DELETE FROM media_playback_samples WHERE start_time < ?")
+        .bind(cutoff_time)
+        .execute(&mut *tx)
+        .await
+        .map_err(|error| {
+            SqliteOperationError::from_sqlx("delete historical media playback samples", error)
+        })?;
     sqlx::query("DELETE FROM anonymous_activity WHERE start_time < ?")
         .bind(cutoff_time)
         .execute(&mut *tx)
@@ -281,17 +271,7 @@ async fn delete_sessions_by_exe_names_in_pool(
     let named = icon_retention::named_reminder_apps(&mut tx)
         .await
         .map_err(cache_error)?;
-    let title_query = format!(
-        "DELETE FROM session_title_samples
-         WHERE session_id IN (SELECT id FROM sessions WHERE exe_name IN ({placeholders}))"
-    );
-    let mut title_query = sqlx::query(&title_query);
-    for exe_name in exe_names {
-        title_query = title_query.bind(exe_name);
-    }
-    title_query.execute(&mut *tx).await.map_err(|error| {
-        SqliteOperationError::from_sqlx("delete app title samples by executable", error)
-    })?;
+    delete_app_samples_by_exe_names(&mut tx, exe_names).await?;
 
     for (table, operation) in [
         ("sessions", "delete native app records by executable"),
@@ -589,9 +569,9 @@ mod tests {
 
     #[tokio::test]
     async fn deleted_web_domains_keep_preferences_without_recreating_history() {
-        use crate::services::activity::data::repositories::{settings, web_activity, web_links};
         use crate::models::activity::backup::BackupSetting;
         use crate::models::activity::web_activity::WebActivitySegmentInput;
+        use crate::services::activity::data::repositories::{settings, web_activity, web_links};
         let pool = setup_test_db().await;
         for schema in [
             db_schema::WEB_ACTIVITY_SESSION_SCHEMA_SQL,
@@ -625,9 +605,16 @@ mod tests {
             web_links::snapshot(&pool).await.unwrap().domains.is_empty(),
             "restored preferences and links alone are not recorded activity"
         );
-        crate::services::activity::data::repositories::sessions::start_session(&pool, "Chrome", "chrome.exe", "", 0, 0)
-            .await
-            .unwrap();
+        crate::services::activity::data::repositories::sessions::start_session(
+            &pool,
+            "Chrome",
+            "chrome.exe",
+            "",
+            0,
+            0,
+        )
+        .await
+        .unwrap();
         let session: i64 = sqlx::query_scalar("SELECT id FROM sessions WHERE end_time IS NULL")
             .fetch_one(&pool)
             .await
@@ -741,6 +728,10 @@ mod tests {
             .await
             .unwrap();
         pool.execute(db_schema::WEB_ACTIVITY_SCHEMA_SQL)
+            .await
+            .unwrap();
+        // 用真实迁移 DDL 建表：清理语句按真实表名删行，夹具一旦漂移这里先红。
+        pool.execute(include_str!("sql/0031_media_playback.sql"))
             .await
             .unwrap();
         pool.execute(

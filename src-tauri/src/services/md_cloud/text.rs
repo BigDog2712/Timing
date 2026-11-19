@@ -106,11 +106,9 @@ pub(crate) fn fail_text_at(stage: FailStage<'_>, err: &WebdavError, remote_dir: 
                 .into()
         }
         /* 兜底（其余 4xx、423 Locked 等）：状态码对用户零信息量，只进日志。 */
-        WebdavError::Server(_) => {
-            "WebDAV 服务拒绝了这次写入，没有给出可读的原因。\
+        WebdavError::Server(_) => "WebDAV 服务拒绝了这次写入，没有给出可读的原因。\
              请把日志里带 md cloud out 的那几行发给开发者。"
-                .into()
-        }
+            .into(),
     }
 }
 
@@ -176,12 +174,18 @@ fn non_ascii_hint(path: &str) -> &'static str {
 
 /// `/我的坚果云/Timing` → `Timing`（“新建文件夹”时用户要打的就是这一段）
 fn last_segment(level: &str) -> &str {
-    level.rsplit('/').find(|segment| !segment.is_empty()).unwrap_or(level)
+    level
+        .rsplit('/')
+        .find(|segment| !segment.is_empty())
+        .unwrap_or(level)
 }
 
 /// `parent_path("/我的坚果云/Timing", 1)` → `/我的坚果云`（与 `dir::level_path` 同源）
 fn parent_path(level: &str, ready: usize) -> String {
-    let segments: Vec<&str> = level.split('/').filter(|segment| !segment.is_empty()).collect();
+    let segments: Vec<&str> = level
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect();
     let up_to = ready.min(segments.len());
     format!("/{}", segments[..up_to].join("/"))
 }

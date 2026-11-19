@@ -23,9 +23,11 @@ fn valid_identity(key: &str) -> bool {
         && key.trim_matches('"') == key
         && !key.chars().any(char::is_control)
         && key.len() + APP_LINK_PREFIX.len() <= 256
-        && crate::models::activity::tracking::resolve_app_override_executable(key).is_some_and(|canonical| {
-            canonical == key || (!key.ends_with(".exe") && canonical == format!("{key}.exe"))
-        })
+        && crate::models::activity::tracking::resolve_app_override_executable(key).is_some_and(
+            |canonical| {
+                canonical == key || (!key.ends_with(".exe") && canonical == format!("{key}.exe"))
+            },
+        )
 }
 
 pub async fn apply_change(
@@ -99,10 +101,10 @@ pub async fn validate_in_tx(tx: &mut Transaction<'_, Sqlite>) -> Result<(), Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::activity::backup::BackupSetting;
     use crate::services::activity::data::repositories::classification_settings::{
         commit_classification_setting_mutations, ClassificationSettingMutation,
     };
-    use crate::models::activity::backup::BackupSetting;
     use sqlx::sqlite::SqlitePoolOptions;
 
     fn change(

@@ -137,7 +137,9 @@ pub(crate) async fn load_history_range_in_tx(
 
 /// 本机 `install_id`。没有 `is_self` 行时返回 `None`（前端据此不画设备泳道），
 /// 不兜底造一个假 id —— 那会让「本机」这一栏永远对不上真正的归属。
-async fn load_self_device_id(tx: &mut Transaction<'_, Sqlite>) -> Result<Option<String>, sqlx::Error> {
+async fn load_self_device_id(
+    tx: &mut Transaction<'_, Sqlite>,
+) -> Result<Option<String>, sqlx::Error> {
     sqlx::query_scalar::<_, String>(
         "SELECT install_id FROM devices WHERE is_self = 1 ORDER BY last_seen_ms DESC LIMIT 1",
     )

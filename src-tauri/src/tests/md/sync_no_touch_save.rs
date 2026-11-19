@@ -23,7 +23,7 @@
 //! PRD B4 的例子是两档，但如果只是「两档不同」，统一到显示值只毁掉一档；三档全不同时
 //! 任何一次误扇出都会同时改掉两档，判据更灵敏。
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sqlx::SqlitePool;
 
 use crate::models::md_sync_config::MdSyncConfig;
@@ -67,9 +67,14 @@ fn legacy_config_json() -> String {
 }
 
 async fn seed(pool: &SqlitePool, raw: &str) {
-    settings::set_value(pool, config::CONFIG_KEY, raw, crate::platform::clock::now_ms())
-        .await
-        .expect("写入老配置应成功");
+    settings::set_value(
+        pool,
+        config::CONFIG_KEY,
+        raw,
+        crate::platform::clock::now_ms(),
+    )
+    .await
+    .expect("写入老配置应成功");
 }
 
 /// 读 `settings` 表里那段 JSON 的 `bindings[i][field]`（逐字段比，不整串比）。
@@ -105,13 +110,33 @@ async fn a_no_touch_save_keeps_every_binding_file_and_root() {
     let saved = persisted(&pool).await;
     assert_eq!(saved["bindings"].as_array().map(Vec::len), Some(3));
 
-    assert_eq!(field_of(&saved, 0, "file"), TIMERS_FILE, "计时档的 file 被改了");
-    assert_eq!(field_of(&saved, 1, "file"), NOTES_FILE, "便利贴档的 file 被统一掉了");
-    assert_eq!(field_of(&saved, 2, "file"), TODOS_FILE, "待办档的 file 被统一掉了");
+    assert_eq!(
+        field_of(&saved, 0, "file"),
+        TIMERS_FILE,
+        "计时档的 file 被改了"
+    );
+    assert_eq!(
+        field_of(&saved, 1, "file"),
+        NOTES_FILE,
+        "便利贴档的 file 被统一掉了"
+    );
+    assert_eq!(
+        field_of(&saved, 2, "file"),
+        TODOS_FILE,
+        "待办档的 file 被统一掉了"
+    );
 
     assert_eq!(field_of(&saved, 0, "root"), TIMERS_ROOT);
-    assert_eq!(field_of(&saved, 1, "root"), NOTES_ROOT, "便利贴档的 root 被统一掉了");
-    assert_eq!(field_of(&saved, 2, "root"), TODOS_ROOT, "待办档的 root 被统一掉了");
+    assert_eq!(
+        field_of(&saved, 1, "root"),
+        NOTES_ROOT,
+        "便利贴档的 root 被统一掉了"
+    );
+    assert_eq!(
+        field_of(&saved, 2, "root"),
+        TODOS_ROOT,
+        "待办档的 root 被统一掉了"
+    );
 }
 
 /// 同一件事的**另一半**：`config::load` 不许在三档不全相同时替用户挑一个值。
@@ -125,8 +150,16 @@ async fn loading_a_mixed_config_does_not_flatten_it() {
     seed(&pool, &legacy_config_json()).await;
 
     let loaded = config::load(&pool).await.expect("读取配置应成功");
-    let files: Vec<&str> = loaded.bindings.iter().map(|item| item.file.as_str()).collect();
-    let roots: Vec<&str> = loaded.bindings.iter().map(|item| item.root.as_str()).collect();
+    let files: Vec<&str> = loaded
+        .bindings
+        .iter()
+        .map(|item| item.file.as_str())
+        .collect();
+    let roots: Vec<&str> = loaded
+        .bindings
+        .iter()
+        .map(|item| item.root.as_str())
+        .collect();
 
     assert_eq!(files, vec![TIMERS_FILE, NOTES_FILE, TODOS_FILE]);
     assert_eq!(roots, vec![TIMERS_ROOT, NOTES_ROOT, TODOS_ROOT]);

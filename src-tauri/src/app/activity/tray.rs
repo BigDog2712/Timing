@@ -1,16 +1,16 @@
 use crate::app::activity::main_window;
 use crate::app::activity::runtime::now_ms;
 use crate::app::activity::state::{AppExitState, BackgroundEntryState, DesktopBehaviorState};
-use crate::services::activity::data::app_settings_service::{self, AppSettingMutation};
-use crate::services::activity::data::tracking_pause_service;
+use crate::infra::activity::windows::tray_icon_theme::{self, TaskbarTheme, TaskbarThemeWatcher};
 use crate::models::activity::events::APP_SETTINGS_CHANGED;
 use crate::models::activity::localization::{Locale, LocalizationState};
 use crate::models::activity::settings::DesktopBehaviorSettings;
+use crate::services::activity::data::app_settings_service::{self, AppSettingMutation};
+use crate::services::activity::data::tracking_pause_service;
 use crate::services::activity::engine::tracking::{
     pause_state::TrackingPauseRuntimeState, runtime as tracking_runtime,
     title_state::TitleRecordingRuntimeState,
 };
-use crate::infra::activity::windows::tray_icon_theme::{self, TaskbarTheme, TaskbarThemeWatcher};
 use std::sync::{Mutex, MutexGuard};
 use tauri::{
     image::Image,

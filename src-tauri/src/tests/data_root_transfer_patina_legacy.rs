@@ -21,7 +21,11 @@ use crate::tests::support;
 
 /// 造一个「旧版搬过、`patina/data` 留在旧根」的现场：`appdata` 里的指针
 /// `dataDir = current`、`previous = legacy`。
-fn pointer_pointing_back(appdata: &std::path::Path, current: &std::path::Path, legacy: &std::path::Path) {
+fn pointer_pointing_back(
+    appdata: &std::path::Path,
+    current: &std::path::Path,
+    legacy: &std::path::Path,
+) {
     std::fs::create_dir_all(appdata).expect("建 appdata");
     root_pointer::write(
         appdata,

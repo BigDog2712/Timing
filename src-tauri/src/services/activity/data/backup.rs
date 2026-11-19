@@ -1,5 +1,7 @@
-use crate::services::activity::data::sqlite_pool::{acquire_sqlite_maintenance, wait_for_sqlite_pool};
 use crate::models::activity::backup::{BackupError, BackupPreview};
+use crate::services::activity::data::sqlite_pool::{
+    acquire_sqlite_maintenance, wait_for_sqlite_pool,
+};
 use tauri::AppHandle;
 use tokio::sync::Mutex;
 

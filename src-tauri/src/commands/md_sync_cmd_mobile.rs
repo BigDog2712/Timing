@@ -69,7 +69,11 @@ pub async fn md_sync_save(
 
     /* [V0.11.22] 顺手同步的判据收窄成「云端可用」：SAF 那一项不再参与
     （`should_autosync` 的第三个参数恒 false，函数本身留给桌面与既有用例）。 */
-    if md_cloud::should_autosync(config.enabled, md_cloud::usable_webdav(&config).is_some(), false) {
+    if md_cloud::should_autosync(
+        config.enabled,
+        md_cloud::usable_webdav(&config).is_some(),
+        false,
+    ) {
         if let Ok(report) = md_sync_mobile::sync_once(&app).await {
             announce(&app, &report);
         }
@@ -119,9 +123,9 @@ pub async fn md_sync_resolve(
 #[tauri::command]
 pub async fn md_sync_open(app: AppHandle, kind: MdSyncKind) -> AppResult<()> {
     let pool = app.state::<AppState>().pool.clone();
-    let rel = md_sync::mirror::path_of(&pool, kind).await?.ok_or_else(|| {
-        AppError::md_sync_config_invalid(format!("「{}」未启用", kind.label()))
-    })?;
+    let rel = md_sync::mirror::path_of(&pool, kind)
+        .await?
+        .ok_or_else(|| AppError::md_sync_config_invalid(format!("「{}」未启用", kind.label())))?;
     crate::app::md_sync_mobile::open_file(&app, &rel).await
 }
 

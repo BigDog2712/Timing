@@ -35,7 +35,9 @@ describe('tag path rules', () => {
 
   it.each([
     ['too deep', 'a/b/c/d/e', 'depth'],
-    ['too long', 'x'.repeat(65), 'path'],
+    /* 65 个字符但每段都 ≤32：命中的是**整条路径**上限，而不是单段上限
+       （单个 65 字的段会先被 `segment` 拦下，那是另一条规则）。 */
+    ['too long', `${'x'.repeat(32)}/${'y'.repeat(32)}`, 'path'],
     ['long segment', `${'x'.repeat(33)}/y`, 'segment'],
     ['control character', 'a\u0001b', 'control'],
   ])('rejects %s without truncating', (_label, input, reason) => {

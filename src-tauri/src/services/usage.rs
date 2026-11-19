@@ -24,9 +24,7 @@
 use sqlx::SqlitePool;
 
 use crate::error::AppResult;
-use crate::models::usage::{
-    UsageAggregate, UsageAppDto, UsageRowDto, UsageSpan, UsageSpanRowDto,
-};
+use crate::models::usage::{UsageAggregate, UsageAppDto, UsageRowDto, UsageSpan, UsageSpanRowDto};
 
 /// 用桥回值**整天重算**某一天的聚合与时段。
 ///
@@ -53,8 +51,8 @@ pub async fn rollup(
     let now = crate::platform::clock::now_ms();
     let mut tx = pool.begin().await?;
     /* 先清后写：重扫一天等于对那一天重新推导一次。取大/累加都会让旧算法的虚高值
-       永远降不下来（见模块注释）。两条 DELETE 与下面的 INSERT 在同一个事务里，
-       中间没有「库里空了一天」的窗口能被别的读命令看到。 */
+    永远降不下来（见模块注释）。两条 DELETE 与下面的 INSERT 在同一个事务里，
+    中间没有「库里空了一天」的窗口能被别的读命令看到。 */
     sqlx::query("DELETE FROM app_usage WHERE local_date = ?1")
         .bind(date)
         .execute(&mut *tx)
@@ -68,7 +66,7 @@ pub async fn rollup(
             continue;
         }
         /* `ON CONFLICT` 只为兜「同一批里重复出现同一个包」这种畸形输入：
-           表已经清空，正常的桥回值不会撞主键。撞了就取大，不让整页报错。 */
+        表已经清空，正常的桥回值不会撞主键。撞了就取大，不让整页报错。 */
         sqlx::query(
             r#"
             INSERT INTO app_usage
@@ -95,7 +93,7 @@ pub async fn rollup(
         .await?;
     }
     /* 时段：同一批理论上一段一行。真撞上同一个起点（畸形输入）就取更长的一侧 ——
-       短的那条必然是裁剪产物，没有信息量。 */
+    短的那条必然是裁剪产物，没有信息量。 */
     for span in spans {
         if span.package_name.is_empty() || span.to <= span.from {
             continue;
@@ -258,8 +256,10 @@ pub fn with_meta(rows: Vec<UsageAggregate>, apps: &[UsageAppDto]) -> Vec<UsageAg
     if apps.is_empty() {
         return rows;
     }
-    let lookup: std::collections::HashMap<&str, &UsageAppDto> =
-        apps.iter().map(|app| (app.package_name.as_str(), app)).collect();
+    let lookup: std::collections::HashMap<&str, &UsageAppDto> = apps
+        .iter()
+        .map(|app| (app.package_name.as_str(), app))
+        .collect();
     rows.into_iter()
         .map(|mut row| {
             if let Some(app) = lookup.get(row.package_name.as_str()) {

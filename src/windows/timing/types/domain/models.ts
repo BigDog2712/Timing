@@ -8,6 +8,7 @@ import type { AccentColors, ThemeMode, ThemeSettings } from '../domain-v020';
 /* [0.12.1 归一] 悬浮条外观 + 手柄绑定的快照形状只在 `lib/pillAppearance` 定义一次
    （设置页与药丸都要用，而两窗唯一合法的共享载体就是 `src/lib/**`）。此处只借类型。 */
 import type { PillPrefs } from '../../lib/pillAppearance';
+import type { ErrorCode } from './errorCode';
 
 /* ===========================================================================
  * 枚举（字符串联合）
@@ -34,32 +35,7 @@ export type SwitchMode =
 /** 崩溃恢复对话框动作 */
 export type ResolveAction = 'resume' | 'close' | 'discard';
 
-/** 统一错误码（20 个；与 Rust `error.rs::as_str` 逐字一致，check:contract 校验） */
-export type ErrorCode =
-  | 'DB_ERROR'
-  | 'ITEM_NOT_FOUND'
-  | 'ITEM_NAME_EMPTY'
-  | 'ITEM_SYSTEM_PROTECTED'
-  | 'TIMER_ALREADY_RUNNING'
-  | 'TIMER_NOT_RUNNING'
-  | 'TIMER_NO_UNDO'
-  | 'INVALID_DURATION'
-  | 'IO_ERROR'
-  /* [V0.2.0] */
-  | 'NOTE_NOT_FOUND'
-  | 'TODO_NOT_FOUND'
-  | 'WINDOW_LIMIT_EXCEEDED'
-  | 'INVALID_TARGET_SEC'
-  | 'INVALID_COLOR'
-  /* [V0.3.0] */
-  | 'ITEM_NAME_TOO_LONG'
-  /* [V0.4.0] 配置校验 / [V0.11.13] 云端通道走不通（网络 / 远端 / 系统凭据），见 ADR-061 */
-  | 'MD_SYNC_CONFIG_INVALID'
-  | 'MD_SYNC_REMOTE_ERROR'
-  /* [0.13.0] 使用情况访问未授权（状态性）/ [0.14] 分层规则被违反 / [R1] 手柄动作被拒 */
-  | 'USAGE_PERMISSION_DENIED'
-  | 'ITEM_DEPTH_EXCEEDED'
-  | 'CUSTOM_ACTION_DENIED';
+export type { ErrorCode } from './errorCode';
 
 /* ===========================================================================
  * 核心领域实体

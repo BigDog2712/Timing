@@ -1,8 +1,8 @@
-use crate::services::activity::data::sqlite_error::SqliteOperationError;
 use crate::models::activity::settings::{
     parse_boolean_setting, DesktopBehaviorSettings, RemoteStatusBridgeSettings,
     WebActivityBridgeSettings, WebActivitySettings,
 };
+use crate::services::activity::data::sqlite_error::SqliteOperationError;
 use sqlx::{Pool, Row, Sqlite};
 
 const SHOW_TRAY_ICON_KEY: &str = "show_tray_icon";
@@ -626,9 +626,11 @@ mod tests {
                     key: key.into(),
                     value: value.into(),
                 };
-                assert!(commit_app_setting_mutations(&pool, std::slice::from_ref(&mutation))
-                    .await
-                    .is_err());
+                assert!(
+                    commit_app_setting_mutations(&pool, std::slice::from_ref(&mutation))
+                        .await
+                        .is_err()
+                );
                 let saved: String = sqlx::query_scalar("SELECT value FROM settings WHERE key=?")
                     .bind(key)
                     .fetch_one(&pool)
@@ -689,9 +691,11 @@ mod tests {
                 key: "tracking_paused".into(),
                 value: "1".into(),
             };
-            assert!(commit_app_setting_mutations(&pool, std::slice::from_ref(&pause))
-                .await
-                .is_err());
+            assert!(
+                commit_app_setting_mutations(&pool, std::slice::from_ref(&pause))
+                    .await
+                    .is_err()
+            );
             let setting: Option<String> =
                 sqlx::query_scalar("SELECT value FROM settings WHERE key='tracking_paused'")
                     .fetch_optional(&pool)

@@ -13,11 +13,11 @@ use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
 
 use crate::infra::md_webdav::WebdavTarget;
+use crate::models::md_cloud_purge::{PurgeChannel, PurgeKey};
 use crate::repositories::md_cloud_pending;
 use crate::services::md_cloud::{self, purge};
 use crate::tests::fake_webdav::{read_request, serve};
 use crate::tests::md_cloud_purge::{kv, seed_past, state_of};
-use crate::models::md_cloud_purge::{PurgeChannel, PurgeKey};
 use crate::tests::md_sync::env;
 use crate::tests::support::unique_dir;
 
@@ -50,8 +50,9 @@ fn serve_sequence(statuses: Vec<&'static str>) -> Sequenced {
             log.lock().expect("假服务器记录锁").push(raw);
             let status = statuses.get(index).copied().unwrap_or("204 No Content");
             /* `Connection: close` 是必须的：复用连接的话「第 n 个请求」这条计数就不再
-               等于「第 n 次 DELETE」，中间的失败档会被吞掉。 */
-            let head = format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            等于「第 n 次 DELETE」，中间的失败档会被吞掉。 */
+            let head =
+                format!("HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
             let _ = stream.write_all(head.as_bytes());
             let _ = stream.flush();
         }

@@ -55,11 +55,10 @@ fn qa_edge_closing_fence_with_language_tag_does_not_close() {
     assert_eq!(issue.text("事项计时"), UNCLOSED_TEXT);
 
     /* 用户补上一个「行内只有围栏」的闭合标记即恢复。 */
-    let fixed = format!(
-        "{TIMERS}\n- [ ] 写代码\n```yaml\n# 备注\n```\n- [ ] 第二段\n#### 读书\n手写\n"
-    );
-    let read = md_file::read_section(&doc("qa-t01-closer-info-fixed", fixed.as_bytes()), TIMERS)
-        .unwrap();
+    let fixed =
+        format!("{TIMERS}\n- [ ] 写代码\n```yaml\n# 备注\n```\n- [ ] 第二段\n#### 读书\n手写\n");
+    let read =
+        md_file::read_section(&doc("qa-t01-closer-info-fixed", fixed.as_bytes()), TIMERS).unwrap();
     match read.state {
         SectionState::Present { body, .. } => {
             assert!(body.contains("# 备注"), "围栏里那行属于正文：{body}");
@@ -75,7 +74,7 @@ fn qa_edge_closing_fence_with_language_tag_does_not_close() {
 #[test]
 fn qa_edge_crlf_bom_trailing_space_fence_roundtrip() {
     /* 别人的区块（含逐字标题）全部放在真标题之前：`write_section` 的
-       `lines[..=head_idx]` 会原样保留，于是这一段是逐字节可比的。 */
+    `lines[..=head_idx]` 会原样保留，于是这一段是逐字节可比的。 */
     let foreign = concat!(
         "顶部说明段（CRLF + BOM 首行）\n",
         "\n",
@@ -97,16 +96,27 @@ fn qa_edge_crlf_bom_trailing_space_fence_roundtrip() {
     let read = md_file::read_section(&path, TIMERS).unwrap();
     match &read.state {
         SectionState::Present { body, .. } => {
-            assert_eq!(body, "- [ ] 旧内容", "围栏内标题不算命中，区块没被吞：{body}");
+            assert_eq!(
+                body, "- [ ] 旧内容",
+                "围栏内标题不算命中，区块没被吞：{body}"
+            );
         }
         other => panic!("应 Present：{other:?}"),
     }
-    assert!(read.issues.is_empty(), "带尾随空格的围栏标记应正常闭合：{:?}", read.issues);
+    assert!(
+        read.issues.is_empty(),
+        "带尾随空格的围栏标记应正常闭合：{:?}",
+        read.issues
+    );
 
     md_file::write_section(&path, TIMERS, "- [ ] 新渲染").unwrap();
     let after = String::from_utf8(std::fs::read(&path).unwrap()).unwrap();
 
-    assert!(after.starts_with(BOM), "BOM 要写回：{:?}", &after[..8.min(after.len())]);
+    assert!(
+        after.starts_with(BOM),
+        "BOM 要写回：{:?}",
+        &after[..8.min(after.len())]
+    );
     assert_eq!(after.matches(BOM).count(), 1, "全文只有一个 BOM");
     assert!(
         !after.replace("\r\n", "").contains('\n'),
@@ -116,7 +126,10 @@ fn qa_edge_crlf_bom_trailing_space_fence_roundtrip() {
         after.starts_with(&format!("{BOM}{}", foreign.replace('\n', "\r\n"))),
         "别人的整段（含围栏、逐字标题、尾随空格、手写行）逐字节不变：\n{after}"
     );
-    assert!(after.contains("尾声手写，不许动\r\n"), "区块外的手写内容逐字节不动");
+    assert!(
+        after.contains("尾声手写，不许动\r\n"),
+        "区块外的手写内容逐字节不动"
+    );
     assert!(after.contains("- [ ] 新渲染\r\n"), "我方区块在原位被更新");
 
     let lines: Vec<&str> = after.split('\n').collect();
@@ -174,7 +187,10 @@ fn qa_edge_outside_fence_hash_note_is_still_a_heading() {
     let (head, level) = md_section::find_heading(&lines, &fences, TIMERS).unwrap();
     let end = md_section::section_end(&lines, &fences, head, level);
     assert_eq!(lines[end], "# 备注", "围栏外的 # 行按既有语义仍是标题");
-    assert_eq!(md_file::body_in_text(&text, TIMERS).as_deref(), Some("- [ ] 甲"));
+    assert_eq!(
+        md_file::body_in_text(&text, TIMERS).as_deref(),
+        Some("- [ ] 甲")
+    );
 }
 
 /// ⑤ §11.1 三句逐字 + `guard()` 的阻断 / 非阻断分流。
@@ -191,13 +207,19 @@ fn qa_edge_three_wordings_and_guard_are_verbatim() {
     assert!(unc.blocks());
 
     let dummy = || SectionState::MissingHeading { mtime_ms: 0 };
-    let read = SectionRead { state: dummy(), issues: vec![dup] };
+    let read = SectionRead {
+        state: dummy(),
+        issues: vec![dup],
+    };
     assert_eq!(
         read.guard("timers", "事项计时").unwrap(),
         vec![DUP_TEXT.to_string()],
         "非阻断诊断以 Ok(提示) 交回调用方"
     );
-    let read = SectionRead { state: dummy(), issues: vec![unc] };
+    let read = SectionRead {
+        state: dummy(),
+        issues: vec![unc],
+    };
     assert_eq!(
         read.guard("timers", "事项计时").unwrap_err(),
         UNCLOSED_TEXT,
@@ -213,8 +235,8 @@ fn qa_edge_three_wordings_and_guard_are_verbatim() {
 #[test]
 fn qa_edge_unclosed_before_heading_is_not_blocking_and_recovers() {
     let before = format!("# 日记\n```\n{TIMERS}\n- [ ] 假\n");
-    let read = md_file::read_section(&doc("qa-t01-unclosed-before", before.as_bytes()), TIMERS)
-        .unwrap();
+    let read =
+        md_file::read_section(&doc("qa-t01-unclosed-before", before.as_bytes()), TIMERS).unwrap();
     assert!(
         matches!(read.state, SectionState::MissingHeading { .. }),
         "标题被围栏吞掉，但不是阻断级：{:?}",
@@ -223,8 +245,12 @@ fn qa_edge_unclosed_before_heading_is_not_blocking_and_recovers() {
     assert!(read.issues.is_empty(), "{:?}", read.issues);
 
     let fixed = format!("# 日记\n```\n{TIMERS}\n```\n{TIMERS}\n- [ ] 真\n");
-    let read = md_file::read_section(&doc("qa-t01-unclosed-fixed", fixed.as_bytes()), TIMERS)
-        .unwrap();
-    assert!(matches!(read.state, SectionState::Present { .. }), "{:?}", read.state);
+    let read =
+        md_file::read_section(&doc("qa-t01-unclosed-fixed", fixed.as_bytes()), TIMERS).unwrap();
+    assert!(
+        matches!(read.state, SectionState::Present { .. }),
+        "{:?}",
+        read.state
+    );
     assert!(read.issues.is_empty(), "{:?}", read.issues);
 }

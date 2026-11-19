@@ -67,9 +67,7 @@ pub(crate) async fn sync_label(pool: &SqlitePool) -> &'static str {
 /// 自己那条的缺项）。只有「有通路开着、却一条都跑不起来」才是这一下什么都不同步的档。
 ///
 /// 判据因此必须与 `sync_label` 同源：拦下 ⇔ 菜单项写着 `Markdown 同步`（O20）。
-pub(crate) fn blocked_notice(
-    config: &MdSyncConfig,
-) -> Option<(&'static str, &'static str)> {
+pub(crate) fn blocked_notice(config: &MdSyncConfig) -> Option<(&'static str, &'static str)> {
     if !config.enabled {
         return Some((LOCAL_LABEL, "先在设置里打开 Markdown 同步"));
     }
@@ -97,7 +95,10 @@ mod tests {
     fn labels_are_three_distinct_strings() {
         assert_ne!(LOCAL_LABEL, CLOUD_LABEL);
         assert_ne!(CLOUD_LABEL, FOLDER_LABEL);
-        assert_ne!(LOCAL_LABEL, FOLDER_LABEL, "三态必须能区分，否则菜单项会骗人");
+        assert_ne!(
+            LOCAL_LABEL, FOLDER_LABEL,
+            "三态必须能区分，否则菜单项会骗人"
+        );
     }
 
     #[test]
@@ -106,7 +107,11 @@ mod tests {
             enabled: true,
             ..Default::default()
         };
-        assert_eq!(blocked_notice(&config), None, "两条都关着 = 只写 Obsidian 那份，放行");
+        assert_eq!(
+            blocked_notice(&config),
+            None,
+            "两条都关着 = 只写 Obsidian 那份，放行"
+        );
         config.cloud_webdav = Some(crate::models::md_sync_channel::MdSyncCloudChannel {
             enabled: true,
             ..Default::default()

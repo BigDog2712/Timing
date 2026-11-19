@@ -231,9 +231,8 @@ async fn adopt_rows(
         return Ok(adopted);
     }
 
-    let backfill_sql = format!(
-        "UPDATE {table} SET uid = '{prefix}' || device_id || ':' || id WHERE uid IS NULL"
-    );
+    let backfill_sql =
+        format!("UPDATE {table} SET uid = '{prefix}' || device_id || ':' || id WHERE uid IS NULL");
     sqlx::query(&backfill_sql)
         .execute(pool)
         .await

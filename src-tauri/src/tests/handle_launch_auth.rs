@@ -29,7 +29,9 @@ async fn hl01_unlisted_path_is_rejected() {
     let pool = fresh_pool("handle-launch-01").await;
     let path = real_file("handle-launch-01");
     assert!(
-        !handle_launch::is_authorized(&pool, &path).await.expect("查询应成功"),
+        !handle_launch::is_authorized(&pool, &path)
+            .await
+            .expect("查询应成功"),
         "用户没在对话框里选过的路径，必须一律不放行"
     );
 }
@@ -38,9 +40,13 @@ async fn hl01_unlisted_path_is_rejected() {
 async fn hl02_authorize_then_that_path_passes() {
     let pool = fresh_pool("handle-launch-02").await;
     let path = real_file("handle-launch-02");
-    let granted = handle_launch::authorize(&pool, &path).await.expect("授权应成功");
+    let granted = handle_launch::authorize(&pool, &path)
+        .await
+        .expect("授权应成功");
     assert!(
-        handle_launch::is_authorized(&pool, &granted).await.expect("查询应成功"),
+        handle_launch::is_authorized(&pool, &granted)
+            .await
+            .expect("查询应成功"),
         "刚授权过的路径必须放行，否则用户选完也点不动"
     );
 }
@@ -48,11 +54,13 @@ async fn hl02_authorize_then_that_path_passes() {
 #[tokio::test]
 async fn hl03_the_same_file_written_differently_still_matches() {
     /* 规范化不是洁癖：不做的话，`C:\Apps\x.exe` 与 `C:\Apps\.\x.exe` 会被当成两个路径，
-       用户看到「明明选过却说未授权」。 */
+    用户看到「明明选过却说未授权」。 */
     let pool = fresh_pool("handle-launch-03").await;
     let raw = real_file("handle-launch-03");
     let path = std::path::Path::new(&raw);
-    let granted = handle_launch::authorize(&pool, &path.to_string_lossy()).await.expect("授权应成功");
+    let granted = handle_launch::authorize(&pool, &path.to_string_lossy())
+        .await
+        .expect("授权应成功");
     let variant = path
         .parent()
         .map(|dir| dir.join(".").join("target.exe"))
@@ -63,7 +71,10 @@ async fn hl03_the_same_file_written_differently_still_matches() {
             .expect("查询应成功"),
         "同一个文件的另一种写法（带 `./`）也必须认出来"
     );
-    assert_eq!(granted, handle_launch::canonical_target(&variant.to_string_lossy()).expect("应能规范化"));
+    assert_eq!(
+        granted,
+        handle_launch::canonical_target(&variant.to_string_lossy()).expect("应能规范化")
+    );
 }
 
 #[tokio::test]
@@ -81,7 +92,7 @@ async fn hl04_directory_is_not_launchable() {
 #[tokio::test]
 async fn hl05_relative_path_is_rejected() {
     /* 相对路径按**当前工作目录**解析，而便携版的工作目录可能跟着 U 盘走 ——
-       同一个绑定在不同次启动会指向不同文件，授权名单就失去意义。 */
+    同一个绑定在不同次启动会指向不同文件，授权名单就失去意义。 */
     let pool = fresh_pool("handle-launch-05").await;
     assert_eq!(
         expect_err(handle_launch::authorize(&pool, "target.exe").await),
@@ -102,11 +113,15 @@ async fn hl06_missing_path_is_rejected() {
 #[tokio::test]
 async fn hl07_authorizing_twice_does_not_duplicate() {
     /* 用户可能会为两格手柄选同一个程序：名单里只该有一条，否则每次重复授权都在
-       消耗上限，最后把真在用的条目挤掉。 */
+    消耗上限，最后把真在用的条目挤掉。 */
     let pool = fresh_pool("handle-launch-07").await;
     let path = real_file("handle-launch-07");
-    handle_launch::authorize(&pool, &path).await.expect("第一次授权应成功");
-    handle_launch::authorize(&pool, &path).await.expect("第二次授权应成功");
+    handle_launch::authorize(&pool, &path)
+        .await
+        .expect("第一次授权应成功");
+    handle_launch::authorize(&pool, &path)
+        .await
+        .expect("第二次授权应成功");
     let raw = crate::repositories::settings::get_value(&pool, "handle.launchTargets")
         .await
         .expect("读名单应成功")

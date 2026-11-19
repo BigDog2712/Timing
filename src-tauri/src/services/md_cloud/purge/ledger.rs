@@ -27,7 +27,11 @@ pub(super) struct Outcome {
 /// 为什么不是「最后一个成功项」：`upto` 是**单调上界**，语义是「这个日期及更早的都确认
 /// 清过了」。若第 3 个失败、第 4 个成功，把水位推到第 4 个就让第 3 个永久漏删。代价是
 /// 第 4~20 个下一轮会重删一次 —— 它们已经不在远端，`404` 按成功处理，无副作用。
-pub(super) async fn advance(pool: &SqlitePool, channel: PurgeChannel, outcome: &Outcome) -> AppResult<()> {
+pub(super) async fn advance(
+    pool: &SqlitePool,
+    channel: PurgeChannel,
+    outcome: &Outcome,
+) -> AppResult<()> {
     if outcome.aborted.is_some() {
         /* 中断 = 后面还有没试过的项，水位一动就是永久漏删。 */
         return Ok(());
@@ -56,7 +60,9 @@ pub(super) async fn finish(
         state.fail_days = 0;
         state.last_fail_day.clear();
     } else {
-        let yesterday = (today_date - Duration::days(1)).format("%Y-%m-%d").to_string();
+        let yesterday = (today_date - Duration::days(1))
+            .format("%Y-%m-%d")
+            .to_string();
         if state.last_fail_day == today {
             /* 同一天内多轮失败只算一天，否则一个下午就能把自己暂停掉。 */
         } else if state.last_fail_day == yesterday {
@@ -72,11 +78,11 @@ pub(super) async fn finish(
     }
     write_state(pool, channel, &state).await?;
     /* day 的语义是「**整遍**扫过了」，不是「跑过一次」：
-       - 成功且没截断 → 写（今天不再扫，I3）；
-       - 提前中断 → 写（中断是「今天别再试了」，不是「明天再说」）；
-       - 普通失败 → 不写，下一轮接着试（设计 §8.3）；
-       - **被截断 → 不写**：还有 candidates 没处理，写下去就等于让首轮大扫（200 天）
-         拖成 10 天（I15 的收敛路径）。 */
+    - 成功且没截断 → 写（今天不再扫，I3）；
+    - 提前中断 → 写（中断是「今天别再试了」，不是「明天再说」）；
+    - 普通失败 → 不写，下一轮接着试（设计 §8.3）；
+    - **被截断 → 不写**：还有 candidates 没处理，写下去就等于让首轮大扫（200 天）
+      拖成 10 天（I15 的收敛路径）。 */
     if outcome.aborted.is_some() || (outcome.failed == 0 && !truncated) {
         write_day(pool, channel, today).await?;
     }

@@ -6,15 +6,15 @@
  *   · `CollapsedDotMark.test.tsx` —— 黄点位置（正计时 / 倒计时两种口径）+ 结构（分针轴心已删）。
  * 两边共用本夹具：假时钟、会话构造、渲染、「从 DOM 反推几何量」。
  *
- * 时钟为什么要钉死（[0.11.20-debt] 修 flaky）：`dashoffset = 100 × (1 − frac)` 量纲是 100，
+ * 时钟为什么要钉死（[0.11.20-debt] 修 flaky）：`visible = 100 × frac` 量纲是 100，
  * 1 位小数的容差 0.05 折算成时间只有 **30ms**。`runningSince` 取 `Date.now()`，冷启动第一次跑
  * （模块转译 + React 首次挂载）轻松超过 30ms → 偶发红。修法不是放宽容差，而是
  * `vi.useFakeTimers()` + `vi.setSystemTime()` 把 `Date.now()` 恒等于 `FIXED_NOW`；
  * rAF / 定时器 / `performance` 一起假掉，`useSmoothTimerTick` 的逐帧循环不会插进来重算一次。
  * 钉死之后容差反而**收紧**到 6 位小数。
  *
- * 用例里的几何量一律**从渲染出来的 DOM 属性反推**（`dashoffset → frac`、`cx/cy → 角度`），
- * 不把组件里的公式抄一遍再自称验证过。
+ * 用例里的几何量一律**从渲染出来的 DOM 属性反推**（`dasharray → frac`、`cx/cy → 角度`、
+ * 遮罩 `rotate → 环口相位`），不把组件里的公式抄一遍再自称验证过。
  */
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -115,8 +115,20 @@ export interface Rendered {
   svg: SVGElement;
   /** 进度弧；`isArcVisible(frac)` 为 false 时整条不渲染 → null */
   arc: SVGCircleElement | null;
-  /** `stroke-dashoffset`（0 = 整周、100 = 空）；无 arc 时为 NaN */
-  offset: number;
+  /** 进度弧 dasharray 第一段：可见弧长（`pathLength=100` 口径）；无 arc 时为 NaN */
+  visible: number;
+  /** 进度弧 dasharray 第二段：余量；无 arc 时为 NaN */
+  gap: number;
+  /** 进度弧的 SVG 旋转角（度）：固定 −90（计时 0 点在 12 点）；无 arc 时为 NaN */
+  arcRotate: number;
+  /** 遮罩圆（挖出黄点处的环口） */
+  mask: SVGCircleElement;
+  /** 遮罩 dasharray 第一段：露出的环（`pathLength=100` 口径） */
+  maskVisible: number;
+  /** 遮罩 dasharray 第二段：挖空的环口 */
+  maskGap: number;
+  /** 遮罩的 SVG 旋转角（度）：环口中心 = 黄点角度 */
+  maskRotate: number;
   /** 黄点（原分针的针尖端） */
   mark: SVGCircleElement;
   /** 黄点角度（度）：0 = 12 点，顺时针；由圆周坐标反推 */
@@ -133,6 +145,8 @@ export function renderDot(): Rendered {
   const svg = dot.querySelector<SVGElement>('.dot__svg');
   if (!svg) throw new Error('未渲染 .dot__svg');
   const arc = dot.querySelector<SVGCircleElement>('.dot__arc');
+  const mask = dot.querySelector<SVGCircleElement>('.dot__mask');
+  if (!mask) throw new Error('未渲染 .dot__mask（环口遮罩）');
   const mark = dot.querySelector<SVGCircleElement>('.dot__mark');
   if (!mark) throw new Error('未渲染 .dot__mark（黄点）');
   /* 圆心从 viewBox 反推（33 / 2 = 16.5），不在测试里抄一份常量 */
@@ -142,11 +156,28 @@ export function renderDot(): Rendered {
   const dy = Number(mark.getAttribute('cy')) - center;
   /* atan2(x, −y)：0° 落在 12 点、顺时针增大（与渲染口径一致） */
   const raw = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  /* 可见段 / 余量直接从 dasharray 反推，不在测试里重抄比例公式 */
+  const [visible = Number.NaN, gap = Number.NaN] = (arc?.getAttribute('stroke-dasharray') ?? '')
+    .split(/\s+/)
+    .map(Number);
+  const [maskVisible = Number.NaN, maskGap = Number.NaN] = (
+    mask.getAttribute('stroke-dasharray') ?? ''
+  )
+    .split(/\s+/)
+    .map(Number);
+  const rotate = /rotate\(([-\d.]+)/.exec(arc?.getAttribute('transform') ?? '');
+  const maskRotate = /rotate\(([-\d.]+)/.exec(mask.getAttribute('transform') ?? '');
   return {
     dot,
     svg,
     arc,
-    offset: Number(arc?.getAttribute('stroke-dashoffset') ?? Number.NaN),
+    visible,
+    gap,
+    arcRotate: Number(rotate?.[1] ?? Number.NaN),
+    mask,
+    maskVisible,
+    maskGap,
+    maskRotate: Number(maskRotate?.[1] ?? Number.NaN),
     mark,
     markAngle: raw < 0 ? raw + 360 : raw,
   };
@@ -168,9 +199,9 @@ export function markPoint(r: Rendered): { x: number; y: number } {
   };
 }
 
-/** 从渲染结果反推 `frac`：`arcDashOffset` 的定义是 `100 × (1 − frac)` */
+/** 从渲染结果反推 `frac`：可见段长度 ÷ 整圈（计时按绝对位置，60 秒满 100） */
 export function fracOf(r: Rendered): number {
-  return 1 - r.offset / 100;
+  return r.visible / 100;
 }
 
 /** 当前渲染出的 `.dot` 根节点（高亮用例要重新查一次 DOM） */

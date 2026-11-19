@@ -107,10 +107,16 @@ mod tests {
     async fn lifetime_cache_handles_dirty_domains_rollback_and_external_commits() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("totals.db");
-        let local = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&path, true)
+        let local =
+            crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+                &path, true,
+            )
             .await
             .unwrap();
-        let other = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&path, false)
+        let other =
+            crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+                &path, false,
+            )
             .await
             .unwrap();
         local

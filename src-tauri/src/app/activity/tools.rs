@@ -1,7 +1,9 @@
-use crate::services::activity::data::tools_store::SqliteToolsStore;
 use crate::models::activity::events as activity_events;
 use crate::models::activity::tools::{ToolAlert, ToolsRuntimeSnapshot};
-use crate::services::activity::engine::tools::{self, CreateActivityReminderRuleRequest, StartPomodoroRequest};
+use crate::services::activity::data::tools_store::SqliteToolsStore;
+use crate::services::activity::engine::tools::{
+    self, CreateActivityReminderRuleRequest, StartPomodoroRequest,
+};
 use tauri::{App, AppHandle, Listener, Manager, Runtime};
 
 pub(crate) fn register_alert_handler<R: Runtime>(app: &App<R>) {
@@ -22,9 +24,9 @@ pub(crate) fn register_alert_handler<R: Runtime>(app: &App<R>) {
     }
     let app_handle = app.handle().clone();
     app.listen(activity_events::TRACKING_DATA_CHANGED, move |event| {
-        let payload = serde_json::from_str::<crate::models::activity::tracking::TrackingDataChangedPayload>(
-            event.payload(),
-        )
+        let payload = serde_json::from_str::<
+            crate::models::activity::tracking::TrackingDataChangedPayload,
+        >(event.payload())
         .ok();
         let reason = payload.as_ref().map(|payload| payload.reason.as_str());
         if !matches!(

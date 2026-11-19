@@ -1,6 +1,6 @@
 //! 事件分段文件：命名 + JSONL 读写（T02 实现体，纯函数为主）。
 //!
-//! 分段是**不可变文件** `sync/events/<device_id>/<seq>.jsonl`（架构设计 §1.2）：
+//! 分段是**不可变文件**；新版写 [`super::streams`]，这里的 `sync/events/<device_id>/<seq>.jsonl` 仅供读取旧版：
 //! 每轮把本机新增事件写进一个「只写一次、永不修改」的新文件。命名、JSONL 读写、
 //! 游标推进都是纯函数，放这里可单测，也让 [`super::repository`] 与编排层引用同一份
 //! 形状而不发明第二套。
@@ -141,7 +141,7 @@ pub fn decode_segment(bytes: &[u8]) -> Result<Vec<TimerOp>, String> {
         ops.push(op);
     }
     /* 尾标与正文一致之后这仍可能不等：只有「尾标是别人补的」或编码侧改了逻辑才会这样。
-       留着它当第二道闸门，比事后查「为什么会少一条」便宜得多。 */
+    留着它当第二道闸门，比事后查「为什么会少一条」便宜得多。 */
     if ops.len() != declared.count {
         return Err(format!(
             "分段尾标写 {} 条、实际解析出 {} 条：格式不一致，拒绝应用",
@@ -171,8 +171,8 @@ fn split_trailer(text: &str) -> Result<(&str, &str), String> {
 
 /// 尾标行 → `count` / `sha256`。形状不对报错，**不回退成「当它没有尾标」**。
 fn parse_trailer(marker: &str) -> Result<Integrity, String> {
-    let line: IntegrityLine = serde_json::from_str(marker)
-        .map_err(|err| format!("分段完整性标记解析失败：{err}"))?;
+    let line: IntegrityLine =
+        serde_json::from_str(marker).map_err(|err| format!("分段完整性标记解析失败：{err}"))?;
     if line.integrity.sha256.len() != 64
         || !line.integrity.sha256.bytes().all(|b| b.is_ascii_hexdigit())
     {
@@ -232,16 +232,33 @@ mod tests {
     #[test]
     fn jsonl_roundtrips_with_snake_case_kind() {
         let ops = vec![
-            op("p:aaaaaaaaaaaa:1", 1, "aaaaaaaaaaaa", "t:aaaaaaaaaaaa:1", "i:aaaaaaaaaaaa:1", 1000),
-            op("p:aaaaaaaaaaaa:2", 2, "aaaaaaaaaaaa", "t:aaaaaaaaaaaa:1", "i:aaaaaaaaaaaa:1", 2000),
+            op(
+                "p:aaaaaaaaaaaa:1",
+                1,
+                "aaaaaaaaaaaa",
+                "t:aaaaaaaaaaaa:1",
+                "i:aaaaaaaaaaaa:1",
+                1000,
+            ),
+            op(
+                "p:aaaaaaaaaaaa:2",
+                2,
+                "aaaaaaaaaaaa",
+                "t:aaaaaaaaaaaa:1",
+                "i:aaaaaaaaaaaa:1",
+                2000,
+            ),
         ];
         let encoded = encode_segment(&ops);
         assert!(encoded.contains("\"kind\":\"start\""));
         /* 2 条事件 + 1 行尾标。原来的断言是 `lines().count() == 2`，把「尾标」这件事
-           钉进计数里才能防住「有人悄悄把尾标删了、单测还绿」。 */
+        钉进计数里才能防住「有人悄悄把尾标删了、单测还绿」。 */
         assert_eq!(encoded.lines().count(), 3, "两条事件 + 一行完整性尾标");
         assert!(encoded.trim_end().ends_with('}'));
-        assert!(encoded.contains("\"integrity\":{\"count\":2,"), "尾标要自报条数");
+        assert!(
+            encoded.contains("\"integrity\":{\"count\":2,"),
+            "尾标要自报条数"
+        );
         let decoded = decode_segment(encoded.as_bytes()).expect("round-trip 必须成功");
         assert_eq!(decoded, ops);
     }
@@ -261,7 +278,10 @@ mod tests {
         /* 截断在尾标之前 —— 这是评审说的「有效 JSONL 前缀」：前 1 行本身完全合法。 */
         let one_line = &good[..good.find('\n').map(|at| at + 1).unwrap()];
         let err = decode_segment(one_line.as_bytes()).expect_err("没有尾标就是残段");
-        assert!(err.contains("缺少完整性标记"), "报错要说清是「没写完」而不是「语法错」：{err}");
+        assert!(
+            err.contains("缺少完整性标记"),
+            "报错要说清是「没写完」而不是「语法错」：{err}"
+        );
 
         /* 尾标还在、正文被改：sha256 对不上。 */
         let tampered = good.replacen("\"at_ms\":1", "\"at_ms\":9", 1);
@@ -276,6 +296,9 @@ mod tests {
             "{err}"
         );
 
-        assert!(decode_segment(b"<xml/>\n").is_err(), "非 JSON 行仍按行号报错");
+        assert!(
+            decode_segment(b"<xml/>\n").is_err(),
+            "非 JSON 行仍按行号报错"
+        );
     }
 }

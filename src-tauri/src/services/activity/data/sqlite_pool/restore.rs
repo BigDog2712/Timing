@@ -170,7 +170,11 @@ async fn prepare_replacement_pool(db_path: &Path) -> Result<sqlx::Pool<sqlx::Sql
     let next_pool = open_single_connection_sqlite_pool(db_path, false).await?;
     let result = async {
         prepare_pool_schema(&next_pool, db_path).await?;
-        crate::services::activity::data::activity_read_model::invalidate_all(&next_pool, "database_restore").await?;
+        crate::services::activity::data::activity_read_model::invalidate_all(
+            &next_pool,
+            "database_restore",
+        )
+        .await?;
         // Removing the marker commits the file replacement. Publish no writable pool before it.
         fs::remove_file(restore_marker_path(db_path)?).map_err(|error| {
             format!("failed to finalize restored database recovery marker: {error}")

@@ -29,8 +29,8 @@
 use serde_json::Value;
 use sqlx::{Pool, Sqlite};
 
-use crate::services::identity::install_id;
 use crate::services::activity::data::repositories::app_category as app_category_repo;
+use crate::services::identity::install_id;
 
 pub const MIGRATION_GUARD_KEY: &str = "__migration_item_centric::v1";
 const APP_OVERRIDE_PREFIX: &str = "__app_override::";
@@ -57,7 +57,10 @@ pub async fn backfill(
     now_ms: i64,
 ) -> Result<BackfillReport, String> {
     if read_guard(business).await? {
-        return Ok(BackfillReport { already_done: true, ..Default::default() });
+        return Ok(BackfillReport {
+            already_done: true,
+            ..Default::default()
+        });
     }
     let rows: Vec<(String, String)> = sqlx::query_as(
         "SELECT key, value FROM settings
@@ -106,7 +109,12 @@ async fn write_categories(
     let mut keys: Vec<String> = value
         .get("categories")
         .and_then(Value::as_array)
-        .map(|list| list.iter().filter_map(|item| item.as_str()).map(|s| s.trim().to_lowercase()).collect())
+        .map(|list| {
+            list.iter()
+                .filter_map(|item| item.as_str())
+                .map(|s| s.trim().to_lowercase())
+                .collect()
+        })
         .unwrap_or_default();
     if keys.is_empty() {
         if let Some(single) = value.get("category").and_then(Value::as_str) {
@@ -116,14 +124,8 @@ async fn write_categories(
     keys.retain(|key| !key.is_empty());
     keys.dedup();
     for (index, category_key) in keys.iter().enumerate() {
-        app_category_repo::upsert(
-            activity,
-            app_key,
-            category_key,
-            index as i64 * 10,
-            now_ms,
-        )
-        .await?;
+        app_category_repo::upsert(activity, app_key, category_key, index as i64 * 10, now_ms)
+            .await?;
         report.app_categories += 1;
     }
     Ok(())
@@ -147,7 +149,7 @@ async fn write_bindings(
                 report.item_bindings += 1;
             }
             /* 悬空 `itemId`（事项已删）**不写**：写进去就是一条永远解不开的绑定，
-               而外键在 SQLite 默认是关的，不会有任何报错。 */
+            而外键在 SQLite 默认是关的，不会有任何报错。 */
             _ => report.skipped += 1,
         }
     }
@@ -181,7 +183,12 @@ async fn bind_item(
 ) -> Result<(), String> {
     crate::repositories::item_app::bind(business, item_id, app_key, 1, now_ms)
         .await
-        .map_err(|error| format!("failed to bind item `{item_id}` to `{app_key}`: {}", error.message))
+        .map_err(|error| {
+            format!(
+                "failed to bind item `{item_id}` to `{app_key}`: {}",
+                error.message
+            )
+        })
 }
 
 async fn item_exists(business: &sqlx::SqlitePool, item_id: i64) -> Result<bool, String> {

@@ -27,10 +27,16 @@ fn tier(startup_ms: i64, startup_done: bool) -> TierState {
 #[test]
 fn d8_off_never_runs_automatically() {
     let state = tier(0, false);
-    assert_eq!(decide(&state, CloudSchedule::Off, 900, 10_000 * SEC, 9_999 * SEC), None);
+    assert_eq!(
+        decide(&state, CloudSchedule::Off, 900, 10_000 * SEC, 9_999 * SEC),
+        None
+    );
     let mut later = state.clone();
     later.startup_done = true;
-    assert_eq!(decide(&later, CloudSchedule::Off, 900, 40_000 * SEC, 0), None);
+    assert_eq!(
+        decide(&later, CloudSchedule::Off, 900, 40_000 * SEC, 0),
+        None
+    );
 }
 
 /// D6：云端可用 + 档位 ≠ 关闭 → 启动后 60s 一次（与 60s 兜底对齐）。
@@ -39,7 +45,13 @@ fn d6_startup_round_fires_after_sixty_seconds() {
     let state = tier(0, false);
     assert_eq!(decide(&state, CloudSchedule::Smart, 900, 59 * SEC, 0), None);
     assert_eq!(
-        decide(&state, CloudSchedule::Smart, 900, MD_CLOUD_STARTUP_DELAY_SECS as i64 * SEC, 0),
+        decide(
+            &state,
+            CloudSchedule::Smart,
+            900,
+            MD_CLOUD_STARTUP_DELAY_SECS as i64 * SEC,
+            0
+        ),
         Some(TierReason::Startup)
     );
     let done = tier(0, true);
@@ -76,12 +88,24 @@ fn d4_smart_waits_five_minutes_after_the_last_write() {
     let state = tier(0, true); /* 启动轮已跑过，单独验 idle */
     let last_write = 720 * SEC; /* 0 / 4 / 8 / 12 分钟各写一次，停手 */
     assert_eq!(
-        decide(&state, CloudSchedule::Smart, 900, last_write + 299 * SEC, last_write),
+        decide(
+            &state,
+            CloudSchedule::Smart,
+            900,
+            last_write + 299 * SEC,
+            last_write
+        ),
         None,
         "连续写期间 5 分钟静默永远不到达"
     );
     assert_eq!(
-        decide(&state, CloudSchedule::Smart, 900, last_write + MD_CLOUD_SMART_IDLE_SECS as i64 * SEC, last_write),
+        decide(
+            &state,
+            CloudSchedule::Smart,
+            900,
+            last_write + MD_CLOUD_SMART_IDLE_SECS as i64 * SEC,
+            last_write
+        ),
         Some(TierReason::Idle)
     );
 }
@@ -150,14 +174,25 @@ fn minutes_are_clamped_persisted_and_never_reset_by_a_schedule_change() {
     assert_eq!(switched.interval_secs(), 30 * 60);
 
     assert_eq!(
-        MdCloudAuto { interval_minutes: 1, ..Default::default() }.clamped_minutes(),
+        MdCloudAuto {
+            interval_minutes: 1,
+            ..Default::default()
+        }
+        .clamped_minutes(),
         MD_CLOUD_INTERVAL_MIN_MINUTES
     );
     assert_eq!(
-        MdCloudAuto { interval_minutes: 999, ..Default::default() }.clamped_minutes(),
+        MdCloudAuto {
+            interval_minutes: 999,
+            ..Default::default()
+        }
+        .clamped_minutes(),
         MD_CLOUD_INTERVAL_MAX_MINUTES
     );
-    assert_eq!(MdCloudAuto::default().interval_minutes, MD_CLOUD_INTERVAL_DEFAULT_MINUTES);
+    assert_eq!(
+        MdCloudAuto::default().interval_minutes,
+        MD_CLOUD_INTERVAL_DEFAULT_MINUTES
+    );
     assert_eq!(MdCloudAuto::default().schedule, CloudSchedule::Smart);
 }
 
@@ -194,8 +229,9 @@ fn schedule_wire_values_match_the_frontend_union() {
     assert_eq!(CloudSchedule::Off.label(), "off");
     assert_eq!(CloudSchedule::Interval.label(), "interval");
     assert_eq!(CloudSchedule::Smart.label(), "smart");
-    let parsed: MdCloudAuto = serde_json::from_str(r#"{"schedule":"interval","intervalMinutes":30}"#)
-        .expect("前端写下来的形状必须能解析");
+    let parsed: MdCloudAuto =
+        serde_json::from_str(r#"{"schedule":"interval","intervalMinutes":30}"#)
+            .expect("前端写下来的形状必须能解析");
     assert_eq!(parsed.schedule, CloudSchedule::Interval);
     assert_eq!(parsed.interval_minutes, 30);
 }

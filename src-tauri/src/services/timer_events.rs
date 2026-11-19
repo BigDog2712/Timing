@@ -115,7 +115,7 @@ mod tests {
 }
 
 /* 接线验收（桌面独占）：`services::timer` 的每个动作都必须留下一条事件。
-   手机端目前没有计时事件写入方（P3 的宿主建库命令还没接），所以整块挂 `desktop`。 */
+手机端目前没有计时事件写入方（P3 的宿主建库命令还没接），所以整块挂 `desktop`。 */
 #[cfg(all(test, desktop))]
 mod wiring_tests {
     use sqlx::SqlitePool;
@@ -157,7 +157,7 @@ mod wiring_tests {
             let rows = kinds(&pool).await;
             let sequence: Vec<&str> = rows.iter().map(|row| row.0.as_str()).collect();
             /* 真实时钟下这段会话只跑了毫秒级，`should_ignore` 会把它判成「太短」：
-               终止事件只发 `drop`（Stop 后再发 Drop 会被折叠器按 AfterStop 忽略）。 */
+            终止事件只发 `drop`（Stop 后再发 Drop 会被折叠器按 AfterStop 忽略）。 */
             assert_eq!(
                 sequence,
                 ["start", "pause", "resume", "drop"],
@@ -218,7 +218,11 @@ mod wiring_tests {
 
             assert_eq!(block.started_at_ms, started_at, "起点必须一致");
             assert_eq!(block.ended_at_ms, ended_at, "终点必须一致");
-            assert_eq!(block.ended_at_ms.is_some(), status == "saved", "状态必须一致");
+            assert_eq!(
+                block.ended_at_ms.is_some(),
+                status == "saved",
+                "状态必须一致"
+            );
             assert_eq!(
                 block.accumulated_sec(),
                 accumulated_sec,
@@ -234,7 +238,9 @@ mod wiring_tests {
             crate::tests::support::allow_short_records(&pool).await;
             crate::services::timer::start(&pool, Some(1)).await.unwrap();
             let stopped = crate::services::timer::stop(&pool).await.unwrap().record;
-            crate::services::timer::undo(&pool, stopped.id).await.unwrap();
+            crate::services::timer::undo(&pool, stopped.id)
+                .await
+                .unwrap();
 
             let sequence: Vec<String> = kinds(&pool).await.into_iter().map(|row| row.0).collect();
             assert_eq!(sequence, ["start", "stop", "resume"]);
@@ -256,7 +262,10 @@ mod wiring_tests {
                 .unwrap()
                 .block
                 .unwrap();
-            assert_eq!(block.ended_at_ms, final_record.ended_at, "第二次结束才是最终结果");
+            assert_eq!(
+                block.ended_at_ms, final_record.ended_at,
+                "第二次结束才是最终结果"
+            );
         });
     }
 

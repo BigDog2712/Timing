@@ -48,10 +48,13 @@ fn valid_backup_is_resolved_inside_root() {
     let dir = temp_dir("ok");
     put(&dir, "webdav__2026-11-06-20261108-120000.md");
 
-    let (path, export) = resolve_in(&dir, "webdav__2026-11-06-20261108-120000.md")
-        .expect("合法备份必须能导出");
+    let (path, export) =
+        resolve_in(&dir, "webdav__2026-11-06-20261108-120000.md").expect("合法备份必须能导出");
     assert!(path.is_file(), "返回的必须是那个真文件");
-    assert_eq!(export, "2026-11-06-20261108-120000.md", "导出名去掉落点前缀");
+    assert_eq!(
+        export, "2026-11-06-20261108-120000.md",
+        "导出名去掉落点前缀"
+    );
 }
 
 /// `obsidian__` 的老底也能导：导出是副本，不需要落点（与「恢复」相反）。
@@ -59,8 +62,8 @@ fn valid_backup_is_resolved_inside_root() {
 fn obsidian_backup_is_exportable() {
     let dir = temp_dir("obsidian");
     put(&dir, "obsidian__2026-11-05-20261108-120000.md");
-    let (_, export) = resolve_in(&dir, "obsidian__2026-11-05-20261108-120000.md")
-        .expect("导出不看归属");
+    let (_, export) =
+        resolve_in(&dir, "obsidian__2026-11-05-20261108-120000.md").expect("导出不看归属");
     assert_eq!(export, "2026-11-05-20261108-120000.md");
 }
 
@@ -125,8 +128,7 @@ fn broken_root_is_refused() {
 fn directory_is_refused() {
     let dir = temp_dir("dir");
     fs::create_dir_all(dir.join("webdav__2026-11-06-20261108-120000.md")).expect("建同名目录");
-    let err = resolve_in(&dir, "webdav__2026-11-06-20261108-120000.md")
-        .expect_err("目录不是备份");
+    let err = resolve_in(&dir, "webdav__2026-11-06-20261108-120000.md").expect_err("目录不是备份");
     assert!(err.contains("不是一个文件"), "实得：{err}");
 }
 

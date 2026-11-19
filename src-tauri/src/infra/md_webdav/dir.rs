@@ -201,7 +201,9 @@ pub async fn ensure_base_dir(target: &WebdavTarget) -> Result<EnsureOutcome, Dir
 /// v0.11.15 已定死（「再 409 = 配额 / 只读」），那里不需要知道卡在第几级；留着 `DirFailure`
 /// 会让那句 `match` 多三行，而 `mod.rs` 是本轮点名「不许变长」的四个临界文件之一。
 pub async fn ensure_base_dir_err(target: &WebdavTarget) -> Result<EnsureOutcome, WebdavError> {
-    ensure_base_dir(target).await.map_err(|failure| failure.error)
+    ensure_base_dir(target)
+        .await
+        .map_err(|failure| failure.error)
 }
 
 /// 建一级目录。`Ok(true)` = 建成了，`Ok(false)` = 已经存在（幂等）。

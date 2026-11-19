@@ -3,8 +3,8 @@
 //! `mod tests` 仍声明在原模块内（`#[path]` 指向本文件），`super::` 语义不变。
 
 use super::*;
-use crate::services::activity::data::schema;
 use crate::models::activity::tools::ActivityReminderTarget;
+use crate::services::activity::data::schema;
 use futures_util::FutureExt;
 use sqlx::{Executor, SqlitePool};
 use std::panic::AssertUnwindSafe;
@@ -15,11 +15,9 @@ async fn tools_tick_skips_activity_tables_when_no_check_is_due() {
     for migration in schema::tracker_migrations() {
         pool.execute(migration.sql).await.unwrap();
     }
-    pool.execute(
-        "ALTER TABLE tool_activity_reminder_rules RENAME TO unavailable_activity_rules",
-    )
-    .await
-    .unwrap();
+    pool.execute("ALTER TABLE tool_activity_reminder_rules RENAME TO unavailable_activity_rules")
+        .await
+        .unwrap();
     let events = tick_tools_with_pool(&pool, 120_000, "2026-06-07", 0, &[], None)
         .await
         .unwrap();

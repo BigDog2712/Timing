@@ -165,7 +165,7 @@ pub fn fold_session(ops: &[TimerOp]) -> FoldResult {
 
     let Some((mut block, mut stopped_by)) = revision::initial_block(&mut ordered) else {
         /* 分片不完整：只拉到了 stop/pause。忽略而不是造一条零长块 —— 造出来的块
-           会进时间轴，看起来像「用户在一个瞬间完成了一次计时」。 */
+        会进时间轴，看起来像「用户在一个瞬间完成了一次计时」。 */
         let ignored = ordered
             .iter()
             .map(|op| Ignored {
@@ -180,20 +180,30 @@ pub fn fold_session(ops: &[TimerOp]) -> FoldResult {
     };
 
     /* ② 单调钳制：每条事件的生效时刻不得早于「上一条已应用事件」。
-       没有它，时钟回拨会造出负区间 —— 更糟的是 `stop` 的 `at_ms` 落在 `start` 之前时，
-       排序后它先于 `start` 出现、被判成「没有 start 的事件」而忽略，会话永远结束不了。
-       钳制把这类事件折叠到同一刻：时长取 0，会话照常收口。 */
+    没有它，时钟回拨会造出负区间 —— 更糟的是 `stop` 的 `at_ms` 落在 `start` 之前时，
+    排序后它先于 `start` 出现、被判成「没有 start 的事件」而忽略，会话永远结束不了。
+    钳制把这类事件折叠到同一刻：时长取 0，会话照常收口。 */
     let mut last_applied = block.started_at_ms;
 
     for op in ordered {
         if let Some(valid) = revision::apply(&mut block, op) {
             if !valid {
-                ignored.push(Ignored { uid: op.uid.clone(), reason: IgnoreReason::MalformedAdjust });
+                ignored.push(Ignored {
+                    uid: op.uid.clone(),
+                    reason: IgnoreReason::MalformedAdjust,
+                });
             }
             continue;
         }
-        if block.record.as_ref().is_some_and(|record| record.deleted_at.is_some()) {
-            ignored.push(Ignored { uid: op.uid.clone(), reason: IgnoreReason::AfterStop });
+        if block
+            .record
+            .as_ref()
+            .is_some_and(|record| record.deleted_at.is_some())
+        {
+            ignored.push(Ignored {
+                uid: op.uid.clone(),
+                reason: IgnoreReason::AfterStop,
+            });
             continue;
         }
         if op.kind == TimerOpKind::Start {
@@ -223,11 +233,11 @@ pub fn fold_session(ops: &[TimerOp]) -> FoldResult {
 
         match op.kind {
             /* 重复的 start 已在循环开头 continue，走不到这里；留一个空分支而不是
-               `unreachable!()`：release 是 panic=abort，可达路径上的 panic 会整进程退出。 */
+            `unreachable!()`：release 是 panic=abort，可达路径上的 panic 会整进程退出。 */
             TimerOpKind::Start => {}
             TimerOpKind::Pause => {
                 /* 累加「正在跑的这一段」并停表。已经是暂停态时重复 pause 是无操作，
-                   不要把它算成一次结算（否则同一段会被累加两次）。 */
+                不要把它算成一次结算（否则同一段会被累加两次）。 */
                 if let Some(since) = block.running_since_ms.take() {
                     // 本地暂停按段截到整秒，余毫秒不能跨暂停累加。
                     block.accumulated_ms += ((at_ms - since).max(0) / 1000) * 1000;
@@ -288,6 +298,6 @@ pub use adjust::item_switch_payload;
 pub use revision::RecordRevision;
 
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 mod revision_tests;
+#[cfg(test)]
+mod tests;

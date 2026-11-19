@@ -25,14 +25,17 @@ fn business_database_stamps_time_records_and_records_tombstones() {
             "trg_time_records_touch_update",
             "trg_time_records_tombstone",
         ] {
-            assert!(trigger_exists(&pool, trigger).await, "missing trigger {trigger}");
+            assert!(
+                trigger_exists(&pool, trigger).await,
+                "missing trigger {trigger}"
+            );
         }
         let version: String =
             sqlx::query_scalar("SELECT value FROM settings WHERE key = 'schema.version'")
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(version, "16");
+        assert_eq!(version, "17");
 
         // items.id = 1 是种子「未归类」（0001 的种子行），外键天然满足。
         //
@@ -51,7 +54,10 @@ fn business_database_stamps_time_records_and_records_tombstones() {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert!(stamped > 0, "insert trigger must stamp time_records.updated_at_ms");
+        assert!(
+            stamped > 0,
+            "insert trigger must stamp time_records.updated_at_ms"
+        );
 
         sqlx::query("DELETE FROM time_records")
             .execute(&pool)
@@ -92,6 +98,9 @@ fn second_start_does_not_restamp_existing_rows() {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(after, 777, "guard backfill must not touch already stamped rows");
+        assert_eq!(
+            after, 777,
+            "guard backfill must not touch already stamped rows"
+        );
     });
 }

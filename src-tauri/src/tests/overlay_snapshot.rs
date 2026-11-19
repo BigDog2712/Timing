@@ -66,14 +66,20 @@ fn idle_snapshot_is_all_zero() {
 
 #[test]
 fn running_keeps_raw_fields_for_the_native_clock() {
-    let snap = OverlaySnapshot::of(&state_of(timer_status::RUNNING, Some(running_record())), "写周报");
+    let snap = OverlaySnapshot::of(
+        &state_of(timer_status::RUNNING, Some(running_record())),
+        "写周报",
+    );
     assert_eq!(snap.status, timer_status::RUNNING);
     assert_eq!(snap.item, "写周报");
     assert_eq!(snap.accumulated_sec, 90);
     /* 原样透传：原生层要用它现算带小数的秒，算好的整秒会让圆点的弧一格一格跳 */
     assert_eq!(snap.running_since, Some(1_700_000_090_000));
     assert_eq!(snap.mode, timer_mode::COUNTUP);
-    assert_eq!(snap.target_sec, 0, "正计时的 targetSec 必须是 0，不是 null 之外的任意值");
+    assert_eq!(
+        snap.target_sec, 0,
+        "正计时的 targetSec 必须是 0，不是 null 之外的任意值"
+    );
 }
 
 #[test]
@@ -81,7 +87,11 @@ fn paused_is_not_shown_as_running() {
     let mut record = running_record();
     record.running_since = None; // 暂停：累计冻结，锚点清空
     let snap = OverlaySnapshot::of(&state_of(timer_status::PAUSED, Some(record)), "写周报");
-    assert_eq!(snap.status, timer_status::PAUSED, "暂停的会话仍在库里，状态必须来自 status 而不是 session 的有无");
+    assert_eq!(
+        snap.status,
+        timer_status::PAUSED,
+        "暂停的会话仍在库里，状态必须来自 status 而不是 session 的有无"
+    );
     assert_eq!(snap.running_since, None);
     assert_eq!(snap.accumulated_sec, 90, "暂停不该清零累计");
 }
@@ -116,7 +126,10 @@ fn missing_item_name_degrades_to_empty() {
 
 #[test]
 fn summary_names_the_state() {
-    let snap = OverlaySnapshot::of(&state_of(timer_status::RUNNING, Some(running_record())), "写周报");
+    let snap = OverlaySnapshot::of(
+        &state_of(timer_status::RUNNING, Some(running_record())),
+        "写周报",
+    );
     let line = snap.summary();
     assert!(line.contains("running"), "摘要要能看出状态：{line}");
     assert!(line.contains("写周报"), "摘要要带事项名：{line}");

@@ -31,7 +31,7 @@ pub async fn delete_file(target: &WebdavTarget, rel: &str) -> Result<u16, Webdav
         .map_err(map_reqwest)?;
     let code = response.status().as_u16();
     /* 404 要先于 `fail_on_status` 判：后者会把它翻成 `NotFound` 错误，
-       而「本来就不在」对清理是成功（I15 收敛路径里 404 会反复出现）。 */
+    而「本来就不在」对清理是成功（I15 收敛路径里 404 会反复出现）。 */
     if code == 404 {
         return Ok(404);
     }
@@ -95,7 +95,7 @@ mod tests {
 
         let outcome = delete_file(&target, "2026-02-03.md").await;
         /* 先断言线上发生了什么，再断言返回什么：变异时最有用的信息是「它多打了一次、
-           而且打到了 /moved」，只看 `left: None` 看不出这一层。 */
+        而且打到了 /moved」，只看 `left: None` 看不出这一层。 */
         let lines = request_lines(&fake);
         assert_eq!(
             lines.len(),

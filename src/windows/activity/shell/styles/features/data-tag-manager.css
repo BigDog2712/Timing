@@ -1,0 +1,164 @@
+/**
+ * data-tag-manager.css — 数据页「标签管理」（`.dtm-*`）
+ * -----------------------------------------------------------------------------
+ * 只服务 `DataTagManagerPanel` / `DataTagManagerRow` 两件东西：行悬停、折叠箭头、
+ * 行内操作（改名 / 删除 / 加子标签）。
+ *
+ * 为什么 hover 不用 `--at-bg-elevated`：暗色下 elevated(#2a2a2a) 比 panel(#2d2d2d)
+ * **更暗**，用它做悬停会像"按下去"。改用 accent 8% 叠加：两个主题下都是"提亮"，
+ * 且换宿主色时自动跟随（不写死 hex，理由同 tokens.css 的派生色一节）。
+ */
+.dtm-row {
+  border-radius: 8px;
+  transition: background-color var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.dtm-row:hover,
+.dtm-row:focus-within {
+  background: color-mix(in srgb, var(--at-accent-default) 8%, transparent);
+}
+
+/* 输入框与「新建」：**不用 `at-control`**。
+ * 那个类的 min-height 是 `--at-row-height`(42px)，是为列表行定的；放在单行表单里
+ * 会把输入框撑高，而按钮（compact 30px）居中后看起来"浮"在输入框中间 —— 截图里
+ * 最刺眼的一处。这里统一 32px，三行控件同高。 */
+.dtm-input {
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
+  background: var(--at-bg-app);
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  outline: none;
+  transition:
+    border-color var(--at-motion-fast) var(--at-motion-ease),
+    background-color var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.dtm-input::placeholder {
+  color: var(--at-text-placeholder);
+}
+
+.dtm-input:focus {
+  border-color: color-mix(in srgb, var(--at-accent-default) 55%, var(--at-border-subtle));
+  background: var(--at-bg-panel);
+}
+
+.dtm-submit {
+  min-height: 32px;
+  padding: 0 14px;
+  font-size: var(--at-font-size-caption);
+}
+
+/* 折叠箭头：16×16 的点击区。用 `at-icon-action`（27×28）会把行高顶起来，
+   而这一列在每一行都存在，行高被它决定。 */
+.dtm-caret {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--at-text-tertiary);
+  transition: color var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.dtm-caret:hover {
+  color: var(--at-text-primary);
+}
+
+/* 行内文字操作：平时安静（tertiary），行被悬停/聚焦时才显形为 secondary。
+   键盘用户靠 `:focus-within` 拿到同一份显形，不靠鼠标。 */
+.dtm-action {
+  color: var(--at-text-tertiary);
+  white-space: nowrap;
+  transition: color var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.dtm-row:hover .dtm-action,
+.dtm-row:focus-within .dtm-action {
+  color: var(--at-text-secondary);
+}
+
+.dtm-action:hover:not(:disabled),
+.dtm-action:focus-visible:not(:disabled) {
+  color: var(--at-text-primary);
+}
+
+.dtm-action-danger:hover:not(:disabled),
+.dtm-action-danger:focus-visible:not(:disabled) {
+  color: var(--at-danger);
+}
+
+/* 确认态：整行换色而不是只让一个按钮变红 —— 变红的还是那个「删除」键时，
+   手快连点两下就删了，而这一下会把标签从所有事项上摘掉。 */
+.dtm-row.dtm-row-confirm,
+.dtm-row.dtm-row-confirm:hover,
+.dtm-row.dtm-row-confirm:focus-within {
+  background: color-mix(in srgb, var(--at-danger) 10%, transparent);
+}
+
+/* 只有「确认删除」这一个动词有形状（描边 + danger 淡底），「取消」保持纯文字：
+   两者一眼分得开，不必靠颜色深浅去猜哪个才真的会删。
+   为什么不用 `at-button-danger`：它是实心 + 白字（`danger 94% + white`），在暗色里
+   是浅粉底压白字，对比度不够；而且 30px 高会把这一行顶得比别的行高，列表会跳。
+   这里高度 26px，行高与普通行完全一致。 */
+.dtm-confirm-danger {
+  display: inline-flex;
+  min-height: 26px;
+  padding: 0 10px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--at-danger) 58%, transparent);
+  border-radius: var(--at-radius-control);
+  background: color-mix(in srgb, var(--at-danger) 15%, transparent);
+  color: color-mix(in srgb, var(--at-danger) 72%, var(--at-text-primary));
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-emphasis);
+  line-height: 1;
+  white-space: nowrap;
+  transition:
+    background-color var(--at-motion-fast) var(--at-motion-ease),
+    border-color var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.dtm-confirm-danger:hover,
+.dtm-confirm-danger:focus-visible {
+  border-color: color-mix(in srgb, var(--at-danger) 80%, transparent);
+  background: color-mix(in srgb, var(--at-danger) 26%, transparent);
+}
+
+/* 加子标签：18px 的圆形小加号，放在行尾最后一个位置（它不是"改这条"，而是"往下长"） */
+.dtm-addchild {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: var(--at-text-tertiary);
+  transition:
+    color var(--at-motion-fast) var(--at-motion-ease),
+    background-color var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.dtm-addchild:hover:not(:disabled),
+.dtm-addchild:focus-visible:not(:disabled) {
+  background: var(--at-accent-muted);
+  color: var(--at-accent-default);
+}
+
+.dtm-addchild:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
+/* 计数是数字列：等宽数字让同一层的「0 / 1 / 12」右缘对齐，扫视时不跳 */
+.dtm-metric {
+  font-variant-numeric: tabular-nums;
+}

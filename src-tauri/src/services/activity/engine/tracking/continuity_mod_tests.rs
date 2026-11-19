@@ -6,11 +6,11 @@ use super::{
     load_pending_continuity, resolve_next_pending_continuity,
     resolve_next_session_continuity_group_start_time,
 };
+use crate::infra::activity::windows::foreground as tracker;
+use crate::models::activity::tracking::{SustainedParticipationKind, TrackingStatusSnapshot};
 use crate::services::activity::data::schema as db_schema;
 use crate::services::activity::data::tracking_runtime::TrackingRuntimeDataStore;
-use crate::models::activity::tracking::{SustainedParticipationKind, TrackingStatusSnapshot};
 use crate::services::activity::engine::tracking::{active_session, transition};
-use crate::infra::activity::windows::foreground as tracker;
 use sqlx::{Executor, SqlitePool};
 
 fn make_window(overrides: &[(&str, &str)]) -> tracker::WindowInfo {
@@ -109,12 +109,11 @@ fn sustained_participation_short_app_switch_reuses_original_continuity_group() {
         .await
         .unwrap();
 
-        let return_continuity_group_start_time =
-            resolve_next_session_continuity_group_start_time(
-                Some(&pending),
-                &resumed_video,
-                70_000,
-            );
+        let return_continuity_group_start_time = resolve_next_session_continuity_group_start_time(
+            Some(&pending),
+            &resumed_video,
+            70_000,
+        );
         let return_reason = transition::apply_window_transition(
             &data,
             Some(&chat),
@@ -200,12 +199,11 @@ fn sustained_participation_return_after_continuity_window_starts_new_group() {
         .await
         .unwrap();
 
-        let return_continuity_group_start_time =
-            resolve_next_session_continuity_group_start_time(
-                Some(&pending),
-                &resumed_video,
-                250_000,
-            );
+        let return_continuity_group_start_time = resolve_next_session_continuity_group_start_time(
+            Some(&pending),
+            &resumed_video,
+            250_000,
+        );
         let return_reason = transition::apply_window_transition(
             &data,
             Some(&chat),
@@ -297,12 +295,11 @@ fn ordinary_short_app_switch_reuses_original_continuity_group() {
         .await
         .unwrap();
 
-        let return_continuity_group_start_time =
-            resolve_next_session_continuity_group_start_time(
-                Some(&pending),
-                &resumed_coding,
-                70_000,
-            );
+        let return_continuity_group_start_time = resolve_next_session_continuity_group_start_time(
+            Some(&pending),
+            &resumed_coding,
+            70_000,
+        );
         transition::apply_window_transition(
             &data,
             Some(&chat),
@@ -392,12 +389,11 @@ fn ordinary_return_after_continuity_window_starts_new_group() {
         .await
         .unwrap();
 
-        let return_continuity_group_start_time =
-            resolve_next_session_continuity_group_start_time(
-                Some(&pending),
-                &resumed_coding,
-                250_000,
-            );
+        let return_continuity_group_start_time = resolve_next_session_continuity_group_start_time(
+            Some(&pending),
+            &resumed_coding,
+            250_000,
+        );
         transition::apply_window_transition(
             &data,
             Some(&chat),

@@ -6,8 +6,8 @@
 use super::*;
 
 use crate::infra::activity::storage_paths::DATA_SUBDIR;
-use std::path::PathBuf;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
+use std::path::PathBuf;
 
 fn temp_root(tag: &str) -> PathBuf {
     let root = std::env::temp_dir().join(format!("activity-migrate2-{tag}-{}", std::process::id()));
@@ -69,10 +69,7 @@ fn settings_rows(path: &Path) -> Vec<(String, String)> {
 fn an_empty_new_directory_does_not_stop_the_copy() {
     let root = temp_root("empty-new-dir");
     let old = root.join(LEGACY_ACTIVITY_DATA_REL);
-    make_settings_db(
-        &old.join(LEGACY_ACTIVITY_DB_FILE),
-        &[("k", "v")],
-    );
+    make_settings_db(&old.join(LEGACY_ACTIVITY_DB_FILE), &[("k", "v")]);
     std::fs::create_dir_all(root.join(ACTIVITY_SUBDIR)).unwrap();
 
     let report = prepare(&root);
@@ -99,7 +96,9 @@ fn paths_stored_inside_the_database_are_never_rewritten() {
     大小写敏感替换碰不到大写那份，用例会绿着放过它（V-8 第一次实测就是这样）。 */
     let remote = "/patina/backups";
     make_settings_db(
-        &root.join(LEGACY_ACTIVITY_DATA_REL).join(LEGACY_ACTIVITY_DB_FILE),
+        &root
+            .join(LEGACY_ACTIVITY_DATA_REL)
+            .join(LEGACY_ACTIVITY_DB_FILE),
         &[
             ("scheduled_backup_config.target_dir", backup),
             ("scheduled_export_config.target_dir", export),

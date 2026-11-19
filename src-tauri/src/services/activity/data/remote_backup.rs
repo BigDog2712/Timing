@@ -1,9 +1,9 @@
-use crate::services::activity::data::backup;
-use crate::services::activity::data::repositories::remote_backup_settings;
-use crate::models::activity::backup::BackupPreview;
-use crate::models::activity::backup_schedule::ScheduledBackupRun;
 use crate::infra::activity::storage_paths;
 use crate::infra::activity::webdav::{WebDavClient, WebDavConfig};
+use crate::models::activity::backup::BackupPreview;
+use crate::models::activity::backup_schedule::ScheduledBackupRun;
+use crate::services::activity::data::backup;
+use crate::services::activity::data::repositories::remote_backup_settings;
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Sqlite};
 use std::cmp::Reverse;
@@ -456,7 +456,8 @@ async fn webdav_client(
 ) -> Result<(WebDavConfig, WebDavClient), String> {
     let requested = config_to_webdav(config)?;
     let pool = crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool(app).await?;
-    let (saved, password) = crate::services::activity::data::remote_backup_config::network_snapshot(app, &pool).await?;
+    let (saved, password) =
+        crate::services::activity::data::remote_backup_config::network_snapshot(app, &pool).await?;
     if saved != requested {
         return Err("WebDAV configuration changed; reload before retrying".into());
     }
@@ -518,7 +519,8 @@ pub(crate) async fn load_scheduled_webdav_target(
     app: &AppHandle,
     pool: &Pool<Sqlite>,
 ) -> Result<ScheduledWebDavTarget, String> {
-    let (config, password) = crate::services::activity::data::remote_backup_config::network_snapshot(app, pool).await?;
+    let (config, password) =
+        crate::services::activity::data::remote_backup_config::network_snapshot(app, pool).await?;
     let client = WebDavClient::new(&config, password)?;
     Ok(ScheduledWebDavTarget { config, client })
 }

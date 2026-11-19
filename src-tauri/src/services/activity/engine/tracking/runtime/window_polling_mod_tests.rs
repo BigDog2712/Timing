@@ -166,11 +166,10 @@ fn native_failure_never_counts_as_a_successful_observation() {
             "A.exe"
         );
         assert!(lock_inner(&state).active_generation.is_none());
-        let recovered =
-            poll_active_window_with_state(state, Duration::from_secs(1), 3_000, || {
-                make_window("B.exe")
-            })
-            .await;
+        let recovered = poll_active_window_with_state(state, Duration::from_secs(1), 3_000, || {
+            make_window("B.exe")
+        })
+        .await;
         assert!(recovered.is_successful_sample());
         assert_eq!(recovered.window.exe_name, "B.exe");
     });
@@ -181,13 +180,11 @@ fn successful_probe_updates_cache() {
     tauri::async_runtime::block_on(async {
         let state = Arc::new(ForegroundProbeState::default());
 
-        let outcome = poll_active_window_with_state(
-            state.clone(),
-            Duration::from_millis(50),
-            1_000,
-            || make_window("Code.exe"),
-        )
-        .await;
+        let outcome =
+            poll_active_window_with_state(state.clone(), Duration::from_millis(50), 1_000, || {
+                make_window("Code.exe")
+            })
+            .await;
 
         assert_eq!(outcome.probe_status, TrackingRuntimeProbeStatus::Ok);
         assert!(outcome.is_successful_sample());
@@ -278,16 +275,12 @@ fn repeated_stuck_probes_enter_hard_degraded_without_unbounded_tasks() {
             guard.last_recovery_attempt_at_ms = Some(13_000);
         }
 
-        let third = poll_active_window_with_state(
-            state.clone(),
-            Duration::from_millis(10),
-            43_000,
-            || {
+        let third =
+            poll_active_window_with_state(state.clone(), Duration::from_millis(10), 43_000, || {
                 thread::sleep(Duration::from_millis(80));
                 make_window("Late2.exe")
-            },
-        )
-        .await;
+            })
+            .await;
         assert_eq!(
             third.probe_status,
             TrackingRuntimeProbeStatus::RecoveryAttemptedFallback

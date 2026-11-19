@@ -79,15 +79,16 @@ pub async fn cmd_get_item_timeline<R: Runtime>(
     let activity = wait_for_sqlite_pool(&app).await?;
     let now = crate::infra::activity::clock::unix_timestamp_millis_i64();
     /* 旧 KV 配置回填（守卫键保证只真跑一次）。放在这里而不是只等设置页点按钮：
-       分类绑定为空时每个子记录都会落到 `other`，而规则 2 会给出一个**看起来正确**
-       的答案 —— 用户看到的是「分类全错了」而不是「还没迁移」（设计文档 §13）。 */
+    分类绑定为空时每个子记录都会落到 `other`，而规则 2 会给出一个**看起来正确**
+    的答案 —— 用户看到的是「分类全错了」而不是「还没迁移」（设计文档 §13）。 */
     if let Err(error) =
-        crate::services::activity::data::legacy_bindings::backfill(&state.pool, &activity, now).await
+        crate::services::activity::data::legacy_bindings::backfill(&state.pool, &activity, now)
+            .await
     {
         crate::log_warn!("legacy binding backfill failed: {error}");
     }
     /* 自愈式增量投影（理由见文件头）。失败只告警：让用户看到上一轮的块，
-       比让时间轴整块空白更容易理解。 */
+    比让时间轴整块空白更容易理解。 */
     if let Err(error) = focus_blocks::project(&state.pool, &activity, Some(start_ms)).await {
         crate::log_warn!("focus block projection before timeline failed: {error}");
     }

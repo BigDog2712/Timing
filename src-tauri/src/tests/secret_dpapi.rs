@@ -11,7 +11,10 @@ fn temp_file() -> std::path::PathBuf {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|gap| gap.as_nanos())
         .unwrap_or(0);
-    std::env::temp_dir().join(format!("timing-webdav-secret-{}-{nanos}.bin", std::process::id()))
+    std::env::temp_dir().join(format!(
+        "timing-webdav-secret-{}-{nanos}.bin",
+        std::process::id()
+    ))
 }
 
 #[test]
@@ -41,6 +44,9 @@ fn round_trips_and_never_writes_plaintext() {
     );
 
     secret_dpapi::clear(&path).expect("清除应成功");
-    assert_eq!(secret_dpapi::get(&path).expect("清掉后仍是「没存过」"), None);
+    assert_eq!(
+        secret_dpapi::get(&path).expect("清掉后仍是「没存过」"),
+        None
+    );
     secret_dpapi::clear(&path).expect("再清一次也要成功（幂等）");
 }

@@ -5,7 +5,10 @@ use tauri::{AppHandle, Runtime, WebviewWindow};
 pub async fn cmd_get_mini_activity_snapshot(
     app: AppHandle,
     window: WebviewWindow,
-) -> Result<crate::services::activity::data::repositories::mini_activity::MiniActivitySnapshot, String> {
+) -> Result<
+    crate::services::activity::data::repositories::mini_activity::MiniActivitySnapshot,
+    String,
+> {
     if window.label() != "mini" {
         return Err("Mini window access denied".into());
     }
@@ -48,7 +51,8 @@ pub async fn cmd_mini_window_action<R: Runtime>(
 #[tauri::command]
 pub async fn cmd_get_mini_bootstrap_snapshot(
     app: AppHandle,
-) -> Result<crate::services::activity::data::repositories::mini_window::MiniBootstrapSnapshot, String> {
+) -> Result<crate::services::activity::data::repositories::mini_window::MiniBootstrapSnapshot, String>
+{
     crate::services::activity::data::mini_window_store::load_bootstrap(&app).await
 }
 

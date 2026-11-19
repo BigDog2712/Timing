@@ -105,7 +105,11 @@ pub fn init(app_data_dir: &Path) {
     let _ = fs::create_dir_all(&dir);
     prune(&dir);
     let path = dir.join(format!("timing-{}.log", today()));
-    let file = OpenOptions::new().create(true).append(true).open(&path).ok();
+    let file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .ok();
     let day = today();
     let _ = LOG_DIR.set(dir);
     let _ = SINK.set(Mutex::new(SinkState { day, file }));
@@ -163,7 +167,13 @@ pub fn log(level: Level, target: &str, message: &str) {
     }
     let now = chrono::Local::now();
     let day = now.format("%Y-%m-%d").to_string();
-    let line = format!("{} {} [{}] {}\n", now.format("%Y-%m-%d %H:%M:%S%.3f"), level.tag(), target, message);
+    let line = format!(
+        "{} {} [{}] {}\n",
+        now.format("%Y-%m-%d %H:%M:%S%.3f"),
+        level.tag(),
+        target,
+        message
+    );
     if let Some(sink) = SINK.get() {
         if let Ok(mut guard) = sink.lock() {
             if guard.day != day {

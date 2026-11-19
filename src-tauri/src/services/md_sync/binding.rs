@@ -46,7 +46,10 @@ pub(super) async fn sync_binding(
 ) -> Result<BindingOutcome, String> {
     let read = md_file::read_section(path, &binding.heading)?;
     /* 阻断级诊断：本轮既不写也不导入（不写保住手改内容，不导入不触发删除块）。 */
-    let warnings = read.guard(binding.kind.label(), &md_section::heading_text(&binding.heading))?;
+    let warnings = read.guard(
+        binding.kind.label(),
+        &md_section::heading_text(&binding.heading),
+    )?;
     let section = read.state;
     let expected = render_expected(pool, binding, date)
         .await
@@ -57,7 +60,9 @@ pub(super) async fn sync_binding(
         SectionState::MissingFile => (None, 0),
         /* 标题缺失按「文件侧没有这一节」处理：只补写，不把空内容当删除。
         `Blocked` 同档：它在上面已 return，这里只为穷尽 match。 */
-        SectionState::MissingHeading { mtime_ms } | SectionState::Blocked { mtime_ms } => (None, *mtime_ms),
+        SectionState::MissingHeading { mtime_ms } | SectionState::Blocked { mtime_ms } => {
+            (None, *mtime_ms)
+        }
         SectionState::Present { body, mtime_ms } => (Some(body.clone()), *mtime_ms),
     };
 

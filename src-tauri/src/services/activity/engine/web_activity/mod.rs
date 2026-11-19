@@ -394,9 +394,16 @@ mod tests {
         pool.execute(db_schema::WEB_ACTIVITY_SESSION_SCHEMA_SQL)
             .await
             .unwrap();
-        crate::services::activity::data::repositories::sessions::start_session(&pool, "Chrome", "chrome.exe", "", 0, 0)
-            .await
-            .unwrap();
+        crate::services::activity::data::repositories::sessions::start_session(
+            &pool,
+            "Chrome",
+            "chrome.exe",
+            "",
+            0,
+            0,
+        )
+        .await
+        .unwrap();
         pool
     }
 

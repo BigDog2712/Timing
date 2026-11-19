@@ -77,10 +77,10 @@ pub(crate) fn seed_from(
     }
     /* 闸③：目标库在 → 这个根里本来就有历史，不需要也不该被另一份覆盖（兜底，保留）。
 
-       这里**必须**引 `SQLITE_DB_FILE_NAME` 而不是写 `"patina.db"`：闸③ 的判断与下面
-       `write_marker` 是无条件的一对——库名翻新而这里仍是旧名时，干净的自定义根会被判
-       「该导」，上游历史被拷成旧名文件，标记照写，随后按新名读不到库 ⇒ 建空库，
-       而下次启动闸② 见标记在就直接返回 ⇒ **这次导入永久作废、用户侧不可自愈**。 */
+    这里**必须**引 `SQLITE_DB_FILE_NAME` 而不是写 `"patina.db"`：闸③ 的判断与下面
+    `write_marker` 是无条件的一对——库名翻新而这里仍是旧名时，干净的自定义根会被判
+    「该导」，上游历史被拷成旧名文件，标记照写，随后按新名读不到库 ⇒ 建空库，
+    而下次启动闸② 见标记在就直接返回 ⇒ **这次导入永久作废、用户侧不可自愈**。 */
     let target = data_dir.join(storage_paths::SQLITE_DB_FILE_NAME);
     let imported = match source {
         Some(from) if !target.exists() => {

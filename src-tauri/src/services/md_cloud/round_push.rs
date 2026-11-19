@@ -47,7 +47,10 @@ pub(crate) use super::text::{fail_tag, fail_text};
 pub(super) fn fatal(err: &WebdavError) -> bool {
     matches!(
         err,
-        WebdavError::Auth | WebdavError::TooLarge | WebdavError::Forbidden | WebdavError::RateLimited
+        WebdavError::Auth
+            | WebdavError::TooLarge
+            | WebdavError::Forbidden
+            | WebdavError::RateLimited
     )
 }
 
@@ -81,7 +84,14 @@ pub(crate) async fn push_today(
     match md_webdav::put(target, &rel, text.as_bytes(), etag).await {
         Ok(outcome) => {
             backoff::on_success().await;
-            repo::mark_synced(pool, PurgeChannel::Webdav, today, outcome.etag.as_deref(), &hash).await?;
+            repo::mark_synced(
+                pool,
+                PurgeChannel::Webdav,
+                today,
+                outcome.etag.as_deref(),
+                &hash,
+            )
+            .await?;
             crate::log_info!(
                 "md cloud out: {}.md bytes={} etag={}",
                 today,
@@ -132,15 +142,15 @@ pub(super) async fn push_history(
             .await?
             .and_then(|row| row.etag);
         /* 记账里没有 ETag 时先问一次远端：无条件 PUT 会用旧快照盖掉对端的手改。
-           404 才是「可以新建」；读到文件却仍无 ETag ⇒ 服务端不支持条件写，本轮跳过。 */
+        404 才是「可以新建」；读到文件却仍无 ETag ⇒ 服务端不支持条件写，本轮跳过。 */
         if etag.is_none() {
             match md_webdav::get(target, &rel).await {
                 Ok(remote) => match remote.etag {
                     Some(found) => etag = Some(found),
                     None => {
-                        report.errors.push(format!(
-                            "{date} 远端文件存在但服务端没有 ETag，本轮不覆盖"
-                        ));
+                        report
+                            .errors
+                            .push(format!("{date} 远端文件存在但服务端没有 ETag，本轮不覆盖"));
                         crate::log_warn!("md cloud out: {date}.md skip=no-etag");
                         continue;
                     }
@@ -161,7 +171,14 @@ pub(super) async fn push_history(
         match md_webdav::put(target, &rel, &bytes, etag.as_deref()).await {
             Ok(outcome) => {
                 backoff::on_success().await;
-                repo::mark_synced(pool, PurgeChannel::Webdav, &date, outcome.etag.as_deref(), &hash).await?;
+                repo::mark_synced(
+                    pool,
+                    PurgeChannel::Webdav,
+                    &date,
+                    outcome.etag.as_deref(),
+                    &hash,
+                )
+                .await?;
                 crate::log_info!(
                     "md cloud out: {date}.md put=ok bytes={} etag={}",
                     bytes.len(),
@@ -170,7 +187,9 @@ pub(super) async fn push_history(
             }
             Err(WebdavError::Precondition) => {
                 crate::log_warn!("md cloud out: {date}.md skip=conflict");
-                report.errors.push(format!("{date} 远端也改过，本轮没有覆盖"));
+                report
+                    .errors
+                    .push(format!("{date} 远端也改过，本轮没有覆盖"));
             }
             Err(err) => {
                 backoff::on_failure(now_ms()).await;

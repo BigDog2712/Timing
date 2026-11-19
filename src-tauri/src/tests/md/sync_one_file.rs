@@ -15,7 +15,7 @@ use crate::services;
 use crate::services::md_sync::config;
 use crate::tests::support::{insert_saved, new_item};
 
-use super::sync::{NOTES_HEADING, TIMERS_HEADING, TODOS_HEADING, at, env};
+use super::sync::{at, env, NOTES_HEADING, TIMERS_HEADING, TODOS_HEADING};
 
 /// 三个种类各放一条**当天**的数据：没有数据时 `mirror` 不建文件、也不写那个区块，
 /// 测不到「只落一个文件、三个标题都在」。
@@ -24,7 +24,14 @@ use super::sync::{NOTES_HEADING, TIMERS_HEADING, TODOS_HEADING, at, env};
 /// 待办必须是今天的，否则它们属于别的日子，不会出现在今天这篇日记里。
 async fn seed_three_kinds(env: &super::sync::Env) {
     let item = new_item(&env.pool, "写代码").await;
-    insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
     let geometry = NoteGeometry {
         pos_x: 160.0,
         pos_y: 160.0,
@@ -53,7 +60,11 @@ async fn one_file_name_for_all_kinds_writes_exactly_one_file_with_three_headings
     config::save(&env.pool, &current).await.expect("保存应成功");
 
     let report = services::md_sync::run(&env.pool).await.expect("同步应成功");
-    assert!(report.errors.is_empty(), "同步不该有落点错误：{:?}", report.errors);
+    assert!(
+        report.errors.is_empty(),
+        "同步不该有落点错误：{:?}",
+        report.errors
+    );
 
     /* 落点目录里只能有一个 .md */
     let mut names: Vec<String> = std::fs::read_dir(&env.vault)

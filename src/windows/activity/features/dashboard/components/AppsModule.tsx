@@ -6,13 +6,7 @@ import { DASHBOARD_COPY } from "../copy.ts";
 import ModuleShell, { moduleState } from "./ModuleShell.tsx";
 import type { ReactNode } from "react";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
-import QuickClassificationEntry from "../../classification/components/QuickClassificationEntry.tsx";
-import { useQuickClassificationLauncher } from "../../classification/hooks/useQuickClassificationLauncher.ts";
-import {
-  createQuickAppClassificationTarget,
-  getQuickClassificationTargetKey,
-  type QuickClassificationItemBinding,
-} from "../../classification/types.ts";
+import AppTagDialog from "./AppTagDialog.tsx";
 import { useAppItemBindings } from "../hooks/useAppItemBindings.ts";
 
 /**
@@ -22,12 +16,12 @@ import { useAppItemBindings } from "../hooks/useAppItemBindings.ts";
  * 行 = `grid 24px / 1fr / 52px`，行高走 `--at-row-app`（视觉层 32 → 28）。
  * [视觉层 0.12.x] 行间那 2px 发丝已删，图标 20 → 22、圆角 5 → 6、底色升到 raise 层。
  *
- * ## 行**可编辑**：双击 / 回车 / 右键都能打开快捷编辑（0.12.1 补回）
+ * ## 行**可编辑**：双击 / 回车 / 右键打开**标签编辑**（[0.12.4] 起不再是分类）
  *
- * 编辑走的是既有的快捷分类弹层（`useQuickClassificationLauncher` + `QuickClassificationEntry`，
- * 数据页与历史页用的是同一套），内容 = 改分类 / 改名 / **绑定指定事项**。
- * 卡底 footer「全部分类…」仍然是**分类映射视图**的入口（逐应用改类别/颜色/名字 + 全局筛选），
- * 两条路径不互相取代：行入口只解决「就这一个应用，顺手改一下」，映射视图解决「整体过一遍」。
+ * 原来的「快捷分类弹层」（改分类 / 改名 / 绑定事项）整条下线：分类这个单一维度
+ * 由标签取代，行入口只做一件事 —— 给这个应用挂标签（`AppTagDialog`，写
+ * `__app_override::<exe>.tags`）。改名 / 绑定事项 / 排除统计等整体操作仍在
+ * 卡底 footer 指向的映射视图里，两条路径分工不变。
  *
  * 键盘可达是硬要求（只用双击的入口对键盘用户等于没有）：行上是
  * `tabIndex=0` + `role="button"`，Enter / 空格 / `Shift+F10` 打开，右键同效。
@@ -50,11 +44,22 @@ interface Props {
   /** 快照失败但仍有数据 = E3（卡头小图标） */
   refreshError: boolean;
   onRetry: () => void;
-  /** 「全部分类…」→ 分类映射视图（AppShell 的 handleSidebarNavigate("mapping")） */
+  /** 卡底 footer → 应用映射视图（AppShell 的 handleSidebarNavigate("mapping")） */
   onOpenMapping: () => void;
+  /** 标签保存成功后给上层一个「映射变了」的信号（颜色/筛选要重算） */
+  onTagSaved?: () => void;
 }
 
-export default function AppsModule({ controls, applications, icons, status, refreshError, onRetry, onOpenMapping }: Props) {
+export default function AppsModule({
+  controls,
+  applications,
+  icons,
+  status,
+  refreshError,
+  onRetry,
+  onOpenMapping,
+  onTagSaved,
+}: Props) {
   const UI_TEXT = useLocaleText();
   const copy = DASHBOARD_COPY[useLocale()];
   const visible = applications.slice(0, 5);
@@ -63,49 +68,29 @@ export default function AppsModule({ controls, applications, icons, status, refr
   const totalDuration = applications.reduce((sum, app) => sum + Math.max(0, app.duration), 0);
   const state = moduleState(status, refreshError, visible.length === 0);
 
-  /* 弹层是懒加载的（`QuickClassificationEntry` 内部 `lazy`），但钩子挂在卡上：
-     `openAtElement` 会先 `preload()` 再开，所以首屏不含 385 行的 Surface。 */
-  const { request, openAtElement, close } = useQuickClassificationLauncher();
-  const { bindings, items, itemsLoadFailed, setBinding } = useAppItemBindings();
+  const { bindings, items } = useAppItemBindings();
   const [editError, setEditError] = useState<string | null>(null);
+  /* 双击打开的是**这一行**的标签编辑器；`tagVersion` 在保存后自增，让行上的标签
+     重新按映射表取一遍（override 存在模块级静态表里，不随 props 变）。 */
+  const [editing, setEditing] = useState<{ exeName: string; name: string } | null>(null);
+  const [tagVersion, setTagVersion] = useState(0);
 
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
-  const bindingLabels = useMemo<QuickClassificationItemBinding["labels"]>(() => ({
-    entry: copy.bindItem,
-    none: copy.noBinding,
-    unbindOnlyHint: copy.unbindOnlyHint,
-    menuLabel: copy.itemMenuLabel,
-    loadFailed: copy.itemsLoadFailed,
-    empty: copy.itemsEmpty,
-    saveFailed: copy.saveFailed,
-  }), [copy]);
 
-  const editingApp = request && request.target.kind === "app" ? request.target : null;
-  const itemBinding = useMemo<QuickClassificationItemBinding | undefined>(() => {
-    if (!editingApp) return undefined;
-    return {
-      itemId: bindings[editingApp.exeName] ?? null,
-      items,
-      loadFailed: itemsLoadFailed,
-      labels: bindingLabels,
-      onSave: (itemId) => setBinding(editingApp.exeName, itemId),
-    };
-  }, [bindings, editingApp, items, itemsLoadFailed, bindingLabels, setBinding]);
-
-  const openEditor = useCallback((app: TopApplicationItem, row: HTMLElement) => {
+  const openEditor = useCallback((app: TopApplicationItem) => {
     if (!app.exeName.trim()) return;
     setEditError(null);
-    openAtElement(
-      createQuickAppClassificationTarget({
-        exeName: app.exeName,
-        displayName: app.name,
-        /* `TopApplicationItem` 没有 category 字段（它是排行读数，不是分类记录），
-           所以这里按 exe 问一次映射表 —— 与 `buildTopApplications` 用的是同一个口径。 */
-        category: AppClassification.mapApp(app.exeName, { appName: app.name }).category,
-      }),
-      row,
-    );
-  }, [openAtElement]);
+    setEditing({ exeName: app.exeName, name: app.name });
+  }, []);
+
+  /* 每行的标签（保存后随 `tagVersion` 重取）。分类只在老数据里存在，
+     由 `resolveAppTags` 回落成同名标签 —— 界面不再出现「分类」这个词。 */
+  const tagsByExe = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const app of visible) map.set(app.exeName, AppClassification.getAppTags(app.exeName));
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tagVersion 是"重取一次"的信号
+  }, [visible, tagVersion]);
 
   const handleEditError = useCallback((message: string) => setEditError(message), []);
 
@@ -132,6 +117,7 @@ export default function AppsModule({ controls, applications, icons, status, refr
              行上却没有标记（0.12.1 S1）。 */
           const boundItemId = bindings[AppClassification.resolveStatisticalApp(app.exeName)];
           const bound = boundItemId === undefined ? undefined : itemsById.get(boundItemId);
+          const rowTags = tagsByExe.get(app.exeName) ?? [];
           return (
             <li
               key={app.exeName}
@@ -148,11 +134,11 @@ export default function AppsModule({ controls, applications, icons, status, refr
               /* 双击前 preventDefault：否则连点两下会把下面的名字选中，弹出蓝色选区。 */
               onDoubleClick={(event) => {
                 event.preventDefault();
-                openEditor(app, event.currentTarget);
+                openEditor(app);
               }}
               onContextMenu={(event) => {
                 event.preventDefault();
-                openEditor(app, event.currentTarget);
+                openEditor(app);
               }}
               onKeyDown={(event) => {
                 const opensEditor = event.key === "Enter"
@@ -161,7 +147,7 @@ export default function AppsModule({ controls, applications, icons, status, refr
                   || (event.key === "F10" && event.shiftKey);
                 if (!opensEditor) return;
                 event.preventDefault();
-                openEditor(app, event.currentTarget);
+                openEditor(app);
               }}
             >
               <span className="at-app-icon" aria-hidden="true">
@@ -173,6 +159,16 @@ export default function AppsModule({ controls, applications, icons, status, refr
                   卡宽拖到 w=1（约 300px）时也不横向滚动、不挤变形时长列。 */}
               <span className="at-app-label">
                 <span className="at-app-name">{app.name}</span>
+                {rowTags.length > 0 ? (
+                  <span className="at-app-tags" aria-hidden="true">
+                    {rowTags.slice(0, 2).map((tag) => (
+                      <span key={tag} className="at-app-tag">#{tag}</span>
+                    ))}
+                    {rowTags.length > 2 ? (
+                      <span className="at-app-tag">+{rowTags.length - 2}</span>
+                    ) : null}
+                  </span>
+                ) : null}
                 {bound ? (
                   <span className="at-app-binding" aria-hidden="true">
                     <span
@@ -205,14 +201,18 @@ export default function AppsModule({ controls, applications, icons, status, refr
       </button>
       {/* 弹层本身挂在本卡内（懒加载）：`key` 带上锚点坐标 —— 换一个应用要重挂，
           否则 `QuickClassificationSurface` 里那些 `useState` 初值会沿用上一条。 */}
-      {request ? (
-        <QuickClassificationEntry
-          key={`${getQuickClassificationTargetKey(request.target)}:${request.anchor.clientX}:${request.anchor.clientY}`}
-          request={request}
-          onClose={close}
-          onSaved={() => setEditError(null)}
+      {editing ? (
+        <AppTagDialog
+          key={editing.exeName}
+          exeName={editing.exeName}
+          displayName={editing.name}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditError(null);
+            setTagVersion((version) => version + 1);
+            onTagSaved?.();
+          }}
           onError={handleEditError}
-          itemBinding={itemBinding}
         />
       ) : null}
     </ModuleShell>

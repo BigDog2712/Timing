@@ -102,7 +102,14 @@ pub(super) async fn resolve(
         Ok(outcome) => {
             /* 重试成功=服务端恢复正常：不清掉退避会让下一轮凭空 `skip=backoff`。 */
             backoff::on_success().await;
-            repo::mark_synced(pool, PurgeChannel::Webdav, today, outcome.etag.as_deref(), &merged_hash).await?;
+            repo::mark_synced(
+                pool,
+                PurgeChannel::Webdav,
+                today,
+                outcome.etag.as_deref(),
+                &merged_hash,
+            )
+            .await?;
             crate::log_info!(
                 "md cloud out: {today}.md put=ok retry bytes={} etag={}",
                 text.len(),

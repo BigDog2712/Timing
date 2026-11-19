@@ -21,7 +21,7 @@ pub async fn create_item(
     name: String,
     color: Option<String>,
     /* [0.13.x] 事项树与分类：两个新参数都给了缺省值，既有前端调用（只传 name/color）
-       一条都不用改，而新前端可以一次把层级与分类带上。 */
+    一条都不用改，而新前端可以一次把层级与分类带上。 */
     parent_id: Option<i64>,
     category_key: Option<String>,
 ) -> AppResult<Item> {

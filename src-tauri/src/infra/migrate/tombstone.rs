@@ -38,8 +38,8 @@ pub(super) async fn widen_kinds(pool: &SqlitePool) -> AppResult<()> {
     .map_err(AppError::db)?;
     let Some(create_sql) = create_sql else {
         /* 表还没建（0001–0010 都跑完了却仍不存在）：交给 0010 guard 下次启动建。
-           这里不能自己建一个结构不同的版本，否则 guard 的 `CREATE TABLE IF NOT EXISTS`
-           会永久跳过它。 */
+        这里不能自己建一个结构不同的版本，否则 guard 的 `CREATE TABLE IF NOT EXISTS`
+        会永久跳过它。 */
         return Ok(());
     };
     if !create_sql.contains("kind IN ('s','t')") {
@@ -48,7 +48,7 @@ pub(super) async fn widen_kinds(pool: &SqlitePool) -> AppResult<()> {
 
     let mut tx = pool.begin().await.map_err(AppError::db)?;
     /* 逐条执行而不是 `raw_sql` 多语句：多语句在事务里中途失败时，报错位置指向整段的
-       开头，排查会被带到「建表」而不是真正失败的那一步。 */
+    开头，排查会被带到「建表」而不是真正失败的那一步。 */
     let steps = [
         "DROP TRIGGER IF EXISTS trg_time_records_tombstone",
         "CREATE TABLE sync_tombstone_v11 (

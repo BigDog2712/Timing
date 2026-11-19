@@ -1,3 +1,4 @@
+use crate::infra::activity::windows::{audio, foreground as tracker, media};
 use crate::models::activity::tracking::{
     evaluate_sustained_participation_signal, resolve_sustained_participation_identity_key,
     resolve_sustained_participation_kind, signal_explicitly_stopped_for_window,
@@ -7,7 +8,6 @@ use crate::models::activity::tracking::{
     SustainedParticipationSignalSnapshot, SustainedParticipationSignalSource,
     SustainedParticipationState, SustainedParticipationStatusReason, TrackingStatusSnapshot,
 };
-use crate::infra::activity::windows::{audio, foreground as tracker, media};
 
 const SUSTAINED_PARTICIPATION_TRANSIENT_MISS_THRESHOLD: u8 = 3;
 const SUSTAINED_PARTICIPATION_GRACE_WINDOW_SECS: u64 = 12;

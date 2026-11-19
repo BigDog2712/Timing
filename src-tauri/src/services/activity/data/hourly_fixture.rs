@@ -134,7 +134,10 @@ pub(crate) async fn insert_open_session(pool: &SqlitePool, device_id: &str, star
 /// 而不是把用例挂死。
 pub(crate) async fn drain(pool: &SqlitePool) {
     for _ in 0..1000 {
-        if !super::activity_read_model::maintain_once(pool).await.unwrap() {
+        if !super::activity_read_model::maintain_once(pool)
+            .await
+            .unwrap()
+        {
             return;
         }
     }

@@ -73,7 +73,9 @@ pub async fn upsert_active_segment(
                 }
                 false
             }
-            "tracking_paused" => crate::models::activity::settings::parse_boolean_setting(&value, false),
+            "tracking_paused" => {
+                crate::models::activity::settings::parse_boolean_setting(&value, false)
+            }
             "web_activity_enabled" => {
                 !crate::models::activity::settings::parse_boolean_setting(&value, false)
             }
@@ -313,7 +315,8 @@ pub async fn end_active_segment_for_domain(
     normalized_domain: &str,
     timestamp_ms: i64,
 ) -> Result<bool, sqlx::Error> {
-    let Some(target_domain) = crate::models::activity::web_activity::normalize_domain(normalized_domain)
+    let Some(target_domain) =
+        crate::models::activity::web_activity::normalize_domain(normalized_domain)
     else {
         return Ok(false);
     };

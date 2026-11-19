@@ -144,13 +144,22 @@ async fn moving_the_root_carries_the_activity_database() {
         "活动库必须跟着数据根一起搬：新位置没有它 = 用户的活动历史没了"
     );
     assert!(dest.join("timing.db").is_file(), "两个库都要在新根里");
-    assert_eq!(count_sessions(&copied).await, 1, "搬过去的是那份历史，不是空库");
+    assert_eq!(
+        count_sessions(&copied).await,
+        1,
+        "搬过去的是那份历史，不是空库"
+    );
     assert!(
-        source.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME).is_file(),
+        source
+            .join(ACTIVITY_DATA_REL)
+            .join(SQLITE_DB_FILE_NAME)
+            .is_file(),
         "旧目录不删（用户重启确认没问题之后自己删）"
     );
     assert!(
-        dest.join(ACTIVITY_DATA_REL).join(legacy_import::IMPORT_MARKER).is_file(),
+        dest.join(ACTIVITY_DATA_REL)
+            .join(legacy_import::IMPORT_MARKER)
+            .is_file(),
         "「已处理过」标记必须跟着活动数据一起走，否则新位置等于从没导入过"
     );
     assert!(
@@ -234,11 +243,9 @@ fn first_run_import_copies_the_upstream_database_and_writes_the_marker() {
     /* 没有源 = 也是「处理过」：不写标记的话，用户后来装了独立 Patina，下次启动就会被灌一份。 */
     let fresh = root.join("patina2").join("data");
     std::fs::create_dir_all(&fresh).expect("建 data");
-    assert!(
-        legacy_import::seed_from(&fresh, None, None)
-            .expect("没有源不该失败")
-            .is_none()
-    );
+    assert!(legacy_import::seed_from(&fresh, None, None)
+        .expect("没有源不该失败")
+        .is_none());
     assert!(
         fresh.join(legacy_import::IMPORT_MARKER).is_file(),
         "没有源也要写标记"

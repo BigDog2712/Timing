@@ -32,7 +32,8 @@ pub(super) async fn status_for(
         .ok()
         .flatten()
         .is_some();
-    let scope = channel_cfg.and_then(|cfg| crate::services::sync_stream::scope::for_channel(cfg, channel).ok());
+    let scope = channel_cfg
+        .and_then(|cfg| crate::services::sync_stream::scope::for_channel(cfg, channel).ok());
     let progress = crate::services::sync_stream::progress(
         pool,
         scope.as_deref().unwrap_or(""),
@@ -53,7 +54,7 @@ pub(super) async fn status_for(
         today_pushed: progress.pushed_today,
         pending_dates: progress.pending_days,
         /* 闸③ 拒绝时的逐字红字走 `last_error` 这个既有出口：`MdCloudPurgeStatus` 不进
-           线缆（`#[serde(skip)]`），而块④ 的红字位就是 `status.lastError`。 */
+        线缆（`#[serde(skip)]`），而块④ 的红字位就是 `status.lastError`。 */
         last_error: purge.overlap_note.clone().or(last_error),
         purge,
     })

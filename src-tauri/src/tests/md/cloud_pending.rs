@@ -81,7 +81,7 @@ async fn migration_keeps_existing_rows() {
         )
         .await
         .as_deref(),
-        Some("16")
+        Some("17")
     );
     for (index, table) in TABLES.iter().enumerate() {
         assert_eq!(
@@ -127,7 +127,10 @@ async fn pending_queue_three_states() {
     let today = "2026-11-06";
 
     assert!(
-        repo::get(&pool, PurgeChannel::Webdav, today).await.expect("查询应成功").is_none(),
+        repo::get(&pool, PurgeChannel::Webdav, today)
+            .await
+            .expect("查询应成功")
+            .is_none(),
         "还没改过时不应有行"
     );
 
@@ -144,7 +147,9 @@ async fn pending_queue_three_states() {
     assert_eq!(row.etag, None, "还没传成功过，不该有 etag");
     assert!(row.is_pending());
     assert_eq!(
-        repo::pending_dates(&pool, PurgeChannel::Webdav).await.expect("查询应成功"),
+        repo::pending_dates(&pool, PurgeChannel::Webdav)
+            .await
+            .expect("查询应成功"),
         vec![today.to_string()]
     );
 
@@ -171,14 +176,22 @@ async fn pending_queue_three_states() {
         .await
         .expect("mark_pending 应成功");
     assert_eq!(
-        repo::pending_dates(&pool, PurgeChannel::Webdav).await.expect("查询应成功"),
+        repo::pending_dates(&pool, PurgeChannel::Webdav)
+            .await
+            .expect("查询应成功"),
         vec!["2026-11-05".to_string(), today.to_string()]
     );
 
     // ③ 上传成功：欠账归 0，同时留下 etag 与指纹。
-    repo::mark_synced(&pool, PurgeChannel::Webdav, today, Some("W/\"abc\""), "hash-b")
-        .await
-        .expect("mark_synced 应成功");
+    repo::mark_synced(
+        &pool,
+        PurgeChannel::Webdav,
+        today,
+        Some("W/\"abc\""),
+        "hash-b",
+    )
+    .await
+    .expect("mark_synced 应成功");
     let row = repo::get(&pool, PurgeChannel::Webdav, today)
         .await
         .expect("查询应成功")
@@ -188,7 +201,9 @@ async fn pending_queue_three_states() {
     assert_eq!(row.last_hash.as_deref(), Some("hash-b"));
     assert!(!row.is_pending());
     assert_eq!(
-        repo::pending_dates(&pool, PurgeChannel::Webdav).await.expect("查询应成功"),
+        repo::pending_dates(&pool, PurgeChannel::Webdav)
+            .await
+            .expect("查询应成功"),
         vec!["2026-11-05".to_string()],
         "已传的那天要从补传清单里消失"
     );
@@ -197,13 +212,13 @@ async fn pending_queue_three_states() {
     repo::clear(&pool, PurgeChannel::Webdav, "2026-11-05")
         .await
         .expect("clear 应成功");
-    assert!(
-        repo::get(&pool, PurgeChannel::Webdav, "2026-11-05")
-            .await
-            .expect("查询应成功")
-            .is_none()
-    );
-    let all = repo::list(&pool, PurgeChannel::Webdav).await.expect("list 应成功");
+    assert!(repo::get(&pool, PurgeChannel::Webdav, "2026-11-05")
+        .await
+        .expect("查询应成功")
+        .is_none());
+    let all = repo::list(&pool, PurgeChannel::Webdav)
+        .await
+        .expect("list 应成功");
     assert_eq!(all.len(), 1);
     assert_eq!(all[0].date, today);
 }

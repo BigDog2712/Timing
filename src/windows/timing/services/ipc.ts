@@ -5,68 +5,27 @@
  *   3. 事件订阅统一经 `onIpcEvent`，返回的 unlisten 须由调用方在 cleanup 调用（K-8）；非 Tauri 环境（纯浏览器 dev）自动降级到 src/mocks/browserMock，便于 UI 走查。
  */
 import type {
-  AccentColors,
-  AccentSetParams,
-  CloseNoteWindowParams,
-  CreateItemParams, HandleCustomActionParams,
-  Item, ItemIdParams,
-  ItemAppBindParams, ItemAppBinding, ItemAppKeyParams,
-  ListItemsParams, ListRecordsParams,
-  Note, NoteCreateParams,
-  NoteListParams, NoteRefParams,
-  NoteUpdateParams, OpenNoteWindowParams,
-  OverlayStatus, OverlayStyle,
-  Paginated,
-  Reminder, ReminderClearParams,
-  ReminderSetParams,
-  ResolveOpenRecordParams,
-  SafStatus,
-  SaveWindowPositionParams,
-  SetAutostartParams,
-  SetCountdownPresetParams,
-  Settings,
-  ReferenceSettings,
-  ReferenceSettingsPatch,
-  StartCountdownParams,
-  StartTimerParams,
-  StatsSummary,
-  StatsSummaryParams,
-  SwitchItemParams,
-  ThemeSetParams,
-  ThemeSettings,
-  TimeRecord,
-  TimerState,
-  Todo,
-  TodoCreateBatchParams,
-  TodoCreateParams,
-  TodoListParams,
-  TodoRefParams,
-  TodoToggleParams,
-  TodoUpdateParams,
-  UndoStopParams,
-  UpdateItemParams,
-  UpdateRecordParams,
-  UpdateSettingsParams,
-  IpcApi,
-  StopResult,
-  WindowRectDip,
-  WorkAreaDip,
-  PluginListResult,
-  Decision,
-  MdPendingConflict,
-  MdResolveOutcome,
-  MdSyncConfig,
-  MdSyncKind,
-  MdSyncReport,
-  MdSyncViewCloud,
-  MdSyncTestResult,
-  MdBackupItem,
-  MdBackupExport,
-  MdBackupRestoreResult,
-  MigrationInfo,
+  AccentColors, AccentSetParams, CloseNoteWindowParams, CreateItemParams, HandleCustomActionParams,
+  Item, ItemIdParams, ItemAppBindParams, ItemAppBinding, ItemAppKeyParams,
+  ListItemsParams, ListRecordsParams, Note, NoteCreateParams, NoteListParams, NoteRefParams,
+  NoteUpdateParams, OpenNoteWindowParams, OverlayStatus, OverlayStyle, Paginated,
+  Reminder, ReminderClearParams, ReminderSetParams, ResolveOpenRecordParams, SafStatus,
+  SaveWindowPositionParams, SetAutostartParams, SetCountdownPresetParams,
+  Settings, ReferenceSettings, ReferenceSettingsPatch, StartCountdownParams, StartTimerParams,
+  StatsSummary, StatsSummaryParams, SwitchItemParams, ThemeSetParams, ThemeSettings,
+  TimeRecord, TimerState, Todo, TodoCreateBatchParams, TodoCreateParams, TodoListParams,
+  TodoRefParams, TodoToggleParams, TodoUpdateParams, UndoStopParams, UpdateItemParams,
+  UpdateRecordParams, UpdateSettingsParams, IpcApi, StopResult, WindowRectDip, WorkAreaDip,
+  PluginListResult, Decision, MdPendingConflict, MdResolveOutcome, MdSyncConfig, MdSyncKind,
+  MdSyncReport, MdSyncViewCloud, MdSyncTestResult, MdBackupItem, MdBackupExport,
+  MdBackupRestoreResult, MigrationInfo,
 } from '../types/domain';
 import type { DataRootInfo } from '../types/domain/dataRoot';
 import type { CategoryCatalogRows } from '../types/domain/categoryCatalog';
+import type { CategoryPropagationPreview, CategoryPropagationRequest } from '../types/domain/categoryPropagation';
+import type {
+  AiConfig, AiConfigView, AiDailySummary, AiListModelsRequest, AiSuggestRequest, AiSuggestResponse, AiTestResult, ItemTags, TagMutation,
+} from '../types/domain/ai';
 /* [V0.5.0] 错误类型与规范化搬到 ipcError.ts 腾行数；`errorText()` 留在本文件——check-contract.mjs 从这里内联解析 `case '...'`。 */
 import { IpcError } from './ipcError';
 export { IpcError } from './ipcError';
@@ -131,6 +90,28 @@ export function errorText(err: unknown): string {
        比兜底的「操作失败」有用得多，所以保留后端原文。 */
     case 'CUSTOM_ACTION_DENIED':
       return err instanceof Error && err.message ? err.message : '这个动作没有被授权，请回设置里重新选一次';
+    case 'INVALID_TAG_PATH':
+      return err instanceof Error && err.message ? err.message : '标签路径不合法，请检查层级与长度';
+    case 'AI_NOT_CONFIGURED':
+      return 'AI 尚未配置，请到 设置 → AI 完成连接设置';
+    case 'AI_DISABLED':
+      return '此 AI 功能未启用，请到 设置 → AI 开启';
+    case 'AI_AUTH':
+      return 'API 密钥无效或无权限，请到 设置 → AI 检查密钥与模型';
+    case 'AI_RATE_LIMITED':
+      return '请求太频繁或额度不足，请稍后再试并检查服务商额度';
+    case 'AI_NETWORK':
+      return '无法连接 AI 服务，请检查网络、代理和服务地址';
+    case 'AI_TIMEOUT':
+      return 'AI 请求超时，请稍后重试或缩小请求范围';
+    case 'AI_UPSTREAM':
+      return 'AI 服务暂时过载，请稍后重试';
+    case 'AI_BAD_REQUEST':
+      return 'AI 请求不被服务商接受，请检查模型名称或缩短内容';
+    case 'AI_PARSE':
+      return 'AI 返回内容无法识别，请重试';
+    case 'AI_CANCELLED':
+      return 'AI 请求已取消';
     default:
       return err instanceof Error && err.message ? err.message : '操作失败，请稍后重试';
   }
@@ -155,6 +136,26 @@ export const ipc: IpcApi = {
   unbindItemApp: (p: ItemAppKeyParams) => call<boolean>('unbind_item_app', { itemId: p.itemId, appKey: p.appKey }),
   /* [0.14] 分类目录读口（两窗共用；手机端桩回空目录） */
   listCategoryCatalog: () => call<CategoryCatalogRows>('list_category_catalog', {}),
+  previewCategoryPropagation: (request: CategoryPropagationRequest) =>
+    call<CategoryPropagationPreview>('preview_category_propagation', { request }),
+  applyCategoryPropagation: (request: CategoryPropagationRequest, expectedFingerprint: string) =>
+    call<void>('apply_category_propagation', { request, expectedFingerprint }),
+  /* [0.12.3] 事项多标签（读全量 / 覆盖写一条） */
+  listItemTags: () => call<ItemTags[]>('list_item_tags', {}),
+  setItemTags: (p: { itemId: number; tags: string[] }) => call<string[]>('set_item_tags', { itemId: p.itemId, tags: p.tags }),
+  /* [0.12.4] 标签目录（定义行 + 跨事项改名 / 删除） */
+  listTagCatalog: () => call<string[]>('list_tag_catalog', {}),
+  createTagDefinition: (p: { path: string }) => call<string[]>('create_tag_definition', { path: p.path }),
+  renameTag: (p: { from: string; to: string }) => call<TagMutation>('rename_tag', { from: p.from, to: p.to }),
+  deleteTag: (p: { path: string }) => call<TagMutation>('delete_tag', { path: p.path }),
+  /* [0.12.3] AI：配置 / 测试 / 建议 / 今日汇总 */
+  aiConfigGet: () => call<AiConfigView>('ai_config_get', {}),
+  aiConfigSave: (p: { config: AiConfig; apiKey?: string | null }) =>
+    call<AiConfigView>('ai_config_save', { config: p.config, ...(p.apiKey === undefined ? {} : { apiKey: p.apiKey }) }),
+  aiTest: () => call<AiTestResult>('ai_test', {}),
+  aiListModels: (p: AiListModelsRequest) => call<string[]>('ai_list_models', { request: p }),
+  aiSuggestTags: (p: AiSuggestRequest) => call<AiSuggestResponse>('ai_suggest_tags', { request: p }),
+  aiDailySummary: () => call<AiDailySummary>('ai_daily_summary', {}),
   /* [0.13] 进程监视注册（自动接管段专用；字段名与 Rust `BoundProcessWatchInput` 的
      `rename_all = "camelCase"` 对齐，`deny_unknown_fields` 会在字段漂移时当场报错）。 */
   setBoundProcessWatch: (watch: { itemId: number; processId: number; segmentStartedAt: number } | null) =>

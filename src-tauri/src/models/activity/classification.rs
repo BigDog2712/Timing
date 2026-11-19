@@ -92,7 +92,8 @@ impl ClassificationSnapshot {
     pub fn from_settings(rows: impl IntoIterator<Item = (String, String)>) -> Self {
         let mut snapshot = Self::default();
         for (key, value) in rows {
-            if let Some(root) = key.strip_prefix(crate::models::activity::web_links::SETTING_PREFIX) {
+            if let Some(root) = key.strip_prefix(crate::models::activity::web_links::SETTING_PREFIX)
+            {
                 if let Ok(rule) = serde_json::from_str(&value) {
                     snapshot.web_sites.insert(root.to_string(), rule);
                 }
@@ -180,8 +181,9 @@ impl ClassificationSnapshot {
         if !self.is_app_enabled(&canonical) {
             return None;
         }
-        let association_key = crate::models::activity::tracking::resolve_app_override_executable(&canonical)
-            .unwrap_or_else(|| canonical.clone());
+        let association_key =
+            crate::models::activity::tracking::resolve_app_override_executable(&canonical)
+                .unwrap_or_else(|| canonical.clone());
         let canonical = self
             .app_links
             .get(&canonical)
@@ -216,16 +218,17 @@ impl ClassificationSnapshot {
             return None;
         }
         let owner = crate::models::activity::web_links::resolve_owner(&domain, &self.web_sites);
-        let raw_category = if let Some(root) = crate::models::activity::web_links::group_domain(&owner) {
-            self.web_sites
-                .get(&root)
-                .and_then(|rule| rule.category.clone())
-        } else {
-            self.web_overrides
-                .get(&domain)
-                .and_then(|value| value.category.clone())
-        }
-        .unwrap_or_else(|| "other".to_string());
+        let raw_category =
+            if let Some(root) = crate::models::activity::web_links::group_domain(&owner) {
+                self.web_sites
+                    .get(&root)
+                    .and_then(|rule| rule.category.clone())
+            } else {
+                self.web_overrides
+                    .get(&domain)
+                    .and_then(|value| value.category.clone())
+            }
+            .unwrap_or_else(|| "other".to_string());
         Some(self.resolve_category(raw_category))
     }
 

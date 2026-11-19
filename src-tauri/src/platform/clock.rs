@@ -153,5 +153,10 @@ pub fn anchored_elapsed_ms_at(running_since: i64, sampled_at: Instant) -> Option
     anchors
         .iter()
         .find(|a| a.wall_ms == running_since)
-        .map(|a| sampled_at.saturating_duration_since(a.mono).as_millis().min(i64::MAX as u128) as i64)
+        .map(|a| {
+            sampled_at
+                .saturating_duration_since(a.mono)
+                .as_millis()
+                .min(i64::MAX as u128) as i64
+        })
 }

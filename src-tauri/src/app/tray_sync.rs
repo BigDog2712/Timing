@@ -194,11 +194,11 @@ mod tests {
     /// 互相把对方的闸拨掉，红的会是随机一条。
     #[test]
     fn try_acquire_never_steals_or_resets_the_gate_of_a_running_round() {
-        use std::sync::atomic::Ordering;
         use super::{try_acquire, RUNNING};
+        use std::sync::atomic::Ordering;
 
         /* 场景 1：已经有一轮在跑（`spawn` 抢到了闸）。此时点托盘退出 / 再点同步都抢不到，
-           而且**不许**把那一轮的闸复位。 */
+        而且**不许**把那一轮的闸复位。 */
         RUNNING.store(true, Ordering::SeqCst);
         assert!(try_acquire().is_none(), "闸被占着时必须返回 None（早退）");
         assert!(
@@ -210,7 +210,10 @@ mod tests {
         RUNNING.store(false, Ordering::SeqCst);
         let gate = try_acquire().expect("空闸必须抢得到");
         assert!(RUNNING.load(Ordering::SeqCst), "抢到之后闸必须是关着的");
-        assert!(try_acquire().is_none(), "持有期间再一次抢必须失败（防重入）");
+        assert!(
+            try_acquire().is_none(),
+            "持有期间再一次抢必须失败（防重入）"
+        );
         drop(gate);
         assert!(!RUNNING.load(Ordering::SeqCst), "Gate 必须由 Drop 复位");
         assert!(try_acquire().is_some(), "复位之后必须能再抢到");

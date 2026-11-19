@@ -64,7 +64,7 @@ pub(crate) fn consume_fail_after_put() -> bool {
 /// 事件流传输落点。
 #[derive(Debug, Clone)]
 pub enum Transport {
-    /// 本地目录根（相对路径 `sync/events/...` 会拼在它下面）。
+    /// 本地目录根（相对路径 `sync/streams/...` 会拼在它下面）。
     Folder(PathBuf),
     /// WebDAV 远端。
     Webdav(WebdavTarget),
@@ -155,7 +155,7 @@ fn publish_atomic(path: &Path, bytes: &[u8]) -> Result<bool, String> {
         .unwrap_or_else(|| "segment".to_string());
     let serial = TMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     /* 名字以 `.` 开头、以 `.tmp` 结尾：同步盘的「忽略临时文件」规则（`~$` / `.tmp` /
-       隐藏文件）大概率能盖住它，即使进程被强杀留下残骸也不会被当成一个分段。 */
+    隐藏文件）大概率能盖住它，即使进程被强杀留下残骸也不会被当成一个分段。 */
     let tmp = parent.join(format!(".{name}.{}-{serial}.tmp", std::process::id()));
 
     {
@@ -164,7 +164,7 @@ fn publish_atomic(path: &Path, bytes: &[u8]) -> Result<bool, String> {
         file.write_all(bytes)
             .map_err(|err| format!("写不进临时分段 {}：{err}", tmp.display()))?;
         /* flush 到盘再发布：只 flush 到内核时，断电后可能留下一个「名字有了、内容是空的」
-           文件 —— 那正是这次要消灭的形态。 */
+        文件 —— 那正是这次要消灭的形态。 */
         file.sync_all()
             .map_err(|err| format!("刷不进盘 {}：{err}", tmp.display()))?;
     }
@@ -186,7 +186,7 @@ fn publish_atomic(path: &Path, bytes: &[u8]) -> Result<bool, String> {
         },
     };
     /* 硬链接成功时 tmp 还在（两份名字指向同一份内容），失败时也可能留下残骸：
-       无论成败都清一次，清不掉也不影响结果。 */
+    无论成败都清一次，清不掉也不影响结果。 */
     let _ = std::fs::remove_file(&tmp);
     published
 }

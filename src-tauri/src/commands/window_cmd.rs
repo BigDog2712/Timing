@@ -4,9 +4,9 @@
 
 use tauri::{AppHandle, State};
 
-use crate::app::events;
 #[cfg(desktop)]
 use crate::app::activity::main_window::tools_navigation::{self as patina_nav, HistoryTarget};
+use crate::app::events;
 use crate::error::AppResult;
 use crate::infra::window;
 use crate::models::foreground::ForegroundWindow;
@@ -163,7 +163,7 @@ pub async fn open_activity_window(
     };
 
     /* 先写 pending 再 show（`open_history` / `open_overview` 内部保证），冷启动才拿得到目标。
-       硬失败时 pending 已被回滚，本命令仍按既有口径返回 Ok——「窗没起来」不是用户操作失败。 */
+    硬失败时 pending 已被回滚，本命令仍按既有口径返回 Ok——「窗没起来」不是用户操作失败。 */
     let navigation = match view {
         OpenTarget::History(history) => patina_nav::open_history(&app, history),
         OpenTarget::Settings => patina_nav::open_settings(&app),
@@ -198,8 +198,8 @@ pub fn get_foreground_window() -> Result<Option<ForegroundWindow>, String> {
 }
 
 /* 载荷形状的单测：这条通道的另一半（真实的窗口生命周期）只能手测，但「前端 JSON 到底被
-   反序列化成什么」是可以在单测里钉死的——尤其是 `null` 与 `Option` 的边界，以及空日期
-   必须退化成「只 show」而不是乱跳。 */
+反序列化成什么」是可以在单测里钉死的——尤其是 `null` 与 `Option` 的边界，以及空日期
+必须退化成「只 show」而不是乱跳。 */
 #[cfg(all(test, desktop))]
 mod tests {
     use super::*;
@@ -211,8 +211,8 @@ mod tests {
     #[test]
     fn explicit_null_target_is_absence_so_the_existing_open_path_is_untouched() {
         /* 前端在「只要把分析窗叫到前台」时显式传 `{ "target": null }`（设置页
-           「时间统计 · 打开」就是这条路径）。钉住 null → None：新参数不能把 V0.12.0
-           的既有入口带坏。 */
+        「时间统计 · 打开」就是这条路径）。钉住 null → None：新参数不能把 V0.12.0
+        的既有入口带坏。 */
         assert!(parse("null").expect("null 是合法的「没有落点」").is_none());
     }
 
@@ -250,7 +250,10 @@ mod tests {
     #[test]
     fn overview_parses_and_history_wins_when_both_are_sent() {
         let view = |raw: &str| parse(raw).expect("形状合法").expect("有落点").into_view();
-        assert!(matches!(view(r#"{"overview":true}"#), Some(OpenTarget::Overview)));
+        assert!(matches!(
+            view(r#"{"overview":true}"#),
+            Some(OpenTarget::Overview)
+        ));
         assert!(view(r#"{"overview":false}"#).is_none());
         let both = view(r#"{"overview":true,"history":{"dateKey":"2026-11-10"}}"#);
         assert!(matches!(both, Some(OpenTarget::History(_))));
@@ -260,7 +263,10 @@ mod tests {
     #[test]
     fn settings_target_parses_alone() {
         let view = |raw: &str| parse(raw).expect("形状合法").expect("有落点").into_view();
-        assert!(matches!(view(r#"{"settings":true}"#), Some(OpenTarget::Settings)));
+        assert!(matches!(
+            view(r#"{"settings":true}"#),
+            Some(OpenTarget::Settings)
+        ));
         /* `false` = 「没指定落点」，必须退化成「只 show」，与 overview 同口径 */
         assert!(view(r#"{"settings":false}"#).is_none());
     }

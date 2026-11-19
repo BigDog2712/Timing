@@ -43,8 +43,7 @@ fn bounded_native_exception_history_is_written_without_truncation() {
             });
         }
     }
-    let snapshot =
-        serde_json::json!({"native":native, "other_tracking_fields":"x".repeat(4096)});
+    let snapshot = serde_json::json!({"native":native, "other_tracking_fields":"x".repeat(4096)});
     assert!(serde_json::to_vec(&snapshot).unwrap().len() > 16 * 1024);
     let expected = snapshot.clone();
     let (sent, received) = mpsc::sync_channel(1);
@@ -143,7 +142,10 @@ fn full_diagnostic_queue_and_busy_executor_do_not_stop_observation() {
     let observer = RuntimeDiagnostics::start_with_writer(
         move || {
             let n = observed.fetch_add(1, Ordering::Relaxed);
-            (n.is_multiple_of(2), serde_json::json!({"stage":"foreground"}))
+            (
+                n.is_multiple_of(2),
+                serde_json::json!({"stage":"foreground"}),
+            )
         },
         move |_| {
             if let Some(held) = held.take() {
@@ -175,8 +177,7 @@ fn full_diagnostic_queue_and_busy_executor_do_not_stop_observation() {
 }
 #[test]
 fn observer_runs_without_tokio_and_unwritable_logs_do_not_block_it() {
-    let directory =
-        std::env::temp_dir().join(format!("patina-observer-{}", uuid::Uuid::new_v4()));
+    let directory = std::env::temp_dir().join(format!("patina-observer-{}", uuid::Uuid::new_v4()));
     fs::write(&directory, b"not a directory").unwrap();
     let (observed, receiver) = mpsc::sync_channel(1);
     let observer = RuntimeDiagnostics::start(directory.clone(), move || {

@@ -313,11 +313,14 @@ fn cancelled_icon_waiter_keeps_native_capacity_until_worker_finishes() {
                 || 100,
                 &task_semaphore,
                 |permit| async move {
-                    crate::services::activity::engine::tracking::metadata::run_icon_extraction(permit, move || {
-                        let _ = started.send(());
-                        let _ = blocked.recv_timeout(std::time::Duration::from_secs(5));
-                        Some("late-result".into())
-                    })
+                    crate::services::activity::engine::tracking::metadata::run_icon_extraction(
+                        permit,
+                        move || {
+                            let _ = started.send(());
+                            let _ = blocked.recv_timeout(std::time::Duration::from_secs(5));
+                            Some("late-result".into())
+                        },
+                    )
                     .await
                 },
             )

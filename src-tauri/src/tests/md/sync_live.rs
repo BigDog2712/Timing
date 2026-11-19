@@ -7,11 +7,11 @@
 //! 写回数据库（既不插新记录、也不改 active 行）；④渲染在设定粒度内稳定
 //! （同一分钟内多次调用文本完全一致 → 不会每次 tick 都写盘）。
 
+use super::sync::{at, binding, env, file_for, save_binding, Env, TIMERS_HEADING};
 use crate::infra::md_file;
 use crate::models::md_sync::MdSyncKind;
 use crate::services;
 use crate::services::md_sync::{export, format};
-use super::sync::{at, binding, env, file_for, save_binding, Env, TIMERS_HEADING};
 use crate::tests::support::{insert_saved, new_item, scalar_i64};
 
 /// 把 active 会话的开始时刻钉到指定毫秒（当前计时段一起改，保证仍算「正在跑」）。

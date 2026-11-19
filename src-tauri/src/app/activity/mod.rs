@@ -4,6 +4,7 @@ pub mod classification;
 pub mod desktop_behavior;
 pub mod import;
 pub mod main_window;
+pub mod media_samples;
 pub mod mini_window;
 pub mod remote_status_bridge;
 pub mod runtime;

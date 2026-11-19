@@ -1,6 +1,6 @@
 use super::*;
-use crate::services::activity::data::{schema, schema_contracts};
 use crate::models::activity::tools::ActivityReminderTarget;
+use crate::services::activity::data::{schema, schema_contracts};
 use sqlx::{Executor, SqlitePool};
 
 async fn database() -> SqlitePool {
@@ -186,7 +186,9 @@ async fn merge_skips_live_target_conflicts_without_overwriting_state_and_rolls_b
 
 #[tokio::test]
 async fn version_twenty_upgrade_soft_deletes_duplicates_and_validates_unique_index() {
-    use crate::services::activity::data::sqlite_pool::{open_single_connection_sqlite_pool, prepare_pool_schema};
+    use crate::services::activity::data::sqlite_pool::{
+        open_single_connection_sqlite_pool, prepare_pool_schema,
+    };
     let path =
         std::env::temp_dir().join(format!("patina-unique-target-{}.db", uuid::Uuid::new_v4()));
     let pool = open_single_connection_sqlite_pool(&path, true)

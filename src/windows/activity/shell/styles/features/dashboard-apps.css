@@ -175,3 +175,28 @@
   white-space: nowrap;
 }
 
+
+/* [0.12.4] 行上的标签（取代原来的分类色点）：最多显示两个，其余折成 +N。
+ * 与 `.at-app-binding` 同一行、同一套省略号规则；标签比绑定更"长"，所以给它
+ * 更小的上限（38%）—— 两段都抢宽度时，应用名还是要有位置。 */
+.at-app-tags {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 38%;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--at-text-tertiary);
+  white-space: nowrap;
+}
+
+.at-app-tag {
+  overflow: hidden;
+  padding: 0 5px;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 17px;
+  text-overflow: ellipsis;
+}

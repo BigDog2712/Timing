@@ -54,7 +54,7 @@ pub async fn start_session(
     let mut tx = pool.begin().await?;
 
     /* `device_id` 必须显式写：`session_uid` 由触发器按它拼出来，而认领逻辑只在启动跑一次。
-       漏了它就等于「这个会话永远没有 uid 也永远不被导出」，而且不报错。 */
+    漏了它就等于「这个会话永远没有 uid 也永远不被导出」，而且不报错。 */
     sqlx::query(
         "INSERT INTO time_records(item_id, status, started_at, accumulated_sec, running_since,
                                   note, mode, target_sec, created_at, updated_at, device_id)
@@ -84,7 +84,7 @@ pub async fn start_session(
     let item_uid = item_uid.flatten();
 
     /* 两个 uid 都必须已经存在：items 的由启动认领补，会话的由触发器发。
-       缺失时宁可失败，也不要拼一个 `t::12` 出来 —— 那种行一旦落库就不再重算。 */
+    缺失时宁可失败，也不要拼一个 `t::12` 出来 —— 那种行一旦落库就不再重算。 */
     let session_uid = session_uid.ok_or_else(|| {
         crate::error::AppError::db(format!(
             "time_records id {id} has no uid; device identity was not adopted"
@@ -130,7 +130,16 @@ pub async fn append(
     device_id: &str,
 ) -> AppResult<TimerOp> {
     let mut tx = pool.begin().await?;
-    let op = event::append(&mut tx, session_uid, kind, at_ms, day_key, payload, device_id).await?;
+    let op = event::append(
+        &mut tx,
+        session_uid,
+        kind,
+        at_ms,
+        day_key,
+        payload,
+        device_id,
+    )
+    .await?;
     tx.commit().await?;
     Ok(op)
 }
@@ -182,7 +191,7 @@ pub async fn materialize_in(
         "active"
     };
     /* 事项只在折叠里出现过「换事项」时才改写：升级前就在跑的会话、本机手工改过事项的
-       已保存记录，都不能被 `start` 上那份旧事项覆盖回去。 */
+    已保存记录，都不能被 `start` 上那份旧事项覆盖回去。 */
     sqlx::query(
         "UPDATE time_records
             SET status = ?2, started_at = ?3, ended_at = ?4, accumulated_sec = ?5,
@@ -206,7 +215,12 @@ pub async fn materialize_in(
     .bind(block.item_switched)
     .bind(&block.item_uid)
     .bind(block.record.is_some())
-    .bind(block.record.as_ref().and_then(|record| record.note.as_deref()))
+    .bind(
+        block
+            .record
+            .as_ref()
+            .and_then(|record| record.note.as_deref()),
+    )
     .bind(block.record.as_ref().map(|record| record.mode.as_str()))
     .bind(block.record.as_ref().and_then(|record| record.target_sec))
     .bind(block.record.as_ref().and_then(|record| record.deleted_at))

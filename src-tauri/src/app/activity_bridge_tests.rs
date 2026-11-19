@@ -44,7 +44,14 @@ async fn overlapping_sessions_are_clipped_to_the_range() {
     // ① 横跨左边界：0-10 分钟，区间从第 8 分钟开始 → 应计 2 分钟
     insert_session(&pool, "Editor", "editor.exe", start, start + 600_000).await;
     // ② 完全落在区间内：第 8.3 到第 9.3 分钟 → 应计 60 秒
-    insert_session(&pool, "Browser", "chrome.exe", start + 500_000, start + 560_000).await;
+    insert_session(
+        &pool,
+        "Browser",
+        "chrome.exe",
+        start + 500_000,
+        start + 560_000,
+    )
+    .await;
     // ③ 完全在区间之前：不该出现在结果里
     insert_session(&pool, "Mail", "mail.exe", start - 900_000, start - 600_000).await;
 
@@ -60,7 +67,10 @@ async fn overlapping_sessions_are_clipped_to_the_range() {
 
     assert_eq!(rows.len(), 2, "区间外的应用不该出现在结果里");
     assert_eq!(rows[0].app, "Editor");
-    assert_eq!(rows[0].sec, 120, "跨界会话必须按区间裁剪，不能拿 duration 求和");
+    assert_eq!(
+        rows[0].sec, 120,
+        "跨界会话必须按区间裁剪，不能拿 duration 求和"
+    );
     assert_eq!(rows[0].samples, 1);
     assert_eq!(rows[1].app, "Browser");
     assert_eq!(rows[1].sec, 60, "完全落在区间内的会话按原样计入");
@@ -109,7 +119,8 @@ fn the_two_layouts_stay_separate_all_the_way_into_storage_paths() {
     );
     assert_eq!(
         paths.webview_root,
-        root.join(activity_subdir_of(Layout::Old)).join(WEBVIEW_SUBDIR),
+        root.join(activity_subdir_of(Layout::Old))
+            .join(WEBVIEW_SUBDIR),
         "profile 落点不许被数据落点带着走（`patina/webview`，不是 `patina/data/webview`）"
     );
 }

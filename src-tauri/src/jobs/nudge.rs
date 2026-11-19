@@ -71,7 +71,11 @@ async fn scan_once(app: &AppHandle, pool: &SqlitePool) -> AppResult<()> {
 /// 发不出去写 warn：通知权限被拒时系统会静默丢，`notify()` 返回 false 是唯一线索。
 #[cfg(mobile)]
 fn notify_nudge(app: &AppHandle, nudge: &TodoNudge) {
-    let minutes = if nudge.stage == STAGE_LIGHT { "15" } else { "5" };
+    let minutes = if nudge.stage == STAGE_LIGHT {
+        "15"
+    } else {
+        "5"
+    };
     let body = format!("{minutes} 分钟后开始，点开可以现在就开始");
     if !crate::infra::notify::notify(app, &nudge.title, &body) {
         crate::log_warn!("todo nudge notify failed: {}", nudge.title);

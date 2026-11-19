@@ -130,10 +130,17 @@ fn prune_never_deletes_old_style_backups() {
     let names = names_in(&backups);
     /* ① 无前缀老文件一个都没少。 */
     for name in &old {
-        assert!(names.contains(name), "升级前的老备份不许被 prune 删掉：{name}");
+        assert!(
+            names.contains(name),
+            "升级前的老备份不许被 prune 删掉：{name}"
+        );
     }
     let untagged = names.iter().filter(|name| !name.contains("__")).count();
-    assert_eq!(untagged, old.len(), "老格式备份既不计数也不淘汰，实际剩 {untagged}");
+    assert_eq!(
+        untagged,
+        old.len(),
+        "老格式备份既不计数也不淘汰，实际剩 {untagged}"
+    );
 
     /* ② 带前缀的淘汰到 KEEP 份（含刚写的那一份）。 */
     let tagged_total = names.iter().filter(|name| name.contains("__")).count();

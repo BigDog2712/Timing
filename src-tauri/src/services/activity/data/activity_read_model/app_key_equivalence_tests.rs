@@ -103,7 +103,8 @@ async fn recorded_app_catalog_keys_recompute_to_themselves() {
 #[test]
 #[ignore = "reads a real database via TIMING_PARITY_DB; run with --ignored"]
 fn production_catalog_keys_recompute_to_themselves() {
-    let path = std::env::var("TIMING_PARITY_DB").expect("TIMING_PARITY_DB must point at a patina.db");
+    let path =
+        std::env::var("TIMING_PARITY_DB").expect("TIMING_PARITY_DB must point at a patina.db");
     tauri::async_runtime::block_on(async {
         let pool =
             crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
@@ -112,11 +113,12 @@ fn production_catalog_keys_recompute_to_themselves() {
             )
             .await
             .unwrap();
-        let rows: Vec<(String, String)> =
-            sqlx::query_as("SELECT app_key, raw_exe_name FROM recorded_app_catalog ORDER BY app_key")
-                .fetch_all(&pool)
-                .await
-                .unwrap();
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "SELECT app_key, raw_exe_name FROM recorded_app_catalog ORDER BY app_key",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
         println!("recorded_app_catalog rows = {}", rows.len());
         assert_recompute_equals_stored(&rows);
         pool.close().await;

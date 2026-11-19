@@ -56,6 +56,7 @@
   --danger-wash: color-mix(in srgb, #E5484D 12%, transparent);
   --ok:          #4CC38A;
   --ok-ink:      #06251A;
+  --violet:      #A78BFA;   /* 收起圆点 ≥2h 档色（非四色可配，不参与设置） */
 
   --solid-bg:  #EDEFF3;
   --solid-ink: #0B0C10;

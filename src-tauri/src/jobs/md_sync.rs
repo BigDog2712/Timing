@@ -77,7 +77,10 @@ impl FileWatch {
     /// 否则「消失又出现」会被当成新文件、把真实改动吞掉。
     pub(crate) fn probe(&mut self, bindings: &[MdSyncBinding], date: chrono::NaiveDate) -> bool {
         let mut changed = false;
-        for binding in bindings.iter().filter(|item| item.enabled && item.is_configured()) {
+        for binding in bindings
+            .iter()
+            .filter(|item| item.enabled && item.is_configured())
+        {
             let path = md_file::resolve_path(&binding.root, &binding.file, date);
             let Ok(meta) = fs::metadata(&path) else {
                 continue;
@@ -188,7 +191,7 @@ pub(crate) fn decide(
         }
     }
     /* 60s 兜底：绕过事件直接改库、只改 mtime、同步盘回写、跨零点全靠它纠正。
-       注释掉这一段，C7（≤70s 内被兜底扫描纠正）会立刻红。 */
+    注释掉这一段，C7（≤70s 内被兜底扫描纠正）会立刻红。 */
     if elapsed_since_ms(now, next.last_run_ms) >= (MD_SYNC_FALLBACK_SECS * 1000) as i64 {
         return (Some(WakeReason::Fallback), next);
     }
@@ -216,7 +219,7 @@ pub fn spawn_md_sync_watcher(app: AppHandle) {
             };
 
             /* 只有总开关开着才碰文件：关掉时连 `fs::metadata` 都不许有（C5）。
-               文件探测本身按 1.5s 一档，200ms 的观察圈不该反复 stat。 */
+            文件探测本身按 1.5s 一档，200ms 的观察圈不该反复 stat。 */
             let mut file_changed = false;
             if enabled && elapsed_since_ms(now, last_probe_ms) >= MD_SYNC_FILE_TICK_MS as i64 {
                 last_probe_ms = now;
@@ -237,7 +240,7 @@ pub fn spawn_md_sync_watcher(app: AppHandle) {
 
             if let Some(reason) = reason {
                 /* 与托盘 / 云链共用同一把闸。抢不到就本圈早退，不 sleep 重试；
-                   `SEQ` 没推进 → 200ms 后下一圈自然还会看到「还欠一轮」。 */
+                `SEQ` 没推进 → 200ms 后下一圈自然还会看到「还欠一轮」。 */
                 if let Some(_gate) = crate::app::tray_sync::try_acquire() {
                     crate::log_info!("md sync wake: reason={}", reason.label());
                     match md_sync::run_with(
@@ -251,7 +254,7 @@ pub fn spawn_md_sync_watcher(app: AppHandle) {
                                 events::emit_md_sync_changed(&app, &report);
                             }
                             /* 自己这一轮可能改了 md 文件。立刻重取一次基线，
-                               免得下一圈把「我们自己写的 mtime」当成外部改动又跑一轮。 */
+                            免得下一圈把「我们自己写的 mtime」当成外部改动又跑一轮。 */
                             let _ = watch.probe(&bindings, Local::now().date_naive());
                         }
                         Err(err) => crate::log_warn!("md sync wake failed: {err}"),

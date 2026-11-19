@@ -1,6 +1,6 @@
+use crate::models::activity::web_activity::{WebActivityChange, WebActivitySegmentInput};
 use crate::services::activity::data::repositories::web_activity;
 use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
-use crate::models::activity::web_activity::{WebActivityChange, WebActivitySegmentInput};
 use crate::services::activity::engine::web_activity::{WebActivityStore, WebActivityStoreFuture};
 use sqlx::{Pool, Sqlite};
 use tauri::{AppHandle, Runtime};
@@ -28,16 +28,20 @@ impl SqliteWebActivityStore {
 impl WebActivityStore for SqliteWebActivityStore {
     fn seal_anonymous(&self, now_ms: i64) -> WebActivityStoreFuture<'_, bool> {
         Box::pin(async move {
-            crate::services::activity::data::repositories::anonymous_activity::seal(&self.pool, now_ms)
-                .await
-                .map_err(|error| error.to_string())
+            crate::services::activity::data::repositories::anonymous_activity::seal(
+                &self.pool, now_ms,
+            )
+            .await
+            .map_err(|error| error.to_string())
         })
     }
     fn record_anonymous(&self, now_ms: i64) -> WebActivityStoreFuture<'_, bool> {
         Box::pin(async move {
-            crate::services::activity::data::repositories::anonymous_activity::observe(&self.pool, now_ms, true)
-                .await
-                .map_err(|error| error.to_string())
+            crate::services::activity::data::repositories::anonymous_activity::observe(
+                &self.pool, now_ms, true,
+            )
+            .await
+            .map_err(|error| error.to_string())
         })
     }
 

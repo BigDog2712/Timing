@@ -47,6 +47,14 @@ pub const SYNC_BOOKKEEPING_SQL: &str = include_str!("sql/0029_sync_bookkeeping.s
 /// 事项归属的正文：`app_category` / `block_segment_override` / `focus_blocks`。
 pub const ITEM_ATTRIBUTION_SQL: &str = include_str!("sql/0030_item_attribution.sql");
 
+/// 媒体播放时间线的版本号（当前 head）。
+///
+/// ⚠️ 同上：**不要**给 `schema_revision_limit()` 加 31 的探测项。
+pub const MEDIA_PLAYBACK_MIGRATION_VERSION: i64 = 31;
+
+/// 媒体播放时间线的正文：`media_playback_samples` 只记系统媒体会话公开的标题/作者。
+pub const MEDIA_PLAYBACK_SQL: &str = include_str!("sql/0031_media_playback.sql");
+
 /// 登记表里的最大版本（= 当前 head）。
 ///
 /// 给巡检与用例用。用例里写死数字会让每加一条迁移都要改好几处断言，而「改断言」正是
@@ -211,6 +219,11 @@ pub fn tracker_migrations() -> Vec<Migration> {
             version: ITEM_ATTRIBUTION_MIGRATION_VERSION,
             description: "item_attribution",
             sql: ITEM_ATTRIBUTION_SQL,
+        },
+        Migration {
+            version: MEDIA_PLAYBACK_MIGRATION_VERSION,
+            description: "media_playback_timeline",
+            sql: MEDIA_PLAYBACK_SQL,
         },
     ]
 }

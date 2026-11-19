@@ -166,12 +166,13 @@ fn business_identity_adopts_all_four_uid_tables() {
                 wrong_shape, 0,
                 "{table} 的 uid 不是 `{prefix}<install>:<id>` 的形状（前缀登记错了？）"
             );
-            let device_left: i64 =
-                sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table} WHERE device_id <> ?1"))
-                    .bind(&install_id)
-                    .fetch_one(&pool)
-                    .await
-                    .unwrap();
+            let device_left: i64 = sqlx::query_scalar(&format!(
+                "SELECT COUNT(*) FROM {table} WHERE device_id <> ?1"
+            ))
+            .bind(&install_id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
             assert_eq!(device_left, 0, "{table} 还有 device_id 不是本机的行");
         }
     });

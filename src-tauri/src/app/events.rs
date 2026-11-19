@@ -39,6 +39,23 @@ pub const MD_SYNC_CHANGED: &str = "md-sync:changed";
 /// [T03] md 覆盖提醒：检测到文件侧冲突、且前台可弹窗时广播（载荷 `Vec<PendingConflict>`）。
 /// 前端据此弹出「覆盖 / 保留 / 暂不处理」的裁决窗。
 pub const MD_SYNC_DECISION_REQUIRED: &str = "md-sync:decision-required";
+/// Item tags changed after a successful write; consumers reload the item-tag snapshot.
+pub const ITEM_TAGS_CHANGED: &str = "item-tags:changed";
+/// Classification/tag catalog changed after a committed propagation operation.
+pub const CATEGORY_CATALOG_CHANGED: &str = "category-catalog:changed";
+
+pub fn emit_category_catalog_changed<R: tauri::Runtime>(app: &AppHandle<R>) {
+    if let Err(error) = app.emit(CATEGORY_CATALOG_CHANGED, serde_json::json!({})) {
+        crate::log_warn!("emit {CATEGORY_CATALOG_CHANGED} failed: {error}");
+    }
+}
+
+/// Broadcast a successful item-tag write to all windows.
+pub fn emit_item_tags_changed(app: &AppHandle, item_id: i64) {
+    if let Err(err) = app.emit(ITEM_TAGS_CHANGED, serde_json::json!({ "itemId": item_id })) {
+        crate::log_warn!("emit {ITEM_TAGS_CHANGED} failed: {err}");
+    }
+}
 
 /// 读取最新 `TimerState` 并 emit 给前端（权威状态）。
 ///
@@ -48,7 +65,7 @@ pub async fn emit_timer_state(app: &AppHandle, pool: &SqlitePool) {
         Ok(state) => {
             sync_tray(app, pool, &state).await;
             /* [V0.11.27] 同一处再推一次悬浮条。跟着广播走而不是各记各的时机：
-               这是计时状态的唯一出口，多一个挂点就多一条会漏推的路径。 */
+            这是计时状态的唯一出口，多一个挂点就多一条会漏推的路径。 */
             crate::app::overlay_push::push(app, pool).await;
             if let Err(err) = app.emit(TIMER_STATE_CHANGED, &state) {
                 crate::log_warn!("emit {TIMER_STATE_CHANGED} failed: {err}");

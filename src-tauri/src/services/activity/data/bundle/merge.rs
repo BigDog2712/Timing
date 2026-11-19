@@ -193,8 +193,8 @@ async fn apply_deferred_parents(
             continue;
         };
         /* `AND parent_id IS NOT ?`：父没变就别写。`items` 上挂着 `AFTER UPDATE OF parent_id`
-           的 touch 触发器，无条件的写会把 `updated_at_ms` 推到「现在」——重复导入于是
-           变成一次全库写风暴（判据 ②：再导一次 `total_updated == 0`）。 */
+        的 touch 触发器，无条件的写会把 `updated_at_ms` 推到「现在」——重复导入于是
+        变成一次全库写风暴（判据 ②：再导一次 `total_updated == 0`）。 */
         sqlx::query(&format!(
             "UPDATE \"{ITEMS_TABLE}\" SET \"{DEFERRED_PARENT}\" = ? \
              WHERE \"id\" = ? AND \"{DEFERRED_PARENT}\" IS NOT ?"
@@ -234,11 +234,13 @@ async fn local_id_by_uid(
     table: &str,
     uid: &str,
 ) -> Result<Option<i64>, String> {
-    sqlx::query_scalar::<_, i64>(&format!("SELECT \"id\" FROM \"{table}\" WHERE \"{UID}\" = ?"))
-        .bind(uid)
-        .fetch_optional(&mut *conn)
-        .await
-        .map_err(|error| format!("failed to resolve local id in {table}: {error}"))
+    sqlx::query_scalar::<_, i64>(&format!(
+        "SELECT \"id\" FROM \"{table}\" WHERE \"{UID}\" = ?"
+    ))
+    .bind(uid)
+    .fetch_optional(&mut *conn)
+    .await
+    .map_err(|error| format!("failed to resolve local id in {table}: {error}"))
 }
 
 /// `settings` 里那一小撮**不跨设备**的键（见 `mod.rs` 的 `NON_PORTABLE_SETTING_KEYS`）。

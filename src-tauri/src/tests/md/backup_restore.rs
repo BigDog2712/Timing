@@ -16,6 +16,7 @@ use std::sync::OnceLock;
 
 use chrono::NaiveDate;
 
+use super::sync::{env, Env, TIMERS_HEADING};
 use crate::error::ErrorCode;
 use crate::infra::md_backup as store;
 use crate::infra::md_file;
@@ -25,7 +26,6 @@ use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending;
 use crate::services::md_backup;
 use crate::services::md_sync;
-use super::sync::{env, Env, TIMERS_HEADING};
 use crate::tests::support::{exec, expect_err, insert_saved, new_item, scalar_i64, unique_dir};
 
 /// 本测试进程的备份目录（`set_root` 只生效一次，于是整份文件共用一个）。
@@ -88,7 +88,11 @@ async fn restore_overwrites_both_the_database_and_the_file() {
     )
     .await;
     md_sync::run(&fixture.pool).await.expect("第二轮同步应成功");
-    assert_eq!(alive(&fixture.pool).await, 0, "准备阶段：库里已经没有活记录");
+    assert_eq!(
+        alive(&fixture.pool).await,
+        0,
+        "准备阶段：库里已经没有活记录"
+    );
     assert!(
         !fs::read_to_string(&file).unwrap().contains("写作"),
         "准备阶段：文件也不该还留着这条"
@@ -100,7 +104,11 @@ async fn restore_overwrites_both_the_database_and_the_file() {
     assert_eq!(result.date, fixture.date.format("%Y-%m-%d").to_string());
     assert_eq!(result.target, "obsidian", "备份名的前缀就是归属");
     assert_eq!(result.written, 1, "三个 kind 落同一个文件 → 只算一个文件");
-    assert!(result.imported >= 1, "记录要被导回来，实际 {}", result.imported);
+    assert!(
+        result.imported >= 1,
+        "记录要被导回来，实际 {}",
+        result.imported
+    );
 
     assert_eq!(alive(&fixture.pool).await, 1, "SQL 必须被备份覆盖回去");
     let restored = fs::read_to_string(&file).expect("恢复后文件应可读");
@@ -172,13 +180,13 @@ async fn restoring_into_the_cloud_channel_requires_a_resolvable_webdav_root() {
     );
     assert!(
         md_cloud_pending::get(
-        &fixture.pool,
-        PurgeChannel::Webdav,
-        &fixture.date.format("%Y-%m-%d").to_string(),
-    )
-            .await
-            .expect("查询应成功")
-            .is_none(),
+            &fixture.pool,
+            PurgeChannel::Webdav,
+            &fixture.date.format("%Y-%m-%d").to_string(),
+        )
+        .await
+        .expect("查询应成功")
+        .is_none(),
         "没恢复成就不该留下待传"
     );
 }
@@ -230,7 +238,9 @@ async fn restoring_a_folder_backup_writes_the_cloud_folder_not_the_vault() {
     .await;
     md_sync::run(&fixture.pool).await.expect("第二轮同步应成功");
     assert!(
-        !fs::read_to_string(today_file(&fixture)).unwrap().contains("写作"),
+        !fs::read_to_string(today_file(&fixture))
+            .unwrap()
+            .contains("写作"),
         "准备阶段：vault 里不该还留着这条"
     );
 
@@ -248,7 +258,9 @@ async fn restoring_a_folder_backup_writes_the_cloud_folder_not_the_vault() {
         "恢复的内容必须落在「本地目录」落点:\n{restored}"
     );
     assert!(
-        !fs::read_to_string(today_file(&fixture)).unwrap().contains("写作"),
+        !fs::read_to_string(today_file(&fixture))
+            .unwrap()
+            .contains("写作"),
         "不得改写 Obsidian 那份：用户以为自己恢复的是云端那份"
     );
 

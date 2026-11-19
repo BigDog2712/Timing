@@ -52,15 +52,24 @@ struct Outcome {
 
 impl Outcome {
     fn nothing() -> Self {
-        Self { step: Step::Nothing, fresh_copy: false }
+        Self {
+            step: Step::Nothing,
+            fresh_copy: false,
+        }
     }
 
     fn done(fresh_copy: bool) -> Self {
-        Self { step: Step::Done, fresh_copy }
+        Self {
+            step: Step::Done,
+            fresh_copy,
+        }
     }
 
     fn failed() -> Self {
-        Self { step: Step::Failed, fresh_copy: false }
+        Self {
+            step: Step::Failed,
+            fresh_copy: false,
+        }
     }
 }
 
@@ -222,7 +231,8 @@ fn discard_partial_copy(path: &Path) {
 /// 不用 `fs::copy`：库在 WAL 模式下主文件与 `-wal` 是两个时刻的快照，直拷会拿到撕裂的
 /// 页。这里**没有** `legacy_import::copy_database` 那样的「VACUUM 失败就退化成文件复制」
 /// 退路——搬活动库时退化成撕裂副本，比本次不搬更坏（判据 2 就是这么规定的）。
-fn vacuum_into(source: &Path, target: &Path) -> Result<(), String> {    let escaped_target = target.display().to_string().replace('\'', "''");
+fn vacuum_into(source: &Path, target: &Path) -> Result<(), String> {
+    let escaped_target = target.display().to_string().replace('\'', "''");
     let target_label = target.display().to_string();
     let source_owned = source.to_path_buf();
     tauri::async_runtime::block_on(async move {

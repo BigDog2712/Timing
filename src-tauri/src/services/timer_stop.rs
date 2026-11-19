@@ -51,18 +51,18 @@ pub async fn stop(pool: &SqlitePool) -> AppResult<StopResult> {
     }
     let accumulated = live_duration(&active, now);
     /* 语义时刻与 `accumulated` 同源（都是「段起点 + 单调流逝」）。落库的 `ended_at`
-       也用它，而不是 `now`：两个值一旦分叉（有单调锚点时必然分叉几毫秒，NTP 校时后
-       可能差几秒），事件流 fold 出来的终点与 `time_records.ended_at` 就对不上 ——
-       而「时长」按 `ended_at - started_at` 反算的地方会给出另一套数。 */
+    也用它，而不是 `now`：两个值一旦分叉（有单调锚点时必然分叉几毫秒，NTP 校时后
+    可能差几秒），事件流 fold 出来的终点与 `time_records.ended_at` 就对不上 ——
+    而「时长」按 `ended_at - started_at` 反算的地方会给出另一套数。 */
     let at_ms = crate::services::timer_events::end_at(active.running_since, now);
     // 与切换分段同一口径，判定逻辑只在 `should_ignore` 里写一遍（ADR-023）。
     if should_ignore(pool, accumulated).await {
         /* [S3] 软删 + 两条事件同一事务：分开写时「本机丢了这段、对端还留着」，
-           而两端都不报错 —— 用户永远发现不了时长对不上。 */
+        而两端都不报错 —— 用户永远发现不了时长对不上。 */
         let mut tx = pool.begin().await.map_err(AppError::db)?;
         session::discard_in(&mut tx, active.id, accumulated, at_ms, now).await?;
         /* A discarded session has one terminal event. Emitting Stop before Drop at the same
-           timestamp made the fold reject Drop as an after-stop operation. */
+        timestamp made the fold reject Drop as an after-stop operation. */
         crate::services::timer_events::record(
             &mut tx,
             active.id,
@@ -146,7 +146,9 @@ pub async fn undo(pool: &SqlitePool, record_id: i64) -> AppResult<TimeRecord> {
     }
     let mut tx = pool.begin().await.map_err(AppError::db)?;
     // 撤销必须排在 stop 及跨天分段修订之后。
-    let resume_at = crate::repositories::record_revision::next_at(&mut tx, record_id, now.max(ended_at)).await?;
+    let resume_at =
+        crate::repositories::record_revision::next_at(&mut tx, record_id, now.max(ended_at))
+            .await?;
     if !session::reactivate_in(&mut tx, record_id, resume_at, now).await? {
         return Err(AppError::timer_no_undo());
     }

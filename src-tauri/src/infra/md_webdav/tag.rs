@@ -54,7 +54,12 @@ mod tests {
     use crate::infra::md_webdav::{WebdavError, WebdavTarget};
 
     fn target(path: &str) -> WebdavTarget {
-        WebdavTarget::new("https://dav.example.com/dav/", path, "me@example.com", "app-pass")
+        WebdavTarget::new(
+            "https://dav.example.com/dav/",
+            path,
+            "me@example.com",
+            "app-pass",
+        )
     }
 
     #[test]
@@ -91,7 +96,11 @@ mod tests {
             (WebdavError::Network("连不上".into()), "Network"),
         ];
         for (err, expect) in cases {
-            assert_eq!(fail_tag(&err), expect, "旧词不许顺手改名（已有日志靠它 grep）");
+            assert_eq!(
+                fail_tag(&err),
+                expect,
+                "旧词不许顺手改名（已有日志靠它 grep）"
+            );
             /* 词表是给 `fail={}` 用的：不许有空格、不许是空串 */
             assert!(!expect.is_empty() && !expect.contains(' '));
         }

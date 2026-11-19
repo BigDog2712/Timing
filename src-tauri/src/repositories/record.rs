@@ -66,7 +66,9 @@ pub async fn update_saved(
         .push(" AND status = 'saved' AND deleted_at IS NULL");
     let mut tx = pool.begin().await?;
     let changed = qb.build().execute(&mut *tx).await?.rows_affected();
-    if changed != 1 { return Err(crate::error::AppError::item_not_found()); }
+    if changed != 1 {
+        return Err(crate::error::AppError::item_not_found());
+    }
     super::record_revision::append_in(&mut tx, id, now).await?;
     tx.commit().await?;
     Ok(())
@@ -88,8 +90,11 @@ pub async fn soft_delete(pool: &SqlitePool, id: i64, now: i64) -> AppResult<()> 
     .bind(now)
     .bind(id)
     .execute(&mut *tx)
-    .await?.rows_affected();
-    if changed > 0 { super::record_revision::append_in(&mut tx, id, now).await?; }
+    .await?
+    .rows_affected();
+    if changed > 0 {
+        super::record_revision::append_in(&mut tx, id, now).await?;
+    }
     tx.commit().await?;
     Ok(())
 }

@@ -119,7 +119,7 @@ fn rollup_replaces_the_whole_day_instead_of_taking_max() {
         .await
         .unwrap();
         /* 新口径重扫：同一个包里只剩 25 分钟、两段（间隅 70 秒的真断开），
-           另一个包这一轮没出现 */
+        另一个包这一轮没出现 */
         rollup(
             &pool,
             "2026-11-14",

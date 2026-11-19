@@ -38,7 +38,10 @@ pub async fn apply_timers(
 
     let mut db_by_name: HashMap<String, Vec<repo::RecordWithItem>> = HashMap::new();
     for row in repo::records_for_day(pool, from, to).await? {
-        db_by_name.entry(normalize_item_name(&row.item_name)).or_default().push(row);
+        db_by_name
+            .entry(normalize_item_name(&row.item_name))
+            .or_default()
+            .push(row);
     }
     let now = now_ms();
     let mut stats = ImportStats::default();
@@ -53,12 +56,28 @@ pub async fn apply_timers(
             let accumulated = ((interval.end_ms - interval.start_ms) / 1000).max(1);
             match id {
                 Some(id) => {
-                    repo::update_record_times(pool, id, interval.start_ms, interval.end_ms, accumulated, now).await?;
+                    repo::update_record_times(
+                        pool,
+                        id,
+                        interval.start_ms,
+                        interval.end_ms,
+                        accumulated,
+                        now,
+                    )
+                    .await?;
                     stats.updated += 1;
                 }
                 None => {
                     let item_id = ensure_item(pool, &name, &mut cache).await?;
-                    repo::insert_saved_record(pool, item_id, interval.start_ms, interval.end_ms, accumulated, now).await?;
+                    repo::insert_saved_record(
+                        pool,
+                        item_id,
+                        interval.start_ms,
+                        interval.end_ms,
+                        accumulated,
+                        now,
+                    )
+                    .await?;
                     stats.created += 1;
                 }
             }
@@ -71,7 +90,10 @@ pub async fn apply_timers(
 fn grouped(entries: Vec<TimerEntry>) -> BTreeMap<String, Vec<TimerInterval>> {
     let mut groups: BTreeMap<String, Vec<TimerInterval>> = BTreeMap::new();
     for entry in entries {
-        groups.entry(normalize_item_name(&entry.item)).or_default().extend(entry.intervals);
+        groups
+            .entry(normalize_item_name(&entry.item))
+            .or_default()
+            .extend(entry.intervals);
     }
     for intervals in groups.values_mut() {
         intervals.sort_by_key(|interval| (interval.start_ms, interval.end_ms));
@@ -94,7 +116,10 @@ async fn trusted_placeholders(
         }
     }
     if let Some(active) = repo::active_record_in_day(pool, from, to).await? {
-        trusted.insert((normalize_item_name(&active.item_name), second(active.started_at)));
+        trusted.insert((
+            normalize_item_name(&active.item_name),
+            second(active.started_at),
+        ));
     }
     Ok(trusted)
 }

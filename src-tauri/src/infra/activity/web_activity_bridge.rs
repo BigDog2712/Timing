@@ -1,8 +1,8 @@
-use crate::models::activity::settings::WebActivityBridgeSettings;
 use crate::infra::activity::web_activity_bridge_lifecycle::{
     classify_bind_error, is_retryable_bind_error, unix_now_ms, WebActivityBridgeLifecycle,
     WebActivityBridgeRetryPolicy, WebActivityBridgeRuntimeSnapshot,
 };
+use crate::models::activity::settings::WebActivityBridgeSettings;
 use serde_json::{json, Value};
 use std::future::Future;
 use std::io;
@@ -353,9 +353,7 @@ async fn acquire_listener_with_retry(
                         category,
                         failure_count,
                     );
-                    crate::log_error!(
-                        "bind failed terminally on 127.0.0.1:{port}: {category:?}"
-                    );
+                    crate::log_error!("bind failed terminally on 127.0.0.1:{port}: {category:?}");
                     return None;
                 }
 
@@ -624,7 +622,7 @@ mod tests {
                     &mut shutdown_rx,
                     task_lifecycle,
                     /* 预算 2000 次而不是 5 次：观察 RetryWait 在满载机器上会晚于 50ms，
-                       先耗尽次数就只剩「没恢复」这一个假红（评审 P2-3）。 */
+                    先耗尽次数就只剩「没恢复」这一个假红（评审 P2-3）。 */
                     WebActivityBridgeRetryPolicy::for_tests(10, 2_000),
                 )
                 .await

@@ -9,80 +9,37 @@
  */
 import type { UsageDayDto } from './usage';
 import type {
-  AccentColors,
-  AccentSetParams,
-  CloseNoteWindowParams,
-  Note, NoteCreateParams,
-  NoteListParams, NoteRefParams,
-  NoteUpdateParams,
-  OpenNoteWindowParams,
-  Reminder,
-  ReminderClearParams,
-  ReminderSetParams,
-  ThemeSetParams,
-  ThemeSettings,
-  Todo,
-  TodoCreateBatchParams,
-  TodoCreateParams,
-  TodoListParams,
-  TodoRefParams,
-  TodoToggleParams,
-  TodoUpdateParams,
+  AiConfig, AiConfigView, AiDailySummary, AiListModelsRequest, AiSuggestRequest, AiSuggestResponse, AiTestResult, ItemTags, TagMutation,
+} from './ai';
+import type {
+  AccentColors, AccentSetParams, CloseNoteWindowParams, Note, NoteCreateParams, NoteListParams,
+  NoteRefParams, NoteUpdateParams, OpenNoteWindowParams, Reminder, ReminderClearParams,
+  ReminderSetParams, ThemeSetParams, ThemeSettings, Todo, TodoCreateBatchParams, TodoCreateParams,
+  TodoListParams, TodoRefParams, TodoToggleParams, TodoUpdateParams,
 } from '../domain-v020';
 import type {
-  CreateItemParams,
-  ItemAppBindParams,
-  ItemAppBinding,
-  ItemAppKeyParams,
-  ItemIdParams,
-  ListItemsParams,
-  ListRecordsParams,
-  ResolveOpenRecordParams,
-  SaveWindowPositionParams,
-  SetAutostartParams,
-  SetCountdownPresetParams,
-  StartCountdownParams,
-  StartTimerParams,
-  StatsSummaryParams,
-  SwitchItemParams,
-  UndoStopParams,
-  UpdateItemParams,
-  UpdateRecordParams,
+  CreateItemParams, ItemAppBindParams, ItemAppBinding, ItemAppKeyParams, ItemIdParams,
+  ListItemsParams, ListRecordsParams, ResolveOpenRecordParams, SaveWindowPositionParams,
+  SetAutostartParams, SetCountdownPresetParams, StartCountdownParams, StartTimerParams,
+  StatsSummaryParams, SwitchItemParams, UndoStopParams, UpdateItemParams, UpdateRecordParams,
   UpdateSettingsParams,
 } from '../domain-params';
 import type {
-  Item,
-  Paginated,
-  ReferenceSettings,
-  ReferenceSettingsPatch,
-  Settings,
-  StatsSummary,
-  StopResult,
-  TimeRecord,
-  TimerState,
-  WindowRectDip,
-  WorkAreaDip,
+  Item, Paginated, ReferenceSettings, ReferenceSettingsPatch, Settings, StatsSummary,
+  StopResult, TimeRecord, TimerState, WindowRectDip, WorkAreaDip,
 } from './models';
 import type { PluginListResult } from './plugin';
 import type {
-  Decision,
-  MdPendingConflict,
-  MdResolveOutcome,
-  MdSyncConfig,
-  MdSyncKind,
-  MdSyncReport,
+  Decision, MdPendingConflict, MdResolveOutcome, MdSyncConfig, MdSyncKind, MdSyncReport,
 } from './mdSync';
 import type {
-  MdBackupExport,
-  MdBackupItem,
-  MdBackupRestoreResult,
-  MdSyncTestResult,
-  MdSyncViewCloud,
+  MdBackupExport, MdBackupItem, MdBackupRestoreResult, MdSyncTestResult, MdSyncViewCloud,
 } from './mdCloud';
 import type { OverlayStatus, OverlayStyle, SafStatus } from './mobile';
 import type { DataRootInfo } from './dataRoot';
 import type { MigrationInfo } from './migration';
 import type { CategoryCatalogRows } from './categoryCatalog';
+import type { CategoryPropagationPreview, CategoryPropagationRequest } from './categoryPropagation';
 
 /** 事件名常量（供 listen 使用，避免字符串散落）。每个键都必须有 Rust 侧 emit 来源——
  * `check:contract` 会把「前端声明了、后端从不 emit」判为死常量（`EVENT_ALLOWLIST` 目前为空；
@@ -107,6 +64,8 @@ export const IPC_EVENTS = {
   mdSyncChanged: 'md-sync:changed',
   /* [T03] md 覆盖提醒：检测到文件侧冲突且前台可弹窗时广播（载荷 `MdPendingConflict[]`） */
   mdSyncDecisionRequired: 'md-sync:decision-required',
+  itemTagsChanged: 'item-tags:changed',
+  categoryCatalogChanged: 'category-catalog:changed',
 } as const;
 
 /* [P0-03] 分析窗的一次性落点（`ActivityHistoryTarget` / `PatinaOpenTarget` /
@@ -137,6 +96,23 @@ export interface IpcApi {
   unbindItemApp(params: ItemAppKeyParams): Promise<boolean>;
   /* [0.14] 分类目录（两窗「事项分类选用」共用读口；哑管道，合并在前端） */
   listCategoryCatalog(): Promise<CategoryCatalogRows>;
+  previewCategoryPropagation(request: CategoryPropagationRequest): Promise<CategoryPropagationPreview>;
+  applyCategoryPropagation(request: CategoryPropagationRequest, expectedFingerprint: string): Promise<void>;
+  /* [0.12.3] 事项多标签（`items.tags`；`学习/考公` 表示嵌套） */
+  listItemTags(): Promise<ItemTags[]>;
+  setItemTags(params: { itemId: number; tags: string[] }): Promise<string[]>;
+  /* [0.12.4] 标签目录：定义行（空标签的落点）+ 跨事项改名 / 删除（后端一个事务） */
+  listTagCatalog(): Promise<string[]>;
+  createTagDefinition(params: { path: string }): Promise<string[]>;
+  renameTag(params: { from: string; to: string }): Promise<TagMutation>;
+  deleteTag(params: { path: string }): Promise<TagMutation>;
+  /* [0.12.3] AI（OpenAI 兼容）。密钥只进 `apiKey` 三态入参，读回只有 hasKey。 */
+  aiConfigGet(): Promise<AiConfigView>;
+  aiConfigSave(params: { config: AiConfig; apiKey?: string | null }): Promise<AiConfigView>;
+  aiTest(): Promise<AiTestResult>;
+  aiListModels(params: AiListModelsRequest): Promise<string[]>;
+  aiSuggestTags(params: AiSuggestRequest): Promise<AiSuggestResponse>;
+  aiDailySummary(): Promise<AiDailySummary>;
   /* [0.13] 进程监视（绑定应用退出→结束这一段自动接管段）；null=清除，前端不主动调。
      段身份=(itemId, segmentStartedAt)，后者取 TimeRecord.startedAt（暂停/继续不改，switch 开新段）。 */
   setBoundProcessWatch(watch: { itemId: number; processId: number; segmentStartedAt: number } | null): Promise<void>;

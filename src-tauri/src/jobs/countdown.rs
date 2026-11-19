@@ -31,7 +31,11 @@ pub fn spawn_countdown_watcher(app: AppHandle) {
         let mut idle_ticks: u32 = 0;
         loop {
             ticker.tick().await;
-            if app.state::<AppState>().timer_recovery_pending.load(std::sync::atomic::Ordering::Acquire) {
+            if app
+                .state::<AppState>()
+                .timer_recovery_pending
+                .load(std::sync::atomic::Ordering::Acquire)
+            {
                 continue;
             }
             if !services::countdown::active_hint() {

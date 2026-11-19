@@ -134,7 +134,10 @@ mod tests {
         assert_eq!(state.take(), None);
         state.put(PendingView::Tools(ToolsSection::Pomodoro));
         state.put(PendingView::Tools(ToolsSection::Reminders));
-        assert_eq!(state.take(), Some(PendingView::Tools(ToolsSection::Reminders)));
+        assert_eq!(
+            state.take(),
+            Some(PendingView::Tools(ToolsSection::Reminders))
+        );
         assert_eq!(state.take(), None);
     }
 

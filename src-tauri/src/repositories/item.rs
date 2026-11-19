@@ -52,12 +52,11 @@ pub async fn list(pool: &SqlitePool, include_archived: bool) -> AppResult<Vec<It
 
 /// 直接子事项数量（排除已软删除）—— 「有子的事项不能再挂到别人下面」的判据。
 pub async fn count_children(pool: &SqlitePool, parent_id: i64) -> AppResult<i64> {
-    let value: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM items WHERE parent_id = ? AND deleted_at IS NULL",
-    )
-    .bind(parent_id)
-    .fetch_one(pool)
-    .await?;
+    let value: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM items WHERE parent_id = ? AND deleted_at IS NULL")
+            .bind(parent_id)
+            .fetch_one(pool)
+            .await?;
     Ok(value)
 }
 

@@ -121,7 +121,8 @@ async fn the_merged_binding_can_actually_write_the_block() {
             poll_secs: 900,
             enabled: true,
             bindings: redirected,
-        ..MdSyncConfig::default() },
+            ..MdSyncConfig::default()
+        },
     )
     .await
     .unwrap();

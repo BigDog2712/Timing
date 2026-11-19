@@ -17,9 +17,7 @@ use crate::models::usage::UsageDay;
 use crate::state::AppState;
 
 /* 只有安卓构建才有原生桥与「未授权」这条错误；桌面上这些名字根本不存在，
-   所以导入必须跟着 `cfg(mobile)` 走，否则桌面 `cargo check` 直接报 unresolved import。 */
-#[cfg(mobile)]
-use tauri::Manager;
+所以导入必须跟着 `cfg(mobile)` 走，否则桌面 `cargo check` 直接报 unresolved import。 */
 #[cfg(mobile)]
 use crate::error::{AppError, ErrorCode};
 #[cfg(mobile)]
@@ -28,6 +26,8 @@ use crate::infra::native_bridge::NativeBridge;
 use crate::models::usage::UsageDayReply;
 #[cfg(mobile)]
 use crate::services::usage;
+#[cfg(mobile)]
+use tauri::Manager;
 
 /// 取某一天的排行。`date` 是本地日 `yyyy-MM-dd`。
 #[tauri::command]
@@ -43,13 +43,13 @@ pub async fn usage_stats_get(
             .ok_or_else(|| AppError::io("原生桥未注册：TimingNativePlugin 没有加载"))?;
 
         /* 窗口 = 本地日 [00:00, 次日 00:00)。Rust 侧算好再传下去：Kotlin 不做本地日推算，
-           两边各算一次必然在时区/夏令时上分叉（与 md 同步镜像根同一条教训）。 */
+        两边各算一次必然在时区/夏令时上分叉（与 md 同步镜像根同一条教训）。 */
         let (from, to) = local_day_bounds(&date)?;
 
         /* 库里这一天已有的包名也一并下传。**这是老日期能显示真名的唯一办法**：
-           系统只留约 7 天明细，更早的日子桥那边 `queryDay` 回空，但库里的行还在；
-           把包名点名要过去，`PackageManager` 就能解析出「微信」而不是回落成「Mm」。
-           名字与「系统明细还在不在」是两件事，不能捆在一起。 */
+        系统只留约 7 天明细，更早的日子桥那边 `queryDay` 回空，但库里的行还在；
+        把包名点名要过去，`PackageManager` 就能解析出「微信」而不是回落成「Mm」。
+        名字与「系统明细还在不在」是两件事，不能捆在一起。 */
         let known = usage::packages(&state.pool, &date).await?;
         let reply: UsageDayReply = bridge
             .call(
@@ -66,12 +66,12 @@ pub async fn usage_stats_get(
         }
 
         /* 聚合与时段一起落（同一个事务）：只写进聚合、段没写进的话，界面就会
-           「有 40 分钟但一个时段都没有」，且没有任何报错。
+        「有 40 分钟但一个时段都没有」，且没有任何报错。
 
-           [评审 P2-2] 但**截断的那一轮不落库**。Kotlin 侧一次最多读 2 万条事件，撞上上限
-           时聚合只是一部分；`rollup` 是「先 DELETE 再 INSERT」的重扫语义，拿一份不完整的
-           结果去写，等于把库里已经完整的那一天改小 —— 而且没有任何地方会再算回来。
-           这里宁可什么都不写（保留上一份），把 `truncated` 如实交给界面标出来。 */
+        [评审 P2-2] 但**截断的那一轮不落库**。Kotlin 侧一次最多读 2 万条事件，撞上上限
+        时聚合只是一部分；`rollup` 是「先 DELETE 再 INSERT」的重扫语义，拿一份不完整的
+        结果去写，等于把库里已经完整的那一天改小 —— 而且没有任何地方会再算回来。
+        这里宁可什么都不写（保留上一份），把 `truncated` 如实交给界面标出来。 */
         if reply.truncated {
             crate::log_warn!(
                 "usage day {date} hit the event cap: keeping the stored aggregates untouched"
@@ -81,9 +81,9 @@ pub async fn usage_stats_get(
         }
 
         /* 读库 → 用桥回的 `apps` 补上显示名与图标。
-           名字**不进库**（迁移 0008 的「不存过期副本」），每次现查现合并。
-           时段也在这一层从库里读出来挂到每行上（老日期系统已没有任何回值，
-           但库里还留着当时记的段）。 */
+        名字**不进库**（迁移 0008 的「不存过期副本」），每次现查现合并。
+        时段也在这一层从库里读出来挂到每行上（老日期系统已没有任何回值，
+        但库里还留着当时记的段）。 */
         let rows = usage::with_meta(usage::read(&state.pool, &date).await?, &reply.apps);
         let total_sec = rows.iter().map(|row| row.sec.max(0)).sum();
         Ok(UsageDay {

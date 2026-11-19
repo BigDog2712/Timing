@@ -16,23 +16,28 @@ export interface CategoryAdminCopy {
   duplicateName: string;
   /** 删除确认里的第二句：分类删掉之后，里面的应用去哪儿 */
   deleteFallback: string;
+  propagationConflict: string;
 }
 
 export const CATEGORY_ADMIN_COPY: Record<Locale, CategoryAdminCopy> = {
   "zh-CN": {
     duplicateName: "已经有同名分类了",
     deleteFallback: "该分类下的应用会回到「未分类」。",
+    propagationConflict: "分类传播发生冲突，未执行修改。请刷新后重试。",
   },
   "en-US": {
     duplicateName: "A category with that name already exists",
     deleteFallback: "Apps in this category will fall back to “Other”.",
+    propagationConflict: "Category propagation conflicted. No changes were applied; refresh and try again.",
   },
   "ru-RU": {
     duplicateName: "Категория с таким названием уже есть",
     deleteFallback: "Приложения из этой категории перейдут в «Прочее».",
+    propagationConflict: "Конфликт при переносе категории. Изменения не применены; обновите данные и повторите попытку.",
   },
   es: {
     duplicateName: "Ya existe una categoría con ese nombre",
     deleteFallback: "Las aplicaciones de esta categoría pasarán a «Otros».",
+    propagationConflict: "Conflicto al propagar la categoría. No se aplicaron cambios; actualiza y vuelve a intentarlo.",
   },
 };

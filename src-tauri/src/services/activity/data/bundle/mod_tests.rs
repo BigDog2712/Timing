@@ -37,7 +37,9 @@ fn writer_emits_one_object_per_row_and_keeps_table_order() {
 
     let parsed: Value = serde_json::from_slice(&writer.into_inner()).expect("必须是合法 JSON");
     assert_eq!(parsed["format"], "timing.full-bundle.v1");
-    let items = parsed["business"]["items"].as_array().expect("items 应是数组");
+    let items = parsed["business"]["items"]
+        .as_array()
+        .expect("items 应是数组");
     assert_eq!(items.len(), 2);
     /* 行是「列名 → 值」的对象：加列不会让旧解析错位。 */
     assert_eq!(items[0]["name"], "工作");
@@ -47,17 +49,16 @@ fn writer_emits_one_object_per_row_and_keeps_table_order() {
 
 #[test]
 fn partial_uid_index_forces_the_where_clause_on_conflict() {
-    let sql = upsert_sql(
-        "items",
-        &columns(&["uid", "name"]),
-        Conflict::UidPartial,
-    );
+    let sql = upsert_sql("items", &columns(&["uid", "name"]), Conflict::UidPartial);
     assert!(
         sql.contains("ON CONFLICT(\"uid\") WHERE \"uid\" IS NOT NULL DO UPDATE"),
         "部分唯一索引必须带同样的 WHERE，实际：{sql}"
     );
     /* 主键/合并键不能被自己覆盖。 */
-    assert!(!sql.contains("\"uid\"=excluded"), "uid 不应进 SET，实际：{sql}");
+    assert!(
+        !sql.contains("\"uid\"=excluded"),
+        "uid 不应进 SET，实际：{sql}"
+    );
 }
 
 #[test]
@@ -83,14 +84,22 @@ fn lww_only_guards_when_the_version_column_travels() {
             version: "updated_at",
         },
     );
-    assert!(!without_version.contains(" WHERE excluded."), "实际：{without_version}");
+    assert!(
+        !without_version.contains(" WHERE excluded."),
+        "实际：{without_version}"
+    );
 }
 
 #[test]
 fn ignore_strategy_never_emits_a_conflict_target() {
-    let sql = upsert_sql("todos", &columns(&["id", "title"]), Conflict::InsertOrIgnore);
+    let sql = upsert_sql(
+        "todos",
+        &columns(&["id", "title"]),
+        Conflict::InsertOrIgnore,
+    );
     assert_eq!(
-        sql, "INSERT OR IGNORE INTO \"todos\" (\"id\",\"title\") VALUES (?,?)",
+        sql,
+        "INSERT OR IGNORE INTO \"todos\" (\"id\",\"title\") VALUES (?,?)",
     );
 }
 
@@ -123,7 +132,11 @@ fn synthetic_uid_follows_the_trigger_format() {
     };
     let row = row_of(json!({ "id": 7, "uid": null, "device_id": "" }));
     let patched = synth::synthesize(&spec, &row, "dev-a");
-    assert_eq!(patched[UID], json!("i:dev-a:7"), "合成 uid 必须与触发器同格式");
+    assert_eq!(
+        patched[UID],
+        json!("i:dev-a:7"),
+        "合成 uid 必须与触发器同格式"
+    );
     /* 空串 `device_id` 一并补成来源设备：它的语义是「还没认领」。 */
     assert_eq!(patched[synth::DEVICE_ID], json!("dev-a"));
 }
@@ -136,7 +149,10 @@ fn synthetic_uid_prefers_the_rows_own_device_and_never_guesses() {
     };
     /* 行里有属主就用它（触发器本该发过 uid，这条路是给历史数据补救的）。 */
     let owned = row_of(json!({ "id": 3, "uid": null, "device_id": "dev-z" }));
-    assert_eq!(synth::synthesize(&spec, &owned, "dev-a")[UID], json!("s:dev-z:3"));
+    assert_eq!(
+        synth::synthesize(&spec, &owned, "dev-a")[UID],
+        json!("s:dev-z:3")
+    );
     /* 没有 id：拿不到确定值 → 原样借回，调用方退化成 `INSERT OR IGNORE`。 */
     let no_id = row_of(json!({ "uid": null, "device_id": "" }));
     assert!(matches!(

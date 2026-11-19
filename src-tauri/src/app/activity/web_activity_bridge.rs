@@ -1,11 +1,11 @@
-use crate::services::activity::data::app_settings_service;
-use crate::models::activity::settings::WebActivityBridgeSettings;
-use crate::services::activity::engine::web_activity::WebActivityRuntimeState;
 use crate::infra::activity::web_activity_bridge::{
     WebActivityBridgeHttpRequest, WebActivityBridgeHttpResponse, WebActivityBridgeRuntimeDeps,
     WebActivityBridgeRuntimeState,
 };
 use crate::models::activity::events::APP_SETTINGS_CHANGED;
+use crate::models::activity::settings::WebActivityBridgeSettings;
+use crate::services::activity::data::app_settings_service;
+use crate::services::activity::engine::web_activity::WebActivityRuntimeState;
 use std::future::Future;
 use std::pin::Pin;
 use tauri::{AppHandle, Listener, Manager, Runtime};
@@ -74,5 +74,7 @@ fn handle_http_request_boxed<R: Runtime + 'static>(
     app: AppHandle<R>,
     request: WebActivityBridgeHttpRequest,
 ) -> Pin<Box<dyn Future<Output = WebActivityBridgeHttpResponse> + Send>> {
-    Box::pin(crate::app::activity::web_activity::handle_http_request(app, request))
+    Box::pin(crate::app::activity::web_activity::handle_http_request(
+        app, request,
+    ))
 }

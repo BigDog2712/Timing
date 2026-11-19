@@ -26,20 +26,16 @@ use super::{dir, fail_on_status, map_reqwest, WebdavError, WebdavTarget, USER_AG
 
 /// 写一份「只允许不存在」的文件。服务端回 412（Precondition Failed）表示目标已存在，
 /// 返回 `Ok(false)` 而不是错误；其余语义与 `put` 相同（409 补建父目录后重试一次）。
-pub async fn put_new(
-    target: &WebdavTarget,
-    rel: &str,
-    bytes: &[u8],
-) -> Result<bool, WebdavError> {
+pub async fn put_new(target: &WebdavTarget, rel: &str, bytes: &[u8]) -> Result<bool, WebdavError> {
     match send_put_new(target, rel, bytes).await {
         /* 已存在 = 别人的分段已经占了这个名字。不覆盖：分段是只写一次的不可变文件。 */
         Err(WebdavError::Precondition) => Ok(false),
         Err(WebdavError::Server(409)) => match dir::ensure_base_dir_err(target).await? {
             dir::EnsureOutcome::Ready { .. } => {
                 /* 409 = 父集合不存在。`ensure_base_dir` 只补到 `basePath` 那几级，而分段的
-                   落点还在 `sync/events/<设备 id>/` 下面 —— 那几级它不认识，从来没人建过，
-                   于是重试一次还是同一个 409，手机首次上传**恒失败**（0.12.12 真机实测，
-                   远端始终只有桌面那一个设备目录）。先把 `rel` 的父目录逐级建出来再重试。 */
+                落点还在 `sync/events/<设备 id>/` 下面 —— 那几级它不认识，从来没人建过，
+                于是重试一次还是同一个 409，手机首次上传**恒失败**（0.12.12 真机实测，
+                远端始终只有桌面那一个设备目录）。先把 `rel` 的父目录逐级建出来再重试。 */
                 ensure_parent_dirs(target, rel).await?;
                 send_put_new(target, rel, bytes).await.map(|_| true)
             }
@@ -57,11 +53,7 @@ pub async fn put_new(
 }
 
 /// 裸的 `If-None-Match: *` PUT，不补建目录（409 原样上抛，交给 [`put_new`] 兜底）。
-async fn send_put_new(
-    target: &WebdavTarget,
-    rel: &str,
-    bytes: &[u8],
-) -> Result<(), WebdavError> {
+async fn send_put_new(target: &WebdavTarget, rel: &str, bytes: &[u8]) -> Result<(), WebdavError> {
     let url = target.url_for(rel)?;
     let response = super::client()?
         .put(&url)
@@ -120,7 +112,10 @@ pub async fn list_children(target: &WebdavTarget, rel: &str) -> Result<Vec<Strin
         .request(propfind_method(), &url)
         .basic_auth(&target.user, Some(&target.password))
         .header(depth_header(), HeaderValue::from_static("1"))
-        .header(reqwest::header::CONTENT_TYPE, "application/xml; charset=utf-8")
+        .header(
+            reqwest::header::CONTENT_TYPE,
+            "application/xml; charset=utf-8",
+        )
         .body(body.to_string())
         .send()
         .await
@@ -129,7 +124,8 @@ pub async fn list_children(target: &WebdavTarget, rel: &str) -> Result<Vec<Strin
     const MAX_DIRECTORY_BYTES: usize = 2 * 1024 * 1024;
     super::limits::check_content_length(&response, MAX_DIRECTORY_BYTES)?;
     let bytes = super::limits::read_limited(response, MAX_DIRECTORY_BYTES).await?;
-    let text = String::from_utf8(bytes).map_err(|_| WebdavError::Network("WebDAV 目录响应不是 UTF-8".into()))?;
+    let text = String::from_utf8(bytes)
+        .map_err(|_| WebdavError::Network("WebDAV 目录响应不是 UTF-8".into()))?;
     Ok(children_of(&text, rel))
 }
 
@@ -145,7 +141,9 @@ fn children_of(xml: &str, rel: &str) -> Vec<String> {
     let mut rest = xml;
     while let Some(start) = rest.find("href>") {
         let after_tag = &rest[start + "href>".len()..];
-        let Some(end) = after_tag.find("</") else { break };
+        let Some(end) = after_tag.find("</") else {
+            break;
+        };
         let raw = &after_tag[..end];
         rest = &after_tag[end..];
 
@@ -265,7 +263,10 @@ mod tests {
 
     #[test]
     fn decodes_percent_encoded_hrefs() {
-        assert_eq!(percent_decode("sync/events/abc%31%32%33/"), "sync/events/abc123/");
+        assert_eq!(
+            percent_decode("sync/events/abc%31%32%33/"),
+            "sync/events/abc123/"
+        );
         assert_eq!(percent_decode("no-escapes"), "no-escapes");
         assert_eq!(percent_decode("%zz"), "%zz", "非法转义按字面量保留");
     }
@@ -279,6 +280,9 @@ mod tests {
   <d:response><d:href>/base/sync/events/bbbbbbbbbbbb</d:href></d:response>
 </d:multistatus>"#;
         let names = children_of(xml, "sync/events/");
-        assert_eq!(names, vec!["aaaaaaaaaaaa".to_string(), "bbbbbbbbbbbb".to_string()]);
+        assert_eq!(
+            names,
+            vec!["aaaaaaaaaaaa".to_string(), "bbbbbbbbbbbb".to_string()]
+        );
     }
 }

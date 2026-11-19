@@ -149,47 +149,89 @@ fn same_app_different_window_refreshes_metadata_without_splitting_session() {
 
 #[test]
 fn lock_screen_processes_are_not_trackable() {
-    assert!(!crate::models::activity::tracking::should_track("LockApp.exe"));
-    assert!(!crate::models::activity::tracking::should_track("LogonUI.exe"));
-    assert!(crate::models::activity::tracking::should_track("time-tracker.exe"));
-    assert!(crate::models::activity::tracking::should_track("time_tracker.exe"));
-    assert!(crate::models::activity::tracking::should_track("patina.exe"));
+    assert!(!crate::models::activity::tracking::should_track(
+        "LockApp.exe"
+    ));
+    assert!(!crate::models::activity::tracking::should_track(
+        "LogonUI.exe"
+    ));
+    assert!(crate::models::activity::tracking::should_track(
+        "time-tracker.exe"
+    ));
+    assert!(crate::models::activity::tracking::should_track(
+        "time_tracker.exe"
+    ));
+    assert!(crate::models::activity::tracking::should_track(
+        "patina.exe"
+    ));
     assert!(!crate::models::activity::tracking::should_track("un.exe"));
-    assert!(!crate::models::activity::tracking::should_track("SearchHost.exe"));
-    assert!(!crate::models::activity::tracking::should_track("ShellHost.exe"));
+    assert!(!crate::models::activity::tracking::should_track(
+        "SearchHost.exe"
+    ));
+    assert!(!crate::models::activity::tracking::should_track(
+        "ShellHost.exe"
+    ));
     assert!(!crate::models::activity::tracking::should_track(
         "ShellExperienceHost.exe"
     ));
-    assert!(!crate::models::activity::tracking::should_track("Consent.exe"));
-    assert!(!crate::models::activity::tracking::should_track("PickerHost.exe"));
-    assert!(!crate::models::activity::tracking::should_track("openwith.exe"));
-    assert!(!crate::models::activity::tracking::should_track("SearchUXHost.exe"));
+    assert!(!crate::models::activity::tracking::should_track(
+        "Consent.exe"
+    ));
+    assert!(!crate::models::activity::tracking::should_track(
+        "PickerHost.exe"
+    ));
+    assert!(!crate::models::activity::tracking::should_track(
+        "openwith.exe"
+    ));
+    assert!(!crate::models::activity::tracking::should_track(
+        "SearchUXHost.exe"
+    ));
     assert!(!crate::models::activity::tracking::should_track(
         "FooExperienceHost.exe"
     ));
-    assert!(!crate::models::activity::tracking::should_track("svchost.exe"));
+    assert!(!crate::models::activity::tracking::should_track(
+        "svchost.exe"
+    ));
     assert!(crate::models::activity::tracking::should_track("cmd.exe"));
-    assert!(crate::models::activity::tracking::should_track("powershell.exe"));
+    assert!(crate::models::activity::tracking::should_track(
+        "powershell.exe"
+    ));
     assert!(crate::models::activity::tracking::should_track("pwsh.exe"));
-    assert!(crate::models::activity::tracking::should_track("WindowsTerminal.exe"));
+    assert!(crate::models::activity::tracking::should_track(
+        "WindowsTerminal.exe"
+    ));
     assert!(crate::models::activity::tracking::should_track("wt.exe"));
-    assert!(crate::models::activity::tracking::should_track("conhost.exe"));
-    assert!(crate::models::activity::tracking::should_track("OpenConsole.exe"));
+    assert!(crate::models::activity::tracking::should_track(
+        "conhost.exe"
+    ));
+    assert!(crate::models::activity::tracking::should_track(
+        "OpenConsole.exe"
+    ));
 }
 
 #[test]
 fn lifecycle_utility_processes_are_not_trackable() {
-    assert!(!crate::models::activity::tracking::should_track("uninstall.exe"));
-    assert!(!crate::models::activity::tracking::should_track("unins000.exe"));
-    assert!(!crate::models::activity::tracking::should_track("obsidian-setup.exe"));
+    assert!(!crate::models::activity::tracking::should_track(
+        "uninstall.exe"
+    ));
+    assert!(!crate::models::activity::tracking::should_track(
+        "unins000.exe"
+    ));
+    assert!(!crate::models::activity::tracking::should_track(
+        "obsidian-setup.exe"
+    ));
     assert!(!crate::models::activity::tracking::should_track(
         "cursor-installer.exe"
     ));
-    assert!(!crate::models::activity::tracking::should_track("cursor-updater.exe"));
+    assert!(!crate::models::activity::tracking::should_track(
+        "cursor-updater.exe"
+    ));
     assert!(!crate::models::activity::tracking::should_track(
         "maintenancetool.exe"
     ));
-    assert!(crate::models::activity::tracking::should_track("Antigravity.exe"));
+    assert!(crate::models::activity::tracking::should_track(
+        "Antigravity.exe"
+    ));
 }
 
 #[test]
@@ -268,10 +310,9 @@ fn app_title_capture_override_defaults_to_enabled() {
     tauri::async_runtime::block_on(async {
         let pool = setup_test_db().await;
 
-        let enabled =
-            tracker_settings::load_capture_window_title_setting_for_app(&pool, "QQ.exe")
-                .await
-                .unwrap();
+        let enabled = tracker_settings::load_capture_window_title_setting_for_app(&pool, "QQ.exe")
+            .await
+            .unwrap();
 
         assert!(enabled);
     });
@@ -298,10 +339,9 @@ fn app_title_capture_override_can_disable_title_recording() {
         .await
         .unwrap();
 
-        let enabled =
-            tracker_settings::load_capture_window_title_setting_for_app(&pool, "QQ.exe")
-                .await
-                .unwrap();
+        let enabled = tracker_settings::load_capture_window_title_setting_for_app(&pool, "QQ.exe")
+            .await
+            .unwrap();
 
         assert!(!enabled);
     });
@@ -310,8 +350,7 @@ fn app_title_capture_override_can_disable_title_recording() {
 #[test]
 fn tracking_payload_contracts_are_stable() {
     let payload =
-        serde_json::to_value(TrackingDataChangedPayload::new("session-transition", 123))
-            .unwrap();
+        serde_json::to_value(TrackingDataChangedPayload::new("session-transition", 123)).unwrap();
 
     assert_eq!(
         payload,
@@ -511,12 +550,11 @@ fn metadata_refresh_updates_active_session_title() {
         .await
         .unwrap();
 
-        let latest_title: String = sqlx::query_scalar(
-            "SELECT window_title FROM sessions WHERE end_time IS NULL LIMIT 1",
-        )
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let latest_title: String =
+            sqlx::query_scalar("SELECT window_title FROM sessions WHERE end_time IS NULL LIMIT 1")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
 
         assert_eq!(reason, Some("session-metadata-refreshed"));
         assert_eq!(latest_title, "Window B");
@@ -562,12 +600,11 @@ fn title_capture_disabled_closes_active_title_sample_without_starting_new_one() 
         .await
         .unwrap();
 
-        let latest_title: String = sqlx::query_scalar(
-            "SELECT window_title FROM sessions WHERE end_time IS NULL LIMIT 1",
-        )
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let latest_title: String =
+            sqlx::query_scalar("SELECT window_title FROM sessions WHERE end_time IS NULL LIMIT 1")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         let samples: Vec<(String, i64, Option<i64>)> = sqlx::query_as(
             "SELECT title, start_time, end_time
              FROM session_title_samples
@@ -749,12 +786,11 @@ fn lock_after_tracking_pause_does_not_double_seal_closed_session() {
             .await
             .unwrap();
 
-        let ended_sessions: Vec<(i64, i64)> = sqlx::query_as(
-            "SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL",
-        )
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+        let ended_sessions: Vec<(i64, i64)> =
+            sqlx::query_as("SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
 
         assert_eq!(pause_reason, Some(TRACKING_REASON_TRACKING_PAUSED_SEALED));
         assert_eq!(lock_reason, None);
@@ -779,12 +815,11 @@ fn tracking_pause_after_lock_is_a_noop_for_already_closed_session() {
             .await
             .unwrap();
 
-        let ended_sessions: Vec<(i64, i64)> = sqlx::query_as(
-            "SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL",
-        )
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+        let ended_sessions: Vec<(i64, i64)> =
+            sqlx::query_as("SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
 
         assert_eq!(lock_reason, Some("session-ended-lock"));
         assert_eq!(pause_reason, None);
@@ -817,12 +852,11 @@ fn lock_after_startup_seal_is_a_noop_for_already_closed_session() {
             .await
             .unwrap();
 
-        let ended_sessions: Vec<(i64, i64)> = sqlx::query_as(
-            "SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL",
-        )
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+        let ended_sessions: Vec<(i64, i64)> =
+            sqlx::query_as("SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
 
         assert_eq!(startup_reason, Some(8_000));
         assert_eq!(lock_reason, None);
@@ -855,12 +889,11 @@ fn suspend_after_startup_seal_is_a_noop_for_already_closed_session() {
             .await
             .unwrap();
 
-        let ended_sessions: Vec<(i64, i64)> = sqlx::query_as(
-            "SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL",
-        )
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+        let ended_sessions: Vec<(i64, i64)> =
+            sqlx::query_as("SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
 
         assert_eq!(startup_reason, Some(8_000));
         assert_eq!(suspend_reason, None);
@@ -893,12 +926,11 @@ fn tracking_pause_after_startup_seal_is_a_noop_for_already_closed_session() {
             .await
             .unwrap();
 
-        let ended_sessions: Vec<(i64, i64)> = sqlx::query_as(
-            "SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL",
-        )
-        .fetch_all(&pool)
-        .await
-        .unwrap();
+        let ended_sessions: Vec<(i64, i64)> =
+            sqlx::query_as("SELECT end_time, duration FROM sessions WHERE end_time IS NOT NULL")
+                .fetch_all(&pool)
+                .await
+                .unwrap();
 
         assert_eq!(startup_reason, Some(8_000));
         assert_eq!(pause_reason, None);

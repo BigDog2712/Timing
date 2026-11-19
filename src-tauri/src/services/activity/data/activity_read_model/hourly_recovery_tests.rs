@@ -1,5 +1,7 @@
 use super::*;
-use crate::services::activity::data::sqlite_pool::{open_single_connection_sqlite_pool, prepare_pool_schema};
+use crate::services::activity::data::sqlite_pool::{
+    open_single_connection_sqlite_pool, prepare_pool_schema,
+};
 use futures_util::FutureExt;
 use sqlx::{Executor, SqlitePool};
 use std::panic::AssertUnwindSafe;

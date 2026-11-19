@@ -33,6 +33,7 @@
     "activity-host-settings",
     "host-theme-read",
     "activity-host-data",
+    "activity-host-tags",
     "dialog:allow-open"
   ]
 }

@@ -50,7 +50,11 @@ fn two_devices_fully_overlapping_report_the_union_not_the_device_sum() {
     ];
     let sum = sum_overlaps_per_bucket(&records, &boundaries);
     assert_eq!(sum, vec![60 * 60_000], "单设备快路径加起来必须是 60 分钟");
-    assert_eq!(distinct_device_count(&records), 2, "两条记录必须被认成两台设备");
+    assert_eq!(
+        distinct_device_count(&records),
+        2,
+        "两条记录必须被认成两台设备"
+    );
 }
 
 /// 两台设备**不重叠**时并集 = 加总（各 30 分钟首尾相接 = 60 分钟）。
@@ -76,9 +80,9 @@ fn nested_and_crossing_intervals_do_not_shrink_the_union() {
         ("bbbb2222", 50, 80),
     ]);
     /* 设备 a：[0,60) ∪ [10,20) = [0,60) = 60；设备 b：[50,80) = 30；
-       两者再求并 = [0,80) = 80。
-       「取上一条的 end」（LAG 语义）在这里会算成 60 + 0 + 30 = **90** —— 多算 10 分钟，
-       而且只在"嵌套之后还有一个从中间起头的区间"这个形状上才暴露。 */
+    两者再求并 = [0,80) = 80。
+    「取上一条的 end」（LAG 语义）在这里会算成 60 + 0 + 30 = **90** —— 多算 10 分钟，
+    而且只在"嵌套之后还有一个从中间起头的区间"这个形状上才暴露。 */
     assert_eq!(union_spans_per_bucket(&merged, &boundaries), vec![80]);
 }
 
@@ -86,7 +90,11 @@ fn nested_and_crossing_intervals_do_not_shrink_the_union() {
 #[test]
 fn spans_are_clipped_per_bucket() {
     let boundaries = [HOUR9, HOUR9 + HOUR_MS, HOUR9 + 2 * HOUR_MS];
-    let merged = spans(&[("aaaa1111", HOUR9 + 50 * 60_000, HOUR9 + HOUR_MS + 20 * 60_000)]);
+    let merged = spans(&[(
+        "aaaa1111",
+        HOUR9 + 50 * 60_000,
+        HOUR9 + HOUR_MS + 20 * 60_000,
+    )]);
     assert_eq!(
         union_spans_per_bucket(&merged, &boundaries),
         vec![10 * 60_000, 20 * 60_000]

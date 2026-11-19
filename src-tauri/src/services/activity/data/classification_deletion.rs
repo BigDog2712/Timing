@@ -1,12 +1,13 @@
+use crate::models::activity::{
+    tracking::resolve_app_override_executable,
+    web_links::{group_key, registrable_domain, resolve_owner, SETTING_PREFIX},
+};
 use crate::services::activity::data::repositories::{
     app_links::APP_LINK_PREFIX,
     classification_settings::{APP_OVERRIDE_KEY_PREFIX, WEB_DOMAIN_OVERRIDE_KEY_PREFIX},
     icon_cache::acquire_icon_cache_maintenance,
+    media_playback,
     web_links,
-};
-use crate::models::activity::{
-    tracking::resolve_app_override_executable,
-    web_links::{group_key, registrable_domain, resolve_owner, SETTING_PREFIX},
 };
 use serde::{Deserialize, Serialize};
 use sqlx::{Sqlite, SqlitePool, Transaction};
@@ -181,6 +182,9 @@ async fn delete_apps(tx: &mut Tx<'_>, plan: &Impact) -> Result<(), sqlx::Error> 
      ] {
         sqlx::query(query).bind(&keys).execute(&mut **tx).await?;
     }
+    /* 媒体时间线单独走仓储：它的来源标识不是 `exe_name`（打包应用是 AUMID），
+       比对规则和去重键都不一样，塞进上面这批同名 SQL 里会漏删。 */
+    media_playback::delete_by_app_ids(tx, &plan.members.iter().cloned().collect::<Vec<_>>()).await?;
     sqlx::query("DELETE FROM settings WHERE key IN (SELECT ? || value FROM json_each(?))")
         .bind(APP_OVERRIDE_KEY_PREFIX)
         .bind(keys)

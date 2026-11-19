@@ -3,9 +3,9 @@ use crate::services::activity::data::sqlite_pool::run_recoverable_sqlite_write;
 use sqlx::{Pool, Sqlite};
 use tauri::{AppHandle, Runtime};
 
-use crate::services::activity::data::repositories::remote_backup_settings::WEBDAV_BACKUP_LAST_BACKUP_AT_MS_KEY;
 #[cfg(test)]
 use crate::infra::activity::webdav::normalize_remote_dir;
+use crate::services::activity::data::repositories::remote_backup_settings::WEBDAV_BACKUP_LAST_BACKUP_AT_MS_KEY;
 const DATA_BOOTSTRAP_SNAPSHOT_KEY: &str = "data.bootstrap_snapshot";
 const HISTORY_BOOTSTRAP_SNAPSHOT_KEY: &str = "history.bootstrap_snapshot.v1";
 const MAX_SETTINGS_PAYLOAD_LEN: usize = 10 * 1024 * 1024;

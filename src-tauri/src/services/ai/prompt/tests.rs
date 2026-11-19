@@ -133,3 +133,45 @@ fn suggestion_type_stays_serializable() {
     };
     assert_eq!(suggestion.id, "3");
 }
+
+#[test]
+fn new_tags_are_created_only_under_the_five_top_levels() {
+    /* 候选里没有「燕云」，模型新建：合规（父/子、一级在白名单里）→ 保留；
+       同时给一条一级不合规的（`游戏/燕云`）与一条三级的，两者都必须被丢掉。 */
+    let raw = r##"{"suggestions":[
+        {"id":"4","tags":["娱乐/燕云","游戏/燕云","娱乐/燕云/开荒"]}
+    ]}"##;
+    let response = parse_suggestions(raw, &targets(), &candidates(), 3);
+    assert_eq!(response.suggestions.len(), 1);
+    assert_eq!(response.suggestions[0].tags, vec!["娱乐/燕云".to_string()]);
+    assert_eq!(response.created, vec!["娱乐/燕云".to_string()]);
+}
+
+#[test]
+fn hyphenated_parent_child_is_read_as_a_path() {
+    /* 用户口径的写法就是「父类-子类」（娱乐-燕云）。只在**前半段正好是一级标签**时
+       才转成路径：`AI-编程` 这种本来就想带连字符的名字不许被改写。 */
+    let raw = r##"{"suggestions":[{"id":"4","tags":["娱乐-燕云","AI-编程"]}]}"##;
+    let response = parse_suggestions(raw, &targets(), &candidates(), 3);
+    assert_eq!(response.suggestions[0].tags, vec!["娱乐/燕云".to_string()]);
+    assert_eq!(response.created, vec!["娱乐/燕云".to_string()]);
+}
+
+#[test]
+fn existing_tags_win_over_new_ones_and_are_not_reported_as_created() {
+    /* `娱乐` 已在候选里：按候选原样回，不进 created；重复的同一个意思只留一条。 */
+    let raw = r##"{"suggestions":[{"id":"4","tags":["娱乐","娱乐","#娱乐"]}]}"##;
+    let response = parse_suggestions(raw, &targets(), &candidates(), 3);
+    assert_eq!(response.suggestions[0].tags, vec!["fun".to_string()]);
+    assert!(response.created.is_empty());
+}
+
+#[test]
+fn empty_or_control_only_tags_never_become_new_tags() {
+    let raw = r##"{"suggestions":[{"id":"4","tags":["","   ","#","学习/"]}]}"##;
+    let response = parse_suggestions(raw, &targets(), &candidates(), 3);
+    let tags = &response.suggestions.first().map(|row| row.tags.clone()).unwrap_or_default();
+    /* `学习/` 归一成 `学习`，而 `学习` 在候选里（key=study），所以它是匹配不是新建 */
+    assert_eq!(tags, &vec!["study".to_string()]);
+    assert!(response.created.is_empty());
+}

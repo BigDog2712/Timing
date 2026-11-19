@@ -32,7 +32,9 @@ pub async fn find_all_active(pool: &SqlitePool) -> AppResult<Vec<TimeRecord>> {
         "SELECT {COLS} FROM time_records \
          WHERE status = 'active' AND deleted_at IS NULL ORDER BY started_at ASC, id ASC"
     );
-    Ok(sqlx::query_as::<_, TimeRecord>(&sql).fetch_all(pool).await?)
+    Ok(sqlx::query_as::<_, TimeRecord>(&sql)
+        .fetch_all(pool)
+        .await?)
 }
 
 /// 新建 active 会话并返回新 id。
@@ -41,7 +43,7 @@ pub async fn find_all_active(pool: &SqlitePool) -> AppResult<Vec<TimeRecord>> {
 /// 漏了 → uid 恒 NULL → 这行永不被同步导出，且零报错（早前这个 INSERT 就没写）。
 /// 取不到身份时退化成哨兵 `''` 而不是报错：按下开始必须能开始，交给下次启动认领。
 /* 生产路径全走 `insert_active_in`（`timer::start` 要同事务写 start 事件）；这个薄封装
-   只剩测试在用（`tests/daily_status.rs` 建一条 active 行），所以只对 lib 豁免死码。 */
+只剩测试在用（`tests/daily_status.rs` 建一条 active 行），所以只对 lib 豁免死码。 */
 #[cfg_attr(not(test), allow(dead_code))]
 pub async fn insert_active(pool: &SqlitePool, item_id: i64, now: i64) -> AppResult<i64> {
     let mut conn = pool.acquire().await.map_err(AppError::db)?;
@@ -149,15 +151,20 @@ pub async fn flush_snapshot(
 }
 
 /* 结束 / 跨天拆分段落库移到 `record_session_split.rs`（本文件压在 300 行硬限上，
-   而那一对函数自带 20 行口径说明）。在此 re-export：`record_session::finalize*`
-   的调用点写法不变。 */
+而那一对函数自带 20 行口径说明）。在此 re-export：`record_session::finalize*`
+的调用点写法不变。 */
 /* [S3] 这一对改成收**调用方的事务**（原来是 `pool`）：结束会话与 `stop` 事件必须一起落。
-   `pub(crate)` 而不是 `pub`：只在「我已经有事务」时才有意义，对外暴露会诱使调用方
-   先 begin 再忘 commit。 */
+`pub(crate)` 而不是 `pub`：只在「我已经有事务」时才有意义，对外暴露会诱使调用方
+先 begin 再忘 commit。 */
 pub(crate) use crate::repositories::record_session_split::{finalize, finalize_split};
 
 /// 撤销结束：saved 回滚为 active，并让调用方在同一事务里补记 `resume`。
-pub(crate) async fn reactivate_in(conn: &mut SqliteConnection, id: i64, running_since: i64, now: i64) -> AppResult<bool> {
+pub(crate) async fn reactivate_in(
+    conn: &mut SqliteConnection,
+    id: i64,
+    running_since: i64,
+    now: i64,
+) -> AppResult<bool> {
     let changed = sqlx::query(
         "UPDATE time_records \
          SET status = 'active', ended_at = NULL, running_since = ?, updated_at = ? \
@@ -218,8 +225,7 @@ pub(crate) async fn discard_in(
 }
 
 /* 分段换事项移到 `record_session_switch.rs`（本文件贴着 300 行硬限）。
-   池版本与事务内版本都在那边，这里 re-export 让既有调用点写法不变。 */
+池版本与事务内版本都在那边，这里 re-export 让既有调用点写法不变。 */
 #[cfg(test)]
 pub use crate::repositories::record_session_switch::end_and_start;
 pub(crate) use crate::repositories::record_session_switch::end_and_start_in;
-

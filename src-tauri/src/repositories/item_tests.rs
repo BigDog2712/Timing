@@ -18,9 +18,9 @@ fn insert_mints_device_id_and_uid() {
         let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
         crate::infra::migrate::migrate(&pool).await.unwrap();
         /* 缓存里要有身份，否则写入口只能退化成哨兵 `''`（那是留给启动认领的降级路径，
-           本用例要钉的正是「正常路径不发哨兵」）。缓存是进程级的、可能已被别的用例填过，
-           所以走 `remember_and_lock_install_id` 取得真正生效的那一份，断言只比
-           `device_id` 与 `uid` 的自洽性，不假定具体是哪个 id。 */
+        本用例要钉的正是「正常路径不发哨兵」）。缓存是进程级的、可能已被别的用例填过，
+        所以走 `remember_and_lock_install_id` 取得真正生效的那一份，断言只比
+        `device_id` 与 `uid` 的自洽性，不假定具体是哪个 id。 */
         let resolved = crate::services::identity::load_install_id().expect("测试环境应能生成身份");
         let cached = crate::services::identity::remember_and_lock_install_id(resolved);
         assert!(!cached.is_empty(), "测试环境必须先有可用身份");

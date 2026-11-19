@@ -6,10 +6,10 @@
 //!
 //! **不做**变异自检的替代品：注释掉分支后必须真的红（见交付说明里的前后输出）。
 
-use crate::infra::md_webdav::dir::{ensure_base_dir, EnsureOutcome, MAX_LEVELS};
-use crate::infra::md_webdav::{put, WebdavError, WebdavTarget};
 use super::fake_webdav::header_value;
 use super::fake_webdav_dir::DirServer;
+use crate::infra::md_webdav::dir::{ensure_base_dir, EnsureOutcome, MAX_LEVELS};
+use crate::infra::md_webdav::{put, WebdavError, WebdavTarget};
 
 fn target(server: &DirServer, base_path: &str) -> WebdavTarget {
     WebdavTarget::new(&server.base_url, base_path, "u", "p")
@@ -24,7 +24,10 @@ async fn put_409_bootstraps_base_path_and_retries_once() {
     let target = target(&server, "/Timing/md");
     let ok = put(&target, REL, b"# x", None).await.expect("补建后应成功");
 
-    assert!(ok.etag.is_some(), "第二次 PUT 的 ETag 要带回来（下一轮 If-Match 用）");
+    assert!(
+        ok.etag.is_some(),
+        "第二次 PUT 的 ETag 要带回来（下一轮 If-Match 用）"
+    );
     assert_eq!(
         server.method_paths(),
         vec![
@@ -64,7 +67,11 @@ async fn ensure_base_dir_creates_each_level_and_is_idempotent() {
         vec!["MKCOL /Timing", "MKCOL /Timing/md"],
         "浅 → 深，每级一次"
     );
-    assert_eq!(server.dirs(), vec!["/Timing", "/Timing/md"], "服务端真的有了");
+    assert_eq!(
+        server.dirs(),
+        vec!["/Timing", "/Timing/md"],
+        "服务端真的有了"
+    );
 
     /* 幂等：不去重的话「每轮同步都发 N 次 MKCOL」，8181 之类的服务端会开始限流。 */
     let again = ensure_base_dir(&target).await.expect("重复调用不该失败");
@@ -84,7 +91,9 @@ async fn mkcol_405_counts_as_existing() {
     let server = DirServer::new(&["/Timing"]);
     let target = target(&server, "/Timing");
 
-    let outcome = ensure_base_dir(&target).await.expect("405 是「已存在」，不是错误");
+    let outcome = ensure_base_dir(&target)
+        .await
+        .expect("405 是「已存在」，不是错误");
     assert_eq!(
         outcome,
         EnsureOutcome::Ready {
@@ -105,7 +114,9 @@ async fn mkcol_301_counts_as_existing_without_following() {
     server.fail_mkcol_with(301);
     let target = target(&server, "/Timing/md");
 
-    let outcome = ensure_base_dir(&target).await.expect("3xx 是「已就绪」，不是错误");
+    let outcome = ensure_base_dir(&target)
+        .await
+        .expect("3xx 是「已就绪」，不是错误");
     assert_eq!(
         outcome,
         EnsureOutcome::Ready {
@@ -130,7 +141,11 @@ async fn mkcol_403_is_forbidden_and_stops() {
     let err = put(&target, REL, b"# x", None)
         .await
         .expect_err("403 必须失败");
-    assert_eq!(err, WebdavError::Forbidden, "必须落到 Forbidden 而不是 Server(403)");
+    assert_eq!(
+        err,
+        WebdavError::Forbidden,
+        "必须落到 Forbidden 而不是 Server(403)"
+    );
     assert_eq!(
         server.method_paths(),
         vec!["PUT /Timing/md/2026-11-07.md", "MKCOL /Timing"],
@@ -231,7 +246,10 @@ async fn retry_after_ensure_still_409_is_server_409() {
         "PUT 恰好两次（原始 + 一次重试）"
     );
     assert_eq!(
-        paths.iter().filter(|line| line.starts_with("MKCOL ")).count(),
+        paths
+            .iter()
+            .filter(|line| line.starts_with("MKCOL "))
+            .count(),
         2,
         "两级各一次 MKCOL"
     );

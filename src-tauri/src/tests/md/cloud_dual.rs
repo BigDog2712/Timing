@@ -12,13 +12,13 @@
 
 use std::fs;
 
+use super::sync::env;
 use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync_channel::MdSyncCloudChannel;
+use crate::platform::clock::now_ms;
 use crate::repositories::md_cloud_pending as repo;
 use crate::services::md_cloud;
 use crate::services::md_sync::config;
-use super::sync::env;
-use crate::platform::clock::now_ms;
 use crate::tests::support::{fresh_pool, new_item, unique_dir};
 
 /// 账本隔离：同一天、两条通路各一行，谁清谁都不许动对面。
@@ -109,7 +109,7 @@ async fn folder_failure_does_not_block_the_webdav_half() {
         "folder 那一半必须报错（夹具造错了？）：{errors:?}"
     );
     /* webdav 那一半的错文案随环境不同（缺密码 / 系统凭据不可用），所以只判「除 folder
-       那条之外还有一条」——提前 return 的实现这里只有一条。 */
+    那条之外还有一条」——提前 return 的实现这里只有一条。 */
     assert!(
         errors.len() >= 2,
         "本地轮失败不许挡住云端轮：webdav 那一半的错也必须出现（{errors:?}）"
@@ -130,7 +130,13 @@ async fn round_channel_runs_only_the_asked_channel() {
     let device = crate::services::identity::install_id().expect("测试环境应能生成 install_id");
     let today = md_cloud::today();
     let start = crate::repositories::timer_ops::start_session(
-        &fixture.pool, item, now - 600_000, &today, "countup", None, device,
+        &fixture.pool,
+        item,
+        now - 600_000,
+        &today,
+        "countup",
+        None,
+        device,
     )
     .await
     .expect("造开始事件应成功");
@@ -172,10 +178,14 @@ async fn round_channel_runs_only_the_asked_channel() {
         outcome.report.errors
     );
     let today = md_cloud::today();
+    let writer = crate::services::sync_stream::transport::Transport::Folder(folder_root.clone())
+        .scope()
+        .unwrap();
     assert!(
         folder_root
-            .join("sync/events")
+            .join("sync/streams")
             .join(device)
+            .join(writer)
             .join("00000001.jsonl")
             .exists(),
         "folder 轮必须把本机第一段事件写进本地落点"

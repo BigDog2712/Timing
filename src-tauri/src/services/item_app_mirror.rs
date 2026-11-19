@@ -141,8 +141,8 @@ fn collect_wanted(rows: &HashMap<String, String>) -> BTreeMap<String, BTreeMap<i
             continue;
         };
         /* 口径 3 覆盖的是**哪些事项**，不是"计不计入"：应用在 override 里标了 `track: false`
-           时，1:1 这一路补出来的行也必须带 `track = 0`，否则每次开机把用户的"仅观察"翻回
-           接管。用例 `single_item_key_keeps_the_track_off_flag`。 */
+        时，1:1 这一路补出来的行也必须带 `track = 0`，否则每次开机把用户的"仅观察"翻回
+        接管。用例 `single_item_key_keeps_the_track_off_flag`。 */
         let track = if track_off.contains(&app_key) { 0 } else { 1 };
         wanted.insert(app_key, BTreeMap::from([(item_id, track)]));
     }
@@ -153,7 +153,9 @@ fn collect_wanted(rows: &HashMap<String, String>) -> BTreeMap<String, BTreeMap<i
 ///
 /// `kv` = 分析窗配置表所在库（只读）；`business` = 业务库（`item_app` 在这里，只写）。
 pub async fn mirror(business: &SqlitePool, kv: &SqlitePool) -> Result<MirrorReport, String> {
-    let rows = settings_repo::get_all(kv).await.map_err(|err| err.to_string())?;
+    let rows = settings_repo::get_all(kv)
+        .await
+        .map_err(|err| err.to_string())?;
     let mut report = MirrorReport::default();
     for (app_key, items) in collect_wanted(&rows) {
         let existing = match item_app::list_for_app(business, &app_key).await {
@@ -190,13 +192,14 @@ pub fn mirror_on_boot<R: tauri::Runtime>(app: &tauri::AppHandle<R>, business: &S
     let app = app.clone();
     let business = business.clone();
     tauri::async_runtime::spawn(async move {
-        let kv = match crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool(&app).await {
-            Ok(pool) => pool,
-            Err(err) => {
-                crate::log_warn!("item_app 启动补镜像：分析窗库未就绪（{err}）");
-                return;
-            }
-        };
+        let kv =
+            match crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool(&app).await {
+                Ok(pool) => pool,
+                Err(err) => {
+                    crate::log_warn!("item_app 启动补镜像：分析窗库未就绪（{err}）");
+                    return;
+                }
+            };
         match mirror(&business, &kv).await {
             Ok(report) if report.inserted > 0 => {
                 crate::log_info!(

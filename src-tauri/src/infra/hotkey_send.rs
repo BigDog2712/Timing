@@ -57,7 +57,9 @@ pub fn validate(vks: &[u16]) -> Result<(), String> {
         return Err(format!("一次最多发送 {} 个按键", MAX_KEYS));
     }
     if let Some(vk) = vks.iter().find(|vk| VK_WIN_KEYS.contains(vk)) {
-        return Err(format!("不支持 Win 键组合（VK {vk:#04x}）：它会和系统快捷键冲突"));
+        return Err(format!(
+            "不支持 Win 键组合（VK {vk:#04x}）：它会和系统快捷键冲突"
+        ));
     }
     let modifiers = vks.iter().filter(|vk| is_modifier(**vk)).count();
     if modifiers == 0 {
@@ -151,14 +153,14 @@ mod imp {
 
     pub fn send(vks: &[u16]) -> Result<(), String> {
         /* [R1] 闸门在 `super::validate`（跨平台、可单测），不在这里 —— 这里只负责
-           「形状已经合法，把它按下去」。 */
+        「形状已经合法，把它按下去」。 */
         super::validate(vks)?;
         // 真正发键（`SendInput`）不写单测：它会往当前前台窗口注入按键，
         // 在 CI / 开发机上跑等于随机敲别人的窗口。可测的是上面几条拒绝分支。
         ensure_external_foreground();
 
         /* 按下：修饰键在前（前端已排好序）；抬起：**逆序**。反过来会让 Ctrl 先松手，
-           目标应用收到的是「M」而不是「Ctrl+M」。 */
+        目标应用收到的是「M」而不是「Ctrl+M」。 */
         let mut inputs: Vec<INPUT> = Vec::with_capacity(vks.len() * 2);
         for vk in vks {
             inputs.push(key_input(*vk, false));
@@ -192,12 +194,15 @@ mod validate_tests {
     use super::{validate, MAX_KEYS};
 
     /* 这一组不挂 `target_os = "windows"`：`validate` 是纯判定，不碰 Win32，
-       所以 CI 的 Linux 任务也能替我们守住「Win 组合不许发」这条。 */
+    所以 CI 的 Linux 任务也能替我们守住「Win 组合不许发」这条。 */
 
     #[test]
     fn hv01_modifier_plus_one_key_is_accepted() {
         assert!(validate(&[0x11, 0x4d]).is_ok(), "Ctrl+M 是最典型的合法载荷");
-        assert!(validate(&[0x11, 0x10, 0x7b]).is_ok(), "Ctrl+Shift+F12 也要过");
+        assert!(
+            validate(&[0x11, 0x10, 0x7b]).is_ok(),
+            "Ctrl+Shift+F12 也要过"
+        );
     }
 
     #[test]
@@ -210,7 +215,7 @@ mod validate_tests {
     #[test]
     fn hv03_win_key_is_rejected() {
         /* [R1] 这是唯一的完整 RCE 路径：Win+R 打开运行框，再敲命令。
-           LWIN 与 RWIN 都要挡住（前端只产出 LWIN，但闸门不能只守一半）。 */
+        LWIN 与 RWIN 都要挡住（前端只产出 LWIN，但闸门不能只守一半）。 */
         for win in [0x5bu16, 0x5c] {
             let err = validate(&[win, 0x52]).err().unwrap_or_default();
             assert!(err.contains("Win"), "Win 组合必须点名拒绝：{err}");
@@ -232,7 +237,10 @@ mod validate_tests {
 
     #[test]
     fn hv06_length_cap_is_four() {
-        assert_eq!(MAX_KEYS, 4, "上限 = 三个修饰 + 一个主键，多一格都是给宏留的门");
+        assert_eq!(
+            MAX_KEYS, 4,
+            "上限 = 三个修饰 + 一个主键，多一格都是给宏留的门"
+        );
         let too_many = vec![0x11u16; MAX_KEYS + 1];
         assert!(validate(&too_many).is_err());
     }
@@ -244,7 +252,10 @@ mod tests {
 
     #[test]
     fn hs01_empty_sequence_is_rejected() {
-        assert!(send(&[]).is_err(), "空序列必须拒绝 —— 后端不该把「没有键」当成一次成功的注入");
+        assert!(
+            send(&[]).is_err(),
+            "空序列必须拒绝 —— 后端不该把「没有键」当成一次成功的注入"
+        );
     }
 
     #[test]
@@ -252,13 +263,16 @@ mod tests {
         /* 手改配置塞进几百个键会把输入队列打满；上限存在的意义就是这一条 */
         let too_many = vec![0x11u16; MAX_KEYS + 1];
         let err = send(&too_many).err().unwrap_or_default();
-        assert!(err.contains(&MAX_KEYS.to_string()), "提示里要说出上限是多少：{err}");
+        assert!(
+            err.contains(&MAX_KEYS.to_string()),
+            "提示里要说出上限是多少：{err}"
+        );
     }
 
     #[test]
     fn hs03_remembering_zero_does_not_clobber_the_last_real_window() {
         /* 0 是「还没观测到」的哨兵。允许它覆盖的话，一次空桌面的轮询就会让下一发快捷键
-           失去抢回前台的目标（表现为偶发「点了没反应」）。 */
+        失去抢回前台的目标（表现为偶发「点了没反应」）。 */
         remember_foreign_foreground(42);
         remember_foreign_foreground(0);
         assert_eq!(super::imp::peek_foreign_foreground(), 42);

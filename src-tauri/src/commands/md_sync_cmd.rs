@@ -75,9 +75,9 @@ pub async fn md_sync_save(
     let pool = pool_of(&app);
     md_sync::config::save(&pool, &config).await?;
     /* [V0.11.18] 通道可能刚被改（只用本地 ↔ 本地 + 云端），托盘那一项的标签要立刻跟上。
-       K-30 的「仅状态迁移时重建」在这里**不够**：通道切换不是状态迁移（PRD §3.2）。
-       位置在 `config::save` **之后**、`round` **之前**：标签要读的是刚落库的那份配置。
-       这不是新命令、不是新事件 → 契约账面零变；`pool` 复用上面那个变量，不再取一次。 */
+    K-30 的「仅状态迁移时重建」在这里**不够**：通道切换不是状态迁移（PRD §3.2）。
+    位置在 `config::save` **之后**、`round` **之前**：标签要读的是刚落库的那份配置。
+    这不是新命令、不是新事件 → 契约账面零变；`pool` 复用上面那个变量，不再取一次。 */
     #[cfg(desktop)]
     events::refresh_tray(&app, &pool).await;
     let outcome = md_cloud::round(&pool).await?;
@@ -91,7 +91,7 @@ pub async fn md_sync_save(
 #[tauri::command]
 pub async fn md_sync_run(app: AppHandle) -> AppResult<MdSyncReport> {
     /* [V0.11.19] 手动入口统一走 `round_manual`：T04 的「点一次立即同步 → 解除清理
-       暂停」只需要挂在那一个函数上，两处手动入口不会各记一份。 */
+    暂停」只需要挂在那一个函数上，两处手动入口不会各记一份。 */
     let outcome = md_cloud::round_manual(&pool_of(&app)).await?;
     announce(&app, &outcome.report);
     announce_decisions(&app);
@@ -158,7 +158,7 @@ pub async fn md_backup_restore(
 ) -> AppResult<MdBackupRestoreResult> {
     let result = md_backup::restore(&pool_of(&app), &name, target.as_deref()).await?;
     /* 恢复把记录 / 待办 / 便利贴写回 SQL，是一次真实的业务写入，必须让 md 链看见。
-       `md_sync_cmd.rs` 里只允许这一处打标记：`md_sync_save` 自己就会跑一轮同步。 */
+    `md_sync_cmd.rs` 里只允许这一处打标记：`md_sync_save` 自己就会跑一轮同步。 */
     md_sync::dirty::mark("record");
     Ok(result)
 }

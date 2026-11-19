@@ -1,7 +1,9 @@
 use crate::app::activity::tools;
 use crate::models::activity::classification::{canonical_exe, normalize_domain_key};
 use crate::models::activity::tools::{ActivityReminderTarget, ToolAlert, ToolsRuntimeSnapshot};
-use crate::services::activity::engine::tools::{CreateActivityReminderRuleRequest, StartPomodoroRequest};
+use crate::services::activity::engine::tools::{
+    CreateActivityReminderRuleRequest, StartPomodoroRequest,
+};
 use serde::Deserialize;
 use tauri::AppHandle;
 

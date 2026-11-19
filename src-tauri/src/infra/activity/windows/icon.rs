@@ -19,7 +19,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     ICON_SMALL, ICON_SMALL2, SMTO_ABORTIFHUNG, SMTO_BLOCK, WM_GETICON,
 };
 
-use crate::infra::activity::windows::handles::{MemoryDcGuard, OwnedBitmap, OwnedIcon, ScreenDcGuard};
+use crate::infra::activity::windows::handles::{
+    MemoryDcGuard, OwnedBitmap, OwnedIcon, ScreenDcGuard,
+};
 
 const ICON_RESULT_CACHE_MAX_ENTRIES: usize = 128;
 const ICON_RESULT_CACHE_MAX_BYTES: usize = 16 * 1024 * 1024;

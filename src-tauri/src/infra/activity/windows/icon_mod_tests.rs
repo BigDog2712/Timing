@@ -27,17 +27,14 @@ fn monochrome_icon_conversion_releases_mask_bitmaps() {
         return;
     }
 
-    use windows::Win32::System::Threading::{
-        GetCurrentProcess, GetGuiResources, GR_GDIOBJECTS,
-    };
+    use windows::Win32::System::Threading::{GetCurrentProcess, GetGuiResources, GR_GDIOBJECTS};
     use windows::Win32::UI::WindowsAndMessaging::CreateIcon;
     unsafe {
         let mask = [0xff_u8; 128];
         let pixels = [0_u8; 128];
-        let icon = OwnedIcon::new(
-            CreateIcon(None, 32, 32, 1, 1, mask.as_ptr(), pixels.as_ptr()).unwrap(),
-        )
-        .unwrap();
+        let icon =
+            OwnedIcon::new(CreateIcon(None, 32, 32, 1, 1, mask.as_ptr(), pixels.as_ptr()).unwrap())
+                .unwrap();
         let mut info = Default::default();
         GetIconInfo(icon.raw(), &mut info).unwrap();
         assert!(info.hbmColor.is_invalid());
@@ -54,8 +51,7 @@ fn monochrome_icon_conversion_releases_mask_bitmaps() {
 }
 
 fn cache_test_guard() -> std::sync::MutexGuard<'static, ()> {
-    static CACHE_TEST_LOCK: std::sync::OnceLock<std::sync::Mutex<()>> =
-        std::sync::OnceLock::new();
+    static CACHE_TEST_LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
     CACHE_TEST_LOCK
         .get_or_init(|| std::sync::Mutex::new(()))
         .lock()

@@ -39,7 +39,13 @@ pub async fn list_for_app(pool: &SqlitePool, app_key: &str) -> AppResult<Vec<Ite
 ///
 /// `device_id` 必须显式写：`uid`（`b:<device>:<id>`）由 AFTER INSERT 触发器按它发，
 /// 漏了它 → uid 恒 NULL → 这条绑定永远不同步，且零报错。
-pub async fn bind(pool: &SqlitePool, item_id: i64, app_key: &str, track: i64, now: i64) -> AppResult<()> {
+pub async fn bind(
+    pool: &SqlitePool,
+    item_id: i64,
+    app_key: &str,
+    track: i64,
+    now: i64,
+) -> AppResult<()> {
     let device_id = crate::services::identity::install_id().unwrap_or_default();
     sqlx::query(
         "INSERT INTO item_app(item_id, app_key, track, created_at, updated_at, device_id)

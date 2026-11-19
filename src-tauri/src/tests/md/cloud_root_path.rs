@@ -63,7 +63,10 @@ fn webdav_root_sits_beside_the_obsidian_root() {
     let root = cloud.resolve_root().expect("Webdav 模式有出厂落点");
     assert!(root.is_absolute(), "{}", root.display());
     assert_eq!(root.file_name().and_then(|n| n.to_str()), Some("md-webdav"));
-    assert_eq!(root.parent(), Some(crate::platform::app_dir::data_root().as_path()));
+    assert_eq!(
+        root.parent(),
+        Some(crate::platform::app_dir::data_root().as_path())
+    );
 }
 
 /// `LocalFolder` 模式的落点就是用户填的那个目录（展开后），**不**加 `md-webdav` 后缀。

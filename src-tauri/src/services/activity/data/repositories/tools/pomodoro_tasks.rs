@@ -1,4 +1,6 @@
-use crate::models::activity::tools::{PomodoroStatus, PomodoroTaskAction, ToolPomodoroRun, ToolPomodoroTask};
+use crate::models::activity::tools::{
+    PomodoroStatus, PomodoroTaskAction, ToolPomodoroRun, ToolPomodoroTask,
+};
 use sqlx::{Pool, Row, Sqlite, Transaction};
 
 pub(super) async fn notification_task(
@@ -37,13 +39,15 @@ pub(super) async fn complete_group(
     .execute(&mut **tx)
     .await
     .map_err(|e| e.to_string())?;
-    Ok(crate::models::activity::tools::CompletedPomodoroNotification {
-        task: notification_task(tx, run.id).await?,
-        run_id: run.id,
-        completed_phase: run.phase,
-        next_phase: crate::models::activity::tools::PomodoroPhase::Focus,
-        completed_focus_count: run.completed_focus_count,
-    })
+    Ok(
+        crate::models::activity::tools::CompletedPomodoroNotification {
+            task: notification_task(tx, run.id).await?,
+            run_id: run.id,
+            completed_phase: run.phase,
+            next_phase: crate::models::activity::tools::PomodoroPhase::Focus,
+            completed_focus_count: run.completed_focus_count,
+        },
+    )
 }
 
 pub(super) async fn fetch_tasks(pool: &Pool<Sqlite>) -> Result<Vec<ToolPomodoroTask>, String> {

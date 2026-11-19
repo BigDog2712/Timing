@@ -1,4 +1,6 @@
-use crate::models::activity::export_schedule::{ScheduledExportConfigInput, ScheduledExportSnapshot};
+use crate::models::activity::export_schedule::{
+    ScheduledExportConfigInput, ScheduledExportSnapshot,
+};
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tokio::sync::{Mutex, Notify, OwnedMutexGuard};
@@ -25,7 +27,8 @@ pub async fn save_config(
 ) -> Result<ScheduledExportSnapshot, String> {
     let state = app.state::<ScheduledExportRuntimeState>();
     let _guard = state.run_lock.lock().await;
-    let snapshot = crate::services::activity::data::scheduled_export::save_config(app, input).await?;
+    let snapshot =
+        crate::services::activity::data::scheduled_export::save_config(app, input).await?;
     state.wake();
     emit_changed(app);
     Ok(snapshot)

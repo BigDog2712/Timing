@@ -1,16 +1,4 @@
-/**
- * Timing — 常用事项 · 管理卡 ItemsPrefsMenu（V0.3.9）
- * -----------------------------------------------------------------------------
- * 入口：常用事项框右下角的小圆点（`CommonItems` footer）。
- *
- * 形态**对齐摸鱼管理**（用户口径：参考摸鱼事项管理，可拖动、新增、设置倒计时）：
- *   1. 列表 = 已置顶的**常用事项**：拖手柄排序（`ItemsPrefsRow`，手柄上 ↑/↓ 也可），落库写 `sort_order`；
- *   2. 新增 / 编辑共用 `ItemsPrefsForm`：名称 + 默认倒计时（留空 = 正计时）；
- *   3. 删除 = **移出常用**（取消置顶），事项本身保留；
- *   4. 「显示最近事项」开 = 高亮色、关 = 常规色（无图标无对勾），条数填在行右侧（默认 5，钳 1..10）。
- *
- * 时长落 `settings.itemsTimers`（itemId → 分钟），不建表、不动 IPC 契约。
- */
+/** Timing 常用事项管理卡。 */
 import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import {
@@ -20,10 +8,10 @@ import {
   movedList,
   withItemTimer,
 } from '../../lib/commonItems';
-import { fitBounds } from '../../lib/fitBounds';
-import { itemApi, settingsApi } from '../../services/api';
+import { placeMenu } from '../../lib/menuPlacement';
+import { itemApi, rawIpcText, settingsApi } from '../../services/api';
 import { errorText } from '../../services/ipc';
-import { useItemCategoryCatalog } from '../../hooks/useItemCategoryCatalog';
+import { useItemTags } from '../../hooks/useItemTags';
 import { useItemStore } from '../../stores/itemStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { useUiStore } from '../../stores/uiStore';
@@ -32,11 +20,11 @@ import type { Item } from '../../types/domain';
 import { ItemsPrefsForm } from './ItemsPrefsForm';
 import { ItemsPrefsRecentRow } from './ItemsPrefsRecentRow';
 import { ItemsPrefsRow } from './ItemsPrefsRow';
-import { withCurrentValueOption } from '../../../shared/classification/categoryCatalog';
+import { ItemsPrefsTags } from './ItemsPrefsTags';
+import { trapMenuTab, useMenuFocusTrap } from './useMenuFocusTrap';
 import '../../styles/common-items.css';
 
 const W = 248;
-const EDGE = 4;
 /** 贴底留高（再小只剩半行表单），超出部分列表内部滚动 */
 const MIN_H = 220;
 
@@ -65,16 +53,34 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
   const [count, setCount] = useState(String(settings.itemsRecentCount));
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState<number | null>(null);
-  /* [0.14] 分类选用三态：touched=false（没动）→ patch 不带 categoryKey 字段；
-     touched=true 时显式带值（null = 清空）——「不改」与「清空」是两件事。 */
-  const [categoryValue, setCategoryValue] = useState<string | null>(null);
-  const [categoryTouched, setCategoryTouched] = useState(false);
-  const { options: rawCategoryOptions, loading: categoryLoading } = useItemCategoryCatalog();
+  /* [0.12.3] 标签：编辑中的草稿 + 全量映射（打开管理卡时读一次） */
+  const [draftTags, setDraftTags] = useState<string[]>([]);
+  const tagState = useItemTags();
+
+  /* 候选 = 已有标签 + 事项名（事项名是隐式同名标签）。
+     [0.12.4] 不再掺「分类目录」：分类已不是用户面概念，把它的显示名混进标签候选
+     会让用户以为那些是标签，选中之后又是一条同名的新标签。 */
+  const tagSuggestions = useMemo(() => {
+    const all = new Set<string>();
+    for (const list of Object.values(tagState.byItemId)) {
+      for (const tag of list) all.add(tag);
+    }
+    for (const item of items) if (!item.isSystem) all.add(item.name);
+    return [...all].sort((a, b) => a.localeCompare(b));
+  }, [tagState.byItemId, items]);
+  const aiCandidates = useMemo(
+    () => tagSuggestions.map((tag) => ({ key: tag, label: tag })),
+    [tagSuggestions],
+  );
+  const menuRef = useMenuFocusTrap();
 
   useEffect(() => setCount(String(settings.itemsRecentCount)), [settings.itemsRecentCount]);
+  useEffect(() => {
+    if (editingId != null) setDraftTags(tagState.byItemId[editingId] ?? []);
+  }, [editingId, tagState.byItemId]);
 
-  const notify = (err: unknown) =>
-    useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
+  const notify = (err: unknown) => useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
+  const notifyAi = (err: unknown) => useUiStore.getState().setNotice({ text: rawIpcText(err), tone: 'danger' });
 
   const patchSettings = async (patch: Parameters<typeof settingsApi.update>[0]) => {
     try {
@@ -91,15 +97,13 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
     setEditingId(null);
     setName('');
     setMinutes('');
-    setCategoryValue(null);
-    setCategoryTouched(false);
+    setDraftTags([]);
   };
 
   const startEdit = (item: Item) => {
     setEditingId(item.id);
     setName(item.name);
-    setCategoryValue(item.categoryKey ?? null);
-    setCategoryTouched(false);
+    setDraftTags(tagState.byItemId[item.id] ?? []);
     const current = itemTimerMinutes(timers, item.id);
     setMinutes(current != null ? String(current) : '');
   };
@@ -122,19 +126,13 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
       try {
         const safeMinutes = readMinutes();
         if (editingId != null) {
-          /* 三态（判据必须 `!== undefined`）：没动分类 → 不带字段；动了 → 显式带值（含 null 清空）。 */
-          await itemApi.update({
-            id: editingId,
-            patch: {
-              name: label,
-              ...(categoryTouched ? { categoryKey: categoryValue } : {}),
-            },
-          });
+          await itemApi.update({ id: editingId, patch: { name: label } });
+          await tagState.save(editingId, draftTags);
           await patchSettings({ itemsTimers: withItemTimer(timers, editingId, safeMinutes) });
         } else {
           const nextOrder = pinned.reduce((max, item) => Math.max(max, item.sortOrder), 0) + 1;
-          /* 新建：分类是创建语义的一部分，始终带上（null = 未分类） */
-          const created = await itemApi.create({ name: label, categoryKey: categoryValue ?? undefined });
+          const created = await itemApi.create({ name: label });
+          if (draftTags.length > 0) await tagState.save(created.id, draftTags);
           await itemApi.update({ id: created.id, patch: { isPinned: true, sortOrder: nextOrder } });
           if (safeMinutes != null) {
             await patchSettings({ itemsTimers: withItemTimer(timers, created.id, safeMinutes) });
@@ -202,27 +200,16 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
     if (clamped !== settings.itemsRecentCount) void patchSettings({ itemsRecentCount: clamped });
   };
 
-  const placement = useMemo(() => {
-    const viewport = fitBounds();
-    const leftEdge = viewport.x + EDGE;
-    const topEdge = viewport.y + EDGE;
-    const left = Math.min(
-      Math.max(anchor.x, leftEdge),
-      Math.max(leftEdge, viewport.x + viewport.w - W - EDGE),
-    );
-    const top = Math.min(
-      Math.max(anchor.y, topEdge),
-      Math.max(topEdge, viewport.y + viewport.h - MIN_H - EDGE),
-    );
-    return { left, top, maxHeight: Math.max(MIN_H, viewport.y + viewport.h - top - EDGE) };
-  }, [anchor.x, anchor.y]);
+  const placement = useMemo(() => placeMenu(anchor, W, MIN_H), [anchor]);
 
   return (
     <>
       <div className="menu-scrim" onMouseDown={onClose} aria-hidden />
       <div
         className="menu items-prefs"
+        ref={menuRef}
         role="dialog"
+        aria-modal="true"
         aria-label="常用事项管理"
         style={{
           left: `${placement.left}px`,
@@ -234,7 +221,9 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
           if (event.key === 'Escape') {
             event.stopPropagation();
             onClose();
+            return;
           }
+          trapMenuTab(event, menuRef.current);
         }}
       >
         <div className="menu__group">常用事项</div>
@@ -266,19 +255,20 @@ export function ItemsPrefsMenu({ anchor, onClose }: ItemsPrefsMenuProps) {
           editing={editingId != null}
           name={name}
           minutes={minutes}
-          categoryOptions={
-            /* selectedOption 兜底：当前值不在候选（分类刚被删）时追加原键名一项，触发器不空白 */
-            withCurrentValueOption(rawCategoryOptions, categoryValue)
-          }
-          categoryValue={categoryValue}
-          categoryLoading={categoryLoading}
+          tagsSlot={(
+            <ItemsPrefsTags
+              itemName={name}
+              value={draftTags}
+              suggestions={tagSuggestions}
+              candidates={aiCandidates}
+              disabled={busy}
+              onChange={setDraftTags}
+              onError={notifyAi}
+            />
+          )}
           busy={busy}
           onName={setName}
           onMinutes={setMinutes}
-          onCategoryChange={(next) => {
-            setCategoryValue(next);
-            setCategoryTouched(true);
-          }}
           onSubmit={submit}
           onCancel={editingId != null ? resetForm : onClose}
         />

@@ -1,8 +1,8 @@
 use super::merge::merge_backup_records_in_tx;
-use crate::services::activity::data::schema as db_schema;
 use crate::models::activity::backup::{
     BackupIconCache, BackupRecords, BackupSession, BackupSetting, BackupTitleSample,
 };
+use crate::services::activity::data::schema as db_schema;
 use sqlx::{Executor, SqlitePool};
 
 async fn merge_records(pool: &SqlitePool, records: &BackupRecords) -> Result<(), String> {

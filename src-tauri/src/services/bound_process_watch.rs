@@ -138,7 +138,7 @@ impl WatchRegistry {
 
     /// 当前的注册（只读快照；用例断言与日志用）。
     /* 生产路径不读这张快照（收尾走 `take_if_current` 的消费语义），只给用例断言与
-       日志留读数口；`not(test)` 豁免是为了不让「用例专用」变成 lib 编译告警。 */
+    日志留读数口；`not(test)` 豁免是为了不让「用例专用」变成 lib 编译告警。 */
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn snapshot(&self) -> Option<Registration> {
         self.lock().clone()
@@ -232,10 +232,10 @@ pub async fn settle_after_exit(
 }
 
 /* ---- Win32 侧：打开句柄 + 阻塞等待 ----------------------------------------
-   桌面非 Windows 走空实现：`open` 恒 `None`（于是永远不注册、永远不停表）。
-   这一支在本仓其实到不了 —— `infra::insight` 整个子树（含 `foreground`）已经
-   无条件 `use windows::`，桌面非 Windows 根本编不过。留着只是为了「模块自己不漏
-   平台假设」，不是可达路径。 */
+桌面非 Windows 走空实现：`open` 恒 `None`（于是永远不注册、永远不停表）。
+这一支在本仓其实到不了 —— `infra::insight` 整个子树（含 `foreground`）已经
+无条件 `use windows::`，桌面非 Windows 根本编不过。留着只是为了「模块自己不漏
+平台假设」，不是可达路径。 */
 #[cfg(windows)]
 #[path = "bound_process_watch_win.rs"]
 mod win;
@@ -279,6 +279,6 @@ mod win {
 
 pub use win::{wait_for_exit, ExitOutcome, ProcessHandle};
 /* 第二道闸的读数口：产品路径不调它（句柄本身已防 pid 复用），用例要断言
-   「拿得到身份」。分开 re-export 才能只豁免这一个名字的未使用告警。 */
+「拿得到身份」。分开 re-export 才能只豁免这一个名字的未使用告警。 */
 #[cfg_attr(not(test), allow(unused_imports))]
 pub use win::creation_token;

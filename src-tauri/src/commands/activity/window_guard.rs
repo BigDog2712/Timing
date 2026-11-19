@@ -36,7 +36,7 @@ mod tests {
     #[test]
     fn main_window_is_allowed() {
         /* 值锁用**字面量**，不引用 `ACTIVITY_WINDOW_LABEL`（设计 §6 原则）：
-           引用常量的话，常量改错值时这条测试会跟着一起错——测试就成了同义反复。 */
+        引用常量的话，常量改错值时这条测试会跟着一起错——测试就成了同义反复。 */
         assert_eq!(require_main_window_label("activity"), Ok(()));
     }
 

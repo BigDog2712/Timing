@@ -169,7 +169,10 @@ fn file_probe_checks_the_fingerprint_not_just_mtime() {
 
     let mut watch = FileWatch::default();
     write_stamped(&path, b"first", 1_700_000_000);
-    assert!(!watch.probe(std::slice::from_ref(&binding), date), "第一次观测只记基线");
+    assert!(
+        !watch.probe(std::slice::from_ref(&binding), date),
+        "第一次观测只记基线"
+    );
 
     /* mtime 前移 1 秒而内容逐字未变：必须真的走到指纹比较，判「没变」。 */
     write_stamped(&path, b"first", 1_700_000_001);
@@ -198,7 +201,10 @@ fn cross_midnight_uses_the_next_days_path() {
     let binding = today_binding(&dir.to_string_lossy());
     let first = md_file::resolve_path(&binding.root, &binding.file, day_one);
     let second = md_file::resolve_path(&binding.root, &binding.file, day_two);
-    assert_ne!(first, second, "每轮重算 Local::now().date_naive()，路径必须跟着换");
+    assert_ne!(
+        first, second,
+        "每轮重算 Local::now().date_naive()，路径必须跟着换"
+    );
 
     let mut watch = FileWatch::default();
     fs::write(&first, b"old").expect("写昨天");

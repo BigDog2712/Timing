@@ -10,7 +10,9 @@ use std::path::Path;
 /// 内存库走到 head（`prepare_pool_schema` 会跑 Migrator + 认领 + ensure_self）。
 pub(super) async fn fresh_patina() -> SqlitePool {
     let pool = SqlitePool::connect("sqlite::memory:").await.unwrap();
-    prepare_pool_schema(&pool, Path::new(":memory:")).await.unwrap();
+    prepare_pool_schema(&pool, Path::new(":memory:"))
+        .await
+        .unwrap();
     pool
 }
 

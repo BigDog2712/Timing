@@ -44,10 +44,10 @@ async fn qa_sync_label_follows_effective_channel_not_the_selection() {
     let pool = fresh_pool("qa-blocked-label").await;
 
     /* ① 选了云端（字段还填全了）但 Markdown 总开关关着 → 标签是 `Markdown 同步`。
-       [V0.11.18 裁决后] 这一帧已被修掉：`md_cloud::usable()` 不看顶层 `config.enabled`，
-       所以 `sync_label` 单独判了一次。原实现给的是 `云端同步` —— 那句是假话：
-       总开关关着时这一轮连 `md_sync::run` 都不会进，点下去弹的却是「先在设置里打开
-       Markdown 同步」。断言因此从「现状照片」改成「判据」。 */
+    [V0.11.18 裁决后] 这一帧已被修掉：`md_cloud::usable()` 不看顶层 `config.enabled`，
+    所以 `sync_label` 单独判了一次。原实现给的是 `云端同步` —— 那句是假话：
+    总开关关着时这一轮连 `md_sync::run` 都不会进，点下去弹的却是「先在设置里打开
+    Markdown 同步」。断言因此从「现状照片」改成「判据」。 */
     store(&pool, &cfg_of(false, Some(webdav_filled()))).await;
     assert_eq!(
         sync_label(&pool).await,
@@ -72,7 +72,7 @@ async fn qa_sync_label_follows_effective_channel_not_the_selection() {
     );
 
     /* ③ 同一份配置下：标签说本地、通知正文说云端。两句各说一件事（状态 vs 动作），不打架；
-       标题该取哪个常量见下面那条挂起用例。 */
+    标题该取哪个常量见下面那条挂起用例。 */
     assert_eq!(
         blocked_notice(&not_filled).map(|(_, body)| body),
         Some(V0118_BODY),
@@ -128,7 +128,11 @@ async fn qa_b4_notice_title_should_equal_the_menu_item_label() {
 /// 被断言。**唯一需要维护的情形**：出现了不在这几个维度上的新判据（按时间、按网络状态、
 /// 按上次失败次数……），那时把那个维度加进来；除此之外新增档位零维护。
 fn config_space() -> Vec<(String, MdSyncConfig)> {
-    let blank_webdav = || MdSyncCloud { enabled: true, mode: CloudMode::Webdav, ..MdSyncCloud::default() };
+    let blank_webdav = || MdSyncCloud {
+        enabled: true,
+        mode: CloudMode::Webdav,
+        ..MdSyncCloud::default()
+    };
     let cleared = |f: fn(&mut MdSyncCloud)| {
         let mut cloud = webdav_filled();
         f(&mut cloud);
@@ -145,8 +149,14 @@ fn config_space() -> Vec<(String, MdSyncConfig)> {
             }),
         ),
         ("webdav 三项全空".into(), Some(blank_webdav())),
-        ("webdav 只缺 baseUrl".into(), Some(cleared(|c| c.base_url.clear()))),
-        ("webdav 只缺 basePath".into(), Some(cleared(|c| c.base_path.clear()))),
+        (
+            "webdav 只缺 baseUrl".into(),
+            Some(cleared(|c| c.base_url.clear())),
+        ),
+        (
+            "webdav 只缺 basePath".into(),
+            Some(cleared(|c| c.base_path.clear())),
+        ),
         ("webdav 只缺 user".into(), Some(cleared(|c| c.user.clear()))),
         ("webdav 填全".into(), Some(webdav_filled())),
         (
@@ -163,13 +173,16 @@ fn config_space() -> Vec<(String, MdSyncConfig)> {
     let mut cells: Vec<(String, MdSyncConfig)> = Vec::with_capacity(clouds.len() * 2 + 12);
     for enabled in [false, true] {
         for (label, cloud) in &clouds {
-            cells.push((format!("总开关={enabled} / {label}"), cfg_of(enabled, cloud.clone())));
+            cells.push((
+                format!("总开关={enabled} / {label}"),
+                cfg_of(enabled, cloud.clone()),
+            ));
         }
     }
 
     /* [V0.11.26] 新维度：**两条通路各自开不开**。老形状（二选一）永远造不出
-       「folder 开 + webdav 开」这一格，而块④⑤ 两个独立开关正是这次改造的判据本体。
-       每格三态（关 / 开但空 / 开且填全），两条通路交叉 = 3 × 3 × 总开关 2 = 18 格。 */
+    「folder 开 + webdav 开」这一格，而块④⑤ 两个独立开关正是这次改造的判据本体。
+    每格三态（关 / 开但空 / 开且填全），两条通路交叉 = 3 × 3 × 总开关 2 = 18 格。 */
     let folder_of = |state: u8| match state {
         0 => None,
         1 => Some(md_sync_channel::MdSyncCloudChannel {
@@ -241,7 +254,10 @@ async fn qa_notice_title_always_equals_the_menu_item_label() {
     }
 
     /* 防空转：`blocked_notice` 哪天恒返回 None，上面一个格子都不会进，这条要红。 */
-    assert!(notice_cells >= 2, "至少两档会弹通知，实际只有 {notice_cells} 档");
+    assert!(
+        notice_cells >= 2,
+        "至少两档会弹通知，实际只有 {notice_cells} 档"
+    );
 }
 
 /// 反向：**不该插话**的档位连标题都不产生，也就没有「标题不符」可言。

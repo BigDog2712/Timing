@@ -25,11 +25,11 @@ pub(super) async fn run(
     report: &mut MdSyncReport,
 ) -> bool {
     /* 没有身份就没有 uid，事件传不出去也认不出对端。这条**必须说出来**：静默跳过会让
-       设置页的「今天还没上传」看起来像网络问题，而真正的原因是本机身份没认领。 */
+    设置页的「今天还没上传」看起来像网络问题，而真正的原因是本机身份没认领。 */
     let Some(device_id) = crate::services::identity::install_id() else {
-        report.errors.push(
-            "本机设备身份还没建立（install_id 读不到）：这一轮没有传任何事件".into(),
-        );
+        report
+            .errors
+            .push("本机设备身份还没建立（install_id 读不到）：这一轮没有传任何事件".into());
         return false;
     };
     let mut ok = true;
@@ -38,7 +38,7 @@ pub(super) async fn run(
         Ok(summary) => {
             if summary.segment_seq > 0 {
                 /* 「导出」= 写出去的分段数（事件流一轮最多写一段），与 md 时代的
-                   「写文件的落点数」同一个位置、同一个含义：这一轮往远端写出了几份。 */
+                「写文件的落点数」同一个位置、同一个含义：这一轮往远端写出了几份。 */
                 report.exported += 1;
                 crate::log_info!(
                     "sync stream push: seq={} events={} bytes={}",
@@ -62,8 +62,8 @@ pub(super) async fn run(
         Ok(summary) => {
             if summary.applied > 0 {
                 /* `imported` 的读者只有两个：`touched()`（决定要不要广播一次刷新）与
-                   托盘那句「导入 N 条」。对端事件落库确实改写了 `time_records`，
-                   所以这里记的是**实际新落下的事件数**，不是「几台设备」。 */
+                托盘那句「导入 N 条」。对端事件落库确实改写了 `time_records`，
+                所以这里记的是**实际新落下的事件数**，不是「几台设备」。 */
                 report.note_imported(MdSyncKind::Timers, summary.applied as u32);
                 crate::log_info!(
                     "sync stream pull: peers={} segments={} events={} applied={}",
@@ -78,7 +78,7 @@ pub(super) async fn run(
                 report.errors.extend(summary.errors);
             }
             /* 警告只落日志，**不**改 `ok`：见 `pull::peers_of` 的注释 —— 用它判失败会让
-               一个与同步无关的远端条目（坚果云的 `unix-directory`）把整轮拖进退避。 */
+            一个与同步无关的远端条目（坚果云的 `unix-directory`）把整轮拖进退避。 */
             for warning in &summary.warnings {
                 crate::log_warn!("sync stream pull: {warning}");
             }

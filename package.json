@@ -1,7 +1,7 @@
 {
   "name": "timing",
   "private": true,
-  "version": "0.12.3",
+  "version": "0.12.4",
   "type": "module",
   "description": "Timing — 桌面悬浮计时条（Tauri 2 + React 19）",
   "scripts": {
@@ -20,12 +20,13 @@
     "check:storage-keys": "node scripts/check-storage-keys.mjs",
     "check:de-patina": "node scripts/check-de-patina.mjs",
     "check:ci-parity": "node scripts/check-ci-parity.mjs",
-    "check": "npm run check:ci-parity && npm run typecheck && npm run check:build && npm run check:contract && npm run check:size && npm run check:version && npm run check:doc-numbers && npm run check:layers && npm run check:brand && npm run lint && npm run check:mutation && npm run check:runtime-ids && npm run check:storage-keys && npm run check:de-patina && npm test",
+    "check": "npm run check:ci-parity && npm run typecheck && npm run check:build && npm run check:contract && npm run test:scripts && npm run check:size && npm run check:version && npm run check:doc-numbers && npm run check:layers && npm run check:brand && npm run lint && npm run check:mutation && npm run check:runtime-ids && npm run check:storage-keys && npm run check:de-patina && npm test",
     "verify": "npm run check && npm run build && npm test",
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint src --max-warnings=0",
     "test": "vitest run",
+    "test:scripts": "node --test \"scripts/*.test.mjs\"",
     "test:watch": "vitest"
   },
   "dependencies": {

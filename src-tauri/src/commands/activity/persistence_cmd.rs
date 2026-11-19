@@ -1,6 +1,8 @@
 use crate::commands::activity::error::CommandErrorDto;
 use crate::commands::activity::window_guard::require_main_window;
-use crate::services::activity::data::remote_backup_config::{self, ConfigSnapshot, SaveConfigInput};
+use crate::services::activity::data::remote_backup_config::{
+    self, ConfigSnapshot, SaveConfigInput,
+};
 use crate::services::activity::data::settings_payload_service;
 use crate::services::activity::data::user_data_maintenance;
 use tauri::{AppHandle, Manager, Runtime, WebviewWindow};
@@ -22,9 +24,12 @@ pub async fn cmd_classification_object_deletion<R: Runtime>(
     } else {
         None
     };
-    let result = crate::services::activity::data::classification_deletion::run(&pool, &target, confirmed).await?;
+    let result =
+        crate::services::activity::data::classification_deletion::run(&pool, &target, confirmed)
+            .await?;
     if apply {
-        if let crate::services::activity::data::classification_deletion::Target::App(key) = &target {
+        if let crate::services::activity::data::classification_deletion::Target::App(key) = &target
+        {
             if let Some(active) = tracking.snapshot().and_then(|s| s.active_session) {
                 use crate::models::activity::tracking::resolve_app_override_executable;
                 if resolve_app_override_executable(&active.exe_name)

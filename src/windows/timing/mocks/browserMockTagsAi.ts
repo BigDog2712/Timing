@@ -17,7 +17,7 @@ import type {
   ItemTags,
 } from '../types/domain/ai';
 import { fail, now, type MockState } from './mockSeed';
-import { normalizeTagPaths } from '../../shared/tags/normalize';
+import { normalizeTagPath, normalizeTagPaths } from '../../shared/tags/normalize';
 
 const DEFAULT_CONFIG: AiConfig = {
   enabled: false,
@@ -34,10 +34,27 @@ function normalizeTags(input: string[]): string[] {
   return normalizeTagPaths(input, 32);
 }
 
+/** 子树改名：`学习` 与 `学习/**` 一起改（与 `repositories/item_tags.rs::rename_in` 同口径）。 */
+function renamePath(path: string, from: string, to: string): string | null {
+  if (path === from) return to;
+  if (!path.startsWith(`${from}/`)) return null;
+  const next = `${to}${path.slice(from.length)}`;
+  try {
+    return normalizeTagPath(next);
+  } catch {
+    return null;
+  }
+}
+
+function isSameOrChild(path: string, parent: string): boolean {
+  return path === parent || path.startsWith(`${parent}/`);
+}
+
 export function createMockApiTagsAi(s: MockState): Record<string, (args?: any) => unknown> {
   let config: AiConfig = { ...DEFAULT_CONFIG };
   let hasKey = false;
   const view = (): AiConfigView => ({ config: { ...config }, hasKey, secretAvailable: true });
+  const definitions = (): string[] => [...s.tagDefinitions].sort();
 
   return {
     list_item_tags: (): ItemTags[] =>
@@ -57,6 +74,65 @@ export function createMockApiTagsAi(s: MockState): Record<string, (args?: any) =
       }
       s.itemTags[itemId] = tags;
       return [...tags];
+    },
+    list_tag_catalog: (): string[] => definitions(),
+    create_tag_definition: (a): string[] => {
+      let path: string;
+      try {
+        path = normalizeTagPath(String(a?.path ?? ''));
+      } catch (error) {
+        fail('INVALID_TAG_PATH', error instanceof Error ? error.message : '标签路径不合法');
+      }
+      if (!path) fail('INVALID_TAG_PATH', '标签不能为空');
+      if (!s.tagDefinitions.includes(path)) s.tagDefinitions.push(path);
+      return definitions();
+    },
+    rename_tag: (a) => {
+      let from: string;
+      let to: string;
+      try {
+        from = normalizeTagPath(String(a?.from ?? ''));
+        to = normalizeTagPath(String(a?.to ?? ''));
+      } catch (error) {
+        fail('INVALID_TAG_PATH', error instanceof Error ? error.message : '标签路径不合法');
+      }
+      let items = 0;
+      for (const [key, tags] of Object.entries(s.itemTags)) {
+        const id = Number(key);
+        const next: string[] = [];
+        let changed = false;
+        for (const tag of tags) {
+          const mapped = renamePath(tag, from, to);
+          if (mapped && mapped !== tag) changed = true;
+          next.push(mapped ?? tag);
+        }
+        if (!changed) continue;
+        try {
+          s.itemTags[id] = normalizeTagPaths(next, 32);
+        } catch {
+          continue;
+        }
+        items += 1;
+      }
+      s.tagDefinitions = s.tagDefinitions.map((path) => renamePath(path, from, to) ?? path);
+      return { items, definitions: definitions() };
+    },
+    delete_tag: (a) => {
+      let path: string;
+      try {
+        path = normalizeTagPath(String(a?.path ?? ''));
+      } catch (error) {
+        fail('INVALID_TAG_PATH', error instanceof Error ? error.message : '标签路径不合法');
+      }
+      let items = 0;
+      for (const [key, tags] of Object.entries(s.itemTags)) {
+        const kept = tags.filter((tag) => !isSameOrChild(tag, path));
+        if (kept.length === tags.length) continue;
+        s.itemTags[Number(key)] = kept;
+        items += 1;
+      }
+      s.tagDefinitions = s.tagDefinitions.filter((tag) => !isSameOrChild(tag, path));
+      return { items, definitions: definitions() };
     },
 
     ai_config_get: () => view(),

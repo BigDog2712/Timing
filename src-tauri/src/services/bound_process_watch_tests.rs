@@ -21,8 +21,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use crate::services::bound_process_watch::{
-    should_stop, wait_for_exit, ExitOutcome, ProcessHandle, Registration, SegmentRef,
-    WatchRegistry,
+    should_stop, wait_for_exit, ExitOutcome, ProcessHandle, Registration, SegmentRef, WatchRegistry,
 };
 
 /// 起一个短命子进程（`ping -n 4` 约 3 秒；没有 `ping` 时 `cmd` 秒退，两种都可接受）。
@@ -50,8 +49,8 @@ fn registration(item_id: i64, started_at: i64, process_id: u32, generation: u64)
 }
 
 /* ---------------------------------------------------------------------------
-   ① 纯函数矩阵
-   --------------------------------------------------------------------------- */
+① 纯函数矩阵
+--------------------------------------------------------------------------- */
 
 #[test]
 fn bound_process_should_stop_requires_item_and_segment_to_both_match() {
@@ -100,8 +99,20 @@ fn bound_process_should_stop_requires_item_and_segment_to_both_match() {
 #[test]
 fn bound_process_registry_supersedes_older_generation_without_stealing_the_new_one() {
     let registry = WatchRegistry::new();
-    let first = registry.register(SegmentRef { item_id: 1, started_at: 10 }, 100);
-    let second = registry.register(SegmentRef { item_id: 2, started_at: 20 }, 200);
+    let first = registry.register(
+        SegmentRef {
+            item_id: 1,
+            started_at: 10,
+        },
+        100,
+    );
+    let second = registry.register(
+        SegmentRef {
+            item_id: 2,
+            started_at: 20,
+        },
+        200,
+    );
 
     assert_ne!(first, second, "每次注册都必须推进代数");
     assert_eq!(registry.generation(), second);
@@ -117,8 +128,8 @@ fn bound_process_registry_supersedes_older_generation_without_stealing_the_new_o
 }
 
 /* ---------------------------------------------------------------------------
-   ② 替换不泄漏
-   --------------------------------------------------------------------------- */
+② 替换不泄漏
+--------------------------------------------------------------------------- */
 
 #[test]
 fn bound_process_replacement_retires_the_old_thread_and_closes_its_handle() {
@@ -129,7 +140,10 @@ fn bound_process_replacement_retires_the_old_thread_and_closes_its_handle() {
     let dropped = Arc::new(AtomicUsize::new(0));
     first_handle.track_drop(Arc::clone(&dropped));
     let first_generation = registry.register(
-        SegmentRef { item_id: 1, started_at: 10 },
+        SegmentRef {
+            item_id: 1,
+            started_at: 10,
+        },
         first_child.id(),
     );
 
@@ -141,7 +155,10 @@ fn bound_process_replacement_retires_the_old_thread_and_closes_its_handle() {
     let second_child = spawn_child();
     let second_handle = ProcessHandle::open(second_child.id()).expect("OpenProcess 应成功");
     let second_generation = registry.register(
-        SegmentRef { item_id: 2, started_at: 20 },
+        SegmentRef {
+            item_id: 2,
+            started_at: 20,
+        },
         second_child.id(),
     );
 

@@ -277,12 +277,10 @@ async fn csv_and_parquet_preserve_open_rows_order_and_one_sided_bounds() {
     insert_session(&pool, "First", "", 2000, 2500).await;
     insert_session(&pool, "Second", "", 2000, 3000).await;
     insert_session(&pool, "Open", "", 1000, 1200).await;
-    sqlx::query(
-        "UPDATE sessions SET end_time=NULL, duration=NULL, window_title=NULL WHERE id=3",
-    )
-    .execute(&pool)
-    .await
-    .unwrap();
+    sqlx::query("UPDATE sessions SET end_time=NULL, duration=NULL, window_title=NULL WHERE id=3")
+        .execute(&pool)
+        .await
+        .unwrap();
     let fields = field_list(&["session_id", "app_name", "window_title"]);
     for (start, end, expected) in [
         (None, None, vec![1_i64, 2, 3]),
@@ -292,15 +290,10 @@ async fn csv_and_parquet_preserve_open_rows_order_and_one_sided_bounds() {
     ] {
         let csv = output_path("csv");
         let parquet = output_path("parquet");
-        let count = csv_exporter::export_to_csv(
-            &pool,
-            csv.to_str().unwrap(),
-            start,
-            end,
-            Some(&fields),
-        )
-        .await
-        .unwrap();
+        let count =
+            csv_exporter::export_to_csv(&pool, csv.to_str().unwrap(), start, end, Some(&fields))
+                .await
+                .unwrap();
         assert_eq!(count as usize, expected.len());
         let text = std::fs::read_to_string(&csv).unwrap();
         let ids: Vec<i64> = text
@@ -488,8 +481,8 @@ async fn parquet_export_keeps_field_order_for_new_field_groups() {
     .expect("parquet export should succeed");
 
     let file = std::fs::File::open(&path).expect("parquet output should be readable");
-    let builder = ParquetRecordBatchReaderBuilder::try_new(file)
-        .expect("parquet reader should be created");
+    let builder =
+        ParquetRecordBatchReaderBuilder::try_new(file).expect("parquet reader should be created");
     let schema = builder.schema();
     let field_names: Vec<String> = schema
         .fields()
@@ -649,15 +642,9 @@ async fn markdown_uses_english_labels_when_the_app_language_is_english() {
     insert_session(&pool, "Editor", "Plan", 1_000, 2_000).await;
     let path = output_path("md");
     let fields = field_list(&["start_time", "duration_ms"]);
-    markdown_exporter::export_to_markdown(
-        &pool,
-        path.to_str().unwrap(),
-        None,
-        None,
-        Some(&fields),
-    )
-    .await
-    .unwrap();
+    markdown_exporter::export_to_markdown(&pool, path.to_str().unwrap(), None, None, Some(&fields))
+        .await
+        .unwrap();
     let markdown = std::fs::read_to_string(&path).unwrap();
     assert!(markdown.starts_with("# Timing Activity Records"));
     assert!(markdown.contains("| Start Time | Duration (ms) |"));

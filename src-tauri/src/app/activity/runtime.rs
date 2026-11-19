@@ -2,10 +2,13 @@ use crate::app::activity::desktop_behavior;
 use crate::app::activity::main_window;
 use crate::app::activity::runtime_tasks;
 use crate::app::activity::tray::setup_tray;
+use crate::infra::activity::windows::{audio, media, power};
 use crate::models::activity::settings::{DesktopBehaviorSettings, StartupSource};
 use crate::services::activity::engine::tracking::watchdog::RuntimeHealthState;
-use crate::infra::activity::windows::{audio, media, power};
-#[cfg(any(test, all(not(debug_assertions), not(feature = "activity_local_build"))))]
+#[cfg(any(
+    test,
+    all(not(debug_assertions), not(feature = "activity_local_build"))
+))]
 use std::path::Path;
 use std::sync::Arc;
 
@@ -27,7 +30,10 @@ pub fn was_launched_by_autostart() -> bool {
     std::env::args().any(|arg| arg == AUTOSTART_ARG)
 }
 
-#[cfg(any(test, all(not(debug_assertions), not(feature = "activity_local_build"))))]
+#[cfg(any(
+    test,
+    all(not(debug_assertions), not(feature = "activity_local_build"))
+))]
 #[cfg_attr(debug_assertions, allow(dead_code))]
 pub fn should_use_local_build_context() -> bool {
     match std::env::current_exe() {
@@ -36,7 +42,10 @@ pub fn should_use_local_build_context() -> bool {
     }
 }
 
-#[cfg(any(test, all(not(debug_assertions), not(feature = "activity_local_build"))))]
+#[cfg(any(
+    test,
+    all(not(debug_assertions), not(feature = "activity_local_build"))
+))]
 fn is_workspace_target_binary(path: &Path) -> bool {
     let components = path
         .components()
@@ -58,9 +67,9 @@ pub fn setup(
     runtime_health: Arc<RuntimeHealthState>,
     startup: StartupContext,
 ) -> tauri::Result<()> {
-    tauri::async_runtime::block_on(crate::app::activity::remote_status_bridge::ensure_machine_id(
-        &app.handle().clone(),
-    ))
+    tauri::async_runtime::block_on(
+        crate::app::activity::remote_status_bridge::ensure_machine_id(&app.handle().clone()),
+    )
     .map_err(std::io::Error::other)?;
     crate::app::activity::tracking::register_power_lifecycle_handler(app);
     crate::app::activity::mini_window::register_power_handler(app);
@@ -94,10 +103,15 @@ pub fn setup(
     power::start(app.handle().clone());
     let pause = app.state::<crate::services::activity::engine::tracking::pause_state::TrackingPauseRuntimeState>();
     audio::start_signal_source(pause.subscribe());
-    media::start_signal_source(pause.subscribe());
+    media::start_signal_source(
+        pause.subscribe(),
+        crate::app::activity::media_samples::build_sink(app.handle().clone()),
+    );
     crate::app::activity::web_activity_bridge::start(app.handle().clone());
     crate::app::activity::remote_status_bridge::start(app.handle().clone());
-    crate::services::activity::data::activity_read_model::spawn_background_worker(app.handle().clone());
+    crate::services::activity::data::activity_read_model::spawn_background_worker(
+        app.handle().clone(),
+    );
 
     let app_handle = app.handle().clone();
     main_window::ensure_main_window(&app_handle).map_err(std::io::Error::other)?;

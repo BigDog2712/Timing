@@ -19,8 +19,10 @@ use crate::infra::activity::storage_paths::{
 };
 use crate::infra::db;
 use crate::services::data_root::transfer;
+use crate::tests::data_root_transfer_patina::{
+    inspect_activity, open_activity_db, write_activity_db,
+};
 use crate::tests::support;
-use crate::tests::data_root_transfer_patina::{inspect_activity, open_activity_db, write_activity_db};
 
 /// ① 活库搬迁：`-wal` 里未合并的帧也必须在新根里，且副本是单文件、结构完好、源库不动。
 #[tokio::test]
@@ -111,7 +113,10 @@ async fn corrupted_activity_copy_fails_verification() {
 三个断言各钉一处：搬得过去 / 对话框报得对 / 新布局回归。 */
 
 /// 造一个 **Legacy 布局**的根：只有 `<根>/patina/data/patina.db`。
-async fn root_in_legacy_layout(tag: &str, rows: i64) -> (std::path::PathBuf, sqlx::SqlitePool, std::path::PathBuf) {
+async fn root_in_legacy_layout(
+    tag: &str,
+    rows: i64,
+) -> (std::path::PathBuf, sqlx::SqlitePool, std::path::PathBuf) {
     let source = support::unique_dir(tag);
     let pool = db::init_pool(&source).await.expect("建业务库");
     let old_dir = source.join(LEGACY_ACTIVITY_DATA_REL);
@@ -170,7 +175,9 @@ async fn legacy_layout_activity_history_is_carried_into_the_new_layout() {
 async fn the_confirm_dialog_reports_the_activity_bytes_it_is_about_to_move() {
     let (source, pool, old_db) = root_in_legacy_layout("legacy-report", 2).await;
     /* `timing.db` 由 `init_pool` 建（体积不是常量），所以期望值现场量。 */
-    let timing_len = std::fs::metadata(source.join("timing.db")).expect("量 timing.db").len();
+    let timing_len = std::fs::metadata(source.join("timing.db"))
+        .expect("量 timing.db")
+        .len();
     let activity_len = std::fs::metadata(&old_db).expect("量活动库").len();
 
     let entries = transfer::entries(&source);

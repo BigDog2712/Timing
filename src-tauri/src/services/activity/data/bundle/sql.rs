@@ -69,7 +69,10 @@ pub(super) fn conflict_names(conflict: Conflict) -> Vec<&'static str> {
 }
 
 /// 存在性判定用的键值；`None` = 该行缺合并键（整行跳过，不能瞎插）。
-pub(super) fn key_values(conflict: Conflict, row: &serde_json::Map<String, Value>) -> Option<Vec<Value>> {
+pub(super) fn key_values(
+    conflict: Conflict,
+    row: &serde_json::Map<String, Value>,
+) -> Option<Vec<Value>> {
     let mut values = Vec::new();
     for name in conflict_names(conflict) {
         match row.get(name) {

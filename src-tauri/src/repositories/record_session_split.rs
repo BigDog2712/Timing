@@ -35,7 +35,7 @@ pub(crate) async fn finalize(
     .await?;
     if saved.rows_affected() != 1 {
         /* 0 行说明会话已被别处结束（双击结束、并发 stop），不能让调用方以为保存成功。
-           返回 Err 而不回滚：回滚是调用方事务的事（`finalize` 丢弃 tx 即回滚）。 */
+        返回 Err 而不回滚：回滚是调用方事务的事（`finalize` 丢弃 tx 即回滚）。 */
         return Err(AppError::timer_not_running());
     }
     super::todo::soft_delete_for_saved_record(conn, id, now).await?;
@@ -56,7 +56,7 @@ pub(crate) async fn finalize_split(
     };
 
     /* 拆出来的每一段都要带 device_id：uid（`t:<device>:<id>`）靠 AFTER INSERT 触发器按它发，
-       漏写就是「这一段永远不同步」，而且零报错。 */
+    漏写就是「这一段永远不同步」，而且零报错。 */
     let device_id = crate::services::identity::install_id().unwrap_or_default();
     for (start, end, accum) in &segments[..segments.len() - 1] {
         let id: i64 = sqlx::query_scalar(

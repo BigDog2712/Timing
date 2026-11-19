@@ -19,7 +19,11 @@ pub(crate) fn spawn_tracking_runtime_restart_loop<R: Runtime + 'static>(
         let mut retry_delay = RestartBackoff::new();
         let mut background_tasks_started = false;
         loop {
-            let data = match crate::services::activity::data::tracking_runtime::shared_from_app(&app).await {
+            let data = match crate::services::activity::data::tracking_runtime::shared_from_app(
+                &app,
+            )
+            .await
+            {
                 Ok(data) => data,
                 Err(error) => {
                     crate::log_error!("tracking data store unavailable: {error}");
@@ -46,9 +50,7 @@ pub(crate) fn spawn_tracking_runtime_restart_loop<R: Runtime + 'static>(
                 Err(_) => {
                     // Unwinding does not cancel SQL already dispatched to its
                     // worker. Preserve diagnostics without starting a second writer.
-                    crate::log_error!(
-                        "tracking runtime panicked; restart requires reconciliation"
-                    );
+                    crate::log_error!("tracking runtime panicked; restart requires reconciliation");
                     return;
                 }
             };
@@ -89,7 +91,11 @@ pub(crate) fn spawn_tracking_watchdog_restart_loop<R: Runtime + 'static>(
     tauri::async_runtime::spawn(async move {
         let mut retry_delay = RestartBackoff::new();
         loop {
-            let data = match crate::services::activity::data::tracking_runtime::shared_from_app(&app).await {
+            let data = match crate::services::activity::data::tracking_runtime::shared_from_app(
+                &app,
+            )
+            .await
+            {
                 Ok(data) => data,
                 Err(error) => {
                     crate::log_error!("watchdog data store unavailable: {error}");
@@ -102,10 +108,7 @@ pub(crate) fn spawn_tracking_watchdog_restart_loop<R: Runtime + 'static>(
             {
                 crate::log_error!("watchdog stopped: {error}");
                 let delay = retry_delay.next_delay();
-                crate::log_info!(
-                    "restarting watchdog in {} seconds...",
-                    delay.as_secs()
-                );
+                crate::log_info!("restarting watchdog in {} seconds...", delay.as_secs());
                 sleep(delay).await;
                 continue;
             }
@@ -122,10 +125,7 @@ fn spawn_tools_runtime_restart_loop<R: Runtime + 'static>(app: AppHandle<R>) {
             if let Err(error) = tools_runtime::run(app.clone()).await {
                 crate::log_error!("runtime stopped: {error}");
                 let delay = retry_delay.next_delay();
-                crate::log_info!(
-                    "restarting tools runtime in {} seconds...",
-                    delay.as_secs()
-                );
+                crate::log_info!("restarting tools runtime in {} seconds...", delay.as_secs());
                 sleep(delay).await;
                 continue;
             }
@@ -142,10 +142,7 @@ pub(crate) fn spawn_scheduled_backup_runtime_restart_loop(app: AppHandle) {
             if let Err(error) = crate::app::activity::scheduled_backup::run(app.clone()).await {
                 crate::log_error!("runtime stopped: {error}");
                 let delay = retry_delay.next_delay();
-                crate::log_info!(
-                    "restarting runtime in {} seconds...",
-                    delay.as_secs()
-                );
+                crate::log_info!("restarting runtime in {} seconds...", delay.as_secs());
                 sleep(delay).await;
                 continue;
             }
@@ -161,10 +158,7 @@ pub(crate) fn spawn_scheduled_export_runtime_restart_loop(app: AppHandle) {
             if let Err(error) = crate::app::activity::scheduled_export::run(app.clone()).await {
                 crate::log_error!("runtime stopped: {error}");
                 let delay = retry_delay.next_delay();
-                crate::log_info!(
-                    "restarting runtime in {} seconds...",
-                    delay.as_secs()
-                );
+                crate::log_info!("restarting runtime in {} seconds...", delay.as_secs());
                 sleep(delay).await;
                 continue;
             }
@@ -201,7 +195,8 @@ mod tests {
 
     #[tokio::test]
     async fn tracker_exit_is_observed_for_success_error_and_panic() {
-        let health = crate::services::activity::engine::tracking::watchdog::RuntimeHealthState::default();
+        let health =
+            crate::services::activity::engine::tracking::watchdog::RuntimeHealthState::default();
         let mut backoff = RestartBackoff::new();
         health.progress.observed();
         health.progress.committed();
@@ -230,7 +225,8 @@ mod tests {
 
     #[tokio::test]
     async fn failed_runs_only_reset_backoff_after_committing_new_facts() {
-        let health = crate::services::activity::engine::tracking::watchdog::RuntimeHealthState::default();
+        let health =
+            crate::services::activity::engine::tracking::watchdog::RuntimeHealthState::default();
         let mut backoff = RestartBackoff::new();
         // A commit from an earlier run cannot make repeated startup failures healthy.
         health.progress.committed();

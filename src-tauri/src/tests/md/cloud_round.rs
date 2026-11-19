@@ -10,6 +10,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+use super::sync::{binding, env, TIMERS_HEADING};
 use crate::infra::md_file;
 use crate::models::md_cloud_purge::PurgeChannel;
 use crate::models::md_sync::MdSyncReport;
@@ -19,7 +20,6 @@ use crate::repositories::timer_ops as op_repo;
 use crate::services::md_cloud::{self, pending};
 use crate::services::md_sync::{self, config};
 use crate::services::timer_ops::TimerOpKind;
-use super::sync::{binding, env, TIMERS_HEADING};
 use crate::tests::support::{insert_saved, new_item, unique_dir};
 use crate::{platform::clock::now_ms, services::md_sync::config::load};
 
@@ -42,11 +42,11 @@ async fn round_without_cloud_is_the_same_as_run() {
     let via_run = env("cloud-equiv-run").await;
 
     /* 两个库造同一份数据：一条 10 分钟的已保存记录。
-       `now` 必须在循环外只取一次：两次 `now_ms()` 若跨过秒/分界，两个库里的
-       `started_at` / `ended_at` 会差一瞬，而 `md_sync::format` 把时间打进 md 正文，
-       下面「两个入口写出的文件逐字相同」就会偶发红。`cloud=None` 时 `round` 直接调
-       `md_sync::run`，两边是同一套渲染；本用例没有进行中的记录，`timers_at` 的 `now`
-       不参与正文，所以数据一致即可逐字一致。 */
+    `now` 必须在循环外只取一次：两次 `now_ms()` 若跨过秒/分界，两个库里的
+    `started_at` / `ended_at` 会差一瞬，而 `md_sync::format` 把时间打进 md 正文，
+    下面「两个入口写出的文件逐字相同」就会偶发红。`cloud=None` 时 `round` 直接调
+    `md_sync::run`，两边是同一套渲染；本用例没有进行中的记录，`timers_at` 的 `now`
+    不参与正文，所以数据一致即可逐字一致。 */
     let now = now_ms();
     for fixture in [&via_round, &via_run] {
         let item = new_item(&fixture.pool, "写作").await;
@@ -95,7 +95,9 @@ fn fnv1a64_vectors_are_pinned() {
     /* 形状也要钉住：16 位小写十六进制（SQL / 日志里看到的长相）。 */
     let hash = pending::fingerprint(b"2026-11-06");
     assert_eq!(hash.len(), 16);
-    assert!(hash.chars().all(|ch| ch.is_ascii_hexdigit() && !ch.is_uppercase()));
+    assert!(hash
+        .chars()
+        .all(|ch| ch.is_ascii_hexdigit() && !ch.is_uppercase()));
 }
 
 /// LocalFolder：跑一轮之后目标目录里出现的是**事件分段**，md 快照不再写进落点。
@@ -108,13 +110,28 @@ async fn local_folder_round_writes_todays_segment() {
     let device = crate::services::identity::install_id().expect("测试环境应能生成 install_id");
     let today = md_cloud::today();
     let now = now_ms();
-    let start =
-        op_repo::start_session(&fixture.pool, item, now - 300_000, &today, "countup", None, device)
-            .await
-            .expect("造开始事件应成功");
-    op_repo::append(&fixture.pool, &start.session_uid, TimerOpKind::Stop, now, &today, None, device)
-        .await
-        .expect("造结束事件应成功");
+    let start = op_repo::start_session(
+        &fixture.pool,
+        item,
+        now - 300_000,
+        &today,
+        "countup",
+        None,
+        device,
+    )
+    .await
+    .expect("造开始事件应成功");
+    op_repo::append(
+        &fixture.pool,
+        &start.session_uid,
+        TimerOpKind::Stop,
+        now,
+        &today,
+        None,
+        device,
+    )
+    .await
+    .expect("造结束事件应成功");
 
     let mut stored = load(&fixture.pool).await.expect("读配置应成功");
     stored.cloud = Some(MdSyncCloud {
@@ -128,11 +145,21 @@ async fn local_folder_round_writes_todays_segment() {
         .expect("保存云端配置应成功");
 
     let outcome = md_cloud::round(&fixture.pool).await.expect("round 应成功");
-    assert!(outcome.report.errors.is_empty(), "{:?}", outcome.report.errors);
+    assert!(
+        outcome.report.errors.is_empty(),
+        "{:?}",
+        outcome.report.errors
+    );
     assert!(outcome.pending.is_empty(), "LocalFolder 没有待传概念");
 
-    /* ① 落点里是分段：`sync/events/<设备>/00000001.jsonl`（8 位零填充），能解码出这两条事件。 */
-    let segment = cloud_dir.join("sync/events").join(device).join("00000001.jsonl");
+    let writer = crate::services::sync_stream::transport::Transport::Folder(cloud_dir.clone())
+        .scope()
+        .unwrap();
+    let segment = cloud_dir
+        .join("sync/streams")
+        .join(device)
+        .join(writer)
+        .join("00000001.jsonl");
     let bytes = fs::read(&segment).expect("落点里应出现今日的第一段事件分段");
     let ops = crate::services::sync_stream::segment::decode_segment(&bytes)
         .expect("分段必须能解码（含完整性尾标）");
@@ -158,9 +185,15 @@ async fn pending_only_moves_when_the_file_content_changes() {
     let later = 9_000i64;
 
     assert!(
-        pending::record_if_changed(&fixture.pool, PurgeChannel::Webdav, "2026-11-06", "第一版", first)
-            .await
-            .expect("记账应成功"),
+        pending::record_if_changed(
+            &fixture.pool,
+            PurgeChannel::Webdav,
+            "2026-11-06",
+            "第一版",
+            first
+        )
+        .await
+        .expect("记账应成功"),
         "第一次看到内容 → 必须记一笔"
     );
     let row = md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, "2026-11-06")
@@ -175,9 +208,15 @@ async fn pending_only_moves_when_the_file_content_changes() {
     );
 
     assert!(
-        !pending::record_if_changed(&fixture.pool, PurgeChannel::Webdav, "2026-11-06", "第一版", later)
-            .await
-            .expect("记账应成功"),
+        !pending::record_if_changed(
+            &fixture.pool,
+            PurgeChannel::Webdav,
+            "2026-11-06",
+            "第一版",
+            later
+        )
+        .await
+        .expect("记账应成功"),
         "内容没变 → 不该产生新欠账"
     );
     let row = md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, "2026-11-06")
@@ -187,9 +226,15 @@ async fn pending_only_moves_when_the_file_content_changes() {
     assert_eq!(row.pending_since, first, "没变化时连时间也不该动");
 
     assert!(
-        pending::record_if_changed(&fixture.pool, PurgeChannel::Webdav, "2026-11-06", "第二版", later)
-            .await
-            .expect("记账应成功"),
+        pending::record_if_changed(
+            &fixture.pool,
+            PurgeChannel::Webdav,
+            "2026-11-06",
+            "第二版",
+            later
+        )
+        .await
+        .expect("记账应成功"),
         "内容变了 → 再欠一笔"
     );
     let row = md_cloud_pending::get(&fixture.pool, PurgeChannel::Webdav, "2026-11-06")

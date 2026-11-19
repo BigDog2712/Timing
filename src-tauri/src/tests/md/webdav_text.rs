@@ -6,9 +6,9 @@
 
 use crate::infra::md_webdav::WebdavError;
 /* `fail_text` 走 `round_push::`（既有 3 个调用点的路径，本轮要求一字不改）；
-   `dir_label` / `fail_text_at` / `FailStage` 走 `text::`（文案表的定义处）。 */
+`dir_label` / `fail_text_at` / `FailStage` 走 `text::`（文案表的定义处）。 */
 use crate::services::md_cloud::round_push::fail_text;
-use crate::services::md_cloud::text::{FailStage, dir_label, fail_tag, fail_text_at};
+use crate::services::md_cloud::text::{dir_label, fail_tag, fail_text_at, FailStage};
 
 /// ⑩ 纯函数：文案分两类，且**都不含任何裸状态码**（`\b\d{3}\b` 零命中）。
 ///
@@ -22,9 +22,9 @@ use crate::services::md_cloud::text::{FailStage, dir_label, fail_tag, fail_text_
 fn fail_text_carries_real_path() {
     let dir = "/Timing/md";
     /* 带路径的三类：文案里必须出现用户填的那串目录。
-       [V0.11.16] 403 那一条的关键词从「账号能登录」改成「写不进去」：R9 把旧那句
-       「账号能登录，但没有写文件的权限」拆成了「建不出来」/「写不进去」两句，自动同步
-       路径（`fail_text` == `Push` 关卡）拿到的是后者。 */
+    [V0.11.16] 403 那一条的关键词从「账号能登录」改成「写不进去」：R9 把旧那句
+    「账号能登录，但没有写文件的权限」拆成了「建不出来」/「写不进去」两句，自动同步
+    路径（`fail_text` == `Push` 关卡）拿到的是后者。 */
     let with_path = [
         (WebdavError::Forbidden, "写不进去"),
         (WebdavError::Server(409), "这台服务器不允许程序自动建"),
@@ -114,8 +114,14 @@ fn no_bare_status_code_in_any_fail_text() {
         for stage in [
             FailStage::Push,
             FailStage::Account,
-            FailStage::Dir { level: dir, ready: 0 },
-            FailStage::Dir { level: dir, ready: 1 },
+            FailStage::Dir {
+                level: dir,
+                ready: 0,
+            },
+            FailStage::Dir {
+                level: dir,
+                ready: 1,
+            },
             FailStage::Write,
         ] {
             let at = fail_text_at(stage, &err, dir);
@@ -134,7 +140,10 @@ fn forbidden_text_splits_by_stage() {
 
     let push = fail_text_at(FailStage::Push, &WebdavError::Forbidden, dir);
     assert!(push.contains("写不进去"), "{push}");
-    assert!(!push.contains("建不出来"), "自动同步的 403 不该说目录建不出来：{push}");
+    assert!(
+        !push.contains("建不出来"),
+        "自动同步的 403 不该说目录建不出来：{push}"
+    );
     assert!(push.contains("拖一个文件"), "要给出那个对照实验：{push}");
     /* 旧签名 == `Push` 关卡：既有 3 个调用点的语义一个字都没变 */
     assert_eq!(push, fail_text(&WebdavError::Forbidden, dir));
@@ -143,15 +152,38 @@ fn forbidden_text_splits_by_stage() {
     assert!(account.contains("账号能登录"), "{account}");
     assert!(account.contains("同一台服务端"), "{account}");
 
-    let first = fail_text_at(FailStage::Dir { level: dir, ready: 0 }, &WebdavError::Forbidden, dir);
+    let first = fail_text_at(
+        FailStage::Dir {
+            level: dir,
+            ready: 0,
+        },
+        &WebdavError::Forbidden,
+        dir,
+    );
     assert!(first.contains("第一级"), "第一级就没建出来：{first}");
     assert!(first.contains(dir), "{first}");
 
-    let deeper = fail_text_at(FailStage::Dir { level: dir, ready: 1 }, &WebdavError::Forbidden, dir);
+    let deeper = fail_text_at(
+        FailStage::Dir {
+            level: dir,
+            ready: 1,
+        },
+        &WebdavError::Forbidden,
+        dir,
+    );
     assert!(deeper.contains("这一级建不出来"), "{deeper}");
-    assert!(deeper.contains("「/我的坚果云」已就绪"), "要点明上级已经就绪：{deeper}");
-    assert!(deeper.contains("名字用「Timing」"), "动作要具体到那一段名字：{deeper}");
-    assert!(!deeper.contains("拖一个文件"), "第 2 关不该说第 3 关的话：{deeper}");
+    assert!(
+        deeper.contains("「/我的坚果云」已就绪"),
+        "要点明上级已经就绪：{deeper}"
+    );
+    assert!(
+        deeper.contains("名字用「Timing」"),
+        "动作要具体到那一段名字：{deeper}"
+    );
+    assert!(
+        !deeper.contains("拖一个文件"),
+        "第 2 关不该说第 3 关的话：{deeper}"
+    );
 
     let write = fail_text_at(FailStage::Write, &WebdavError::Forbidden, dir);
     assert_eq!(write, push, "第 3 关与自动同步说同一句：目录都已就绪");
@@ -162,20 +194,30 @@ fn forbidden_text_splits_by_stage() {
 fn non_ascii_hint_only_for_non_ascii_paths() {
     let hint = "改成英文再试一次";
     let chinese = fail_text_at(
-        FailStage::Dir { level: "/我的坚果云/Timing", ready: 1 },
+        FailStage::Dir {
+            level: "/我的坚果云/Timing",
+            ready: 1,
+        },
         &WebdavError::Forbidden,
         "/我的坚果云/Timing",
     );
     assert!(chinese.contains(hint), "{chinese}");
 
     let ascii = fail_text_at(
-        FailStage::Dir { level: "/Vault/Timing", ready: 1 },
+        FailStage::Dir {
+            level: "/Vault/Timing",
+            ready: 1,
+        },
         &WebdavError::Forbidden,
         "/Vault/Timing",
     );
     assert!(!ascii.contains(hint), "纯英文路径不该出现中文退路：{ascii}");
     /* 与「名字」无关的失败不加：超时是网络问题，不是目录名问题 */
-    let timeout = fail_text_at(FailStage::Account, &WebdavError::Timeout, "/我的坚果云/Timing");
+    let timeout = fail_text_at(
+        FailStage::Account,
+        &WebdavError::Timeout,
+        "/我的坚果云/Timing",
+    );
     assert!(!timeout.contains(hint), "{timeout}");
 }
 
@@ -215,7 +257,10 @@ fn log_vocabulary_agrees_and_carries_status_code() {
     assert_eq!(fail_tag(&WebdavError::Auth).to_string(), "Auth");
     assert_eq!(fail_tag(&WebdavError::Forbidden).to_string(), "Forbidden");
     assert_eq!(fail_tag(&WebdavError::NotFound).to_string(), "NotFound");
-    assert_eq!(fail_tag(&WebdavError::Network("x".into())).to_string(), "Network");
+    assert_eq!(
+        fail_tag(&WebdavError::Network("x".into())).to_string(),
+        "Network"
+    );
 
     /* `Server` 带码：三个码互不相同，且不是退化后的裸 `Server` */
     for code in [400u16, 409, 423, 503] {

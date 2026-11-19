@@ -32,7 +32,11 @@ async fn backfill_writes_one_saved_row() {
     let row = &rows[0];
     assert_eq!(row.status, "saved", "补记恒为 saved，绝不产生 active");
     assert_eq!(row.running_since, None, "saved 行不许带计时段起点");
-    assert_eq!(row.accumulated_sec, (ended - started) / 1000, "累计秒 = 区间毫秒 / 1000");
+    assert_eq!(
+        row.accumulated_sec,
+        (ended - started) / 1000,
+        "累计秒 = 区间毫秒 / 1000"
+    );
     assert_eq!(row.mode, "countup", "补记不产生倒计时");
     assert_eq!(row.target_sec, None, "countup 行没有目标秒数");
     assert_eq!(row.started_at, started);
@@ -51,7 +55,11 @@ async fn backfill_rejects_zero_or_negative_span() {
     let base = now_ms() - 600_000;
 
     let zero = record::backfill(&pool, item, base, base, None).await;
-    assert_eq!(expect_err(zero), ErrorCode::InvalidDuration, "相等要拒：0 长度记录没有意义");
+    assert_eq!(
+        expect_err(zero),
+        ErrorCode::InvalidDuration,
+        "相等要拒：0 长度记录没有意义"
+    );
     let inverted = record::backfill(&pool, item, base, base - 1_000, None).await;
     assert_eq!(expect_err(inverted), ErrorCode::InvalidDuration, "倒挂要拒");
     assert_eq!(total_rows(&pool).await, 0, "被拒时一行都不许落");
@@ -127,7 +135,11 @@ async fn backfill_splits_across_local_midnight() {
     let mut ordered = rows.clone();
     ordered.sort_by_key(|r| r.started_at);
     assert_eq!(ordered[0].started_at, started);
-    assert_eq!(ordered[0].ended_at, Some(midnight), "第一行结束在次日本地零点");
+    assert_eq!(
+        ordered[0].ended_at,
+        Some(midnight),
+        "第一行结束在次日本地零点"
+    );
     assert_eq!(ordered[1].started_at, midnight);
     assert_eq!(ordered[1].ended_at, Some(ended));
     let sum: i64 = ordered.iter().map(|r| r.accumulated_sec).sum();
@@ -273,13 +285,18 @@ fn create_record_marks_dirty_and_broadcasts() {
         .iter()
         .position(|line| line.contains("events::emit_timer_state("))
         .expect("after_backfill 里必须有 emit_timer_state 调用");
-    assert!(mark_at < emit_at, "先打脏标记、再广播（顺序反了会让观察线程抢跑）");
     assert!(
-        code.iter().any(|line| line.contains("after_backfill(&app, &state.pool)")),
+        mark_at < emit_at,
+        "先打脏标记、再广播（顺序反了会让观察线程抢跑）"
+    );
+    assert!(
+        code.iter()
+            .any(|line| line.contains("after_backfill(&app, &state.pool)")),
         "create_record 的成功路径上必须调 after_backfill"
     );
     assert!(
-        code.iter().any(|line| line.contains("state.pool, item_id, started_at, ended_at")),
+        code.iter()
+            .any(|line| line.contains("state.pool, item_id, started_at, ended_at")),
         "create_record 必须把四个入参原样交给服务层"
     );
 }

@@ -1,4 +1,6 @@
-use crate::models::activity::tools::{PomodoroPhase, PomodoroStatus, ReminderStatus, ToolsRuntimeSnapshot};
+use crate::models::activity::tools::{
+    PomodoroPhase, PomodoroStatus, ReminderStatus, ToolsRuntimeSnapshot,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]

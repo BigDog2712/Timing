@@ -14,7 +14,12 @@ fn cats(entries: &[(&str, i64)]) -> Vec<AppCategory> {
 }
 
 /// chrome 既是学习工具又是娱乐/游戏工具 —— 这就是「一个应用挂多个分类」的全部理由。
-const CHROME: &[(&str, i64)] = &[("study", 10), ("work", 20), ("entertainment", 30), ("game", 40)];
+const CHROME: &[(&str, i64)] = &[
+    ("study", 10),
+    ("work", 20),
+    ("entertainment", 30),
+    ("game", 40),
+];
 const PYCHARM: &[(&str, i64)] = &[("study", 10)];
 /// bilibili 的首位是「摸鱼」，所以它在学习事项下显示摸鱼（规则 2），不需要任何覆盖。
 const BILIBILI: &[(&str, i64)] = &[("idle", 10), ("entertainment", 20)];
@@ -24,9 +29,15 @@ const WECHAT: &[(&str, i64)] = &[("social", 10)];
 
 #[test]
 fn app_that_has_the_item_category_follows_the_item() {
-    assert_eq!(resolve_child_category(&cats(CHROME), Some("study")), "study");
+    assert_eq!(
+        resolve_child_category(&cats(CHROME), Some("study")),
+        "study"
+    );
     assert_eq!(resolve_child_category(&cats(CHROME), Some("game")), "game");
-    assert_eq!(resolve_child_category(&cats(PYCHARM), Some("study")), "study");
+    assert_eq!(
+        resolve_child_category(&cats(PYCHARM), Some("study")),
+        "study"
+    );
     assert_eq!(
         resolve_child_category(&cats(BILIBILI_WITH_GAME), Some("game")),
         "game"
@@ -35,8 +46,14 @@ fn app_that_has_the_item_category_follows_the_item() {
 
 #[test]
 fn app_without_the_item_category_falls_back_to_its_first() {
-    assert_eq!(resolve_child_category(&cats(WECHAT), Some("game")), "social");
-    assert_eq!(resolve_child_category(&cats(BILIBILI), Some("study")), "idle");
+    assert_eq!(
+        resolve_child_category(&cats(WECHAT), Some("game")),
+        "social"
+    );
+    assert_eq!(
+        resolve_child_category(&cats(BILIBILI), Some("study")),
+        "idle"
+    );
 }
 
 /// 事项没分类时，规则 1 天然不命中，直接落到应用首位 —— 不需要单独一条分支。
@@ -85,5 +102,8 @@ fn equal_priority_is_broken_by_key_for_determinism() {
 #[test]
 fn matching_category_wins_regardless_of_priority() {
     let chrome_game_last = cats(&[("study", 1), ("work", 2), ("game", 99)]);
-    assert_eq!(resolve_child_category(&chrome_game_last, Some("game")), "game");
+    assert_eq!(
+        resolve_child_category(&chrome_game_last, Some("game")),
+        "game"
+    );
 }

@@ -42,6 +42,29 @@
 .sync-cloud__hint { margin: 0; font-size: var(--text-cap); line-height: 1.5; color: var(--ink-4); }
 .sync-cloud__test { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); }
 
+/* [0.13.x] 手动同步 / 定时同步 / 智能同步三档。
+   此前桌面端漏了这组样式，三个 button 被渲染成一行裸文字（截图里的「关闭定时智能」）。 */
+.sync-cloud__auto { display: flex; flex-direction: column; gap: var(--space-2); }
+.sync-cloud__auto[data-disabled="true"] { opacity: 0.62; }
+.sync-cloud__auto-label { font-size: var(--text-cap); color: var(--ink-3); }
+
+.sync-cloud__auto-tiers {
+  display: inline-flex; align-self: flex-start; gap: 2px; padding: 3px;
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--bg-seg);
+}
+
+.sync-cloud__auto-item {
+  flex: none; min-width: 84px; height: 28px; padding: 0 var(--space-3);
+  border-radius: var(--radius-sm); font-size: var(--text-sm); font-weight: var(--weight-medium);
+  color: var(--ink-3);
+}
+
+.sync-cloud__auto-item:hover { color: var(--ink); }
+.sync-cloud__auto-item[aria-pressed="true"] { background: var(--bg-seg-on); color: var(--ink); }
+.sync-cloud__auto-item:disabled { cursor: default; }
+
+.sync-cloud__auto-interval { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
 .sync-cloud__result {
   overflow-wrap: anywhere;
   font-size: var(--text-cap); line-height: 1.5; color: var(--ok);

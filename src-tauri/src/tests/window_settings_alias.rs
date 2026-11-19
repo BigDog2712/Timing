@@ -60,7 +60,7 @@ fn settings_entry_delegates_and_never_builds_a_window() {
 #[test]
 fn settings_command_and_spec_path_stay_registered() {
     /* 命令**不许**删：81 条命令是冻结契约（`scripts/check-contract.mjs` 也钉着）。
-       这条同时是下一条哨兵的防假绿：如果哪天命令被删了，上面那条「别名」就无从谈起。 */
+    这条同时是下一条哨兵的防假绿：如果哪天命令被删了，上面那条「别名」就无从谈起。 */
     assert!(
         WINDOW_CMD_RS.contains("pub async fn open_settings_window"),
         "commands/window_cmd.rs 少了 open_settings_window（命令数冻结 81，不许删）"
@@ -74,7 +74,7 @@ fn settings_command_and_spec_path_stay_registered() {
         "ipc_commands.rs 的 generate_handler! 里少了 open_settings_window"
     );
     /* `SETTINGS` 规格仍在（`spec_for(\"settings\")` 被 label 表与测试引用），
-       但它的注释必须写明「已无建窗入口」——文档与代码背离是这轮事故的根源。 */
+    但它的注释必须写明「已无建窗入口」——文档与代码背离是这轮事故的根源。 */
     let spec = include_str!("../infra/window_spec.rs");
     assert!(
         spec.contains("pub const SETTINGS: WindowSpec"),

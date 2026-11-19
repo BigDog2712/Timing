@@ -1,6 +1,8 @@
 //! `snapshot.rs` 的测试（`#[path]` 挂回原模块，`super::` 语义不变）。
 use super::*;
-use futures_util::FutureExt; use sqlx::Executor; use std::panic::AssertUnwindSafe;
+use futures_util::FutureExt;
+use sqlx::Executor;
+use std::panic::AssertUnwindSafe;
 
 pub(super) struct SnapshotTestDirectory(pub(super) PathBuf);
 
@@ -42,7 +44,6 @@ fn snapshot_format_is_explicit_and_not_the_legacy_format() {
     assert_eq!(SNAPSHOT_FORMAT, "PatinaSQLiteSnapshot-1");
     assert_ne!(SNAPSHOT_FORMAT, "PatinaBackup");
 }
-
 
 #[tokio::test]
 async fn snapshot_replace_preparation_rejects_failed_schedule_reset() {
@@ -93,7 +94,10 @@ async fn snapshot_archive_round_trips_a_consistent_database() {
     // Keep the extracted directory alive until every registered SQLite pool has closed.
     let mut extracted = None;
     let outcome = AssertUnwindSafe(async {
-        let pool = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&db_path, true)
+        let pool =
+            crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+                &db_path, true,
+            )
             .await
             .expect("open source database");
         pools.push(pool.clone());
@@ -137,9 +141,11 @@ async fn snapshot_archive_round_trips_a_consistent_database() {
             .await
             .unwrap();
         let anonymous =
-            crate::services::activity::data::repositories::anonymous_activity::read_range(&pool, 0, 100)
-                .await
-                .unwrap();
+            crate::services::activity::data::repositories::anonymous_activity::read_range(
+                &pool, 0, 100,
+            )
+            .await
+            .unwrap();
         assert_eq!(read_counts(&pool).await.unwrap().anonymous_activity, 1);
 
         let preview = write_snapshot_archive(&pool, &archive_path, "test")
@@ -177,9 +183,13 @@ async fn snapshot_archive_round_trips_a_consistent_database() {
         assert_eq!(value, "preserved");
         assert_eq!(external_counts, (1, 1, 1));
         assert_eq!(
-            crate::services::activity::data::repositories::anonymous_activity::read_range(&restored_pool, 0, 100)
-                .await
-                .unwrap(),
+            crate::services::activity::data::repositories::anonymous_activity::read_range(
+                &restored_pool,
+                0,
+                100
+            )
+            .await
+            .unwrap(),
             anonymous
         );
     })
@@ -205,7 +215,10 @@ async fn older_migration_prefix_is_verified_before_current_table_counts() {
     let db_path = work_dir.0.join("old.db");
     let mut pools = Vec::new();
     let outcome = AssertUnwindSafe(async {
-        let pool = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&db_path, true)
+        let pool =
+            crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+                &db_path, true,
+            )
             .await
             .expect("open source database");
         pools.push(pool.clone());
@@ -239,9 +252,11 @@ async fn older_migration_prefix_is_verified_before_current_table_counts() {
             )
         );
         assert!(
-            !crate::services::activity::data::schema_contracts::has_web_activity_session_schema(&pool)
-                .await
-                .expect("old schema omits the current native web relation")
+            !crate::services::activity::data::schema_contracts::has_web_activity_session_schema(
+                &pool
+            )
+            .await
+            .expect("old schema omits the current native web relation")
         );
         assert!(
             !crate::services::activity::data::schema_contracts::has_session_range_index(&pool)
@@ -282,13 +297,18 @@ async fn older_migration_prefix_is_verified_before_current_table_counts() {
             .expect("old schema prefix should reach migration"));
 
         let migration_pool =
-            crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&db_path, false)
-                .await
-                .expect("open old schema for migration");
-        pools.push(migration_pool.clone());
-        crate::services::activity::data::sqlite_pool::prepare_pool_schema(&migration_pool, &db_path)
+            crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+                &db_path, false,
+            )
             .await
-            .expect("migrate old schema");
+            .expect("open old schema for migration");
+        pools.push(migration_pool.clone());
+        crate::services::activity::data::sqlite_pool::prepare_pool_schema(
+            &migration_pool,
+            &db_path,
+        )
+        .await
+        .expect("migrate old schema");
         validate_current_schema(&migration_pool)
             .await
             .expect("migrated schema should expose all current tables");

@@ -4,6 +4,7 @@ import type { UiText } from "../i18n/index.ts";
 import { isAnonymousActivity } from "./anonymousActivity.ts";
 import { OTHER_CATEGORY_FIXED_COLOR } from "./categoryTokens.ts";
 import { resolveLinkedApp, validateAppLinks, linkedAppKeys, type AppLinks } from "./appLinks.ts";
+import { resolveAppTags } from "./appOverrideCodec.ts";
 import {
   normalizeExecutable,
   resolveCanonicalExecutable,
@@ -57,6 +58,18 @@ export class AppClassification {
   static getCategoryColor(category: AppCategory): string {
     if (category === "anonymous") return OTHER_CATEGORY_FIXED_COLOR;
     return ProcessMapper.getCategoryColor(category);
+  }
+
+  /**
+   * [0.12.4] 这个应用当前的**标签**（分类已不再是用户面概念）。
+   * 老数据只有分类时回落成同名标签，见 `resolveAppTags`。
+   */
+  static getAppTags(exeName: string): string[] {
+    if (isAnonymousActivity(exeName)) return [];
+    return resolveAppTags(
+      ProcessMapper.getUserOverride(exeName),
+      ProcessMapper.getDeletedCategories(),
+    );
   }
 
   static getUserOverride(exeName: string): AppOverride | null {

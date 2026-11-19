@@ -21,8 +21,8 @@
 //! 补建之后仍然 409——用户填一个合法的 `%` 目录就再也写不上去（本文件第一条用例在
 //! 变异版本里报的就是 `Server(409)`）。
 
-use crate::infra::md_webdav::{put, WebdavTarget};
 use super::fake_webdav_dir::DirServer;
+use crate::infra::md_webdav::{put, WebdavTarget};
 
 fn target(server: &DirServer, base_path: &str) -> WebdavTarget {
     WebdavTarget::new(&server.base_url, base_path, "u", "p")
@@ -36,9 +36,9 @@ async fn mkcol_url_is_a_prefix_of_the_put_url_when_encoding_happened() {
     for raw in ["/Timing/%E6%88%91", "/a+b", "/Timing/我的 md"] {
         let server = DirServer::new(&[]);
         let target = target(&server, raw);
-        put(&target, REL, b"# x", None)
-            .await
-            .unwrap_or_else(|err| panic!("{raw} 补建后应成功（否则 MKCOL 建到了别的目录）：{err:?}"));
+        put(&target, REL, b"# x", None).await.unwrap_or_else(|err| {
+            panic!("{raw} 补建后应成功（否则 MKCOL 建到了别的目录）：{err:?}")
+        });
 
         let paths = server.method_paths();
         let put_url = paths

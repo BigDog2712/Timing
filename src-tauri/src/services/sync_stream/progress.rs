@@ -42,7 +42,7 @@ pub async fn progress(
     let cursor: i64 = sqlx::query_scalar(
         "SELECT last_op_id FROM sync_target_cursor WHERE scope = ?1 AND device_id = ?2",
     )
-    .bind(scope)
+    .bind(super::scope::upload(scope))
     .bind(device_id)
     .fetch_optional(pool)
     .await
@@ -50,7 +50,7 @@ pub async fn progress(
     .unwrap_or(0);
 
     /* 端点对齐：只有「本机产生的、带 uid 的」事件才会被 push（`push.rs::load_new_ops`
-       的两条过滤条件），这里必须逐字沿用，否则状态会比真实传输乐观。 */
+    的两条过滤条件），这里必须逐字沿用，否则状态会比真实传输乐观。 */
     let rows = sqlx::query(
         "SELECT day_key, MAX(id) AS max_id
            FROM timer_ops

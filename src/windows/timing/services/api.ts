@@ -15,6 +15,16 @@
 import { errorText, ipc, isTauri } from './ipc';
 import { rawIpcText } from './ipcError';
 import type {
+  AiConfig,
+  AiConfigView,
+  AiDailySummary,
+  AiSuggestRequest,
+  AiSuggestResponse,
+  AiTestResult,
+  ItemTags,
+  TagMutation,
+} from '../types/domain/ai';
+import type {
   CreateItemParams,
   Item,
   ItemIdParams,
@@ -52,6 +62,27 @@ export const itemApi = {
   unarchive: (params: ItemIdParams): Promise<Item> => ipc.unarchiveItem(params),
   /* [0.14] 分类目录（哑管道，合并在共享 categoryCatalog.ts） */
   categoryCatalog: () => ipc.listCategoryCatalog(),
+};
+
+/* ---- [0.12.3] 事项多标签 ---- */
+export const tagApi = {
+  list: (): Promise<ItemTags[]> => ipc.listItemTags(),
+  set: (itemId: number, tags: string[]): Promise<string[]> => ipc.setItemTags({ itemId, tags }),
+  /** [0.12.4] 标签定义（没有事项引用的空标签靠它存在） */
+  catalog: (): Promise<string[]> => ipc.listTagCatalog(),
+  create: (path: string): Promise<string[]> => ipc.createTagDefinition({ path }),
+  rename: (from: string, to: string): Promise<TagMutation> => ipc.renameTag({ from, to }),
+  remove: (path: string): Promise<TagMutation> => ipc.deleteTag({ path }),
+};
+
+/* ---- [0.12.3] AI（OpenAI 兼容） ---- */
+export const aiApi = {
+  config: (): Promise<AiConfigView> => ipc.aiConfigGet(),
+  saveConfig: (config: AiConfig, apiKey?: string | null): Promise<AiConfigView> =>
+    ipc.aiConfigSave({ config, apiKey }),
+  test: (): Promise<AiTestResult> => ipc.aiTest(),
+  suggestTags: (request: AiSuggestRequest): Promise<AiSuggestResponse> => ipc.aiSuggestTags(request),
+  dailySummary: (): Promise<AiDailySummary> => ipc.aiDailySummary(),
 };
 
 /* ---- 记录 ---- */

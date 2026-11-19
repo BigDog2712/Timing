@@ -11,9 +11,12 @@ async fn database() -> SqlitePool {
         .connect("sqlite::memory:")
         .await
         .unwrap();
-    crate::services::activity::data::sqlite_pool::prepare_pool_schema(&pool, std::path::Path::new(":memory:"))
-        .await
-        .unwrap();
+    crate::services::activity::data::sqlite_pool::prepare_pool_schema(
+        &pool,
+        std::path::Path::new(":memory:"),
+    )
+    .await
+    .unwrap();
     pool
 }
 
@@ -32,11 +35,9 @@ async fn selected_application_only_and_recheck_before_erasing() {
         .reminders
         .iter()
         .any(|r| r.shared && r.label == "Shared"));
-    pool.execute(
-        "INSERT INTO settings(key,value) VALUES ('__app_link::second.exe','root.exe')",
-    )
-    .await
-    .unwrap();
+    pool.execute("INSERT INTO settings(key,value) VALUES ('__app_link::second.exe','root.exe')")
+        .await
+        .unwrap();
     assert!(run(&pool, &target, Some(stale)).await.is_err());
     let plan = run(&pool, &target, None).await.unwrap();
     pool.execute("CREATE TRIGGER refuse_icon BEFORE DELETE ON icon_cache BEGIN SELECT RAISE(ABORT,'fixture'); END").await.unwrap();
@@ -50,8 +51,37 @@ async fn selected_application_only_and_recheck_before_erasing() {
     );
     pool.execute("DROP TRIGGER refuse_icon").await.unwrap();
     run(&pool, &target, Some(plan)).await.unwrap();
-    for (query,expected) in [("SELECT count(*) FROM sessions WHERE exe_name='child.exe'",1),("SELECT count(*) FROM sessions WHERE exe_name='root.exe'",0),("SELECT count(*) FROM icon_cache",1),("SELECT count(*) FROM settings WHERE key GLOB '__app_link::*'",0),("SELECT count(*) FROM settings WHERE key='__app_override::root.exe'",0),("SELECT count(*) FROM tool_activity_reminder_rules WHERE label_snapshot='Shared'",1),("SELECT count(*) FROM tool_activity_reminder_rules WHERE label_snapshot='Dedicated'",0)]{
-        assert_eq!(sqlx::query_scalar::<_,i64>(query).fetch_one(&pool).await.unwrap(),expected);
+    for (query, expected) in [
+        (
+            "SELECT count(*) FROM sessions WHERE exe_name='child.exe'",
+            1,
+        ),
+        ("SELECT count(*) FROM sessions WHERE exe_name='root.exe'", 0),
+        ("SELECT count(*) FROM icon_cache", 1),
+        (
+            "SELECT count(*) FROM settings WHERE key GLOB '__app_link::*'",
+            0,
+        ),
+        (
+            "SELECT count(*) FROM settings WHERE key='__app_override::root.exe'",
+            0,
+        ),
+        (
+            "SELECT count(*) FROM tool_activity_reminder_rules WHERE label_snapshot='Shared'",
+            1,
+        ),
+        (
+            "SELECT count(*) FROM tool_activity_reminder_rules WHERE label_snapshot='Dedicated'",
+            0,
+        ),
+    ] {
+        assert_eq!(
+            sqlx::query_scalar::<_, i64>(query)
+                .fetch_one(&pool)
+                .await
+                .unwrap(),
+            expected
+        );
     }
 }
 

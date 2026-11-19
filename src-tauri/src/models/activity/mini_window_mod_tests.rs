@@ -135,7 +135,8 @@ fn page_migration_preserves_placement_and_hold_and_cycles_both_directions() {
     for page in ["null", "7", "\"future\"", "\"today\""] {
         let preferences: Preferences = serde_json::from_str(&format!(
             "{{\"held\":true,\"placement\":{{\"edge\":\"left\",\"anchor\":0.25}},\"page\":{page}}}"
-        )).unwrap();
+        ))
+        .unwrap();
         assert!(preferences.held);
         assert_eq!(preferences.placement.edge, Some(Edge::Left));
         assert_eq!(preferences.placement.anchor, 0.25);

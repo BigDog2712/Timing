@@ -23,5 +23,9 @@ pub(crate) fn register_power_lifecycle_handler<R: Runtime>(app: &App<R>) {
 
 pub async fn handle_power_lifecycle_event<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     let data = crate::services::activity::data::tracking_runtime::shared_from_app(&app).await?;
-    crate::services::activity::engine::tracking::runtime::handle_power_lifecycle_event(app, data.as_ref()).await
+    crate::services::activity::engine::tracking::runtime::handle_power_lifecycle_event(
+        app,
+        data.as_ref(),
+    )
+    .await
 }

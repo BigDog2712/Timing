@@ -84,7 +84,7 @@ pub fn setup(app: AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     crate::app::timer_recovery::manage(&app, &pool);
     boot_timing::mark("defaults_ready");
     crate::app::overlay_push::push_on_boot(&app, &pool); // [V0.11.27] 冷启动补推悬浮条快照（必须 spawn 的理由见该函数）
-    // [0.13 fix] 存量「事项↔应用」绑定补镜像（两个库的口径见 services/item_app_mirror.rs）
+                                                         // [0.13 fix] 存量「事项↔应用」绑定补镜像（两个库的口径见 services/item_app_mirror.rs）
     #[cfg(desktop)]
     services::item_app_mirror::mirror_on_boot(&app, &pool);
 

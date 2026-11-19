@@ -57,7 +57,11 @@ async fn probe(server: &DirServer) -> MdSyncTestResult {
 
 /// 失败关的 `key`（`None` = 全部通过）
 fn failed_step_key(result: &MdSyncTestResult) -> Option<&str> {
-    result.steps.iter().find(|step| !step.ok).map(|step| step.key.as_str())
+    result
+        .steps
+        .iter()
+        .find(|step| !step.ok)
+        .map(|step| step.key.as_str())
 }
 
 /// 目录 GET 被拒 **不是** 账号失败：这一关必须绿着走完。
@@ -163,7 +167,11 @@ async fn get_403_with_working_put_stays_green() {
 
     let result = probe(&server).await;
 
-    assert!(result.ok, "能写进去就说明账号是好的，不许红：{}", result.detail);
+    assert!(
+        result.ok,
+        "能写进去就说明账号是好的，不许红：{}",
+        result.detail
+    );
     assert_eq!(result.steps.len(), 3, "三关都走到：{:?}", result.steps);
     assert!(result.steps.iter().all(|step| step.ok));
     assert_account_step_passed(&result);

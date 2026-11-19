@@ -63,6 +63,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
       { id: "s-general", title: "通用" },
       { id: "s-resident", title: "常驻与启动" },
       { id: "s-plugins", title: "插件" },
+      { id: "s-ai", title: "AI 与标签" },
     ],
   },
 ];

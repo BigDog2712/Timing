@@ -69,11 +69,12 @@ pub async fn ensure_self(pool: &Pool<Sqlite>, install_id: &str) -> Result<(), St
 /// 它填不上就等于所有事件都没有 `device_id`（→ uid 恒 NULL → 永不同步，且零报错）。
 pub async fn startup_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
     /* 以缓存里的那一份为准：认领历史行与新写入的行必须是同一个 `device_id`，
-       否则同一台机器会出现两个设备（见 `identity::remember_and_lock_install_id`）。 */
+    否则同一台机器会出现两个设备（见 `identity::remember_and_lock_install_id`）。 */
     let install_id = crate::services::identity::remember_and_lock_install_id(
         crate::services::identity::load_install_id()?,
     );
-    let adopted = crate::services::activity::schema_core::adopt_local_rows(pool, &install_id).await?;
+    let adopted =
+        crate::services::activity::schema_core::adopt_local_rows(pool, &install_id).await?;
     if adopted > 0 {
         crate::log_info!("adopted {adopted} local activity row(s) into device {install_id}");
     }
@@ -94,11 +95,12 @@ pub async fn startup_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
 /// `app::bootstrap` 而不是 `infra` 层，因为 `check-layers` 的 L4 不许 `infra` 依赖 `services`。
 pub async fn startup_business_identity(pool: &Pool<Sqlite>) -> Result<String, String> {
     /* 同 [`startup_identity`]：认领时用的 `device_id` 必须与缓存一致，否则被认领的历史行
-       与之后新建的行会落在两台「设备」上。 */
+    与之后新建的行会落在两台「设备」上。 */
     let install_id = crate::services::identity::remember_and_lock_install_id(
         crate::services::identity::load_install_id()?,
     );
-    let adopted = crate::services::activity::schema_core::adopt_business_rows(pool, &install_id).await?;
+    let adopted =
+        crate::services::activity::schema_core::adopt_business_rows(pool, &install_id).await?;
     if adopted > 0 {
         crate::log_info!("adopted {adopted} local business row(s) into device {install_id}");
     }

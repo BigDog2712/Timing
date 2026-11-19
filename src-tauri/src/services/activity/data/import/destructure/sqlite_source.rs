@@ -1,5 +1,7 @@
 use super::{ExternalConversion, ExternalWarning};
-use crate::services::activity::data::import::model::{CanonicalImportRecord, ImportRecordType, MAX_IMPORT_RECORDS};
+use crate::services::activity::data::import::model::{
+    CanonicalImportRecord, ImportRecordType, MAX_IMPORT_RECORDS,
+};
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Pool, Row, Sqlite};

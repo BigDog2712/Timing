@@ -40,7 +40,7 @@ pub async fn set_bound_process_watch(
     let registry = bound_process_watch::global_arc();
 
     /* `None` = 清除。前端**不主动**调它（段级校验会自己兜住「用户手动切走」），
-       保留它是为了让这条契约在两种语义上都可表达、也可被用例驱动。 */
+    保留它是为了让这条契约在两种语义上都可表达、也可被用例驱动。 */
     let Some(watch) = watch else {
         registry.clear();
         return Ok(());
@@ -48,7 +48,7 @@ pub async fn set_bound_process_watch(
 
     let Some(handle) = ProcessHandle::open(watch.process_id) else {
         /* 打不开 = 已经退出 / 权限不足。**不注册**：绝不拿失败句柄去等。
-           顺手清掉上一条注册 —— 同一个应用的下一次接管会重新注册。 */
+        顺手清掉上一条注册 —— 同一个应用的下一次接管会重新注册。 */
         registry.clear();
         crate::log_warn!(
             "bound process watch not registered: pid={} open failed (item={})",
@@ -77,19 +77,19 @@ pub async fn set_bound_process_watch(
     let settle_registry = Arc::clone(&registry);
     let app_handle = app.clone();
     /* 一线程一次注册。它是**内核阻塞**（没退出时睡在内核里），不占 CPU；
-       返回即析构句柄，所以线程退出与句柄回收是同一件事。 */
+    返回即析构句柄，所以线程退出与句柄回收是同一件事。 */
     std::thread::spawn(move || {
         let outcome = bound_process_watch::wait_for_exit(handle, generation, wait_registry);
         if outcome != ExitOutcome::Exited {
             /* `Superseded` = 注册被替换（正常）；`Failed` = 句柄失效（记一行就够，
-               下一次接管会重新注册，不重试也不上报用户）。 */
+            下一次接管会重新注册，不重试也不上报用户）。 */
             if outcome == ExitOutcome::Failed {
                 crate::log_warn!("bound process watch wait failed: pid={}", watch.process_id);
             }
             return;
         }
         /* 线程里不能 await：把真正的写库交给 tokio 运行时，池从 AppState 现取
-           （`State<'_, _>` 搬不进 `'static` 线程，`jobs/flusher.rs` 同一手法）。 */
+        （`State<'_, _>` 搬不进 `'static` 线程，`jobs/flusher.rs` 同一手法）。 */
         tauri::async_runtime::spawn(async move {
             let pool = app_handle.state::<AppState>().pool.clone();
             match bound_process_watch::settle_after_exit(&pool, &settle_registry, generation).await
@@ -99,7 +99,7 @@ pub async fn set_bound_process_watch(
                     discarded,
                 } => {
                     /* 与 `stop_timer` 逐字同一条收尾（`commands/timer_cmd.rs:57-63`）：
-                       落盘信号 + 状态广播。少一样就是「停了但界面/同步不知道」。 */
+                    落盘信号 + 状态广播。少一样就是「停了但界面/同步不知道」。 */
                     services::md_sync::dirty::mark("timer");
                     crate::app::events::emit_timer_state(&app_handle, &pool).await;
                     crate::log_info!(

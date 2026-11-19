@@ -1,8 +1,8 @@
 use crate::app::activity::{desktop_behavior, tray};
-use crate::services::activity::data::backup::{self, RestoreStrategy};
-use crate::services::activity::data::remote_backup;
 use crate::models::activity::backup::BackupError;
 use crate::models::activity::events::APP_SETTINGS_CHANGED;
+use crate::services::activity::data::backup::{self, RestoreStrategy};
+use crate::services::activity::data::remote_backup;
 use crate::services::activity::engine::tracking::runtime as tracking_runtime;
 use tauri::{AppHandle, Emitter, Manager};
 
@@ -13,9 +13,13 @@ pub(crate) async fn restore_backup_and_refresh(
     strategy: RestoreStrategy,
 ) -> Result<(), BackupError> {
     let prepared = backup::prepare_backup_restore(&backup_path, &hash, strategy).await?;
-    let scheduled_backup_guard = crate::app::activity::scheduled_backup::lock_for_restore(&app).await;
-    let scheduled_export_guard = crate::app::activity::scheduled_export::lock_for_restore(&app).await;
-    let webdav_guard = crate::services::activity::data::remote_backup_config::CONFIG_LOCK.lock().await;
+    let scheduled_backup_guard =
+        crate::app::activity::scheduled_backup::lock_for_restore(&app).await;
+    let scheduled_export_guard =
+        crate::app::activity::scheduled_export::lock_for_restore(&app).await;
+    let webdav_guard = crate::services::activity::data::remote_backup_config::CONFIG_LOCK
+        .lock()
+        .await;
     let title_state =
         app.state::<crate::services::activity::engine::tracking::title_state::TitleRecordingRuntimeState>();
     let _title_guard = title_state.lock_update().await;

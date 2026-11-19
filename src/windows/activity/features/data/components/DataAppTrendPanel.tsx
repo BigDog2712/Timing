@@ -26,10 +26,9 @@ import type {
 import type { DataTrendRangeSelection } from "../services/dataTrendRange.ts";
 import DataTrendRangeControl from "./DataTrendRangeControl.tsx";
 import DataAppTrendSkeleton from "./DataAppTrendSkeleton.tsx";
-import DataAppEditDialog from "./DataAppEditDialog.tsx";
 import DataCategoryManageEntry from "./DataCategoryManageEntry.tsx";
+import DataOptionTags from "./DataOptionTags.tsx";
 import { useAppTrendRowEdit } from "../hooks/useAppTrendRowEdit.ts";
-import QuickClassificationStatus from "../../classification/components/QuickClassificationStatus.tsx";
 import type { QuickClassificationAnchor } from "../../classification/types.ts";
 
 interface DataChartDimension { width: number; height: number }
@@ -83,6 +82,8 @@ interface DataAppTrendPanelProps {
     returnFocusTo?: HTMLElement | null,
   ) => void;
   onOptionOpenDetails: (option: DataDestinationTrendOption) => void;
+  /** [0.12.4] 双击一行 = 改它的**标签**；不给时才退回内建弹窗 */
+  onOptionEdit?: (option: DataDestinationTrendOption) => void;
   activeQuickClassificationTargetKey?: string | null;
   onQuickClassificationPreload?: () => void;
   onQuickClassificationOpen?: (
@@ -145,6 +146,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
   onRestoreSelection,
   onOptionIntentStart,
   onOptionOpenDetails,
+  onOptionEdit,
   activeQuickClassificationTargetKey,
   onQuickClassificationPreload,
   onQuickClassificationOpen,
@@ -154,13 +156,13 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
   onMouseLeave,
   } = presentation;
   const UI_TEXT = useLocaleText();
-  const canClassify = (option: DataDestinationTrendOption) => supportsQuickClassification && !isAnonymousActivity(option.key);
+  const canEditTags = (option: DataDestinationTrendOption) => supportsQuickClassification && !isAnonymousActivity(option.key);
   const handleRetry = (event: MouseEvent<HTMLButtonElement>) => {
     if (document.activeElement === event.currentTarget) event.currentTarget.closest(".data-app-panel")?.querySelector<HTMLElement>(".data-trend-range-trigger")?.focus();
     onRetry();
   };
   const handleQuickClassificationKeyDown = (option: DataDestinationTrendOption, event: KeyboardEvent<HTMLButtonElement>) => {
-    if (!canClassify(option) || (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10"))) return false;
+    if (!canEditTags(option) || (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10"))) return false;
     event.preventDefault();
     const bounds = event.currentTarget.getBoundingClientRect();
     onQuickClassificationOpen?.(
@@ -188,7 +190,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
     event.stopPropagation();
     onOptionOpenDetails(option);
   };
-  /* 单击选中 / 双击编辑的时序、"行首图标 = 详情"的分支、超窗双击的选中补偿、分类 tab 的双击都在这个 hook 里 */
+  /* 单击选中 / 双击编辑的时序、"行首图标 = 详情"、超窗双击的选中补偿都在这里 */
   const rowEdit = useAppTrendRowEdit({
     editable: destinationMode === "app",
     manageableCategories: destinationMode === "category",
@@ -197,12 +199,14 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
     onOptionSelect,
     onRestoreSelection,
     onOptionOpenDetails,
+    onEditOption: onOptionEdit,
   });
   const detailCopy = UI_TEXT.destinationDetail;
+  /* `tag` 以前偷用 `destinationCategory`（tab 上写着"分类"）；i18n 是生成产物、没有 `destinationTag`，直接写中文 */
   const modeLabels: Record<DataDestinationMode, string> = {
     app: UI_TEXT.data.destinationApp,
     category: UI_TEXT.data.destinationCategory,
-    tag: UI_TEXT.data.destinationCategory,
+    tag: "标签",
     web: UI_TEXT.data.destinationWeb,
   };
   const modeOptions = availableDestinationModes.map((value) => ({ value, label: modeLabels[value] }));
@@ -243,18 +247,18 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
                     data-selection-key={option.key}
                     key={option.key}
                     aria-label={detailCopy.open(option.displayName)}
-                    aria-keyshortcuts={canClassify(option) ? "Enter Shift+F10" : "Enter"}
-                    aria-haspopup={canClassify(option) ? "menu" : undefined}
-                    aria-expanded={canClassify(option)
+                    aria-keyshortcuts={canEditTags(option) ? "Enter Shift+F10" : "Enter"}
+                    aria-haspopup={canEditTags(option) ? "dialog" : undefined}
+                    aria-expanded={canEditTags(option)
                       ? activeQuickClassificationTargetKey === (option.exeName
                         ? `app:${option.exeName}`
                         : `web:${option.normalizedDomain}`)
                       : undefined}
-                    onPointerEnter={canClassify(option) ? onQuickClassificationPreload : undefined}
-                    onFocus={canClassify(option) ? onQuickClassificationPreload : undefined}
+                    onPointerEnter={canEditTags(option) ? onQuickClassificationPreload : undefined}
+                    onFocus={canEditTags(option) ? onQuickClassificationPreload : undefined}
                     onMouseDown={(event) => handleDetailIntent(option, event)}
                     onDoubleClick={(event) => handleDetailOpen(option, event)}
-                    onContextMenu={canClassify(option) ? (event) => handleClassificationContextMenu(option, event) : undefined}
+                    onContextMenu={canEditTags(option) ? (event) => handleClassificationContextMenu(option, event) : undefined}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         event.preventDefault();
@@ -393,16 +397,16 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
                     } as CSSProperties : undefined}
                     onMouseDown={(event) => handleDetailIntent(option, event)}
                     {...rowEdit.handlers(option)}
-                    onContextMenu={canClassify(option) ? (event) => handleClassificationContextMenu(option, event) : undefined}
-                    onPointerEnter={canClassify(option) ? onQuickClassificationPreload : undefined}
-                    onFocus={canClassify(option) ? onQuickClassificationPreload : undefined}
+                    onContextMenu={canEditTags(option) ? (event) => handleClassificationContextMenu(option, event) : undefined}
+                    onPointerEnter={canEditTags(option) ? onQuickClassificationPreload : undefined}
+                    onFocus={canEditTags(option) ? onQuickClassificationPreload : undefined}
                     onKeyDown={handleOptionKeyDown}
                     aria-pressed={isSelected}
-                    aria-keyshortcuts={canClassify(option)
+                    aria-keyshortcuts={canEditTags(option)
                       ? "Enter Space Control+Enter Control+Space Shift+F10"
                       : "Enter Space Control+Enter Control+Space"}
-                    aria-haspopup={canClassify(option) ? "menu" : undefined}
-                    aria-expanded={canClassify(option)
+                    aria-haspopup={canEditTags(option) ? "dialog" : undefined}
+                    aria-expanded={canEditTags(option)
                       ? activeQuickClassificationTargetKey === (option.exeName
                         ? `app:${option.exeName}`
                         : `web:${option.normalizedDomain}`)
@@ -430,10 +434,7 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
                     <span className="data-app-option-main">
                       {anonymous ? <span className="data-app-option-name"><AnonymousActivityName /></span> : <span className="data-app-option-name-row">
                         <span className="data-app-option-name">{option.displayName}</span>
-                        <QuickClassificationStatus
-                          density="dense"
-                          unclassified={Boolean(supportsQuickClassification && option.unclassified)}
-                        />
+                        <DataOptionTags exeName={option.exeName} />
                       </span>}
                       <span className="data-app-option-meta">
                         {Math.round(option.percentage)}%{option.secondaryText ? ` · ${option.secondaryText}` : ""}
@@ -497,8 +498,6 @@ function DataAppTrendPanel(props: DataAppTrendPanelProps) {
           </div>
         </div>
       )}
-      {/* 双击整行开「应用设置」（关掉即卸载=弃稿）。[修复 D-7] `onSaved` 接 `onRetry`：只作废缓存的话这一行分类标记会停在旧值 */}
-      <DataAppEditDialog app={rowEdit.editing} onClose={rowEdit.closeEditor} onSaved={onRetry} />
     </div>
   );
 }

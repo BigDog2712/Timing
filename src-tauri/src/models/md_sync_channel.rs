@@ -23,7 +23,10 @@ use serde::{Deserialize, Serialize};
 use crate::infra::md_env::expand_env;
 use crate::models::md_sync::{MdSyncBinding, MD_SYNC_ROOT_MAX_LEN};
 use crate::models::md_sync_auto::MdCloudAuto;
-use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud, MD_CLOUD_PATH_MAX_LEN, MD_CLOUD_URL_MAX_LEN, MD_CLOUD_USER_MAX_LEN, MD_SYNC_CLOUD_ROOT};
+use crate::models::md_sync_cloud::{
+    CloudMode, MdSyncCloud, MD_CLOUD_PATH_MAX_LEN, MD_CLOUD_URL_MAX_LEN, MD_CLOUD_USER_MAX_LEN,
+    MD_SYNC_CLOUD_ROOT,
+};
 
 /// 一条通路自己的配置（`MdSyncConfig.cloudFolder` / `cloudWebdav`）。
 ///
@@ -231,7 +234,7 @@ fn is_loopback_host(authority: &str) -> bool {
         return false;
     };
     /* `host_str()` 对 IPv6 会带方括号（`[::1]`），所以按 `Host` 枚举判，
-       不拿字符串再 parse。 */
+    不拿字符串再 parse。 */
     match parsed.host() {
         Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
         Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
@@ -258,7 +261,7 @@ pub fn split_legacy(
         return (None, None);
     };
     /* 两条通路都从「全字段原值 + 关着 + 无三档」起步，活跃侧再覆盖 enabled / auto：
-       非活跃侧字段留原值（A4「切回不用重填」的继承者）、auto=None（读作默认）。 */
+    非活跃侧字段留原值（A4「切回不用重填」的继承者）、auto=None（读作默认）。 */
     let base = MdSyncCloudChannel {
         enabled: false,
         local_root: cloud.local_root.clone(),

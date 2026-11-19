@@ -125,11 +125,7 @@ pub(crate) fn list_in(root: &Path) -> Vec<BackupFile> {
 /// 系统默认程序去**打开**，`join` 一旦被 `..` 带出备份目录，后果就不是「读错文件」
 /// 而是「打开任意文件」——所以这里比 `read_in` 更严（连 `..` 出现在中间也拒）。
 pub fn path_of(name: &str) -> Result<PathBuf, String> {
-    if name.trim().is_empty()
-        || name.contains("..")
-        || name.contains('/')
-        || name.contains('\\')
-    {
+    if name.trim().is_empty() || name.contains("..") || name.contains('/') || name.contains('\\') {
         return Err("备份文件名不合法".into());
     }
     let root = backup_root().ok_or_else(|| "备份目录还没准备好".to_string())?;
@@ -163,7 +159,8 @@ fn is_timestamp(raw: &str) -> bool {
     bytes.len() == TIMESTAMP_LEN
         && bytes[0] == b'-'
         && bytes[9] == b'-'
-        && bytes.iter().enumerate().all(|(index, byte)| {
-            index == 0 || index == 9 || byte.is_ascii_digit()
-        })
+        && bytes
+            .iter()
+            .enumerate()
+            .all(|(index, byte)| index == 0 || index == 9 || byte.is_ascii_digit())
 }

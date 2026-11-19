@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { IpcError, errorText } from '../../services/ipc';
-import { itemApi } from '../../services/api';
+import { itemApi, tagApi } from '../../services/api';
 import { useTimerActions } from '../../hooks/useTimerActions';
 import { useItemStore } from '../../stores/itemStore';
 import { useTimerStore } from '../../stores/timerStore';
@@ -19,6 +19,7 @@ import { ITEM_NAME_MAX_CHARS } from '../../lib/constants';
 import { RecentChips } from './RecentChips';
 import { useHoverClose } from '../../hooks/useHoverClose';
 import { ShortcutHint } from './ShortcutHint';
+import { PanelTagField, loadTagOptions } from './PanelTagField';
 
 export function ItemPicker() {
   const actions = useTimerActions();
@@ -31,10 +32,27 @@ export function ItemPicker() {
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /* [0.12.4] 标签：与事项一起创建（`create_item` 之后紧接 `set_item_tags`） */
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagOptions, setTagOptions] = useState<string[]>([]);
+  const [tagHint, setTagHint] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     inputRef.current?.focus();
+  }, []);
+
+  /* 候选读不到不挡新建：标签是可选信息，读失败就退回「只能手输」 */
+  useEffect(() => {
+    let alive = true;
+    void loadTagOptions()
+      .then((options) => {
+        if (alive) setTagOptions(options);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const recent = useMemo(() => items.slice(0, 3), [items]);
@@ -49,6 +67,8 @@ export function ItemPicker() {
         closePanel();
       }
       setName('');
+      setTags([]);
+      setTagHint('');
       setError(null);
     },
     [actions, closePanel],
@@ -64,6 +84,15 @@ export function ItemPicker() {
     setError(null);
     try {
       const item = await itemApi.create({ name: value });
+      /* 先建事项再挂标签：`set_item_tags` 要 itemId，而标签失败不该把刚建好的事项丢掉
+         （用户至少能开始计时，标签可以随后在管理卡里补）。 */
+      if (tags.length > 0) {
+        try {
+          await tagApi.set(item.id, tags);
+        } catch {
+          useUiStore.getState().setNotice({ text: '标签没保存上，可在事项管理里补', tone: 'danger' });
+        }
+      }
       await useItemStore.getState().reload();
       await activate(item.id);
     } catch (err) {
@@ -75,7 +104,7 @@ export function ItemPicker() {
     } finally {
       setBusy(false);
     }
-  }, [name, activate]);
+  }, [name, tags, activate]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
@@ -108,6 +137,15 @@ export function ItemPicker() {
         />
         {busy && <span className="panel__spinner" aria-hidden />}
       </div>
+
+      <PanelTagField
+        value={tags}
+        options={tagOptions}
+        disabled={busy}
+        onChange={setTags}
+        onHint={setTagHint}
+      />
+      {tagHint && <p className="panel__tag-hint" role="status">{tagHint}</p>}
 
       {error && (
         <p className="inline-error" role="alert">

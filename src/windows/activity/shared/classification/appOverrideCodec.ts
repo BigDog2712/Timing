@@ -25,6 +25,7 @@
 // `category`（主分类）；用户把某个事项绑到副分类后，那段时间的时长**不会**挪到副分类，
 // 所以"应用选了 A+B、事项绑到 B"时统计口径与展示不一致。要一致就必须让后端读这张
 // 配置表并按时段切分重算 —— 涉及 Rust 侧聚合与 schema 口径，本轮明确不做。
+import { normalizeTagPath } from "../../../shared/tags/normalize.ts";
 import {
   USER_ASSIGNABLE_CATEGORIES,
   isExtendedCategory,
@@ -42,6 +43,16 @@ export interface AppItemCategoryBinding {
 /** `__app_override::<exe>` 里那条 JSON 的形状（与 Rust `StoredAppOverride` 的前缀兼容） */
 export interface AppOverrideShape {
   category?: UserAssignableAppCategory;
+  /**
+   * [0.12.4] 应用自己的**标签**（`学习/考公` 这类路径，最多 12 条）。
+   *
+   * 与 `category` 的关系：分类是上一代的单值归类，标签是它现在的替代物。两个字段
+   * 同时存在是为了**读旧数据**——老行只有 `category`，新写入只碰 `tags`；
+   * 展示层用 `resolveAppTags()` 统一取（有 tags 用 tags，没有才回落分类）。
+   * Rust 侧不解析这个字段（`StoredAppOverride` 只读 category/track/...），
+   * 多出来的键在 `serde_json::Value` 里被忽略，所以不需要改后端结构体。
+   */
+  tags?: string[];
   /** 该应用允许归属的分类集合，`[0]` = 主分类（= `category`） */
   categories?: UserAssignableAppCategory[];
   /** 已绑定的事项 → 各自归属的分类 */
@@ -159,6 +170,46 @@ export function normalizeItemBindings(
  * （旧实现是白名单式重建，漏掉的字段会被**静默抹掉** —— 那正是"在弹窗里改了分类，
  * 保存时把事项绑定整段清空"这类事故的成因）。
  */
+/** 标签归一：路径合法化 + 去重（大小写不敏感）+ 上限 12 条。非法条目直接丢，不整条失败。 */
+export function normalizeAppTags(tags: readonly string[] | undefined): string[] {
+  if (!tags || tags.length === 0) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of tags) {
+    let path: string;
+    try {
+      path = normalizeTagPath(raw);
+    } catch {
+      continue;
+    }
+    if (!path) continue;
+    const key = path.toLocaleLowerCase("en-US").replace(/\u03c2/gu, "\u03c3");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(path);
+    if (out.length >= 12) break;
+  }
+  return out;
+}
+
+/**
+ * 展示用：这个应用现在有哪些标签。
+ *
+ * `tags` 为空时回落到分类集合（`categories` / `category`）——老用户的分类不会因为
+ * 升级而「消失」，它们以同名标签的形式继续出现；下一次在标签编辑器里保存才真正
+ * 写进 `tags`。回落放在这里而不是写盘时，是为了**不产生一次隐式迁移**：
+ * 打开一次应用排行就把所有应用都改写成标签，风险远大于收益。
+ */
+export function resolveAppTags(
+  override: Pick<AppOverrideShape, "tags" | "category" | "categories"> | null | undefined,
+  deletedCategories: readonly AppCategory[] = [],
+): string[] {
+  if (!override) return [];
+  const tags = normalizeAppTags(override.tags);
+  if (tags.length > 0) return tags;
+  return resolveCategorySet(override, deletedCategories);
+}
+
 export function normalizeAppOverride(
   override: AppOverrideShape | null | undefined,
 ): AppOverrideShape | null {
@@ -195,12 +246,17 @@ export function normalizeAppOverride(
   if (itemBindings.length > 0) {
     normalized.itemBindings = itemBindings;
   }
+  const tags = normalizeAppTags(override.tags);
+  if (tags.length > 0) {
+    normalized.tags = tags;
+  }
   normalized.enabled = true;
 
   const hasMeaningfulOverride = Boolean(
     normalized.category
     || normalized.categories
     || normalized.itemBindings
+    || normalized.tags
     || normalized.displayName
     || normalized.color
     || normalized.track === false
@@ -225,6 +281,7 @@ export function serializeAppOverride(override: AppOverrideShape): string {
     updatedAt: override.updatedAt ?? Date.now(),
     categories: normalizeCategorySet(override.categories, override.category),
     itemBindings: normalizeItemBindings(override.itemBindings),
+    tags: normalizeAppTags(override.tags),
   });
 }
 

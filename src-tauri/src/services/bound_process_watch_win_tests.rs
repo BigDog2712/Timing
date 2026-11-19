@@ -33,14 +33,14 @@ fn spawn_child() -> Child {
 }
 
 /* ---------------------------------------------------------------------------
-   ① 真实进程：退出 → 结束这一段
-   --------------------------------------------------------------------------- */
+① 真实进程：退出 → 结束这一段
+--------------------------------------------------------------------------- */
 
 #[tokio::test]
 async fn bound_process_real_exit_ends_the_auto_started_segment() {
     let pool = fresh_pool("bound-watch-stop").await;
     /* 阈值降到 0：让这一段是一次**保存**，而不是被 `min_record_seconds`(默认 30s) 丢弃。
-       `discarded` 的语义另有专属用例（`timer_threshold`），别在这里混着证。 */
+    `discarded` 的语义另有专属用例（`timer_threshold`），别在这里混着证。 */
     crate::repositories::settings::set_value(&pool, "timing.min_record_seconds", "0", 1)
         .await
         .expect("写设置");
@@ -68,19 +68,19 @@ async fn bound_process_real_exit_ends_the_auto_started_segment() {
     );
 
     let wait_registry = Arc::clone(&registry);
-    let outcome = tokio::task::spawn_blocking(move || {
-        wait_for_exit(handle, generation, wait_registry)
-    })
-    .await
-    .expect("等待线程不应 panic");
+    let outcome =
+        tokio::task::spawn_blocking(move || wait_for_exit(handle, generation, wait_registry))
+            .await
+            .expect("等待线程不应 panic");
     assert_eq!(outcome, ExitOutcome::Exited, "子进程退出必须被判成 Exited");
 
-    let settle = crate::services::bound_process_watch::settle_after_exit(
-        &pool, &registry, generation,
-    )
-    .await;
+    let settle =
+        crate::services::bound_process_watch::settle_after_exit(&pool, &registry, generation).await;
     match settle {
-        SettleOutcome::Stopped { record_id, discarded } => {
+        SettleOutcome::Stopped {
+            record_id,
+            discarded,
+        } => {
             assert_eq!(record_id, record.id, "结束的必须是刚才那一段");
             assert!(!discarded, "阈值已设 0，不该被丢弃");
         }
@@ -96,14 +96,14 @@ async fn bound_process_real_exit_ends_the_auto_started_segment() {
 }
 
 /* ---------------------------------------------------------------------------
-   ② 失配不停：注册着 A 段，退出时当前已经是 B 段
-   --------------------------------------------------------------------------- */
+② 失配不停：注册着 A 段，退出时当前已经是 B 段
+--------------------------------------------------------------------------- */
 
 #[tokio::test]
 async fn bound_process_exit_does_not_stop_a_different_segment_on_the_same_item() {
     let pool = fresh_pool("bound-watch-mismatch").await;
     /* 阈值不动（默认 30s）：这一段本来就短，无论如何都进不了记录列表——
-       本用例只看「有没有被停」，不看落库形态。 */
+    本用例只看「有没有被停」，不看落库形态。 */
     let first = crate::services::timer::start(&pool, Some(1))
         .await
         .expect("开始第一段");
@@ -122,16 +122,20 @@ async fn bound_process_exit_does_not_stop_a_different_segment_on_the_same_item()
     );
 
     /* 用户手动换了一段：先 pause 再 end_and_start（与 `startOrSwitch` 同一条路径）。
-       关键点是**同一事项**也照样换段 —— 段级校验就是为了这个。 */
+    关键点是**同一事项**也照样换段 —— 段级校验就是为了这个。 */
     let other_item = crate::services::item::create(&pool, "另一件事", None)
         .await
         .expect("建事项");
     crate::services::timer::pause(&pool)
         .await
         .expect("分段前必须非运行中");
-    crate::services::timer::switch(&pool, other_item.id, crate::models::enums::SwitchMode::EndAndStart)
-        .await
-        .expect("切到另一段");
+    crate::services::timer::switch(
+        &pool,
+        other_item.id,
+        crate::models::enums::SwitchMode::EndAndStart,
+    )
+    .await
+    .expect("切到另一段");
     let second = crate::services::timer::state(&pool)
         .await
         .expect("读状态")
@@ -143,11 +147,10 @@ async fn bound_process_exit_does_not_stop_a_different_segment_on_the_same_item()
     );
 
     let wait_registry = Arc::clone(&registry);
-    let outcome = tokio::task::spawn_blocking(move || {
-        wait_for_exit(handle, generation, wait_registry)
-    })
-    .await
-    .expect("等待线程不应 panic");
+    let outcome =
+        tokio::task::spawn_blocking(move || wait_for_exit(handle, generation, wait_registry))
+            .await
+            .expect("等待线程不应 panic");
     assert_eq!(outcome, ExitOutcome::Exited);
 
     assert_eq!(
@@ -163,7 +166,10 @@ async fn bound_process_exit_does_not_stop_a_different_segment_on_the_same_item()
         Some(second.id),
         "被保住的必须是用户手动开的这一段"
     );
-    assert!(registry.snapshot().is_none(), "失配也要清注册表，不能留着下次误伤");
+    assert!(
+        registry.snapshot().is_none(),
+        "失配也要清注册表，不能留着下次误伤"
+    );
 
     drop(child);
 }

@@ -36,11 +36,11 @@ use crate::services::{md_cloud, md_sync};
 use crate::state::AppState;
 
 /* [V0.11.21] 三个名字搬到 `services/md_cloud/tier.rs`——手机端也要按同一套节奏跑，
-   而本模块是 `#[cfg(desktop)]`（靠 `tray_sync::try_acquire()` 防重入）。判定不碰 IO，
-   放 services 里两端都编、`tests/` 也够得着。
+而本模块是 `#[cfg(desktop)]`（靠 `tray_sync::try_acquire()` 防重入）。判定不碰 IO，
+放 services 里两端都编、`tests/` 也够得着。
 
-   `pub(crate) use` 而不是改所有引用点：`tests/md_cloud_tier.rs` 与 `qa_batch1_edges.rs`
-   写的是 `crate::jobs::md_cloud::{decide, TierState, TierReason}`，转出后一个字都不用改。 */
+`pub(crate) use` 而不是改所有引用点：`tests/md_cloud_tier.rs` 与 `qa_batch1_edges.rs`
+写的是 `crate::jobs::md_cloud::{decide, TierState, TierReason}`，转出后一个字都不用改。 */
 pub(crate) use crate::services::md_cloud::tier::{decide, TierReason, TierState};
 
 /// 一条通路自己的调度记账（[V0.11.26]：双通路 = 双份，互不干扰）。
@@ -89,7 +89,7 @@ pub fn spawn(app: AppHandle) {
                     .enumerate()
                 {
                     /* 「这条通路会不会跑」只认 `usable_*`（唯一出口），并且总开关也必须是开的：
-                       总开关关着时 `round` 里的本地那半会早退，但云端那半仍会写文件。 */
+                    总开关关着时 `round` 里的本地那半会早退，但云端那半仍会写文件。 */
                     let usable = match channel {
                         PurgeChannel::Folder => md_cloud::usable_folder(&config),
                         PurgeChannel::Webdav => md_cloud::usable_webdav(&config),
@@ -98,7 +98,7 @@ pub fn spawn(app: AppHandle) {
                     let state = &mut states[index];
                     let auto = auto_of(Some(channel_cfg));
                     /* 切档时计时器从「现在」起算（PRD §3.4 边界表）：只记一次锚点，
-                       不动 `interval_minutes` —— 切档不重置用户填过的分钟数（H-2）。 */
+                    不动 `interval_minutes` —— 切档不重置用户填过的分钟数（H-2）。 */
                     if state.prev_schedule != Some(auto.schedule) {
                         if state.prev_schedule.is_some() {
                             state.tier.last_attempt_ms = Some(now);
@@ -114,14 +114,12 @@ pub fn spawn(app: AppHandle) {
                         md_sync::dirty::last_write_ms(),
                     ) {
                         /* 抢不到闸 → 本轮跳过，等下一个触发点；不排队、不 sleep 重试。
-                           双通路同秒到点时后到者同此口径（设计 §四 3）。 */
+                        双通路同秒到点时后到者同此口径（设计 §四 3）。 */
                         if let Some(_gate) = crate::app::tray_sync::try_acquire() {
                             let next_in = match reason {
                                 TierReason::Interval => auto.interval_secs(),
                                 TierReason::Max => MD_CLOUD_SMART_MAX_SECS,
-                                TierReason::Idle | TierReason::Startup => {
-                                    MD_CLOUD_SMART_IDLE_SECS
-                                }
+                                TierReason::Idle | TierReason::Startup => MD_CLOUD_SMART_IDLE_SECS,
                             };
                             crate::log_info!(
                                 "md cloud tier: channel={} schedule={} next_in={}",

@@ -3,7 +3,7 @@
 //! 把本机新增的计时事件写进用户选的本地目录，上传交给坚果云 / OneDrive 客户端。这条路
 //! 的意义是「不想把账号密码交给 Timing 也能有第二份」：所以它连 `infra::secret` 都不读。
 //!
-//! ## 落档格式：`<目录>/sync/events/<设备id>/<seq>.jsonl`
+//! ## 落档格式：`<目录>/sync/streams/<设备id>/<目标指纹>/<seq>.jsonl`（旧 `sync/events` 只读）
 //!
 //! 与 WebDAV 那条路逐字同形（同一套 [`super::round_stream`]），区别只在 transport 是本地
 //! 文件系统。这一版**停写 md 快照**，理由见 `round_webdav` 的模块头（三条与传输无关）。
@@ -35,7 +35,7 @@ use crate::platform::clock::now_ms;
 use crate::services::md_sync::decision::ConflictMode;
 use crate::services::sync_stream::transport::Transport;
 /* 只在桌面存在：手机端 `round_with` 在建轮之前就以 `MD_SYNC_CONFIG_INVALID` 拒绝
-   folder 通路（`md_cloud/mod.rs` 的 `NO_LOCAL_FOLDER_ON_MOBILE`）。 */
+folder 通路（`md_cloud/mod.rs` 的 `NO_LOCAL_FOLDER_ON_MOBILE`）。 */
 #[cfg(not(mobile))]
 use crate::services::md_sync;
 
@@ -58,7 +58,7 @@ pub async fn run(
         return Ok(report);
     }
     /* 登记这个根属于「本地目录」通路：**不再往这里写 md**，但 `md_backup` 仍要按这个
-       归属回答「这份备份该恢复到哪里」（用户在备份列表里点恢复时，落点由它决定）。 */
+    归属回答「这份备份该恢复到哪里」（用户在备份列表里点恢复时，落点由它决定）。 */
     md_backup::register_root(root.clone(), "folder");
     crate::log_info!("md cloud: root={}", root.display());
 

@@ -1,5 +1,5 @@
-use crate::services::activity::data::repositories;
 use crate::models::activity::backup::BackupRecords;
+use crate::services::activity::data::repositories;
 use sqlx::{Sqlite, Transaction};
 
 pub(super) async fn merge_backup_records_in_tx(

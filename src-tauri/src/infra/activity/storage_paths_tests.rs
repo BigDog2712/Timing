@@ -108,7 +108,12 @@ fn only_the_database_and_its_sidecars_are_recognised() {
             assert!(is_database_file_name(&sidecar), "{sidecar} 必须被认出来");
         }
     }
-    for other in ["backups", "diagnostics", "data-anchor.json", "activity.db.bak"] {
+    for other in [
+        "backups",
+        "diagnostics",
+        "data-anchor.json",
+        "activity.db.bak",
+    ] {
         assert!(!is_database_file_name(other), "{other} 不是库文件");
     }
 }
@@ -157,7 +162,8 @@ fn db_path_follows_the_layout_file_name_it_is_given() {
 
     let new_paths = StoragePaths::from_roots(
         new_data_root.clone(),
-        root.join(activity_subdir_of(Layout::New)).join(WEBVIEW_SUBDIR),
+        root.join(activity_subdir_of(Layout::New))
+            .join(WEBVIEW_SUBDIR),
         false,
         false,
         db_file_of(Layout::New),
@@ -171,7 +177,8 @@ fn db_path_follows_the_layout_file_name_it_is_given() {
 
     let old_paths = StoragePaths::from_roots(
         old_data_root.clone(),
-        root.join(activity_subdir_of(Layout::Old)).join(WEBVIEW_SUBDIR),
+        root.join(activity_subdir_of(Layout::Old))
+            .join(WEBVIEW_SUBDIR),
         false,
         false,
         db_file_of(Layout::Old),

@@ -1,3 +1,7 @@
+use crate::infra::activity::{app_paths, storage_control, storage_paths, webview_cache};
+use crate::models::activity::storage::{
+    StorageMigrationPreview, StorageMigrationRequest, WebviewCacheMigrationRequest,
+};
 use crate::services::activity::data::storage_migration_cleanup::{
     remove_migration_path_if_safe, remove_path_if_exists,
 };
@@ -6,10 +10,6 @@ use crate::services::activity::data::storage_path_safety::{
     resolved_path_is_same_or_child, resolved_paths_equal, same_path,
 };
 use crate::services::activity::data::{backup, sqlite_pool, storage_restart};
-use crate::models::activity::storage::{
-    StorageMigrationPreview, StorageMigrationRequest, WebviewCacheMigrationRequest,
-};
-use crate::infra::activity::{app_paths, storage_control, storage_paths, webview_cache};
 use sqlx::{Pool, Sqlite};
 use std::fs;
 use std::path::{Path, PathBuf};

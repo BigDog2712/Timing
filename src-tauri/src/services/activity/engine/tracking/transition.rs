@@ -1,8 +1,8 @@
 use super::ports::{TrackingDataError, TrackingDataStore};
+use crate::infra::activity::windows::foreground as tracker;
 use crate::models::activity::tracking::{
     self, WindowSessionIdentity, WindowTrackingCandidate, WindowTransitionDecision,
 };
-use crate::infra::activity::windows::foreground as tracker;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -201,7 +201,9 @@ fn to_tracking_candidate(window: &tracker::WindowInfo) -> WindowTrackingCandidat
 #[cfg(test)]
 mod failure_recovery_tests {
     use super::*;
-    use crate::services::activity::data::{repositories::sessions, schema, tracking_runtime::TrackingRuntimeDataStore};
+    use crate::services::activity::data::{
+        repositories::sessions, schema, tracking_runtime::TrackingRuntimeDataStore,
+    };
     use crate::services::activity::engine::tracking::active_session::start_session_for_transition;
     use sqlx::{Executor, SqlitePool};
 

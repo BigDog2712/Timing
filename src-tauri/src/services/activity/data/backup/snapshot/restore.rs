@@ -91,12 +91,21 @@ pub(super) async fn prepare_snapshot_restore(
     let cutoff = (exported_at_ms.min(i64::MAX as u64) as i64)
         .min(crate::infra::activity::clock::unix_timestamp_millis_i64());
     let sealed = async {
-        crate::services::activity::data::repositories::sessions::seal_interrupted_session(candidate_pool, cutoff)
-            .await?;
-        crate::services::activity::data::repositories::web_activity::seal_interrupted_segments(candidate_pool, cutoff)
-            .await?;
-        crate::services::activity::data::repositories::anonymous_activity::seal_interrupted(candidate_pool, cutoff)
-            .await?;
+        crate::services::activity::data::repositories::sessions::seal_interrupted_session(
+            candidate_pool,
+            cutoff,
+        )
+        .await?;
+        crate::services::activity::data::repositories::web_activity::seal_interrupted_segments(
+            candidate_pool,
+            cutoff,
+        )
+        .await?;
+        crate::services::activity::data::repositories::anonymous_activity::seal_interrupted(
+            candidate_pool,
+            cutoff,
+        )
+        .await?;
         Ok::<(), sqlx::Error>(())
     }
     .await;
@@ -131,14 +140,18 @@ pub(super) async fn merge_snapshot_backup(
     }
     let records_result = load_backup_records(&candidate_pool).await;
     let activity_rules_result =
-        crate::services::activity::data::repositories::tools::fetch_all_activity_reminder_rules(&candidate_pool).await;
+        crate::services::activity::data::repositories::tools::fetch_all_activity_reminder_rules(
+            &candidate_pool,
+        )
+        .await;
     let import_result = load_external_import_backup_from_pool(&candidate_pool).await;
-    let anonymous_result = crate::services::activity::data::repositories::anonymous_activity::read_range(
-        &candidate_pool,
-        i64::MIN,
-        i64::MAX,
-    )
-    .await;
+    let anonymous_result =
+        crate::services::activity::data::repositories::anonymous_activity::read_range(
+            &candidate_pool,
+            i64::MIN,
+            i64::MAX,
+        )
+        .await;
     let history_result = repositories::tools::focus_history::for_backup(&candidate_pool).await;
     candidate_pool.close().await;
 
@@ -149,7 +162,10 @@ pub(super) async fn merge_snapshot_backup(
     let anonymous =
         anonymous_result.map_err(|error| format!("failed to read anonymous backup: {error}"))?;
     let _icon_maintenance =
-        crate::services::activity::data::repositories::icon_cache::acquire_icon_cache_maintenance(pool).await;
+        crate::services::activity::data::repositories::icon_cache::acquire_icon_cache_maintenance(
+            pool,
+        )
+        .await;
     let mut tx = pool
         .begin()
         .await
@@ -157,12 +173,17 @@ pub(super) async fn merge_snapshot_backup(
     repositories::tools::focus_history::detach_existing_tasks(&mut tx, &mut history).await?;
     merge_backup_records_in_tx(&mut tx, &records).await?;
     repositories::tools::focus_history::restore(&mut tx, &history).await?;
-    crate::services::activity::data::repositories::tools::merge_activity_reminder_rules(&mut tx, &activity_rules)
-        .await?;
+    crate::services::activity::data::repositories::tools::merge_activity_reminder_rules(
+        &mut tx,
+        &activity_rules,
+    )
+    .await?;
     merge_external_import_backup_in_tx(&mut tx, &import_backup).await?;
-    crate::services::activity::data::repositories::anonymous_activity::merge_for_restore(&mut tx, &anonymous)
-        .await
-        .map_err(|error| format!("failed to merge anonymous backup: {error}"))?;
+    crate::services::activity::data::repositories::anonymous_activity::merge_for_restore(
+        &mut tx, &anonymous,
+    )
+    .await
+    .map_err(|error| format!("failed to merge anonymous backup: {error}"))?;
     tx.commit()
         .await
         .map_err(|error| format!("failed to commit snapshot merge: {error}"))?;

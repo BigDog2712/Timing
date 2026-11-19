@@ -1,10 +1,10 @@
+use crate::infra::activity::windows::foreground::WindowInfo;
 use crate::models::activity::mini_window::content::{self, MiniStatusSnapshot};
 use crate::models::activity::tracking::TrackingStatusSnapshot;
 use crate::services::activity::engine::tools::ToolsRuntimeState;
 use crate::services::activity::engine::tracking::runtime_snapshot::{
     TrackingRuntimeProbeStatus, TrackingRuntimeSnapshotState,
 };
-use crate::infra::activity::windows::foreground::WindowInfo;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -30,7 +30,8 @@ pub(crate) async fn get_mini_presentation_snapshot<R: Runtime>(
     let state = app.state::<TrackingRuntimeSnapshotState>();
     let _transition = state.transition.lock().await;
     let tracking_paused =
-        crate::services::activity::data::tracking_pause_service::load_tracking_pause_setting(app).await?;
+        crate::services::activity::data::tracking_pause_service::load_tracking_pause_setting(app)
+            .await?;
     let tracking = state
         .snapshot()
         .ok_or_else(|| "tracking runtime snapshot is not ready".to_string())?;

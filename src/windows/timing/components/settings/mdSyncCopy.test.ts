@@ -54,11 +54,11 @@ describe('mdSyncCopy —— PRD 4.0 逐字常量表', () => {
     expect(COPY.backupHint).toBe(EXPECTED.C21);
   });
 
-  /* [设置页七项改造·批 4] 三档标签改稿（常量半；DOM 半在 MdSyncCloudAuto） */
-  it('[批 4] AUTO_COPY：第二档逐字「定时」，smartNote 逐字 = PM 裁定句', () => {
-    expect(AUTO_COPY.interval).toBe('定时');
-    expect(AUTO_COPY.off).toBe('关闭');
-    expect(AUTO_COPY.smart).toBe('智能');
+  /* [0.13.x] 三档标签改成完整动作名（常量半；DOM 半在 MdSyncCloudAuto） */
+  it('[0.13.x] AUTO_COPY：三档逐字「手动同步 / 定时同步 / 智能同步」', () => {
+    expect(AUTO_COPY.off).toBe('手动同步');
+    expect(AUTO_COPY.interval).toBe('定时同步');
+    expect(AUTO_COPY.smart).toBe('智能同步');
     expect(AUTO_COPY.smartNote).toBe(
       '启动后 1 分钟同步一次；停手 5 分钟同步一次；一直写则每 30 分钟同步一次。',
     );

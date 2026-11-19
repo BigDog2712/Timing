@@ -10,9 +10,10 @@ use crate::state::AppState;
 /// 恢复对话框的用户选择（`resolve_open_record`）是唯一解除点；`jobs::countdown`
 /// 每 tick 读这一个原子位，所以「不计退出期间 / 丢弃」不会在用户点击之前被后台抢先落账。
 pub(super) fn manage(app: &AppHandle, pool: &SqlitePool) {
-    let pending = tauri::async_runtime::block_on(crate::repositories::record_session::find_active(pool))
-        .map(|active| active.is_some())
-        .unwrap_or(false);
+    let pending =
+        tauri::async_runtime::block_on(crate::repositories::record_session::find_active(pool))
+            .map(|active| active.is_some())
+            .unwrap_or(false);
     let state = AppState::new(pool.clone());
     state
         .timer_recovery_pending

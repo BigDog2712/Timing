@@ -32,7 +32,9 @@ impl From<SqliteOperationError> for CommandErrorDto {
 impl From<crate::models::activity::backup::BackupError> for CommandErrorDto {
     fn from(error: crate::models::activity::backup::BackupError) -> Self {
         let code = match &error {
-            crate::models::activity::backup::BackupError::UnsupportedFormat => "BACKUP_FORMAT_UNSUPPORTED",
+            crate::models::activity::backup::BackupError::UnsupportedFormat => {
+                "BACKUP_FORMAT_UNSUPPORTED"
+            }
             crate::models::activity::backup::BackupError::Invalid(_) => "BACKUP_FAILED",
         };
         Self::new(code, error.to_string(), false)

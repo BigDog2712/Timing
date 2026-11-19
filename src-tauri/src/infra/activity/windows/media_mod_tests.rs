@@ -2,9 +2,30 @@
 //!
 //! `mod tests` 仍声明在原模块内（`#[path]` 指向本文件），`super::` 语义不变。
 
-use super::map_playback_type;
-use crate::models::activity::tracking::SystemMediaPlaybackType;
+use super::{map_playback_type, sink_sample};
+use crate::models::activity::tracking::{
+    MediaPlaybackInfo, MediaProbePayload, SystemMediaPlaybackType,
+};
 use windows::Media::MediaPlaybackType;
+
+#[test]
+fn a_failed_probe_never_reaches_the_media_timeline() {
+    /* 三态：有会话 / 真的没会话 / 探测失败。第三态必须是「不交给 sink」，
+       否则一次 WinRT 超时就会把连续播放切成一条条碎段。 */
+    let playing = MediaProbePayload {
+        signal: None,
+        media: MediaPlaybackInfo::from_session("chrome.exe", "视频名", None, None),
+    };
+
+    assert!(sink_sample(&Err(())).is_none());
+    assert_eq!(sink_sample(&Ok(None)), Some(None));
+    assert_eq!(
+        sink_sample(&Ok(Some(playing)))
+            .flatten()
+            .map(|media| media.title.as_str()),
+        Some("视频名")
+    );
+}
 
 #[test]
 fn busy_media_probe_cannot_starve_timeout_or_accumulate_retries() {

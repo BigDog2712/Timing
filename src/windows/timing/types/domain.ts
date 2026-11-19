@@ -29,6 +29,7 @@
 
 export * from './domain/constants';
 export * from './domain/categoryCatalog';
+export * from './domain/categoryPropagation';
 export * from './domain/models';
 export * from './domain/ipc';
 export * from './domain/plugin';

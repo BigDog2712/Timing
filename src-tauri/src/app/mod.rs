@@ -10,8 +10,8 @@
 //! 禁止：被 `infra` 反向依赖（否则又成环）。
 
 pub mod bootstrap;
-mod timer_recovery;
 pub mod events;
+mod timer_recovery;
 /* [V0.11.27] 计时快照 → 安卓悬浮条：与 `events` 分文件，因为桌面那边是空实现而
 `events` 本身要常年保持桌面可编（推送只在手机端有消费者）。 */
 pub mod overlay_push;
@@ -45,9 +45,9 @@ WebView2 / Win32，Android 上根本编不进来。 */
 pub mod activity_bridge;
 
 /* [T05] 活动数据目录去 Patina 化：`patina/{data,webview}` → `activity/{data,webview}`。
-   由 `lib.rs` 在 `Builder::default()` **之前**调一次（窗口一建起来就晚了）。
-   桌面独占：实现依赖 `infra::activity`（WebView2 profile / Win32），移动端编译不进来；
-   lib.rs 的调用点本就在 `#[cfg(desktop)]` 块里。 */
+由 `lib.rs` 在 `Builder::default()` **之前**调一次（窗口一建起来就晚了）。
+桌面独占：实现依赖 `infra::activity`（WebView2 profile / Win32），移动端编译不进来；
+lib.rs 的调用点本就在 `#[cfg(desktop)]` 块里。 */
 #[cfg(desktop)]
 pub mod activity_dir_migrate;
 /* [数据根搬迁] Patina 首启导入（含「已处理过」标记，从 `activity_bridge` 拆出：
@@ -68,8 +68,8 @@ pub mod tray_sync;
 pub mod tray_label;
 
 /* 分析窗（原 Patina 子系统）的装配层：bootstrap / 托盘 / 状态 / 主窗与迷你窗 / 追踪运行时。
-   桌面独占（上游依赖 WebView2 / Win32）。`allow(dead_code)` 覆盖整棵子树——上游是独立应用，
-   部分入口在融合后被宿主接管，实现留在原地以便吸收上游补丁。 */
+桌面独占（上游依赖 WebView2 / Win32）。`allow(dead_code)` 覆盖整棵子树——上游是独立应用，
+部分入口在融合后被宿主接管，实现留在原地以便吸收上游补丁。 */
 #[cfg(desktop)]
 #[allow(dead_code)]
 pub mod activity;

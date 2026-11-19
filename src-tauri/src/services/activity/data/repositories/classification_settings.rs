@@ -1,4 +1,3 @@
-use crate::services::activity::data::sqlite_error::SqliteOperationError;
 use crate::models::activity::activity_read_model::{
     resolve_activity_precedence, ActivityOrigin, OwnedActivityRange,
 };
@@ -6,7 +5,10 @@ use crate::models::activity::classification::{
     ClassificationSnapshot, CATEGORY_COLOR_OVERRIDE_KEY_PREFIX, CATEGORY_DEFINITION_KEY_PREFIX,
     CATEGORY_LABEL_OVERRIDE_KEY_PREFIX, DELETED_CATEGORY_KEY_PREFIX,
 };
-pub use crate::models::activity::classification::{APP_ITEM_BINDING_KEY_PREFIX, APP_OVERRIDE_KEY_PREFIX, WEB_DOMAIN_OVERRIDE_KEY_PREFIX};
+pub use crate::models::activity::classification::{
+    APP_ITEM_BINDING_KEY_PREFIX, APP_OVERRIDE_KEY_PREFIX, WEB_DOMAIN_OVERRIDE_KEY_PREFIX,
+};
+use crate::services::activity::data::sqlite_error::SqliteOperationError;
 use sqlx::{Pool, Row, Sqlite, Transaction};
 use std::collections::HashMap;
 #[derive(Clone, Debug, PartialEq, Eq)]

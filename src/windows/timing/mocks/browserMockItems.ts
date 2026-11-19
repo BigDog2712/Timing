@@ -172,5 +172,24 @@ export function createMockApiItems(s: MockState): Record<string, (args?: any) =>
       appOverrides: [],
       webOverrides: [],
     }),
+    preview_category_propagation: (args) => {
+      const mapping = args?.request?.mapping as Record<string, string | null> | undefined;
+      if (!mapping || Object.keys(mapping).length === 0) fail('INVALID_TAG_PATH', '分类映射不能为空');
+      let affectedItems = 0;
+      for (const item of s.items) if (item.categoryKey && item.categoryKey in mapping) affectedItems += 1;
+      return { fingerprint: `mock-${affectedItems}-${Object.keys(mapping).sort().join(',')}`, affectedItems, affectedActivitySettings: 0, affectedBindings: 0, affectedOverrides: 0, conflicts: [] };
+    },
+    apply_category_propagation: (args) => {
+      const request = args?.request as { mapping?: Record<string, string | null> } | undefined;
+      const mapping = request?.mapping;
+      if (!mapping || Object.keys(mapping).length === 0) fail('INVALID_TAG_PATH', '分类映射不能为空');
+      for (const item of s.items) {
+        if (item.categoryKey && item.categoryKey in mapping) {
+          item.categoryKey = mapping[item.categoryKey] ?? null;
+          item.updatedAt = now();
+        }
+      }
+      return undefined;
+    },
   };
 }

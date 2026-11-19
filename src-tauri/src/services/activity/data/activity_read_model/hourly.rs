@@ -10,7 +10,7 @@ use crate::models::activity::activity_read_model::{
 };
 use sqlx::{Pool, Row, Sqlite, Transaction};
 /* 只给用例用（它们经 `use super::*` 取）：事实候选读取改成 `facts::load_fact_candidates` 之后
-   本文件不再直接引用，但 `contract_tests` / `benchmark` 还在做 query-plan 断言。 */
+本文件不再直接引用，但 `contract_tests` / `benchmark` 还在做 query-plan 断言。 */
 #[cfg(test)]
 use super::facts::{fact_candidates_query, ACTIVE_SESSION_START_SQL, FACT_CANDIDATES_SQL};
 #[cfg(test)]
@@ -514,7 +514,11 @@ pub(crate) async fn load_range_in_tx(
 
     let mut fact_row_count = 0;
     // 事实支路的「本机」身份：只在没有事实区间时省掉这次查库。
-    let device_id = if fact_intervals.is_empty() { String::new() } else { local_device_id(tx).await? };
+    let device_id = if fact_intervals.is_empty() {
+        String::new()
+    } else {
+        local_device_id(tx).await?
+    };
     for interval in &fact_intervals {
         let candidates = load_fact_candidates(
             tx,

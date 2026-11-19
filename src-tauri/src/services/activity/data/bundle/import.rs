@@ -113,7 +113,7 @@ pub async fn import_full_bundle(
     let mut business_tx = business.begin().await.map_err(|error| error.to_string())?;
     let mut stats = Vec::new();
     /* 事项的源 id → 本地 id：子表（item_app / time_records / todos / notes）与
-       items.parent_id 都靠它改写引用。必须先走 items。 */
+    items.parent_id 都靠它改写引用。必须先走 items。 */
     let mut items = ItemMap::default();
     for spec in BUSINESS_TABLES {
         let rows = bundle
@@ -143,7 +143,10 @@ pub async fn import_full_bundle(
         .commit()
         .await
         .map_err(|error| error.to_string())?;
-    business_tx.commit().await.map_err(|error| error.to_string())?;
+    business_tx
+        .commit()
+        .await
+        .map_err(|error| error.to_string())?;
 
     let total_inserted = stats.iter().map(|stat| stat.inserted).sum();
     let total_updated = stats.iter().map(|stat| stat.updated).sum();

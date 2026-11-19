@@ -1,22 +1,27 @@
-use crate::models::activity::backup::{BackupToolDailyStats, BackupToolPomodoroRun, BackupToolReminder};
+use crate::models::activity::backup::{
+    BackupToolDailyStats, BackupToolPomodoroRun, BackupToolReminder,
+};
 use sqlx::{Pool, Row, Sqlite, Transaction};
 
 pub async fn fetch_all_reminders_for_backup(
     pool: &Pool<Sqlite>,
 ) -> Result<Vec<BackupToolReminder>, String> {
     let recurrence_columns =
-        if crate::services::activity::data::schema_contracts::has_reminder_recurrence_schema(pool).await? {
+        if crate::services::activity::data::schema_contracts::has_reminder_recurrence_schema(pool)
+            .await?
+        {
             super::read::REMINDER_RECURRENCE_COLUMNS
         } else {
             "NULL AS recurrence, NULL AS recurrence_anchor_at"
         };
-    let identity_column = if crate::services::activity::data::schema_contracts::has_reminder_identity_schema(pool)
-        .await?
-    {
-        "(SELECT restore_key FROM tool_reminder_identities WHERE reminder_id=tool_reminders.id) AS restore_key"
-    } else {
-        "NULL AS restore_key"
-    };
+    let identity_column =
+        if crate::services::activity::data::schema_contracts::has_reminder_identity_schema(pool)
+            .await?
+        {
+            "(SELECT restore_key FROM tool_reminder_identities WHERE reminder_id=tool_reminders.id) AS restore_key"
+        } else {
+            "NULL AS restore_key"
+        };
     let rows = sqlx::query(&format!(
         "SELECT {identity_column}, id, label, scheduled_at, created_at, status, fired_at, cancelled_at, {recurrence_columns}
          FROM tool_reminders
@@ -48,19 +53,23 @@ pub async fn fetch_all_reminders_for_backup(
 pub async fn fetch_all_pomodoro_runs_for_backup(
     pool: &Pool<Sqlite>,
 ) -> Result<Vec<BackupToolPomodoroRun>, String> {
-    let completed_groups = if crate::services::activity::data::schema_contracts::has_pomodoro_completions_schema(pool)
-        .await?
-    {
-        "COALESCE((SELECT completed_groups FROM tool_pomodoro_task_completions WHERE run_id=tool_pomodoro_runs.id),0)"
-    } else {
-        "0"
-    };
-    let task_columns = if crate::services::activity::data::schema_contracts::has_pomodoro_tasks_schema(pool).await? {
-        "(SELECT label FROM tool_pomodoro_tasks WHERE run_id=tool_pomodoro_runs.id) AS task_label,
+    let completed_groups =
+        if crate::services::activity::data::schema_contracts::has_pomodoro_completions_schema(pool)
+            .await?
+        {
+            "COALESCE((SELECT completed_groups FROM tool_pomodoro_task_completions WHERE run_id=tool_pomodoro_runs.id),0)"
+        } else {
+            "0"
+        };
+    let task_columns =
+        if crate::services::activity::data::schema_contracts::has_pomodoro_tasks_schema(pool)
+            .await?
+        {
+            "(SELECT label FROM tool_pomodoro_tasks WHERE run_id=tool_pomodoro_runs.id) AS task_label,
          (SELECT deleted_at FROM tool_pomodoro_tasks WHERE run_id=tool_pomodoro_runs.id) AS task_deleted_at"
-    } else {
-        "NULL AS task_label, NULL AS task_deleted_at"
-    };
+        } else {
+            "NULL AS task_label, NULL AS task_deleted_at"
+        };
     let rows = sqlx::query(&format!(
         "SELECT {completed_groups} AS completed_groups, {task_columns}, id, phase, status, cycle_index, focus_ms, short_break_ms, long_break_ms,
                 long_break_every, phase_started_at, phase_paused_at, phase_remaining_ms,

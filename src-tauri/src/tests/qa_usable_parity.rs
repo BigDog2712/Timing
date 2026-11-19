@@ -55,13 +55,21 @@ fn table() -> Vec<(&'static str, MdSyncConfig, bool, bool)> {
         (
             "1 · folder + 通路关着（enabled:false，字段都留着）",
             config_of(
-                Some(MdSyncCloudChannel { enabled: false, ..folder("D:////md") }),
+                Some(MdSyncCloudChannel {
+                    enabled: false,
+                    ..folder("D:////md")
+                }),
                 None,
             ),
             false,
             false,
         ),
-        ("2 · folder + 落点为空", config_of(Some(folder("")), None), false, false),
+        (
+            "2 · folder + 落点为空",
+            config_of(Some(folder("")), None),
+            false,
+            false,
+        ),
         (
             "3 · folder + 落点只有空格",
             config_of(Some(folder("   ")), None),
@@ -80,10 +88,18 @@ fn table() -> Vec<(&'static str, MdSyncConfig, bool, bool)> {
             true,
             false,
         ),
-        ("6 · webdav + 三件套全空", config_of(None, Some(webdav("", "", ""))), false, false),
+        (
+            "6 · webdav + 三件套全空",
+            config_of(None, Some(webdav("", "", ""))),
+            false,
+            false,
+        ),
         (
             "7 · webdav + 只缺 user",
-            config_of(None, Some(webdav("https://dav.jianguoyun.com/dav/", "/Timing", ""))),
+            config_of(
+                None,
+                Some(webdav("https://dav.jianguoyun.com/dav/", "/Timing", "")),
+            ),
             false,
             false,
         ),
@@ -97,7 +113,11 @@ fn table() -> Vec<(&'static str, MdSyncConfig, bool, bool)> {
             "9 · webdav + 三件套填全",
             config_of(
                 None,
-                Some(webdav("https://dav.jianguoyun.com/dav/", "/Timing", "me@example.com")),
+                Some(webdav(
+                    "https://dav.jianguoyun.com/dav/",
+                    "/Timing",
+                    "me@example.com",
+                )),
             ),
             false,
             true,
@@ -108,7 +128,11 @@ fn table() -> Vec<(&'static str, MdSyncConfig, bool, bool)> {
                 None,
                 Some(MdSyncCloudChannel {
                     enabled: false,
-                    ..webdav("https://dav.jianguoyun.com/dav/", "/Timing", "me@example.com")
+                    ..webdav(
+                        "https://dav.jianguoyun.com/dav/",
+                        "/Timing",
+                        "me@example.com",
+                    )
                 }),
             ),
             false,
@@ -142,15 +166,26 @@ fn usable_matches_the_shared_table() {
 fn two_channels_are_judged_independently() {
     let config = config_of(
         Some(folder("D:////md")),
-        Some(webdav("https://dav.jianguoyun.com/dav/", "/Timing", "me@example.com")),
+        Some(webdav(
+            "https://dav.jianguoyun.com/dav/",
+            "/Timing",
+            "me@example.com",
+        )),
     );
     assert!(md_cloud::usable_folder(&config).is_some());
     assert!(md_cloud::usable_webdav(&config).is_some());
     let webdav_only = config_of(
         None,
-        Some(webdav("https://dav.jianguoyun.com/dav/", "/Timing", "me@example.com")),
+        Some(webdav(
+            "https://dav.jianguoyun.com/dav/",
+            "/Timing",
+            "me@example.com",
+        )),
     );
-    assert!(md_cloud::usable_folder(&webdav_only).is_none(), "folder 侧不许被 webdav 的字段点亮");
+    assert!(
+        md_cloud::usable_folder(&webdav_only).is_none(),
+        "folder 侧不许被 webdav 的字段点亮"
+    );
 }
 
 /// `cloud_folder / cloud_webdav` 都缺（V0.11.12 及以前的老配置）单独一档：
@@ -169,7 +204,9 @@ fn password_is_not_part_of_the_struct() {
     let json = serde_json::to_value(channel).unwrap();
     let keys: Vec<&String> = json.as_object().unwrap().keys().collect();
     assert!(
-        !keys.iter().any(|key| key.contains("secret") || key.contains("password")),
+        !keys
+            .iter()
+            .any(|key| key.contains("secret") || key.contains("password")),
         "通路配置结构里不许出现密码 / 密文字段：{keys:?}"
     );
 }

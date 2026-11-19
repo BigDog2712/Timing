@@ -9,9 +9,10 @@ use crate::repositories::timer_ops as repo;
 use crate::services::timer_ops::TimerOp;
 
 use super::repository;
-use super::segment::{encode_segment, segment_path};
+use super::segment::encode_segment;
 use super::transport::Transport;
 use super::PushSummary;
+use super::{scope, streams};
 
 /// 上传：把本机 `op_id > 上传游标` 的新事件写成一个不可变分段并 PUT（If-None-Match）。
 ///
@@ -36,10 +37,21 @@ async fn push_with(
         return Ok(summary);
     }
 
-    let scope = match transport.scope() {
+    if !crate::services::identity::is_valid(device_id) {
+        summary
+            .errors
+            .push("本机设备身份无效，未写入同步目录".to_string());
+        return Ok(summary);
+    }
+    let writer = match transport.scope() {
         Ok(scope) => scope,
-        Err(err) => { summary.errors.push(err); return Ok(summary); }
+        Err(err) => {
+            summary.errors.push(err);
+            return Ok(summary);
+        }
     };
+    let scope = scope::upload(&writer);
+    let dir = streams::dir(device_id, &writer);
     let pending = match repository::pending_upload(pool, &scope, device_id).await? {
         Some(batch) => batch,
         None => {
@@ -48,20 +60,46 @@ async fn push_with(
             let last_seq = cursor.as_ref().map(|c| c.last_seq).unwrap_or(0);
             let ops = load_new_ops(pool, device_id, last_op_id).await?;
             let (offset, last_seq) = match super::recover_cursor::verified_prefix(
-                pool, &scope, transport, device_id, &ops, last_seq,
-            ).await {
+                pool, &scope, transport, device_id, &ops, last_seq, &dir,
+            )
+            .await
+            {
                 Ok(recovered) => recovered,
-                Err(err) => { summary.errors.push(err); return Ok(summary); }
+                Err(err) => {
+                    summary.errors.push(err);
+                    return Ok(summary);
+                }
             };
             let ops = &ops[offset..];
-            let Some((max_op_id, _)) = ops.last() else { return Ok(summary); };
-            let seq = last_seq.saturating_add(1);
-            let payload: Vec<_> = ops.iter().map(|(_, op)| op.clone()).collect();
-            repository::stage_upload(pool, &scope, device_id, seq, *max_op_id, encode_segment(&payload).as_bytes()).await?
+            if ops.is_empty() {
+                return Ok(summary);
+            }
+            let (count, body) = match bounded_payload(ops) {
+                Ok(batch) => batch,
+                Err(err) => {
+                    summary.errors.push(err);
+                    return Ok(summary);
+                }
+            };
+            repository::stage_upload(
+                pool,
+                &scope,
+                device_id,
+                last_seq + 1,
+                ops[count - 1].0,
+                &body,
+            )
+            .await?
         }
     };
-    let seq = pending.seq as u32;
-    let rel = segment_path(device_id, seq);
+    let seq = match u32::try_from(pending.seq).ok().filter(|seq| *seq > 0) {
+        Some(seq) => seq,
+        None => {
+            summary.errors.push("分段序号无效".to_string());
+            return Ok(summary);
+        }
+    };
+    let rel = streams::path(device_id, &writer, seq);
     let body = pending.body.as_slice();
 
     /* 已存在时只认同字节；不符则保留 outbox 并等待重试/人工处理。 */
@@ -101,10 +139,31 @@ async fn push_with(
     if committed {
         repository::confirm_upload(pool, &scope, device_id, &pending).await?;
         summary.segment_seq = seq;
-        summary.events = super::segment::decode_segment(body).map(|ops| ops.len()).unwrap_or(0);
+        summary.events = super::segment::decode_segment(body)
+            .map(|ops| ops.len())
+            .unwrap_or(0);
         summary.bytes = body.len();
     }
     Ok(summary)
+}
+
+const MAX_BATCH_BYTES: usize = 1024 * 1024;
+
+fn bounded_payload(ops: &[(i64, TimerOp)]) -> Result<(usize, Vec<u8>), String> {
+    let mut size = 256;
+    let mut payload = Vec::new();
+    for (_, op) in ops {
+        let bytes = serde_json::to_vec(op).expect("TimerOp 序列化不会失败");
+        if size + bytes.len() + 1 > MAX_BATCH_BYTES {
+            break;
+        }
+        size += bytes.len() + 1;
+        payload.push(op.clone());
+    }
+    if payload.is_empty() {
+        return Err("单条计时事件超过同步分段大小上限，未跳过事件".to_string());
+    }
+    Ok((payload.len(), encode_segment(&payload).into_bytes()))
 }
 
 /// 查本机 `op_id > after_op_id` 且 uid 已发的新事件（按 id 升序，保证分段内顺序稳定）。
@@ -124,5 +183,8 @@ async fn load_new_ops(
     .fetch_all(pool)
     .await
     .map_err(AppError::db)?;
-    Ok(rows.iter().filter_map(|row| repo::to_op(row).map(|op| (row.get("id"), op))).collect())
+    Ok(rows
+        .iter()
+        .filter_map(|row| repo::to_op(row).map(|op| (row.get("id"), op)))
+        .collect())
 }

@@ -19,12 +19,11 @@ async fn idle_statistics_follow_empty_install_and_growth_without_invalidating_re
     )
     .await
     .unwrap();
-    let empty_samples: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM sqlite_stat4 WHERE idx='idx_sessions_end_start'",
-    )
-    .fetch_one(&pool)
-    .await
-    .unwrap();
+    let empty_samples: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_stat4 WHERE idx='idx_sessions_end_start'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
     assert_eq!(empty_samples, 0);
     let mut schedule = MaintenanceSchedule::default();
     for (offset, count) in [(0, 1000), (1000, 20000)] {
@@ -48,23 +47,21 @@ async fn idle_statistics_follow_empty_install_and_growth_without_invalidating_re
         }
         assert!(idle);
         for index in ["idx_sessions_date", "idx_sessions_end_start"] {
-            let samples: i64 =
-                sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_stat4 WHERE idx=?")
-                    .bind(index)
-                    .fetch_one(&pool)
-                    .await
-                    .unwrap();
+            let samples: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM sqlite_stat4 WHERE idx=?")
+                .bind(index)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
             assert!(
                 samples > 0,
                 "missing histogram after {count} rows for {index}"
             );
         }
-        let stat: String = sqlx::query_scalar(
-            "SELECT stat FROM sqlite_stat1 WHERE idx='idx_sessions_end_start'",
-        )
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let stat: String =
+            sqlx::query_scalar("SELECT stat FROM sqlite_stat1 WHERE idx='idx_sessions_end_start'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(
             stat.split_whitespace()
                 .next()

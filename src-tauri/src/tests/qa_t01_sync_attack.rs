@@ -24,7 +24,14 @@ const ALIVE_SQL: &str =
 async fn qa_attack_hole2_foreign_fence_is_byte_identical_after_a_real_round() {
     let env = env("qa-t01-hole2").await;
     let item = new_item(&env.pool, "写代码").await;
-    insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
 
     /* 围栏放在我方区块之前：只有这样「第一个命中」才可能落进别人的围栏里。 */
     let foreign = concat!(
@@ -56,7 +63,10 @@ async fn qa_attack_hole2_foreign_fence_is_byte_identical_after_a_real_round() {
     assert!(after.contains("别人的手写第一行（一个字都不许动）"));
     assert!(after.contains("别人的手写最后一行（一个字都不许动）"));
     assert!(after.contains("这行是别人的示例文本，不是标题"));
-    assert!(after.contains(tail), "区块之后的手写内容一字不动：\n{after}");
+    assert!(
+        after.contains(tail),
+        "区块之后的手写内容一字不动：\n{after}"
+    );
 
     /* ② 我们的区块仍在原位被更新（不是被追加到末尾）。 */
     let body = md_file::body_in_text(&after, TIMERS_HEADING).expect("真标题还在");
@@ -65,13 +75,20 @@ async fn qa_attack_hole2_foreign_fence_is_byte_identical_after_a_real_round() {
     let fences = md_fence::scan(&lines);
     let (head_idx, _) = md_section::find_heading(&lines, &fences, TIMERS_HEADING).unwrap();
     let first = lines.iter().position(|l| *l == TIMERS_HEADING).unwrap();
-    assert!(first < head_idx, "围栏里那行在前，真标题在后，没有被挪到末尾");
+    assert!(
+        first < head_idx,
+        "围栏里那行在前，真标题在后，没有被挪到末尾"
+    );
 
     /* ③ 文件里只有 1 个真标题；围栏里那份示例原样保留。 */
     assert_eq!(md_section::count_exact(&lines, &fences, TIMERS_HEADING), 1);
     assert_eq!(after.matches(TIMERS_HEADING).count(), 2);
     /* ④ SQL 零变化：无软删，且那条 saved 记录还活着。 */
-    assert_eq!(scalar_i64(&env.pool, SOFT_SQL).await, 0, "洞 2 不得触发任何软删");
+    assert_eq!(
+        scalar_i64(&env.pool, SOFT_SQL).await,
+        0,
+        "洞 2 不得触发任何软删"
+    );
     assert_eq!(scalar_i64(&env.pool, ALIVE_SQL).await, 1);
 }
 
@@ -80,7 +97,14 @@ async fn qa_attack_hole2_foreign_fence_is_byte_identical_after_a_real_round() {
 async fn qa_attack_hole1_comment_inside_fence_soft_deletes_nothing() {
     let env = env("qa-t01-hole1-in").await;
     let item = new_item(&env.pool, "写代码").await;
-    insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
     let path = file_for(&env);
 
     /* 第 1 轮：正常导出，建立进程内基线。 */
@@ -99,11 +123,15 @@ async fn qa_attack_hole1_comment_inside_fence_soft_deletes_nothing() {
     assert!(second.errors.is_empty(), "{:?}", second.errors);
     let after = std::fs::read_to_string(&path).unwrap();
     /* 观察（见验收报告「洞 1」）：插入的 ```yaml 围栏与注释行会被本轮「导入后重新
-       渲染」规范化掉——render_expected 只从 SQL 渲染，是 v0.11.18 既有语义，不是
-       T01 回归；关键是它**没有软删任何记录**，这才是 J9 要防的「数据丢进库里找不回」。 */
+    渲染」规范化掉——render_expected 只从 SQL 渲染，是 v0.11.18 既有语义，不是
+    T01 回归；关键是它**没有软删任何记录**，这才是 J9 要防的「数据丢进库里找不回」。 */
 
     /* 硬判据：截断消失 → 删除块不动 → 软删 0，计时段仍在（J9 的核心）。 */
-    assert_eq!(scalar_i64(&env.pool, SOFT_SQL).await, 0, "围栏内 # 备注 不得软删记录");
+    assert_eq!(
+        scalar_i64(&env.pool, SOFT_SQL).await,
+        0,
+        "围栏内 # 备注 不得软删记录"
+    );
     assert_eq!(scalar_i64(&env.pool, ALIVE_SQL).await, 1);
     assert!(after.contains("09:00:00"), "计时段没被截断丢掉：\n{after}");
 }
@@ -114,7 +142,14 @@ async fn qa_attack_hole1_comment_inside_fence_soft_deletes_nothing() {
 async fn qa_attack_hole1_note_outside_fence_is_known_residual() {
     let env = env("qa-t01-hole1-out").await;
     let item = new_item(&env.pool, "写代码").await;
-    insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
     let path = file_for(&env);
 
     let first = services::md_sync::run(&env.pool).await.unwrap();
@@ -130,17 +165,26 @@ async fn qa_attack_hole1_note_outside_fence_is_known_residual() {
     let lines: Vec<&str> = text2.split('\n').collect();
     let fences = md_fence::scan(&lines);
     let (head, level) = md_section::find_heading(&lines, &fences, TIMERS_HEADING).unwrap();
-    assert_eq!(lines[md_section::section_end(&lines, &fences, head, level)], "# 备注");
+    assert_eq!(
+        lines[md_section::section_end(&lines, &fences, head, level)],
+        "# 备注"
+    );
 
     let second = services::md_sync::run(&env.pool).await.unwrap();
     assert!(second.errors.is_empty(), "{:?}", second.errors);
     let after = std::fs::read_to_string(&path).unwrap();
     let soft = scalar_i64(&env.pool, SOFT_SQL).await;
     /* 钉住这个残留的确切规模：T02 提频后不许把「软删 1 条」放大成更多，
-       也不许悄悄变成「静默改数据」。数字变了说明同步链路被改动，要重新评。 */
-    assert_eq!(soft, 1, "既有语义：围栏外的 level-1 标题截断区块 → 软删 1 条");
+    也不许悄悄变成「静默改数据」。数字变了说明同步链路被改动，要重新评。 */
+    assert_eq!(
+        soft, 1,
+        "既有语义：围栏外的 level-1 标题截断区块 → 软删 1 条"
+    );
     assert_eq!(scalar_i64(&env.pool, ALIVE_SQL).await, 0);
-    assert!(after.contains("# 备注"), "那行是合法标题，不属于我方区块，不该被改写");
+    assert!(
+        after.contains("# 备注"),
+        "那行是合法标题，不属于我方区块，不该被改写"
+    );
 }
 
 /// P1-a：同名标题 2 份 → 报逐字红字、第 1 个被替换、第 2 个逐字节不动、SQL 零变化。
@@ -148,7 +192,14 @@ async fn qa_attack_hole1_note_outside_fence_is_known_residual() {
 async fn qa_attack_p1_duplicate_reports_verbatim_and_never_touches_sql() {
     let env = env("qa-t01-p1-dup").await;
     let item = new_item(&env.pool, "写代码").await;
-    insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
 
     let second_block = "#### 事项计时\n- [ ] 用户手写的第二节\n";
     let before = format!("{TIMERS_HEADING}\n\n{second_block}#### 读书\n");
@@ -162,9 +213,14 @@ async fn qa_attack_p1_duplicate_reports_verbatim_and_never_touches_sql() {
         report.errors
     );
     let after = std::fs::read_to_string(&path).unwrap();
-    assert!(after.contains(second_block), "第 2 个标题及其内容逐字节不动：\n{after}");
+    assert!(
+        after.contains(second_block),
+        "第 2 个标题及其内容逐字节不动：\n{after}"
+    );
     assert_eq!(after.matches(TIMERS_HEADING).count(), 2, "不追加第三节");
-    assert!(md_file::body_in_text(&after, TIMERS_HEADING).unwrap().contains("09:00:00"));
+    assert!(md_file::body_in_text(&after, TIMERS_HEADING)
+        .unwrap()
+        .contains("09:00:00"));
     assert_eq!(scalar_i64(&env.pool, SOFT_SQL).await, 0);
     assert_eq!(scalar_i64(&env.pool, ALIVE_SQL).await, 1);
 }
@@ -174,7 +230,14 @@ async fn qa_attack_p1_duplicate_reports_verbatim_and_never_touches_sql() {
 async fn qa_attack_p1_mismatch_blocks_without_append_or_sql_change() {
     let env = env("qa-t01-p1-mis").await;
     let item = new_item(&env.pool, "写代码").await;
-    insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
 
     let before = "### 事项计时\n- [ ] 用户改过等级的手写内容\n#### 读书\n";
     let path = file_for(&env);
@@ -188,7 +251,11 @@ async fn qa_attack_p1_mismatch_blocks_without_append_or_sql_change() {
     );
     let after = std::fs::read_to_string(&path).unwrap();
     assert_eq!(after, before, "阻断级：本轮一个字节都不写");
-    assert_eq!(after.matches(TIMERS_HEADING).count(), 0, "不许在末尾追加第二节");
+    assert_eq!(
+        after.matches(TIMERS_HEADING).count(),
+        0,
+        "不许在末尾追加第二节"
+    );
     assert_eq!(scalar_i64(&env.pool, SOFT_SQL).await, 0);
     assert_eq!(scalar_i64(&env.pool, ALIVE_SQL).await, 1);
 }
@@ -198,16 +265,33 @@ async fn qa_attack_p1_mismatch_blocks_without_append_or_sql_change() {
 async fn qa_attack_p1_toc_line_does_not_false_positive() {
     let env = env("qa-t01-p1-toc").await;
     let item = new_item(&env.pool, "写代码").await;
-    insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
 
     let before = format!("### 事项计时\n- [ ] 目录抄的一行\n{TIMERS_HEADING}\n\n#### 读书\n");
     let path = file_for(&env);
     std::fs::write(&path, &before).unwrap();
 
     let report = services::md_sync::run(&env.pool).await.unwrap();
-    assert!(report.errors.is_empty(), "见同名就报红会把同步永久堵死：{:?}", report.errors);
+    assert!(
+        report.errors.is_empty(),
+        "见同名就报红会把同步永久堵死：{:?}",
+        report.errors
+    );
     let after = std::fs::read_to_string(&path).unwrap();
     assert!(after.contains("- [ ] 目录抄的一行"), "目录那节逐字节不动");
-    assert!(md_file::body_in_text(&after, TIMERS_HEADING).unwrap().contains("09:00:00"));
-    assert_eq!(after.matches(TIMERS_HEADING).count(), 1, "只认第 1 个真标题");
+    assert!(md_file::body_in_text(&after, TIMERS_HEADING)
+        .unwrap()
+        .contains("09:00:00"));
+    assert_eq!(
+        after.matches(TIMERS_HEADING).count(),
+        1,
+        "只认第 1 个真标题"
+    );
 }

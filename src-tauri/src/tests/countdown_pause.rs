@@ -35,13 +35,16 @@ async fn tick_after_pause_ends_at_the_resumed_moment() {
     assert_eq!(paused.status, "paused");
 
     /* ③ 让暂停持续 1 小时：running_since 为空，只有 started_at 被推回去，
-          于是「墙钟跨度」比「已跑时长」多出一小时 —— 两个口径的分叉点就在这里。 */
+    于是「墙钟跨度」比「已跑时长」多出一小时 —— 两个口径的分叉点就在这里。 */
     rewind(&pool, rec.id, 3_600_000).await;
 
     /* ④ 恢复再跑 30 秒 → 累计满 60，到点。 */
     timer::resume(&pool).await.unwrap();
     rewind(&pool, rec.id, 30_000).await;
-    let fired = countdown::tick(&pool).await.unwrap().expect("累计满 target 必须到点");
+    let fired = countdown::tick(&pool)
+        .await
+        .unwrap()
+        .expect("累计满 target 必须到点");
 
     let ended_at = fired.record.ended_at.expect("已结束必须有 ended_at");
     let span = ended_at - fired.record.started_at;
@@ -95,8 +98,8 @@ async fn tick_after_pause_splits_on_the_real_end_moment() {
         .timestamp_millis();
 
     /* 直接摆好状态：昨天 23:00 开始、已跑 10 分钟、10 分钟前刚恢复。
-       手改而不是走 pause/resume，是因为这里要的是「跨零点的形状」，
-       暂停语义本身由上一条用例覆盖。 */
+    手改而不是走 pause/resume，是因为这里要的是「跨零点的形状」，
+    暂停语义本身由上一条用例覆盖。 */
     exec(
         &pool,
         &format!(
@@ -108,11 +111,14 @@ async fn tick_after_pause_splits_on_the_real_end_moment() {
     )
     .await;
 
-    let fired = countdown::tick(&pool).await.unwrap().expect("累计满 target 必须到点");
+    let fired = countdown::tick(&pool)
+        .await
+        .unwrap()
+        .expect("累计满 target 必须到点");
     assert!(fired.ended, "到点恒结束");
 
     /* 拆天之后：两条记录、总和仍是 target、且有一条落在今天。
-       （拆开后**没有哪一行**还等于 target —— 秒数是按墙钟占比分的，所以这里只能查总和。） */
+    （拆开后**没有哪一行**还等于 target —— 秒数是按墙钟占比分的，所以这里只能查总和。） */
     let rows: Vec<(i64, i64)> = sqlx::query_as(
         "SELECT started_at, accumulated_sec FROM time_records \
           WHERE deleted_at IS NULL ORDER BY started_at",

@@ -47,20 +47,6 @@ pub(crate) const LIFECYCLE_TITLE_MARKERS: &[&str] = &[
 
 /// 打包器附加的构建标记（`App-win-x64.exe` 之类）。与生命周期标记同时出现才算命中。
 pub(crate) const LIFECYCLE_BUILD_TOKENS: &[&str] = &[
-    "win",
-    "windows",
-    "x64",
-    "x86",
-    "amd64",
-    "arm64",
-    "ia32",
-    "portable",
-    "release",
-    "latest",
-    "beta",
-    "alpha",
-    "nightly",
-    "stable",
-    "desktop",
-    "app",
+    "win", "windows", "x64", "x86", "amd64", "arm64", "ia32", "portable", "release", "latest",
+    "beta", "alpha", "nightly", "stable", "desktop", "app",
 ];

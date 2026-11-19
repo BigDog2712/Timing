@@ -112,8 +112,8 @@ async fn tick_always_finalizes_session() {
     assert_eq!(fired.record.status, "saved", "会话已落盘");
     assert_eq!(fired.record.accumulated_sec, 60, "时长钳到 target");
     /* 连续跑（无暂停）时与旧口径等价：`ended_at` 仍是「开始后 target 秒」。
-       容差 2 秒：新口径由「现在的读数」反推，起点是 rewind 出来的整秒、而 now 带着
-       真实毫秒，两者不可能逐毫秒对齐 —— 但也不许偏离更多（那说明在按 tick 的时刻落档）。 */
+    容差 2 秒：新口径由「现在的读数」反推，起点是 rewind 出来的整秒、而 now 带着
+    真实毫秒，两者不可能逐毫秒对齐 —— 但也不许偏离更多（那说明在按 tick 的时刻落档）。 */
     let span = fired.record.ended_at.unwrap() - fired.record.started_at;
     assert!(
         (span - 60_000).abs() <= 2_000,

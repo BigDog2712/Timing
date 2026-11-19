@@ -16,12 +16,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+use super::sync::env;
 use crate::infra::md_backup;
 use crate::models::md_cloud_purge::{channel_key, PurgeChannel, PurgeKey, PurgeState};
 use crate::models::md_sync::{MdSyncBinding, MdSyncKind};
 use crate::repositories::{md_cloud_pending, settings};
 use crate::services::md_cloud::{self, pending, purge};
-use super::sync::env;
 use crate::tests::support::unique_dir;
 
 /// 备份根只注入一次（`OnceLock`）。
@@ -42,11 +42,17 @@ pub(crate) async fn seed_past(pool: &sqlx::SqlitePool, root: &Path, date: &str) 
     let body = format!("#### 事项计时\n\n| {date} 09:00:00 | 读书 | 25 分 |\n");
     fs::write(&path, &body).expect("写往期文件");
     /* [V0.11.26] 欠账账本按通路各记一份，所以夹具两条通路都记：一份往期文件在真实使用里
-       通常是「两条通路都同步过」，而各条清理链只会清自己那一条（互不串账正是要验的事）。 */
+    通常是「两条通路都同步过」，而各条清理链只会清自己那一条（互不串账正是要验的事）。 */
     for channel in [PurgeChannel::Folder, PurgeChannel::Webdav] {
-        md_cloud_pending::mark_synced(pool, channel, date, None, &pending::fingerprint(body.as_bytes()))
-            .await
-            .expect("记 pending 行");
+        md_cloud_pending::mark_synced(
+            pool,
+            channel,
+            date,
+            None,
+            &pending::fingerprint(body.as_bytes()),
+        )
+        .await
+        .expect("记 pending 行");
     }
     path
 }
@@ -61,7 +67,11 @@ pub(crate) fn binding_of(root: &Path) -> MdSyncBinding {
     }
 }
 
-pub(crate) async fn kv(pool: &sqlx::SqlitePool, channel: PurgeChannel, kind: PurgeKey) -> Option<String> {
+pub(crate) async fn kv(
+    pool: &sqlx::SqlitePool,
+    channel: PurgeChannel,
+    kind: PurgeKey,
+) -> Option<String> {
     settings::get_value(pool, channel_key(channel, kind))
         .await
         .expect("读 KV")
@@ -89,7 +99,7 @@ async fn folder_round_deletes_past_files_and_keeps_today() {
     fs::write(root.join(format!("{today}.md")), "今天的日记").expect("写当天文件");
 
     /* 生产路径里 `round_folder` 在清理之前先 `register_root(root, "folder")`；
-       这里直呼 `purge::run_folder`，所以要照抄这一步，否则留底会被标成 obsidian。 */
+    这里直呼 `purge::run_folder`，所以要照抄这一步，否则留底会被标成 obsidian。 */
     md_backup::register_root(root.clone(), "folder");
     let before = backup_count(&dates);
     purge::run_folder(&fixture.pool, &root, &[], &today)
@@ -133,7 +143,9 @@ async fn folder_round_deletes_past_files_and_keeps_today() {
         "扫完一整遍才写 day（今天不再扫）"
     );
     assert_eq!(
-        state_of(&fixture.pool, PurgeChannel::Folder).await.last_deleted,
+        state_of(&fixture.pool, PurgeChannel::Folder)
+            .await
+            .last_deleted,
         3
     );
 
@@ -142,7 +154,9 @@ async fn folder_round_deletes_past_files_and_keeps_today() {
         .await
         .expect("同一天第二轮应当直接返回");
     assert_eq!(
-        state_of(&fixture.pool, PurgeChannel::Folder).await.last_deleted,
+        state_of(&fixture.pool, PurgeChannel::Folder)
+            .await
+            .last_deleted,
         3,
         "第二轮没有重写 state（早退在 `begin`）"
     );
@@ -162,7 +176,9 @@ async fn folder_round_deletes_past_files_and_keeps_today() {
         .expect("次日首轮");
     assert!(!root.join("2019-01-08.md").exists(), "新过期的那一天被删");
     assert_eq!(
-        state_of(&fixture.pool, PurgeChannel::Folder).await.last_deleted,
+        state_of(&fixture.pool, PurgeChannel::Folder)
+            .await
+            .last_deleted,
         1,
         "只处理了那一天（水位挡住了更早的）"
     );

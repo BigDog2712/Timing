@@ -1,5 +1,5 @@
-use crate::models::activity::tracking::{ActiveSessionSnapshot, TrackingStatusSnapshot};
 use crate::infra::activity::windows::foreground::WindowInfo;
+use crate::models::activity::tracking::{ActiveSessionSnapshot, TrackingStatusSnapshot};
 use serde::Serialize;
 use std::sync::Mutex;
 

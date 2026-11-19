@@ -1,7 +1,7 @@
-use crate::services::activity::engine::tracking::metadata;
-use crate::services::activity::engine::tools;
 use crate::infra::activity::web_activity_bridge;
 use crate::infra::activity::windows::{foreground, icon, resource};
+use crate::services::activity::engine::tools;
+use crate::services::activity::engine::tracking::metadata;
 use serde::Serialize;
 use tauri::Manager;
 
@@ -9,8 +9,10 @@ use tauri::Manager;
 pub struct ResourceDiagnosticsSnapshot {
     pub process_id: u32,
     pub database_timings: Vec<crate::services::activity::data::sqlite_pool::diagnostics::Snapshot>,
-    pub tracking_progress: crate::services::activity::engine::tracking::watchdog::progress::TrackingProgressSnapshot,
-    pub name_resolution: crate::services::activity::engine::tracking::app_names::NameResolutionDiagnostics,
+    pub tracking_progress:
+        crate::services::activity::engine::tracking::watchdog::progress::TrackingProgressSnapshot,
+    pub name_resolution:
+        crate::services::activity::engine::tracking::app_names::NameResolutionDiagnostics,
     pub webview_window_count: usize,
     pub mini_window: crate::app::activity::mini_window::Diagnostics,
     pub webview_window_labels: Vec<String>,
@@ -42,7 +44,9 @@ pub fn cmd_get_resource_diagnostics(app: tauri::AppHandle) -> ResourceDiagnostic
             .diagnostics(),
         database_timings: crate::services::activity::data::sqlite_pool::diagnostics::snapshot(),
         tracking_progress: app
-            .state::<std::sync::Arc<crate::services::activity::engine::tracking::watchdog::RuntimeHealthState>>()
+            .state::<std::sync::Arc<
+                crate::services::activity::engine::tracking::watchdog::RuntimeHealthState,
+            >>()
             .progress
             .snapshot(),
         name_resolution: crate::services::activity::engine::tracking::app_names::diagnostics(),
@@ -70,4 +74,3 @@ pub fn cmd_get_resource_diagnostics(app: tauri::AppHandle) -> ResourceDiagnostic
 fn now_ms() -> i64 {
     crate::infra::activity::clock::unix_timestamp_millis_i64()
 }
-

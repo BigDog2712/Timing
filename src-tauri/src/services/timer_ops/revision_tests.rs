@@ -31,7 +31,10 @@ fn concurrent_record_revisions_have_a_deterministic_winner() {
     let forward = fold_session(&[a.clone(), b.clone()]).block.unwrap();
     let reverse = fold_session(&[b, a]).block.unwrap();
     assert_eq!(forward, reverse);
-    assert_eq!(forward.record.as_ref().unwrap().note.as_deref(), Some("手机"));
+    assert_eq!(
+        forward.record.as_ref().unwrap().note.as_deref(),
+        Some("手机")
+    );
     assert_eq!(forward.accumulated_sec(), 20);
     assert_eq!(forward.device_id, "aaaaaaaaaaaa", "编辑设备不是记录属主");
 }
@@ -40,7 +43,9 @@ fn concurrent_record_revisions_have_a_deterministic_winner() {
 fn saved_record_delete_wins_even_over_a_later_concurrent_edit() {
     let deleted = revision(50_000, 1, "aaaaaaaaaaaa", "删除", Some(50_000));
     let edited = revision(60_000, 1, "bbbbbbbbbbbb", "迟到编辑", None);
-    let forward = fold_session(&[deleted.clone(), edited.clone()]).block.unwrap();
+    let forward = fold_session(&[deleted.clone(), edited.clone()])
+        .block
+        .unwrap();
     let reverse = fold_session(&[edited, deleted]).block.unwrap();
     assert_eq!(forward, reverse);
     assert!(forward.dropped);
@@ -74,14 +79,22 @@ fn pause_and_undo_settle_seconds_like_the_local_record() {
         op
     };
     let paused = fold_session(&[
-        event(TimerOpKind::Start, 0, 1), event(TimerOpKind::Pause, 30_600, 2),
-        event(TimerOpKind::Resume, 40_000, 3), event(TimerOpKind::Stop, 41_600, 4),
-    ]).block.unwrap();
+        event(TimerOpKind::Start, 0, 1),
+        event(TimerOpKind::Pause, 30_600, 2),
+        event(TimerOpKind::Resume, 40_000, 3),
+        event(TimerOpKind::Stop, 41_600, 4),
+    ])
+    .block
+    .unwrap();
     assert_eq!(paused.accumulated_sec(), 31);
     let undone = fold_session(&[
-        event(TimerOpKind::Start, 0, 1), event(TimerOpKind::Stop, 1_500, 2),
-        event(TimerOpKind::Resume, 2_000, 3), event(TimerOpKind::Stop, 3_500, 4),
-    ]).block.unwrap();
+        event(TimerOpKind::Start, 0, 1),
+        event(TimerOpKind::Stop, 1_500, 2),
+        event(TimerOpKind::Resume, 2_000, 3),
+        event(TimerOpKind::Stop, 3_500, 4),
+    ])
+    .block
+    .unwrap();
     assert_eq!(undone.accumulated_sec(), 2);
 }
 
@@ -95,11 +108,15 @@ fn malformed_saved_revision_does_not_corrupt_a_valid_record() {
         let mut invalid = revision(60_000, 2, "aaaaaaaaaaaa", "错误", None);
         invalid.payload = Some(replacement.to_string());
         let folded = fold_session(&[valid.clone(), invalid]);
-        assert_eq!(folded.block.unwrap().record.unwrap().note.as_deref(), Some("正确"));
+        assert_eq!(
+            folded.block.unwrap().record.unwrap().note.as_deref(),
+            Some("正确")
+        );
         assert_eq!(folded.ignored[0].reason, IgnoreReason::MalformedAdjust);
     }
     let mut invalid = revision(60_000, 2, "aaaaaaaaaaaa", "错误", None);
-    let mut value: serde_json::Value = serde_json::from_str(invalid.payload.as_deref().unwrap()).unwrap();
+    let mut value: serde_json::Value =
+        serde_json::from_str(invalid.payload.as_deref().unwrap()).unwrap();
     value["record_v1"]["accumulated_sec"] = serde_json::json!(i64::MAX);
     invalid.payload = Some(value.to_string());
     let folded = fold_session(&[valid, invalid]);

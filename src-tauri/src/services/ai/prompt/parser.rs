@@ -1,7 +1,13 @@
 //! Tolerant AI tag-suggestion parsing and candidate validation.
+//!
+//! ## 两种标签：候选里的、模型新建的
+//!
+//! 归一与新建的规则都在 `parser_tags`（候选命中优先、一级白名单、最多两级）；
+//! 这里只负责「把模型那坨 JSON 认出形状来」，再把每条标签交给那一层定稿。
 
 use serde_json::Value;
 
+use super::parser_tags::resolve_tags;
 use crate::models::ai::{
     AiSuggestResponse, AiSuggestStats, AiTagCandidate, AiTagSuggestion, AiTagTarget,
 };
@@ -21,6 +27,7 @@ pub(super) fn parse_suggestions(
             batches: 1,
             failed_batches: 0,
         },
+        created: Vec::new(),
     };
     let Some(value) = extract_json(raw) else {
         return empty(1);
@@ -39,6 +46,7 @@ pub(super) fn parse_suggestions(
     };
 
     let mut suggestions = Vec::new();
+    let mut created: Vec<String> = Vec::new();
     let mut parsed = 0usize;
     let mut dropped = 0usize;
     for row in &rows {
@@ -64,7 +72,12 @@ pub(super) fn parse_suggestions(
             dropped += 1;
             continue;
         };
-        let resolved = resolve_tags(&tags, candidates, max);
+        let (resolved, fresh) = resolve_tags(&tags, candidates, max);
+        for tag in fresh {
+            if !created.contains(&tag) {
+                created.push(tag);
+            }
+        }
         if resolved.is_empty() && tags.iter().any(|tag| !tag.trim().is_empty()) {
             dropped += 1;
             continue;
@@ -90,6 +103,7 @@ pub(super) fn parse_suggestions(
             failed_batches: 0,
         },
         suggestions,
+        created,
     }
 }
 
@@ -113,44 +127,6 @@ fn value_tags(value: &Value) -> Option<Vec<String>> {
         Value::String(value) => Some(value.split([',', '，', '、']).map(str::to_string).collect()),
         _ => None,
     }
-}
-
-fn resolve_tags(tags: &[String], candidates: &[AiTagCandidate], max: u8) -> Vec<String> {
-    let mut resolved = Vec::new();
-    for text in tags {
-        if let Some(key) = resolve_tag(text, candidates) {
-            if !resolved.contains(&key) {
-                resolved.push(key);
-            }
-            if resolved.len() == usize::from(max.clamp(1, 8)) {
-                break;
-            }
-        }
-    }
-    resolved
-}
-
-fn resolve_tag(raw: &str, candidates: &[AiTagCandidate]) -> Option<String> {
-    let clean = raw.trim().trim_start_matches('#').trim().replace('\\', "/");
-    if clean.is_empty() {
-        return None;
-    }
-    if let Some(hit) = candidates.iter().find(|candidate| candidate.key == clean) {
-        return Some(hit.key.clone());
-    }
-    let lowered = clean.to_lowercase();
-    candidates
-        .iter()
-        .find(|candidate| {
-            candidate
-                .label
-                .trim()
-                .trim_start_matches('#')
-                .trim()
-                .to_lowercase()
-                == lowered
-        })
-        .map(|candidate| candidate.key.clone())
 }
 
 fn extract_json(raw: &str) -> Option<Value> {

@@ -1,0 +1,38 @@
+/* ── [0.12.4] 应用趋势行的标签 chip ──
+ * 取代原来那个「未分类」徽标（分类口径已下线）。口径见 `DataOptionTags`：
+ * 有标签 → 全部 `#标签` 胶囊，写不下就换行；没标签 → 不画（「未打标签」已去掉）。
+ *
+ * 为什么是换行而不是截断：侧栏最窄只有 220px，`#学习/考公` 截成 `#学习/考…` 之后
+ * 既认不出是哪个标签、也没省下多少地方，还把应用名一起挤成 `DeepSeek Harne…`。
+ * 现在 `flex-wrap: wrap` 让名字先占满自己这一行，chip 整体掉到下一行铺开 ——
+ * 名字和标签都不被截，行高只在真放不下时才多一行。
+ * 不用 `at-badge`：那个是 12px 带底色的实心块，挂在行名旁边会把行高顶起来。 */
+.data-app-option-name-row {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+
+.data-app-option-tags {
+  display: inline-flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* `flex: 0 0 auto`：chip 按自己的文字宽度排，不压缩也不省略；换行交给容器。
+   单枚 chip 宽过整行（超长路径）时才截断，这是唯一的兜底。 */
+.data-app-option-tag {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--at-accent-default) 12%, transparent);
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-compact);
+  line-height: 16px;
+  white-space: nowrap;
+}

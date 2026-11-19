@@ -95,7 +95,9 @@ pub(super) async fn has_import_data_v6_schema(pool: &Pool<Sqlite>) -> Result<boo
         && foreign_keys_match(pool, "import_time_buckets", &[BATCH_CASCADE_FOREIGN_KEY]).await?)
 }
 
-pub(in crate::services::activity::data) async fn has_import_data_schema(pool: &Pool<Sqlite>) -> Result<bool, String> {
+pub(in crate::services::activity::data) async fn has_import_data_schema(
+    pool: &Pool<Sqlite>,
+) -> Result<bool, String> {
     Ok(requirements_ready(pool, SHARED_REQUIREMENTS).await?
         && requirement_ready(pool, ISOLATED_EXACT_REQUIREMENT).await?
         && foreign_keys_match(pool, "import_exact_sessions", &[BATCH_CASCADE_FOREIGN_KEY]).await?

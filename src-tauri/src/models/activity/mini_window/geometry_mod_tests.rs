@@ -207,8 +207,7 @@ fn resolution_and_dpi_matrix_selects_each_synthetic_target() {
             let target = monitor("target", 1920, 0, width, height);
             let width = (64.0 * scale).round() as u32;
             let height = (48.0 * scale).round() as u32;
-            let rect =
-                PhysicalRect::new(1920 + width as i32 - width as i32, 100, width, height);
+            let rect = PhysicalRect::new(1920 + width as i32 - width as i32, 100, width, height);
             let monitors = [primary, target];
 
             assert_eq!(select_monitor(&rect, &monitors), Some(1));

@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 const g = vi.hoisted(() => ({
   commit: vi.fn(async (_mutations: readonly { key: string; value: string | null }[]) => undefined),
+  propagate: vi.fn(async (_mapping: Record<string, string | null>) => ({ conflicts: [] })),
   loadAppOverrides: vi.fn(async (): Promise<Record<string, unknown>> => ({})),
   loadWebDomainOverrides: vi.fn(async (): Promise<Record<string, unknown>> => ({})),
   loadBootstrap: vi.fn(),
@@ -30,6 +31,11 @@ const g = vi.hoisted(() => ({
 
 vi.mock("../../../platform/persistence/classificationSettingsGateway.ts", () => ({
   commitClassificationSettingMutations: g.commit,
+}));
+
+vi.mock("../../../platform/persistence/categoryPropagationGateway.ts", () => ({
+  propagateCategoryMapping: g.propagate,
+  CategoryPropagationConflictError: class extends Error {},
 }));
 
 vi.mock("../services/classificationService", () => ({
@@ -117,7 +123,7 @@ async function mount(currentCategory: string | null = "browser"): Promise<void> 
 beforeEach(async () => {
   await loadLocaleText("zh-CN");
   for (const fn of [
-    g.commit, g.loadAppOverrides, g.loadWebDomainOverrides, g.loadBootstrap,
+    g.commit, g.propagate, g.loadAppOverrides, g.loadWebDomainOverrides, g.loadBootstrap,
     g.invalidateBootstrapCache, g.saveAppOverride, g.saveWebDomainOverride,
     g.prompt, g.confirm, g.onOptionsChange, g.onAssigned, g.onError,
   ]) fn.mockClear();
@@ -200,7 +206,7 @@ describe("新建分类", () => {
 describe("删除分类", () => {
   const CUSTOM = "custom:category_old" as const;
 
-  it("ca05_the_batch_contains_the_member_fallback_and_the_four_cleanup_keys", async () => {
+  it("ca05_runs_propagation_before_cleaning_category_metadata", async () => {
     g.confirm.mockResolvedValue(true);
     g.loadAppOverrides.mockResolvedValue({
       "code.exe": { enabled: true, category: CUSTOM, updatedAt: 1 },
@@ -220,9 +226,10 @@ describe("删除分类", () => {
       CATEGORY_ADMIN_COPY["zh-CN"].deleteFallback,
     );
 
+    expect(g.propagate).toHaveBeenCalledWith({ [CUSTOM]: null });
     expect(g.commit).toHaveBeenCalledTimes(1);
     const keys = (g.commit.mock.calls[0]?.[0] ?? []).map((row) => row.key);
-    expect(keys).toContain("__app_override::code.exe");
+    expect(keys).not.toContain("__app_override::code.exe");
     expect(keys).not.toContain("__app_override::steam.exe");
     expect(keys).toContain(`__custom_category::${CUSTOM}`);
     expect(keys).toContain(`__deleted_category::${CUSTOM}`);
@@ -238,8 +245,8 @@ describe("删除分类", () => {
     await act(async () => { await latest?.deleteCategory(CUSTOM); });
 
     /* 当前应用正属于被删分类 → 必须把 category 从 override 里去掉（= 回落到「其他」） */
-    expect(g.saveAppOverride).toHaveBeenCalledTimes(1);
-    expect(g.saveAppOverride.mock.calls[0]?.[1]).toBeNull();
+    expect(g.propagate).toHaveBeenCalledWith({ [CUSTOM]: null });
+    expect(g.saveAppOverride).not.toHaveBeenCalled();
     expect(g.onAssigned).toHaveBeenCalledWith(null, "other");
   });
 
@@ -250,6 +257,7 @@ describe("删除分类", () => {
     await act(async () => { await latest?.deleteCategory(CUSTOM); });
 
     expect(g.commit).not.toHaveBeenCalled();
+    expect(g.propagate).not.toHaveBeenCalled();
     expect(g.saveAppOverride).not.toHaveBeenCalled();
   });
 });

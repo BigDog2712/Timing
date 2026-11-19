@@ -66,7 +66,10 @@ fn qa_edge_three_tier_boundary_frames() {
         "默认智能：不许从 180 秒反推出谁都没选过的「定时 3 分钟」"
     );
     assert_eq!(auto.interval_minutes, MD_CLOUD_INTERVAL_DEFAULT_MINUTES);
-    assert_eq!(auto.interval_minutes, 15, "不是 3、不是 180/60，是独立的 15");
+    assert_eq!(
+        auto.interval_minutes, 15,
+        "不是 3、不是 180/60，是独立的 15"
+    );
     assert_eq!(
         serde_json::to_string(&config).expect("序列化"),
         raw,
@@ -75,12 +78,20 @@ fn qa_edge_three_tier_boundary_frames() {
 
     /* ---- 帧组 1：定时档夹值 5–120（试 4 和 121）+ 切档不重置 30 ---- */
     assert_eq!(
-        MdCloudAuto { interval_minutes: 4, ..Default::default() }.clamped_minutes(),
+        MdCloudAuto {
+            interval_minutes: 4,
+            ..Default::default()
+        }
+        .clamped_minutes(),
         MD_CLOUD_INTERVAL_MIN_MINUTES,
         "4 分钟要夹到 5"
     );
     assert_eq!(
-        MdCloudAuto { interval_minutes: 121, ..Default::default() }.clamped_minutes(),
+        MdCloudAuto {
+            interval_minutes: 121,
+            ..Default::default()
+        }
+        .clamped_minutes(),
         MD_CLOUD_INTERVAL_MAX_MINUTES,
         "121 分钟要夹到 120"
     );
@@ -96,14 +107,26 @@ fn qa_edge_three_tier_boundary_frames() {
         schedule: CloudSchedule::Interval,
         ..smart
     };
-    assert_eq!(back.interval_minutes, 30, "定时 30 → 智能 → 定时仍是 30（H-2）");
+    assert_eq!(
+        back.interval_minutes, 30,
+        "定时 30 → 智能 → 定时仍是 30（H-2）"
+    );
     assert_eq!(back.interval_secs(), 30 * 60);
 
     /* ---- 帧组 2：启动轮 59 / 60，且只跑一次 ---- */
     let startup = tier(0, false);
-    assert_eq!(decide(&startup, CloudSchedule::Smart, 900, 59 * SEC, 0), None);
     assert_eq!(
-        decide(&startup, CloudSchedule::Smart, 900, MD_CLOUD_STARTUP_DELAY_SECS as i64 * SEC, 0),
+        decide(&startup, CloudSchedule::Smart, 900, 59 * SEC, 0),
+        None
+    );
+    assert_eq!(
+        decide(
+            &startup,
+            CloudSchedule::Smart,
+            900,
+            MD_CLOUD_STARTUP_DELAY_SECS as i64 * SEC,
+            0
+        ),
         Some(TierReason::Startup),
         "刚好 60s 才跑"
     );
@@ -118,7 +141,13 @@ fn qa_edge_three_tier_boundary_frames() {
     let write_at: i64 = 1_000 * SEC;
     let idle_state = tier(0, true);
     assert_eq!(
-        decide(&idle_state, CloudSchedule::Smart, 900, write_at + 299 * SEC, write_at),
+        decide(
+            &idle_state,
+            CloudSchedule::Smart,
+            900,
+            write_at + 299 * SEC,
+            write_at
+        ),
         None,
         "差 1 秒不许抢跑"
     );
@@ -138,14 +167,26 @@ fn qa_edge_three_tier_boundary_frames() {
     let mut settled = tier(0, true);
     settled.last_success_ms = Some(write_at); /* 成功轮与最后一笔写**同一毫秒** */
     assert_eq!(
-        decide(&settled, CloudSchedule::Smart, 900, write_at + 300 * SEC, write_at),
+        decide(
+            &settled,
+            CloudSchedule::Smart,
+            900,
+            write_at + 300 * SEC,
+            write_at
+        ),
         None,
         "账已结清：`ok >= last_write` 必须含等号，改成 `>` 会在这一帧红"
     );
     let mut not_settled = tier(0, true);
     not_settled.last_success_ms = Some(write_at - 1); /* 写发生在成功轮之后 1ms */
     assert_eq!(
-        decide(&not_settled, CloudSchedule::Smart, 900, write_at + 300 * SEC, write_at),
+        decide(
+            &not_settled,
+            CloudSchedule::Smart,
+            900,
+            write_at + 300 * SEC,
+            write_at
+        ),
         Some(TierReason::Idle),
         "新写的那笔没被覆盖，仍要传一次"
     );
@@ -154,19 +195,37 @@ fn qa_edge_three_tier_boundary_frames() {
     let mut max_state = tier(0, true);
     max_state.last_success_ms = Some(0);
     assert_eq!(
-        decide(&max_state, CloudSchedule::Smart, 900, 1_799 * SEC, 1_700 * SEC),
+        decide(
+            &max_state,
+            CloudSchedule::Smart,
+            900,
+            1_799 * SEC,
+            1_700 * SEC
+        ),
         None,
         "距上次成功 1799s 差 1 秒，不许抢跑"
     );
     assert_eq!(
-        decide(&max_state, CloudSchedule::Smart, 900, 1_800 * SEC, 1_700 * SEC),
+        decide(
+            &max_state,
+            CloudSchedule::Smart,
+            900,
+            1_800 * SEC,
+            1_700 * SEC
+        ),
         Some(TierReason::Max),
         "刚好 1800s 且期间有写 → Max 兜底"
     );
     let mut no_new_write = tier(0, true);
     no_new_write.last_success_ms = Some(600 * SEC);
     assert_eq!(
-        decide(&no_new_write, CloudSchedule::Smart, 900, 2_400 * SEC, 300 * SEC),
+        decide(
+            &no_new_write,
+            CloudSchedule::Smart,
+            900,
+            2_400 * SEC,
+            300 * SEC
+        ),
         None,
         "最后一笔写在成功轮之前、30 分钟里没有新写 → 不许空跑一轮上传"
     );
@@ -175,7 +234,10 @@ fn qa_edge_three_tier_boundary_frames() {
     let mut failing = tier(0, true);
     failing.last_attempt_ms = Some(1_190 * SEC); /* 刚失败过一轮，没有 last_success */
     let last_write = 900 * SEC;
-    assert_eq!(decide(&failing, CloudSchedule::Smart, 900, 1_200 * SEC, last_write), None);
+    assert_eq!(
+        decide(&failing, CloudSchedule::Smart, 900, 1_200 * SEC, last_write),
+        None
+    );
     assert_eq!(
         decide(&failing, CloudSchedule::Smart, 900, 1_489 * SEC, last_write),
         None,
@@ -244,7 +306,10 @@ fn qa_edge_bom_crlf_external_change_fingerprint() {
     );
 
     let two = write_stamped(&path, touched.as_bytes(), 1_700_000_001);
-    assert_ne!(two, one, "夹具自检：mtime 必须真的变了，否则 probe 会走快速路径跳过内容比较");
+    assert_ne!(
+        two, one,
+        "夹具自检：mtime 必须真的变了，否则 probe 会走快速路径跳过内容比较"
+    );
     assert!(
         !watch.probe(std::slice::from_ref(&binding), date),
         "touch / 无改动保存只推 mtime，BOM+CRLF 字节未变 → 不算外部改动（K-1 条件）"

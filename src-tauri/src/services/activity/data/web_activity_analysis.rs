@@ -1,6 +1,6 @@
-use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
 use crate::models::activity::activity_read_model::ANONYMOUS_ACTIVITY_KEY;
 use crate::models::activity::web_activity::normalize_domain;
+use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use sqlx::{Pool, QueryBuilder, Row, Sqlite};
@@ -178,7 +178,9 @@ pub async fn load_web_activity_aggregate_range_from_pool(
         .begin()
         .await
         .map_err(|error| format!("failed to begin web activity aggregate snapshot: {error}"))?;
-    let web_links = crate::services::activity::data::repositories::web_links::snapshot_in_tx(&mut transaction).await?;
+    let web_links =
+        crate::services::activity::data::repositories::web_links::snapshot_in_tx(&mut transaction)
+            .await?;
     let website_rules = &web_links.rules;
     let domain_filter = if let Some(selected) = domain_filter {
         if selected
@@ -191,10 +193,12 @@ pub async fn load_web_activity_aggregate_range_from_pool(
                     .iter()
                     .filter(|domain| {
                         selected.contains(domain)
-                            || selected.contains(&crate::models::activity::web_links::resolve_owner(
-                                domain,
-                                website_rules,
-                            ))
+                            || selected.contains(
+                                &crate::models::activity::web_links::resolve_owner(
+                                    domain,
+                                    website_rules,
+                                ),
+                            )
                     })
                     .cloned()
                     .collect::<Vec<_>>(),
@@ -290,21 +294,22 @@ pub async fn load_web_activity_aggregate_range_from_pool(
             .fetch_one(&mut *transaction).await.map_err(|error| error.to_string())?;
         if let Some(start) = earliest {
             domain_coverage.push(WebActivityDomainCoverageDto {
-                normalized_domain: crate::models::activity::activity_read_model::ANONYMOUS_ACTIVITY_KEY
-                    .into(),
+                normalized_domain:
+                    crate::models::activity::activity_read_model::ANONYMOUS_ACTIVITY_KEY.into(),
                 earliest_recorded_start_ms: start,
             });
         }
     }
 
     let anonymous_records = if include_anonymous {
-        let anonymous = crate::services::activity::data::repositories::anonymous_activity::read_range_tx(
-            &mut transaction,
-            start_ms,
-            end_ms,
-        )
-        .await
-        .map_err(|error| error.to_string())?;
+        let anonymous =
+            crate::services::activity::data::repositories::anonymous_activity::read_range_tx(
+                &mut transaction,
+                start_ms,
+                end_ms,
+            )
+            .await
+            .map_err(|error| error.to_string())?;
         aggregate_segments(
             anonymous
                 .into_iter()
@@ -541,7 +546,9 @@ mod tests {
             0,
             10000,
             &[0, 10000],
-            Some(&crate::models::activity::web_links::group_key("example.com")),
+            Some(&crate::models::activity::web_links::group_key(
+                "example.com",
+            )),
             None,
             10000,
         )

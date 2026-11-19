@@ -20,8 +20,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::models::constants::{
-    MD_CLOUD_INTERVAL_DEFAULT_MINUTES, MD_CLOUD_INTERVAL_MAX_MINUTES,
-    MD_CLOUD_INTERVAL_MIN_MINUTES,
+    MD_CLOUD_INTERVAL_DEFAULT_MINUTES, MD_CLOUD_INTERVAL_MAX_MINUTES, MD_CLOUD_INTERVAL_MIN_MINUTES,
 };
 
 /// 四档。线缆值由 `rename_all = "lowercase"` 决定：`off` / `interval` / `smart` / `stream`。
@@ -108,23 +107,47 @@ mod tests {
 
     #[test]
     fn out_of_range_minutes_are_clamped_not_rejected() {
-        assert_eq!(MdCloudAuto { interval_minutes: 1, ..Default::default() }.clamped_minutes(), MD_CLOUD_INTERVAL_MIN_MINUTES);
-        assert_eq!(MdCloudAuto { interval_minutes: 999, ..Default::default() }.clamped_minutes(), MD_CLOUD_INTERVAL_MAX_MINUTES);
+        assert_eq!(
+            MdCloudAuto {
+                interval_minutes: 1,
+                ..Default::default()
+            }
+            .clamped_minutes(),
+            MD_CLOUD_INTERVAL_MIN_MINUTES
+        );
+        assert_eq!(
+            MdCloudAuto {
+                interval_minutes: 999,
+                ..Default::default()
+            }
+            .clamped_minutes(),
+            MD_CLOUD_INTERVAL_MAX_MINUTES
+        );
     }
 
     #[test]
     fn old_json_without_auto_deserializes_to_the_default() {
         let parsed: MdCloudAuto = serde_json::from_str("{}").expect("老配置必须能解析");
         assert_eq!(parsed, MdCloudAuto::default());
-        let partial: MdCloudAuto = serde_json::from_str(r#"{"schedule":"interval"}"#).expect("缺字段要补默认");
+        let partial: MdCloudAuto =
+            serde_json::from_str(r#"{"schedule":"interval"}"#).expect("缺字段要补默认");
         assert_eq!(partial.interval_minutes, MD_CLOUD_INTERVAL_DEFAULT_MINUTES);
     }
 
     #[test]
     fn switching_schedule_keeps_the_minutes_field() {
-        let auto = MdCloudAuto { schedule: CloudSchedule::Interval, interval_minutes: 30 };
-        let switched = MdCloudAuto { schedule: CloudSchedule::Smart, ..auto.clone() };
-        assert_eq!(switched.interval_minutes, 30, "切档不许把用户填过的分钟数盖回 15");
+        let auto = MdCloudAuto {
+            schedule: CloudSchedule::Interval,
+            interval_minutes: 30,
+        };
+        let switched = MdCloudAuto {
+            schedule: CloudSchedule::Smart,
+            ..auto.clone()
+        };
+        assert_eq!(
+            switched.interval_minutes, 30,
+            "切档不许把用户填过的分钟数盖回 15"
+        );
         assert_eq!(switched.interval_secs(), 30 * 60);
     }
 }

@@ -102,8 +102,16 @@ async fn verify_names_the_table_that_differs_and_incomplete_file_is_written() {
         "文案要点名哪张表：{}",
         err.message
     );
-    assert!(err.message.contains("源 2"), "要写出源库行数：{}", err.message);
-    assert!(err.message.contains("副本 1"), "要写出副本行数：{}", err.message);
+    assert!(
+        err.message.contains("源 2"),
+        "要写出源库行数：{}",
+        err.message
+    );
+    assert!(
+        err.message.contains("副本 1"),
+        "要写出副本行数：{}",
+        err.message
+    );
 
     transfer::write_incomplete(&dest, &err.message);
     assert!(
@@ -144,7 +152,7 @@ fn entries_report_presence_and_skip_missing_dirs() {
     let backups = &entries[1];
     assert!(!backups.present, "源里没有就不许报 0 字节");
     /* 活动数据那一项的名字与路径不同（只搬 `<活动子目录>/data`）：显示给用户的必须是
-       短名，否则确认对话框里会出现 `activity/data\` 这种要用户自己翻译的目录结构。 */
+    短名，否则确认对话框里会出现 `activity/data\` 这种要用户自己翻译的目录结构。 */
     let activity = &entries[4];
     assert_eq!(activity.name, "activity");
     assert!(
@@ -172,8 +180,7 @@ fn preflight_rejects_four_shapes_with_exact_wording() {
     );
     let parent = preflight(&base, &current).expect_err("上级目录必须拒绝");
     assert_eq!(
-        parent.message,
-        "不能选当前数据目录里面的文件夹（或它的上级）",
+        parent.message, "不能选当前数据目录里面的文件夹（或它的上级）",
         "祖先与后代是同一句：对用户是同一件事"
     );
 
@@ -213,8 +220,8 @@ async fn switch_writes_pointer_with_previous_root() {
         .expect("切换应成功");
     let pointer = root_pointer::read(&appdata).expect("指针要写出来");
     /* 先 canonicalize 再比：Windows 上同一目录有长名与 8.3 短名两种写法
-       （CI 是 `C:\Users\runneradmin\…`，读回来可能是 `C:\Users\RUNNER~1\…`），
-       直接比字符串会在这种机器上假红。canonicalize 把两侧归一到同一写法。 */
+    （CI 是 `C:\Users\runneradmin\…`，读回来可能是 `C:\Users\RUNNER~1\…`），
+    直接比字符串会在这种机器上假红。canonicalize 把两侧归一到同一写法。 */
     let canonical = |p: &Path| std::fs::canonicalize(p).expect("目录应可解析");
     assert_eq!(
         canonical(Path::new(&pointer.data_dir)),
@@ -246,7 +253,10 @@ async fn failed_switch_leaves_no_pointer() {
     let err = switch(&pool, &appdata, &source, &target.to_string_lossy())
         .await
         .expect_err("非空目录必须拒绝");
-    assert_eq!(err.message, "这个文件夹里已有文件，请选一个空文件夹或新建一个");
+    assert_eq!(
+        err.message,
+        "这个文件夹里已有文件，请选一个空文件夹或新建一个"
+    );
     assert!(
         root_pointer::read(&appdata).is_none(),
         "预检失败绝不能写指针"

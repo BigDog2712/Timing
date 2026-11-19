@@ -75,8 +75,13 @@ pub(super) fn aggregate_records_into_boundaries(
                 continue;
             }
             /* 设备进 key：两台机器同桶同应用是**两条**记录，不是一个"合并后的应用"。
-               单设备时这一项恒定，所以记录条数与改造前完全相同。 */
-            let key = (index, record.device_id.clone(), record.anonymous, record.exe_name.clone());
+            单设备时这一项恒定，所以记录条数与改造前完全相同。 */
+            let key = (
+                index,
+                record.device_id.clone(),
+                record.anonymous,
+                record.exe_name.clone(),
+            );
             let entry = aggregated
                 .entry(key)
                 .or_insert((record.app_name.clone(), 0));
@@ -151,8 +156,7 @@ pub(super) fn sum_overlaps_per_bucket(
             if pair[0] >= record.end_time {
                 break;
             }
-            let overlap_ms =
-                record.end_time.min(pair[1]) - record.start_time.max(pair[0]);
+            let overlap_ms = record.end_time.min(pair[1]) - record.start_time.max(pair[0]);
             if overlap_ms > 0 {
                 totals[index] += overlap_ms;
             }
@@ -166,10 +170,7 @@ pub(super) fn sum_overlaps_per_bucket(
 /// 顺序是「先设备内求并、再跨设备求并」，不是「直接对全体求并」：
 /// 同一设备的两段如果互相包含，先各自求并能保留"这台机器确实记了这么多"，
 /// 第二条并则只去掉两台机器之间的重复。
-pub(super) fn union_spans_per_bucket(
-    spans: &[(String, i64, i64)],
-    boundaries: &[i64],
-) -> Vec<i64> {
+pub(super) fn union_spans_per_bucket(spans: &[(String, i64, i64)], boundaries: &[i64]) -> Vec<i64> {
     let bucket_count = boundaries.len().saturating_sub(1);
     let mut per_bucket: Vec<BTreeMap<&str, Vec<(i64, i64)>>> =
         (0..bucket_count).map(|_| BTreeMap::new()).collect();

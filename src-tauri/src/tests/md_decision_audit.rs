@@ -10,10 +10,10 @@
 //! 2. `direction` 落的是词汇值（`deferred`），不是枚举名（`Deferred`）——
 //!    迁移 0012 的列注释与前端文案都以词汇值为准。
 
-use crate::services::md_sync::decision::{self, ConflictState};
+use crate::models::md_sync::{Decision, MdSyncBinding, MdSyncKind};
 use crate::services::md_sync::audit;
 use crate::services::md_sync::decision::registry;
-use crate::models::md_sync::{Decision, MdSyncBinding, MdSyncKind};
+use crate::services::md_sync::decision::{self, ConflictState};
 use crate::tests::support::{fresh_pool, scalar_i64, scalar_opt_str};
 
 fn binding() -> MdSyncBinding {
@@ -45,12 +45,24 @@ fn register(b: &MdSyncBinding) -> String {
 #[tokio::test]
 async fn audit_record_appends_one_row_per_decision() {
     let pool = fresh_pool("t03-audit-append").await;
-    audit::record(&pool, MdSyncKind::Timers, "#### 事项计时", "keep_timing", 1_000)
-        .await
-        .expect("第一次审计应写入");
-    audit::record(&pool, MdSyncKind::Timers, "#### 事项计时", "deferred", 2_000)
-        .await
-        .expect("第二次审计应写入");
+    audit::record(
+        &pool,
+        MdSyncKind::Timers,
+        "#### 事项计时",
+        "keep_timing",
+        1_000,
+    )
+    .await
+    .expect("第一次审计应写入");
+    audit::record(
+        &pool,
+        MdSyncKind::Timers,
+        "#### 事项计时",
+        "deferred",
+        2_000,
+    )
+    .await
+    .expect("第二次审计应写入");
 
     assert_eq!(
         scalar_i64(&pool, "SELECT COUNT(*) FROM md_decision_audit").await,
@@ -97,7 +109,9 @@ async fn deferred_writes_audit_and_keeps_conflict_pending() {
         "裁决都要留审计，包括暂不处理"
     );
     assert_eq!(
-        scalar_opt_str(&pool, "SELECT direction FROM md_decision_audit").await.as_deref(),
+        scalar_opt_str(&pool, "SELECT direction FROM md_decision_audit")
+            .await
+            .as_deref(),
         Some("deferred"),
         "审计方向与 Decision::as_str 一致"
     );

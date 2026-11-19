@@ -1,0 +1,99 @@
+/* ── [0.12.4] 应用标签弹窗：已选一行 + 底部「所有标签」选择器 ──
+ * 底部那片的用途是「从现有的里挑」：标签路径常带层级（`学习/考公`），凭记忆敲很容易
+ * 敲成另一个标签，于是把全部已知标签铺成可点的小胶囊。缩略由 `max-height` + 滚动实现 ——
+ * 标签再多也不让弹窗长到看不完，但一屏能扫到十几个。 */
+.at-tag-picked-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.at-tag-section-label {
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-medium);
+}
+
+/* 计数用 tertiary：它是配角，不该和标签名抢注意力 */
+.at-tag-section-count {
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-compact);
+  font-variant-numeric: tabular-nums;
+}
+
+.at-tag-picked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+/* 「已选」那几颗和底下的候选长得一样：同一个对话框里，同一个东西不该有两种尺寸 */
+.at-tag-picked .at-chip {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 8px;
+  font-size: var(--at-font-size-compact);
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.at-tag-empty {
+  margin: 0;
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-compact);
+}
+
+.at-tag-picker {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--at-border-subtle);
+}
+
+.at-tag-picker-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: 126px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.at-tag-chip {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 8px;
+  cursor: pointer;
+  border: 1px solid var(--at-border-subtle);
+  /* 与「已选」那排 `at-chip` 同一个圆角（8px）。用 999px 的胶囊会和它们并排时
+     显得是两种控件，而这两片本来就是同一件事的两面 */
+  border-radius: var(--at-radius-chip);
+  background: var(--at-bg-elevated);
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-compact);
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition:
+    background-color var(--at-motion-fast) var(--at-motion-ease),
+    border-color var(--at-motion-fast) var(--at-motion-ease),
+    color var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.at-tag-chip:hover,
+.at-tag-chip:focus-visible {
+  border-color: var(--at-border-strong);
+  color: var(--at-text-primary);
+}
+
+/* 已选：填充 + `✓`（`AppTagDialog` 里那个前缀）。只靠颜色区分对色弱不友好 */
+.at-tag-chip[data-selected="true"] {
+  border-color: color-mix(in srgb, var(--at-accent-default) 55%, transparent);
+  background: color-mix(in srgb, var(--at-accent-default) 24%, transparent);
+  color: var(--at-text-primary);
+}

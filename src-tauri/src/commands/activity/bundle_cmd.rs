@@ -43,7 +43,7 @@ pub async fn cmd_export_full_bundle<R: Runtime>(
     let business = business_pool(&app)?;
     let activity = crate::app::activity_bridge::activity_pool().await?;
     /* `device_id` 由这里读：`services::insight` 不依赖宿主的 `services::identity`，
-       两边各读一次会出现「包里的 id 与本机 id 不是同一份」。 */
+    两边各读一次会出现「包里的 id 与本机 id 不是同一份」。 */
     let device_id = crate::services::identity::install_id().unwrap_or_default();
     export_full_bundle(&business, activity, Path::new(&output), device_id).await
 }
@@ -74,8 +74,7 @@ pub async fn cmd_import_full_bundle<R: Runtime>(
     require_main_window_string(&window)?;
     let path = require_path(&path, "bundle path")?;
     let business = business_pool(&app)?;
-    let activity =
-        crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool(&app).await?;
+    let activity = crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool(&app).await?;
     import_full_bundle(&business, &activity, Path::new(&path)).await
 }
 

@@ -44,11 +44,18 @@ pub struct HeadingScan {
 pub enum SectionState {
     MissingFile,
     /// 文件存在，但没有目标标题行。
-    MissingHeading { mtime_ms: i64 },
+    MissingHeading {
+        mtime_ms: i64,
+    },
     /// 存在阻断级诊断（标题等级不一致 / 区块内代码围栏未收尾）：本轮不写、不导入。
-    Blocked { mtime_ms: i64 },
+    Blocked {
+        mtime_ms: i64,
+    },
     /// 标题下的内容（已去首尾空行）；形状与 v0.11.18 **逐字相同**，三处 pattern 不用改。
-    Present { body: String, mtime_ms: i64 },
+    Present {
+        body: String,
+        mtime_ms: i64,
+    },
 }
 
 /// 一次读取的结果：状态 + 诊断（诊断可能为空；`Duplicate` 是非阻断的）。
@@ -220,7 +227,7 @@ pub fn find_heading(lines: &[&str], fences: &Fences, heading: &str) -> Option<(u
 
 /// 围栏外逐字相同的标题条数（薄包装，不另写循环）。
 /* 生产路径只调 `scan_headings` 一趟。这两个薄包装是设计 §8.2 的判定出口，供 QA 的
-   「只去掉 exact_count 的围栏过滤」变异自检与用例直接调，lib 的非测试构建里没人调。 */
+「只去掉 exact_count 的围栏过滤」变异自检与用例直接调，lib 的非测试构建里没人调。 */
 #[allow(dead_code)]
 pub fn count_exact(lines: &[&str], fences: &Fences, heading: &str) -> usize {
     scan_headings(lines, fences, heading).exact_count
@@ -249,7 +256,12 @@ pub fn section_end(lines: &[&str], fences: &Fences, head_idx: usize, level: usiz
 /// 三档诊断：只吃 `scan_headings` 的结果，不重扫行（重扫就有第二个出处）。
 ///
 /// `end` 由调用方传进来（它已经算过一遍），本函数不重算。
-pub fn diagnose(fences: &Fences, heading: &str, scan: &HeadingScan, end: usize) -> Vec<SectionIssue> {
+pub fn diagnose(
+    fences: &Fences,
+    heading: &str,
+    scan: &HeadingScan,
+    end: usize,
+) -> Vec<SectionIssue> {
     let mut issues = Vec::new();
 
     if scan.exact_count > 1 {

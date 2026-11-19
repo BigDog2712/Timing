@@ -114,7 +114,10 @@ pub fn slice_block(
             }
         }
         let resolved = resolve_child_category(
-            categories.get(&fact.app_key).map(Vec::as_slice).unwrap_or(&[]),
+            categories
+                .get(&fact.app_key)
+                .map(Vec::as_slice)
+                .unwrap_or(&[]),
             block.category_key.as_deref(),
         );
         segments.push(ChildSegment {
@@ -171,7 +174,7 @@ pub fn union_ranges(ranges: &[(i64, i64)]) -> Vec<(i64, i64)> {
     for (start, end) in valid {
         match merged.last_mut() {
             /* `start <= last.1` 相邻也算接上：两段 09:30–10:00 与 10:00–10:30 之间
-               没有任何缝，分成两段会让界面上多出一条 0 宽的空档。 */
+            没有任何缝，分成两段会让界面上多出一条 0 宽的空档。 */
             Some(last) if start <= last.1 => last.1 = last.1.max(end),
             _ => merged.push((start, end)),
         }
@@ -215,7 +218,7 @@ pub fn gaps_within(outer: &[(i64, i64)], covered: &[(i64, i64)]) -> Vec<(i64, i6
 mod slice_tests;
 
 /* 设备维度单独一个文件：`slice_tests.rs` 已到 300 行硬限，而这一组的判据与切片本身的
-   正确性无关（丢设备不会让任何数字变错，只让双端并行不可见）。 */
+正确性无关（丢设备不会让任何数字变错，只让双端并行不可见）。 */
 #[cfg(test)]
 #[path = "slice_device_tests.rs"]
 mod slice_device_tests;

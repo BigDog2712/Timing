@@ -1,0 +1,23 @@
+# 分析窗的**标签写面**（标签管理页：新建 / 改名 / 删除）。
+#
+# 为什么不复用 activity-host-data：那条在文件头写死了「只给两条只读命令」，
+# 而且「写」与「读」本该是两张清单 —— 审核 ACL 的人看到 read-only 里混进 DELETE，
+# 就无法判断哪条通道是有意的。这里单开一条，名字里带 tags，语义与范围都自解释。
+#
+# 只给四条，且都是**标签域**命令：
+#   list_tag_catalog       —— 标签定义行（没有事项引用的空标签靠它存在）
+#   create_tag_definition  —— 新建一个可能还没被引用的标签
+#   rename_tag             —— 改名（含子树），后端一个事务里改完所有事项
+#   delete_tag             —— 删除（含子树），同上
+#
+# 事项标签的**逐条写入**（set_item_tags）不在本清单：事项编辑仍走 host-intent 事件桥，
+# 由药丸侧执行；本清单只服务「整棵树的管理动作」。
+[[permission]]
+identifier = "activity-host-tags"
+description = "Allows the activity window to manage the host tag catalog (create / rename / delete tag paths)."
+commands.allow = [
+  "list_tag_catalog",
+  "create_tag_definition",
+  "rename_tag",
+  "delete_tag",
+]

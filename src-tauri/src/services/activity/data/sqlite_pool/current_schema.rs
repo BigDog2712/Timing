@@ -5,7 +5,9 @@
 //! **28 之前**的基线布局，28 之后恒为假。最后那条为什么必须恒为假、以及
 //! `ensure_current_indexes` 为什么分成两支，见各自函数上的注释。
 
-use super::{sessions_has_column, sessions_has_index, table_exists, table_has_columns, table_has_index};
+use super::{
+    sessions_has_column, sessions_has_index, table_exists, table_has_columns, table_has_index,
+};
 use crate::services::activity::data::schema_contracts;
 use sqlx::{Pool, Sqlite};
 
@@ -21,11 +23,14 @@ const LEGACY_SINGLE_ACTIVE_INDEX: &str = "idx_sessions_single_active";
 /// 迁移 28 之前，索引被删是靠「历史归一化把账本截短 → Migrator 重跑那条迁移」自愈的；
 /// 28 之后那条路整体关闭（见文件头），所以自愈的落点改到这里。
 const IMPORT_BUCKET_EXE_INDEX: &str = "idx_import_time_buckets_exe_time";
-const IMPORT_BUCKET_EXE_INDEX_SQL: &str = "CREATE INDEX IF NOT EXISTS idx_import_time_buckets_exe_time
+const IMPORT_BUCKET_EXE_INDEX_SQL: &str =
+    "CREATE INDEX IF NOT EXISTS idx_import_time_buckets_exe_time
      ON import_time_buckets(exe_name COLLATE NOCASE, bucket_start_time)";
 
 /// 补齐当前版本需要的索引（幂等）。返回 `true` = 这一次真的写了东西。
-pub(in crate::services::activity::data) async fn ensure_current_indexes(pool: &Pool<Sqlite>) -> Result<bool, String> {
+pub(in crate::services::activity::data) async fn ensure_current_indexes(
+    pool: &Pool<Sqlite>,
+) -> Result<bool, String> {
     let mut changed = false;
 
     if !sessions_has_index(pool, "idx_sessions_date").await? {
@@ -136,7 +141,9 @@ async fn ensure_legacy_single_active_index(pool: &Pool<Sqlite>) -> Result<bool, 
 }
 
 /// 启动验收：全部 schema 契约是否都成立（不成立 = `schema validation failed`）。
-pub(in crate::services::activity::data) async fn has_current_schema(pool: &Pool<Sqlite>) -> Result<bool, String> {
+pub(in crate::services::activity::data) async fn has_current_schema(
+    pool: &Pool<Sqlite>,
+) -> Result<bool, String> {
     let checks = [
         schema_contracts::has_pomodoro_tasks_schema(pool).await?,
         schema_contracts::has_free_focus_schema(pool).await?,
@@ -177,10 +184,15 @@ pub(in crate::services::activity::data) async fn has_current_schema(pool: &Pool<
 /// 「库里有空 device_id」当成 schema 问题掩盖掉。
 async fn has_current_baseline_layout(pool: &Pool<Sqlite>) -> Result<bool, String> {
     /* `sync_tombstone` 也进必需项：墓碑表只被同步路径读，缺了它 App 照样能跑，
-       但「删过的行」会在下一次推送里**复活**（对端仍持有那条状态行）。宁可在启动
-       验收时明确失败，也不要让数据在无声中回来。 */
+    但「删过的行」会在下一次推送里**复活**（对端仍持有那条状态行）。宁可在启动
+    验收时明确失败，也不要让数据在无声中回来。 */
     for table in [
-        "sessions", "settings", "icon_cache", "devices", "activity_daily_totals", "sync_tombstone",
+        "sessions",
+        "settings",
+        "icon_cache",
+        "devices",
+        "activity_daily_totals",
+        "sync_tombstone",
     ] {
         if !table_exists(pool, table).await? {
             return Ok(false);
@@ -192,8 +204,17 @@ async fn has_current_baseline_layout(pool: &Pool<Sqlite>) -> Result<bool, String
         pool,
         "sessions",
         &[
-            "id", "app_name", "exe_name", "window_title", "start_time", "end_time",
-            "duration", "continuity_group_start_time", "device_id", "uid", "updated_at_ms",
+            "id",
+            "app_name",
+            "exe_name",
+            "window_title",
+            "start_time",
+            "end_time",
+            "duration",
+            "continuity_group_start_time",
+            "device_id",
+            "uid",
+            "updated_at_ms",
         ],
     )
     .await?;
@@ -230,7 +251,12 @@ async fn has_current_baseline_layout(pool: &Pool<Sqlite>) -> Result<bool, String
             "idx_session_title_samples_session_time",
         )
         .await?
-        && table_has_index(pool, "session_title_samples", "idx_session_title_samples_time").await?)
+        && table_has_index(
+            pool,
+            "session_title_samples",
+            "idx_session_title_samples_time",
+        )
+        .await?)
 }
 
 /// 28 **之前**的基线布局判据（判 `idx_sessions_single_active`）。
@@ -243,7 +269,9 @@ async fn has_current_baseline_layout(pool: &Pool<Sqlite>) -> Result<bool, String
 /// 只数到 27（它不认识 28），闸门一旦在 28 的库上打开，改写就会删掉「28 已应用」那行
 /// → 下次启动重跑迁移 28 → `duplicate column name` → 老用户开机即挂。
 /// 两个决策点退化成「什么都不做」正是想要的结果。
-pub(in crate::services::activity::data) async fn has_current_baseline_schema(pool: &Pool<Sqlite>) -> Result<bool, String> {
+pub(in crate::services::activity::data) async fn has_current_baseline_schema(
+    pool: &Pool<Sqlite>,
+) -> Result<bool, String> {
     if !table_exists(pool, "sessions").await?
         || !table_exists(pool, "settings").await?
         || !table_exists(pool, "icon_cache").await?
@@ -255,8 +283,14 @@ pub(in crate::services::activity::data) async fn has_current_baseline_schema(poo
         pool,
         "sessions",
         &[
-            "id", "app_name", "exe_name", "window_title", "start_time", "end_time",
-            "duration", "continuity_group_start_time",
+            "id",
+            "app_name",
+            "exe_name",
+            "window_title",
+            "start_time",
+            "end_time",
+            "duration",
+            "continuity_group_start_time",
         ],
     )
     .await?;

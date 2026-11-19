@@ -49,6 +49,24 @@ export interface TimingRecord {
   status: string;
 }
 
+export interface TimingItemTags {
+  itemId: number;
+  tags: string[];
+}
+
+export async function listTimingItemTags(): Promise<TimingItemTags[]> {
+  const rows = await invokeWithCommandError<unknown>("list_item_tags", {});
+  if (!Array.isArray(rows)) return [];
+  return rows.flatMap((row): TimingItemTags[] => {
+    if (!row || typeof row !== "object") return [];
+    const record = row as Record<string, unknown>;
+    const itemId = Number(record.itemId);
+    if (!Number.isSafeInteger(itemId) || !Array.isArray(record.tags)) return [];
+    const tags = record.tags.filter((tag): tag is string => typeof tag === "string");
+    return [{ itemId, tags }];
+  });
+}
+
 export async function listTimingItems(): Promise<TimingItem[]> {
   const rows = await invokeWithCommandError<unknown>("list_items", { includeArchived: false });
   if (!Array.isArray(rows)) return [];

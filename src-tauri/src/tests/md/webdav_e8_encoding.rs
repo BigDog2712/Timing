@@ -12,8 +12,8 @@
 //! 本用例只证明**客户端**行为（这部分不依赖网络，可以本机钉死）。「坚果云是否接受这种
 //! 形态」必须真机点一次「测试连接」，本机验不了（见 PRD R-1）。
 
-use crate::infra::md_webdav::{WebdavTarget, put};
 use super::fake_webdav_dir::DirServer;
+use crate::infra::md_webdav::{put, WebdavTarget};
 
 /// 与默认预填值同形（PRD 裁决 Q1）。
 const DIR: &str = "/我的坚果云/Timing";
@@ -47,11 +47,15 @@ async fn chinese_base_path_is_percent_encoded_exactly_once_on_the_wire() {
 
     let encoded_once = |line: &str| line.to_uppercase().contains(ENCODED);
     assert!(
-        paths.iter().any(|line| line.starts_with("MKCOL ") && encoded_once(line)),
+        paths
+            .iter()
+            .any(|line| line.starts_with("MKCOL ") && encoded_once(line)),
         "MKCOL 的 URL 应带着编码后的中文目录：{paths:?}"
     );
     assert!(
-        paths.iter().any(|line| line.starts_with("PUT ") && encoded_once(line)),
+        paths
+            .iter()
+            .any(|line| line.starts_with("PUT ") && encoded_once(line)),
         "PUT 的 URL 应带着编码后的中文目录：{paths:?}"
     );
     /* 保存值里存的是中文（不转码），显示与存储都是可读形态（PRD 6.2 第 2、3 条） */

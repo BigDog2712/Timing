@@ -4,6 +4,7 @@ use super::super::sustained_participation::{
     SustainedParticipationStatusInput,
 };
 use super::support::log_tracker_error;
+use crate::infra::activity::windows::foreground as tracker;
 use crate::models::activity::tracking::{
     is_trackable_window, resolve_app_override_executable, TrackingStatusSnapshot,
     WindowTrackingCandidate,
@@ -13,7 +14,6 @@ use crate::services::activity::engine::tracking::ports::{
     TrackingDataStore, TRACKER_LAST_HEARTBEAT_KEY, TRACKER_LAST_SUCCESSFUL_SAMPLE_KEY,
 };
 use crate::services::activity::engine::tracking::title_state::TitleRecordingRuntimeState;
-use crate::infra::activity::windows::foreground as tracker;
 use std::collections::HashMap;
 
 const TRACKER_TIMESTAMP_PERSIST_INTERVAL_MS: i64 = 3_000;
@@ -184,8 +184,10 @@ pub(super) async fn load_tracking_loop_state(
             )
             .await;
 
-    if crate::models::activity::web_activity::resolve_web_activity_browser_family(&window_info.exe_name)
-        .is_some()
+    if crate::models::activity::web_activity::resolve_web_activity_browser_family(
+        &window_info.exe_name,
+    )
+    .is_some()
         && settings_cache.load_anonymous_web_rules(data, now_ms).await
         && !title_state.permits_browser_title(window_info, now_ms)
     {
@@ -523,7 +525,10 @@ impl TrackingLoopState {
         previous_status: Option<&TrackingStatusSnapshot>,
         now_ms: i64,
         successful_sample: bool,
-    ) -> Result<Option<TrackingStop>, crate::services::activity::engine::tracking::ports::TrackingDataError> {
+    ) -> Result<
+        Option<TrackingStop>,
+        crate::services::activity::engine::tracking::ports::TrackingDataError,
+    > {
         use super::super::session_timeout::*;
         let reason = if self.tracking_paused {
             seal_active_sessions_for_tracking_pause(data, now_ms).await?
@@ -1077,9 +1082,13 @@ mod tests {
                     .await
                     .unwrap();
                 let row =
-                    crate::services::activity::data::repositories::anonymous_activity::read_range(&pool, 0, now + 1)
-                        .await
-                        .unwrap();
+                    crate::services::activity::data::repositories::anonymous_activity::read_range(
+                        &pool,
+                        0,
+                        now + 1,
+                    )
+                    .await
+                    .unwrap();
                 assert_eq!(row.len(), 1);
                 assert_eq!(row[0].end_time, Some(expected));
             }

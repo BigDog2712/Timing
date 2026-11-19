@@ -1,6 +1,8 @@
 use crate::commands::activity::{error::CommandErrorDto, window_guard::require_main_window};
 use crate::services::activity::data::repositories::{icon_cache, sessions, settings, web_activity};
-use crate::services::activity::data::{sqlite_error::SqliteOperationError, sqlite_pool::wait_for_sqlite_pool};
+use crate::services::activity::data::{
+    sqlite_error::SqliteOperationError, sqlite_pool::wait_for_sqlite_pool,
+};
 use tauri::{AppHandle, Runtime, WebviewWindow};
 
 #[tauri::command]

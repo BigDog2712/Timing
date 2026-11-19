@@ -227,8 +227,7 @@ fn jittered_retry_delay(base: Duration) -> Duration {
     let jitter_percent = (seed % 41) as i64 - 20;
     let factor = (100 + jitter_percent) as u128;
     let jittered_nanos = base.as_nanos().saturating_mul(factor) / 100;
-    let jittered = Duration::from_nanos(u64::try_from(jittered_nanos).unwrap_or(u64::MAX));
-    jittered
+    Duration::from_nanos(u64::try_from(jittered_nanos).unwrap_or(u64::MAX))
 }
 
 /// 「测试连接」：真发一次最小请求。网络/鉴权失败回 `ok=false` 而不是 `Err`，

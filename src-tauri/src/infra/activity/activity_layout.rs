@@ -297,4 +297,3 @@ pub(crate) fn integrity_ok(path: &Path) -> bool {
 #[cfg(test)]
 #[path = "activity_layout_tests.rs"]
 mod activity_layout_tests;
-

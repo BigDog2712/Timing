@@ -9,9 +9,9 @@
 //! 三条用例各自钉一个分支：正常失败（第 N 级）、已有一级（`ready` 计数）、`..` 拒绝
 //! （`level_path(total)` 取全路径且一个请求都不发）。
 
+use super::fake_webdav_dir::DirServer;
 use crate::infra::md_webdav::dir::ensure_base_dir;
 use crate::infra::md_webdav::{WebdavError, WebdavTarget};
-use super::fake_webdav_dir::DirServer;
 
 fn target(server: &DirServer, base_path: &str) -> WebdavTarget {
     WebdavTarget::new(&server.base_url, base_path, "u", "p")

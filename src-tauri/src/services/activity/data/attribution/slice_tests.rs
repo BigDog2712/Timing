@@ -10,7 +10,7 @@
 use std::collections::BTreeMap;
 
 /* 本文件是 `slice.rs` 的子模块（`#[path]` 挂载），所以 `super` 就是切片本身，
-   而 `AppCategory` 要回到 attribution 层取。 */
+而 `AppCategory` 要回到 attribution 层取。 */
 use super::{
     gaps_within, slice_block, summarize_by_category, union_ranges, BlockSpan, FactSpan,
     SegmentOverride,
@@ -199,8 +199,8 @@ fn summary_totals_by_category_not_by_app() {
 }
 
 /* ---------------------------------------------------------------------------
-   区间并集 / 空档：双层渲染的两条口径，各自对应一种「零报错算错」
-   --------------------------------------------------------------------------- */
+区间并集 / 空档：双层渲染的两条口径，各自对应一种「零报错算错」
+--------------------------------------------------------------------------- */
 
 /// 双端并行：PC 09:30–11:30 + 手机 10:00–10:40，并集必须是 2 小时不是 2 小时 40 分。
 ///

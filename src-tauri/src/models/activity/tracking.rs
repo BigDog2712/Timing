@@ -1,5 +1,9 @@
 #[path = "tracking/contracts.rs"]
 mod contracts;
+#[path = "tracking/interrupts.rs"]
+mod interrupts;
+#[path = "tracking/media_info.rs"]
+mod media_info;
 #[path = "tracking/process_filters.rs"]
 mod process_filters;
 #[path = "tracking/session_identity.rs"]
@@ -8,14 +12,15 @@ mod session_identity;
 mod sustained_identity;
 
 pub use contracts::*;
+pub(crate) use interrupts::resolve_interrupted_session_end;
+pub use media_info::*;
 #[allow(unused_imports)]
 pub use process_filters::should_track;
 pub use session_identity::*;
 pub use sustained_identity::*;
 
-// Owner ledger: this file is a thin aggregate for stable tracking domain exports.
-// Runtime orchestration stays in engine/tracking; concrete domain decisions live
-// in the owner modules under domain/tracking/.
+// Owner ledger: thin aggregate for stable tracking exports; orchestration stays in
+// engine/tracking and concrete decisions live in the owner modules below.
 
 #[cfg(test)]
 mod tests {

@@ -41,7 +41,8 @@ pub async fn stats_summary(
     #[cfg(desktop)]
     {
         let (start, end) = activity_window(from, to);
-        summary.activity = crate::app::activity_bridge::activity_summary(start, end, ACTIVITY_LIMIT).await;
+        summary.activity =
+            crate::app::activity_bridge::activity_summary(start, end, ACTIVITY_LIMIT).await;
     }
     Ok(summary)
 }
@@ -120,7 +121,8 @@ pub async fn create_record(
     ended_at: i64,
     note: Option<String>,
 ) -> AppResult<Vec<TimeRecord>> {
-    let records = services::record::backfill(&state.pool, item_id, started_at, ended_at, note).await?;
+    let records =
+        services::record::backfill(&state.pool, item_id, started_at, ended_at, note).await?;
     after_backfill(&app, &state.pool).await;
     Ok(records)
 }

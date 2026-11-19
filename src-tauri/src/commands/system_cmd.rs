@@ -106,7 +106,9 @@ pub async fn pick_custom_launch_target(state: State<'_, AppState>) -> AppResult<
     .await
     .map_err(|err| AppError::io(format!("打开文件选择器失败: {err}")))?;
     let Some(path) = picked else { return Ok(None) };
-    services::handle_launch::authorize(&state.pool, &path).await.map(Some)
+    services::handle_launch::authorize(&state.pool, &path)
+        .await
+        .map(Some)
 }
 
 #[tauri::command]
@@ -126,9 +128,8 @@ pub async fn run_handle_custom_action(
         }
         HandleCustomAction::Hotkey { vks } => {
             /* 后端闸门（前端那份只是提示）。校验失败是**载荷不合法**，不是 IO 故障 ——
-               归到 `CUSTOM_ACTION_DENIED`，否则用户会去查系统权限。 */
-            crate::infra::hotkey_send::validate(&vks)
-                .map_err(AppError::custom_action_denied)?;
+            归到 `CUSTOM_ACTION_DENIED`，否则用户会去查系统权限。 */
+            crate::infra::hotkey_send::validate(&vks).map_err(AppError::custom_action_denied)?;
             crate::infra::hotkey_send::send(&vks).map_err(AppError::io)
         }
     }

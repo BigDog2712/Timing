@@ -141,7 +141,7 @@ pub async fn backfill(
     }
     let now = now_ms();
     /* 零/负长度与**未来时间**一并拒（复用 INVALID_DURATION，不新增错误码）：补记是「补过去
-       的账」，落在未来的记录会让「今天总计」超过 24h，且用户无法自证；0 长度记录没有意义。 */
+    的账」，落在未来的记录会让「今天总计」超过 24h，且用户无法自证；0 长度记录没有意义。 */
     if ended_at <= started_at || started_at >= now || ended_at > now {
         return Err(AppError::invalid_duration());
     }
@@ -157,15 +157,27 @@ pub async fn backfill(
     let mut ids: Vec<i64> = Vec::with_capacity(segments.len());
     for seg in &segments {
         ids.push(
-            repo::insert_saved(&mut tx, item_id, seg.started_at, seg.ended_at, seg.accumulated_sec, note.as_deref(), now)
-                .await?,
+            repo::insert_saved(
+                &mut tx,
+                item_id,
+                seg.started_at,
+                seg.ended_at,
+                seg.accumulated_sec,
+                note.as_deref(),
+                now,
+            )
+            .await?,
         );
     }
     tx.commit().await?;
 
     let mut written: Vec<TimeRecord> = Vec::with_capacity(ids.len());
     for id in ids {
-        written.push(repo::find_by_id(pool, id).await?.ok_or_else(|| AppError::db("补记写入后读取失败"))?);
+        written.push(
+            repo::find_by_id(pool, id)
+                .await?
+                .ok_or_else(|| AppError::db("补记写入后读取失败"))?,
+        );
     }
     Ok(written)
 }

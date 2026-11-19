@@ -20,13 +20,7 @@
 use sqlx::{Executor, SqlitePool};
 
 /// 28 加进 `sessions` 的列（`app_key` 是生成列，同样要拆）。
-const SESSIONS_COLUMNS: &[&str] = &[
-    "app_key",
-    "synced_seq",
-    "updated_at_ms",
-    "uid",
-    "device_id",
-];
+const SESSIONS_COLUMNS: &[&str] = &["app_key", "synced_seq", "updated_at_ms", "uid", "device_id"];
 
 /// 把库回退到迁移 27 结束时的样子，并把账本截到 27。
 pub(crate) async fn rewind_to_pre_device_dimension(pool: &SqlitePool) -> Result<(), String> {

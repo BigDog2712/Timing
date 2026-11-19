@@ -37,18 +37,16 @@ fn anonymous_heartbeats_do_not_accumulate_projection_dirty_ranges() {
         for now in 1..100 {
             observe(&pool, now * 1000, false).await.unwrap();
         }
-        let count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM activity_summary_dirty_ranges")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM activity_summary_dirty_ranges")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(count, 1);
         seal(&pool, 100_000).await.unwrap();
-        let count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM activity_summary_dirty_ranges")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM activity_summary_dirty_ranges")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(count, 2);
     });
 }
@@ -68,12 +66,11 @@ fn settings_stop_anonymous_activity_without_erasing_or_disabling_other_app_time(
         )
         .await
         .unwrap();
-        let active: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM anonymous_activity WHERE end_time IS NULL",
-        )
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let active: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM anonymous_activity WHERE end_time IS NULL")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(active, 0);
         observe(&pool, 2000, false).await.unwrap();
         commit_app_setting_mutations(
@@ -85,12 +82,11 @@ fn settings_stop_anonymous_activity_without_erasing_or_disabling_other_app_time(
         )
         .await
         .unwrap();
-        let active: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM anonymous_activity WHERE end_time IS NULL",
-        )
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let active: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM anonymous_activity WHERE end_time IS NULL")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(
             active, 1,
             "web settings do not stop native anonymous app activity"
@@ -145,8 +141,12 @@ fn failed_anonymous_projection_signal_rolls_back_the_named_boundary() {
         super::super::sessions::start_session(&pool, "Editor", "editor.exe", "Public", 0, 0)
             .await
             .unwrap();
-        pool.execute("CREATE TRIGGER reject_anonymous_dirty BEFORE INSERT ON activity_summary_dirty_ranges
-            WHEN NEW.reason='native_insert' BEGIN SELECT RAISE(ABORT, 'fixture'); END").await.unwrap();
+        pool.execute(
+            "CREATE TRIGGER reject_anonymous_dirty BEFORE INSERT ON activity_summary_dirty_ranges
+            WHEN NEW.reason='native_insert' BEGIN SELECT RAISE(ABORT, 'fixture'); END",
+        )
+        .await
+        .unwrap();
         assert!(observe(&pool, 1_000, false).await.is_err());
         let end: Option<i64> = sqlx::query_scalar("SELECT end_time FROM sessions LIMIT 1")
             .fetch_one(&pool)
@@ -218,9 +218,9 @@ fn anonymous_range_uses_its_effective_end_index() {
                 .await
                 .unwrap();
         assert!(
-            plan.iter().any(|row| row.3.contains(
-                "SEARCH anonymous_activity USING INDEX idx_anonymous_activity_range"
-            )),
+            plan.iter().any(|row| row
+                .3
+                .contains("SEARCH anonymous_activity USING INDEX idx_anonymous_activity_range")),
             "{plan:?}"
         );
         assert!(

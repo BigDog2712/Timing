@@ -35,10 +35,12 @@ async fn put_setting(pool: &SqlitePool, key: &str, value: &str) {
 }
 
 async fn categories(activity: &SqlitePool) -> Vec<(String, String, i64)> {
-    sqlx::query_as("SELECT app_key, category_key, priority FROM app_category ORDER BY app_key, priority")
-        .fetch_all(activity)
-        .await
-        .unwrap()
+    sqlx::query_as(
+        "SELECT app_key, category_key, priority FROM app_category ORDER BY app_key, priority",
+    )
+    .fetch_all(activity)
+    .await
+    .unwrap()
 }
 
 async fn bindings(business: &SqlitePool) -> Vec<(i64, String)> {
@@ -49,7 +51,9 @@ async fn bindings(business: &SqlitePool) -> Vec<(i64, String)> {
 }
 
 async fn run_backfill(business: &SqlitePool, activity: &SqlitePool) -> BackfillReport {
-    backfill(business, activity, 1_700_000_000_000).await.unwrap()
+    backfill(business, activity, 1_700_000_000_000)
+        .await
+        .unwrap()
 }
 
 /// 分类数组按**下标**变成 priority：`[0]` 就是「分类首位」。
@@ -87,7 +91,12 @@ fn category_array_order_becomes_priority() {
 fn a_lone_category_is_treated_as_a_single_element_set() {
     tauri::async_runtime::block_on(async {
         let (business, activity) = fixture().await;
-        put_setting(&business, "__app_override::wechat.exe", r#"{"category":"social"}"#).await;
+        put_setting(
+            &business,
+            "__app_override::wechat.exe",
+            r#"{"category":"social"}"#,
+        )
+        .await;
         run_backfill(&business, &activity).await;
 
         assert_eq!(
@@ -103,7 +112,12 @@ fn a_lone_category_is_treated_as_a_single_element_set() {
 fn the_key_is_lowercased_to_match_the_session_app_key() {
     tauri::async_runtime::block_on(async {
         let (business, activity) = fixture().await;
-        put_setting(&business, "__app_override::Chrome.EXE", r#"{"categories":["Study"]}"#).await;
+        put_setting(
+            &business,
+            "__app_override::Chrome.EXE",
+            r#"{"categories":["Study"]}"#,
+        )
+        .await;
         run_backfill(&business, &activity).await;
 
         assert_eq!(
@@ -132,7 +146,12 @@ fn both_binding_keys_migrate_but_dangling_item_ids_are_dropped() {
         )
         .await;
         /* 悬空：9999 不存在。 */
-        put_setting(&business, "__app_item_binding::old.exe", r#"{"itemId":9999}"#).await;
+        put_setting(
+            &business,
+            "__app_item_binding::old.exe",
+            r#"{"itemId":9999}"#,
+        )
+        .await;
 
         let report = run_backfill(&business, &activity).await;
         assert_eq!(report.item_bindings, 2);
@@ -153,7 +172,12 @@ fn both_binding_keys_migrate_but_dangling_item_ids_are_dropped() {
 fn the_guard_key_makes_the_backfill_run_only_once() {
     tauri::async_runtime::block_on(async {
         let (business, activity) = fixture().await;
-        put_setting(&business, "__app_override::chrome.exe", r#"{"categories":["study"]}"#).await;
+        put_setting(
+            &business,
+            "__app_override::chrome.exe",
+            r#"{"categories":["study"]}"#,
+        )
+        .await;
         assert!(!run_backfill(&business, &activity).await.already_done);
 
         /* 用户后来在旧界面把分类改成了 game。守卫存在 ⇒ 这次不该跟。 */
@@ -186,7 +210,12 @@ fn a_malformed_value_is_skipped_instead_of_aborting_the_whole_backfill() {
     tauri::async_runtime::block_on(async {
         let (business, activity) = fixture().await;
         put_setting(&business, "__app_override::broken.exe", "{not json").await;
-        put_setting(&business, "__app_override::chrome.exe", r#"{"categories":["study"]}"#).await;
+        put_setting(
+            &business,
+            "__app_override::chrome.exe",
+            r#"{"categories":["study"]}"#,
+        )
+        .await;
 
         let report = run_backfill(&business, &activity).await;
         assert_eq!(report.skipped, 1);

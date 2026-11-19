@@ -9,7 +9,9 @@
 
 use chrono::NaiveDate;
 
-use super::{action_for, awaiting, pending, promote_all, registry, Action, ConflictMode, ConflictState};
+use super::{
+    action_for, awaiting, pending, promote_all, registry, Action, ConflictMode, ConflictState,
+};
 use crate::models::md_sync::{Decision, MdSyncBinding, MdSyncKind};
 
 fn binding(kind: MdSyncKind, heading: &str) -> MdSyncBinding {

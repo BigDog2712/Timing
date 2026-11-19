@@ -3,9 +3,7 @@
 //! 每条用例都对应 §7 里的一条硬约定；注释里写明「改坏了哪条会变红」，
 //! 因为这一层唯一的真值就是两端折叠结果必须逐位相同。
 
-use super::{
-    fold_session, FoldedBlock, IgnoreReason, TimerOp, TimerOpKind,
-};
+use super::{fold_session, FoldedBlock, IgnoreReason, TimerOp, TimerOpKind};
 
 const PC: &str = "aaaaaaaaaaaa";
 const PHONE: &str = "bbbbbbbbbbbb";
@@ -42,7 +40,10 @@ fn start_then_stop_yields_the_exact_span() {
     assert_eq!(folded.accumulated_sec(), 60);
     assert_eq!(folded.wall_clock_ms(), Some(60_000));
     assert!(!folded.is_running());
-    assert_eq!(folded.device_id, PC, "发起设备不是「本机」，是 start 的属主");
+    assert_eq!(
+        folded.device_id, PC,
+        "发起设备不是「本机」，是 start 的属主"
+    );
 }
 
 /// 暂停的那段时间**不**计入时长，但计入墙钟跨度。两个口径不能混。
@@ -80,7 +81,12 @@ fn input_order_does_not_matter() {
         op(TimerOpKind::Resume, 30_000, PC, 3),
         op(TimerOpKind::Stop, 40_000, PC, 4),
     ];
-    let shuffled = [ordered[2].clone(), ordered[0].clone(), ordered[3].clone(), ordered[1].clone()];
+    let shuffled = [
+        ordered[2].clone(),
+        ordered[0].clone(),
+        ordered[3].clone(),
+        ordered[1].clone(),
+    ];
     assert_eq!(block(&ordered), block(&shuffled));
 }
 

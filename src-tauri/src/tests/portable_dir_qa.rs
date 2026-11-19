@@ -121,11 +121,11 @@ fn shadow_sibling(target: &Path) -> PathBuf {
 #[tokio::test]
 async fn a2_second_run_neither_copies_nor_touches_target() {
     /* 独立夹具根：`source` 与 `target` 都在 `root` 里面，于是**所有**按 target 派生的
-       中间产物（`<target>.migrating` / `<target>.migrating.v4-src` / 将来新增的任何后缀）
-       都落在同一个目录下，收尾时用「根里除了 source 和 target 不许有别的东西」一句审计
-       干净。原来 source/target 是两个互不相干的随机目录、残留按名字点名，见 `residue_in`
-       的注释：漏一种后缀是假绿，别人留下同名东西是假红 —— QA 记录的那条 flaky 就是
-       「分不清是谁留下的」。 */
+    中间产物（`<target>.migrating` / `<target>.migrating.v4-src` / 将来新增的任何后缀）
+    都落在同一个目录下，收尾时用「根里除了 source 和 target 不许有别的东西」一句审计
+    干净。原来 source/target 是两个互不相干的随机目录、残留按名字点名，见 `residue_in`
+    的注释：漏一种后缀是假绿，别人留下同名东西是假红 —— QA 记录的那条 flaky 就是
+    「分不清是谁留下的」。 */
     let root = temp("qa-a2");
     let source = root.join("source");
     let target = root.join("target");
@@ -155,7 +155,7 @@ async fn a2_second_run_neither_copies_nor_touches_target() {
         "第二次跑不许覆盖目标库"
     );
     /* 临时目录 / V4 影子副本目录 / 以及任何以后新增的中间产物，一并靠这一句守住。
-       真实存在的条目名会原样打出来，报告里直接能看出是谁留下的。 */
+    真实存在的条目名会原样打出来，报告里直接能看出是谁留下的。 */
     assert_eq!(
         residue_in(&root, &["source", "target"]),
         Vec::<String>::new(),

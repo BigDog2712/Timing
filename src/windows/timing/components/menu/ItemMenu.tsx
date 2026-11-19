@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTimerActions } from '../../hooks/useTimerActions';
+import { useTimerTick } from '../../hooks/useTimerTick';
 import {
   CalendarClockIcon,
   CheckIcon,
@@ -27,10 +28,11 @@ import { errorText } from '../../services/ipc';
 import { itemApi, reminderApi } from '../../services/api';
 import { openNewNote } from '../../services/noteActions';
 import { reminderActions } from '../../services/reminderActions';
+import { formatClockTime, formatDuration } from '../../lib/format';
 import { findItem, useItemStore } from '../../stores/itemStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { useUiStore } from '../../stores/uiStore';
-import { GlassMenu, type MenuEntry } from './GlassMenu';
+import { GlassMenu, type MenuEntry, type MenuStatus } from './GlassMenu';
 import { ItemsCascadeDeleteConfirm } from './ItemsCascadeDeleteConfirm';
 
 /** 删除事项的两步确认窗口（与便利贴圆点同口径） */
@@ -42,7 +44,9 @@ export function ItemMenu() {
   const closeItemMenu = useUiStore((s) => s.closeItemMenu);
   const items = useItemStore((s) => s.items);
   const status = useTimerStore((s) => s.state.status);
-  const sessionItemId = useTimerStore((s) => s.state.session?.itemId ?? null);
+  const session = useTimerStore((s) => s.state.session);
+  const sessionItemId = session?.itemId ?? null;
+  const liveSec = useTimerTick();
 
   const item = findItem(items, itemMenu?.itemId ?? null);
   const name = item?.name ?? '未归类';
@@ -73,6 +77,26 @@ export function ItemMenu() {
   // 锚点本身只随 itemMenu 变化，用 useMemo 固定引用。
   const pos = useMemo(() => itemMenu?.pos ?? { x: 12, y: 56 }, [itemMenu?.pos]);
   const runningThis = status !== 'idle' && sessionItemId != null && sessionItemId === item?.id;
+
+  /* [0.12.4] 菜单顶部固定显示**当前正在进行的事项**（用户口径：右键任意事项都要能
+     一眼看到「现在在跑哪一条、跑了多久」）。菜单操作的对象仍是右键点中的那一条，
+     两者刻意分开：顶部是全局状态，下面是这一条的动作。 */
+  const statusBlock = useMemo<MenuStatus | null>(() => {
+    if (!session || status === 'idle') return null;
+    const runningName = findItem(items, session.itemId)?.name ?? '未归类';
+    const isCountdown = session.mode === 'countdown' && session.targetSec != null;
+    const remaining = isCountdown ? Math.max(0, (session.targetSec ?? 0) - liveSec) : 0;
+    return {
+      title: `正在进行：${runningName}`,
+      meta: formatClockTime(session.startedAt),
+      detail: isCountdown
+        ? `倒计时 · 剩 ${formatDuration(remaining)}`
+        : status === 'paused'
+          ? `已暂停 · ${formatDuration(liveSec)}`
+          : `计时中 · ${formatDuration(liveSec)}`,
+      tone: status === 'paused' ? 'danger' : 'accent',
+    };
+  }, [session, status, items, liveSec]);
 
   const removeItem = useCallback(() => {
     const target = item;
@@ -182,7 +206,13 @@ export function ItemMenu() {
   return (
     <>
       <div className="menu-scrim" onMouseDown={closeItemMenu} aria-hidden />
-      <GlassMenu entries={entries} anchor={pos} ariaLabel="事项操作" onClose={closeItemMenu} />
+      <GlassMenu
+        entries={entries}
+        status={statusBlock}
+        anchor={pos}
+        ariaLabel="事项操作"
+        onClose={closeItemMenu}
+      />
       {/* 弹窗叠在菜单上（后渲染在后）：自己的 scrim 接管点击，确认后 reload 事项表 */}
       {cascadeOpen && item ? (
         <ItemsCascadeDeleteConfirm

@@ -45,7 +45,7 @@ fn single_item_key_keeps_the_track_off_flag() {
         mirror(&business, &kv).await.unwrap();
 
         /* 口径 3 仍然生效：只认单事项键那条（`watched` 不补进来）；
-           但它必须带 `track = 0`（用户说过不计入）。 */
+        但它必须带 `track = 0`（用户说过不计入）。 */
         assert_eq!(rows_for(&business, "code.exe").await, vec![(bound, 0)]);
     });
 }

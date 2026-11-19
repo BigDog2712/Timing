@@ -12,7 +12,7 @@
 //! 才能在一个查询里完成；两个 pool 不能 JOIN。事项的 `category_key` 由
 //! `focus_blocks.category_key`（快照）带过来，因此解析过程不需要回读业务库。
 
-use sqlx::{Pool, Sqlite, Row};
+use sqlx::{Pool, Row, Sqlite};
 
 /// 一行「应用 → 分类」绑定。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,7 +23,10 @@ pub struct AppCategoryRow {
 }
 
 /// 列出绑定：给 `app_key` 就只列那个应用的，不给就列全部（设置页总览要它）。
-pub async fn list(pool: &Pool<Sqlite>, app_key: Option<&str>) -> Result<Vec<AppCategoryRow>, String> {
+pub async fn list(
+    pool: &Pool<Sqlite>,
+    app_key: Option<&str>,
+) -> Result<Vec<AppCategoryRow>, String> {
     let sql = match app_key {
         Some(_) => {
             "SELECT app_key, category_key, priority FROM app_category

@@ -1,8 +1,10 @@
 use crate::app::activity::main_window;
 use crate::app::activity::state::{BackgroundEntryState, DesktopBehaviorState};
 use crate::app::activity::tray::{apply_tray_visibility, show_main_window};
+use crate::models::activity::settings::{
+    DesktopBehaviorSettings, StartupSource, StartupUiStrategy,
+};
 use crate::services::activity::data::app_settings_service;
-use crate::models::activity::settings::{DesktopBehaviorSettings, StartupSource, StartupUiStrategy};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
 
@@ -77,11 +79,7 @@ pub(crate) fn apply_startup_desktop_behavior<R: Runtime + 'static>(
         }
     }
     let strategy = next.startup_ui_strategy(source);
-    crate::log_info!(
-        "source={} strategy={}",
-        source.as_str(),
-        strategy.as_str()
-    );
+    crate::log_info!("source={} strategy={}", source.as_str(), strategy.as_str());
 
     match strategy {
         StartupUiStrategy::Show => {

@@ -10,8 +10,8 @@
 //! 用例⑥⑦⑫ 是洞 2 的守卫：变异自检（去掉 `find_heading` 的围栏判断）必须让它们红。
 //! 用例① 是洞 1 的守卫：去掉 `section_end` 的围栏判断必须让它红。
 
-use crate::infra::md_file;
 use crate::infra::md_fence;
+use crate::infra::md_file;
 use crate::infra::md_section::{self, SectionIssue, SectionState};
 use crate::tests::support::unique_dir;
 
@@ -44,7 +44,10 @@ fn yaml_comment_in_closed_fence_does_not_truncate_section() {
     let doc = "#### 事项计时\n- [ ] 写代码\n```\n# 备注\n```\n- [ ] 第二段\n#### 便利贴\n\n表格\n";
     let body = md_file::body_in_text(doc, TIMERS).expect("应找到标题");
     assert!(body.contains("# 备注"), "围栏里的注释属于正文：{body}");
-    assert!(body.contains("- [ ] 第二段"), "围栏之后的内容也要读到：{body}");
+    assert!(
+        body.contains("- [ ] 第二段"),
+        "围栏之后的内容也要读到：{body}"
+    );
     assert_eq!(end_line_of(doc, TIMERS), NOTES, "区块应结束在下一个真标题");
 }
 
@@ -69,7 +72,10 @@ fn tilde_fence_hides_comment_and_is_not_closed_by_backticks() {
     let doc = "#### 事项计时\n- [ ] 写代码\n~~~\n# 备注\n```\n- [ ] 还在围栏里\n~~~\n- [ ] 第二段\n#### 便利贴\n";
     let body = md_file::body_in_text(doc, TIMERS).expect("应找到标题");
     assert!(body.contains("# 备注"));
-    assert!(body.contains("- [ ] 还在围栏里"), "反引号关不掉波浪号围栏：{body}");
+    assert!(
+        body.contains("- [ ] 还在围栏里"),
+        "反引号关不掉波浪号围栏：{body}"
+    );
     assert!(body.contains("- [ ] 第二段"));
     assert_eq!(end_line_of(doc, TIMERS), NOTES);
 }
@@ -93,7 +99,10 @@ fn shorter_fence_inside_longer_does_not_close() {
 fn four_space_indented_fence_is_not_a_fence() {
     let doc = "#### 事项计时\n    ```\n# 备注\n    ```\n#### 便利贴\n";
     let body = md_file::body_in_text(doc, TIMERS).expect("应找到标题");
-    assert!(!body.contains("# 备注"), "没有围栏，`# 备注` 就是真标题：{body}");
+    assert!(
+        !body.contains("# 备注"),
+        "没有围栏，`# 备注` 就是真标题：{body}"
+    );
     assert_eq!(end_line_of(doc, TIMERS), "# 备注");
 }
 
@@ -105,11 +114,19 @@ fn heading_inside_fence_is_not_the_section_start() {
     let doc = "说明\n```\n#### 事项计时\n```\n真的内容\n#### 事项计时\n- [ ] 真\n";
     let lines: Vec<&str> = doc.split('\n').collect();
     let fences = md_fence::scan(&lines);
-    let (head_idx, level) = md_section::find_heading(&lines, &fences, TIMERS).expect("应命中真标题");
+    let (head_idx, level) =
+        md_section::find_heading(&lines, &fences, TIMERS).expect("应命中真标题");
     assert_eq!(head_idx, 5, "围栏里那行是示例文本，不是区块起点");
     assert_eq!(level, 4);
-    assert_eq!(md_section::count_exact(&lines, &fences, TIMERS), 1, "围栏里那份不算标题");
-    assert_eq!(md_file::body_in_text(doc, TIMERS).as_deref(), Some("- [ ] 真"));
+    assert_eq!(
+        md_section::count_exact(&lines, &fences, TIMERS),
+        1,
+        "围栏里那份不算标题"
+    );
+    assert_eq!(
+        md_file::body_in_text(doc, TIMERS).as_deref(),
+        Some("- [ ] 真")
+    );
 }
 
 /// ⑦ 围栏里那行在前、文件里**根本没有**真标题 → `MissingHeading`，补在末尾且不改写围栏。
@@ -127,16 +144,27 @@ fn heading_only_inside_fence_is_missing_and_appends_at_end() {
         "围栏里那行不算标题：{:?}",
         read.state
     );
-    assert!(read.issues.is_empty(), "别误报成等级不一致：{:?}", read.issues);
+    assert!(
+        read.issues.is_empty(),
+        "别误报成等级不一致：{:?}",
+        read.issues
+    );
 
     md_file::write_section(&path, TIMERS, "- [ ] 新").unwrap();
     let after = std::fs::read_to_string(&path).unwrap();
-    assert!(after.starts_with(before), "围栏那段必须逐字节不变：\n{after}");
+    assert!(
+        after.starts_with(before),
+        "围栏那段必须逐字节不变：\n{after}"
+    );
     assert!(
         after.trim_end().ends_with("#### 事项计时\n- [ ] 新"),
         "新的一节应补在末尾：\n{after}"
     );
-    assert_eq!(after.matches(TIMERS).count(), 2, "围栏里那行还在，只多了一个真标题");
+    assert_eq!(
+        after.matches(TIMERS).count(),
+        2,
+        "围栏里那行还在，只多了一个真标题"
+    );
 }
 
 // ---------------------------------------------------------------- 未闭合围栏
@@ -163,11 +191,14 @@ fn unclosed_fence_inside_section_blocks_the_round() {
     );
 
     /* F7 的语义仍在：未闭合围栏一直延伸到 EOF，所以 `section_end` 就是文件末尾。
-       危险的不是这个数字，而是「别把它当 body」——`Blocked` 保证了这一点。 */
+    危险的不是这个数字，而是「别把它当 body」——`Blocked` 保证了这一点。 */
     let lines: Vec<&str> = doc.split('\n').collect();
     let fences = md_fence::scan(&lines);
     let (head_idx, level) = md_section::find_heading(&lines, &fences, TIMERS).unwrap();
-    assert_eq!(md_section::section_end(&lines, &fences, head_idx, level), lines.len());
+    assert_eq!(
+        md_section::section_end(&lines, &fences, head_idx, level),
+        lines.len()
+    );
 
     /* 用户补上三个反引号即恢复：body 只到下一个真标题。 */
     let fixed = "#### 事项计时\n- [ ] 写代码\n```\n# 备注\n```\n#### 便利贴\n\n表格\n";
@@ -175,7 +206,10 @@ fn unclosed_fence_inside_section_blocks_the_round() {
     match read.state {
         SectionState::Present { body, .. } => {
             assert!(body.contains("# 备注"));
-            assert!(!body.contains("表格"), "补上收尾后不许把下一节吞进来：{body}");
+            assert!(
+                !body.contains("表格"),
+                "补上收尾后不许把下一节吞进来：{body}"
+            );
         }
         other => panic!("补上收尾后应恢复：{other:?}"),
     }
@@ -203,7 +237,11 @@ fn unclosed_fence_before_our_heading_is_not_blocking() {
 fn fence_example_is_not_counted_as_duplicate_heading() {
     let doc = "说明\n```\n#### 事项计时\n```\n#### 事项计时\n- [ ] 真\n";
     let read = read_text("md-fence-no-fake-duplicate", doc, TIMERS);
-    assert!(matches!(read.state, SectionState::Present { .. }), "{:?}", read.state);
+    assert!(
+        matches!(read.state, SectionState::Present { .. }),
+        "{:?}",
+        read.state
+    );
     assert!(
         read.issues.is_empty(),
         "围栏里那行不该报「文件里有 2 个…」：{:?}",
@@ -226,7 +264,11 @@ fn fence_example_is_not_counted_as_duplicate_heading() {
 fn duplicate_heading_is_reported_but_not_blocking() {
     let doc = "#### 事项计时\n- [ ] 甲\n#### 事项计时\n- [ ] 乙\n#### 便利贴\n";
     let read = read_text("md-fence-duplicate", doc, TIMERS);
-    assert!(matches!(read.state, SectionState::Present { .. }), "{:?}", read.state);
+    assert!(
+        matches!(read.state, SectionState::Present { .. }),
+        "{:?}",
+        read.state
+    );
     let issue = read
         .issues
         .iter()
@@ -248,7 +290,11 @@ fn duplicate_heading_is_reported_but_not_blocking() {
 #[test]
 fn mismatched_heading_level_blocks_and_does_not_append() {
     let read = read_text("md-fence-mismatch", "### 事项计时\n- [ ] 甲\n", TIMERS);
-    assert!(matches!(read.state, SectionState::Blocked { .. }), "{:?}", read.state);
+    assert!(
+        matches!(read.state, SectionState::Blocked { .. }),
+        "{:?}",
+        read.state
+    );
     let issue = read
         .issues
         .iter()
@@ -268,6 +314,14 @@ fn mismatched_heading_level_blocks_and_does_not_append() {
 fn mismatched_is_not_reported_when_exact_heading_exists() {
     let doc = "### 事项计时\n- [ ] 目录抄的一行\n#### 事项计时\n- [ ] 真\n#### 便利贴\n";
     let read = read_text("md-fence-mismatch-ok", doc, TIMERS);
-    assert!(matches!(read.state, SectionState::Present { .. }), "{:?}", read.state);
-    assert!(read.issues.is_empty(), "见同名就报红会把同步永久堵死：{:?}", read.issues);
+    assert!(
+        matches!(read.state, SectionState::Present { .. }),
+        "{:?}",
+        read.state
+    );
+    assert!(
+        read.issues.is_empty(),
+        "见同名就报红会把同步永久堵死：{:?}",
+        read.issues
+    );
 }

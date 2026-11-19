@@ -174,7 +174,11 @@ mod tests {
     /// 用户自己填的根目录同样要归一（LocalFolder 模式那条路也走这个函数）。
     #[test]
     fn user_typed_root_is_normalized_too() {
-        let got = resolve_template(r"%APP_DIR%\我的日记\md", "/data/user/0/com.timing.app", true);
+        let got = resolve_template(
+            r"%APP_DIR%\我的日记\md",
+            "/data/user/0/com.timing.app",
+            true,
+        );
         assert_eq!(got, "/data/user/0/com.timing.app/我的日记/md", "{got}");
     }
 }

@@ -46,8 +46,14 @@ fn sync_item_label_switches_but_menu_shape_does_not() {
     assert_eq!(label_of(&local, ID_MD_SYNC).as_deref(), Some(LOCAL));
     assert_eq!(label_of(&cloud, ID_MD_SYNC).as_deref(), Some(CLOUD));
     /* 数量：两档都恰好 1 项（不是「新增一项」） */
-    assert_eq!(ids(&local).iter().filter(|id| **id == ID_MD_SYNC).count(), 1);
-    assert_eq!(ids(&cloud).iter().filter(|id| **id == ID_MD_SYNC).count(), 1);
+    assert_eq!(
+        ids(&local).iter().filter(|id| **id == ID_MD_SYNC).count(),
+        1
+    );
+    assert_eq!(
+        ids(&cloud).iter().filter(|id| **id == ID_MD_SYNC).count(),
+        1
+    );
     /* 结构：id 序列逐项相同 —— 只有那个 label 变了 */
     assert_eq!(ids(&local), ids(&cloud));
 }
@@ -120,7 +126,11 @@ fn quit_item_shows_busy_state_while_syncing() {
 
     /* 逐字：单个 `…`，不是三个点 —— B7 的判据写的是「标签逐字」 */
     assert_eq!(label_of(&busy, ID_QUIT).as_deref(), Some("正在同步…"));
-    assert_eq!(enabled_of(&busy, ID_QUIT), Some(false), "同步期间不能再点一次退出");
+    assert_eq!(
+        enabled_of(&busy, ID_QUIT),
+        Some(false),
+        "同步期间不能再点一次退出"
+    );
 
     /* 只有退出项变：id 序列与其余各项的文字 / 启用态一个字不动（菜单高度不许跳） */
     assert_eq!(ids(&idle), ids(&busy), "退出项变字不该改变菜单结构");
@@ -131,7 +141,11 @@ fn quit_item_shows_busy_state_while_syncing() {
         ID_OPEN_NOTE,
         ID_OPEN_SETTINGS,
     ] {
-        assert_eq!(label_of(&idle, id), label_of(&busy, id), "{id} 的文字不该变");
+        assert_eq!(
+            label_of(&idle, id),
+            label_of(&busy, id),
+            "{id} 的文字不该变"
+        );
         assert_eq!(
             enabled_of(&idle, id),
             enabled_of(&busy, id),

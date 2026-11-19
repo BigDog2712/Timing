@@ -3,15 +3,11 @@ import type { RefObject } from "react";
 import { createPortal } from "react-dom";
 
 import { formatDuration, formatTime } from "../services/historyFormatting.ts";
+import type { TimelineDetailTitle } from "./historyTitleCleanup.ts";
 
-export type TimelineDetailTitle = {
-  title: string;
-  secondaryText?: string | null;
-  startTime: number;
-  endTime: number | null;
-  duration?: number;
-  isUntitled?: boolean;
-};
+/* Re-exported so timeline renderers keep importing the row type from the popover
+   that consumes it; the definition itself lives next to the title cleaner. */
+export type { TimelineDetailTitle };
 
 export interface HistoryTimelineDetailsPopoverState {
   sessionId: number | string;

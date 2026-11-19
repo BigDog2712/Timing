@@ -55,9 +55,14 @@ const LIVE_JSON: &str = r#####"{"enabled":true,"pollSecs":900,"bindings":[{"kind
 const CHANNEL_FIELDS: [&str; 4] = ["localRoot", "baseUrl", "basePath", "user"];
 
 async fn seed(pool: &sqlx::SqlitePool, raw: &str) {
-    settings::set_value(pool, config::CONFIG_KEY, raw, crate::platform::clock::now_ms())
-        .await
-        .expect("写入主人配置应成功");
+    settings::set_value(
+        pool,
+        config::CONFIG_KEY,
+        raw,
+        crate::platform::clock::now_ms(),
+    )
+    .await
+    .expect("写入主人配置应成功");
 }
 
 async fn raw_of(pool: &sqlx::SqlitePool) -> String {
@@ -85,9 +90,18 @@ async fn load_then_save_keeps_the_live_config_byte_identical() {
         !once.contains(r#""cloud":"#),
         "新保存形里不许再出现 legacy `cloud` 键：{once}"
     );
-    assert!(once.contains("cloudFolder"), "folder 通路必须物化出来：{once}");
-    assert!(once.contains("我的坚果云"), "迁移把用户填的中文目录弄丢了：{once}");
-    assert!(once.contains("someone@example.com"), "迁移把账号弄丢了：{once}");
+    assert!(
+        once.contains("cloudFolder"),
+        "folder 通路必须物化出来：{once}"
+    );
+    assert!(
+        once.contains("我的坚果云"),
+        "迁移把用户填的中文目录弄丢了：{once}"
+    );
+    assert!(
+        once.contains("someone@example.com"),
+        "迁移把账号弄丢了：{once}"
+    );
 
     /* 幂等：第二次什么都没改的保存必须逐字节相同。 */
     let again = config::load(&pool).await.expect("load 应成功");
@@ -128,7 +142,10 @@ async fn going_local_only_moves_the_channel_bit_and_nothing_else() {
     seed(&pool, LIVE_JSON).await;
 
     let loaded = config::load(&pool).await.expect("load 应成功");
-    let before = loaded.cloud_folder.clone().expect("夹具里 folder 通路必须物化");
+    let before = loaded
+        .cloud_folder
+        .clone()
+        .expect("夹具里 folder 通路必须物化");
     config::save(&pool, &loaded).await.expect("save 应成功");
     /* 迁移后的那一串，作为「切出去再切回来」的对照（老形状不会回写，这是 PRD §4.4 的设计）。 */
     let migrated = raw_of(&pool).await;
@@ -157,11 +174,17 @@ async fn going_local_only_moves_the_channel_bit_and_nothing_else() {
             .get(field)
             .cloned()
             .unwrap();
-        assert_eq!(got, want, "`{field}` 被关开关改掉了（A3：一个字节都不许变）");
+        assert_eq!(
+            got, want,
+            "`{field}` 被关开关改掉了（A3：一个字节都不许变）"
+        );
     }
 
     /* 再打开：地址 / 目录 / 账号一个都不用重填，落库回到迁移后的那一串（A4）。 */
-    back.cloud_folder = Some(MdSyncCloudChannel { enabled: true, ..after });
+    back.cloud_folder = Some(MdSyncCloudChannel {
+        enabled: true,
+        ..after
+    });
     config::save(&pool, &back).await.expect("save 应成功");
     assert_eq!(
         raw_of(&pool).await,
@@ -182,11 +205,17 @@ async fn null_cloud_is_never_fattened_into_a_default_shell() {
         r#""cloud":{"enabled":true,"mode":"localfolder","localRoot":"C:\\Users\\user\\Nutstore\\1\\我的坚果云\\Timing","baseUrl":"https://dav.jianguoyun.com/dav/","basePath":"/Timing","user":"someone@example.com"}"#,
         r#""cloud":null"#,
     );
-    assert!(nulled.contains(r#""cloud":null"#), "夹具替换失败，用例会假绿");
+    assert!(
+        nulled.contains(r#""cloud":null"#),
+        "夹具替换失败，用例会假绿"
+    );
     seed(&pool, &nulled).await;
 
     let loaded = config::load(&pool).await.expect("load 应成功");
-    assert!(loaded.cloud.is_none(), "`cloud: null` 必须读成 None，不许补默认值");
+    assert!(
+        loaded.cloud.is_none(),
+        "`cloud: null` 必须读成 None，不许补默认值"
+    );
     assert!(loaded.cloud_folder.is_none(), "null 不许物化出 folder 通路");
     assert!(loaded.cloud_webdav.is_none(), "null 不许物化出 webdav 通路");
     config::save(&pool, &loaded).await.expect("save 应成功");
@@ -200,7 +229,9 @@ async fn null_cloud_is_never_fattened_into_a_default_shell() {
 
     /* 形状 B：老配置里**根本没有** `cloud` 这个键（V0.11.12 及以前） */
     let pool2 = fresh_pool("qa-absent-cloud").await;
-    let cut = LIVE_JSON.find(r#","cloud":"#).expect("夹具里必须有 cloud 键");
+    let cut = LIVE_JSON
+        .find(r#","cloud":"#)
+        .expect("夹具里必须有 cloud 键");
     let absent = format!("{}}}", &LIVE_JSON[..cut]);
     seed(&pool2, &absent).await;
     let loaded2 = config::load(&pool2).await.expect("load 应成功");
@@ -226,19 +257,22 @@ async fn poll_secs_survives_a_save_that_only_touches_the_channel() {
     seed(&pool, LIVE_JSON).await;
 
     let mut loaded = config::load(&pool).await.expect("load 应成功");
-    loaded.cloud_folder = loaded
-        .cloud_folder
-        .map(|channel| MdSyncCloudChannel { enabled: false, ..channel });
+    loaded.cloud_folder = loaded.cloud_folder.map(|channel| MdSyncCloudChannel {
+        enabled: false,
+        ..channel
+    });
     config::save(&pool, &loaded).await.expect("save 应成功");
 
     let after = config::load(&pool).await.expect("load 应成功");
     assert_eq!(after.poll_secs, 900, "老用户的间隔被改成默认值了");
     assert_eq!(after.bindings.len(), 3, "三档落点不许少");
-    assert_eq!(after.bindings[2].root, r"%APP_DIR%\md", "待办那一档的落点被改了");
+    assert_eq!(
+        after.bindings[2].root, r"%APP_DIR%\md",
+        "待办那一档的落点被改了"
+    );
     let folder = after.cloud_folder.expect("folder 通路不许被删掉（CH4）");
     assert_eq!(
-        folder.local_root,
-        r"C:\Users\user\Nutstore\1\我的坚果云\Timing",
+        folder.local_root, r"C:\Users\user\Nutstore\1\我的坚果云\Timing",
         "本地落点被改了"
     );
 }

@@ -174,6 +174,9 @@ pub(crate) const NON_PORTABLE_SETTING_KEYS: &[&str] = &[
     "remote_status_bridge_token",
     "web_activity_token",
     "plugin.md-sync.config",
+    /* [0.12.3] AI 配置不跨设备：密钥在各自的凭据存储里，把地址与开关搬过去只会让
+    另一台机器拿着「看起来已配置」的空壳反复失败。包里照常留着（可追溯）。 */
+    "ai.config",
     "__tracker_last_heartbeat_ms",
     "__tracker_last_successful_sample_ms",
     "__tracker_last_startup_self_heal_at_ms",
@@ -261,7 +264,7 @@ fn cell(row: &SqliteRow, index: usize) -> Value {
         return Value::from(value);
     }
     /* BLOB（目前只有极端脏数据会出现）：不塞进 JSON，如实留空。
-       宁可丢一个二进制字段，也不让整包因为一行坏数据导不出来。 */
+    宁可丢一个二进制字段，也不让整包因为一行坏数据导不出来。 */
     Value::Null
 }
 

@@ -70,9 +70,11 @@ fn only_new_db_means_new_layout() {
 #[test]
 fn only_old_db_means_old_layout() {
     let root = temp_root("old-only");
-    touch(&root
-        .join(LEGACY_ACTIVITY_DATA_REL)
-        .join(LEGACY_ACTIVITY_DB_FILE));
+    touch(
+        &root
+            .join(LEGACY_ACTIVITY_DATA_REL)
+            .join(LEGACY_ACTIVITY_DB_FILE),
+    );
     assert_eq!(fs_only_layout_in(&root), Layout::Old);
 }
 
@@ -121,13 +123,21 @@ fn tie_between_the_two_copies_resolves_to_new() {
 fn webview_layout_is_independent_of_the_data_layout() {
     let root = temp_root("webview");
     make_valid_db(&root.join(ACTIVITY_DATA_REL).join(SQLITE_DB_FILE_NAME));
-    fs::create_dir_all(root.join(activity_subdir_of(Layout::Old)).join(WEBVIEW_SUBDIR)).unwrap();
+    fs::create_dir_all(
+        root.join(activity_subdir_of(Layout::Old))
+            .join(WEBVIEW_SUBDIR),
+    )
+    .unwrap();
     assert_eq!(fs_only_layout_in(&root), Layout::New);
     /* 带闸那一档也必须是 New：这份库是真的，不该因为完整性检测而退回旧布局。 */
     assert_eq!(data_layout_checked_in(&root), Layout::New);
     assert_eq!(webview_layout_in(&root), Layout::Old);
 
-    fs::create_dir_all(root.join(activity_subdir_of(Layout::New)).join(WEBVIEW_SUBDIR)).unwrap();
+    fs::create_dir_all(
+        root.join(activity_subdir_of(Layout::New))
+            .join(WEBVIEW_SUBDIR),
+    )
+    .unwrap();
     assert_eq!(webview_layout_in(&root), Layout::New);
 }
 

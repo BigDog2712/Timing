@@ -1,7 +1,7 @@
 use super::ports::TrackingDataStore;
 use super::transition;
-use crate::models::activity::tracking::TrackingStatusSnapshot;
 use crate::infra::activity::windows::foreground as tracker;
+use crate::models::activity::tracking::TrackingStatusSnapshot;
 
 #[derive(Clone, Debug)]
 pub(crate) struct PendingContinuity {

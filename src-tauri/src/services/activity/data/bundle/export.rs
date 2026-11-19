@@ -18,7 +18,7 @@
 //! 清单里的表在**旧库**上可能还不存在（迁移没跑到 / 用户从更早版本升上来）。
 //! 缺表导出成 `[]` 并跳过计数，不影响整包——导入侧对「包里没有这张表」也是同一个态度。
 
-use super::{row_to_value, BundleWriter, ACTIVITY_TABLES, BUSINESS_TABLES, FORMAT, TableSpec};
+use super::{row_to_value, BundleWriter, TableSpec, ACTIVITY_TABLES, BUSINESS_TABLES, FORMAT};
 use futures_util::TryStreamExt;
 use serde::Serialize;
 use serde_json::Value;
@@ -80,7 +80,11 @@ pub async fn export_full_bundle(
     let bytes = fs::metadata(output)
         .map_err(|error| format!("failed to stat bundle file: {error}"))?
         .len();
-    Ok(ExportSummary { row_count, table_count, bytes })
+    Ok(ExportSummary {
+        row_count,
+        table_count,
+        bytes,
+    })
 }
 
 async fn write_section<W: Write>(
@@ -91,9 +95,7 @@ async fn write_section<W: Write>(
 ) -> Result<usize, String> {
     let mut written = 0_usize;
     for (index, spec) in tables.iter().enumerate() {
-        writer
-            .open_table(spec.name, index == 0)
-            .map_err(io_error)?;
+        writer.open_table(spec.name, index == 0).map_err(io_error)?;
         if table_exists(pool, spec.name).await? {
             written += 1;
             let sql = format!("SELECT * FROM \"{}\"", spec.name);

@@ -22,6 +22,7 @@ import {
   loadCurrentAppSettings,
   subscribeAppSettingsChanged,
 } from "../services/appSettingsRuntimeService.ts";
+import { subscribeCategoryCatalogChanged } from "../../platform/persistence/categoryCatalogEvents.ts";
 import { clearDashboardSnapshotCache } from "../../features/dashboard/services/dashboardSnapshotCache.ts";
 import {
   clearDataBootstrapCache,
@@ -84,6 +85,12 @@ export function useWindowTracking(options: UseWindowTrackingOptions = {}) {
       if (cancelled) off(); else unlisteners.push(off);
     };
     const refreshTracking = () => tracking.refresh();
+    const refreshCategoryCatalog = async () => {
+      if (cancelled) return;
+      ClassificationService.invalidateBootstrapCache();
+      ClassificationService.invalidateAppCatalog();
+      setSyncTick((tick) => tick + 1);
+    };
     const refreshAfterDataChange = async (payload: { reason: string }) => {
       if (cancelled) return;
       const invalidateCaches = shouldInvalidateDataCaches(payload.reason);
@@ -110,6 +117,7 @@ export function useWindowTracking(options: UseWindowTrackingOptions = {}) {
           listen(subscribeAppSettingsChanged(async () => {
             await Promise.all([settings.refresh(), tracking.refresh()]);
           })),
+          listen(subscribeCategoryCatalogChanged(refreshCategoryCatalog)),
         ]);
         for (const result of subscriptions) {
           if (result.status === "rejected") console.warn("Failed to subscribe to runtime changes", result.reason);

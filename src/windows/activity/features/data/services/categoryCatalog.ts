@@ -2,8 +2,10 @@ import { ProcessMapper } from "../../../shared/classification/processMapper.ts";
 import type { Locale, UiText } from "../../../shared/i18n/index.ts";
 import type { ClassificationBootstrapData } from "../../classification/services/classificationService.ts";
 import { buildQuickClassificationCategoryOptions } from "../../classification/services/quickClassification.ts";
+import { resolveCategorySet } from "../../../shared/classification/appOverrideCodec.ts";
+import type { AppOverride } from "../../../shared/classification/processMapper.ts";
+import type { WebDomainOverride } from "../../../shared/types/webActivity.ts";
 import type { AppEditCategoryOption } from "../hooks/useAppEditCategoryAdmin.ts";
-import { collectCategoryUsage } from "./appEditDraft.ts";
 
 /**
  * 「分类候选 + 用量」这一对派生量（[本轮] 从 `useAppEditDialog` 抽出来的共用件）。
@@ -34,4 +36,24 @@ export function collectAppEditCategoryUsage(
   bootstrap: ClassificationBootstrapData,
 ): Record<string, number> {
   return collectCategoryUsage(bootstrap.loadedOverrides, bootstrap.loadedWebDomainOverrides);
+}
+
+/**
+ * 每个分类被多少个应用（含网页）指着 —— 删除确认要报的影响面。
+ * [0.12.4] 从 `appEditDraft.ts` 搬来这里：那个文件随「应用设置」弹窗一起下线了，
+ * 而这一个函数仍有消费方（分类管理的删除确认）。
+ */
+export function collectCategoryUsage(
+  appOverrides: Readonly<Record<string, AppOverride>>,
+  webDomainOverrides: Readonly<Record<string, WebDomainOverride>> = {},
+): Record<string, number> {
+  const usage: Record<string, number> = {};
+  const record = (categories: readonly string[]) => {
+    for (const category of categories) {
+      usage[category] = (usage[category] ?? 0) + 1;
+    }
+  };
+  for (const override of Object.values(appOverrides)) record(resolveCategorySet(override));
+  for (const override of Object.values(webDomainOverrides)) record(resolveCategorySet(override));
+  return usage;
 }

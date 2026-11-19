@@ -1,0 +1,134 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant MainUI as Main window UI
+    participant ActivityUI as Activity window UI
+    participant Shared as Shared Tag Rules
+    participant Gateway as Window-local IPC Gateway
+    participant Cmd as Rust TagIpcCommands
+    participant Service as TagCatalogService
+    participant Repo as TagRepository
+    participant DB as Business SQLite + independent Activity SQLite/KV
+    participant Events as Host Tag Event
+    participant AI as AiClient/Parser
+
+    Note over Cmd,DB: Startup and migration
+    Cmd->>Service: initialize / recoverPendingMutations()
+    Service->>Repo: apply schema migrations and idempotent backfill
+    Repo->>DB: ensure items.tags; seed empty tags from valid legacy categoryKey once
+    Repo->>DB: commit migration marker with data changes
+    Service->>Repo: load settings KV + item tag paths
+    Repo-->>Service: catalog rows and assignments
+    Service->>Shared: build canonical catalog inputs
+    Shared-->>Service: normalized sorted tree
+    par Both windows initialize
+      MainUI->>Gateway: tag_catalog_list()
+      Gateway->>Cmd: IPC list
+      Cmd->>Service: list()
+      Service-->>MainUI: TagNode[]
+    and
+      ActivityUI->>Gateway: tag_catalog_list()
+      Gateway->>Cmd: IPC list
+      Cmd->>Service: list()
+      Service-->>ActivityUI: TagNode[]
+    end
+    MainUI->>Events: subscribe tags:changed
+    ActivityUI->>Events: subscribe tags:changed
+
+    Note over User,Events: Manual assignment from data/history or item editor
+    User->>ActivityUI: select tags for app/item row
+    ActivityUI->>Shared: normalize and validate for immediate feedback
+    Shared-->>ActivityUI: canonical assignment or validation error
+    ActivityUI->>ActivityUI: optimistic chip update
+    ActivityUI->>Gateway: tag_assignment_set(assignment)
+    Gateway->>Cmd: IPC set
+    Cmd->>Service: setAssignment(input)
+    Service->>Shared: normalize and validate again
+    Service->>Repo: begin transaction / prepare journal
+    Repo->>DB: ensure path registration + update object tags/primary
+    Repo->>DB: commit object and catalog changes
+    Service->>Events: emit tags:changed(revision, affected targets)
+    Service-->>Cmd: canonical TagAssignment
+    Cmd-->>Gateway: success DTO
+    Gateway-->>ActivityUI: canonical assignment
+    Events-->>MainUI: tags:changed
+    MainUI->>Gateway: reload affected assignments/catalog
+    Gateway-->>MainUI: refreshed chips
+    Note over ActivityUI: On IPC failure, rollback optimistic state and show localized error
+
+    Note over User,Events: Rename with conflict preview
+    User->>ActivityUI: request rename path to destination
+    ActivityUI->>Gateway: tag_mutation_preview(rename, source, destination)
+    Gateway->>Cmd: IPC preview
+    Cmd->>Service: preview()
+    Service->>Repo: read descendant paths and all references
+    Repo-->>Service: impacted apps, sites, items and counts
+    Service-->>ActivityUI: TagMutationPreview + app_category conflicts + expectedFingerprint
+    ActivityUI-->>User: show impact and app_category conflict details; resolve conflicts before retry
+    alt conflicts not empty
+      ActivityUI-->>User: reject entire operation; resolve conflicts first
+    else no conflicts
+      User->>ActivityUI: confirm
+    end
+    ActivityUI->>Gateway: tag_rename(source, destination, expectedFingerprint)
+    Gateway->>Cmd: IPC mutate
+    Cmd->>Service: rename()
+    Service->>Repo: re-read impact, validate fingerprint/conflicts, then prepare journal
+    Repo->>DB: insert prepared journal in business SQLite
+    Repo->>DB: activity SQLite transaction: rewrite app_category and override references
+    Repo->>DB: business SQLite transaction: rewrite items.category_key to target/NULL and update items.tags
+    Repo->>DB: update journal phase after each single-DB commit
+    Note over Repo,DB: focus_blocks.category_key is not written here; projector rebuilds the activity snapshot from business data
+    Service->>Events: emit tags:changed only after all journal phases complete
+    Service-->>ActivityUI: updated catalog
+    Events-->>MainUI: refresh active catalog and chips
+
+    Note over User,Events: Delete and restore
+    User->>ActivityUI: request delete path
+    ActivityUI->>Gateway: preview(delete, path)
+    Gateway->>Cmd: IPC preview
+    Cmd->>Service: preview()
+    Service->>Repo: collect subtree and impacted objects
+    Repo-->>ActivityUI: counts, first N names, conflicts, expectedFingerprint
+    ActivityUI-->>User: confirm cascade delete
+    User->>ActivityUI: confirm delete
+    ActivityUI->>Gateway: tag_delete(path, cascade, confirmed)
+    Gateway->>Cmd: IPC delete
+    Cmd->>Service: delete()
+    Service->>Repo: revalidate impact and persist
+    Repo->>DB: business SQLite: map items.category_key to target/NULL and remove tag refs
+    Repo->>DB: activity SQLite: remove refs; promote next app tag; tombstone built-in definitions
+    Note over Repo,DB: focus_blocks is a rebuildable projection, never a second propagation source
+    Repo->>DB: commit each single-DB phase or leave recoverable journal; no cross-DB atomic transaction
+    Service->>Events: emit tags:changed
+    User->>ActivityUI: restore built-in tombstone
+    ActivityUI->>Gateway: tag_restore(path)
+    Gateway->>Cmd: IPC restore
+    Cmd->>Service: restore(path)
+    Service->>Repo: clear tombstone without inventing references
+    Service->>Events: emit tags:changed
+
+    Note over User,AI: AI suggestions are previews; confirmation writes through normal assignment
+    User->>ActivityUI: request suggestions for selected targets
+    ActivityUI->>Gateway: ai_suggest_tags(requestId, targets, candidates)
+    Gateway->>AI: check config/entry switch; request with total budget
+    AI->>AI: retry transient failures with bounded backoff
+    AI->>AI: extract JSON and validate rows against existing candidates
+    AI-->>Gateway: suggestions + parse/retry/batch stats
+    Gateway-->>ActivityUI: preview suggestions
+    ActivityUI-->>User: show selectable rows and dropped count
+    alt User cancels or window closes
+      ActivityUI->>Gateway: ai_cancel(requestId)
+      Gateway->>AI: cancel transport and discard late response
+      AI-->>ActivityUI: AI_CANCELLED; no writes
+    else User confirms selected suggestions
+      User->>ActivityUI: apply selected rows
+      loop Each selected target
+        ActivityUI->>Gateway: tag_assignment_set(canonical assignment)
+        Gateway->>Cmd: IPC set
+        Cmd->>Service: setAssignment()
+        Service->>Repo: persist through shared tag path
+      end
+      Service->>Events: emit tags:changed after successful writes
+      Events-->>MainUI: reload affected tags
+    end

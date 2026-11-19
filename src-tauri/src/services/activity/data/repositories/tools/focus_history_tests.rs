@@ -1,7 +1,7 @@
 use super::*;
-use crate::services::activity::data::repositories::tools::{self, free_focus};
 use crate::models::activity::free_focus::{FreeFocusAction, RestMode};
 use crate::models::activity::tools::PomodoroTaskAction;
+use crate::services::activity::data::repositories::tools::{self, free_focus};
 use sqlx::Executor;
 
 async fn db() -> SqlitePool {
@@ -128,9 +128,11 @@ async fn completing_and_restarting_a_pomodoro_keeps_the_previous_group() {
 async fn reopened_database_preserves_spans_and_rolls_back_a_failed_resume() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("history.db");
-    let pool = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&path, true)
-        .await
-        .unwrap();
+    let pool = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+        &path, true,
+    )
+    .await
+    .unwrap();
     crate::services::activity::data::sqlite_pool::prepare_pool_schema(&pool, &path)
         .await
         .unwrap();
@@ -139,9 +141,11 @@ async fn reopened_database_preserves_spans_and_rolls_back_a_failed_resume() {
         .unwrap();
     tools::pause_pomodoro(&pool, 2000).await.unwrap();
     pool.close().await;
-    let pool = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(&path, false)
-        .await
-        .unwrap();
+    let pool = crate::services::activity::data::sqlite_pool::open_single_connection_sqlite_pool(
+        &path, false,
+    )
+    .await
+    .unwrap();
     pool.execute(
         "CREATE TRIGGER reject_span BEFORE INSERT ON focus_history_spans
         BEGIN SELECT RAISE(ABORT,'synthetic history failure'); END;",

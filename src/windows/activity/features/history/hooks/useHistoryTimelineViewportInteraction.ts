@@ -5,7 +5,6 @@ import {
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
-  type RefObject,
 } from "react";
 import {
   panHistoryTimelineViewport,
@@ -14,6 +13,14 @@ import {
   zoomHistoryTimelineViewportAroundAnchor,
   type HistoryTimelineViewport,
 } from "../../../shared/lib/activityTimelineCompiler.ts";
+import type {
+  DragSession,
+  HistoryTimelineViewportChangeReason,
+  Params,
+  PendingViewportChange,
+} from "./useHistoryTimelineViewportInteractionTypes.ts";
+
+export type { HistoryTimelineViewportChangeReason };
 
 const DRAG_THRESHOLD_PX = 5;
 const HORIZONTAL_WHEEL_DOMINANCE = 1.1;
@@ -22,33 +29,6 @@ const WHEEL_ZOOM_STEP_MS = 0.2 * 60 * 60_000;
 const WHEEL_LINE_HEIGHT_PX = 16;
 const DOM_DELTA_LINE = 1;
 const DOM_DELTA_PAGE = 2;
-
-export type HistoryTimelineViewportChangeReason = "pan" | "zoom";
-
-interface Params {
-  selectedDate: Date;
-  viewport: HistoryTimelineViewport;
-  enabled: boolean;
-  interactionRef: RefObject<HTMLDivElement | null>;
-  onViewportChange: (
-    viewport: HistoryTimelineViewport,
-    reason: HistoryTimelineViewportChangeReason,
-  ) => void;
-}
-
-interface PendingViewportChange {
-  viewport: HistoryTimelineViewport;
-  reason: HistoryTimelineViewportChangeReason;
-}
-
-interface DragSession {
-  pointerId: number;
-  startClientX: number;
-  startViewport: HistoryTimelineViewport;
-  trackWidthPx: number;
-  element: HTMLDivElement;
-  dragging: boolean;
-}
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));

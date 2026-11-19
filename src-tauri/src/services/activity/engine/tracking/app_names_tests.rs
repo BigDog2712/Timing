@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod cases {
     use super::super::*;
+    use crate::infra::activity::windows::foreground::WindowInfo;
     use crate::services::activity::data::{schema, tracking_runtime::TrackingRuntimeDataStore};
     use crate::services::activity::engine::tracking::{active_session, ports::TrackingDataStore};
-    use crate::infra::activity::windows::foreground::WindowInfo;
     use sqlx::{Executor, SqlitePool};
     use std::sync::{
         atomic::{AtomicUsize, Ordering},

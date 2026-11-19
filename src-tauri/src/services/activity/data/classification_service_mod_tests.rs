@@ -174,12 +174,11 @@ fn policy_apply_seals_matching_app_and_web_activity_together() {
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        let active_web: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM web_activity_segments WHERE end_time IS NULL",
-        )
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let active_web: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM web_activity_segments WHERE end_time IS NULL")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
         assert_eq!(active_sessions, 0);
         assert_eq!(active_web, 0);
     });

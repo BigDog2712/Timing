@@ -61,7 +61,9 @@ pub async fn load(
         let members: BTreeSet<_> = keys
             .iter()
             .filter_map(|key| {
-                crate::models::activity::tracking::resolve_app_override_executable(&key.to_lowercase())
+                crate::models::activity::tracking::resolve_app_override_executable(
+                    &key.to_lowercase(),
+                )
             })
             .collect();
         for link in &bootstrap.app_links {

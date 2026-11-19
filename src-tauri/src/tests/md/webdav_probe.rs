@@ -14,10 +14,10 @@
 //! 末尾那条 `no_status_code_leaks_into_any_verdict` 补上**绿字与 `steps`**——`md_webdav_text`
 //! 只管得到 `fail_text`，管不到 `probe` 自己拼的摘要句。
 
+use super::fake_webdav_dir::DirServer;
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud, MdSyncTestResult};
 use crate::models::md_sync_config::MdSyncConfig;
 use crate::services::md_cloud;
-use super::fake_webdav_dir::DirServer;
 use crate::tests::support::fresh_pool;
 
 /// 与默认预填值同形（含中文，且不含三位连续数字）
@@ -83,19 +83,29 @@ async fn mkcol_forbidden_names_the_level_and_stops_at_dir() {
 
     let result = probe(&server).await;
     assert!(!result.ok, "目录建不出来、写也失败 → 整体不许绿");
-    assert_eq!(result.steps.len(), 2, "红在第 2 关（第 2 关不再当场判死，但最终仍停在它）");
+    assert_eq!(
+        result.steps.len(),
+        2,
+        "红在第 2 关（第 2 关不再当场判死，但最终仍停在它）"
+    );
     assert!(result.steps[0].ok, "第 1 关（账号）应通过");
     assert_eq!(result.steps[1].key, "dir");
     assert!(!result.steps[1].ok);
 
     let text = detail_of(&result, "dir").expect("第 2 关必须带原文");
-    assert!(text.contains("这一级建不出来"), "文案要点明是「哪一级」：{text}");
+    assert!(
+        text.contains("这一级建不出来"),
+        "文案要点明是「哪一级」：{text}"
+    );
     assert!(text.contains(DIR), "文案必须带出卡住的那一级路径：{text}");
-    assert!(text.contains("新建文件夹"), "必须给一个用户当场能做的动作：{text}");
+    assert!(
+        text.contains("新建文件夹"),
+        "必须给一个用户当场能做的动作：{text}"
+    );
     /* 摘要句就是那一关的原文（不拼接、不改写） */
     assert_eq!(result.detail, text);
     /* [V0.11.17] B2：MKCOL 403 不再当场判死——第 3 关真的试写过（探针 PUT 发过），
-       写不进去才回到第 2 关的话。这条同时钉住「403 继续走第 3 关」。 */
+    写不进去才回到第 2 关的话。这条同时钉住「403 继续走第 3 关」。 */
     assert!(
         server
             .method_paths()
@@ -114,14 +124,28 @@ async fn directory_get_403_is_not_an_account_failure() {
     server.fail_get_with(403); // 目录 GET 被拒，但 PUT 文件是好的
 
     let result = probe(&server).await;
-    assert!(result.ok, "GET 目录 403 不该判死整条通道：{}", result.detail);
+    assert!(
+        result.ok,
+        "GET 目录 403 不该判死整条通道：{}",
+        result.detail
+    );
     assert_eq!(result.steps.len(), 3, "三关都要走到");
-    assert!(result.steps.iter().all(|step| step.ok), "三关全绿：{:?}", result.steps);
-    assert!(result.detail.contains("服务端不支持直接读目录"), "{}", result.detail);
+    assert!(
+        result.steps.iter().all(|step| step.ok),
+        "三关全绿：{:?}",
+        result.steps
+    );
+    assert!(
+        result.detail.contains("服务端不支持直接读目录"),
+        "{}",
+        result.detail
+    );
     /* 绿字必须有实写支撑：末两条是 PUT → DELETE 探针 */
     let paths = server.method_paths();
     assert!(
-        paths.iter().any(|hit| hit.starts_with("PUT ") && hit.ends_with("/timing-write-test.txt")),
+        paths
+            .iter()
+            .any(|hit| hit.starts_with("PUT ") && hit.ends_with("/timing-write-test.txt")),
         "绿字必须建立在真写过一份文件之上：{paths:?}"
     );
     assert_no_status_code(&result, "GET 目录 403");
@@ -137,7 +161,11 @@ async fn mkcol_403_on_existing_dir_is_green_when_writable() {
     server.fail_mkcol_at(DIR, 403);
 
     let result = probe(&server).await;
-    assert!(result.ok, "目录已在、文件也写进去了 → 不许报红：{}", result.detail);
+    assert!(
+        result.ok,
+        "目录已在、文件也写进去了 → 不许报红：{}",
+        result.detail
+    );
     assert_eq!(result.steps.len(), 3, "三关如实显示：{:?}", result.steps);
     assert!(result.steps.iter().all(|step| step.ok));
     /* 第 2 关可以被标记为「已就绪」——green 时它必须出现且是 ok */
@@ -187,12 +215,20 @@ async fn green_means_a_real_put_then_a_delete() {
     assert!(result.ok, "全绿：{}", result.detail);
     assert_eq!(result.steps.len(), 3);
     assert!(result.steps.iter().all(|step| step.ok));
-    assert!(result.detail.contains("账号、目录、写入都通过"), "{}", result.detail);
+    assert!(
+        result.detail.contains("账号、目录、写入都通过"),
+        "{}",
+        result.detail
+    );
 
     /* 末两条必须是「PUT 探针 → DELETE 探针」（文件名是 ASCII，编码不影响这一段） */
     let paths = server.method_paths();
     let tail = &paths[paths.len() - 2..];
-    assert_eq!(tail.len(), 2, "绿字必须建立在「真的写了一份文件」之上：{paths:?}");
+    assert_eq!(
+        tail.len(),
+        2,
+        "绿字必须建立在「真的写了一份文件」之上：{paths:?}"
+    );
     assert!(
         tail[0].starts_with("PUT ") && tail[0].ends_with("/timing-write-test.txt"),
         "第 3 关要先 PUT 探针：{paths:?}"
@@ -208,7 +244,7 @@ async fn green_means_a_real_put_then_a_delete() {
 #[tokio::test]
 async fn cleanup_failure_keeps_the_green_result() {
     /* `DirServer` 对 DELETE 一律回 404（= 已经不在那儿了）。清理失败只该进日志，
-       绿字不能被一个清理动作改红——否则「能写但删不掉」的服务端永远测不过。 */
+    绿字不能被一个清理动作改红——否则「能写但删不掉」的服务端永远测不过。 */
     let server = DirServer::new(&[]);
     let result = probe(&server).await;
 
@@ -226,7 +262,7 @@ async fn cleanup_failure_keeps_the_green_result() {
 #[tokio::test]
 async fn no_status_code_leaks_into_any_verdict() {
     /* 五种结局各走一遍：绿、第 1 关红（密码错）、第 2 关红、第 3 关红、超层级。
-       文案里的裸状态码对用户零信息量，只该出现在日志里。 */
+    文案里的裸状态码对用户零信息量，只该出现在日志里。 */
     let green = {
         let server = DirServer::new(&[]);
         probe(&server).await
@@ -264,8 +300,8 @@ async fn no_status_code_leaks_into_any_verdict() {
     assert!(!auth.steps[0].ok);
 
     /* [QA] 每个失败场景都必须真的**失败**：只断言「文案里没有三位数字」时，若某一天
-       第 3 关被改成恒判成功（`write_403` 变成绿字），这条用例会照样通过——那正是
-       E5「存在但只读的目录红在第 3 关」唯一的一条兜底。 */
+    第 3 关被改成恒判成功（`write_403` 变成绿字），这条用例会照样通过——那正是
+    E5「存在但只读的目录红在第 3 关」唯一的一条兜底。 */
     for (result, scene, steps) in [
         (&dir_403, "第 2 关 403", 2usize),
         (&write_403, "第 3 关 403", 3),

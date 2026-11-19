@@ -1,11 +1,11 @@
-use crate::services::activity::data::backup;
-use crate::services::activity::data::remote_backup::{self, ScheduledRemotePruneOutcome};
-use crate::services::activity::data::repositories::scheduled_backup as repository;
 use crate::models::activity::backup_schedule::{
     next_slot_after, LogicalBackupSlot, ScheduledBackupCadence, ScheduledBackupConfig,
     ScheduledBackupConfigInput, ScheduledBackupRun, ScheduledBackupSnapshot, ScheduledBackupTarget,
     ScheduledBackupTargetInput, DEFAULT_LOCAL_TIME_MINUTES, SCHEDULED_BACKUP_KEEP_COUNT,
 };
+use crate::services::activity::data::backup;
+use crate::services::activity::data::remote_backup::{self, ScheduledRemotePruneOutcome};
+use crate::services::activity::data::repositories::scheduled_backup as repository;
 use crate::services::activity::engine::backup_scheduler::{decide_action, SchedulerAction};
 use chrono::{Local, LocalResult, NaiveDate, NaiveDateTime, TimeZone};
 use sqlx::{Pool, Sqlite};
@@ -99,8 +99,11 @@ pub async fn tick(app: &AppHandle) -> Result<bool, String> {
         .unwrap_or(now)
         .naive_local();
     let active = repository::load_active(&pool).await?;
-    let latest_slot =
-        crate::models::activity::backup_schedule::latest_due_slot(now.naive_local(), anchor_local, &config);
+    let latest_slot = crate::models::activity::backup_schedule::latest_due_slot(
+        now.naive_local(),
+        anchor_local,
+        &config,
+    );
     let latest_recorded = if let Some(slot) = latest_slot {
         repository::load_run(&pool, &slot.run_key(&config.target_generation))
             .await?
@@ -287,7 +290,10 @@ async fn reconcile_published_run(
 /// 刻意既不读也不写库里的 `scheduled_backup_config`：老用户那条 `enabled: true` 就此失效，
 /// 配置本身原样留着（将来 UI 回来能接着用）。摘掉的调用（原来各一处）是
 /// `repository::load_config` 与 `repository::save_config`；判据见 `tests::scheduled_backup_off`。
-async fn load_or_create_config(app: &AppHandle, _pool: &Pool<Sqlite>) -> Result<ScheduledBackupConfig, String> {
+async fn load_or_create_config(
+    app: &AppHandle,
+    _pool: &Pool<Sqlite>,
+) -> Result<ScheduledBackupConfig, String> {
     let target = default_local_target_dir(app)?;
     let now = Local::now();
     Ok(ScheduledBackupConfig {

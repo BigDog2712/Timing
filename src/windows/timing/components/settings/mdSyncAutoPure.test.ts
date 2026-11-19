@@ -53,11 +53,14 @@ describe('mdSyncAuto —— 纯函数', () => {
     expect(purgeNoteOf({ paused: false, deleted: 0, failed: 0 })).toBe(PURGE_COPY.idle);
   });
 
-  it('三档文案逐字表（[设置页七项改造·批 4] 第二档改回「定时」+ 三档各自一句说明）', () => {
+  it('三档文案逐字表（[0.13.x] 手动同步 / 定时同步 / 智能同步 + 三档各自一句说明）', () => {
     expect(AUTO_COPY).toEqual({
-      label: '自动同步', off: '关闭', interval: '定时', smart: '智能',
-      every: '每', minutes: '分钟', times: '上传一次', range: '（5 ~ 120）',
-      offNote: '只在你点「立即同步」时上传。',
+      label: '自动同步',
+      off: '手动同步',
+      interval: '定时同步',
+      smart: '智能同步',
+      every: '每', minutes: '分钟', times: '同步一次', range: '（5 ~ 120）',
+      offNote: '只在你点「立即同步」时同步。',
       smartNote: '启动后 1 分钟同步一次；停手 5 分钟同步一次；一直写则每 30 分钟同步一次。',
     });
     expect(REMOVED_PHRASES).toContain('同步间隔');

@@ -114,7 +114,7 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: ItemPatch) -> AppResult<I
         .map(str::to_string);
 
     /* 改父子关系要连带改 depth，而 depth 一变，它已有的子就会变成第 3 层。
-       所以在**允许挂到别人下面之前**先确认它自己没有子。 */
+    所以在**允许挂到别人下面之前**先确认它自己没有子。 */
     let mut depth_to_set: Option<i64> = None;
     if let Some(parent) = patch.parent_id {
         if parent == Some(id) {
@@ -131,7 +131,7 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: ItemPatch) -> AppResult<I
     }
 
     /* 借用检查：`ItemFields` 里的分类是 `Option<Option<&str>>`（避免每列都克隆），
-       所以归一后的 `String` 要先落成局部变量活到 `repo::update` 调用结束。 */
+    所以归一后的 `String` 要先落成局部变量活到 `repo::update` 调用结束。 */
     let category_to_set: Option<Option<String>> = patch
         .category_key
         .as_ref()
@@ -148,7 +148,7 @@ pub async fn update(pool: &SqlitePool, id: i64, patch: ItemPatch) -> AppResult<I
             is_pinned: patch.is_pinned,
             parent_id: patch.parent_id,
             /* 只有「父子关系真的改了」才写 depth：没改就传 None，别把 existing 再写一遍
-               （那会多一次 `updated_at_ms` 盖戳，同步端看到一条没变化的变更）。 */
+            （那会多一次 `updated_at_ms` 盖戳，同步端看到一条没变化的变更）。 */
             depth: depth_to_set,
             category_key: category_to_set.as_ref().map(|value| value.as_deref()),
         },
@@ -179,9 +179,9 @@ pub async fn delete(pool: &SqlitePool, id: i64) -> AppResult<()> {
         return Err(AppError::item_system_protected());
     }
     /* [0.14] 级联软删（同一事务）：查直接子 → 逐个软删 → 删父。树硬限 2 层，
-       直接子就是全部子孙（无孙层）；archived 子也级联（归档是软态，不跳过）。
-       事务不可省：删到一半断掉的话，父还在、子已删一半，「父块含子块」的
-       读路径会看到半棵树，且没有任何报错。 */
+    直接子就是全部子孙（无孙层）；archived 子也级联（归档是软态，不跳过）。
+    事务不可省：删到一半断掉的话，父还在、子已删一半，「父块含子块」的
+    读路径会看到半棵树，且没有任何报错。 */
     let mut tx = pool.begin().await?;
     let children = repo::list_children(&mut *tx, id).await?;
     let now = now_ms();

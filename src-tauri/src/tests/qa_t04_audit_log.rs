@@ -49,9 +49,9 @@ pub(crate) fn audit_lines() -> Vec<String> {
 #[tokio::test]
 async fn i9a_today_survives_two_rounds_and_the_audit_log_really_lands() {
     /* **必须先注入日志目录，再跑这一轮**：`purge_log::append` 在 `log_dir() == None` 时
-       静默 return，而 `LOG_DIR` 是进程级 `OnceLock`。晚一步注入的话，第一轮那两行会
-       一条不落地丢掉，断言就变成「有时 1 行、有时 2 行」—— 实测在一次全量里就是这么
-       红过一次（651/1），红的是**这条用例自己**，不是实现。 */
+    静默 return，而 `LOG_DIR` 是进程级 `OnceLock`。晚一步注入的话，第一轮那两行会
+    一条不落地丢掉，断言就变成「有时 1 行、有时 2 行」—— 实测在一次全量里就是这么
+    红过一次（651/1），红的是**这条用例自己**，不是实现。 */
     let _ = audit_dir();
     let fixture = env("qa-t04-i9a").await;
     let root = unique_dir("qa-t04-i9a");

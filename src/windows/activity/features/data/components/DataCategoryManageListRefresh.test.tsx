@@ -28,6 +28,9 @@ const h = vi.hoisted(() => ({
   saveAppOverride: vi.fn(async (): Promise<void> => undefined),
   saveWebDomainOverride: vi.fn(async (): Promise<void> => undefined),
   commitMutations: vi.fn(async (_mutations: unknown): Promise<void> => undefined),
+  /* 删除的成员回落走可恢复 propagation（真 IPC）：jsdom 没有 `__TAURI_INTERNALS__`，
+     不替掉就会在 commit 之前抛错，表现为"删了但那一行还在"的假红。 */
+  propagate: vi.fn(async (_mapping: Record<string, string | null>) => ({ conflicts: [] })),
   loadAppOverrides: vi.fn(),
   loadWebDomainOverrides: vi.fn(),
 }));
@@ -42,6 +45,10 @@ vi.mock("../../classification/services/classificationService.ts", () => ({
 }));
 vi.mock("../../../platform/persistence/classificationSettingsGateway.ts", () => ({
   commitClassificationSettingMutations: h.commitMutations,
+}));
+vi.mock("../../../platform/persistence/categoryPropagationGateway.ts", () => ({
+  propagateCategoryMapping: h.propagate,
+  CategoryPropagationConflictError: class extends Error {},
 }));
 /* 只替掉两条**读**：写库的 builder 全走真实现 */
 vi.mock("../../classification/services/classificationStore.ts", async (importOriginal) => {
@@ -107,6 +114,8 @@ beforeEach(() => {
   h.commitMutations.mockImplementation(async (mutations: unknown) => {
     applyToFixture(fixture, mutations as MutationRow[]);
   });
+  h.propagate.mockReset();
+  h.propagate.mockResolvedValue({ conflicts: [] });
   h.loadAppOverrides.mockReset();
   h.loadAppOverrides.mockResolvedValue({
     "code.exe": { category: "development", categories: ["development", CUSTOM], enabled: true, updatedAt: 1 },

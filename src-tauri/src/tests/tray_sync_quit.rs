@@ -19,8 +19,8 @@ use sqlx::SqlitePool;
 use super::md_sync::{at, env};
 /* `run_before_quit` 与 `QUIT_SYNC_BUDGET` 在 `app/tray_quit.rs`（[V0.11.18] 为行数门禁拆出），
 `sync_label` / `try_acquire` 留在 `app/tray_sync.rs`：闸的 `Drop` 语义只该有一处定义。 */
-use crate::app::tray_quit::run_before_quit;
 use crate::app::tray_label::{blocked_notice, sync_label, CLOUD_LABEL, FOLDER_LABEL, LOCAL_LABEL};
+use crate::app::tray_quit::run_before_quit;
 use crate::models::md_sync::MdSyncConfig;
 use crate::models::md_sync_channel::MdSyncCloudChannel;
 use crate::repositories::settings;
@@ -86,7 +86,11 @@ async fn sync_label_is_folder_when_only_folder_channel_is_usable() {
     });
     store(&env.pool, &current).await;
 
-    assert_eq!(sync_label(&env.pool).await, FOLDER_LABEL, "只有本地通路在跑，标签必须是第三态");
+    assert_eq!(
+        sync_label(&env.pool).await,
+        FOLDER_LABEL,
+        "只有本地通路在跑，标签必须是第三态"
+    );
 }
 
 /// TR1b 第 3 档：**选了本地 + 云端但没填全** → 仍说「Markdown 同步」。
@@ -177,7 +181,9 @@ async fn run_before_quit_returns_immediately_when_sync_disabled() {
 
     assert!(!run_before_quit(&env.pool).await, "总开关关着不该跑一轮");
     /* 真的一行都没写：连落点目录都不该被建出来 */
-    let file = env.vault.join(format!("{}.md", env.date.format("%Y-%m-%d")));
+    let file = env
+        .vault
+        .join(format!("{}.md", env.date.format("%Y-%m-%d")));
     assert!(!file.exists());
 }
 
@@ -188,11 +194,21 @@ async fn run_before_quit_returns_immediately_when_sync_disabled() {
 async fn run_before_quit_writes_before_exit_when_enabled() {
     let env = env("tray-quit-on").await;
     let item = new_item(&env.pool, "收尾写盘").await;
-    insert_saved(&env.pool, item, at(env.date, 9, 0), at(env.date, 9, 30), 1800).await;
+    insert_saved(
+        &env.pool,
+        item,
+        at(env.date, 9, 0),
+        at(env.date, 9, 30),
+        1800,
+    )
+    .await;
 
     assert!(run_before_quit(&env.pool).await, "开着就该跑一轮");
-    let text = std::fs::read_to_string(env.vault.join(format!("{}.md", env.date.format("%Y-%m-%d"))))
-        .expect("退出前那一轮应写出今日文件");
+    let text = std::fs::read_to_string(
+        env.vault
+            .join(format!("{}.md", env.date.format("%Y-%m-%d"))),
+    )
+    .expect("退出前那一轮应写出今日文件");
     assert!(text.contains("收尾写盘"));
 }
 
@@ -225,22 +241,28 @@ fn blocked_notice_covers_off_and_not_filled() {
     );
 
     /* ② 开着 + 选了「本地 + 云端」但地址 / 目录 / 账号全空
-          → 正文逐字 `先在设置里填好云端`；**标题是 `LOCAL_LABEL`**——
-          用户点的那一项此刻就写着「Markdown 同步」（未填全 → `sync_label` 也返回它），
-          通知标题若写「云端同步」就是另一句假话。 */
+    → 正文逐字 `先在设置里填好云端`；**标题是 `LOCAL_LABEL`**——
+    用户点的那一项此刻就写着「Markdown 同步」（未填全 → `sync_label` 也返回它），
+    通知标题若写「云端同步」就是另一句假话。 */
     config.enabled = true;
     config.cloud_webdav = Some(MdSyncCloudChannel {
         enabled: true,
         ..Default::default()
     });
-    assert_eq!(blocked_notice(&config), Some((LOCAL_LABEL, "先在设置里填好云端")));
+    assert_eq!(
+        blocked_notice(&config),
+        Some((LOCAL_LABEL, "先在设置里填好云端"))
+    );
 
     /* ③ 只填了两个字段也不算填全（`is_usable` 要求三个都非空）——这一档最容易写漏 */
     config.cloud_webdav = Some(MdSyncCloudChannel {
         user: String::new(),
         ..filled_webdav()
     });
-    assert_eq!(blocked_notice(&config), Some((LOCAL_LABEL, "先在设置里填好云端")));
+    assert_eq!(
+        blocked_notice(&config),
+        Some((LOCAL_LABEL, "先在设置里填好云端"))
+    );
 
     /* ④ 填全了 → 不再插话，这一下会真的跑 */
     config.cloud_webdav = Some(filled_webdav());

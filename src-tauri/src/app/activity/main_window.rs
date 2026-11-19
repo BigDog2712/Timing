@@ -2,8 +2,8 @@ use crate::app::activity::state::{
     AppExitState, MainWindowLifecycleSnapshot, MainWindowLifecycleState, MainWindowReadyDecision,
     MainWindowRenderToken, MainWindowShowDecision, MainWindowTimeoutDecision,
 };
-use crate::models::activity::settings::StartupSource;
 use crate::infra::activity::windows::window_activation;
+use crate::models::activity::settings::StartupSource;
 use std::time::{Duration, Instant};
 use tauri::{
     webview::PageLoadEvent, AppHandle, Manager, Runtime, WebviewUrl, WebviewWindow,
@@ -671,7 +671,10 @@ fn schedule_main_window_destroy_after_background<R: Runtime + 'static>(
 
         let should_reopen = lifecycle.finish_destroy_hidden_window(destroyed);
         if should_reopen && !app.state::<AppExitState>().is_exit_requested() {
-            let _ = crate::app::activity::tray::show_main_window(&app, MainWindowShowReason::DestroyRecovery);
+            let _ = crate::app::activity::tray::show_main_window(
+                &app,
+                MainWindowShowReason::DestroyRecovery,
+            );
         }
     });
 }
@@ -722,9 +725,7 @@ fn schedule_main_window_liveness_timeout<R: Runtime + 'static>(
                 );
                 if snapshot.desired_visible && !app.state::<AppExitState>().is_exit_requested() {
                     if let Err(error) = recreate_main_window(&app, "liveness-timeout") {
-                        crate::log_error!(
-                            "failed to recreate unresponsive hidden window: {error}"
-                        );
+                        crate::log_error!("failed to recreate unresponsive hidden window: {error}");
                     }
                 }
             }
@@ -759,7 +760,7 @@ mod tests {
         assert!(script.contains("writable: false"));
         assert!(script.contains("configurable: false"));
         /* [T04] `data-window-label` 注入已删除：它写的是原生 label，而 CSS 只认前端归一化后的
-           `main`。这里反向钉住，防它被"顺手加回来"——加回来不会报错，只会让两份身份并存。 */
+        `main`。这里反向钉住，防它被"顺手加回来"——加回来不会报错，只会让两份身份并存。 */
         assert!(!script.contains("data-window-label"));
         assert!(!script.contains("document.documentElement"));
     }

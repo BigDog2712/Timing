@@ -139,7 +139,7 @@ impl MainWindowTargetDto {
     fn from_pending(view: main_window::tools_navigation::PendingView) -> Self {
         use main_window::tools_navigation::{HistoryTarget, PendingView};
         /* 每个分支只写自己那一个键，其余靠 `Default`（全 None）补齐：
-           万一哪天加了第四个落点，不必再逐个分支补三个 `None`。 */
+        万一哪天加了第四个落点，不必再逐个分支补三个 `None`。 */
         match view {
             PendingView::Tools(section) => Self {
                 tools: Some(section),
@@ -192,7 +192,7 @@ mod tests {
     }
 
     /* [0.12.1] 设置落点：前端网关按 `{"settings":true}` 这个单键解析（见
-       `mainToolsNavigationGateway.ts` 的 `kind:"settings"`）。多一个键都会让判序变味。 */
+    `mainToolsNavigationGateway.ts` 的 `kind:"settings"`）。多一个键都会让判序变味。 */
     #[test]
     fn settings_pending_serializes_to_the_single_key_the_gateway_reads() {
         let json = serde_json::to_value(MainWindowTargetDto::from_pending(PendingView::Settings))

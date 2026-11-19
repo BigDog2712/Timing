@@ -5,9 +5,9 @@
 //! 撞出来的重复**永远不会自愈**。现在 `claim_rows` 是「精确匹配优先 + 索引兜底」，
 //! 这里把两个删除场景锁死：存活行数正确、`started_at` 不重复、文件里同一段只画一次。
 
+use super::sync::{at, env, Env};
 use crate::services::md_sync::format::{TimerEntry, TimerInterval};
 use crate::services::md_sync::{export, format, import};
-use super::sync::{at, env, Env};
 use crate::tests::support::{insert_saved, new_item};
 
 /// 渲染一个「只有事项 测试2」的计时区块（基线与用户改后的文件体都用它构造）。

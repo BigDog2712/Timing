@@ -1,8 +1,8 @@
-use crate::services::activity::data::schema;
-use crate::services::activity::data::schema_registry;
-use crate::services::activity::data::schema_contracts;
-use crate::services::activity::data::sqlite_error::SqliteOperationError;
 use crate::infra::activity::storage_paths;
+use crate::services::activity::data::schema;
+use crate::services::activity::data::schema_contracts;
+use crate::services::activity::data::schema_registry;
+use crate::services::activity::data::sqlite_error::SqliteOperationError;
 use sqlx::migrate::{Migration as SqlxMigration, MigrationType};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use sqlx::{Pool, Row, Sqlite};
@@ -25,7 +25,7 @@ pub(crate) async fn register_sqlite_pool(state: &AppSqlitePool, pool: Pool<Sqlit
         previous.close().await;
     }
 }
-const VALIDATED_SCHEMA_MIGRATION_HEAD: i64 = schema_registry::ITEM_ATTRIBUTION_MIGRATION_VERSION;
+const VALIDATED_SCHEMA_MIGRATION_HEAD: i64 = schema_registry::MEDIA_PLAYBACK_MIGRATION_VERSION;
 mod activity_read_model_schema;
 mod current_schema;
 pub(super) mod import_schema;
@@ -721,6 +721,12 @@ async fn normalize_current_baseline_migration_history_for_pool(
     })?;
 
     Ok(true)
+}
+
+pub async fn registered_sqlite_pool<R: Runtime>(app: &AppHandle<R>) -> Option<Pool<Sqlite>> {
+    let state = app.try_state::<AppSqlitePool>()?;
+    let pool = state.0.read().await.as_ref().cloned();
+    pool
 }
 
 pub async fn wait_for_sqlite_pool<R: Runtime>(app: &AppHandle<R>) -> Result<Pool<Sqlite>, String> {

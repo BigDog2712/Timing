@@ -1,7 +1,9 @@
+use crate::models::activity::tools::ActivityReminderCheck;
 use crate::services::activity::data::repositories::tools;
 use crate::services::activity::data::sqlite_pool::wait_for_sqlite_pool;
-use crate::models::activity::tools::ActivityReminderCheck;
-use crate::services::activity::engine::tools::{ToolsMutation, ToolsStore, ToolsStoreFuture, ToolsTickEvents};
+use crate::services::activity::engine::tools::{
+    ToolsMutation, ToolsStore, ToolsStoreFuture, ToolsTickEvents,
+};
 use tauri::{AppHandle, Runtime};
 
 pub struct SqliteToolsStore<R: Runtime> {

@@ -42,7 +42,10 @@ fn parent_and_child_directories_are_refused() {
         Some(OVERLAP_TEXT.to_string()),
         "子目录算重合"
     );
-    assert!(overlaps_binding(&child, &[binding(&root)]).is_err(), "父目录算重合");
+    assert!(
+        overlaps_binding(&child, &[binding(&root)]).is_err(),
+        "父目录算重合"
+    );
     let _ = fs::remove_dir_all(&root);
 }
 
@@ -69,7 +72,10 @@ fn normalization_catches_case_and_separator_differences() {
 #[test]
 fn an_unresolvable_root_is_refused() {
     let gone = temp_dir("gone").join("never-created");
-    assert_eq!(overlaps_binding(&gone, &[]).err(), Some(OVERLAP_TEXT.to_string()));
+    assert_eq!(
+        overlaps_binding(&gone, &[]).err(),
+        Some(OVERLAP_TEXT.to_string())
+    );
 }
 
 /// I13e 的机制：留底失败 → **文件仍在**，且原因是 `NoBackup`。
@@ -83,7 +89,10 @@ fn remove_one_without_a_backup_keeps_the_file() {
     fs::write(&path, "旧内容").expect("写样本");
 
     let outcome = remove_one(&path, "旧内容".as_bytes(), |_, _| false);
-    assert!(matches!(outcome, Err(RemoveErr::NoBackup)), "留不下底就不许删");
+    assert!(
+        matches!(outcome, Err(RemoveErr::NoBackup)),
+        "留不下底就不许删"
+    );
     assert!(path.is_file(), "文件必须还在");
     let _ = fs::remove_dir_all(&root);
 }
@@ -125,12 +134,12 @@ fn backup_reports_failure_when_the_directory_cannot_be_created() {
     /* 父级是个名字就叫 `md` 的**普通文件**：`create_dir_all(backups\md)` 必然失败。 */
     fs::write(blocker.join("md"), "x").expect("写占位文件");
 
-    let wrote = crate::infra::md_backup::save_to(
-        &blocker.join("md"),
-        Path::new("2019-09-05.md"),
-        "内容",
+    let wrote =
+        crate::infra::md_backup::save_to(&blocker.join("md"), Path::new("2019-09-05.md"), "内容");
+    assert!(
+        !wrote,
+        "建不出备份目录时必须回 false（不能静默当成留底成功）"
     );
-    assert!(!wrote, "建不出备份目录时必须回 false（不能静默当成留底成功）");
 
     let ok_root = blocker.join("ok");
     assert!(
@@ -141,14 +150,14 @@ fn backup_reports_failure_when_the_directory_cannot_be_created() {
 }
 
 /* ── 下面两条是同一件事的另一半：判得对（上面）之外，还要**整段不动手** ──
-   走真 pool + 真目录：`run_folder` 的入口行为，与 `overlaps_binding` 的纯判定互补。 */
+走真 pool + 真目录：`run_folder` 的入口行为，与 `overlaps_binding` 的纯判定互补。 */
 
+use super::cloud_purge::{binding_of, kv, list_names, seed_past, state_of};
+use super::sync::env;
 use crate::models::md_cloud_purge::{PurgeChannel, PurgeKey};
 use crate::models::md_sync_cloud::{CloudMode, MdSyncCloud};
 use crate::services::md_cloud::{self, purge};
 use crate::services::md_sync::config;
-use super::cloud_purge::{binding_of, kv, list_names, seed_past, state_of};
-use super::sync::env;
 use crate::tests::support::unique_dir;
 
 #[tokio::test]
@@ -160,9 +169,14 @@ async fn folder_round_refuses_a_directory_that_overlaps_a_binding() {
     }
     let before: Vec<String> = list_names(&root);
 
-    purge::run_folder(&fixture.pool, &root, &[binding_of(&root)], &md_cloud::today())
-        .await
-        .expect("闸③ 拒绝不是错误，是一条记账");
+    purge::run_folder(
+        &fixture.pool,
+        &root,
+        &[binding_of(&root)],
+        &md_cloud::today(),
+    )
+    .await
+    .expect("闸③ 拒绝不是错误，是一条记账");
 
     assert_eq!(list_names(&root), before, "重合时一个文件都不许删");
     assert_eq!(
@@ -171,12 +185,16 @@ async fn folder_round_refuses_a_directory_that_overlaps_a_binding() {
         "水位一动不动（用户改好配置后第二天自动恢复）"
     );
     assert_eq!(
-        state_of(&fixture.pool, PurgeChannel::Folder).await.overlap_note,
+        state_of(&fixture.pool, PurgeChannel::Folder)
+            .await
+            .overlap_note,
         OVERLAP_TEXT,
         "红字逐字进 state"
     );
     /* 块④ 的红字位是 `status.lastError`：`MdCloudPurgeStatus` 不在线缆里带这句话。 */
-    let status = md_cloud::status(&fixture.pool, PurgeChannel::Folder).await.expect("status");
+    let status = md_cloud::status(&fixture.pool, PurgeChannel::Folder)
+        .await
+        .expect("status");
     assert_eq!(status.last_error.as_deref(), Some(OVERLAP_TEXT));
     let _ = fs::remove_dir_all(&root);
 }

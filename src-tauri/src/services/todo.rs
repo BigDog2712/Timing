@@ -59,14 +59,18 @@ pub async fn create(
 ///   · 事务体沿用 sqlx 的 drop-rollback：`tx` 在错误路径上被丢弃即回滚。
 pub async fn create_batch(pool: &SqlitePool, inputs: Vec<TodoCreateInput>) -> AppResult<Vec<Todo>> {
     /* 1..=60（设计 §3.2 `MAX_BATCH`；前端 `TODO_BATCH_MAX` 同值先拦）。
-       这里是防御分支：走不到，走到了说明契约被改坏 —— 用 `DB_ERROR` 报内部不变式。 */
+    这里是防御分支：走不到，走到了说明契约被改坏 —— 用 `DB_ERROR` 报内部不变式。 */
     if inputs.is_empty() || inputs.len() > TODO_BATCH_MAX {
         return Err(AppError::db("批量条数须在 1–60 之间"));
     }
     let normalized: Vec<(String, Option<i64>, Option<i64>)> = inputs
         .iter()
         .map(|input| {
-            Ok::<_, AppError>((normalize_title(&input.title)?, input.planned_at, input.remind_at))
+            Ok::<_, AppError>((
+                normalize_title(&input.title)?,
+                input.planned_at,
+                input.remind_at,
+            ))
         })
         .collect::<AppResult<_>>()?;
 
@@ -78,7 +82,16 @@ pub async fn create_batch(pool: &SqlitePool, inputs: Vec<TodoCreateInput>) -> Ap
             .await?
             .map(|item| item.id);
         sort_order += 1;
-        let id = repo::insert(&mut *tx, title, bound, *planned_at, *remind_at, sort_order, now_ms()).await?;
+        let id = repo::insert(
+            &mut *tx,
+            title,
+            bound,
+            *planned_at,
+            *remind_at,
+            sort_order,
+            now_ms(),
+        )
+        .await?;
         created.push(
             repo::find_by_id(&mut *tx, id)
                 .await?

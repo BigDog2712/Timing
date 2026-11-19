@@ -115,7 +115,8 @@ export default function AppViewOutlet({
           <div
             key={outgoingView}
             aria-hidden="true"
-            className="at-view-container at-view-container-outgoing absolute inset-4 md:inset-5 z-10 flex min-h-0 flex-col overflow-hidden pointer-events-none"
+            inert
+            className="at-view-container at-view-container-outgoing absolute inset-0 z-10 flex min-h-0 flex-col overflow-hidden pointer-events-none"
           >
             {views[outgoingView]}
           </div>

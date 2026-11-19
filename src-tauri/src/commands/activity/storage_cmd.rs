@@ -1,12 +1,12 @@
 use crate::app::activity::state::AppExitState;
 use crate::commands::activity::window_guard::require_main_window_string;
-use crate::services::activity::data::{storage_migration, storage_restart};
+use crate::infra::activity::{storage_control, storage_paths, storage_usage, webview_cache};
 use crate::models::activity::lifecycle::AppRestartState;
 use crate::models::activity::storage::{
     StorageMaintenanceSnapshot, StorageMigrationPreview, StorageMigrationRequest,
     StoragePathSnapshot, StorageSnapshot, WebviewCacheMigrationRequest,
 };
-use crate::infra::activity::{storage_control, storage_paths, storage_usage, webview_cache};
+use crate::services::activity::data::{storage_migration, storage_restart};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, Runtime, WebviewWindow};
 
@@ -172,7 +172,7 @@ pub fn cmd_open_storage_directory(path: String) -> Result<(), String> {
 fn storage_snapshot<R: Runtime>(app: &AppHandle<R>) -> Result<StorageSnapshot, String> {
     let paths = storage_paths::resolve_storage_paths(app)?;
     /* 设置页「数据目录」那一行要的是**数据根**（`%APPDATA%\com.timing.app`），
-       不是 `paths.data_root`（那只是它下面的 `patina/data`）。两者都给出去，由前端选。 */
+    不是 `paths.data_root`（那只是它下面的 `patina/data`）。两者都给出去，由前端选。 */
     let timing_data_root = storage_paths::timing_data_root();
     let install_dir = install_dir()?;
     let maintenance = storage_control::read_maintenance_state(app)
