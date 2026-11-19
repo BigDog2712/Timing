@@ -5,6 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import SettingsGroupNav from "./SettingsGroupNav.tsx";
 import { SETTINGS_GROUPS } from "../settingsGroups";
+import {
+  ANCHOR_TOPS,
+  CSS_ACTIVE_OFFSET,
+  FIRST_ANCHOR_ID,
+  FIXTURE_ANCHOR_IDS,
+} from "../settingsNavAnchors.test-utils";
 
 /**
  * 设置页分组导航的**判定算法**回归。
@@ -25,26 +31,10 @@ import { SETTINGS_GROUPS } from "../settingsGroups";
  * jsdom 没有排版，真读 DOM 只会得到一堆 0，什么也证明不了。
  */
 
-/** 各锚点的**文档绝对**纵坐标（px）。与原页面同序，两位被删的锚点不再出现。 */
-const ANCHOR_TOPS: Readonly<Record<string, number>> = {
-  "s-pill-handles": 0,
-  "s-pill-look": 80,
-  "s-theme": 160,
-  "s-highlight": 240,
-  "s-display": 320,
-  "s-tracking": 700,
-  "s-sync": 820,
-  "s-backup": 900,
-  "s-general": 1000,
-  "s-resident": 1080,
-  "s-plugins": 1140,
-};
-
-/** 内容总高：1200 > 视口 400，所以容器"确实还能滚" */
+/** 各锚点的**文档绝对**纵坐标与判定线偏移：共享自 `settingsNavAnchors.test-utils`
+ *  （原来这里手抄一份，IA 顺序一变就静默失配；顺序改由 `SETTINGS_ANCHOR_IDS` 派生）。 */
 const CONTENT_HEIGHT = 1200;
 const VIEWPORT_HEIGHT = 400;
-/** `settings-handles.css` 里锚点真实的 `scroll-margin-top`（判定线的偏移） */
-const CSS_ACTIVE_OFFSET = 18;
 
 let scrollTop = 0;
 let scrollHeight = CONTENT_HEIGHT;
@@ -103,17 +93,9 @@ function buildScrollHost() {
     parent.appendChild(section);
     return section;
   };
-  make("s-pill-handles", host);
-  make("s-pill-look", host);
-  make("s-theme", host);
-  make("s-highlight", host);
-  make("s-display", host);
-  make("s-tracking", host);
-  make("s-sync", host);
-  make("s-backup", host);
-  make("s-general", host);
-  make("s-resident", host);
-  make("s-plugins", host);
+  /* 搭 DOM 的顺序 = 页面顺序 = 导航顺序：从共享几何表派生，不再手抄（IA 调整时只需改
+     `settingsGroups.ts` 一处）。 */
+  for (const id of FIXTURE_ANCHOR_IDS) make(id, host);
   return host;
 }
 
@@ -153,9 +135,11 @@ beforeEach(() => {
   activeOffset = CSS_ACTIVE_OFFSET;
   /* jsdom 的 `getComputedStyle` 对 `scroll-margin-top` 一律回 "0"（cssstyle 没有这条属性），
      而真实应用里它是 `settings-handles.css` 给的 18。这里只替换**第一个锚点**的读数，
-     其余元素照旧委托给真实现 —— `readActiveOffset()` 正是只看第一个锚点。 */
+     其余元素照旧委托给真实现 —— `readActiveOffset()` 正是只看第一个锚点。
+     目标锚点必须派生（`FIRST_ANCHOR_ID`）：写死旧首锚点的话，IA 一调整这条 mock 就静默
+     失效，而失败形态是**假绿**（判定线回落到 0 或读不到值），比红更难发现。 */
   window.getComputedStyle = ((element: Element) => (
-    (element as HTMLElement).id === "s-pill-handles"
+    (element as HTMLElement).id === FIRST_ANCHOR_ID
       ? ({ scrollMarginTop: `${activeOffset}px` } as CSSStyleDeclaration)
       : realGetComputedStyle(element as HTMLElement)
   )) as typeof window.getComputedStyle;

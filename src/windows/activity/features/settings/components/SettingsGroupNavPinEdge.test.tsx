@@ -5,6 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import SettingsGroupNav from "./SettingsGroupNav.tsx";
 import { SETTINGS_GROUPS } from "../settingsGroups";
+import {
+  ANCHOR_TOPS,
+  CSS_ACTIVE_OFFSET,
+  FIRST_ANCHOR_ID,
+  FIXTURE_ANCHOR_IDS,
+} from "../settingsNavAnchors.test-utils";
 
 /**
  * [QA 补测] 点击钉住语义的**边界**（`SettingsGroupNav.test.tsx` 只测了"停在落点/离开落点"
@@ -22,25 +28,9 @@ import { SETTINGS_GROUPS } from "../settingsGroups";
  * `scrollTop` 用浏览器语义（夹到 `[0, maxScroll]`）—— 不夹的话"落点可达性"整个测不到。
  */
 
-const ANCHOR_TOPS: Readonly<Record<string, number>> = {
-  "s-pill-handles": 0,
-  "s-pill-look": 80,
-  "s-theme": 160,
-  "s-highlight": 240,
-  "s-display": 320,
-  "s-tracking": 700,
-  "s-sync": 820,
-  "s-backup": 900,
-  "s-general": 1000,
-  "s-resident": 1080,
-  "s-plugins": 1140,
-};
-
-/** `settings-handles.css` 的 `scroll-margin-top`：判定线与落点共用 */
-const CSS_ACTIVE_OFFSET = 18;
+/** 锚点纵坐标与判定线偏移：共享自 `settingsNavAnchors.test-utils`（顺序按 IA 派生） */
 /** 与组件里的 `BOTTOM_TOLERANCE` 同值 —— 钉子与到底判定共用 */
 const TOLERANCE = 2;
-
 let contentHeight = 1200;
 let viewportHeight = 700;
 let scrollTop = 0;
@@ -83,21 +73,13 @@ function buildHost({ skip = [] as string[] } = {}) {
     if (skip.includes(id)) return null;
     const section = document.createElement("section");
     section.id = id;
-    pinTop(section, ANCHOR_TOPS[id] ?? 0);
+    pinTop(section, ANCHOR_TOPS[id]);
     parent.appendChild(section);
     return section;
   };
-  make("s-pill-handles", el);
-  make("s-pill-look", el);
-  make("s-theme", el);
-  make("s-highlight", el);
-  make("s-display", el);
-  make("s-tracking", el);
-  make("s-sync", el);
-  make("s-backup", el);
-  make("s-general", el);
-  make("s-resident", el);
-  make("s-plugins", el);
+  /* 按 `FIXTURE_ANCHOR_IDS`（= `SETTINGS_ANCHOR_IDS` 页序）搭 DOM：写死列表会在 IA
+     调整时静默漏掉新锚点、留下已删锚点，且顺序与导航判定顺序脱钩。 */
+  for (const id of FIXTURE_ANCHOR_IDS) make(id, el);
   return el;
 }
 
@@ -106,7 +88,7 @@ beforeEach(() => {
   contentHeight = 1200;
   viewportHeight = 700;
   window.getComputedStyle = ((element: Element) => (
-    (element as HTMLElement).id === "s-pill-handles"
+    (element as HTMLElement).id === FIRST_ANCHOR_ID
       ? ({ scrollMarginTop: `${CSS_ACTIVE_OFFSET}px` } as CSSStyleDeclaration)
       : realGCS(element as HTMLElement)
   )) as typeof window.getComputedStyle;

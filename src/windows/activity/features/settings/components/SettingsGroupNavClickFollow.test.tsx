@@ -5,6 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import SettingsGroupNav from "./SettingsGroupNav.tsx";
 import { SETTINGS_GROUPS } from "../settingsGroups";
+import {
+  ANCHOR_TOPS,
+  CSS_ACTIVE_OFFSET,
+  FIRST_ANCHOR_ID,
+  FIXTURE_ANCHOR_IDS,
+} from "../settingsNavAnchors.test-utils";
 
 /**
  * [QA 补测] 点击跳转的**后续交互**（`SettingsGroupNav.test.tsx` 只测了"落定那一刻"）。
@@ -20,21 +26,7 @@ import { SETTINGS_GROUPS } from "../settingsGroups";
  * `qaPinStale`（落点被夹到底后单次滚动）是已知缺陷，另见 QA 报告，**故意不放在这里装绿**。
  */
 
-const ANCHOR_TOPS: Readonly<Record<string, number>> = {
-  "s-pill-handles": 0,
-  "s-pill-look": 80,
-  "s-theme": 160,
-  "s-highlight": 240,
-  "s-display": 320,
-  "s-tracking": 700,
-  "s-sync": 820,
-  "s-backup": 900,
-  "s-general": 1000,
-  "s-resident": 1080,
-  "s-plugins": 1140,
-};
-const CSS_ACTIVE_OFFSET = 18;
-
+/** 锚点纵坐标与判定线偏移：共享自 `settingsNavAnchors.test-utils`（顺序按 IA 派生） */
 let contentHeight = 1600;
 let viewportHeight = 400;
 let scrollTop = 0;
@@ -82,17 +74,7 @@ function buildHost() {
     parent.appendChild(section);
     return section;
   };
-  make("s-pill-handles", el);
-  make("s-pill-look", el);
-  make("s-theme", el);
-  make("s-highlight", el);
-  make("s-display", el);
-  make("s-tracking", el);
-  make("s-sync", el);
-  make("s-backup", el);
-  make("s-general", el);
-  make("s-resident", el);
-  make("s-plugins", el);
+  for (const id of FIXTURE_ANCHOR_IDS) make(id, el);
   return el;
 }
 
@@ -101,7 +83,7 @@ beforeEach(() => {
   contentHeight = 1600;
   viewportHeight = 400;
   window.getComputedStyle = ((element: Element) => (
-    (element as HTMLElement).id === "s-pill-handles"
+    (element as HTMLElement).id === FIRST_ANCHOR_ID
       ? ({ scrollMarginTop: `${CSS_ACTIVE_OFFSET}px` } as CSSStyleDeclaration)
       : realGCS(element as HTMLElement)
   )) as typeof window.getComputedStyle;

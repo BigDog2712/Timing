@@ -5,6 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import SettingsGroupNav from "./SettingsGroupNav.tsx";
 import { SETTINGS_GROUPS } from "../settingsGroups";
+import {
+  ANCHOR_TOPS,
+  CSS_ACTIVE_OFFSET,
+  FIRST_ANCHOR_ID,
+  FIXTURE_ANCHOR_IDS,
+} from "../settingsNavAnchors.test-utils";
 
 /**
  * 点击后的「钉住」语义（QA 探针 `SettingsGroupNav.pinStale` 转正）。
@@ -27,25 +33,9 @@ import { SETTINGS_GROUPS } from "../settingsGroups";
  * 每条用例都点名它咬住的机制；pin03 / pin04 在修复前后都是绿的，作为回归留着（防改坏）。
  */
 
-/** 各锚点的**文档绝对**纵坐标（px）。同心跳测试；两位被删的锚点不再出现。 */
-const ANCHOR_TOPS: Readonly<Record<string, number>> = {
-  "s-pill-handles": 0,
-  "s-pill-look": 80,
-  "s-theme": 160,
-  "s-highlight": 240,
-  "s-display": 320,
-  "s-tracking": 700,
-  "s-sync": 820,
-  "s-backup": 900,
-  "s-general": 1000,
-  "s-resident": 1080,
-  "s-plugins": 1140,
-};
-
+/** 锚点纵坐标与判定线偏移：共享自 `settingsNavAnchors.test-utils`（顺序按 IA 派生） */
 const CONTENT_HEIGHT = 1200;
 const VIEWPORT_HEIGHT = 700;
-/** `settings-handles.css` 里锚点真实的 `scroll-margin-top`（判定线与落点共用它） */
-const CSS_ACTIVE_OFFSET = 18;
 /** 可达的最大滚动量：1200 − 700 = 500。页尾锚点的落点全部被夹在它上面 */
 const MAX_SCROLL = CONTENT_HEIGHT - VIEWPORT_HEIGHT;
 
@@ -97,17 +87,7 @@ function buildHost() {
     parent.appendChild(section);
     return section;
   };
-  make("s-pill-handles", el);
-  make("s-pill-look", el);
-  make("s-theme", el);
-  make("s-highlight", el);
-  make("s-display", el);
-  make("s-tracking", el);
-  make("s-sync", el);
-  make("s-backup", el);
-  make("s-general", el);
-  make("s-resident", el);
-  make("s-plugins", el);
+  for (const id of FIXTURE_ANCHOR_IDS) make(id, el);
   return el;
 }
 
@@ -116,7 +96,7 @@ beforeEach(() => {
   /* jsdom 的 `scroll-margin-top` 一律读成 0（cssstyle 没这条属性）：只替换第一个锚点的读数，
      其余委托真实现 —— `readActiveOffset()` 正是只看第一个锚点。 */
   window.getComputedStyle = ((element: Element) => (
-    (element as HTMLElement).id === "s-pill-handles"
+    (element as HTMLElement).id === FIRST_ANCHOR_ID
       ? ({ scrollMarginTop: `${CSS_ACTIVE_OFFSET}px` } as CSSStyleDeclaration)
       : realGCS(element as HTMLElement)
   )) as typeof window.getComputedStyle;
