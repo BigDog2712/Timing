@@ -172,4 +172,42 @@ describe('AI 设置卡', () => {
     expect(document.body.textContent).toContain('AI 服务响应格式异常');
     expect(document.body.textContent).toContain('可以直接在模型框里手填');
   });
+
+  it('ai07_开关只改草稿_必须说出按保存才生效', async () => {
+    /* 这一卡的所有控件（含「启用 AI」）都只改草稿。用户拨开开关、看着它是开的就走了，
+       库里仍是 false，回到数据页点「AI 自动打标签」只会得到「总开关还没打开」——
+       同一件事说两遍，还都不在同一页。判据：拨完立刻提示「按保存」，存完提示消失。 */
+    expect(document.body.textContent).not.toContain('未保存');
+    const toggle = document.body.querySelector<HTMLButtonElement>('[role="switch"][aria-label="启用 AI"]');
+    expect(toggle).not.toBeNull();
+    await act(async () => { toggle?.click(); });
+    expect(h.aiApi.save).not.toHaveBeenCalled();
+    expect(toggle?.getAttribute('aria-checked')).toBe('false');
+    expect(document.body.textContent).toContain('按卡片底部的「保存」后才会生效');
+    expect(document.body.textContent).toContain('未保存');
+    await act(async () => { button('保存')?.click(); });
+    await flush();
+    expect(h.aiApi.save).toHaveBeenCalledWith(expect.objectContaining({ enabled: false }), undefined);
+    /* 存完必须归零：一直挂着「未保存」等于没提示。 */
+    expect(document.body.textContent).not.toContain('未保存');
+    expect(document.body.textContent).not.toContain('后才会生效');
+  });
+
+  it('ai08_改文本字段也算未保存_存完归零', async () => {
+    const input = document.body.querySelector<HTMLInputElement>('input[placeholder="https://api.deepseek.com/v1"]');
+    expect(input).not.toBeNull();
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    await act(async () => {
+      setter?.call(input, 'https://api.deepseek.com');
+      input?.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(document.body.textContent).toContain('未保存');
+    await act(async () => { button('保存')?.click(); });
+    await flush();
+    expect(h.aiApi.save).toHaveBeenCalledWith(
+      expect.objectContaining({ baseUrl: 'https://api.deepseek.com' }),
+      undefined,
+    );
+    expect(document.body.textContent).not.toContain('未保存');
+  });
 });

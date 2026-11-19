@@ -164,10 +164,23 @@ export default function AiAutoTagButton({ onApplied, onNotice }: Props) {
         return;
       }
 
+      /* 预检按 `require_ready` 的**同一个顺序**报缺：总开关 → 密钥。
+         两种毛病补的地方不一样（卡顶的开关 / 「连接」里的密钥框），合成一句
+         「填好地址与密钥，再打开总开关」会让已经填过的人去重填一遍。
+         另一条更隐蔽：设置卡里的开关改的是**草稿**，不按卡片底部的「保存」就不落库
+         —— 用户看着开关是开的、库里仍是关的，所以这里必须把「按保存」说出来。 */
       if (!configView.config.enabled) {
-        /* 总开关没开时说"没启用"，而不是"标签建议已关闭" —— 后者会让人去翻那两个
-           子开关，翻完还是不行（`require_ready` 先看总开关与密钥）。 */
-        onNotice?.("AI 还没启用：到「设置 → AI」填好地址与密钥，再打开总开关", "error");
+        onNotice?.(
+          "AI 总开关还没打开：到「设置 → AI」拨开「启用 AI」，再按卡片底部的「保存」",
+          "error",
+        );
+        return;
+      }
+      if (!configView.hasKey) {
+        onNotice?.(
+          "还没保存 API Key：到「设置 → AI」在「连接」里粘贴密钥，再按卡片底部的「保存」",
+          "error",
+        );
         return;
       }
       const { appTagsEnabled, itemTagsEnabled } = configView.config;

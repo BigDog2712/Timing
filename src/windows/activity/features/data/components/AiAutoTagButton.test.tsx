@@ -15,6 +15,8 @@ const g = vi.hoisted(() => ({
   itemTags: [] as Array<{ itemId: number; tags: string[] }>,
   appTags: {} as Record<string, string[]>,
   enabled: { enabled: true, appTagsEnabled: true, itemTagsEnabled: true },
+  /* 预检的第二道：总开关之后是密钥。默认有密钥，用例按需拨掉。 */
+  hasKey: true,
   suggest: vi.fn(),
   applyPlan: vi.fn(),
   persistDefinitions: vi.fn(),
@@ -25,7 +27,7 @@ const g = vi.hoisted(() => ({
 vi.mock("../../../platform/desktop/hostAiGateway.ts", () => ({
   aiConfigGet: async () => ({
     config: { ...g.enabled },
-    hasKey: true,
+    hasKey: g.hasKey,
     secretAvailable: true,
   }),
   aiSuggestTags: (request: unknown) => g.suggest(request),
@@ -274,8 +276,28 @@ describe("AI 自动打标签 · 接线", () => {
     });
     await flush();
     expect(g.suggest).not.toHaveBeenCalled();
-    expect(g.notices.at(-1)?.text).toContain("还没启用");
+    expect(g.notices.at(-1)?.text).toContain("总开关还没打开");
+    /* 必须点名「按保存」：设置卡里的开关只改草稿，不存库。少了这半句，用户会回去
+       看着开关是开的、以为自己已经打开了，然后再次撞同一句话。 */
+    expect(g.notices.at(-1)?.text).toContain("保存");
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("c07b_missing_key_says_key_not_switch", async () => {
+    /* 总开关开着但没存密钥：这时劝人"去打开总开关"是错的——开关本来就是开的，
+       真正缺的是「连接」里的密钥框。两条缺失的补法不同，必须分开说。 */
+    g.enabled = { enabled: true, appTagsEnabled: true, itemTagsEnabled: true };
+    g.hasKey = false;
+    await mount();
+    const trigger = byText("AI 自动打标签");
+    await act(async () => {
+      trigger?.click();
+    });
+    await flush();
+    expect(g.suggest).not.toHaveBeenCalled();
+    expect(g.notices.at(-1)?.text).toContain("API Key");
+    expect(g.notices.at(-1)?.text).not.toContain("总开关");
+    g.hasKey = true;
   });
 
   it("c08_one_side_failing_keeps_the_other_side_result", async () => {
