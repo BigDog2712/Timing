@@ -43,7 +43,7 @@
 
 /* ------------------------------ 选择浮层 ------------------------------ */
 .dt-pop {
-  z-index: var(--z-menu);
+  z-index: var(--z-panel);
   display: grid;
   gap: var(--space-1);
   padding: var(--space-2);

@@ -182,7 +182,10 @@ kbd {
   left: var(--snap-margin);
   right: var(--snap-margin);
   bottom: var(--snap-margin);
-  z-index: var(--z-tooltip);
+  /* [B3c] 原 --z-tooltip(50)。P1 §3.6 把 NoticeBar 归 toast(40)，但现网次序是
+     notice(50) < menu(60)——直改 40 会让提示条盖住右键菜单首项（视觉回退）。
+     故**保序**落到 popover(20)（0<20<30<50 与原 0<50<60<70 同构），语义归位留待 ux 复核。 */
+  z-index: var(--z-popover);
   display: flex;
   align-items: center;
   gap: var(--space-3);

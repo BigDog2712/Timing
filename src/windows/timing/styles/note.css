@@ -60,6 +60,9 @@ html[data-window="note"] * {
 /* ------------------------------ 头（两枚圆点，浮在正文框右上角内侧） ------------------------------ */
 /* [V0.2.4 · 1] 圆点从「独立一行」改为**浮在文字框内**的右上角：不再占正文高度，
    文字背景亮起时它们就在这块底色里（用户口径：按钮放在文字背景内）。 */
+/* [B3c · 刻度豁免] 便利贴是**独立窗**（ADR-020，html[data-window="note"]），窗内除下列
+   圆点/缩放手柄外没有任何 z 索引，2 只是「压在本体文字之上」的局部子层，不是全局浮层档位。
+   P1 §3.6 明文「note 若为独立窗不进刻度（见 PLAN A3）」，故保留裸 2 不动。 */
 .note__head {
   position: absolute;
   top: var(--note-pad);
@@ -88,7 +91,7 @@ html[data-window="note"] * {
   position: absolute;
   right: 2px;
   bottom: 2px;
-  z-index: 2;
+  z-index: 2; /* 同上：独立窗局部子层，与 .note__head 并列（同值保 DOM 次序） */
   width: 14px;
   height: 14px;
   /* [V0.3.1] 不再改指针（原 nwse-resize）：整块便利贴统一默认箭头 */

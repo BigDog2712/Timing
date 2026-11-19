@@ -8,7 +8,9 @@
 
 .note-preview {
   position: fixed;
-  z-index: 60;
+  /* [B3c] 原裸 60 = 旧 --z-menu。归 panel(30)：与 60 处并列的 .menu/.dt-pop/.countdown-card
+     **一起**落 30，仍严格低于 .reminder/.dialog-scrim(50)，也仍高于 .notice(20)。 */
+  z-index: var(--z-panel);
   display: flex;
   flex-direction: column;
   gap: var(--space-1);

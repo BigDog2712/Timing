@@ -8,7 +8,7 @@
 .m-scrim {
   position: absolute;
   inset: 0;
-  z-index: var(--z-dialog);
+  z-index: var(--z-drag);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -177,7 +177,9 @@
   left: var(--space-3);
   right: var(--space-3);
   bottom: calc(var(--m-tabbar-h) + env(safe-area-inset-bottom, 0px) + var(--space-3));
-  z-index: var(--z-undo);
+  z-index: var(--z-toast);
+  /* [B3c] 数值仍 40（原 --z-undo）。.m-toast 由 50 归 popover(20) 后，撤销条在数值上
+     高于顶部提示条；两者一底一顶、几何不重叠，实际视觉零变化。 */
   display: flex;
   align-items: center;
   gap: var(--space-3);

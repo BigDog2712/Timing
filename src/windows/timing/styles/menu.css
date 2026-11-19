@@ -10,14 +10,15 @@
 .menu-scrim {
   position: absolute;
   inset: 0;
-  z-index: var(--z-tooltip);
+  /* [B3c] 遮罩必须**严格低于** .menu（下条 panel 30），否则点空白关不掉菜单 */
+  z-index: var(--z-popover);
   background: transparent;
   pointer-events: auto;
 }
 
 .menu {
   position: absolute;
-  z-index: var(--z-menu);
+  z-index: var(--z-panel);
   min-width: var(--menu-w);
   max-width: var(--menu-w-max);
   padding: var(--menu-pad);

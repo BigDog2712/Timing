@@ -179,9 +179,21 @@
   --ease-exit:     cubic-bezier(0.4, 0, 1, 1);
   --ease-morph:    cubic-bezier(0.32, 0.72, 0, 1);
 
-  /* ---- 层级 ---- */
-  --z-base: 0;  --z-pill: 10;  --z-panel: 20;  --z-note: 20;
-  --z-settings: 30;  --z-undo: 40;  --z-tooltip: 50;  --z-menu: 60;  --z-dialog: 70;
+  /* ---- 层级（B3 · P1 §3.6：6 档 base/handles/popover/panel/toast/drag）----
+   * 原 9 名（base/pill/panel/note/settings/undo/tooltip/menu/dialog）已全部归到 6 档并删除别名；
+   * 全仓消费点已于 B3c 一并改写成 6 档名，无遗留旧名。
+   * **严格单调**：旧 tooltip(50) < menu(60) < dialog(70) → 新 popover(20) < panel(30) < drag(50)，
+   * 相对次序逐一对齐（20<30<50 与 50<60<70 同构），所以窗口内任何元素的叠放关系不变——
+   * z-index 只在同一层叠上下文内比大小，绝对数值无意义，保序即零像素。
+   * 硬约束：.menu-scrim(popover 20) 必须**严格低于** .menu(panel 30)，否则点空白关不掉菜单。
+   * 豁免：① 便利贴独立窗（note.css 裸 2，P1 明文不进刻度）；② 分析窗自带 0–170 细粒度阶梯
+   * （相邻档 44/45、110/120/130/140/170 都有真实语义，压成 6 档会翻序），本窗不套用本表。 */
+  --z-base: 0;      /* 药丸 / 圆点本体 */
+  --z-handles: 10;  /* 把手簇 / 滚轮提示 / 面板内贴底卡片（.todos-compose） */
+  --z-popover: 20;  /* 右键菜单遮罩 / tooltip / 提示条 */
+  --z-panel: 30;    /* 右键菜单 / 事项 / 设置 / 面板 / 日期浮层 */
+  --z-toast: 40;    /* 撤销条 */
+  --z-drag: 50;     /* 对话框 / 提醒卡 / 拖动中浮层 */
 
   /* ---- 玻璃（有明确功能目的，见 DESIGN-V0.2.0.md §6.4）---- */
   --glass-blur: 18px;

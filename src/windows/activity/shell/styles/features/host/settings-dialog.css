@@ -161,7 +161,9 @@
 .dialog-scrim {
   position: absolute;
   inset: 0;
-  z-index: var(--z-dialog);
+  /* [B3c] 原 --z-dialog(70) → drag(50)，与 .reminder / .m-scrim 同档同步迁移（三者原为并列 70）。
+     本文件两窗共引；分析窗不渲染 .dialog-scrim，且分析窗没有 --z-* 定义——真要用需另建 --at-z-*。 */
+  z-index: var(--z-drag);
   display: grid;
   place-items: center;
   background: var(--scrim); /* 纯色半透明，禁用模糊 */

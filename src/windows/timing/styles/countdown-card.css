@@ -1,7 +1,7 @@
 /* 独立倒计时卡：玻璃材质与应用菜单一致，仅使用设计令牌。 */
 .countdown-card {
   position: absolute;
-  z-index: var(--z-menu);
+  z-index: var(--z-panel);
   display: flex;
   width: max-content;
   min-width: 168px;

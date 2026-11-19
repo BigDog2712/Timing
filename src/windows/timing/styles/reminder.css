@@ -2,12 +2,15 @@
  * Timing V0.2.0 — reminder.css（批2 N-5 提醒浮出卡）
  * -----------------------------------------------------------------------------
  * 依据 docs/design/pages-V0.2.0/reminder-popover.md §1/§3.2。
- * P0：仅 var(--*)，零字面量色值。层 --z-dialog (70)，宽 330（Timing BoxW，RemindBox.cs:12），玻璃 --menu-bg。
+ * P0：仅 var(--*)，零字面量色值。层 --z-drag (50)，宽 330（Timing BoxW，RemindBox.cs:12），玻璃 --menu-bg。
  * ========================================================================== */
 
 .reminder {
   position: absolute;
-  z-index: var(--z-dialog);
+  /* [B3c] 原 --z-dialog(70) → drag(50)：与 .dialog-scrim / .m-scrim 同为 70 档，三者必须
+     **一起**迁到同档才不会破坏 70 处原本的并列关系（P1 把提醒归 toast(40)，那会把提醒
+     压到对话框遮罩之下，属刻意改序，本批不做）。 */
+  z-index: var(--z-drag);
   width: 330px;   /* [Timing 对齐 D12] BoxW 330（RemindBox.cs:12） */
   padding: var(--space-3);
   border-radius: var(--radius-lg);

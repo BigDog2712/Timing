@@ -11,7 +11,9 @@
   left: var(--space-2);
   right: var(--space-2);
   bottom: calc(var(--todos-foot-h) + var(--space-2));
-  z-index: 5;
+  /* [B3c] 原裸 5（局部子层）。归 handles(10)：仍需严格低于 .notice(20)、.dt-pop(30)
+     与 .note-preview(30)；若并入 panel(30) 会与 .dt-pop 并列、被并列 DT 浮层穿插。 */
+  z-index: var(--z-handles);
   display: grid;
   gap: var(--space-2);
   padding: var(--space-3);

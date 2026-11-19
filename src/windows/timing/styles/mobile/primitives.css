@@ -267,7 +267,7 @@
   left: var(--m-gutter);
   right: var(--m-gutter);
   top: calc(env(safe-area-inset-top, 0px) + 12px);
-  z-index: var(--z-tooltip);
+  z-index: var(--z-popover);
   display: flex;
   align-items: center;
   gap: var(--space-2);
