@@ -253,7 +253,52 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 | T1 | 「最短记录时长」在**两个窗各有一份实现、一份常量副本**：活动窗 `SettingsMinRecordRow.tsx`（`FALLBACK_MIN_RECORD_SEC` / `MIN_RECORD_SEC_MIN` / `MIN_RECORD_SEC_MAX` / `clampSec`）与主窗·移动端 `timing/components/settings/GeneralTab.tsx` 顶部同一组常量（搜 `MIN_RECORD_SEC_MAX` 即命中，两文件的这行几乎逐字相同）。**今天同值，但没有任何机制保证继续同值** | 主窗那份不在本次重构的改动面内：它只服务 Android，唯一调用点是 `timing/components/mobile/SettingsPage.tsx` 的 `<GeneralTab showAutostart={false} />`；收尾期扩大改动面不值 | 把四个常量与 `clampSec` 提到 `src/windows/shared/`（`handleCatalog.ts` 已在那里，跨窗共享有先例），两窗各引一份。届时两边可以各自换 UI，但**值域与钳制只留一处** |
 | T2 | `timing/components/settings/GeneralTab.tsx` 里「开机自启」`Switch` 的 `onChange` 只调 `settingsActions.setAutostart(v)`，**没有 D5 的双写**。当前**不可达**（唯一调用点 `src/windows/timing/components/mobile/SettingsPage.tsx` 传 `showAutostart={false}`），但**有毒**：把它改成 `true` 会原样复现 D5 的分叉 bug | 同上（不在改动面内、当前无真实缺陷） | 开启该分支前必须先补 `commitSettingsPatch({ launchAtLogin: v })`。**技术细节不在此重复**，见该 `Switch` 上方的 ⚠️ 源码警告（搜 `测试覆盖不等于可达` 即命中） |
 
-> 两条债的**共性**不是"复制粘贴没清"，而是"**同值靠巧合维持**"：常量两份、双写只在一处。任何"两份东西今天恰好一致"的地方，都要问一句"什么机制保证以后也一致"——没有机制，就是债。
+| T3 | **分析窗的裸 `var()` 是一"类"问题，不是一"族"**：全量 **370 次 / 15 文件**（四分：A 有源 22 / B 只由桥提供 277 / C 只存在于主窗 68 / D 全仓无定义 3，合计 370 — 详情与口径见下「T3 详述」） | 通用化不划算：现有那条 fallback 判据（`settingsDataCssFallback.source.test.ts` 的 fc01/fc02）的类名清单是**从 `FoldBlock.tsx` 现推**的，只保护 `.data__block*` 一族——它守的是"出过事的那一族"，不是"这一类问题"；通用化约 100 行 + 两个 allowlist（C 类 68 条与桥外那部分需逐条归类），且收尾期不再动 `quiet-pro.css` / `motion.css` | 下批改判据时，口径必须是「**定义点真实存在**」，不是「前缀是 `--at-`」（注 ①） |
+
+> 三条债的**共性**不是"复制粘贴没清"，而是"**同值靠巧合维持**"：常量两份、双写只在一处。任何"两份东西今天恰好一致"的地方，都要问一句"什么机制保证以后也一致"——没有机制，就是债。T3 是同一句在**样式层**的说法："`--at-*` 前缀看着都有定义"也是一种巧合，而 `--at-active-nav-index` 就是那个反例。
+
+#### T3 详述：分析窗裸 `var()` 四分表
+
+**口径（不写口径的数不可复现——本轮三个人算出 369 / 370 / 387 / 390，差的全是口径）**：
+
+1. **范围**：`src/windows/activity/shell/styles/**/*.css`，**目录全扫**（不是 `@import` 闭包）；
+2. **先剥注释**（`/* var(--line) */` 这种举例会被误计）；
+3. **判定**：`var(` 之后取变量名，**名字后第一个非空字符不是 `,`** 即算"没 fallback"（比"右括号紧跟"更严：能覆盖 `var(--x , 8px)`）；
+4. **排除** `--at-*` 与 `--font-*`（`--at-*` 由 `useAppThemeMode` 运行时注入 `:root`，`--font-*` 在分析窗 `tokens.css` 的 `@theme` 里有定义）。**排除 ≠ 一定存在**：`--at-*` 里也有全仓找不到定义点的，它们逐条列入 D 类，不能被前缀白名单吃掉。
+
+```bash
+node -e "
+const fs=require('fs'),p=require('path');
+const walk=(d,o=[])=>{for(const e of fs.readdirSync(d,{withFileTypes:true})){const q=p.join(d,e.name);e.isDirectory()?walk(q,o):(e.name.endsWith('.css')&&o.push(q))}return o};
+let t=0,f=[];
+for(const x of walk('src/windows/activity/shell/styles')){
+  const s=fs.readFileSync(x,'utf8').replace(/\/\*[\s\S]*?\*\//g,'');
+  let n=0;
+  for(const m of s.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)\s*([,)])/g)){
+    if(m[2]===',') continue;
+    if(/^--(font-|at-)/.test(m[1])) continue;
+    n++;
+  }
+  if(n){t+=n;f.push(x)}
+}
+console.log(t,'次 /',f.length,'文件');"
+```
+
+| 类 | 判定规则 | 次数 | 含义 |
+|---|---|---:|---|
+| **A** 有源 | 分析窗样式树里自己定义了它 | 22 | 安全 |
+| **B** 只由桥提供 | **分析窗可达的样式里唯一**的定义点是 `.settings-host-sync` | 277 | 唯一可能出事的一类（例：插件卡 B5f、把手绑定 B5c） |
+| **C** 只存在于主窗 | 分析窗可达样式里**没有任何定义点**，但主窗 `timing/styles/tokens/*` 里有 | 68 | 主窗残留，分析窗 tsx 里 0 引用；不炸，但会让后人以为"这里能用" |
+| **D** 全仓无定义 | 哪里都没有 | 3 | 见注 ② |
+| | | **370** | |
+
+**B 类不再细分**：再拆"桥内安全 / 桥外只在主窗渲染 / 桥外真渲染"要判每条规则命中的组件**有没有 `.settings-host-sync` 祖先**，那是人工看 DOM 树，静态扫描推不出来（用"文件归属"近似会立刻跟 `s-general` 撞车：`.setting-row` 就在 `settings-dialog.css` 里、现在渲染在桥外、靠 fallback 活着）。**只记一句现状：当前 B3（桥外且真渲染）= 0** —— 插件卡 B5f 整块进桥后，已知的三个病例全部收敛。
+
+**注 ①（这张表里最有迁移价值的一句）**：现有判据把 **`--at-*` 整个前缀当成"恒有定义"**排除（`settingsDataCssFallback.source.test.ts` 的 `ALWAYS_DEFINED = /^--(at-|font-mono$|font-sans$|font-display$)/`）。**这个前提是错的**——`--at-active-nav-index` 就是 `--at-` 开头、且全仓没有定义点。正确判据不是"前缀是 `--at-`"，而是"**定义点真实存在**"。改判据时不先改这一条，新判据会把同一批 `--at-*` 缺口原样放行。
+
+**注 ②：D 类是死 CSS，不是半成品。** `--tools-active-section-index` 全仓只出现在 `motion.css` 一处、无定义；消费它的 `.tools-section-active-bg` 与兄弟 `.at-nav-active-bg` / `.at-nav-active-indicator` **在 tsx 里没有任何渲染点**（`src` 全域 grep 只命中 CSS；`at-nav` 前缀在 tsx 里 0 命中，排除了拼类名）。所以不存在"滑块不动"这种用户可见现象——**没有滑块存在**。位置（搜类名即命中）：`quiet-pro.css` 的 `.at-nav-active-bg` / `.at-nav-active-indicator` 两条，`motion.css` 里 `[data-at-motion="enhanced"]` 下三条（上面三个类）+ `:root[data-at-motion="reduced"]` 下一条（三个类合列）——这两处就是 `--tools-active-section-index` 与 `--at-active-nav-index` 的**全部**消费点，**可整段删**，本轮不动。另一个 `--tooltip-color` 是 JS 内联注入（`DestinationDetailTimeline` / `HistoryHorizontalTimeline` 的 style prop），**不是缺口**。
+
+**注 ③：两种修法二选一，判据是"会不会被搬到桥外"，不是哪种省事。** **桥内渲染的类 → 补桥内值；桥外会渲染的类 → 补 fallback。** `.num-field` 选 fallback（它已经被搬到桥外），插件卡选补桥（B5f 把 `--btn-sm-h` / `--bg-field-hi` 补进桥——给每条规则抄 fallback 等于同一份真值写两遍，桥和 fallback 迟早各长各的）。
 
 ### 3.4 可发现性补偿（把手绑定降级后）
 
@@ -291,6 +336,16 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 - 桌面药丸的内联设置面板（`SettingsPanel → ThemePicker`）已删；`ThemePicker` / `GeneralTab` / `PluginsTab` / `AppearanceCard` / `HighlightColorRow` / `SwatchRow` 的唯一生产消费者是 `mobile/SettingsPage.tsx`，而 `MobileShell` 由编译期 `__TIMING_MOBILE__` 分叉（该常量只在 `timing/lib/platform.ts` 声明并导出为 `IS_MOBILE`，搜 `__TIMING_MOBILE__`；`entry/App.tsx` 搜 `IS_MOBILE` 即见分叉点）。**桌面产物里这一整组组件不存在**——所以在桌面设置页里 grep 到"同名同功能"的实现时，先确认它是不是只服务 Android，不要急着合并。
 - 该目录下 `mdSyncAuto.ts` / `mdSyncConfig.ts` / `mdSyncCopy.ts` 都是 **6 行 re-export 壳**（如 `mdSyncCopy.ts` 只有一行注释 + `export * from '../../../../../shared/settings/mdSyncCopy'`），真源已合并到 `shared/settings/mdSync*`；`features/settings/services/host/mdSync*.ts` 也是同样的壳。三处 **不是三份实现**，`mdSyncCopies.drift.test.ts` 专门盯着不许分叉——拆分或搬移这些文件时不要"顺手合并"，会把壳变回副本。
 
+**(4) 卡壳不是自带的：设置页的卡，一半靠组件自己、一半靠父级——搬到分析窗的第一件事是问"外壳跟过来了没有"。**
+
+三个病例（`s-pill-handles` / `s-plugins` / `s-general`）同源：**组件都是照主窗形状写的**，主窗那层父级外壳（`.data` / 页签容器 / `.setting-group`）只承担排版职责；搬到分析窗后外壳没跟过来，于是既不是卡、也拿不到宿主令牌。
+
+- `s-pill-handles`：`FoldBlock` 原来只长在数据卡的 `.settings-host-sync` 里，换到第 3 组就是桥外 → B5c 补 fallback + B5d 的 `.data__block--standalone`（**它自己是卡**）。
+- `s-plugins`：`HostPluginsPanel` 的根只有 `<div className="plg">`，主窗靠页签容器给外壳 → B5f（`733acf0`）补 `at-panel p-5 md:p-6` + `settings-host-sync`（**标记一个字没改**）。
+- `s-general`：`HostGeneralPanel` 的根只有 `.setting-group`（`display:flex; flex-direction:column`）→ B5g（`be682e3`）补 `at-panel p-5 md:p-6`（**不加桥**，`.setting-row` 的令牌自带 fallback；卡头与开关解耦，`showAutostart={false}` 时也保留标题）。
+
+失败形状是**静默**的：没有报错、没有布局崩，只是缺底色/圆角/内边距，看起来像"材质和别处不太一样"，很容易被当成设计取舍放过。所以：**加新块时先问一句——它的卡壳是自带的，还是指望父级？** 指望父级的，搬家时外壳必须同批搬。
+
 ## 4. 键盘与无障碍
 
 ### 4.1 快捷键归纳（悬浮条聚焦时）
@@ -321,7 +376,7 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 | 药丸整体 | 有可访问名「Timing 计时器 · {事项名}」 | 读屏进入即知这是什么 |
 | 主按钮 | `aria-pressed` 反映 running/paused；可访问名随态变"开始/暂停/继续" | 状态可被读屏感知，不靠纯颜色 |
 | 计时数字 | `aria-live="polite"`，但**按分钟而非每秒**播报 | 防读屏每秒刷屏；告警阈值切换时额外 polite 播报一次 |
-| dot | 可访问名「{事项名} · 已计 {时长}」，等于其 tooltip 文本 | tooltip 内容必须同时是 aria-label，不能只有视觉 tooltip |
+| dot | 可访问名「收起状态：{事项名} · 已计 {时长}，单击展开，拖动可移动」 | **方向必须是 tooltip ⊆ aria-label**：视觉 tooltip 只需"是什么 + 多久"，读屏还需要"能单击展开、能拖动"。两者信息量可以不等，但不能反过来（不能只有视觉 tooltip 而读屏拿不到），也不能把操作提示塞进 tooltip |
 | 把手按钮 | 可访问名 = 绑定动作的 label（读 `handleCatalog.label`）；不可逆动作加 `aria-description`"不可撤销" | 复用目录 label，改名只改 label 不改 id |
 | 结束按钮 | 面板内，可访问名「结束并保存（不可撤销）」 | 不可逆语义进可访问名 |
 | 四态 | 不以颜色为唯一信号：running/paused 由主按钮可访问名 + aria-pressed 承载 | 满足"不靠颜色传达信息" |
@@ -377,7 +432,7 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 - [ ] 把手按钮在 :focus-visible 下强制可见，Tab 顺序从左到右不跳序、无焦点陷阱。
 - [ ] 主按钮 aria-pressed 与可访问名随态变化；状态不以颜色为唯一信号（读屏可辨 running/paused）。
 - [ ] 计时数字 aria-live 按分钟播报，不每秒刷屏；告警切换播报一次。
-- [ ] dot 的 tooltip 文本同时是其 aria-label。
+- [ ] dot 的 tooltip 文本**包含在** aria-label 里（方向为 tooltip ⊆ aria-label；**不要求逐字相等** —— 读屏多出"单击展开、拖动可移动"是对的，不是缺陷）。
 - [ ] 不可逆动作（结束/把手绑定的 stop）可访问名含"不可撤销"。
 - [ ] 焦点环深浅两套对比度 ≥3:1；无裸 outline:none 且无替代。
 - [ ] prefers-reduced-motion 下全部过渡退化为瞬切/静态，状态信息不丢。
@@ -389,6 +444,7 @@ morph（dot↔pill）与把手露出是**两套独立动画**，不得联动：m
 - **IPC 不碰**：本规范全部为前端交互/呈现层改动，默认绑定调整只改 `DEFAULT_HANDLE_BINDINGS` 常量，不新增命令、不改契约。
 - **功能不可回退**：去重是"合并入口"不是"删功能"；迁移后每个原功能仍可达，验收按 §5.3 逐条核对。**[实测修正]** 本轮去重只剩 D5，且它删掉的是"重复的第二个开关"，不是能力本身——`launchAtLogin` 行移除后"开机自启"仍可在 `HostGeneralPanel` 一处开关完成（§3.3 D5 详述）。
 - **只调默认与呈现**：把手 id、slot 枚举、三形态枚举均不可改；label 可改（会反映到 aria 名）。
+- **行号指针的适用边界**：`docs/` 下的判据**一律不写行号**（本轮已清零）；源码注释沿既有约定（指向 Rust 布局实现的几何出处）**保留行号**，但新增注释若引用的目标行**易随重构漂移**（跨文件、跨目录，例如另一个窗的令牌文件），改写可搜索记号（`搜 --btn-sm-h: 24px`）。理由一句话：`docs/` 离代码远、复审频率低，行号一漂就没人发现；源码注释离被引用处近，且仓库已有 43 处同型写法（`dashboard-apps.css` / `dashboard-modules.css` / `dashboard.css` / `dashboard-todos.css` 等 16 个文件），单独立规矩反而制造两套标准。
 - **视觉以 P1 为准**：本文不定任何像素/色值；morph 时长 280ms、dot ⌀33、一处强调等数值均引自 P1，fe 以 P1 令牌为准。**[实测修正]** dot 直径统一为 **⌀33**（`--dot-size: 33px`，搜 `--dot-size`；P1 §4.2 已按实测重写为 ⌀33 开口进度环 + 环身黄点，初稿 ⌀32 作废）；**⌀32 是 `--pill-h` 条高**（搜 `--pill-h`），两个数不要混——B6 判像素按 33。
 
 ---
