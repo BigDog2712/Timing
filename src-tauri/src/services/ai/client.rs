@@ -7,6 +7,7 @@ use tokio::time::{sleep, timeout};
 use super::error_mapping::{is_retryable, map_openai_error, retry_delay as bounded_retry_delay};
 
 use async_openai::config::OpenAIConfig;
+use async_openai::error::{ApiError, ApiErrorResponse, OpenAIError};
 use async_openai::types::chat::{
     ChatCompletionRequestMessage, ChatCompletionRequestSystemMessage,
     ChatCompletionRequestUserMessage, CreateChatCompletionRequestArgs,
@@ -100,23 +101,29 @@ fn build_with_timeout(
 }
 
 /// `GET /models`：只读目录，不要求总开关打开；密钥由调用方按同源规则解析。
+///
+/// **不走 `client.models().list()`**：`async_openai` 的 `Model` 把 `created: u32` 当必填，
+/// 而 OpenAI 兼容网关普遍只回 `{id, object, owned_by}` —— DeepSeek 就是这样（实测它的
+/// `/models` 文档示例里没有 `created`），Ollama 的自建端点同理。缺字段 → 整条反序列化
+/// 失败 → 用户看到「AI 服务响应格式异常」，目录永远拉不到，而型号本身是能用的。
+/// 这里只认 `data[].id`：多出来的字段忽略，缺字段不影响。
 pub async fn list_models(base_url: &str, api_key: &str) -> AppResult<Vec<String>> {
-    let client = openai_client(base_url, api_key, MODEL_LIST_SINGLE_TIMEOUT)?;
+    let url = format!("{}/models", base_url.trim_end_matches('/'));
+    let http = http_client(MODEL_LIST_SINGLE_TIMEOUT)?;
     let started = Instant::now();
     let mut attempt = 0usize;
-    let response = loop {
+    loop {
         if started.elapsed() >= MODEL_LIST_TOTAL_BUDGET {
             return Err(AppError::new(ErrorCode::AiTimeout, "获取模型列表超时"));
         }
         attempt += 1;
         let remaining = MODEL_LIST_TOTAL_BUDGET.saturating_sub(started.elapsed());
         let request_budget = MODEL_LIST_SINGLE_TIMEOUT.min(remaining);
-        match timeout(request_budget, client.models().list()).await {
-            Ok(Ok(response)) => break response,
-            Ok(Err(err)) => {
-                let mapped = map_openai_error(&err, api_key);
-                if attempt > MAX_RETRIES || !is_retryable(mapped.code) {
-                    return Err(mapped);
+        match timeout(request_budget, fetch_models(&http, &url, api_key)).await {
+            Ok(Ok(ids)) => return Ok(model_ids(ids)),
+            Ok(Err(error)) => {
+                if attempt > MAX_RETRIES || !is_retryable(error.code) {
+                    return Err(error);
                 }
                 let remaining = MODEL_LIST_TOTAL_BUDGET.saturating_sub(started.elapsed());
                 sleep(bounded_retry_delay(
@@ -139,8 +146,83 @@ pub async fn list_models(base_url: &str, api_key: &str) -> AppResult<Vec<String>
                 .await;
             }
         }
-    };
-    Ok(model_ids(response.data.into_iter().map(|model| model.id)))
+    }
+}
+
+/// 一次目录请求。非 2xx 走 `map_openai_error` 那套口径（401/403 认证、429 限流、5xx 上游），
+/// 不在这里另立一份映射 —— 两张表迟早对不上。
+async fn fetch_models(
+    http: &reqwest::Client,
+    url: &str,
+    api_key: &str,
+) -> AppResult<Vec<String>> {
+    let response = http
+        .get(url)
+        .bearer_auth(api_key)
+        .header(reqwest::header::ACCEPT, "application/json")
+        .send()
+        .await
+        .map_err(|err| {
+            if err.is_timeout() {
+                AppError::new(ErrorCode::AiTimeout, "获取模型列表超时")
+            } else {
+                AppError::new(ErrorCode::AiNetwork, "无法连接 AI 服务，请检查网络后重试")
+            }
+        })?;
+    let status = response.status();
+    /* 正文读完再判状态：错误体里那句 `error.message` 是用户唯一的线索。 */
+    let body = response.text().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(map_openai_error(
+            &OpenAIError::ApiError(ApiErrorResponse {
+                status_code: status,
+                api_error: ApiError {
+                    message: error_message(&body),
+                    r#type: None,
+                    param: None,
+                    code: None,
+                    misalignment: None,
+                },
+            }),
+            api_key,
+        ));
+    }
+    parse_model_ids(&body)
+        .ok_or_else(|| AppError::new(ErrorCode::AiUpstream, "模型目录格式无法识别，请手动填写型号"))
+}
+
+/// 目录正文 → 型号 id。只认 `{"data":[{"id":"..."}]}`，其它字段一律不看。
+/// 解不开返回 `None`：让调用方说「手动填」，而不是假装目录是空的。
+fn parse_model_ids(body: &str) -> Option<Vec<String>> {
+    #[derive(serde::Deserialize)]
+    struct Row {
+        id: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct List {
+        data: Vec<Row>,
+    }
+    serde_json::from_str::<List>(body)
+        .ok()
+        .map(|list| list.data.into_iter().map(|row| row.id).collect())
+}
+
+/// 错误正文里的那句话。取不到就把原文截一段——比「请求失败」有用。
+fn error_message(body: &str) -> String {
+    #[derive(serde::Deserialize)]
+    struct Envelope {
+        error: Inner,
+    }
+    #[derive(serde::Deserialize)]
+    struct Inner {
+        message: String,
+    }
+    if let Ok(parsed) = serde_json::from_str::<Envelope>(body) {
+        if !parsed.error.message.trim().is_empty() {
+            return parsed.error.message;
+        }
+    }
+    body.trim().chars().take(120).collect()
 }
 
 fn model_ids(ids: impl IntoIterator<Item = String>) -> Vec<String> {
@@ -288,5 +370,36 @@ mod tests {
         let out = model_ids(ids);
         assert_eq!(out.len(), MAX_MODELS);
         assert_eq!(out[0], "m000");
+    }
+
+    #[test]
+    fn model_catalog_tolerates_entries_without_created() {
+        /* 真实形状（DeepSeek / Ollama 的 OpenAI 兼容端点）：每条只有 id / object / owned_by。
+           `async_openai::Model` 把 `created: u32` 当必填，用它解析就是「响应格式异常」。 */
+        let body = r#"{"object":"list","data":[
+            {"id":"deepseek-flash","object":"model","owned_by":"deepseek"},
+            {"id":"deepseek-v4-pro","object":"model","owned_by":"deepseek","created":1700000000}
+        ]}"#;
+        assert_eq!(
+            parse_model_ids(body),
+            Some(vec!["deepseek-flash".to_string(), "deepseek-v4-pro".to_string()])
+        );
+    }
+
+    #[test]
+    fn empty_or_odd_catalogs_are_told_apart() {
+        /* 空目录是合法答复（前端提示「请手动填写」）；解不开要报错，不能假装是空的。 */
+        assert_eq!(parse_model_ids(r#"{"object":"list","data":[]}"#), Some(vec![]));
+        assert_eq!(parse_model_ids("<html>gateway</html>"), None);
+        assert_eq!(parse_model_ids(r#"{"data":[{"object":"model"}]}"#), None);
+    }
+
+    #[test]
+    fn error_body_message_is_preferred_over_raw_text() {
+        let body = r#"{"error":{"message":"Authentication Fails (governor)","type":"authentication_error"}}"#;
+        assert_eq!(error_message(body), "Authentication Fails (governor)");
+        assert_eq!(error_message("  plain text  "), "plain text");
+        assert_eq!(error_message(&"x".repeat(300)).chars().count(), 120);
+        assert_eq!(error_message(r#"{"error":{"message":"   "}}"#), r#"{"error":{"message":"   "}}"#);
     }
 }

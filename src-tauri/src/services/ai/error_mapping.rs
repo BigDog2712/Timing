@@ -30,7 +30,14 @@ pub(super) fn map_openai_error(err: &OpenAIError, api_key: &str) -> AppError {
             (ErrorCode::AiNetwork, "网络连接失败")
         }
         OpenAIError::Reqwest(_) => (ErrorCode::AiUpstream, "AI 服务请求失败"),
-        OpenAIError::JSONDeserialize(_, _) => (ErrorCode::AiUpstream, "AI 服务响应格式异常"),
+        OpenAIError::JSONDeserialize(_, _) => {
+            /* 拿到了 2xx、内容却解不开：这是**接口不兼容**，不是暂时故障。
+               「稍后重试」会让人一直重试同一堵墙，所以这里直接指到该改的地方。 */
+            return AppError::new(
+                ErrorCode::AiUpstream,
+                "AI 服务返回的内容不是 OpenAI 兼容格式：请确认 Base URL 指向兼容接口（多数服务商是 /v1）",
+            );
+        }
         OpenAIError::InvalidArgument(_) => (ErrorCode::AiBadRequest, "AI 请求参数无效"),
         OpenAIError::StreamError(_) => (ErrorCode::AiUpstream, "AI 服务响应异常"),
         OpenAIError::FileSaveError(_) | OpenAIError::FileReadError(_) => {
@@ -318,6 +325,16 @@ mod tests {
              but you passed deepseek-v4.1-flash. (request_id: abc)",
         );
         assert_eq!(listed, vec!["deepseek-flash", "deepseek-v4-pro"]);
+    }
+
+    #[test]
+    fn unparsable_body_points_at_the_interface_not_at_retrying() {
+        /* 2xx + 解不开 = 接口不兼容。这句话要是写成「稍后重试」，用户会一直重试同一堵墙。 */
+        let broken = serde_json::from_str::<i32>("not json").expect_err("构造一个反序列化错误");
+        let mapped = map_openai_error(&OpenAIError::JSONDeserialize(broken, "body".into()), "key");
+        assert_eq!(mapped.code, ErrorCode::AiUpstream);
+        assert!(mapped.message.contains("OpenAI 兼容"), "{}", mapped.message);
+        assert!(!mapped.message.contains("稍后重试"), "{}", mapped.message);
     }
 
     #[test]
