@@ -153,10 +153,15 @@ describe('G1 手柄卡', () => {
     const originalLabel = target!.label;
     target!.label = '改过名的便利贴';
     try {
-      mount();
+      /* [B4 · P2 §1.3] `note.current` 已不在出厂左键（改到中键），
+         这里显式把它摆到左键，被测的仍是「改 label 不动已存 id」这件事。 */
+      mount({
+        ...DEFAULT_HANDLE_BINDINGS.full,
+        slots: { ...DEFAULT_HANDLE_BINDINGS.full.slots, left: 'note.current' },
+      });
       const trigger = container.querySelector('button[aria-haspopup="listbox"]');
       expect((trigger?.textContent ?? '').trim()).toContain('改过名的便利贴');
-      expect(DEFAULT_HANDLE_BINDINGS.full.slots.left).toBe('note.current');
+      expect(DEFAULT_HANDLE_BINDINGS.full.slots.middle).toBe('note.current');
     } finally {
       target!.label = originalLabel;
     }

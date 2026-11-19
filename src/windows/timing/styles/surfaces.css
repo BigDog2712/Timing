@@ -179,14 +179,29 @@
   padding: 0;
 }
 
+/* [B4 · P2 §2.3] 把手露出时机：
+   · 露出（hover / 键盘聚焦 / 有浮层展开）→ 立即，150ms 淡入；
+   · 收起 → **延迟 200ms（--dur-base）再淡出**，给鼠标从药丸移向把手的缓冲，
+     否则手一抖把手刚露就消失、够不着（验收口径「延迟淡出不小于 150ms」）。
+   实现方式：把 delay 写进「隐藏」这一侧的 transition，露出那一侧再把它归零——
+   同一个 opacity 过渡，进/出两侧拿不同 delay，纯 CSS 即可，不需要 JS 定时器。 */
 .pill__handle svg {
   opacity: 0;
-  transition: opacity var(--dur-exit) var(--ease-standard);
+  transition: opacity var(--dur-exit) var(--ease-standard) var(--dur-base);
 }
 
 .pill:hover .pill__handle svg,
-.pill__handle:focus-visible svg {
+.pill__handle:focus-visible svg,
+.pill[data-reveal="true"] .pill__handle svg {
   opacity: 1;
+  transition-delay: 0ms;
+}
+
+/* 拖动中把手隐藏（P2 §2.3「拖动时不误触把手动作」）。
+   `html[data-dragging]` 由 lib/dragState 在越过 4px 阈值那一刻镜像上去（不触发重渲染）。 */
+html[data-dragging="true"] .pill__handle svg {
+  opacity: 0;
+  transition-delay: 0ms;
 }
 
 /* [0.12.1] P0-03 的「今天」图标位整块删除（R-01）：它的两个动作已搬到 `today.panel` /

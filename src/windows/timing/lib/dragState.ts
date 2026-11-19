@@ -33,13 +33,27 @@ let dragActive = false;
 /** 超时兜底定时器（原生拖动吃掉 pointerup 时唯一能复位它的东西） */
 let backstop: number | null = null;
 
+/**
+ * [B4 · P2 §2.3] 把拖动态**镜像**到 `html[data-dragging]`，让 CSS 能在不重渲染的前提下
+ * 表达「拖动中把手隐藏」。这与上面「不进 React 状态」的决定一致：属性写的是 DOM，
+ * 不触发任何 setState，药丸 / 圆点仍然零重渲染。
+ */
+function syncDraggingAttr(active: boolean): void {
+  const root = typeof document === 'undefined' ? null : document.documentElement;
+  if (!root) return;
+  if (active) root.dataset.dragging = 'true';
+  else delete root.dataset.dragging;
+}
+
 /** 开始拖动：置位 + 重排兜底（重复调用不会叠定时器） */
 export function markDragActive(): void {
   dragActive = true;
+  syncDraggingAttr(true);
   if (backstop != null) window.clearTimeout(backstop);
   backstop = window.setTimeout(() => {
     backstop = null;
     dragActive = false;
+    syncDraggingAttr(false);
   }, DRAG_FLAG_MAX_MS);
 }
 
@@ -50,6 +64,7 @@ export function markDragIdle(): void {
     backstop = null;
   }
   dragActive = false;
+  syncDraggingAttr(false);
 }
 
 /** 当前是否在拖动（read-only 探针，调用方不要拿它做副作用） */

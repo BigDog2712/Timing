@@ -151,7 +151,9 @@ describe('H-05 / H-06：可发现性与键盘', () => {
     expect(handleOf('full').getAttribute('title')).toContain('当前事项便利贴');
     expect(handleOf('full').getAttribute('title')).toContain('记录面板');
 
-    render(withFullSlots({ left: 'patina.open', leftDouble: null }), makeCtx());
+    /* [B4 · P2 §1.3] `note.current` 默认已移到中键、`today.panel` 默认在右键，
+       所以这里要连中键与右键一起清空，否则「旧文案必须消失」会被那两格重新填回来。 */
+    render(withFullSlots({ left: 'patina.open', leftDouble: null, middle: null, right: null }), makeCtx());
     const title = handleOf('full').getAttribute('title') ?? '';
     expect(title).toContain('唤出主界面');
     /* 旧文案必须消失：留着就是"改完看不出改没改" */

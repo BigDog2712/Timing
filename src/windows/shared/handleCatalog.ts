@@ -112,12 +112,25 @@ export const HANDLE_ACTIONS: HandleActionDescriptor[] = [
  * 三条形态里**只有「手柄」默认开**：圆点 / 半手柄是给"我只想要一个小圆点"的人，
  * 默认开等于一上来就摆三个可点区域；而原「手柄」是既有唯一手柄的直接延续，
  * 关掉它会让所有老用户升级后突然失去便利贴入口。
+ *
+ * [B4 · P2 §1.3] 槽位默认值重排 —— **只改值，不改任何 id / slot 枚举 / 形态枚举**：
+ *   · full.left  note.current → todos.open  「切事项」是最高频的把手动作，给最顺手的左单击
+ *   · full.right note.list    → today.panel 「看今日记录」次高频
+ *   · full.middle null        → note.current 便利贴降中键，仍一键可达
+ *   · full.leftDouble  today.panel  → patina.open 「唤出完整界面」属进一层，适合双击
+ *   · full.rightDouble today.digest → note.list  清单低频，留双击
+ *   · half.left  patina.open → todos.open    与 full 左键语义对齐（减少形态间记忆负担）
+ *   · half.right todos.open  → patina.open
+ *   · dot.left   today.panel → patina.open   圆点态最可能的诉求是「展开回来」
+ *   · dot.right  today.digest 保持不变（轻量只读入口）
+ * 老用户已存配置不受影响（归一化优先读 localStorage，出厂表只服务首次 / 重置）。
+ * 注意 `timer.stop` **不在任何出厂单击槽**：不可逆动作必须走面板内带确认的按钮（P2 §1.2 / A4）。
  */
 export const DEFAULT_HANDLE_BINDINGS: HandleBindings = {
   dot: {
     enabled: false,
     slots: {
-      left: 'today.panel',
+      left: 'patina.open',
       right: 'today.digest',
       middle: null,
       leftDouble: null,
@@ -127,8 +140,8 @@ export const DEFAULT_HANDLE_BINDINGS: HandleBindings = {
   half: {
     enabled: false,
     slots: {
-      left: 'patina.open',
-      right: 'todos.open',
+      left: 'todos.open',
+      right: 'patina.open',
       middle: null,
       leftDouble: null,
       rightDouble: null,
@@ -137,11 +150,11 @@ export const DEFAULT_HANDLE_BINDINGS: HandleBindings = {
   full: {
     enabled: true,
     slots: {
-      left: 'note.current',
-      right: 'note.list',
-      middle: null,
-      leftDouble: 'today.panel',
-      rightDouble: 'today.digest',
+      left: 'todos.open',
+      right: 'today.panel',
+      middle: 'note.current',
+      leftDouble: 'patina.open',
+      rightDouble: 'note.list',
     },
   },
 };

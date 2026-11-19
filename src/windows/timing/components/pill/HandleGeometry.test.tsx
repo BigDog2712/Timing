@@ -3,7 +3,7 @@
  * -----------------------------------------------------------------------------
  * jsdom 不做布局：`offsetWidth` 恒为 0、外部 CSS 不参与计算，所以 §6.1 的宽度算式不可能
  * 靠"量 DOM"验证。这里改读**样式源码**（真实文件）把 token 代入算式，断言三手柄全开时
- * name ≥154、总宽 ≤320，并钉住「手柄之间」那条兄弟规则真的存在。
+ * name ≥154、总宽 ≤384（B4 起上限由 320 抬到 384），并钉住「手柄之间」那条兄弟规则真的存在。
  *
  * 为什么与 `HandleCluster.test.tsx` 分开（0.12.1 末）：那个文件已到 300 行硬上限。
  * 切口是"行为 vs 几何"——DOM 形状 / 键鼠派发 / 槽位语义留在那边，这里只读样式与 token。
@@ -36,8 +36,10 @@ describe('几何：token 与宽度算式（W-01…W-06 / R-03）', () => {
     expect(token(primitives, 'grip-hit-w')).toBe(12);
   });
 
-  it('w02_pill_max_width_is_320_and_undo_stays_at_288', () => {
-    expect(token(primitives, 'pill-w-max')).toBe(320);
+  it('w02_pill_max_width_is_384_and_undo_stays_at_288', () => {
+    /* [B4 · P1 §4.1 / PLAN A2] 药丸上限 320 → **384**（设计上限，刻意变更）；
+       撤销条仍是 288，不跟着变宽（W-02：它和药丸不是一个东西）。 */
+    expect(token(primitives, 'pill-w-max')).toBe(384);
     expect(token(primitives, 'undo-w-max')).toBe(288);
     /* 撤销条是唯一必须换变量的消费点；`--pill-w-max` 的消费点只剩 `.pill` 一处 */
     expect(overlays).toContain('max-width: var(--undo-w-max)');
@@ -80,11 +82,12 @@ describe('几何：token 与宽度算式（W-01…W-06 / R-03）', () => {
     expect(perFirst).toBe(16);
     expect(perRest).toBe(12);
     expect(fixed).toBe(138);
-    /* 反证：`--pill-w-max` 回落到 288 → name 只剩 142 < 154 → 本条红（W-04） */
+    /* 反证：`--pill-w-max` 回落到 288 → name 只剩 150 < 154 → 本条红（W-04） */
     expect(nameWidth).toBeGreaterThanOrEqual(154);
-    expect(nameWidth).toBe(164);
-    /* 三手柄全开的总宽 = 302，且必须仍 ≤ 上限 */
-    expect(fixed + nameWidth).toBe(302);
+    /* [B4] 上限抬到 384 后名字档 164 → 220 才用得上新空间（min(384-138, 220) = 220） */
+    expect(nameWidth).toBe(220);
+    /* 三手柄全开的总宽 = 358，且必须仍 ≤ 上限（留 26px 余量防子像素取整溢出） */
+    expect(fixed + nameWidth).toBe(358);
     expect(fixed + nameWidth).toBeLessThanOrEqual(pillMax);
   });
 
@@ -101,12 +104,12 @@ describe('几何：token 与宽度算式（W-01…W-06 / R-03）', () => {
     expect(surfaces).toMatch(/\.pill__handle\s*\{\s*margin-left:\s*calc\(-1 \* var\(--space-1\)\)/);
   });
 
-  it('w05_pill_max_width_leaves_headroom_for_the_frame', () => {
-    /* 药丸窗口 384 - 2 × 每手柄净占 = 352 是"还能塞三个手柄"的物理上限；320 ≤ 352。
-       变异：把 320 改 360 → 本条红。 */
-    const gap = token(primitives, 'space-2');
-    const margin = token(primitives, 'space-1');
-    const perHandle = gap - margin + token(primitives, 'grip-w');
-    expect(token(primitives, 'pill-w-max')).toBeLessThanOrEqual(384 - 2 * perHandle);
+  it('w05_pill_max_width_is_the_design_cap', () => {
+    /* [B4 · P1 §4.1 / PLAN A2] 药丸上限就是设计上限 384（原 320 是「三手柄 + 164 名」的
+       历史凑数，已被 384 取代）。药丸宽度仍由内容自适应，384 只是容器上限；
+       窗口侧由 ADR-020 的 `--fit-w`（显示器工作区）动态兜底，不再有固定 384 画布。
+       变异：调到 400 → 本条红（超出设计上限）。 */
+    expect(token(primitives, 'pill-w-max')).toBe(384);
+    expect(token(primitives, 'pill-w-max')).toBeGreaterThan(token(primitives, 'pill-w-min'));
   });
 });

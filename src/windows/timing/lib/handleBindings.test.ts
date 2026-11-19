@@ -171,7 +171,7 @@ describe('parseHandleBindings —— 非法输入一律回落默认，永不抛'
     const out = parseHandleBindings(null);
     out.full.slots.left = 'patina.open';
     out.full.enabled = false;
-    expect(DEFAULT_HANDLE_BINDINGS.full.slots.left).toBe('note.current');
+    expect(DEFAULT_HANDLE_BINDINGS.full.slots.left).toBe('todos.open');
     expect(DEFAULT_HANDLE_BINDINGS.full.enabled).toBe(true);
   });
 });
@@ -254,9 +254,11 @@ describe('出厂绑定 = 设计 §3.3 的逐格表（QA 20261111 补）', () => 
    */
   const TABLE: Record<string, [boolean, string[], string[]]> = {
     /* 形态: [默认开?, 左键/右键/中键, 左双击/右双击] */
-    dot: [false, ['today.panel', 'today.digest', '—'], ['—', '—']],
-    half: [false, ['patina.open', 'todos.open', '—'], ['—', '—']],
-    full: [true, ['note.current', 'note.list', '—'], ['today.panel', 'today.digest']],
+    /* [B4 · P2 §1.3] 高频（切事项 / 看今日）提到单击，便利贴降中键，
+       唤出主界面进双击；`timer.stop` 不在任何出厂单击槽（不可逆动作走面板内确认）。 */
+    dot: [false, ['patina.open', 'today.digest', '—'], ['—', '—']],
+    half: [false, ['todos.open', 'patina.open', '—'], ['—', '—']],
+    full: [true, ['todos.open', 'today.panel', 'note.current'], ['patina.open', 'note.list']],
   };
 
   it('a02_defaults_match_the_design_table_cell_by_cell', () => {

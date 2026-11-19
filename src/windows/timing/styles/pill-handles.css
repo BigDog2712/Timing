@@ -43,7 +43,5 @@
 }
 
 /* [§4.2 显影矩阵漏的那一格] 有浮层展开时（data-reveal）手柄一并显形。
-   既有规则在 surfaces.css 只覆盖 :hover / :focus-within / :focus-visible。 */
-.pill[data-reveal='true'] .pill__handle svg {
-  opacity: 1;
-}
+   [B4] 该条已并到 surfaces.css 的显影矩阵（新增 transition-delay 归零那一侧），
+   这里不再重复声明 opacity —— 显影/收起的时机只留一处真源。 */
