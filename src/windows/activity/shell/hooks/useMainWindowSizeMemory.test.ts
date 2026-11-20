@@ -17,7 +17,7 @@ beforeEach(() => {
 });
 
 describe("窗口大小存档", () => {
-  it("没存过 → null（回 Rust 侧默认 1100×736，而不是凭空造一个尺寸）", () => {
+  it("没存过 → null（回 Rust 侧默认 1040×680，而不是凭空造一个尺寸）", () => {
     expect(readStoredWindowSize()).toBeNull();
   });
 

@@ -2,14 +2,14 @@
  * dashboard-items-card.css — 「今日时间线」卡 + 「事项管理」卡（0.12.6）
  * -----------------------------------------------------------------------------
  * 两张**独立**的卡（用户口径，见设计文档 §⑦）：
- *   · `.at-card-items`  今日时间线卡（`TimelineTodosCard`）= 上区待办 + 浅横线 + 下区时间线
+ *   · `.at-card-items`  今日时间线卡（`TimelineTodosCard`）= 上区时间线 + 浅横线 + 下区待办
  *   · `.at-card-manage` 事项管理卡（`ManageCard`）= 一个区（`ItemsManageZone`）占满卡身
  *
  * 三条只说一次：
  *   ① **分隔线是卡的直接子节点**（`.at-card-items__divider`），不在任何一个区里 ——
  *      挂在区里就会跟着那一区一起滚，"横线固定不动"当场失效（P1-1）。
- *   ② 时间线卡两区各自滚：上区 `max-height: 40%`（有上限的自适应，**不是**固定 40%，
- *      待办少的时候不该留一块空白）；下区吃余下高度。页面级不滚。
+ *   ② 时间线卡两区各自滚：**下区**（待办）`max-height: 40%`（有上限的自适应，**不是**
+ *      固定 40%，待办少的时候不该留一块空白）；上区（时间线）吃余下高度。页面级不滚。
  *   ③ 颜色/间距一律引用既有 `--at-*` 令牌，本文件**不出现任何十六进制**（`check:css-hex`）。
  *
  * 除卡壳类名之外，本文件还给两处**已被既有组件定义过的**元素补卡内版式，
@@ -35,13 +35,11 @@
   min-height: 0;
 }
 
-/* ── 上区：事项管理 ── */
+/* ── 上区：今日时间线（吃余下高度） ── */
 .at-card-items__upper {
   display: flex;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   flex-direction: column;
-  /* 卡高的 40% 是**上限**：内容少就按内容高，多了才在上区内部滚动 */
-  max-height: 40%;
   min-height: 0;
   overflow: hidden;
 }
@@ -55,11 +53,12 @@
   border: 0;
 }
 
-/* ── 下区：今日时间线（吃余下高度） ── */
+/* ── 下区：待办事项（卡高的 40% 是**上限**：内容少就按内容高，多了才在区内部滚动） ── */
 .at-card-items__lower {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   flex-direction: column;
+  max-height: 40%;
   min-height: 0;
   overflow: hidden;
 }
@@ -141,6 +140,46 @@
   margin-left: auto;
 }
 
+/* [0.13.x] 下区标题行 = 标题 + 总计 + 两颗入口（新建 / 编辑）。总计已经 `margin-left: auto`
+   把右侧推满，动作组就**不能**再自带一个 `auto`（两个 auto 会把总计挤到行中间）。 */
+.at-card-items .at-items-zone-timeline .at-items-zone-actions {
+  margin-left: 0;
+}
+
+/* ── [0.13.x] 时间线区的滚动容器：时间线行 + 常用两组共用一个滚动区 ──
+   行列表原来自己滚（见 `.at-card-items .at-timeline-rows`）；现在它下面还有两组事项，
+   两段各自滚会出现"上半截滚到底、下半截还没动"的观感。所以滚动上提到这一层，
+   行列表退回内容高（下面的嵌套覆盖）。 */
+.at-card-items .at-timeline-scroll {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--at-border-strong) transparent;
+}
+
+.at-card-items .at-timeline-scroll .at-timeline-rows {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+/* 有分组时"今天还没有计时记录"只是一行说明，不占整卡（`.at-empty` 是唯一内容的形态） */
+.at-timeline-note {
+  margin: 0 0 var(--at-space-group);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-tertiary);
+}
+
+/* 行列表与第一组之间留出与"组与组"同档的间距（相邻组间距由 `.at-items-group + …` 管） */
+.at-timeline-scroll .at-timeline-rows + .at-items-group {
+  margin-top: var(--at-space-group);
+}
+
 /* ── 上区两组列表 ── */
 .at-items-groups {
   display: flex;
@@ -181,10 +220,12 @@
 .at-items-row {
   display: flex;
   flex: 0 0 auto;
+  /* 行尾圆点与名称/累计**同一水平线**（圆点键自己撑满行高，也仍然居中） */
+  align-items: center;
 }
 
-/* 整行是一个按钮（点一下起停计时，T4 接 intent）：行高与时间线行同一档，
-   两区扫视时行距不会一宽一窄。 */
+/* 行主体 = 打开编辑（T4 之前是起停计时；用户口径：点事项应是编辑，起停挪到行尾）：
+   行高与时间线行同一档，两区扫视时行距不会一宽一窄。 */
 .at-items-row-main {
   display: flex;
   flex: 1 1 auto;
@@ -199,7 +240,51 @@
   line-height: var(--at-line-height-caption);
   color: var(--at-text-primary);
   text-align: left;
-  cursor: default;
+  cursor: pointer;
+}
+
+/* 行尾的状态圆点（用户口径：一个点，灰 = 空闲，蓝 = 启用，黄 = 待办）。
+   键撑满行高（拇指区），点本身 7px 居中 —— 与名称在同一水平线。
+   恒定占位（不 `display:none`）：否则"有计时"和"没计时"两种行首尾差一格，扫视会跳。 */
+.at-items-row-timer {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: var(--at-row-items);
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--at-radius-button);
+  background: transparent;
+  color: var(--at-text-tertiary);
+  cursor: pointer;
+}
+
+.at-items-row-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* 颜色只走令牌：设置里换主题时三种状态一起调度（蓝优先于黄，见组件里的判定） */
+.at-items-row[data-timer-state="running"] .at-items-row-timer {
+  color: var(--at-accent-default);
+}
+
+.at-items-row[data-timer-state="pending"] .at-items-row-timer {
+  color: var(--at-warning);
+}
+
+.at-items-row-timer:hover {
+  background: var(--at-badge-subtle);
+}
+
+.at-items-row-timer:focus-visible {
+  outline: 2px solid var(--at-focus-ring);
+  outline-offset: 1px;
 }
 
 .at-items-row-main:hover {
@@ -272,16 +357,15 @@
   left: 0;
 }
 
-/* ── [0.12.6 · T4] 行上的「正在计时」标记 ──
- * 只用一个小圆点：行高 20，塞字会把名字挤掉；语义由 `aria-label`（`结束计时：X`）承担，
- * 所以这个点是装饰。
- * 圆点走 `::before` 的 `inline-block`（**不**把名字改成 flex 容器）：名字本身靠
- * `text-overflow: ellipsis` 收尾，一旦变成 flex，长名字就只剩硬裁、连省略号都没有了。 */
-.at-items-row[data-running] .at-items-row-name {
+/* ── 时间线卡「常用事项」组的行仍是**整行起停**（不是事项管理卡的点）──
+ * 正在计时那一条保留名称着色 + 左侧小点；作用域锁在时间线区，不串到事项管理行。
+ * 圆点走 `::before` 的 `inline-block`（不把名字改成 flex 容器）：名字还要靠
+ * `text-overflow: ellipsis` 收尾。 */
+.at-items-zone-timeline .at-items-row[data-running] .at-items-row-name {
   color: var(--at-accent-default);
 }
 
-.at-items-row[data-running] .at-items-row-name::before {
+.at-items-zone-timeline .at-items-row[data-running] .at-items-row-name::before {
   content: "";
   display: inline-block;
   width: 5px;

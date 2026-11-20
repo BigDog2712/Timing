@@ -30,6 +30,7 @@ interface Item {
 const h = vi.hoisted(() => ({
   emitHostIntent: vi.fn(async (_intent: unknown) => true),
   listTimingItems: vi.fn(async (): Promise<unknown[]> => []),
+  listTimingItemTags: vi.fn(async (): Promise<unknown[]> => []),
   getSettings: vi.fn(async (): Promise<unknown> => ({
     itemsTimers: {},
     itemsRecentCount: 5,
@@ -40,6 +41,7 @@ const h = vi.hoisted(() => ({
 vi.mock("../../../platform/runtime/hostIntentGateway.ts", () => ({ emitHostIntent: h.emitHostIntent }));
 vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
   listTimingItems: h.listTimingItems,
+  listTimingItemTags: h.listTimingItemTags,
 }));
 vi.mock("../../../platform/desktop/hostSettingsGateway.ts", () => ({ getSettings: h.getSettings }));
 
@@ -104,6 +106,8 @@ beforeEach(() => {
   h.emitHostIntent.mockReset();
   h.emitHostIntent.mockResolvedValue(true);
   h.listTimingItems.mockReset();
+  h.listTimingItemTags.mockReset();
+  h.listTimingItemTags.mockResolvedValue([]);
   h.listTimingItems.mockResolvedValue([]);
   h.getSettings.mockReset();
   h.getSettings.mockResolvedValue({ itemsTimers: {}, itemsRecentCount: 5, itemsShowRecent: true });

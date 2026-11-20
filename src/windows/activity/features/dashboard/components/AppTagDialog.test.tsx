@@ -15,7 +15,8 @@ const g = vi.hoisted(() => ({
   tags: [] as string[],
   catalog: [] as string[],
   assignments: [] as { itemId: number; tags: string[] }[],
-  save: vi.fn(async () => undefined),
+  save: vi.fn(async (_exeName: string, _override: unknown) => undefined),
+  createDefinition: vi.fn(async (_path: string) => undefined),
 }));
 
 vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
@@ -24,6 +25,7 @@ vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
 
 vi.mock("../../../platform/persistence/tagAdminGateway.ts", () => ({
   listTagDefinitions: async () => g.catalog,
+  createTagDefinition: (path: string) => g.createDefinition(path),
 }));
 
 vi.mock("../../../shared/classification/appClassification.ts", () => ({
@@ -34,7 +36,9 @@ vi.mock("../../../shared/classification/appClassification.ts", () => ({
 }));
 
 vi.mock("../../classification/services/classificationService.ts", () => ({
-  ClassificationService: { saveAppOverride: g.save },
+  ClassificationService: {
+    saveAppOverride: (exeName: string, override: unknown) => g.save(exeName, override),
+  },
 }));
 
 import AppTagDialog from "./AppTagDialog.tsx";
@@ -48,7 +52,8 @@ beforeEach(() => {
   g.tags = [];
   g.catalog = [];
   g.assignments = [];
-  g.save = vi.fn(async () => undefined);
+  g.save = vi.fn(async (_exeName: string, _override: unknown) => undefined);
+  g.createDefinition = vi.fn(async (_path: string) => undefined);
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -124,5 +129,59 @@ describe("应用标签弹窗的所有标签选择器", () => {
     await mount();
     expect(pickerChips()).toEqual([]);
     expect(document.body.textContent).toContain("还没有任何标签");
+  });
+});
+
+/**
+ * [2026-11-20] 应用侧新建的标签必须同时落一张定义行。
+ *
+ * 应用标签只写 `__app_override::<exe>.tags`，而「标签管理」读的是定义行 ∪ 事项引用；
+ * 只写 override 的话，用户在应用趋势 / 应用排行里建完标签，去标签管理处永远看不到。
+ */
+function typeInto(input: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  act(() => {
+    setter?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+function saveButton(): HTMLButtonElement | undefined {
+  return Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
+    .find((button) => button.textContent === "保存");
+}
+
+async function save() {
+  const target = saveButton();
+  await act(async () => { target?.click(); });
+  await act(async () => undefined);
+}
+
+describe("应用标签弹窗 · 新标签补定义行", () => {
+  it("at05_a_new_app_tag_gets_a_definition_before_the_override_is_saved", async () => {
+    g.catalog = ["工作"];
+    await mount();
+    const input = document.body.querySelector<HTMLInputElement>('input[aria-label="应用标签"]');
+    typeInto(input as HTMLInputElement, "学习/考公");
+    act(() => {
+      input?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    expect(document.body.textContent).toContain("#学习/考公 ×");
+
+    await save();
+    expect(g.createDefinition).toHaveBeenCalledTimes(1);
+    expect(g.createDefinition).toHaveBeenCalledWith("学习/考公");
+    expect(g.save).toHaveBeenCalledTimes(1);
+    expect(g.save.mock.calls[0][1]).toEqual({ tags: ["学习/考公"] });
+  });
+
+  it("at06_tags_already_in_the_catalog_do_not_create_duplicate_definitions", async () => {
+    g.catalog = ["工作"];
+    await mount();
+    act(() => pickerChip("工作")?.click());
+    await save();
+    expect(g.createDefinition).not.toHaveBeenCalled();
+    expect(g.save).toHaveBeenCalledTimes(1);
+    expect(g.save.mock.calls[0][1]).toEqual({ tags: ["工作"] });
   });
 });

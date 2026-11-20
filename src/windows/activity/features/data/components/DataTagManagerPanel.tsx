@@ -79,6 +79,7 @@ export default function DataTagManagerPanel({ state, onError, onAfterBulkApply }
      notice 是"上一次操作的结果"，拖拽过程中的提示不该把结果提示顶掉。 */
   const [dragHint, setDragHint] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const newTagRef = useRef<HTMLInputElement>(null);
 
   const searching = query.trim().length > 0;
   /* 搜索态不给拖；一次改名还在飞的时候也不给拖（run() 会静默 return，
@@ -124,7 +125,12 @@ export default function DataTagManagerPanel({ state, onError, onAfterBulkApply }
     void run(async () => {
       await state.create(path);
       setDraft("");
-    }, `已新建 #${path}`);
+    }, `已新建 #${path}`).finally(() => {
+      /* 保存期间输入框是 disabled 的，浏览器的 disabled 会顺手把焦点收走；
+         保存完把焦点还回输入框，用户能直接接着敲下一个标签（不用再点一下）。
+         用 rAF 是为了等 React 把 disabled 摘掉、DOM 已可聚焦之后再调。 */
+      window.requestAnimationFrame(() => newTagRef.current?.focus());
+    });
   };
 
   const endDrag = () => {
@@ -208,6 +214,7 @@ export default function DataTagManagerPanel({ state, onError, onAfterBulkApply }
         }}
       >
         <input
+          ref={newTagRef}
           className="dtm-input min-w-0 flex-1"
           value={draft}
           placeholder="新建标签，如 学习/考公"
@@ -215,6 +222,13 @@ export default function DataTagManagerPanel({ state, onError, onAfterBulkApply }
           spellCheck={false}
           disabled={busy}
           onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            /* 中文输入法里回车是「上屏」，不是「提交」：组合态交给 IME，
+               否则拼音还没选字就被拿去做标签名了。 */
+            if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            submitNew(draft);
+          }}
         />
         <button
           type="submit"
@@ -356,9 +370,7 @@ export default function DataTagManagerPanel({ state, onError, onAfterBulkApply }
               }
               onAddChild={(path) => {
                 setDraft(`${path}/`);
-                document
-                  .querySelector<HTMLInputElement>('input[aria-label="新建标签路径"]')
-                  ?.focus();
+                newTagRef.current?.focus();
               }}
               onDelete={(path) =>
                 void run(() => state.remove(path), `已删除 #${path}（含子标签）`)

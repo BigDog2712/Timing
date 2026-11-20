@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BOARD_H, BOARD_W, KIND_SPECS, minSizeOf, SNAP, type BoardCard } from "./contract";
+import { BOARD_H, BOARD_W, KIND_SPECS, MIN_H, MIN_W, minSizeOf, SNAP, type BoardCard } from "./contract";
 import { clampRect, contentHeight, findFreeSpot, firstOverlap, overlaps, snapValue, tidyCards } from "./geometry";
 
 /**
@@ -36,27 +36,25 @@ describe("snapValue / clampRect", () => {
     expect(clampRect("apps", { x: 0, y: 4000, w: 518, h: 264 }).y).toBe(4000);
   });
 
-  /* 便利贴曾经的下限是 480×96 —— 宽下不去 480、三档预设宽度还全是通栏，于是
-   * 「调尺寸」在这张卡上看起来完全没生效。现在下限就是 exe 的 320×168
-   * （`widgets/mod.rs:101`），这条用例钉住它真的能缩到那个尺寸。 */
-  it("便利贴宽高都能拖到 320×168，不被通栏时代的 480 卡住", () => {
-    expect(clampRect("notes", { x: 0, y: 0, w: 320, h: 168 })).toEqual({ x: 0, y: 0, w: 320, h: 168 });
+  /* [2026-11-20] 主人口径：便利贴「再缩小」→ 下限低于画布默认下限（200×96），
+   * 由组件自己的规格说了算。纸片区自己滚（`dashboard-notes.css`），不需要放下一整张纸片。 */
+  it("便利贴能缩到 200×96（低于画布默认下限）", () => {
+    expect(clampRect("notes", { x: 0, y: 0, w: 200, h: 96 })).toEqual({ x: 0, y: 0, w: 200, h: 96 });
+    expect(minSizeOf("notes")).toEqual({ w: 200, h: 96 });
+    expect(minSizeOf("notes").w).toBeLessThan(MIN_W);
+    expect(minSizeOf("notes").h).toBeLessThan(MIN_H);
     /* 拖过头照样夹回下限，不允许出现负尺寸 */
-    expect(clampRect("notes", { x: 0, y: 0, w: 100, h: 40 })).toEqual({ x: 0, y: 0, w: 320, h: 168 });
+    expect(clampRect("notes", { x: 0, y: 0, w: 100, h: 40 })).toEqual({ x: 0, y: 0, w: 200, h: 96 });
   });
 
-  /* 下限 168 与 exe 同值，且必须放得下一整张纸片：卡头 46 + 纸片 88 + 底内距 16 = 150。
-   * 矮于它就会出现"只露半张纸片"的残破态。 */
-  it("便利贴的最小高度放得下一整张纸片", () => {
-    expect(minSizeOf("notes").h).toBeGreaterThanOrEqual(46 + 88 + 16);
-  });
-
-  /* 三档预设横向要真有差别，否则点「小」当场看不出变化（原先 S/M/L 宽度全是 1052）。 */
-  it("便利贴三档预设既有宽差、也放得下整数行纸片", () => {
+  /* 三档预设横向要真有差别，否则点「小」当场看不出变化（原先 S/M/L 宽度全是 1052）。
+   * [2026-11-20] S 档跟着新下限走（200×96）；矮于一张纸片是允许的 —— 纸片区自己滚。
+   * M / L 仍要求"放得下整数行"，避免默认尺寸露出切了一半的下缘。 */
+  it("便利贴三档预设：S 就是新下限，M/L 放得下整数行纸片", () => {
     const { S, M, L } = KIND_SPECS.notes.sizes;
     expect(S[0]).toBeLessThan(M[0]);
-    /* 每档高度 = 卡头 + 底内距 + n×88 + (n−1)×10 的下界之内，不留"切了一半"的下缘 */
-    for (const [, h] of [S, M, L]) {
+    expect(S).toEqual([minSizeOf("notes").w, minSizeOf("notes").h]);
+    for (const [, h] of [M, L]) {
       const available = h - 62;
       const rows = Math.floor((available + 10) / 98);
       expect(rows).toBeGreaterThanOrEqual(1);

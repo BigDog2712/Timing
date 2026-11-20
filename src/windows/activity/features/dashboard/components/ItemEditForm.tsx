@@ -13,10 +13,13 @@
  *      否则 `QuietDialog` 的 window 级 Escape 会把整个弹层关掉（表单没保存就全没了）；
  *   2. 保存键 `disabled={busy}`：意图发出中不许连点（没有回执，连点 = 多发意图）。
  */
-import { useLocaleText } from "../../../shared/i18n/index.ts";
+import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import type { KeyboardEvent } from "react";
 import type { TimelineManageCopy } from "../copyTimeline.ts";
+import { ITEM_EDITOR_COPY } from "../copyItemEditor.ts";
 import { ITEM_NAME_MAX_LEN } from "../services/timelineItemName.ts";
+
+type TimerMode = "up" | "down";
 
 interface Props {
   draftName: string;
@@ -27,6 +30,9 @@ interface Props {
   issue: string | null;
   /** `aria-invalid`：issue 存在时输入框标红 */
   copy: TimelineManageCopy;
+  /** 传了才画「正计时 / 倒计时」切换（行内编辑不传，保持老版式） */
+  timerMode?: TimerMode;
+  onTimerModeChange?: (mode: TimerMode) => void;
   onNameChange: (value: string) => void;
   onMinutesChange: (value: string) => void;
   onSave: () => void;
@@ -39,12 +45,15 @@ export default function ItemEditForm({
   busy,
   issue,
   copy,
+  timerMode,
+  onTimerModeChange,
   onNameChange,
   onMinutesChange,
   onSave,
   onCancel,
 }: Props) {
   const UI_TEXT = useLocaleText();
+  const editorCopy = ITEM_EDITOR_COPY[useLocale()];
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
@@ -68,6 +77,26 @@ export default function ItemEditForm({
         onChange={(event) => onNameChange(event.target.value)}
         onKeyDown={onKeyDown}
       />
+      {timerMode && onTimerModeChange ? (
+        <div className="at-timer-mode" role="group" aria-label={editorCopy.timerModeLabel}>
+          <button
+            type="button"
+            className="at-timer-mode-btn"
+            aria-pressed={timerMode === "up"}
+            onClick={() => onTimerModeChange("up")}
+          >
+            {editorCopy.timerUp}
+          </button>
+          <button
+            type="button"
+            className="at-timer-mode-btn"
+            aria-pressed={timerMode === "down"}
+            onClick={() => onTimerModeChange("down")}
+          >
+            {editorCopy.timerDown}
+          </button>
+        </div>
+      ) : null}
       <input
         className="at-input at-timeline-manage-timer"
         value={draftMinutes}

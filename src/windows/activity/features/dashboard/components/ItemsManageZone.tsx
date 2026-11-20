@@ -7,7 +7,14 @@
  *
  * 每行 = 名称 + 今日累计（`useTodayItems` 的 `value`，没有就不画） + 绑定标记
  * （`useAppItemBindings().bindings` 里有没有这个事项；**只说有没有**，不列具体应用 ——
- * 一行 12px 的标记塞不下清单，完整清单在应用视角） + 行点击起停（`itemTimer`）。
+ * 一行 12px 的标记塞不下清单，完整清单在应用视角） + 行尾状态圆点（`itemTimer`）。
+ *
+ * ## 行尾圆点（用户口径）
+ *
+ * 一个点、三种颜色，颜色全部走主题令牌（设置里换配色一起变）：灰 = 空闲，
+ * 蓝 = 正在计这一条，黄 = 待办（这个事项有未完成待办，或暂停中的会话挂在这条上）。
+ * 蓝优先于黄。同一个点上点一下就是起停；**正在计别的条**时先弹「是否切换」，
+ * 确认后才发意图 —— 免得手滑把当前计时切走。
  *
  * ## 为什么排序 / 条数 / 置顶全走 `services/itemPrefs.ts`
  *
@@ -16,17 +23,21 @@
  *
  * ## 写动作一律不在这里发
  *
- * 新增 / 编辑 / 事项管理三个入口打开的是既有的 `TimelineManage` / `TimelineEditDialog`
- * （意图在那些组件里发，分析窗没有写命令）。本组件只决定**入口的位置**。
- * AI 一键分类自带按钮与预览层（`ItemsAiTagButton`），点击起停走 `itemTimer`（见
+ * 新增 / 事项管理两个入口打开的是既有的 `TimelineManage`；行点击直接打开该行的
+ * `TimelineEditDialog`（意图在那些组件里发，分析窗没有写命令）。本组件只决定**入口的位置**。
+ * 卡头**不再**提供「编辑事项」：那与行点击是同一个动作，只会让用户多记一个入口。
+ * AI 一键分类自带按钮与预览层（`ItemsAiTagButton`），圆点起停走 `itemTimer`（见
  * `hooks/useItemTimerToggle.ts`：方向在发信侧判、不做乐观切换）。
  */
 import { Link2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import QuietConfirmDialog from "../../../shared/components/QuietConfirmDialog.tsx";
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import type { ToastPush } from "../../../shared/types/toast.ts";
+import type { TodoSummary } from "../../../shared/types/todos.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
+import { ITEM_EDITOR_COPY } from "../copyItemEditor.ts";
 import { useAppItemBindings } from "../hooks/useAppItemBindings.ts";
 import { useItemPrefs } from "../hooks/useItemPrefs.ts";
 import type { ItemTimerToggle } from "../hooks/useItemTimerToggle.ts";
@@ -39,15 +50,15 @@ import { moduleState, type ModuleState } from "./ModuleShell.tsx";
 import TimelineEditDialog from "./TimelineEditDialog.tsx";
 import TimelineManage from "./TimelineManage.tsx";
 
-/** 三个弹层的互斥态（`TimelineManage` 自己的 mode 只认 create / manage）。 */
-type ManageDialogMode = "create" | "edit" | "manage" | null;
+/** 卡头两个弹层的互斥态（`TimelineManage` 自己的 mode 只认 create / manage）。 */
+type ManageDialogMode = "create" | "manage" | null;
 
 interface Props {
   /** 今日事项行：只取 `itemId → value` 做行上的「今日累计」 */
   todayRows: readonly TodayItemRow[];
-  /** 「编辑事项」的候选（今日时间线顺序，`todayTimedItemIds` 的结果） */
-  editableItemIds: readonly number[];
-  /** 行点击起停（含当前会话挂在哪个事项上） */
+  /** 未完成待办：按标题匹配同名事项，命中的行尾圆点画成黄色 */
+  todos?: readonly TodoSummary[];
+  /** 行尾圆点起停（含当前会话挂在哪个事项上） */
   itemTimer: ItemTimerToggle;
   /** 分析窗的提示条出口（AI 结果 / 起停确认都走它） */
   onToast: ToastPush;
@@ -57,17 +68,22 @@ interface Props {
 
 export default function ItemsManageZone({
   todayRows,
-  editableItemIds,
+  todos,
   itemTimer,
   onToast,
   onLocalRename,
   onLocalCreate,
 }: Props) {
   const copy = DASHBOARD_COPY[useLocale()];
+  const editorCopy = ITEM_EDITOR_COPY[useLocale()];
   const UI_TEXT = useLocaleText();
   /* 多实例：区标题 id 要带后缀（与 `ModuleShell` 同一口径） */
   const domId = withInstance("t-items-manage", useBoardInstance());
   const [dialog, setDialog] = useState<ManageDialogMode>(null);
+  /** 行点击直达的那一条；非空即打开编辑弹层（没有“先选事项”的候选态） */
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  /** 正在计着别的条时点圆点：先挂起，等「是否切换」确认 */
+  const [pendingSwitch, setPendingSwitch] = useState<{ itemId: number; name: string } | null>(null);
   /* 上区是**常驻**的卡内容（不是弹层），所以 `active` 恒为 true：这两条读命令就是
      这一区的数据源。写动作仍全部在弹层里（`TimelineManage` 自己再取一份）。 */
   const { items, recentCount, showRecent, status, reload } = useItemPrefs(true);
@@ -87,6 +103,23 @@ export default function ItemsManageZone({
     return ids;
   }, [bindings]);
 
+  /* 待办与事项按**标题**对上（与宿主 `todoItemExtras` 同一口径：没有 itemId 列） */
+  const pendingTodoTitles = useMemo(() => {
+    const titles = new Set<string>();
+    for (const todo of todos ?? []) titles.add(todo.title.trim());
+    return titles;
+  }, [todos]);
+
+  const requestToggle = (item: ItemPrefsLike) => {
+    const active = itemTimer.status !== "idle" && itemTimer.sessionItemId !== null;
+    /* 同一条：跑着 = 停，暂停着 = 继续；空闲 = 直接开始。都不需要确认。 */
+    if (!active || itemTimer.sessionItemId === item.id) {
+      itemTimer.toggleItem(item.id, item.name);
+      return;
+    }
+    setPendingSwitch({ itemId: item.id, name: item.name });
+  };
+
   const pinned = pinnedItems(items);
   const recent = showRecent ? recentItems(items, recentCount) : [];
   const isEmpty = pinned.length === 0 && recent.length === 0;
@@ -96,15 +129,25 @@ export default function ItemsManageZone({
     const total = todayTotals.get(item.id) ?? 0;
     const bound = boundItemIds.has(item.id);
     /* 「正在计这一条」只认 running + 同一事项：暂停中的会话也算"当前这一条"，
-       但点它的语义是**继续**，所以不能画成"正在计时"（红点会撒谎）。 */
+       但点它的语义是**继续**，所以不能画成"正在计时"（蓝点会撒谎）。
+       黄点 = 暂停在同一事项（点它=继续）或这条事项有未完成待办；蓝点优先于黄点。 */
     const running = itemTimer.status === "running" && itemTimer.sessionItemId === item.id;
+    const pausedHere = itemTimer.status === "paused" && itemTimer.sessionItemId === item.id;
+    const pending = !running && (pausedHere || pendingTodoTitles.has(item.name.trim()));
+    const timerState = running ? "running" : pending ? "pending" : "idle";
     return (
-      <li key={item.id} className="at-items-row" data-bound={bound || undefined} data-running={running || undefined}>
+      <li
+        key={item.id}
+        className="at-items-row"
+        data-bound={bound || undefined}
+        data-running={running || undefined}
+        data-timer-state={timerState}
+      >
         <button
           type="button"
           className="at-items-row-main"
-          aria-label={running ? copy.itemsStopTimer(item.name) : copy.itemsStartTimer(item.name)}
-          onClick={() => itemTimer.toggleItem(item.id, item.name)}
+          aria-label={editorCopy.editItemLabel(item.name)}
+          onClick={() => setEditingItemId(item.id)}
         >
           <span className="at-items-row-name" title={item.name}>{item.name}</span>
           {total > 0 ? (
@@ -115,6 +158,14 @@ export default function ItemsManageZone({
               <Link2 size={11} strokeWidth={2} aria-hidden="true" />
             </span>
           ) : null}
+        </button>
+        <button
+          type="button"
+          className="at-items-row-timer"
+          aria-label={running ? copy.itemsStopTimer(item.name) : copy.itemsStartTimer(item.name)}
+          onClick={() => requestToggle(item)}
+        >
+          <span className="at-items-row-dot" aria-hidden="true" />
         </button>
       </li>
     );
@@ -127,15 +178,12 @@ export default function ItemsManageZone({
       data-state={state}
       aria-labelledby={domId}
     >
-      {/* ── 区标题行：标题 + 四个动作。动作在四态之外常驻（读失败也要能新建） ── */}
+      {/* ── 区标题行：标题 + 三个动作。动作在四态之外常驻（读失败也要能新建） ── */}
       <div className="at-items-zone-head">
         <h3 className="at-items-zone-title" id={domId}>{copy.itemsManageTitle}</h3>
         <div className="at-items-zone-actions">
           <button type="button" className="at-link-btn" onClick={() => setDialog("create")}>
             {copy.itemsNewAction}
-          </button>
-          <button type="button" className="at-link-btn" onClick={() => setDialog("edit")}>
-            {copy.timelineEditItem}
           </button>
           <button type="button" className="at-link-btn" onClick={() => setDialog("manage")}>
             {copy.timelineManageItems}
@@ -179,16 +227,30 @@ export default function ItemsManageZone({
       {/* 弹层是本区根节点的**兄弟**：挂在四态分支里，空态/错误态下点「新增」就什么都
           不会出来（`TimelineCardEntry.test.tsx` 钉的就是这一条）。 */}
       <TimelineManage
-        mode={dialog === "edit" ? null : dialog}
+        mode={dialog}
         onClose={() => setDialog(null)}
         onLocalRename={onLocalRename}
         onLocalCreate={onLocalCreate}
       />
       <TimelineEditDialog
-        open={dialog === "edit"}
-        onClose={() => setDialog(null)}
-        todayItemIds={editableItemIds}
+        open={editingItemId !== null}
+        onClose={() => setEditingItemId(null)}
+        todayItemIds={[]}
+        itemIds={editingItemId === null ? undefined : [editingItemId]}
+        initialItemId={editingItemId}
         onLocalRename={onLocalRename}
+      />
+      <QuietConfirmDialog
+        open={pendingSwitch !== null}
+        title={copy.itemsSwitchTitle}
+        description={pendingSwitch === null ? undefined : copy.itemsSwitchDescription(pendingSwitch.name)}
+        confirmLabel={copy.itemsSwitchAction}
+        cancelLabel={UI_TEXT.common.cancel}
+        onCancel={() => setPendingSwitch(null)}
+        onConfirm={() => {
+          if (pendingSwitch !== null) itemTimer.toggleItem(pendingSwitch.itemId, pendingSwitch.name);
+          setPendingSwitch(null);
+        }}
       />
     </div>
   );

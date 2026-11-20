@@ -20,7 +20,11 @@ import { openSettings } from './settingsActions';
 import { openTodosWindow } from './todosActions';
 import { applyCreateItemIntent, applyUpdateItemIntent } from './hostIntentItemWrite';
 import { applySyncAppItemBindingsIntent } from './hostIntentItemAppWrite';
+import { countdownActions } from './countdownActions';
+import { itemTimerMinutes } from '../lib/commonItems';
 import { useItemStore } from '../stores/itemStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { useTimerStore } from '../stores/timerStore';
 import { useUiStore } from '../stores/uiStore';
 import { openNoteWindowFor, removeNote } from './noteActions';
 
@@ -50,8 +54,8 @@ type HostIntent =
   | { action: 'delete_note'; noteId: number }
   /** [本轮] 时间线卡的写动作：字段名与 `hostIntentGateway.ts` 逐字一致（L9：两侧各写一份）。
    *  `timerMinutes` 三态：缺省 = 不改；`null` = 清除（回正计时）；数字 = 设为该分钟数。 */
-  | { action: 'create_item'; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number; categoryKey?: string | null }
-  | { action: 'update_item'; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null; categoryKey?: string | null }
+  | { action: 'create_item'; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number; tags?: readonly string[]; appKey?: string | null; start?: boolean }
+  | { action: 'update_item'; id: number; name?: string; isPinned?: boolean; sortOrder?: number; timerMinutes?: number | null; categoryKey?: string | null; tags?: readonly string[] }
   /** [0.13 · T03b] 改计时记录起止：字段名与 `hostIntentGateway.ts` 逐字一致（L9：两侧各写一份）。
    *  执行端复用既有 `recordApi.update`（→ `update_record`，命令面零改动）。payload **没有**
    *  时长字段 —— `accumulated_sec` 由 Rust 按新区间重算（ADR-030 / §3.8 B4）。 */
@@ -262,9 +266,21 @@ export function useHostIntentBridge(): void {
          `start_timer_for_item` 走 `startOrSwitch`（与用户点药丸大按钮同一条路径）：
          空闲就直接开始，正在计别的就先暂停冻结累计再分段切过去。
          `stop_timer` 走 `stop`：没有会话时宿主侧静默忽略（`stop` 内部已经 notify 失败口径）。 */
-      case 'start_timer_for_item':
+      case 'start_timer_for_item': {
+        /* 与药丸「常用事项」挑一行同一条口径：设过默认时长的按倒计时起，
+           否则走 startOrSwitch（空闲开、在计别的先暂停分段再切）。 */
+        const minutes = itemTimerMinutes(
+          useSettingsStore.getState().settings.itemsTimers,
+          intent.itemId,
+        );
+        if (minutes !== null) {
+          const status = useTimerStore.getState().state.status;
+          void countdownActions.start(intent.itemId, minutes * 60, status !== 'idle');
+          return;
+        }
         void startOrSwitch(intent.itemId);
         return;
+      }
       case 'stop_timer':
         void stop();
         return;

@@ -32,6 +32,7 @@ interface Item {
 const h = vi.hoisted(() => ({
   emitHostIntent: vi.fn(async (_intent: unknown) => true),
   listTimingItems: vi.fn(async (): Promise<unknown[]> => []),
+  listTimingItemTags: vi.fn(async (): Promise<unknown[]> => []),
   getSettings: vi.fn(async (): Promise<unknown> => ({
     itemsTimers: {},
     itemsRecentCount: 5,
@@ -42,6 +43,7 @@ const h = vi.hoisted(() => ({
 vi.mock("../../../platform/runtime/hostIntentGateway.ts", () => ({ emitHostIntent: h.emitHostIntent }));
 vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
   listTimingItems: h.listTimingItems,
+  listTimingItemTags: h.listTimingItemTags,
 }));
 vi.mock("../../../platform/desktop/hostSettingsGateway.ts", () => ({ getSettings: h.getSettings }));
 
@@ -109,6 +111,8 @@ beforeEach(() => {
   h.emitHostIntent.mockReset();
   h.emitHostIntent.mockResolvedValue(true);
   h.listTimingItems.mockReset();
+  h.listTimingItemTags.mockReset();
+  h.listTimingItemTags.mockResolvedValue([]);
   h.listTimingItems.mockResolvedValue([]);
   h.getSettings.mockReset();
   h.getSettings.mockResolvedValue({ itemsTimers: {}, itemsRecentCount: 5, itemsShowRecent: true });
@@ -157,12 +161,34 @@ describe("TimelineManage · 新建事项", () => {
       isPinned: true,
       timerMinutes: 25,
       sortOrder: 5, // 常用组里 max(sortOrder)=4 → +1
-      /* [0.13] 没选分类也显式带 `null`：让载荷读起来是"用户选了未分类"，
-         而不是"这一版忘了带分类"（两者在落库上等价，在排查时不等价）。 */
-      categoryKey: null,
     });
     expect(onLocalCreate).toHaveBeenCalledWith("看论文");
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("tm02b_create_carries_tags_and_start_after_create", async () => {
+    await mount("create");
+    typeInto(inputIn(dialog()), "看论文");
+    typeInto(timerIn(dialog()), "30");
+    const tagInput = dialog()?.querySelector<HTMLInputElement>(".at-item-tag-input") ?? null;
+    typeInto(tagInput, "工作");
+    act(() => {
+      tagInput?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    const boxes = dialog()?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    /* 第一个是「设为常用」，第二个是「创建后开始」 */
+    act(() => { boxes?.[1]?.click(); });
+    act(() => { (byText("确认") as HTMLButtonElement).click(); });
+    await flush();
+
+    expect(h.emitHostIntent).toHaveBeenCalledWith({
+      action: "create_item",
+      name: "看论文",
+      isPinned: false,
+      timerMinutes: 30,
+      tags: ["工作"],
+      start: true,
+    });
   });
 
   it("tm03_by_default_a_new_item_is_not_pinned_and_carries_no_sortOrder", async () => {
@@ -177,7 +203,6 @@ describe("TimelineManage · 新建事项", () => {
       name: "看论文",
       isPinned: false,
       timerMinutes: null,
-      categoryKey: null,
     });
     expect((h.emitHostIntent.mock.calls[0]?.[0] as { sortOrder?: number }).sortOrder).toBeUndefined();
   });

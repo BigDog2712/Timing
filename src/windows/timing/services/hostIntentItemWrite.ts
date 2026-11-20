@@ -15,9 +15,11 @@
  * 3. 失败只 `setNotice({tone:'danger'})` 弹在药丸上，不跨窗（§6.5）。
  */
 import { useItemStore } from '../stores/itemStore';
+import { useTimerStore } from '../stores/timerStore';
 import { useUiStore } from '../stores/uiStore';
-import { itemApi } from './api';
-import { errorText } from './ipc';
+import { itemApi, tagApi } from './api';
+import { countdownActions } from './countdownActions';
+import { errorText, ipc } from './ipc';
 import { writeItemTimer } from './itemTimerWrite';
 
 /** 事项字段的补丁（不含 `timerMinutes`：它落 `settings.itemsTimers`，三态另走 `writeItemTimer`） */
@@ -58,28 +60,80 @@ export interface CreateItemIntent {
   isPinned?: boolean;
   timerMinutes?: number | null;
   sortOrder?: number;
-  categoryKey?: string | null;
+  /** 新事项的标签（全量）；缺省 = 不动。没有 id 的项目只能在这一步顺手落。 */
+  tags?: readonly string[];
+  /** 建好后顺手绑一个应用（`item_app.track = 1`）；缺省 = 不绑。 */
+  appKey?: string | null;
+  /** 建好后立刻开始计时（分析窗「创建后开始」）。计时中则只提示、不抢占。 */
+  start?: boolean;
 }
 
 /**
  * 新建事项。落库顺序与宿主菜单 `ItemsPrefsMenu.submit()` 相同：建 → 置顶 → 时长 → `reload()`。
  *
- * 分类在 `create` 这一步就落库（`create_item` 命令本来就收 `categoryKey`）：不走
- * "先建再 patch"，少一次 IPC，也不会出现"建好了但分类没跟上"的中间态。
+ * 新建不收分类（2026-11-20 主人口径）：分类只在「事项管理」的行上改，走 `update_item`。
  */
 export async function applyCreateItemIntent(intent: CreateItemIntent): Promise<void> {
   const name = intent.name.trim();
   if (!name) return;
   try {
-    const categoryKey = intent.categoryKey === undefined
-      ? undefined
-      : (intent.categoryKey?.trim() || null);
-    const created = await itemApi.create({ name, categoryKey: categoryKey ?? undefined });
+    const created = await itemApi.create({ name });
     const patch = pickItemPatch({ isPinned: intent.isPinned, sortOrder: intent.sortOrder });
     /* name 不塞回 patch：`create` 已经落过名字了（口径同 update） */
     if (Object.keys(patch).length > 0) await itemApi.update({ id: created.id, patch });
     if (intent.timerMinutes !== undefined) await writeItemTimer(created.id, intent.timerMinutes);
+
+    /* 标签 / 应用是**附加项**：失败只提示、不回滚事项（药丸快捷新建同一条口径）。
+       它们在 `create` 之后才有 id，所以只能在这里补。 */
+    const missed: string[] = [];
+    const tags = intent.tags?.map((tag) => tag.trim()).filter(Boolean) ?? [];
+    if (tags.length > 0) {
+      try {
+        await tagApi.set(created.id, tags);
+      } catch {
+        missed.push('标签');
+      }
+    }
+    if (intent.appKey?.trim()) {
+      try {
+        await ipc.bindItemApp({ itemId: created.id, appKey: intent.appKey.trim(), track: 1 });
+      } catch {
+        missed.push('应用绑定');
+      }
+    }
+    if (intent.start) await startCreatedItem(created.id, intent.timerMinutes);
     await useItemStore.getState().reload();
+    if (missed.length > 0) {
+      useUiStore.getState().setNotice({
+        text: `事项已建好，但${missed.join('、')}没保存上；可在事项管理里补。`,
+        tone: 'info',
+      });
+    }
+  } catch (err) {
+    useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
+  }
+}
+
+/** 「创建后开始」：与药丸快捷新建同一条口径（计时中不抢占，只提示）。 */
+async function startCreatedItem(itemId: number, timerMinutes: number | null | undefined): Promise<void> {
+  const status = useTimerStore.getState().state.status;
+  if (status === 'running') {
+    useUiStore.getState().setNotice({
+      text: '事项已建好；计时进行中，请先暂停或结束当前计时再开始它。',
+      tone: 'info',
+    });
+    return;
+  }
+  try {
+    if (typeof timerMinutes === 'number') {
+      await countdownActions.start(itemId, timerMinutes * 60, status !== 'idle');
+    } else if (status === 'idle') {
+      await ipc.startTimer({ itemId });
+      await useTimerStore.getState().refresh();
+    } else {
+      await ipc.switchItem({ itemId, mode: 'end_and_start' });
+      await useTimerStore.getState().refresh();
+    }
   } catch (err) {
     useUiStore.getState().setNotice({ text: errorText(err), tone: 'danger' });
   }
@@ -88,6 +142,8 @@ export async function applyCreateItemIntent(intent: CreateItemIntent): Promise<v
 export interface UpdateItemIntent extends ItemPatchInput {
   id: number;
   timerMinutes?: number | null;
+  /** 事项标签全量覆盖；缺省 = 不动（只想改个名字时不能顺手清标签）。 */
+  tags?: readonly string[];
 }
 
 /**
@@ -96,12 +152,16 @@ export interface UpdateItemIntent extends ItemPatchInput {
  */
 export async function applyUpdateItemIntent(intent: UpdateItemIntent): Promise<void> {
   const patch = pickItemPatch(intent);
-  const touchesItem = Object.keys(patch).length > 0;
+  const touchesItem = Object.keys(patch).length > 0 || intent.tags !== undefined;
   if (!touchesItem && intent.timerMinutes === undefined) return;
   try {
-    if (touchesItem) await itemApi.update({ id: intent.id, patch });
+    if (Object.keys(patch).length > 0) await itemApi.update({ id: intent.id, patch });
     if (intent.timerMinutes !== undefined) {
       await writeItemTimer(intent.id, intent.timerMinutes);
+    }
+    if (intent.tags !== undefined) {
+      const tags = intent.tags.map((tag) => tag.trim()).filter(Boolean);
+      await tagApi.set(intent.id, tags);
     }
     await useItemStore.getState().reload();
   } catch (err) {

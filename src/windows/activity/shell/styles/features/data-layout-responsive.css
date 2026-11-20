@@ -1,0 +1,30 @@
+.data-app-panel {
+  container: data-destination / inline-size;
+}
+
+@container data-destination (max-width: 639px) {
+  .data-app-metric-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .data-app-metric:nth-child(3) {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .data-app-metric:nth-child(n + 3) {
+    margin-top: 10px;
+  }
+}
+
+@container data-destination (min-width: 640px) and (max-width: 899px) {
+  .data-app-metric-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .data-app-metric:nth-child(4) {
+    margin-top: 10px;
+    border-left: 0;
+    padding-left: 0;
+  }
+}

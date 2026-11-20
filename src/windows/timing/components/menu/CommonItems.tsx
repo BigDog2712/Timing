@@ -40,6 +40,7 @@ import type { MenuPos } from '../../stores/uiStore';
 import type { Item } from '../../types/domain';
 import { GlassMenu, type MenuEntry } from './GlassMenu';
 import { ItemsPrefsMenu } from './ItemsPrefsMenu';
+import { QuickAddExtras } from './QuickAddExtras';
 import '../../styles/common-items.css';
 import '../../styles/common-items-chips.css';
 
@@ -95,7 +96,8 @@ export function CommonItems() {
   });
   /* 胶囊挂在框底（footer），这里只补一条分隔线把「置顶行」和「最近胶囊」分开 */
   if (rows.length > 0 && recent.length > 0) rows.push({ type: 'separator', id: 'sep-recent' });
-  if (rows.length === 0 && recent.length === 0) {
+  /* 新建流程里框底已经有输入重点（标签 / 应用 / 开始），不再垫一行「还没有常用事项」 */
+  if (rows.length === 0 && recent.length === 0 && !newItemEdit) {
     rows.push({
       type: 'item',
       id: 'empty',
@@ -119,43 +121,46 @@ export function CommonItems() {
         anchor={pos}
         ariaLabel="常用事项"
         onClose={close}
-        className="menu--common"
+        className={newItemEdit ? 'menu--common menu--common-new' : 'menu--common'}
         hoverClose={{ graceMs: 1000, requireEnter: true }}
         autoFocus={!newItemEdit}
         footer={
-          /* 框底一行：左边最近事项小胶囊（自然宽度、自动换行），右边「事项管理」小圆点。
-             新建不在这里做（在事项组件的内联命名里）。 */
+          /* 框底两段：新建时先给标签 / 应用 /「开始」，再接最近事项小胶囊与「事项管理」小圆点。
+             挑已有事项那条路不显示附加项（点一行就切走了，没有可建的）。 */
           <div className="common-items__foot">
-            {recent.length > 0 && (
-              <div className="common-items__chips" role="group" aria-label="最近事项">
-                {recent.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className="common-items__chip"
-                    data-current={item.id === currentId ? 'true' : 'false'}
-                    title={item.name}
-                    /* 胶囊在 footer 里，不在 GlassMenu 的行渲染路径上，得自己收框
-                       （整行点选是 GlassMenu 的 onClose 收的） */
-                    onClick={() => {
-                      choose(item);
-                      close();
-                    }}
-                  >
-                    {item.name}
-                  </button>
-                ))}
-              </div>
-            )}
-            <button
-              ref={dotRef}
-              type="button"
-              className="common-items__dot"
-              aria-label="事项管理"
-              aria-haspopup="menu"
-              aria-expanded={prefsPos != null}
-              onClick={openPrefs}
-            />
+            {newItemEdit && <QuickAddExtras />}
+            <div className="common-items__foot-row">
+              {recent.length > 0 && (
+                <div className="common-items__chips" role="group" aria-label="最近事项">
+                  {recent.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="common-items__chip"
+                      data-current={item.id === currentId ? 'true' : 'false'}
+                      title={item.name}
+                      /* 胶囊在 footer 里，不在 GlassMenu 的行渲染路径上，得自己收框
+                         （整行点选是 GlassMenu 的 onClose 收的） */
+                      onClick={() => {
+                        choose(item);
+                        close();
+                      }}
+                    >
+                      {item.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                ref={dotRef}
+                type="button"
+                className="common-items__dot"
+                aria-label="事项管理"
+                aria-haspopup="menu"
+                aria-expanded={prefsPos != null}
+                onClick={openPrefs}
+              />
+            </div>
           </div>
         }
       />

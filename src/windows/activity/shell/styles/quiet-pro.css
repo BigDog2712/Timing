@@ -1307,8 +1307,8 @@
 
 @media (min-width: 1900px) {
   .data-dashboard-grid {
-    grid-template-columns: minmax(0, var(--data-reference-panel-width)) minmax(420px, 1fr);
-    grid-template-areas: "overview destination";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "overview" "destination";
     align-items: start;
   }
 
@@ -1341,7 +1341,7 @@
 
 @media (min-width: 1900px) and (min-height: 900px) {
   .data-dashboard-grid > .data-overview .data-trend-chart {
-    height: 257px;
+    height: 320px;
   }
 }
 

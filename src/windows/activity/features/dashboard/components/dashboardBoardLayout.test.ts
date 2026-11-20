@@ -144,7 +144,7 @@ describe("组件分发", () => {
  */
 describe("时间线卡的行容器守卫", () => {
   it("p06a_timeline_rows_scroll_instead_of_clipping", () => {
-    /* [0.12.6] 行容器现在挂在**时间线卡的下区**（时间线区）：`.at-card-items` 是那张卡的
+    /* [0.12.6] 行容器现在挂在**时间线卡的时间线区**（2026-11-20 起在上半块）：`.at-card-items` 是那张卡的
        卡壳类名（`__upper` 是待办区、`__lower` 是时间线区），原来那条 `.at-card-timeline`
        规则随旧卡壳下线，判据改读新文件。 */
     const itemsCss = readCss("../../../shell/styles/features/dashboard-items-card.css");

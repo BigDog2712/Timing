@@ -4,6 +4,221 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 0.12.7 — 大窗体验收敛与时间线 / 快捷新建优化 — 2026-11-20
+
+> 桌面 **0.12.6 → 0.12.7** / 手机 **0.12.13（12013）** 不动。
+> **零新增 IPC 命令**（宿主 109 / 活动窗 114 不变）：标签走既有 `set_item_tags`，
+> 绑定走既有 `bind_item_app`，前台应用复用追踪引擎已在广播的 `active-window-changed`。
+
+### 一、今日时间线卡：恢复「新增事项 / 编辑事项」
+
+- 0.12.6 把整组入口搬去了「事项管理」卡；用户口径是这两颗要回到**时间线卡头**：
+  在「今日时间线」标题右侧直接给「新建事项」「编辑事项」。
+- 「事项管理」仍只在事项管理卡上，不重复出现（卡片头的按钮组断言钉在
+  `TimelineCardR2.test.tsx`：头里恰好两颗，且不含「事项管理」）。
+- 新建 / 编辑沿用 `TimelineManage` 与 `TimelineEditDialog`，今天的已计时事项
+  仍会进编辑弹层的「今天已计过」范围（`todayTimedItemIds` 现按合并后的行算）。
+
+### 二、正在计时与常用 / 历史事项也进时间线卡
+
+- `list_records` 只回 `saved` 行，运行中的会话由 `get_timer_state` 补进今日行
+  （`mergeActiveSession`，含 1s 走钟）：进行中的行显示现在时刻 + 「进行中」，
+  **暂停行显示「已暂停」**，不再冒充进行中。
+- 时间下线新增**常用事项**组（置顶，按 `sortOrder`）。已在今日时间线上的事项不重复
+  出现（按 `todayTimedItemIds` 去重）。**历史事项组在同版内按下文「六」下线**。
+- 两组的行点一下即起停（与事项管理卡同一套 `itemTimer.toggleItem`），
+  卡片滚动收敛到外层 `.at-timeline-scroll`，不再嵌套两层滚动条。
+- 分组数据来自 `useTodayItems` 已加载的 `items`，**不新增 IPC 轮询**。
+
+### 三、药丸快捷新建：标签 / AI 自动填标签 / 绑定应用
+
+- 空闲态点事项组件（或圆环无事项）→ 条上内联输入框与常用框一起出；框底新增：
+  - **标签行**：复用 `PanelTagField`（回车 / 逗号确认、已有标签 datalist 候选）；
+    「AI」按**条上正在输入的名称**建议（`suggestText`），不再拿「新事项」三个字去猜。
+  - **应用**：最近 8 个前台应用的小胶囊，点一下选中、再点取消；数据来自
+    `active-window-changed`（`useForegroundAppLog` 订阅 + 冷启动补查一次当前前台），
+    不新增选择器 / IPC。自家进程（`timing.exe`）不收。
+  - **开始**：与条上回车同一出口；名称为空时聚焦回输入框并提示。
+- 落地顺序：`create_item` → `set_item_tags` → `bind_item_app(track=1)` → 重载 → 起计时。
+  后两步是附加项：失败只提示「可在事项管理里补」，不回滚已建好的事项；
+  草稿在提交后一律清空（`quickAddStore.reset`）。
+- 焦点行为修正：内联输入框失焦时先看焦点是否落在菜单内（点标签 / 应用 /「开始」
+  不再把草稿当作放弃），只有焦点回 body（点桌面 / 整窗失焦）才取消。
+
+### 四、标签管理：连续新建不用再点一次输入框；拖动改分类在 Windows 上恢复
+
+- **回车建完接着敲下一个**：保存期间输入框是 `disabled` 的，浏览器会顺手把焦点收走；
+  现在保存完（下一帧、disabled 已摘掉）把焦点还回新建框并清空草稿。
+  「＋（加子标签）」也走同一个 ref：先填好 `父路径/` 再聚焦，不再 `querySelector`。
+- **IME 组合态的回车只是上屏**：按 `nativeEvent.isComposing` 放行，避免拼音还没选字
+  就被拿去做标签名。
+- **拖动改分类拖不动的根因在宿主，不在页面**：Tauri 在 Windows 上默认接管 WebView2
+  的拖放（发 `DragDropEvent`），页面里的 HTML5 拖拽整个收不到 —— `dragstart` 不触发、
+  没有报错，只是"拖不动"。两处一起关掉：
+  - conf 的小条窗口 `dragDropEnabled: false`；
+  - activity 主窗口是程序化创建的，不读 conf，在 builder 上调
+    `disable_drag_drop_handler()`（初始与 recovery 重建共用同一 builder）。
+  本应用没有文件拖入功能，关掉不丢东西；小条里事项的上下排序拖动同受益。
+- 哨兵 `tagDragWebview.source.test.ts` 钉住上面两处（剥注释后判，真调用被删就红）。
+
+### 五、开发：调试版可与已安装版本同时运行
+
+- `scripts/dev-desktop.cmd` 现在合并 `src-tauri/tauri.dev.conf.json`（identifier
+  `com.timing.app.dev`）：单实例互斥量、`.window-state.json`、WebView2 profile、
+  install_id 全部按 identifier 落盘，两个进程不再互相顶掉 / 覆盖。
+- 不带 `--config` 的 `npm run tauri dev` 仍与安装版共用 identifier（安装版在跑时会被
+  单实例插件静默转发退出）；README 的两种启动方式已同步。
+- 哨兵 `scripts/dev-dual-run.test.mjs` 钉住「dev identifier ≠ 出包 identifier」与
+  「脚手架确实把 dev 配置传给了 tauri dev」。
+
+### 六、今日时间线卡：时间线在上、待办在下；「历史事项」组下线
+
+- 主人口径：一张卡先回答"今天做了什么"，再回答"还要做什么" —— 上区换成
+  `TimelineZone`（吃余下高度），下区 `TodosZone`（`max-height: 40%` 仍是上限，
+  待办少就不留空白）。分隔线仍是卡的直接子节点，两区都不许把它卷进滚动。
+  CSS 的 40% 从 `.at-card-items__upper` 挪到 `__lower`，结构判据同步改
+  （`TimelineTodosCard.test.tsx` tc03）。
+- 「历史事项」组从这张卡下线：近期但今天没计时的事项归「事项管理」卡
+  （`ItemsManageZone` 仍保留该组）。同一批事项在两张卡上都出现，用户分不清
+  "该在哪张卡上找它"。`services/itemPrefs.ts` 的 `recentItems` 不动。
+  判据换成"`[data-group="recent"]` 不存在 + 近期事项不在本卡出现"
+  （`TimelineCardR2.test.tsx` tc04c）。
+
+### 七、活动热力图：横轴日期、纵轴 6 个四小时段 + 当日合计，按月份回看
+
+- 轴整换：原来的「周几 × 24 小时 / 近 4 周平均」读不出"哪一天忙"。现在
+  **横轴是整月每一天**（28–31 列都铺满、可横向滚动、默认停在最近一天，日期数字
+  每 5 天标一次：1、5、10、15…，其余留空不挤），**纵轴第一行「day」= 当天合计**，
+  下面 6 行只标时段起点：0 / 4 / 8 / 12 / 16 / 20。
+- 月导航挂在卡头之下（`QuietRangeControl`）：「上一个月」可一直往前翻（最多往前
+  一个月起），当前月不许往未来翻。换月先回骨架，不让上个月的数挂着冒充本月。
+- 每格是**该时段的活动毫秒数**（不是平均）：取数只到"此刻"，今天还没开始的时段与
+  今天之后的整天画虚线（`data-future`，不是零活动）；日期轴本身整月都在。
+- 两个分母：6 个时段行按**时段峰值**、合计行按**日峰值**分 5 档 —— 合计是时段的数倍，
+  共用分母会让合计行永远满格、时段行永远最浅。
+- 取数**仍是一条** `cmd_get_activity_aggregate_range`（一个月最多 31 × 6 = 186 个边界，
+  远低于上限）；格值优先用后端逐桶并集，旧快照退回记录求交。
+- 判据：`heatmapDays.test.ts`（整月日期轴 / 切段 / 未来段 / 峰值）、`heatmapOracle.test.ts`
+  （186 格与旧路径逐格相等）、`HeatmapModule.test.tsx`（day 行在顶、7 行 × 整月天数、
+  每 5 天日期、虚线未来格、月导航）。
+
+### 八、卡内滚轮看全数据；便利贴最小尺寸降到画布下限
+
+- 主人口径：鼠标停在卡里时，滚轮要能把这卡的数据看全，不再出现"右侧事项只显示到一半"。
+- **计时分布**：右侧图例不再截前 4 条 + 合并「其他」，有多少分类写多少行；
+  放不下时由 `.at-readouts` 自己滚（`overflow-y: auto` + `overscroll-behavior: contain`），
+  环和图例仍是同一份切片，不会一多一少。判据 `tm08`（7 个切片 → 7 行，且无「其他」）。
+- **应用排行**：删掉前端 `slice(0, 5)` 的截断，每个应用都有一行；
+  裁切交给 `.at-app-list` 的滚动（`flex: 1 1 auto` + `min-height: 0` + `overscroll-behavior: contain`）。
+  判据 `apps16`（8 个应用 → 8 行且列表带 `at-scroll-region`）。
+- **活动提醒**：卡内创建表单压成**两行**——「目标」标签 + 应用候选选择器一行，
+  「每日上限」+ 时长选择 + 「创建」一行（原先标签与控件上下叠，四行起步）；规则编辑
+  弹层不挂 `.at-reminder-form`，仍是竖排字段。表单 + 候选错误 + 验证 + 规则列表仍共用
+  一个滚动的 `.at-reminder-body`；规则列表自身 `max-height: 260px` 的内滚保留。
+  判据 `rm01`（两行、目标行无时长选择、动作行有时长与创建）。
+- **今日时间线 / 事项管理**：本来就有 `.at-timeline-scroll` / `.at-todo-list` /
+  `.at-items-groups` 内滚（均带 `contain`），本轮不改结构，只随上两张卡把"没截断"补齐。
+- **便利贴最小尺寸 320×168 → 200×96**（比画布默认下限 240×120 还小，由组件自己的
+  规格声明，`minSizeOf` 不再与全局下限取大），S 预设同步变成 200×96。最小时一张纸片
+  放不全，由 `.at-notes-track` 纵向滚动补齐；这是全仓唯一有意偏离其余卡下限口径的组件。
+  判据改在 `geometry.test.ts`（缩到 200×96 不弹回、S 即下限、确实低于全局下限）。
+- 判据合计：`geometry.test.ts` 12、`AppsModule.test.tsx` 17、`TimerModuleSource.test.tsx` 8、
+  `ReminderModule.test.tsx` 1。
+
+### 九、应用标签弹窗补定义行：新建的标签在标签管理处能看到了
+
+- 症状：在「应用趋势」或「应用排行」双击应用、输入一个新标签保存后，回到数据页
+  「标签管理」看不到它；已有的应用标签也一样。
+- 根因：应用标签只写 `__app_override::<exe>.tags`，而标签管理读的是
+  `tag.def.*` 定义行 ∪ `items.tags` 引用。弹窗从来没建定义行（AI 打标签那条路
+  有 `persistNewTagDefinitions`，弹窗漏了这一半）。
+- 修法：`AppTagDialog` 保存时先给「已选里不在定义目录中的标签」逐条
+  `create_tag_definition`，再写 override。定义行建失败就整次保存中止并提示——
+  不留"应用有、管理处没有"的幽灵标签。定义行是幂等的（同路径重复创建只重写同一个键）。
+- 标签管理处当场刷新：`DataTagSection` 在弹窗 `onSaved` 里先 `state.reload()`，
+  再通知页面重取 override；不用重开页面。
+- 判据：`AppTagDialog.test.tsx` at05/at06（新标签建定义、目录内标签不重复建）、
+  `DataTagSection.test.tsx` dt01（保存后标签树重读且页面收到信号）。
+
+### 十、事项编辑统一到一张弹层；事项管理行点击改为编辑；待办可挂标签 / 应用
+
+- **新建 / 编辑与悬浮条快捷新建对齐**：`TimelineCreateDialog` 与 `TimelineEditDialog`
+  都补上「正计时 / 倒计时」切换、标签行（含 AI 建议）、绑定应用；新建再加
+  「创建后开始」。写入仍是**一条** `create_item` / `update_item`：标签、
+  `appKey`、`start` 随意图一起带过去，宿主在 `create` 拿到 id 后再补
+  `set_item_tags` / `bind_item_app` / 起计时（附加项失败不回滚事项）。
+- **编辑事项的默认时长三态不变**：正计时光标 = `timerMinutes: null`（清默认时长），
+  倒计时必须填 1–1440 分钟；标签只在用户动过时带上（V-1.6c 的"恰一条意图"不变）。
+- **事项管理卡：点行 = 编辑，不再是开始计时**。行尾新增起停键（后续改为状态圆点，
+  见「十一」）；点击行主体直接打开该事项的编辑弹层（跳过候选列表），
+  可改名称、正 / 倒计时、标签、绑定应用。
+- **新建待办可顺手带标签 / 应用**：待办表没有这两列，落点是**同名事项** ——
+  已有同名事项就把待办里填的标签**并入**它已有的标签（先读再并集；读不到就不写，
+  绝不拿半截当全集），并发 `bind_item_app`；没有同名事项就用 `create_item`
+  顺手建一条同名事项并带上附加项。待办本身先落库，附加项失败不挡创建。
+- **样式**：标签 chip / 模式开关 / 行尾起停键全部用 `--at-*` 令牌，零字面色值；
+  窄弹层里 chip 流换行、输入框让位，不横向溢出。
+- 判据：`todoItemExtras.test.ts`（同名命中 / 新建 / 系统事项不覆盖 / 空附加项零 IPC）、
+  `hostIntentBridge.itemWrite.test.ts` tl15–tl18（标签 + 应用 + 创建后开始、
+  计时中不抢占、只改标签）、`ManageCard.test.tsx` mc04 / mc04b（点行开编辑、
+  行尾键起停）。
+
+### 十一、新建不再选分类；事项管理删重复编辑入口；行尾改状态圆点
+
+- **新建事项不再带分类**：`create_item` 意图去掉 `categoryKey`（两侧类型同步删），
+  `TimelineCreateDialog` 里的分类下拉与「管理分类」一并下线；分类只在「事项管理」
+  的行上改（仍走 `update_item` 的三态）。新建表单的标题区把这一条写清楚，避免用户
+  找不到分类时以为功能坏了。
+- **事项管理卡头删掉「编辑事项」**：它与"点行编辑"是同一个动作、同一个弹层，
+  重复入口只会让用户多记一条路径。动作组收敛为 新增 / 事项管理 / AI 分类 三颗。
+- **行尾起停键改为一个状态圆点**：键撑满行高、圆点 7px 居中，与名称/今日累计同一
+  水平线。灰 = 空闲，蓝 = 正在计这一条，黄 = 待办（有未完成同名待办，或暂停中的
+  会话挂在这条上），蓝点优先；三种颜色全部走 `--at-*` 令牌，跟随设置里的主题色。
+- **正在计别的条时点圆点先确认**：弹「切换计时事项？」；确认才发
+  `start/stop`/`start_timer_for_item`，取消则当前计时不动。空闲开始、同条停止 /
+  继续仍是一点即生效，不弹窗。
+- 判据：`hostIntentMirror.test.ts` d02d（`create_item` 不再有 `categoryKey?`）、
+  `TimelineCategories.test.tsx` tc02（新建弹层无分类控件）、
+  `TimelineCardEntry.test.tsx` tl10（卡头无「编辑事项」）、
+  `ManageCard.test.tsx` mc05–mc05e（三色圆点 / 待办黄 / 蓝优先 / 切换确认与取消）。
+
+### 十二、改起止并入「编辑事项」，只改时刻
+
+- **时间线行右侧的悬停入口删除**：`.at-timeline-record-edit` 整组下线，行回到三列
+  grid（名称 - 起止 - 总用时）。同一个动作藏在 hover 里，用户永远找不到；入口改用
+  用户已经会用的「编辑事项」。
+- **原「改起止」弹层（`TimelineRecordTimeDialog`）删除**，抽出 `ItemRecordTimeSection`
+  挂进 `TimelineEditDialog` 的「今日记录」区。两条入口（时间线卡头「编辑事项」、
+  事项管理行点击）都能到达；与「绑定应用」一样**就地改就地落**，不走弹层保存键。
+- **只改时刻，日期不出现**：输入框改为 `type="time"`（`HH:mm`），日锚点取记录自己的
+  本地日（`startOfLocalDay(segment.startedAt)`）。新增纯函数 `parseClockOnDay`，
+  空串 / 越界回 `null`（保存键据此 disabled）。
+- **六条边界不变**：`validateRecordTime` 的判定顺序未动；B3 进行中的段仍
+  disabled + 行上说明；B4 payload 仍只有 `{recordId, startedAt, endedAt}`。
+  两条输入锚在同一天后跨零点表达不出来 —— 填 23:30–01:00 走 B1 就地提示，
+  一个意图都不发。
+- **换选事项不串段**：`useItemRecords` 记 `loadedFor`，弹层里从 A 切到 B 时，
+  B 的数据到达前不会把 A 的段画给 B。
+- 判据：`TimelineCardR2.test.tsx` tc02c（行上入口零元素）、tc06（`time` 输入 +
+  恰一条 camelCase 意图）、tc07（倒挂就地拦、零意图）、tc08（B3 disabled）；
+  `recordTimeEdit.test.ts` r07 / r08（`parseClockOnDay`）。
+
+### 十三、当前主界面布局固化为出厂布局
+
+- `DEFAULT_LAYOUT` 从 exe 首屏那版（3 列栅格、卡宽按 `sizes.M` 取整）替换为主人
+  2026-11-20 摆定的 8 卡版：
+  - 左列 x=24：计时分布 328×304 → 今日时间线 328×424；
+  - 中列 x=360：应用排行 328×304 → 事项管理 328×424；
+  - 右列 x=696：活动热力图 536×248 → 活动趋势 536×192 → 便利贴 320×280；
+  - 底部：活动提醒 330×304（x=0 / y=776）。
+- 生效范围：首次安装（无布局键）、坏存档回落、删除当前布局、布局管理里的
+  「出厂布局」条目。**已有布局键的用户当前排布一个字不改**（`loadLayout` 优先读
+  自己的键）；主人自己存过默认版（`loadSavedDefault`）的仍以那一版为准。
+- `nextId` 8 → 9，uid / w/h 按当前排布逐值抄入；这些 w/h 是主人拖出来的值，
+  不等于 `KIND_SPECS[kind].sizes.M`（如计时分布 328 而非 340），`clampRect` 不夹回去。
+- 判据：`features/dashboard/layout` 11 文件 / 100 条全绿（默认布局相关断言都从
+  `DEFAULT_LAYOUT` 派生，没有写死坐标）。
+
 ## 0.12.6 — 待办并入今日时间线卡 + 新增事项管理卡；AI 打标按软件用途判断 — 2026-11-20
 
 > 桌面 **0.12.5 → 0.12.6** / 手机 **0.12.13（12013）** 不动。

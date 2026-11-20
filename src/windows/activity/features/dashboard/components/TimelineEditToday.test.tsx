@@ -26,6 +26,8 @@ interface Item {
 const h = vi.hoisted(() => ({
   emitHostIntent: vi.fn(async (_intent: unknown) => true),
   listTimingItems: vi.fn(async (): Promise<unknown[]> => []),
+  listTimingRecords: vi.fn(async (): Promise<unknown[]> => []),
+  listTimingItemTags: vi.fn(async (): Promise<unknown[]> => []),
   getSettings: vi.fn(async (): Promise<unknown> => ({
     itemsTimers: {},
     itemsRecentCount: 5,
@@ -36,6 +38,8 @@ const h = vi.hoisted(() => ({
 vi.mock("../../../platform/runtime/hostIntentGateway.ts", () => ({ emitHostIntent: h.emitHostIntent }));
 vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
   listTimingItems: h.listTimingItems,
+  listTimingRecords: h.listTimingRecords,
+  listTimingItemTags: h.listTimingItemTags,
 }));
 vi.mock("../../../platform/desktop/hostSettingsGateway.ts", () => ({ getSettings: h.getSettings }));
 
@@ -89,7 +93,12 @@ async function mount(todayItemIds: readonly number[]) {
 }
 
 beforeEach(() => {
+  h.emitHostIntent.mockClear();
   h.listTimingItems.mockReset();
+  h.listTimingRecords.mockReset();
+  h.listTimingRecords.mockResolvedValue([]);
+  h.listTimingItemTags.mockReset();
+  h.listTimingItemTags.mockResolvedValue([]);
   h.getSettings.mockReset();
   h.getSettings.mockResolvedValue({ itemsTimers: {}, itemsRecentCount: 5, itemsShowRecent: true });
   onClose = vi.fn<() => void>();
@@ -148,5 +157,40 @@ describe("编辑事项 · 候选范围", () => {
     await mount([1, 9]);
 
     expect(choices()).toEqual(["Timing优化"]);
+  });
+
+  it("te05_existing_tags_load_into_the_draft_and_new_ones_merge", async () => {
+    h.listTimingItems.mockResolvedValue([item(9, "Timing优化")]);
+    h.listTimingItemTags.mockResolvedValue([{ itemId: 9, tags: ["工作"] }]);
+    await mount([9]);
+
+    act(() => { document.body.querySelector<HTMLButtonElement>(".at-timeline-edit-choice")?.click(); });
+    await flush();
+    const chips = () => Array.from(document.body.querySelectorAll(".at-item-tag-chip"))
+      .map((node) => node.textContent ?? "");
+    expect(chips().some((text) => text.includes("工作"))).toBe(true);
+
+    /* 再加一个：保存必须把**原有 + 新增**整组发给宿主（tags 是全量覆盖） */
+    const input = document.body.querySelector<HTMLInputElement>(".at-item-tag-input");
+    if (!input) throw new Error("标签输入框没渲染");
+    await act(async () => {
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setValue?.call(input, "新标签");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
+    await flush();
+    act(() => {
+      document.body.querySelector<HTMLButtonElement>(".at-timeline-item-editor-actions .at-button-primary")?.click();
+    });
+    await flush();
+
+    expect(h.emitHostIntent).toHaveBeenCalledWith(expect.objectContaining({
+      action: "update_item",
+      id: 9,
+      tags: ["工作", "新标签"],
+    }));
   });
 });

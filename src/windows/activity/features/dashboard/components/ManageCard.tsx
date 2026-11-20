@@ -3,16 +3,18 @@
  *
  * ```
  * ┌─ 事项管理 ──────────────────────────── ⋯ ─┐
- * │ 事项管理    [新增][编辑][事项管理][AI 分类] │   ← 区标题 + 四动作（常驻，四态之外）
+ * │ 事项管理    [新增][事项管理][AI 分类]      │   ← 区标题 + 三动作（常驻，四态之外）
  * │ 常用事项                                  │
- * │  ● 写周报      1h20m  🔗                  │   ← 行点击起停计时；🔗 = 已绑定应用
+ * │  写周报      1h20m  🔗  ●                 │   ← 行点击编辑；行尾圆点起停
  * │ 历史事项                                  │
- * │  ○ 记账        25m                        │
+ * │  记账        25m        ○                 │
  * └──────────────────────────────────────────┘
  * ```
  *
  * 为什么不带"时间"：这个卡管的是**事项本身**（名称、常用/历史、绑定、标签），
- * 时间由计时器与时间线负责。卡上唯一的动手动作是"点一下就开始计这一条"。
+ * 时间由计时器与时间线负责。卡上唯一的动手动作是行尾那颗状态圆点。
+ *
+ * 卡头**没有**「编辑事项」：点行已经是编辑，再放一颗只会让用户多记一条重复路径。
  *
  * 起停与提示条是**配套**的（成败只在宿主确认后由 toast 报出来，见
  * `hooks/useItemTimerToggle.ts`），所以打成一个 `actions` 对象传，分成两个 props
@@ -21,10 +23,10 @@
 import type { ReactNode } from "react";
 
 import type { ToastPush } from "../../../shared/types/toast.ts";
+import type { TodoSummary } from "../../../shared/types/todos.ts";
 import { IDLE_ITEM_TIMER, type ItemTimerToggle } from "../hooks/useItemTimerToggle.ts";
 import type { TodayItemsState } from "../hooks/useTodayItems.ts";
 import { useBoardInstance, withInstance } from "../layout/instanceContext.ts";
-import { todayTimedItemIds } from "../services/timelineRows.ts";
 import ItemsManageZone from "./ItemsManageZone.tsx";
 
 /** 本卡用到的今日事项切片：只读 + 两个"已发出先本地生效"的回执。 */
@@ -49,7 +51,9 @@ interface Props {
   controls?: ReactNode;
   /** 今日事项（行上的"今日累计"与"编辑事项"的候选都从这里来） */
   todayItems: ManageCardModel;
-  /** 行起停 + 卡内提示条（缺省 = 空实现，见 `NO_MANAGE_ACTIONS`） */
+  /** 未完成待办：同名事项的行尾圆点画成黄色（缺省 = 没有黄点） */
+  todos?: readonly TodoSummary[];
+  /** 行尾圆点起停 + 卡内提示条（缺省 = 空实现，见 `NO_MANAGE_ACTIONS`） */
   actions?: ManageCardActions;
 }
 
@@ -57,11 +61,10 @@ export default function ManageCard({
   title,
   controls,
   todayItems,
+  todos,
   actions = NO_MANAGE_ACTIONS,
 }: Props) {
   const domId = withInstance("t-manage-card", useBoardInstance());
-  /* 「编辑事项」的候选 = 今天真的计过时的事项（时间线顺序，不受可见行数限制） */
-  const editableItemIds = todayTimedItemIds(todayItems.rows);
 
   return (
     <section className="at-card at-card-manage" aria-labelledby={domId}>
@@ -75,7 +78,7 @@ export default function ManageCard({
       <div className="at-card-manage__body">
         <ItemsManageZone
           todayRows={todayItems.rows}
-          editableItemIds={editableItemIds}
+          todos={todos}
           itemTimer={actions.itemTimer}
           onToast={actions.onToast}
           onLocalRename={todayItems.applyLocalRename}

@@ -301,3 +301,22 @@ describe("工具标记（不计入统计）", () => {
     expect(rows()[0]!.querySelector(".at-app-value")?.textContent).toBe("1h 0m");
   });
 });
+
+describe("列表不再截前 5", () => {
+  /** [2026-11-20] 主人口径：卡内滚轮能看到全部应用。裁在 `slice(0, 5)` 的话第 6 行起
+   *  根本不在 DOM 里，滚动容器也就没有可滚的内容 —— 这条钉住"全量渲染 + 滚动容器"。 */
+  it("apps16_every_application_gets_a_row_and_the_list_owns_the_scroll", async () => {
+    const many = Array.from({ length: 8 }, (_, index): TopApplicationItem => ({
+      exeName: `app-${index}.exe`,
+      name: `App ${index}`,
+      color: "#0a84ff",
+      duration: 60_000,
+      suspiciousDuration: 0,
+      percentage: 10,
+      categoryInitial: "A",
+    }));
+    await mount(many);
+    expect(rows()).toHaveLength(8);
+    expect(container?.querySelector(".at-app-list")?.className).toContain("at-scroll-region");
+  });
+});

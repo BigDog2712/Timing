@@ -112,8 +112,8 @@
      取近档 12=--space-3。消费点见 settings/dashboard 分组间距，整体收紧 2px。 */
   --at-space-group: 12px;
   --at-row-height: 42px;
-  /* 顶栏 52 = 长档基准（1100×736）。短档 44 的覆盖只写在 topbar.css 的
-   * @media (max-height: 735.98px) 里，不在这里重复定义第二个真相源。全仓消费点只有
+  /* 顶栏 52 = 长档基准（1040×680）。短档 44 的覆盖只写在 topbar.css 的
+   * @media (max-height: 679.98px) 里，不在这里重复定义第二个真相源。全仓消费点只有
    * quiet-pro.css:19-20 的 .app-titlebar（flex-basis + height），改 token 即两头一起变。 */
   --at-titlebar-height: 52px;
   --at-window-corner-radius: 8px;
@@ -170,6 +170,9 @@
  * dark 时会先套用这块、再被下一块同名 token 覆盖。所以**两处同名 token 必须成对出现**，
  * 漏一个就会在暗色下静默沿用浅色值 —— 那是最难发现的一类 bug。 */
 :root {
+  --at-disabled-text: var(--at-text-tertiary);
+  --at-disabled-bg: var(--at-bg-panel);
+  --at-disabled-border: var(--at-border-subtle);
   /* 占位符：浅色**不许**照搬暗色的 40% 混合（会得到 ≈6.3:1，占位比正文还响）。
    * 直接等于 tertiary = #707070 on panel(#fff) = 4.95:1（正文 15.9:1，层级正确）。 */
   --at-text-placeholder: var(--at-text-tertiary);
@@ -195,6 +198,9 @@
 }
 
 :root[data-theme="dark"] {
+  --at-disabled-text: #ffffff;
+  --at-disabled-bg: var(--at-bg-panel);
+  --at-disabled-border: var(--at-border-subtle);
   /* 暗 40% = #9199a3 on panel(#2d2d2d) = 4.78:1 */
   --at-text-placeholder: color-mix(in srgb, var(--at-text-secondary) 40%, var(--at-text-tertiary));
   /* 暗 40% = #535b68：对 panel 2.01:1、primary 在其上 4.65:1。

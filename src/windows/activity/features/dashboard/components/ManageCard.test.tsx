@@ -9,13 +9,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * 两件事必须由这一层钉住（纯函数与 hook 单测都看得见不到）：
  *   ① **卡壳本身**：卡头标题来自 props（改名后跟着变）、区标题是「常用与历史」、
  *      区根节点带 `data-zone="manage"`；
- *   ② **四颗动作在四态之外常驻**：新增 / 编辑事项 / 事项管理 / 一键 AI 分类。
- *      动作挂在区标题行里，而"库里还没有任何事项"（空态）与"读失败"（错误态）恰恰是
- *      最需要点「新增」的时刻 —— 把动作塞进 ready 分支，这两种状态下入口就是死链，
- *      零报错、零提示。
+ *   ② **三颗动作在四态之外常驻**：新增 / 事项管理 / 一键 AI 分类。卡头**没有**「编辑事项」
+ *      —— 点行就是编辑，重复入口已删。动作挂在区标题行里，而"库里还没有任何事项"（空态）
+ *      与"读失败"（错误态）恰恰是最需要点「新增」的时刻 —— 把动作塞进 ready 分支，
+ *      这两种状态下入口就是死链，零报错、零提示。
  *
  * 单击/长按都不该"看起来生效"：起停方向由 `useItemTimerToggle` 判，这里只传 `ItemTimerToggle`
- * 桩，判的是"点了有没有把 id 与名字交上去"以及"正在计的那一行有没有标记"。
+ * 桩，判的是"点了有没有把 id 与名字交上去"以及"行尾圆点画成哪一种颜色状态"。圆点三种
+ * 状态（灰 / 蓝 / 黄）由 `data-timer-state` 落到行上；正在计别的条时点它先弹「是否切换」。
  *
  * V-1.6c（「编辑事项」弹层保存 = 恰一条 `update_item`）随入口从时间线卡搬来本册：
  * 那颗入口现在住在本卡的区标题行里，`TimelineCardR2.test.tsx` 已经挂不到它。
@@ -74,6 +75,7 @@ vi.mock("../services/appItemBindingMirror.ts", () => ({
 
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { resolveLocaleActivation } from "../../../shared/i18n/runtime.ts";
+import type { TodoSummary } from "../../../shared/types/todos.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import type { TodayItemRow } from "../hooks/useTodayItems.ts";
 import ManageCard, {
@@ -134,6 +136,7 @@ async function flush() {
 interface MountOptions {
   title?: string;
   todayItems?: ManageCardModel;
+  todos?: readonly TodoSummary[];
   actions?: ManageCardActions;
 }
 
@@ -230,10 +233,10 @@ describe("事项管理卡 · 卡壳", () => {
   });
 });
 
-describe("事项管理卡 · 四颗动作在四态之外常驻", () => {
-  const EXPECTED = [COPY.itemsNewAction, COPY.timelineEditItem, COPY.timelineManageItems, COPY.itemsAiTag];
+describe("事项管理卡 · 三颗动作在四态之外常驻", () => {
+  const EXPECTED = [COPY.itemsNewAction, COPY.timelineManageItems, COPY.itemsAiTag];
 
-  it("mc03a_ready_state_shows_all_four", async () => {
+  it("mc03a_ready_state_shows_all_three", async () => {
     await mount({ todayItems: model([ITEM_A, ITEM_B]) });
     expect(zone()?.getAttribute("data-state")).toBe("ready");
     expect(actionLabels()).toEqual(EXPECTED);
@@ -256,30 +259,93 @@ describe("事项管理卡 · 四颗动作在四态之外常驻", () => {
 });
 
 describe("事项管理卡 · 行", () => {
-  it("mc04_clicking_a_row_asks_the_host_to_toggle_that_item", async () => {
+  it("mc04_clicking_a_row_opens_the_item_editor_instead_of_starting_the_timer", async () => {
     await mount({ todayItems: model([ITEM_A, ITEM_B]), actions: actions() });
     act(() => { rowOf("写周报")?.querySelector<HTMLButtonElement>(".at-items-row-main")?.click(); });
-    /* 名字一起交上去：宿主成功后的提示条要念出是哪一条 */
-    expect(toggleItem).toHaveBeenCalledWith(11, "写周报");
+    await flush();
+    /* 用户口径：点事项 = 编辑它；起停挪到行尾那颗键 */
+    expect(toggleItem).not.toHaveBeenCalled();
+    expect(document.body.querySelector(".at-timeline-edit"), "点击行没有打开编辑弹层").not.toBeNull();
   });
 
-  it("mc05_only_the_running_item_is_marked", async () => {
+  it("mc04b_the_row_tail_dot_toggles_the_timer", async () => {
+    await mount({ todayItems: model([ITEM_A, ITEM_B]), actions: actions() });
+    act(() => { rowOf("写周报")?.querySelector<HTMLButtonElement>(".at-items-row-timer")?.click(); });
+    /* 名字一起交上去：宿主成功后的提示条要念出是哪一条 */
+    expect(toggleItem).toHaveBeenCalledWith(11, "写周报");
+    /* 行尾是一个圆点，不再是播放/停止图标 */
+    expect(rowOf("写周报")?.querySelector(".at-items-row-timer .at-items-row-dot")).not.toBeNull();
+  });
+
+  it("mc05_only_the_running_item_is_blue", async () => {
     await mount({
       todayItems: model([ITEM_A, ITEM_B]),
       actions: actions({ itemTimer: { status: "running", sessionItemId: 11, toggleItem } }),
     });
-    expect(rowOf("写周报")?.hasAttribute("data-running"), "正在计的那一行没有标记").toBe(true);
-    expect(rowOf("记账")?.hasAttribute("data-running"), "别的行也被画成正在计时").toBe(false);
-    expect(container?.querySelectorAll(".at-items-row[data-running]")).toHaveLength(1);
+    expect(rowOf("写周报")?.getAttribute("data-timer-state"), "正在计的那一行不是蓝点").toBe("running");
+    expect(rowOf("记账")?.getAttribute("data-timer-state"), "别的行也被画成正在计时").toBe("idle");
+    expect(container?.querySelectorAll('.at-items-row[data-timer-state="running"]')).toHaveLength(1);
   });
 
-  it("mc05b_a_paused_session_is_not_painted_as_running", async () => {
+  it("mc05b_a_paused_session_is_yellow_not_blue", async () => {
     /* 暂停中的会话也"挂在"这一条上，但点它的语义是**继续** —— 画成正在计时就是撒谎 */
     await mount({
       todayItems: model([ITEM_A]),
       actions: actions({ itemTimer: { status: "paused", sessionItemId: 11, toggleItem } }),
     });
     expect(rowOf("写周报")?.hasAttribute("data-running")).toBe(false);
+    expect(rowOf("写周报")?.getAttribute("data-timer-state")).toBe("pending");
+  });
+
+  it("mc05c_a_pending_same_name_todo_turns_the_dot_yellow_and_blue_wins", async () => {
+    const todo: TodoSummary = {
+      id: 1,
+      title: "写周报",
+      plannedAt: null,
+      remindAt: null,
+      doneAt: null,
+      sortOrder: 0,
+    };
+    await mount({ todayItems: model([ITEM_A, ITEM_B]), todos: [todo] });
+    expect(rowOf("写周报")?.getAttribute("data-timer-state"), "有未完成待办却不黄").toBe("pending");
+    expect(rowOf("记账")?.getAttribute("data-timer-state")).toBe("idle");
+
+    /* 正在计时时蓝点优先：黄点只是"这条还有待办"，不能盖掉"正在计" */
+    await mount({
+      todayItems: model([ITEM_A, ITEM_B]),
+      todos: [todo],
+      actions: actions({ itemTimer: { status: "running", sessionItemId: 11, toggleItem } }),
+    });
+    expect(rowOf("写周报")?.getAttribute("data-timer-state")).toBe("running");
+  });
+
+  it("mc05d_a_dot_on_another_item_while_timing_asks_before_switching", async () => {
+    await mount({
+      todayItems: model([ITEM_A, ITEM_B]),
+      actions: actions({ itemTimer: { status: "running", sessionItemId: 11, toggleItem } }),
+    });
+    act(() => { rowOf("记账")?.querySelector<HTMLButtonElement>(".at-items-row-timer")?.click(); });
+    await flush();
+
+    /* 还没确认：一条意图都不许发 */
+    expect(toggleItem).not.toHaveBeenCalled();
+    expect(surfaceText()).toContain(COPY.itemsSwitchTitle);
+
+    act(() => { byText(COPY.itemsSwitchAction)?.click(); });
+    await flush();
+    expect(toggleItem).toHaveBeenCalledWith(12, "记账");
+  });
+
+  it("mc05e_cancelling_the_switch_keeps_the_current_timer", async () => {
+    await mount({
+      todayItems: model([ITEM_A, ITEM_B]),
+      actions: actions({ itemTimer: { status: "running", sessionItemId: 11, toggleItem } }),
+    });
+    act(() => { rowOf("记账")?.querySelector<HTMLButtonElement>(".at-items-row-timer")?.click(); });
+    await flush();
+    act(() => { byText("取消")?.click(); });
+    await flush();
+    expect(toggleItem).not.toHaveBeenCalled();
   });
 
   it("mc06_an_item_with_a_bound_app_carries_the_bound_mark", async () => {
@@ -316,19 +382,13 @@ describe("事项管理卡 · 空态与错误态", () => {
   });
 });
 
-describe("事项管理卡 · 编辑事项弹层（V-1.6c）", () => {
-  it("mc09_edit_save_emits_exactly_one_update_item_intent", async () => {
+describe("事项管理卡 · 行点击编辑（V-1.6c）", () => {
+  it("mc09_row_click_edit_save_emits_exactly_one_update_item_intent", async () => {
     await mount({ todayItems: model([ITEM_A, ITEM_B]), actions: actions() });
-    act(() => { byText(COPY.timelineEditItem)?.click(); });
+    /* 唯一入口是点行：卡头那颗重复的「编辑事项」已经删了 */
+    act(() => { rowOf("写周报")?.querySelector<HTMLButtonElement>(".at-items-row-main")?.click(); });
     await flush();
-    expect(surfaceText(), "「编辑事项」没有弹出任何东西").not.toBe("");
-
-    /* 候选 = 今天真的计过时的事项（`todayTimedItemIds`）：ITEM_B 的 value 是 0，不进来 */
-    const choices = Array.from(document.body.querySelectorAll<HTMLButtonElement>(".at-timeline-edit-choice"));
-    expect(choices.map((button) => button.querySelector(".at-timeline-edit-name")?.textContent))
-      .toEqual(["写周报"]);
-    act(() => { choices[0].click(); });
-    await flush();
+    expect(surfaceText(), "点行没有弹出编辑弹层").not.toBe("");
 
     const nameInput = document.body.querySelector<HTMLInputElement>(
       ".at-timeline-manage-dialog input.at-timeline-manage-input",

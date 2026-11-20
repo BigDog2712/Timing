@@ -14,7 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *   · V-1.6e / B4：「改起止」保存 = **恰一条** `update_record_time`，payload 只有
  *     `{recordId, startedAt, endedAt}`（camelCase）——**没有**时长字段（B4，
  *     `accumulated_sec` 由 Rust 重算）；
- *   · B2：跨零点的改法**不发意图**、就地给 `crossDayHint`（Rust 不按天拆分）；
+ *   · [2026-11-20] 改起止已并入「编辑事项」弹层：行右侧那颗悬停才浮出的按钮必须
+ *     消失（`at-timeline-record-edit` 零元素）；输入只有 `time`，没有日期；
+ *   · B1 / B2：只改时刻时跨零点表达不出来 —— 填 23:30–01:00 会就地报「结束要晚于
+ *     开始」且**不发意图**（Rust 不按天拆分，绝不能让这种行落库）；
  *   · V-1.6g / B3：进行中的段保存键 disabled + 行上显式给 `onlySavedEditable`。
  *
  * V-1.6c（编辑事项弹层恰一条 `update_item`）随入口一起搬到了 `ManageCard.test.tsx`。
@@ -30,14 +33,18 @@ vi.mock("../../../platform/runtime/hostIntentGateway.ts", () => ({ emitHostInten
 vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
   listTimingItems: h.listTimingItems,
   listTimingRecords: h.listTimingRecords,
+  listTimingItemTags: vi.fn(async (): Promise<unknown[]> => []),
 }));
 vi.mock("../../../platform/desktop/hostSettingsGateway.ts", () => ({ getSettings: h.getSettings }));
 
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { resolveLocaleActivation } from "../../../shared/i18n/runtime.ts";
-import { formatDateTimeLocal } from "../services/todoDraft.ts";
+import type { TimingItem } from "../../../platform/persistence/timingReadRepository.ts";
+import { DASHBOARD_COPY } from "../copy.ts";
 import TimelineZone from "./TimelineZone.tsx";
 import type { TodayItemRow } from "../hooks/useTodayItems.ts";
+
+const COPY = DASHBOARD_COPY["zh-CN"];
 
 /* 弹层判域 = 挂载那一刻的"今天"（组件里 `new Date()` 现算），测试里也用真实今天，
    不写死 2026 —— 否则日界一漂，合法改法会被 crossDay 误拦（或反过来）。 */
@@ -97,6 +104,12 @@ function typeInto(input: HTMLInputElement | null, value: string) {
   });
 }
 
+/** 改起止只改时刻：`time` 输入的值是 `HH:mm`，不带日期 */
+function formatClock(ms: number): string {
+  const at = new Date(ms);
+  return `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+}
+
 const issueText = () =>
   Array.from(document.body.querySelectorAll('[role="alert"], [role="status"]') ?? [])
     .map((node) => node.textContent ?? "")
@@ -128,30 +141,50 @@ afterEach(() => {
   root = null;
 });
 
-describe("下区 · 总计读数与入口收敛（V-1.6a）", () => {
-  it("tc01_the_zone_head_has_no_menu_buttons_and_only_the_total_readout", async () => {
+describe("下区 · 总计读数与入口（V-1.6a → [0.13.x] 恢复新建/编辑）", () => {
+  it("tc01_the_zone_head_carries_the_total_and_the_two_item_entries", async () => {
     await mount([itemRow()]);
     /* 区标题行右侧 = 总计读数（来自 `useTodayItems.total`，后端口径）。
        [0.12.6] 总计从"卡头"下移到"下区标题行"：卡头现在归合并卡（标题 + 布局工具条）。 */
     const head = container?.querySelector(".at-items-zone-head");
     expect(head?.textContent).toContain("总计 1h 20m");
-    /* 「常用事项 / 事项菜单」两颗唤起按钮已删：这一行一颗按钮都不该有 */
-    expect(head?.querySelectorAll("button")).toHaveLength(0);
+    /* [0.13.x] 主人口径：**恢复「新建事项」「编辑事项」**，挂在本区标题行（四态之外常驻）。 */
+    const labels = Array.from(head?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+      .map((button) => (button.textContent ?? "").trim());
+    expect(labels).toEqual([COPY.timelineNewItem, COPY.timelineEditItem]);
   });
 
-  it("tc02_the_zone_carries_no_card_foot_entries_at_all", async () => {
+  it("tc02_the_manage_entry_is_not_duplicated_here", async () => {
     await mount([itemRow()]);
-    /* [0.12.6] 卡底三颗（新建 / 编辑 / 事项管理）整组搬进了 `ManageCard`：
-       本区一个都不许留 —— 同一个动作两张卡上各有一颗，点错了只是打开同一个弹层，
-       但"这个按钮在哪张卡上"会永久地失败。 */
+    /* 「事项管理」仍住在 `ManageCard`：同一个动作在两张卡上各有一颗按钮，
+       用户对"按钮在哪"会永久失败。本区只恢复新建 / 编辑两个入口。 */
     expect(container?.querySelector(".at-timeline-manage"), "卡底入口条又长回来了").toBeNull();
     const labels = Array.from(container?.querySelectorAll<HTMLButtonElement>("button") ?? [])
-      .map((button) => button.textContent ?? "");
-    expect(labels).not.toContain("新建事项");
-    expect(labels).not.toContain("编辑事项");
-    expect(labels).not.toContain("事项管理");
+      .map((button) => (button.textContent ?? "").trim());
+    expect(labels).not.toContain(COPY.timelineManageItems);
     /* 区根节点带 `data-zone="timeline"`：上区是待办（`data-zone="todos"`），这里判的是下区 */
     expect(container?.querySelector('[data-zone="timeline"]'), "下区没有 data-zone 标记").not.toBeNull();
+  });
+
+  it("tc02b_the_entries_open_their_dialogs_even_when_today_is_empty", async () => {
+    /* 空态恰恰是最需要「新建」的时刻：入口在四态之外，弹层必须真的挂上
+       （挂进分支 = 点了零反应，判据同 `TimelineCardEntry.test.tsx`）。 */
+    await mount([]);
+    const button = (label: string) =>
+      Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-items-zone-actions button") ?? [])
+        .find((entry) => (entry.textContent ?? "").trim() === label) ?? null;
+    act(() => { button(COPY.timelineNewItem)?.click(); });
+    await flush();
+    expect(document.body.querySelector(".at-dialog-surface .at-dialog-title")?.textContent)
+      .toBe(COPY.timelineCreateTitle);
+  });
+
+  it("tc02c_the_row_no_longer_pops_out_a_record_edit_entry", async () => {
+    /* [2026-11-20] 改起止并入「编辑事项」：行右侧不许再有悬停才浮出的第四列。
+       同一动作藏在 hover 里 = 用户永远找不到；现在入口是它已经会用的那一颗。 */
+    await mount([itemRow()]);
+    expect(container?.querySelector(".at-timeline-record-edit"), "行上的改起止按钮又长回来了").toBeNull();
+    expect(container?.querySelector("button[aria-label='改起止 事项 A']")).toBeNull();
   });
 
   it("tc03_rows_show_name_range_and_total", async () => {
@@ -169,39 +202,106 @@ describe("下区 · 总计读数与入口收敛（V-1.6a）", () => {
     expect(range).toContain("进行中");
     expect(container?.querySelector(".at-timeline-row")?.hasAttribute("data-running")).toBe(true);
   });
+
+  it("tc04b_a_paused_row_says_paused_instead_of_running", async () => {
+    /* 暂停 = 数字不再涨：写"进行中"会让用户以为还在走，写此刻钟点更糟 */
+    await mount([itemRow({ lastEnd: null, paused: true })]);
+    const range = container?.querySelector(".at-timeline-range")?.textContent ?? "";
+    expect(range).toBe(COPY.timelinePaused);
+    expect(container?.querySelector(".at-timeline-row")?.hasAttribute("data-paused")).toBe(true);
+  });
 });
 
-describe("下区 · 改起止弹层（V-1.6e / B2 / B3）", () => {
-  /** 打开「改起止」并等段列表就绪 */
-  async function openRecordDialog() {
+describe("下区 · 常用事项（历史事项组已下线）", () => {
+  function timingItem(id: number, name: string, over: Partial<TimingItem> = {}): TimingItem {
+    return {
+      id, name, color: "", isSystem: false, isPinned: false, sortOrder: 0, updatedAt: 0,
+      categoryKey: null, ...over,
+    };
+  }
+
+  async function mountGroups() {
+    const toggleItem = vi.fn();
+    await resolveAndMount(createElement(TimelineZone, {
+      items: [itemRow()],
+      total: itemRow().value,
+      status: "ready",
+      onRetry: () => undefined,
+      allItems: [
+        timingItem(21, "常用的事", { isPinned: true, sortOrder: 1 }),
+        timingItem(22, "近期的事", { updatedAt: 20 }),
+        /* 今天已经计时的事（11）不该在组里再出现一次 */
+        timingItem(11, "事项 A", { isPinned: true, sortOrder: 2 }),
+      ],
+      itemTimer: { status: "idle", sessionItemId: null, toggleItem },
+    }));
+    return toggleItem;
+  }
+
+  it("tc04c_the_groups_list_items_without_a_row_today", async () => {
+    await mountGroups();
+    const pinned = container?.querySelector('[data-group="pinned"]')?.textContent ?? "";
+    expect(pinned).toContain(COPY.itemsPinnedGroup);
+    expect(pinned).toContain("常用的事");
+    /* [2026-11-20] 「历史事项」组整组下线：近期但今天没计时的事项归「事项管理」卡，
+       这张卡上再出现一次，用户就分不清该在哪张卡上找它 */
+    expect(container?.querySelector('[data-group="recent"]'), "历史事项组又长回来了").toBeNull();
+    expect(container?.textContent ?? "").not.toContain("近期的事");
+    /* 同一件事在卡上出现两次：行里一次、组里又一次（判"今天计时过的不进组"） */
+    expect(pinned).not.toContain("事项 A");
+  });
+
+  it("tc04d_clicking_a_group_row_starts_that_item", async () => {
+    const toggleItem = await mountGroups();
+    const row = Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-items-row-main") ?? [])
+      .find((button) => (button.textContent ?? "").trim() === "常用的事");
+    act(() => { row?.click(); });
+    expect(toggleItem).toHaveBeenCalledWith(21, "常用的事");
+  });
+});
+
+describe("下区 · 改起止（[2026-11-20] 并入编辑事项，只改时刻）", () => {
+  /** 打开「编辑事项」→ 选中今天唯一的事项 → 等「今日记录」区就绪 */
+  async function openRecordSection() {
     await mount([itemRow()]);
     act(() => {
-      container?.querySelector<HTMLButtonElement>("button[aria-label='改起止 事项 A']")?.click();
+      Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-items-zone-actions button") ?? [])
+        .find((button) => (button.textContent ?? "").trim() === COPY.timelineEditItem)
+        ?.click();
+    });
+    await flush();
+    act(() => {
+      document.body.querySelector<HTMLButtonElement>(".at-timeline-edit-choice")?.click();
     });
     await flush();
     expect(document.body.querySelector(".at-record-time")).not.toBeNull();
     expect(document.body.querySelectorAll(".at-record-time-row")).toHaveLength(1);
   }
 
+  const expandFirstSegment = () => {
+    act(() => {
+      document.body.querySelector<HTMLButtonElement>(".at-record-time-row .at-timeline-item-action")?.click();
+    });
+  };
   const editorSave = () =>
     document.body.querySelector<HTMLButtonElement>(".at-record-time-editor .at-button-primary");
   const editorInputs = () =>
     Array.from(document.body.querySelectorAll<HTMLInputElement>(
-      ".at-record-time-editor input[type='datetime-local']",
+      ".at-record-time-editor input[type='time']",
     ));
 
   it("tc06_save_emits_exactly_one_camel_case_intent_without_a_duration_field", async () => {
-    await openRecordDialog();
-    /* 逐段改（B5）：点这一段的「改起止」展开编辑器 */
-    act(() => {
-      document.body.querySelector<HTMLButtonElement>(".at-record-time-row .at-timeline-item-action")?.click();
-    });
+    await openRecordSection();
+    expect(document.body.querySelector(".at-record-time-title")?.textContent).toBe("今日记录");
+    expandFirstSegment();
     await flush();
 
     const inputs = editorInputs();
     expect(inputs).toHaveLength(2);
-    typeInto(inputs[0], formatDateTimeLocal(DAY + 9 * HOUR));
-    typeInto(inputs[1], formatDateTimeLocal(DAY + 10.5 * HOUR));
+    /* 只改时刻：日期不摆在界面上，锚点由记录自己带 */
+    expect(document.body.querySelector(".at-record-time-editor input[type='datetime-local']")).toBeNull();
+    typeInto(inputs[0], formatClock(DAY + 9 * HOUR));
+    typeInto(inputs[1], formatClock(DAY + 10.5 * HOUR));
     act(() => { editorSave()?.click(); });
     await flush();
 
@@ -218,22 +318,20 @@ describe("下区 · 改起止弹层（V-1.6e / B2 / B3）", () => {
     expect(issueText()).toContain("已保存，稍后刷新生效");
   });
 
-  it("tc07_a_cross_midnight_edit_is_refused_in_place_and_emits_nothing", async () => {
-    await openRecordDialog();
-    act(() => {
-      document.body.querySelector<HTMLButtonElement>(".at-record-time-row .at-timeline-item-action")?.click();
-    });
+  it("tc07_a_backwards_edit_that_would_cross_midnight_is_refused_in_place", async () => {
+    await openRecordSection();
+    expandFirstSegment();
     await flush();
 
-    /* 结束推到次日 01:00（跨零点）：B2 必须在前端拦 —— Rust 不按天拆分，
-       跨零点行会让整天时长算给起始日且零报错 */
+    /* 只改时刻时跨零点表达不出来：填 23:30–01:00 会走 B1。绝不能让这条落库 ——
+       Rust 不按天拆分，跨零点行会把整天时长算给起始日且零报错。 */
     const inputs = editorInputs();
-    typeInto(inputs[0], formatDateTimeLocal(DAY + 23.5 * HOUR));
-    typeInto(inputs[1], formatDateTimeLocal(DAY + 24 * HOUR + HOUR));
+    typeInto(inputs[0], "23:30");
+    typeInto(inputs[1], "01:00");
     act(() => { editorSave()?.click(); });
     await flush();
 
-    expect(issueText()).toContain("跨零点的记录请在两天里分别修改");
+    expect(issueText()).toContain("结束时刻要晚于开始");
     /* 拦在门口：一个意图都不许发出去 */
     expect(h.emitHostIntent).not.toHaveBeenCalled();
   });
@@ -245,7 +343,13 @@ describe("下区 · 改起止弹层（V-1.6e / B2 / B3）", () => {
     ]);
     await mount([itemRow()]);
     act(() => {
-      container?.querySelector<HTMLButtonElement>("button[aria-label='改起止 事项 A']")?.click();
+      Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-items-zone-actions button") ?? [])
+        .find((button) => (button.textContent ?? "").trim() === COPY.timelineEditItem)
+        ?.click();
+    });
+    await flush();
+    act(() => {
+      document.body.querySelector<HTMLButtonElement>(".at-timeline-edit-choice")?.click();
     });
     await flush();
     expect(document.body.querySelectorAll(".at-record-time-row")).toHaveLength(2);
@@ -260,8 +364,8 @@ describe("下区 · 改起止弹层（V-1.6e / B2 / B3）", () => {
     act(() => { runningRow.querySelector<HTMLButtonElement>(".at-timeline-item-action")?.click(); });
     await flush();
     const inputs = editorInputs();
-    typeInto(inputs[0], formatDateTimeLocal(DAY + 11 * HOUR));
-    typeInto(inputs[1], formatDateTimeLocal(DAY + 12 * HOUR));
+    typeInto(inputs[0], formatClock(DAY + 11 * HOUR));
+    typeInto(inputs[1], formatClock(DAY + 12 * HOUR));
     expect(editorSave()?.disabled).toBe(true);
     expect(h.emitHostIntent).not.toHaveBeenCalled();
   });

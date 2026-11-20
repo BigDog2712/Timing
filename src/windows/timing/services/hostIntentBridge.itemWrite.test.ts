@@ -24,7 +24,16 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Intent =
-  | { action: 'create_item'; name: string; isPinned?: boolean; timerMinutes?: number | null; sortOrder?: number; categoryKey?: string | null }
+  | {
+    action: 'create_item';
+    name: string;
+    isPinned?: boolean;
+    timerMinutes?: number | null;
+    sortOrder?: number;
+    tags?: readonly string[];
+    appKey?: string | null;
+    start?: boolean;
+  }
   | {
     action: 'update_item';
     id: number;
@@ -33,6 +42,7 @@ type Intent =
     sortOrder?: number;
     timerMinutes?: number | null;
     categoryKey?: string | null;
+    tags?: readonly string[];
   };
 
 const h = vi.hoisted(() => ({
@@ -48,6 +58,13 @@ const h = vi.hoisted(() => ({
   reloadItems: vi.fn(async () => []),
   setNotice: vi.fn(),
   items: [] as { id: number; name: string }[],
+  tagSet: vi.fn(async (_itemId: number, _tags: readonly string[]) => []),
+  bindItemApp: vi.fn(async (_params: { itemId: number; appKey: string; track: number }) => undefined),
+  startTimer: vi.fn(async (_params: { itemId: number }) => undefined),
+  switchItem: vi.fn(async (_params: { itemId: number; mode: string }) => undefined),
+  refreshTimer: vi.fn(async () => undefined),
+  timerStatus: 'idle' as 'idle' | 'running' | 'paused',
+  countdownStart: vi.fn(async (_itemId: number, _seconds: number, _resume: boolean) => undefined),
 }));
 
 vi.mock('../hooks/useTauriEvent', () => ({
@@ -62,7 +79,9 @@ vi.mock('../hooks/useTimerActions', () => ({
 vi.mock('./api', () => ({
   itemApi: { create: h.createItem, update: h.updateItem },
   settingsApi: { update: h.updateSettings },
+  tagApi: { set: h.tagSet },
 }));
+vi.mock('./countdownActions', () => ({ countdownActions: { start: h.countdownStart } }));
 vi.mock('./highlightActions', () => ({ highlightPill: vi.fn(async () => undefined) }));
 vi.mock('./todosActions', () => ({ openTodosWindow: vi.fn(async () => undefined) }));
 vi.mock('./noteActions', () => ({
@@ -72,7 +91,13 @@ vi.mock('./noteActions', () => ({
 vi.mock('./settingsActions', () => ({ openSettings: vi.fn(async () => undefined) }));
 vi.mock('./ipc', () => ({
   errorText: (err: unknown) => `错误：${String(err)}`,
-  ipc: { showWindow: vi.fn(async () => undefined), createRecord: vi.fn(async () => []) },
+  ipc: {
+    showWindow: vi.fn(async () => undefined),
+    createRecord: vi.fn(async () => []),
+    bindItemApp: h.bindItemApp,
+    startTimer: h.startTimer,
+    switchItem: h.switchItem,
+  },
 }));
 vi.mock('../stores/itemStore', () => ({
   useItemStore: { getState: () => ({ items: h.items, reload: h.reloadItems }) },
@@ -97,6 +122,14 @@ vi.mock('../stores/uiStore', () => ({
     }),
   },
 }));
+vi.mock('../stores/timerStore', () => ({
+  useTimerStore: {
+    getState: () => ({
+      state: { status: h.timerStatus },
+      refresh: h.refreshTimer,
+    }),
+  },
+}));
 
 const { useHostIntentBridge } = await import('./hostIntentBridge');
 
@@ -113,10 +146,12 @@ let root: Root;
 const allMocks = () => [
   h.startOrSwitch, h.togglePause, h.createItem, h.updateItem,
   h.updateSettings, h.setSettings, h.reloadItems, h.setNotice,
+  h.tagSet, h.bindItemApp, h.startTimer, h.switchItem, h.refreshTimer, h.countdownStart,
 ];
 
 beforeEach(() => {
   h.settings = { itemsTimers: {} };
+  h.timerStatus = 'idle';
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -213,8 +248,8 @@ describe('useHostIntentBridge · 时间线卡的写意图', () => {
       sortOrder: 5,
     });
 
-    /* 没给分类时 `categoryKey` 传 `undefined`（= 不设置），命令层再归一成 `null` */
-    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文', categoryKey: undefined });
+    /* 新建不收分类（2026-11-20 主人口径）：create 只拿名字，分类在「事项管理」行上改 */
+    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文' });
     /* 用**新建出来的 id**（42），不是意图里的任何东西 */
     expect(h.updateItem).toHaveBeenCalledWith({ id: 42, patch: { isPinned: true, sortOrder: 5 } });
     /* 时长落 settings.itemsTimers（itemId → 分钟），并且把宿主返回的快照写回 store */
@@ -226,8 +261,7 @@ describe('useHostIntentBridge · 时间线卡的写意图', () => {
   it('tl09_create_item_without_a_pin_leaves_the_item_patch_empty', async () => {
     await dispatch({ action: 'create_item', name: '看论文', isPinned: false, timerMinutes: null });
 
-    /* 没给分类时 `categoryKey` 传 `undefined`（= 不设置），命令层再归一成 `null` */
-    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文', categoryKey: undefined });
+    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文' });
     /* `isPinned: false` 也要写（用户明确选了"不设为常用"），但不该带 sortOrder */
     expect(h.updateItem).toHaveBeenCalledWith({ id: 42, patch: { isPinned: false } });
     /* `timerMinutes: null` = 明确不设时长 → 写一次设置（清键），而不是留着旧值 */
@@ -252,16 +286,8 @@ describe('useHostIntentBridge · 时间线卡的写意图', () => {
     expect(h.reloadItems).toHaveBeenCalledTimes(1);
   });
 
-  /* [0.13] 事项分类：新建时选中的分类走 `create` 一步落库；行上改分类走 `update_item`
+  /* [0.13] 事项分类：新建不再带分类（2026-11-20 主人口径）；行上改分类走 `update_item`
      的 `categoryKey` 三态 —— `null` 必须原样带过去（`if (value)` 会把"清空分类"吞掉）。 */
-  it('tl13_create_item_carries_categoryKey_into_create', async () => {
-    await dispatch({ action: 'create_item', name: '看论文', categoryKey: ' development ' });
-
-    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文', categoryKey: 'development' });
-    /* 分类不是"再 patch 一次"的字段：`create` 已经落了，不该出现在 update 的 patch 里 */
-    expect(h.updateItem).not.toHaveBeenCalled();
-  });
-
   it('tl14_update_item_clears_category_with_null_and_keeps_other_fields_alone', async () => {
     await dispatch({ action: 'update_item', id: 7, categoryKey: null });
 
@@ -275,5 +301,42 @@ describe('useHostIntentBridge · 时间线卡的写意图', () => {
     expect(h.updateItem).not.toHaveBeenCalled();
     expect(h.updateSettings).not.toHaveBeenCalled();
     expect(h.reloadItems).not.toHaveBeenCalled();
+  });
+
+  /* [本轮] 新建弹层的「标签 / 绑定应用 / 创建后开始」：这三项都要**建好之后**才有 itemId，
+     所以只能在 create 之后补；补失败不回滚事项（与药丸 `ItemPicker` 同一条口径）。 */
+  it('tl15_create_item_attaches_tags_and_app_after_the_item_exists', async () => {
+    await dispatch({ action: 'create_item', name: '看论文', tags: [' #读研 ', ' '], appKey: ' code.exe ' });
+
+    expect(h.createItem).toHaveBeenCalledWith({ name: '看论文' });
+    expect(h.tagSet).toHaveBeenCalledWith(42, ['#读研']);
+    expect(h.bindItemApp).toHaveBeenCalledWith({ itemId: 42, appKey: 'code.exe', track: 1 });
+    /* 没勾「创建后开始」：计时一条都不许动 */
+    expect(h.startTimer).not.toHaveBeenCalled();
+    expect(h.countdownStart).not.toHaveBeenCalled();
+  });
+
+  it('tl16_create_item_start_uses_countdown_when_a_default_duration_exists', async () => {
+    await dispatch({ action: 'create_item', name: '看论文', timerMinutes: 25, start: true });
+
+    expect(h.countdownStart).toHaveBeenCalledWith(42, 25 * 60, false);
+    expect(h.startTimer).not.toHaveBeenCalled();
+  });
+
+  it('tl17_create_item_start_does_not_preempt_a_running_timer', async () => {
+    h.timerStatus = 'running';
+    await dispatch({ action: 'create_item', name: '看论文', start: true });
+
+    expect(h.startTimer).not.toHaveBeenCalled();
+    expect(h.switchItem).not.toHaveBeenCalled();
+    expect(h.setNotice).toHaveBeenCalledWith(expect.objectContaining({ tone: 'info' }));
+  });
+
+  it('tl18_update_item_writes_tags_even_when_no_other_field_changed', async () => {
+    await dispatch({ action: 'update_item', id: 7, tags: ['工作'] });
+
+    expect(h.updateItem).not.toHaveBeenCalled();
+    expect(h.tagSet).toHaveBeenCalledWith(7, ['工作']);
+    expect(h.reloadItems).toHaveBeenCalledTimes(1);
   });
 });

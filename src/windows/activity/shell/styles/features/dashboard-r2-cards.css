@@ -5,17 +5,18 @@
  * 锁定态 / 布局管理弹层），卡面内容（时间线行、改起止弹层、待办批量表单）住这里，
  * 一段对应一个任务号。红线同全仓：零字面量色值，只用 `var(--at-*)`；不加阴影渐变。
  *
- *   T03a · 时间线行三列（名称 - 起止 - 总用时）+ 行上「改起止」入口 + 编辑事项弹层
- *   T03b · 改起止弹层
+ *   T03a · 时间线行三列（名称 - 起止 - 总用时）+ 编辑事项弹层
+ *   T03b · 改起止（[2026-11-20] 并入编辑事项弹层的「今日记录」区，行上入口已删）
  *   T03a · 待办批量表单（多日期 × 多时刻 chip 流）+ 行编辑键
  * ========================================================================== */
 
-/* ── T03a · 时间线行三列（名称 - 起止 - 总用时）+ 行上「改起止」入口 ──
+/* ── T03a · 时间线行三列（名称 - 起止 - 总用时）──
  * 行是 grid：名称可省略（title 兜底全名），起止列贴中、总用时贴右。
+ * [2026-11-20] 第四列（悬停才浮出的「改起止」）已删除：改起止住进编辑事项弹层。
  * 进行中的行（data-running）不加删除线类效果 —— 它的"止"就是此刻，实时变。 */
 .at-timeline-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
 }
@@ -26,16 +27,6 @@
   font-size: var(--at-font-size-caption);
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-.at-timeline-record-edit {
-  flex: 0 0 auto;
-  visibility: hidden;
-}
-
-.at-timeline-row:hover .at-timeline-record-edit,
-.at-timeline-row:focus-within .at-timeline-record-edit {
-  visibility: visible;
 }
 
 /* 「编辑事项」弹层：左侧选择列表 + 底部编辑表单（复用 `.at-timeline-item-editor`） */
@@ -85,12 +76,21 @@
   white-space: nowrap;
 }
 
-/* ── T03b · 改起止弹层 ── */
+/* ── T03b · 「今日记录」区（编辑事项弹层内）── */
 .at-record-time {
   display: flex;
   flex-direction: column;
   gap: var(--at-space-group);
   min-height: 0;
+  padding-top: var(--at-space-group);
+  border-top: 1px solid var(--at-border-subtle);
+}
+
+.at-record-time-title {
+  margin: 0;
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
 }
 
 .at-record-time-list {
@@ -226,7 +226,7 @@
 }
 
 /* ── [0.13.x · T18] 时间轴第二层：事项行下的子记录 ─────────────────────────
-   第一层 `.at-timeline-row` 是 4 列 grid（名称 | 起止 | 时长 | 改起止键）。
+   第一层 `.at-timeline-row` 是 3 列 grid（名称 | 起止 | 时长）。
    第二层必须是它的**整行子项**（`grid-column: 1 / -1`），否则会掉进第一行第 5 格，
    表现为「子记录挤在时长右边」——看起来像数据错位，其实是网格流。 */
 .at-timeline-toggle {

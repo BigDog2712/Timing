@@ -1,102 +1,129 @@
 /* ============================================================================
- * dashboard-heatmap.css — 活动热力图卡（近 4 周平均：周一→周日 7 行 × 24 列）
+ * dashboard-heatmap.css — 活动热力图卡（一个月 × 6 个四小时段 + 当日合计）
  * -----------------------------------------------------------------------------
- * 版式逐值照 `widgets/heatmap.rs`：
- *   星期列 16（`label_w`）· 格距 3（`GAP`）· 单格 `min(cell_w, cell_h).clamp(4, 18)`
- *   · 底部刻度带 15 + 图例带 15（`bottom_h` / `legend_h`）· 刻度与星期 9px
- *   · 图例小格 10×10、贴右下。
+ * [2026-11-20] 轴换了，版式跟着换：
+ *   · 纵轴最上面一行「day」（当天合计，行高 16），下面 6 行只标时段起点
+ *     （0 / 4 / 8 / 12 / 16 / 20，行高 12）；
+ *   · 横轴整月每一天一列（列宽 12，28–31 列都铺满；日期数字每 5 天标一次），
+ *     整块在 `.at-heatmap__scroll` 里横向滚动；
+ *   · 左侧标签列固定在滚动区外 —— 跟着滚的话一拖就不知道哪一行是几点了。
  *
  * 两条不能省的取法：
- *   · **格子必须是正方形**：整块尺寸由外层的 `--at-heatmap-cell` 算一次、行列共用，
- *     不能用 `1fr` 让列宽撑满 —— 卡一宽格子就成了扁条，24 小时的"形状"就没了
- *     （Rust 那句 `.min(cell_h)` 就是防这个）；
- *   · **行、列、刻度三者共用同一个格宽**，否则 0/6/12/18 会与格子错列。
+ *   · **标签列与格阵共用同一套行高 / 间距**（12 + 3），否则第 3 行以后全部错位；
+ *   · 两个分母：时段行按 `bucketMaxMs`、合计行按 `totalMaxMs`，都由组件算好档位，
+ *     CSS 只认 `data-level`。
  *
  * 配色只用 `--at-*` 令牌：深浅是 `--at-accent-default` 的 `color-mix` 五档，
- * 不写死任何一个色值（`brand-gate` 会拦）。
+ * 不写死任何一个色值（`brand-gate` 会拦）。零活动格用 `--at-surface-raise`（比卡面
+ * 亮一档，看得见但不出声）；"还没到"的时段用虚线边框，与零活动分开。
  * ========================================================================== */
 
-/* 容器锚点放在这张卡自己身上（不是卡壳）：`100cqw`/`100cqh` 就是"格阵可用区"，
- * 与 Rust 的 `avail_w`/`avail_h` 同义。注意 `cqw` 在容器**自身**上不生效（元素不能
- * 给自己当容器），所以格宽令牌定义在子元素上。 */
 .at-heatmap {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   gap: 4px;
   min-height: 0;
-  /* 整块上限 520 = 星期列 16 + 间距 3 + 格阵 501（24×18 + 23×3）。卡更宽时居中留白，
-   * Rust 也是居中，不是把格子拉开。 */
   width: 100%;
-  max-width: 520px;
-  margin: 0 auto;
   container-type: size;
-}
-
-/* 格宽 = `clamp(4, min((可用宽-23GAP)/24, (可用高-6GAP)/7), 18)`。
- * 85 = 星期列 16 + 它后面的 3 + 23 个格距 69；48 = 底部两条带 30 + 6 个格距 18。 */
-.at-heatmap__rows,
-.at-heatmap__foot {
-  --at-heatmap-label: 16px;
+  --at-heatmap-cell: 12px;
   --at-heatmap-gap: 3px;
-  --at-heatmap-cell: clamp(
-    4px,
-    min(calc((100cqw - 85px) / 24), calc((100cqh - 48px) / 7)),
-    18px
-  );
+  --at-heatmap-total-cell: calc(var(--at-heatmap-cell) + 4px);
+  --at-heatmap-label: 34px;
 }
 
-/* 两列：星期列 + 格阵。`justify-content` / `align-content` 都居中 ——
- * Rust 把格阵摆在可用区正中（`(avail - grid) * 0.5`），不是贴左上。 */
-.at-heatmap__rows {
-  display: grid;
+/* ── 月导航（壳的 subhead）：右缘，紧贴卡头之下 ── */
+.at-heatmap-range {
+  display: flex;
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+/* ── 标签列 + 滚动格阵 ── */
+.at-heatmap__frame {
+  display: flex;
   flex: 1 1 auto;
-  grid-template-columns: var(--at-heatmap-label) max-content;
-  grid-auto-rows: var(--at-heatmap-cell);
-  justify-content: center;
-  align-content: center;
   gap: var(--at-heatmap-gap);
   min-height: 0;
+  overflow: hidden;
 }
 
-.at-heatmap__day {
-  min-width: 0;
-  overflow: hidden;
-  align-self: center;
-  text-align: right;
-  padding-right: var(--at-heatmap-gap);
+.at-heatmap__labels {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-rows: 12px var(--at-heatmap-total-cell) repeat(6, var(--at-heatmap-cell));
+  gap: var(--at-heatmap-gap);
+  width: var(--at-heatmap-label);
+  min-height: 0;
   font-size: var(--at-font-size-compact);
   line-height: 12px;
   color: var(--at-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.at-heatmap__bucket-label {
+  align-self: center;
+  overflow: hidden;
+  text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.at-heatmap__cells {
-  display: grid;
-  grid-template-columns: repeat(24, var(--at-heatmap-cell));
-  grid-auto-rows: var(--at-heatmap-cell);
-  gap: var(--at-heatmap-gap);
+.at-heatmap__bucket-label--total {
+  align-self: center;
+  border-bottom: 1px solid var(--at-border-subtle);
+  color: var(--at-text-secondary);
+}
+
+.at-heatmap__scroll {
+  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--at-border-strong) transparent;
+}
+
+.at-heatmap__grid {
+  display: grid;
+  grid-template-columns: repeat(var(--at-heatmap-days), var(--at-heatmap-cell));
+  grid-template-rows: 12px var(--at-heatmap-total-cell) repeat(6, var(--at-heatmap-cell));
+  gap: var(--at-heatmap-gap);
+  width: max-content;
+  min-height: 0;
+  font-size: var(--at-font-size-compact);
+  line-height: 12px;
+  color: var(--at-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.at-heatmap__date {
+  overflow: visible;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .at-heatmap__cell {
   min-width: 0;
   min-height: 0;
   border-radius: 2px;
-  /* 零活动 = 一个浅浅的底，与"还没发生"（`data-future` 的虚线）分开。
-   * 用 `--at-surface-raise` 而不是 border-subtle 的透明混色：它在两套主题里都比卡面
-   * **亮一档**（深色 #2d2d2d → #393a3c，浅色 #ffffff → #f8f8f8），零活动格因此
-   * 「看得见但不出声」。实测 34% 的 border-subtle 在深色卡上直接看不见，24 格的网格
-   * 只剩有量的那几格 —— 读起来像"这一天只有这几个小时"。（GitHub 那套也是这么做的。） */
   background: var(--at-surface-raise);
 }
 
-/* 五档强度：**开方后分 5 档**（照 Rust 的 `sqrt` 压长尾），alpha 沿用它的阶梯
- * `38 + t*200`：t = 0.12/0.32/0.52/0.72/0.92 → 62/102/142/182/222 ≈ 24/40/56/71/87%。
- * 不用"15/30/45 分钟"这种绝对门槛：4 周平均之后一小时里有 20 分钟就算很满了，
- * 写死门槛会让整张图永远停在第 1 档。 */
+/* 今天还没到的时段：**不是零活动** —— 虚线空底，不占色阶 */
+.at-heatmap__cell[data-future="true"] {
+  background: transparent;
+  border: 1px dashed var(--at-border-subtle);
+}
+
+/* 当日合计行（最上面一行）：比时段行高一档、下缘一条细线，扫视时先落到这一行 */
+.at-heatmap__cell--total {
+  border-bottom: 1px solid var(--at-border-subtle);
+}
+
+/* 五档强度：**开方后分 5 档**（活动分布长尾很重，线性映射会让满屏都停在第 1 档） */
 .at-heatmap__cell[data-level="1"],
 .at-heatmap__legend i[data-level="1"] {
   background: color-mix(in srgb, var(--at-accent-default) 24%, transparent);
@@ -122,40 +149,20 @@
   background: color-mix(in srgb, var(--at-accent-default) 87%, transparent);
 }
 
-/* 底部两条带：小时刻度一条、图例一条贴右下（Rust 里是两条独立的带）。
- * 与 `__rows` 用同一套列骨架，格宽和居中方式都一样 —— 否则 0/6/12/18 与格子错列。 */
+/* 合计行也可以同时是零活动：让它保持浅底、只留上缘那条线 */
+.at-heatmap__cell--total[data-level="0"] {
+  background: var(--at-surface-raise);
+}
+
 .at-heatmap__foot {
-  display: grid;
+  display: flex;
   flex: 0 0 auto;
-  grid-template-columns: var(--at-heatmap-label) max-content;
-  grid-auto-rows: 12px;
-  justify-content: center;
-  align-content: end;
-  gap: 2px var(--at-heatmap-gap);
-  min-width: 0;
-}
-
-.at-heatmap__axis {
-  grid-column: 2;
-  display: grid;
-  grid-template-columns: repeat(24, var(--at-heatmap-cell));
-  gap: var(--at-heatmap-gap);
-  min-width: 0;
-  font-size: var(--at-font-size-compact);
-  line-height: 12px;
-  color: var(--at-text-tertiary);
-  font-variant-numeric: tabular-nums;
-}
-
-.at-heatmap__axis > span {
-  /* 刻度压在列的**中间**（Rust 是 `x - 12` 起 24 宽居中），不是压在列左缘 */
-  text-align: center;
+  justify-content: flex-end;
+  min-height: 12px;
 }
 
 .at-heatmap__legend {
-  grid-column: 2;
   display: none;
-  justify-self: end;
   align-items: center;
   gap: 3px;
   font-size: var(--at-font-size-compact);
@@ -163,7 +170,6 @@
   color: var(--at-text-tertiary);
 }
 
-/* 图例小格 10×10（Rust `heatmap.rs:130`） */
 .at-heatmap__legend i {
   display: block;
   width: 10px;
@@ -171,9 +177,7 @@
   border-radius: 2px;
 }
 
-/* 够高才给图例：Rust 的门槛就是正文高 > 150（`legend_h = if body.height() > 150`）。
- * 现在容器是 `.at-heatmap` 本身，`100cqh` 就是正文高 —— 阈值可以直接写 150，
- * 不必再折算出卡高（原来写 180 是因为量的是卡壳内容盒）。 */
+/* 够高才给图例：S 档 ~110px 可用高，塞图例会把最后一行挤掉 */
 @container (min-height: 150px) {
   .at-heatmap__legend {
     display: inline-flex;

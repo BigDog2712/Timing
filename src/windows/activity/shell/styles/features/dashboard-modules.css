@@ -36,20 +36,14 @@
   pointer-events: none;
 }
 
-/* 环心主读数：Rust 按环径分三档 14.5 / 17 / 19.5（`focus.rs:108`）。
- * 三档其实是同一条线性关系（19.5/144 ≈ 0.135），所以用环径乘系数一次算完：
- * 158 → 20.9（Rust 上限 158 时取 19.5，差 1.4px）、132 → 17.4（Rust 17）、
- * 110 → 14.5（Rust 14.5）。取 0.128 让三档同时贴合：158→20.2、132→16.9、110→14.1。 */
+/* 首页唯一 Primary 答案读数：使用现有 metric 档（24px / 700 / tabular-nums）。 */
 .at-donut-total {
   min-width: 0;
   text-align: center;
-  /* 环心读数：Rust 是**按环径分三档**（`focus.rs:105`，d<118 → 14.5 / d<140 → 17 / 否则 19.5），
-   * 用 clamp 连续逼近：两端钉死在 14.5 与 19.5，中段偏差 < 1px。 */
-  font-size: clamp(14.5px, var(--at-donut-fit, 158px) * 0.128, 19.5px);
+  font-size: var(--at-font-size-metric);
   font-variant-numeric: tabular-nums;
   font-weight: var(--at-font-weight-emphasis);
-  line-height: 1.05;
-  letter-spacing: -0.01em;
+  line-height: var(--at-line-height-metric);
   color: var(--at-text-primary);
 }
 

@@ -65,7 +65,10 @@ export default function AppsModule({
   const copy = DASHBOARD_COPY[useLocale()];
   /* [0.12.6 · P0-9] 行上「工具」标记的文案：单独一张表（`copy.ts` 已被另一位工程师占着） */
   const toolCopy = TOOL_TAG_COPY[useLocale()];
-  const visible = applications.slice(0, 5);
+  /* [2026-11-20] 不再只画前 5 行：主人口径是"卡里滚轮能看到全部"。
+   * 排行本身是全量（`buildTopApplications` 不截断），裁切改由 `.at-app-list` 的
+   * `overflow-y: auto` 承担 —— 数据一条都不藏，放不下才滚。 */
+  const visible = applications;
   /* 卡头读数是**全部已计入统计的应用**的合计（exe `meta(Apps)` = `dur(apps_total_ms)`
      的同一位置），不是被卡片高度裁剩的那几条之和 —— 那两个数在窄卡上会差很多。
      [M1] 工具类**不进**这个合计：它们的时长已经被读模型从总量/分类分布里扣掉了

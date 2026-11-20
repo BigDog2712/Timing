@@ -28,7 +28,7 @@ vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
   listTimingRecords: g.listTimingRecords,
 }));
 
-import { buildTodayItemRows, useTodayItems, type TodayItemsState } from "./useTodayItems.ts";
+import { buildTodayItemRows, mergeActiveSession, useTodayItems, type TodayItemsState } from "./useTodayItems.ts";
 import type { TimingItem, TimingRecord } from "../../../platform/persistence/timingReadRepository.ts";
 
 function item(id: number, name: string, isSystem = false): TimingItem {
@@ -244,5 +244,61 @@ describe("buildTodayItemRows · lastEnd 与总计的后端口径", () => {
     /* useTodayItems 的 total = Σ row.value（useMemo），同一口径的镜像断言 */
     const sum = rows.reduce((acc, row) => acc + row.value, 0);
     expect(sum).toBe(600_000);
+  });
+});
+
+/* ── [0.13.x] 把宿主当前会话并进今日行 ──
+ * `list_records` 只回 `status='saved'`，正在计的那条**永远不在**记录里。
+ * 少了这一帧，今日时间线看不到"正在计时的事项"（用户口径的第一个症状）。 */
+describe("mergeActiveSession · 正在计时的会话也要进今日时间线", () => {
+  const dayStart = new Date(2026, 10, 11, 0, 0, 0).getTime();
+  const now = dayStart + 11 * 3600_000;
+
+  it("i10_a_running_session_is_added_even_with_no_saved_record_today", () => {
+    const merged = mergeActiveSession([], {
+      itemId: 2, accumulatedSec: 300, runningSince: now - 120_000, status: "running",
+    }, [item(2, "写代码")], now, dayStart);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0].name).toBe("写代码");
+    /* 300s 已累计 + 120s 本次运行段 */
+    expect(merged[0].value).toBe(420_000);
+    /* 进行中：止列必须走 `timelineNoEnd` 分支 */
+    expect(merged[0].lastEnd).toBeNull();
+    expect(merged[0].paused).toBe(false);
+  });
+
+  it("i11_a_session_on_a_timed_item_adds_up_without_double_counting", () => {
+    const rows = [{
+      itemId: 2, name: "写代码", color: "", value: 600_000,
+      firstStart: dayStart + 9 * 3600_000, lastEnd: dayStart + 10 * 3600_000, segments: 1,
+    }];
+    const merged = mergeActiveSession(rows, {
+      itemId: 2, accumulatedSec: 60, runningSince: now - 60_000, status: "running",
+    }, [item(2, "写代码")], now, dayStart);
+
+    expect(merged).toHaveLength(1);
+    /* 已封存 10min + 当前会话 2min（1min 冻结 + 1min 运行） */
+    expect(merged[0].value).toBe(720_000);
+    expect(merged[0].lastEnd).toBeNull();
+  });
+
+  it("i12_a_paused_session_keeps_the_duration_frozen_and_is_marked_paused", () => {
+    const merged = mergeActiveSession([], {
+      itemId: 2, accumulatedSec: 600, runningSince: null, status: "paused",
+    }, [item(2, "写代码")], now, dayStart);
+
+    expect(merged[0].value).toBe(600_000);
+    /* 暂停 = 进行中的最后一帧，但「止」列要写「已暂停」（数字不涨） */
+    expect(merged[0].lastEnd).toBeNull();
+    expect(merged[0].paused).toBe(true);
+  });
+
+  it("i13_a_zero_length_session_does_not_add_an_empty_row", () => {
+    /* 刚开始、连一秒都没到：多一行「0m · 进行中」是噪声，不是事实 */
+    const merged = mergeActiveSession([], {
+      itemId: 2, accumulatedSec: 0, runningSince: now, status: "running",
+    }, [item(2, "写代码")], now, dayStart);
+    expect(merged).toHaveLength(0);
   });
 });

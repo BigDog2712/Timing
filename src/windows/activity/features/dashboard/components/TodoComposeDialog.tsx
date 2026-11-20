@@ -21,12 +21,19 @@
  *   · 成功 → 清草稿 + 关弹层（下一次打开是干净的一张空表单）。
  *
  * Esc / 取消 / 点遮罩：走同一个 `handleClose`（清草稿 + 关），三条路径不能有一条忘了清。
+ *
+ * ## 标签 / 应用落在同名事项上
+ *
+ * 待办表没有这两列，用户口径是「立即可见 + 挂同名事项」：建完待办再把附加项交给
+ * `onItemExtras`（`services/todoItemExtras`）。待办先落库，附加项失败不挡关闭。
  */
 import { useId, useRef, useState } from "react";
 
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import QuietDialog from "../../../shared/components/QuietDialog.tsx";
 import { DASHBOARD_COPY } from "../copy.ts";
+import { ITEM_EDITOR_COPY } from "../copyItemEditor.ts";
+import { useItemTagSnapshot } from "../hooks/useItemTagSnapshot.ts";
 import { TODO_TITLE_MAX_CHARS } from "../services/todoDraft.ts";
 import {
   expandTodoBatch,
@@ -34,6 +41,9 @@ import {
   type TodoBatchIssue,
 } from "../services/todoBatch.ts";
 import type { TodoWritePlan } from "../services/todoDraft.ts";
+import type { TodoItemExtras } from "../services/todoItemExtras.ts";
+import ItemAppSelect from "./ItemAppSelect.tsx";
+import ItemTagField from "./ItemTagField.tsx";
 import TodoBatchFields from "./TodoBatchFields.tsx";
 
 interface Props {
@@ -42,6 +52,8 @@ interface Props {
   onClose: () => void;
   /** `useTodayTodos().createBatch`：返回 false = 没建成（失败），弹层要留着 */
   createBatch: (plans: readonly TodoWritePlan[]) => Promise<boolean>;
+  /** 待办建成后把标签 / 应用挂到同名事项（失败不影响待办本身） */
+  onItemExtras?: (name: string, extras: TodoItemExtras) => Promise<void> | void;
 }
 
 /** issue → 一句人话。名称类复用 `copyTimeline` 的同义句（同一个后端 1-200 口径）。 */
@@ -55,9 +67,11 @@ function describeIssue(code: TodoBatchIssue, copy: (typeof DASHBOARD_COPY)["zh-C
   return copy.todoBatchRemindPast;
 }
 
-export default function TodoComposeDialog({ open, onClose, createBatch }: Props) {
+export default function TodoComposeDialog({ open, onClose, createBatch, onItemExtras }: Props) {
   const copy = DASHBOARD_COPY[useLocale()];
+  const editorCopy = ITEM_EDITOR_COPY[useLocale()];
   const UI_TEXT = useLocaleText();
+  const tagSnapshot = useItemTagSnapshot(open);
   const nameRef = useRef<HTMLInputElement>(null);
   const nameId = useId();
 
@@ -65,6 +79,9 @@ export default function TodoComposeDialog({ open, onClose, createBatch }: Props)
   const [dates, setDates] = useState<readonly string[]>([]);
   const [times, setTimes] = useState<readonly string[]>([]);
   const [remind, setRemind] = useState(false);
+  const [tags, setTags] = useState<string[]>([]);
+  const [appKey, setAppKey] = useState<string | null>(null);
+  const [tagHint, setTagHint] = useState<string | null>(null);
   const [issue, setIssue] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -75,6 +92,9 @@ export default function TodoComposeDialog({ open, onClose, createBatch }: Props)
     setDates([]);
     setTimes([]);
     setRemind(false);
+    setTags([]);
+    setAppKey(null);
+    setTagHint(null);
     setIssue(null);
     setBusy(false);
   };
@@ -94,6 +114,7 @@ export default function TodoComposeDialog({ open, onClose, createBatch }: Props)
       return;
     }
     setBusy(true);
+    const createdName = name.trim();
     void createBatch(result.plans).then((accepted) => {
       setBusy(false);
       if (!accepted) {
@@ -101,6 +122,8 @@ export default function TodoComposeDialog({ open, onClose, createBatch }: Props)
         setIssue(copy.todoCreateFailed);
         return;
       }
+      /* 标签 / 应用挂同名事项：待办已经落库，这里不挡关闭（失败由药丸提示） */
+      void onItemExtras?.(createdName, { tags, appKey });
       resetDraft();
       onClose();
     });
@@ -174,6 +197,24 @@ export default function TodoComposeDialog({ open, onClose, createBatch }: Props)
           onDatesChange={setDates}
           onTimesChange={setTimes}
         />
+
+        {/* 标签 / 应用落在「同名事项」上（待办表没有这两列），宿主建待办本就按标题匹配事项 */}
+        <ItemTagField
+          value={tags}
+          options={tagSnapshot.options}
+          suggestText={name}
+          disabled={busy}
+          onHint={(message) => setTagHint(message || null)}
+          onChange={(next) => {
+            setTags(next);
+            setIssue(null);
+          }}
+        />
+        <label className="at-todo-field">
+          <span className="at-todo-field-label">{editorCopy.appsLabel}</span>
+          <ItemAppSelect enabled={open} value={appKey} onChange={setAppKey} disabled={busy} />
+        </label>
+        {tagHint ? <p className="at-todo-hint" role="status">{tagHint}</p> : null}
 
         <label className="at-todo-remind">
           <input

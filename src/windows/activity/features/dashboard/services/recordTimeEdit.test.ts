@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { validateRecordTime } from "./recordTimeEdit";
+import { parseClockOnDay, validateRecordTime } from "./recordTimeEdit";
 
 /**
  * 「改起止」边界校验的判据（0.13 · T03b §3.8，B1–B6）。
@@ -19,6 +19,23 @@ const H = 3_600_000;
 
 /** 合法底座：一条已保存的 09:00–10:00 记录，改法默认在日内 */
 const SAVED = { startedAt: DAY_START + 9 * H, endedAt: DAY_START + 10 * H, status: "saved" };
+
+describe("parseClockOnDay · 只改时刻（日期锚在记录当天）", () => {
+  it("r07_hh_mm_is_anchored_to_the_given_local_day", () => {
+    expect(parseClockOnDay("00:00", DAY_START)).toBe(DAY_START);
+    expect(parseClockOnDay("09:30", DAY_START)).toBe(DAY_START + 9.5 * H);
+    expect(parseClockOnDay("23:59", DAY_START)).toBe(DAY_START + 23 * H + 59 * 60_000);
+    /* `type=time` 可带秒；秒在保存时保留，不在界面上显示 */
+    expect(parseClockOnDay("09:30:15", DAY_START)).toBe(DAY_START + 9.5 * H + 15_000);
+  });
+
+  it("r08_empty_or_out_of_range_is_null_so_save_stays_disabled", () => {
+    expect(parseClockOnDay("", DAY_START)).toBeNull();
+    expect(parseClockOnDay("24:00", DAY_START)).toBeNull();
+    expect(parseClockOnDay("12:60", DAY_START)).toBeNull();
+    expect(parseClockOnDay("not-a-clock", DAY_START)).toBeNull();
+  });
+});
 
 describe("validateRecordTime · 六条边界与判定顺序", () => {
   it("r01_a_valid_same_day_edit_passes", () => {

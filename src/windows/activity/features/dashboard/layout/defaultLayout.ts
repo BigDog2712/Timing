@@ -1,33 +1,37 @@
 /**
- * [v3] 出厂布局 = **`timing-board.exe` 首屏那一版**（`layout.rs` 的 `Layout::default` + `pack`）。
+ * [v3] 出厂布局 = **主人在 2026-11-20 摆定的那一版主界面**（原 exe 首屏版下线）。
  *
- * 排布不是"设计"出来的，而是 exe 的装箱算法跑出来的结果，这里直接写成常量：
- *   三列 x = 24 / 380 / 726，列宽 340 / 330 / 500，列距 16，首行 y = 24，行距 16。
- *   每张卡进"放得下且最靠上"的那一列（exe `pack()` 的判据）。
+ * 这一版不是重新"设计"的，而是把当时主界面上的排布原样抄成常量 —— 主人明确要求
+ * 「当前主界面布局就是未来应用的起始布局」，所以从此以后：
+ *   · 首次安装（没有任何布局键）→ 这一版；
+ *   · 删掉当前布局 / 坏存档回落 / 布局管理里的「出厂布局」→ 也是这一版。
  *
- *   col1 24 : timer (340×304) → items (340×424)
- *   col2 380: apps  (330×304)
- *   col3 726: trend (500×304) → heatmap (500×224) → notes (500×184)
+ * 画布仍然是 1250 宽的设计点，三列不再是等宽栅格：
  *
- * [0.12.6] 「待办事项」并进「今日时间线」卡（上区待办 / 下区记录），并新增一张独立的
- * 「事项管理」卡：两张卡正好占住原来的两个槽位 —— 时间线在左列第二行 24/344/340/424，
- * 事项管理在中列第二行 380/344/330/304。
+ *   col1 x=24  : timer    (328×304)  → timeline (328×424)
+ *   col2 x=360 : apps     (328×304)  → manage   (328×424)
+ *   col3 x=696 : heatmap  (536×248)  → trend    (536×192) → notes (320×280)
+ *   bottom     : reminder (330×304, x=0 / y=776)
+ *
+ * `w/h` 是主人拖出来的尺寸，不再等于 `KIND_SPECS[kind].sizes.M`（例如 timer 328 而非
+ * 340）；`clampRect` 只保证不越界、不小于 min，不会把它们改回去。
  */
 import { LAYOUT_VERSION, type DashboardLayout } from "./contract";
 
 export const DEFAULT_LAYOUT: DashboardLayout = {
   version: LAYOUT_VERSION,
-  /* 出厂最大 uid = 7 → 下一个可用号 = 8（`normalizeLayout` 也按 max(uid)+1 重算，同口径） */
-  nextId: 8,
+  /* 最大 uid = 8 → 下一个可用号 = 9（`normalizeLayout` 也按 max(uid)+1 重算，同口径） */
+  nextId: 9,
   snap: true,
   cards: [
-    { uid: 1, kind: "timer", x: 24, y: 24, w: 340, h: 304, tier: "M" },
-    { uid: 2, kind: "apps", x: 380, y: 24, w: 330, h: 304, tier: "M" },
-    { uid: 3, kind: "trend", x: 726, y: 24, w: 500, h: 304, tier: "M" },
-    { uid: 4, kind: "timeline", x: 24, y: 344, w: 340, h: 424, tier: "M" },
-    { uid: 5, kind: "manage", x: 380, y: 344, w: 330, h: 304, tier: "M" },
-    { uid: 6, kind: "heatmap", x: 726, y: 344, w: 500, h: 224, tier: "M" },
-    { uid: 7, kind: "notes", x: 726, y: 584, w: 500, h: 184, tier: "M" },
+    { uid: 1, kind: "timer", x: 24, y: 24, w: 328, h: 304, tier: "M" },
+    { uid: 4, kind: "timeline", x: 24, y: 344, w: 328, h: 424, tier: "M" },
+    { uid: 2, kind: "apps", x: 360, y: 24, w: 328, h: 304, tier: "M" },
+    { uid: 5, kind: "manage", x: 360, y: 344, w: 328, h: 424, tier: "M" },
+    { uid: 6, kind: "heatmap", x: 696, y: 24, w: 536, h: 248, tier: "M" },
+    { uid: 3, kind: "trend", x: 696, y: 280, w: 536, h: 192, tier: "M" },
+    { uid: 7, kind: "notes", x: 696, y: 488, w: 320, h: 280, tier: "M" },
+    { uid: 8, kind: "reminder", x: 0, y: 776, w: 330, h: 304, tier: "M" },
   ],
 };
 

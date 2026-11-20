@@ -55,7 +55,7 @@ heatmap and reminders. Tags are Obsidian-style paths (`study/exam`) you can
 downloaders, terminals and screenshot utilities **out of your time statistics**.
 
 **Download:** [latest release](https://github.com/BigDog2712/Timing/releases/latest) —
-`Timing-0.12.6-setup.exe` (installer) or `Timing-0.12.6-portable.zip` (no install,
+`Timing-0.12.7-setup.exe` (installer) or `Timing-0.12.7-portable.zip` (no install,
 data stays next to the exe). Windows 10/11 x64, WebView2 required. Builds are
 unsigned, so SmartScreen may warn about an unknown publisher.
 
@@ -63,15 +63,15 @@ unsigned, so SmartScreen may warn about an unknown publisher.
 
 Windows 10/11 x64, WebView2 runtime required (bundled on Win11).
 
-1. Grab `Timing-0.12.6-setup.exe` from the [latest release](https://github.com/BigDog2712/Timing/releases/latest)
-   (adds tray menu + autostart), or `Timing-0.12.6-portable.zip` (no install, data lives in `data\`
+1. Grab `Timing-0.12.7-setup.exe` from the [latest release](https://github.com/BigDog2712/Timing/releases/latest)
+   (adds tray menu + autostart), or `Timing-0.12.7-portable.zip` (no install, data lives in `data\`
    next to the exe — copy the whole folder to move machines).
 2. Launch it. A pill appears at the screen edge; click the ring to start timing, click again to save.
 3. Click the icon on the pill to open the main window: a drag-and-resize card board with today's
    time split, app ranking, timeline with to-dos, an item manager, trend, heatmap and reminders.
 
 Builds are unsigned, so SmartScreen may warn about an unknown publisher — verify against
-`SHA256SUMS-0.12.6.txt`, or build from source (see [从源码构建](#从源码构建)).
+`SHA256SUMS-0.12.7.txt`, or build from source (see [从源码构建](#从源码构建)).
 
 MIT licensed. Issues and PRs are welcome.
 
@@ -205,13 +205,13 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 
 [![Latest release](https://img.shields.io/github/v/release/BigDog2712/Timing?label=下载&sort=semver)](https://github.com/BigDog2712/Timing/releases/latest)
 
-当前主线 0.12.6 已出包，从 [Releases](https://github.com/BigDog2712/Timing/releases/latest) 下载：
+当前主线 0.12.7 已出包，从 [Releases](https://github.com/BigDog2712/Timing/releases/latest) 下载：
 
 | 产物 | 说明 |
 |---|---|
-| `Timing-0.12.6-setup.exe` | 安装版（NSIS，约 8 MB）。覆盖安装即可，老数据与卡片布局自动迁移 |
-| `Timing-0.12.6-portable.zip` | 绿色版，解压即用，数据在 `Timing.exe` 同级 `data\`，不写注册表 |
-| `SHA256SUMS-0.12.6.txt` | 两份产物的校验和；`BUILD-INFO-0.12.6.txt` 记录这包是哪个 commit 编的 |
+| `Timing-0.12.7-setup.exe` | 安装版（NSIS，约 8 MB）。覆盖安装即可，老数据与卡片布局自动迁移 |
+| `Timing-0.12.7-portable.zip` | 绿色版，解压即用，数据在 `Timing.exe` 同级 `data\`，不写注册表 |
+| `SHA256SUMS-0.12.7.txt` | 两份产物的校验和；`BUILD-INFO-0.12.7.txt` 记录这包是哪个 commit 编的 |
 
 **装哪个**：想让它开机就在、托盘里有菜单 → 用 setup；不想动系统、想放 U 盘带走 →
 用 portable（数据跟着 exe 走，换机拷走整个目录即可）。
@@ -241,8 +241,13 @@ MSRV 1.90）、VS Build Tools 的「使用 C++ 的桌面开发」、Windows SDK�
 VS Build Tools **不会**把 `link.exe` 写进系统 PATH，直接跑会报
 ``linker `link.exe` not found``。两种解法：
 
-- 用 `scripts/dev-desktop.cmd`（自动 `vcvars64` 后启动）；
-- 或在「x64 Native Tools Command Prompt for VS」里执行 `npm run tauri dev`。
+- 用 `scripts/dev-desktop.cmd`（自动 `vcvars64` 后启动，并合并
+  `src-tauri/tauri.dev.conf.json`：dev 用独立 identifier，**已安装的 Timing 正在跑也能调**）；
+- 或在「x64 Native Tools Command Prompt for VS」里执行
+  `npm run tauri dev -- --config src-tauri\tauri.dev.conf.json`。
+
+不带 `--config` 的 `npm run tauri dev` 与安装版共用 identifier：安装版在跑时，
+新进程会被单实例插件转发后就地退出（没有报错），窗口几何 / WebView2 profile 也会互相覆盖。
 
 出包（需 NSIS / WiX）：
 
@@ -384,7 +389,7 @@ restriction lint 在 `Cargo.toml` 里开着（本地看得见），而 `--all-ta
 
 ## 版本
 
-桌面 **0.12.6**，Tauri 移动端 **0.12.13**；`android-app/` 里那份原生 Kotlin 实现已归档，冻结在 **0.3.6**。
+桌面 **0.12.7**，Tauri 移动端 **0.12.13**；`android-app/` 里那份原生 Kotlin 实现已归档，冻结在 **0.3.6**。
 
 版本号是单一真源：`scripts/platform-versions.json` 定义两端号，桌面六处基线
 （`package.json` · `package-lock.json` ×2 · `Cargo.toml` · `Cargo.lock` · `tauri.conf.json`）

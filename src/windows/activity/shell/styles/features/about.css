@@ -54,6 +54,8 @@
 }
 
 .about-center-profile p {
+  max-width: var(--at-text-measure);
+  justify-self: center;
   margin: 0;
   color: var(--at-text-tertiary);
   font-size: var(--at-font-size-caption);

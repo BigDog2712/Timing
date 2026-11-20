@@ -26,6 +26,8 @@ export interface TimelineRow {
   endLabel: string;
   /** `lastEnd === null`（还有一段在跑）——行上用 `timelineNoEnd` 标注 */
   running: boolean;
+  /** [本轮] 会话暂停在这一条（也是"进行中"，但数字不再涨）——行上用 `timelinePaused` */
+  paused: boolean;
   /** 事项名下那行的总用时（已格式化） */
   duration: string;
   value: number;
@@ -64,6 +66,7 @@ export function buildTimelineRows(
       /* 「止」= 今天最后一段的结束；进行中显示**此刻**（V-1.6b），不是空白 */
       endLabel: clockOf(item.lastEnd ?? nowMs),
       running: item.lastEnd === null,
+      paused: item.paused === true,
       duration: formatDashboardDuration(item.value),
       value: item.value,
     }));

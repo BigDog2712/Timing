@@ -9,7 +9,7 @@
  * 娱乐 / 复盘，最多两级），新建的标签会在这里以 chip 形式出现，用户仍可删掉。
  * AI 失败只提示，不挡「保存」。
  */
-import { useState } from 'react';
+import { useId, useState } from 'react';
 
 import { aiApi, tagApi } from '../../services/api';
 import { normalizeTagPath } from '../../../shared/tags/normalize';
@@ -23,11 +23,18 @@ interface PanelTagFieldProps {
   disabled?: boolean;
   onChange: (tags: string[]) => void;
   onHint: (message: string) => void;
+  /**
+   * 喂给 AI 的事项文本。药丸快捷新建时名称在**条上**的输入框里（不归本组件管），
+   * 不传就会把「新事项」这三个字拿去做建议 —— 与真实输入对不上。
+   */
+  suggestText?: string;
 }
 
-export function PanelTagField({ value, options, disabled, onChange, onHint }: PanelTagFieldProps) {
+export function PanelTagField({ value, options, disabled, onChange, onHint, suggestText }: PanelTagFieldProps) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
+  /* 每个实例一份：ItemPicker 与药丸快捷添加可能先后挂载，写死 id 会让两处 datalist 撞车 */
+  const listId = useId();
 
   const add = (raw: string) => {
     let path: string;
@@ -59,7 +66,7 @@ export function PanelTagField({ value, options, disabled, onChange, onHint }: Pa
       try {
         const response = await aiApi.suggestTags({
           mode: 'item',
-          targets: [{ id: 'current', text: draft.trim() || '新事项' }],
+          targets: [{ id: 'current', text: suggestText?.trim() || draft.trim() || '新事项' }],
           candidates: options.slice(0, 200).map((tag) => ({ key: tag, label: tag })),
         });
         const next = [...value];
@@ -101,7 +108,7 @@ export function PanelTagField({ value, options, disabled, onChange, onHint }: Pa
       <input
         className="panel__tag-input"
         type="text"
-        list="panel-tag-options"
+        list={listId}
         placeholder="回车添加，如 学习/考公"
         aria-label="事项标签"
         value={draft}
@@ -116,7 +123,7 @@ export function PanelTagField({ value, options, disabled, onChange, onHint }: Pa
           }
         }}
       />
-      <datalist id="panel-tag-options">
+      <datalist id={listId}>
         {options.map((tag) => (
           <option key={tag} value={tag} />
         ))}

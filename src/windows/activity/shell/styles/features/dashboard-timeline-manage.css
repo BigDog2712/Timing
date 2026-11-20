@@ -266,3 +266,95 @@
 .at-item-app-binding-select {
   max-width: 220px;
 }
+
+/* ── 正计时 / 倒计时 切换（[本轮] 新建 + 编辑事项共用）────────────────────── */
+
+/* 两段式小开关：`aria-pressed` 定态，不另造 JS 类名；边框包住整组，比两颗独立
+   按钮更省横向空间（弹层只有 380，左侧还有「默认时长」四个字的标签）。 */
+.at-timer-mode {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-button);
+  overflow: hidden;
+}
+
+.at-timer-mode-btn {
+  padding: 2px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-caption);
+  cursor: pointer;
+}
+
+.at-timer-mode-btn + .at-timer-mode-btn {
+  border-left: 1px solid var(--at-border-subtle);
+}
+
+.at-timer-mode-btn[aria-pressed="true"] {
+  background: var(--at-accent-muted);
+  color: var(--at-accent-default);
+}
+
+.at-timer-mode-btn:focus-visible {
+  outline: 2px solid var(--at-focus-ring);
+  outline-offset: -2px;
+}
+
+/* ── 标签行（[本轮] 新建 / 编辑事项、新建待办共用）───────────────────────── */
+
+/* chip 流：标签多了自己换行，输入框吃余下的宽度（`flex: 1 1 120px`）；不换行的话
+   弹层 380 宽里塞两三个标签就把输入框压成一条竖线。 */
+.at-item-tag-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.at-item-tag-label {
+  flex: 0 0 auto;
+  color: var(--at-text-secondary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+.at-item-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 0 6px;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-chip);
+  background: var(--at-badge-subtle);
+  color: var(--at-text-primary);
+  font-size: var(--at-font-size-compact);
+  line-height: var(--at-line-height-compact);
+  cursor: pointer;
+}
+
+.at-item-tag-chip:hover:not(:disabled) {
+  border-color: var(--at-border-strong);
+}
+
+.at-item-tag-chip:disabled {
+  color: var(--at-text-disabled);
+  cursor: default;
+}
+
+.at-item-tag-input {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+
+.at-item-tag-ai {
+  flex: 0 0 auto;
+}
+
+/* 绑定应用下拉：与「管理分类」同一控制档；窄了让位给占位文字，不撑破弹层 */
+.at-item-app-select {
+  max-width: 180px;
+}

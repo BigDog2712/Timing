@@ -4,14 +4,15 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 /**
- * 「事项分类」（[0.13] 主人反馈：新建事项时能选分类、常用事项也能改分类、分类本身可增删改查）。
+ * 「事项分类」（2026-11-20 主人口径：新建不再带分类，分类只在「事项管理」的行上改）。
  *
  * 判据钉四件事：
- *   ① 新建弹层选中的分类要真的进 `create_item` 载荷（字段名 `categoryKey`，不是 `category`）；
+ *   ① 分类候选的顺序（内置在前、自定义按名字、未分类恒在最后）；
  *   ② 事项管理行上改分类走 `update_item` + `categoryKey`，**选「未分类」时必须发 `null`**
  *      —— 用 `if (value)` 过滤会把"清空分类"整个吞掉：界面回弹、库里不动、零报错；
  *   ③ 行上的分类下拉是"改一条落一条"，不需要进编辑态；
- *   ④ 「管理分类」能把分类管理弹窗打开，且它写成功后分类候选会**重取**（否则刚建的分类型
+ *   ④ 新建弹层**没有**任何分类控件（下拉与管理入口都不在）；
+ *   ⑤ 「管理分类」能把分类管理弹窗打开，且它写成功后分类候选会**重取**（否则刚建的分类型
  *      当场选不到）。分类管理弹窗本身由 `DataCategoryManageDialog` 的测试覆盖，这里只 mock
  *      成一个按钮，验证"打开 + 刷新"这条接线。
  */
@@ -45,6 +46,7 @@ const h = vi.hoisted(() => ({
 vi.mock("../../../platform/runtime/hostIntentGateway.ts", () => ({ emitHostIntent: h.emitHostIntent }));
 vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
   listTimingItems: h.listTimingItems,
+  listTimingItemTags: vi.fn(async (): Promise<unknown[]> => []),
 }));
 vi.mock("../../../platform/desktop/hostSettingsGateway.ts", () => ({ getSettings: h.getSettings }));
 vi.mock("../../../platform/persistence/activityReminderCatalogGateway.ts", () => ({
@@ -101,14 +103,6 @@ const currentLabel = () =>
   document.body.querySelector<HTMLElement>(".at-item-category-select .at-select-label-current")?.textContent?.trim() ?? "";
 const menuOptions = () => Array.from(document.body.querySelectorAll<HTMLElement>('[role="option"]'));
 const optionByText = (text: string) => menuOptions().find((node) => node.textContent?.trim() === text) ?? null;
-const typeInto = (input: HTMLInputElement | null, value: string) => {
-  const target = input as HTMLInputElement;
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-  act(() => {
-    setter?.call(target, value);
-    target.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-};
 
 async function mount(mode: TimelineManageMode) {
   await act(async () => {
@@ -183,7 +177,8 @@ afterEach(() => {
 
 describe("事项分类 · 候选与顺序", () => {
   it("tc01_下拉里内置在前_自定义按名字排_未分类恒在最后", async () => {
-    await mount("create");
+    h.listTimingItems.mockResolvedValue([item(7, "写周报")]);
+    await mount("manage");
     await act(async () => { categoryTrigger()?.click(); });
     await flush();
     /* [0.14] 候选 = 内置十键（共享 builder 固定序）+ 自定义按显示名 zh-CN 序；
@@ -194,51 +189,13 @@ describe("事项分类 · 候选与顺序", () => {
   });
 });
 
-describe("事项分类 · 新建事项", () => {
-  it("tc02_选中的分类进_create_item_载荷", async () => {
+describe("事项分类 · 新建事项不再带分类", () => {
+  it("tc02_create_dialog_has_no_category_control", async () => {
     await mount("create");
-    typeInto(dialog()?.querySelector<HTMLInputElement>("input.at-timeline-manage-input") ?? null, "写周报");
-    await pickOption("开发");
-    const confirm = Array.from(dialog()?.querySelectorAll<HTMLButtonElement>(".at-dialog-actions button") ?? [])
-      .find((button) => button.textContent === "确认");
-    await act(async () => { confirm?.click(); });
-    await flush();
-
-    expect(h.emitHostIntent).toHaveBeenCalledWith(expect.objectContaining({
-      action: "create_item",
-      name: "写周报",
-      categoryKey: "development",
-    }));
-  });
-
-  it("tc03_没选分类时载荷仍显式带_null", async () => {
-    await mount("create");
-    typeInto(dialog()?.querySelector<HTMLInputElement>("input.at-timeline-manage-input") ?? null, "写周报");
-    const confirm = Array.from(dialog()?.querySelectorAll<HTMLButtonElement>(".at-dialog-actions button") ?? [])
-      .find((button) => button.textContent === "确认");
-    await act(async () => { confirm?.click(); });
-    await flush();
-    expect(h.emitHostIntent).toHaveBeenCalledWith(expect.objectContaining({ categoryKey: null }));
-  });
-
-  it("tc04_新建弹层里的管理分类能打开分类管理_写成功后重取候选", async () => {
-    await mount("create");
+    expect(categoryTrigger(), "新建弹层里仍有分类下拉").toBeNull();
     const manage = Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
       .find((button) => button.textContent === "管理分类");
-    expect(manage).toBeTruthy();
-    await act(async () => { manage?.click(); });
-    await flush();
-
-    const opened = document.body.querySelector<HTMLButtonElement>("[data-manage-open]");
-    expect(opened).not.toBeNull();
-    const before =
-      h.loadSettingRowsByKeyPrefix.mock.calls.length + h.loadSettingKeysByKeyPrefix.mock.calls.length;
-    await act(async () => { opened?.click(); });
-    await flush();
-    /* onChanged → reload：候选必须重取一次，否则刚在管理里建好的分类选不到 */
-    expect(
-      h.loadSettingRowsByKeyPrefix.mock.calls.length + h.loadSettingKeysByKeyPrefix.mock.calls.length,
-    ).toBe(before + 6);
+    expect(manage, "新建弹层里仍有「管理分类」入口").toBeUndefined();
   });
 });
 

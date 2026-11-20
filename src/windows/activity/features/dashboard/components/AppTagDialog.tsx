@@ -5,7 +5,7 @@ import { AppClassification } from "../../../shared/classification/appClassificat
 import { normalizeAppTags } from "../../../shared/classification/appOverrideCodec.ts";
 import { normalizeTagPath } from "../../../../shared/tags/normalize.ts";
 import { listTimingItemTags } from "../../../platform/persistence/timingReadRepository.ts";
-import { listTagDefinitions } from "../../../platform/persistence/tagAdminGateway.ts";
+import { listTagDefinitions, createTagDefinition } from "../../../platform/persistence/tagAdminGateway.ts";
 import { ClassificationService } from "../../classification/services/classificationService.ts";
 
 /**
@@ -17,6 +17,9 @@ import { ClassificationService } from "../../classification/services/classificat
  *
  * 保存仍走 `ClassificationService.saveAppOverride`：那条路已经处理了 canonical exe、
  * 删除态、候选同步与事件广播，另开一条写盘路径只会多一处「改名后颜色不刷新」。
+ *
+ * [2026-11-20] 保存前先给新标签补 `tag.def.*` 定义行：应用标签只存在 override 里，
+ * 而「标签管理」读定义行 ∪ 事项引用；不补定义行，这里建的标签在管理处永远不出现。
  */
 interface Props {
   exeName: string;
@@ -31,6 +34,7 @@ const MAX_TAGS = 12;
 
 export default function AppTagDialog({ exeName, displayName, onClose, onSaved, onError }: Props) {
   const [tags, setTags] = useState<string[]>(() => AppClassification.getAppTags(exeName));
+  const [catalog, setCatalog] = useState<string[]>([]);
   const [options, setOptions] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
   const [hint, setHint] = useState("");
@@ -42,6 +46,7 @@ export default function AppTagDialog({ exeName, displayName, onClose, onSaved, o
     void Promise.all([listTagDefinitions(), listTimingItemTags()])
       .then(([catalog, assignments]) => {
         if (!alive) return;
+        setCatalog(catalog);
         const all = new Set<string>(catalog);
         for (const row of assignments) for (const tag of row.tags) all.add(tag);
         setOptions([...all].sort((left, right) => left.localeCompare(right, "zh-CN")));
@@ -101,6 +106,15 @@ export default function AppTagDialog({ exeName, displayName, onClose, onSaved, o
     try {
       const current = AppClassification.getUserOverride(exeName) ?? {};
       const next = normalizeAppTags(tags);
+      /* [2026-11-20] 新标签先补定义行，再写 override。
+         应用标签只存在 `__app_override::<exe>.tags`，而「标签管理」读的是
+         `tag.def.*` 定义行 ∪ 事项引用 —— 不补定义行，这里建的标签在标签管理处
+         永远不出现。定义失败就整次保存中止：宁可这次没绑上，也不留一个
+         "应用有、管理处没有"的幽灵标签。 */
+      const known = new Set(catalog);
+      for (const path of next) {
+        if (!known.has(path)) await createTagDefinition(path);
+      }
       /* 只写 `tags`，**不碰** `category` / `categories`：那两个字段是老数据的读路径，
          而标签路径（`娱乐/燕云`）本来就不是合法的分类键，硬塞进去会被
          `normalizeAppOverride` 丢掉。老分类留着不影响展示 —— 读侧 `resolveAppTags`

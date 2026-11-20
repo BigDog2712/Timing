@@ -74,6 +74,8 @@ export interface TimelineManageCopy {
   timelineRange: (start: string, end: string) => string;
   /** 进行中那一行的「止」：`14:32 · 进行中`（`{clock}` = 此刻钟点，实时变） */
   timelineNoEnd: (clock: string) => string;
+  /** [本轮] 会话暂停在那一行：`已暂停`（数字不再涨，不能写成"进行中"） */
+  timelinePaused: string;
   /** 行上的展开键：`展开 3 条子记录` / `收起子记录`（`count` = 子记录 + 空档的总条数） */
   timelineChildrenToggle: (count: number) => string;
   timelineChildrenCollapse: string;
@@ -83,6 +85,8 @@ export interface TimelineManageCopy {
   /* ── [0.13 · T03b] 改起止（`update_record_time` 意图；边界规则见 §3.8） ── */
   /** 行上与弹层标题共用的「改起止」 */
   editRecordTime: string;
+  /** 「编辑事项」弹层里这一区的标题（原独立弹层的标题） */
+  recordSectionTitle: string;
   /** 段的开始输入框 `aria-label` */
   recordStartLabel: string;
   /** 段的结束输入框 `aria-label` */
@@ -127,6 +131,12 @@ export interface TimelineManageCopy {
   /* ── [0.12.6 · T4] 行点击起停 + AI 一键分类 ── */
   /** 正在计这一条时的 `aria-label`（同一个按钮，方向反过来了） */
   itemsStopTimer: (name: string) => string;
+  /** 点另一条事项、而当前已有计时会话时的确认标题 */
+  itemsSwitchTitle: string;
+  /** 切换说明：当前会话会结束，随后开始点的那一条 */
+  itemsSwitchDescription: (next: string) => string;
+  /** 切换确认键 */
+  itemsSwitchAction: string;
   /** 宿主**确认之后**才出的提示（发信侧不承诺结果，见 `useItemTimerToggle`） */
   itemsTimerStarted: (name: string) => string;
   /**
@@ -203,10 +213,12 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineTotal: (text) => `总计 ${text}`,
     timelineRange: (start, end) => `${start}–${end}`,
     timelineNoEnd: (clock) => `${clock} · 进行中`,
+    timelinePaused: "已暂停",
     timelineChildrenToggle: (count) => `展开 ${count} 条子记录`,
     timelineChildrenCollapse: "收起子记录",
     timelineUnmeasured: (range) => `未采集 ${range}`,
     editRecordTime: "改起止",
+    recordSectionTitle: "今日记录",
     recordStartLabel: "开始时刻",
     recordEndLabel: "结束时刻",
     onlySavedEditable: "进行中的记录要等结束之后才能改",
@@ -227,6 +239,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsBoundMark: "已绑定应用",
     itemsStartTimer: (name) => `开始计时：${name}`,
     itemsStopTimer: (name) => `结束计时：${name}`,
+    itemsSwitchTitle: "切换计时事项？",
+    itemsSwitchDescription: (next) => `当前计时会先结束，然后开始「${next}」。`,
+    itemsSwitchAction: "切换",
     itemsTimerStarted: (name) => `已开始计时：${name}`,
     itemsTimerStopped: (name) => `已停止：${name}`,
     itemsTimerSendFailed: "没通知到计时器，再点一次",
@@ -278,10 +293,12 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineTotal: (text) => `Total ${text}`,
     timelineRange: (start, end) => `${start}–${end}`,
     timelineNoEnd: (clock) => `${clock} · running`,
+    timelinePaused: "Paused",
     timelineChildrenToggle: (count) => `Show ${count} child records`,
     timelineChildrenCollapse: "Hide child records",
     timelineUnmeasured: (range) => `Not captured ${range}`,
     editRecordTime: "Edit times",
+    recordSectionTitle: "Today's records",
     recordStartLabel: "Start time",
     recordEndLabel: "End time",
     onlySavedEditable: "A running record can only be edited after it ends",
@@ -302,6 +319,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsBoundMark: "App bound",
     itemsStartTimer: (name) => `Start timer: ${name}`,
     itemsStopTimer: (name) => `Stop timer: ${name}`,
+    itemsSwitchTitle: "Switch timer item?",
+    itemsSwitchDescription: (next) => `The current timer will stop first, then “${next}” starts.`,
+    itemsSwitchAction: "Switch",
     itemsTimerStarted: (name) => `Timer started: ${name}`,
     itemsTimerStopped: (name) => `Stopped: ${name}`,
     itemsTimerSendFailed: "Couldn’t reach the timer, tap again",
@@ -353,10 +373,12 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineTotal: (text) => `Всего ${text}`,
     timelineRange: (start, end) => `${start}–${end}`,
     timelineNoEnd: (clock) => `${clock} · идёт`,
+    timelinePaused: "Пауза",
     timelineChildrenToggle: (count) => `Показать дочерние записи: ${count}`,
     timelineChildrenCollapse: "Скрыть дочерние записи",
     timelineUnmeasured: (range) => `Не записано ${range}`,
     editRecordTime: "Изменить время",
+    recordSectionTitle: "Записи за сегодня",
     recordStartLabel: "Время начала",
     recordEndLabel: "Время конца",
     onlySavedEditable: "Идущую запись можно изменить только после её завершения",
@@ -377,6 +399,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsBoundMark: "Приложение привязано",
     itemsStartTimer: (name) => `Начать отсчёт: ${name}`,
     itemsStopTimer: (name) => `Остановить отсчёт: ${name}`,
+    itemsSwitchTitle: "Переключить дело отсчёта?",
+    itemsSwitchDescription: (next) => `Текущий отсчёт сначала завершится, затем начнётся «${next}».`,
+    itemsSwitchAction: "Переключить",
     itemsTimerStarted: (name) => `Отсчёт начат: ${name}`,
     itemsTimerStopped: (name) => `Остановлено: ${name}`,
     itemsTimerSendFailed: "Не удалось связаться с таймером, нажмите ещё раз",
@@ -428,10 +453,12 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     timelineTotal: (text) => `Total ${text}`,
     timelineRange: (start, end) => `${start}–${end}`,
     timelineNoEnd: (clock) => `${clock} · en curso`,
+    timelinePaused: "En pausa",
     timelineChildrenToggle: (count) => `Mostrar ${count} registros hijos`,
     timelineChildrenCollapse: "Ocultar registros hijos",
     timelineUnmeasured: (range) => `Sin capturar ${range}`,
     editRecordTime: "Editar horas",
+    recordSectionTitle: "Registros de hoy",
     recordStartLabel: "Hora de inicio",
     recordEndLabel: "Hora de fin",
     onlySavedEditable: "Un registro en curso solo puede editarse cuando termine",
@@ -452,6 +479,9 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsBoundMark: "Aplicación vinculada",
     itemsStartTimer: (name) => `Iniciar cronómetro: ${name}`,
     itemsStopTimer: (name) => `Detener cronómetro: ${name}`,
+    itemsSwitchTitle: "¿Cambiar de asunto?",
+    itemsSwitchDescription: (next) => `El cronómetro actual se detendrá y luego empezará «${next}».`,
+    itemsSwitchAction: "Cambiar",
     itemsTimerStarted: (name) => `Cronómetro iniciado: ${name}`,
     itemsTimerStopped: (name) => `Detenido: ${name}`,
     itemsTimerSendFailed: "No se pudo avisar al cronómetro, inténtalo otra vez",

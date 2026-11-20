@@ -1,0 +1,43 @@
+/* Theme-aware disabled controls: preserve dark-theme white text and lower the surface. */
+:root :is(button, input, select, textarea):disabled:not(.at-switch):not(.at-segmented-filter-item):not(.at-calendar-nav):not(.at-calendar-day) {
+  color: var(--at-disabled-text);
+  border-color: var(--at-disabled-border);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+:root :is(input, select, textarea):disabled,
+:root button:disabled:not(.at-switch):not(.at-segmented-filter-item):not(.at-calendar-nav):not(.at-calendar-day) {
+  background-color: var(--at-disabled-bg);
+}
+
+:root :is(button, input, select, textarea):disabled:not(.at-switch):not(.at-segmented-filter-item):not(.at-calendar-nav):not(.at-calendar-day) svg {
+  color: currentColor;
+  opacity: 1;
+}
+
+:root .settings-dialog-action-composite[data-disabled="true"],
+:root .sync__card[data-disabled="true"],
+:root .sync-cloud__auto[data-disabled="true"] {
+  color: var(--at-disabled-text);
+  background-color: var(--at-disabled-bg);
+  opacity: 1;
+}
+
+:root .settings-dialog-action-composite[data-disabled="true"] *,
+:root .sync__card[data-disabled="true"] *,
+:root .sync-cloud__auto[data-disabled="true"] * {
+  color: var(--at-disabled-text);
+  opacity: 1;
+}
+
+:root .at-app-mapping-row[inert] {
+  filter: none;
+  color: var(--at-disabled-text);
+  background-color: var(--at-disabled-bg);
+  opacity: 1;
+}
+
+:root .at-app-mapping-row[inert] :where(button, input, select, textarea) {
+  color: var(--at-disabled-text);
+}

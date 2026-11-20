@@ -3,7 +3,7 @@
  *
  * 为什么前端还要再记一遍：`window-state` 插件只在**进程退出**时落盘。分析窗是"用完关掉、
  * 需要时再从托盘叫出来"的用法 —— 用户拉大窗 → 关掉 → 再叫出来，全程进程没退，插件那份
- * 存档还是旧的，于是每次都弹回 1100×736。这里的存档写在 **resize 结束那一刻**，
+ * 存档还是旧的，于是每次都弹回默认尺寸。这里的存档写在 **resize 结束那一刻**，
  * 与进程生死无关。
  *
  * 存**逻辑像素**：物理像素跨 DPI 会漂（125% 屏存 1240×826，到 100% 屏就大一圈）。
@@ -27,8 +27,8 @@ import {
 /* [T04-4] 键名从注册表取（老键字面量只住 activityStorageKeys.ts）；读写走出口（先过迁移闸）。 */
 export const WINDOW_SIZE_STORAGE_KEY = activityKeyOf("mainWindowSize");
 /** 与 Rust 侧 `MAIN_WINDOW_MIN_WIDTH/HEIGHT`（`insight/main_window.rs`）同值：更小就不是这块板了 */
-export const MIN_WINDOW_WIDTH = 900;
-export const MIN_WINDOW_HEIGHT = 636;
+export const MIN_WINDOW_WIDTH = 860;
+export const MIN_WINDOW_HEIGHT = 600;
 const SAVE_DELAY_MS = 420;
 /** 复原本身会触发若干次 resize，这段时间内不落盘（避免把中间态写成"用户的尺寸"） */
 const RESTORE_GRACE_MS = 700;

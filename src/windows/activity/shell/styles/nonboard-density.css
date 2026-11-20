@@ -1,0 +1,14 @@
+@media (max-width: 1039px) {
+  .at-canvas:not([data-presented-view="dashboard"]) {
+    padding: 12px;
+  }
+
+  .at-canvas:not([data-presented-view="dashboard"]) #settings-scroll {
+    padding-right: 0;
+  }
+
+  .at-canvas:not([data-presented-view="dashboard"]) .data-dashboard-grid,
+  .at-canvas:not([data-presented-view="dashboard"]) #settings-scroll > .grid {
+    gap: 12px;
+  }
+}

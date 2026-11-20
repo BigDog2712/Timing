@@ -153,3 +153,18 @@ describe("计时分布卡 · 读数口径", () => {
     expect(figure?.querySelector(".at-empty")).not.toBeNull();
   });
 });
+
+describe("图例是全量", () => {
+  /**
+   * [2026-11-20] 主人口径：鼠标停在卡里滚轮能看到全部读数。早先「前 4 + 其他」会把
+   * 第 5 名之后的每一行合并掉 —— 滚动容器里永远只有 5 行，滚轮没有可滚的东西。
+   */
+  it("tm08_every_slice_gets_its_own_readout_row", async () => {
+    const many = Array.from({ length: 7 }, (_, index) =>
+      slice(`事项 ${index}`, 70 - index * 10, "other"),
+    );
+    await mount({ categoryDist: many, dimension: "item" });
+    expect(container?.querySelectorAll(".at-readout")).toHaveLength(7);
+    expect(container?.querySelector(".at-readouts")?.textContent).not.toContain("其他");
+  });
+});

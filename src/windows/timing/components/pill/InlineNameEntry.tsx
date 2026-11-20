@@ -15,12 +15,14 @@ interface InlineNameEntryProps {
   placeholder?: string;
   onSubmit: (value: string) => void;
   onCancel: () => void;
+  /** 每次输入都回调（新建时镜像到 quickAddStore，供下方「开始」按钮取用） */
+  onChangeText?: (value: string) => void;
 }
 
 /** 事项名长度上限（与 ItemPicker 的 maxLength / 后端 `ITEM_NAME_MAX_LEN` 同值） */
 const NAME_MAX_LENGTH = ITEM_NAME_MAX_CHARS;
 
-export function InlineNameEntry({ initial = '', placeholder = '新事项名称', onSubmit, onCancel }: InlineNameEntryProps) {
+export function InlineNameEntry({ initial = '', placeholder = '新事项名称', onSubmit, onCancel, onChangeText }: InlineNameEntryProps) {
   const [value, setValue] = useState(initial);
   const inputRef = useRef<HTMLInputElement>(null);
   /* 提交/取消后不要再被 blur 触发第二次回调 */
@@ -63,6 +65,18 @@ export function InlineNameEntry({ initial = '', placeholder = '新事项名称',
   /* 指针不进 .pill：拖选文字不该拖动窗口，点击输入框也不该被当成条上的手势 */
   const stopPointer = (e: ReactPointerEvent<HTMLInputElement>) => e.stopPropagation();
 
+  /* 焦点离开输入框 ≠ 放弃：下方常用框里还有标签 / 应用 / 「开始」可点。
+     先让点击落地（focus 已移到目标），再看焦点是否仍在框内菜单里；
+     点桌面 / 别的窗口（整窗失焦）时 activeElement 回 body，才真的取消。 */
+  const handleBlur = () => {
+    window.setTimeout(() => {
+      if (settledRef.current) return;
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active.closest('.menu')) return;
+      settle(onCancel);
+    }, 0);
+  };
+
   return (
     <input
       ref={inputRef}
@@ -73,11 +87,14 @@ export function InlineNameEntry({ initial = '', placeholder = '新事项名称',
       placeholder={placeholder}
       aria-label={placeholder}
       spellCheck={false}
-      onChange={(e) => setValue(e.target.value)}
+      onChange={(e) => {
+        setValue(e.target.value);
+        onChangeText?.(e.target.value);
+      }}
       onKeyDown={handleKeyDown}
       onPointerDown={stopPointer}
       onPointerUp={stopPointer}
-      onBlur={() => settle(onCancel)}
+      onBlur={handleBlur}
     />
   );
 }

@@ -12,7 +12,7 @@
  *   T02 · 布局管理弹层
  *   T04 · 活动提醒卡（表单/行样式族在 `tools-alerts.css`，这里只放卡级布局）
  *
- * 卡面侧（T03a/T03b：时间线行三列、改起止弹层、待办批量表单）在
+ * 卡面侧（T03a/T03b：时间线行三列、今日记录区、待办批量表单）在
  * `dashboard-r2-cards.css` —— 300 行棘轮，拆两份。
  *
  * 红线同全仓：零字面量色值，只用 `var(--at-*)`；不加阴影渐变。
@@ -222,8 +222,26 @@
  * 表单 / 目标候选 / 规则行的皮都在 `tools-alerts.css`（三件套搬迁时类名不变）。
  * 这里只放**卡级**差异：卡是流式高度，规则列表不能再 `flex: 1 1 0` 撑满
  * （旧面板是整页高度），给一个可滚的相对上限，随卡档位自然伸缩。 */
+/* [2026-11-20] 表单 + 规则列表共用一个滚动体：鼠标停在卡里滚轮就能把整块内容
+ * （含被拖矮时本会被卡底裁掉的表单后半段）看全。列表自己仍保留 260 上限内的局部滚动，
+ * 到顶/到底后自然接力到这一层（`overscroll-behavior: contain` 只挡住传给画布）。 */
+.at-card .at-reminder-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.at-card .at-reminder-body > .tools-reminder-list-frame {
+  flex: 0 0 auto;
+}
+
 .at-card .at-reminder-form {
   margin-top: 0;
+  gap: 8px;
 }
 
 .at-card .tools-reminder-list-frame {

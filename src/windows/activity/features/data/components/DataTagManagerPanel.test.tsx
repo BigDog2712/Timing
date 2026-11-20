@@ -90,6 +90,58 @@ describe("标签管理页", () => {
     expect(state.create).toHaveBeenCalledWith("复盘/周报");
   });
 
+  /**
+   * 连续建标签是常态（一次整理往往要敲七八个）。保存期间输入框是 `disabled` 的，
+   * 浏览器会把焦点收走 —— 保存完必须还回去，否则每建一个都要再点一下输入框。
+   *
+   * 判据：回车提交 → 新建被调用（参数已 trim）→ 输入框清空 → `document.activeElement`
+   * 还是它。焦点是在 `requestAnimationFrame` 里还的，所以要等一帧。
+   */
+  it("keeps the new-tag input focused and empty after Enter, ready for the next one", async () => {
+    const state = makeState();
+    mount(state);
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="新建标签路径"]')!;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, " 复盘 ");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.focus();
+    });
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+      /* rAF 在 jsdom 里按 ~16ms 的定时器推进，等它落地 */
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(state.create).toHaveBeenCalledWith("复盘");
+    expect(input.value, "提交后输入框该清空，等着敲下一个").toBe("");
+    expect(document.activeElement, "焦点没还回输入框，等于每个标签都要再点一下").toBe(input);
+  });
+
+  it("does not submit while the IME is composing (Enter = 上屏)", async () => {
+    const state = makeState();
+    mount(state);
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="新建标签路径"]')!;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      setter?.call(input, "xue");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      Object.defineProperty(enter, "isComposing", { value: true });
+      input.dispatchEvent(enter);
+    });
+    expect(state.create, "组合态的回车只是上屏，不该拿拼音去建标签").not.toHaveBeenCalled();
+  });
+
+  it("prefills the parent path when adding a child tag", () => {
+    mount(makeState());
+    act(() => button("在 学习 下新建子标签")!.click());
+    const input = container.querySelector<HTMLInputElement>('input[aria-label="新建标签路径"]')!;
+    expect(input.value).toBe("学习/");
+    expect(document.activeElement).toBe(input);
+  });
+
   it("renames with the whole path, not the leaf name", async () => {
     const state = makeState();
     mount(state);

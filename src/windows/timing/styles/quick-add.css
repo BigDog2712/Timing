@@ -1,0 +1,104 @@
+/* =============================================================================
+ * Timing — quick-add.css（药丸新建事项的框底附加项）
+ * -----------------------------------------------------------------------------
+ * 标签行沿用 panel-tags.css 的 .panel__* 口径（同一套圆角 / --line / --ink），
+ * 这里只补三样：更宽的菜单板、应用小胶囊、「开始」。
+ * P0：仅 var(--*)，零字面量色值。
+ * ========================================================================== */
+
+/* 默认菜单板 136px 装不下「标签 + 应用 + 开始」：新建流程单独放宽（与级联弹窗同宽） */
+.menu.menu--common-new {
+  min-width: 232px;
+  max-width: 260px;
+}
+
+.quick-add {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--menu-item-pad-x) var(--space-2);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-1);
+}
+
+/* 面板里这条标签行本来就贴着一个标题，这里上面没有标题，不需要它的上外边距 */
+.quick-add .panel__tags {
+  margin-top: 0;
+}
+
+/* ------------------------------ 绑定应用 ------------------------------ */
+.quick-add__apps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+
+.quick-add__label {
+  font-size: var(--text-caption);
+  color: var(--ink-3);
+}
+
+.quick-add__empty {
+  min-width: 0;
+  font-size: var(--text-caption);
+  color: var(--ink-4);
+}
+
+/* 与常用框底的最近事项胶囊同口径：18px 高、自然宽度、超出省略 */
+.quick-add__app {
+  max-width: 100%;
+  height: 18px;
+  padding: 0 6px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--bg-field);
+  color: var(--ink-3);
+  font-size: var(--text-cap);
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition:
+    background-color var(--dur-quick) var(--ease-standard),
+    color var(--dur-quick) var(--ease-standard);
+}
+
+.quick-add__app:hover,
+.quick-add__app:focus-visible {
+  background: var(--bg-field-hi);
+  color: var(--ink);
+}
+
+.quick-add__app[data-current="true"] {
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+}
+
+/* ------------------------------ 提示 / 开始 ------------------------------ */
+.quick-add__hint {
+  width: 100%;
+  margin: 0;
+  font-size: var(--text-caption);
+  color: var(--ink-3);
+}
+
+.quick-add__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.quick-add__start {
+  height: 22px;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+  background: var(--accent-wash);
+  color: var(--accent-ink);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-emphasize);
+  transition: background-color var(--dur-quick) var(--ease-standard);
+}
+
+.quick-add__start:hover,
+.quick-add__start:focus-visible {
+  background: var(--accent-line);
+}

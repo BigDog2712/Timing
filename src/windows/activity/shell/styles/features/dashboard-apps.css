@@ -13,7 +13,17 @@
  */
 
 /* ── 应用排行：一行 = 图标砖 / 名称 / 时长 / 细条（逐值对照 `widgets/apps.rs`） ── */
-.at-app-list { display: flex; flex: 1 1 auto; flex-direction: column; }
+.at-app-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  /* [2026-11-20] 行数不再截在前 5：卡内自己滚，鼠标停在列表上滚轮就能看到全部应用。
+     `overscroll-behavior: contain` 让列表到底时不再把滚动传给整块画布。 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
 
 /* 自绘滚动条（轨道 6px 不动：右缘对齐靠 `at-scroll-region-stable` 常驻的那 6px 槽，
  * 宽度改 4 会让数字列整体右移 2px）。视觉上的"细"靠 thumb 的 1px 透明边 +

@@ -78,14 +78,22 @@ describe("聚合命令的逐桶并集（P2 · T07 的来源断言）", () => {
       startMs: HOUR9,
       endMs: HOUR9 + HOUR,
       boundaries: [HOUR9, HOUR9 + HOUR],
-      days: [{ key: "2026-10-15", startMs: DAY_START, endMs: DAY_START + 24 * HOUR, weekday: 2 }],
-      cells: [{ dayIndex: 0, weekday: 2, hour: 9, startMs: HOUR9, endMs: HOUR9 + HOUR }],
+      days: [{
+        key: "2026-10-15",
+        startMs: DAY_START,
+        endMs: DAY_START + 24 * HOUR,
+        dayOfMonth: 15,
+      }],
+      /* 9 点落在 8–12 段（bucket 2） */
+      cells: [{ dayIndex: 0, bucket: 2, startMs: HOUR9, endMs: HOUR9 + HOUR }],
+      monthStartMs: DAY_START,
+      monthOffset: 1,
     };
     const next = accumulateHeatmap(plan, parsed.records, {
       boundaries: plan.boundaries,
       unionByBucket: parsed.bucketUnionMs ?? [],
     });
-    expect(next.rows[2].cells[9]).toBe(1_800_000);
-    expect(accumulateHeatmap(plan, parsed.records).rows[2].cells[9]).toBe(3_600_000);
+    expect(next.days[0].buckets[2]).toBe(1_800_000);
+    expect(accumulateHeatmap(plan, parsed.records).days[0].buckets[2]).toBe(3_600_000);
   });
 });

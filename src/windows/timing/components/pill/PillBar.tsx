@@ -23,6 +23,7 @@ import { readCountdownDuration, useCountdownArmStore } from '../../stores/countd
 import { useSettingsStore } from '../../stores/settingsStore';
 import { openTodosWindow } from '../../services/todosActions';
 import { findItem, useItemStore } from '../../stores/itemStore';
+import { useQuickAddStore } from '../../stores/quickAddStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { useUiStore } from '../../stores/uiStore';
 import type { MenuPos } from '../../stores/uiStore';
@@ -73,7 +74,6 @@ export function PillBar() {
   const inlineEdit = useUiStore((s) => s.inlineEdit);
   /** [V0.3.1] 托盘双击 → 高亮定位：序号变化即闪一下（3 × 0.8s） */
   const highlightSeq = useUiStore((s) => s.highlightSeq);
-  const openInlineEdit = useUiStore((s) => s.openInlineEdit);
   const openCountdownMenu = useUiStore((s) => s.openCountdownMenu);
   const openMoyuMenu = useUiStore((s) => s.openMoyuMenu);
   const openCommonItems = useUiStore((s) => s.openCommonItems);
@@ -113,16 +113,6 @@ export function PillBar() {
   const currentItemId = status === 'idle' ? lastItemId : sessionItemId;
   const currentName = findItem(items, currentItemId)?.name;
 
-  /* 就地长出输入框（不再弹 ItemPicker 面板）。[V0.3.9] 只剩「圆环 + 尚无任何事项」这条路径：
-     空闲态的「新建事项」格已改为弹常用事项框（框里自带常驻输入框）。 */
-  const beginCreate = useCallback(() => {
-    if (status === 'running') {
-      useUiStore.getState().setNotice({ text: '计时进行中，事项已锁定；请先暂停或结束当前计时。', tone: 'info' });
-      return;
-    }
-    openInlineEdit({ itemId: null, initial: '' });
-  }, [openInlineEdit, status]);
-
   /* 倒计时菜单整块 233px 高，用光标位置当锚点会盖住小条本身：统一贴到小条下沿 +4px 展开。
      rect 是 viewport 坐标，必须换回 layer 坐标；auto-fit 扩展窗口后 layer 会平移，不能直接拿 rect.bottom。 */
   const pillRef = useRef<HTMLDivElement>(null);
@@ -130,6 +120,18 @@ export function PillBar() {
     const rect = pillRef.current?.getBoundingClientRect();
     return rect ? { x: pos.x, y: clientToLayer(0, rect.bottom).y + 4 } : pos;
   }, []);
+
+  /* 就地长出输入框（不再弹 ItemPicker 面板）。[V0.3.9] 只剩「圆环 + 尚无任何事项」这条路径：
+     空闲态的「新建事项」格已改为弹常用事项框（框里自带常驻输入框）。
+     输入框与常用框一起出：框底给标签 / 绑定应用 /「开始」（见 QuickAddExtras）。 */
+  const beginCreate = useCallback(() => {
+    if (status === 'running') {
+      useUiStore.getState().setNotice({ text: '计时进行中，事项已锁定；请先暂停或结束当前计时。', tone: 'info' });
+      return;
+    }
+    useQuickAddStore.getState().reset();
+    openCommonItemsNew(posBelowBar({ x: 32, y: 56 }));
+  }, [openCommonItemsNew, posBelowBar, status]);
 
   /* 主菜单已删除（V0.3.1：用户口径「悬浮框右键唤出设置菜单」不要了），
      右下的注释保留说明：菜单锚点曾用 pill 的 rect 换算到层坐标。 */
@@ -274,13 +276,23 @@ export function PillBar() {
           placeholder={inlineEdit.itemId == null ? '新事项名称' : '事项名称'}
           onSubmit={submitInline}
           onCancel={() => useUiStore.getState().closeInlineEdit()}
+          /* 新建：名称实时镜像到 quickAddStore，框底「开始」与 AI 建议都靠它 */
+          onChangeText={
+            inlineEdit.itemId == null
+              ? (value) => useQuickAddStore.getState().setName(value)
+              : undefined
+          }
         />
       ) : status === 'idle' ? (
         <NewItemEntry
           /* [V0.3.9] 空闲态点事项组件 = **新建输入框与常用事项框一起出**（用户口径）：
              条上就地长出输入框可以直接命名，下方同时展开常用框可以挑已有事项。
-             两者由 `openCommonItemsNew` 一次落库（分两次会互相顶掉）。 */
-          onClick={() => openCommonItemsNew(posBelowBar({ x: 32, y: 56 }))}
+             两者由 `openCommonItemsNew` 一次落库（分两次会互相顶掉）。
+             框底还带标签 / 绑定应用 /「开始」（0.13.x），所以每次开新流程先清草稿。 */
+          onClick={() => {
+            useQuickAddStore.getState().reset();
+            openCommonItemsNew(posBelowBar({ x: 32, y: 56 }));
+          }}
           /* [V0.2.6] Zone.Task 右键：展开事项窗口（对齐 Timing 的「今日计时」面板；事项级菜单在窗内逐行给） */
           onMenu={() => void openTodosWindow()}
         />

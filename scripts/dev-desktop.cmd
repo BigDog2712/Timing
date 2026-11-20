@@ -30,7 +30,12 @@ rem installed build share the same identifier, so the very first `tauri dev`
 rem would move the developer's live data. Remove this line only if you
 rem deliberately want to exercise the migration on real data.
 set "TIMING_SKIP_MIGRATE=1"
-call npm.cmd run tauri dev
+rem Debug builds run alongside the installed app (dual-run): tauri.dev.conf.json
+rem gives dev its own identifier. The single-instance plugin, window-state file,
+rem WebView2 profile and install_id are all keyed by that identifier, so the two
+rem processes no longer fight (dev would otherwise be forwarded to the running
+rem installed instance and exit). The file is dev-only and never bundled.
+call npm.cmd run tauri dev -- --config "src-tauri\tauri.dev.conf.json"
 set "RC=%ERRORLEVEL%"
 popd
 if not "%RC%"=="0" goto devfail

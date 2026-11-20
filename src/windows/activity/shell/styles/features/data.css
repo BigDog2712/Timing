@@ -52,6 +52,16 @@
   gap: 10px;
 }
 
+.data-overview > .data-trend-panel .data-trend-chart {
+  height: 280px;
+}
+
+@media (min-width: 1900px) and (min-height: 900px) {
+  .data-dashboard-grid > .data-overview .data-trend-chart {
+    height: 320px;
+  }
+}
+
 .data-app-panel-heading {
   display: flex;
   min-width: 0;

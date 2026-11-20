@@ -23,6 +23,7 @@ vi.mock("../../../platform/runtime/hostIntentGateway.ts", () => ({ emitHostInten
 vi.mock("../../../platform/persistence/timingReadRepository.ts", () => ({
   listTimingItems: vi.fn(async () => []),
   listTimingRecords: vi.fn(async () => []),
+  listTimingItemTags: vi.fn(async () => []),
 }));
 vi.mock("../../../platform/desktop/hostSettingsGateway.ts", () => ({
   getSettings: vi.fn(async () => ({})),

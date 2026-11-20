@@ -141,13 +141,13 @@ describe("今日时间线卡 · 卡壳结构", () => {
     expect(separator?.getAttribute("aria-label")).toBe(COPY.itemsDividerLabel);
   });
 
-  it("tc03_the_todos_zone_sits_above_and_the_timeline_zone_below", async () => {
+  it("tc03_the_timeline_zone_sits_above_and_the_todos_zone_below", async () => {
     await mount();
-    expect(zones()).toEqual(["todos", "timeline"]);
+    expect(zones()).toEqual(["timeline", "todos"]);
     /* 两区各在自己的包裹层里（`.at-card-items__upper` / `__lower`）：顺序判据之外，
-       还要判它们确实分居分隔线两侧，否则"上面是待办"只是数组顺序的巧合 */
-    expect(card()?.querySelector(".at-card-items__upper [data-zone='todos']")).not.toBeNull();
-    expect(card()?.querySelector(".at-card-items__lower [data-zone='timeline']")).not.toBeNull();
+       还要判它们确实分居分隔线两侧，否则"上面是时间线"只是数组顺序的巧合 */
+    expect(card()?.querySelector(".at-card-items__upper [data-zone='timeline']")).not.toBeNull();
+    expect(card()?.querySelector(".at-card-items__lower [data-zone='todos']")).not.toBeNull();
     const separator = card()?.querySelector('[role="separator"]');
     expect(separator?.previousElementSibling?.hasAttribute("data-zone")).toBe(false);
     expect(separator?.nextElementSibling?.hasAttribute("data-zone")).toBe(false);

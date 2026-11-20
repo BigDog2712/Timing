@@ -53,7 +53,7 @@ export const BOARD_W = 1250;
 export const BOARD_H = 820;
 /** 吸附步长：拖拽 / 缩放 / 新建落点都对齐到它。 */
 export const SNAP = 8;
-/** 全局尺寸硬下限（各组件另有自己的下限，取两者较大值）。 */
+/** 画布默认下限：除便利贴外，每个组件的规格都不低于它（便利贴低于它是主人点名的例外）。 */
 export const MIN_W = 240;
 export const MIN_H = 120;
 
@@ -92,7 +92,9 @@ export interface KindSpec {
  * 用户拿两个窗口并排比的时候，最小尺寸、默认尺寸、三档预设全都对得上，
  * 不会出现"明明同一个组件，一个能缩、一个缩不动"。
  *
- * 便利贴的 320×168 也是 exe 的值（旧值 480×96 让它只能当通栏横条，而且 96 高会裁纸片）。
+ * 便利贴是唯一的例外：主人口径（2026-11-20）要「尽可能小」，所以下限一路降到
+ * 200×96（比画布默认下限 240×120 还小；exe 的 320×168 只放得下一整张纸片）。
+ * 矮于一张纸片时纸片区自己滚（`dashboard-notes.css`），不裁内容也不撑破卡。
  */
 export const KIND_SPECS: Record<CardKind, KindSpec> = {
   timer: {
@@ -109,7 +111,7 @@ export const KIND_SPECS: Record<CardKind, KindSpec> = {
   },
   timeline: {
     /* [0.12.6] 原「待办事项」并进来：上区待办（未开始 + 时间/提醒 + 勾选 + 撤销）、
-     * 下区今日时间线（进行中 + 已完成 + 改起止），中间浅横线。尺寸沿用原时间线那一格
+     * 下区今日时间线（进行中 + 已完成 + 常用事项；改起止在「编辑事项」弹层里），中间浅横线。尺寸沿用原时间线那一格
      * （exe 的「事项菜单」340×424 槽位），因此首屏三列的高度关系与 exe 一致。 */
     label: "今日时间线",
     hint: "今天的待办与计时记录",
@@ -127,8 +129,8 @@ export const KIND_SPECS: Record<CardKind, KindSpec> = {
   notes: {
     label: "便利贴",
     hint: "今天更新的便利贴；拖右缘下缘随你改大小，纸片会自己换列",
-    minW: 320, minH: 168,
-    sizes: { S: [320, 168], M: [500, 184], L: [500, 368] },
+    minW: 200, minH: 96,
+    sizes: { S: [200, 96], M: [500, 184], L: [500, 368] },
   },
   trend: {
     label: "活动趋势",
@@ -191,10 +193,16 @@ export function specOf(kind: CardKind): KindSpec {
   return KIND_SPECS[kind];
 }
 
-/** 组件最小尺寸：全局下限与组件下限取大。 */
+/**
+ * 组件最小尺寸 = 规格自己声明的下限。
+ *
+ * 早先是「与画布默认下限取大」，那会让低于 240×120 的声明永远无效；便利贴要再缩时
+ * 只能改全局常量，连带所有卡一起变。现在默认下限只是**各规格的参考值**（除便利贴外
+ * 都 ≥ 它），谁要更小就在自己的 `KIND_SPECS` 里写明。
+ */
 export function minSizeOf(kind: CardKind): { w: number; h: number } {
   const spec = KIND_SPECS[kind];
-  return { w: Math.max(MIN_W, spec.minW), h: Math.max(MIN_H, spec.minH) };
+  return { w: spec.minW, h: spec.minH };
 }
 
 export function isCardId(value: unknown): value is CardKind {

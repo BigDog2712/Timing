@@ -1,7 +1,7 @@
 /**
- * 今日时间线卡 · **上区 = 待办**（0.12.6）。
+ * 今日时间线卡 · **下区 = 待办**（2026-11-20 从上半块换到下半块）。
  *
- * 这一区就是 0.12.5 的待办卡内容，原样搬进时间线卡的上半块：
+ * 这一区就是 0.12.5 的待办卡内容，原样搬进时间线卡的下半块：
  * 区标题（`待办事项`）+ 量出来的「N 条待办 / 还有 K 项 ▸」+ 「新建待办」紧凑行 +
  * 四态（loading / error / empty / 列表）+ 3 秒撤销条 + 两个弹层。
  *
@@ -26,6 +26,7 @@ import type { TodoSummary } from "../../../shared/types/todos.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import type { TodayTodosState } from "../hooks/useTodayTodos.ts";
 import { useBoardInstance, withInstance } from "../layout/instanceContext.ts";
+import { applyTodoItemExtras } from "../services/todoItemExtras.ts";
 import { moduleState, type ModuleState } from "./ModuleShell.tsx";
 import TodoComposeDialog from "./TodoComposeDialog.tsx";
 import TodoEditDialog from "./TodoEditDialog.tsx";
@@ -169,6 +170,7 @@ export default function TodosZone({ todosModel, refreshError }: Props) {
         open={composeOpen}
         onClose={() => setComposeOpen(false)}
         createBatch={todosModel.createBatch}
+        onItemExtras={(title, extras) => applyTodoItemExtras(title, extras).catch(() => undefined)}
       />
     </div>
   );

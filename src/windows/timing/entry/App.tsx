@@ -34,6 +34,7 @@ import { useAppBootstrap } from '../hooks/useAppBootstrap';
 import { useHostIntentBridge } from '../services/hostIntentBridge';
 import { useItemsRefreshOnFocus } from '../hooks/useItemsRefreshOnFocus';
 import { useAppBindingAutoTimer } from '../hooks/useAppBindingAutoTimer';
+import { useForegroundAppLog } from '../hooks/useForegroundAppLog';
 import { useWindowAutoFit } from '../hooks/useWindowAutoFit';
 import { HIGHLIGHT_MS } from '../lib/constants';
 import { isDragActive } from '../lib/dragState';
@@ -71,6 +72,8 @@ function MainWindow() {
   /* [0.13] 切到「绑定了事项」的应用时自动接管计时：结束当前这段，按绑定事项重新开始。
      订阅的是追踪引擎的前台变化广播（真的变了才发），所以"进入这个应用"天然只触发一次。 */
   useAppBindingAutoTimer();
+  /* [0.13.x] 快捷添加的「绑定应用」候选来自近期前台应用：与自动接管共用同一条广播。 */
+  useForegroundAppLog();
 
   const collapsed = useUiStore((s) => s.collapsed);
   const highlightSeq = useUiStore((s) => s.highlightSeq);

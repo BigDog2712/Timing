@@ -22,10 +22,10 @@ pub(crate) async fn show_desktop() -> Result<(), String> {
 }
 
 const MAIN_WINDOW_TITLE: &str = "Timing";
-const MAIN_WINDOW_WIDTH: f64 = 1100.0;
-const MAIN_WINDOW_HEIGHT: f64 = 736.0;
-const MAIN_WINDOW_MIN_WIDTH: f64 = 900.0;
-const MAIN_WINDOW_MIN_HEIGHT: f64 = 636.0;
+const MAIN_WINDOW_WIDTH: f64 = 1040.0;
+const MAIN_WINDOW_HEIGHT: f64 = 680.0;
+const MAIN_WINDOW_MIN_WIDTH: f64 = 860.0;
+const MAIN_WINDOW_MIN_HEIGHT: f64 = 600.0;
 const MAIN_WINDOW_DESTROY_AFTER_BACKGROUND_SECS: u64 = 30;
 /* 上游取 8 秒。融合后有两处让它不够用：
 1. **开发模式**：宿主是双入口 + 437 个 Patina 模块走 Vite 逐模块加载（不是打包产物），
@@ -397,9 +397,7 @@ pub(crate) fn ensure_main_window<R: Runtime + 'static>(
         MainWindowEnsureResult::Existing(window) | MainWindowEnsureResult::Created(window) => {
             Ok(window)
         }
-        MainWindowEnsureResult::Creating => {
-            Err("main window creation is already in progress".to_string())
-        }
+        MainWindowEnsureResult::Creating => Err("main window creation is already in progress".to_string()),
     }
 }
 
@@ -446,6 +444,11 @@ fn ensure_main_window_once<R: Runtime + 'static>(
         .center()
         /* 建窗时不可见：由前端 `cmd_mark_main_window_ready` 握手后才揭示，避免「白底闪一下再变透明」 */
         .visible(false)
+        /* Windows 上 Tauri 默认接管 WebView2 的拖放，用来发 `DragDropEvent`；副作用是
+           **页面里的 HTML5 拖拽整个收不到**。标签管理「拖动改分类」与小条那条排序都靠
+           HTML5 DnD，所以这里关掉 Tauri 的处理器（= conf 的 `dragDropEnabled: false`）。
+           本应用没有任何文件拖入功能，关掉不丢东西。 */
+        .disable_drag_drop_handler()
         /* 参数与 conf main 逐字一致：同一默认数据目录下浏览器参数不同 = WebView2 拒建环境（0x8007139F） */
         .additional_browser_args(crate::infra::window::WEBVIEW_ADDITIONAL_ARGS)
         .initialization_script(initialization_script)

@@ -34,8 +34,6 @@ const DONUT_RADIUS = 62.28;
 const DONUT_STROKE_WIDTH = 19.44;
 const DONUT_CIRCUMFERENCE = 2 * Math.PI * DONUT_RADIUS;
 const DONUT_GAP_DEGREES = 1.47;
-/** 5 行图例 = 前 4 类 + 「其他」（Rust 前 5 名单独成条，第 6 名起并入「其他」） */
-const READOUT_LIMIT = 4;
 
 interface Props {
   controls?: ReactNode;
@@ -61,26 +59,6 @@ interface Props {
   onRetry: () => void;
 }
 
-/** 前 4 类 + 其余合并成「其他」：环与读数行**同一份数组**，下标才能一一联动 */
-function buildReadouts(
-  categoryDist: CategoryDistItem[],
-  otherLabel: string,
-): CategoryDistItem[] {
-  const visible = categoryDist.slice(0, READOUT_LIMIT);
-  const restValue = categoryDist
-    .slice(READOUT_LIMIT)
-    .reduce((sum, item) => sum + Math.max(0, item.value), 0);
-
-  if (restValue <= 0) return visible;
-
-  return [...visible, {
-    category: "other" as const,
-    name: otherLabel,
-    value: restValue,
-    color: "var(--at-text-tertiary)",
-  }];
-}
-
 export default function TimerModule({
   controls,
   categoryDist,
@@ -101,13 +79,13 @@ export default function TimerModule({
   /** 环弧段 ↔ 读数行 双向联动（01 §4.2）；只存下标，不存对象 */
   const [hovered, setHovered] = useState<number | null>(null);
 
-  const readouts = useMemo(() => {
-    const localized = categoryDist.map((item) => ({
-      ...item,
-      name: item.name || getCategoryToken(item.category, UI_TEXT).label,
-    }));
-    return buildReadouts(localized, UI_TEXT.categories.other);
-  }, [categoryDist, UI_TEXT]);
+  /* [2026-11-20] 图例不再只留前 4 类 + 「其他」：主人口径是"卡里滚轮能看到全部"。
+   * 环与读数行仍是**同一份数组**（下标一一联动），放不下时由 `.at-readouts` 自己滚 ——
+   * 合并成「其他」等于把第 5 类之后的每一行都藏起来，滚轮也就无从滚起。 */
+  const readouts = useMemo(() => categoryDist.map((item) => ({
+    ...item,
+    name: item.name || getCategoryToken(item.category, UI_TEXT).label,
+  })), [categoryDist, UI_TEXT]);
 
   /* 环心读数 / 卡头读数 / 空态判定**必须是同一份数**：`total` 是当前维度的合计
      （分类 / 应用 / 事项），`readouts` 是它的分段。
@@ -254,9 +232,8 @@ export default function TimerModule({
              * 这一行 67%"三个数字互相打架。
              *
              * 只有**没有自带读数**的段才回退到自算：
-             *   · 分类 / 事项维度（读模型本来不产百分比）；
-             *   · 被 `buildReadouts` 合并出来的「其他」那一段（它是卡内新造的一段，
-             *     读数只能在这里算）。回退用的仍是同一份 readouts 的总量，环与占比自洽。 */
+             *   · 分类 / 事项维度（读模型本来不产百分比）。
+             * 回退用的仍是同一份 readouts 的总量，环与占比自洽。 */
             const percent = typeof item.percentage === "number"
               ? item.percentage
               : total > 0 ? Math.round((Math.max(0, item.value) / total) * 100) : 0;

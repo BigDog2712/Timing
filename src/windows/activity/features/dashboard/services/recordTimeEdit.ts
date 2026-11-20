@@ -27,6 +27,28 @@ export interface RecordTimeBounds {
   status: string;
 }
 
+const CLOCK_PATTERN = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/;
+
+/**
+ * `HH:mm`（`type="time"` 的值，可带秒）× 该记录所属日的 0 点 → 毫秒。
+ *
+ * [2026-11-20] 改起止只改**时刻**：日期不摆在界面上，锚点由记录自己带
+ * （`startOfLocalDay(segment.startedAt)`）。两条输入都锚在同一天，跨零点因此
+ * 表达不出来 —— 用户填 23:30–01:00 会走 B1（结束早于开始），而不是生成一条
+ * 把整天算给起始日的跨日记录。
+ *
+ * 空串 / 越界 / 脏串回 `null`：保存键据此 `disabled`（与 `parseDateTimeLocal` 同型）。
+ */
+export function parseClockOnDay(clock: string, dayStart: number): number | null {
+  const match = CLOCK_PATTERN.exec(clock.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = match[3] === undefined ? 0 : Number(match[3]);
+  if (hours > 23 || minutes > 59 || seconds > 59) return null;
+  return dayStart + ((hours * 60 + minutes) * 60 + seconds) * 1000;
+}
+
 export type RecordTimeIssue =
   | "notSaved"
   | "endMissing"

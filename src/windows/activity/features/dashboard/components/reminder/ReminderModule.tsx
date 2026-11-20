@@ -145,96 +145,106 @@ export default function ReminderModule({ controls, icons }: Props) {
       onRetry={reminders.retryLoad}
       controls={controls}
     >
-      <div className="tools-reminder-form tools-software-reminder-form at-reminder-form">
-        <div className="tools-form-field">
-          <span>{UI_TEXT.tools.activityReminderTargetLabel}</span>
-          <ActivityReminderTargetPicker
-            value={targetValue}
-            appCandidates={reminders.appCandidates}
-            categoryCandidates={reminders.categoryCandidates}
-            webCandidates={reminders.webCandidates}
-            icons={icons}
-            placeholder={UI_TEXT.tools.activityReminderTargetPlaceholder}
-            ariaLabel={UI_TEXT.tools.activityReminderTargetPlaceholder}
-            onChange={(value) => updateDraft({ targetValue: value, validationMessage: null })}
-          />
-        </div>
-        {ACTIVITY_TARGET_KINDS.filter((kind) => reminders.candidateLoadState[kind] === "error").map((kind) => (
-          <div key={kind} className="tools-candidate-load-error" role="status">
-            <span>{typeLabels[kind]} · {UI_TEXT.tools.activityReminderCandidatesLoadFailed}</span>
-            <QuietButton size="compact" onClick={() => reminders.retryCandidates(kind)}>
-              {UI_TEXT.common.retry}
-            </QuietButton>
+      {/* [2026-11-20] 表单 + 规则列表共用一个滚动体：卡被拖矮时整块内容（不只是列表）
+          都能用滚轮看全；表单本身没有滚动位置，裁掉它就再也够不到下面的规则。 */}
+      <div className="at-reminder-body at-scroll-region at-scroll-region-stable">
+        <div className="tools-reminder-form tools-software-reminder-form at-reminder-form">
+          {/* [2026-11-20] 卡内表单压成两行：目标是「标签 + 应用选择器」一行，
+              每日上限与「创建」一行；规则编辑弹层仍用竖排字段，不受影响。 */}
+          <div className="at-reminder-form-row">
+            <div className="tools-form-field">
+              <span>{UI_TEXT.tools.activityReminderTargetLabel}</span>
+              <ActivityReminderTargetPicker
+                value={targetValue}
+                appCandidates={reminders.appCandidates}
+                categoryCandidates={reminders.categoryCandidates}
+                webCandidates={reminders.webCandidates}
+                icons={icons}
+                placeholder={UI_TEXT.tools.activityReminderTargetPlaceholder}
+                ariaLabel={UI_TEXT.tools.activityReminderTargetPlaceholder}
+                onChange={(value) => updateDraft({ targetValue: value, validationMessage: null })}
+              />
+            </div>
           </div>
-        ))}
-        <div className="tools-form-field">
-          <span>{UI_TEXT.tools.activityReminderDurationLabel}</span>
-          <ActivityReminderDurationPicker
-            minutes={existingRule?.limitMinutes ?? durationMinutes}
-            disabled={creating || Boolean(existingRule)}
-            onChange={(minutes) => updateDraft({ durationMinutes: minutes, validationMessage: null })}
-          />
+          {ACTIVITY_TARGET_KINDS.filter((kind) => reminders.candidateLoadState[kind] === "error").map((kind) => (
+            <div key={kind} className="tools-candidate-load-error" role="status">
+              <span>{typeLabels[kind]} · {UI_TEXT.tools.activityReminderCandidatesLoadFailed}</span>
+              <QuietButton size="compact" onClick={() => reminders.retryCandidates(kind)}>
+                {UI_TEXT.common.retry}
+              </QuietButton>
+            </div>
+          ))}
+          <div className="at-reminder-form-row">
+            <div className="tools-form-field at-reminder-field-duration">
+              <span>{UI_TEXT.tools.activityReminderDurationLabel}</span>
+              <ActivityReminderDurationPicker
+                minutes={existingRule?.limitMinutes ?? durationMinutes}
+                disabled={creating || Boolean(existingRule)}
+                onChange={(minutes) => updateDraft({ durationMinutes: minutes, validationMessage: null })}
+              />
+            </div>
+            <div className="tools-form-actions tools-software-form-actions at-reminder-form-submit">
+              <QuietButton
+                tone="primary"
+                size="compact"
+                disabled={reminders.busyAction !== null}
+                onClick={() => void handleCreate()}
+                aria-label={existingRule ? `${UI_TEXT.tools.activityReminderEdit}: ${selectedTarget?.label}` : UI_TEXT.accessibility.tools.createReminder}
+                busy={creating}
+                className="tools-action-button"
+              >
+                {existingRule ? UI_TEXT.tools.activityReminderEdit : UI_TEXT.tools.createReminder}
+              </QuietButton>
+            </div>
+          </div>
+          {validationMessage ? <p className="tools-validation-message">{validationMessage}</p> : null}
+          {reminders.actionError ? <p className="tools-validation-message" role="alert">{reminders.actionError}</p> : null}
         </div>
-        <div className="tools-form-actions tools-software-form-actions">
-          <QuietButton
-            tone="primary"
-            size="compact"
-            disabled={reminders.busyAction !== null}
-            onClick={() => void handleCreate()}
-            aria-label={existingRule ? `${UI_TEXT.tools.activityReminderEdit}: ${selectedTarget?.label}` : UI_TEXT.accessibility.tools.createReminder}
-            busy={creating}
-            className="tools-action-button"
-          >
-            {existingRule ? UI_TEXT.tools.activityReminderEdit : UI_TEXT.tools.createReminder}
-          </QuietButton>
-        </div>
-        {validationMessage ? <p className="tools-validation-message">{validationMessage}</p> : null}
-        {reminders.actionError ? <p className="tools-validation-message" role="alert">{reminders.actionError}</p> : null}
-      </div>
 
-      {reminders.ruleRows.length === 0 ? (
-        <div className="tools-empty-state">{copy.reminderEmpty}</div>
-      ) : (
-        <div className="tools-reminder-list-frame">
-          <div className="tools-reminder-list at-scroll-region at-scroll-region-stable">
-            {reminders.ruleRows.map((row) => {
-              const busy = reminders.busyAction !== null;
-              const webCandidate = row.kind === "web"
-                ? reminders.webCandidates.find((candidate) => candidate.normalizedDomain === row.targetKey)
-                : null;
-              const category = row.kind === "category"
-                ? reminders.categoryCandidates.find((candidate) => candidate.categoryId === row.targetKey)
-                : null;
-              const appCandidate = row.kind === "app"
-                ? reminders.appCandidates.find((candidate) => candidate.exeName === row.targetKey)
-                : null;
-              const currentLabel = appCandidate?.appName
-                ?? category?.label
-                ?? webCandidate?.label
-                ?? row.targetLabel;
-              return (
-                <div key={row.id} className="tools-reminder-row" data-activity-rule-kind={row.kind} data-activity-rule-enabled={row.enabled}>
-                  <div className="tools-reminder-row-main tools-software-rule-main">
-                    {renderRuleIcon(row, currentLabel)}
-                    <div className="tools-software-rule-copy">
-                      <div className="tools-software-rule-heading">
-                        <strong>{currentLabel}</strong>
-                        <span className="tools-tabular">{row.limitLabel}</span>
+        {reminders.ruleRows.length === 0 ? (
+          <div className="tools-empty-state">{copy.reminderEmpty}</div>
+        ) : (
+          <div className="tools-reminder-list-frame">
+            <div className="tools-reminder-list at-scroll-region at-scroll-region-stable">
+              {reminders.ruleRows.map((row) => {
+                const busy = reminders.busyAction !== null;
+                const webCandidate = row.kind === "web"
+                  ? reminders.webCandidates.find((candidate) => candidate.normalizedDomain === row.targetKey)
+                  : null;
+                const category = row.kind === "category"
+                  ? reminders.categoryCandidates.find((candidate) => candidate.categoryId === row.targetKey)
+                  : null;
+                const appCandidate = row.kind === "app"
+                  ? reminders.appCandidates.find((candidate) => candidate.exeName === row.targetKey)
+                  : null;
+                const currentLabel = appCandidate?.appName
+                  ?? category?.label
+                  ?? webCandidate?.label
+                  ?? row.targetLabel;
+                return (
+                  <div key={row.id} className="tools-reminder-row" data-activity-rule-kind={row.kind} data-activity-rule-enabled={row.enabled}>
+                    <div className="tools-reminder-row-main tools-software-rule-main">
+                      {renderRuleIcon(row, currentLabel)}
+                      <div className="tools-software-rule-copy">
+                        <div className="tools-software-rule-heading">
+                          <strong>{currentLabel}</strong>
+                          <span className="tools-tabular">{row.limitLabel}</span>
+                        </div>
+                        {row.suspensionReason ? <span>{UI_TEXT.tools.activityReminderSuspension[row.suspensionReason]}</span>
+                          : row.message ? <span>{row.message}</span> : null}
                       </div>
-                      {row.suspensionReason ? <span>{UI_TEXT.tools.activityReminderSuspension[row.suspensionReason]}</span>
-                        : row.message ? <span>{row.message}</span> : null}
                     </div>
+                    <ReminderRowActions label={currentLabel} enabled={row.enabled} busy={busy}
+                      onToggle={() => void reminders.setRuleEnabled(row.id, !row.enabled)}
+                      onEdit={() => setEditingRule({ ...row, targetLabel: currentLabel })}
+                      onDelete={() => void reminders.disableRule(row.id)} />
                   </div>
-                  <ReminderRowActions label={currentLabel} enabled={row.enabled} busy={busy}
-                    onToggle={() => void reminders.setRuleEnabled(row.id, !row.enabled)}
-                    onEdit={() => setEditingRule({ ...row, targetLabel: currentLabel })}
-                    onDelete={() => void reminders.disableRule(row.id)} />
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
       {editingRule ? <ActivityReminderRuleEditor rule={editingRule}
         targetIcon={renderRuleIcon(editingRule)}
         busy={reminders.busyAction !== null}

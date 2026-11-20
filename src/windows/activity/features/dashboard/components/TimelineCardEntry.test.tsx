@@ -180,7 +180,7 @@ afterEach(() => {
   document.body.querySelectorAll(".at-dialog-backdrop").forEach((node) => node.remove());
 });
 
-describe("事项管理卡 · 空态 / 错误态下四颗入口也要能开弹层", () => {
+describe("事项管理卡 · 空态 / 错误态下三颗入口也要能开弹层", () => {
   it("tl09_empty_state_new_item_opens_the_create_dialog", async () => {
     await mountManage();
     /* 前提：库里一条事项都没有 ⇒ 区进空态，但动作组在场 */
@@ -193,18 +193,10 @@ describe("事项管理卡 · 空态 / 错误态下四颗入口也要能开弹层
     expect(openDialogTitle(), "空态下点「新增」没有弹出任何东西").toBe(COPY.timelineCreateTitle);
   });
 
-  it("tl10_empty_state_edit_and_manage_open_their_dialogs_too", async () => {
+  it("tl10_empty_state_manage_opens_its_dialog_and_no_duplicate_edit_entry", async () => {
     await mountManage();
-    act(() => { zoneButton(COPY.timelineEditItem)?.click(); });
-    await flush();
-    expect(openDialogTitle(), "空态下点「编辑事项」没有弹出任何东西").toBe(COPY.timelineEditItem);
-
-    /* 弹层互斥：先关掉再点下一颗（两个 QuietDialog 同时开着会各关一层 Escape） */
-    act(() => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    });
-    await flush();
-    expect(openDialogTitle(), "Escape 没关掉「编辑事项」").toBeNull();
+    /* 卡头不再有「编辑事项」：它与点行编辑是同一个动作，重复入口已删 */
+    expect(zoneButton(COPY.timelineEditItem), "卡头仍残留「编辑事项」").toBeNull();
 
     act(() => { zoneButton(COPY.timelineManageItems)?.click(); });
     await flush();

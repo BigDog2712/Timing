@@ -1,38 +1,72 @@
 /**
- * 今日时间线卡 · **下区 = 今天的计时记录**（0.12.6）。
+ * 今日时间线卡 · **下区 = 今天的计时记录 + 常用事项**（0.13.x 恢复入口）。
  *
- * 自上而下：进行中（止列显示此刻钟点）→ 已完成（可展开第二层的应用段/空档，
- * `TimelineChildRows`）→ 每行右侧的「改起止」（`TimelineRecordTimeDialog`）。
+ * 自上而下：进行中 / 已暂停 / 已完成（可展开第二层的应用段/空档，
+ * `TimelineChildRows`）→「常用事项」组（今天没计时的事项，点一下就能开始）。
  *
- * ## 这一区只剩"看与改"，不再造事项
+ * [2026-11-20] 行右侧那颗悬停才浮出的「改起止」已删除：改起止并入「编辑事项」弹层
+ * （`ItemRecordTimeSection`），只改时刻、日期不再出现在界面上。行回到三列
+ * （名称 - 起止 - 总用时），不再有 hover 才长出来的第四颗按钮。
  *
- * 0.12.5 的时间线卡底部有三颗入口（新建 / 编辑 / 事项管理），0.12.6 起这三颗**整组搬进了
- * 事项管理卡**（`ManageCard` → `ItemsManageZone`）—— 同一个动作在两张卡上各有一颗按钮，
- * 点错了只是打开同一个弹层，但用户的"这个按钮在哪张卡上"会永久地失败。上区待办自带
- * 「新建待办」，本区就只负责记录。
+ * [2026-11-20] 主人口径：**「历史事项」组整组下线** —— 这张卡回答的是"今天做了什么、
+ * 还能做什么"，近期但今天没碰过的事项属于「事项管理」卡（`ItemsManageZone` 仍有那一组）。
+ * 同一批事项在两张卡上都出现，用户分不清"该在哪张卡上找它"。卡的位置也从下区搬到上区
+ * （见 `TimelineTodosCard` 的线框）。
  *
- * ## 行数不写死：按实际行数全渲染
+ * ## 入口回到本区（0.12.6 的反向决定）
  *
- * 旧时间线卡按档位（S/M/L = 4/6/8 行）切片。现在本区只占卡的下半块（上区还有待办），
- * 切片会让"今天真做过的事"看不见 —— 所以全渲染，溢出靠 `.at-timeline-rows` 自己滚。
+ * 0.12.6 把「新建 / 编辑 / 事项管理」整组搬进了独立的「事项管理」卡，本区只剩"看与改"。
+ * 主人口径（2026-11-20）要求**恢复「新建事项」「编辑事项」**：用户在一张卡上就看到
+ * "今天做了什么 + 还能做什么"，不必先知道另一张卡的存在。所以：
+ *   · 两颗入口挂在本区标题行（`.`at-items-zone-actions`，四态之外常驻 —— 空态恰恰是最想
+ *     新建的时刻，判据 `TimelineCardEntry.test.tsx`）；
+ *   · 「事项管理」**不回来**：它仍住在 `ManageCard`（常用/历史的完整管理、排序、AI 分类），
+ *     同一个动作在两张卡上各有一颗按钮，用户对"按钮在哪"会永久失败。
+ *
+ * ## 正在计时的那一条（`useTodayItems` 的合并帧）
+ *
+ * `list_records` 只回 `status='saved'`，正在计的会话**永远不在**记录里。`useTodayItems`
+ * 把宿主 `timer:state-changed` 并进今日行（`mergeActiveSession`），本区因此能看到它：
+ *   · `lastEnd === null` → 「止」列显示此刻钟点 + 进行中（`timelineNoEnd`）；
+ *   · `paused` → 「止」列写「已暂停」：数字不再涨，写"进行中"会让用户误以为还在跳。
+ *
+ * ## 常用事项组（`allItems` 可选）
+ *
+ * 组内只放**今天时间线上没有的事项**（已出现的行不重复）。分组口径的唯一实现在
+ * `services/itemPrefs.ts`（`pinnedItems`），与宿主事项菜单同源。
+ * `allItems` 缺省 = 不画这一组（卡片单测的旧夹具逐字不变）。
  *
  * ## 第二层是**附加信息**
  *
  * `useItemTimeline()` 拿不到子记录时只有第一层，不把卡片打成错误态（见该 hook 头注释）。
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
+import type { TimingItem } from "../../../platform/persistence/timingReadRepository.ts";
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import { useItemTimeline } from "../hooks/useItemTimeline.ts";
+import { IDLE_ITEM_TIMER, type ItemTimerToggle } from "../hooks/useItemTimerToggle.ts";
 import type { TodayItemRow } from "../hooks/useTodayItems.ts";
 import { useBoardInstance, withInstance } from "../layout/instanceContext.ts";
 import { formatDashboardDuration } from "../services/dashboardFormatting.ts";
-import { buildTimelineRows, type TimelineRow } from "../services/timelineRows.ts";
+import { pinnedItems } from "../services/itemPrefs.ts";
+import {
+  buildTimelineRows,
+  todayTimedItemIds,
+  type TimelineRow,
+} from "../services/timelineRows.ts";
 import { moduleState, type ModuleState } from "./ModuleShell.tsx";
 import TimelineChildRows from "./TimelineChildRows.tsx";
-import TimelineRecordTimeDialog from "./TimelineRecordTimeDialog.tsx";
+import TimelineEditDialog from "./TimelineEditDialog.tsx";
+import TimelineManage from "./TimelineManage.tsx";
+
+/** 本区两个弹层的互斥态（「事项管理」不在这里，它住 `ManageCard`） */
+type TimelineDialog = "create" | "edit" | null;
+
+const noopRename = (): void => undefined;
+const noopCreate = (): void => undefined;
 
 interface Props {
   /** 今日事项行（`useTodayItems.rows`，由 `Dashboard` 提起后传进来；本组件不取数） */
@@ -43,14 +77,30 @@ interface Props {
   status: LoadStatus;
   /** 重试事项源 */
   onRetry: () => void;
+  /** 全部事项（`useTodayItems.items`）：画「常用事项」组。缺省 = 不画（旧夹具不变） */
+  allItems?: readonly TimingItem[];
+  /** 「常用事项」组内行点击起停；缺省 = 空实现（单测里点了什么也不发） */
+  itemTimer?: ItemTimerToggle;
+  /** 交给 `useTodayItems.applyLocalRename`（改名意图发出后本地先改） */
+  onLocalRename?: (itemId: number, name: string) => void;
+  /** 交给 `useTodayItems.applyLocalCreate`（新条目重拉一次，拿到真实 id） */
+  onLocalCreate?: (name: string) => void;
 }
 
-export default function TimelineZone({ items, total, status, onRetry }: Props) {
+export default function TimelineZone({
+  items,
+  total,
+  status,
+  onRetry,
+  allItems,
+  itemTimer = IDLE_ITEM_TIMER,
+  onLocalRename = noopRename,
+  onLocalCreate = noopCreate,
+}: Props) {
   const copy = DASHBOARD_COPY[useLocale()];
   const UI_TEXT = useLocaleText();
   const domId = withInstance("t-items-timeline", useBoardInstance());
-  /** 「改起止」弹层：`null` = 关着；数字 = 该事项的 itemId（弹层自己按需拉段） */
-  const [recordEditItemId, setRecordEditItemId] = useState<number | null>(null);
+  const [dialog, setDialog] = useState<TimelineDialog>(null);
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set<string>());
 
   const { byItemId } = useItemTimeline();
@@ -60,8 +110,17 @@ export default function TimelineZone({ items, total, status, onRetry }: Props) {
   const runningRows = rows.filter((row) => row.running);
   const finishedRows = rows.filter((row) => !row.running);
 
-  /* 有行 + error = 刷新失败（E3，卡头小图标由待办区统一画）；无行 + error = 模块级错误 */
-  const state: ModuleState = moduleState(status, status === "error" && rows.length > 0, rows.length === 0);
+  /* 只放"今天时间线上没有的事项"：已出现过的行不重复（否则同一件事在卡上出现两次） */
+  const timedIds = useMemo(() => new Set(todayTimedItemIds(items)), [items]);
+  const pinned = useMemo(
+    () => (allItems ? pinnedItems(allItems).filter((item) => !timedIds.has(item.id)) : []),
+    [allItems, timedIds],
+  );
+  const hasGroups = pinned.length > 0;
+  const hasData = rows.length > 0 || hasGroups;
+
+  /* 有数据 + error = 刷新失败（E3，卡头小图标由待办区统一画）；无数据 + error = 模块级错误 */
+  const state: ModuleState = moduleState(status, status === "error" && hasData, !hasData);
   const totalReady = status === "ready";
 
   const toggleExpanded = (key: string) => {
@@ -73,13 +132,23 @@ export default function TimelineZone({ items, total, status, onRetry }: Props) {
     });
   };
 
-  const recordEditItemName = items.find((item) => item.itemId === recordEditItemId)?.name ?? "";
-
   const renderRow = (row: TimelineRow, group: "running" | "finished") => {
     const detail = byItemId.get(Number(row.key));
     const isOpen = expanded.has(row.key);
+    /* 暂停中的行既不写"进行中"（数字不涨）也不写此刻钟点（会让人以为还在走） */
+    const rangeText = row.running
+      ? row.paused
+        ? copy.timelinePaused
+        : copy.timelineNoEnd(row.endLabel)
+      : copy.timelineRange(row.startLabel, row.endLabel);
     return (
-      <li key={row.key} className="at-timeline-row" data-group={group} data-running={row.running || undefined}>
+      <li
+        key={row.key}
+        className="at-timeline-row"
+        data-group={group}
+        data-running={row.running || undefined}
+        data-paused={row.paused || undefined}
+      >
         <span className="at-timeline-label" title={row.label}>
           {detail && detail.segments.length + detail.gaps.length > 0 ? (
             <button
@@ -96,22 +165,26 @@ export default function TimelineZone({ items, total, status, onRetry }: Props) {
           ) : null}
           {row.label}
         </span>
-        <span
-          className="at-timeline-range"
-          title={row.running ? copy.timelineNoEnd(row.endLabel) : copy.timelineRange(row.startLabel, row.endLabel)}
-        >
-          {row.running ? copy.timelineNoEnd(row.endLabel) : copy.timelineRange(row.startLabel, row.endLabel)}
-        </span>
+        <span className="at-timeline-range" title={rangeText}>{rangeText}</span>
         <span className="at-timeline-duration">{row.duration}</span>
+        {isOpen && detail ? <TimelineChildRows row={detail} /> : null}
+      </li>
+    );
+  };
+
+  const renderGroupRow = (item: TimingItem) => {
+    /* 「正在计这一条」只认 running + 同一事项：暂停中的会话点它是"继续"，不能画成在跑 */
+    const running = itemTimer.status === "running" && itemTimer.sessionItemId === item.id;
+    return (
+      <li key={item.id} className="at-items-row" data-running={running || undefined}>
         <button
           type="button"
-          className="at-link-btn at-timeline-record-edit"
-          aria-label={`${copy.editRecordTime} ${row.label}`}
-          onClick={() => setRecordEditItemId(Number(row.key))}
+          className="at-items-row-main"
+          aria-label={running ? copy.itemsStopTimer(item.name) : copy.itemsStartTimer(item.name)}
+          onClick={() => itemTimer.toggleItem(item.id, item.name)}
         >
-          {copy.editRecordTime}
+          <span className="at-items-row-name" title={item.name}>{item.name}</span>
         </button>
-        {isOpen && detail ? <TimelineChildRows row={detail} /> : null}
       </li>
     );
   };
@@ -123,10 +196,18 @@ export default function TimelineZone({ items, total, status, onRetry }: Props) {
       data-state={state}
       aria-labelledby={domId}
     >
-      {/* ── 区标题行：标题 + 总计。总计只在事项源 ready 时给数 ── */}
+      {/* ── 区标题行：标题 + 总计 + 两颗入口。入口在四态之外常驻（读失败也要能新建） ── */}
       <div className="at-items-zone-head">
         <h3 className="at-items-zone-title" id={domId}>{copy.itemsTitle}</h3>
         {totalReady ? <span className="at-card-meta">{copy.timelineTotal(formatDashboardDuration(total))}</span> : null}
+        <div className="at-items-zone-actions">
+          <button type="button" className="at-link-btn" onClick={() => setDialog("create")}>
+            {copy.timelineNewItem}
+          </button>
+          <button type="button" className="at-link-btn" onClick={() => setDialog("edit")}>
+            {copy.timelineEditItem}
+          </button>
+        </div>
       </div>
 
       {state === "loading" ? (
@@ -143,17 +224,37 @@ export default function TimelineZone({ items, total, status, onRetry }: Props) {
       ) : state === "empty" ? (
         <p className="at-empty">{copy.itemsTimelineEmpty}</p>
       ) : (
-        <ul className="at-timeline-rows at-scroll-region at-scroll-region-stable">
-          {runningRows.map((row) => renderRow(row, "running"))}
-          {finishedRows.map((row) => renderRow(row, "finished"))}
-        </ul>
+        <div className="at-timeline-scroll">
+          {rows.length > 0 ? (
+            <ul className="at-timeline-rows">
+              {runningRows.map((row) => renderRow(row, "running"))}
+              {finishedRows.map((row) => renderRow(row, "finished"))}
+            </ul>
+          ) : (
+            /* 常用组还在：不占整卡的 `.at-empty`（那是唯一内容的形态），只给一行说明 */
+            <p className="at-timeline-note">{copy.itemsTimelineEmpty}</p>
+          )}
+          {pinned.length > 0 ? (
+            <section className="at-items-group" data-group="pinned">
+              <h4 className="at-items-group-title">{copy.itemsPinnedGroup}</h4>
+              <ul className="at-items-list">{pinned.map(renderGroupRow)}</ul>
+            </section>
+          ) : null}
+        </div>
       )}
 
-      {/* 弹层是本区根节点的**兄弟**（见文件头第 4 段）：挂进条件分支就会"点得到没反应" */}
-      <TimelineRecordTimeDialog
-        itemId={recordEditItemId}
-        itemName={recordEditItemName}
-        onClose={() => setRecordEditItemId(null)}
+      {/* 弹层是本区根节点的**兄弟**：挂进四态分支，空态/错误态下点了就没反应 */}
+      <TimelineManage
+        mode={dialog === "create" ? "create" : null}
+        onClose={() => setDialog(null)}
+        onLocalRename={onLocalRename}
+        onLocalCreate={onLocalCreate}
+      />
+      <TimelineEditDialog
+        open={dialog === "edit"}
+        onClose={() => setDialog(null)}
+        todayItemIds={todayTimedItemIds(items)}
+        onLocalRename={onLocalRename}
       />
     </div>
   );

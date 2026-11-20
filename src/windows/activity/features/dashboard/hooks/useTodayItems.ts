@@ -6,6 +6,13 @@ import {
   type TimingItem,
   type TimingRecord,
 } from "../../../platform/persistence/timingReadRepository.ts";
+import {
+  computeHostLiveSec,
+  readHostTimerSnapshot,
+  subscribeHostTimerState,
+  type HostTimerSession,
+  type HostTimerStatus,
+} from "../../../platform/runtime/hostTimerGateway.ts";
 import { startOfLocalDay } from "../../../shared/lib/localDate.ts";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
 
@@ -34,10 +41,36 @@ export interface TodayItemRow {
   lastEnd: number | null;
   /** 段数 */
   segments: number;
+  /**
+   * [本轮] 当前会话**暂停**在这一条上（`lastEnd === null` 但不是 running）。
+   * 时间线的「止」列不能写"进行中"——用户会以为还在涨；也不能写此刻钟点。
+   */
+  paused?: boolean;
+}
+
+/**
+ * 宿主当前会话的快照（只留画时间线要的两列）。
+ *
+ * `list_records` 只回 `status='saved'` 的行（见 `services/record.rs` 的 `list`），
+ * 所以正在计的那条**永远不在** `records` 里 —— 今日时间线要显示它，只能从
+ * `get_timer_state` / `timer:state-changed` 补一帧。
+ */
+export interface ActiveSession {
+  itemId: number;
+  accumulatedSec: number;
+  runningSince: number | null;
+  status: Exclude<HostTimerStatus, "idle">;
 }
 
 export interface TodayItemsState {
   rows: TodayItemRow[];
+  /**
+   * [本轮] 全部事项（`list_items` 的原样返回值）。
+   *
+   * 时间线卡用它画「常用 / 历史事项」两组 —— 不另开一条读命令：这两个分组要的
+   * `isPinned` / `sortOrder` / `updatedAt` 本来就在这份载荷里。
+   */
+  items: TimingItem[];
   status: LoadStatus;
   total: number;
   retry: () => void;
@@ -113,16 +146,106 @@ export function buildTodayItemRows(
   return [...buckets.values()].sort((a, b) => b.value - a.value);
 }
 
+function sessionOf(snapshot: {
+  status: HostTimerStatus;
+  session: HostTimerSession | null;
+} | null): ActiveSession | null {
+  if (!snapshot || snapshot.status === "idle" || !snapshot.session) return null;
+  return {
+    itemId: snapshot.session.itemId,
+    accumulatedSec: snapshot.session.accumulatedSec,
+    runningSince: snapshot.session.runningSince,
+    status: snapshot.status,
+  };
+}
+
+function sessionKey(session: ActiveSession | null): string {
+  return session ? `${session.status}:${session.itemId}` : "idle";
+}
+
+/**
+ * 把宿主**当前会话**并进今日行（纯函数，单测直接喂夹具）。
+ *
+ * 口径：
+ *   · 已在今日行里 → 累计加上 `liveSec`，`lastEnd = null`（时间线置为"进行中/暂停"）；
+ *   · 今天还没落过盘（新开的一件）→ 补一行；`firstStart` 用「此刻 - 已计」回推，
+ *     跨零点时钳到今日 0 点。宿主快照里没有段起点，这是唯一的可行近似；
+ *   · `value` 取整毫秒，避免总计时长出现 0.000001 的抖动。
+ */
+export function mergeActiveSession(
+  rows: readonly TodayItemRow[],
+  session: ActiveSession | null,
+  items: readonly TimingItem[],
+  nowMs: number,
+  dayStartMs: number,
+): TodayItemRow[] {
+  if (!session) return [...rows];
+  const liveSec = computeHostLiveSec(session.accumulatedSec, session.runningSince, nowMs);
+  const value = Math.max(0, Math.floor(liveSec * 1000));
+  if (value <= 0) return [...rows];
+
+  const item = items.find((entry) => entry.id === session.itemId);
+  const name = item?.name ?? "未归类";
+  const paused = session.status === "paused";
+  const index = rows.findIndex((row) => row.itemId === session.itemId);
+  const next = index >= 0
+    ? rows.map((row) => (row.itemId === session.itemId
+      ? { ...row, name, value: row.value + value, lastEnd: null, segments: row.segments + 1, paused }
+      : row))
+    : [...rows, {
+      itemId: session.itemId,
+      name,
+      color: item?.color ?? "",
+      value,
+      firstStart: Math.max(dayStartMs, nowMs - value),
+      lastEnd: null,
+      segments: 1,
+      paused,
+    }];
+  return next.sort((a, b) => b.value - a.value);
+}
+
 export function useTodayItems(refreshKey: number, refreshIntervalSecs: number): TodayItemsState {
-  const [rows, setRows] = useState<TodayItemRow[]>([]);
+  const [baseRows, setBaseRows] = useState<TodayItemRow[]>([]);
+  const [items, setItems] = useState<TimingItem[]>([]);
+  const [session, setSession] = useState<ActiveSession | null>(null);
+  const [tickNow, setTickNow] = useState(() => Date.now());
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [attempt, setAttempt] = useState(0);
   /* 已发出改名意图、但宿主还没落库的行：`itemId → 本地名字`。
      ref 而不是 state —— 它只用于"覆盖下一次结果"，由 `applyLocalRename` 顺带的那次
      `setRows` 触发重渲染，不需要自己再排一次刷新。 */
   const pendingRenamesRef = useRef<Map<number, string>>(new Map());
+  /* 订阅只挂一次，回调里要判"会话换没换"：换了就重拉一次 records —— 结束/切换后
+     新封存的那一段只有重拉才会出现在今日行里。 */
+  const sessionRef = useRef<ActiveSession | null>(null);
 
   const retry = useCallback(() => setAttempt((value) => value + 1), []);
+
+  const applySnapshot = useCallback((next: ActiveSession | null) => {
+    const previous = sessionRef.current;
+    sessionRef.current = next;
+    setSession(next);
+    setTickNow(Date.now());
+    /* 同一会话的状态迁移（running ⇄ paused）不产生新记录，不用重拉 */
+    if (sessionKey(previous) === sessionKey(next)) return;
+    if (previous !== null || next !== null) setAttempt((value) => value + 1);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let unlisten: (() => void) | null = null;
+    void subscribeHostTimerState((snapshot) => {
+      if (!cancelled) applySnapshot(sessionOf(snapshot));
+    }).then((fn) => {
+      if (cancelled) fn?.();
+      else unlisten = fn;
+    });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [applySnapshot]);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,9 +255,13 @@ export function useTodayItems(refreshKey: number, refreshIntervalSecs: number): 
       try {
         const start = startOfLocalDay(new Date()).getTime();
         const end = start + 24 * 60 * 60 * 1000;
-        const [items, records] = await Promise.all([listTimingItems(), listTimingRecords(start, end)]);
+        const [loadedItems, records, snapshot] = await Promise.all([
+          listTimingItems(),
+          listTimingRecords(start, end),
+          readHostTimerSnapshot(),
+        ]);
         if (cancelled) return;
-        const next = buildTodayItemRows(items, records, start, end);
+        const next = buildTodayItemRows(loadedItems, records, start, end);
         /* ③④「改名不被刷新覆盖」的唯一一处实现：
            · 返回的名字与本地一致 → 宿主已落库，摘掉这条待确认；
            · 返回的还是旧名字 → 用本地名字覆盖（否则用户看到"改完又变回去"）；
@@ -151,7 +278,13 @@ export function useTodayItems(refreshKey: number, refreshIntervalSecs: number): 
             next[index] = { ...next[index], name: localName };
           }
         }
-        setRows(next);
+        setBaseRows(next);
+        setItems(loadedItems);
+        /* 冷启动补一帧：订阅之前宿主可能早就在计了（同 `useItemTimerToggle` 的理由） */
+        const nextSession = sessionOf(snapshot);
+        sessionRef.current = nextSession;
+        setSession(nextSession);
+        setTickNow(Date.now());
         setStatus("ready");
       } catch (error) {
         if (cancelled) return;
@@ -173,12 +306,28 @@ export function useTodayItems(refreshKey: number, refreshIntervalSecs: number): 
     };
   }, [attempt, refreshKey, refreshIntervalSecs]);
 
+  /* 有活动会话才起秒表：没有计时时一行都不需要重算（这个 hook 常驻仪表盘）。 */
+  useEffect(() => {
+    if (!session) return;
+    const timer = window.setInterval(() => setTickNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [session]);
+
+  const rows = useMemo(
+    () => mergeActiveSession(baseRows, session, items, tickNow, startOfLocalDay(new Date(tickNow)).getTime()),
+    [baseRows, session, items, tickNow],
+  );
+
   const applyLocalRename = useCallback((itemId: number, rawName: string) => {
     const name = rawName.trim();
     if (!name) return;
     pendingRenamesRef.current.set(itemId, name);
-    setRows((current) => current.map((row) => (
+    setBaseRows((current) => current.map((row) => (
       row.itemId === itemId ? { ...row, name } : row
+    )));
+    /* 活动会话那一行也吃这份名字（它的名字来自 `items`，不跟着改会到下次刷新才变） */
+    setItems((current) => current.map((item) => (
+      item.id === itemId ? { ...item, name } : item
     )));
   }, []);
 
@@ -190,5 +339,5 @@ export function useTodayItems(refreshKey: number, refreshIntervalSecs: number): 
   }, []);
 
   const total = useMemo(() => rows.reduce((sum, row) => sum + row.value, 0), [rows]);
-  return { rows, status, total, retry, applyLocalRename, applyLocalCreate };
+  return { rows, items, status, total, retry, applyLocalRename, applyLocalCreate };
 }

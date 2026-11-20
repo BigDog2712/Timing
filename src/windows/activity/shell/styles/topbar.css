@@ -10,18 +10,18 @@
  * 这里定义的变量，不许重算。**本文件自身也受 300 行硬顶**，注释按需压缩。
  *
  * 五段配平（border-box，零余量）：
- *   1100 档 = 114(brand) + 96(drag) + 252(tab) + 486(status) + 152(controls) = 1100
- *    900 档 = 114        + 96       + 216(tab) + 322(status) + 152          = 900
+ *   1040 档 = 114(brand) + 96(drag) + 252(tab) + 426(status) + 152(controls) = 1040
+ *    860 档 = 114        + 96       + 216(tab) + 282(status) + 152          = 860
  * 纵向配平：顶栏 52 已含 1px 底边（.app-titlebar 的 border-bottom）→ 内容盒 51，
  * tab 项 44 居中 → 上下各 3.5（不是 4）。
  *
- * 这条配平的护栏只有下面几条，**都能实测变红**（数值是 1100×736 档实测）：
+ * 这条配平的护栏只有下面几条，**都能实测变红**（数值按 1040×680 档）：
  *   1. .at-topbar-nav 的 align-items 必须是 center —— 改 flex-start 后 tab 顶到 0（≠3.5）
  *   2. .at-tab-ind 的 bottom 必须是 -1px —— 改 0 后指标条底边落在 51（≠52），压不住那 1px
  *   3. --at-titlebar-height 回退 36 → 画布高 652、tab 顶 −4.5
- *   4. 900×636 强制用 52 → 画布 544 < 五模块高和 552（缺 8px，五模块被挤爆）
+ *   4. 860×600 强制用 52 → 画布 468 < 短档内容高度，五模块会被挤爆
  * 反过来说：**顶栏高度是固定值，内容撑不动它** —— "给 tab 容器加 padding 会撑到 53 /
- * 画布变 635"是错的（对称 padding 只压缩内容盒，实测 titlebar 52 / canvas 636 一动不动）。
+ * 画布变矮"是错的（对称 padding 只压缩内容盒，不改变 titlebar / canvas 高度）。
  * ========================================================================== */
 
 /* ── 段宽（两档同值，锁死） ── */
@@ -31,7 +31,7 @@
   --at-controls-w: 152px; /* = 4 × 38，与既有 .app-titlebar-button{width:38px} 一致 */
   --at-tab-count: 3;
 
-  /* 纵向档位 —— 长档基准（1100×736）。基准 --at-titlebar-height: 52px 在 tokens.css，
+  /* 纵向档位 —— 长档基准（1040×680）。基准 --at-titlebar-height: 52px 在 tokens.css，
    * 这里只给短档覆盖，避免两个真相源。 */
   --at-nav-item-h: 44px;
   --at-nav-icon: 20px;
@@ -51,9 +51,9 @@
  * ⚠ **加载顺序**：本块必须晚于 `tokens.css` 加载（`App.css` 里 topbar 排在 tokens 之后）。
  * `--at-titlebar-height` 的长档基准 52 定义在 tokens.css，这里只覆盖短档 44；两者选择器
  * 都是 `:root`，**同特异性 → 后加载的赢**。若哪天有人把 topbar.css 挪到 tokens.css 上面，
- * 短档会静默变回 52：画布 636−52−40 = 544 < 五模块高和 552，五张卡被挤爆，
+ * 短档会静默变回 52：600−52−40 = 508 < 短档内容高，五张卡被挤爆，
  * 而控制台一个字都不会报。 */
-@media (max-height: 735.98px) {
+@media (max-height: 679.98px) {
   :root {
     --at-titlebar-height: 44px;
     --at-nav-item-h: 36px;
@@ -232,15 +232,23 @@
 [data-at-motion="reduced"] .at-tab-ind { transition: none; }
 
 /* ── 外壳内距：收敛成**一层**（01 §3.8） ──
- * 现状是两层叠加：at-shell 24 + at-canvas 20 = 44/侧（1100 档）。设计是 24 → 1052。
+ * at-shell 的 24px 内距对齐默认 1040 窗宽与 992px 画布。
  * 覆盖 Tailwind 的 p-4/md:p-5/lg:p-6（无 layer 的规则优先于 @layer utilities），
  * 且改为**跟窗高**而不是跟窗宽（Tailwind 的 md/lg 是宽度断点，会在"宽而矮"时错档）。 */
 .at-shell {
   padding: var(--at-shell-pad);
 }
 
+/* Data/settings/mapping/about share one readable content width; dashboard's board
+   keeps its own narrower --at-board-w and remains centered inside this canvas. */
+.at-shell > .at-canvas {
+  width: 100%;
+  max-width: var(--at-content-max);
+  margin-inline: auto;
+}
+
 /* 主界面（dashboard）画布内距归零 + 1px 边从 border 换成 outline（outline 不占布局，
- * 否则 1052 变成内容 1050 → 五模块列宽 464.14/569.86 全差 1px，01 §4.6）。
+ * 否则 992 变成内容 990，画布内部几何会少 1px。
  * **只作用于 dashboard**：数据管理/设置沿用视图的 20 内距与 1px border 一个像素都不许动
  * （它们内部排版是按 border 版算的）。
  * ⚠ 已知缺陷（本轮引入，第二批第一件事修）：`.at-view-container-outgoing` 的

@@ -1,5 +1,6 @@
 /**
- * 某事项**当天的原始记录段**（0.13 · T03b）—— 只在「改起止」弹层打开时拉。
+ * 某事项**当天的原始记录段**（0.13 · T03b）—— 只在「编辑事项」弹层选中事项时拉
+ * （[2026-11-20] 原「改起止」弹层并入编辑弹层，`itemId === null` 即不拉）。
  *
  * ## 为什么不塞进 `useTodayItems` 的轮询
  *
@@ -41,6 +42,9 @@ export function useItemRecords(
   dayEnd: number,
 ): ItemRecordsState {
   const [segments, setSegments] = useState<ItemRecordSegment[]>([]);
+  /* 段是**哪个事项**的：弹层里可以换选事项，换选到新数据到达之间不能把上一条的
+     段画给新事项（那会让用户改错记录）。 */
+  const [loadedFor, setLoadedFor] = useState<number | null>(null);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [attempt, setAttempt] = useState(0);
   const aliveRef = useRef(true);
@@ -50,6 +54,7 @@ export function useItemRecords(
     /* `itemId === null` = 弹层没开：不拉、清列表（上次打开的残留段不该给下一次用） */
     if (itemId === null) {
       setSegments([]);
+      setLoadedFor(null);
       setStatus("loading");
       return;
     }
@@ -69,6 +74,7 @@ export function useItemRecords(
             status: record.status,
           }))
           .sort((left, right) => left.startedAt - right.startedAt));
+        setLoadedFor(itemId);
         setStatus("ready");
       } catch (error) {
         if (cancelled || !aliveRef.current) return;
@@ -85,5 +91,9 @@ export function useItemRecords(
 
   const reload = useCallback(() => setAttempt((value) => value + 1), []);
 
-  return { segments, status, reload };
+  return {
+    segments: loadedFor === itemId ? segments : [],
+    status,
+    reload,
+  };
 }

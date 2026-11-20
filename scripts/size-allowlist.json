@@ -3,7 +3,7 @@
   "mode": "effective",
   "limit": 600,
   "files": {
-    "src-tauri/src/app/activity/main_window.rs": 671,
+    "src-tauri/src/app/activity/main_window.rs": 670,
     "src-tauri/src/app/activity/state.rs": 1056,
     "src-tauri/src/app/activity/tray.rs": 941,
     "src-tauri/src/infra/activity/web_activity_bridge.rs": 718,

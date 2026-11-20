@@ -53,7 +53,11 @@ export default function DataTagSection({
           exeName={target.exeName}
           displayName={target.name}
           onClose={onClose}
-          onSaved={onSaved}
+          /* 弹窗保存时会给新标签补定义行：重读一遍标签树，管理处当场就能看到 */
+          onSaved={() => {
+            void state.reload();
+            onSaved();
+          }}
           onError={onError}
         />
       ) : null}

@@ -39,6 +39,46 @@
   align-self: end;
 }
 
+/* [2026-11-20] 卡内创建表单压成两行：目标 =「标签 + 应用选择器」，
+ * 第二行 =「每日上限 + 创建」。标签与控件并排而不是上下叠，字段高度省一半。
+ * 规则编辑弹层不挂 `.at-reminder-form`，仍是竖排字段。 */
+.at-reminder-form-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.at-reminder-form-row .tools-form-field {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.at-reminder-form-row .tools-form-field > span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.at-reminder-form-row .tools-form-field > .tools-activity-target-search-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.at-reminder-form .at-reminder-field-duration {
+  flex: 0 1 168px;
+}
+
+.at-reminder-form .at-reminder-field-duration .tools-usage-duration-trigger {
+  width: 100%;
+}
+
+.at-reminder-form-submit {
+  flex: 0 0 auto;
+}
+
 .tools-candidate-load-error {
   display: flex;
   min-width: 0;
