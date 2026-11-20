@@ -33,9 +33,22 @@
  *
  * ## 提示只在**宿主确认之后**出
  *
- * 「已开始计时 / 已结束计时」这两句承诺的是**结果**，而结果只有广播知道。
+ * 「已开始计时 / 已停止」这两句承诺的是**结果**，而结果只有广播知道。
  * 所以点击时只挂一个"我在等什么"的备忘录（`pendingRef`），下一帧广播对上了才提示；
  * 对不上（例如药丸拒绝了）就静静清掉，不编一句成功。失败由药丸的 `setNotice` 呈现。
+ *
+ * ## 为什么「停」的提示**不**说"已记录"（M6）
+ *
+ * 这里的判据只有一条：会话离开了这一条（`sessionItemId !== pending.itemId`）。宿主还有
+ * 第二个事实 —— 这段是不是短到被丢弃（`StopResult.discarded`，低于「最短记录时长」时
+ * 后端软删除，药丸自己会飘一句「不足 X 秒，未记录」，见
+ * `windows/timing/hooks/useTimerActions.ts:149`）—— 但那个事实**只存在于药丸进程**：
+ * 我们发出去的 `stop_timer` 是意图、没有回执，回来的是 `timer:state-changed` 广播，
+ * 而广播的载荷 `TimerState`（`hostTimerGateway.HostTimerSnapshot`）里没有这个字段。
+ * 也就是说：分析窗**拿不到**这个事实，写成"已结束计时：X"就是在替宿主保证"记上了"，
+ * 而用户可能刚看到药丸说"不足 5 秒，未记录" —— 两句话互相打脸。
+ * 所以文案退到只报动作（`itemsTimerStopped` = 「已停止：{name}」）。
+ * 要说得更准就得给跨窗契约加字段（`TimerState` + `events.rs`），那不在这张卡的范围里。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -115,7 +128,8 @@ export function useItemTimerToggle(onToast: ToastPush): ItemTimerToggle {
     const sessionItemId = next && next.status !== "idle" ? next.session?.itemId ?? null : null;
     const { copy: text, onToast: push } = latest.current;
     if (pending.wantStop) {
-      /* 会话离开这一条（结束 / 切走）就是结束成功了；还挂着说明药丸没停，不出声 */
+      /* 会话离开这一条（结束 / 切走）就说一声；还挂着说明药丸没停，不出声。
+         **只报"停了"**：这段有没有被丢弃（`discarded`）不在这条广播里，见文件头 M6 那段。 */
       if (sessionItemId !== pending.itemId) push(text.itemsTimerStopped(pending.name), "success");
       return;
     }

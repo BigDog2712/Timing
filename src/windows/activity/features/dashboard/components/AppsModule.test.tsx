@@ -281,4 +281,23 @@ describe("工具标记（不计入统计）", () => {
     /* 行仍然是原来那三段 grid（图标 / 名字 / 时长）：标记不新增直接子节点 */
     expect(rows()[0]!.children.length).toBe(rows()[1]!.children.length);
   });
+
+  /**
+   * [0.12.6 · M1] 卡头合计（与卡底汇总）**不吃**工具类。
+   *
+   * QA 那一组数：`totalTrackedTime=1h`、工具类 2h —— 计时卡写「今日 1h」、这张卡头写 3h，
+   * 同一块板上两个互相矛盾的总数，而用户没有任何办法知道哪个对。剔除点只有一处
+   * （`dashboardReadModel.splitToolStats`），卡里加回来就是把口径拆成两份。
+   * 列表本身照旧全量：工具行仍在、时长照实显示、还带标记（apps12 钉住）。
+   */
+  it("apps15_head_total_and_footer_exclude_tool_apps", async () => {
+    await mount(WITH_TOOL);
+
+    /* VS Code 1h 是工具类（排除），Chrome 30m 计入 */
+    expect(container?.querySelector(".at-card-meta")?.textContent, "卡头合计把工具类加回来了").toBe("30m");
+    expect(container?.querySelector(".at-card-footer")?.textContent).toBe("共 2 个应用 · 合计 30m");
+    /* 行本身没被删、时长也没被改写 —— 只影响合计 */
+    expect(rows()).toHaveLength(2);
+    expect(rows()[0]!.querySelector(".at-app-value")?.textContent).toBe("1h 0m");
+  });
 });

@@ -20,11 +20,17 @@
  * `applyItemAutoTags` → `emitHostIntent({action:'set_item_tags'})` → 药丸用 `tagApi.set` 落库。
  * 本文件**不** invoke，也不自己拼事件。
  *
- * ## 撤销为什么是"写回空数组"
+ * ## 撤销为什么是"写回空数组"，以及它的**边界**
  *
- * 参与分类的事项在分类前**标签都是空的**（入口就筛 `tags.length === 0`），所以"打标前状态"
- * 就是空数组 —— 撤销 = 把这一批逐条写回 `[]`。这比缓存旧标签更简单，也不会因为中途用户
- * 手动改过标签而把他的手改覆盖掉（那种情况下撤销就只清掉 AI 写的那一份）。
+ * `set_item_tags` 是**整份覆盖**，不是增量：撤销发的是 `tags: []`，把这批事项的标签整体
+ * 写成空。它能还原，只因为入口筛的是 `tags.length === 0` —— 参与分类的事项在分类前本来就
+ * 没有标签，"清空"恰好等于"分类前状态"。这比缓存旧标签简单，也不会因为缓存过时而写回
+ * 一份更旧的快照。
+ *
+ * 但它**不是**"只撤掉 AI 写的那一份"：从「应用」到点撤销之间，用户在别处给这批里某条
+ * 手动加上的标签，也会被一起清掉（本轮不做逐条 diff 撤销，批次历史见 P2-2）。
+ * 这是"整份覆盖"的必然结果，不是实现失误 —— 所以撤销键带 `itemsAiTagUndoHint`
+ * 把代价写在 `title`/`aria-label` 里：按钮上只有四个字，代价却是不可逆的。
  * 只保留**最近一次**（P2-2 的"按批次保留历史、可重复回滚一次"留到下一轮）。
  */
 import { useEffect, useMemo, useState } from "react";
@@ -279,9 +285,18 @@ export default function ItemsAiTagButton({ items, onApplied, onToast }: Props) {
         {busy ? copy.itemsAiTagBusy : copy.itemsAiTag}
       </button>
 
-      {/* 撤销只保留最近一次：再打完一批，上一批就不可撤销（P2-2 的批次历史留到下一轮） */}
+      {/* 撤销只保留最近一次：再打完一批，上一批就不可撤销（P2-2 的批次历史留到下一轮）。
+          `title` / `aria-label` 说的是**后果**（整份覆盖，会连手动加的标签一起清掉）：
+          这两处是唯一能在点下去之前看到代价的地方。
+          `aria-label` 以可见文字开头，读屏念出来的名字仍包含按钮上那几个字（WCAG 2.5.3）。 */}
       {undo && undo.length > 0 ? (
-        <button type="button" className="at-link-btn at-items-zone-undo" onClick={() => void undoAll()}>
+        <button
+          type="button"
+          className="at-link-btn at-items-zone-undo"
+          title={copy.itemsAiTagUndoHint}
+          aria-label={copy.itemsAiTagUndoHint}
+          onClick={() => void undoAll()}
+        >
           {copy.itemsAiTagUndo}
         </button>
       ) : null}

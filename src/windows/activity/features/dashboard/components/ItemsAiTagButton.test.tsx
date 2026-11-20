@@ -10,7 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  *   ① 只把 `tags.length === 0` 的事项发给模型 —— 已打标的**不进请求**（不被覆盖的前提）；
  *   ② 取消 = 零写入（预览不是写入的借口）；
  *   ③ 预览里摘掉的行不写（`selection` 里没有它就等于"没动"）；
- *   ④ 落库后报条数，并留一次整体撤销（写回空数组 = 打标前状态）；
+ *   ④ 落库后报条数，并留一次整体撤销（**整份覆盖**写回空数组 = 打标前状态；代价写在
+ *      `title`/`aria-label` 里，因为中途手动加的标签也会被一起清掉）；
  *   ⑤ 没有未打标事项时置灰并**说清原因**（点了也有一句 toast）。
  *
  * 所有写库都经 `emitHostIntent`（分析窗没有 `set_item_tags`），所以这里断言的是**意图**：
@@ -203,6 +204,11 @@ describe("AI 一键分类 · 只补空白（P0-6）", () => {
     /* 预览层关掉、撤销入口出现 */
     expect(dialogRows()).toHaveLength(0);
     expect(undoButton()?.textContent).toBe("撤销本次分类");
+    /* [M4] `set_item_tags` 是**整份覆盖**：撤销会把这批事项的标签整体清空，
+       连「应用」之后用户手动加上去的那几条也一起清掉。代价只能写在 title/aria-label 里，
+       因为按钮上只有四个字。`aria-label` 以可见文字开头，读屏念出的名字仍包含它（2.5.3）。 */
+    expect(undoButton()?.getAttribute("title"), "撤销键没有说出代价").toBe("撤销本次分类（会清空这批事项的标签）");
+    expect(undoButton()?.getAttribute("aria-label")).toBe("撤销本次分类（会清空这批事项的标签）");
 
     h.emitHostIntent.mockClear();
     await act(async () => { undoButton()?.click(); });

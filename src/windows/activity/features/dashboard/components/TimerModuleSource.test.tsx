@@ -58,6 +58,9 @@ const card = () => container?.querySelector<HTMLElement>(".at-card") ?? null;
 const donutTotal = () => container?.querySelector(".at-donut-total")?.textContent ?? null;
 const donutCap = () => container?.querySelector(".at-donut-cap")?.textContent ?? null;
 const emptyText = () => container?.querySelector(".at-empty")?.textContent ?? null;
+/** 读数行右段（`百分比%  ·  时长`）：环、名称、占比三者是否自洽就看这里 */
+const readoutSubs = () =>
+  Array.from(container?.querySelectorAll(".at-readout-sub") ?? []).map((node) => node.textContent);
 
 beforeEach(() => {
   container = document.createElement("div");
@@ -113,6 +116,29 @@ describe("计时分布卡 · 读数口径", () => {
     expect(tabs.map((tab) => tab.textContent)).toHaveLength(3);
     act(() => { tabs[0]?.click(); });
     expect(onDimensionChange).toHaveBeenCalledWith("category");
+  });
+
+  it("tm06_readout_percentage_comes_from_the_slice_when_the_model_gave_one", async () => {
+    /* [M1] 应用维度：读模型已经算好每一行该显示百分之几（工具类记 0，它们不在分母里）。
+       卡里若再按 `value / total` 重算，就会得到一个"诚实但错误"的 33% —— 那正是 QA 报的
+       IDM 67% / VS Code 33%（环心 3h、分类维度 1h、这一行 67% 三个数互相打架）。
+       这条把"优先印切片自带的 percentage"钉死：80m/160m 若重算会印 33%/67%。 */
+    await mount({
+      categoryDist: [
+        { ...slice("写代码", 60), percentage: 100 },
+        { ...slice("IDM", 120), percentage: 0 },
+      ],
+      dimension: "app",
+    });
+
+    expect(readoutSubs()).toEqual(["100%  ·  1h 0m", "0%  ·  2h 0m"]);
+  });
+
+  it("tm07_without_a_model_percentage_the_card_still_computes_its_own", async () => {
+    /* 分类 / 事项维度读模型不产 percentage：回退到卡内自算（与 0.12.5 逐字一致），
+       否则这两维的读数会全部变成 0% —— 修 M1 时最容易顺手弄坏的正是这里。 */
+    await mount({ categoryDist: [slice("开发", 30), slice("摸鱼", 10)], dimension: "category" });
+    expect(readoutSubs()).toEqual(["75%  ·  30m", "25%  ·  10m"]);
   });
 
   it("tm04_empty_ring_is_wrapped_so_the_caption_cannot_cover_it", async () => {

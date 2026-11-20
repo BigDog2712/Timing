@@ -146,6 +146,39 @@ describe("标签管理 · 拖动改分类", () => {
     expect(container.textContent).not.toContain("不能挂到它自己下面");
   });
 
+  /**
+   * 根投放区也得**先判再画**：`学习/考公` 拖到根、而根上已经有 `考公` 时，
+   * 那道虚线框不能先亮成"可以放"再在松手后报 `exists` —— 它在替一个放不下的
+   * 动作打包票，与行上那套"判完才画"的结论也会自相矛盾。
+   */
+  it("根上已有同名标签时，根投放区不会先亮成可放", async () => {
+    const state = makeState({
+      tree: buildTagTree(
+        ["娱乐", "娱乐/燕云", "学习/考公", "考公"].map((path) => ({ path, count: 1 })),
+      ),
+      paths: ["娱乐", "娱乐/燕云", "学习", "学习/考公", "考公"],
+    });
+    mount(state);
+
+    act(() => row("学习/考公")!.dispatchEvent(dragEvent("dragstart")));
+    const zone = container.querySelector<HTMLElement>('[aria-label="拖到这里移到一级标签"]')!;
+    expect(zone, "拖拽中根投放区没出现").not.toBeNull();
+
+    const over = dragEvent("dragover");
+    act(() => zone.dispatchEvent(over));
+    expect(zone.getAttribute("data-drop-target"), "放不下却亮了可放").not.toBe("ok");
+    expect(
+      over.defaultPrevented,
+      "放不下却 preventDefault：浏览器会把它当成合法目标（松手才报错）",
+    ).toBe(false);
+
+    await act(async () => {
+      zone.dispatchEvent(dragEvent("drop"));
+    });
+    expect(state.rename, "撞名不该发意图").not.toHaveBeenCalled();
+    expect(container.textContent).toContain("已经存在");
+  });
+
   it("搜索态下不给拖，并说明清空搜索后再拖", () => {
     mount(makeState());
     expect(row("学习/考公")!.draggable, "平时应当可拖").toBe(true);

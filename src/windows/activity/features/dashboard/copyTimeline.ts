@@ -129,6 +129,12 @@ export interface TimelineManageCopy {
   itemsStopTimer: (name: string) => string;
   /** 宿主**确认之后**才出的提示（发信侧不承诺结果，见 `useItemTimerToggle`） */
   itemsTimerStarted: (name: string) => string;
+  /**
+   * 「停」的提示。**只报"停了"，不报"记了多少"** ——
+   * 分析窗只看得到"会话离开了这一条"，看不到那段是否短到被宿主丢弃
+   * （`StopResult.discarded` 只存在于药丸进程，`timer:state-changed` 里没有这个字段）。
+   * 所以这里不许出现"已结束计时"这种听起来像"已落库"的说法，见 `useItemTimerToggle`。
+   */
   itemsTimerStopped: (name: string) => string;
   /** 连"我想干什么"都没发出去（桥断了，不是宿主的错） */
   itemsTimerSendFailed: string;
@@ -156,6 +162,12 @@ export interface TimelineManageCopy {
   itemsAiTagSkippedRows: (count: number) => string;
   /** 整体撤销（只保留最近一次，撤销后按钮消失） */
   itemsAiTagUndo: string;
+  /**
+   * 撤销键的 `title` / `aria-label`：**代价**（`set_item_tags` 是整份覆盖，
+   * 会把这批事项的标签整体清空 —— 包括应用之后手动加上的那几条）。
+   * 文案必须以可见文字开头，读屏念出的名字才包含按钮上那几个字（WCAG 2.5.3）。
+   */
+  itemsAiTagUndoHint: string;
   itemsAiTagUndone: (count: number) => string;
 }
 
@@ -216,7 +228,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsStartTimer: (name) => `开始计时：${name}`,
     itemsStopTimer: (name) => `结束计时：${name}`,
     itemsTimerStarted: (name) => `已开始计时：${name}`,
-    itemsTimerStopped: (name) => `已结束计时：${name}`,
+    itemsTimerStopped: (name) => `已停止：${name}`,
     itemsTimerSendFailed: "没通知到计时器，再点一次",
     itemsAiTagBusy: "正在分类…",
     itemsAiTagNothing: "没有需要分类的事项",
@@ -232,6 +244,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
       skipped > 0 ? `已写入 ${written} 条，跳过 ${skipped} 条` : `已写入 ${written} 条`,
     itemsAiTagSkippedRows: (count) => `另有 ${count} 条 AI 没给出建议，保持不动`,
     itemsAiTagUndo: "撤销本次分类",
+    itemsAiTagUndoHint: "撤销本次分类（会清空这批事项的标签）",
     itemsAiTagUndone: (count) => `已撤销 ${count} 条分类`,
   },
   "en-US": {
@@ -290,7 +303,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsStartTimer: (name) => `Start timer: ${name}`,
     itemsStopTimer: (name) => `Stop timer: ${name}`,
     itemsTimerStarted: (name) => `Timer started: ${name}`,
-    itemsTimerStopped: (name) => `Timer stopped: ${name}`,
+    itemsTimerStopped: (name) => `Stopped: ${name}`,
     itemsTimerSendFailed: "Couldn’t reach the timer, tap again",
     itemsAiTagBusy: "Classifying…",
     itemsAiTagNothing: "Nothing needs classifying",
@@ -306,6 +319,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
       skipped > 0 ? `Wrote ${written}, skipped ${skipped}` : `Wrote ${written}`,
     itemsAiTagSkippedRows: (count) => `${count} more got no suggestion and stay untouched`,
     itemsAiTagUndo: "Undo this tagging",
+    itemsAiTagUndoHint: "Undo this tagging (clears the tags on these items)",
     itemsAiTagUndone: (count) => `Undid ${count} taggings`,
   },
   "ru-RU": {
@@ -364,7 +378,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsStartTimer: (name) => `Начать отсчёт: ${name}`,
     itemsStopTimer: (name) => `Остановить отсчёт: ${name}`,
     itemsTimerStarted: (name) => `Отсчёт начат: ${name}`,
-    itemsTimerStopped: (name) => `Отсчёт остановлен: ${name}`,
+    itemsTimerStopped: (name) => `Остановлено: ${name}`,
     itemsTimerSendFailed: "Не удалось связаться с таймером, нажмите ещё раз",
     itemsAiTagBusy: "Идёт разметка…",
     itemsAiTagNothing: "Нет дел, которые нужно размечать",
@@ -380,6 +394,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
       skipped > 0 ? `Записано ${written}, пропущено ${skipped}` : `Записано ${written}`,
     itemsAiTagSkippedRows: (count) => `Ещё ${count} без предложений, остаются как есть`,
     itemsAiTagUndo: "Отменить эту разметку",
+    itemsAiTagUndoHint: "Отменить эту разметку (очистит теги у этих пунктов)",
     itemsAiTagUndone: (count) => `Отменено разметок: ${count}`,
   },
   es: {
@@ -438,7 +453,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsStartTimer: (name) => `Iniciar cronómetro: ${name}`,
     itemsStopTimer: (name) => `Detener cronómetro: ${name}`,
     itemsTimerStarted: (name) => `Cronómetro iniciado: ${name}`,
-    itemsTimerStopped: (name) => `Cronómetro detenido: ${name}`,
+    itemsTimerStopped: (name) => `Detenido: ${name}`,
     itemsTimerSendFailed: "No se pudo avisar al cronómetro, inténtalo otra vez",
     itemsAiTagBusy: "Clasificando…",
     itemsAiTagNothing: "No hay asuntos que clasificar",
@@ -454,6 +469,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
       skipped > 0 ? `Escritos ${written}, omitidos ${skipped}` : `Escritos ${written}`,
     itemsAiTagSkippedRows: (count) => `Otros ${count} sin sugerencia se quedan igual`,
     itemsAiTagUndo: "Deshacer esta clasificación",
+    itemsAiTagUndoHint: "Deshacer esta clasificación (borra las etiquetas de estos elementos)",
     itemsAiTagUndone: (count) => `Clasificaciones deshechas: ${count}`,
   },
 };

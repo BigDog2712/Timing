@@ -159,7 +159,11 @@ describe("提示只在宿主确认之后出（§6.5）", () => {
     await flush();
 
     await act(async () => { broadcast?.(snapshot("idle", null)); await Promise.resolve(); });
-    expect(toasts).toEqual(["已结束计时：写周报"]);
+    /* [M6] 只报"停了"。宿主那边还有第二个事实 —— 这段是不是短到被丢弃
+       （`StopResult.discarded`，药丸会飘「不足 X 秒，未记录」）—— 但它只存在于药丸进程，
+       `timer:state-changed` 的载荷里没有这个字段。所以文案不许出现"已结束计时"这种
+       听起来像"已落库"的说法：用户可能刚看到药丸说没记录，两句话会互相打脸。 */
+    expect(toasts).toEqual(["已停止：写周报"]);
   });
 
   it("tt08_a_transition_that_does_not_match_stays_silent", async () => {

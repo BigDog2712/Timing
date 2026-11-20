@@ -291,6 +291,24 @@ export default function DataTagManagerPanel({ state, onError, onAfterBulkApply }
           data-drop-target={rootTone ?? "none"}
           aria-label="拖到这里移到一级标签"
           onDragOver={(event) => {
+            /* 先判再画，与行同口径（判据只有 `reparentTagPath` 一处）。
+               不判就会"框先亮成能放、松手才报已存在" —— 那道虚线框在替一个
+               放不下的动作打包票。 */
+            if (dragging === null) return;
+            const outcome = reparentTagPath(dragging, null, state.paths);
+            if (!outcome.ok) {
+              /* `same` = 它本来就在一级，拖到这儿什么也不会变：中性，不标红
+                 （跟行上"拖回原位静默"是同一条口径）；其余真理由标红 + 说清。 */
+              if (outcome.reason === "same") {
+                setRootTone(null);
+                setDragHint(null);
+              } else {
+                setRootTone("invalid");
+                setDragHint(reparentFailureText(dragging, null, outcome.reason));
+              }
+              if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
+              return;
+            }
             event.preventDefault();
             if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
             setRootTone("ok");

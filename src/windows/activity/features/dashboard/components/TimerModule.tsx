@@ -8,6 +8,7 @@ import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { formatDashboardDuration, type CategoryDistItem } from "../services/dashboardFormatting.ts";
 import { FOCUS_DIMENSIONS, type FocusDimension } from "../services/focusDimension.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
+import { TOOL_TAG_COPY } from "../copyToolTag.ts";
 import ModuleShell, { moduleState } from "./ModuleShell.tsx";
 import type { ReactNode } from "react";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
@@ -44,6 +45,15 @@ interface Props {
   onDimensionChange: (dimension: FocusDimension) => void;
   /** 较昨日的**应用活动**总量差。只在分类 / 应用维度成立 —— 事项维度昨天没有对应读数 */
   dayDeltaTrackedTime: number;
+  /**
+   * [M2] 被「工具」标签排除在统计之外的时长（`dashboardReadModel.excludedToolTime`）。
+   *
+   * 只用于**空态那一句**：今天只有工具类应用时环里没有任何弧（工具类不进应用维度），
+   * 空卡必须说清"它们被统计口径排除了"，否则用户面对的是"卡说没记录、排行里明明有三行"。
+   *
+   * 可选是因为最小读模型（单测构造点）不产这个字段；缺省 0 = 与旧行为逐字一致。
+   */
+  excludedToolTime?: number;
   /** 快照源的同一个 `status`（E2/E3 都由它派生，不另算） */
   status: LoadStatus;
   /** 快照失败但仍有数据 = E3（卡头小图标） */
@@ -77,6 +87,7 @@ export default function TimerModule({
   dimension,
   onDimensionChange,
   dayDeltaTrackedTime,
+  excludedToolTime = 0,
   status,
   refreshError,
   onRetry,
@@ -84,6 +95,8 @@ export default function TimerModule({
   const displayColor = useActivityDisplayColor();
   const UI_TEXT = useLocaleText();
   const copy = DASHBOARD_COPY[useLocale()];
+  /* [M2] 工具类的文案表：与排行行上的「工具」标记同一份（说清"被排除"这件事） */
+  const toolCopy = TOOL_TAG_COPY[useLocale()];
   const anonymousPatternId = useId();
   /** 环弧段 ↔ 读数行 双向联动（01 §4.2）；只存下标，不存对象 */
   const [hovered, setHovered] = useState<number | null>(null);
@@ -108,8 +121,18 @@ export default function TimerModule({
   const direction = dayDeltaTrackedTime > 0 ? "increase" : dayDeltaTrackedTime < 0 ? "decrease" : "same";
   const DeltaIcon = direction === "increase" ? TrendingUp : direction === "decrease" ? TrendingDown : Minus;
   const state = moduleState(status, refreshError, readouts.length === 0);
-  /* 空态文案按维度分开：事项维度的"空"是"今天还没在事项上计时"，与"今天没记录"不同 */
-  const emptyText = isItemDimension ? copy.timerEmptyItems : copy.timerEmpty;
+  /* 空态文案按维度分开：事项维度的"空"是"今天还没在事项上计时"，与"今天没记录"不同。
+     [M2] 分类 / 应用维度的空还有第二种成因：**今天只有工具类应用**。工具类被统计口径
+     排除了（`dashboardReadModel` 的分叉点），于是环里一段都没有 —— 这时说"今天还没有
+     记录"是句假话（排行里明明有三行时长），必须换成"只有工具类应用、不计入统计"并给出
+     被排除的时长。
+     事项维度**不用**这句：那一维吃的是计时记录，跟应用有没有被标成工具毫无关系 ——
+     在事项维度上写"只有工具类应用"是拿另一把尺子解释这一把。 */
+  const emptyText = isItemDimension
+    ? copy.timerEmptyItems
+    : excludedToolTime > 0
+      ? toolCopy.emptyAllTools(formatDashboardDuration(excludedToolTime))
+      : copy.timerEmpty;
 
   let consumed = 0;
 
@@ -223,9 +246,20 @@ export default function TimerModule({
 
         <ul className="at-readouts">
           {readouts.map((item, index) => {
-            /* Rust 的图例每行两段：名称（12）与「百分比 · 时长」（10）。百分比在这层算，
-             * 用**同一份** readouts 的总量 —— 环、名称、占比三者永远自洽。 */
-            const percent = total > 0 ? Math.round((Math.max(0, item.value) / total) * 100) : 0;
+            /* Rust 的图例每行两段：名称（12）与「百分比 · 时长」（10）。
+             *
+             * [M1] 百分比**优先印切片自带的那个**（读模型算的，工具类记 0）。原来这里一律
+             * 用 `value / total` 重算，等于给同一份数据配了第二个算法：读模型把工具类判成
+             * 0%（不在分母里），重算却照样给它 67% —— 卡上就出现"环心 3h、分类维度 1h、
+             * 这一行 67%"三个数字互相打架。
+             *
+             * 只有**没有自带读数**的段才回退到自算：
+             *   · 分类 / 事项维度（读模型本来不产百分比）；
+             *   · 被 `buildReadouts` 合并出来的「其他」那一段（它是卡内新造的一段，
+             *     读数只能在这里算）。回退用的仍是同一份 readouts 的总量，环与占比自洽。 */
+            const percent = typeof item.percentage === "number"
+              ? item.percentage
+              : total > 0 ? Math.round((Math.max(0, item.value) / total) * 100) : 0;
             return (
               <li
                 key={`${item.category}:${index}`}

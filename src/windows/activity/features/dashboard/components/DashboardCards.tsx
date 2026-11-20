@@ -50,6 +50,16 @@ interface CardProps {
   /** [0.12.6 · T4] 事项管理卡的对外动作：行点击起停（`useItemTimerToggle`）+ 提示条出口 */
   itemActions: ManageCardActions;
   dayDeltaTrackedTime: number;
+  /**
+   * [M2] 被「工具」标签排除在统计之外的时长（`dashboardReadModel` 的 `excludedToolTime`）。
+   *
+   * 透传给计时卡做**空态的解释**：全是工具类应用时环里一个弧都没有，不解释一句
+   * 「今天只有工具类应用（3h）」的话，用户只会看到一张写着"今天还没有记录"的空卡，
+   * 而右下角的应用排行里明明有三行时长 —— 那是"卡坏了"的观感。
+   *
+   * 类型跟着读模型走（`number | undefined`）：最小读模型（测试里的构造点）不产这个字段。
+   */
+  excludedToolTime: DashboardReadModel["excludedToolTime"];
   snapshotStatus: DashboardReadState["status"];
   refreshError: boolean;
   onRetry: () => void;
@@ -72,10 +82,14 @@ export function buildCardBody(card: BoardCard, label: string, props: CardProps):
             name: slice.name,
             value: slice.value,
             color: slice.color,
+            /* 读模型算过的百分比原样透传（应用维度）：卡里再算一遍就是第二个口径（M1） */
+            percentage: slice.percentage,
           }))}
           dimension={props.focusDimension}
           onDimensionChange={props.onDimensionChange}
           dayDeltaTrackedTime={props.dayDeltaTrackedTime}
+          /* [M2] 「今天只有工具类应用」那句空态要用的数：被统计口径排除掉的时长 */
+          excludedToolTime={props.excludedToolTime}
           {...props.snapshotProps}
         />
       );

@@ -12,13 +12,15 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
  *   · `totalTrackedTime` / `categoryDist` **不含**工具类（`tw01`）；
  *   · `topApplications` **仍含**工具类，且 `isTool=true`、占比记 0（`tw02`）；
  *   · `excludedToolTime` = 被拿掉的那部分（"我的总时长为什么少了"的唯一解释）；
- *   · 环比（`dayDeltaTrackedTime`）与今日同一口径，否则"今天"和"昨天"不可比（`tw03`）。
+ *   · 环比（`dayDeltaTrackedTime`）与今日同一口径，否则"今天"和"昨天"不可比（`tw03`）；
+ *   · 三个消费点（应用维度 / 排行卡头 / `totalTrackedTime`）逐毫秒同量（`tw07`，M1 回归）。
  *
  * 变异靶点：把 `categoryDist: buildCategoryDistribution(toolSplit.counted)` 改回
  * `buildCategoryDistribution(stats)` → tw01 红；把 `splitToolStats` 恒返回全量 →
  * tw01 / tw02 / tw03 全红。
  */
 import { buildDashboardReadModel, type DashboardReadModel } from "./dashboardReadModel.ts";
+import { buildFocusDistribution } from "./focusDimension.ts";
 import { ProcessMapper } from "../../../shared/classification/processMapper.ts";
 import { AppClassification } from "../../../shared/classification/appClassification.ts";
 import type { AggregateSessionRecord } from "../../../platform/persistence/sessionReadRepository.ts";
@@ -124,5 +126,38 @@ describe("[P0-9] 工具标签的统计口径", () => {
     expect(model.totalTrackedTime).toBe(HOUR);
     expect(model.excludedToolTime).toBe(0);
     expect(model.topApplications[0]?.isTool).toBe(false);
+  });
+
+  /**
+   * [0.12.6 · M1] 三个消费点必须是同一个数。
+   *
+   * QA 那一组：`totalTrackedTime=1h, excludedToolTime=2h`，而应用维度合计 3h、
+   * 排行卡头也 3h —— 用户在同一块板上看见 1h 和 3h，没有任何办法知道哪个是对的。
+   * 这条钉的是**读模型给出去的原料**：`topApplications` 里把 `isTool` 的行按 0 计，
+   * 剩下的合计必须逐毫秒等于 `totalTrackedTime`；应用维度（`fromApplications`）同理。
+   * 组件自己那两处（卡头 `meta` / 读数行百分比）分别钉在
+   * `AppsModule.test.tsx`（apps15）与 `TimerModuleSource.test.tsx`（tm06）。
+   */
+  it("tw07_应用维度与排行卡头都只吃已计入的合计", () => {
+    const model = readModel(TODAY);
+    const byApp = buildFocusDistribution("app", {
+      categories: model.categoryDist,
+      applications: model.topApplications,
+      items: [],
+    });
+
+    expect(byApp.total, "应用维度把工具类的时长加回来了").toBe(model.totalTrackedTime);
+    expect(byApp.slices.map((slice) => slice.key), "工具类跑进了应用维度的环").toEqual(["code.exe"]);
+    /* 切片带着读模型算好的百分比（100 = 分母是已计入的 1h，不是全量 2.5h） */
+    expect(byApp.slices[0]?.percentage).toBe(100);
+
+    const headTotal = model.topApplications.reduce(
+      (sum, app) => sum + (app.isTool === true ? 0 : Math.max(0, app.duration)),
+      0,
+    );
+    expect(headTotal, "排行卡头合计与计时卡不是同一个数").toBe(model.totalTrackedTime);
+    /* 工具行仍在列表里（有 `isTool` 标记），只是不进合计 */
+    expect(model.topApplications.filter((app) => app.isTool === true).map((app) => app.exeName))
+      .toEqual(["idm.exe", "wt.exe"]);
   });
 });

@@ -83,7 +83,10 @@ export default function Dashboard({
      提到这一层是因为它要订阅事件、要 toast —— 卡里只管画。 */
   const itemTimer = useItemTimerToggle(onToast);
 
-  const { categoryDist, topApplications, dayDeltaTrackedTime } = dashboard;
+  /* [M2] `excludedToolTime` 也要装配上来：计时卡的空态要靠它解释"今天的时长去哪了"。
+     读模型早就产了这个数（`dashboardReadModel.ts:210`），只是一直没人消费 ——
+     结果是"全是工具类应用"的那一天，卡里说「今天还没有记录」，排行里却有三行时长。 */
+  const { categoryDist, topApplications, dayDeltaTrackedTime, excludedToolTime } = dashboard;
 
   /* E3 = 快照失败但仍有数据（卡头小图标）；E2 = 失败且无数据（卡内一块）。同一处分派，不另算 */
   const snapshotStatus = readState.status;
@@ -139,7 +142,7 @@ export default function Dashboard({
     topApplications, icons, onOpenMapping,
     todosModel, notesModel, todayItems, snapshotProps,
     itemActions: { itemTimer, onToast },
-    dayDeltaTrackedTime,    snapshotStatus, refreshError, onRetry: readState.retry,
+    dayDeltaTrackedTime,    snapshotStatus, refreshError, onRetry: readState.retry, excludedToolTime,
     trend: trendModel, heatmap: heatmapModel,
   };
 

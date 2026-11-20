@@ -8,6 +8,15 @@ export interface CategoryDistItem {
   name: string;
   value: number;
   color: string;
+  /**
+   * 这一段的百分比（整数）。**只有读模型已经算过的那一维才带**（应用维度，见
+   * `focusDimension.fromApplications`）；分类 / 事项维度缺省 = 计时卡自己按
+   * `value / total` 算（与 0.12.5 逐字一致）。
+   *
+   * 为什么不是必填：这个类型在仓里被当成"环的一段"用（计时卡的 `categoryDist` prop
+   * 吃的是 `focus.slices`），两条来源都往这里灌 —— 硬要一个字段，另一条就得编一个。
+   */
+  percentage?: number;
 }
 
 export interface TopApplicationItem {

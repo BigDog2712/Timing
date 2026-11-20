@@ -66,9 +66,17 @@ export default function AppsModule({
   /* [0.12.6 · P0-9] 行上「工具」标记的文案：单独一张表（`copy.ts` 已被另一位工程师占着） */
   const toolCopy = TOOL_TAG_COPY[useLocale()];
   const visible = applications.slice(0, 5);
-  /* 卡头读数是**全部应用的合计**（exe `meta(Apps)` = `dur(apps_total_ms)`），
-     不是被卡片高度裁剩的那几条之和 —— 那两个数在窄卡上会差很多。 */
-  const totalDuration = applications.reduce((sum, app) => sum + Math.max(0, app.duration), 0);
+  /* 卡头读数是**全部已计入统计的应用**的合计（exe `meta(Apps)` = `dur(apps_total_ms)`
+     的同一位置），不是被卡片高度裁剩的那几条之和 —— 那两个数在窄卡上会差很多。
+     [M1] 工具类**不进**这个合计：它们的时长已经被读模型从总量/分类分布里扣掉了
+     （`splitToolStats`），在这里再加回来，计时卡写「今日 1h」、这张卡头写 3h，
+     用户只能判定"有一张卡在撒谎"，而他没有任何办法知道是哪一张。
+     列表本身照旧**全量**（`visible` 吃 `applications`）：工具行还带着「工具」标记和
+     自己的时长 —— 那是"我装了 IDM、它被标成工具了"的唯一出口，删了就没处查了。 */
+  const totalDuration = applications.reduce(
+    (sum, app) => sum + (app.isTool === true ? 0 : Math.max(0, app.duration)),
+    0,
+  );
   const state = moduleState(status, refreshError, visible.length === 0);
 
   const { bindings, items } = useAppItemBindings();

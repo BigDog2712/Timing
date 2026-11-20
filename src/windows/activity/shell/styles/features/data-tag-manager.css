@@ -213,3 +213,11 @@
   background: color-mix(in srgb, var(--at-accent-default) 10%, transparent);
   color: var(--at-text-secondary);
 }
+
+/* 放不下时（例如根上已经有同名标签）：虚线框得**变**，否则它与中性态一模一样，
+   用户看不出"判过了、是不行"。理由那句在列表下方，这里只给一次颜色回答。 */
+.dtm-drop-root[data-drop-target="invalid"] {
+  border-color: color-mix(in srgb, var(--at-danger) 55%, transparent);
+  background: color-mix(in srgb, var(--at-danger) 10%, transparent);
+  color: var(--at-text-secondary);
+}
