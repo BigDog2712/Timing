@@ -110,7 +110,22 @@ export type HostIntent =
    *
    * `tags` 是**全量覆盖**（与 `set_item_tags` 一致，不是增量）。字段名与
    * `src/services/hostIntentBridge.ts` 逐字一致（L9 两侧各写一份，靠镜像用例钉相等）。 */
-  | { action: "set_item_tags"; itemId: number; tags: readonly string[] };
+  | { action: "set_item_tags"; itemId: number; tags: readonly string[] }
+  /* ── [0.12.6 · T4] 合并卡「事项」上区的**行点击起停** ──
+   * 为什么是两条意图而不是一条 `toggle_item_timer`：起停的**方向**由分析窗按宿主广播的
+   * `timer:state-changed` 决定（`session.itemId === 点的那一条` ⇒ 停，否则 ⇒ 起），但通道一旦
+   * 把"切换"当动作，宿主就必须自己再判一次方向 —— 两处判据必然漂（分析窗以为在停、宿主以为
+   * 在起，用户看到的是"点一下跑两下"）。所以动作显式化成两条，方向只在**发信侧**判一次。
+   *
+   * `start_timer_for_item` 走宿主 `timerStore.startOrSwitch(itemId)`：已经在计别的事项时
+   * 会先暂停冻结累计再分段切过去（`useTimerActions.startOrSwitch` 的那条语义，与药丸点
+   * 事项菜单完全同一条路）。**不做乐观切换**：行上的"正在计时"一律读广播，不本地置位。
+   *
+   * 字段名与 `src/services/hostIntentBridge.ts`（药丸侧）逐字一致（L9 两侧各写一份，
+   * 靠 `features/dashboard/services/hostIntentMirror.test.ts` 钉集合与字段）。 */
+  | { action: "start_timer_for_item"; itemId: number }
+  /** 结束当前这一段并落库（宿主 `timerStore.stop()`）。没有会话时宿主侧静默忽略。 */
+  | { action: "stop_timer" };
 
 /**
  * 发一条意图。返回「有没有发出去」——**不是**「宿主做成了没有」。

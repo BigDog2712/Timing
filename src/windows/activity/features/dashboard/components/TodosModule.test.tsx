@@ -44,9 +44,9 @@ vi.mock("../../../platform/runtime/hostIntentGateway.ts", () => ({ emitHostInten
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { useTodayTodos } from "../hooks/useTodayTodos.ts";
 import type { TodoSummary } from "../../../shared/types/todos.ts";
-import TodosModule from "./TodosModule.tsx";
+import TodosZone from "./TodosZone.tsx";
 
-/* TodosModule 的 useLayoutEffect 里 new ResizeObserver：jsdom 没有，给个空实现 */
+/* 下区的 useLayoutEffect 里 new ResizeObserver：jsdom 没有，给个空实现 */
 class ResizeObserverStub {
   observe(): void {}
   unobserve(): void {}
@@ -57,9 +57,15 @@ class ResizeObserverStub {
 /* 真链路：挂真的 hook，这样 `model.createBatch` / `model.update` 的失败/成功路径都走生产代码 */
 let latest: ReturnType<typeof useTodayTodos> | null = null;
 
+/* [0.12.6] 待办是「今日时间线」卡的**上区**（`TodosZone`）：这一册只判待办那一半，
+   所以只挂这一个区 —— 它只收 `todosModel`，计时记录源一条都不碰（不发 list_items /
+   list_records），待办行为与"卡里还有没有别的区"无关。 */
 function Harness(): null {
   latest = useTodayTodos(0);
-  return createElement(TodosModule, { model: latest }) as unknown as null;
+  return createElement(TodosZone, {
+    todosModel: latest,
+    refreshError: false,
+  }) as unknown as null;
 }
 
 let container: HTMLDivElement | null = null;
@@ -144,7 +150,7 @@ afterEach(() => {
   root = null;
 });
 
-describe("TodosModule · 新建待办（批量）", () => {
+describe("上区 · 新建待办（批量）", () => {
   it("tq01_the_card_head_action_opens_the_dialog", async () => {
     await mount();
     expect(dialog()).toBeNull();
@@ -249,43 +255,46 @@ describe("TodosModule · 新建待办（批量）", () => {
   });
 });
 
-describe("TodosModule · 新建入口在卡头下方那一行（[本轮]）", () => {
+describe("上区 · 「新建待办」那一行的位置", () => {
   it("tq08_the_entry_lives_below_the_card_head_and_survives_the_empty_state", async () => {
     /* 空态（今天一条待办都没有）必须**也有**入口：这正是「新建」最该出现的时刻，
-       也是 old 版把它放在 footer 的唯一理由。搬到卡头下方之后这条语义不许丢。 */
+       也是 old 版把它放在 footer 的唯一理由。搬到区标题行下方之后这条语义不许丢。 */
     await mount();
+    /* 区根节点带 `data-zone="todos"`：上区=待办、下区=时间线，两区靠它区分（见
+       `TimelineTodosCard.test.tsx` 的顺序判据）。 */
+    expect(container?.querySelector('[data-zone="todos"]'), "待办区没有 data-zone 标记").not.toBeNull();
     const entry = byText("新建待办");
     expect(entry, "空态没有「新建待办」= 入口被四态门控吃掉了").not.toBeUndefined();
-    expect(entry?.closest(".at-todo-new-row"), "入口必须在那条通栏窄行里（ModuleShell 的 subhead）")
+    expect(entry?.closest(".at-todo-new-row"), "入口必须在那条通栏窄行里（区标题行之下、列表之上）")
       .not.toBeNull();
-    expect(entry?.closest(".at-card-head-right"), "入口已从卡头右槽下移，不许留在那儿")
+    expect(entry?.closest(".at-items-zone-head"), "入口不许挤进区标题行（那行要留给标题与读数）")
       .toBeNull();
     expect(container?.querySelector(".at-card-foot, .at-todo-foot"), "卡底那条入口条必须已经下线")
       .toBeNull();
   });
 
-  it("tq09_the_entry_row_sits_after_the_head_and_before_the_list", async () => {
-    /* 位置判据（[本轮] 用户口径「往下挪」）：那一行是**卡头的下一个兄弟**，而且排在列表
-       之前。搬回卡头右槽 / 掉到列表下面都会被这一条挡住 —— 变异靶点。 */
+  it("tq09_the_entry_row_sits_after_the_zone_head_and_before_the_list", async () => {
+    /* 位置判据（用户口径「往下挪」）：那一行紧跟在**区标题行**之后，且排在列表之前。
+       搬进区标题行 / 掉到列表下面都会被这一条挡住 —— 变异靶点。 */
     h.listPendingTodos.mockResolvedValue([todo(1)]);
     await mount();
-    const head = container?.querySelector(".at-card-head");
+    const head = container?.querySelector(".at-items-zone-head");
     const row = container?.querySelector(".at-todo-new-row");
     const list = container?.querySelector(".at-todo-list");
-    expect(head, "找不到卡头").not.toBeNull();
+    expect(head, "找不到区标题行").not.toBeNull();
     expect(row, "找不到「新建待办」那一行").not.toBeNull();
     expect(list, "ready 态应有列表").not.toBeNull();
-    expect(head?.nextElementSibling, "那一行必须紧跟在卡头之后").toBe(row);
+    expect(head?.nextElementSibling, "那一行必须紧跟在区标题行之后").toBe(row);
     /* `compareDocumentPosition`：row 在 list **之前**（FOLLOWING 位） */
     expect((row as Node).compareDocumentPosition(list as Node) & Node.DOCUMENT_POSITION_FOLLOWING)
       .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    /* 右槽里不再有入口键：读数与 `⋯` 控件才该占那儿 */
-    expect(container?.querySelector(".at-card-head-right .at-link-btn"), "卡头右槽里不该再有入口键")
+    /* 区标题行里不摆入口键：那一行留给标题 / 读数 / 总计 */
+    expect(container?.querySelector(".at-items-zone-head .at-link-btn"), "区标题行里不该有入口键")
       .toBeNull();
   });
 });
 
-describe("TodosModule · 列表全量渲染（V-1.7a）", () => {
+describe("上区 · 列表全量渲染（V-1.7a）", () => {
   it("tq07_eight_todos_render_eight_rows_and_the_meta_counts_them_all", async () => {
     /* 显示**所有**未完成待办 —— 前端切片截断会让"还有 N 项"之外的事永远看不见 */
     h.listPendingTodos.mockResolvedValue(Array.from({ length: 8 }, (_, i) => todo(i + 1)));
@@ -293,7 +302,75 @@ describe("TodosModule · 列表全量渲染（V-1.7a）", () => {
 
     const rows = container?.querySelectorAll(".at-todo-row") ?? [];
     expect(rows).toHaveLength(8);
-    const meta = container?.querySelector(".at-card-meta")?.textContent ?? "";
+    /* 读数在上区标题行（`.at-todo-meta`）；总计是下区标题行的 `.at-card-meta`，两码事 */
+    const meta = container?.querySelector(".at-todo-meta")?.textContent ?? "";
     expect(meta).toContain("8 条待办");
+  });
+});
+
+/**
+ * [0.12.6] 并进时间线卡**没有**削掉待办能力 —— 这条是"两张卡变一张"最大的回归面。
+ *
+ * 搬迁最容易出的三种静默退化，都不报错、只是"少了点什么"：
+ *   ① 勾选 / 提醒铃铛 / 时间胶囊 / 编辑键里少了任何一个（行还在，功能没了）；
+ *   ② 勾选后不再有 3 秒撤销条（用户勾错一次就只能自己去后端改回来）；
+ *   ③ 编辑键点了没反应（`onEdit` 忘了接线，弹层状态改了但消费它的组件没挂载）。
+ * 所以这里判的是**行上的可交互元素 + 它们真的通到写命令**，不是"渲染了 8 行"。
+ */
+describe("上区 · 待办能力在合并卡里原样保留（0.12.6）", () => {
+  /** 今天 09:30：时间胶囊与提醒铃铛都按本地时分渲染 */
+  const today = new Date();
+  today.setHours(9, 30, 0, 0);
+  const NINE_THIRTY = today.getTime();
+
+  const row = () => container?.querySelector<HTMLElement>(".at-todo-row") ?? null;
+
+  it("tq10_a_row_still_carries_checkbox_reminder_bell_time_chip_and_edit_key", async () => {
+    h.listPendingTodos.mockResolvedValue([todo(1, { plannedAt: NINE_THIRTY, remindAt: NINE_THIRTY })]);
+    await mount();
+
+    /* 勾选：`role=checkbox` + 状态换成"目标状态"，读屏用户才不会重复做同一件事 */
+    const check = row()?.querySelector<HTMLElement>(".at-todo-check");
+    expect(check?.getAttribute("role")).toBe("checkbox");
+    expect(check?.getAttribute("aria-checked")).toBe("false");
+    /* 时间胶囊：计划时刻（没排期时这一格整个不画，见 `PlannedChip`） */
+    expect(row()?.querySelector(".at-todo-time")?.textContent).toBe("09:30");
+    /* 提醒铃铛：`remindAt` 非 null 才有 */
+    expect(row()?.querySelector(".at-todo-bell")?.getAttribute("aria-label")).toContain("09:30");
+    /* 编辑键仍在（按 id 打开单条编辑弹层） */
+    expect(row()?.querySelector(".at-todo-edit")?.getAttribute("aria-label")).toContain("编辑");
+  });
+
+  it("tq11_ticking_the_box_writes_through_and_leaves_an_undo_bar", async () => {
+    h.listPendingTodos.mockResolvedValue([todo(1)]);
+    await mount();
+
+    act(() => { row()?.querySelector<HTMLButtonElement>(".at-todo-check")?.click(); });
+    await flush();
+
+    /* 勾选 = 立即落库；撤销条同时出现（3 秒内可反悔） */
+    expect(h.toggleTodo).toHaveBeenCalledWith(1, true);
+    expect(container?.querySelectorAll(".at-todo-row")).toHaveLength(0);
+    const undo = container?.querySelector<HTMLButtonElement>(".at-undo-btn");
+    expect(undo?.textContent).toBe("撤销");
+
+    /* 撤销 = 反向再调一次（`todo_toggle` 已落库，不能靠"不发请求"撤销） */
+    act(() => undo?.click());
+    await flush();
+    expect(h.toggleTodo).toHaveBeenLastCalledWith(1, false);
+    expect(container?.querySelectorAll(".at-todo-row")).toHaveLength(1);
+  });
+
+  it("tq12_the_edit_key_opens_the_row_dialog_prefilled", async () => {
+    h.listPendingTodos.mockResolvedValue([todo(1, { title: "看论文", plannedAt: NINE_THIRTY })]);
+    await mount();
+
+    act(() => { row()?.querySelector<HTMLButtonElement>(".at-todo-edit")?.click(); });
+    await flush();
+
+    /* 弹层是本区根节点的兄弟（不是列表的 children）：挂进条件分支就会"点得到没反应" */
+    const editor = document.body.querySelector<HTMLElement>(".at-todo-dialog");
+    expect(editor, "编辑键点了没有弹出编辑层").not.toBeNull();
+    expect(editor?.querySelector<HTMLInputElement>("input.at-todo-name-input")?.value).toBe("看论文");
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildTimelineRows, todayTimedItemIds } from "./TimelineCard";
+/* [0.12.6] 纯函数搬到服务层（卡壳 `TimelineCard.tsx` 已随合并卡下线），判据一条不动 */
+import { buildTimelineRows, todayTimedItemIds } from "../services/timelineRows";
 import type { TodayItemRow } from "../hooks/useTodayItems";
 
 /**

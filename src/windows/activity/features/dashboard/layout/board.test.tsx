@@ -110,7 +110,7 @@ describe("DashboardBoard", () => {
     mount();
     const before = frames().length;
     act(() => {
-      useBoardStore.getState().add("todos");
+      useBoardStore.getState().add("timeline");
     });
     expect(frames().length).toBe(before + 1);
   });

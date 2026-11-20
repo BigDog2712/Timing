@@ -108,7 +108,7 @@ describe("tidyCards", () => {
       card(1, 137, 421, 340, 304, "timer"),
       card(2, 901, 33, 330, 304, "apps"),
       card(3, 0, 700, 500, 304, "trend"),
-      card(4, 200, 100, 340, 424, "todos"),
+      card(4, 200, 100, 340, 424, "timeline"),
     ];
     const tidy = tidyCards(messy);
     /* 逐张按「放得下且游标最靠上」的列落位（exe `pack()`）：

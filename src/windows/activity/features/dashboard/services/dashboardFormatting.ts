@@ -18,6 +18,31 @@ export interface TopApplicationItem {
   suspiciousDuration: number;
   percentage: number;
   categoryInitial: string;
+  /**
+   * [0.12.6 · P0-9] 这个应用带「工具」标签（下载器 / 终端 / 截图 / 系统维护）。
+   *
+   * 语义只有一条：**它不计入统计**（总量 / 分类分布 / 占比分母），但**仍在排行里出现**
+   * —— 用户要能在排行上看见"我装了 IDM，它被标成工具了"，否则"我的总时长怎么少了"
+   * 永远查不出来。行上的「工具」小标记读的就是这个字段。
+   *
+   * 为什么是**可选**：`TopApplicationItem` 在测试里是手写字面量（`AppsModule.test.tsx`），
+   * 加成必填会让所有构造点一起编译失败。缺省语义 = `false`（不是工具类）。
+   */
+  isTool?: boolean;
+}
+
+/** `buildTopApplications` 的统计口径（缺省 = 全部应用都算，老调用点行为不变） */
+export interface TopApplicationOptions {
+  /**
+   * 判定这一行是不是**工具类**（由调用方给出，唯一判据在 `dashboardReadModel`）。
+   *
+   * 为什么不在这里import `isToolTags` 自己算：统计过滤必须只有**一个实现点**
+   * （`dashboardReadModel.ts`），否则"排行里的标记"与"总量里扣掉的那部分"会各判一次，
+   * 两边规则一歪，用户就会看到"标了工具、总时长却没变"。
+   */
+  isTool?: (stat: AppStat) => boolean;
+  /** 占比分母；缺省 = 本批合计。统计口径剔除工具应用时由调用方传"已计入"的合计 */
+  totalDuration?: number;
 }
 
 export function formatDashboardDuration(ms: number) {
@@ -75,23 +100,41 @@ export function formatWeekdayNarrow(startMs: number, locale: string): string {
   }
 }
 
-export function buildTopApplications(stats: AppStat[]): TopApplicationItem[] {
-  const totalTrackedTime = getTotalTrackedTime(stats);
+/**
+ * 应用排行（**全量**，含工具类）。
+ *
+ * 三条口径：
+ *   · 排行本身**不筛人**：工具类应用照样出现在列表里，只是 `isTool=true`、占比记 0 ——
+ *     它们已经从统计口径里被拿掉了，再给一个"占已计入时长的百分比"会算出一个 >100%
+ *     的数（IDM 2h + 写代码 1h）；
+ *   · 占比分母由调用方定（`options.totalDuration`）：`dashboardReadModel` 传"剔除工具类
+ *     之后"的合计，于是排行里各非工具项的占比仍按统计口径细分；
+ *   · 老调用点（`buildTopApplications(stats)`）不传 options → 全部 `isTool=false`、
+ *     分母 = 本批合计，行为与 0.12.5 逐字一致。
+ */
+export function buildTopApplications(
+  stats: AppStat[],
+  options: TopApplicationOptions = {},
+): TopApplicationItem[] {
+  const isTool = options.isTool ?? (() => false);
+  const totalTrackedTime = options.totalDuration ?? getTotalTrackedTime(stats);
 
   return stats.map((item) => {
     const mapped = AppClassification.mapApp(item.exeName, { appName: item.appName });
     const overrideName = AppClassification.getUserOverride(item.exeName)?.displayName?.trim();
     const name = overrideName || item.appName.trim() || mapped.name;
+    const tool = isTool(item);
     return {
       exeName: item.exeName,
       name,
       color: mapped.color,
       duration: Math.max(0, item.totalDuration),
       suspiciousDuration: Math.max(0, item.suspiciousDuration),
-      percentage: totalTrackedTime > 0
-        ? Math.round((Math.max(0, item.totalDuration) / totalTrackedTime) * 100)
-        : 0,
+      percentage: tool || totalTrackedTime <= 0
+        ? 0
+        : Math.round((Math.max(0, item.totalDuration) / totalTrackedTime) * 100),
       categoryInitial: mapped.category[0].toUpperCase(),
+      isTool: tool,
     };
   });
 }

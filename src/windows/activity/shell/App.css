@@ -57,6 +57,12 @@
 @import "./styles/features/dashboard-card-fit.css";
 @import "./styles/features/dashboard-todos-compose.css";
 @import "./styles/features/dashboard-todos.css";
+/* [0.12.6] 合并卡「事项」（上区事项管理 / 下区今日时间线 + 贯穿卡宽的浅分隔线）。
+ * 排在 `dashboard-todos.css` / `dashboard-timeline-manage.css` 之后：它除了
+ * `.at-card-items*` 自己那一族，还给 `.at-timeline-rows` / `.at-undo-bar` /
+ * `.at-timeline-manage` 补了**以 `.at-card-items` 作前缀**的卡内版式 —— 前缀让权重更高，
+ * 顺序在这里只是"依赖先加载"的表达，不靠它抢覆盖。 */
+@import "./styles/features/dashboard-items-card.css";
 @import "./styles/features/dashboard-notes.css";
 /* [A 批 · 0.12.x] 卡头控件（⋯ 菜单 + grip）与手柄显形。dnd.css 只新增
  * .at-card-more / .at-card-menu-* / .at-card-grip，不覆盖既有规则，

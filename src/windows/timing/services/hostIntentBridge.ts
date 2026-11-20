@@ -64,7 +64,14 @@ type HostIntent =
    *  （L9 两侧各写一份，靠 `hostIntentMirror.test.ts` 钉集合与字段）。
    *  分析窗没有 `set_item_tags` 写命令，只能喊意图、由这里用 `tagApi.set` 落库。
    *  `tags` 是全量覆盖（与命令语义一致）。 */
-  | { action: 'set_item_tags'; itemId: number; tags: readonly string[] };
+  | { action: 'set_item_tags'; itemId: number; tags: readonly string[] }
+  /** [0.12.6 · T4] 合并卡的事项行点击起停：字段名与 `hostIntentGateway.ts` 逐字一致
+   *  （L9 两侧各写一份，靠 `hostIntentMirror.test.ts` 钉集合与字段）。
+   *  方向由**发信侧**按 `timer:state-changed` 判好再发 —— 这里只忠实执行：
+   *  `start_timer_for_item` 走 `startOrSwitch`（在计别的就先暂停分段再切过去），
+   *  `stop_timer` 走 `stop`（没有会话时宿主侧静默忽略）。 */
+  | { action: 'start_timer_for_item'; itemId: number }
+  | { action: 'stop_timer' };
 
 /** 菜单在药丸内容区里的固定锚点（见 gateway 侧「锚点口径」注释）。 */
 const PILL_ANCHOR = { x: 12, y: 12 } as const;
@@ -107,7 +114,7 @@ async function ensureItemByName(rawName: string): Promise<{ id: number } | null>
  * 挂两处会让同一条意图被执行两次（`toggle_timer` 连切两下 = 看起来没反应）。
  */
 export function useHostIntentBridge(): void {
-  const { startOrSwitch, togglePause } = useTimerActions();
+  const { startOrSwitch, togglePause, stop } = useTimerActions();
 
   const handleStartForActivity = useCallback(async (itemName: string) => {
     try {
@@ -249,11 +256,23 @@ export function useHostIntentBridge(): void {
           });
         });
         return;
+      /* [0.12.6 · T4] 合并卡的事项行点击起停。**方向已在发信侧判好**（发信侧订阅
+         `timer:state-changed`，看到「正在计的就是这一条」才发 `stop_timer`），
+         所以这里不做二次判断、也不做乐观切换：一次点击只会产生一条记录。
+         `start_timer_for_item` 走 `startOrSwitch`（与用户点药丸大按钮同一条路径）：
+         空闲就直接开始，正在计别的就先暂停冻结累计再分段切过去。
+         `stop_timer` 走 `stop`：没有会话时宿主侧静默忽略（`stop` 内部已经 notify 失败口径）。 */
+      case 'start_timer_for_item':
+        void startOrSwitch(intent.itemId);
+        return;
+      case 'stop_timer':
+        void stop();
+        return;
       default:
         /* 分析窗版本比药丸新时可能发来不认识的动作：忽略，不抛、不提示 */
         return;
     }
-  }, [handleStartForActivity, handleBackfill, togglePause, handleUpdateRecordTime]);
+  }, [handleStartForActivity, handleBackfill, togglePause, stop, startOrSwitch, handleUpdateRecordTime]);
 
   useTauriEvent<HostIntent>(HOST_INTENT, handleIntent);
 }

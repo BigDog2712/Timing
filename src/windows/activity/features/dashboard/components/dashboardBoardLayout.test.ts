@@ -7,7 +7,7 @@ import canvasSource from "../layout/BoardCanvas.tsx?raw";
 import zoomSource from "../layout/useBoardZoom.ts?raw";
 import frameSource from "../layout/BoardCardFrame.tsx?raw";
 import dragSource from "../layout/useBoardDrag.ts?raw";
-import todosSource from "./TodosModule.tsx?raw";
+import todosZoneSource from "./TodosZone.tsx?raw";
 
 /**
  * [v3 自由摆位] 主界面「板子塌了 / 缩放没接对 / 卡拖不动」的回归判据。
@@ -112,13 +112,25 @@ describe("三种抓取（移动 / 改宽 / 改高）", () => {
 describe("组件分发", () => {
   it("p05a_all_kinds_dispatch_to_real_components", async () => {
     const cards = (await import("./DashboardCards.tsx?raw")).default as string;
-    /* [本轮 T04] 活动提醒回归为新卡（原工具页分区迁入） */
-    for (const tag of ["TimerModule", "AppsModule", "TodosModule", "NotesStrip", "TimelineCard", "TrendModule", "HeatmapModule", "ReminderModule"]) {
+    /* [本轮 T04] 活动提醒回归为新卡（原工具页分区迁入）。
+       [0.12.6] 两张卡壳按用户口径拆成 `timeline`（上区待办 / 下区记录）与 `manage`
+       （事项管理）—— 分发里必须是这两个名字，写回作废的合并卡就是"点开少半屏"。 */
+    for (const tag of [
+      "TimerModule",
+      "AppsModule",
+      "TimelineTodosCard",
+      "ManageCard",
+      "NotesStrip",
+      "TrendModule",
+      "HeatmapModule",
+      "ReminderModule",
+    ]) {
       expect(cards, `分发里少了 ${tag}`).toContain(`<${tag}`);
     }
-    /* 下线的组件不许留在分发里：留着就是「能加成空框」（[本轮 T04] ReminderModule 回归，摘出名单） */
-    for (const gone of ["ItemsModule"]) {
-      expect(cards, `${gone} 已下线`).not.toContain(gone);
+    /* 下线的组件不许留在分发里：留着就是「能加成空框」。
+       [0.12.6] `TodosModule` / `TimelineCard` 两张旧卡壳、作废的合并卡 `ItemsCard` 一起下线。 */
+    for (const gone of ["ItemsModule", "TodosModule", "TimelineCard", "ItemsCard", "ItemsTimelineZone"]) {
+      expect(cards, `${gone} 已下线`).not.toContain(`<${gone}`);
     }
   });
 });
@@ -132,19 +144,23 @@ describe("组件分发", () => {
  */
 describe("时间线卡的行容器守卫", () => {
   it("p06a_timeline_rows_scroll_instead_of_clipping", () => {
-    const layoutCss = readCss("../../../shell/styles/features/dashboard-layout.css");
-    const rows = cssBlock(layoutCss, ".at-card-timeline .at-timeline-rows");
-    expect(rows, "行容器必须纵向可滚（否则 S 档裁半行）").toContain("overflow-y: auto");
+    /* [0.12.6] 行容器现在挂在**时间线卡的下区**（时间线区）：`.at-card-items` 是那张卡的
+       卡壳类名（`__upper` 是待办区、`__lower` 是时间线区），原来那条 `.at-card-timeline`
+       规则随旧卡壳下线，判据改读新文件。 */
+    const itemsCss = readCss("../../../shell/styles/features/dashboard-items-card.css");
+    const rows = cssBlock(itemsCss, ".at-card-items .at-timeline-rows");
+    expect(rows, "行容器必须纵向可滚（否则窄档裁半行）").toContain("overflow-y: auto");
     expect(rows, "横向仍要裁：时间线不横向滚动").toContain("overflow-x: hidden");
     /* 行项不许被压扁：列向 flex 子项默认 `flex-shrink: 1`，容器一矮就把 30px 挤成 26/15。
        压扁比裁行更隐蔽（裁口消失了，但行高已经不是 30），所以这条也要钉。 */
-    expect(cssBlock(layoutCss, ".at-timeline-row"), "行高必须固定 30，不许被压缩")
-      .toContain("flex: 0 0 auto");
+    expect(cssBlock(readCss("../../../shell/styles/features/dashboard-layout.css"), ".at-timeline-row"),
+      "行高必须固定 30，不许被压缩").toContain("flex: 0 0 auto");
   });
 });
 
 /**
- * 待办卡的卡底 / 收缩守卫（2026-11-12 建，[本轮] 入口从卡底 footer 搬到卡头后重锚）。
+ * 待办区（`.at-card-items__upper`）的卡底 / 收缩守卫
+ * （2026-11-12 建，[本轮] 入口从卡底 footer 搬到区标题行下方后重锚）。
  *
  * 两类"改回去零报错、只会某天被报『撤销条悬空 / 卡片顶出滚动』"的接线：
  *  ① 撤销条是 absolute；卡底那条 32 高的入口条（`.at-todo-foot`）本轮随入口搬到卡头
@@ -152,7 +168,7 @@ describe("时间线卡的行容器守卫", () => {
  *     还留着 `--at-card-foot-h` 就是照旧几何算的 —— 没有实体接住那 32px，撤销条会悬空。
  *  ② 列表是 flex 子项，默认 `min-height: auto` —— 容器一矮，列表拒不收缩，整卡被顶出滚动区。
  */
-describe("待办卡的卡底守卫", () => {
+describe("待办区的卡底守卫", () => {
   it("p07a_todo_undo_bar_sits_above_the_card_bottom_padding", () => {
     const css = readCss("../../../shell/styles/features/dashboard-todos.css");
     const bar = cssBlock(css, ".at-undo-bar");
@@ -171,7 +187,7 @@ describe("待办卡的卡底守卫", () => {
 });
 
 /**
- * 待办卡「新建待办」**入口位置**守卫（[本轮]：卡头右槽 → 卡头下方一条通栏窄行）。
+ * 待办区「新建待办」**入口位置**守卫（[本轮]：卡头右槽 → 区标题行下方一条通栏窄行）。
  *
  * 搬这一趟的理由是排版（右槽要同时摆「N 条待办」读数与 `⋯` 控件），所以这里钉的是
  * **那一行的样式契约**：必须是紧凑的 —— 长成大号按钮就等于把列表的可见行数还回去
@@ -180,9 +196,9 @@ describe("待办卡的卡底守卫", () => {
  * 「入口不许搬回卡头右槽」那一条**不再**是源码 grep：`headAction` 这个 prop 已经整段
  * 删除，`not.toContain("headAction=")` 就成了一句永真的废话。改成渲染级判据：
  *   · `ModuleShellHeadSlot.test.tsx` —— 外壳右槽四态里都没有文字键（`headAction` 槽下线）；
- *   · `TodosModule.test.tsx` 的 tq09 —— 待办卡右槽里没有那颗入口键。
+ *   · `TodosModule.test.tsx` 的 tq09 —— 区标题行里没有那颗入口键。
  */
-describe("待办卡的新建入口位置", () => {
+describe("待办区的新建入口位置", () => {
   it("p07c_the_new_entry_is_a_compact_row_below_the_card_head", () => {
     const css = readCss("../../../shell/styles/features/dashboard-todos.css");
     const row = cssBlock(css, ".at-todo-new-row");
@@ -194,7 +210,7 @@ describe("待办卡的新建入口位置", () => {
        真正的位置判据是渲染级的 `TodosModule.test.tsx` 的 tq09：`head.nextElementSibling`
        === 这一行 + `compareDocumentPosition` 排在列表之前。这里保留它只是因为"入口整段
        消失"这种编辑在源码层面一句话就能红，位置对不对交给 tq09。 */
-    expect(todosSource, "源码里必须有 `at-todo-new-row` 这个行容器；位置判据见 TodosModule.test.tsx 的 tq09")
+    expect(todosZoneSource, "源码里必须有 `at-todo-new-row` 这个行容器；位置判据见 TodosModule.test.tsx 的 tq09")
       .toContain('className="at-todo-new-row"');
   });
 });

@@ -135,7 +135,7 @@ fn suggestion_type_stays_serializable() {
 }
 
 #[test]
-fn new_tags_are_created_only_under_the_five_top_levels() {
+fn new_tags_are_created_only_under_the_six_top_levels() {
     /* 候选里没有「燕云」，模型新建：合规（父/子、一级在白名单里）→ 保留；
        同时给一条一级不合规的（`游戏/燕云`）与一条三级的，两者都必须被丢掉。 */
     let raw = r##"{"suggestions":[
@@ -145,6 +145,69 @@ fn new_tags_are_created_only_under_the_five_top_levels() {
     assert_eq!(response.suggestions.len(), 1);
     assert_eq!(response.suggestions[0].tags, vec!["娱乐/燕云".to_string()]);
     assert_eq!(response.created, vec!["娱乐/燕云".to_string()]);
+}
+
+#[test]
+fn tool_is_a_top_level_so_tool_sub_tags_are_accepted() {
+    /* [P0-9 · 2026-11-20] 白名单加了「工具」：`工具/下载` 必须**被保留**（以前会被
+       `sanitize_new_tag` 整条丢掉，用户看到的是"AI 就是不肯给下载器打工具"）。
+       变异靶点：把 `TAG_TOP_LEVELS` 里的 `"工具"` 删掉 → 本条红（created 变空）。 */
+    assert!(
+        TAG_TOP_LEVELS.contains(&"工具"),
+        "「工具」必须在一级白名单里，否则 P0-9 整条失效"
+    );
+    let raw = r##"{"suggestions":[{"id":"4","tags":["工具","工具/下载","工具/系统"]}]}"##;
+    let response = parse_suggestions(raw, &targets(), &candidates(), 3);
+    assert_eq!(
+        response.suggestions[0].tags,
+        vec![
+            "工具".to_string(),
+            "工具/下载".to_string(),
+            "工具/系统".to_string()
+        ]
+    );
+    assert_eq!(
+        response.created,
+        vec![
+            "工具".to_string(),
+            "工具/下载".to_string(),
+            "工具/系统".to_string()
+        ]
+    );
+}
+
+#[test]
+fn system_prompt_tells_the_model_to_read_the_apps_purpose_not_only_its_name() {
+    /* [P0-10] 规则升级的两条硬要求，缺一条结果就会退化成"只看名字猜"：
+       ① 依据里必须有**用途**（名称 / exe / 简介三样一起读）；
+       ② 多功能应用允许**多个**一级标签（否则 Chrome 只会被判成一类）。
+       这条钉的是**提示词文本**，不是解析 —— 解析侧对多标签本来就无上限。 */
+    assert!(
+        SYSTEM_SUGGEST.contains("用途"),
+        "提示词必须要求看软件的用途，而不是只看名字"
+    );
+    assert!(
+        SYSTEM_SUGGEST.contains("多个") || SYSTEM_SUGGEST.contains("多标签"),
+        "提示词必须允许一个应用给多个一级标签"
+    );
+    assert!(
+        SYSTEM_SUGGEST.contains("工具") && SYSTEM_SUGGEST.contains("游戏"),
+        "工具类与游戏类的判定口径必须写在提示词里（IDM / 燕云那两个样例）"
+    );
+}
+
+#[test]
+fn system_prompt_keeps_the_two_level_no_hash_no_space_rule() {
+    /* 「最多两级 + 父/子 + 不写 #、不带空格」是新建标签的底线：提示词里少了这句，
+       模型就会回 `娱乐/燕云/开荒`（三级）或 `#娱乐`，落库前虽然还有一层兜底，
+       但兜底一丢就等于整批建议白跑。 */
+    assert!(SYSTEM_SUGGEST.contains("父/子"));
+    assert!(SYSTEM_SUGGEST.contains("最多两级"));
+    assert!(SYSTEM_SUGGEST.contains('#'));
+    assert!(SYSTEM_SUGGEST.contains("不写空格"));
+    /* 事项侧的自动建标（吃饭 → 生活/吃饭）也必须还在 */
+    assert!(SYSTEM_SUGGEST.contains("生活/吃饭"));
+    assert!(SYSTEM_SUGGEST.contains("工作/周报"));
 }
 
 #[test]

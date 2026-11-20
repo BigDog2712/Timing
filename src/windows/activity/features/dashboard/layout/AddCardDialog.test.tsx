@@ -71,7 +71,7 @@ describe("AddCardDialog（v3）", () => {
     const onClose = vi.fn();
     mount(createElement(AddCardDialog, {
       copy: BOARD_COPY["zh-CN"],
-      countOf: (kind) => (kind === "todos" ? 3 : 0),
+      countOf: (kind) => (kind === "timeline" ? 3 : 0),
       onAdd: () => undefined,
       onClose,
     }));

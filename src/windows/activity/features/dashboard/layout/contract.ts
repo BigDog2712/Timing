@@ -22,10 +22,12 @@ import { activityKeyOf } from "../../../../shared/activityStorageKeys";
 export const CARD_IDS = [
   "timer",
   "apps",
-  "todos",
+  /* [0.12.6] 原 `todos` 并进 `timeline`（上区待办 / 下区记录），并新增独立的
+   * `manage`（事项管理）。旧数据迁移见 `normalizeLayout.migrateLegacyCards`。 */
+  "timeline",
+  "manage",
   "notes",
   "trend",
-  "timeline",
   "heatmap",
   "reminder",
 ] as const;
@@ -105,11 +107,22 @@ export const KIND_SPECS: Record<CardKind, KindSpec> = {
     minW: 288, minH: 208,
     sizes: { S: [288, 208], M: [330, 304], L: [500, 304] },
   },
-  todos: {
-    label: "待办事项",
-    hint: "今天要做的事，可直接勾选",
+  timeline: {
+    /* [0.12.6] 原「待办事项」并进来：上区待办（未开始 + 时间/提醒 + 勾选 + 撤销）、
+     * 下区今日时间线（进行中 + 已完成 + 改起止），中间浅横线。尺寸沿用原时间线那一格
+     * （exe 的「事项菜单」340×424 槽位），因此首屏三列的高度关系与 exe 一致。 */
+    label: "今日时间线",
+    hint: "今天的待办与计时记录",
+    minW: 280, minH: 200,
+    sizes: { S: [280, 200], M: [340, 424], L: [500, 424] },
+  },
+  manage: {
+    /* [0.12.6] 全新独立卡：常用 / 历史事项、新增 · 编辑 · 事项管理、AI 一键分类、
+     * 行点击起停。**不含任何时间线内容**——那是 `timeline` 那张卡的事。 */
+    label: "事项管理",
+    hint: "常用/历史事项，点一下就开始计时",
     minW: 296, minH: 216,
-    sizes: { S: [296, 216], M: [330, 424], L: [500, 424] },
+    sizes: { S: [296, 216], M: [330, 304], L: [500, 304] },
   },
   notes: {
     label: "便利贴",
@@ -128,14 +141,6 @@ export const KIND_SPECS: Record<CardKind, KindSpec> = {
     hint: "近 4 周的作息轮廓：周一到周日，每个小时平均多忙",
     minW: 352, minH: 188,
     sizes: { S: [352, 188], M: [500, 224], L: [500, 304] },
-  },
-  timeline: {
-    /* exe 里这个槽位是「事项菜单」340×424（`SPECS` 的 Items）；本仓用今日时间线顶上，
-     * 尺寸照抄那一格，于是首屏三列的高度关系与 exe 完全一致。 */
-    label: "今日时间线",
-    hint: "今天每一段计时的时间轴",
-    minW: 280, minH: 200,
-    sizes: { S: [280, 200], M: [340, 424], L: [500, 424] },
   },
   reminder: {
     /* [本轮 T04] 工具页「活动提醒」分区的卡内形态；窄卡，与 todos 同列宽便于并排 */

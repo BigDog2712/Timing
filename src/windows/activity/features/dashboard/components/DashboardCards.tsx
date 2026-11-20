@@ -16,10 +16,11 @@ import type { DashboardReadState } from "../hooks/useDashboardStats.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import AppsModule from "./AppsModule.tsx";
 import HeatmapModule from "./HeatmapModule.tsx";
+import ManageCard from "./ManageCard.tsx";
+import type { ManageCardActions } from "./ManageCard.tsx";
 import NotesStrip from "./NotesStrip.tsx";
 import TimerModule from "./TimerModule.tsx";
-import TimelineCard from "./TimelineCard.tsx";
-import TodosModule from "./TodosModule.tsx";
+import TimelineTodosCard from "./TimelineTodosCard.tsx";
 import TrendModule from "./TrendModule.tsx";
 import ReminderModule from "./reminder/ReminderModule.tsx";
 import type { TrendState } from "../hooks/useTrendDays.ts";
@@ -40,8 +41,14 @@ interface CardProps {
   onOpenMapping: () => void;
   todosModel: TodayTodosState;
   notesModel: TodayNotesState;
-  todayItems: Pick<TodayItemsState, "rows" | "total" | "applyLocalRename" | "applyLocalCreate">;
+  /** [0.12.6] 今日时间线卡 / 事项管理卡共用的今日事项切片 */
+  todayItems: Pick<
+    TodayItemsState,
+    "rows" | "total" | "status" | "retry" | "applyLocalRename" | "applyLocalCreate"
+  >;
   snapshotProps: { status: DashboardReadState["status"]; refreshError: boolean; onRetry: () => void };
+  /** [0.12.6 · T4] 事项管理卡的对外动作：行点击起停（`useItemTimerToggle`）+ 提示条出口 */
+  itemActions: ManageCardActions;
   dayDeltaTrackedTime: number;
   snapshotStatus: DashboardReadState["status"];
   refreshError: boolean;
@@ -82,22 +89,30 @@ export function buildCardBody(card: BoardCard, label: string, props: CardProps):
           {...props.snapshotProps}
         />
       );
-    case "todos":
-      return <TodosModule model={props.todosModel} controls={controls} />;
     case "notes":
       return <NotesStrip model={props.notesModel} controls={controls} />;
     case "timeline":
+      /* [0.12.6] 原「待办事项」+ 原「今日时间线」两张卡合并成这一张：上区待办、下区时间线。
+         `todosModel` / `todayItems` 都由 `Dashboard.tsx` 提起，这里只做透传（不重复取数）。 */
       return (
-        <TimelineCard
+        <TimelineTodosCard
+          title={label}
           controls={controls}
-          items={props.todayItems.rows}
-          total={props.todayItems.total}
-          tier={card.tier}
-          status={props.snapshotStatus}
+          todayItems={props.todayItems}
+          todosModel={props.todosModel}
           refreshError={props.refreshError}
-          onRetry={props.onRetry}
-          onLocalRename={props.todayItems.applyLocalRename}
-          onLocalCreate={props.todayItems.applyLocalCreate}
+        />
+      );
+    case "manage":
+      /* [0.12.6] 事项管理是**独立的一张卡**（用户口径）：常用/历史事项、增删改管、
+         AI 一键分类、绑定标记、点一下起停。起停与提示条在 `Dashboard.tsx` 装配一次，
+         多张 manage 卡共用同一份。 */
+      return (
+        <ManageCard
+          title={label}
+          controls={controls}
+          todayItems={props.todayItems}
+          actions={props.itemActions}
         />
       );
     case "trend":

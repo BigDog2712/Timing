@@ -200,3 +200,23 @@
   line-height: 17px;
   text-overflow: ellipsis;
 }
+
+/* [0.12.6 · P0-9] 行上的「工具」标记：这个应用的时长**不计入统计**，必须在排行里可见。
+ *
+ * 几何纪律（标记不许动行高与列宽）：
+ *   · `flex: none` —— 标签容器（`.at-app-label`）是 flex，标记不许被压缩成半截字；
+ *   · `line-height: 15px` + 1px 边框 + 上下 0 内边距 = 17px，仍小于名字那行的 19px，
+ *     所以**行高不变**（有/没标记的行高度一致，列表不会抖）；
+ *   · 12px 字比名字（12.5）小半档，视觉上是"附注"而不是第二个主语；
+ *   · 名字（`.at-app-name`）本来就是 `min-width: 0` + 省略号，标记吃掉的那点宽度
+ *    由名字让出来，卡宽拖到 w=1 也不会横向滚动。 */
+.at-app-tool {
+  flex: none;
+  padding: 0 4px;
+  border: 1px solid var(--at-border-subtle);
+  border-radius: var(--at-radius-full);
+  font-size: 12px;
+  line-height: 15px;
+  color: var(--at-text-tertiary);
+  white-space: nowrap;
+}

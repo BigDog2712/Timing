@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
+import type { ToastPush } from "../../../shared/types/toast.ts";
 import { useTodayNotes } from "../hooks/useTodayNotes.ts";
 import { useTodayItems } from "../hooks/useTodayItems.ts";
 import { useTodayTodos } from "../hooks/useTodayTodos.ts";
+import { useItemTimerToggle } from "../hooks/useItemTimerToggle.ts";
 import { useTrendDays } from "../hooks/useTrendDays.ts";
 import { useHeatmapModel } from "../hooks/useHeatmapModel.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
@@ -39,6 +41,8 @@ interface Props {
   refreshIntervalSecs: number;
   /** 「全部分类…」→ 分类映射视图 */
   onOpenMapping: () => void;
+  /** 分析窗的提示条出口（`AppShell` 的 `pushToast` 透传下来） */
+  onToast: ToastPush;
 }
 
 export default function Dashboard({
@@ -48,6 +52,7 @@ export default function Dashboard({
   refreshKey,
   refreshIntervalSecs,
   onOpenMapping,
+  onToast,
 }: Props) {
   const UI_TEXT = useLocaleText();
   const locale = useLocale();
@@ -73,6 +78,10 @@ export default function Dashboard({
   const notesModel = useTodayNotes(refreshKey);
   const trendModel = useTrendDays(refreshKey);
   const heatmapModel = useHeatmapModel(refreshKey);
+  /* [0.12.6 · T4] 事项管理卡的行点击起停：订阅宿主的 `timer:state-changed`，
+     一次点击只发一条意图（方向在这里判，见 `hooks/useItemTimerToggle.ts`）。
+     提到这一层是因为它要订阅事件、要 toast —— 卡里只管画。 */
+  const itemTimer = useItemTimerToggle(onToast);
 
   const { categoryDist, topApplications, dayDeltaTrackedTime } = dashboard;
 
@@ -129,8 +138,8 @@ export default function Dashboard({
     onDimensionChange: setFocusDimension,
     topApplications, icons, onOpenMapping,
     todosModel, notesModel, todayItems, snapshotProps,
-    dayDeltaTrackedTime,
-    snapshotStatus, refreshError, onRetry: readState.retry,
+    itemActions: { itemTimer, onToast },
+    dayDeltaTrackedTime,    snapshotStatus, refreshError, onRetry: readState.retry,
     trend: trendModel, heatmap: heatmapModel,
   };
 

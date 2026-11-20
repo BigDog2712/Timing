@@ -4,19 +4,20 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * 时间线卡 R2 重做的**行为**判据（0.13 · 1.6 / T03b）—— 纯函数判据在
+ * 时间线**下区** R2 重做的行为判据（0.13 · 1.6 / T03b）—— 纯函数判据在
  * `TimelineCard.test.ts`（行形）与 `services/recordTimeEdit.test.ts`（B1–B6）。
  *
  * 钉的是"错了也照样渲染 / 照样发"的静默项：
- *   · V-1.6a：卡头不再有「常用事项 / 事项菜单」两颗唤起按钮（入口收敛到卡底三键），
- *     卡头右侧只留**总计**读数；卡底**恰好三颗**（多一颗 = 入口又漏了）；
- *   · V-1.6c：「编辑事项」弹层保存 = **恰一条** `update_item` 意图（多发 = 药丸上
- *     多次落库；字段名漂一个 = 静默落进 default 分支）；
+ *   · V-1.6a：区标题行只留**总计**读数，一颗唤起按钮都没有；卡底三入口（新建 / 编辑 /
+ *     事项管理）[0.12.6] 已整组搬进 `ManageCard`，本区一个都不许留 —— 同一个动作在两张
+ *     卡上各有一颗按钮，用户对"这个按钮在哪张卡上"会永久地失败；
  *   · V-1.6e / B4：「改起止」保存 = **恰一条** `update_record_time`，payload 只有
  *     `{recordId, startedAt, endedAt}`（camelCase）——**没有**时长字段（B4，
  *     `accumulated_sec` 由 Rust 重算）；
  *   · B2：跨零点的改法**不发意图**、就地给 `crossDayHint`（Rust 不按天拆分）；
  *   · V-1.6g / B3：进行中的段保存键 disabled + 行上显式给 `onlySavedEditable`。
+ *
+ * V-1.6c（编辑事项弹层恰一条 `update_item`）随入口一起搬到了 `ManageCard.test.tsx`。
  */
 const h = vi.hoisted(() => ({
   emitHostIntent: vi.fn(async () => true),
@@ -35,7 +36,7 @@ vi.mock("../../../platform/desktop/hostSettingsGateway.ts", () => ({ getSettings
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { resolveLocaleActivation } from "../../../shared/i18n/runtime.ts";
 import { formatDateTimeLocal } from "../services/todoDraft.ts";
-import TimelineCard from "./TimelineCard.tsx";
+import TimelineZone from "./TimelineZone.tsx";
 import type { TodayItemRow } from "../hooks/useTodayItems.ts";
 
 /* 弹层判域 = 挂载那一刻的"今天"（组件里 `new Date()` 现算），测试里也用真实今天，
@@ -72,15 +73,11 @@ async function flush() {
 }
 
 async function mount(items: TodayItemRow[]) {
-  await resolveAndMount(createElement(TimelineCard, {
+  await resolveAndMount(createElement(TimelineZone, {
     items,
     total: items.reduce((sum, row) => sum + row.value, 0),
-    tier: "M",
     status: "ready",
-    refreshError: false,
     onRetry: () => undefined,
-    onLocalRename: () => undefined,
-    onLocalCreate: () => undefined,
   }));
 }
 
@@ -100,11 +97,6 @@ function typeInto(input: HTMLInputElement | null, value: string) {
   });
 }
 
-const footerButtons = () =>
-  Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-timeline-manage button") ?? []);
-const byText = (text: string) =>
-  Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
-    .find((button) => button.textContent === text);
 const issueText = () =>
   Array.from(document.body.querySelectorAll('[role="alert"], [role="status"]') ?? [])
     .map((node) => node.textContent ?? "")
@@ -136,22 +128,30 @@ afterEach(() => {
   root = null;
 });
 
-describe("TimelineCard · 入口收敛与总计（V-1.6a）", () => {
-  it("tc01_header_has_no_menu_buttons_and_only_the_total_readout", async () => {
+describe("下区 · 总计读数与入口收敛（V-1.6a）", () => {
+  it("tc01_the_zone_head_has_no_menu_buttons_and_only_the_total_readout", async () => {
     await mount([itemRow()]);
-    /* 卡头右侧 = 总计读数（来自 `useTodayItems.total`，后端口径） */
-    const head = container?.querySelector(".at-card-head");
+    /* 区标题行右侧 = 总计读数（来自 `useTodayItems.total`，后端口径）。
+       [0.12.6] 总计从"卡头"下移到"下区标题行"：卡头现在归合并卡（标题 + 布局工具条）。 */
+    const head = container?.querySelector(".at-items-zone-head");
     expect(head?.textContent).toContain("总计 1h 20m");
-    /* 「常用事项 / 事项菜单」两颗唤起按钮已删：卡头一颗按钮都不该有 */
+    /* 「常用事项 / 事项菜单」两颗唤起按钮已删：这一行一颗按钮都不该有 */
     expect(head?.querySelectorAll("button")).toHaveLength(0);
   });
 
-  it("tc02_footer_has_exactly_three_entry_buttons", async () => {
+  it("tc02_the_zone_carries_no_card_foot_entries_at_all", async () => {
     await mount([itemRow()]);
-    const buttons = footerButtons();
-    expect(buttons).toHaveLength(3);
-    expect(buttons.map((button) => button.textContent))
-      .toEqual(["新建事项", "编辑事项", "事项管理"]);
+    /* [0.12.6] 卡底三颗（新建 / 编辑 / 事项管理）整组搬进了 `ManageCard`：
+       本区一个都不许留 —— 同一个动作两张卡上各有一颗，点错了只是打开同一个弹层，
+       但"这个按钮在哪张卡上"会永久地失败。 */
+    expect(container?.querySelector(".at-timeline-manage"), "卡底入口条又长回来了").toBeNull();
+    const labels = Array.from(container?.querySelectorAll<HTMLButtonElement>("button") ?? [])
+      .map((button) => button.textContent ?? "");
+    expect(labels).not.toContain("新建事项");
+    expect(labels).not.toContain("编辑事项");
+    expect(labels).not.toContain("事项管理");
+    /* 区根节点带 `data-zone="timeline"`：上区是待办（`data-zone="todos"`），这里判的是下区 */
+    expect(container?.querySelector('[data-zone="timeline"]'), "下区没有 data-zone 标记").not.toBeNull();
   });
 
   it("tc03_rows_show_name_range_and_total", async () => {
@@ -171,39 +171,7 @@ describe("TimelineCard · 入口收敛与总计（V-1.6a）", () => {
   });
 });
 
-describe("TimelineCard · 编辑事项弹层（V-1.6c）", () => {
-  it("tc05_edit_save_emits_exactly_one_update_item_intent", async () => {
-    await mount([itemRow()]);
-    act(() => { byText("编辑事项")?.click(); });
-    await flush();
-
-    /* 先选事项，再改名称 + 默认时长（候选按 updatedAt 倒序 —— 按名字找，不按下标） */
-    const choices = Array.from(document.body.querySelectorAll<HTMLButtonElement>(".at-timeline-edit-choice"));
-    act(() => {
-      choices.find((button) => button.textContent?.includes("事项 A"))?.click();
-    });
-    await flush();
-    const nameInput = document.body.querySelector<HTMLInputElement>(
-      ".at-timeline-manage-dialog input.at-timeline-manage-input",
-    );
-    expect(nameInput?.value).toBe("事项 A");
-    typeInto(nameInput, "事项 A2");
-
-    act(() => { byText("确认")?.click(); });
-    await flush();
-
-    /* 恰一条意图；`timerMinutes` 显式发（留空 = null = 清默认时长） */
-    expect(h.emitHostIntent).toHaveBeenCalledTimes(1);
-    expect(h.emitHostIntent).toHaveBeenCalledWith({
-      action: "update_item",
-      id: 11,
-      name: "事项 A2",
-      timerMinutes: null,
-    });
-  });
-});
-
-describe("TimelineCard · 改起止弹层（V-1.6e / B2 / B3）", () => {
+describe("下区 · 改起止弹层（V-1.6e / B2 / B3）", () => {
   /** 打开「改起止」并等段列表就绪 */
   async function openRecordDialog() {
     await mount([itemRow()]);

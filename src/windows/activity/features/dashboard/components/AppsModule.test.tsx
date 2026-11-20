@@ -237,3 +237,48 @@ describe("第二条出口不许被拿走", () => {
     expect(onOpenMapping).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * [0.12.6 · P0-9] 工具类应用在排行行上的标记。
+ *
+ * 判据不是"有个小字"，而是三件事同时成立：
+ *   ① 标记能看见且说出后果（`title` 点名**已扣除的那两项**：总量与分类分布）—— 它的时长
+ *      已经从总量/分布里被扣掉了，没有这个标记，用户唯一的感受是"我的总时长怎么少了"；
+ *      文案**故意不提趋势**：今日分时柱本轮不剔除工具类（后端逐桶并集拿不到逐应用分摊，
+ *      见设计文档风险 3），写"不计入时间统计"会在趋势卡上自相矛盾；
+ *   ② **只标工具类**：别的行走 `isTool` 缺省（`undefined`）= 不是工具类，不能误标；
+ *   ③ **不动行几何**：名字还在（标记不能顶掉名字），标记挂在名字所在的第二列里
+ *      （`dashboard-apps.css` 的 `.at-app-tool` 用 `flex: none` + 15px 行高做到不改行高）。
+ */
+describe("工具标记（不计入统计）", () => {
+  const WITH_TOOL: TopApplicationItem[] = [
+    { ...APPS[0]!, isTool: true },
+    APPS[1]!,
+  ];
+
+  it("apps12_tool_row_shows_a_badge_with_the_consequence_in_title", async () => {
+    await mount(WITH_TOOL);
+
+    const badge = rows()[0]!.querySelector(".at-app-tool");
+    expect(badge, "工具类的行上没有标记 —— 用户查不到时长为什么变少").not.toBeNull();
+    expect(badge!.textContent?.trim()).toBe("工具");
+    expect(badge!.getAttribute("title")).toBe("工具类应用，不计入总量与分类分布");
+  });
+
+  it("apps13_non_tool_row_has_no_badge", async () => {
+    await mount(WITH_TOOL);
+
+    expect(rows()[0]!.querySelector(".at-app-tool")).not.toBeNull();
+    expect(rows()[1]!.querySelector(".at-app-tool"), "非工具类不许被误标").toBeNull();
+  });
+
+  it("apps14_badge_keeps_the_name_and_lives_in_the_label_cell", async () => {
+    await mount(WITH_TOOL);
+
+    const label = rows()[0]!.querySelector(".at-app-label")!;
+    expect(label.querySelector(".at-app-name")?.textContent, "标记顶掉了名字").toBe("VS Code");
+    expect(label.querySelector(".at-app-tool"), "标记必须留在第二列（不许新开一列改列宽）").not.toBeNull();
+    /* 行仍然是原来那三段 grid（图标 / 名字 / 时长）：标记不新增直接子节点 */
+    expect(rows()[0]!.children.length).toBe(rows()[1]!.children.length);
+  });
+});

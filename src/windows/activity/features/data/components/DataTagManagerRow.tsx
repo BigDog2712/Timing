@@ -1,5 +1,6 @@
 import { AlertTriangle, ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import type { DragEvent } from "react";
 
 import type { TagNode } from "../../../../shared/tags/tagTree.ts";
 
@@ -25,16 +26,45 @@ import type { TagNode } from "../../../../shared/tags/tagTree.ts";
  * 现在点一下，整行原地换成一条确认带：说清删的是哪棵子树、会摘掉多少条引用，
  * 只有明确的「确认删除」才真删；「取消」与 Escape 都回到普通行，焦点也落在取消上
  * （误触时默认动作是安全的那个）。
+ *
+ * ## 拖动改分类：行只管「展示投放态」，判据全在面板
+ *
+ * 把一行拖到另一行上 = 变成它的子标签，拖到根投放区 = 移到一级。行收到的是
+ * `dragPath`（谁在被拖）与 `resolveDrop`（面板算的可行性），自己不算路径 ——
+ * 一算就会和面板的 `reparentTagPath` 判据分叉，出现"行说能放、面板拒绝"的错位。
+ *
+ * 三种情况**不给拖**，理由各不相同：
+ *   · 搜索态（`dragEnabled=false`）：搜索结果是过滤后的树，缺父子上下文 ——
+ *     拖了会让人以为是"移到搜索结果里"，而实际落点是完整路径；
+ *   · 行内编辑：拖拽会抢走输入框的文本选择；
+ *   · 删除确认态：这时用户想的是"删不删"，让他在这一行上再发起一次移动是危险的。
  */
 interface Props {
   node: TagNode;
   expanded: boolean;
   /** 子树引用合计（含自身），删除确认要报这个数 */
   descendantCount: number;
+  /** 正在被拖的路径（null = 没人拖）。行据此画半透明与投放态 */
+  dragPath: string | null;
+  /** 面板统一算：把被拖的东西挂到本行下面能不能成 */
+  resolveDrop: (targetPath: string) => "ok" | "invalid";
+  /** 允许发起拖动的时机（搜索态 / busy 时由面板关掉） */
+  dragEnabled: boolean;
   onToggle: (path: string) => void;
   onRename: (from: string, to: string) => void;
   onAddChild: (path: string) => void;
   onDelete: (path: string) => void;
+  onDragStartNode: (path: string) => void;
+  onDragEndNode: () => void;
+  onReparent: (from: string, targetParent: string | null) => void;
+  /**
+   * 指针进出本行时告诉面板「现在悬在哪一行」（null = 离开了）。
+   *
+   * 为什么需要它：非法目标刻意**不** `preventDefault`，浏览器就不会在松手时给
+   * `drop` —— 那样"为什么不行"这句话就永远没机会出现。悬停时把落点报给面板，
+   * 由面板当场说清理由，不必等一次不会发生的 drop。
+   */
+  onDropHover: (targetPath: string | null) => void;
 }
 
 const ICON = 12;
@@ -44,16 +74,29 @@ export default function DataTagManagerRow({
   node,
   expanded,
   descendantCount,
+  dragPath,
+  resolveDrop,
+  dragEnabled,
   onToggle,
   onRename,
   onAddChild,
   onDelete,
+  onDragStartNode,
+  onDragEndNode,
+  onReparent,
+  onDropHover,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(node.path);
   const [confirming, setConfirming] = useState(false);
+  const [dropTone, setDropTone] = useState<"ok" | "invalid" | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+
+  const draggingSelf = dragPath === node.path;
+  /* 编辑 / 确认态里不给拖：拖动会抢走输入框的文本选择，也会在"删不删"的当口
+     再发起一次移动 */
+  const canDrag = dragEnabled && !editing && !confirming;
 
   useEffect(() => {
     if (editing) inputRef.current?.select();
@@ -69,6 +112,76 @@ export default function DataTagManagerRow({
     setDraft(node.path);
     setConfirming(false);
   }, [node.path]);
+
+  /* `dragend` 只在**源行**触发，被扫过的行收不到 —— 拖拽一结束（dragPath 归零）
+     就在这里统一清投放态，否则松手前后亮着的行会一直亮着。 */
+  useEffect(() => {
+    if (dragPath === null) setDropTone(null);
+  }, [dragPath]);
+
+  const handleDragStart = (event: DragEvent<HTMLDivElement>) => {
+    /* `text/plain` 是给宿主与调试用的（拖到别处至少能看见路径）；面板内部的判据
+       认的是 `dragPath`，所以 dataTransfer 缺失（jsdom 等）也不该把拖拽打断。 */
+    const transfer = event.dataTransfer;
+    if (transfer) {
+      transfer.setData("text/plain", node.path);
+      transfer.effectAllowed = "move";
+    }
+    onDragStartNode(node.path);
+  };
+
+  const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
+    /* 外部拖进来的东西（文件、别处的文字）不是改分类 */
+    if (dragPath === null) return;
+    /* 指针就在自己身上：拿起一行时它必然先在自己的行上停留。这时既不该标"能放"
+       也不该说"不能挂到自己下面" —— 那不是用户在做的事，是他还没开始移动。 */
+    if (draggingSelf) {
+      setDropTone(null);
+      onDropHover(null);
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
+      return;
+    }
+    const tone = resolveDrop(node.path);
+    setDropTone(tone);
+    /* 悬停即报落点：非法目标不会收到 drop，理由得在悬停时就说出口 */
+    onDropHover(node.path);
+    if (tone === "invalid") {
+      /* 非法目标**不** preventDefault：让浏览器画自己的「禁止」光标，比自绘一个
+         not-allowed 更可信（自绘会盖掉"为什么不行"）。此时浏览器一般不给 drop，
+         行的淡红底已经说明"这里放不下"；宿主真给了 drop，由面板说清理由。 */
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "none";
+      return;
+    }
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    /* `dragleave` 在指针进入子元素时也会触发：只有真离开这一行才清 */
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setDropTone(null);
+    onDropHover(null);
+  };
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (dragPath === null) return;
+    /* 落在自己身上 = 什么都没发生（不是"挂到自己下面"这种错误） */
+    if (draggingSelf) return;
+    event.preventDefault();
+    /* 这一下已经由本行处理，别让外层的投放区再收一遍 */
+    event.stopPropagation();
+    setDropTone(null);
+    onDropHover(null);
+    /* 非法目标也交给面板：合法性由 `reparentTagPath` 一处判，面板据此出中文人话。
+       行在这里再判一次只会造成"两处判据分叉"。 */
+    onReparent(dragPath, node.path);
+  };
+
+  const handleDragEnd = () => {
+    setDropTone(null);
+    onDropHover(null);
+    onDragEndNode();
+  };
 
   const commit = () => {
     const next = draft.trim();
@@ -98,6 +211,16 @@ export default function DataTagManagerRow({
           confirming ? " dtm-row-confirm" : ""
         }`}
         style={{ paddingLeft: `${8 + node.depth * 18}px` }}
+        /* `data-path` 是拖拽落点的身份（判据与测试都靠它认路，不靠文案） */
+        data-path={node.path}
+        data-dragging={draggingSelf ? "true" : "false"}
+        data-drop-target={dropTone ?? "none"}
+        draggable={canDrag}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        onDragEnd={handleDragEnd}
       >
         {confirming ? (
           <div

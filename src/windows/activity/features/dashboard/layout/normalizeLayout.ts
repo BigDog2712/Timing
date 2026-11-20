@@ -4,6 +4,7 @@
  * 判据（每条都给出确定结论，`reason` 只记第一条，日志一条就够）：
  *   · 不是对象 / 版本未知        → 回出厂布局
  *   · 版本 2（网格）             → **迁移**：按 dense 流式重放成像素矩形，卡一张不丢
+ *   · 旧 todos / 作废的 items → 变成一张 `manage`（现役 `timeline` 卡原样保留，见下）
  *   · uid 重复 / 缺失            → 重新发号（保留位置）
  *   · 未知 kind                  → 丢这一张（留着渲染不出来，反而是空槽）
  *   · x/y/w/h 非法或越界         → 用 `clampRect` 修到合法（吸附 + 最小尺寸 + 不越画布）
@@ -38,6 +39,30 @@ const GRID_COL_W = 251;
 const GRID_ROW_H = 264;
 const GRID_GAP = 16;
 
+/**
+ * 0.12.6 起**不再是合法的卡种**、但仍要能从存量布局里读出来的旧 id。
+ *
+ * 为什么它们必须活到迁移那一步才许被丢：v2/v3 的用户手里可能就摆着待办卡，
+ * `CARD_IDS` 一删，`isCardId` 立刻把它判成"不认识的组件"→ 静默吃掉一张卡，
+ * 而用户看到的只是"我的待办没了"。所以它先被读进来，再由 `migrateLegacyCards`
+ * 变成一张 `manage`（`timeline` 卡本身是现役卡种，收在这里只是为了让迁移能把它当
+ * "位置来源"认出来并原样保留 —— 它**不触发**迁移）。
+ *
+ * `items` 是 0.12.6 中途作废的合并卡种（从未出包，只有开发者本机可能有）：
+ * 一并收进来，按 `todos` 同一条路迁成 `timeline`，避免老布局在开发机上被当成未知卡种丢掉。
+ */
+const LEGACY_ITEM_KINDS: readonly string[] = ["todos", "timeline", "items"];
+
+/** 迁移阶段手里的条目：v3 存下来的裸记录，或 `migrateFromGrid` 刚拼出来的对象。 */
+type RawEntry = Record<string, unknown>;
+
+/** 条目声明的卡种；脏数据一律返回空串（交给后面的 `isCardId` 判）。 */
+function kindOf(entry: unknown): string {
+  if (!entry || typeof entry !== "object") return "";
+  const kind = (entry as { kind?: unknown }).kind;
+  return typeof kind === "string" ? kind : "";
+}
+
 function gridRect(col: number, row: number, span: number, rows: number) {
   return {
     x: col * (GRID_COL_W + GRID_GAP),
@@ -54,9 +79,9 @@ function gridRect(col: number, row: number, span: number, rows: number) {
  * 只换 x 会让 items / todos / notes 全部叠在第一行。这里重放一遍 dense 网格：
  * 每张卡找「最上面、最靠左」且 `w×h` 全空的格子，然后换成矩形。
  */
-function migrateFromGrid(rawCards: unknown[]): BoardCard[] {
+function migrateFromGrid(rawCards: unknown[]): RawEntry[] {
   const taken: boolean[][] = [];
-  const cards: BoardCard[] = [];
+  const cards: RawEntry[] = [];
   let uid = 1;
 
   const fits = (row: number, col: number, span: number, rows: number) => {
@@ -77,7 +102,9 @@ function migrateFromGrid(rawCards: unknown[]): BoardCard[] {
   for (const entry of rawCards) {
     if (!entry || typeof entry !== "object") continue;
     const record = entry as { id?: unknown; x?: unknown; w?: unknown; h?: unknown; tier?: unknown; title?: unknown; options?: unknown };
-    if (!isCardId(record.id)) continue;
+    /* 旧卡种（todos / timeline）在这一步**先当合法**收进来，合并交给下一步 —— 这里丢掉
+     * 就等于把用户在 v2 里摆过的待办/时间线直接吞掉，合并卡永远不会有。 */
+    if (!isCardId(record.id) && !LEGACY_ITEM_KINDS.includes(String(record.id))) continue;
 
     const span = Math.min(GRID_COLS, Math.max(1, Math.round(Number(record.w) || 1)));
     const rows = Math.min(4, Math.max(1, Math.round(Number(record.h) || 1)));
@@ -111,6 +138,111 @@ function migrateFromGrid(rawCards: unknown[]): BoardCard[] {
 
 function num(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+/** `migrateLegacyCards` 的结果：新卡表 + 是否真的命中过旧卡种。 */
+export interface LegacyCardMigration {
+  cards: unknown[];
+  /** 命中（= 需要回写）。`cards.length` 在「只有一张旧卡」时不变，所以不能靠比长度判。 */
+  migrated: boolean;
+}
+
+/** 排序键必须是确定的三元组，否则同一份布局两次迁移得到的落点可能不同。 */
+function byVisualOrder(left: unknown, right: unknown): number {
+  const a = left as RawEntry;
+  const b = right as RawEntry;
+  return num(a.y, 0) - num(b.y, 0)
+    || num(a.x, 0) - num(b.x, 0)
+    || num(a.uid, 0) - num(b.uid, 0);
+}
+
+function rectCard(entry: unknown, uid: number, kind: string): RawEntry {
+  const raw = entry as RawEntry;
+  return {
+    uid,
+    kind,
+    tier: isCardTier(raw.tier) ? raw.tier : DEFAULT_TIER,
+    x: num(raw.x, 0),
+    y: num(raw.y, 0),
+    w: num(raw.w, 0),
+    h: num(raw.h, 0),
+  };
+}
+
+/**
+ * [0.12.6] 退休卡种（`todos` / 作废的 `items`）→ **至多一张 `manage`**；
+ * 现役的 `timeline` 卡只作为"位置来源"参与，**原样保留**。
+ *
+ * 五条口径：
+ *   ① **身份优先，位置其次**：`timeline` 优先于 `items`、`items` 优先于 `todos`，同类之间
+ *      才由 `(y, x, uid)` 定序。为什么不能纯按"视觉第一张"：真实布局里旧待办卡常在左列
+ *      `(24, 344)`、时间线卡在第二列 `(380, 344)`，纯视觉序会把**旧待办卡变成时间线卡**、
+ *      现役时间线卡退成事项管理卡 —— 身份整个错位，比"位置差 340px"糟得多。
+ *   ② **现役时间线卡原样保留**：`title` / `options`（以及将来新增的字段）都不重建、不丢。
+ *      来源是 `todos` / `items` 时才走 `rectCard`（旧标题「待办事项」挂到「今日时间线」上
+ *      更糟）；事项管理卡一律 `rectCard` —— 它是另一张卡、另一套内容。
+ *   ③ **触发只认真正退休的卡种**：`timeline` 是现役卡种（`CARD_IDS` 里有、出厂布局就摆着
+ *      一张），单独出现时绝不触发迁移 —— 否则每次读入都命中，`repaired` 恒真、每次都写盘。
+ *   ④ **事项管理卡不凭空补**：只有当布局里原本存在 `todos`（或作废的 `items`）时才补一张，
+ *      落在它让出的那个矩形上；多余的**退休**卡（`todos` / `items`）一律丢弃（同一份布局里
+ *      出现两张 `todos` 本来就是脏数据）。**`timeline` 是例外**：多张是用户自己加的卡
+ *      （「加卡」与「复制」都能造出来），原样保留，一张都不许吞。
+ *   ⑤ **uid 不许退成 0**：现役时间线卡保留自己原来的号（不参与"取最小"重排）；`rectCard`
+ *      那条取命中集合里最小的正 uid，撞号或缺失时退到 `max(整份布局正 uid)+1` 依次递增
+ *      —— 0 会在下一次归一化里被当脏数据丢掉，而它恰恰是刚迁出来的那张卡。
+ *      `nextId` 由调用方按 `max(uid)+1` 重算，只增不减。
+ *
+ * `w/h` 小于新卡 `minSize` 时**不在这里夹**：统一交给 `clampRect` 收口（单一职责，
+ * 也避免"迁移时夹一次、读入时又夹一次"的两套边界）。幂等：迁完只剩现役 timeline / manage，
+ * 第二次扫不到退休卡种。
+ */
+export function migrateLegacyCards(cards: readonly unknown[]): LegacyCardMigration {
+  const hits = cards.filter((entry) => LEGACY_ITEM_KINDS.includes(kindOf(entry)));
+  /* timeline 只作为"位置来源"参与；单独出现（= 新出厂布局、正常升级后的常态）时绝不触发迁移。 */
+  const retired = hits.filter((entry) => kindOf(entry) !== "timeline");
+  if (retired.length === 0) return { cards: cards.slice(), migrated: false };
+
+  const timelines = hits.filter((entry) => kindOf(entry) === "timeline").sort(byVisualOrder);
+  const merged = hits.filter((entry) => kindOf(entry) === "items").sort(byVisualOrder);
+  const todos = hits.filter((entry) => kindOf(entry) === "todos").sort(byVisualOrder);
+
+  /* 时间线位置：优先真实的时间线卡；只有作废合并卡时沿用它的矩形；再退到待办卡 */
+  const timelineSource = timelines[0] ?? merged[0] ?? todos[0];
+  /** 现役卡（本来就叫 timeline）→ 原样 push，不重建 */
+  const timelineIsLive = timelineSource !== undefined && kindOf(timelineSource) === "timeline";
+  const manageSource = todos.find((entry) => entry !== timelineSource)
+    ?? merged.find((entry) => entry !== timelineSource)
+    ?? null;
+
+  const uidOf = (entry: unknown): number => Math.round(num((entry as RawEntry).uid, 0));
+  const usedUids = cards.map(uidOf).filter((uid) => uid > 0);
+  /* 命中集合自己的号优先（用户的卡位不改号）；号缺失或重号时退到一个**没被占用**的新号 ——
+     退成 0 的话这张卡会在下一次归一化里被当成脏数据丢掉，而它恰恰是刚迁出来的那张。 */
+  let nextFree = (usedUids.length > 0 ? Math.max(...usedUids) : 0) + 1;
+  const hitUids = hits.map(uidOf).filter((uid) => uid > 0).sort((left, right) => left - right);
+
+  const timelineUid = timelineIsLive
+    ? (uidOf(timelineSource) > 0 ? uidOf(timelineSource) : nextFree++)
+    : (hitUids[0] ?? nextFree++);
+  const manageOwnUid = manageSource === null ? 0 : uidOf(manageSource);
+  const manageUid = manageOwnUid > 0 && manageOwnUid !== timelineUid ? manageOwnUid : nextFree++;
+
+  const out: unknown[] = [];
+  for (const entry of cards) {
+    if (entry === timelineSource) {
+      out.push(timelineIsLive ? entry : rectCard(entry, timelineUid, "timeline"));
+      continue;
+    }
+    if (entry === manageSource) {
+      out.push(rectCard(entry, manageUid, "manage"));
+      continue;
+    }
+    /* 只丢**退休卡种**：多出来的现役 timeline 卡是用户自己加的（板子本来就允许同种多张），
+       一并丢掉等于把他摆好的那张卡吞了 —— 这条和"多余的 todos 是脏数据"不是一回事。 */
+    if (kindOf(entry) === "todos" || kindOf(entry) === "items") continue;
+    out.push(entry);
+  }
+  return { cards: out, migrated: true };
 }
 
 function sanitizeTitle(value: unknown): string | undefined {
@@ -152,6 +284,13 @@ export function normalizeLayout(
   } else if (candidate.version !== LAYOUT_VERSION) {
     return defaultResult("version-mismatch", fallback);
   }
+
+  /* [0.12.6] 退休卡种（todos / 作废的 items）→ 一张事项管理卡，现役时间线卡原样保留。
+   * 顺序固定：**网格迁移之后、`clampRect` 之前**
+   * （v2 的卡还没有像素矩形，先迁移就无从取位；夹紧放最后，两种迁移都享受同一套边界）。 */
+  const merged = migrateLegacyCards(incoming);
+  if (merged.migrated) note("migrated-todos-timeline");
+  incoming = merged.cards;
 
   const used = new Set<number>();
   let nextId = 1;

@@ -177,6 +177,7 @@ export function buildAppShellViews(props: AppShellViewsProps): Record<View, Reac
         refreshKey={refreshSignal}
         refreshIntervalSecs={appSettings.refreshIntervalSecs}
         onOpenMapping={onOpenMapping}
+        onToast={onToast}
       />
     ),
     history: (

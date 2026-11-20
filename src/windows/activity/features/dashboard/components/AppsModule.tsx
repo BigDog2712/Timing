@@ -3,6 +3,7 @@ import { useLocale, useLocaleText } from "../../../shared/i18n/index.ts";
 import { AppClassification } from "../../../shared/classification/appClassification.ts";
 import { formatDashboardDuration, type TopApplicationItem } from "../services/dashboardFormatting.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
+import { TOOL_TAG_COPY } from "../copyToolTag.ts";
 import ModuleShell, { moduleState } from "./ModuleShell.tsx";
 import type { ReactNode } from "react";
 import type { LoadStatus } from "../../../shared/types/loadStatus.ts";
@@ -62,6 +63,8 @@ export default function AppsModule({
 }: Props) {
   const UI_TEXT = useLocaleText();
   const copy = DASHBOARD_COPY[useLocale()];
+  /* [0.12.6 · P0-9] 行上「工具」标记的文案：单独一张表（`copy.ts` 已被另一位工程师占着） */
+  const toolCopy = TOOL_TAG_COPY[useLocale()];
   const visible = applications.slice(0, 5);
   /* 卡头读数是**全部应用的合计**（exe `meta(Apps)` = `dur(apps_total_ms)`），
      不是被卡片高度裁剩的那几条之和 —— 那两个数在窄卡上会差很多。 */
@@ -118,6 +121,15 @@ export default function AppsModule({
           const boundItemId = bindings[AppClassification.resolveStatisticalApp(app.exeName)];
           const bound = boundItemId === undefined ? undefined : itemsById.get(boundItemId);
           const rowTags = tagsByExe.get(app.exeName) ?? [];
+          /* 工具类（P0-9）：行上要有一个**看得见**的标记 —— 它的时长已经从总量/分布里
+             拿掉了，不标的话用户唯一的感受就是"我的总时长怎么少了"，而且无处可查。
+             标记只进 `title` / `aria-label`，不改行几何（见 `dashboard-apps.css`）。 */
+          const isTool = app.isTool === true;
+          const rowLabel = [
+            copy.editApp(app.name),
+            isTool ? toolCopy.toolHint : null,
+            bound ? copy.boundTo(bound.name) : null,
+          ].filter((part): part is string => part !== null).join(copy.rowLabelJoiner);
           return (
             <li
               key={app.exeName}
@@ -127,9 +139,7 @@ export default function AppsModule({
               aria-haspopup="menu"
               /* 两段都是完整句子，中间必须有分隔符：只用一个空格时英文会粘成
                  「Edit VS Code Bound to: X」（分隔符走文案表，四语言各一种）。 */
-              aria-label={bound
-                ? `${copy.editApp(app.name)}${copy.rowLabelJoiner}${copy.boundTo(bound.name)}`
-                : copy.editApp(app.name)}
+              aria-label={rowLabel}
               title={bound ? copy.boundTo(bound.name) : app.name}
               /* 双击前 preventDefault：否则连点两下会把下面的名字选中，弹出蓝色选区。 */
               onDoubleClick={(event) => {
@@ -159,6 +169,11 @@ export default function AppsModule({
                   卡宽拖到 w=1（约 300px）时也不横向滚动、不挤变形时长列。 */}
               <span className="at-app-label">
                 <span className="at-app-name">{app.name}</span>
+                {isTool ? (
+                  <span className="at-app-tool" title={toolCopy.toolHint}>
+                    {toolCopy.toolBadge}
+                  </span>
+                ) : null}
                 {rowTags.length > 0 ? (
                   <span className="at-app-tags" aria-hidden="true">
                     {rowTags.slice(0, 2).map((tag) => (

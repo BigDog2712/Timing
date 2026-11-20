@@ -103,6 +103,20 @@ describe("HostIntent 两侧镜像", () => {
     expect(gateway).toContain("set_item_tags{itemId,tags}");
     expect(bridge).toContain("set_item_tags{itemId,tags}");
   });
+
+  /* [0.12.6 · T4] 合并卡事项行点击的起停。**两条动作、不是一条 toggle**：
+     方向必须由发信侧（分析窗）按 `timer:state-changed` 判好再发 —— 药丸侧只忠实执行。
+     三条静默失败路径与上面同族：① `itemId` 写成 `id` → 药丸侧
+     `startOrSwitch(undefined)` 落进 `runStart` 的兜底（去计 lastItemId / 首个事项），
+     于是点了 A 却在计 B，**看起来"生效了"**，最难查；② 把两条合并成一条 toggle →
+     双击 / 广播延迟时方向判反，正在计的反而被停掉；③ 只改一侧（L9 各写一份）。
+     所以两条动作都逐字钉，且 `stop_timer` **不带任何字段**（方向信息不能夹在载荷里）。 */
+  it("d02i_item_row_start_stop_actions_are_identical_on_both_sides", () => {
+    expect(gateway).toContain("start_timer_for_item{itemId}");
+    expect(bridge).toContain("start_timer_for_item{itemId}");
+    expect(gateway).toContain("stop_timer{}");
+    expect(bridge).toContain("stop_timer{}");
+  });
 });
 
 /**

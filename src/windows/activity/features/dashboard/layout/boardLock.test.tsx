@@ -56,7 +56,7 @@ describe("V-1.3a 锁定后六个动作都不改 layout 引用", () => {
     const uid = before.cards[0].uid;
     const store = useBoardStore.getState();
 
-    expect(store.add("todos")).toBe(-1);
+    expect(store.add("timeline")).toBe(-1);
     expect(store.duplicate(uid)).toBeNull();
     store.remove(uid);
     store.moveTo(uid, { x: 100, y: 100, w: 340, h: 304 });

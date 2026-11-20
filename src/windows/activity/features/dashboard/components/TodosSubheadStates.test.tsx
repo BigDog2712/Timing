@@ -35,7 +35,7 @@ vi.mock("../../../platform/runtime/hostIntentGateway.ts", () => ({ emitHostInten
 
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { useTodayTodos } from "../hooks/useTodayTodos.ts";
-import TodosModule from "./TodosModule.tsx";
+import TodosZone from "./TodosZone.tsx";
 
 class ResizeObserverStub {
   observe(): void {}
@@ -44,9 +44,13 @@ class ResizeObserverStub {
 }
 (window as unknown as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub;
 
+/* [0.12.6] 待办是「今日时间线」卡的**上区**：同一批判据换挂 `TodosZone`（只收待办源） */
 function Harness(): null {
   const model = useTodayTodos(0);
-  return createElement(TodosModule, { model }) as unknown as null;
+  return createElement(TodosZone, {
+    todosModel: model,
+    refreshError: false,
+  }) as unknown as null;
 }
 
 let container: HTMLDivElement | null = null;
@@ -84,7 +88,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-describe("待办卡 · 新建入口在四态里都要在（subhead 不受 state 门控）", () => {
+describe("上区 · 「新建待办」入口在四态里都要在", () => {
   it("ts01_loading_state_still_shows_the_entry_row", async () => {
     /* 永不 resolve：模块停在 loading 态 */
     h.listPendingTodos.mockImplementation(() => new Promise(() => {}));
@@ -99,7 +103,7 @@ describe("待办卡 · 新建入口在四态里都要在（subhead 不受 state 
     await mount();
     expect(container?.querySelector(".at-skeleton"), "读取失败时不该停在骨架").toBeNull();
     expect(entryRow(), "error 态没有「新建待办」那一行").not.toBeNull();
-    /* 弹层挂在 `ModuleShell` 外面：error 态点它必须能打开，否则入口是个死链 */
+    /* 弹层挂在四态**外面**的本区兄弟位置：error 态点它必须能打开，否则入口是个死链 */
     act(() => { entryButton()?.click(); });
     await flush();
     expect(dialog(), "error 态点「新建待办」没有打开弹层").not.toBeNull();
@@ -110,6 +114,6 @@ describe("待办卡 · 新建入口在四态里都要在（subhead 不受 state 
     await mount();
     expect(entryRow(), "空态没有「新建待办」那一行").not.toBeNull();
     expect(container?.querySelector(".at-todo-list"), "空态不该有列表").toBeNull();
-    expect(container?.querySelector(".at-card-head-right .at-link-btn"), "入口又回到卡头右槽了").toBeNull();
+    expect(container?.querySelector(".at-items-zone-head .at-link-btn"), "入口又挤回区标题行了").toBeNull();
   });
 });

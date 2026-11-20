@@ -42,7 +42,7 @@ vi.mock("../../../platform/runtime/hostIntentGateway.ts", () => ({ emitHostInten
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { useTodayTodos } from "../hooks/useTodayTodos.ts";
 import type { TodoSummary } from "../../../shared/types/todos.ts";
-import TodosModule from "./TodosModule.tsx";
+import TodosZone from "./TodosZone.tsx";
 
 class ResizeObserverStub {
   observe(): void {}
@@ -53,9 +53,14 @@ class ResizeObserverStub {
 
 let latest: ReturnType<typeof useTodayTodos> | null = null;
 
+/* [0.12.6] 待办是「今日时间线」卡的**上区**（`TodosZone`）：同一批量测判据换挂新组件，
+   只给待办源（这一册判"可见行数是量出来的"，与下区的记录无关）。 */
 function Harness(): null {
   latest = useTodayTodos(0);
-  return createElement(TodosModule, { model: latest }) as unknown as null;
+  return createElement(TodosZone, {
+    todosModel: latest,
+    refreshError: false,
+  }) as unknown as null;
 }
 
 let container: HTMLDivElement | null = null;
@@ -82,7 +87,8 @@ async function mount() {
 }
 
 const list = () => container?.querySelector<HTMLElement>(".at-todo-list") ?? null;
-const metaText = () => container?.querySelector(".at-card-meta")?.textContent ?? "";
+/* 待办读数在**上区的区标题行**（`.at-todo-meta`）；`.at-card-meta` 是下区的同日总计，别混 */
+const metaText = () => container?.querySelector(".at-todo-meta")?.textContent ?? "";
 const entry = () => Array.from(document.body.querySelectorAll<HTMLButtonElement>("button"))
   .find((button) => button.textContent === "新建待办");
 
@@ -117,12 +123,12 @@ afterEach(() => {
   root = null;
 });
 
-describe("待办卡 · 入口在卡头之下时的「还有 K 项」", () => {
+describe("上区 · 待办溢出时的「还有 K 项」（量出来的）", () => {
   it("tl01_the_empty_state_has_the_entry_and_no_overflow_readout", async () => {
     await mount();
     /* 空态：入口在（这是入口一路搬家的全部理由） */
     expect(entry()).not.toBeUndefined();
-    expect(entry()?.closest(".at-todo-new-row"), "入口在卡头下方那条窄行里").not.toBeNull();
+    expect(entry()?.closest(".at-todo-new-row"), "入口在那条窄行里").not.toBeNull();
     /* 空态没有列表、也没有 meta 读数 */
     expect(list()).toBeNull();
     expect(metaText()).toBe("");

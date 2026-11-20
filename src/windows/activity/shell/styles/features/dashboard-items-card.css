@@ -1,0 +1,369 @@
+/* ============================================================================
+ * dashboard-items-card.css — 「今日时间线」卡 + 「事项管理」卡（0.12.6）
+ * -----------------------------------------------------------------------------
+ * 两张**独立**的卡（用户口径，见设计文档 §⑦）：
+ *   · `.at-card-items`  今日时间线卡（`TimelineTodosCard`）= 上区待办 + 浅横线 + 下区时间线
+ *   · `.at-card-manage` 事项管理卡（`ManageCard`）= 一个区（`ItemsManageZone`）占满卡身
+ *
+ * 三条只说一次：
+ *   ① **分隔线是卡的直接子节点**（`.at-card-items__divider`），不在任何一个区里 ——
+ *      挂在区里就会跟着那一区一起滚，"横线固定不动"当场失效（P1-1）。
+ *   ② 时间线卡两区各自滚：上区 `max-height: 40%`（有上限的自适应，**不是**固定 40%，
+ *      待办少的时候不该留一块空白）；下区吃余下高度。页面级不滚。
+ *   ③ 颜色/间距一律引用既有 `--at-*` 令牌，本文件**不出现任何十六进制**（`check:css-hex`）。
+ *
+ * 除卡壳类名之外，本文件还给两处**已被既有组件定义过的**元素补卡内版式，
+ * 以 `.at-card-items` / `.at-card-manage` 作前缀（不改任何全局规则，也就不影响别的卡）：
+ *   · `.at-card-items .at-timeline-rows`（行容器自己的滚动，原规则挂在已下线的 `.at-card-timeline` 上）
+ *   · `.at-card-items .at-undo-bar`（撤销条锚到待办区而不是整张卡）
+ * ========================================================================== */
+
+.at-card-items {
+  /* 分隔线可以相对这张卡定位（负 margin 贯穿卡宽）；不写 `overflow`（`.at-card` 已是 hidden） */
+  position: relative;
+}
+
+/* ── 事项管理卡：只有一个区，区自己滚 ── */
+.at-card-manage {
+  position: relative;
+}
+
+.at-card-manage__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── 上区：事项管理 ── */
+.at-card-items__upper {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  /* 卡高的 40% 是**上限**：内容少就按内容高，多了才在上区内部滚动 */
+  max-height: 40%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── 那条浅横线：贯穿卡宽（负 margin 吃掉卡身左右内距），固定不随两区滚动 ── */
+.at-card-items__divider {
+  flex: 0 0 auto;
+  height: 1px;
+  margin: 8px calc(-1 * var(--at-card-pad));
+  background: var(--at-border-subtle);
+  border: 0;
+}
+
+/* ── 下区：今日时间线（吃余下高度） ── */
+.at-card-items__lower {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── 两区共用：区根 / 区标题行 ── */
+.at-items-zone {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* 撤销条是 `position: absolute`：锚点必须是**待办区**（见文件尾部的 `.at-undo-bar` 覆盖）。
+   时间线区也留一个锚点，将来若给它加浮层不必再动这条。 */
+.at-items-zone-todos,
+.at-items-zone-timeline {
+  position: relative;
+}
+
+.at-items-zone-head {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+/* 区标题比卡头小一号：卡头 13.5 是"这张卡叫什么"，区标题 11 是"这一块叫什么" */
+.at-items-zone-title {
+  margin: 0;
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-medium);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
+  white-space: nowrap;
+}
+
+/* 上区的四个动作：靠右、可换行（窄卡时 AI 那一颗换到第二行，不横向溢出） */
+.at-items-zone-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--at-space-group);
+  margin-left: auto;
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+}
+
+/* AI 一键分类还没接落库（T3 只留按钮位）：`aria-disabled` 而不是 `disabled` —— 禁用会丢焦点 */
+.at-items-zone-ai[aria-disabled="true"] {
+  color: var(--at-text-tertiary);
+  cursor: default;
+}
+
+.at-items-zone-ai[aria-disabled="true"]:hover {
+  color: var(--at-text-tertiary);
+}
+
+/* 下区标题行里的「N 条待办 / 还有 K 项」读数（量出来的，不是常量）。
+ * `margin-right: auto` 把后面的「总计」推到右缘：区标题行没有 `⋯`，而 `.at-card-meta`
+ * 自带 `margin-right: 30px`（那是给卡头右槽的 `⋯` 让位），这一行要抹掉。 */
+.at-card-items .at-todo-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+  font-size: var(--at-font-size-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
+  white-space: nowrap;
+}
+
+/* 区标题行里的总计：右缘落位，去掉卡头那 30px 的 `⋯` 让位 */
+.at-card-items .at-items-zone-head .at-card-meta {
+  margin-right: 0;
+  margin-left: auto;
+}
+
+/* ── 上区两组列表 ── */
+.at-items-groups {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.at-items-group {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+}
+
+.at-items-group + .at-items-group {
+  margin-top: var(--at-space-group);
+}
+
+.at-items-group-title {
+  margin: 0;
+  font-size: var(--at-font-size-caption);
+  font-weight: var(--at-font-weight-regular);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-tertiary);
+}
+
+.at-items-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.at-items-row {
+  display: flex;
+  flex: 0 0 auto;
+}
+
+/* 整行是一个按钮（点一下起停计时，T4 接 intent）：行高与时间线行同一档，
+   两区扫视时行距不会一宽一窄。 */
+.at-items-row-main {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: var(--at-row-items);
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-primary);
+  text-align: left;
+  cursor: default;
+}
+
+.at-items-row-main:hover {
+  color: var(--at-accent-default);
+}
+
+.at-items-row-main:focus-visible {
+  outline: 2px solid var(--at-focus-ring);
+  outline-offset: 1px;
+  border-radius: var(--at-radius-button);
+}
+
+.at-items-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 今日累计：等宽数字，右缘对齐（一列数扫下来不会跳） */
+.at-items-row-today {
+  flex: 0 0 auto;
+  color: var(--at-text-secondary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 绑定标记：只说"这个事项绑着应用"，不列具体是哪个（清单在应用视角） */
+.at-items-row-bound {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  color: var(--at-text-tertiary);
+}
+
+/* ── 既有元素在合并卡里的补丁（全部以 `.at-card-items` 作前缀，不影响别的卡） ── */
+
+/* 时间线行容器自己滚：原规则挂在 `.at-card-timeline` 上（那张卡已下线），
+   这里按同一口径重挂一遍 —— 宁可出滚动条，也别裁半行。 */
+.at-card-items .at-timeline-rows {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  list-style: none;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--at-border-strong) transparent;
+}
+
+/* 待办列表吃掉下区余下的高度（它自己已经是 `overflow-y: auto`），
+   时间线行按内容高取位、放不下才让位 —— 这样"只有待办"和"只有时间线"两种日子
+   都不会出现半块空白。 */
+.at-card-items .at-todo-list {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* 撤销条锚到待办区：`bottom` 归零（卡底三入口已搬进事项管理卡，不再需要让开），
+   左右归零（本区已经在卡的 20 内距里，再吃一次 `--at-card-pad` 会缩成一小截）。 */
+.at-card-items .at-undo-bar {
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+/* ── [0.12.6 · T4] 行上的「正在计时」标记 ──
+ * 只用一个小圆点：行高 20，塞字会把名字挤掉；语义由 `aria-label`（`结束计时：X`）承担，
+ * 所以这个点是装饰。
+ * 圆点走 `::before` 的 `inline-block`（**不**把名字改成 flex 容器）：名字本身靠
+ * `text-overflow: ellipsis` 收尾，一旦变成 flex，长名字就只剩硬裁、连省略号都没有了。 */
+.at-items-row[data-running] .at-items-row-name {
+  color: var(--at-accent-default);
+}
+
+.at-items-row[data-running] .at-items-row-name::before {
+  content: "";
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  margin-right: 5px;
+  border-radius: 50%;
+  vertical-align: middle;
+  background: var(--at-accent-default);
+}
+
+/* ── AI 一键分类：撤销入口 ──
+ * 只在写过一批之后出现（第二颗按钮），与动作组同一档字号，但颜色退一档 ——
+ * 它不是"再来一次"，而是"我后悔了"。 */
+.at-items-zone-undo {
+  color: var(--at-text-tertiary);
+}
+
+.at-items-zone-undo:hover,
+.at-items-zone-undo:focus-visible {
+  color: var(--at-accent-default);
+}
+
+/* ── AI 预览层 ── */
+.at-items-ai-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-secondary);
+}
+
+.at-items-ai-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 52vh;
+  margin: 6px 0 0;
+  padding: 0 var(--at-space-group) 0 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.at-items-ai-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: var(--at-radius-button);
+}
+
+/* 被摘掉的那一行：变淡但**不隐藏** —— 用户摘完还要能看见自己摘了什么，也要能改回来 */
+.at-items-ai-row[data-excluded] {
+  opacity: 0.5;
+}
+
+.at-items-ai-check {
+  flex: 0 0 auto;
+  margin: 2px 0 0;
+  accent-color: var(--at-accent-default);
+}
+
+.at-items-ai-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.at-items-ai-name {
+  overflow: hidden;
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  color: var(--at-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.at-items-ai-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}

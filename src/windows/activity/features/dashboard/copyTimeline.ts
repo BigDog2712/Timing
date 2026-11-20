@@ -99,6 +99,64 @@ export interface TimelineManageCopy {
   recordSaved: string;
   /** 意图没发出去（与 `timelineSaveFailed` 同型，但语义属记录编辑，分开一句） */
   recordSaveFailed: string;
+
+  /* ── [0.12.6] 时间线卡（待办 + 时间线）与事项管理卡 ── */
+  /** 事项管理卡的区标题（卡头已写「事项管理」，区里说清这列表装的是哪两段） */
+  itemsManageTitle: string;
+  /** 时间线卡的**下区**标题（上区是待办，见 `copyTodos.ts` 的 `todosTitle`） */
+  itemsTitle: string;
+  /** 事项管理卡的第一组（置顶在前） */
+  itemsPinnedGroup: string;
+  /** 事项管理卡的第二组：最近用过、但没置顶的事项 */
+  itemsRecentGroup: string;
+  /** 事项管理卡的一句空态（两组都空） */
+  itemsEmpty: string;
+  /** 时间线卡下区的一句空态（今天一条计时记录都没有） */
+  itemsTimelineEmpty: string;
+  /** 时间线卡两区之间那条浅横线的 `aria-label`（`role="separator"`，读屏要念得出来） */
+  itemsDividerLabel: string;
+  /** 事项管理卡动作组的「新增」（「编辑」「事项管理」复用 `timelineEditItem` / `timelineManageItems`） */
+  itemsNewAction: string;
+  /** 事项管理卡动作组的 AI 一键分类 */
+  itemsAiTag: string;
+  /** 事项管理卡行上的绑定标记（只表示"这个事项绑了应用"，不列具体是哪个） */
+  itemsBoundMark: string;
+  /** 行点击起停的 `aria-label`（行本体是一个按钮） */
+  itemsStartTimer: (name: string) => string;
+
+  /* ── [0.12.6 · T4] 行点击起停 + AI 一键分类 ── */
+  /** 正在计这一条时的 `aria-label`（同一个按钮，方向反过来了） */
+  itemsStopTimer: (name: string) => string;
+  /** 宿主**确认之后**才出的提示（发信侧不承诺结果，见 `useItemTimerToggle`） */
+  itemsTimerStarted: (name: string) => string;
+  itemsTimerStopped: (name: string) => string;
+  /** 连"我想干什么"都没发出去（桥断了，不是宿主的错） */
+  itemsTimerSendFailed: string;
+  /** AI 按键上的进行态：`正在分类…` */
+  itemsAiTagBusy: string;
+  /** 没有未打标事项时按键的置灰理由（同时也是点击后的提示） */
+  itemsAiTagNothing: string;
+  /** 未配置 AI 时按键的置灰理由 */
+  itemsAiTagNoConfig: string;
+  /** 候选表为空：AI 没有可以挑的标签路径 */
+  itemsAiTagNoCandidates: string;
+  /** 模型这批没给出可用的建议（不是"没事项"，别混用一句） */
+  itemsAiTagNoSuggestion: string;
+  /** 预览层标题 / 说明（说明必须写明"没勾的不写"） */
+  itemsAiTagPreviewTitle: string;
+  itemsAiTagPreviewDesc: string;
+  /** 预览层确认键：`应用（3）`（数字 = 会真正写出去的条数） */
+  itemsAiTagApply: (count: number) => string;
+  itemsAiTagNothingSelected: string;
+  /** 行上那颗勾选框的 `aria-label`（反向表述：勾掉 = 不写这一条） */
+  itemsAiTagSkipRow: string;
+  /** 落库结果：`已写入 5 条，跳过 1 条`（跳过 = 意图没发出去） */
+  itemsAiTagResult: (written: number, skipped: number) => string;
+  /** 预览层里"AI 也没想法"的那些：不占列表，只报条数 */
+  itemsAiTagSkippedRows: (count: number) => string;
+  /** 整体撤销（只保留最近一次，撤销后按钮消失） */
+  itemsAiTagUndo: string;
+  itemsAiTagUndone: (count: number) => string;
 }
 
 export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
@@ -145,6 +203,36 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     crossDayHint: "跨零点的记录请在两天里分别修改",
     recordSaved: "已保存，稍后刷新生效",
     recordSaveFailed: "没发出去，请重试",
+    itemsManageTitle: "常用与历史",
+    itemsTitle: "今日时间线",
+    itemsPinnedGroup: "常用事项",
+    itemsRecentGroup: "历史事项",
+    itemsEmpty: "还没有事项 · 点「新增」建一个",
+    itemsTimelineEmpty: "今天还没有计时记录",
+    itemsDividerLabel: "待办与今日时间线之间的分隔",
+    itemsNewAction: "新增",
+    itemsAiTag: "一键 AI 分类",
+    itemsBoundMark: "已绑定应用",
+    itemsStartTimer: (name) => `开始计时：${name}`,
+    itemsStopTimer: (name) => `结束计时：${name}`,
+    itemsTimerStarted: (name) => `已开始计时：${name}`,
+    itemsTimerStopped: (name) => `已结束计时：${name}`,
+    itemsTimerSendFailed: "没通知到计时器，再点一次",
+    itemsAiTagBusy: "正在分类…",
+    itemsAiTagNothing: "没有需要分类的事项",
+    itemsAiTagNoConfig: "未配置 AI，去设置",
+    itemsAiTagNoCandidates: "还没有任何标签 —— 先建一个标签，AI 才有地方挂",
+    itemsAiTagNoSuggestion: "AI 这次没给出可用的标签建议，稍后再试",
+    itemsAiTagPreviewTitle: "AI 建议标签",
+    itemsAiTagPreviewDesc: "只列还没打标的事项。勾掉的不写入，取消则一条都不写。",
+    itemsAiTagApply: (count) => `应用（${count}）`,
+    itemsAiTagNothingSelected: "没有勾选任何事项",
+    itemsAiTagSkipRow: "不写入这一条",
+    itemsAiTagResult: (written, skipped) =>
+      skipped > 0 ? `已写入 ${written} 条，跳过 ${skipped} 条` : `已写入 ${written} 条`,
+    itemsAiTagSkippedRows: (count) => `另有 ${count} 条 AI 没给出建议，保持不动`,
+    itemsAiTagUndo: "撤销本次分类",
+    itemsAiTagUndone: (count) => `已撤销 ${count} 条分类`,
   },
   "en-US": {
     timelineNewItem: "New item",
@@ -189,6 +277,36 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     crossDayHint: "A record across midnight must be split into two days",
     recordSaved: "Saved, takes effect after the next refresh",
     recordSaveFailed: "Not sent, please retry",
+    itemsManageTitle: "Frequent & past",
+    itemsTitle: "Today’s timeline",
+    itemsPinnedGroup: "Frequent items",
+    itemsRecentGroup: "Past items",
+    itemsEmpty: "No items yet · use “New” to create one",
+    itemsTimelineEmpty: "No tracked time today",
+    itemsDividerLabel: "Divider between to-dos and today’s timeline",
+    itemsNewAction: "New",
+    itemsAiTag: "One-click AI tagging",
+    itemsBoundMark: "App bound",
+    itemsStartTimer: (name) => `Start timer: ${name}`,
+    itemsStopTimer: (name) => `Stop timer: ${name}`,
+    itemsTimerStarted: (name) => `Timer started: ${name}`,
+    itemsTimerStopped: (name) => `Timer stopped: ${name}`,
+    itemsTimerSendFailed: "Couldn’t reach the timer, tap again",
+    itemsAiTagBusy: "Classifying…",
+    itemsAiTagNothing: "Nothing needs classifying",
+    itemsAiTagNoConfig: "AI is not configured, open settings",
+    itemsAiTagNoCandidates: "No tags yet — create one first so the AI has somewhere to attach",
+    itemsAiTagNoSuggestion: "The AI returned no usable tags this time, try again later",
+    itemsAiTagPreviewTitle: "AI suggested tags",
+    itemsAiTagPreviewDesc: "Only untagged items are listed. Unticked items are not written; cancelling writes nothing.",
+    itemsAiTagApply: (count) => `Apply (${count})`,
+    itemsAiTagNothingSelected: "No items selected",
+    itemsAiTagSkipRow: "Do not write this one",
+    itemsAiTagResult: (written, skipped) =>
+      skipped > 0 ? `Wrote ${written}, skipped ${skipped}` : `Wrote ${written}`,
+    itemsAiTagSkippedRows: (count) => `${count} more got no suggestion and stay untouched`,
+    itemsAiTagUndo: "Undo this tagging",
+    itemsAiTagUndone: (count) => `Undid ${count} taggings`,
   },
   "ru-RU": {
     timelineNewItem: "Новое дело",
@@ -233,6 +351,36 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     crossDayHint: "Запись через полночь нужно разделить на два дня",
     recordSaved: "Сохранено, вступит в силу после обновления",
     recordSaveFailed: "Не отправлено, повторите",
+    itemsManageTitle: "Частые и прошлые",
+    itemsTitle: "Хронология дня",
+    itemsPinnedGroup: "Частые дела",
+    itemsRecentGroup: "Прошлые дела",
+    itemsEmpty: "Дел пока нет · нажмите «Добавить»",
+    itemsTimelineEmpty: "Сегодня отсчётов нет",
+    itemsDividerLabel: "Разделитель между задачами и хронологией дня",
+    itemsNewAction: "Добавить",
+    itemsAiTag: "Разметка ИИ одним нажатием",
+    itemsBoundMark: "Приложение привязано",
+    itemsStartTimer: (name) => `Начать отсчёт: ${name}`,
+    itemsStopTimer: (name) => `Остановить отсчёт: ${name}`,
+    itemsTimerStarted: (name) => `Отсчёт начат: ${name}`,
+    itemsTimerStopped: (name) => `Отсчёт остановлен: ${name}`,
+    itemsTimerSendFailed: "Не удалось связаться с таймером, нажмите ещё раз",
+    itemsAiTagBusy: "Идёт разметка…",
+    itemsAiTagNothing: "Нет дел, которые нужно размечать",
+    itemsAiTagNoConfig: "ИИ не настроен, откройте настройки",
+    itemsAiTagNoCandidates: "Тегов пока нет — создайте тег, чтобы ИИ было куда его поставить",
+    itemsAiTagNoSuggestion: "ИИ не предложил подходящих тегов, повторите позже",
+    itemsAiTagPreviewTitle: "ИИ предлагает теги",
+    itemsAiTagPreviewDesc: "Показаны только дела без тегов. Снятые отметки не записываются, отмена не пишет ничего.",
+    itemsAiTagApply: (count) => `Применить (${count})`,
+    itemsAiTagNothingSelected: "Ничего не отмечено",
+    itemsAiTagSkipRow: "Не записывать это",
+    itemsAiTagResult: (written, skipped) =>
+      skipped > 0 ? `Записано ${written}, пропущено ${skipped}` : `Записано ${written}`,
+    itemsAiTagSkippedRows: (count) => `Ещё ${count} без предложений, остаются как есть`,
+    itemsAiTagUndo: "Отменить эту разметку",
+    itemsAiTagUndone: (count) => `Отменено разметок: ${count}`,
   },
   es: {
     timelineNewItem: "Nuevo asunto",
@@ -277,5 +425,35 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     crossDayHint: "Un registro que cruza la medianoche debe repartirse en dos días",
     recordSaved: "Guardado, surte efecto tras la próxima actualización",
     recordSaveFailed: "No se envió, inténtalo de nuevo",
+    itemsManageTitle: "Frecuentes y anteriores",
+    itemsTitle: "Cronología de hoy",
+    itemsPinnedGroup: "Asuntos frecuentes",
+    itemsRecentGroup: "Asuntos anteriores",
+    itemsEmpty: "Aún no hay asuntos · usa «Nuevo» para crear uno",
+    itemsTimelineEmpty: "Hoy no hay tiempo registrado",
+    itemsDividerLabel: "Separador entre los pendientes y la cronología de hoy",
+    itemsNewAction: "Nuevo",
+    itemsAiTag: "Clasificación con IA en un clic",
+    itemsBoundMark: "Aplicación vinculada",
+    itemsStartTimer: (name) => `Iniciar cronómetro: ${name}`,
+    itemsStopTimer: (name) => `Detener cronómetro: ${name}`,
+    itemsTimerStarted: (name) => `Cronómetro iniciado: ${name}`,
+    itemsTimerStopped: (name) => `Cronómetro detenido: ${name}`,
+    itemsTimerSendFailed: "No se pudo avisar al cronómetro, inténtalo otra vez",
+    itemsAiTagBusy: "Clasificando…",
+    itemsAiTagNothing: "No hay asuntos que clasificar",
+    itemsAiTagNoConfig: "La IA no está configurada, abre los ajustes",
+    itemsAiTagNoCandidates: "Aún no hay etiquetas: crea una para que la IA tenga dónde ponerla",
+    itemsAiTagNoSuggestion: "La IA no propuso etiquetas utilizables, inténtalo más tarde",
+    itemsAiTagPreviewTitle: "Etiquetas sugeridas por la IA",
+    itemsAiTagPreviewDesc: "Solo se listan asuntos sin etiquetas. Los no marcados no se escriben; cancelar no escribe nada.",
+    itemsAiTagApply: (count) => `Aplicar (${count})`,
+    itemsAiTagNothingSelected: "No hay ningún asunto marcado",
+    itemsAiTagSkipRow: "No escribir este",
+    itemsAiTagResult: (written, skipped) =>
+      skipped > 0 ? `Escritos ${written}, omitidos ${skipped}` : `Escritos ${written}`,
+    itemsAiTagSkippedRows: (count) => `Otros ${count} sin sugerencia se quedan igual`,
+    itemsAiTagUndo: "Deshacer esta clasificación",
+    itemsAiTagUndone: (count) => `Clasificaciones deshechas: ${count}`,
   },
 };

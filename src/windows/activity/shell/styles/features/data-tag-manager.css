@@ -162,3 +162,54 @@
 .dtm-metric {
   font-variant-numeric: tabular-nums;
 }
+
+/* ── 拖动改分类 ───────────────────────────────────────────────────────────────
+ * 三个状态各只给**一种**视觉，不叠加：
+ *   · 正在被拖 → 半透明（"它已经被拿起来了"）；
+ *   · 能放 → 左侧 2px accent 内阴影（唯一的形状信号，指向"成为子标签"）；
+ *   · 不能放 → danger 淡底（**不给 not-allowed 光标**：光标已经由未 preventDefault
+ *     的 dragover 变成"禁止"了，再涂一层只会盖掉真正的原因）。
+ */
+
+/* 半透明而不是位移/缩放：一行在列表里跳动会让下面所有行跟着重排 */
+.dtm-row[data-dragging="true"] {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+/* 左内边框 + 同色淡底：两者是**一个**视觉（同色、同侧），不像"描边 + 底色"那样
+   让人分不清"这行被选中"还是"东西会掉进来" */
+.dtm-row[data-drop-target="ok"] {
+  background: color-mix(in srgb, var(--at-accent-default) 10%, transparent);
+  box-shadow: inset 2px 0 0 0 var(--at-accent-default);
+}
+
+.dtm-row[data-drop-target="invalid"] {
+  background: color-mix(in srgb, var(--at-danger) 12%, transparent);
+}
+
+/* 根投放区（移到一级）：虚线框 + 一句提示。高度压在 28（< 32）：
+   它只在拖拽过程中出现，一旦比一行还高，列表会在松手前后跳一次。 */
+.dtm-drop-root {
+  display: flex;
+  box-sizing: border-box;
+  min-height: 28px;
+  padding: 0 10px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--at-border-subtle);
+  border-radius: var(--at-radius-control);
+  color: var(--at-text-tertiary);
+  font-size: var(--at-font-size-caption);
+  line-height: var(--at-line-height-caption);
+  transition:
+    border-color var(--at-motion-fast) var(--at-motion-ease),
+    color var(--at-motion-fast) var(--at-motion-ease),
+    background-color var(--at-motion-fast) var(--at-motion-ease);
+}
+
+.dtm-drop-root[data-drop-target="ok"] {
+  border-color: color-mix(in srgb, var(--at-accent-default) 60%, transparent);
+  background: color-mix(in srgb, var(--at-accent-default) 10%, transparent);
+  color: var(--at-text-secondary);
+}

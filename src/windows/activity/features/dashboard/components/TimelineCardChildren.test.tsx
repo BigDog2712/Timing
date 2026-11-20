@@ -30,7 +30,7 @@ vi.mock("../../../platform/desktop/hostSettingsGateway.ts", () => ({
 
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { resolveLocaleActivation } from "../../../shared/i18n/runtime.ts";
-import TimelineCard from "./TimelineCard.tsx";
+import TimelineZone from "./TimelineZone.tsx";
 import { buildChildEntries, categoryLabelOf } from "./TimelineChildRows.tsx";
 import type { ItemTimelineRow } from "../../../platform/persistence/attributionGateway.ts";
 import type { TodayItemRow } from "../hooks/useTodayItems.ts";
@@ -96,15 +96,11 @@ describe("时间轴第二层", () => {
       root.render(
         createElement(LocaleProvider, {
           locale: "zh-CN" as const,
-          children: createElement(TimelineCard, {
+          children: createElement(TimelineZone, {
             items: rows,
             total: rows.reduce((sum, row) => sum + row.value, 0),
-            tier: "M" as const,
             status: "ready" as const,
-            refreshError: false,
             onRetry: () => {},
-            onLocalRename: () => {},
-            onLocalCreate: () => {},
           }),
         }),
       );

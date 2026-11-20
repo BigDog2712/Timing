@@ -48,7 +48,10 @@ describe("normalizeLayout（自由摆位 v3）", () => {
       ["timer", 0, 0, 518, 264],
       ["apps", 534, 0, 518, 264],
       ["trend", 0, 280, 518, 264],
-      ["todos", 534, 280, 518, 544],
+      /* [0.12.6] v2 的 `todos` 卡迁成 `timeline` 卡，**沿用它的矩形**：老用户摆过的
+       * 那一格不丢，只是内容从此是"上区待办 / 下区今日时间线"。判据见
+       * `migrateLegacyCards.test.ts` 的 ml01–ml05。 */
+      ["timeline", 534, 280, 518, 544],
       /* v2 的 4 跨列 = 4×251 + 3×16 = 1052，与新画布 1250 无关：迁移只是把旧网格换算成像素 */
       ["notes", 0, 840, 1052, 264],
     ]);
@@ -68,7 +71,7 @@ describe("normalizeLayout（自由摆位 v3）", () => {
         { uid: 3, kind: "nope", x: 0, y: 0, w: 100, h: 100 },
         /* 这两张是真的被主人摘掉的组件：老布局文件里还留着，读进来必须安静地清掉，
          * 不能因为「有个不认识的 kind」就整份回默认（那会把用户其余排布一起抹了） */
-        { uid: 5, kind: "items", x: 0, y: 280, w: 518, h: 264, tier: "M" },
+        { uid: 5, kind: "legacy-feed", x: 0, y: 280, w: 518, h: 264, tier: "M" },
         /* [本轮 T04] `reminder` 回归为合法 kind（活动提醒新卡），这里换一个真不存在的 kind */
         { uid: 6, kind: "gauge", x: 534, y: 280, w: 518, h: 264, tier: "M" },
         { uid: 4, kind: "notes", x: 0, y: 600, w: 1052, h: 264, tier: "M" },
@@ -154,11 +157,11 @@ describe("boardStore（多实例 / 增删 / 尺寸 / 标题）", () => {
 
   it("同一种组件可以加多张，落点互不重叠", () => {
     const store = useBoardStore.getState();
-    const first = store.add("todos");
-    const second = useBoardStore.getState().add("todos");
+    const first = store.add("timeline");
+    const second = useBoardStore.getState().add("timeline");
     const cards = useBoardStore.getState().layout.cards;
     expect(first).not.toBe(second);
-    expect(cards.filter((card) => card.kind === "todos").length).toBeGreaterThanOrEqual(2);
+    expect(cards.filter((card) => card.kind === "timeline").length).toBeGreaterThanOrEqual(2);
     expect(firstOverlap(cards)).toBeNull();
   });
 
