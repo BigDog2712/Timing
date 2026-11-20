@@ -1,2 +1,2 @@
-4ffdb19e851ea166db63f05b1c521342dd4e2150911ffa61a56ec2d96d89302a  Timing-0.12.6-portable.zip
-d4fec1b34fde417425695708092ead8ced958f03f89125e34d007f6c30a9b2ad  Timing-0.12.6-setup.exe
+42fa34e4109a6657f1badfb5c70d50fc8b6161c52ae68908a2a36faa6677ea9f  Timing-0.12.6-portable.zip
+dd05eec82ccab81402db0ebdfd000ae5ca5c49d63f20216a819a710f1c1d656b  Timing-0.12.6-setup.exe
