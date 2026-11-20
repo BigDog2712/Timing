@@ -6,20 +6,26 @@
 
 **屏幕边缘的一颗药丸。点一下开始计时，不打断你手上的事。**
 
+计时 · 待办 · 便利贴 · 应用使用统计，一个 32 px 的悬浮条加一张自由摆位的卡片板。
+
+[![Download](https://img.shields.io/github/v/release/BigDog2712/Timing?label=%E4%B8%8B%E8%BD%BD&sort=semver&style=for-the-badge&color=0078D4)](https://github.com/BigDog2712/Timing/releases/latest)
 [![CI](https://github.com/BigDog2712/Timing/actions/workflows/ci.yml/badge.svg)](https://github.com/BigDog2712/Timing/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/BigDog2712/Timing?label=release)](https://github.com/BigDog2712/Timing/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20x64-0078D4)](docs/)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%2F%2011%20x64-0078D4)](https://github.com/BigDog2712/Timing/releases/latest)
 [![Tauri](https://img.shields.io/badge/Tauri-2.12-24C8DB)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.100.0-DEA584)](rust-toolchain.toml)
 
-Windows 10 / 11 · Tauri 2 · React 19 · Rust · SQLite
+Windows 10 / 11 · Tauri 2 · React 19 · Rust · SQLite · **纯本地，无账号，无遥测**
 
-[中文](#为什么是这个形态) · [English](#english)
+[为什么是这个形态](#为什么是这个形态) · [功能](#功能) · [安装](#安装) · [数据去哪了](#数据去哪了) · [English](#english)
 
 </div>
 
 ---
+
+> **30 秒上手**：装好后屏幕边上出现一条药丸 → 点圆环开始计时，干完再点一下，
+> 记录落进当天的 Markdown；点药丸上的图标打开主界面，那里是一张可以随便拖、随便缩的卡片板。
+
 
 ## English
 
@@ -39,6 +45,19 @@ todos with daily/weekly records, up to 20 sticky notes as separate windows, a
 reminder bell, an idle menu for switching task on the fly, declarative plugins,
 two-way Markdown sync into your own notes, and a vendored time-insight window
 (Patina) for app-usage tracking.
+
+On top of that, the insight window has a **free-form card board**: drag any card
+anywhere, resize it in three tiers, and it remembers. Cards cover today's time
+split, app ranking, the day's timeline (with your to-dos folded into the same
+card), an item manager you can click to start/stop tracking, activity trend,
+heatmap and reminders. Tags are Obsidian-style paths (`study/exam`) you can
+**drag onto another tag to re-parent**, and a top-level `工具` (`tools`) tag keeps
+downloaders, terminals and screenshot utilities **out of your time statistics**.
+
+**Download:** [latest release](https://github.com/BigDog2712/Timing/releases/latest) —
+`Timing-0.12.6-setup.exe` (installer) or `Timing-0.12.6-portable.zip` (no install,
+data stays next to the exe). Windows 10/11 x64, WebView2 required. Builds are
+unsigned, so SmartScreen may warn about an unknown publisher.
 
 MIT licensed. Issues and PRs are welcome.
 
@@ -87,6 +106,18 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
   哪天不用这个软件了，记录还在你自己的 `{date}.md` 里。
 - **倒计时到点恒结束并保存**，不弹确认框问你要不要留。错过了就是错过了。
 
+## 怎么用
+
+三件事，五分钟就能上手：
+
+1. **计时**：屏幕边上那条药丸，点圆环开始、再点结束。计时的同时可以改事项名、
+   切正计时 / 倒计时；干完的记录落在当天的 Markdown 里（你配的目录与标题）。
+2. **看统计**：点药丸上的图标打开主界面 —— 一张自由摆位的卡片板：今天的计时分布、
+   应用排行、今日时间线（含待办）、事项管理、活动趋势、热力图、提醒。
+   卡片能拖着换位置、拖着改大小，摆好之后它自己记住。
+3. **管事项**：在「事项管理」卡里点一行就开始计这一件，再点一下结束。
+   常用事项置顶在前，历史事项按最近用过的排。它只管事项本身，**不设时间**。
+
 ## 功能
 
 | | 能力 | 说明 |
@@ -95,6 +126,9 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 | ⚪ | **小圆点形态** | 22 px 纯图形钟面（表盘 / 进度弧 / 分针）：外环一分钟一圈、分针一小时一圈，暂停时环冻在当前位置；点一下临时展开成悬浮条，移开收回 |
 | ⏳ | **正计时 / 倒计时** | 倒计时剩余 ≤60 s 转 `#E5484D` 并 1 s 闪烁（低于 WCAG 2.3.1 光敏阈值）；到点恒结束并保存 |
 | ✅ | **待办与记录** | 日 / 周视图、软删除、撤销条（3 s）、内联编辑；低于「最短记录时长」（默认 30 s，可调 5–300 s）的计时自动忽略 |
+| 🗂 | **事项管理卡** | 常用（置顶）/ 历史两组；新增 / 编辑 / 事项管理都不设时间；**点一行即开始计这一件**（在计别的先暂停再切过去）；AI 一键分类只碰未打标事项；已绑定应用的行有标记 |
+| 🏷 | **标签树可拖动** | 数据页标签管理：拖一行到另一行 → 成为其子标签（整棵子树跟着走），拖到根投放区 → 回到一级；非法投放当场说理由（绕环 / 超 4 级 / 同名），**同名拒绝而非合并** |
+| 🧰 | **「工具」标签不计数** | 下载器 / 终端 / 截图 / 系统维护打上「工具」后，时长不进总时长与分类分布；排行仍显示、标「工具」、占比 0%（趋势与热力图这一版不剔除） |
 | 📝 | **便利贴** | `note-{id}` 独立多窗，320×232 默认、160×120–900×900 硬钳，几何 300 ms 防抖落盘，上限 20 |
 | 🔔 | **提醒铃** | 15 s 查询式调度（`remind_at <= now AND reminded_at IS NULL`），抗休眠补偿，±60 s 聚合、`reminded_at` 去重 |
 | 🎯 | **摸鱼菜单** | 暂停态右键数字 / 左键事项名唤出：一键「换个事项 + 定长」开倒计时；「其他事项」打完名字用滚轮定长 |
@@ -154,17 +188,27 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 
 ### 预编译包
 
-Releases 上有**两个早期版本**，都远早于当前主线 0.12.6（宿主命令数 68 → 95，功能差得多）：
+[![Latest release](https://img.shields.io/github/v/release/BigDog2712/Timing?label=下载&sort=semver)](https://github.com/BigDog2712/Timing/releases/latest)
 
-| 版本 | 产物 | 说明 |
-|---|---|---|
-| v0.5.0 | `Timing.exe` + `SHA256SUMS.txt` | 「品牌归位」版：产品名统一为 Timing，老数据自动复制迁移 |
-| v0.1.1 | `Timing-0.1.1-portable.exe` | 绿色版，双击即用，不写注册表 |
+当前主线 0.12.6 已出包，从 [Releases](https://github.com/BigDog2712/Timing/releases/latest) 下载：
 
-为什么有两个 0.x：`v0.5.0` 是私有仓时代的最后一个包，`v0.1.1` 是公开仓发布线的包 ——
-2026-11-13 两条历史已合并到本仓，两个 Release 与 tag 都保留着，一个都没删。
+| 产物 | 说明 |
+|---|---|
+| `Timing-0.12.6-setup.exe` | 安装版（NSIS，约 8 MB）。覆盖安装即可，老数据与卡片布局自动迁移 |
+| `Timing-0.12.6-portable.zip` | 绿色版，解压即用，数据在 `Timing.exe` 同级 `data\`，不写注册表 |
+| `SHA256SUMS-0.12.6.txt` | 两份产物的校验和；`BUILD-INFO-0.12.6.txt` 记录这包是哪个 commit 编的 |
 
-**当前主线 0.12.6 尚未出包**（0.12.1 是最近一次出包的桌面版，见 `release/`），要体验 0.12.6 的新功能请从源码构建（见下）。
+**要求 Windows 10 / 11 x64**，第一次启动需要 WebView2 运行时（Win11 自带，Win10 多数已装，
+没有的话安装器会引导）。安装包未做代码签名，SmartScreen 可能提示"未知发布者"——
+介意的话可以用便携版，或自行从源码构建核对。
+
+Release 里还留着两个早期包，都远早于 0.12.6（宿主命令数 68 → 109，功能差得多），
+只为历史可追溯，**不要从那里下载**：`v0.5.0`（「品牌归位」版，私有仓时代最后一个包）、
+`v0.1.1`（公开仓发布线的第一个包）。2026-11-13 两条历史已合并到本仓，两个 Release 与 tag
+都保留着，一个都没删。
+
+各版本改了什么见 [发布说明](release/RELEASE-NOTES.md)，逐条改动与踩坑见
+[`CHANGELOG.md`](CHANGELOG.md) / [`更新日志.md`](更新日志.md)。
 
 ### 从源码构建
 
