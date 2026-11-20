@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="src-tauri/icons/icon.png" width="96" height="96" alt="Timing">
+<img src="https://raw.githubusercontent.com/BigDog2712/Timing/master/src-tauri/icons/icon.png" width="96" height="96" alt="Timing">
 
 # Timing
 
@@ -58,6 +58,20 @@ downloaders, terminals and screenshot utilities **out of your time statistics**.
 `Timing-0.12.6-setup.exe` (installer) or `Timing-0.12.6-portable.zip` (no install,
 data stays next to the exe). Windows 10/11 x64, WebView2 required. Builds are
 unsigned, so SmartScreen may warn about an unknown publisher.
+
+### Install
+
+Windows 10/11 x64, WebView2 runtime required (bundled on Win11).
+
+1. Grab `Timing-0.12.6-setup.exe` from the [latest release](https://github.com/BigDog2712/Timing/releases/latest)
+   (adds tray menu + autostart), or `Timing-0.12.6-portable.zip` (no install, data lives in `data\`
+   next to the exe — copy the whole folder to move machines).
+2. Launch it. A pill appears at the screen edge; click the ring to start timing, click again to save.
+3. Click the icon on the pill to open the main window: a drag-and-resize card board with today's
+   time split, app ranking, timeline with to-dos, an item manager, trend, heatmap and reminders.
+
+Builds are unsigned, so SmartScreen may warn about an unknown publisher — verify against
+`SHA256SUMS-0.12.6.txt`, or build from source (see [从源码构建](#从源码构建)).
 
 MIT licensed. Issues and PRs are welcome.
 
@@ -177,12 +191,13 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 
 <p align="center"><em>药丸四态。等宽数字不抖动，暂停不换色，结束时按 绿 &gt; 红 &gt; 蓝 的优先级取色。</em></p>
 
-上面两张是**设计稿渲染图**（由 `preview/*.html` 截出），不是真机截图 —— 说清楚这点比放一张来路不明的图有用。可交互版本（下载后双击即开，零依赖）：
+可交互版本（下载后双击即开，零依赖，比看图片更能判断手感）：
 
 - [`preview/timing-desktop-features.html`](preview/timing-desktop-features.html) —— 桌面各功能页对照
 - [`preview/pill-preview.html`](preview/pill-preview.html) —— 药丸四态 / 展开面板 / 右键菜单
 
-> 真机截图仍缺：仓库里还没有跑起来的 App 截图。等出包时补，不拿设计稿冒充。
+> **这两张是设计稿渲染图**（由 `preview/*.html` 截出），不是真机截图 —— 标了 `v0.12`，
+> 早于当前 0.12.6 的卡片板改版。真机截图还没补：与其放一张来路不明的图，不如说清楚这件事。
 
 ## 安装
 
@@ -197,6 +212,9 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 | `Timing-0.12.6-setup.exe` | 安装版（NSIS，约 8 MB）。覆盖安装即可，老数据与卡片布局自动迁移 |
 | `Timing-0.12.6-portable.zip` | 绿色版，解压即用，数据在 `Timing.exe` 同级 `data\`，不写注册表 |
 | `SHA256SUMS-0.12.6.txt` | 两份产物的校验和；`BUILD-INFO-0.12.6.txt` 记录这包是哪个 commit 编的 |
+
+**装哪个**：想让它开机就在、托盘里有菜单 → 用 setup；不想动系统、想放 U 盘带走 →
+用 portable（数据跟着 exe 走，换机拷走整个目录即可）。
 
 **要求 Windows 10 / 11 x64**，第一次启动需要 WebView2 运行时（Win11 自带，Win10 多数已装，
 没有的话安装器会引导）。安装包未做代码签名，SmartScreen 可能提示"未知发布者"——
