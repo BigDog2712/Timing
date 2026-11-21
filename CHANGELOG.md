@@ -4,6 +4,193 @@
 **V0.11.33 起双轨**：桌面版号 = `scripts/platform-versions.json` 的 `desktop`（六处同步），
 手机版号 = 同文件的 `mobile`（`android-apk.mjs` 只读它）。两边互不牵连。
 
+## 0.12.10 — 右键圆环恢复结束，时间线卡只看今日 — 2026-11-21
+
+> 桌面 **0.12.9 → 0.12.10** / 手机 **0.12.13（12013）** 不动。
+> **零新增 IPC 命令**（宿主 109 / 活动窗 114 不变）、**零迁移**、**零后端改动**。
+
+### 一、悬浮框左侧小圆环右键「结束」失效（修复 = 恢复）
+
+病灶不是坏而是**没接线**：0.13.x 的 A4（`b52e347`）以防误触为由把
+`MainButton` 的 `onMenu` 从 PillBar 整体摘掉，「计时中右键圆环 = 结束并保存」
+从此什么都不做——主人报的"失效"就是这个。
+
+- **恢复**：计时中 / 暂停态右键圆环 = 直接结束并保存（`PillBar` 重新绑
+  `onMenu={status === 'idle' ? undefined : () => void actions.stop()}`）。
+  空闲态不绑——没有会话可结束。
+- **误触兜底不变**：`stop()` 自带撤销条（`beginUndo`）与"低于最短记录时长只弹提示"
+  两条回退路径，右键直达不牺牲可撤销性。
+- **计时小面板保留**：点数字 / 圆环上按 Enter 仍展开面板、面板内按钮仍带两步确认；
+  键盘直达（Enter=直接结束）不恢复。
+- **接线判据**：`ringStopWiring.source.test.ts` 照 `usePillAction.source.test.ts`
+  先例钉源码，谁再摘这条线先红。
+
+### 二、「今日时间线」卡删除「常用事项」显示
+
+主人口径：这张卡只回答"今天做了什么"，"还能做什么"归「事项管理」卡。
+
+- `TimelineZone` 下区的「常用事项」组整组下线（`allItems` / `itemTimer` props、
+  `renderGroupRow`、`pinned` 过滤一并退场）；时间线行（进行中 / 已暂停 / 已完成）
+  与「新建事项」「编辑事项」入口不受影响。
+- `TimelineTodosCard` 的 `itemTimer` prop 与 `TimelineTodosCardModel.items` 退场；
+  `DashboardCards` 的 `todayItems` 切片同步收窄。
+- 「事项管理」卡（`ManageCard` / `ItemsManageZone`）的常用事项组**不动**。
+- 旧判据 `TimelineCardR2.test.tsx` tc04c/tc04d 随组退场，换成
+  `tc04e_the_pinned_group_never_renders_anymore` 的反向判据。
+
+### 三、测试基建：vitest 换 `vmThreads` 池
+
+本机（Node 22.22.2）默认 forks 池下 292 个测试文件全灭——每个文件在首个
+`describe` 处抛 `Cannot read properties of undefined (reading 'config')`（worker
+运行时的 runner 状态没送达测试文件解析到的 vitest 模块实例）。`vitest.config.ts`
+切 `pool: 'vmThreads'`，逐文件隔离语义不变，全量 2269 条用例恢复全绿。
+
+### 四、devDependency
+
+- `vitest` 5.0.5 → 5.1.1（随环境修复一并落定，行为判据零改动）。
+
+## 0.12.9 — AI 打标先问本地记忆，命中就不调模型 — 2026-11-21
+
+> 桌面 **0.12.8 → 0.12.9** / 手机 **0.12.13（12013）** 不动。
+> **零新增 IPC 命令**（宿主 109 / 活动窗 114 不变）、**零迁移**、**零后端改动**：
+> 全部在渲染层，跑的是本地已有的 `items.tags` 与 `app_category`。
+
+### 一、病灶：重复的事每次都在花钱重问
+
+0.12.8 解决的是"模型看不见历史"，代价是每次点击仍然要把几十个对象连同历史例子
+一起发出去。可用户的时间线里重复度极高 —— 「写周报」每周一次、同一批 exe 天天在用。
+这些不是"需要判断"的事，是"已经定过"的事；再问一遍模型只会更慢、更贵，
+还可能换来一个近义词。
+
+### 二、三级短路（`aiMemory.ts` 的 `resolveLocally`）
+
+| 层 | 条件 | 结果 |
+|---|---|---|
+| L0 | 归一化后与历史**完全同名** | 直接采纳，score = 1 |
+| L1 | Dice 相似度 ≥ 0.55 且领先「另一个答案」≥ 0.12 | 直接采纳，标 `similar` |
+| — | 以上都不满足 | 进 `pending`，照旧问模型 |
+
+命中项**仍然进预览清单、仍然可勾掉**，不是静默写入 —— 短路省的是 token，
+不是用户的确认权。
+
+### 三、两条硬约束，都是"宁可漏"
+
+1. **已有标签的一律不短路**。`AiAutoTagButton` 的语义是"重新判断已有标签"，
+   替用户把旧值固定住，等于让 AI 永远改不掉一个错标签。这条也保证了
+   `ItemsAiTagButton「只补空白」` 与 `AiAutoTagButton「全量重判」` 两套口径不互相污染。
+2. **记忆有分歧时不替用户选**。同名却被标过两种标签（用户改过口径）、或两条同样像的
+   历史给出不同答案时，`margin` 挡不住就交回模型。同标签的多条历史**不算**分歧 ——
+   用户反复用同一个标签是更强的证据。
+
+### 四、为什么短路用 Dice，而不用现成的 `textSimilarity`
+
+`textSimilarity` 是 Jaccard（分母取两侧较大者），挑例子时用它是对的：宁可多给几条
+让模型自己判断。但短路要把标签**直接写进库**，Jaccard 会系统性地漏掉包含关系：
+
+| 一对 | Jaccard | Dice | 该不该命中 |
+|---|---|---|---|
+| 健身 / 健身打卡 | 0.41 | 0.58 | 该（同一件事） |
+| 行测刷题 / 行测刷题第3套 | 0.53 | 0.69 | 该 |
+| 读日记 / 读书笔记 | 0.23 | 0.26 | 不该 |
+| 看剧 / 看电影 | 0.15 | 0.18 | 不该 |
+
+短串被长串完整包含，本身就说明是同一件事。所以新增 `diceSimilarity` 专供短路，
+`textSimilarity` 原样保留给例子检索 —— 两把尺子对应两种代价不对称的用途。
+
+### 五、接到五个入口
+
+- 批量：`AiAutoTagButton`（应用 + 事项全量重判）、`ItemsAiTagButton`（只补空白）；
+- 单条：`ItemTagField`（分析窗事项编辑）、`PanelTagField`（药丸快捷添加）、
+  `ItemsPrefsTags`（事项管理），仅在**这条还没有标签**时试。
+
+批量预览里会标出「N 条来自本地记忆」并在行尾注明 `· 记忆`，用户能直接看到
+这一轮省掉了多少调用。
+
+### 六、验证
+
+```
+vitest（全量）            291 文件 / 2267 用例 passed（比 0.12.8 多 11 条）
+新增「短路」9 条单测      含分歧保护、已有标签不短路、不重不漏
+新增集成 2 条             ia07（事项）/ c10（应用）：断言模型**没有被调用**
+```
+
+后端未改动，`cargo test` 与 0.12.8 同一结果。
+
+### 七、仍未做
+
+token 用量与反馈闭环。前者的根因仍在 `client.rs`（`response.usage` 被丢弃），
+需要 `ai_usage` 表 + 两条命令；后者需要 `ai_feedback(suggested, final)` 表 ——
+那张表才是"采纳率"这个质量指标的唯一来源，也是下一步"同 exe 直接命中"的依据。
+本版只是把**确定性**那部分先省下来，不改变任何记账与学习机制。
+
+## 0.12.8 — AI 打标带上用户自己的记忆 — 2026-11-21
+
+> 桌面 **0.12.7 → 0.12.8** / 手机 **0.12.13（12013）** 不动。
+> **零新增 IPC 命令**（宿主 109 / 活动窗 114 不变）、**零迁移**：只扩了
+> `ai_suggest_tags` 的请求体，三个字段全部可选（旧客户端不传仍照常解析）。
+
+### 一、病灶：模型既看不见历史，也看不见"这条已经有什么"
+
+- 请求体过去只有 `{id, text}` 与候选 `{label}`。用户两年的打标习惯（`items.tags`、
+  应用 override）一个字节都没进提示词，模型只能拿常识猜。
+- `AiAutoTagButton` 的 `toAiTarget` 把 `existing` 丢在了 UI 层：批量入口的语义是
+  "重新判断已有标签"，而模型收到的却是一个全新对象 —— 它把 `工作/周报` 换成
+  自己造的 `工作/报告` 并不是错，是**没人告诉它已经这么写了**。
+- 候选表是 200 条平铺 label，没有频次也没有层级，模型分不清哪个是用户的口径。
+
+### 二、三个可选字段（`models/ai.rs`）
+
+| 字段 | 含义 | 谁给 |
+|---|---|---|
+| `targets[].existing` | 这条对象当前的标签 | 前端（各入口本来就有） |
+| `candidates[].used` | 该路径在用户数据里出现几次 | `buildTagCandidates` 计数 |
+| `examples[]` | 相似历史条目的「名字 → 标签」 | 本地检索（见第三节） |
+
+- 后端只做裁剪与拼装：例子最多 **12** 条、每条例子的标签最多 **8** 个、文本 200 字
+  （`suggest.rs` 的 `MAX_EXAMPLES` / `MAX_EXAMPLE_TAGS`），空字段不写进载荷 ——
+  `"existing":[]` 这种占位只会稀释模型的注意力。
+- 分批时 `examples` 跟着每一批走（`suggest_in_batches`）：漏了它，第 2 批开始模型
+  就退回"只看名字猜"。
+
+### 三、提示词：记忆优先于常识（`prompt.rs`）
+
+- 新增字段说明 + 第 1 条规则「复用用户的口径」：`examples` 照抄、`existing` 仍说得通
+  就保留、`used` 高的优先复用。原有五条（候选优先 / 应用看用途 / 事项建两级 /
+  上限 / 只输出 JSON）逐字保留。
+- 测试钉的是**行为**而不是文案：`prompt_carries_memory_fields_only_when_present`
+  （有才给、空不占位）与 `system_prompt_tells_the_model_to_prefer_the_users_own_history`
+  （三个字段都要解释、必须写成"优先于常识判断"）。
+
+### 四、相似历史检索：本地算，不上向量
+
+- 两窗各一份 `aiMemory`（`activity/features/data/services/aiMemory.ts` 与
+  `timing/services/aiMemory.ts`，L9 不允许互相 import）：0.55 × bigram + 0.45 × 单字
+  的 Jaccard。**只用 bigram 时 `写月报` / `写周报` 的交集是 0** —— 改一个字换掉两个
+  bigram，而那恰恰是最该命中的一对；掺单字后共享 {写, 报} 能过 0.18 阈值，
+  `行测刷题` / `看剧` 仍然为 0。
+- 排序按相似度降序、同分保持输入顺序（调用方按"最近用过"传入）；低于阈值的
+  一条都不给 —— 不相关的历史比没有历史更容易带偏。
+- 不引 embedding：中文事项名大多 2–8 个字，几何特征够用；embedding 要么加几十 MB
+  本地模型，要么每次调 API，把"省钱"又还回去了。
+
+### 五、接线（六个调用点）
+
+- `AiAutoTagButton`：`toAiTarget` 带上 `existing`；候选经 `buildTagCandidates` 带 `used`。
+- `ItemsAiTagButton`：只收空白事项，`examples` 取"已打过标的事项"（同树命名习惯）。
+- `ItemTagField`（分析窗）与 `PanelTagField`（药丸）：单条新建最缺上下文，点 AI 时
+  本地读一次 `items + item_tags` 取最像的几条；读失败按"没有历史"处理，不挡建议。
+- `ItemsPrefsTags`：编辑时把 `existing`（当前标签）一起发。
+- **`AiCategorySuggestButton` 未动**：它发的是"分类 key"而不是标签路径，把
+  `AppClassification` 的 tags 填进 `existing` 会让模型照抄一个不在候选表里的值。
+  等分类与标签两套口径合并时再改。
+
+### 六、验证
+
+- `cargo test services::ai`：**39 通过**（新增 examples 裁剪、载荷字段、提示词纪律）。
+- `aiMemory.test.ts`：**10 条**（相似度、排序、阈值、上限、去重、排除待判项）。
+- 全量 `vitest`：**2256 通过**（`AiAutoTagButton` / `ItemsPrefsMenu` 的断言按新字段更新）。
+- `check:size` 未新增超限文件（冻结基线 44 条）；`check:layers` 10 条全绿。
+
 ## 0.12.7 — 大窗体验收敛与时间线 / 快捷新建优化 — 2026-11-20
 
 > 桌面 **0.12.6 → 0.12.7** / 手机 **0.12.13（12013）** 不动。

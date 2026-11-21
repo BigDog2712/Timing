@@ -205,7 +205,7 @@ Timing 的答案是把它缩到最小、并且把数据交还给你：
 
 [![Latest release](https://img.shields.io/github/v/release/BigDog2712/Timing?label=下载&sort=semver)](https://github.com/BigDog2712/Timing/releases/latest)
 
-当前主线 0.12.7 已出包，从 [Releases](https://github.com/BigDog2712/Timing/releases/latest) 下载：
+当前主线 0.12.10（最近一个**已出包**的版本是 0.12.7），从 [Releases](https://github.com/BigDog2712/Timing/releases/latest) 下载：
 
 | 产物 | 说明 |
 |---|---|
@@ -389,7 +389,7 @@ restriction lint 在 `Cargo.toml` 里开着（本地看得见），而 `--all-ta
 
 ## 版本
 
-桌面 **0.12.7**，Tauri 移动端 **0.12.13**；`android-app/` 里那份原生 Kotlin 实现已归档，冻结在 **0.3.6**。
+桌面 **0.12.10**，Tauri 移动端 **0.12.13**；`android-app/` 里那份原生 Kotlin 实现已归档，冻结在 **0.3.6**。
 
 版本号是单一真源：`scripts/platform-versions.json` 定义两端号，桌面六处基线
 （`package.json` · `package-lock.json` ×2 · `Cargo.toml` · `Cargo.lock` · `tauri.conf.json`）
