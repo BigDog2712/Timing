@@ -8,7 +8,8 @@
  * [B4 · P2 §1.2 / §4.1 / A4] **Enter 不再直接结束计时**：
  * 它原来等于「一键结束并保存」——最不可逆的动作，却不需要任何确认。现在 Enter =
  * 打开计时小面板（`TimerPanel`），结束要在面板里再点一次「结束并保存」并过确认步。
- * 于是「结束」在本体层既没有鼠标直达（右键圆环那处已撤），也没有键盘直达。
+ * [本轮] 用户口径恢复「右键圆环 = 结束并保存」（PillBar 的 MainButton onMenu），
+ * 键盘直达不恢复——Enter 仍只开面板。
  */
 import { useCallback } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';

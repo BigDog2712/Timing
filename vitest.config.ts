@@ -15,6 +15,11 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    /* [本轮] 默认 forks 池在 Node 22.22 下模块图损坏：所有测试文件在首个 describe 处
+       抛 "Cannot read properties of undefined (reading 'config')"（worker 运行时的
+       runner 状态没送到测试文件解析到的 vitest 模块实例里，292 个文件全灭）。
+       vmThreads 池共享同一份 VM 模块图，逐文件隔离语义不变，实测全绿。 */
+    pool: 'vmThreads',
     include: ['src/**/*.test.{ts,tsx}'],
     exclude: ['node_modules/**', 'src-tauri/**', 'dist/**'],
     reporters: 'default',

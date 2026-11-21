@@ -113,8 +113,9 @@ interface MainButtonProps {
   warn?: boolean;
   /**
    * [V0.2.6] 右键（对齐 Timing v1.7.3 的 Zone.Ring / OnRingRight）：
-   * 通用右键入口。按定时器状态绑定动作——但**不能再绑 `timer.stop`**：
-   * [B4 · P2 §1.2 / A4] 不可逆动作不许有本体层直达入口，结束只在计时小面板里。
+   * 通用右键入口，动作由调用方按定时器状态绑定。
+   * [本轮] 用户口径：恢复「计时中右键圆环 = 结束并保存」（A4 曾撤，主人要回来；
+   * 撤销条兜底误触）。计时小面板的确认按钮仍是另一条路，两条并存。
    */
   onMenu?: (pos: { x: number; y: number }) => void;
 }

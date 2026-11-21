@@ -39,7 +39,6 @@ vi.mock("../../../platform/desktop/hostSettingsGateway.ts", () => ({ getSettings
 
 import { LocaleProvider } from "../../../shared/i18n/LocaleContext.tsx";
 import { resolveLocaleActivation } from "../../../shared/i18n/runtime.ts";
-import type { TimingItem } from "../../../platform/persistence/timingReadRepository.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
 import TimelineZone from "./TimelineZone.tsx";
 import type { TodayItemRow } from "../hooks/useTodayItems.ts";
@@ -212,51 +211,14 @@ describe("下区 · 总计读数与入口（V-1.6a → [0.13.x] 恢复新建/编
   });
 });
 
-describe("下区 · 常用事项（历史事项组已下线）", () => {
-  function timingItem(id: number, name: string, over: Partial<TimingItem> = {}): TimingItem {
-    return {
-      id, name, color: "", isSystem: false, isPinned: false, sortOrder: 0, updatedAt: 0,
-      categoryKey: null, ...over,
-    };
-  }
-
-  async function mountGroups() {
-    const toggleItem = vi.fn();
-    await resolveAndMount(createElement(TimelineZone, {
-      items: [itemRow()],
-      total: itemRow().value,
-      status: "ready",
-      onRetry: () => undefined,
-      allItems: [
-        timingItem(21, "常用的事", { isPinned: true, sortOrder: 1 }),
-        timingItem(22, "近期的事", { updatedAt: 20 }),
-        /* 今天已经计时的事（11）不该在组里再出现一次 */
-        timingItem(11, "事项 A", { isPinned: true, sortOrder: 2 }),
-      ],
-      itemTimer: { status: "idle", sessionItemId: null, toggleItem },
-    }));
-    return toggleItem;
-  }
-
-  it("tc04c_the_groups_list_items_without_a_row_today", async () => {
-    await mountGroups();
-    const pinned = container?.querySelector('[data-group="pinned"]')?.textContent ?? "";
-    expect(pinned).toContain(COPY.itemsPinnedGroup);
-    expect(pinned).toContain("常用的事");
-    /* [2026-11-20] 「历史事项」组整组下线：近期但今天没计时的事项归「事项管理」卡，
-       这张卡上再出现一次，用户就分不清该在哪张卡上找它 */
-    expect(container?.querySelector('[data-group="recent"]'), "历史事项组又长回来了").toBeNull();
-    expect(container?.textContent ?? "").not.toContain("近期的事");
-    /* 同一件事在卡上出现两次：行里一次、组里又一次（判"今天计时过的不进组"） */
-    expect(pinned).not.toContain("事项 A");
-  });
-
-  it("tc04d_clicking_a_group_row_starts_that_item", async () => {
-    const toggleItem = await mountGroups();
-    const row = Array.from(container?.querySelectorAll<HTMLButtonElement>(".at-items-row-main") ?? [])
-      .find((button) => (button.textContent ?? "").trim() === "常用的事");
-    act(() => { row?.click(); });
-    expect(toggleItem).toHaveBeenCalledWith(21, "常用的事");
+describe("下区 · 常用事项组下线（[本轮] 主人口径）", () => {
+  /* [本轮] 「常用事项」组整组下线：这张卡只回答“今天做了什么”，一键起停归「事项管理」卡。
+     旧判据（tc04c/tc04d 钉组内行与点击起停）随组一起退场。 */
+  it("tc04e_the_pinned_group_never_renders_anymore", async () => {
+    await mount([itemRow()]);
+    expect(container?.querySelector('[data-group="pinned"]'), "常用事项组又长回来了").toBeNull();
+    expect(container?.querySelector(".at-items-group"), "任何事项分组都不许出现在时间线卡上").toBeNull();
+    expect(container?.querySelector(".at-items-row-main"), "组行起停按钮又长回来了").toBeNull();
   });
 });
 

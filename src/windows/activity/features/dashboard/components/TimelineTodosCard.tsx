@@ -30,7 +30,6 @@ import type { ReactNode } from "react";
 
 import { useLocale } from "../../../shared/i18n/index.ts";
 import { DASHBOARD_COPY } from "../copy.ts";
-import type { ItemTimerToggle } from "../hooks/useItemTimerToggle.ts";
 import type { TodayItemsState } from "../hooks/useTodayItems.ts";
 import type { TodayTodosState } from "../hooks/useTodayTodos.ts";
 import { useBoardInstance, withInstance } from "../layout/instanceContext.ts";
@@ -41,10 +40,11 @@ import TodosZone from "./TodosZone.tsx";
  * 本卡用到的今日事项切片。
  *
  * 前四项是下区的骨架（行 / 总计 / 四态）；后三项是 [0.13.x] 恢复的「新建 / 编辑事项」
- * 与「常用 / 历史」分组所需 —— 都做成可选：卡片单测与孤立渲染只传前四项，逐字不变。
+ * 所需 —— 都做成可选：卡片单测与孤立渲染只传前四项，逐字不变。
+ * [本轮] `items` 从切片里退场：「常用事项」组已从时间线卡下线（归「事项管理」卡）。
  */
 export type TimelineTodosCardModel = Pick<TodayItemsState, "rows" | "total" | "status" | "retry"> &
-  Partial<Pick<TodayItemsState, "items" | "applyLocalRename" | "applyLocalCreate">>;
+  Partial<Pick<TodayItemsState, "applyLocalRename" | "applyLocalCreate">>;
 
 interface Props {
   /** 卡头标题（`displayTitle(card, cardLabels)` 的结果：改名后跟着变） */
@@ -57,8 +57,6 @@ interface Props {
   todosModel: TodayTodosState;
   /** E3：快照刷新失败（卡内小图标） */
   refreshError: boolean;
-  /** [0.13.x] 「常用 / 历史」组内行点击起停；缺省 = 空实现（单测里点了不发意图） */
-  itemTimer?: ItemTimerToggle;
 }
 
 export default function TimelineTodosCard({
@@ -67,7 +65,6 @@ export default function TimelineTodosCard({
   todayItems,
   todosModel,
   refreshError,
-  itemTimer,
 }: Props) {
   const copy = DASHBOARD_COPY[useLocale()];
   const domId = withInstance("t-timeline-todos-card", useBoardInstance());
@@ -87,8 +84,6 @@ export default function TimelineTodosCard({
           total={todayItems.total}
           status={todayItems.status}
           onRetry={todayItems.retry}
-          allItems={todayItems.items}
-          itemTimer={itemTimer}
           onLocalRename={todayItems.applyLocalRename}
           onLocalCreate={todayItems.applyLocalCreate}
         />

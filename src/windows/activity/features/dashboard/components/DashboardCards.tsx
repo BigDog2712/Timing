@@ -42,10 +42,11 @@ interface CardProps {
   todosModel: TodayTodosState;
   notesModel: TodayNotesState;
   /** [0.12.6] 今日时间线卡 / 事项管理卡共用的今日事项切片
-   *  （[0.13.x] 时间线卡还要 `items` 画常用 / 历史两组 + 两个本地回执接新建 / 编辑） */
+   *  （[0.13.x] 时间线卡还要两个本地回执接新建 / 编辑；[本轮] `items` 不再需要 ——
+   *  时间线卡的「常用事项」组已下线） */
   todayItems: Pick<
     TodayItemsState,
-    "rows" | "items" | "total" | "status" | "retry" | "applyLocalRename" | "applyLocalCreate"
+    "rows" | "total" | "status" | "retry" | "applyLocalRename" | "applyLocalCreate"
   >;
   snapshotProps: { status: DashboardReadState["status"]; refreshError: boolean; onRetry: () => void };
   /** [0.12.6 · T4] 事项管理卡的对外动作：行点击起停（`useItemTimerToggle`）+ 提示条出口 */
@@ -116,7 +117,6 @@ export function buildCardBody(card: BoardCard, label: string, props: CardProps):
           todayItems={props.todayItems}
           todosModel={props.todosModel}
           refreshError={props.refreshError}
-          itemTimer={props.itemActions.itemTimer}
         />
       );
     case "manage":

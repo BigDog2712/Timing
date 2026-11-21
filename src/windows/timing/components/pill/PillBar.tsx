@@ -167,10 +167,10 @@ export function PillBar() {
     pauseAndOpenMoyu();
   }, [armedSec, currentItemId, status, beginCreate, pauseAndOpenMoyu]);
 
-  /* [V0.2.6] Zone.Time 左键：
-     · 计时中 / 暂停 = **展开计时小面板**（[B4 · P2 §1.2 / A4]「结束并保存」只在那里面）；
-     · 空闲 = 正计时 ⇄ 倒计时切换（对齐 ToggleCountdownMode：切到倒计时用「默认倒计时时长」，再点回正计时）。
-     原先计时中点数字=暂停、右键圆环/Enter=直接结束，都属于「不可逆动作放在本体层单击直达」，已按 A4 撤掉。 */
+  /* [V0.2.6] Zone.Time 左键：计时中 / 暂停 = **展开计时小面板**；
+     空闲 = 正计时 ⇄ 倒计时切换（对齐 ToggleCountdownMode：切到倒计时用「默认倒计时时长」，再点回正计时）。
+     [V0.3.8→本轮] 原先计时中点数字=暂停、Enter=直接结束已按 A4 撤掉；右键圆环=结束并保存
+     按用户口径恢复（见下方 MainButton 的 onMenu）。 */
   const onTimeClick = useCallback(() => {
     if (status !== 'idle') {
       openPanel('timer');
@@ -246,9 +246,10 @@ export function PillBar() {
         countdown={isCountdown || armedIdle}
         progress={isCountdown && session?.targetSec ? remaining / session.targetSec : 1}
         warn={nearEnd}
-        /* [B4 · P2 §1.2 / A4] 原先「计时中右键圆环 = 结束并保存」在这里。
-           它是最不可逆的动作（`timer.stop` 标了 irreversible）却占本体层单击直达，
-           已撤掉：结束只剩面板内带确认的按钮；右键圆环现在什么也不做。 */
+        /* [本轮] 用户口径：恢复「计时中右键圆环 = 结束并保存」（A4 曾以防误触为由撤掉，
+           主人反馈这是失效，要回来）。误触有回退路径：stop() 失败/成功都走撤销条（beginUndo），
+           低于最短记录时长只弹提示；空闲态不绑（没有会话可结束）。 */
+        onMenu={status === 'idle' ? undefined : () => void actions.stop()}
       />
       <TimerDisplay
         seconds={displaySec}

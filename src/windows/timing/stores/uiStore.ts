@@ -12,7 +12,8 @@ export type PanelKind = 'none' | 'create' | 'records' | 'digest' | 'timer';
 /* [0.12.1 T04b] 原 `'settings'` 已从联合类型里删掉：药丸内联设置面板下线后，药丸里
    再没有任何一支渲染它（设置只有一个家 = 分析窗的 settings 视图）。 */
 /* [B4 · P2 §1.2 / A4] `'timer'` = 计时小面板：点计时数字（或圆环上按 Enter）展开，
-   **「结束并保存」只在这里**——不可逆动作从本体层的单击直达降级为面板内带确认的按钮。 */
+   面板内带确认步的「结束并保存」按钮。[本轮] 用户口径恢复了右键圆环直达结束
+   （带撤销条兜底），但键盘直达不恢复——Enter 仍只开这个面板。 */
 
 export interface Notice {
   text: string;
