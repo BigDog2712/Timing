@@ -1,19 +1,22 @@
 use super::*;
-use crate::models::ai::{AiTagCandidate, AiTagMode, AiTagSuggestion, AiTagTarget};
+use crate::models::ai::{AiTagCandidate, AiTagExample, AiTagMode, AiTagSuggestion, AiTagTarget};
 
 fn candidates() -> Vec<AiTagCandidate> {
     vec![
         AiTagCandidate {
             key: "study".into(),
             label: "学习".into(),
+            used: 12,
         },
         AiTagCandidate {
             key: "custom:category_a".into(),
             label: "学习/考公".into(),
+            used: 8,
         },
         AiTagCandidate {
             key: "fun".into(),
             label: "娱乐".into(),
+            used: 3,
         },
     ]
 }
@@ -23,16 +26,26 @@ fn targets() -> Vec<AiTagTarget> {
         AiTagTarget {
             id: "3".into(),
             text: "行测刷题".into(),
+            existing: vec!["学习/考公".into()],
         },
         AiTagTarget {
             id: "4".into(),
             text: "看剧".into(),
+            existing: Vec::new(),
         },
         AiTagTarget {
             id: "5".into(),
             text: "发呆".into(),
+            existing: Vec::new(),
         },
     ]
+}
+
+fn examples() -> Vec<AiTagExample> {
+    vec![AiTagExample {
+        text: "写周报".into(),
+        tags: vec!["工作/周报".into()],
+    }]
 }
 
 #[test]
@@ -119,10 +132,66 @@ fn prompt_never_contains_candidate_keys() {
         mode: AiTagMode::Item,
         targets: targets(),
         candidates: candidates(),
+        examples: Vec::new(),
     };
     let prompt = suggest_prompt(&request, 3);
     assert!(prompt.contains("学习/考公"));
     assert!(!prompt.contains("custom:category_a"));
+}
+
+#[test]
+fn prompt_carries_memory_fields_only_when_present() {
+    /* 记忆三件套（examples / existing / used）必须真的出现在载荷里 —— 这一版的
+       "更懂用户"全靠它们。反过来，空记忆不许占位：`"existing":[]` 只会稀释注意力。 */
+    let request = AiSuggestRequest {
+        mode: AiTagMode::Item,
+        targets: targets(),
+        candidates: candidates(),
+        examples: examples(),
+    };
+    let prompt = suggest_prompt(&request, 3);
+    assert!(prompt.contains("\"examples\""));
+    assert!(prompt.contains("写周报"));
+    assert!(prompt.contains("\"existing\":[\"学习/考公\"]"));
+    assert!(prompt.contains("\"used\":12"));
+    /* 第二条没有 existing，它的载荷里不该出现这个键（第一条有，所以按 id 段落切） */
+    let second = prompt
+        .split("\"id\":\"4\"")
+        .nth(1)
+        .expect("第二条 target 在载荷里");
+    assert!(!second.contains("existing"));
+
+    let bare = AiSuggestRequest {
+        mode: AiTagMode::Item,
+        targets: vec![AiTagTarget {
+            id: "9".into(),
+            text: "新事项".into(),
+            existing: Vec::new(),
+        }],
+        candidates: Vec::new(),
+        examples: Vec::new(),
+    };
+    let bare_prompt = suggest_prompt(&bare, 3);
+    assert!(!bare_prompt.contains("\"examples\""));
+    assert!(!bare_prompt.contains("existing"));
+}
+
+#[test]
+fn system_prompt_tells_the_model_to_prefer_the_users_own_history() {
+    /* 三个字段与三条纪律缺一不可：只把记忆塞进载荷、不告诉模型"它优先"，
+       模型照样会按自己的常识把 `工作/周报` 改成 `工作/报告`。 */
+    for field in ["examples", "existing", "used"] {
+        assert!(
+            SYSTEM_SUGGEST.contains(field),
+            "提示词必须解释输入字段 {field} 的含义"
+        );
+    }
+    assert!(SYSTEM_SUGGEST.contains("照抄"));
+    assert!(SYSTEM_SUGGEST.contains("近义词"));
+    assert!(
+        SYSTEM_SUGGEST.contains("优先于你的常识判断"),
+        "记忆优先必须写成一句话，而不是散在三条规则里"
+    );
 }
 
 #[test]

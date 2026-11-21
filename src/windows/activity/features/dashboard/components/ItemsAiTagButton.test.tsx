@@ -251,4 +251,21 @@ describe("AI 一键分类 · 只补空白（P0-6）", () => {
     expect(h.aiSuggestTags).not.toHaveBeenCalled();
     expect(toasts.map((entry) => entry.text)).toEqual(["未配置 AI，去设置"]);
   });
+
+  it("ia07_a_memory_hit_skips_the_model_entirely", async () => {
+    /* 库里已有「写周报 → 工作/周报」，待判的只多一个年份后缀。这类重复动作不该花钱：
+       本地记忆直接给答案，仍然进预览、仍然可勾掉（不静默写入）。 */
+    h.listTimingItemTags.mockResolvedValue([{ itemId: 1, tags: ["工作/周报"] }]);
+    await mount([item(1, "写周报"), item(2, "写周报2024")]);
+
+    await act(async () => { aiButton()?.click(); });
+    await flush();
+
+    expect(h.aiSuggestTags, "记忆命中却仍然调了模型").not.toHaveBeenCalled();
+    expect(dialogRows()).toHaveLength(1);
+    expect(dialogRows()[0]?.querySelector(".at-tag-chip")?.textContent).toBe("#工作/周报");
+    expect(document.body.textContent).toContain("1 条来自本地记忆");
+    /* 没调模型不等于失败：不该冒出一条"AI 没有给出建议" */
+    expect(toasts.map((entry) => entry.text)).not.toContain("AI 没有给出可用的标签建议");
+  });
 });

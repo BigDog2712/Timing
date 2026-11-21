@@ -241,6 +241,30 @@ export function ItemsPage() {
 
       <section className="m-section">
         <header className="m-section__head">
+          <h2 className="m-section__title">事项管理</h2>
+          <span className="m-section__meta">{items.length} 项 · 点开编辑</span>
+        </header>
+        {items.length === 0 ? (
+          <p className="m-empty">还没有事项。去「计时」页换事项并新建。</p>
+        ) : (
+          <ul className="m-list">
+            {items.map((item) => {
+              const active = session != null && session.itemId === item.id;
+              return (
+                <li key={item.id}>
+                  <button type="button" className="m-list__row" onClick={() => openSheet({ kind: 'itemMenu', itemId: item.id })}>
+                    <span className="m-list__name">{item.name}</span>
+                    <span className="m-section__meta">{active ? (timerStatus === 'paused' ? '已暂停' : '计时中') : item.isPinned ? '常用' : ''}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="m-section">
+        <header className="m-section__head">
           <h2 className="m-section__title">已完成待办</h2>
           <button type="button" className="m-link" onClick={() => useMobileUiStore.getState().setTab('records')}>
             看全部

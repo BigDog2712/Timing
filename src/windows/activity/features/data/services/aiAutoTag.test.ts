@@ -40,7 +40,10 @@ describe("候选表", () => {
     expect(candidates.map((candidate) => candidate.label)).toEqual(["学习/考公", "娱乐"]);
     /* key 与 label 逐字相同：后端按 label 折回 key，两者不一致就会出现
        "模型照抄了 label，解析却按 key 找不到" → 全部判为未知标签。 */
-    expect(candidates[0]).toEqual({ key: "学习/考公", label: "学习/考公" });
+    expect(candidates[0]).toEqual({ key: "学习/考公", label: "学习/考公", used: 3 });
+    /* `used` 是"这个路径在输入里出现几次"：尾斜杠归一后与正主算同一条，
+       所以是 3 而不是 2 —— 它给模型的是"这条路径有多常用"的先验。 */
+    expect(candidates[1]?.used).toBe(1);
   });
 
   it("a02_caps_at_the_backend_limit_instead_of_letting_the_request_fail", () => {

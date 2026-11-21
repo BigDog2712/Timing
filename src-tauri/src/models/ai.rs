@@ -13,7 +13,6 @@
 
 use serde::{Deserialize, Serialize};
 
-#[allow(dead_code)]
 fn is_zero(value: &usize) -> bool {
     *value == 0
 }
@@ -106,6 +105,14 @@ pub struct AiTagTarget {
     pub id: String,
     /// 给模型看的文本：事项名，或「应用名 / exe」。
     pub text: String,
+    /// 这条对象**当前已有的标签**（应用 = override.tags，事项 = items.tags）。
+    ///
+    /// 为什么必须进提示词：分析窗的批量入口语义是「重新判断已有标签」，而旧前端只把
+    /// `existing` 留在 UI 上做 chip 比对，发请求时丢掉了 —— 模型看到的是一个"全新对象"，
+    /// 于是把用户手填的 `工作/周报` 换成它自己造的 `工作/报告`。用户侧体感就是
+    /// "AI 老是改我的标签"。这里给默认空数组：老客户端不传也照常解析。
+    #[serde(default)]
+    pub existing: Vec<String>,
 }
 
 /// 候选标签。`key` 是前端落库用的键（事项模式 = 标签路径，应用模式 = 分类键），
@@ -115,6 +122,26 @@ pub struct AiTagTarget {
 pub struct AiTagCandidate {
     pub key: String,
     pub label: String,
+    /// 这个标签在用户已有数据里出现的次数（标签定义 + 挂着的引用）。
+    ///
+    /// 只用来给模型一个「哪个是常用路径」的先验：`工作/周报` 用过 20 次、
+    /// `工作/汇报` 用过 1 次时，前者才是用户的口径。解析层完全不用它，
+    /// 0 不序列化 —— 老客户端不传时提示词里也不会多出 `used:0` 的噪声。
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub used: usize,
+}
+
+/// 一条「用户过去怎么打标」的例子，作为 few-shot 记忆喂给模型。
+///
+/// 与 `targets` 的区别是**不带 id**：例子只读、不参与回传校验，模型照抄它的标签
+/// 也要经过候选表/白名单那一层，抄错不会写进库。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiTagExample {
+    /// 过去那条对象的文本（事项名 / 「应用名 / exe」）。
+    pub text: String,
+    /// 用户最终给它定的标签（候选表里的 label 形态）。
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -123,6 +150,10 @@ pub struct AiSuggestRequest {
     pub mode: AiTagMode,
     pub targets: Vec<AiTagTarget>,
     pub candidates: Vec<AiTagCandidate>,
+    /// 相似历史条目：由前端在本地检索后给出（后端不查库，避免为了几条例子
+    /// 去跨业务库/活动库拼两套读模型）。后端只负责裁剪与拼进提示词。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub examples: Vec<AiTagExample>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

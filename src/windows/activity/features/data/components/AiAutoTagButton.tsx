@@ -33,7 +33,7 @@ import { useMemo, useState } from "react";
 
 import QuietButton from "../../../shared/components/QuietButton.tsx";
 import QuietDialog from "../../../shared/components/QuietDialog.tsx";
-import type { AiTagCandidate, AiSuggestResponse } from "../../../shared/types/ai.ts";
+import type { AiTagCandidate, AiTagSuggestion, AiSuggestResponse } from "../../../shared/types/ai.ts";
 import { aiConfigGet, aiSuggestTags } from "../../../platform/desktop/hostAiGateway.ts";
 import { listTagDefinitions } from "../../../platform/persistence/tagAdminGateway.ts";
 import {
@@ -42,6 +42,7 @@ import {
 } from "../../../platform/persistence/timingReadRepository.ts";
 import { AppClassification } from "../../../shared/classification/appClassification.ts";
 import { ClassificationService } from "../../classification/services/classificationService.ts";
+import { itemMemoryEntries, resolveLocally, type LocalHint, type MemoryEntry } from "../services/aiMemory.ts";
 import {
   buildApplyPlan,
   buildTagCandidates,
@@ -71,8 +72,16 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** 发给模型的形状。`existing` 必须带上：不带的话"重新判断"就是盲判，
+ *  模型会把你手填的 `工作/周报` 换成它自己造的近义词。 */
 function toAiTarget(target: AutoTagTarget) {
-  return { id: target.id, text: target.text };
+  return { id: target.id, text: target.text, existing: target.existing };
+}
+
+/** 本地命中的结论伪装成模型建议：后面的合并、预览、写入走同一条路，
+ *  用户看到的仍是「逐条可摘」的清单，而不是静默写入。 */
+function toSuggestion(hint: LocalHint): AiTagSuggestion {
+  return { id: hint.id, tags: hint.tags };
 }
 
 /** 应用侧目标：先用分类页那份应用目录（**全部见过的应用**，不受数据页时间范围影响）。 */
@@ -116,6 +125,8 @@ export default function AiAutoTagButton({ onApplied, onNotice }: Props) {
   const [busy, setBusy] = useState(false);
   const [rows, setRows] = useState<AutoTagRow[] | null>(null);
   const [skipped, setSkipped] = useState(0);
+  /** 哪些行来自本地记忆（`kind:id`）：用来在预览里标出来源，也用来统计省下的调用。 */
+  const [memoryKeys, setMemoryKeys] = useState<Set<string>>(new Set());
   const [selection, setSelection] = useState<Record<string, string[]>>({});
   const [newTags, setNewTags] = useState<string[]>([]);
 
@@ -130,6 +141,7 @@ export default function AiAutoTagButton({ onApplied, onNotice }: Props) {
     setSelection({});
     setNewTags([]);
     setSkipped(0);
+    setMemoryKeys(new Set());
   };
 
   const suggest = async () => {
@@ -153,6 +165,33 @@ export default function AiAutoTagButton({ onApplied, onNotice }: Props) {
           text: item.name,
           existing: tagsByItem.get(item.id) ?? [],
         }));
+
+      /* ── 本地短路（0.12.9）───────────────────────────────────────────────
+         库里历史已经能回答的那部分，不再问模型：同一个 exe 天天在用、同一类事项
+         反复出现，它们的标签是"已经定过的事"，重问只会更慢更贵、还可能换成近义词。
+
+         两条硬约束：
+           1. **已有标签的一律不短路** —— 这个按钮的语义是"重新判断"，替他固定旧值
+              等于让 AI 永远改不掉一个错标签；
+           2. 记忆有分歧时不短路（`resolveLocally` 里按 margin 挡掉）。
+         命中项仍然进预览清单、仍然可摘，只是不花 token —— 不静默写入。 */
+      const memoryEntries: MemoryEntry[] = [
+        ...appTargets
+          .filter((target) => target.existing.length > 0)
+          .map((target) => ({ text: target.name, tags: target.existing })),
+        ...itemMemoryEntries(items, tagsByItem),
+      ];
+      /* 应用侧拿纯名字去比，不拿「名字 / exe」整串：exe 后缀会拉低所有相似度，
+         让本该命中的老条目全部落选。 */
+      const appLocal = resolveLocally(
+        appTargets.map((target) => ({ id: target.id, text: target.name, existing: target.existing })),
+        memoryEntries,
+      );
+      const itemLocal = resolveLocally(itemTargets, memoryEntries);
+      const appAsking = new Set(appLocal.pending);
+      const itemAsking = new Set(itemLocal.pending);
+      const appToAsk = appTargets.filter((target) => appAsking.has(target.id));
+      const itemToAsk = itemTargets.filter((target) => itemAsking.has(target.id));
 
       const candidates: AiTagCandidate[] = buildTagCandidates([
         ...definitions,
@@ -189,30 +228,33 @@ export default function AiAutoTagButton({ onApplied, onNotice }: Props) {
       let sideErrors: string[] = [];
       /* 两侧各自受设置里的开关管（后端也会拒），所以只跑开着的那一侧——
          两开关都关着时**不报错**，只提示去哪里开：这不是 bug，是用户的选择。
-         一侧失败**不丢另一侧**：网络抖一下就让整批白跑，用户只会再点一次再等一遍。 */
-      if (appTagsEnabled && appTargets.length > 0) {
+         一侧失败**不丢另一侧**：网络抖一下就让整批白跑，用户只会再点一次再等一遍。
+         发出去的只有 `appToAsk` / `itemToAsk`：本地记忆已经答过的那些不进请求体。 */
+      if (appTagsEnabled && appToAsk.length > 0) {
         try {
           appResponse = await aiSuggestTags({
             mode: "app",
-            targets: appTargets.map(toAiTarget),
+            targets: appToAsk.map(toAiTarget),
             candidates,
           });
         } catch (error) {
           sideErrors = [...sideErrors, `应用侧失败：${message(error)}`];
         }
       }
-      if (itemTagsEnabled && itemTargets.length > 0) {
+      if (itemTagsEnabled && itemToAsk.length > 0) {
         try {
           itemResponse = await aiSuggestTags({
             mode: "item",
-            targets: itemTargets.map(toAiTarget),
+            targets: itemToAsk.map(toAiTarget),
             candidates,
           });
         } catch (error) {
           sideErrors = [...sideErrors, `事项侧失败：${message(error)}`];
         }
       }
-      if (!appResponse && !itemResponse) {
+      const localHits = appLocal.hints.length + itemLocal.hints.length;
+      /* 全部命中本地记忆时两侧都不会发请求，那不是失败 —— 那一批本来就不该花钱。 */
+      if (!appResponse && !itemResponse && localHits === 0) {
         onNotice?.(
           sideErrors.length > 0
             ? sideErrors.join("；")
@@ -222,9 +264,17 @@ export default function AiAutoTagButton({ onApplied, onNotice }: Props) {
         return;
       }
 
+      /* 本地结论与模型结论走同一条合并路径：用户看到的仍是逐条可摘的清单，
+         只是其中几行的来源是记忆而不是模型。 */
       const merged = [
-        ...(appResponse ? mergeSuggestions(appTargets, appResponse.suggestions) : []),
-        ...(itemResponse ? mergeSuggestions(itemTargets, itemResponse.suggestions) : []),
+        ...mergeSuggestions(appTargets, [
+          ...appLocal.hints.map(toSuggestion),
+          ...(appResponse?.suggestions ?? []),
+        ]),
+        ...mergeSuggestions(itemTargets, [
+          ...itemLocal.hints.map(toSuggestion),
+          ...(itemResponse?.suggestions ?? []),
+        ]),
       ];
       const visible = visibleRows(merged);
       const failures = (appResponse?.stats.failedBatches ?? 0) + (itemResponse?.stats.failedBatches ?? 0);
@@ -238,6 +288,10 @@ export default function AiAutoTagButton({ onApplied, onNotice }: Props) {
 
       setRows(visible);
       setSkipped(merged.length - visible.length);
+      setMemoryKeys(new Set([
+        ...appLocal.hints.map((hint) => `app:${hint.id}`),
+        ...itemLocal.hints.map((hint) => `item:${hint.id}`),
+      ]));
       setNewTags(collectCreatedTags([appResponse, itemResponse].filter((row): row is AiSuggestResponse => row !== null)));
       setSelection(Object.fromEntries(visible.map((row) => [rowKey(row), defaultSelection(row)])));
       if (failures > 0) onNotice?.(`部分建议生成失败（${failures} 批），已保留成功结果`, "error");
@@ -303,6 +357,11 @@ export default function AiAutoTagButton({ onApplied, onNotice }: Props) {
       >
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 at-text-caption text-[var(--at-text-secondary)]">
           <span>建议写入：{counts.apps} 个应用 · {counts.items} 个事项</span>
+          {memoryKeys.size > 0 ? (
+            <span className="text-[var(--at-text-tertiary)]">
+              其中 {memoryKeys.size} 条来自本地记忆，未调用模型
+            </span>
+          ) : null}
           {skipped > 0 ? (
             <span className="text-[var(--at-text-tertiary)]">
               另有 {skipped} 个对象 AI 没给出标签，保持不动
@@ -326,6 +385,7 @@ export default function AiAutoTagButton({ onApplied, onNotice }: Props) {
                   </span>
                   <span className="shrink-0 at-text-caption text-[var(--at-text-tertiary)]">
                     {row.kind === "app" ? "应用" : "事项"}
+                    {memoryKeys.has(key) ? " · 记忆" : ""}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1">

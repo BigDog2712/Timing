@@ -192,7 +192,13 @@ describe('常用事项 · 多标签编辑', () => {
       await act(async () => { await Promise.resolve(); });
     }
     expect(h.aiApi.suggestTags).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: 'item', targets: [{ id: 'current', text: '写周报' }] }),
+      /* [0.12.8] 编辑时把**当前**标签一起发：不带的话"重新判断"是盲判，
+         模型会把用户刚选的标签换成自己造的近义词。这条用例先把 chip 点空了，
+         所以 existing 是空数组 —— 关键是字段在，而不是值。 */
+      expect.objectContaining({
+        mode: 'item',
+        targets: [{ id: 'current', text: '写周报', existing: [] }],
+      }),
     );
     expect(h.tagApi.set).not.toHaveBeenCalled();
     expect(tagChips().map((chip) => chip.textContent ?? '').join(' ')).toContain('#娱乐');

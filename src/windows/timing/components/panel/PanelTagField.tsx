@@ -11,7 +11,8 @@
  */
 import { useId, useState } from 'react';
 
-import { aiApi, tagApi } from '../../services/api';
+import { aiApi, itemApi, tagApi } from '../../services/api';
+import { itemMemoryEntries, pickExamples, resolveLocally } from '../../services/aiMemory';
 import { normalizeTagPath } from '../../../shared/tags/normalize';
 
 const MAX_TAGS = 8;
@@ -64,10 +65,38 @@ export function PanelTagField({ value, options, disabled, onChange, onHint, sugg
     onHint('');
     void (async () => {
       try {
+        const text = suggestText?.trim() || draft.trim() || '新事项';
+        /* 药丸侧没有现成的历史表：读一次事项与标签，把最像的几条当例子。
+           两条都是本地 SQLite 读，读失败按"没有历史"处理，不挡建议。 */
+        const [tagRows, items] = await Promise.all([
+          tagApi.list().catch(() => []),
+          itemApi.list().catch(() => []),
+        ]);
+        const tagsByItem = new Map(tagRows.map((row) => [row.itemId, row.tags]));
+        const entries = itemMemoryEntries(items, tagsByItem);
+
+        /* 先问记忆，再问模型：药丸快捷新建的事项多数是重复动作（"写周报"每周一次），
+           记忆里有同名/极相似的历史就直接填，0 延迟不花钱，而且是用户自己的口径。
+           已有标签时不短路（交回模型重判）—— 约束在 `resolveLocally` 里。 */
+        const local = resolveLocally([{ id: 'current', text, existing: [...value] }], entries);
+        const hit = local.hints[0];
+        if (hit) {
+          const next = [...value];
+          for (const tag of hit.tags) if (!next.includes(tag)) next.push(tag);
+          if (next.length === value.length) {
+            onHint('AI 没有给出更合适的标签');
+            return;
+          }
+          onChange(next.slice(0, MAX_TAGS));
+          onHint(`按记忆填入 ${hit.tags.join('、')}（没调用模型）`);
+          return;
+        }
+
         const response = await aiApi.suggestTags({
           mode: 'item',
-          targets: [{ id: 'current', text: suggestText?.trim() || draft.trim() || '新事项' }],
+          targets: [{ id: 'current', text, existing: [...value] }],
           candidates: options.slice(0, 200).map((tag) => ({ key: tag, label: tag })),
+          examples: pickExamples([text], entries),
         });
         const next = [...value];
         for (const tag of response.suggestions[0]?.tags ?? []) {

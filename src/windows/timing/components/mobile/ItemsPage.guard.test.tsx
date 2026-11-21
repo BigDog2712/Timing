@@ -182,6 +182,17 @@ afterEach(async () => {
   container?.remove();
 });
 
+describe('事项管理入口', () => {
+  it('点事项行打开统一事项编辑 Sheet，不直接开始计时', async () => {
+    const el = await mount();
+    const row = Array.from(el.querySelectorAll('.m-list__row')).find((button) => button.textContent?.includes(ITEM.name));
+    await click(row);
+
+    expect(useMobileUiStore.getState().sheet).toEqual({ kind: 'itemMenu', itemId: ITEM.id });
+    expect(timerApi.start).not.toHaveBeenCalled();
+  });
+});
+
 describe('锁得住（P2-1 / P2-12）', () => {
   it('同一同步块里连点两次 → 只发一条 todo_start（useRef 同步写入，不靠闭包快照）', async () => {
     const { release } = hangStart();

@@ -170,6 +170,8 @@ export interface TimelineManageCopy {
   itemsAiTagResult: (written: number, skipped: number) => string;
   /** 预览层里"AI 也没想法"的那些：不占列表，只报条数 */
   itemsAiTagSkippedRows: (count: number) => string;
+  /** 预览层里"本地记忆直接给出答案"的那些：说明这几条没花 token */
+  itemsAiTagMemory: (count: number) => string;
   /** 整体撤销（只保留最近一次，撤销后按钮消失） */
   itemsAiTagUndo: string;
   /**
@@ -258,6 +260,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsAiTagResult: (written, skipped) =>
       skipped > 0 ? `已写入 ${written} 条，跳过 ${skipped} 条` : `已写入 ${written} 条`,
     itemsAiTagSkippedRows: (count) => `另有 ${count} 条 AI 没给出建议，保持不动`,
+    itemsAiTagMemory: (count) => `其中 ${count} 条来自本地记忆，没调用模型`,
     itemsAiTagUndo: "撤销本次分类",
     itemsAiTagUndoHint: "撤销本次分类（会清空这批事项的标签）",
     itemsAiTagUndone: (count) => `已撤销 ${count} 条分类`,
@@ -338,6 +341,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsAiTagResult: (written, skipped) =>
       skipped > 0 ? `Wrote ${written}, skipped ${skipped}` : `Wrote ${written}`,
     itemsAiTagSkippedRows: (count) => `${count} more got no suggestion and stay untouched`,
+    itemsAiTagMemory: (count) => `${count} came from local memory, no model call`,
     itemsAiTagUndo: "Undo this tagging",
     itemsAiTagUndoHint: "Undo this tagging (clears the tags on these items)",
     itemsAiTagUndone: (count) => `Undid ${count} taggings`,
@@ -418,6 +422,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsAiTagResult: (written, skipped) =>
       skipped > 0 ? `Записано ${written}, пропущено ${skipped}` : `Записано ${written}`,
     itemsAiTagSkippedRows: (count) => `Ещё ${count} без предложений, остаются как есть`,
+    itemsAiTagMemory: (count) => `${count} из локальной памяти, без вызова модели`,
     itemsAiTagUndo: "Отменить эту разметку",
     itemsAiTagUndoHint: "Отменить эту разметку (очистит теги у этих пунктов)",
     itemsAiTagUndone: (count) => `Отменено разметок: ${count}`,
@@ -498,6 +503,7 @@ export const TIMELINE_MANAGE_COPY: Record<Locale, TimelineManageCopy> = {
     itemsAiTagResult: (written, skipped) =>
       skipped > 0 ? `Escritos ${written}, omitidos ${skipped}` : `Escritos ${written}`,
     itemsAiTagSkippedRows: (count) => `Otros ${count} sin sugerencia se quedan igual`,
+    itemsAiTagMemory: (count) => `${count} desde la memoria local, sin llamar al modelo`,
     itemsAiTagUndo: "Deshacer esta clasificación",
     itemsAiTagUndoHint: "Deshacer esta clasificación (borra las etiquetas de estos elementos)",
     itemsAiTagUndone: (count) => `Clasificaciones deshechas: ${count}`,

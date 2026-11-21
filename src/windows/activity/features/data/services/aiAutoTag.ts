@@ -58,10 +58,14 @@ function canonicalKey(path: string): string {
  *
  * 为什么不用"标签树里的一级节点"当候选：模型更擅长匹配具体路径（`学习/考公`），
  * 只给一级会让它每次都在"新建"和"选父级"之间摇摆，产出比给全量路径更散。
+ *
+ * 同时统计 `used`（同一路径在输入里出现几次 ≈ 有多少条对象在用它）。这是给模型的
+ * 先验：`工作/周报` 用过 20 次、`工作/汇报` 用过 1 次时，前者才是用户的口径，
+ * 不该被新建的近义路径顶掉。0.12.8 起 `definitions` 也各算一次 —— 它表示"这个标签
+ * 在树里存在"，与"有对象在挂它"合起来才是完整的存在感。
  */
 export function buildTagCandidates(paths: Iterable<string>): AiTagCandidate[] {
-  const seen = new Set<string>();
-  const out: AiTagCandidate[] = [];
+  const counts = new Map<string, { path: string; count: number }>();
   for (const raw of paths) {
     let path: string;
     try {
@@ -71,12 +75,21 @@ export function buildTagCandidates(paths: Iterable<string>): AiTagCandidate[] {
     }
     if (!path) continue;
     const key = canonicalKey(path);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ key: path, label: path });
+    const row = counts.get(key);
+    if (row) {
+      row.count += 1;
+      continue;
+    }
+    counts.set(key, { path, count: 1 });
   }
-  out.sort((left, right) => left.label.localeCompare(right.label, "zh-CN"));
-  return out.slice(0, MAX_CANDIDATES);
+  /* 先按使用次数截断、再按拼音排：反过来的话，截断点会按字母序切掉一堆常用标签，
+     模型的候选表里就只剩 `Z` 开头的冷门路径。顺序只影响展示，`used` 才是信号。 */
+  const ranked = [...counts.values()].sort(
+    (left, right) => right.count - left.count || left.path.localeCompare(right.path, "zh-CN"),
+  );
+  return ranked.slice(0, MAX_CANDIDATES)
+    .map((row) => ({ key: row.path, label: row.path, used: row.count }))
+    .sort((left, right) => left.label.localeCompare(right.label, "zh-CN"));
 }
 
 /** 归一 + 去重 + 限量。坏路径跳过（它是"这一条脏"，不是"整批失败"）。 */

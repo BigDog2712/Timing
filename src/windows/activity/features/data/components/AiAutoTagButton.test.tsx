@@ -160,13 +160,18 @@ describe("AI 自动打标签 · 接线", () => {
     expect(itemCall.mode).toBe("item");
     /* 应用侧文本是「名字 / exe」：中文名往往就是标签语义，exe 兜住同名的不同程序。
        顺序按累计时长倒序（steam 900s > code 120s）—— 后端每 40 个一批顺序发，
-       常用的先出结果，别让"最常用的那个"排在第八批。 */
+       常用的先出结果，别让"最常用的那个"排在第八批。
+       `existing` 也必须一起发（[0.12.8]）：不带的话"重新判断"就是盲判，
+       模型会把用户手填的标签换成自己造的近义词。 */
     expect(appCall.targets).toEqual([
-      { id: "steam.exe", text: "Steam / steam.exe" },
-      { id: "code.exe", text: "VS Code / code.exe" },
+      { id: "steam.exe", text: "Steam / steam.exe", existing: [] },
+      { id: "code.exe", text: "VS Code / code.exe", existing: [] },
     ]);
-    /* 系统项「未归类」不参与：给它打标签没有意义，写进去还会污染标签树 */
-    expect(itemCall.targets).toEqual([{ id: "7", text: "写周报" }]);
+    /* 系统项「未归类」不参与：给它打标签没有意义，写进去还会污染标签树。
+       事项 7 已有的「工作/日报」要原样进载荷，模型才知道该保留什么。 */
+    expect(itemCall.targets).toEqual([
+      { id: "7", text: "写周报", existing: ["工作/日报"] },
+    ]);
     /* 候选是「定义行 ∪ 事项标签 ∪ 应用标签」的并集 —— 少了任何一路，AI 就会去新建
        一个本来已经存在的标签 */
     expect(itemCall.candidates.map((candidate) => candidate.label)).toEqual(["工作", "工作/日报", "学习"]);
@@ -319,5 +324,28 @@ describe("AI 自动打标签 · 接线", () => {
     expect(dialog?.textContent).not.toContain("Steam");
     expect(g.notices.at(-1)?.text).toContain("应用侧失败");
     expect(g.notices.at(-1)?.text).toContain("频率限制");
+  });
+
+  it("c10_a_memory_hit_keeps_the_app_out_of_the_request", async () => {
+    /* 「VS Code 该归到哪」这件事库里已经有答案（挂在同名事项上）。新应用还没有标签，
+       但名字与记忆完全一致 —— 再问一遍模型只是更慢更贵、还可能换个近义词。
+       短路后仍然进预览、仍然可摘，不是静默写入。 */
+    g.apps = [{ exeName: "code.exe", appName: "VS Code", totalDuration: 100_000 }];
+    g.items = [{ id: 7, name: "VS Code", isSystem: false }];
+    g.itemTags = [{ itemId: 7, tags: ["工作/编程"] }];
+    g.appTags = {};
+    /* 只测应用侧：事项侧有一个已带标签的 VS Code，开着也只会多一次无关请求。 */
+    g.enabled = { enabled: true, appTagsEnabled: true, itemTagsEnabled: false };
+
+    await openPreview();
+
+    expect(g.suggest, "记忆命中却仍然调了模型").not.toHaveBeenCalled();
+    const dialog = document.querySelector('[role="dialog"]') ?? document.body;
+    const chips = Array.from(dialog.querySelectorAll<HTMLButtonElement>("button[aria-pressed]"));
+    expect(chips[0]?.textContent).toContain("#工作/编程");
+    expect(chips[0]?.getAttribute("aria-pressed")).toBe("true");
+    expect(dialog.textContent).toContain("1 条来自本地记忆");
+    /* 全部命中不是失败：不该报"AI 没有给出可用的标签建议" */
+    expect(g.notices.map((notice) => notice.text)).not.toContain("AI 没有给出可用的标签建议");
   });
 });

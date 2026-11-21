@@ -55,6 +55,7 @@ import {
   type AutoTagRow,
   type AutoTagTarget,
 } from "../../data/services/aiAutoTag.ts";
+import { itemMemoryEntries, pickExamples, resolveLocally } from "../../data/services/aiMemory.ts";
 import { applyItemAutoTags, persistNewTagDefinitions } from "../../data/services/aiAutoTagApply.ts";
 import { TIMELINE_MANAGE_COPY } from "../copyTimeline.ts";
 import type { ItemPrefsLike } from "../services/itemPrefs.ts";
@@ -92,6 +93,8 @@ export default function ItemsAiTagButton({ items, onApplied, onToast }: Props) {
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
   const [newTags, setNewTags] = useState<string[]>([]);
   const [skipped, setSkipped] = useState(0);
+  /** 本地记忆直接给出答案的条数（它们没有进请求体，也就没有花 token） */
+  const [memoryHits, setMemoryHits] = useState(0);
   const [undo, setUndo] = useState<UndoEntry[] | null>(null);
 
   /* 挂载时读一次：标签（算"哪些事项还没打标"）+ AI 配置（决定能不能点）。
@@ -147,6 +150,7 @@ export default function ItemsAiTagButton({ items, onApplied, onToast }: Props) {
     setExcluded(new Set());
     setNewTags([]);
     setSkipped(0);
+    setMemoryHits(0);
   };
 
   const suggest = async (): Promise<void> => {
@@ -180,12 +184,41 @@ export default function ItemsAiTagButton({ items, onApplied, onToast }: Props) {
         return;
       }
 
-      const response = await aiSuggestTags({
-        mode: "item",
-        targets: targets.map((target) => ({ id: target.id, text: target.text })),
-        candidates,
-      });
-      const merged = mergeSuggestions(targets, response.suggestions);
+      /* 记忆：本入口只收**空白事项**，所以"已打过标的事项"天然就是最好的例子 ——
+         它们与待判项同属一个事项树，命名习惯一致。`targets` 本身没有标签，不会被收进
+         记忆库，不必再传排除集。 */
+      const memoryEntries = itemMemoryEntries(items, byItem);
+
+      /* ── 本地短路（0.12.9）───────────────────────────────────────────────
+         这个入口只收 `existing: []` 的事项，正好是短路最安全的地方：没有旧标签要保，
+         命中直接用；判错的代价与"多调一次模型"同级（仍需用户在预览里确认）。
+         命中项照样进清单、照样能勾掉 —— 不是静默写入。 */
+      const local = resolveLocally(targets, memoryEntries);
+      const asking = new Set(local.pending);
+      const toAsk = targets.filter((target) => asking.has(target.id));
+
+      const response = toAsk.length > 0
+        ? await aiSuggestTags({
+          mode: "item",
+          targets: toAsk.map((target) => ({
+            id: target.id,
+            text: target.text,
+            /* 本入口只收空白事项，`existing` 恒为空数组 —— 仍然显式给，
+               是为了和"这条没有标签"与"我不知道它有没有"区分开（形状一致，语义明确）。 */
+            existing: target.existing,
+          })),
+          candidates,
+          /* 例子只从**真正要问的**那几条里挑：全量算一遍会把已短路的项也带进来，
+             白算，还可能挤掉更像的例子。 */
+          examples: pickExamples(toAsk.map((target) => target.text), memoryEntries),
+        })
+        : null;
+
+      /* 本地结论与模型结论走同一条合并路径：预览里仍是逐条清单，只是来源不同。 */
+      const merged = mergeSuggestions(targets, [
+        ...local.hints.map((hint) => ({ id: hint.id, tags: hint.tags })),
+        ...(response?.suggestions ?? []),
+      ]);
       const visible = visibleRows(merged);
       if (visible.length === 0) {
         onToast(copy.itemsAiTagNoSuggestion, "warning");
@@ -194,7 +227,8 @@ export default function ItemsAiTagButton({ items, onApplied, onToast }: Props) {
       setRows(visible);
       setExcluded(new Set());
       setSkipped(merged.length - visible.length);
-      setNewTags(collectCreatedTags([response]));
+      setMemoryHits(local.hints.length);
+      setNewTags(collectCreatedTags(response ? [response] : []));
     } catch (error) {
       /* AI 失败 / 超时：报错、原标签不变（这里根本没写），可重试，不产生半截数据 */
       onToast(message(error), "error");
@@ -317,6 +351,7 @@ export default function ItemsAiTagButton({ items, onApplied, onToast }: Props) {
       >
         <div className="at-items-ai-summary">
           <span>{copy.itemsAiTagApply(counts.items)}</span>
+          {memoryHits > 0 ? <span>{copy.itemsAiTagMemory(memoryHits)}</span> : null}
           {skipped > 0 ? <span>{copy.itemsAiTagSkippedRows(skipped)}</span> : null}
         </div>
         <ul className="at-items-ai-list">

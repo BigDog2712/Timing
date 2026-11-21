@@ -53,7 +53,7 @@ interface TabDef {
 
 const TABS: readonly TabDef[] = [
   { id: 'timer', label: '计时', sub: '点一下就开始', Icon: TimerIcon },
-  { id: 'items', label: '事项', sub: '待办与今日记录', Icon: ListIcon },
+  { id: 'items', label: '事项', sub: '今日时间线 · 事项管理', Icon: ListIcon },
   /* [0.13.3] 「应用使用」不再是独立页签：它并进了记录页（在总计卡下面）。
      底栏原本 6 格，再加就挤成图标条；而两块本来就是同一件事的两面。 */
   { id: 'records', label: '记录', sub: '时间都去哪儿了', Icon: ClockIcon },

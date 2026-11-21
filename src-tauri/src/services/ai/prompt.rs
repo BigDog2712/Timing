@@ -33,8 +33,12 @@ use crate::models::ai::{
 /// 加第七类时会漂移。
 pub const TAG_TOP_LEVELS: &[&str] = &["生活", "工作", "学习", "娱乐", "复盘", "工具"];
 
-/// 打标规则的三层结构（2026-11-20 升级，PRD §3.1）：
+/// 打标规则的三层结构（2026-11-20 升级，PRD §3.1；2026-11-21 追加「记忆优先」）：
 ///
+///   · **记忆优先** —— `examples` 是用户亲手定过的标签，`targets[].existing` 是这条
+///     对象现在的标签，`candidates[].used` 是各路径被用过的次数。三者构成"用户的口径"，
+///     优先于模型的常识判断。没有这一层时，模型会把 `工作/周报` 改成 `工作/报告`——
+///     它没错，只是不知道用户已经这么写了两年；
 ///   · **匹配优先** —— 候选里有原样的 label 就复用，绝不改写、绝不造同义词；
 ///   · **应用侧看用途** —— 判断依据是三样（名称 / exe / 用途简介），不是只看名字；
 ///     多功能软件可以给**多个**一级标签，游戏只给「娱乐」，下载器 / 终端 / 截图 /
@@ -46,14 +50,23 @@ pub const TAG_TOP_LEVELS: &[&str] = &["生活", "工作", "学习", "娱乐", "�
 /// （`parser.rs` 只认这个形状，改文案时容易顺手改坏）。
 pub const SYSTEM_SUGGEST: &str = r#"你是 Timing（本地计时应用）的标签分类器。
 
+输入字段的含义：
+- examples：用户过去亲手定过的标签（最可信的记忆）。
+- targets[].existing：这条对象**现在**已有的标签。
+- candidates[].used：该标签在用户数据里被用过的次数。
+
 规则：
-1. 先匹配候选标签：意思能对上就原样输出候选的 label（如 学习/考公），不要改写、不要另造同义词。
-2. 候选里确实没有合适的，才新建标签。新建必须满足：
+1. 复用用户的口径，这一条优先于你的常识判断：
+   - examples 里出现过的对象，标签照抄，不要换成同义写法；
+   - existing 里的标签只要仍然说得通就保留，不要用近义词替换；只有明显不对时才删掉；
+   - used 高的路径是用户常用的口径，优先复用，不要新建与它并列的近义路径。
+2. 再匹配候选标签：意思能对上就原样输出候选的 label（如 学习/考公），不要改写、不要另造同义词。
+3. 候选与记忆里确实都没有合适的，才新建标签。新建必须满足：
    - 一级只能是 生活 / 工作 / 学习 / 娱乐 / 复盘 / 工具 之一；
    - 最多两级，写成「父/子」（例：娱乐/燕云、学习/考公、工具/下载），不写 #、不写空格；
    - 同一意思只建一个，不要用近义词堆出多条；
    - 宁缺毋滥：拿不准就给空数组，不要为凑数建标签。
-3. 应用侧（object 是「应用使用记录」）：判断依据是「软件名称 + exe + 它的用途/简介」，
+4. 应用侧（object 是「应用使用记录」）：判断依据是「软件名称 + exe + 它的用途/简介」，
    不能只看名字；名字看不出用途时按 exe 与简介推断，还看不出就给空数组。
    - 一个应用按其真实用途可以给**多个**一级标签：浏览器这类一个软件身兼数职的，
      工作 / 生活 / 学习 / 娱乐 都该给（Chrome → 工作、生活、学习、娱乐）；
@@ -62,12 +75,12 @@ pub const SYSTEM_SUGGEST: &str = r#"你是 Timing（本地计时应用）的标�
    - 知识管理类可以同时是生活 / 学习 / 娱乐（Obsidian）；
    - 候选里已经有一级标签（生活 / 工作 / 学习 / 娱乐 / 复盘 / 工具）就直接复用那条 label，
      不要再新建成「工具/工具」这种与一级同名的子路径。
-4. 事项侧（object 是「事项」）：没打标的事项要自动建两级标签，「父/子」写成这件事的
+5. 事项侧（object 是「事项」）：没打标的事项要自动建两级标签，「父/子」写成这件事的
    归属与名字（吃饭 → 生活/吃饭，写周报 → 工作/周报）；先匹配候选里用户已有的标签，
    匹配得上就复用，保证同类事项稳定命中同一标签、不要来回漂移。
-5. 每个对象最多 maxTags 个标签，按相关度从高到低；相关度低的宁可不给。
-6. 对象自己的名字通常已经是同名标签（事项），不要再建议它。
-7. 只输出 JSON，不要 Markdown 代码块，不要解释。格式：
+6. 每个对象最多 maxTags 个标签，按相关度从高到低；相关度低的宁可不给。
+7. 对象自己的名字通常已经是同名标签（事项），不要再建议它。
+8. 只输出 JSON，不要 Markdown 代码块，不要解释。格式：
 {"suggestions":[{"id":"原样回传的 id","tags":["候选 label 或新建路径"]}]}
 "#;
 
@@ -85,23 +98,46 @@ pub fn suggest_prompt(req: &AiSuggestRequest, max: u8) -> String {
         AiTagMode::Item => "事项",
         AiTagMode::App => "应用使用记录",
     };
+    /* 三个可选字段都按「有才给」拼：空数组一并写进去会让载荷凭空长一截，
+       而模型的注意力是有限的 —— `"existing":[]` 这种条目只会稀释真正的信号。 */
     let candidates: Vec<Value> = req
         .candidates
         .iter()
-        .map(|candidate| json!({ "label": candidate.label }))
+        .map(|candidate| {
+            if candidate.used == 0 {
+                json!({ "label": candidate.label })
+            } else {
+                json!({ "label": candidate.label, "used": candidate.used })
+            }
+        })
         .collect();
     let targets: Vec<Value> = req
         .targets
         .iter()
-        .map(|target| json!({ "id": target.id, "text": target.text }))
+        .map(|target| {
+            if target.existing.is_empty() {
+                json!({ "id": target.id, "text": target.text })
+            } else {
+                json!({ "id": target.id, "text": target.text, "existing": target.existing })
+            }
+        })
         .collect();
-    json!({
+    let examples: Vec<Value> = req
+        .examples
+        .iter()
+        .map(|example| json!({ "text": example.text, "tags": example.tags }))
+        .collect();
+    let mut payload = json!({
         "object": object,
         "maxTags": max,
         "candidates": candidates,
         "targets": targets,
-    })
-    .to_string()
+    });
+    if !examples.is_empty() {
+        /* 只在真有记忆时才出现这个键：老提示词里没有它，模型也不会凭空引用。 */
+        payload["examples"] = Value::Array(examples);
+    }
+    payload.to_string()
 }
 
 /// 解析建议。返回顺序跟着 `targets`，空建议的条目被丢弃。

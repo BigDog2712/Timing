@@ -17,6 +17,11 @@ const MAX_CANDIDATES: usize = 200;
 /// 不裁剪就等于让一次点击决定 token 账单。
 const MAX_TARGET_TEXT: usize = 200;
 const MAX_CANDIDATE_LABEL: usize = 120;
+/// 记忆例子最多 12 条：`targets` 才是本次要判的东西，例子多了会抢注意力，
+/// 也把 token 花在「模型已经会的东西」上。检索排序在前端做，这里只认前 N 条。
+const MAX_EXAMPLES: usize = 12;
+/// 一条例子的标签上限，与 `MAX_TAGS_PER_TARGET` 同量级 —— 超出的部分用户也没真在用。
+const MAX_EXAMPLE_TAGS: usize = 8;
 
 pub async fn suggest(pool: &SqlitePool, request: AiSuggestRequest) -> AppResult<AiSuggestResponse> {
     let (config, key) = config::require_ready(pool).await?;
@@ -69,6 +74,9 @@ async fn suggest_in_batches(
             mode: request.mode,
             targets: targets.to_vec(),
             candidates: request.candidates.clone(),
+            /* 记忆要跟着每一批走：漏了它，第 2 批开始模型就退回"只看名字猜"。
+               克隆一份而不是借用，是因为 `suggest_batch` 拿到的是整份请求。 */
+            examples: request.examples.clone(),
         };
         match suggest_batch(chat, &batch_request, max_tags_per_target).await {
             Ok(response) => merge_batch_response(&mut merged, response),
@@ -153,9 +161,23 @@ fn prepare(mut request: AiSuggestRequest) -> AiSuggestRequest {
     request.candidates.truncate(MAX_CANDIDATES);
     for target in &mut request.targets {
         target.text = cap_chars(&target.text, MAX_TARGET_TEXT);
+        /* `existing` 也要裁：一条对象挂 30 个标签时，全量塞进去会挤掉别人。
+           保留前 N 个而不是按相关度挑 —— 标签顺序本身就有用户语义（先加的更重要）。 */
+        target.existing.truncate(MAX_EXAMPLE_TAGS);
+        for tag in &mut target.existing {
+            *tag = cap_chars(tag, MAX_CANDIDATE_LABEL);
+        }
     }
     for candidate in &mut request.candidates {
         candidate.label = cap_chars(&candidate.label, MAX_CANDIDATE_LABEL);
+    }
+    request.examples.truncate(MAX_EXAMPLES);
+    for example in &mut request.examples {
+        example.text = cap_chars(&example.text, MAX_TARGET_TEXT);
+        example.tags.truncate(MAX_EXAMPLE_TAGS);
+        for tag in &mut example.tags {
+            *tag = cap_chars(tag, MAX_CANDIDATE_LABEL);
+        }
     }
     request
 }
@@ -187,14 +209,17 @@ mod tests {
                 .map(|index| AiTagTarget {
                     id: index.to_string(),
                     text: "长".repeat(5000),
+                    existing: Vec::new(),
                 })
                 .collect(),
             candidates: (0..MAX_CANDIDATES + 10)
                 .map(|index| crate::models::ai::AiTagCandidate {
                     key: format!("k{index}"),
                     label: "标".repeat(5000),
+                    used: 0,
                 })
                 .collect(),
+            examples: Vec::new(),
         };
         let bounded = prepare(request);
         assert_eq!(bounded.targets.len(), MAX_TARGETS + 1);
@@ -205,6 +230,32 @@ mod tests {
             MAX_CANDIDATE_LABEL
         );
         assert_eq!(bounded.targets.chunks(MAX_TARGETS).count(), 2);
+    }
+
+    #[test]
+    fn prepare_caps_examples_and_each_examples_tags() {
+        /* 例子是"记忆"，不是"待判对象"：条数与标签数都必须有硬上限，
+           否则一个标签树很深的用户能把一次请求顶到几万 token。 */
+        let request = AiSuggestRequest {
+            mode: AiTagMode::Item,
+            targets: vec![AiTagTarget {
+                id: "1".to_string(),
+                text: "写周报".to_string(),
+                existing: (0..20).map(|index| format!("旧{index}")).collect(),
+            }],
+            candidates: Vec::new(),
+            examples: (0..MAX_EXAMPLES + 5)
+                .map(|index| crate::models::ai::AiTagExample {
+                    text: "例".repeat(5000),
+                    tags: (0..20).map(|tag| format!("标签{tag}")).collect(),
+                })
+                .collect(),
+        };
+        let bounded = prepare(request);
+        assert_eq!(bounded.examples.len(), MAX_EXAMPLES);
+        assert_eq!(bounded.examples[0].text.chars().count(), MAX_TARGET_TEXT);
+        assert_eq!(bounded.examples[0].tags.len(), MAX_EXAMPLE_TAGS);
+        assert_eq!(bounded.targets[0].existing.len(), MAX_EXAMPLE_TAGS);
     }
 
     #[test]
@@ -245,6 +296,7 @@ mod tests {
             .map(|index| AiTagTarget {
                 id: index.to_string(),
                 text: format!("target-{index}"),
+                existing: Vec::new(),
             })
             .collect();
         let batches: Vec<Vec<String>> = targets

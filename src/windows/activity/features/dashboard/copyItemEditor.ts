@@ -12,6 +12,8 @@ export interface ItemEditorCopy {
   tagInvalid: string;
   tagAiNone: string;
   tagAiCreated: (tags: string) => string;
+  /** 本地记忆直接命中（没调模型）：告诉用户这几个标签来自他以前打过的那条 */
+  tagAiMemory: (tags: string) => string;
   timerModeLabel: string;
   timerUp: string;
   timerDown: string;
@@ -34,6 +36,7 @@ export const ITEM_EDITOR_COPY: Record<Locale, ItemEditorCopy> = {
     tagInvalid: "标签不合法",
     tagAiNone: "AI 没有给出更合适的标签",
     tagAiCreated: (tags) => `AI 新建了 ${tags}`,
+    tagAiMemory: (tags) => `按记忆填入 ${tags}（没调用模型）`,
     timerModeLabel: "计时方式",
     timerUp: "正计时",
     timerDown: "倒计时",
@@ -54,6 +57,7 @@ export const ITEM_EDITOR_COPY: Record<Locale, ItemEditorCopy> = {
     tagInvalid: "Invalid tag",
     tagAiNone: "AI had no better tag",
     tagAiCreated: (tags) => `AI created ${tags}`,
+    tagAiMemory: (tags) => `Filled ${tags} from memory (no model call)`,
     timerModeLabel: "Timer",
     timerUp: "Count up",
     timerDown: "Count down",
@@ -74,6 +78,7 @@ export const ITEM_EDITOR_COPY: Record<Locale, ItemEditorCopy> = {
     tagInvalid: "Недопустимый тег",
     tagAiNone: "AI не предложил лучший тег",
     tagAiCreated: (tags) => `AI создал ${tags}`,
+    tagAiMemory: (tags) => `Заполнено из памяти: ${tags} (без вызова модели)`,
     timerModeLabel: "Режим",
     timerUp: "Прямой отсчёт",
     timerDown: "Обратный отсчёт",
@@ -94,6 +99,7 @@ export const ITEM_EDITOR_COPY: Record<Locale, ItemEditorCopy> = {
     tagInvalid: "Etiqueta no válida",
     tagAiNone: "La IA no propuso una etiqueta mejor",
     tagAiCreated: (tags) => `La IA creó ${tags}`,
+    tagAiMemory: (tags) => `Rellenado ${tags} desde la memoria (sin llamar al modelo)`,
     timerModeLabel: "Modo",
     timerUp: "Cronómetro",
     timerDown: "Cuenta atrás",

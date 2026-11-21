@@ -58,17 +58,32 @@ export type AiTagMode = 'item' | 'app';
 export interface AiTagTarget {
   id: string;
   text: string;
+  /**
+   * 这条对象当前已有的标签（应用 = override.tags，事项 = items.tags）。
+   * 省略等于「没有」；带上它模型才知道"重新判断"该保留什么。
+   */
+  existing?: string[];
 }
 
 export interface AiTagCandidate {
   key: string;
   label: string;
+  /** 该标签在用户数据里出现的次数；0/省略 = 不告诉模型频次 */
+  used?: number;
+}
+
+/** 一条「用户过去怎么打标」的例子，作为 few-shot 记忆喂给模型。 */
+export interface AiTagExample {
+  text: string;
+  tags: string[];
 }
 
 export interface AiSuggestRequest {
   mode: AiTagMode;
   targets: AiTagTarget[];
   candidates: AiTagCandidate[];
+  /** 相似历史条目；后端裁剪到 12 条后拼进提示词 */
+  examples?: AiTagExample[];
 }
 
 export interface AiTagSuggestion {

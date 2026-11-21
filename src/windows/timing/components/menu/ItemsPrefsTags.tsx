@@ -9,7 +9,8 @@
  */
 import { useState } from 'react';
 
-import { aiApi } from '../../services/api';
+import { aiApi, itemApi, tagApi } from '../../services/api';
+import { itemMemoryEntries, resolveLocally } from '../../services/aiMemory';
 import type { AiTagCandidate } from '../../types/domain/ai';
 
 interface ItemsPrefsTagsProps {
@@ -74,9 +75,35 @@ export function ItemsPrefsTags({
     setHint('');
     void (async () => {
       try {
+        const text = itemName.trim() || '未命名事项';
+
+        /* ── 先问记忆（0.12.9）──────────────────────────────────────────────
+           只在**这条还没有标签**时试：已有标签说明用户点的是"重判"，那是模型的活
+           （`resolveLocally` 对非空 existing 一律返回 pending）。
+           命中就 0 延迟给答案、不花 token；没命中才走下面的请求。 */
+        if (value.length === 0) {
+          const [tagRows, items] = await Promise.all([
+            tagApi.list().catch(() => []),
+            itemApi.list().catch(() => []),
+          ]);
+          const tagsByItem = new Map(tagRows.map((row) => [row.itemId, row.tags]));
+          const local = resolveLocally(
+            [{ id: 'current', text, existing: [] }],
+            itemMemoryEntries(items, tagsByItem),
+          );
+          const hit = local.hints[0];
+          if (hit) {
+            onChange(hit.tags.slice(0, MAX_TAGS));
+            setHint(`按记忆填入 ${hit.tags.join('、')}（没调用模型）`);
+            return;
+          }
+        }
+
         const rows = await aiApi.suggestTags({
           mode: 'item',
-          targets: [{ id: 'current', text: itemName.trim() || '未命名事项' }],
+          /* `existing` 是这条事项**当前**的标签：带上它，模型才不会把用户刚选的
+             `工作/周报` 换成它自己造的近义词（"重新判断"必须有依据）。 */
+          targets: [{ id: 'current', text, existing: [...value] }],
           candidates: candidates.slice(0, 200),
         });
         const next = [...value];

@@ -90,6 +90,7 @@ import '../styles/mobile/notes.css';
 import '../styles/mobile/name-stop.css';
 import '../styles/mobile/settings.css';
 import '../styles/mobile/sheets.css';
+import '../styles/mobile/item-edit.css';
 import App from './App';
 import { AppErrorBoundary, installGlobalErrorHooks } from '../components/ui/AppErrorBoundary';
 import { markWindowKind } from '../lib/window';
